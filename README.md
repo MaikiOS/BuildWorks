@@ -2,7 +2,7 @@
 
 **English** | [Русский](README_RU.md)
 
-> Alpha 0.19.33 for Valheim 1.0. Automated checks pass; the manual in-game validation of 0.19.33 is still in progress.
+> Alpha 0.19.37 source baseline for Valheim 1.0. Automated checks pass; English localization and the reported slanted-piece Q/E positioning are accepted in-game. Russian localization and the new nearby-target preview remain manual gates.
 
 ![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
 
@@ -31,25 +31,27 @@ flowchart LR
 - creating a blueprint from world pieces or from an empty document;
 - a dedicated editor with a catalog, camera, grid, object tree, and Undo/Redo;
 - precise translation, three-axis rotation, and uniform scaling;
+- persistent editor Q/E snap-mode feedback and visible nearby target points within 2 m, without changing the 0.55 m magnetic snap threshold;
 - groups, nesting, local group anchors, and a separate world anchor for the blueprint;
 - Array with line/plane layouts, Pack/Fit/exact spacing, rise, heading, pitch, roll, scale step, and symmetry;
 - Contour repetition of a selected piece or group along a connected chain;
 - F9 world editing for a piece or composite blueprint;
 - sequential construction of real pieces using normal Valheim resources, permissions, and restrictions.
+- English-first runtime localization with a complete Russian catalog.
 
-Full documentation: [features and interactions](docs/FEATURES.md), [controls](docs/CONTROLS.md), [installation](docs/INSTALL.md), and [roadmap](docs/ROADMAP.md).
+Full documentation: [features and interactions](docs/FEATURES.md), [controls](docs/CONTROLS.md), [architecture](docs/ARCHITECTURE.md), [localization](docs/LOCALIZATION.md), [installation](docs/INSTALL.md), and [roadmap](docs/ROADMAP.md).
 
 ## Alpha status
 
-Version 0.19.33 passes a Release build with zero errors and warnings, Geometry 104, Store, EditorBridge, WorldLayout, HostContract, and Unity Workbench 81/81. The latest snap-point, slope/roof/furniture contact, and initial Array-mode changes still require a manual smoke test in Valheim.
+Version 0.19.37 keeps the active editor Q/E snap mode visible in the footer and previews target points on nearby pieces within 2 m. The magnetic snap threshold remains 0.55 m. It passes a Release build with zero errors and warnings, 596 collision-free runtime tokens, isolated English/Russian registration, Geometry 104, Store, EditorBridge 3, WorldLayout 10, HostContract, and Unity Workbench 81/81. English localization and the reported slanted-piece positioning are accepted in-game; Russian localization and the target preview still require owner-run checks.
 
-See [the 0.19.33 status report](docs/ALPHA_0.19.33.md).
+See [the 0.19.37 status report](docs/ALPHA_0.19.37.md).
 
 ## License and pull requests
 
 BuildWorks is proprietary/source-available software, not open-source software. The official binaries may be installed for personal, non-commercial testing. You may inspect and fork the source solely to prepare a pull request. Reusing BuildWorks code or original materials in another project, redistributing them, or using them commercially requires prior written permission from the owner.
 
-See [LICENSE](LICENSE) for the complete terms and [CONTRIBUTING.md](CONTRIBUTING.md) to propose a change.
+See [LICENSE](LICENSE) for the governing terms, the [Russian convenience translation](LICENSE_RU.md), and [CONTRIBUTING.md](CONTRIBUTING.md) to propose a change.
 
 ## Dependencies
 

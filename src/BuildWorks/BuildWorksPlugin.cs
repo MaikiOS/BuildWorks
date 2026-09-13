@@ -10,12 +10,16 @@ using UnityEngine;
 
 namespace OstrixMods.BuildWorks
 {
+    /// <summary>
+    /// Composes the BepInEx lifecycle, Harmony host adapters, indexed Hammer,
+    /// Blueprint Editor, and world precision-placement session.
+    /// </summary>
     [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
     internal sealed class BuildWorksPlugin : BaseUnityPlugin
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.33";
+        internal const string PluginVersion = "0.19.37";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -88,6 +92,7 @@ namespace OstrixMods.BuildWorks
                 hammerCatalog = new UnifiedHammerCatalog(Logger);
                 placementInjectionInstalled = false;
                 harmony = Harmony.CreateAndPatchAll(typeof(BuildWorksPlugin).Assembly, PluginGuid);
+                BuildWorksLocalization.RegisterCurrent();
                 if (!placementInjectionInstalled)
                 {
                     throw new InvalidOperationException(
@@ -288,7 +293,9 @@ namespace OstrixMods.BuildWorks
                         current.ResolveBlueprintEditorName,
                         current.BlueprintEditorCatalogItems,
                         message => Logger.LogError(message),
-                        _ => current.RefreshBlueprintEditorLibrary());
+                        _ => current.RefreshBlueprintEditorLibrary(),
+                        initialPlacementSnapPointProvider:
+                            PrecisionPlacementSession.CurrentManualSnapPoint);
                     blueprintEditor.InterfaceScaleChanged += scale =>
                         InterfaceScalePercent.Value = Mathf.Clamp(
                             Mathf.RoundToInt(scale * 100f), 60, 140);
@@ -305,7 +312,7 @@ namespace OstrixMods.BuildWorks
                     Logger.LogError("BuildWorks blueprint editor did not open: " + error);
                     MessageHud.instance?.ShowMessage(
                         MessageHud.MessageType.Center,
-                        "BuildWorks: не удалось открыть редактор: " + error);
+                        BuildWorksLocalization.Text("editor.open_failed", error));
                 }
                 else blueprintEditor.SetUiScale(
                     Mathf.Clamp(InterfaceScalePercent.Value, 60, 140) / 100f);

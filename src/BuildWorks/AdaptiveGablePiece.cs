@@ -128,8 +128,8 @@ namespace OstrixMods.BuildWorks
             view.m_syncInitialScale = false;
 
             Piece piece = prefab.AddComponent<Piece>();
-            piece.m_name = "BuildWorks: адаптивная фронтонная панель";
-            piece.m_description = "Оригинальная изменяемая панель для сложных скатов.";
+            piece.m_name = BuildWorksLocalization.Token("adaptive_gable.name");
+            piece.m_description = BuildWorksLocalization.Token("adaptive_gable.description");
             piece.m_category = Piece.PieceCategory.BuildingWorkbench;
             piece.m_canRotate = true;
             piece.m_canBeRemoved = true;

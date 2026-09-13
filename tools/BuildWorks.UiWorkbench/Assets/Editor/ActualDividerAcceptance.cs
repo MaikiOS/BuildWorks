@@ -325,7 +325,8 @@ public static class ActualDividerAcceptance
             Require(beamPoints.Count >= 2 &&
                 Vector3.Distance(beamRoot.TransformPoint(beamPoints[0]), selectedPoint) < .001f,
                 "Q/E does not place the selected beam endpoint under the cursor");
-            Require(scene.PlacementSnapPointLabel(0).Contains("НИЗ"),
+            Require(scene.PlacementSnapPointLabel(0).Contains(
+                BuildWorksLocalization.Text("blueprint.snap.bottom")),
                 "Beam Q/E guidance does not identify its native lower endpoint");
             evidence.Add("PASS Q/E endpoint alignment and furniture fallback placement points.");
         }

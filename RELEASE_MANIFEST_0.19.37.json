@@ -1,0 +1,28 @@
+{
+  "name": "BuildWorks",
+  "version": "0.19.37",
+  "channel": "alpha",
+  "githubPrerelease": true,
+  "game": "Valheim 1.0",
+  "hostSteamBuild": "25185596",
+  "installedInIsolatedTestProfile": true,
+  "manualRuntimeSmoke": "partial",
+  "asset": {
+    "path": "release/BuildWorks-0.19.37-alpha.zip",
+    "bytes": 335837,
+    "sha256": "ED146FD05FE23346DC417950EAAD53464862F3496D0BBBBD279747F002470E0F"
+  },
+  "files": [
+    {
+      "path": "BepInEx/plugins/Ostrix-BuildWorks/BuildWorks.dll",
+      "fileVersion": "0.19.37.0",
+      "sha256": "3D32B505D6A522213414F2CEBADA27488D554FFC61F408D71C2D67AE79E9D009"
+    },
+    {
+      "path": "BepInEx/plugins/Ostrix-BuildWorks/BuildWorks.Geometry.dll",
+      "fileVersion": "0.1.0.0",
+      "sha256": "29746E620709B0964A6345613A8AA75C261B35D9C22887F5F67A0AF0877AAB82"
+    }
+  ],
+  "note": "English localization and the reported slanted-piece positioning are accepted. The 2 m target preview and Russian localization remain manual gates."
+}

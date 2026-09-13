@@ -100,6 +100,10 @@ namespace OstrixMods.BuildWorks
         }
     }
 
+    /// <summary>
+    /// Owns editor-only cameras, temporary piece instances, picking, surface
+    /// contact, snap candidates, and transform gizmo projection.
+    /// </summary>
     internal sealed class BlueprintEditorScene : IDisposable
     {
         private const float GroundExtent = 1000f;
@@ -108,6 +112,7 @@ namespace OstrixMods.BuildWorks
         private const float SnapReleaseScreenDistance = 78f;
         private const float SnapEdgeScreenDistance = 12f;
         private const float SnapPreviewScreenDistance = 120f;
+        private const float PlacementSnapPreviewRadius = 2f;
         private const int MaximumSnapPreviewTargets = 24;
         private const int MaximumNativeAnchors = 512;
 
@@ -191,8 +196,14 @@ namespace OstrixMods.BuildWorks
         private readonly TransformGizmoView gizmo;
         private readonly List<VisualNode> contourPreviews = new List<VisualNode>();
         private readonly List<VisualNode> duplicatePreviews = new List<VisualNode>();
+        private readonly List<Vector3> placementSnapPreviewTargets = new List<Vector3>();
+        private readonly List<bool> placementSnapPreviewNative = new List<bool>();
         private VisualNode placementPreview;
         internal Vector3? PlacementSnapTarget { get; private set; }
+        internal IReadOnlyList<Vector3> PlacementSnapPreviewTargets =>
+            placementSnapPreviewTargets;
+        internal IReadOnlyList<bool> PlacementSnapPreviewNative =>
+            placementSnapPreviewNative;
         private BlueprintEditorRenderIsolation renderIsolation;
         private BlueprintEditorLightingPreset lightingPreset;
         private string hoveredId;
@@ -508,12 +519,12 @@ namespace OstrixMods.BuildWorks
             if (!TryPickPoint(
                 screenPosition, includeLocked: true, out string seedId, out _))
             {
-                warning = "Наведи курсор на деталь опорной цепи или кольца.";
+                warning = BuildWorksLocalization.Text("blueprint.scene.chain_aim");
                 return false;
             }
             if (document.IsPartSelected(seedId))
             {
-                warning = "Выбери опору, а не исходную деталь.";
+                warning = BuildWorksLocalization.Text("blueprint.scene.choose_support");
                 return false;
             }
 
@@ -523,7 +534,7 @@ namespace OstrixMods.BuildWorks
                     seedVisual, screenPosition, out Edge3 selectedEdge,
                     out Vector3 pathPointLocal))
             {
-                warning = "У выбранного ребра нет пары штатных точек соединения.";
+                warning = BuildWorksLocalization.Text("blueprint.scene.edge_pair_missing");
                 return false;
             }
 
@@ -550,7 +561,7 @@ namespace OstrixMods.BuildWorks
             }
             if (seedIndex < 0 || candidateIds.Count < 2)
             {
-                warning = "Нужна цепь минимум из двух одинаковых опор.";
+                warning = BuildWorksLocalization.Text("blueprint.scene.chain_too_short");
                 return false;
             }
 
@@ -569,7 +580,7 @@ namespace OstrixMods.BuildWorks
             }
             if (ordered.Count < 2)
             {
-                warning = "Эта опора не входит в простую цепь или кольцо без развилок.";
+                warning = BuildWorksLocalization.Text("blueprint.scene.chain_invalid");
                 return false;
             }
             foreach (int index in ordered)
@@ -625,6 +636,8 @@ namespace OstrixMods.BuildWorks
             int manualSnapPoint = -1)
         {
             PlacementSnapTarget = null;
+            placementSnapPreviewTargets.Clear();
+            placementSnapPreviewNative.Clear();
             ShowDuplicatePreview(preview);
             offset = Vector3.zero;
             bool found = false;
@@ -656,6 +669,8 @@ namespace OstrixMods.BuildWorks
         internal void ClearBlueprintPlacementPreview()
         {
             PlacementSnapTarget = null;
+            placementSnapPreviewTargets.Clear();
+            placementSnapPreviewNative.Clear();
             ClearDuplicatePreview();
         }
 
@@ -674,8 +689,8 @@ namespace OstrixMods.BuildWorks
                     {
                         GameObject source = resolveVisualSource(part.PrefabName);
                         if (!source)
-                            throw new InvalidOperationException(
-                                "Не найдена деталь предпросмотра: " + part.PrefabName);
+                            throw new InvalidOperationException(BuildWorksLocalization.Text(
+                                "blueprint.scene.preview_piece_missing", part.PrefabName));
                         VisualNode replacement = CreateVisual(part, source, selectable: false);
                         DestroyVisual(visual);
                         visual = replacement;
@@ -1037,6 +1052,8 @@ namespace OstrixMods.BuildWorks
             ThrowIfDisposed();
             finalPosition = position;
             PlacementSnapTarget = null;
+            placementSnapPreviewTargets.Clear();
+            placementSnapPreviewNative.Clear();
             warning = null;
             try
             {
@@ -1049,7 +1066,8 @@ namespace OstrixMods.BuildWorks
                     if (!source)
                     {
                         placementPreview = null;
-                        warning = "Не найдена деталь: " + prefabName;
+                        warning = BuildWorksLocalization.Text(
+                            "blueprint.scene.piece_missing", prefabName);
                         return false;
                     }
                     placementPreview = CreateVisual(
@@ -1090,7 +1108,8 @@ namespace OstrixMods.BuildWorks
             {
                 DestroyVisual(placementPreview);
                 placementPreview = null;
-                warning = "Не удалось показать деталь: " + exception.Message;
+                warning = BuildWorksLocalization.Text(
+                    "blueprint.scene.show_failed", exception.Message);
                 return false;
             }
         }
@@ -1112,10 +1131,17 @@ namespace OstrixMods.BuildWorks
                 foreach (VisualNode visual in visuals.Values)
                 {
                     if (!visual.Root.activeInHierarchy) continue;
-                    foreach (Vector3 targetLocal in visual.PlacementLocal)
+                    for (int targetIndex = 0;
+                        targetIndex < visual.PlacementLocal.Count;
+                        ++targetIndex)
                     {
+                        Vector3 targetLocal = visual.PlacementLocal[targetIndex];
                         Vector3 targetWorld = visual.Root.transform.TransformPoint(targetLocal);
                         float distance = (targetWorld - sourceWorld).sqrMagnitude;
+                        if (distance <= PlacementSnapPreviewRadius * PlacementSnapPreviewRadius)
+                            AddPlacementSnapPreviewTarget(
+                                targetWorld,
+                                targetIndex < visual.SnapLocal.Count);
                         if (distance >= best) continue;
                         best = distance;
                         offset = targetWorld - sourceWorld;
@@ -1123,6 +1149,20 @@ namespace OstrixMods.BuildWorks
                     }
                 }
             }
+        }
+
+        private void AddPlacementSnapPreviewTarget(Vector3 point, bool native)
+        {
+            for (int index = 0; index < placementSnapPreviewTargets.Count; ++index)
+            {
+                if ((placementSnapPreviewTargets[index] - point).sqrMagnitude >= 0.0004f)
+                    continue;
+                placementSnapPreviewNative[index] |= native;
+                return;
+            }
+            if (placementSnapPreviewTargets.Count >= MaximumSnapPreviewTargets) return;
+            placementSnapPreviewTargets.Add(point);
+            placementSnapPreviewNative.Add(native);
         }
 
         private static Vector3 PlacementContactOffset(
@@ -1151,6 +1191,8 @@ namespace OstrixMods.BuildWorks
         internal void HidePlacementPreview()
         {
             PlacementSnapTarget = null;
+            placementSnapPreviewTargets.Clear();
+            placementSnapPreviewNative.Clear();
             if (placementPreview?.Root) placementPreview.Root.SetActive(false);
         }
 
@@ -1371,7 +1413,10 @@ namespace OstrixMods.BuildWorks
             }
             candidates.Add(new SnapCandidate
             {
-                Point = point, Native = native, Edge = edge, Distance = distance
+                Point = point,
+                Native = native,
+                Edge = edge,
+                Distance = distance
             });
         }
 
@@ -1686,7 +1731,7 @@ namespace OstrixMods.BuildWorks
                 {
                     points.Add(midpoint);
                     placementPoints.Add(midpoint);
-                    placementLabels.Add("СЕРЕДИНА");
+                    placementLabels.Add(BuildWorksLocalization.Text("blueprint.snap.middle"));
                 }
             }
         }
@@ -1694,27 +1739,38 @@ namespace OstrixMods.BuildWorks
         private static string PlacementPointLabel(string name, Vector3 point, Bounds bounds)
         {
             string lower = (name ?? string.Empty).ToLowerInvariant();
-            if (lower.Contains("bottom") || lower.Contains("down")) return "НИЗ";
-            if (lower.Contains("top") || lower.Contains("up")) return "ВЕРХ";
-            if (lower.Contains("center") || lower.Contains("middle")) return "ЦЕНТР";
+            if (lower.Contains("bottom") || lower.Contains("down"))
+                return BuildWorksLocalization.Text("blueprint.snap.bottom");
+            if (lower.Contains("top") || lower.Contains("up"))
+                return BuildWorksLocalization.Text("blueprint.snap.top");
+            if (lower.Contains("center") || lower.Contains("middle"))
+                return BuildWorksLocalization.Text("blueprint.snap.center");
             const float tolerance = 0.001f;
             var labels = new List<string>();
             if (bounds.size.y > tolerance)
             {
-                if (Mathf.Abs(point.y - bounds.min.y) < tolerance) labels.Add("НИЗ");
-                else if (Mathf.Abs(point.y - bounds.max.y) < tolerance) labels.Add("ВЕРХ");
+                if (Mathf.Abs(point.y - bounds.min.y) < tolerance)
+                    labels.Add(BuildWorksLocalization.Text("blueprint.snap.bottom"));
+                else if (Mathf.Abs(point.y - bounds.max.y) < tolerance)
+                    labels.Add(BuildWorksLocalization.Text("blueprint.snap.top"));
             }
             if (bounds.size.x > tolerance)
             {
-                if (Mathf.Abs(point.x - bounds.min.x) < tolerance) labels.Add("ЛЕВО");
-                else if (Mathf.Abs(point.x - bounds.max.x) < tolerance) labels.Add("ПРАВО");
+                if (Mathf.Abs(point.x - bounds.min.x) < tolerance)
+                    labels.Add(BuildWorksLocalization.Text("blueprint.snap.left"));
+                else if (Mathf.Abs(point.x - bounds.max.x) < tolerance)
+                    labels.Add(BuildWorksLocalization.Text("blueprint.snap.right"));
             }
             if (bounds.size.z > tolerance)
             {
-                if (Mathf.Abs(point.z - bounds.min.z) < tolerance) labels.Add("НАЗАД");
-                else if (Mathf.Abs(point.z - bounds.max.z) < tolerance) labels.Add("ВПЕРЁД");
+                if (Mathf.Abs(point.z - bounds.min.z) < tolerance)
+                    labels.Add(BuildWorksLocalization.Text("blueprint.snap.back"));
+                else if (Mathf.Abs(point.z - bounds.max.z) < tolerance)
+                    labels.Add(BuildWorksLocalization.Text("blueprint.snap.front"));
             }
-            return labels.Count > 0 ? string.Join(" · ", labels) : "ТОЧКА";
+            return labels.Count > 0
+                ? string.Join(" · ", labels)
+                : BuildWorksLocalization.Text("blueprint.snap.point");
         }
 
         private static void AddBoundsPlacementPoints(VisualNode visual)
@@ -1756,10 +1812,22 @@ namespace OstrixMods.BuildWorks
                 center,
                 new Vector3(center.x, max.y, center.z)
             };
+            string bottom = BuildWorksLocalization.Text("blueprint.snap.bottom");
+            string top = BuildWorksLocalization.Text("blueprint.snap.top");
+            string centerLabel = BuildWorksLocalization.Text("blueprint.snap.center");
+            string left = BuildWorksLocalization.Text("blueprint.snap.left");
+            string right = BuildWorksLocalization.Text("blueprint.snap.right");
+            string back = BuildWorksLocalization.Text("blueprint.snap.back");
+            string front = BuildWorksLocalization.Text("blueprint.snap.front");
             string[] labels =
             {
-                "НИЗ · ЦЕНТР", "НИЗ · ЛЕВО · НАЗАД", "НИЗ · ПРАВО · НАЗАД",
-                "НИЗ · ПРАВО · ВПЕРЁД", "НИЗ · ЛЕВО · ВПЕРЁД", "ЦЕНТР", "ВЕРХ · ЦЕНТР"
+                bottom + " · " + centerLabel,
+                bottom + " · " + left + " · " + back,
+                bottom + " · " + right + " · " + back,
+                bottom + " · " + right + " · " + front,
+                bottom + " · " + left + " · " + front,
+                centerLabel,
+                top + " · " + centerLabel
             };
             visual.PlacementLocal.AddRange(points);
             visual.PlacementLabels.AddRange(labels);

@@ -51,13 +51,19 @@ namespace OstrixMods.BuildWorks
         }
     }
 
+    /// <summary>
+    /// Adapts Valheim's Hammer inventory into the indexed BuildWorks catalog
+    /// while preserving native selection, favorites, and placement ownership.
+    /// </summary>
     internal sealed class UnifiedHammerCatalog : IDisposable
     {
         private const string VanillaHammerPrefab = "Hammer";
         private const string OdinHammerPrefab = "odin_hammer";
         private const string VanillaPieceTable = "_HammerPieceTable";
-        private const string BlueprintCategoryName = "ЧЕРТЕЖИ";
-        private const string FavoriteCategoryName = "ИЗБРАННОЕ";
+        private static string BlueprintCategoryName =>
+            BuildWorksLocalization.Text("catalog.category.blueprints");
+        private static string FavoriteCategoryName =>
+            BuildWorksLocalization.Text("catalog.category.favorites");
 
         private readonly struct AddedPiece
         {
@@ -294,8 +300,10 @@ namespace OstrixMods.BuildWorks
             if (source.Contains("door")) return Piece.PieceCategory.BuildingWorkbench;
 
             string material = HammerCatalogOrganizer.Group(piece);
-            return material == "КАМЕНЬ" || material == "ЧЁРНЫЙ МРАМОР" ||
-                material == "ГРАУСТЕН" || material == "МЕТАЛЛ"
+            return material == HammerCatalogOrganizer.StoneGroup ||
+                material == HammerCatalogOrganizer.BlackMarbleGroup ||
+                material == HammerCatalogOrganizer.GraustenGroup ||
+                material == HammerCatalogOrganizer.MetalGroup
                 ? Piece.PieceCategory.BuildingStonecutter
                 : Piece.PieceCategory.BuildingWorkbench;
         }
@@ -395,6 +403,20 @@ namespace OstrixMods.BuildWorks
 
     internal static class HammerCatalogOrganizer
     {
+        internal const string AllSource = "all";
+        internal const string VanillaSource = "vanilla";
+        internal const string BlueprintsGroup = "blueprints";
+        internal const string ActionsGroup = "actions";
+        internal const string WoodGroup = "wood";
+        internal const string CoreWoodGroup = "core_wood";
+        internal const string DarkWoodGroup = "dark_wood";
+        internal const string AshWoodGroup = "ash_wood";
+        internal const string StoneGroup = "stone";
+        internal const string BlackMarbleGroup = "black_marble";
+        internal const string GraustenGroup = "grausten";
+        internal const string MetalGroup = "metal";
+        internal const string GlassGroup = "glass";
+        internal const string OtherGroup = "other";
         internal readonly struct SelectionSnapshot
         {
             public SelectionSnapshot(Piece.PieceCategory category, Piece piece)
@@ -512,7 +534,7 @@ namespace OstrixMods.BuildWorks
                     var filtered = new List<Piece>(pieces);
                     AllLists[key] = new List<Piece>(pieces);
                     if (SourceFilters.TryGetValue(key, out string source) &&
-                        !string.IsNullOrEmpty(source) && source != "ВСЕ")
+                        !string.IsNullOrEmpty(source) && source != AllSource)
                         filtered.RemoveAll(piece => !MatchesSource(piece, source));
                     if (!string.IsNullOrEmpty(search))
                         filtered.RemoveAll(piece => !MatchesSearch(piece, search));
@@ -777,15 +799,15 @@ namespace OstrixMods.BuildWorks
             var counts = new Dictionary<string, int>(StringComparer.Ordinal);
             foreach (Piece piece in all)
             {
-                string source = UnifiedHammerCatalog.OdinSourceGroup(piece) ?? "ВАНИЛЬНОЕ";
+                string source = UnifiedHammerCatalog.OdinSourceGroup(piece) ?? VanillaSource;
                 counts[source] = counts.TryGetValue(source, out int count) ? count + 1 : 1;
             }
             if (counts.Count <= 1) return result;
-            result.Add(new SourceInfo("ВСЕ", all.Count));
-            if (counts.TryGetValue("ВАНИЛЬНОЕ", out int vanilla))
-                result.Add(new SourceInfo("ВАНИЛЬНОЕ", vanilla));
+            result.Add(new SourceInfo(AllSource, all.Count));
+            if (counts.TryGetValue(VanillaSource, out int vanilla))
+                result.Add(new SourceInfo(VanillaSource, vanilla));
             foreach (KeyValuePair<string, int> entry in counts)
-                if (entry.Key != "ВАНИЛЬНОЕ")
+                if (entry.Key != VanillaSource)
                     result.Add(new SourceInfo(entry.Key, entry.Value));
             return result;
         }
@@ -795,7 +817,7 @@ namespace OstrixMods.BuildWorks
             Piece.PieceCategory category) =>
             table && SourceFilters.TryGetValue(Key(table, category), out string value)
                 ? value
-                : "ВСЕ";
+                : AllSource;
 
         public static void SetSourceFilter(
             PieceTable table,
@@ -804,7 +826,7 @@ namespace OstrixMods.BuildWorks
             Player player)
         {
             if (!table) return;
-            SourceFilters[Key(table, category)] = value ?? "ВСЕ";
+            SourceFilters[Key(table, category)] = value ?? AllSource;
             Pages[Key(table, category)] = 0;
             RequestRefresh(player);
         }
@@ -921,10 +943,10 @@ namespace OstrixMods.BuildWorks
 
         public static string Group(Piece piece)
         {
-            if (!piece) return "ПРОЧЕЕ";
+            if (!piece) return OtherGroup;
             if (piece.gameObject.name.StartsWith(
                 HammerBlueprintPieceRegistry.PrefabPrefix,
-                StringComparison.Ordinal)) return "ЧЕРТЕЖИ";
+                StringComparison.Ordinal)) return BlueprintsGroup;
 
             string text = (piece.gameObject.name + " " + piece.m_name).ToLowerInvariant();
             foreach (Piece.Requirement requirement in piece.m_resources ??
@@ -935,18 +957,18 @@ namespace OstrixMods.BuildWorks
                 text += " " + requirement.m_resItem.m_itemData.m_shared.m_name.ToLowerInvariant();
             }
 
-            if (text.Contains("repair")) return "ДЕЙСТВИЯ";
-            if (text.Contains("ashwood") || text.Contains("asksvin")) return "ЯСЕНЬ";
-            if (text.Contains("darkwood")) return "ТЁМНОЕ ДЕРЕВО";
-            if (text.Contains("blackmarble")) return "ЧЁРНЫЙ МРАМОР";
-            if (text.Contains("grausten")) return "ГРАУСТЕН";
-            if (text.Contains("stone") || text.Contains("marble")) return "КАМЕНЬ";
+            if (text.Contains("repair")) return ActionsGroup;
+            if (text.Contains("ashwood") || text.Contains("asksvin")) return AshWoodGroup;
+            if (text.Contains("darkwood")) return DarkWoodGroup;
+            if (text.Contains("blackmarble")) return BlackMarbleGroup;
+            if (text.Contains("grausten")) return GraustenGroup;
+            if (text.Contains("stone") || text.Contains("marble")) return StoneGroup;
             if (text.Contains("iron") || text.Contains("bronze") ||
-                text.Contains("copper") || text.Contains("metal")) return "МЕТАЛЛ";
-            if (text.Contains("crystal") || text.Contains("glass")) return "СТЕКЛО";
-            if (text.Contains("corewood") || text.Contains("roundlog")) return "КРУГЛЯК";
-            if (text.Contains("wood")) return "ДЕРЕВО";
-            return "ПРОЧЕЕ";
+                text.Contains("copper") || text.Contains("metal")) return MetalGroup;
+            if (text.Contains("crystal") || text.Contains("glass")) return GlassGroup;
+            if (text.Contains("corewood") || text.Contains("roundlog")) return CoreWoodGroup;
+            if (text.Contains("wood")) return WoodGroup;
+            return OtherGroup;
         }
 
         private static int ComparePieces(Piece left, Piece right)
@@ -973,7 +995,7 @@ namespace OstrixMods.BuildWorks
         private static bool MatchesSource(Piece piece, string source)
         {
             string actual = UnifiedHammerCatalog.OdinSourceGroup(piece);
-            return source == "ВАНИЛЬНОЕ"
+            return source == VanillaSource
                 ? string.IsNullOrEmpty(actual)
                 : string.Equals(actual, source, StringComparison.Ordinal);
         }
@@ -1038,17 +1060,17 @@ namespace OstrixMods.BuildWorks
         {
             switch (group)
             {
-                case "ЧЕРТЕЖИ": return 0;
-                case "ДЕЙСТВИЯ": return 1;
-                case "ДЕРЕВО": return 2;
-                case "КРУГЛЯК": return 3;
-                case "ТЁМНОЕ ДЕРЕВО": return 4;
-                case "ЯСЕНЬ": return 5;
-                case "КАМЕНЬ": return 6;
-                case "ЧЁРНЫЙ МРАМОР": return 7;
-                case "ГРАУСТЕН": return 8;
-                case "МЕТАЛЛ": return 9;
-                case "СТЕКЛО": return 10;
+                case BlueprintsGroup: return 0;
+                case ActionsGroup: return 1;
+                case WoodGroup: return 2;
+                case CoreWoodGroup: return 3;
+                case DarkWoodGroup: return 4;
+                case AshWoodGroup: return 5;
+                case StoneGroup: return 6;
+                case BlackMarbleGroup: return 7;
+                case GraustenGroup: return 8;
+                case MetalGroup: return 9;
+                case GlassGroup: return 10;
                 default: return 11;
             }
         }
@@ -1121,7 +1143,8 @@ namespace OstrixMods.BuildWorks
         private static readonly List<Button> ContextButtons = new List<Button>();
         private static string lastBlueprintClickId;
         private static float lastBlueprintClickAt = float.NegativeInfinity;
-        private static string blueprintCategory = "ВСЕ";
+        private const string AllBlueprintCategories = "all";
+        private static string blueprintCategory = AllBlueprintCategories;
         private static int blueprintPage;
         private static int blueprintsPerPage = 8;
         private static string deleteConfirmationId;
@@ -1814,8 +1837,9 @@ namespace OstrixMods.BuildWorks
                 hud,
                 rail.transform,
                 blueprints
-                    ? "ЧЕРТЕЖИ  " + (blueprintStore?.All().Count ?? 0)
-                    : "КАТАЛОГ  " + info.Total,
+                    ? BuildWorksLocalization.Text(
+                        "catalog.title.blueprints", blueprintStore?.All().Count ?? 0)
+                    : BuildWorksLocalization.Text("catalog.title.catalog", info.Total),
                 new Vector2(10f, -8f),
                 19f,
                 new Color(0.94f, 0.72f, 0.31f, 1f),
@@ -1827,10 +1851,10 @@ namespace OstrixMods.BuildWorks
             AddRailButton(
                 hud,
                 rail.transform,
-                "РЕМОНТ",
+                BuildWorksLocalization.Text("catalog.action.repair"),
                 y,
                 28f,
-                Accent("ДЕЙСТВИЯ"),
+                Accent(HammerCatalogOrganizer.ActionsGroup),
                 table.GetSelectedPiece() == repairPiece,
                 () => SelectPiece(player, table, repairPiece),
                 width: buttonWidth);
@@ -1839,17 +1863,18 @@ namespace OstrixMods.BuildWorks
                 hud,
                 rail.transform,
                 string.IsNullOrEmpty(HammerCatalogOrganizer.Search)
-                    ? "ПОИСК"
-                    : "ПОИСК: " + HammerCatalogOrganizer.Search,
+                    ? BuildWorksLocalization.Text("catalog.action.search")
+                    : BuildWorksLocalization.Text(
+                        "catalog.action.search_value", HammerCatalogOrganizer.Search),
                 y,
                 26f,
-                Accent("СТЕКЛО"),
+                Accent(HammerCatalogOrganizer.GlassGroup),
                 !string.IsNullOrEmpty(HammerCatalogOrganizer.Search),
                 () => TextInput.instance?.RequestText(
                     new PromptReceiver(
                         () => HammerCatalogOrganizer.Search,
                         value => HammerCatalogOrganizer.SetSearch(value, player)),
-                    "ПОИСК ПО КАТАЛОГУ",
+                    BuildWorksLocalization.Text("catalog.prompt.search"),
                     48),
                 width: buttonWidth);
             y -= 36f;
@@ -1868,7 +1893,7 @@ namespace OstrixMods.BuildWorks
                 AddRailButton(
                     hud,
                     rail.transform,
-                    group.Name + "  " + group.Count,
+                    BuildWorksLocalization.CatalogLabel(group.Name) + "  " + group.Count,
                     y,
                     buttonHeight,
                     Accent(group.Name),
@@ -1890,7 +1915,7 @@ namespace OstrixMods.BuildWorks
                 "◀",
                 bottom,
                 28f,
-                Accent("ДЕРЕВО"),
+                Accent(HammerCatalogOrganizer.WoodGroup),
                 false,
                 () => HammerCatalogOrganizer.GoToPage(
                     table,
@@ -1915,7 +1940,7 @@ namespace OstrixMods.BuildWorks
                 "▶",
                 bottom,
                 28f,
-                Accent("ДЕРЕВО"),
+                Accent(HammerCatalogOrganizer.WoodGroup),
                 false,
                 () => HammerCatalogOrganizer.GoToPage(
                     table,
@@ -1994,7 +2019,9 @@ namespace OstrixMods.BuildWorks
                 hud,
                 hud.m_pieceSelectionWindow.transform,
                 "ModeToggle",
-                indexMode ? "ВАНИЛЬНЫЙ МОЛОТОК" : "РЕЖИМ ИНДЕКСА",
+                indexMode
+                    ? BuildWorksLocalization.Text("catalog.action.vanilla_hammer")
+                    : BuildWorksLocalization.Text("catalog.action.index_mode"),
                 Vector2.zero,
                 new Vector2(indexMode ? 158f : 144f, 30f),
                 false,
@@ -2069,7 +2096,11 @@ namespace OstrixMods.BuildWorks
             foreach (HammerCatalogOrganizer.SourceInfo source in sources)
             {
                 HammerCatalogOrganizer.SourceInfo target = source;
-                string label = ShortSourceName(source.Name) + " [" + source.Count + "]";
+                string sourceName = source.Name == HammerCatalogOrganizer.AllSource ||
+                    source.Name == HammerCatalogOrganizer.VanillaSource
+                        ? BuildWorksLocalization.CatalogLabel(source.Name)
+                        : ShortSourceName(source.Name);
+                string label = sourceName + " [" + source.Count + "]";
                 float width = Mathf.Clamp(42f + label.Length * 6.4f, 72f, 190f);
                 if (x + width > available && row + 1 < layoutSourceRows)
                 {
@@ -2085,7 +2116,7 @@ namespace OstrixMods.BuildWorks
                     label,
                     y,
                     24f,
-                    Accent("ДЕРЕВО"),
+                    Accent(HammerCatalogOrganizer.WoodGroup),
                     string.Equals(selected, source.Name, StringComparison.Ordinal),
                     () => HammerCatalogOrganizer.SetSourceFilter(
                         table,
@@ -2108,35 +2139,39 @@ namespace OstrixMods.BuildWorks
             AddRailButton(
                 hud,
                 rail,
-                "+ СОЗДАТЬ ЧЕРТЁЖ",
+                BuildWorksLocalization.Text("catalog.action.create_blueprint"),
                 y,
                 27f,
-                Accent("ЧЕРТЕЖИ"),
+                Accent(HammerCatalogOrganizer.BlueprintsGroup),
                 false,
                 () => blueprintCreateAction?.Invoke(),
                 width: width);
             y -= 32f;
             if (blueprintWorldSelectionAction != null)
             {
-                AddRailButton(hud, rail, "ВЫБРАТЬ В МИРЕ", y, 27f,
-                    Accent("ЧЕРТЕЖИ"), false, () => blueprintWorldSelectionAction?.Invoke(), width: width);
+                AddRailButton(hud, rail,
+                    BuildWorksLocalization.Text("catalog.action.select_in_world"), y, 27f,
+                    Accent(HammerCatalogOrganizer.BlueprintsGroup), false,
+                    () => blueprintWorldSelectionAction?.Invoke(), width: width);
                 y -= 32f;
             }
-            var categories = new List<string> { "ВСЕ" };
+            var categories = new List<string> { AllBlueprintCategories };
             categories.AddRange(blueprintStore.Categories());
             foreach (string category in categories)
             {
                 string target = category;
-                int count = category == "ВСЕ"
+                int count = category == AllBlueprintCategories
                     ? blueprintStore.All().Count
                     : CountBlueprints(category);
                 AddRailButton(
                     hud,
                     rail,
-                    category + "  " + count,
+                    (category == AllBlueprintCategories
+                        ? BuildWorksLocalization.CatalogLabel(HammerCatalogOrganizer.AllSource)
+                        : BuildWorksLocalization.BlueprintCategoryLabel(category)) + "  " + count,
                     y,
                     23f,
-                    Accent("ЧЕРТЕЖИ"),
+                    Accent(HammerCatalogOrganizer.BlueprintsGroup),
                     string.Equals(blueprintCategory, category, StringComparison.Ordinal),
                     () =>
                     {
@@ -2152,10 +2187,10 @@ namespace OstrixMods.BuildWorks
             AddRailButton(
                 hud,
                 rail,
-                "+ КАТЕГОРИЯ",
+                BuildWorksLocalization.Text("catalog.action.add_category"),
                 y,
                 23f,
-                Accent("ДЕРЕВО"),
+                Accent(HammerCatalogOrganizer.WoodGroup),
                 false,
                 () => TextInput.instance?.RequestText(
                     new PromptReceiver(
@@ -2169,17 +2204,17 @@ namespace OstrixMods.BuildWorks
                             }
                             else ShowStatus(error);
                         }),
-                    "НОВАЯ КАТЕГОРИЯ ЧЕРТЕЖЕЙ",
+                    BuildWorksLocalization.Text("catalog.prompt.new_category"),
                     24),
                 width: width);
             y -= 26f;
-            if (blueprintCategory != "ВСЕ" &&
+            if (blueprintCategory != AllBlueprintCategories &&
                 blueprintCategory != CompositeBlueprintStore.DefaultCategory)
             {
                 AddRailButton(
                     hud,
                     rail,
-                    "− УДАЛИТЬ КАТ.",
+                    BuildWorksLocalization.Text("catalog.action.delete_category"),
                     y,
                     23f,
                     new Color(0.72f, 0.25f, 0.18f, 1f),
@@ -2245,7 +2280,7 @@ namespace OstrixMods.BuildWorks
             var filtered = new List<CompositeBlueprintStore.Blueprint>();
             foreach (CompositeBlueprintStore.Blueprint blueprint in blueprintStore.All())
             {
-                if (blueprintCategory != "ВСЕ" && !string.Equals(
+                if (blueprintCategory != AllBlueprintCategories && !string.Equals(
                     blueprint.category,
                     blueprintCategory,
                     StringComparison.Ordinal)) continue;
@@ -2286,8 +2321,7 @@ namespace OstrixMods.BuildWorks
                 AddRailText(
                     hud,
                     cards.transform,
-                    "Чертежей пока нет. Нажми «+ СОЗДАТЬ ЧЕРТЁЖ» слева.\n" +
-                    "Создание бесплатно; ресурсы нужны только при размещении в мире.",
+                    BuildWorksLocalization.Text("catalog.empty"),
                     new Vector2(16f, -18f),
                     18f,
                     new Color(0.88f, 0.76f, 0.55f, 1f),
@@ -2295,12 +2329,14 @@ namespace OstrixMods.BuildWorks
                     width: cardsWidth - 32f);
             if (pageCount > 1)
             {
-                AddRailButton(hud, cards.transform, "◀", 8f, 28f, Accent("ДЕРЕВО"), false,
+                AddRailButton(hud, cards.transform, "◀", 8f, 28f,
+                    Accent(HammerCatalogOrganizer.WoodGroup), false,
                     () => ChangeBlueprintPage(-1), fromBottom: true, width: 34f);
                 AddRailText(hud, cards.transform, (blueprintPage + 1) + " / " + pageCount,
                     new Vector2(44f, 8f), 15f, Color.white, FontStyles.Bold,
                     fromBottom: true, width: 72f);
-                AddRailButton(hud, cards.transform, "▶", 8f, 28f, Accent("ДЕРЕВО"), false,
+                AddRailButton(hud, cards.transform, "▶", 8f, 28f,
+                    Accent(HammerCatalogOrganizer.WoodGroup), false,
                     () => ChangeBlueprintPage(1), fromBottom: true,
                     x: 112f, width: 34f);
             }
@@ -2359,7 +2395,8 @@ namespace OstrixMods.BuildWorks
             AddRailText(
                 hud,
                 card.transform,
-                blueprint.name + "\n" + blueprint.parts.Count + " дет.",
+                blueprint.name + "\n" + BuildWorksLocalization.Text(
+                    "catalog.card.parts", blueprint.parts.Count),
                 new Vector2(8f, -(size.y - 35f)),
                 14f,
                 Color.white,
@@ -2416,13 +2453,16 @@ namespace OstrixMods.BuildWorks
                 Color.white, FontStyles.Bold, width: 190f);
             float y = -38f;
             float width = 224f;
-            AddContextAction(hud, menu.transform, "РАЗМЕСТИТЬ", y, width,
+            AddContextAction(hud, menu.transform,
+                BuildWorksLocalization.Text("catalog.action.place"), y, width,
                 () => { contextBlueprint = null; blueprintAction?.Invoke(blueprint, false); });
             y -= 30f;
-            AddContextAction(hud, menu.transform, "РЕДАКТИРОВАТЬ", y, width,
+            AddContextAction(hud, menu.transform,
+                BuildWorksLocalization.Text("catalog.action.edit"), y, width,
                 () => { contextBlueprint = null; blueprintAction?.Invoke(blueprint, true); });
             y -= 30f;
-            AddContextAction(hud, menu.transform, "ПЕРЕИМЕНОВАТЬ", y, width,
+            AddContextAction(hud, menu.transform,
+                BuildWorksLocalization.Text("catalog.action.rename"), y, width,
                 () => TextInput.instance?.RequestText(new PromptReceiver(
                     () => blueprint.name,
                     value =>
@@ -2431,20 +2471,26 @@ namespace OstrixMods.BuildWorks
                             ShowStatus(error);
                         contextBlueprint = null;
                         Invalidate();
-                    }), "ИМЯ ЧЕРТЕЖА", 48));
+                    }), BuildWorksLocalization.Text("catalog.prompt.blueprint_name"), 48));
             y -= 30f;
-            AddContextAction(hud, menu.transform, "КАТЕГОРИЯ: " + blueprint.category, y, width,
+            AddContextAction(hud, menu.transform, BuildWorksLocalization.Text(
+                "catalog.action.category",
+                BuildWorksLocalization.BlueprintCategoryLabel(blueprint.category)), y, width,
                 () => { contextBlueprint = null; CycleBlueprintCategory(blueprint); });
             y -= 30f;
-            AddContextAction(hud, menu.transform, "ОБНОВИТЬ ПРЕВЬЮ", y, width,
+            AddContextAction(hud, menu.transform,
+                BuildWorksLocalization.Text("catalog.action.refresh_preview"), y, width,
                 () => { contextBlueprint = null; RefreshBlueprintPreview(blueprint); });
             y -= 30f;
-            AddContextAction(hud, menu.transform, "РЕСУРСЫ", y, width,
+            AddContextAction(hud, menu.transform,
+                BuildWorksLocalization.Text("catalog.action.resources"), y, width,
                 () => { contextBlueprint = null; showResources = true; Invalidate(); });
             y -= 30f;
             bool confirming = deleteConfirmationId == blueprint.id;
             AddContextAction(hud, menu.transform,
-                confirming ? "ПОДТВЕРДИТЬ УДАЛЕНИЕ" : "УДАЛИТЬ", y, width,
+                confirming
+                    ? BuildWorksLocalization.Text("catalog.action.confirm_delete")
+                    : BuildWorksLocalization.Text("catalog.action.delete"), y, width,
                 () => DeleteBlueprint(player, blueprint), danger: true);
         }
 
@@ -2482,7 +2528,9 @@ namespace OstrixMods.BuildWorks
         {
             if (selectedBlueprint == null)
             {
-                AddRailText(hud, parent, "Выбери чертёж", new Vector2(16f, -16f), 18f,
+                AddRailText(hud, parent,
+                    BuildWorksLocalization.Text("catalog.choose_blueprint"),
+                    new Vector2(16f, -16f), 18f,
                     Color.white, FontStyles.Bold, width: width - 32f);
                 return;
             }
@@ -2490,7 +2538,9 @@ namespace OstrixMods.BuildWorks
             AddRailText(hud, parent, blueprint.name, new Vector2(16f, -14f), 20f,
                 new Color(0.96f, 0.78f, 0.39f, 1f), FontStyles.Bold, width: width - 32f);
             AddRailText(hud, parent,
-                blueprint.parts.Count + " деталей  ·  " + blueprint.category,
+                BuildWorksLocalization.Text("catalog.blueprint_summary",
+                    blueprint.parts.Count,
+                    BuildWorksLocalization.BlueprintCategoryLabel(blueprint.category)),
                 new Vector2(16f, -46f), 14f,
                 new Color(0.88f, 0.80f, 0.66f, 1f), FontStyles.Normal,
                 width: width - 32f);
@@ -2506,13 +2556,16 @@ namespace OstrixMods.BuildWorks
                 Mathf.Max(86f, height - actionCount * actionHeight - 8f));
             float y = -actionTop;
             float buttonWidth = width - 32f;
-            AddActionButton(hud, parent, "РАЗМЕСТИТЬ", y, buttonWidth,
+            AddActionButton(hud, parent,
+                BuildWorksLocalization.Text("catalog.action.place"), y, buttonWidth,
                 () => blueprintAction?.Invoke(blueprint, false));
             y -= actionHeight;
-            AddActionButton(hud, parent, "РЕДАКТИРОВАТЬ", y, buttonWidth,
+            AddActionButton(hud, parent,
+                BuildWorksLocalization.Text("catalog.action.edit"), y, buttonWidth,
                 () => blueprintAction?.Invoke(blueprint, true));
             y -= actionHeight;
-            AddActionButton(hud, parent, "ПЕРЕИМЕНОВАТЬ", y, buttonWidth,
+            AddActionButton(hud, parent,
+                BuildWorksLocalization.Text("catalog.action.rename"), y, buttonWidth,
                 () => TextInput.instance?.RequestText(
                     new PromptReceiver(
                         () => blueprint.name,
@@ -2522,23 +2575,31 @@ namespace OstrixMods.BuildWorks
                                 ShowStatus(error);
                             Invalidate();
                         }),
-                    "ИМЯ ЧЕРТЕЖА",
+                    BuildWorksLocalization.Text("catalog.prompt.blueprint_name"),
                     48));
             y -= actionHeight;
-            AddActionButton(hud, parent, "КАТЕГОРИЯ: " + blueprint.category, y, buttonWidth,
+            AddActionButton(hud, parent, BuildWorksLocalization.Text(
+                "catalog.action.category",
+                BuildWorksLocalization.BlueprintCategoryLabel(blueprint.category)), y, buttonWidth,
                 () => CycleBlueprintCategory(blueprint));
             y -= actionHeight;
-            AddActionButton(hud, parent, "ОБНОВИТЬ ПРЕВЬЮ", y, buttonWidth,
+            AddActionButton(hud, parent,
+                BuildWorksLocalization.Text("catalog.action.refresh_preview"), y, buttonWidth,
                 () => RefreshBlueprintPreview(blueprint));
             y -= actionHeight;
-            AddActionButton(hud, parent, showResources ? "СКРЫТЬ РЕСУРСЫ" : "РЕСУРСЫ",
+            AddActionButton(hud, parent,
+                showResources
+                    ? BuildWorksLocalization.Text("catalog.action.hide_resources")
+                    : BuildWorksLocalization.Text("catalog.action.resources"),
                 y, buttonWidth, () => { showResources = !showResources; Invalidate(); });
             y -= actionHeight;
             bool confirming = deleteConfirmationId == blueprint.id;
             AddActionButton(
                 hud,
                 parent,
-                confirming ? "ПОДТВЕРДИТЬ УДАЛЕНИЕ" : "УДАЛИТЬ",
+                confirming
+                    ? BuildWorksLocalization.Text("catalog.action.confirm_delete")
+                    : BuildWorksLocalization.Text("catalog.action.delete"),
                 y,
                 buttonWidth,
                 () => DeleteBlueprint(player, blueprint),
@@ -2672,7 +2733,9 @@ namespace OstrixMods.BuildWorks
             GameObject popup = AddPanel(parent, "Resources", new Vector2(6f, -6f),
                 new Vector2(width - 12f, popupHeight),
                 new Color(0.055f, 0.028f, 0.012f, 0.98f));
-            AddRailText(hud, popup.transform, "РЕСУРСЫ", new Vector2(12f, -10f), 18f,
+            AddRailText(hud, popup.transform,
+                BuildWorksLocalization.Text("catalog.action.resources"),
+                new Vector2(12f, -10f), 18f,
                 new Color(0.96f, 0.76f, 0.36f, 1f), FontStyles.Bold,
                 width: width - 70f);
             AddButton(hud, popup.transform, "CloseResources", "×",
@@ -2724,7 +2787,8 @@ namespace OstrixMods.BuildWorks
                 y -= 34f;
             }
             if (resources.Count == 0)
-                AddRailText(hud, content.transform, "Ресурсы не требуются",
+                AddRailText(hud, content.transform,
+                    BuildWorksLocalization.Text("catalog.resources.none"),
                     new Vector2(4f, 0f), 15f, Color.white, FontStyles.Normal,
                     width: width - 36f);
         }
@@ -2751,7 +2815,7 @@ namespace OstrixMods.BuildWorks
             previewSession = blueprintRegistry.BeginPreview(blueprint);
             if (previewSession == null)
             {
-                ShowStatus("не удалось открыть камеру превью");
+                ShowStatus(BuildWorksLocalization.Text("catalog.preview.open_failed"));
                 return;
             }
             previewBlueprint = blueprint;
@@ -2781,12 +2845,12 @@ namespace OstrixMods.BuildWorks
             modalCanvas.sortingOrder = (parentCanvas ? parentCanvas.sortingOrder : 0) + 50;
             panel.AddComponent<GraphicRaycaster>();
             AddRailText(hud, panel.transform,
-                "КАМЕРА ПРЕВЬЮ — " + previewBlueprint.name,
+                BuildWorksLocalization.Text("catalog.preview.title", previewBlueprint.name),
                 new Vector2(14f, -10f), 20f,
                 new Color(0.96f, 0.76f, 0.36f, 1f), FontStyles.Bold,
                 width: width - 28f);
             AddRailText(hud, panel.transform,
-                "СКМ: вращать  ·  колесо: масштаб  ·  F: вписать",
+                BuildWorksLocalization.Text("catalog.preview.controls"),
                 new Vector2(14f, -39f), 14f,
                 new Color(0.86f, 0.80f, 0.70f, 1f), FontStyles.Normal,
                 width: width - 28f);
@@ -2809,21 +2873,25 @@ namespace OstrixMods.BuildWorks
             float buttonY = -(height - 46f);
             float gap = 8f;
             float buttonWidth = (width - 28f - gap * 3f) / 4f;
-            AddButton(hud, panel.transform, "PreviewAuto", "АВТОРАКУРС",
+            AddButton(hud, panel.transform, "PreviewAuto",
+                BuildWorksLocalization.Text("catalog.preview.auto"),
                 new Vector2(14f, buttonY), new Vector2(buttonWidth, 30f), false,
                 () => SetPreviewView(45f, 30f, 1f));
-            AddButton(hud, panel.transform, "PreviewReset", "СБРОСИТЬ",
+            AddButton(hud, panel.transform, "PreviewReset",
+                BuildWorksLocalization.Text("catalog.preview.reset"),
                 new Vector2(14f + (buttonWidth + gap), buttonY),
                 new Vector2(buttonWidth, 30f), false,
                 () => SetPreviewView(
                     previewBlueprint.previewYaw,
                     previewBlueprint.previewPitch,
                     previewBlueprint.previewZoom));
-            AddButton(hud, panel.transform, "PreviewCancel", "ОТМЕНА",
+            AddButton(hud, panel.transform, "PreviewCancel",
+                BuildWorksLocalization.Text("catalog.preview.cancel"),
                 new Vector2(14f + (buttonWidth + gap) * 2f, buttonY),
                 new Vector2(buttonWidth, 30f), false,
                 () => { ClosePreview(); Invalidate(); });
-            AddButton(hud, panel.transform, "PreviewSave", "СОХРАНИТЬ ПРЕВЬЮ",
+            AddButton(hud, panel.transform, "PreviewSave",
+                BuildWorksLocalization.Text("catalog.preview.save"),
                 new Vector2(14f + (buttonWidth + gap) * 3f, buttonY),
                 new Vector2(buttonWidth, 30f), true,
                 SavePreview);
@@ -2892,7 +2960,7 @@ namespace OstrixMods.BuildWorks
             }
             ClosePreview();
             if (!blueprintRegistry.RefreshThumbnail(blueprint))
-                ShowStatus("не удалось сохранить превью");
+                ShowStatus(BuildWorksLocalization.Text("catalog.preview.save_failed"));
             Invalidate();
         }
 
@@ -2935,7 +3003,8 @@ namespace OstrixMods.BuildWorks
             if (blueprintStore != null)
             {
                 foreach (CompositeBlueprintStore.Blueprint blueprint in blueprintStore.All())
-                    if ((blueprintCategory == "ВСЕ" || blueprint.category == blueprintCategory) &&
+                    if ((blueprintCategory == AllBlueprintCategories ||
+                            blueprint.category == blueprintCategory) &&
                         (string.IsNullOrEmpty(HammerCatalogOrganizer.Search) ||
                         blueprint.name.IndexOf(HammerCatalogOrganizer.Search,
                             StringComparison.OrdinalIgnoreCase) >= 0)) ++count;
@@ -2994,7 +3063,7 @@ namespace OstrixMods.BuildWorks
             if (string.IsNullOrWhiteSpace(text) || !Player.m_localPlayer) return;
             Player.m_localPlayer.Message(
                 MessageHud.MessageType.Center,
-                "BuildWorks: " + text,
+                "BuildWorks: " + BuildWorksLocalization.ResolveUserText(text),
                 0,
                 null);
         }
@@ -3142,17 +3211,26 @@ namespace OstrixMods.BuildWorks
         {
             switch (group)
             {
-                case "ЧЕРТЕЖИ": return new Color(0.72f, 0.48f, 0.95f, 1f);
-                case "ДЕЙСТВИЯ": return new Color(0.92f, 0.42f, 0.24f, 1f);
-                case "МЕТАЛЛ": return new Color(0.60f, 0.75f, 0.82f, 1f);
-                case "СТЕКЛО": return new Color(0.48f, 0.86f, 0.88f, 1f);
-                case "КАМЕНЬ":
-                case "ЧЁРНЫЙ МРАМОР":
-                case "ГРАУСТЕН": return new Color(0.70f, 0.69f, 0.61f, 1f);
-                case "ЯСЕНЬ": return new Color(0.88f, 0.75f, 0.47f, 1f);
-                case "ТЁМНОЕ ДЕРЕВО": return new Color(0.63f, 0.43f, 0.27f, 1f);
-                case "КРУГЛЯК": return new Color(0.73f, 0.54f, 0.30f, 1f);
-                case "ДЕРЕВО": return new Color(0.86f, 0.62f, 0.30f, 1f);
+                case HammerCatalogOrganizer.BlueprintsGroup:
+                    return new Color(0.72f, 0.48f, 0.95f, 1f);
+                case HammerCatalogOrganizer.ActionsGroup:
+                    return new Color(0.92f, 0.42f, 0.24f, 1f);
+                case HammerCatalogOrganizer.MetalGroup:
+                    return new Color(0.60f, 0.75f, 0.82f, 1f);
+                case HammerCatalogOrganizer.GlassGroup:
+                    return new Color(0.48f, 0.86f, 0.88f, 1f);
+                case HammerCatalogOrganizer.StoneGroup:
+                case HammerCatalogOrganizer.BlackMarbleGroup:
+                case HammerCatalogOrganizer.GraustenGroup:
+                    return new Color(0.70f, 0.69f, 0.61f, 1f);
+                case HammerCatalogOrganizer.AshWoodGroup:
+                    return new Color(0.88f, 0.75f, 0.47f, 1f);
+                case HammerCatalogOrganizer.DarkWoodGroup:
+                    return new Color(0.63f, 0.43f, 0.27f, 1f);
+                case HammerCatalogOrganizer.CoreWoodGroup:
+                    return new Color(0.73f, 0.54f, 0.30f, 1f);
+                case HammerCatalogOrganizer.WoodGroup:
+                    return new Color(0.86f, 0.62f, 0.30f, 1f);
                 default: return new Color(0.80f, 0.66f, 0.39f, 1f);
             }
         }

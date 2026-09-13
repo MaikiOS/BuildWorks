@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\src\BuildWorks\BuildWorksLocalization.cs" Link="BuildWorksLocalization.cs" />
+    <EmbeddedResource Include="..\..\src\BuildWorks\Translations\English.tsv" Link="Translations\English.tsv" />
+    <EmbeddedResource Include="..\..\src\BuildWorks\Translations\Russian.tsv" Link="Translations\Russian.tsv" />
+  </ItemGroup>
+</Project>

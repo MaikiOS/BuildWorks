@@ -1,0 +1,597 @@
+# Stable key<TAB>English fallback
+adaptive_gable.name	BuildWorks: adaptive gable panel
+adaptive_gable.description	An original adjustable panel for complex roof slopes.
+catalog.category.blueprints	BLUEPRINTS
+catalog.category.favorites	FAVORITES
+catalog.group.all	ALL
+catalog.group.vanilla	VANILLA
+catalog.group.blueprints	BLUEPRINTS
+catalog.group.actions	ACTIONS
+catalog.group.wood	WOOD
+catalog.group.core_wood	CORE WOOD
+catalog.group.dark_wood	DARK WOOD
+catalog.group.ash_wood	ASH WOOD
+catalog.group.stone	STONE
+catalog.group.black_marble	BLACK MARBLE
+catalog.group.grausten	GRAUSTEN
+catalog.group.metal	METAL
+catalog.group.glass	GLASS
+catalog.group.other	OTHER
+blueprint.category.default	OTHER
+blueprint.default_name	Group {0}
+blueprint.piece.description	{0} parts. LMB to place. Edit from the blueprint library.
+blueprint.scene.chain_aim	Aim at a part in the support chain or ring.
+blueprint.scene.choose_support	Choose a support, not the source part.
+blueprint.scene.edge_pair_missing	The selected edge has no pair of native snap points.
+blueprint.scene.chain_too_short	A chain needs at least two identical supports.
+blueprint.scene.chain_invalid	This support is not part of a simple chain or branch-free ring.
+blueprint.scene.preview_piece_missing	Preview part not found: {0}
+blueprint.scene.piece_missing	Part not found: {0}
+blueprint.scene.show_failed	Could not display the part: {0}
+blueprint.snap.middle	MIDDLE
+blueprint.snap.bottom	BOTTOM
+blueprint.snap.top	TOP
+blueprint.snap.center	CENTER
+blueprint.snap.left	LEFT
+blueprint.snap.right	RIGHT
+blueprint.snap.back	BACK
+blueprint.snap.front	FRONT
+blueprint.snap.point	POINT
+editor.open_failed	BuildWorks: could not open the editor: {0}
+store.invalid_metadata	Blueprint name or category has an invalid length.
+store.category_limit	The category limit has been reached.
+store.invalid_composition	The blueprint composition is invalid.
+store.blueprint_limit	The limit of 32 blueprints has been reached.
+store.invalid_parts_or_groups	The blueprint contains invalid parts or groups.
+store.primary_part_missing	The primary part was not found in the blueprint.
+store.primary_group_missing	The primary group was not found in the blueprint.
+store.invalid_anchor	The blueprint contains an invalid snap point.
+store.invalid_name	The name must contain 1 to 48 characters.
+store.category_missing	The category was not found.
+store.invalid_category_name	The category name must contain 1 to 24 characters.
+store.duplicate_category	That category already exists.
+store.protected_category	This category cannot be deleted.
+store.invalid_preview	The preview camera values are invalid.
+store.unknown_version	Unknown blueprints.json version.
+store.corrupt_entries	blueprints.json contains damaged or duplicate entries.
+store.corrupt_file	blueprints.json is damaged: {0}
+store.verify_file_failed	Blueprint file verification failed after writing.
+store.verify_data_failed	Blueprint data verification failed after writing.
+store.blueprint_missing	Blueprint not found.
+catalog.title.blueprints	BLUEPRINTS  {0}
+catalog.title.catalog	CATALOG  {0}
+catalog.action.repair	REPAIR
+catalog.action.search	SEARCH
+catalog.action.search_value	SEARCH: {0}
+catalog.prompt.search	SEARCH CATALOG
+catalog.action.vanilla_hammer	VANILLA HAMMER
+catalog.action.index_mode	INDEX MODE
+catalog.action.create_blueprint	+ CREATE BLUEPRINT
+catalog.action.select_in_world	SELECT IN WORLD
+catalog.action.add_category	+ CATEGORY
+catalog.prompt.new_category	NEW BLUEPRINT CATEGORY
+catalog.action.delete_category	− DELETE CATEGORY
+catalog.empty	No blueprints yet. Select “+ CREATE BLUEPRINT” on the left.\nCreation is free; resources are required only when placing in the world.
+catalog.card.parts	{0} parts
+catalog.action.place	PLACE
+catalog.action.edit	EDIT
+catalog.action.rename	RENAME
+catalog.prompt.blueprint_name	BLUEPRINT NAME
+catalog.action.category	CATEGORY: {0}
+catalog.action.refresh_preview	REFRESH PREVIEW
+catalog.action.resources	RESOURCES
+catalog.action.hide_resources	HIDE RESOURCES
+catalog.action.delete	DELETE
+catalog.action.confirm_delete	CONFIRM DELETE
+catalog.choose_blueprint	Choose a blueprint
+catalog.blueprint_summary	{0} parts  ·  {1}
+catalog.resources.none	No resources required
+catalog.preview.open_failed	Could not open the preview camera.
+catalog.preview.title	PREVIEW CAMERA — {0}
+catalog.preview.controls	MMB: rotate  ·  wheel: zoom  ·  F: fit
+catalog.preview.auto	AUTO VIEW
+catalog.preview.reset	RESET
+catalog.preview.cancel	CANCEL
+catalog.preview.save	SAVE PREVIEW
+catalog.preview.save_failed	Could not save the preview.
+hud.title.select_blueprint	BUILDWORKS — CREATE BLUEPRINT
+hud.title.part_precision	BUILDWORKS — PRECISE PART POSITION
+hud.title.blueprint_precision	BUILDWORKS — PRECISE BLUEPRINT PLACEMENT
+hud.title.blueprint_editor	BUILDWORKS — BLUEPRINT EDITOR
+hud.title.precision	BUILDWORKS — PRECISE PLACEMENT
+hud.hint.select_blueprint	LMB: part or selection box  ·  Ctrl: remove  ·  first part defines the axes
+hud.hint.auto_align	Arrows: move  ·  Rings: rotate  ·  Auto-align: axes + points  ·  Ctrl+point: manual snap
+hud.hint.transform	Arrows: move  ·  Rings: rotate  ·  Ctrl+point: snap
+hud.selection_summary	Selected parts: {0}\nPress SAVE SELECTION when the set is ready.
+hud.move_step	MOVE {0}
+hud.angle_step	ANGLE {0}
+hud.array	ARRAY
+hud.contour	CONTOUR
+hud.array_count	ARRAY: {0}×{1}
+hud.contour_count	CONTOUR: {0}
+hud.part_count	PARTS: {0}
+hud.axes_local	AXES: LOCAL
+hud.axes_world	AXES: WORLD
+hud.array_step	ARRAY STEP: {0}
+hud.points_all	POINTS: ALL
+hud.points_near	POINTS: NEAR
+hud.handles	HANDLES {0}
+hud.distribution_fit	FIT
+hud.distribution_exact	EXACT STEP
+hud.distribution_pack	PACK
+hud.rise	RISE {0} m
+hud.turn	TURN {0}°
+hud.pitch	PITCH {0}°
+hud.roll	ROLL {0}°
+hud.scale	SCALE {0}%
+hud.symmetry	SYMMETRY
+hud.snap_mesh	SNAP: MESH
+hud.snap_game	SNAP: GAME
+hud.auto_align_on	AUTO-ALIGN: ON
+hud.auto_align_off	AUTO-ALIGN: OFF
+hud.save_selection	SAVE SELECTION · {0}
+hud.select_in_world	SELECT IN WORLD
+hud.target_temporary	TARGET: TEMPORARY PART
+hud.target_group	TARGET: WHOLE GROUP
+hud.target_part	TARGET: PART {0}/{1}
+hud.blueprint_world	● {0} · editing the whole group
+hud.blueprint_part	● {0} · click a part or press Tab for the next
+hud.light	LIGHT: {0}
+hud.constraint_free	FREE
+hud.constraint_x	AROUND X
+hud.constraint_y	AROUND Y
+hud.constraint_z	AROUND Z
+hud.undo	UNDO ({0})
+hud.redo	REDO ({0})
+hud.save	SAVE
+hud.install	PLACE
+hud.apply	APPLY
+hud.armed.paused	BUILDWORKS — PAUSED {0}/{1}
+hud.armed.selection	BUILDWORKS — SELECT THE PREVIOUS PART {0}/{1}
+hud.armed.tool	BUILDWORKS — REPLACE HAMMER {0}/{1}
+hud.armed.stamina	BUILDWORKS — WAITING FOR STAMINA {0}/{1}
+hud.armed.installing	BUILDWORKS — PLACING {0}/{1}
+hud.armed.paused_hint	Remaining parts saved · resume from part {0}
+hud.armed.selection_hint	Cursor released: select the same part on the new hammer · sequence saved
+hud.armed.tool_hint	Cursor released: open inventory and equip an intact hammer · sequence saved
+hud.armed.stamina_hint	The sequence resumes automatically after recovery · F9 or Esc cancels
+hud.armed.installing_hint	Parts are placed automatically · F9 or Esc cancels
+hud.frozen.title	BUILDWORKS — POSITION FROZEN
+hud.frozen.hint	Esc: continue editing · F9: return to normal building
+hud.passive.continuation	BUILDWORKS — ROW CONTINUATION AVAILABLE
+hud.passive.enabled	BUILDWORKS — ASSISTANT ENABLED
+hud.passive.continuation_hint	Alt+axis: continue from the end point  ·  F9: edit a new object
+hud.passive.hint	LMB: normal  ·  Alt+axis: row  ·  F9: open precise editing
+hud.workspace.new	BUILDWORKS — NEW BLUEPRINT
+hud.workspace.edit	BUILDWORKS — EDITOR: {0}
+hud.workspace.hint	LMB: place · MMB: delete · RMB: catalog/view · wheel: rotate · Ctrl+wheel: scale
+hud.workspace.parts	PARTS: {0}{1}
+hud.workspace.resume	RESUME · ENTER
+hud.workspace.finish	END SEQUENCE · ESC
+hud.workspace.catalog	CATALOG
+hud.cancel	CANCEL
+hud.reset	RESET
+hud.disable	DISABLE
+placement.scale_persistence_unsupported	The placed part does not support Valheim scale persistence.
+catalog.group.my_blueprints	MY BLUEPRINTS
+catalog.group.crafting	CRAFTING
+catalog.group.building	BUILDING
+catalog.group.heavy_building	HEAVY BUILDING
+catalog.group.furniture	FURNITURE
+catalog.group.misc	MISC
+placement.close_ui_first	BuildWorks: close the menu or other interface first.
+placement.selection_cancelled	BuildWorks: part selection cancelled.
+placement.sequence_finished	BuildWorks: sequence finished; already placed parts were kept.
+placement.cancelled_reopen	BuildWorks: placement cancelled; editing resumed.
+placement.blueprint_unavailable	BuildWorks: the blueprint is currently unavailable in the hammer.
+placement.build_camera_disable_failed	BuildWorks: could not temporarily disable Build Camera.
+placement.game_camera_missing	BuildWorks: the game camera was not found.
+placement.blueprint_ghost_prepare_failed	BuildWorks: could not prepare the blueprint ghost.
+placement.blueprint_ghost_front_failed	BuildWorks: could not place the ghost in front of the character.
+placement.blueprint_ghost_missing	BuildWorks: Valheim did not create a visible blueprint ghost.
+placement.blueprint_place_hint	BuildWorks: LMB places; editing opens only from the library.
+placement.hammer_piece_missing	BuildWorks: part {0} is not available in the current hammer.
+placement.editor_piece_missing	BuildWorks: no ordinary part is available to open the blueprint editor.
+placement.editor_piece_prepare_failed	BuildWorks: could not prepare the editor part.
+placement.editor_open_failed	BuildWorks: could not open the blueprint editor.
+placement.editor_temp_missing	BuildWorks: Valheim did not create the temporary editor part.
+placement.editor_temp_copy_failed	BuildWorks: could not create a temporary copy of part {0}.
+placement.editor_empty_opened	BuildWorks: empty editor opened — select hammer parts and build the blueprint.
+placement.editor_loaded	BuildWorks: {0} opened as separate temporary parts.
+placement.temp_add_limit	BuildWorks: the limit was reached or the part is unsupported.
+placement.temp_added	BuildWorks: temporary part added without consuming resources.
+placement.temp_deleted	BuildWorks: temporary part deleted.
+placement.aim_temp_f9	BuildWorks: aim at a temporary part and press F9.
+placement.temp_precision_hint	BuildWorks: F9 edits only this temporary part; APPLY returns to blueprint building.
+placement.temp_change_cancelled	BuildWorks: temporary part position change cancelled.
+placement.temp_change_applied	BuildWorks: temporary part position applied.
+placement.blueprint_cannot_place	BuildWorks: the blueprint cannot be placed now.
+placement.primary_unavailable	BuildWorks: the primary blueprint part is no longer available.
+placement.blueprint_bounds_failed	BuildWorks: could not determine the blueprint bounds.
+placement.blueprint_precision_hint	BuildWorks: F9 edits the whole blueprint position; APPLY places it in the world.
+placement.blueprint_prepare_failed	BuildWorks: the blueprint could not be prepared for placement.
+placement.pause.scale	part does not support Valheim scale persistence
+placement.pause.resources	not enough resources
+placement.pause.validation	the next part did not pass Valheim validation
+placement.pause.tool_missing	the required part is unavailable in the current hammer
+placement.pause.native_start	Valheim did not start placement; check the hammer and stamina
+placement.pause.native_rejected	Valheim rejected the next part
+placement.progress.tool	BuildWorks: placed {0}/{1} — equip an intact hammer to continue automatically.
+placement.progress.stamina	BuildWorks: waiting for stamina — {0}/{1}.
+placement.complete.skipped	BuildWorks: sequence complete; skipped because of the character: {0}.
+placement.complete.blueprint	BuildWorks: blueprint placed — {0} parts.
+placement.paused	BuildWorks: placed {0}/{1} — {2}. Enter resumes from part {3}; Esc ends the sequence.
+placement.cell_skipped	BuildWorks: cell {0} is occupied by the character — skipping.
+placement.error	BuildWorks: placement error. Inspect the world before retrying.
+placement.select_build_piece	BuildWorks: select a construction part with the hammer.
+placement.snap_visible_first	BuildWorks: first aim a visible part at a snap point.
+placement.special_unsupported	BuildWorks: this special part is not supported yet.
+layout.row_ready	BuildWorks: row {0}×1 is ready. Drag the other gold arrow to add width.
+layout.plane_ready	BuildWorks: grid {0}×{1} is ready.
+layout.scale_positive	ARRAY: reduce the scale step or count — every copy scale must be positive
+layout.scale_bounds	ARRAY: every part scale must remain within 1–400%; reduce the step or count
+layout.distribution.fit	FIT SPAN
+layout.distribution.size	BY SIZE
+layout.distribution.size_gap	SIZE + {0} cm
+contour.click_highlighted	BuildWorks: click the highlighted chain or ring.
+contour.closed_found	BuildWorks: closed contour found — {0} parts; the source is linked to the nearest support.
+contour.open_found	BuildWorks: open contour found — {0} parts; the source is linked to the nearest support.
+contour.aim_installed	BuildWorks: aim at an installed chain or ring part.
+contour.edge_points_missing	BuildWorks: the selected edge has no pair of native connection points.
+contour.chain_missing	BuildWorks: no nearby chain of at least two identical parts was found.
+contour.simple_path_missing	BuildWorks: no simple branch-free chain or loop was found.
+snap.pin_other_first	BuildWorks: pin another support with Shift before rotating a native snap point.
+snap.mesh_enabled	BuildWorks: model snapping — Ctrl aligns only the selected points.
+snap.native_only	BuildWorks: snapping uses native Valheim points only.
+snap.auto_align_enabled	BuildWorks: auto-join enabled — orientation and native points align together.
+snap.auto_align_disabled	BuildWorks: auto-join disabled.
+blueprint.save_failed	BuildWorks: {0}
+blueprint.world_saved	BuildWorks: {0} saved to BLUEPRINTS → {1}. World parts were left in place.
+blueprint.select_part_count	select 2 to {0} parts
+blueprint.selected_piece_unavailable	the selected part is no longer available in the hammer
+blueprint.piece_scale_range	part {0} scale is outside the supported range
+blueprint.piece_scale_persistence	part {0} scale cannot be saved using native Valheim persistence
+blueprint.world_selection_hint	BuildWorks: select parts with LMB or a marquee; Ctrl removes from selection.
+blueprint.missing_piece	BuildWorks: part {0} is not available in the current hammer.
+blueprint.frame_select_failed	BuildWorks: could not select the blueprint frame part.
+blueprint.frame_bounds_failed	BuildWorks: could not determine the blueprint frame bounds.
+blueprint.anchors_restore_failed	BuildWorks: could not restore the blueprint bounds.
+blueprint.frame_edit_select_failed	BuildWorks: could not select the frame part for editing.
+blueprint.loaded	BuildWorks: {0} loaded — {1} parts; click or Tab cycles parts.
+blueprint.edit_switch_failed	BuildWorks: could not switch the edited part.
+blueprint.anchors_recalc_failed	could not recalculate snap points
+blueprint.scale_persistence_suffix	{0} (Valheim has no native scale persistence)
+placement.anchor_geometry_missing	BuildWorks: no support geometry was found for this part.
+common.local_short	Local
+common.world_short	World
+common.first	first
+common.second	second
+unit.centimeters	{0} cm
+unit.meters	{0} m
+hud.offset_values	{0} offset  X {1:F2}  Y {2:F2}  Z {3:F2} m
+hud.rotation_values	{0} rotation  X {1:F1}°  Y {2:F1}°  Z {3:F1}°
+hint.blueprint_part	BLUEPRINT PART: arrows and rings affect only this part · F9/APPLY — return to building · UNDO — revert
+hint.blueprint_limit	BLUEPRINT: safe limit of {0} parts exceeded; reduce the array
+hint.repeat_begin	DRAG A GOLD ARROW — define a row; parameters apply to each following copy
+hint.repeat_direction	Wheel: {0} direction · Ctrl+wheel: camera · parameters apply to each following copy
+hint.blueprint_world	BLUEPRINT IN WORLD: the whole group moves · ARRAY / CONTOUR repeat the group · PLACE — build · F9/Esc — return
+hint.blueprint_group_edit	{0}: the whole group moves · click/Tab — select a part · APPLY — save · Esc — exit
+hint.blueprint_piece_edit	{0}: part {1}/{2} · click/Tab — select another · APPLY — save · Esc — exit
+hint.contour_ring_hover	Ring highlighted: {0} parts; LMB selects this contour
+hint.contour_chain_hover	Chain highlighted: {0} parts; LMB selects this contour
+hint.contour_aim	CONTOUR: aim at a visible chain edge to highlight it; LMB selects
+hint.contour_closed_ready	Closed contour ready: {0} parts preserve the source position; PLACE builds the chain
+hint.contour_open_ready	Open contour ready: {0} parts preserve the source position; PLACE builds the chain
+editor.save_failed	BuildWorks: could not save blueprint changes — {0}.
+editor.saved	BuildWorks: {0} saved; the editor closed without world placement.
+editor.minimum_parts	build at least two parts
+editor.temp_bounds_failed	could not determine temporary part bounds
+editor.temp_layout_invalid	the temporary construction has invalid bounds
+editor.closed_without_saving	BuildWorks: blueprint editor closed without saving.
+placement.array_limit	BuildWorks: reduce the array — at most {0} parts per placement.
+placement.finish_layout_first	BuildWorks: finish the layout first.
+placement.plan_corrupt	BuildWorks: the blueprint plan is damaged; recreate it.
+placement.first_piece_unavailable	BuildWorks: the first blueprint part is unavailable in the current hammer.
+placement.position_rejected	BuildWorks: Valheim rejected the position. Correct the part and retry.
+placement.first_piece_gone	BuildWorks: the first blueprint part is no longer available.
+placement.rollback_complete	BuildWorks: unfinished blueprint cancelled; removed parts: {0}.
+placement.rollback_pending	BuildWorks: cancellation is finishing; parts awaiting another removal attempt: {0}.
+placement.restore_build_camera_manually	BuildWorks: enable Build Camera manually.
+lighting.studio	STUDIO
+lighting.warm	WARM
+lighting.soft	SOFT
+editor.new_blueprint	New blueprint
+editor.open_data_failed	Could not open blueprint data: {0}
+editor.already_disposed	the editor is already disposed
+editor.already_open	the editor is already open
+editor.group_name	Group {0}
+editor.hint.modal	Esc — continue editing · choose an action in the dialog
+editor.hint.context_menu	Hold RMB · point at an action · release · outside the menu — cancel
+editor.hint.outliner_menu	LMB — choose action · Esc — close outliner menu
+editor.hint.viewport_settings	LMB — change viewport settings · Esc — close settings
+editor.hint.catalog_input	Type text · Esc — close catalog
+editor.hint.catalog	LMB — select · Q/E or PgUp/PgDn — pages · Esc — close
+editor.hint.reparent	Release over a group to move · over root to ungroup · Esc — cancel
+editor.hint.numeric_scrub	Drag — change · Shift — fine · Ctrl — coarse · RMB — reset
+editor.hint.text_input	Type a value · Enter — apply · Esc — cancel input
+editor.hint.part_placement	LMB — add · wheel — rotate · Q/E — snap point · MMB — delete · Ctrl+Z/Y — history · G — transform · RMB — catalog
+editor.hint.gizmo_drag	Release LMB — apply · Esc — cancel · Shift — no step
+editor.hint.camera	WASD — camera · Q/E — down/up · Shift — faster · release RMB — finish
+editor.hint.array_ready	Enter — create copies · Esc — cancel · wheel — count · Ctrl+wheel — camera
+editor.hint.array_begin	Drag one gold arrow for the first row · the other for the second · Esc — cancel
+editor.hint.contour_ready	LMB — another chain · Enter — create copies · Esc — cancel
+editor.hint.contour_begin	LMB on support — find chain · Esc — cancel
+editor.hint.transform	Drag — change · N — composite frame · H/Shift+H/Ctrl+H/Alt+H — visibility · Q — select
+editor.hint.empty	Tab — add part · MMB — camera
+editor.hint.select	LMB — select · G — transform · N — composite frame · H/Shift+H/Ctrl+H/Alt+H — visibility · Tab — add
+editor.anchor_controls	Shift + LMB pins the point · Ctrl + drag performs magnetic movement.
+editor.anchor_on_axis	The point lies on the rotation axis. Choose another point or axis.
+editor.anchor_drag_magnetic	Magnet: drag to a point on another part · Shift — free.
+editor.anchor_drag_rotate	Rotate around the pinned point · X/Y/Z set the axis before dragging.
+editor.array_drag_ready	Array: {0} × {1} · the other gold arrow sets the second direction · Enter applies.
+editor.anchor_rotation_free	Point rotation: free.
+editor.anchor_rotation_axis	Point rotation: {0} axis. Press again to remove the constraint.
+editor.anchor_unpinned	Point pin removed.
+editor.anchor_pinned	Point pinned: drag another point to rotate.
+editor.select_available_first	Select an available part or group first.
+editor.contour_tool_hint	Contour: LMB on a support edge finds a chain · Enter applies · Esc cancels.
+editor.array_tool_hint	Array: drag a gold arrow for a row and the other for a grid · Enter applies · Esc cancels.
+editor.transform_tool_hint	Point: rotate · Shift+LMB: pin · Ctrl+drag: magnet · X/Y/Z: axis · RMB+WASD: camera
+editor.select_tool_hint	LMB: select · Ctrl+LMB: add to selection · marquee: multiple parts · RMB: catalog
+editor.catalog_empty	The part catalog is empty.
+editor.catalog_open_failed	Could not open the part catalog.
+editor.part_has_no_snaps	The part has no native snap points.
+editor.snap_free	Snap point: FREE
+editor.snap_selected	Snap point: {0}
+editor.snap_mode_free	FREE
+editor.snap_mode_auto	AUTO
+editor.part_placement_started	LMB — add “{0}” · wheel — rotate · Q/E — snap point · RMB+WASD — camera · Esc — finish
+editor.part_added	Added. LMB — another · wheel — rotate · G — transform · Esc — finish.
+editor.part_placement_finished	Part placement finished.
+editor.array_fit	FIT LENGTH
+editor.array_exact_step	{0} M
+editor.array_no_gap	NO GAP
+editor.array_gap	+ {0} M
+editor.array_step_info	Step: {0} / {1} m
+editor.array_preview	Array: {0} × {1} · wheel: count · Ctrl+wheel: view scale · Enter: apply.
+editor.array_rejected	Array rejected: {0}
+editor.array_preview_required	Array: configure a valid preview first.
+editor.array_applied	Array applied: {0} copies · one Undo operation.
+editor.array_cancelled	Array cancelled.
+editor.generated.copy	copy
+editor.generated.array	array
+editor.generated.contour	contour
+editor.array_limit_direction	Array: the 128-part limit has no room in this direction.
+editor.contour_warning	Contour: {0}
+editor.contour_ring_preview	Contour: ring of {0} supports · {1} copies · Enter applies · Esc cancels.
+editor.contour_chain_preview	Contour: chain of {0} supports · {1} copies · Enter applies · Esc cancels.
+editor.contour_rejected	Contour rejected: {0}
+editor.contour_select_chain_first	Contour: select a support chain first.
+editor.contour_applied	Contour applied: {0} copies · one Undo operation.
+editor.contour_cancelled	Contour cancelled.
+editor.part_count	{0} parts
+editor.snap_steps	Step: {0} m · {1}°
+editor.axes_local	Axes: local.
+editor.axes_world	Axes: world.
+editor.anchors_all	Points: all points of the selected part are visible.
+editor.anchors_nearby	Points: only the nearest visible points are shown.
+editor.mesh_snap	Magnet: native points and model bounds.
+editor.native_snap	Magnet: native connection points only.
+editor.pivot_selection	Pivot: selection center.
+editor.pivot_active	Pivot: active part.
+editor.pivot_bounds	Pivot: bounds point {0}/9.
+editor.transform_reset	Selection transform reset as one Undo operation.
+editor.transform_already_reset	Transform is already reset.
+editor.cannot_save_title	CANNOT SAVE
+editor.minimum_two_parts	A blueprint needs at least two parts.
+editor.part_not_found	Part not found: {0}
+editor.save_error_title	SAVE ERROR
+editor.blueprint_saved	Blueprint saved.
+editor.library_refresh_failed	Blueprint saved, but the library list did not refresh.
+editor.blueprint_points_failed	Could not determine blueprint points.
+editor.view.active_short	ACTIVE
+editor.view.all	ALL
+editor.view.all_categories	ALL CATEGORIES
+editor.view.all_materials	ALL MATERIALS
+editor.view.all_sources	ALL SOURCES
+editor.view.all_types	ALL TYPES
+editor.view.angle_step_tooltip	Rotation step in degrees. Click to type; drag to change.
+editor.view.angle_step_value	ANGLE STEP: {0}
+editor.view.apply	APPLY
+editor.view.apply_name	APPLY NAME
+editor.view.array_angle_step_tooltip	Drag step for turn, pitch and roll: the same presets as F9.
+editor.view.array_arrows	Array arrows
+editor.view.array_direction	Drag a gold arrow to set the direction
+editor.view.array_gap_tooltip	Extra spacing between repeats. Turn, Pitch and Roll define orientation.
+editor.view.array_move_step_tooltip	Drag step for rise: the same presets as F9.
+editor.view.array_wheel_help	Wheel: count · Ctrl: view scale
+editor.view.auto_group_center	Auto: group center
+editor.view.axes_local	AXES: LOCAL
+editor.view.axes_world	AXES: WORLD
+editor.view.axis_rotation_tooltip	Rotate the point around the {0} axis. Press again to remove the constraint.
+editor.view.back	BACK
+editor.view.blueprint	BLUEPRINT
+editor.view.blueprint_category	BLUEPRINT CATEGORY
+editor.view.blueprint_frame	BLUEPRINT FRAME
+editor.view.blueprint_frame_marker	\n◆ Blueprint frame
+editor.view.blueprint_info	Parts: {0} · groups: {1}\nBounds: {2}\nMissing prefabs: {3}\nPreview: current view\n{4}
+editor.view.blueprint_name	BLUEPRINT NAME
+editor.view.blueprint_properties	BLUEPRINT PROPERTIES
+editor.view.blueprints	BLUEPRINTS
+editor.view.bounds_pivot	BOUNDS PIVOT
+editor.view.bounds_m	{0} × {1} × {2} m
+editor.view.cancel	CANCEL
+editor.view.catalog	CATALOG
+editor.view.catalog_breadcrumb	{0}  ›  {1}  ›  {2}{3}     ·     Found: {4}
+editor.view.catalog_search	SEARCH BY NAME, PREFAB OR #…
+editor.view.categories_down	CATEGORIES ↓
+editor.view.categories_up	↑ CATEGORIES
+editor.view.category	CATEGORY
+editor.view.center	CENTER
+editor.view.chain_parts	chain · {0} parts
+editor.view.changes_saved	Changes saved
+editor.view.close	CLOSE
+editor.view.contour	CONTOUR
+editor.view.contour_info	SOURCE: {0}\nSUPPORT: {1}\nCOPIES: {2}\n\nLMB on support — select chain.\nEnter: apply · Esc: cancel.
+editor.view.copies_enter_esc	Copies: {0} · Enter / Esc
+editor.view.copy_suffix	 + {0} copies
+editor.view.delete	DELETE
+editor.view.discard_exit	EXIT WITHOUT SAVING
+editor.view.duplicate	DUPLICATE
+editor.view.empty_group	Empty group
+editor.view.exact_step	EXACT STEP
+editor.view.exit	EXIT
+editor.view.frame_all	FRAME ALL
+editor.view.frame_blueprint	FRAME BLUEPRINT
+editor.view.frame_selected	SELECTED
+editor.view.free_rotation_tooltip	Free rotation of the selected point around the support.
+editor.view.free_short	FREE
+editor.view.gizmo_size	GIZMO SIZE · %
+editor.view.grid_tooltip	Show / hide grid
+editor.view.group	GROUP
+editor.view.group_info	Group · {0} parts\n◇ Pivot: {1}\nEye/Lock are inherited by child parts.
+editor.view.group_pivot	GROUP PIVOT: {0}
+editor.view.group_root	GROUP: ROOT
+editor.view.group_selection	Group selection (Ctrl+G)
+editor.view.group_short	GR
+editor.view.group_two_objects	Select at least two neighboring objects to create a group
+editor.view.group_value	GROUP: {0}
+editor.view.hidden	HIDDEN
+editor.view.hide_object	Hide object
+editor.view.hide_selected	HIDE SELECTED
+editor.view.in_row	IN ROW
+editor.view.interface_scale	INTERFACE: {0}%
+editor.view.invalid_array_values	Check values: count 1–128, scale step −300% to 300%.
+editor.view.invalid_metadata	Name: 1–48 characters; category: 1–24.
+editor.view.invalid_red_field	A red field contains an invalid value.
+editor.view.invalid_scale_step	Scale step: −99% to 300%; zero or at least 1% in magnitude.
+editor.view.invalid_steps	Step: 0.001–10 m; angle: 0.1–90°.
+editor.view.light	LIGHT
+editor.view.light_neutral	NEUTRAL
+editor.view.light_outline	OUTLINE
+editor.view.light_warm	WARM
+editor.view.lock	LOCK
+editor.view.lock_object	Lock object
+editor.view.lock_selected	LOCK SELECTED
+editor.view.lock_unlock	LOCK / UNLOCK
+editor.view.locked	LOCKED
+editor.view.magnet_game	MAGNET: GAME
+editor.view.magnet_mesh	MAGNET: MESH
+editor.view.material	MATERIAL
+editor.view.materials_down	MATERIALS ↓
+editor.view.materials_up	↑ MATERIALS
+editor.view.missing	MISSING
+editor.view.mixed	MIXED
+editor.view.move_arrows	Move arrows
+editor.view.move_step_short	Δm
+editor.view.move_step_tooltip	Movement step in meters. Click to type; drag to change; Shift for fine; Ctrl for coarse.
+editor.view.move_step_value	MOVE STEP: {0}
+editor.view.move_to_root	MOVE TO ROOT
+editor.view.multi_selection_info	{0} objects\nCommands below affect the whole selection as one Undo operation.
+editor.view.name	NAME
+editor.view.name_short	NAME
+editor.view.new_group_short	+GR
+editor.view.no_geometry	no geometry
+editor.view.non_uniform_scale	non-uniform (from blueprint)
+editor.view.not_selected	not selected
+editor.view.nothing_selected	Nothing selected
+editor.view.numeric_axis_tooltip	{0} · {1}. Click to type; drag horizontally to change.
+editor.view.object_count	{0} objects
+editor.view.object_properties	OBJECT PROPERTIES
+editor.view.objects	OBJECTS
+editor.view.offset_delta_m	OFFSET Δ · M
+editor.view.operation_metrics	Selected: {0}    Δ {1} / {2} / {3} m    Rotation {4} / {5} / {6}°    Scale {7}%    {8}/128{9}
+editor.view.outliner	OBJECT TREE
+editor.view.outliner_commands	Object tree commands
+editor.view.pack	PACK
+editor.view.page_help	Page · Q / E · wheel over parts · PgUp / PgDn
+editor.view.part	PART
+editor.view.part_info	Prefab: {0}\nScale: {1}\nGroup: {2}{3}
+editor.view.part_properties	PART PROPERTIES
+editor.view.part_type	PART TYPE
+editor.view.parts	PARTS
+editor.view.parts_delta	{0} parts · DELTA
+editor.view.pin	PIN
+editor.view.pin_anchor_tooltip	Pin the selected point to rotate around it. Shift + LMB on a point does the same.
+editor.view.pitch_deg	PITCH · °
+editor.view.points	Points
+editor.view.points_all	POINTS: ALL
+editor.view.points_nearby	POINTS: NEAR
+editor.view.position_m	POSITION · M
+editor.view.projection_tooltip	Perspective / orthographic view
+editor.view.properties	PROPERTIES
+editor.view.redo_tooltip	Redo (Ctrl+Y)
+editor.view.remove_blueprint_frame	REMOVE BLUEPRINT FRAME
+editor.view.remove_group_pivot	REMOVE GROUP PIVOT: {0}
+editor.view.remove_old_frame	REMOVE OLD FRAME
+editor.view.rename	RENAME
+editor.view.rename_one_object	Select one object to rename
+editor.view.rename_selection	Rename selected object
+editor.view.reparent_selection	Move selection into a group
+editor.view.reparent_short	→GR
+editor.view.reset	RESET
+editor.view.reset_settings	RESET SETTINGS
+editor.view.retry	RETRY
+editor.view.return	RETURN
+editor.view.ring_parts	ring · {0} parts
+editor.view.rise_m	RISE · M
+editor.view.roll_deg	ROLL · °
+editor.view.root_drop_tooltip	Drag selected objects here to move them from a group to the root.
+editor.view.rotation_deg	ROTATION · °
+editor.view.rotation_delta_deg	ROTATION Δ · °
+editor.view.rotation_rings	Rotation rings
+editor.view.rows	ROWS
+editor.view.save	SAVE
+editor.view.save_exit	SAVE AND EXIT
+editor.view.saved_blueprints	SAVED BLUEPRINTS
+editor.view.scale_handle	Scale handle
+editor.view.scale_step	SCALE STEP · %
+editor.view.scale_step_label	Scale step · %
+editor.view.scale_step_repeat_tooltip	Uniform scale change on every repeat, in percent.
+editor.view.scale_step_tooltip	Uniform scale step in percentage points. Shift disables the step. RMB resets to 10%.
+editor.view.search	SEARCH…
+editor.view.select	SELECT
+editor.view.select_first	Select a part or group first
+editor.view.select_in_viewport	Nothing selected\n\nSelect a part in the viewport or object tree.
+editor.view.select_object_or_group	Select an object or group first
+editor.view.selection	SELECTION
+editor.view.selection_help	OBJECT SELECTION\n\nLMB — select part\nShift / Ctrl + LMB — add or remove\nShift in tree — row range\nCtrl+A — all available\nDrag empty space — marquee selection\n\nCAMERA\nMMB — orbit\nShift + MMB — pan\nRMB + WASD — fly\nWheel — zoom\n\nEsc — cancel tool / clear selection\nSelected: {0}
+editor.view.selection_locked_hidden	Selection is hidden or locked. Unlock it on the PART tab.
+editor.view.selection_scale	SELECTION SCALE · %
+editor.view.selection_unavailable	Selected parts are hidden or locked
+editor.view.settings	SETTINGS
+editor.view.settings_tooltip	Grid, projection, framing and gizmo sizes
+editor.view.show_all	SHOW ALL
+editor.view.show_hide	SHOW / HIDE
+editor.view.show_object	Show object
+editor.view.show_selected	SHOW SELECTED
+editor.view.source	SOURCE
+editor.view.step_percent	STEP, %
+editor.view.symmetry	SYMMETRY
+editor.view.title	BUILDWORKS · BLUEPRINT
+editor.view.to_group	TO GROUP: {0}
+editor.view.to_root	TO ROOT
+editor.view.toggle_lock	Lock or unlock selection
+editor.view.toggle_visibility	Show or hide selection
+editor.view.tool_array	Array (A)\nRepeat the selection in two directions
+editor.view.tool_contour	Contour (C)\nRepeat the selection along native snap-point chains
+editor.view.tool_parameters	TOOL PARAMETERS
+editor.view.tool_select	Select (Q)\nShift + LMB — add/remove\nCtrl+A — select all available
+editor.view.tool_transform	Transform (G/F9)\nArrows — move, rings — rotate\nAlt + drag arrow — duplicate\nSeparate square — uniform scale
+editor.view.transform_short	TRANSFORM
+editor.view.turn_deg	TURN · °
+editor.view.type	TYPE
+editor.view.undo_tooltip	Undo (Ctrl+Z)
+editor.view.ungroup	UNGROUP
+editor.view.ungroup_selection	Ungroup selected group
+editor.view.ungroup_short	−GR
+editor.view.uniform_scale	UNIFORM SCALE · %
+editor.view.unlock	UNLOCK
+editor.view.unlock_object	Unlock object
+editor.view.unpin	UNPIN
+editor.view.unsaved_changes	There are unsaved changes
+editor.view.unsaved_message	Save changes to “{0}” before exiting?
+editor.view.unsaved_title	UNSAVED CHANGES
+editor.view.viewport_help	F9/G transform  •  points — match  •  MMB orbit  •  Shift+MMB pan  •  wheel zoom
+editor.view.viewport_settings	VIEW SETTINGS
+editor.view.visibility	VISIBILITY

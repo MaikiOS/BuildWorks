@@ -9,6 +9,13 @@ namespace BepInEx
 }
 namespace OstrixMods.BuildWorks
 {
+    // Stable production IDs required by the isolated editor catalog model.
+    internal static class HammerCatalogOrganizer
+    {
+        internal const string OtherGroup = "other";
+        internal const string VanillaSource = "vanilla";
+    }
+
     internal class PrecisionPlacementSession
     {
         internal readonly struct TransformSnapshot

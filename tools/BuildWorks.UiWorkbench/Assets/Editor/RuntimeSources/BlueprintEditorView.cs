@@ -48,9 +48,15 @@ namespace OstrixMods.BuildWorks
             PrefabName = prefabName;
             DisplayName = displayName;
             Icon = icon;
-            Category = string.IsNullOrWhiteSpace(category) ? "ПРОЧЕЕ" : category;
-            Material = string.IsNullOrWhiteSpace(material) ? "ПРОЧЕЕ" : material;
-            Source = string.IsNullOrWhiteSpace(source) ? "ВАНИЛЬНОЕ" : source;
+            Category = string.IsNullOrWhiteSpace(category)
+                ? HammerCatalogOrganizer.OtherGroup
+                : category;
+            Material = string.IsNullOrWhiteSpace(material)
+                ? HammerCatalogOrganizer.OtherGroup
+                : material;
+            Source = string.IsNullOrWhiteSpace(source)
+                ? HammerCatalogOrganizer.VanillaSource
+                : source;
             Index = Math.Max(0, index);
             Blueprint = blueprint;
         }
@@ -263,8 +269,15 @@ namespace OstrixMods.BuildWorks
         }
     }
 
+    /// <summary>
+    /// Builds and updates the Blueprint Editor canvas, tool inspector, catalog,
+    /// status/help bars, and object-tree interactions.
+    /// </summary>
     internal sealed class BlueprintEditorView : IDisposable
     {
+        private static string T(string key, params object[] arguments) =>
+            BuildWorksLocalization.Text(key, arguments);
+
         private static readonly Color PanelColor = new Color(0.055f, 0.060f, 0.060f, 0.97f);
         private static readonly Color PanelRaised = new Color(0.105f, 0.095f, 0.080f, 0.985f);
         private static readonly Color ButtonColor = new Color(0.155f, 0.145f, 0.125f, 1f);
@@ -349,7 +362,7 @@ namespace OstrixMods.BuildWorks
         private readonly Button arrayMoveStepButton;
         private readonly Button arrayAngleStepButton;
         private readonly Button arraySymmetryButton;
-        private string arrayDirectionInfo = "Потяни золотую стрелку — задай направление";
+        private string arrayDirectionInfo = T("editor.view.array_direction");
         private readonly TMP_InputField arrayRotation;
         private readonly TMP_InputField arrayScaleStepX;
         private readonly TMP_Text arrayInfo;
@@ -472,788 +485,793 @@ namespace OstrixMods.BuildWorks
                 typeof(GraphicRaycaster));
             try
             {
-            canvasObject.hideFlags = HideFlags.HideAndDontSave;
-            canvas = canvasObject.GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.overrideSorting = true;
-            canvas.sortingOrder = 5000;
-            canvasScaler = canvasObject.GetComponent<CanvasScaler>();
-            canvasScaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            canvasScaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-            canvasScaler.matchWidthOrHeight = 1f;
-            UpdateCanvasScale();
+                canvasObject.hideFlags = HideFlags.HideAndDontSave;
+                canvas = canvasObject.GetComponent<Canvas>();
+                canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                canvas.overrideSorting = true;
+                canvas.sortingOrder = 5000;
+                canvasScaler = canvasObject.GetComponent<CanvasScaler>();
+                canvasScaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+                canvasScaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+                canvasScaler.matchWidthOrHeight = 1f;
+                UpdateCanvasScale();
 
-            safeRoot = CreateRect("SafeArea", canvasObject.transform);
-            top = CreatePanel("Top", safeRoot, PanelRaised, BlueprintEditorSkin.Surface.Header);
-            rail = CreatePanel("ToolRail", safeRoot, PanelColor);
-            viewport = CreatePanel("ViewportInput", safeRoot, Color.clear, null);
-            viewport.GetComponent<Image>().raycastTarget = false;
-            rightColumn = CreatePanel("RightColumn", safeRoot, PanelColor, null);
-            outliner = CreatePanel("Outliner", safeRoot, PanelRaised);
-            inspector = CreatePanel("Inspector", safeRoot, PanelRaised);
-            status = CreatePanel("Status", safeRoot, PanelColor, BlueprintEditorSkin.Surface.Header);
-            status.GetComponent<Image>().raycastTarget = false;
+                safeRoot = CreateRect("SafeArea", canvasObject.transform);
+                top = CreatePanel("Top", safeRoot, PanelRaised, BlueprintEditorSkin.Surface.Header);
+                rail = CreatePanel("ToolRail", safeRoot, PanelColor);
+                viewport = CreatePanel("ViewportInput", safeRoot, Color.clear, null);
+                viewport.GetComponent<Image>().raycastTarget = false;
+                rightColumn = CreatePanel("RightColumn", safeRoot, PanelColor, null);
+                outliner = CreatePanel("Outliner", safeRoot, PanelRaised);
+                inspector = CreatePanel("Inspector", safeRoot, PanelRaised);
+                status = CreatePanel("Status", safeRoot, PanelColor, BlueprintEditorSkin.Surface.Header);
+                status.GetComponent<Image>().raycastTarget = false;
 
-            HorizontalLayoutGroup topLayout = top.gameObject.AddComponent<HorizontalLayoutGroup>();
-            topLayout.padding = new RectOffset(8, 8, 12, 12);
-            topLayout.spacing = 8f;
-            topLayout.childAlignment = TextAnchor.MiddleLeft;
-            topLayout.childControlHeight = true;
-            topLayout.childForceExpandHeight = true;
-            topLayout.childForceExpandWidth = false;
-            CreateButton("Back", top, "НАЗАД", 80f, () => CloseRequested?.Invoke());
-            fullTitle = CreateText("Header", top, "BUILDWORKS · ЧЕРТЁЖ", 18f,
-                FontStyles.Bold, TextAlignmentOptions.MidlineLeft).gameObject;
-            fullTitle.AddComponent<LayoutElement>().preferredWidth = 300f;
-            documentTitle = CreateText("Document", top, "Новый чертёж", 16f,
-                FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
-            documentTitle.overflowMode = TextOverflowModes.Ellipsis;
-            documentTitle.gameObject.AddComponent<LayoutElement>().preferredWidth = 220f;
-            undoButton = CreateIconButton(
-                "Undo", top, "undo", "↶", 44f, () => UndoRequested?.Invoke(),
-                "Отменить (Ctrl+Z)");
-            redoButton = CreateIconButton(
-                "Redo", top, "redo", "↷", 44f, () => RedoRequested?.Invoke(),
-                "Повторить (Ctrl+Y)");
-            CreateIconButton("View", top, null, "НАСТРОЙКИ", 112f,
-                ToggleViewportSettings, "Сетка, проекция, кадрирование и размеры манипуляторов");
-            Button lightButton = CreateButton("Lighting", top, "СВЕТ", 92f, CycleLighting);
-            lightingLabel = lightButton.GetComponentInChildren<TMP_Text>();
-            saveButton = CreateButton("Save", top, "СОХРАНИТЬ", 110f,
-                () => SaveRequested?.Invoke(), primary: true);
-            CreateButton("Exit", top, "ВЫЙТИ", 80f, () => CloseRequested?.Invoke());
-            compactPaneButton = CreateButton("CompactPane", top, "ОБЪЕКТЫ", 96f,
-                ToggleCompactPane);
-            compactPaneButton.gameObject.SetActive(false);
+                HorizontalLayoutGroup topLayout = top.gameObject.AddComponent<HorizontalLayoutGroup>();
+                topLayout.padding = new RectOffset(8, 8, 12, 12);
+                topLayout.spacing = 8f;
+                topLayout.childAlignment = TextAnchor.MiddleLeft;
+                topLayout.childControlHeight = true;
+                topLayout.childForceExpandHeight = true;
+                topLayout.childForceExpandWidth = false;
+                CreateButton("Back", top, T("editor.view.back"), 80f, () => CloseRequested?.Invoke());
+                fullTitle = CreateText("Header", top, T("editor.view.title"), 18f,
+                    FontStyles.Bold, TextAlignmentOptions.MidlineLeft).gameObject;
+                fullTitle.AddComponent<LayoutElement>().preferredWidth = 300f;
+                documentTitle = CreateText("Document", top, T("editor.new_blueprint"), 16f,
+                    FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+                documentTitle.overflowMode = TextOverflowModes.Ellipsis;
+                documentTitle.gameObject.AddComponent<LayoutElement>().preferredWidth = 220f;
+                undoButton = CreateIconButton(
+                    "Undo", top, "undo", "↶", 44f, () => UndoRequested?.Invoke(),
+                    T("editor.view.undo_tooltip"));
+                redoButton = CreateIconButton(
+                    "Redo", top, "redo", "↷", 44f, () => RedoRequested?.Invoke(),
+                    T("editor.view.redo_tooltip"));
+                CreateIconButton("View", top, null, T("editor.view.settings"), 112f,
+                    ToggleViewportSettings, T("editor.view.settings_tooltip"));
+                Button lightButton = CreateButton("Lighting", top, T("editor.view.light"), 92f, CycleLighting);
+                lightingLabel = lightButton.GetComponentInChildren<TMP_Text>();
+                saveButton = CreateButton("Save", top, T("editor.view.save"), 110f,
+                    () => SaveRequested?.Invoke(), primary: true);
+                CreateButton("Exit", top, T("editor.view.exit"), 80f, () => CloseRequested?.Invoke());
+                compactPaneButton = CreateButton("CompactPane", top, T("editor.view.objects"), 96f,
+                    ToggleCompactPane);
+                compactPaneButton.gameObject.SetActive(false);
 
-            var railScroll = rail.gameObject.AddComponent<ScrollRect>();
-            railScroll.horizontal = false;
-            railScroll.vertical = true;
-            railScroll.movementType = ScrollRect.MovementType.Clamped;
-            railViewport = CreateRect("RailViewport", rail);
-            railViewport.gameObject.AddComponent<RectMask2D>();
-            RectTransform railContent = CreateRect("RailContent", railViewport);
-            railContent.anchorMin = new Vector2(0f, 1f);
-            railContent.anchorMax = new Vector2(1f, 1f);
-            railContent.pivot = new Vector2(0.5f, 1f);
-            railContent.offsetMin = railContent.offsetMax = Vector2.zero;
-            var railLayout = railContent.gameObject.AddComponent<VerticalLayoutGroup>();
-            railLayout.padding = new RectOffset(6, 6, 4, 4);
-            railLayout.spacing = 4f;
-            railLayout.childAlignment = TextAnchor.UpperCenter;
-            railLayout.childControlWidth = true;
-            railLayout.childControlHeight = false;
-            railLayout.childForceExpandWidth = true;
-            railLayout.childForceExpandHeight = false;
-            ContentSizeFitter railFitter = railContent.gameObject.AddComponent<ContentSizeFitter>();
-            railFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            railScroll.viewport = railViewport;
-            railScroll.content = railContent;
-            AddTool(railContent, BlueprintEditorTool.Select,
-                "select", "↖", "Выбор (Q)\nShift + ЛКМ — добавить/убрать\nCtrl+A — выбрать всё доступное");
-            AddTool(railContent, BlueprintEditorTool.Transform,
-                "axes", "✥", "Трансформация (G/F9)\nСтрелки — сдвиг, кольца — вращение\nAlt + тяни стрелку — копия\nОтдельный квадрат — общий масштаб");
-            AddTool(railContent, BlueprintEditorTool.Array,
-                "duplicate", "▣", "Массив (A)\nПовторить выбранное по двум направлениям");
-            AddTool(railContent, BlueprintEditorTool.Contour,
-                "snap", "⌁", "Контур (C)\nПовторить выбранное по цепи штатных snap points");
+                var railScroll = rail.gameObject.AddComponent<ScrollRect>();
+                railScroll.horizontal = false;
+                railScroll.vertical = true;
+                railScroll.movementType = ScrollRect.MovementType.Clamped;
+                railViewport = CreateRect("RailViewport", rail);
+                railViewport.gameObject.AddComponent<RectMask2D>();
+                RectTransform railContent = CreateRect("RailContent", railViewport);
+                railContent.anchorMin = new Vector2(0f, 1f);
+                railContent.anchorMax = new Vector2(1f, 1f);
+                railContent.pivot = new Vector2(0.5f, 1f);
+                railContent.offsetMin = railContent.offsetMax = Vector2.zero;
+                var railLayout = railContent.gameObject.AddComponent<VerticalLayoutGroup>();
+                railLayout.padding = new RectOffset(6, 6, 4, 4);
+                railLayout.spacing = 4f;
+                railLayout.childAlignment = TextAnchor.UpperCenter;
+                railLayout.childControlWidth = true;
+                railLayout.childControlHeight = false;
+                railLayout.childForceExpandWidth = true;
+                railLayout.childForceExpandHeight = false;
+                ContentSizeFitter railFitter = railContent.gameObject.AddComponent<ContentSizeFitter>();
+                railFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+                railScroll.viewport = railViewport;
+                railScroll.content = railContent;
+                AddTool(railContent, BlueprintEditorTool.Select,
+                    "select", "↖", T("editor.view.tool_select"));
+                AddTool(railContent, BlueprintEditorTool.Transform,
+                    "axes", "✥", T("editor.view.tool_transform"));
+                AddTool(railContent, BlueprintEditorTool.Array,
+                    "duplicate", "▣", T("editor.view.tool_array"));
+                AddTool(railContent, BlueprintEditorTool.Contour,
+                    "snap", "⌁", T("editor.view.tool_contour"));
 
-            RectTransform rootDrop = CreatePanel("OutlinerRootDrop", outliner, Color.clear, null);
-            SetTopAnchored(rootDrop, 8f, 4f, 56f, 32f);
-            outlinerTitle = CreateText("OutlinerTitle", rootDrop, "ДЕРЕВО ОБЪЕКТОВ", 16f,
-                FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
-            SetInsets(outlinerTitle.rectTransform, 4f, 0f, 4f, 0f);
-            AddOutlinerDrop(rootDrop, null, true);
-            AddTooltip(rootDrop, "Перетащи выбранные объекты сюда, чтобы вынести их из группы в корень.");
-            RectTransform outlinerCommands = CreateRect("OutlinerCommands", outliner);
-            SetTopAnchored(outlinerCommands, 8f, 40f, 8f, 32f);
-            var commandsLayout = outlinerCommands.gameObject.AddComponent<HorizontalLayoutGroup>();
-            commandsLayout.spacing = 4f;
-            commandsLayout.childControlWidth = commandsLayout.childControlHeight = true;
-            commandsLayout.childForceExpandWidth = true;
-            AddOutlinerToolbarButton(outlinerCommands, "NewGroup", null, "+ГР", "Пустая группа",
-                () => CreateGroupRequested?.Invoke(), false);
-            outlinerNewGroupButton = AddOutlinerToolbarButton(outlinerCommands,
-                "GroupSelection", "group", "ГР", "Сгруппировать выбранное (Ctrl+G)",
-                () => GroupRequested?.Invoke(), false);
-            AddOutlinerToolbarButton(outlinerCommands, "UngroupSelection", "ungroup", "−ГР",
-                "Разгруппировать выбранную группу", () => UngroupRequested?.Invoke());
-            AddOutlinerToolbarButton(outlinerCommands, "ReparentSelection", "folder", "→ГР",
-                "Перенести выбранное в группу", () => ToggleOutlinerMenu(true));
-            AddOutlinerToolbarButton(outlinerCommands, "RenameSelection", "edit", "ИМЯ",
-                "Переименовать выбранный объект", BeginRenameSelection);
-            AddOutlinerToolbarButton(outlinerCommands, "HideSelectionToolbar", "visibility", "●",
-                "Показать или скрыть выбранное", ToggleSelectedVisibility);
-            AddOutlinerToolbarButton(outlinerCommands, "LockSelectionToolbar", "lock", "■",
-                "Заблокировать или разблокировать выбранное", ToggleSelectedLock);
-            Button outlinerMenuButton = CreateIconButton(
-                "OutlinerMenuButton", outliner, "menu", "⋯", 44f,
-                ToggleOutlinerMenu, "Команды дерева объектов");
-            SetTopRight((RectTransform)outlinerMenuButton.transform, 6f, 4f, 44f, 32f);
-            RectTransform searchPanel = CreatePanel("Search", outliner, ButtonColor);
-            SetTopAnchored(searchPanel, 8f, 76f, 88f, 32f);
-            TMP_Text search = CreateText("Text", searchPanel, string.Empty, 13f,
-                FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
-            search.color = MutedColor;
-            search.raycastTarget = true;
-            SetInsets((RectTransform)search.transform, 8f, 0f, 8f, 0f);
-            TMP_Text searchPlaceholder = CreateText(
-                "Placeholder", searchPanel, "ПОИСК…", 13f,
-                FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
-            searchPlaceholder.color = MutedColor;
-            SetInsets((RectTransform)searchPlaceholder.transform, 8f, 0f, 8f, 0f);
-            outlinerSearch = searchPanel.gameObject.AddComponent<TMP_InputField>();
-            skin.Apply(outlinerSearch, input: true);
-            outlinerSearch.textComponent = search;
-            outlinerSearch.placeholder = searchPlaceholder;
-            outlinerSearch.lineType = TMP_InputField.LineType.SingleLine;
-            outlinerSearch.characterLimit = 48;
-            outlinerSearch.onValueChanged.AddListener(_ =>
-            {
-                if (boundDocument != null) RebuildOutliner(boundDocument);
-            });
-            outlinerFilterButton = CreateButton(
-                "OutlinerFilter", outliner, "ВСЕ", 76f, CycleOutlinerFilter);
-            SetTopRight((RectTransform)outlinerFilterButton.transform, 8f, 76f, 76f, 32f);
-            RectTransform rowViewport = CreateRect("RowsViewport", outliner);
-            outlinerRowViewport = rowViewport;
-            SetInsets(rowViewport, 4f, (float)BlueprintEditorLayout.OutlinerHeaderHeight - 4f, 4f, 4f);
-            rowViewport.gameObject.AddComponent<RectMask2D>();
-            ScrollRect rowScroll = outliner.gameObject.AddComponent<ScrollRect>();
-            rowScroll.horizontal = false;
-            rowScroll.vertical = true;
-            rowScroll.movementType = ScrollRect.MovementType.Clamped;
-            rowScroll.scrollSensitivity = 88f;
-            outlinerRows = CreateRect("Rows", rowViewport);
-            outlinerRows.anchorMin = new Vector2(0f, 1f);
-            outlinerRows.anchorMax = new Vector2(1f, 1f);
-            outlinerRows.pivot = new Vector2(0.5f, 1f);
-            var rowsLayout = outlinerRows.gameObject.AddComponent<VerticalLayoutGroup>();
-            rowsLayout.spacing = 0f;
-            rowsLayout.childControlWidth = true;
-            rowsLayout.childControlHeight = true;
-            rowsLayout.childForceExpandWidth = true;
-            rowsLayout.childForceExpandHeight = false;
-            ContentSizeFitter rowsFitter = outlinerRows.gameObject.AddComponent<ContentSizeFitter>();
-            rowsFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            rowScroll.viewport = rowViewport;
-            rowScroll.content = outlinerRows;
-            BlueprintEditorOutlinerDrag treeDrag = outlinerRows.gameObject.AddComponent<BlueprintEditorOutlinerDrag>();
-            treeDrag.Begin = BeginOutlinerDrag;
-            treeDrag.Drag = data => outlinerDragPosition = data.position;
-            treeDrag.End = EndOutlinerDrag;
-
-            outlinerMenu = CreatePanel("OutlinerMenu", outliner, PanelColor).gameObject;
-            RectTransform outlinerMenuRect = (RectTransform)outlinerMenu.transform;
-            SetInsets(outlinerMenuRect, 4f,
-                (float)BlueprintEditorLayout.OutlinerHeaderHeight - 4f, 4f, 4f);
-            outlinerMenu.gameObject.AddComponent<RectMask2D>();
-            RectTransform outlinerMenuViewport = CreateRect(
-                "Viewport", outlinerMenu.transform);
-            SetInsets(outlinerMenuViewport, 6f, 6f, 6f, 6f);
-            outlinerMenuViewport.gameObject.AddComponent<RectMask2D>();
-            ScrollRect outlinerMenuScroll = outlinerMenu.AddComponent<ScrollRect>();
-            outlinerMenuScroll.horizontal = false;
-            outlinerMenuScroll.vertical = true;
-            outlinerMenuScroll.movementType = ScrollRect.MovementType.Clamped;
-            outlinerMenuScroll.scrollSensitivity = 88f;
-            outlinerMenuRows = CreateRect("Rows", outlinerMenuViewport);
-            outlinerMenuRows.anchorMin = new Vector2(0f, 1f);
-            outlinerMenuRows.anchorMax = new Vector2(1f, 1f);
-            outlinerMenuRows.pivot = new Vector2(0.5f, 1f);
-            var outlinerMenuLayout =
-                outlinerMenuRows.gameObject.AddComponent<VerticalLayoutGroup>();
-            outlinerMenuLayout.spacing = 4f;
-            outlinerMenuLayout.childControlHeight = true;
-            outlinerMenuLayout.childControlWidth = true;
-            outlinerMenuLayout.childForceExpandHeight = false;
-            outlinerMenuLayout.childForceExpandWidth = true;
-            ContentSizeFitter outlinerMenuFitter =
-                outlinerMenuRows.gameObject.AddComponent<ContentSizeFitter>();
-            outlinerMenuFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            outlinerMenuScroll.viewport = outlinerMenuViewport;
-            outlinerMenuScroll.content = outlinerMenuRows;
-            outlinerMenu.SetActive(false);
-
-            outlinerContextMenu = CreatePanel(
-                "OutlinerContextMenu", safeRoot, PanelRaised);
-            outlinerContextMenu.anchorMin = outlinerContextMenu.anchorMax =
-                new Vector2(0.5f, 0.5f);
-            outlinerContextMenu.pivot = new Vector2(0f, 1f);
-            outlinerContextMenu.sizeDelta = new Vector2(500f, 220f);
-            RectTransform contextViewport = CreateRect("Viewport", outlinerContextMenu);
-            outlinerContextViewport = contextViewport;
-            SetInsets(contextViewport, 8f, 8f, 8f, 8f);
-            contextViewport.gameObject.AddComponent<RectMask2D>();
-            ScrollRect contextScroll = outlinerContextMenu.gameObject.AddComponent<ScrollRect>();
-            contextScroll.horizontal = false;
-            contextScroll.vertical = true;
-            contextScroll.movementType = ScrollRect.MovementType.Clamped;
-            contextScroll.scrollSensitivity = 80f;
-            outlinerContextRows = CreateRect("Rows", contextViewport);
-            outlinerContextRows.anchorMin = new Vector2(0f, 1f);
-            outlinerContextRows.anchorMax = new Vector2(1f, 1f);
-            outlinerContextRows.pivot = new Vector2(0.5f, 1f);
-            outlinerContextRows.anchoredPosition = Vector2.zero;
-            contextScroll.viewport = contextViewport;
-            contextScroll.content = outlinerContextRows;
-            outlinerContextMenu.gameObject.SetActive(false);
-
-            inspectorTitle = CreateText("InspectorTitle", inspector, "СВОЙСТВА ОБЪЕКТА", 16f,
-                FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
-            SetTopAnchored((RectTransform)inspectorTitle.transform, 8f, 4f, 8f, 32f);
-            inspectorTabs = CreateRect("InspectorTabs", inspector);
-            SetTopAnchored(inspectorTabs, 8f, 38f, 8f, 28f);
-            var tabLayout = inspectorTabs.gameObject.AddComponent<HorizontalLayoutGroup>();
-            tabLayout.spacing = 4f;
-            tabLayout.childControlHeight = true;
-            tabLayout.childControlWidth = false;
-            tabLayout.childForceExpandHeight = true;
-            tabLayout.childForceExpandWidth = false;
-            inspectorTabButtons[0] = CreateButton(
-                "TransformTab", inspectorTabs, "ТРАНСФ.", 104f, () => SetInspectorTab(0), true);
-            inspectorTabButtons[1] = CreateButton(
-                "PartTab", inspectorTabs, "ДЕТАЛЬ", 76f, () => SetInspectorTab(1));
-            inspectorTabButtons[2] = CreateButton(
-                "BlueprintTab", inspectorTabs, "ЧЕРТЁЖ", 76f, () => SetInspectorTab(2));
-            foreach (Button button in inspectorTabButtons)
-            {
-                LayoutElement layout = button.GetComponent<LayoutElement>();
-                layout.minHeight = layout.preferredHeight = 28f;
-                ((RectTransform)button.transform).sizeDelta = new Vector2(
-                    ((RectTransform)button.transform).sizeDelta.x, 28f);
-                button.GetComponentInChildren<TMP_Text>().fontSize = 11f;
-            }
-            RectTransform inspectorViewport = CreateRect("InspectorViewport", inspector);
-            SetInsets(inspectorViewport, 12f, 42f, 12f, 8f);
-            inspectorViewport.gameObject.AddComponent<RectMask2D>();
-            RectTransform inspectorBody = CreateRect("InspectorBody", inspectorViewport);
-            inspectorBody.anchorMin = new Vector2(0f, 1f);
-            inspectorBody.anchorMax = new Vector2(1f, 1f);
-            inspectorBody.pivot = new Vector2(0.5f, 1f);
-            inspectorBody.anchoredPosition = Vector2.zero;
-            inspectorBody.sizeDelta = new Vector2(0f, 500f);
-            inspectorContent = CreateText("InspectorContent", inspectorBody,
-                "Ничего не выбрано", 14f, FontStyles.Normal, TextAlignmentOptions.TopLeft);
-            inspectorContent.textWrappingMode = TextWrappingModes.Normal;
-            SetInsets((RectTransform)inspectorContent.transform, 0f, 0f, 0f, 0f);
-
-            inspectorEditPanel = CreateRect("InspectorEdit", inspectorBody).gameObject;
-            SetInsets((RectTransform)inspectorEditPanel.transform, 0f, 0f, 0f, 0f);
-            inspectorName = CreateInput(
-                "Name", inspectorEditPanel.transform, new Vector2(0f, -24f), 228f);
-            inspectorName.gameObject.SetActive(false);
-            inspectorName.onSubmit.AddListener(_ => SubmitInspector());
-            inspectorPositionLabel = CreateInspectorLabel(
-                inspectorEditPanel.transform, "ПОЛОЖЕНИЕ · М", 0f);
-            CreateAxisInputs(inspectorEditPanel.transform, inspectorPosition, 24f, 0.01f);
-            inspectorRotationLabel = CreateInspectorLabel(
-                inspectorEditPanel.transform, "ПОВОРОТ · °", 62f);
-            CreateAxisInputs(inspectorEditPanel.transform, inspectorRotation, 86f, 0.25f);
-            foreach (TMP_InputField input in inspectorPosition)
-            {
-                input.onSubmit.AddListener(_ => SubmitInspector());
-                input.onEndEdit.AddListener(_ => SubmitInspector());
-            }
-            foreach (TMP_InputField input in inspectorRotation)
-            {
-                input.onSubmit.AddListener(_ => SubmitInspector());
-                input.onEndEdit.AddListener(_ => SubmitInspector());
-            }
-            inspectorScaleLabel = CreateInspectorLabel(
-                inspectorEditPanel.transform, "РАВНОМЕРНЫЙ МАСШТАБ · %", 124f);
-            inspectorScale = CreateInput(
-                "Scale", inspectorEditPanel.transform, new Vector2(0f, -148f), 228f,
-                1f, 1f, 400f, true, 100f);
-            inspectorScale.GetComponent<BlueprintEditorNumericScrub>().StepProvider = () => ScaleStepPercent;
-            inspectorScale.onSubmit.AddListener(_ => SubmitInspector());
-            inspectorScale.onEndEdit.AddListener(_ => SubmitInspector());
-            Button applyInspector = CreateButton(
-                "ApplyInspector", inspectorEditPanel.transform, "ПРИМЕНИТЬ", 120f,
-                SubmitInspector, primary: true);
-            SetInspectorButton((RectTransform)applyInspector.transform, 0f, 188f, 120f);
-            inspectorResetButton = CreateButton(
-                "ResetInspector", inspectorEditPanel.transform, "СБРОСИТЬ", 100f,
-                ResetInspector);
-            SetInspectorButton((RectTransform)inspectorResetButton.transform, 128f, 188f, 100f);
-            inspectorSpaceButton = CreateButton(
-                "TransformSpace", inspectorEditPanel.transform, "ОСИ: ЛОК.", 110f,
-                () => SpaceRequested?.Invoke());
-            SetInspectorButton((RectTransform)inspectorSpaceButton.transform, 0f, 232f, 70f);
-            TMP_Text moveStepLabel = CreateText(
-                "MoveStepLabel", inspectorEditPanel.transform, "Δм", 10f,
-                FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
-            SetTopLeft((RectTransform)moveStepLabel.transform, 76f, 232f, 22f, 36f);
-            inspectorMoveStep = CreateInput(
-                "MoveStep", inspectorEditPanel.transform, new Vector2(98f, -232f), 48f,
-                0.001f, 0.001f, 10f, resetValue: 0.05f);
-            TMP_Text angleStepLabel = CreateText(
-                "AngleStepLabel", inspectorEditPanel.transform, "Δ°", 10f,
-                FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
-            SetTopLeft((RectTransform)angleStepLabel.transform, 150f, 232f, 22f, 36f);
-            inspectorAngleStep = CreateInput(
-                "AngleStep", inspectorEditPanel.transform, new Vector2(172f, -232f), 56f,
-                0.1f, 0.1f, 90f, resetValue: 1f);
-            inspectorMoveStep.onEndEdit.AddListener(_ => SubmitSnap());
-            inspectorAngleStep.onEndEdit.AddListener(_ => SubmitSnap());
-            AddTooltip((RectTransform)inspectorMoveStep.transform,
-                "Шаг перемещения в метрах. Клик — ввод, тяни — изменить, Shift — точно, Ctrl — крупно.");
-            AddTooltip((RectTransform)inspectorAngleStep.transform,
-                "Шаг вращения в градусах. Клик — ввод, тяни — изменить.");
-            inspectorAnchorVisibilityButton = CreateButton(
-                "TransformAnchors", inspectorEditPanel.transform, "ТОЧКИ: ВСЕ", 110f,
-                () => AnchorVisibilityRequested?.Invoke());
-            SetInspectorButton(
-                (RectTransform)inspectorAnchorVisibilityButton.transform, 0f, 276f, 110f);
-            inspectorMagnetButton = CreateButton(
-                "TransformMagnet", inspectorEditPanel.transform, "МАГНИТ: ИГРА", 110f,
-                () => MeshSnapRequested?.Invoke());
-            SetInspectorButton(
-                (RectTransform)inspectorMagnetButton.transform, 118f, 276f, 110f);
-            inspectorSelectionPivotButton = CreateButton(
-                "PivotSelection", inspectorEditPanel.transform, "ЦЕНТР", 70f,
-                () => PivotModeRequested?.Invoke(BlueprintEditorPivotMode.SelectionCenter));
-            SetInspectorButton(
-                (RectTransform)inspectorSelectionPivotButton.transform, 0f, 320f, 70f);
-            inspectorActivePivotButton = CreateButton(
-                "PivotActive", inspectorEditPanel.transform, "АКТИВ.", 70f,
-                () => PivotModeRequested?.Invoke(BlueprintEditorPivotMode.ActiveObject));
-            SetInspectorButton(
-                (RectTransform)inspectorActivePivotButton.transform, 78f, 320f, 70f);
-            inspectorPivotButton = CreateButton(
-                "TransformPivot", inspectorEditPanel.transform, "ВЫБРАТЬ", 72f,
-                () => PivotRequested?.Invoke());
-            SetInspectorButton((RectTransform)inspectorPivotButton.transform, 156f, 320f, 72f);
-            TMP_Text boundsPivotLabel = CreateInspectorLabel(
-                inspectorEditPanel.transform, "PIVOT ПО ГРАНИЦАМ", 366f);
-            string[] pivotLabels = { "↖", "↑", "↗", "←", "•", "→", "↙", "↓", "↘" };
-            for (int index = 0; index < inspectorBoundsButtons.Length; ++index)
-            {
-                int captured = index;
-                Button button = CreateButton(
-                    "BoundsPivot" + index,
-                    inspectorEditPanel.transform,
-                    pivotLabels[index],
-                    68f,
-                    () => BoundsPivotRequested?.Invoke(captured));
-                RectTransform rect = (RectTransform)button.transform;
-                SetInspectorButton(rect, index % 3 * 80f, 390f + index / 3 * 34f, 68f);
-                rect.sizeDelta = new Vector2(68f, 28f);
-                inspectorBoundsButtons[index] = button;
-            }
-            inspectorSelectionPivotButton.gameObject.SetActive(false);
-            inspectorActivePivotButton.gameObject.SetActive(false);
-            inspectorPivotButton.gameObject.SetActive(false);
-            boundsPivotLabel.gameObject.SetActive(false);
-            foreach (Button button in inspectorBoundsButtons)
-                button.gameObject.SetActive(false);
-            CreateAnchorControls(inspectorEditPanel.transform, 320f);
-            inspectorEditPanel.SetActive(false);
-
-            groupEditPanel = CreateRect("GroupEdit", inspectorBody).gameObject;
-            SetInsets((RectTransform)groupEditPanel.transform, 0f, 0f, 0f, 0f);
-            CreateInspectorLabel(groupEditPanel.transform, "ИМЯ", 0f);
-            groupName = CreateInput(
-                "GroupName", groupEditPanel.transform, new Vector2(0f, -24f), 228f);
-            groupName.onSubmit.AddListener(_ => SubmitDetailName());
-            detailInfo = CreateText(
-                "DetailInfo", groupEditPanel.transform, string.Empty, 12f,
-                FontStyles.Normal, TextAlignmentOptions.TopLeft);
-            detailInfo.textWrappingMode = TextWrappingModes.Normal;
-            SetTopAnchored((RectTransform)detailInfo.transform, 0f, 72f, 0f, 82f);
-            detailVisibilityButton = CreateButton(
-                "DetailVisibility", groupEditPanel.transform, "ВИДИМОСТЬ", 228f,
-                ToggleDetailVisibility);
-            SetInspectorButton((RectTransform)detailVisibilityButton.transform, 0f, 160f, 228f);
-            detailLockButton = CreateButton(
-                "DetailLock", groupEditPanel.transform, "БЛОКИРОВКА", 228f,
-                ToggleDetailLock);
-            SetInspectorButton((RectTransform)detailLockButton.transform, 0f, 204f, 228f);
-            detailGroupButton = CreateButton(
-                "DetailGroup", groupEditPanel.transform, "ГРУППА: ROOT", 228f,
-                CycleDetailGroup);
-            SetInspectorButton((RectTransform)detailGroupButton.transform, 0f, 248f, 228f);
-            Button applyGroup = CreateButton(
-                "ApplyDetailName", groupEditPanel.transform, "ПРИМЕНИТЬ ИМЯ", 228f,
-                SubmitDetailName, primary: true);
-            SetInspectorButton((RectTransform)applyGroup.transform, 0f, 292f, 228f);
-            groupEditPanel.SetActive(false);
-
-            blueprintEditPanel = CreateRect("BlueprintEdit", inspectorBody).gameObject;
-            SetInsets((RectTransform)blueprintEditPanel.transform, 0f, 0f, 0f, 0f);
-            CreateInspectorLabel(blueprintEditPanel.transform, "ИМЯ ЧЕРТЕЖА", 0f);
-            blueprintName = CreateInput(
-                "BlueprintName", blueprintEditPanel.transform, new Vector2(0f, -24f), 228f);
-            CreateInspectorLabel(blueprintEditPanel.transform, "КАТЕГОРИЯ", 72f);
-            blueprintCategory = CreateInput(
-                "BlueprintCategory", blueprintEditPanel.transform,
-                new Vector2(0f, -96f), 228f);
-            blueprintName.onSubmit.AddListener(_ => SubmitBlueprintMetadata());
-            blueprintCategory.onSubmit.AddListener(_ => SubmitBlueprintMetadata());
-            blueprintInfo = CreateText(
-                "BlueprintInfo", blueprintEditPanel.transform, string.Empty, 12f,
-                FontStyles.Normal, TextAlignmentOptions.TopLeft);
-            blueprintInfo.textWrappingMode = TextWrappingModes.Normal;
-            SetTopAnchored((RectTransform)blueprintInfo.transform, 0f, 142f, 0f, 92f);
-            Button frameBlueprint = CreateButton(
-                "FrameBlueprint", blueprintEditPanel.transform, "ПОКАЗАТЬ ВЕСЬ ЧЕРТЁЖ", 228f,
-                () => FrameAllRequested?.Invoke());
-            SetInspectorButton((RectTransform)frameBlueprint.transform, 0f, 240f, 228f);
-            Button applyBlueprint = CreateButton(
-                "ApplyBlueprint", blueprintEditPanel.transform, "ПРИМЕНИТЬ", 228f,
-                SubmitBlueprintMetadata, primary: true);
-            SetInspectorButton((RectTransform)applyBlueprint.transform, 0f, 284f, 228f);
-            blueprintEditPanel.SetActive(false);
-
-            arrayEditPanel = CreateRect("ArrayEdit", inspectorBody).gameObject;
-            SetInsets((RectTransform)arrayEditPanel.transform, 0f, 0f, 0f, 0f);
-            arrayCount[0] = CreateArrayField("ArrayCountX", "В РЯДУ", 0f, 0f, 1f, 1f, 128f, true, 2f);
-            arrayCount[1] = CreateArrayField("ArrayCountY", "РЯДОВ", 118f, 0f, 1f, 1f, 128f, true, 1f);
-            arrayDistributionButton = CreateButton("ArrayDistribution", arrayEditPanel.transform,
-                "УПАКОВАТЬ", 110f, () => ArrayDistributionRequested?.Invoke());
-            SetInspectorButton((RectTransform)arrayDistributionButton.transform, 0f, 44f, 110f);
-            arrayStepButton = CreateButton("ArrayStep", arrayEditPanel.transform,
-                "БЕЗ ЗАЗОРА", 110f, () => ArrayStepRequested?.Invoke());
-            SetInspectorButton((RectTransform)arrayStepButton.transform, 118f, 44f, 110f);
-            AddTooltip((RectTransform)arrayStepButton.transform, "Дополнительный зазор между повторами. Ориентацию задают Поворот, Наклон и Крен.");
-            arrayRise = CreateArrayField("ArrayRise", "ПОДЪЁМ · М", 0f, 84f, .05f, -100f, 100f);
-            arrayRotation = CreateArrayField("ArrayRotation", "ПОВОРОТ · °", 118f, 84f, 1f, -360f, 360f);
-            arrayPitch = CreateArrayField("ArrayPitch", "НАКЛОН · °", 0f, 128f, 1f, -360f, 360f);
-            arrayRoll = CreateArrayField("ArrayRoll", "КРЕН · °", 118f, 128f, 1f, -360f, 360f);
-            arraySymmetryButton = CreateButton("ArraySymmetry", arrayEditPanel.transform,
-                "СИММЕТРИЯ", 110f, () => ArraySymmetryRequested?.Invoke());
-            SetInspectorButton((RectTransform)arraySymmetryButton.transform, 0f, 172f, 110f);
-            arrayScaleStepX = CreateArrayField("ArrayScaleX", "ШАГ МАСШТАБА · %", 118f, 168f, 1f, -300f, 300f);
-            AddTooltip((RectTransform)arrayScaleStepX.transform, "Равномерное изменение масштаба на каждый повтор, в процентах.");
-            arrayMoveStepButton = CreateButton("ArrayMoveStep", arrayEditPanel.transform,
-                "ШАГ М: 0,05", 110f, () => ArrayMoveStepRequested?.Invoke());
-            SetInspectorButton((RectTransform)arrayMoveStepButton.transform, 0f, 212f, 110f);
-            arrayAngleStepButton = CreateButton("ArrayAngleStep", arrayEditPanel.transform,
-                "ШАГ °: 1", 110f, () => ArrayAngleStepRequested?.Invoke());
-            SetInspectorButton((RectTransform)arrayAngleStepButton.transform, 118f, 212f, 110f);
-            AddTooltip((RectTransform)arrayMoveStepButton.transform,
-                "Шаг drag для подъёма: те же значения, что в F9.");
-            AddTooltip((RectTransform)arrayAngleStepButton.transform,
-                "Шаг drag для поворота, наклона и крена: те же значения, что в F9.");
-            arrayInfo = CreateText("ArrayInfo", arrayEditPanel.transform, arrayDirectionInfo,
-                11f, FontStyles.Normal, TextAlignmentOptions.TopLeft);
-            arrayInfo.color = MutedColor;
-            arrayInfo.textWrappingMode = TextWrappingModes.Normal;
-            SetTopAnchored((RectTransform)arrayInfo.transform, 0f, 254f, 0f, 24f);
-            arrayApplyButton = CreateButton("ApplyArray", arrayEditPanel.transform, "ПРИМЕНИТЬ", 110f,
-                () => ApplyArrayRequested?.Invoke(), primary: true);
-            SetInspectorButton((RectTransform)arrayApplyButton.transform, 0f, 280f, 110f);
-            Button cancelArray = CreateButton("CancelArray", arrayEditPanel.transform, "ОТМЕНА", 110f,
-                () => CancelArrayRequested?.Invoke());
-            SetInspectorButton((RectTransform)cancelArray.transform, 118f, 280f, 110f);
-            CreateAnchorControls(arrayEditPanel.transform, 320f);
-            arrayCount[0].SetTextWithoutNotify("2");
-            arrayCount[1].SetTextWithoutNotify("1");
-            foreach (TMP_InputField field in new[] { arrayCount[0], arrayCount[1], arrayRise,
-                arrayRotation, arrayPitch, arrayRoll, arrayScaleStepX })
-            {
-                field.onValueChanged.AddListener(_ => SubmitArrayPreview(clearOnInvalid: false));
-                field.onEndEdit.AddListener(_ => SubmitArrayPreview(clearOnInvalid: true));
-            }
-            BlueprintEditorNumericScrub riseScrub = arrayRise.GetComponent<BlueprintEditorNumericScrub>();
-            riseScrub.StepProvider = riseScrub.UnitsPerPixelProvider = () => translationStep;
-            foreach (TMP_InputField field in new[] { arrayRotation, arrayPitch, arrayRoll })
-            {
-                BlueprintEditorNumericScrub scrub = field.GetComponent<BlueprintEditorNumericScrub>();
-                scrub.StepProvider = scrub.UnitsPerPixelProvider = () => rotationStep;
-            }
-            arrayEditPanel.SetActive(false);
-
-            contourEditPanel = CreateRect("ContourEdit", inspectorBody).gameObject;
-            SetInsets((RectTransform)contourEditPanel.transform, 0f, 0f, 0f, 0f);
-            CreateInspectorLabel(contourEditPanel.transform, "КОНТУР", 0f);
-            contourInfo = CreateText(
-                "ContourInfo", contourEditPanel.transform, string.Empty, 13f,
-                FontStyles.Normal, TextAlignmentOptions.TopLeft);
-            contourInfo.textWrappingMode = TextWrappingModes.Normal;
-            SetTopAnchored((RectTransform)contourInfo.transform, 0f, 32f, 0f, 144f);
-            CreateCompactLabel(contourEditPanel.transform, "ШАГ, %", 184f);
-            contourScaleStep = CreateInput(
-                "ContourScale", contourEditPanel.transform, new Vector2(92f, -182f),
-                136f, 1f, -99f, 300f, true);
-            contourScaleStep.SetTextWithoutNotify("0");
-            contourScaleStep.onEndEdit.AddListener(_ => SubmitContourPreview());
-            contourApplyButton = CreateButton(
-                "ApplyContour", contourEditPanel.transform, "ПРИМЕНИТЬ", 228f,
-                () => ApplyContourRequested?.Invoke(), primary: true);
-            SetInspectorButton((RectTransform)contourApplyButton.transform, 0f, 228f, 110f);
-            Button cancelContour = CreateButton(
-                "CancelContour", contourEditPanel.transform, "ОТМЕНА", 228f,
-                () => CancelContourRequested?.Invoke());
-            SetInspectorButton((RectTransform)cancelContour.transform, 118f, 228f, 110f);
-            CreateAnchorControls(contourEditPanel.transform, 274f);
-            contourEditPanel.SetActive(false);
-
-            statusText = CreateText("StatusText", status,
-                "F9/G трансформация  •  точки — match  •  СКМ orbit  •  Shift+СКМ pan  •  колесо zoom",
-                13f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
-            statusText.color = MutedColor;
-            statusText.raycastTarget = false;
-            statusText.overflowMode = TextOverflowModes.Ellipsis;
-            SetInsets((RectTransform)statusText.transform, 12f, 2f, 12f, 24f);
-            statusHintText = CreateText("StatusHints", status, string.Empty,
-                12f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
-            statusHintText.color = TextColor;
-            statusHintText.raycastTarget = false;
-            statusHintText.overflowMode = TextOverflowModes.Ellipsis;
-            SetInsets((RectTransform)statusHintText.transform, 12f, 24f, 12f, 2f);
-
-            tooltip = CreatePanel("Tooltip", safeRoot, new Color(0.06f, 0.07f, 0.08f, 0.99f), BlueprintEditorSkin.Surface.Tooltip);
-            tooltip.GetComponent<Image>().raycastTarget = false;
-            tooltip.anchorMin = tooltip.anchorMax = new Vector2(0.5f, 0.5f);
-            tooltip.sizeDelta = new Vector2(250f, 58f);
-            tooltip.pivot = new Vector2(0f, 0.5f);
-            tooltipText = CreateText("TooltipText", tooltip, string.Empty, 13f,
-                FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
-            SetInsets((RectTransform)tooltipText.transform, 10f, 4f, 10f, 4f);
-            tooltip.gameObject.SetActive(false);
-
-            viewportControls = CreatePanel("ViewportControls", viewport, Color.clear, null);
-            SetTopRight(viewportControls, 12f, 12f, 84f, 38f);
-            gridButton = CreateIconButton("GridToggle", viewportControls, null, "#", 38f,
-                () => { showGrid = !showGrid; PublishViewportSettings(); }, "Показать / скрыть сетку");
-            SetTopLeft((RectTransform)gridButton.transform, 0f, 0f, 38f, 38f);
-            projectionButton = CreateIconButton("ProjectionToggle", viewportControls, "frame", "◈", 38f,
-                () => { SetProjection(!orthographic); ProjectionChanged?.Invoke(orthographic); },
-                "Перспектива / ортографический вид");
-            SetTopLeft((RectTransform)projectionButton.transform, 46f, 0f, 38f, 38f);
-            SetSelected(gridButton, showGrid);
-            viewportSettings = CreatePanel("ViewportSettings", viewport, PanelRaised).gameObject;
-            SetTopRight((RectTransform)viewportSettings.transform, 12f, 56f, 320f, 454f);
-            TMP_Text viewTitle = CreateText("ViewportSettingsTitle", viewportSettings.transform,
-                "НАСТРОЙКИ ВИДА", 15f, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
-            SetTopLeft((RectTransform)viewTitle.transform, 12f, 8f, 240f, 28f);
-            Button viewClose = CreateButton("ViewportSettingsClose", viewportSettings.transform,
-                "×", 32f, HideViewportSettings);
-            SetTopRight((RectTransform)viewClose.transform, 8f, 8f, 32f, 28f);
-            Button frameAll = CreateButton("ViewportFrameAll", viewportSettings.transform, "ВСЁ В КАДР", 142f,
-                () => FrameAllRequested?.Invoke());
-            SetTopLeft((RectTransform)frameAll.transform, 12f, 44f, 142f, 32f);
-            Button frameSelected = CreateButton("ViewportFrameSelection", viewportSettings.transform, "ВЫДЕЛЕННОЕ", 142f,
-                () => FrameSelectionRequested?.Invoke());
-            SetTopLeft((RectTransform)frameSelected.transform, 164f, 44f, 142f, 32f);
-            TMP_Text sizeTitle = CreateText("GizmoSizeTitle", viewportSettings.transform,
-                "РАЗМЕР МАНИПУЛЯТОРОВ · %", 12f, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
-            SetTopLeft((RectTransform)sizeTitle.transform, 12f, 86f, 294f, 26f);
-            string[] sizeLabels = { "Стрелки", "Кольца вращения", "Стрелки массива", "Точки", "Ручка масштаба" };
-            for (int index = 0; index < viewportScaleInputs.Length; ++index)
-            {
-                TMP_Text sizeLabel = CreateText("GizmoSizeLabel" + index, viewportSettings.transform,
-                    sizeLabels[index], 13f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
-                SetTopLeft((RectTransform)sizeLabel.transform, 12f, 118f + index * 38f, 192f, 32f);
-                TMP_InputField sizeInput = CreateInput("GizmoSize" + index, viewportSettings.transform,
-                    new Vector2(212f, -118f - index * 38f), 94f, 1f, 50f, 250f, true, 100f);
-                ((RectTransform)sizeInput.transform).sizeDelta = new Vector2(94f, 32f);
-                sizeInput.SetTextWithoutNotify("100");
-                sizeInput.onEndEdit.AddListener(_ => PublishViewportSettings());
-                viewportScaleInputs[index] = sizeInput;
-            }
-            TMP_Text scaleStepLabel = CreateText("ScaleStepLabel", viewportSettings.transform,
-                "Шаг масштаба · %", 13f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
-            SetTopLeft(scaleStepLabel.rectTransform, 12f, 310f, 192f, 32f);
-            scaleStepInput = CreateInput("ScaleStepPercent", viewportSettings.transform,
-                new Vector2(212f, -310f), 94f, .1f, .1f, 100f, resetValue: 10f);
-            ((RectTransform)scaleStepInput.transform).sizeDelta = new Vector2(94f, 32f);
-            scaleStepInput.SetTextWithoutNotify("10");
-            scaleStepInput.onEndEdit.AddListener(_ => PublishScaleStep());
-            AddTooltip(scaleStepInput.transform as RectTransform,
-                "Шаг равномерного масштаба в процентных пунктах. Shift — без шага. ПКМ — 10%.");
-            interfaceScaleButton = CreateButton("InterfaceScale", viewportSettings.transform,
-                "ИНТЕРФЕЙС: 100%", 294f, CycleUiScale);
-            SetTopLeft((RectTransform)interfaceScaleButton.transform, 12f, 354f, 294f, 36f);
-            Button resetView = CreateButton("ViewportSettingsReset", viewportSettings.transform,
-                "СБРОСИТЬ НАСТРОЙКИ", 294f, () =>
+                RectTransform rootDrop = CreatePanel("OutlinerRootDrop", outliner, Color.clear, null);
+                SetTopAnchored(rootDrop, 8f, 4f, 56f, 32f);
+                outlinerTitle = CreateText("OutlinerTitle", rootDrop, T("editor.view.outliner"), 16f,
+                    FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+                SetInsets(outlinerTitle.rectTransform, 4f, 0f, 4f, 0f);
+                AddOutlinerDrop(rootDrop, null, true);
+                AddTooltip(rootDrop, T("editor.view.root_drop_tooltip"));
+                RectTransform outlinerCommands = CreateRect("OutlinerCommands", outliner);
+                SetTopAnchored(outlinerCommands, 8f, 40f, 8f, 32f);
+                var commandsLayout = outlinerCommands.gameObject.AddComponent<HorizontalLayoutGroup>();
+                commandsLayout.spacing = 4f;
+                commandsLayout.childControlWidth = commandsLayout.childControlHeight = true;
+                commandsLayout.childForceExpandWidth = true;
+                AddOutlinerToolbarButton(outlinerCommands, "NewGroup", null, T("editor.view.new_group_short"), T("editor.view.empty_group"),
+                    () => CreateGroupRequested?.Invoke(), false);
+                outlinerNewGroupButton = AddOutlinerToolbarButton(outlinerCommands,
+                    "GroupSelection", "group", T("editor.view.group_short"), T("editor.view.group_selection"),
+                    () => GroupRequested?.Invoke(), false);
+                AddOutlinerToolbarButton(outlinerCommands, "UngroupSelection", "ungroup", T("editor.view.ungroup_short"),
+                    T("editor.view.ungroup_selection"), () => UngroupRequested?.Invoke());
+                AddOutlinerToolbarButton(outlinerCommands, "ReparentSelection", "folder", T("editor.view.reparent_short"),
+                    T("editor.view.reparent_selection"), () => ToggleOutlinerMenu(true));
+                AddOutlinerToolbarButton(outlinerCommands, "RenameSelection", "edit", T("editor.view.name_short"),
+                    T("editor.view.rename_selection"), BeginRenameSelection);
+                AddOutlinerToolbarButton(outlinerCommands, "HideSelectionToolbar", "visibility", "●",
+                    T("editor.view.toggle_visibility"), ToggleSelectedVisibility);
+                AddOutlinerToolbarButton(outlinerCommands, "LockSelectionToolbar", "lock", "■",
+                    T("editor.view.toggle_lock"), ToggleSelectedLock);
+                Button outlinerMenuButton = CreateIconButton(
+                    "OutlinerMenuButton", outliner, "menu", "⋯", 44f,
+                    ToggleOutlinerMenu, T("editor.view.outliner_commands"));
+                SetTopRight((RectTransform)outlinerMenuButton.transform, 6f, 4f, 44f, 32f);
+                RectTransform searchPanel = CreatePanel("Search", outliner, ButtonColor);
+                SetTopAnchored(searchPanel, 8f, 76f, 88f, 32f);
+                TMP_Text search = CreateText("Text", searchPanel, string.Empty, 13f,
+                    FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+                search.color = MutedColor;
+                search.raycastTarget = true;
+                SetInsets((RectTransform)search.transform, 8f, 0f, 8f, 0f);
+                TMP_Text searchPlaceholder = CreateText(
+                    "Placeholder", searchPanel, T("editor.view.search"), 13f,
+                    FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+                searchPlaceholder.color = MutedColor;
+                SetInsets((RectTransform)searchPlaceholder.transform, 8f, 0f, 8f, 0f);
+                outlinerSearch = searchPanel.gameObject.AddComponent<TMP_InputField>();
+                skin.Apply(outlinerSearch, input: true);
+                outlinerSearch.textComponent = search;
+                outlinerSearch.placeholder = searchPlaceholder;
+                outlinerSearch.lineType = TMP_InputField.LineType.SingleLine;
+                outlinerSearch.characterLimit = 48;
+                outlinerSearch.onValueChanged.AddListener(_ =>
                 {
-                    scaleStepInput.SetTextWithoutNotify("10");
-                    PublishScaleStep();
-                    SetViewportSettings(1f, 1f, 1f, 1f, 1f, true);
-                    PublishViewportSettings();
+                    if (boundDocument != null) RebuildOutliner(boundDocument);
                 });
-            SetTopLeft((RectTransform)resetView.transform, 12f, 404f, 294f, 36f);
-            viewportSettings.SetActive(false);
+                outlinerFilterButton = CreateButton(
+                    "OutlinerFilter", outliner, T("editor.view.all"), 76f, CycleOutlinerFilter);
+                SetTopRight((RectTransform)outlinerFilterButton.transform, 8f, 76f, 76f, 32f);
+                RectTransform rowViewport = CreateRect("RowsViewport", outliner);
+                outlinerRowViewport = rowViewport;
+                SetInsets(rowViewport, 4f, (float)BlueprintEditorLayout.OutlinerHeaderHeight - 4f, 4f, 4f);
+                rowViewport.gameObject.AddComponent<RectMask2D>();
+                ScrollRect rowScroll = outliner.gameObject.AddComponent<ScrollRect>();
+                rowScroll.horizontal = false;
+                rowScroll.vertical = true;
+                rowScroll.movementType = ScrollRect.MovementType.Clamped;
+                rowScroll.scrollSensitivity = 88f;
+                outlinerRows = CreateRect("Rows", rowViewport);
+                outlinerRows.anchorMin = new Vector2(0f, 1f);
+                outlinerRows.anchorMax = new Vector2(1f, 1f);
+                outlinerRows.pivot = new Vector2(0.5f, 1f);
+                var rowsLayout = outlinerRows.gameObject.AddComponent<VerticalLayoutGroup>();
+                rowsLayout.spacing = 0f;
+                rowsLayout.childControlWidth = true;
+                rowsLayout.childControlHeight = true;
+                rowsLayout.childForceExpandWidth = true;
+                rowsLayout.childForceExpandHeight = false;
+                ContentSizeFitter rowsFitter = outlinerRows.gameObject.AddComponent<ContentSizeFitter>();
+                rowsFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+                rowScroll.viewport = rowViewport;
+                rowScroll.content = outlinerRows;
+                BlueprintEditorOutlinerDrag treeDrag = outlinerRows.gameObject.AddComponent<BlueprintEditorOutlinerDrag>();
+                treeDrag.Begin = BeginOutlinerDrag;
+                treeDrag.Drag = data => outlinerDragPosition = data.position;
+                treeDrag.End = EndOutlinerDrag;
 
-            catalog = CreatePanel(
-                "CatalogOverlay", safeRoot, new Color(0f, 0f, 0f, 0.72f), null).gameObject;
-            catalogPanel = CreatePanel("Catalog", catalog.transform, PanelRaised);
-            catalogPanel.anchorMin = catalogPanel.anchorMax = new Vector2(0.5f, 0.5f);
-            catalogPanel.pivot = new Vector2(0.5f, 0.5f);
-            catalogPanel.sizeDelta = new Vector2(1420f, 680f);
-            TMP_Text catalogTitle = CreateText(
-                "CatalogTitle", catalogPanel, "КАТАЛОГ", 18f,
-                FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
-            SetTopAnchored((RectTransform)catalogTitle.transform, 324f, 12f, 120f, 44f);
-            catalogPartsModeButton = CreateButton("CatalogPartsMode", catalogPanel,
-                "ДЕТАЛИ", 140f, () => SetCatalogMode(false), true);
-            SetTopLeft((RectTransform)catalogPartsModeButton.transform, 20f, 12f, 140f, 44f);
-            catalogBlueprintsModeButton = CreateButton("CatalogBlueprintsMode", catalogPanel,
-                "ЧЕРТЕЖИ", 140f, () => SetCatalogMode(true));
-            SetTopLeft((RectTransform)catalogBlueprintsModeButton.transform, 168f, 12f, 140f, 44f);
-            Button catalogClose = CreateButton(
-                "CatalogClose", catalogPanel, "ЗАКРЫТЬ", 88f, HideCatalog);
-            RectTransform catalogCloseRect = (RectTransform)catalogClose.transform;
-            catalogCloseRect.anchorMin = catalogCloseRect.anchorMax = new Vector2(1f, 1f);
-            catalogCloseRect.pivot = new Vector2(1f, 1f);
-            catalogCloseRect.anchoredPosition = new Vector2(-16f, -12f);
-            catalogCloseRect.sizeDelta = new Vector2(88f, 44f);
-            RectTransform catalogSearchPanel = CreatePanel(
-                "CatalogSearch", catalogPanel, ButtonColor);
-            SetTopAnchored(catalogSearchPanel, 20f, 64f, 20f, 36f);
-            TMP_Text catalogSearchText = CreateText(
-                "Text", catalogSearchPanel, string.Empty, 13f,
-                FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
-            catalogSearchText.raycastTarget = true;
-            SetInsets((RectTransform)catalogSearchText.transform, 8f, 0f, 8f, 0f);
-            TMP_Text catalogSearchPlaceholder = CreateText(
-                "Placeholder", catalogSearchPanel, "ПОИСК ПО НАЗВАНИЮ, PREFAB И #…", 13f,
-                FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
-            catalogSearchPlaceholder.color = MutedColor;
-            SetInsets((RectTransform)catalogSearchPlaceholder.transform, 8f, 0f, 8f, 0f);
-            catalogSearch = catalogSearchPanel.gameObject.AddComponent<TMP_InputField>();
-            skin.Apply(catalogSearch, input: true);
-            catalogSearch.textComponent = catalogSearchText;
-            catalogSearch.placeholder = catalogSearchPlaceholder;
-            catalogSearch.lineType = TMP_InputField.LineType.SingleLine;
-            catalogSearch.characterLimit = 48;
-            catalogSearch.onValueChanged.AddListener(_ =>
-            {
-                catalogPage = 0;
-                RebuildCatalog();
-            });
-            catalogCategoryTabs = CreateCatalogFilterStrip("CatalogCategoryTabs", "ТИП ДЕТАЛИ", 108f);
-            catalogSources = CreateCatalogFilterStrip("CatalogSources", "ИСТОЧНИК", 150f);
-            catalogMaterialTitle = CreateText("CatalogMaterialTitle", catalogPanel,
-                "МАТЕРИАЛ", 13f, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
-            SetTopLeft((RectTransform)catalogMaterialTitle.transform, 20f, 196f, 308f, 28f);
-            RectTransform catalogCategoryViewport = CreateRect(
-                "CatalogCategoryViewport", catalogPanel);
-            SetTopLeft(catalogCategoryViewport, 20f, 232f, 308f, 360f);
-            catalogCategoryViewport.gameObject.AddComponent<RectMask2D>();
-            catalogCategories = CreateRect("CatalogCategories", catalogCategoryViewport);
-            catalogCategories.anchorMin = new Vector2(0f, 1f);
-            catalogCategories.anchorMax = new Vector2(1f, 1f);
-            catalogCategories.pivot = new Vector2(0.5f, 1f);
-            catalogCategories.anchoredPosition = Vector2.zero;
-            var categoryLayout = catalogCategories.gameObject.AddComponent<GridLayoutGroup>();
-            categoryLayout.cellSize = new Vector2(152f, 36f);
-            categoryLayout.spacing = new Vector2(4f, 4f);
-            categoryLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-            categoryLayout.constraintCount = 2;
-            ContentSizeFitter categoryFitter =
-                catalogCategories.gameObject.AddComponent<ContentSizeFitter>();
-            categoryFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            ScrollRect categoryScroll =
-                catalogCategoryViewport.gameObject.AddComponent<ScrollRect>();
-            catalogMaterialScroll = categoryScroll;
-            categoryScroll.horizontal = false;
-            categoryScroll.vertical = true;
-            categoryScroll.movementType = ScrollRect.MovementType.Clamped;
-            categoryScroll.scrollSensitivity = 120f;
-            categoryScroll.viewport = catalogCategoryViewport;
-            categoryScroll.content = catalogCategories;
-            RectTransform catalogViewport = CreateRect("CatalogViewport", catalogPanel);
-            SetTopLeft(
-                catalogViewport,
-                348f,
-                196f,
-                (float)BlueprintEditorLayout.CatalogGridWidth,
-                (float)BlueprintEditorLayout.CatalogGridHeight);
-            catalogViewport.gameObject.AddComponent<RectMask2D>();
-            catalogViewport.gameObject.AddComponent<Image>().color = Color.clear;
-            catalogViewport.gameObject.AddComponent<BlueprintEditorCatalogScroll>().Scroll = delta =>
-            {
-                if (!HasCatalog || HasModal || IsTextInputFocused) return;
-                if (delta < 0f) NextCatalogPage();
-                else if (delta > 0f) PreviousCatalogPage();
-            };
-            catalogGrid = CreateRect("CatalogGrid", catalogViewport);
-            catalogGrid.anchorMin = new Vector2(0f, 1f);
-            catalogGrid.anchorMax = new Vector2(1f, 1f);
-            catalogGrid.pivot = new Vector2(0.5f, 1f);
-            var catalogLayout = catalogGrid.gameObject.AddComponent<GridLayoutGroup>();
-            catalogLayout.cellSize = new Vector2(
-                (float)BlueprintEditorLayout.CatalogCellWidth,
-                (float)BlueprintEditorLayout.CatalogCellHeight);
-            catalogLayout.spacing = Vector2.one * (float)BlueprintEditorLayout.CatalogCellGap;
-            catalogLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-            catalogLayout.constraintCount = BlueprintEditorLayout.CatalogColumns;
-            catalogLayout.childAlignment = TextAnchor.UpperLeft;
-            ContentSizeFitter catalogFitter =
-                catalogGrid.gameObject.AddComponent<ContentSizeFitter>();
-            catalogFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+                outlinerMenu = CreatePanel("OutlinerMenu", outliner, PanelColor).gameObject;
+                RectTransform outlinerMenuRect = (RectTransform)outlinerMenu.transform;
+                SetInsets(outlinerMenuRect, 4f,
+                    (float)BlueprintEditorLayout.OutlinerHeaderHeight - 4f, 4f, 4f);
+                outlinerMenu.gameObject.AddComponent<RectMask2D>();
+                RectTransform outlinerMenuViewport = CreateRect(
+                    "Viewport", outlinerMenu.transform);
+                SetInsets(outlinerMenuViewport, 6f, 6f, 6f, 6f);
+                outlinerMenuViewport.gameObject.AddComponent<RectMask2D>();
+                ScrollRect outlinerMenuScroll = outlinerMenu.AddComponent<ScrollRect>();
+                outlinerMenuScroll.horizontal = false;
+                outlinerMenuScroll.vertical = true;
+                outlinerMenuScroll.movementType = ScrollRect.MovementType.Clamped;
+                outlinerMenuScroll.scrollSensitivity = 88f;
+                outlinerMenuRows = CreateRect("Rows", outlinerMenuViewport);
+                outlinerMenuRows.anchorMin = new Vector2(0f, 1f);
+                outlinerMenuRows.anchorMax = new Vector2(1f, 1f);
+                outlinerMenuRows.pivot = new Vector2(0.5f, 1f);
+                var outlinerMenuLayout =
+                    outlinerMenuRows.gameObject.AddComponent<VerticalLayoutGroup>();
+                outlinerMenuLayout.spacing = 4f;
+                outlinerMenuLayout.childControlHeight = true;
+                outlinerMenuLayout.childControlWidth = true;
+                outlinerMenuLayout.childForceExpandHeight = false;
+                outlinerMenuLayout.childForceExpandWidth = true;
+                ContentSizeFitter outlinerMenuFitter =
+                    outlinerMenuRows.gameObject.AddComponent<ContentSizeFitter>();
+                outlinerMenuFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+                outlinerMenuScroll.viewport = outlinerMenuViewport;
+                outlinerMenuScroll.content = outlinerMenuRows;
+                outlinerMenu.SetActive(false);
 
-            catalogPreviousPage = CreateButton(
-                "CatalogPrevious", catalogPanel, "<", 44f, PreviousCatalogPage);
-            SetBottomLeft((RectTransform)catalogPreviousPage.transform, 348f, 14f, 44f, 36f);
-            catalogPageText = CreateText(
-                "CatalogPage", catalogPanel, "1 / 1", 13f,
-                FontStyles.Bold, TextAlignmentOptions.Center);
-            RectTransform catalogPageRect = (RectTransform)catalogPageText.transform;
-            catalogPageRect.anchorMin = catalogPageRect.anchorMax = new Vector2(0f, 0f);
-            catalogPageRect.pivot = new Vector2(0f, 0f);
-            catalogPageRect.anchoredPosition = new Vector2(400f, 14f);
-            catalogPageRect.sizeDelta = new Vector2(100f, 36f);
-            catalogNextPage = CreateButton(
-                "CatalogNext", catalogPanel, ">", 44f, NextCatalogPage);
-            SetBottomLeft((RectTransform)catalogNextPage.transform, 508f, 14f, 44f, 36f);
-            catalogPageInput = CreateInput("CatalogPageJump", catalogPanel,
-                new Vector2(570f, -630f), 68f, 0f, resetValue: 1f);
-            ((RectTransform)catalogPageInput.transform).sizeDelta = new Vector2(68f, 36f);
-            catalogPageInput.contentType = TMP_InputField.ContentType.IntegerNumber;
-            catalogPageInput.onEndEdit.AddListener(_ => JumpCatalogPage());
-            TMP_Text pageHint = CreateText("CatalogPageHint", catalogPanel,
-                "Страница · Q / E · колесо над деталями · PgUp / PgDn", 12f,
-                FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
-            SetTopLeft((RectTransform)pageHint.transform, 648f, 630f, 600f, 36f);
-            catalogBreadcrumb = CreateText("CatalogBreadcrumb", catalogPanel, string.Empty, 12f,
-                FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
-            catalogBreadcrumb.overflowMode = TextOverflowModes.Ellipsis;
-            SetTopLeft((RectTransform)catalogBreadcrumb.transform, 20f, 598f, 1380f, 28f);
-            catalogMaterialsPrevious = CreateButton("MaterialsPageUp", catalogPanel, "↑ МАТЕРИАЛЫ", 148f,
-                () => ScrollCatalogMaterials(1f));
-            SetBottomLeft((RectTransform)catalogMaterialsPrevious.transform, 20f, 14f, 148f, 36f);
-            catalogMaterialsNext = CreateButton("MaterialsPageDown", catalogPanel, "МАТЕРИАЛЫ ↓", 152f,
-                () => ScrollCatalogMaterials(-1f));
-            SetBottomLeft((RectTransform)catalogMaterialsNext.transform, 176f, 14f, 152f, 36f);
-            catalog.SetActive(false);
+                outlinerContextMenu = CreatePanel(
+                    "OutlinerContextMenu", safeRoot, PanelRaised);
+                outlinerContextMenu.anchorMin = outlinerContextMenu.anchorMax =
+                    new Vector2(0.5f, 0.5f);
+                outlinerContextMenu.pivot = new Vector2(0f, 1f);
+                outlinerContextMenu.sizeDelta = new Vector2(500f, 220f);
+                RectTransform contextViewport = CreateRect("Viewport", outlinerContextMenu);
+                outlinerContextViewport = contextViewport;
+                SetInsets(contextViewport, 8f, 8f, 8f, 8f);
+                contextViewport.gameObject.AddComponent<RectMask2D>();
+                ScrollRect contextScroll = outlinerContextMenu.gameObject.AddComponent<ScrollRect>();
+                contextScroll.horizontal = false;
+                contextScroll.vertical = true;
+                contextScroll.movementType = ScrollRect.MovementType.Clamped;
+                contextScroll.scrollSensitivity = 80f;
+                outlinerContextRows = CreateRect("Rows", contextViewport);
+                outlinerContextRows.anchorMin = new Vector2(0f, 1f);
+                outlinerContextRows.anchorMax = new Vector2(1f, 1f);
+                outlinerContextRows.pivot = new Vector2(0.5f, 1f);
+                outlinerContextRows.anchoredPosition = Vector2.zero;
+                contextScroll.viewport = contextViewport;
+                contextScroll.content = outlinerContextRows;
+                outlinerContextMenu.gameObject.SetActive(false);
 
-            modal = CreatePanel("Modal", safeRoot, new Color(0f, 0f, 0f, 0.72f), null).gameObject;
-            RectTransform dialog = CreatePanel("Dialog", modal.transform, PanelRaised);
-            dialog.anchorMin = dialog.anchorMax = new Vector2(0.5f, 0.5f);
-            dialog.pivot = new Vector2(0.5f, 0.5f);
-            dialog.sizeDelta = new Vector2(520f, 260f);
-            modalTitle = CreateText("DialogTitle", dialog, "НЕСОХРАНЁННЫЕ ИЗМЕНЕНИЯ", 18f,
-                FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
-            SetTopAnchored((RectTransform)modalTitle.transform, 20f, 18f, 20f, 36f);
-            modalMessage = CreateText("DialogMessage", dialog, string.Empty, 15f,
-                FontStyles.Normal, TextAlignmentOptions.TopLeft);
-            modalMessage.textWrappingMode = TextWrappingModes.Normal;
-            SetInsets((RectTransform)modalMessage.transform, 20f, 64f, 20f, 90f);
-            dialogPrimaryButton = CreateDialogButton(
-                dialog, "SaveExit", "СОХРАНИТЬ И ВЫЙТИ", 20f,
-                () => DialogDecided?.Invoke(errorDialog
-                    ? BlueprintEditorDialogDecision.Retry
-                    : BlueprintEditorDialogDecision.SaveAndExit), true);
-            dialogDiscardButton = CreateDialogButton(
-                dialog, "Discard", "ВЫЙТИ БЕЗ СОХРАНЕНИЯ", 190f,
-                () => DialogDecided?.Invoke(BlueprintEditorDialogDecision.DiscardAndExit), false);
-            dialogCancelButton = CreateDialogButton(
-                dialog, "Cancel", "ОТМЕНА", 380f,
-                () => DialogDecided?.Invoke(errorDialog
-                    ? BlueprintEditorDialogDecision.Acknowledge
-                    : BlueprintEditorDialogDecision.Cancel), false);
-            modal.SetActive(false);
+                inspectorTitle = CreateText("InspectorTitle", inspector, T("editor.view.object_properties"), 16f,
+                    FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+                SetTopAnchored((RectTransform)inspectorTitle.transform, 8f, 4f, 8f, 32f);
+                inspectorTabs = CreateRect("InspectorTabs", inspector);
+                SetTopAnchored(inspectorTabs, 8f, 38f, 8f, 28f);
+                var tabLayout = inspectorTabs.gameObject.AddComponent<HorizontalLayoutGroup>();
+                tabLayout.spacing = 4f;
+                tabLayout.childControlHeight = true;
+                tabLayout.childControlWidth = false;
+                tabLayout.childForceExpandHeight = true;
+                tabLayout.childForceExpandWidth = false;
+                inspectorTabButtons[0] = CreateButton(
+                    "TransformTab", inspectorTabs, T("editor.view.transform_short"), 104f, () => SetInspectorTab(0), true);
+                inspectorTabButtons[1] = CreateButton(
+                    "PartTab", inspectorTabs, T("editor.view.part"), 76f, () => SetInspectorTab(1));
+                inspectorTabButtons[2] = CreateButton(
+                    "BlueprintTab", inspectorTabs, T("editor.view.blueprint"), 76f, () => SetInspectorTab(2));
+                foreach (Button button in inspectorTabButtons)
+                {
+                    LayoutElement layout = button.GetComponent<LayoutElement>();
+                    layout.minHeight = layout.preferredHeight = 28f;
+                    ((RectTransform)button.transform).sizeDelta = new Vector2(
+                        ((RectTransform)button.transform).sizeDelta.x, 28f);
+                    button.GetComponentInChildren<TMP_Text>().fontSize = 11f;
+                }
+                RectTransform inspectorViewport = CreateRect("InspectorViewport", inspector);
+                SetInsets(inspectorViewport, 12f, 42f, 12f, 8f);
+                inspectorViewport.gameObject.AddComponent<RectMask2D>();
+                RectTransform inspectorBody = CreateRect("InspectorBody", inspectorViewport);
+                inspectorBody.anchorMin = new Vector2(0f, 1f);
+                inspectorBody.anchorMax = new Vector2(1f, 1f);
+                inspectorBody.pivot = new Vector2(0.5f, 1f);
+                inspectorBody.anchoredPosition = Vector2.zero;
+                inspectorBody.sizeDelta = new Vector2(0f, 500f);
+                inspectorContent = CreateText("InspectorContent", inspectorBody,
+                    T("editor.view.nothing_selected"), 14f, FontStyles.Normal, TextAlignmentOptions.TopLeft);
+                inspectorContent.textWrappingMode = TextWrappingModes.Normal;
+                SetInsets((RectTransform)inspectorContent.transform, 0f, 0f, 0f, 0f);
 
-            foreach (RectTransform panel in new[] { top, rail, viewport, rightColumn,
+                inspectorEditPanel = CreateRect("InspectorEdit", inspectorBody).gameObject;
+                SetInsets((RectTransform)inspectorEditPanel.transform, 0f, 0f, 0f, 0f);
+                inspectorName = CreateInput(
+                    "Name", inspectorEditPanel.transform, new Vector2(0f, -24f), 228f);
+                inspectorName.gameObject.SetActive(false);
+                inspectorName.onSubmit.AddListener(_ => SubmitInspector());
+                inspectorPositionLabel = CreateInspectorLabel(
+                    inspectorEditPanel.transform, T("editor.view.position_m"), 0f);
+                CreateAxisInputs(inspectorEditPanel.transform, inspectorPosition, 24f, 0.01f);
+                inspectorRotationLabel = CreateInspectorLabel(
+                    inspectorEditPanel.transform, T("editor.view.rotation_deg"), 62f);
+                CreateAxisInputs(inspectorEditPanel.transform, inspectorRotation, 86f, 0.25f);
+                foreach (TMP_InputField input in inspectorPosition)
+                {
+                    input.onSubmit.AddListener(_ => SubmitInspector());
+                    input.onEndEdit.AddListener(_ => SubmitInspector());
+                }
+                foreach (TMP_InputField input in inspectorRotation)
+                {
+                    input.onSubmit.AddListener(_ => SubmitInspector());
+                    input.onEndEdit.AddListener(_ => SubmitInspector());
+                }
+                inspectorScaleLabel = CreateInspectorLabel(
+                    inspectorEditPanel.transform, T("editor.view.uniform_scale"), 124f);
+                inspectorScale = CreateInput(
+                    "Scale", inspectorEditPanel.transform, new Vector2(0f, -148f), 228f,
+                    1f, 1f, 400f, true, 100f);
+                inspectorScale.GetComponent<BlueprintEditorNumericScrub>().StepProvider = () => ScaleStepPercent;
+                inspectorScale.onSubmit.AddListener(_ => SubmitInspector());
+                inspectorScale.onEndEdit.AddListener(_ => SubmitInspector());
+                Button applyInspector = CreateButton(
+                    "ApplyInspector", inspectorEditPanel.transform, T("editor.view.apply"), 120f,
+                    SubmitInspector, primary: true);
+                SetInspectorButton((RectTransform)applyInspector.transform, 0f, 188f, 120f);
+                inspectorResetButton = CreateButton(
+                    "ResetInspector", inspectorEditPanel.transform, T("editor.view.reset"), 100f,
+                    ResetInspector);
+                SetInspectorButton((RectTransform)inspectorResetButton.transform, 128f, 188f, 100f);
+                inspectorSpaceButton = CreateButton(
+                    "TransformSpace", inspectorEditPanel.transform, T("editor.view.axes_local"), 110f,
+                    () => SpaceRequested?.Invoke());
+                SetInspectorButton((RectTransform)inspectorSpaceButton.transform, 0f, 232f, 70f);
+                TMP_Text moveStepLabel = CreateText(
+                    "MoveStepLabel", inspectorEditPanel.transform, T("editor.view.move_step_short"), 10f,
+                    FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+                SetTopLeft((RectTransform)moveStepLabel.transform, 76f, 232f, 22f, 36f);
+                inspectorMoveStep = CreateInput(
+                    "MoveStep", inspectorEditPanel.transform, new Vector2(98f, -232f), 48f,
+                    0.001f, 0.001f, 10f, resetValue: 0.05f);
+                TMP_Text angleStepLabel = CreateText(
+                    "AngleStepLabel", inspectorEditPanel.transform, "Δ°", 10f,
+                    FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+                SetTopLeft((RectTransform)angleStepLabel.transform, 150f, 232f, 22f, 36f);
+                inspectorAngleStep = CreateInput(
+                    "AngleStep", inspectorEditPanel.transform, new Vector2(172f, -232f), 56f,
+                    0.1f, 0.1f, 90f, resetValue: 1f);
+                inspectorMoveStep.onEndEdit.AddListener(_ => SubmitSnap());
+                inspectorAngleStep.onEndEdit.AddListener(_ => SubmitSnap());
+                AddTooltip((RectTransform)inspectorMoveStep.transform,
+                    T("editor.view.move_step_tooltip"));
+                AddTooltip((RectTransform)inspectorAngleStep.transform,
+                    T("editor.view.angle_step_tooltip"));
+                inspectorAnchorVisibilityButton = CreateButton(
+                    "TransformAnchors", inspectorEditPanel.transform, T("editor.view.points_all"), 110f,
+                    () => AnchorVisibilityRequested?.Invoke());
+                SetInspectorButton(
+                    (RectTransform)inspectorAnchorVisibilityButton.transform, 0f, 276f, 110f);
+                inspectorMagnetButton = CreateButton(
+                    "TransformMagnet", inspectorEditPanel.transform, T("editor.view.magnet_game"), 110f,
+                    () => MeshSnapRequested?.Invoke());
+                SetInspectorButton(
+                    (RectTransform)inspectorMagnetButton.transform, 118f, 276f, 110f);
+                inspectorSelectionPivotButton = CreateButton(
+                    "PivotSelection", inspectorEditPanel.transform, T("editor.view.center"), 70f,
+                    () => PivotModeRequested?.Invoke(BlueprintEditorPivotMode.SelectionCenter));
+                SetInspectorButton(
+                    (RectTransform)inspectorSelectionPivotButton.transform, 0f, 320f, 70f);
+                inspectorActivePivotButton = CreateButton(
+                    "PivotActive", inspectorEditPanel.transform, T("editor.view.active_short"), 70f,
+                    () => PivotModeRequested?.Invoke(BlueprintEditorPivotMode.ActiveObject));
+                SetInspectorButton(
+                    (RectTransform)inspectorActivePivotButton.transform, 78f, 320f, 70f);
+                inspectorPivotButton = CreateButton(
+                    "TransformPivot", inspectorEditPanel.transform, T("editor.view.select"), 72f,
+                    () => PivotRequested?.Invoke());
+                SetInspectorButton((RectTransform)inspectorPivotButton.transform, 156f, 320f, 72f);
+                TMP_Text boundsPivotLabel = CreateInspectorLabel(
+                    inspectorEditPanel.transform, T("editor.view.bounds_pivot"), 366f);
+                string[] pivotLabels = { "↖", "↑", "↗", "←", "•", "→", "↙", "↓", "↘" };
+                for (int index = 0; index < inspectorBoundsButtons.Length; ++index)
+                {
+                    int captured = index;
+                    Button button = CreateButton(
+                        "BoundsPivot" + index,
+                        inspectorEditPanel.transform,
+                        pivotLabels[index],
+                        68f,
+                        () => BoundsPivotRequested?.Invoke(captured));
+                    RectTransform rect = (RectTransform)button.transform;
+                    SetInspectorButton(rect, index % 3 * 80f, 390f + index / 3 * 34f, 68f);
+                    rect.sizeDelta = new Vector2(68f, 28f);
+                    inspectorBoundsButtons[index] = button;
+                }
+                inspectorSelectionPivotButton.gameObject.SetActive(false);
+                inspectorActivePivotButton.gameObject.SetActive(false);
+                inspectorPivotButton.gameObject.SetActive(false);
+                boundsPivotLabel.gameObject.SetActive(false);
+                foreach (Button button in inspectorBoundsButtons)
+                    button.gameObject.SetActive(false);
+                CreateAnchorControls(inspectorEditPanel.transform, 320f);
+                inspectorEditPanel.SetActive(false);
+
+                groupEditPanel = CreateRect("GroupEdit", inspectorBody).gameObject;
+                SetInsets((RectTransform)groupEditPanel.transform, 0f, 0f, 0f, 0f);
+                CreateInspectorLabel(groupEditPanel.transform, T("editor.view.name"), 0f);
+                groupName = CreateInput(
+                    "GroupName", groupEditPanel.transform, new Vector2(0f, -24f), 228f);
+                groupName.onSubmit.AddListener(_ => SubmitDetailName());
+                detailInfo = CreateText(
+                    "DetailInfo", groupEditPanel.transform, string.Empty, 12f,
+                    FontStyles.Normal, TextAlignmentOptions.TopLeft);
+                detailInfo.textWrappingMode = TextWrappingModes.Normal;
+                SetTopAnchored((RectTransform)detailInfo.transform, 0f, 72f, 0f, 82f);
+                detailVisibilityButton = CreateButton(
+                    "DetailVisibility", groupEditPanel.transform, T("editor.view.visibility"), 228f,
+                    ToggleDetailVisibility);
+                SetInspectorButton((RectTransform)detailVisibilityButton.transform, 0f, 160f, 228f);
+                detailLockButton = CreateButton(
+                    "DetailLock", groupEditPanel.transform, T("editor.view.lock"), 228f,
+                    ToggleDetailLock);
+                SetInspectorButton((RectTransform)detailLockButton.transform, 0f, 204f, 228f);
+                detailGroupButton = CreateButton(
+                    "DetailGroup", groupEditPanel.transform, T("editor.view.group_root"), 228f,
+                    CycleDetailGroup);
+                SetInspectorButton((RectTransform)detailGroupButton.transform, 0f, 248f, 228f);
+                Button applyGroup = CreateButton(
+                    "ApplyDetailName", groupEditPanel.transform, T("editor.view.apply_name"), 228f,
+                    SubmitDetailName, primary: true);
+                SetInspectorButton((RectTransform)applyGroup.transform, 0f, 292f, 228f);
+                groupEditPanel.SetActive(false);
+
+                blueprintEditPanel = CreateRect("BlueprintEdit", inspectorBody).gameObject;
+                SetInsets((RectTransform)blueprintEditPanel.transform, 0f, 0f, 0f, 0f);
+                CreateInspectorLabel(blueprintEditPanel.transform, T("editor.view.blueprint_name"), 0f);
+                blueprintName = CreateInput(
+                    "BlueprintName", blueprintEditPanel.transform, new Vector2(0f, -24f), 228f);
+                CreateInspectorLabel(blueprintEditPanel.transform, T("editor.view.category"), 72f);
+                blueprintCategory = CreateInput(
+                    "BlueprintCategory", blueprintEditPanel.transform,
+                    new Vector2(0f, -96f), 228f);
+                blueprintName.onSubmit.AddListener(_ => SubmitBlueprintMetadata());
+                blueprintCategory.onSubmit.AddListener(_ => SubmitBlueprintMetadata());
+                blueprintInfo = CreateText(
+                    "BlueprintInfo", blueprintEditPanel.transform, string.Empty, 12f,
+                    FontStyles.Normal, TextAlignmentOptions.TopLeft);
+                blueprintInfo.textWrappingMode = TextWrappingModes.Normal;
+                SetTopAnchored((RectTransform)blueprintInfo.transform, 0f, 142f, 0f, 92f);
+                Button frameBlueprint = CreateButton(
+                    "FrameBlueprint", blueprintEditPanel.transform, T("editor.view.frame_blueprint"), 228f,
+                    () => FrameAllRequested?.Invoke());
+                SetInspectorButton((RectTransform)frameBlueprint.transform, 0f, 240f, 228f);
+                Button applyBlueprint = CreateButton(
+                    "ApplyBlueprint", blueprintEditPanel.transform, T("editor.view.apply"), 228f,
+                    SubmitBlueprintMetadata, primary: true);
+                SetInspectorButton((RectTransform)applyBlueprint.transform, 0f, 284f, 228f);
+                blueprintEditPanel.SetActive(false);
+
+                arrayEditPanel = CreateRect("ArrayEdit", inspectorBody).gameObject;
+                SetInsets((RectTransform)arrayEditPanel.transform, 0f, 0f, 0f, 0f);
+                arrayCount[0] = CreateArrayField("ArrayCountX", T("editor.view.in_row"), 0f, 0f, 1f, 1f, 128f, true, 2f);
+                arrayCount[1] = CreateArrayField("ArrayCountY", T("editor.view.rows"), 118f, 0f, 1f, 1f, 128f, true, 1f);
+                arrayDistributionButton = CreateButton("ArrayDistribution", arrayEditPanel.transform,
+                    T("editor.view.pack"), 110f, () => ArrayDistributionRequested?.Invoke());
+                SetInspectorButton((RectTransform)arrayDistributionButton.transform, 0f, 44f, 110f);
+                arrayStepButton = CreateButton("ArrayStep", arrayEditPanel.transform,
+                    T("editor.array_no_gap"), 110f, () => ArrayStepRequested?.Invoke());
+                SetInspectorButton((RectTransform)arrayStepButton.transform, 118f, 44f, 110f);
+                AddTooltip((RectTransform)arrayStepButton.transform, T("editor.view.array_gap_tooltip"));
+                arrayRise = CreateArrayField("ArrayRise", T("editor.view.rise_m"), 0f, 84f, .05f, -100f, 100f);
+                arrayRotation = CreateArrayField("ArrayRotation", T("editor.view.turn_deg"), 118f, 84f, 1f, -360f, 360f);
+                arrayPitch = CreateArrayField("ArrayPitch", T("editor.view.pitch_deg"), 0f, 128f, 1f, -360f, 360f);
+                arrayRoll = CreateArrayField("ArrayRoll", T("editor.view.roll_deg"), 118f, 128f, 1f, -360f, 360f);
+                arraySymmetryButton = CreateButton("ArraySymmetry", arrayEditPanel.transform,
+                    T("editor.view.symmetry"), 110f, () => ArraySymmetryRequested?.Invoke());
+                SetInspectorButton((RectTransform)arraySymmetryButton.transform, 0f, 172f, 110f);
+                arrayScaleStepX = CreateArrayField("ArrayScaleX", T("editor.view.scale_step"), 118f, 168f, 1f, -300f, 300f);
+                AddTooltip((RectTransform)arrayScaleStepX.transform, T("editor.view.scale_step_repeat_tooltip"));
+                arrayMoveStepButton = CreateButton("ArrayMoveStep", arrayEditPanel.transform,
+                    T("editor.view.move_step_value", "0.05"), 110f, () => ArrayMoveStepRequested?.Invoke());
+                SetInspectorButton((RectTransform)arrayMoveStepButton.transform, 0f, 212f, 110f);
+                arrayAngleStepButton = CreateButton("ArrayAngleStep", arrayEditPanel.transform,
+                    T("editor.view.angle_step_value", "1"), 110f, () => ArrayAngleStepRequested?.Invoke());
+                SetInspectorButton((RectTransform)arrayAngleStepButton.transform, 118f, 212f, 110f);
+                AddTooltip((RectTransform)arrayMoveStepButton.transform,
+                    T("editor.view.array_move_step_tooltip"));
+                AddTooltip((RectTransform)arrayAngleStepButton.transform,
+                    T("editor.view.array_angle_step_tooltip"));
+                arrayInfo = CreateText("ArrayInfo", arrayEditPanel.transform, arrayDirectionInfo,
+                    11f, FontStyles.Normal, TextAlignmentOptions.TopLeft);
+                arrayInfo.color = MutedColor;
+                arrayInfo.textWrappingMode = TextWrappingModes.Normal;
+                SetTopAnchored((RectTransform)arrayInfo.transform, 0f, 254f, 0f, 24f);
+                arrayApplyButton = CreateButton("ApplyArray", arrayEditPanel.transform, T("editor.view.apply"), 110f,
+                    () => ApplyArrayRequested?.Invoke(), primary: true);
+                SetInspectorButton((RectTransform)arrayApplyButton.transform, 0f, 280f, 110f);
+                Button cancelArray = CreateButton("CancelArray", arrayEditPanel.transform, T("editor.view.cancel"), 110f,
+                    () => CancelArrayRequested?.Invoke());
+                SetInspectorButton((RectTransform)cancelArray.transform, 118f, 280f, 110f);
+                CreateAnchorControls(arrayEditPanel.transform, 320f);
+                arrayCount[0].SetTextWithoutNotify("2");
+                arrayCount[1].SetTextWithoutNotify("1");
+                foreach (TMP_InputField field in new[] { arrayCount[0], arrayCount[1], arrayRise,
+                arrayRotation, arrayPitch, arrayRoll, arrayScaleStepX })
+                {
+                    field.onValueChanged.AddListener(_ => SubmitArrayPreview(clearOnInvalid: false));
+                    field.onEndEdit.AddListener(_ => SubmitArrayPreview(clearOnInvalid: true));
+                }
+                BlueprintEditorNumericScrub riseScrub = arrayRise.GetComponent<BlueprintEditorNumericScrub>();
+                riseScrub.StepProvider = riseScrub.UnitsPerPixelProvider = () => translationStep;
+                foreach (TMP_InputField field in new[] { arrayRotation, arrayPitch, arrayRoll })
+                {
+                    BlueprintEditorNumericScrub scrub = field.GetComponent<BlueprintEditorNumericScrub>();
+                    scrub.StepProvider = scrub.UnitsPerPixelProvider = () => rotationStep;
+                }
+                arrayEditPanel.SetActive(false);
+
+                contourEditPanel = CreateRect("ContourEdit", inspectorBody).gameObject;
+                SetInsets((RectTransform)contourEditPanel.transform, 0f, 0f, 0f, 0f);
+                CreateInspectorLabel(contourEditPanel.transform, T("editor.view.contour"), 0f);
+                contourInfo = CreateText(
+                    "ContourInfo", contourEditPanel.transform, string.Empty, 13f,
+                    FontStyles.Normal, TextAlignmentOptions.TopLeft);
+                contourInfo.textWrappingMode = TextWrappingModes.Normal;
+                SetTopAnchored((RectTransform)contourInfo.transform, 0f, 32f, 0f, 144f);
+                CreateCompactLabel(contourEditPanel.transform, T("editor.view.step_percent"), 184f);
+                contourScaleStep = CreateInput(
+                    "ContourScale", contourEditPanel.transform, new Vector2(92f, -182f),
+                    136f, 1f, -99f, 300f, true);
+                contourScaleStep.SetTextWithoutNotify("0");
+                contourScaleStep.onEndEdit.AddListener(_ => SubmitContourPreview());
+                contourApplyButton = CreateButton(
+                    "ApplyContour", contourEditPanel.transform, T("editor.view.apply"), 228f,
+                    () => ApplyContourRequested?.Invoke(), primary: true);
+                SetInspectorButton((RectTransform)contourApplyButton.transform, 0f, 228f, 110f);
+                Button cancelContour = CreateButton(
+                    "CancelContour", contourEditPanel.transform, T("editor.view.cancel"), 228f,
+                    () => CancelContourRequested?.Invoke());
+                SetInspectorButton((RectTransform)cancelContour.transform, 118f, 228f, 110f);
+                CreateAnchorControls(contourEditPanel.transform, 274f);
+                contourEditPanel.SetActive(false);
+
+                statusText = CreateText("StatusText", status,
+                    T("editor.view.viewport_help"),
+                    13f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+                statusText.color = MutedColor;
+                statusText.raycastTarget = false;
+                statusText.overflowMode = TextOverflowModes.Ellipsis;
+                SetInsets((RectTransform)statusText.transform, 12f, 2f, 12f, 24f);
+                statusHintText = CreateText("StatusHints", status, string.Empty,
+                    12f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+                statusHintText.color = TextColor;
+                statusHintText.raycastTarget = false;
+                statusHintText.overflowMode = TextOverflowModes.Ellipsis;
+                SetInsets((RectTransform)statusHintText.transform, 12f, 24f, 12f, 2f);
+
+                tooltip = CreatePanel("Tooltip", safeRoot, new Color(0.06f, 0.07f, 0.08f, 0.99f), BlueprintEditorSkin.Surface.Tooltip);
+                tooltip.GetComponent<Image>().raycastTarget = false;
+                tooltip.anchorMin = tooltip.anchorMax = new Vector2(0.5f, 0.5f);
+                tooltip.sizeDelta = new Vector2(250f, 58f);
+                tooltip.pivot = new Vector2(0f, 0.5f);
+                tooltipText = CreateText("TooltipText", tooltip, string.Empty, 13f,
+                    FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+                SetInsets((RectTransform)tooltipText.transform, 10f, 4f, 10f, 4f);
+                tooltip.gameObject.SetActive(false);
+
+                viewportControls = CreatePanel("ViewportControls", viewport, Color.clear, null);
+                SetTopRight(viewportControls, 12f, 12f, 84f, 38f);
+                gridButton = CreateIconButton("GridToggle", viewportControls, null, "#", 38f,
+                    () => { showGrid = !showGrid; PublishViewportSettings(); }, T("editor.view.grid_tooltip"));
+                SetTopLeft((RectTransform)gridButton.transform, 0f, 0f, 38f, 38f);
+                projectionButton = CreateIconButton("ProjectionToggle", viewportControls, "frame", "◈", 38f,
+                    () => { SetProjection(!orthographic); ProjectionChanged?.Invoke(orthographic); },
+                    T("editor.view.projection_tooltip"));
+                SetTopLeft((RectTransform)projectionButton.transform, 46f, 0f, 38f, 38f);
+                SetSelected(gridButton, showGrid);
+                viewportSettings = CreatePanel("ViewportSettings", viewport, PanelRaised).gameObject;
+                SetTopRight((RectTransform)viewportSettings.transform, 12f, 56f, 320f, 454f);
+                TMP_Text viewTitle = CreateText("ViewportSettingsTitle", viewportSettings.transform,
+                    T("editor.view.viewport_settings"), 15f, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+                SetTopLeft((RectTransform)viewTitle.transform, 12f, 8f, 240f, 28f);
+                Button viewClose = CreateButton("ViewportSettingsClose", viewportSettings.transform,
+                    "×", 32f, HideViewportSettings);
+                SetTopRight((RectTransform)viewClose.transform, 8f, 8f, 32f, 28f);
+                Button frameAll = CreateButton("ViewportFrameAll", viewportSettings.transform, T("editor.view.frame_all"), 142f,
+                    () => FrameAllRequested?.Invoke());
+                SetTopLeft((RectTransform)frameAll.transform, 12f, 44f, 142f, 32f);
+                Button frameSelected = CreateButton("ViewportFrameSelection", viewportSettings.transform, T("editor.view.frame_selected"), 142f,
+                    () => FrameSelectionRequested?.Invoke());
+                SetTopLeft((RectTransform)frameSelected.transform, 164f, 44f, 142f, 32f);
+                TMP_Text sizeTitle = CreateText("GizmoSizeTitle", viewportSettings.transform,
+                    T("editor.view.gizmo_size"), 12f, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+                SetTopLeft((RectTransform)sizeTitle.transform, 12f, 86f, 294f, 26f);
+                string[] sizeLabels = {
+                T("editor.view.move_arrows"),
+                T("editor.view.rotation_rings"),
+                T("editor.view.array_arrows"),
+                T("editor.view.points"),
+                T("editor.view.scale_handle") };
+                for (int index = 0; index < viewportScaleInputs.Length; ++index)
+                {
+                    TMP_Text sizeLabel = CreateText("GizmoSizeLabel" + index, viewportSettings.transform,
+                        sizeLabels[index], 13f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+                    SetTopLeft((RectTransform)sizeLabel.transform, 12f, 118f + index * 38f, 192f, 32f);
+                    TMP_InputField sizeInput = CreateInput("GizmoSize" + index, viewportSettings.transform,
+                        new Vector2(212f, -118f - index * 38f), 94f, 1f, 50f, 250f, true, 100f);
+                    ((RectTransform)sizeInput.transform).sizeDelta = new Vector2(94f, 32f);
+                    sizeInput.SetTextWithoutNotify("100");
+                    sizeInput.onEndEdit.AddListener(_ => PublishViewportSettings());
+                    viewportScaleInputs[index] = sizeInput;
+                }
+                TMP_Text scaleStepLabel = CreateText("ScaleStepLabel", viewportSettings.transform,
+                    T("editor.view.scale_step_label"), 13f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+                SetTopLeft(scaleStepLabel.rectTransform, 12f, 310f, 192f, 32f);
+                scaleStepInput = CreateInput("ScaleStepPercent", viewportSettings.transform,
+                    new Vector2(212f, -310f), 94f, .1f, .1f, 100f, resetValue: 10f);
+                ((RectTransform)scaleStepInput.transform).sizeDelta = new Vector2(94f, 32f);
+                scaleStepInput.SetTextWithoutNotify("10");
+                scaleStepInput.onEndEdit.AddListener(_ => PublishScaleStep());
+                AddTooltip(scaleStepInput.transform as RectTransform,
+                    T("editor.view.scale_step_tooltip"));
+                interfaceScaleButton = CreateButton("InterfaceScale", viewportSettings.transform,
+                    T("editor.view.interface_scale", 100), 294f, CycleUiScale);
+                SetTopLeft((RectTransform)interfaceScaleButton.transform, 12f, 354f, 294f, 36f);
+                Button resetView = CreateButton("ViewportSettingsReset", viewportSettings.transform,
+                    T("editor.view.reset_settings"), 294f, () =>
+                    {
+                        scaleStepInput.SetTextWithoutNotify("10");
+                        PublishScaleStep();
+                        SetViewportSettings(1f, 1f, 1f, 1f, 1f, true);
+                        PublishViewportSettings();
+                    });
+                SetTopLeft((RectTransform)resetView.transform, 12f, 404f, 294f, 36f);
+                viewportSettings.SetActive(false);
+
+                catalog = CreatePanel(
+                    "CatalogOverlay", safeRoot, new Color(0f, 0f, 0f, 0.72f), null).gameObject;
+                catalogPanel = CreatePanel("Catalog", catalog.transform, PanelRaised);
+                catalogPanel.anchorMin = catalogPanel.anchorMax = new Vector2(0.5f, 0.5f);
+                catalogPanel.pivot = new Vector2(0.5f, 0.5f);
+                catalogPanel.sizeDelta = new Vector2(1420f, 680f);
+                TMP_Text catalogTitle = CreateText(
+                    "CatalogTitle", catalogPanel, T("editor.view.catalog"), 18f,
+                    FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+                SetTopAnchored((RectTransform)catalogTitle.transform, 324f, 12f, 120f, 44f);
+                catalogPartsModeButton = CreateButton("CatalogPartsMode", catalogPanel,
+                    T("editor.view.parts"), 140f, () => SetCatalogMode(false), true);
+                SetTopLeft((RectTransform)catalogPartsModeButton.transform, 20f, 12f, 140f, 44f);
+                catalogBlueprintsModeButton = CreateButton("CatalogBlueprintsMode", catalogPanel,
+                    T("editor.view.blueprints"), 140f, () => SetCatalogMode(true));
+                SetTopLeft((RectTransform)catalogBlueprintsModeButton.transform, 168f, 12f, 140f, 44f);
+                Button catalogClose = CreateButton(
+                    "CatalogClose", catalogPanel, T("editor.view.close"), 88f, HideCatalog);
+                RectTransform catalogCloseRect = (RectTransform)catalogClose.transform;
+                catalogCloseRect.anchorMin = catalogCloseRect.anchorMax = new Vector2(1f, 1f);
+                catalogCloseRect.pivot = new Vector2(1f, 1f);
+                catalogCloseRect.anchoredPosition = new Vector2(-16f, -12f);
+                catalogCloseRect.sizeDelta = new Vector2(88f, 44f);
+                RectTransform catalogSearchPanel = CreatePanel(
+                    "CatalogSearch", catalogPanel, ButtonColor);
+                SetTopAnchored(catalogSearchPanel, 20f, 64f, 20f, 36f);
+                TMP_Text catalogSearchText = CreateText(
+                    "Text", catalogSearchPanel, string.Empty, 13f,
+                    FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+                catalogSearchText.raycastTarget = true;
+                SetInsets((RectTransform)catalogSearchText.transform, 8f, 0f, 8f, 0f);
+                TMP_Text catalogSearchPlaceholder = CreateText(
+                    "Placeholder", catalogSearchPanel, T("editor.view.catalog_search"), 13f,
+                    FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+                catalogSearchPlaceholder.color = MutedColor;
+                SetInsets((RectTransform)catalogSearchPlaceholder.transform, 8f, 0f, 8f, 0f);
+                catalogSearch = catalogSearchPanel.gameObject.AddComponent<TMP_InputField>();
+                skin.Apply(catalogSearch, input: true);
+                catalogSearch.textComponent = catalogSearchText;
+                catalogSearch.placeholder = catalogSearchPlaceholder;
+                catalogSearch.lineType = TMP_InputField.LineType.SingleLine;
+                catalogSearch.characterLimit = 48;
+                catalogSearch.onValueChanged.AddListener(_ =>
+                {
+                    catalogPage = 0;
+                    RebuildCatalog();
+                });
+                catalogCategoryTabs = CreateCatalogFilterStrip("CatalogCategoryTabs", T("editor.view.part_type"), 108f);
+                catalogSources = CreateCatalogFilterStrip("CatalogSources", T("editor.view.source"), 150f);
+                catalogMaterialTitle = CreateText("CatalogMaterialTitle", catalogPanel,
+                    T("editor.view.material"), 13f, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+                SetTopLeft((RectTransform)catalogMaterialTitle.transform, 20f, 196f, 308f, 28f);
+                RectTransform catalogCategoryViewport = CreateRect(
+                    "CatalogCategoryViewport", catalogPanel);
+                SetTopLeft(catalogCategoryViewport, 20f, 232f, 308f, 360f);
+                catalogCategoryViewport.gameObject.AddComponent<RectMask2D>();
+                catalogCategories = CreateRect("CatalogCategories", catalogCategoryViewport);
+                catalogCategories.anchorMin = new Vector2(0f, 1f);
+                catalogCategories.anchorMax = new Vector2(1f, 1f);
+                catalogCategories.pivot = new Vector2(0.5f, 1f);
+                catalogCategories.anchoredPosition = Vector2.zero;
+                var categoryLayout = catalogCategories.gameObject.AddComponent<GridLayoutGroup>();
+                categoryLayout.cellSize = new Vector2(152f, 36f);
+                categoryLayout.spacing = new Vector2(4f, 4f);
+                categoryLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+                categoryLayout.constraintCount = 2;
+                ContentSizeFitter categoryFitter =
+                    catalogCategories.gameObject.AddComponent<ContentSizeFitter>();
+                categoryFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+                ScrollRect categoryScroll =
+                    catalogCategoryViewport.gameObject.AddComponent<ScrollRect>();
+                catalogMaterialScroll = categoryScroll;
+                categoryScroll.horizontal = false;
+                categoryScroll.vertical = true;
+                categoryScroll.movementType = ScrollRect.MovementType.Clamped;
+                categoryScroll.scrollSensitivity = 120f;
+                categoryScroll.viewport = catalogCategoryViewport;
+                categoryScroll.content = catalogCategories;
+                RectTransform catalogViewport = CreateRect("CatalogViewport", catalogPanel);
+                SetTopLeft(
+                    catalogViewport,
+                    348f,
+                    196f,
+                    (float)BlueprintEditorLayout.CatalogGridWidth,
+                    (float)BlueprintEditorLayout.CatalogGridHeight);
+                catalogViewport.gameObject.AddComponent<RectMask2D>();
+                catalogViewport.gameObject.AddComponent<Image>().color = Color.clear;
+                catalogViewport.gameObject.AddComponent<BlueprintEditorCatalogScroll>().Scroll = delta =>
+                {
+                    if (!HasCatalog || HasModal || IsTextInputFocused) return;
+                    if (delta < 0f) NextCatalogPage();
+                    else if (delta > 0f) PreviousCatalogPage();
+                };
+                catalogGrid = CreateRect("CatalogGrid", catalogViewport);
+                catalogGrid.anchorMin = new Vector2(0f, 1f);
+                catalogGrid.anchorMax = new Vector2(1f, 1f);
+                catalogGrid.pivot = new Vector2(0.5f, 1f);
+                var catalogLayout = catalogGrid.gameObject.AddComponent<GridLayoutGroup>();
+                catalogLayout.cellSize = new Vector2(
+                    (float)BlueprintEditorLayout.CatalogCellWidth,
+                    (float)BlueprintEditorLayout.CatalogCellHeight);
+                catalogLayout.spacing = Vector2.one * (float)BlueprintEditorLayout.CatalogCellGap;
+                catalogLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+                catalogLayout.constraintCount = BlueprintEditorLayout.CatalogColumns;
+                catalogLayout.childAlignment = TextAnchor.UpperLeft;
+                ContentSizeFitter catalogFitter =
+                    catalogGrid.gameObject.AddComponent<ContentSizeFitter>();
+                catalogFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+                catalogPreviousPage = CreateButton(
+                    "CatalogPrevious", catalogPanel, "<", 44f, PreviousCatalogPage);
+                SetBottomLeft((RectTransform)catalogPreviousPage.transform, 348f, 14f, 44f, 36f);
+                catalogPageText = CreateText(
+                    "CatalogPage", catalogPanel, "1 / 1", 13f,
+                    FontStyles.Bold, TextAlignmentOptions.Center);
+                RectTransform catalogPageRect = (RectTransform)catalogPageText.transform;
+                catalogPageRect.anchorMin = catalogPageRect.anchorMax = new Vector2(0f, 0f);
+                catalogPageRect.pivot = new Vector2(0f, 0f);
+                catalogPageRect.anchoredPosition = new Vector2(400f, 14f);
+                catalogPageRect.sizeDelta = new Vector2(100f, 36f);
+                catalogNextPage = CreateButton(
+                    "CatalogNext", catalogPanel, ">", 44f, NextCatalogPage);
+                SetBottomLeft((RectTransform)catalogNextPage.transform, 508f, 14f, 44f, 36f);
+                catalogPageInput = CreateInput("CatalogPageJump", catalogPanel,
+                    new Vector2(570f, -630f), 68f, 0f, resetValue: 1f);
+                ((RectTransform)catalogPageInput.transform).sizeDelta = new Vector2(68f, 36f);
+                catalogPageInput.contentType = TMP_InputField.ContentType.IntegerNumber;
+                catalogPageInput.onEndEdit.AddListener(_ => JumpCatalogPage());
+                TMP_Text pageHint = CreateText("CatalogPageHint", catalogPanel,
+                    T("editor.view.page_help"), 12f,
+                    FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+                SetTopLeft((RectTransform)pageHint.transform, 648f, 630f, 600f, 36f);
+                catalogBreadcrumb = CreateText("CatalogBreadcrumb", catalogPanel, string.Empty, 12f,
+                    FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+                catalogBreadcrumb.overflowMode = TextOverflowModes.Ellipsis;
+                SetTopLeft((RectTransform)catalogBreadcrumb.transform, 20f, 598f, 1380f, 28f);
+                catalogMaterialsPrevious = CreateButton("MaterialsPageUp", catalogPanel, T("editor.view.materials_up"), 148f,
+                    () => ScrollCatalogMaterials(1f));
+                SetBottomLeft((RectTransform)catalogMaterialsPrevious.transform, 20f, 14f, 148f, 36f);
+                catalogMaterialsNext = CreateButton("MaterialsPageDown", catalogPanel, T("editor.view.materials_down"), 152f,
+                    () => ScrollCatalogMaterials(-1f));
+                SetBottomLeft((RectTransform)catalogMaterialsNext.transform, 176f, 14f, 152f, 36f);
+                catalog.SetActive(false);
+
+                modal = CreatePanel("Modal", safeRoot, new Color(0f, 0f, 0f, 0.72f), null).gameObject;
+                RectTransform dialog = CreatePanel("Dialog", modal.transform, PanelRaised);
+                dialog.anchorMin = dialog.anchorMax = new Vector2(0.5f, 0.5f);
+                dialog.pivot = new Vector2(0.5f, 0.5f);
+                dialog.sizeDelta = new Vector2(520f, 260f);
+                modalTitle = CreateText("DialogTitle", dialog, T("editor.view.unsaved_title"), 18f,
+                    FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+                SetTopAnchored((RectTransform)modalTitle.transform, 20f, 18f, 20f, 36f);
+                modalMessage = CreateText("DialogMessage", dialog, string.Empty, 15f,
+                    FontStyles.Normal, TextAlignmentOptions.TopLeft);
+                modalMessage.textWrappingMode = TextWrappingModes.Normal;
+                SetInsets((RectTransform)modalMessage.transform, 20f, 64f, 20f, 90f);
+                dialogPrimaryButton = CreateDialogButton(
+                    dialog, "SaveExit", T("editor.view.save_exit"), 20f,
+                    () => DialogDecided?.Invoke(errorDialog
+                        ? BlueprintEditorDialogDecision.Retry
+                        : BlueprintEditorDialogDecision.SaveAndExit), true);
+                dialogDiscardButton = CreateDialogButton(
+                    dialog, "Discard", T("editor.view.discard_exit"), 190f,
+                    () => DialogDecided?.Invoke(BlueprintEditorDialogDecision.DiscardAndExit), false);
+                dialogCancelButton = CreateDialogButton(
+                    dialog, "Cancel", T("editor.view.cancel"), 380f,
+                    () => DialogDecided?.Invoke(errorDialog
+                        ? BlueprintEditorDialogDecision.Acknowledge
+                        : BlueprintEditorDialogDecision.Cancel), false);
+                modal.SetActive(false);
+
+                foreach (RectTransform panel in new[] { top, rail, viewport, rightColumn,
                 outliner, inspector, status })
-                modalBlockedGroups.Add(panel.gameObject.AddComponent<CanvasGroup>());
+                    modalBlockedGroups.Add(panel.gameObject.AddComponent<CanvasGroup>());
 
-            SetTool(BlueprintEditorTool.Select);
-            ApplySafeAreaAndLayout(force: true);
+                SetTool(BlueprintEditorTool.Select);
+                ApplySafeAreaAndLayout(force: true);
             }
             catch
             {
@@ -1381,8 +1399,8 @@ namespace OstrixMods.BuildWorks
         internal void SetUiScale(float value)
         {
             requestedUiScale = Mathf.Clamp(value, 0.6f, 1.4f);
-            SetButtonLabel(interfaceScaleButton,
-                "ИНТЕРФЕЙС: " + Mathf.RoundToInt(requestedUiScale * 100f) + "%");
+            SetButtonLabel(interfaceScaleButton, T(
+                "editor.view.interface_scale", Mathf.RoundToInt(requestedUiScale * 100f)));
             UpdateCanvasScale();
             ApplySafeAreaAndLayout(force: true);
         }
@@ -1446,13 +1464,15 @@ namespace OstrixMods.BuildWorks
                 if (entry.Key != BlueprintEditorTool.Select)
                     SetAvailability(entry.Value,
                         hasEditableSelection,
-                        hasSelection ? "Выбранные детали скрыты или заблокированы" :
-                            "Сначала выбери деталь или группу");
+                        hasSelection ? T("editor.view.selection_unavailable") :
+                            T("editor.view.select_first"));
             SetAvailability(outlinerNewGroupButton, document.MovableNodeSelectionCount >= 2,
-                "Для группы выбери минимум два соседних объекта");
+                T("editor.view.group_two_objects"));
             foreach (Button button in outlinerSelectionButtons)
                 SetAvailability(button, button.name == "RenameSelection" ? document.Selection.Count == 1 : hasSelection,
-                    button.name == "RenameSelection" ? "Для имени выбери один объект" : "Сначала выбери объект или группу");
+                    button.name == "RenameSelection"
+                        ? T("editor.view.rename_one_object")
+                        : T("editor.view.select_object_or_group"));
             if (!hasEditableSelection && selectedTool != BlueprintEditorTool.Select)
             {
                 SetTool(BlueprintEditorTool.Select);
@@ -1491,7 +1511,9 @@ namespace OstrixMods.BuildWorks
             foreach (Button button in anchorPinButtons)
             {
                 SetButtonInteractable(button, selected);
-                SetButtonLabel(button, selectedPinned ? "ОТКРЕПИТЬ" : "ЗАКРЕПИТЬ");
+                SetButtonLabel(button, T(selectedPinned
+                    ? "editor.view.unpin"
+                    : "editor.view.pin"));
                 SetSelected(button, selectedPinned);
             }
             for (int index = 0; index < anchorConstraintButtons.Count; ++index)
@@ -1506,17 +1528,23 @@ namespace OstrixMods.BuildWorks
         {
             arrayCount[0].SetTextWithoutNotify(countX.ToString());
             arrayCount[1].SetTextWithoutNotify(countY.ToString());
-            SetButtonLabel(arrayDistributionButton, distribution == RepeatDistributionMode.Pack
-                ? "УПАКОВАТЬ" : distribution == RepeatDistributionMode.Fit ? "ПО ДЛИНЕ" : "ТОЧНЫЙ ШАГ");
+            SetButtonLabel(arrayDistributionButton, T(distribution == RepeatDistributionMode.Pack
+                ? "editor.view.pack"
+                : distribution == RepeatDistributionMode.Fit
+                    ? "editor.array_fit"
+                    : "editor.view.exact_step"));
             SetButtonLabel(arrayStepButton, stepLabel);
             SetButtonInteractable(arrayStepButton, distribution != RepeatDistributionMode.Fit);
-            SetButtonLabel(arrayMoveStepButton, "ШАГ М: " +
-                moveStep.ToString("0.###", CultureInfo.InvariantCulture));
-            SetButtonLabel(arrayAngleStepButton, "ШАГ °: " +
-                angleStep.ToString("0.###", CultureInfo.InvariantCulture));
+            SetButtonLabel(arrayMoveStepButton, T(
+                "editor.view.move_step_value",
+                moveStep.ToString("0.###", CultureInfo.InvariantCulture)));
+            SetButtonLabel(arrayAngleStepButton, T(
+                "editor.view.angle_step_value",
+                angleStep.ToString("0.###", CultureInfo.InvariantCulture)));
             SetSelected(arraySymmetryButton, symmetric);
-            arrayDirectionInfo = hasDirection ? stepInfo + "\nКолесо: количество · Ctrl: масштаб вида"
-                : "Потяни золотую стрелку — задай направление";
+            arrayDirectionInfo = hasDirection
+                ? stepInfo + "\n" + T("editor.view.array_wheel_help")
+                : T("editor.view.array_direction");
         }
 
         private TMP_InputField CreateArrayField(string name, string label, float left, float top,
@@ -1550,21 +1578,23 @@ namespace OstrixMods.BuildWorks
             int previewCount,
             bool closed)
         {
-            contourInfo.text =
-                "ИСТОЧНИК: " + (string.IsNullOrEmpty(sourceName) ? "—" : sourceName) +
-                "\nОПОРА: " + (supportCount < 2
-                    ? "не выбрана"
-                    : (closed ? "кольцо · " : "цепь · ") + supportCount + " деталей") +
-                "\nКОПИЙ: " + previewCount +
-                "\n\nЛКМ по опоре — выбрать цепь." +
-                "\nEnter: применить · Esc: отмена.";
+            string support = supportCount < 2
+                ? T("editor.view.not_selected")
+                : T(closed ? "editor.view.ring_parts" : "editor.view.chain_parts", supportCount);
+            contourInfo.text = T(
+                "editor.view.contour_info",
+                string.IsNullOrEmpty(sourceName) ? "—" : sourceName,
+                support,
+                previewCount);
             SetButtonInteractable(contourApplyButton, supportCount >= 2 && previewCount > 0);
         }
 
         internal void SetArrayState(int previewCount, string warning = null)
         {
             arrayInfo.text = string.IsNullOrEmpty(warning)
-                ? arrayDirectionInfo + (previewCount > 0 ? "\nКопий: " + previewCount + " · Enter / Esc" : "")
+                ? arrayDirectionInfo + (previewCount > 0
+                    ? "\n" + T("editor.view.copies_enter_esc", previewCount)
+                    : "")
                 : warning;
             arrayInfo.color = string.IsNullOrEmpty(warning) ? MutedColor : AccentColor;
             SetButtonInteractable(arrayApplyButton,
@@ -1591,13 +1621,18 @@ namespace OstrixMods.BuildWorks
         internal void SetOperationMetrics(int selectedCount, Vector3 translation,
             Vector3 rotationDegrees, float scale, int previewCount, int totalCount)
         {
-            operationMetrics = "Выбрано: " + selectedCount + "    Δ " +
-                translation.x.ToString("0.##") + " / " + translation.y.ToString("0.##") +
-                " / " + translation.z.ToString("0.##") + " м    Поворот " +
-                rotationDegrees.x.ToString("0.#") + " / " + rotationDegrees.y.ToString("0.#") +
-                " / " + rotationDegrees.z.ToString("0.#") + "°    Масштаб " +
-                (scale * 100f).ToString("0.#") + "%    " + totalCount + "/128" +
-                (previewCount > 0 ? " + " + previewCount + " копий" : string.Empty);
+            operationMetrics = T(
+                "editor.view.operation_metrics",
+                selectedCount,
+                translation.x.ToString("0.##"),
+                translation.y.ToString("0.##"),
+                translation.z.ToString("0.##"),
+                rotationDegrees.x.ToString("0.#"),
+                rotationDegrees.y.ToString("0.#"),
+                rotationDegrees.z.ToString("0.#"),
+                (scale * 100f).ToString("0.#"),
+                totalCount,
+                previewCount > 0 ? T("editor.view.copy_suffix", previewCount) : string.Empty);
             RefreshStatusText();
         }
 
@@ -1625,10 +1660,10 @@ namespace OstrixMods.BuildWorks
         internal void ShowUnsavedDialog(string blueprintName)
         {
             errorDialog = false;
-            modalTitle.text = "НЕСОХРАНЁННЫЕ ИЗМЕНЕНИЯ";
-            modalMessage.text = "Сохранить изменения в «" + blueprintName + "» перед выходом?";
-            SetButtonLabel(dialogPrimaryButton, "СОХРАНИТЬ И ВЫЙТИ");
-            SetButtonLabel(dialogCancelButton, "ОТМЕНА");
+            modalTitle.text = T("editor.view.unsaved_title");
+            modalMessage.text = T("editor.view.unsaved_message", blueprintName);
+            SetButtonLabel(dialogPrimaryButton, T("editor.view.save_exit"));
+            SetButtonLabel(dialogCancelButton, T("editor.view.cancel"));
             dialogPrimaryButton.gameObject.SetActive(true);
             dialogDiscardButton.gameObject.SetActive(true);
             ShowDialog();
@@ -1637,10 +1672,12 @@ namespace OstrixMods.BuildWorks
         internal void ShowError(string titleText, string message, bool canRetry = true)
         {
             errorDialog = true;
-            modalTitle.text = titleText;
-            modalMessage.text = message;
-            SetButtonLabel(dialogPrimaryButton, "ПОВТОРИТЬ");
-            SetButtonLabel(dialogCancelButton, canRetry ? "ЗАКРЫТЬ" : "ВЕРНУТЬСЯ");
+            modalTitle.text = BuildWorksLocalization.ResolveUserText(titleText);
+            modalMessage.text = BuildWorksLocalization.ResolveUserText(message);
+            SetButtonLabel(dialogPrimaryButton, T("editor.view.retry"));
+            SetButtonLabel(dialogCancelButton, T(canRetry
+                ? "editor.view.close"
+                : "editor.view.return"));
             dialogPrimaryButton.gameObject.SetActive(canRetry);
             dialogDiscardButton.gameObject.SetActive(false);
             ShowDialog();
@@ -1894,16 +1931,31 @@ namespace OstrixMods.BuildWorks
                     card.gameObject.AddComponent<BlueprintEditorHoverTarget>();
                 hover.Initialize(
                     "#" + (item.Index + 1) + " · " + item.DisplayName +
-                    "\n" + item.Material + " · " + item.Source,
+                    "\n" + BuildWorksLocalization.CatalogLabel(item.Material) + " · " +
+                    BuildWorksLocalization.CatalogLabel(item.Source),
                     BeginTooltip,
                     EndTooltip);
             }
             catalogPageText.text = (catalogPage + 1) + " / " + pageCount;
             catalogPageInput.SetTextWithoutNotify((catalogPage + 1).ToString(CultureInfo.InvariantCulture));
-            catalogBreadcrumb.text = (catalogBlueprintMode ? "ЧЕРТЕЖИ" : "ДЕТАЛИ") + "  ›  " +
-                (selectedCatalogCategory ?? "Все типы") + "  ›  " +
-                (catalogBlueprintMode ? "" : (selectedCatalogMaterial ?? "Все материалы") + "  ›  ") +
-                (selectedCatalogSource ?? "Все источники") + "     ·     Найдено: " + filtered.Count;
+            string categoryLabel = selectedCatalogCategory == null
+                ? T("editor.view.all_types")
+                : catalogBlueprintMode
+                    ? BuildWorksLocalization.BlueprintCategoryLabel(selectedCatalogCategory)
+                    : BuildWorksLocalization.CatalogLabel(selectedCatalogCategory);
+            string materialLabel = selectedCatalogMaterial == null
+                ? T("editor.view.all_materials")
+                : BuildWorksLocalization.CatalogLabel(selectedCatalogMaterial);
+            string sourceLabel = selectedCatalogSource == null
+                ? T("editor.view.all_sources")
+                : BuildWorksLocalization.CatalogLabel(selectedCatalogSource);
+            catalogBreadcrumb.text = T(
+                "editor.view.catalog_breadcrumb",
+                catalogBlueprintMode ? T("editor.view.blueprints") : T("editor.view.parts"),
+                categoryLabel,
+                catalogBlueprintMode ? string.Empty : materialLabel + "  ›  ",
+                sourceLabel,
+                filtered.Count);
             catalogPreviousPage.interactable = catalogPage > 0;
             catalogNextPage.interactable = catalogPage + 1 < pageCount;
         }
@@ -1915,16 +1967,25 @@ namespace OstrixMods.BuildWorks
             ClearChildren(catalogSources);
             SetSelected(catalogPartsModeButton, !catalogBlueprintMode);
             SetSelected(catalogBlueprintsModeButton, catalogBlueprintMode);
-            catalogMaterialTitle.text = catalogBlueprintMode ? "КАТЕГОРИЯ ЧЕРТЕЖА" : "МАТЕРИАЛ";
+            catalogMaterialTitle.text = catalogBlueprintMode
+                ? T("editor.view.blueprint_category")
+                : T("editor.view.material");
             catalogPanel.Find("CatalogCategoryTabsLabel").GetComponent<TMP_Text>().text =
-                catalogBlueprintMode ? "ТИП" : "ТИП ДЕТАЛИ";
-            SetButtonLabel(catalogMaterialsPrevious, catalogBlueprintMode ? "↑ КАТЕГОРИИ" : "↑ МАТЕРИАЛЫ");
-            SetButtonLabel(catalogMaterialsNext, catalogBlueprintMode ? "КАТЕГОРИИ ↓" : "МАТЕРИАЛЫ ↓");
-            if (!catalogBlueprintMode) AddCatalogMaterial("ВСЕ МАТЕРИАЛЫ", null);
-            AddCatalogCategory(catalogBlueprintMode ? "ВСЕ КАТЕГОРИИ" : "ВСЕ ТИПЫ", null);
+                catalogBlueprintMode ? T("editor.view.type") : T("editor.view.part_type");
+            SetButtonLabel(catalogMaterialsPrevious, catalogBlueprintMode
+                ? T("editor.view.categories_up")
+                : T("editor.view.materials_up"));
+            SetButtonLabel(catalogMaterialsNext, catalogBlueprintMode
+                ? T("editor.view.categories_down")
+                : T("editor.view.materials_down"));
+            if (!catalogBlueprintMode) AddCatalogMaterial(T("editor.view.all_materials"), null);
+            AddCatalogCategory(catalogBlueprintMode
+                ? T("editor.view.all_categories")
+                : T("editor.view.all_types"), null);
             if (catalogBlueprintMode)
-                CreateButton("BlueprintType", catalogCategoryTabs, "СОХРАНЁННЫЕ ЧЕРТЕЖИ", 240f, null).interactable = false;
-            AddCatalogSource("ВСЕ ИСТОЧНИКИ", null);
+                CreateButton("BlueprintType", catalogCategoryTabs,
+                    T("editor.view.saved_blueprints"), 240f, null).interactable = false;
+            AddCatalogSource(T("editor.view.all_sources"), null);
             var categories = new SortedSet<string>(
                 StringComparer.CurrentCultureIgnoreCase);
             var materials = new SortedSet<string>(
@@ -2132,7 +2193,7 @@ namespace OstrixMods.BuildWorks
             outlinerDragging = true;
             outlinerDragPosition = data.position;
             data.eligibleForClick = false;
-            outlinerTitle.text = "ПЕРЕНЕСИ В КОРЕНЬ";
+            outlinerTitle.text = T("editor.view.move_to_root");
             EndTooltip();
         }
 
@@ -2207,7 +2268,7 @@ namespace OstrixMods.BuildWorks
         {
             outlinerDragging = false;
             ClearOutlinerDropCue();
-            if (outlinerTitle) outlinerTitle.text = "ДЕРЕВО ОБЪЕКТОВ";
+            if (outlinerTitle) outlinerTitle.text = T("editor.view.outliner");
         }
 
         private void RebuildOutliner(BlueprintEditorDocument document)
@@ -2352,7 +2413,7 @@ namespace OstrixMods.BuildWorks
             Button eye = CreateIconButton(
                 "Eye", row, visible ? "visibility" : "hidden", visible ? "●" : "○", 44f,
                 () => VisibilityChanged?.Invoke(stableId, !visible),
-                visible ? "Скрыть объект" : "Показать объект");
+                T(visible ? "editor.view.hide_object" : "editor.view.show_object"));
             RectTransform eyeRect = (RectTransform)eye.transform;
             eyeRect.anchorMin = eyeRect.anchorMax = new Vector2(1f, 0.5f);
             eyeRect.pivot = new Vector2(1f, 0.5f);
@@ -2361,7 +2422,7 @@ namespace OstrixMods.BuildWorks
             Button lockButton = CreateIconButton(
                 "Lock", row, locked ? "lock" : "unlock", locked ? "■" : "□", 44f,
                 () => LockChanged?.Invoke(stableId, !locked),
-                locked ? "Разблокировать объект" : "Заблокировать объект");
+                T(locked ? "editor.view.unlock_object" : "editor.view.lock_object"));
             RectTransform lockRect = (RectTransform)lockButton.transform;
             lockRect.anchorMin = lockRect.anchorMax = new Vector2(1f, 0.5f);
             lockRect.pivot = new Vector2(1f, 0.5f);
@@ -2395,7 +2456,12 @@ namespace OstrixMods.BuildWorks
         private void CycleOutlinerFilter()
         {
             outlinerFilter = (outlinerFilter + 1) % 5;
-            string[] labels = { "ВСЕ", "ВЫБОР", "СКРЫТ", "ЗАМОК", "НЕТ" };
+            string[] labels = {
+                T("editor.view.all"),
+                T("editor.view.selection"),
+                T("editor.view.hidden"),
+                T("editor.view.locked"),
+                T("editor.view.missing") };
             SetButtonLabel(outlinerFilterButton, labels[outlinerFilter]);
             if (boundDocument != null) RebuildOutliner(boundDocument);
         }
@@ -2504,9 +2570,10 @@ namespace OstrixMods.BuildWorks
             };
             var labels = new List<string>
             {
-                "ПЕРЕИМЕНОВАТЬ", "ПОКАЗАТЬ / СКРЫТЬ", "БЛОК / РАЗБЛОК",
-                "СГРУППИРОВАТЬ", "РАЗГРУППИРОВАТЬ", "ДУБЛИРОВАТЬ",
-                "УДАЛИТЬ", "В ROOT"
+                T("editor.view.rename"), T("editor.view.show_hide"),
+                T("editor.view.lock_unlock"), T("editor.view.group"),
+                T("editor.view.ungroup"), T("editor.view.duplicate"),
+                T("editor.view.delete"), T("editor.view.to_root")
             };
             var enabled = new List<bool>
             {
@@ -2522,7 +2589,9 @@ namespace OstrixMods.BuildWorks
             if (part)
             {
                 actions.Add(() => PrimaryPartRequested?.Invoke(primaryPart ? null : stableId));
-                labels.Add(primaryPart ? "УБРАТЬ ОПОРУ ЧЕРТЕЖА" : "ОПОРА ЧЕРТЕЖА");
+                labels.Add(T(primaryPart
+                    ? "editor.view.remove_blueprint_frame"
+                    : "editor.view.blueprint_frame"));
                 enabled.Add(true);
                 foreach (BlueprintEditorGroup group in boundDocument.Groups)
                 {
@@ -2531,8 +2600,9 @@ namespace OstrixMods.BuildWorks
                     bool groupPivot = group.PivotPartId == stableId;
                     actions.Add(() => GroupPivotRequested?.Invoke(
                         groupId, groupPivot ? null : stableId));
-                    labels.Add((groupPivot ? "УБРАТЬ ОПОРУ: " : "ОПОРА ГРУППЫ: ") +
-                        group.Name);
+                    labels.Add(T(groupPivot
+                        ? "editor.view.remove_group_pivot"
+                        : "editor.view.group_pivot", group.Name));
                     enabled.Add(true);
                 }
             }
@@ -2542,13 +2612,13 @@ namespace OstrixMods.BuildWorks
                 if (group?.PivotPartId != null)
                 {
                     actions.Add(() => GroupPivotRequested?.Invoke(stableId, null));
-                    labels.Add("АВТО: ЦЕНТР ГРУППЫ");
+                    labels.Add(T("editor.view.auto_group_center"));
                     enabled.Add(true);
                 }
                 if (primaryGroup)
                 {
                     actions.Add(() => PrimaryGroupRequested?.Invoke(null));
-                    labels.Add("УБРАТЬ СТАРУЮ ОПОРУ");
+                    labels.Add(T("editor.view.remove_old_frame"));
                     enabled.Add(true);
                 }
             }
@@ -2611,27 +2681,27 @@ namespace OstrixMods.BuildWorks
             ClearChildren(outlinerMenuRows);
             if (!outlinerReparentOnly)
             {
-            CreateButton("ShowAll", outlinerMenuRows, "ПОКАЗАТЬ ВСЁ", 238f,
-                () => InvokeOutlinerCommand(ShowAllRequested));
-            CreateButton("HideSelection", outlinerMenuRows, "СКРЫТЬ ВЫБРАННОЕ", 238f,
-                () => InvokeOutlinerCommand(HideSelectionRequested));
-            CreateButton("LockSelection", outlinerMenuRows, "ЗАБЛОКИРОВАТЬ", 238f,
-                () => InvokeOutlinerCommand(LockSelectionRequested));
-            CreateButton("Ungroup", outlinerMenuRows, "РАЗГРУППИРОВАТЬ", 238f,
-                () => InvokeOutlinerCommand(UngroupRequested));
-            CreateButton("PartProperties", outlinerMenuRows, "СВОЙСТВА ДЕТАЛИ", 238f,
-                () => InvokeOutlinerCommand(() => OpenInspectorTab(1)));
-            CreateButton("BlueprintProperties", outlinerMenuRows, "СВОЙСТВА ЧЕРТЕЖА", 238f,
-                () => InvokeOutlinerCommand(() => OpenInspectorTab(2)));
+                CreateButton("ShowAll", outlinerMenuRows, T("editor.view.show_all"), 238f,
+                    () => InvokeOutlinerCommand(ShowAllRequested));
+                CreateButton("HideSelection", outlinerMenuRows, T("editor.view.hide_selected"), 238f,
+                    () => InvokeOutlinerCommand(HideSelectionRequested));
+                CreateButton("LockSelection", outlinerMenuRows, T("editor.view.lock_selected"), 238f,
+                    () => InvokeOutlinerCommand(LockSelectionRequested));
+                CreateButton("Ungroup", outlinerMenuRows, T("editor.view.ungroup"), 238f,
+                    () => InvokeOutlinerCommand(UngroupRequested));
+                CreateButton("PartProperties", outlinerMenuRows, T("editor.view.part_properties"), 238f,
+                    () => InvokeOutlinerCommand(() => OpenInspectorTab(1)));
+                CreateButton("BlueprintProperties", outlinerMenuRows, T("editor.view.blueprint_properties"), 238f,
+                    () => InvokeOutlinerCommand(() => OpenInspectorTab(2)));
             }
             if (boundDocument == null) return;
-            CreateButton("MoveRoot", outlinerMenuRows, "В ROOT", 238f,
+            CreateButton("MoveRoot", outlinerMenuRows, T("editor.view.to_root"), 238f,
                 () => InvokeMoveToGroup(null));
             foreach (BlueprintEditorGroup group in boundDocument.Groups)
             {
                 string groupId = group.StableId;
                 CreateButton("Move_" + groupId, outlinerMenuRows,
-                    "В ГРУППУ: " + group.Name, 238f,
+                    T("editor.view.to_group", group.Name), 238f,
                     () => InvokeMoveToGroup(groupId));
             }
         }
@@ -2661,18 +2731,13 @@ namespace OstrixMods.BuildWorks
             ResetInspectorFieldColors();
             bool toolParameters = selectedTool == BlueprintEditorTool.Array ||
                 selectedTool == BlueprintEditorTool.Contour;
-            inspectorTitle.text = "ПАРАМЕТРЫ ИНСТРУМЕНТА";
+            inspectorTitle.text = T("editor.view.tool_parameters");
             inspectorTabs.gameObject.SetActive(false);
             if (selectedTool == BlueprintEditorTool.Select && inspectorTab == 0 &&
                 document.Selection.Count == 0)
             {
-                inspectorContent.text = "ВЫБОР ОБЪЕКТА\n\nЛКМ — выбрать деталь\n" +
-                    "Shift / Ctrl + ЛКМ — добавить или убрать\n" +
-                    "Shift в дереве — диапазон строк\nCtrl+A — всё доступное\n" +
-                    "Тяни по пустоте — рамка выбора\n\n" +
-                    "КАМЕРА\nСКМ — вращать вид\nShift + СКМ — двигать вид\n" +
-                    "ПКМ + WASD — полёт\nКолесо — приблизить / отдалить\n\n" +
-                    "Esc — отмена инструмента / снять выбор\nВыбрано: " + document.Selection.Count;
+                inspectorContent.text = T(
+                    "editor.view.selection_help", document.Selection.Count);
                 return;
             }
             if (selectedTool == BlueprintEditorTool.Array)
@@ -2694,24 +2759,26 @@ namespace OstrixMods.BuildWorks
                 blueprintName.SetTextWithoutNotify(document.Name);
                 blueprintCategory.SetTextWithoutNotify(document.Category);
                 string bounds = blueprintBoundsSize.HasValue
-                    ? blueprintBoundsSize.Value.x.ToString("0.##") + " × " +
-                        blueprintBoundsSize.Value.y.ToString("0.##") + " × " +
-                        blueprintBoundsSize.Value.z.ToString("0.##") + " м"
-                    : "нет геометрии";
-                blueprintInfo.text =
-                    "Деталей: " + document.Parts.Count +
-                    " · групп: " + document.Groups.Count +
-                    "\nГраницы: " + bounds +
-                    "\nОшибки prefab: " + missingPrefabNodes.Count +
-                    "\nПревью: текущий вид" +
-                    (document.IsDirty ? "\nЕсть несохранённые изменения" :
-                        "\nИзменения сохранены");
+                    ? T(
+                        "editor.view.bounds_m",
+                        blueprintBoundsSize.Value.x.ToString("0.##"),
+                        blueprintBoundsSize.Value.y.ToString("0.##"),
+                        blueprintBoundsSize.Value.z.ToString("0.##"))
+                    : T("editor.view.no_geometry");
+                blueprintInfo.text = T(
+                    "editor.view.blueprint_info",
+                    document.Parts.Count,
+                    document.Groups.Count,
+                    bounds,
+                    missingPrefabNodes.Count,
+                    T(document.IsDirty
+                        ? "editor.view.unsaved_changes"
+                        : "editor.view.changes_saved"));
                 return;
             }
             if (document.Selection.Count == 0)
             {
-                inspectorContent.text =
-                    "Ничего не выбрано\n\nВыбери деталь во viewport или дереве объектов.";
+                inspectorContent.text = T("editor.view.select_in_viewport");
                 return;
             }
             if (inspectorTab == 1)
@@ -2721,8 +2788,7 @@ namespace OstrixMods.BuildWorks
             }
             if (document.EditablePartSelectionCount == 0)
             {
-                inspectorContent.text =
-                    "Выбор скрыт или заблокирован. Разблокируй его во вкладке ДЕТАЛЬ.";
+                inspectorContent.text = T("editor.view.selection_locked_hidden");
                 return;
             }
 
@@ -2740,12 +2806,17 @@ namespace OstrixMods.BuildWorks
             inspectorName.interactable = singlePart != null;
             inspectorName.SetTextWithoutNotify(singlePart != null
                 ? singlePart.DisplayName
-                : document.EditablePartSelectionCount + " деталей · DELTA");
-            inspectorPositionLabel.text = inspectorDelta ? "СМЕЩЕНИЕ Δ · М" : "ПОЛОЖЕНИЕ · М";
-            inspectorRotationLabel.text = inspectorDelta ? "ПОВОРОТ Δ · °" : "ПОВОРОТ · °";
-            inspectorScaleLabel.text = inspectorDelta ? "МАСШТАБ ВЫБОРА · %" : "РАВНОМЕРНЫЙ МАСШТАБ · %";
-            SetButtonLabel(inspectorResetButton,
-                "СБРОСИТЬ");
+                : T("editor.view.parts_delta", document.EditablePartSelectionCount));
+            inspectorPositionLabel.text = T(inspectorDelta
+                ? "editor.view.offset_delta_m"
+                : "editor.view.position_m");
+            inspectorRotationLabel.text = T(inspectorDelta
+                ? "editor.view.rotation_delta_deg"
+                : "editor.view.rotation_deg");
+            inspectorScaleLabel.text = T(inspectorDelta
+                ? "editor.view.selection_scale"
+                : "editor.view.uniform_scale");
+            SetButtonLabel(inspectorResetButton, T("editor.view.reset"));
             if (singlePart == null)
             {
                 SetAxisValues(inspectorPosition, Vector3.zero);
@@ -2791,7 +2862,7 @@ namespace OstrixMods.BuildWorks
                 ? selectedPart.DisplayName
                 : selectedGroup != null
                     ? selectedGroup.Name
-                    : document.Selection.Count + " объектов");
+                    : T("editor.view.object_count", document.Selection.Count));
 
             detailVisible = true;
             detailLocked = true;
@@ -2826,38 +2897,46 @@ namespace OstrixMods.BuildWorks
                 Point3 scale = selectedPart.Scale;
                 bool uniform = Math.Abs(scale.X - scale.Y) < 0.000001 &&
                     Math.Abs(scale.X - scale.Z) < 0.000001;
-                detailInfo.text = "Prefab: " + selectedPart.PrefabName +
-                    "\nМасштаб: " + (uniform
+                detailInfo.text = T(
+                    "editor.view.part_info",
+                    selectedPart.PrefabName,
+                    uniform
                         ? (scale.X * 100.0).ToString("0.###", CultureInfo.CurrentCulture) + "%"
-                        : "неравномерный (из чертежа)") +
-                    "\nГруппа: " + GroupName(document, selectedPart.ParentGroupId) +
-                    (document.PrimaryPartId == selectedPart.StableId
-                        ? "\n◆ Опора чертежа" : string.Empty);
+                        : T("editor.view.non_uniform_scale"),
+                    GroupName(document, selectedPart.ParentGroupId),
+                    document.PrimaryPartId == selectedPart.StableId
+                        ? T("editor.view.blueprint_frame_marker")
+                        : string.Empty);
             }
             else if (selectedGroup != null)
             {
                 int count = 0;
                 foreach (BlueprintEditorPart part in document.Parts)
                     if (part.ParentGroupId == selectedGroup.StableId) ++count;
-                detailInfo.text = "Группа · " + count + " деталей" +
-                    "\n◇ Опора: " + (selectedGroup.PivotPartId == null
-                        ? "Авто: центр группы"
-                        : PartName(document, selectedGroup.PivotPartId)) +
-                    "\nEye/Lock наследуются дочерними деталями.";
+                detailInfo.text = T(
+                    "editor.view.group_info",
+                    count,
+                    selectedGroup.PivotPartId == null
+                        ? T("editor.view.auto_group_center")
+                        : PartName(document, selectedGroup.PivotPartId));
             }
             else
             {
-                detailInfo.text = document.Selection.Count +
-                    " объектов\nКоманды ниже применяются ко всему выбору одной операцией Undo.";
+                detailInfo.text = T(
+                    "editor.view.multi_selection_info", document.Selection.Count);
             }
             SetButtonLabel(detailVisibilityButton,
-                detailVisible ? "СКРЫТЬ ВЫБРАННОЕ" : "ПОКАЗАТЬ ВЫБРАННОЕ");
+                T(detailVisible
+                    ? "editor.view.hide_selected"
+                    : "editor.view.show_selected"));
             SetButtonLabel(detailLockButton,
-                detailLocked ? "РАЗБЛОКИРОВАТЬ" : "ЗАБЛОКИРОВАТЬ");
+                T(detailLocked
+                    ? "editor.view.unlock"
+                    : "editor.view.lock_selected"));
             detailGroupButton.interactable = partsOnly;
             SetButtonLabel(detailGroupButton,
-                "ГРУППА: " + (detailParentGroupId == string.Empty
-                    ? "СМЕШАННАЯ"
+                T("editor.view.group_value", detailParentGroupId == string.Empty
+                    ? T("editor.view.mixed")
                     : GroupName(document, detailParentGroupId)));
         }
 
@@ -2901,7 +2980,7 @@ namespace OstrixMods.BuildWorks
             if (!pxValid || !pyValid || !pzValid || !rxValid || !ryValid ||
                 !rzValid || !scaleValid || !nameValid)
             {
-                SetStatus("Красное поле содержит некорректное значение.", error: true);
+                SetStatus(T("editor.view.invalid_red_field"), error: true);
                 return;
             }
             InspectorSubmitted?.Invoke(
@@ -2923,7 +3002,7 @@ namespace OstrixMods.BuildWorks
             SetInputValid(inspectorAngleStep, angleValid);
             if (!moveValid || !angleValid)
             {
-                SetStatus("Шаг: 0,001–10 м; угол: 0,1–90°.", error: true);
+                SetStatus(T("editor.view.invalid_steps"), error: true);
                 return;
             }
             SnapChanged?.Invoke(move, angle);
@@ -2949,7 +3028,7 @@ namespace OstrixMods.BuildWorks
             if (!valid)
             {
                 if (clearOnInvalid)
-                    SetArrayState(0, "Проверь числа: количество 1–128, шаг масштаба от −300% до 300%.");
+                    SetArrayState(0, T("editor.view.invalid_array_values"));
                 return;
             }
             ArrayChanged?.Invoke((int)values[0], (int)values[1], values[2], values[3],
@@ -2964,7 +3043,7 @@ namespace OstrixMods.BuildWorks
             SetInputValid(contourScaleStep, valid);
             if (!valid)
             {
-                SetStatus("Шаг масштаба: от −99% до 300%; 0 или не меньше 1% по модулю.", error: true);
+                SetStatus(T("editor.view.invalid_scale_step"), error: true);
                 return;
             }
             ContourChanged?.Invoke(scale / 100f);
@@ -2986,7 +3065,7 @@ namespace OstrixMods.BuildWorks
             SetInputValid(blueprintCategory, categoryValid);
             if (!nameValid || !categoryValid)
             {
-                SetStatus("Имя: 1–48 символов, категория: 1–24.", error: true);
+                SetStatus(T("editor.view.invalid_metadata"), error: true);
                 return;
             }
             BlueprintMetadataSubmitted?.Invoke(name, category);
@@ -3028,15 +3107,23 @@ namespace OstrixMods.BuildWorks
         {
             if (inspectorSpaceButton == null) return;
             SetButtonLabel(inspectorSpaceButton,
-                localTransformSpace ? "ОСИ: ЛОК." : "ОСИ: МИР.");
+                T(localTransformSpace
+                    ? "editor.view.axes_local"
+                    : "editor.view.axes_world"));
             inspectorMoveStep.SetTextWithoutNotify(translationStep.ToString("0.###"));
             inspectorAngleStep.SetTextWithoutNotify(rotationStep.ToString("0.###"));
             SetButtonLabel(inspectorAnchorVisibilityButton,
-                showAllTransformAnchors ? "ТОЧКИ: ВСЕ" : "ТОЧКИ: РЯДОМ");
+                T(showAllTransformAnchors
+                    ? "editor.view.points_all"
+                    : "editor.view.points_nearby"));
             SetButtonLabel(inspectorMagnetButton,
-                transformMeshSnap ? "МАГНИТ: МЕШ" : "МАГНИТ: ИГРА");
+                T(transformMeshSnap
+                    ? "editor.view.magnet_mesh"
+                    : "editor.view.magnet_game"));
             SetButtonLabel(inspectorPivotButton,
-                customTransformPivot ? "СБРОСИТЬ" : "ВЫБРАТЬ");
+                T(customTransformPivot
+                    ? "editor.view.reset"
+                    : "editor.view.select"));
             SetSelected(inspectorSelectionPivotButton,
                 !customTransformPivot &&
                 transformPivotMode == BlueprintEditorPivotMode.SelectionCenter);
@@ -3091,15 +3178,17 @@ namespace OstrixMods.BuildWorks
         private static string PartName(BlueprintEditorDocument document, string partId)
         {
             BlueprintEditorPart part = FindPart(document, partId);
-            return part?.DisplayName ?? "Авто: центр группы";
+            return part?.DisplayName ?? T("editor.view.auto_group_center");
         }
 
         private void CycleLighting()
         {
             lightingPreset = (BlueprintEditorLightingPreset)(((int)lightingPreset + 1) % 3);
-            lightingLabel.text = lightingPreset == BlueprintEditorLightingPreset.Neutral
-                ? "НЕЙТР."
-                : lightingPreset == BlueprintEditorLightingPreset.Warm ? "ТЁПЛЫЙ" : "КОНТУР";
+            lightingLabel.text = T(lightingPreset == BlueprintEditorLightingPreset.Neutral
+                ? "editor.view.light_neutral"
+                : lightingPreset == BlueprintEditorLightingPreset.Warm
+                    ? "editor.view.light_warm"
+                    : "editor.view.light_outline");
             LightingChanged?.Invoke(lightingPreset);
         }
 
@@ -3133,11 +3222,11 @@ namespace OstrixMods.BuildWorks
 
         private void CreateAnchorControls(Transform parent, float top)
         {
-            Button pin = CreateButton("PinSelectedAnchor", parent, "ЗАКРЕПИТЬ", 228f,
+            Button pin = CreateButton("PinSelectedAnchor", parent, T("editor.view.pin"), 228f,
                 () => PinSelectedAnchorRequested?.Invoke());
             SetInspectorButton((RectTransform)pin.transform, 0f, top, 228f);
             AddTooltip((RectTransform)pin.transform,
-                "Закрепить выбранную точку для вращения вокруг неё. Shift + ЛКМ по точке делает то же самое.");
+                T("editor.view.pin_anchor_tooltip"));
             pin.interactable = false;
             anchorPinButtons.Add(pin);
             for (int index = 0; index < 4; ++index)
@@ -3145,13 +3234,14 @@ namespace OstrixMods.BuildWorks
                 GizmoAxis axis = (GizmoAxis)index;
                 float width = index == 0 ? 72f : 44f;
                 Button constraint = CreateButton("AnchorConstraint" + axis, parent,
-                    index == 0 ? "СВОБ." : axis.ToString(), width,
+                    index == 0 ? T("editor.view.free_short") : axis.ToString(), width,
                     () => AnchorConstraintRequested?.Invoke(axis));
                 RectTransform rect = (RectTransform)constraint.transform;
                 SetInspectorButton(rect, index == 0 ? 0f : 80f + (index - 1) * 52f, top + 42f, width);
                 rect.sizeDelta = new Vector2(width, 28f);
-                AddTooltip(rect, index == 0 ? "Свободное вращение выбранной точки вокруг опоры."
-                    : "Вращение точки вокруг оси " + axis + ". Повторное нажатие снимает ограничение.");
+                AddTooltip(rect, index == 0
+                    ? T("editor.view.free_rotation_tooltip")
+                    : T("editor.view.axis_rotation_tooltip", axis));
                 anchorConstraintButtons.Add(constraint);
             }
         }
@@ -3197,9 +3287,10 @@ namespace OstrixMods.BuildWorks
                     0.01f);
                 ((RectTransform)destination[index].transform).sizeDelta =
                     new Vector2(48f, 34f);
-                AddTooltip((RectTransform)destination[index].transform,
-                    labelText + " · " + (index == 0 ? "X" : index == 1 ? "Y" : "Z") +
-                    ". Клик — ввод, горизонтальное перетягивание — изменение.");
+                AddTooltip((RectTransform)destination[index].transform, T(
+                    "editor.view.numeric_axis_tooltip",
+                    labelText,
+                    index == 0 ? "X" : index == 1 ? "Y" : "Z"));
             }
         }
 
@@ -3466,8 +3557,9 @@ namespace OstrixMods.BuildWorks
                 Place(inspector, layout.RightColumn);
                 outliner.gameObject.SetActive(!compactInspector);
                 inspector.gameObject.SetActive(compactInspector);
-                SetButtonLabel(compactPaneButton,
-                    compactInspector ? "СВОЙСТВА" : "ОБЪЕКТЫ");
+                SetButtonLabel(compactPaneButton, T(compactInspector
+                    ? "editor.view.properties"
+                    : "editor.view.objects"));
             }
             else
             {

@@ -16,6 +16,10 @@ using PrecisionAdjustment = OstrixMods.BuildWorks.Geometry.PrecisionAdjustment;
 
 namespace OstrixMods.BuildWorks
 {
+    /// <summary>
+    /// Owns world-side ghost editing, F9 input, blueprint expansion, native
+    /// placement validation, sequential construction, and atomic cancellation.
+    /// </summary>
     internal sealed class PrecisionPlacementSession : IDisposable
     {
         private static readonly List<ZNetView> scaleEnabledPrefabs = new List<ZNetView>();
@@ -50,7 +54,8 @@ namespace OstrixMods.BuildWorks
             {
                 ZNetView view = placed.GetComponent<ZNetView>();
                 if (!view || !view.IsValid() || !view.IsOwner() || !view.m_syncInitialScale)
-                    throw new InvalidOperationException("Размещённая деталь не поддерживает сохранение масштаба Valheim.");
+                    throw new InvalidOperationException(BuildWorksLocalization.Text(
+                        "placement.scale_persistence_unsupported"));
                 view.SetLocalScale(Vector3.Scale(source.transform.localScale, scale));
             }
             if (sessionMode == SessionMode.BlueprintWorldPlacement)
@@ -413,6 +418,14 @@ namespace OstrixMods.BuildWorks
             NoPlacementCostField != null && LastToolUseTimeField != null &&
             PlacePressedTimeField != null;
 
+        internal static int CurrentManualSnapPoint()
+        {
+            Player player = Player.m_localPlayer;
+            if (!player || ManualSnapPointField == null) return -1;
+            try { return (int)ManualSnapPointField.GetValue(player); }
+            catch { return -1; }
+        }
+
         public PrecisionPlacementSession(
             Action<CompositeBlueprintStore.Blueprint> openBlueprintEditor = null,
             Action createBlueprint = null)
@@ -512,7 +525,8 @@ namespace OstrixMods.BuildWorks
                     piece.m_icon,
                     BlueprintEditorCategoryName(piece.m_category),
                     HammerCatalogOrganizer.Group(piece),
-                    UnifiedHammerCatalog.OdinSourceGroup(piece) ?? "ВАНИЛЬНОЕ",
+                    UnifiedHammerCatalog.OdinSourceGroup(piece) ??
+                        HammerCatalogOrganizer.VanillaSource,
                     index));
             }
             result.Sort((left, right) =>
@@ -525,7 +539,8 @@ namespace OstrixMods.BuildWorks
                 if (!blueprintPieceRegistry.TryGetPiece(blueprint, out Piece piece) || !piece)
                     continue;
                 result.Add(new BlueprintEditorCatalogItem(PrefabName(piece), blueprint.name,
-                    piece.m_icon, blueprint.category, "ЧЕРТЕЖИ", "МОИ ЧЕРТЕЖИ",
+                    piece.m_icon, blueprint.category, HammerCatalogOrganizer.BlueprintsGroup,
+                    "my_blueprints",
                     result.Count, blueprint));
             }
             return result;
@@ -533,8 +548,9 @@ namespace OstrixMods.BuildWorks
 
         private static int CatalogPriority(BlueprintEditorCatalogItem item)
         {
-            bool vanilla = string.Equals(item.Source, "ВАНИЛЬНОЕ", StringComparison.Ordinal);
-            bool building = string.Equals(item.Category, "СТРОИТЕЛЬСТВО", StringComparison.Ordinal);
+            bool vanilla = string.Equals(item.Source, HammerCatalogOrganizer.VanillaSource,
+                StringComparison.Ordinal);
+            bool building = string.Equals(item.Category, "building", StringComparison.Ordinal);
             return vanilla && building ? 0 : vanilla ? 1 : building ? 2 : 3;
         }
 
@@ -543,15 +559,15 @@ namespace OstrixMods.BuildWorks
             switch (category)
             {
                 case Piece.PieceCategory.Crafting:
-                    return "РЕМЕСЛО";
+                    return "crafting";
                 case Piece.PieceCategory.BuildingWorkbench:
-                    return "СТРОИТЕЛЬСТВО";
+                    return "building";
                 case Piece.PieceCategory.BuildingStonecutter:
-                    return "ТЯЖ. ПОСТРОЙКИ";
+                    return "heavy_building";
                 case Piece.PieceCategory.Furniture:
-                    return "МЕБЕЛЬ";
+                    return "furniture";
                 case Piece.PieceCategory.Misc:
-                    return "ПРОЧЕЕ";
+                    return "misc";
                 default:
                     return category.ToString().ToUpperInvariant();
             }
@@ -611,7 +627,7 @@ namespace OstrixMods.BuildWorks
                 }
                 if (!GameplayInputAvailable(player))
                 {
-                    ShowStatus(player, "BuildWorks: сначала закрой меню или другой интерфейс.");
+                    ShowStatus(player, BuildWorksLocalization.Text("placement.close_ui_first"));
                     return;
                 }
                 precisionEnabled = true;
@@ -665,7 +681,8 @@ namespace OstrixMods.BuildWorks
                     if (sessionMode == SessionMode.BlueprintWorldSelection)
                     {
                         Finish();
-                        ShowStatus(player, "BuildWorks: выбор деталей отменён.");
+                        ShowStatus(player, BuildWorksLocalization.Text(
+                            "placement.selection_cancelled"));
                         return;
                     }
                     EndBlueprintSelection(clearSelection: true);
@@ -676,11 +693,13 @@ namespace OstrixMods.BuildWorks
                     if (automaticPlacementPaused)
                     {
                         Finish();
-                        ShowStatus(player, "BuildWorks: серия закончена; уже установленные детали сохранены.");
+                        ShowStatus(player, BuildWorksLocalization.Text(
+                            "placement.sequence_finished"));
                         return;
                     }
                     ClearLayout();
-                    ReopenEditor(player, "BuildWorks: установка отменена, редактирование продолжено.");
+                    ReopenEditor(player, BuildWorksLocalization.Text(
+                        "placement.cancelled_reopen"));
                     return;
                 }
                 if (state == PlacementState.Frozen)
@@ -796,7 +815,8 @@ namespace OstrixMods.BuildWorks
             Player player = Player.m_localPlayer;
             if (!player || !blueprintPieceRegistry.TryGetPiece(blueprint, out _))
             {
-                ShowStatus(player, "BuildWorks: чертёж сейчас недоступен в молотке.");
+                ShowStatus(player, BuildWorksLocalization.Text(
+                    "placement.blueprint_unavailable"));
                 return;
             }
             pendingCatalogBlueprint = blueprint;
@@ -844,14 +864,14 @@ namespace OstrixMods.BuildWorks
             if (!TrySuspendExternalBuildCamera())
             {
                 ShowStatus(player,
-                    "BuildWorks: не удалось временно отключить Build Camera.");
+                    BuildWorksLocalization.Text("placement.build_camera_disable_failed"));
                 return false;
             }
             Camera camera = Camera.main;
             if (!camera)
             {
                 RestoreExternalBuildCamera();
-                ShowStatus(player, "BuildWorks: игровая камера не найдена.");
+                ShowStatus(player, BuildWorksLocalization.Text("placement.game_camera_missing"));
                 return false;
             }
 
@@ -904,7 +924,8 @@ namespace OstrixMods.BuildWorks
             }
             if (!blueprintPieceRegistry.Select(player, blueprint))
             {
-                ShowStatus(player, "BuildWorks: не удалось подготовить призрак чертежа.");
+                ShowStatus(player, BuildWorksLocalization.Text(
+                    "placement.blueprint_ghost_prepare_failed"));
                 return;
             }
             try
@@ -915,18 +936,20 @@ namespace OstrixMods.BuildWorks
             {
                 Debug.LogWarning("BuildWorks could not position blueprint editor ghost: " +
                     exception);
-                ShowStatus(player, "BuildWorks: не удалось поставить призрак перед персонажем.");
+                ShowStatus(player, BuildWorksLocalization.Text(
+                    "placement.blueprint_ghost_front_failed"));
                 return;
             }
             GameObject ghost = PlacementGhostField.GetValue(player) as GameObject;
             if (!ghost || !ghost.activeInHierarchy)
             {
-                ShowStatus(player, "BuildWorks: Valheim не создал видимый призрак чертежа.");
+                ShowStatus(player, BuildWorksLocalization.Text(
+                    "placement.blueprint_ghost_missing"));
                 return;
             }
             sessionMode = SessionMode.BlueprintWorldPlacement;
             ShowStatus(player,
-                "BuildWorks: ЛКМ установить; редактирование открывается только из библиотеки.");
+                BuildWorksLocalization.Text("placement.blueprint_place_hint"));
         }
 
         private bool TryBeginWorldPrecision(
@@ -962,15 +985,15 @@ namespace OstrixMods.BuildWorks
             if (blueprint != null && !TryResolveBlueprintPieces(
                 player, blueprint, out pieces, out string missingPrefab))
             {
-                ShowStatus(player, "BuildWorks: в текущем молотке нет детали " +
-                    missingPrefab + ".");
+                ShowStatus(player, BuildWorksLocalization.Text(
+                    "placement.hammer_piece_missing", missingPrefab));
                 return false;
             }
             Piece entryPiece = pieces.Count > 0 ? pieces[0] : FindBlueprintCreationPiece(player);
             if (!entryPiece)
             {
-                ShowStatus(player,
-                    "BuildWorks: нет обычной детали для открытия редактора чертежей.");
+                ShowStatus(player, BuildWorksLocalization.Text(
+                    "placement.editor_piece_missing"));
                 return false;
             }
 
@@ -983,7 +1006,8 @@ namespace OstrixMods.BuildWorks
             if (!blueprintPieceRegistry.SelectPiece(player, entryPiece))
             {
                 Finish();
-                ShowStatus(player, "BuildWorks: не удалось подготовить деталь редактора.");
+                ShowStatus(player, BuildWorksLocalization.Text(
+                    "placement.editor_piece_prepare_failed"));
                 return false;
             }
             try
@@ -996,7 +1020,7 @@ namespace OstrixMods.BuildWorks
                 Debug.LogWarning("BuildWorks could not prepare isolated blueprint editor: " +
                     exception);
                 Finish();
-                ShowStatus(player, "BuildWorks: не удалось открыть редактор чертежа.");
+                ShowStatus(player, BuildWorksLocalization.Text("placement.editor_open_failed"));
                 return false;
             }
             finally
@@ -1007,7 +1031,7 @@ namespace OstrixMods.BuildWorks
             if (!ghost)
             {
                 Finish();
-                ShowStatus(player, "BuildWorks: Valheim не создал временную деталь редактора.");
+                ShowStatus(player, BuildWorksLocalization.Text("placement.editor_temp_missing"));
                 return false;
             }
 
@@ -1019,14 +1043,15 @@ namespace OstrixMods.BuildWorks
             if (!TrySuspendExternalBuildCamera())
             {
                 Finish();
-                ShowStatus(player, "BuildWorks: не удалось временно отключить Build Camera.");
+                ShowStatus(player, BuildWorksLocalization.Text(
+                    "placement.build_camera_disable_failed"));
                 return false;
             }
             Camera camera = Camera.main;
             if (!camera)
             {
                 Finish();
-                ShowStatus(player, "BuildWorks: игровая камера не найдена.");
+                ShowStatus(player, BuildWorksLocalization.Text("placement.game_camera_missing"));
                 return false;
             }
 
@@ -1048,9 +1073,8 @@ namespace OstrixMods.BuildWorks
                         part.scale.ToVector3()))
                     {
                         Finish();
-                        ShowStatus(player,
-                            "BuildWorks: не удалось создать временную копию детали " +
-                            pieces[index].m_name + ".");
+                        ShowStatus(player, BuildWorksLocalization.Text(
+                            "placement.editor_temp_copy_failed", pieces[index].m_name));
                         return false;
                     }
                 }
@@ -1060,9 +1084,8 @@ namespace OstrixMods.BuildWorks
             FocusBlueprintWorkspace();
             RefreshBlueprintWorkspaceSelection(player);
             ShowStatus(player, blueprint == null
-                ? "BuildWorks: пустой редактор открыт — выбери детали молотком и построй чертёж."
-                : "BuildWorks: " + blueprint.name +
-                    " открыт как отдельные временные детали.");
+                ? BuildWorksLocalization.Text("placement.editor_empty_opened")
+                : BuildWorksLocalization.Text("placement.editor_loaded", blueprint.name));
             return true;
         }
 
@@ -1230,10 +1253,10 @@ namespace OstrixMods.BuildWorks
                     placementGhost.transform.position,
                     placementGhost.transform.rotation))
                 {
-                    ShowStatus(player, "BuildWorks: достигнут лимит или деталь не поддерживается.");
+                    ShowStatus(player, BuildWorksLocalization.Text("placement.temp_add_limit"));
                     return;
                 }
-                ShowStatus(player, "BuildWorks: временная деталь добавлена без расхода ресурсов.");
+                ShowStatus(player, BuildWorksLocalization.Text("placement.temp_added"));
             }
             if (Input.GetMouseButtonDown(2)) RemoveBlueprintWorkspacePart(camera, mouse);
         }
@@ -1392,7 +1415,8 @@ namespace OstrixMods.BuildWorks
             if (part == null) return;
             blueprintWorkspaceParts.Remove(part);
             UnityEngine.Object.Destroy(part.Visual);
-            ShowStatus(Player.m_localPlayer, "BuildWorks: временная деталь удалена.");
+            ShowStatus(Player.m_localPlayer, BuildWorksLocalization.Text(
+                "placement.temp_deleted"));
         }
 
         private BlueprintWorkspacePart FindBlueprintWorkspacePart(Collider collider)
@@ -1416,15 +1440,13 @@ namespace OstrixMods.BuildWorks
                 MouseOverEditorPanel(mouse) ||
                 !TryGetBlueprintWorkspaceHit(camera, mouse, out RaycastHit hit))
             {
-                ShowStatus(player,
-                    "BuildWorks: наведи курсор на временную деталь и нажми F9.");
+                ShowStatus(player, BuildWorksLocalization.Text("placement.aim_temp_f9"));
                 return false;
             }
             BlueprintWorkspacePart part = FindBlueprintWorkspacePart(hit.collider);
             if (part?.Visual == null)
             {
-                ShowStatus(player,
-                    "BuildWorks: наведи курсор на временную деталь и нажми F9.");
+                ShowStatus(player, BuildWorksLocalization.Text("placement.aim_temp_f9"));
                 return false;
             }
 
@@ -1451,8 +1473,8 @@ namespace OstrixMods.BuildWorks
             anchorBoundsAvailable = CaptureAnchorPoints(part.Visual);
             singlePieceAnchorLocalPoints = (Vector3[])anchorLocalPoints.Clone();
             suppressPlacementFrame = Time.frameCount;
-            ShowStatus(player,
-                "BuildWorks: F9 редактирует только эту временную деталь; ПРИМЕНИТЬ вернёт к строительству чертежа.");
+            ShowStatus(player, BuildWorksLocalization.Text(
+                "placement.temp_precision_hint"));
             return true;
         }
 
@@ -1493,9 +1515,9 @@ namespace OstrixMods.BuildWorks
                 placementGhost.SetActive(true);
                 ApplyEditorGhostLayer(placementGhost);
             }
-            ShowStatus(player, restoreTransform
-                ? "BuildWorks: изменение положения временной детали отменено."
-                : "BuildWorks: положение временной детали применено.");
+            ShowStatus(player, BuildWorksLocalization.Text(restoreTransform
+                ? "placement.temp_change_cancelled"
+                : "placement.temp_change_applied"));
         }
 
         private void ClearBlueprintWorkspace()
@@ -1524,8 +1546,9 @@ namespace OstrixMods.BuildWorks
                 !TryResolveBlueprintPieces(player, blueprint, out pieces, out missingPrefab))
             {
                 ShowStatus(player, string.IsNullOrEmpty(missingPrefab)
-                    ? "BuildWorks: чертёж сейчас нельзя установить."
-                    : "BuildWorks: в текущем молотке нет детали " + missingPrefab + ".");
+                    ? BuildWorksLocalization.Text("placement.blueprint_cannot_place")
+                    : BuildWorksLocalization.Text(
+                        "placement.hammer_piece_missing", missingPrefab));
                 return false;
             }
             Vector3 placementOrigin = blueprintPieceRegistry.TryGetPlacementOrigin(
@@ -1563,8 +1586,8 @@ namespace OstrixMods.BuildWorks
                 int frameIndex = CompositeBlueprintStore.FramePartIndex(blueprint);
                 if (!SelectBuildPiece(player, pieces[frameIndex]))
                 {
-                    ShowStatus(player,
-                        "BuildWorks: опорная деталь чертежа больше недоступна.");
+                    ShowStatus(player, BuildWorksLocalization.Text(
+                        "placement.primary_unavailable"));
                     Finish();
                     return false;
                 }
@@ -1574,8 +1597,8 @@ namespace OstrixMods.BuildWorks
                 ApplyEditingGhostTransform();
                 if (!ApplyBlueprintAnchors())
                 {
-                    ShowStatus(player,
-                        "BuildWorks: не удалось определить общие границы чертежа.");
+                    ShowStatus(player, BuildWorksLocalization.Text(
+                        "placement.blueprint_bounds_failed"));
                     Finish();
                     return false;
                 }
@@ -1583,29 +1606,31 @@ namespace OstrixMods.BuildWorks
                 history.Reset(baseSnapshot);
                 if (!TrySuspendExternalBuildCamera())
                 {
-                    ShowStatus(player,
-                        "BuildWorks: не удалось временно отключить Build Camera.");
+                    ShowStatus(player, BuildWorksLocalization.Text(
+                        "placement.build_camera_disable_failed"));
                     Finish();
                     return false;
                 }
                 Camera camera = Camera.main;
                 if (!camera)
                 {
-                    ShowStatus(player, "BuildWorks: игровая камера не найдена.");
+                    ShowStatus(player, BuildWorksLocalization.Text(
+                        "placement.game_camera_missing"));
                     Finish();
                     return false;
                 }
                 SaveAndUnlockCursor();
                 BeginFreeView(camera, isolateBlueprint: false);
-                ShowStatus(player,
-                    "BuildWorks: F9 — точное положение всего чертежа; ПРИМЕНИТЬ установит его в мире.");
+                ShowStatus(player, BuildWorksLocalization.Text(
+                    "placement.blueprint_precision_hint"));
                 return true;
             }
             bool armed = ArmPlacement();
             if (!armed && state != PlacementState.Armed &&
                 sessionMode == SessionMode.BlueprintWorldPlacement)
             {
-                ShowStatus(player, "BuildWorks: чертёж не удалось подготовить к установке.");
+                ShowStatus(player, BuildWorksLocalization.Text(
+                    "placement.blueprint_prepare_failed"));
                 Finish();
             }
             return armed || state == PlacementState.Armed;
@@ -2035,7 +2060,8 @@ namespace OstrixMods.BuildWorks
                 ZNetView view = piece.GetComponent<ZNetView>();
                 if (!view || !view.m_syncInitialScale)
                 {
-                    PauseAutomaticPlacement(player, "деталь не поддерживает сохранение масштаба Valheim");
+                    PauseAutomaticPlacement(player, BuildWorksLocalization.Text(
+                        "placement.pause.scale"));
                     return true;
                 }
             }
@@ -2127,7 +2153,8 @@ namespace OstrixMods.BuildWorks
                     selectedPiece,
                     Player.RequirementMode.CanBuild))
                 {
-                    PauseAutomaticPlacement(player, "не хватает ресурсов");
+                    PauseAutomaticPlacement(player, BuildWorksLocalization.Text(
+                        "placement.pause.resources"));
                     takeInput = false;
                     return;
                 }
@@ -2140,7 +2167,8 @@ namespace OstrixMods.BuildWorks
                     }
                     Debug.LogWarning("BuildWorks series stopped: next transform status is " +
                         player.GetPlacementStatus() + ".");
-                    PauseAutomaticPlacement(player, "следующая деталь не проходит проверку Valheim");
+                    PauseAutomaticPlacement(player, BuildWorksLocalization.Text(
+                        "placement.pause.validation"));
                     takeInput = false;
                     return;
                 }
@@ -2267,8 +2295,8 @@ namespace OstrixMods.BuildWorks
                 {
                     automaticWaitingForTool = true;
                     SaveAndUnlockCursor();
-                    ShowStatus(player, "BuildWorks: установлено " + placementPlanIndex + "/" +
-                        placementPlan.Count + " — возьми исправный молоток, продолжим автоматически.");
+                    ShowStatus(player, BuildWorksLocalization.Text(
+                        "placement.progress.tool", placementPlanIndex, placementPlan.Count));
                     Debug.Log("BuildWorks series waiting for a usable build tool before " +
                         (placementPlanIndex + 1) + "/" + placementPlan.Count + ".");
                 }
@@ -2291,7 +2319,8 @@ namespace OstrixMods.BuildWorks
                 Debug.LogWarning("BuildWorks series stopped before native placement " +
                     (placementPlanIndex + 1) + "/" + placementPlan.Count +
                     ": required blueprint piece is unavailable.");
-                PauseAutomaticPlacement(player, "нужная деталь недоступна в текущем молотке");
+                PauseAutomaticPlacement(player, BuildWorksLocalization.Text(
+                    "placement.pause.tool_missing"));
                 return;
             }
             if (!PlacementSelectionStillValid(player))
@@ -2320,8 +2349,8 @@ namespace OstrixMods.BuildWorks
                     automaticWaitingForStamina = true;
                     Debug.Log("BuildWorks series waiting for stamina before " +
                         (placementPlanIndex + 1) + "/" + placementPlan.Count + ".");
-                    ShowStatus(player, "BuildWorks: ждём восстановления выносливости — " +
-                        (placementPlanIndex + 1) + "/" + placementPlan.Count + ".");
+                    ShowStatus(player, BuildWorksLocalization.Text(
+                        "placement.progress.stamina", placementPlanIndex + 1, placementPlan.Count));
                 }
                 return;
             }
@@ -2352,15 +2381,16 @@ namespace OstrixMods.BuildWorks
                     {
                         automaticWaitingForStamina = true;
                         RestoreAutomaticCooldown(player);
-                        ShowStatus(player, "BuildWorks: ждём восстановления выносливости — " +
-                            (placementPlanIndex + 1) + "/" + placementPlan.Count + ".");
+                        ShowStatus(player, BuildWorksLocalization.Text(
+                            "placement.progress.stamina", placementPlanIndex + 1, placementPlan.Count));
                         return;
                     }
                     Debug.LogWarning("BuildWorks series stopped: Valheim did not start native " +
                         "placement for " + (placementPlanIndex + 1) + "/" +
                         placementPlan.Count + ".");
                     RestoreAutomaticCooldown(player);
-                    PauseAutomaticPlacement(player, "Valheim не начал установку; проверь молоток и выносливость");
+                    PauseAutomaticPlacement(player, BuildWorksLocalization.Text(
+                        "placement.pause.native_start"));
                 }
             }
             catch (Exception exception)
@@ -2459,13 +2489,13 @@ namespace OstrixMods.BuildWorks
                 }
                 if (automaticSkippedPlacements > 0)
                 {
-                    ShowStatus(player, "BuildWorks: серия завершена; пропущено из-за персонажа: " +
-                        automaticSkippedPlacements + ".");
+                    ShowStatus(player, BuildWorksLocalization.Text(
+                        "placement.complete.skipped", automaticSkippedPlacements));
                 }
                 else if (activeBlueprint != null)
                 {
-                    ShowStatus(player, "BuildWorks: чертёж установлен — " +
-                        placementPlan.Count + " деталей.");
+                    ShowStatus(player, BuildWorksLocalization.Text(
+                        "placement.complete.blueprint", placementPlan.Count));
                 }
                 CaptureContinuation();
                 currentBlueprintPlacements.Clear();
@@ -2481,7 +2511,8 @@ namespace OstrixMods.BuildWorks
             {
                 return;
             }
-            PauseAutomaticPlacement(player, "Valheim отклонил следующую деталь");
+            PauseAutomaticPlacement(player, BuildWorksLocalization.Text(
+                "placement.pause.native_rejected"));
         }
 
         private void PauseAutomaticPlacement(Player player, string reason)
@@ -2493,10 +2524,12 @@ namespace OstrixMods.BuildWorks
             automaticWaitingForStamina = false;
             SaveAndUnlockCursor();
             UpdateHud();
-            ShowStatus(player, "BuildWorks: установлено " +
-                (placementPlanIndex - automaticSkippedPlacements) + "/" +
-                placementPlan.Count + " — " + reason + ". Enter — продолжить с детали " +
-                (placementPlanIndex + 1) + "; Esc — закончить серию.");
+            ShowStatus(player, BuildWorksLocalization.Text(
+                "placement.paused",
+                placementPlanIndex - automaticSkippedPlacements,
+                placementPlan.Count,
+                reason,
+                placementPlanIndex + 1));
         }
 
         private bool TrySkipPlayerBlockedPlacement(Player player)
@@ -2514,8 +2547,8 @@ namespace OstrixMods.BuildWorks
                 "/" + placementPlan.Count + ".");
             if (placementPlanIndex >= placementPlan.Count)
             {
-                ShowStatus(player, "BuildWorks: серия завершена; пропущено из-за персонажа: " +
-                    automaticSkippedPlacements + ".");
+                ShowStatus(player, BuildWorksLocalization.Text(
+                    "placement.complete.skipped", automaticSkippedPlacements));
                 Finish();
                 return true;
             }
@@ -2524,7 +2557,7 @@ namespace OstrixMods.BuildWorks
             currentPosition = next.Position;
             currentRotation = next.Rotation;
             requestAutomaticPlacement = true;
-            ShowStatus(player, "BuildWorks: ячейка " + skipped + " занята персонажем — пропускаем.");
+            ShowStatus(player, BuildWorksLocalization.Text("placement.cell_skipped", skipped));
             return true;
         }
 
@@ -2535,9 +2568,7 @@ namespace OstrixMods.BuildWorks
             if (state == PlacementState.Armed && player == Player.m_localPlayer &&
                 piece && piece == selectedPiece)
             {
-                ShowStatus(
-                    player,
-                    "BuildWorks: ошибка установки. Проверь мир перед повторной попыткой.");
+                ShowStatus(player, BuildWorksLocalization.Text("placement.error"));
                 Cancel();
             }
         }
@@ -2589,19 +2620,19 @@ namespace OstrixMods.BuildWorks
             if (!piece)
             {
                 if (showErrors)
-                    ShowStatus(player, "BuildWorks: выбери строительную деталь молотом.");
+                    ShowStatus(player, BuildWorksLocalization.Text("placement.select_build_piece"));
                 return false;
             }
             if (!ghost || !ghost.activeInHierarchy)
             {
                 if (showErrors)
-                    ShowStatus(player, "BuildWorks: сначала наведи видимую деталь на точку привязки.");
+                    ShowStatus(player, BuildWorksLocalization.Text("placement.snap_visible_first"));
                 return false;
             }
             if (!SupportsPrecisionPlacement(piece))
             {
                 if (showErrors)
-                    ShowStatus(player, "BuildWorks: эта специальная деталь пока не поддерживается.");
+                    ShowStatus(player, BuildWorksLocalization.Text("placement.special_unsupported"));
                 return false;
             }
             placementGhost = ghost;
@@ -2626,7 +2657,8 @@ namespace OstrixMods.BuildWorks
             if (!TrySuspendExternalBuildCamera())
             {
                 if (showErrors)
-                    ShowStatus(player, "BuildWorks: не удалось временно отключить Build Camera.");
+                    ShowStatus(player, BuildWorksLocalization.Text(
+                        "placement.build_camera_disable_failed"));
                 return false;
             }
             Camera camera = Camera.main;
@@ -2634,7 +2666,7 @@ namespace OstrixMods.BuildWorks
             {
                 RestoreExternalBuildCamera();
                 if (showErrors)
-                    ShowStatus(player, "BuildWorks: игровая камера не найдена.");
+                    ShowStatus(player, BuildWorksLocalization.Text("placement.game_camera_missing"));
                 return false;
             }
             state = PlacementState.Editing;
@@ -2922,11 +2954,11 @@ namespace OstrixMods.BuildWorks
                 dragConstraintActive = false;
                 ClearSnapDrag();
                 if (completedRow)
-                    ShowStatus(Player.m_localPlayer, "BuildWorks: ряд " + copyCount +
-                        "×1 готов. Для ширины потяни другую золотую стрелку.");
+                    ShowStatus(Player.m_localPlayer, BuildWorksLocalization.Text(
+                        "layout.row_ready", copyCount));
                 else if (completedPlane)
-                    ShowStatus(Player.m_localPlayer, "BuildWorks: площадка " + copyCount +
-                        "×" + planeSecondCount + " готова.");
+                    ShowStatus(Player.m_localPlayer, BuildWorksLocalization.Text(
+                        "layout.plane_ready", copyCount, planeSecondCount));
             }
         }
 
@@ -3087,8 +3119,8 @@ namespace OstrixMods.BuildWorks
             {
                 if (dragSourceIsNative)
                 {
-                    ShowStatus(Player.m_localPlayer,
-                        "BuildWorks: для вращения vanilla snap сначала закрепи другую опору через Shift.");
+                    ShowStatus(Player.m_localPlayer, BuildWorksLocalization.Text(
+                        "snap.pin_other_first"));
                 }
                 return;
             }
@@ -3770,7 +3802,7 @@ namespace OstrixMods.BuildWorks
             }
             catch (ArgumentOutOfRangeException)
             {
-                repeatPlanError = "МАССИВ: уменьши шаг масштаба или количество — масштаб копии должен быть положительным";
+                repeatPlanError = BuildWorksLocalization.Text("layout.scale_positive");
                 return;
             }
             int maximumRows = Mathf.Max(
@@ -3876,7 +3908,7 @@ namespace OstrixMods.BuildWorks
             {
                 ShowStatus(Player.m_localPlayer,
                     string.IsNullOrEmpty(contourHoverError)
-                        ? "BuildWorks: щёлкни подсвеченную цепь или кольцо."
+                        ? BuildWorksLocalization.Text("contour.click_highlighted")
                         : contourHoverError);
                 return;
             }
@@ -3903,10 +3935,9 @@ namespace OstrixMods.BuildWorks
 
             ClearContourHover();
             RebuildContourPlan();
-            ShowStatus(Player.m_localPlayer,
-                "BuildWorks: " + (contourClosed ? "замкнутый" : "открытый") +
-                " контур найден — " + contourSupports.Count +
-                " деталей; исходник связан с ближайшей опорой.");
+            ShowStatus(Player.m_localPlayer, BuildWorksLocalization.Text(
+                contourClosed ? "contour.closed_found" : "contour.open_found",
+                contourSupports.Count));
         }
 
         private void UpdateContourHover(
@@ -3954,7 +3985,7 @@ namespace OstrixMods.BuildWorks
             error = null;
             if (!TryGetPlacedPieceAt(camera, mouse, out Piece seed, out _))
             {
-                error = "BuildWorks: наведи курсор на установленную деталь цепи или кольца.";
+                error = BuildWorksLocalization.Text("contour.aim_installed");
                 return false;
             }
 
@@ -3965,7 +3996,7 @@ namespace OstrixMods.BuildWorks
                 out Edge3 contourEdge,
                 out pathPointLocal))
             {
-                error = "BuildWorks: у выбранного ребра нет пары штатных точек соединения.";
+                error = BuildWorksLocalization.Text("contour.edge_points_missing");
                 return false;
             }
 
@@ -3987,7 +4018,7 @@ namespace OstrixMods.BuildWorks
             }
             if (seedIndex < 0 || contourCandidates.Count < 2)
             {
-                error = "BuildWorks: рядом не найдена цепь минимум из двух одинаковых деталей.";
+                error = BuildWorksLocalization.Text("contour.chain_missing");
                 return false;
             }
 
@@ -4018,7 +4049,7 @@ namespace OstrixMods.BuildWorks
             }
             if (contour.Count < 2)
             {
-                error = "BuildWorks: не найдена простая цепь или петля без развилок.";
+                error = BuildWorksLocalization.Text("contour.simple_path_missing");
                 return false;
             }
             for (int index = 0; index < contour.Count; ++index)
@@ -4197,7 +4228,7 @@ namespace OstrixMods.BuildWorks
             }
             catch (ArgumentOutOfRangeException)
             {
-                repeatPlanError = "МАССИВ: масштаб каждой детали должен оставаться в пределах 1–400%; уменьши шаг или количество";
+                repeatPlanError = BuildWorksLocalization.Text("layout.scale_bounds");
                 return false;
             }
             if (activeBlueprint == null)
@@ -4292,20 +4323,24 @@ namespace OstrixMods.BuildWorks
             }
             if (!TrySaveWorldSelection(out CompositeBlueprintStore.Blueprint saved, out string error))
             {
-                ShowStatus(Player.m_localPlayer, "BuildWorks: " + error);
+                ShowStatus(Player.m_localPlayer, BuildWorksLocalization.Text(
+                    "blueprint.save_failed", error));
                 return;
             }
             Finish();
             RefreshBlueprintEditorLibrary();
-            ShowStatus(Player.m_localPlayer, "BuildWorks: " + saved.name +
-                " сохранён в ЧЕРТЕЖИ → " + saved.category + ". Детали мира сохранены на месте.");
+            ShowStatus(Player.m_localPlayer, BuildWorksLocalization.Text(
+                "blueprint.world_saved",
+                saved.name,
+                BuildWorksLocalization.BlueprintCategoryLabel(saved.category)));
         }
 
         private bool TrySaveWorldSelection(out CompositeBlueprintStore.Blueprint saved, out string error)
         {
             saved = null;
             PruneBlueprintSelection();
-            error = "выбери от 2 до " + CompositeBlueprintStore.MaximumParts + " деталей";
+            error = BuildWorksLocalization.Text(
+                "blueprint.select_part_count", CompositeBlueprintStore.MaximumParts);
             if (blueprintSelection.Count < 2 ||
                 blueprintSelection.Count > CompositeBlueprintStore.MaximumParts) return false;
             Quaternion rotation = blueprintSelection[0].transform.rotation;
@@ -4318,7 +4353,7 @@ namespace OstrixMods.BuildWorks
                 if (!IsBlueprintPieceSelectable(piece) || !TryResolveBuildPiece(
                     Player.m_localPlayer, PrefabName(piece), out Piece prefab))
                 {
-                    error = "выбранная деталь больше недоступна в молотке";
+                    error = BuildWorksLocalization.Text("blueprint.selected_piece_unavailable");
                     return false;
                 }
                 Vector3 baseScale = prefab.transform.localScale;
@@ -4327,14 +4362,16 @@ namespace OstrixMods.BuildWorks
                 try { scale = new CompositeBlueprintStore.VectorData(RelativeBlueprintScale(worldScale, baseScale)); }
                 catch (ArgumentException)
                 {
-                    error = "масштаб детали " + PrefabName(piece) + " вне поддерживаемого диапазона";
+                    error = BuildWorksLocalization.Text(
+                        "blueprint.piece_scale_range", PrefabName(piece));
                     return false;
                 }
                 ZNetView netView = prefab.GetComponent<ZNetView>();
                 if (!CompositeBlueprintStore.ValidScale(scale) ||
                     scale.ToVector3() != Vector3.one && (!netView || !netView.m_syncInitialScale))
                 {
-                    error = "масштаб детали " + PrefabName(piece) + " нельзя сохранить штатно";
+                    error = BuildWorksLocalization.Text(
+                        "blueprint.piece_scale_persistence", PrefabName(piece));
                     return false;
                 }
                 parts.Add(new CompositeBlueprintStore.Part
@@ -4357,7 +4394,13 @@ namespace OstrixMods.BuildWorks
                 if (anchors.Count >= MaximumBlueprintSourceNativeSnapPoints) break;
                 anchors.Add(new CompositeBlueprintStore.VectorData(ToUnity(point)));
             }
-            return blueprintStore.TrySave(parts, anchors, out saved, out error);
+            return blueprintStore.TrySave(
+                BuildWorksLocalization.Text(
+                    "blueprint.default_name", blueprintStore.All().Count + 1),
+                parts,
+                anchors,
+                out saved,
+                out error);
         }
 
         internal static Vector3 RelativeBlueprintScale(Vector3 worldScale, Vector3 sourceScale) =>
@@ -4373,8 +4416,8 @@ namespace OstrixMods.BuildWorks
             ClearLayout();
             alignmentTargetVisible = false;
             ClearSnapDrag();
-            ShowStatus(Player.m_localPlayer,
-                "BuildWorks: выбирай детали ЛКМ или рамкой; Ctrl удаляет из выбора.");
+            ShowStatus(Player.m_localPlayer, BuildWorksLocalization.Text(
+                "blueprint.world_selection_hint"));
         }
 
         private void EndBlueprintSelection(bool clearSelection)
@@ -4409,8 +4452,8 @@ namespace OstrixMods.BuildWorks
             if (!TryResolveBlueprintPieces(player, blueprint, out List<Piece> pieces,
                 out string missingPrefab))
             {
-                ShowStatus(player,
-                    "BuildWorks: в текущем молотке нет детали " + missingPrefab + ".");
+                ShowStatus(player, BuildWorksLocalization.Text(
+                    "blueprint.missing_piece", missingPrefab));
                 return false;
             }
 
@@ -4419,15 +4462,16 @@ namespace OstrixMods.BuildWorks
             int frameIndex = CompositeBlueprintStore.FramePartIndex(blueprint);
             if (!SelectBuildPiece(player, pieces[frameIndex]))
             {
-                ShowStatus(player, "BuildWorks: не удалось выбрать опорную деталь чертежа.");
+                ShowStatus(player, BuildWorksLocalization.Text(
+                    "blueprint.frame_select_failed"));
                 return false;
             }
             currentPosition = rootPosition;
             currentRotation = rootRotation;
             if (!CaptureSelectedPieceAnchors())
             {
-                ShowStatus(player,
-                    "BuildWorks: у опорной детали чертежа не удалось определить границы.");
+                ShowStatus(player, BuildWorksLocalization.Text(
+                    "blueprint.frame_bounds_failed"));
                 return false;
             }
 
@@ -4453,8 +4497,8 @@ namespace OstrixMods.BuildWorks
                 activeBlueprint = null;
                 activeBlueprintPieces.Clear();
                 RestoreSinglePieceAnchors();
-                ShowStatus(Player.m_localPlayer,
-                    "BuildWorks: у чертежа не удалось восстановить общие границы.");
+                ShowStatus(Player.m_localPlayer, BuildWorksLocalization.Text(
+                    "blueprint.anchors_restore_failed"));
                 return false;
             }
             ClearLayout();
@@ -4465,13 +4509,12 @@ namespace OstrixMods.BuildWorks
                 RestoreBlueprintDraft();
                 activeBlueprint = null;
                 activeBlueprintPieces.Clear();
-                ShowStatus(Player.m_localPlayer,
-                    "BuildWorks: не удалось выбрать опорную деталь для редактирования.");
+                ShowStatus(Player.m_localPlayer, BuildWorksLocalization.Text(
+                    "blueprint.frame_edit_select_failed"));
                 return false;
             }
-            ShowStatus(Player.m_localPlayer,
-                "BuildWorks: загружена " + blueprint.name + " — " +
-                blueprint.parts.Count + " деталей; клик или Tab переключает детали.");
+            ShowStatus(Player.m_localPlayer, BuildWorksLocalization.Text(
+                "blueprint.loaded", blueprint.name, blueprint.parts.Count));
             return true;
         }
 
@@ -4531,8 +4574,8 @@ namespace OstrixMods.BuildWorks
             int current = blueprintEditPartIndex + 1;
             int next = (current + Math.Sign(direction) + count) % count;
             if (!SelectBlueprintEditTarget(next - 1))
-                ShowStatus(Player.m_localPlayer,
-                    "BuildWorks: не удалось переключить редактируемую деталь.");
+                ShowStatus(Player.m_localPlayer, BuildWorksLocalization.Text(
+                    "blueprint.edit_switch_failed"));
         }
 
         private void CommitBlueprintEditTarget()
@@ -4566,7 +4609,7 @@ namespace OstrixMods.BuildWorks
             if (!blueprintPartsDirty) return true;
             if (!TryBuildBlueprintAnchors(out List<CompositeBlueprintStore.VectorData> anchors))
             {
-                error = "не удалось пересчитать точки привязки";
+                error = BuildWorksLocalization.Text("blueprint.anchors_recalc_failed");
                 return false;
             }
             if (!blueprintStore.TryUpdateParts(activeBlueprint, activeBlueprint.parts, anchors,
@@ -4694,7 +4737,8 @@ namespace OstrixMods.BuildWorks
                 ZNetView view = piece.GetComponent<ZNetView>();
                 if (part.scale.ToVector3() != Vector3.one && (!view || !view.m_syncInitialScale))
                 {
-                    missingPrefab = part.prefabName + " (нет штатного сохранения масштаба Valheim)";
+                    missingPrefab = BuildWorksLocalization.Text(
+                        "blueprint.scale_persistence_suffix", part.prefabName);
                     return false;
                 }
                 pieces.Add(piece);
@@ -5008,7 +5052,8 @@ namespace OstrixMods.BuildWorks
             if ((mode == GizmoMode.Guide || mode == GizmoMode.Repeat) &&
                 !anchorBoundsAvailable)
             {
-                ShowStatus(Player.m_localPlayer, "BuildWorks: у детали не найдена геометрия опор.");
+                ShowStatus(Player.m_localPlayer, BuildWorksLocalization.Text(
+                    "placement.anchor_geometry_missing"));
                 return;
             }
             if (mode != gizmoMode)
@@ -5026,7 +5071,8 @@ namespace OstrixMods.BuildWorks
         {
             if (!anchorBoundsAvailable)
             {
-                ShowStatus(Player.m_localPlayer, "BuildWorks: у детали не найдена геометрия опор.");
+                ShowStatus(Player.m_localPlayer, BuildWorksLocalization.Text(
+                    "placement.anchor_geometry_missing"));
                 return;
             }
             anchorConstraintAxis = axis == GizmoAxis.None
@@ -5176,9 +5222,9 @@ namespace OstrixMods.BuildWorks
         {
             meshSnapEnabled = !meshSnapEnabled;
             if (dragMagneticMove) RefreshSnapTargets();
-            ShowStatus(Player.m_localPlayer, meshSnapEnabled
-                ? "BuildWorks: магнит по модели — Ctrl совмещает только выбранные точки."
-                : "BuildWorks: магнит использует только штатные точки Valheim.");
+            ShowStatus(Player.m_localPlayer, BuildWorksLocalization.Text(meshSnapEnabled
+                ? "snap.mesh_enabled"
+                : "snap.native_only"));
         }
 
         private void ToggleAutoAlignment()
@@ -5192,9 +5238,9 @@ namespace OstrixMods.BuildWorks
                 if (TryAutoAlignToTouchingPiece())
                     CommitTransformIfChanged(oldPosition, oldRotation);
             }
-            ShowStatus(Player.m_localPlayer, autoAlignmentEnabled
-                ? "BuildWorks: автостык включён — ориентация и штатные точки совмещаются вместе."
-                : "BuildWorks: автостык выключен.");
+            ShowStatus(Player.m_localPlayer, BuildWorksLocalization.Text(autoAlignmentEnabled
+                ? "snap.auto_align_enabled"
+                : "snap.auto_align_disabled"));
         }
 
         private bool TryAutoAlignToTouchingPiece()
@@ -5338,16 +5384,20 @@ namespace OstrixMods.BuildWorks
                 : currentRotation * Quaternion.Inverse(baseRotation);
             Vector3 displayedEuler = SignedEuler(displayedRotation);
             string modeHint = LayoutHint();
-            string prefix = localSpace ? "Лок." : "Мир.";
+            string prefix = BuildWorksLocalization.Text(localSpace
+                ? "common.local_short"
+                : "common.world_short");
             string step = gizmoMode == GizmoMode.Repeat
                 ? repeatDistribution == RepeatDistributionMode.Fit
-                    ? "ПО ОТРЕЗКУ"
+                    ? BuildWorksLocalization.Text("layout.distribution.fit")
                     : repeatDistribution == RepeatDistributionMode.Exact
-                    ? ExactRepeatSteps[exactRepeatStepIndex].ToString("0.##") + " м"
+                    ? BuildWorksLocalization.Text(
+                        "unit.meters", ExactRepeatSteps[exactRepeatStepIndex].ToString("0.##"))
                     : RepeatSpacings[repeatSpacingIndex] <= 0f
-                        ? "ПО РАЗМЕРУ"
-                        : "РАЗМЕР + " +
-                            (RepeatSpacings[repeatSpacingIndex] * 100f).ToString("0") + " см"
+                        ? BuildWorksLocalization.Text("layout.distribution.size")
+                        : BuildWorksLocalization.Text(
+                            "layout.distribution.size_gap",
+                            (RepeatSpacings[repeatSpacingIndex] * 100f).ToString("0"))
                 : string.Empty;
             PruneBlueprintSelection();
             bool canSaveBlueprint = sessionMode != SessionMode.BlueprintEditor;
@@ -5374,7 +5424,10 @@ namespace OstrixMods.BuildWorks
                 repeatSymmetric,
                 meshSnapEnabled,
                 autoAlignmentEnabled,
-                (Geometry.PrecisionStepPresets.Translation[translationStepIndex] * 100f).ToString("0") + " см",
+                BuildWorksLocalization.Text(
+                    "unit.centimeters",
+                    (Geometry.PrecisionStepPresets.Translation[translationStepIndex] * 100f)
+                        .ToString("0")),
                 Geometry.PrecisionStepPresets.Rotation[rotationStepIndex].ToString("0.#") + "°",
                 step,
                 activeBlueprint?.name,
@@ -5387,14 +5440,14 @@ namespace OstrixMods.BuildWorks
                 selectingBlueprint,
                 blueprintSelection.Count,
                 modeHint,
-                string.Format(
-                    "{0} смещение  X {1:F2}  Y {2:F2}  Z {3:F2} м",
+                BuildWorksLocalization.Text(
+                    "hud.offset_values",
                     prefix,
                     displayedOffset.x,
                     displayedOffset.y,
                     displayedOffset.z),
-                string.Format(
-                    "{0} вращение  X {1:F1}°  Y {2:F1}°  Z {3:F1}°",
+                BuildWorksLocalization.Text(
+                    "hud.rotation_values",
                     prefix,
                     displayedEuler.x,
                     displayedEuler.y,
@@ -5405,43 +5458,46 @@ namespace OstrixMods.BuildWorks
         {
             if (!string.IsNullOrEmpty(repeatPlanError)) return repeatPlanError;
             if (blueprintWorkspaceEditPart != null)
-                return "ДЕТАЛЬ ЧЕРТЕЖА: стрелки и кольца меняют только её · " +
-                    "F9/ПРИМЕНИТЬ — вернуться к строительству · ОТМЕНА — откатить";
+                return BuildWorksLocalization.Text("hint.blueprint_part");
             if (expandedPlanLimited)
-                return "ЧЕРТЕЖ: превышен безопасный предел " +
-                    MaximumExpandedPlacements + " деталей; уменьши массив";
+                return BuildWorksLocalization.Text(
+                    "hint.blueprint_limit", MaximumExpandedPlacements);
             if (gizmoMode == GizmoMode.Repeat)
             {
                 if (repeatAxis == GizmoAxis.None)
-                    return "ПОТЯНИ ЗОЛОТУЮ СТРЕЛКУ — задай ряд; параметры применятся к следующим копиям";
-                return "Колесо: " + (repeatCountSecond ? "2-е" : "1-е") +
-                    " направление · Ctrl+колесо: камера · параметры на каждую следующую копию";
+                    return BuildWorksLocalization.Text("hint.repeat_begin");
+                return BuildWorksLocalization.Text(
+                    "hint.repeat_direction",
+                    BuildWorksLocalization.Text(repeatCountSecond
+                        ? "common.second"
+                        : "common.first"));
             }
             if (gizmoMode != GizmoMode.Guide)
             {
                 if (sessionMode == SessionMode.BlueprintWorldPlacement)
-                    return "ЧЕРТЕЖ В МИРЕ: двигается вся группа · МАССИВ / КОНТУР повторяют группу · " +
-                        "УСТАНОВИТЬ — разместить · F9/Esc — вернуться";
+                    return BuildWorksLocalization.Text("hint.blueprint_world");
                 return activeBlueprint != null
                     ? blueprintEditPartIndex < 0
-                        ? activeBlueprint.name + ": двигается вся группа · " +
-                            "клик/Tab — выбрать деталь · ПРИМЕНИТЬ — сохранить · Esc — выйти"
-                        : activeBlueprint.name + ": деталь " +
-                            (blueprintEditPartIndex + 1) + "/" + activeBlueprint.parts.Count +
-                            " · клик/Tab — выбрать другую · ПРИМЕНИТЬ — сохранить · Esc — выйти"
+                        ? BuildWorksLocalization.Text(
+                            "hint.blueprint_group_edit", activeBlueprint.name)
+                        : BuildWorksLocalization.Text(
+                            "hint.blueprint_piece_edit",
+                            activeBlueprint.name,
+                            blueprintEditPartIndex + 1,
+                            activeBlueprint.parts.Count)
                     : null;
             }
             if (contourSupports.Count == 0)
             {
                 if (contourHoverSupports.Count > 0)
-                    return (contourHoverClosed ? "Кольцо" : "Цепь") +
-                        " подсвечено: " + contourHoverSupports.Count +
-                        " деталей; ЛКМ выбирает этот контур";
-                return "КОНТУР: наведи на видимое ребро цепи — она подсветится; ЛКМ выбирает";
+                    return BuildWorksLocalization.Text(
+                        contourHoverClosed ? "hint.contour_ring_hover" : "hint.contour_chain_hover",
+                        contourHoverSupports.Count);
+                return BuildWorksLocalization.Text("hint.contour_aim");
             }
-            return (contourClosed ? "Замкнутый" : "Открытый") +
-                " контур готов: " + placementPlan.Count +
-                " деталей сохраняют точное положение исходной; УСТАНОВИТЬ размещает цепь";
+            return BuildWorksLocalization.Text(
+                contourClosed ? "hint.contour_closed_ready" : "hint.contour_open_ready",
+                placementPlan.Count);
         }
 
         private void ShowLayoutPreview(Camera camera)
@@ -5496,15 +5552,15 @@ namespace OstrixMods.BuildWorks
                 out CompositeBlueprintStore.Blueprint savedBlueprint,
                 out string saveError))
             {
-                ShowStatus(player, "BuildWorks: не удалось сохранить правки чертежа — " +
-                    saveError + ".");
+                ShowStatus(player, BuildWorksLocalization.Text(
+                    "editor.save_failed", saveError));
                 return;
             }
             string blueprintName = savedBlueprint.name;
             Finish();
             blueprintPieceRegistry.Update(player);
-            ShowStatus(player, "BuildWorks: " + blueprintName +
-                " сохранён; редактор закрыт без размещения в мире.");
+            ShowStatus(player, BuildWorksLocalization.Text(
+                "editor.saved", blueprintName));
         }
 
         private bool TrySaveBlueprintWorkspace(
@@ -5515,7 +5571,7 @@ namespace OstrixMods.BuildWorks
             error = null;
             if (blueprintWorkspaceParts.Count < 2)
             {
-                error = "нужно построить минимум две детали";
+                error = BuildWorksLocalization.Text("editor.minimum_parts");
                 return false;
             }
 
@@ -5529,7 +5585,7 @@ namespace OstrixMods.BuildWorks
                         workspacePart.Visual.transform.rotation,
                         out AnchorBounds partBounds))
                 {
-                    error = "не удалось определить границы временной детали";
+                    error = BuildWorksLocalization.Text("editor.temp_bounds_failed");
                     return false;
                 }
                 for (int corner = 0; corner < 8; ++corner)
@@ -5548,7 +5604,7 @@ namespace OstrixMods.BuildWorks
             }
             catch (ArgumentException)
             {
-                error = "временная конструкция не имеет корректных границ";
+                error = BuildWorksLocalization.Text("editor.temp_layout_invalid");
                 return false;
             }
             Vector3 rootPosition = ToUnity(groupBounds.Center);
@@ -5578,7 +5634,10 @@ namespace OstrixMods.BuildWorks
                 anchors.Add(new CompositeBlueprintStore.VectorData(ToUnity(point)));
 
             bool saved = activeBlueprint == null
-                ? blueprintStore.TrySave(parts, anchors, out savedBlueprint, out error)
+                ? blueprintStore.TrySave(
+                    BuildWorksLocalization.Text(
+                        "blueprint.default_name", blueprintStore.All().Count + 1),
+                    parts, anchors, out savedBlueprint, out error)
                 : blueprintStore.TryUpdateParts(activeBlueprint, parts, anchors, out error);
             if (!saved) return false;
             if (activeBlueprint != null)
@@ -5592,7 +5651,7 @@ namespace OstrixMods.BuildWorks
             if (sessionMode != SessionMode.BlueprintEditor) return;
             Player player = Player.m_localPlayer;
             Finish();
-            ShowStatus(player, "BuildWorks: редактор чертежа закрыт без сохранения.");
+            ShowStatus(player, BuildWorksLocalization.Text("editor.closed_without_saving"));
         }
 
         private bool ArmPlacement()
@@ -5605,9 +5664,8 @@ namespace OstrixMods.BuildWorks
             }
             if (expandedPlanLimited)
             {
-                ShowStatus(Player.m_localPlayer,
-                    "BuildWorks: уменьши массив — максимум " +
-                    MaximumExpandedPlacements + " деталей за одну установку.");
+                ShowStatus(Player.m_localPlayer, BuildWorksLocalization.Text(
+                    "placement.array_limit", MaximumExpandedPlacements));
                 return false;
             }
 
@@ -5623,7 +5681,7 @@ namespace OstrixMods.BuildWorks
                 (gizmoMode == GizmoMode.Repeat || gizmoMode == GizmoMode.Guide) &&
                     placementPlan.Count == 0)
             {
-                ShowStatus(player, "BuildWorks: сначала закончи разметку.");
+                ShowStatus(player, BuildWorksLocalization.Text("placement.finish_layout_first"));
                 return false;
             }
             if (placementPlan.Count == 0)
@@ -5637,7 +5695,7 @@ namespace OstrixMods.BuildWorks
             }
             if (placementPlanPieces.Count != placementPlan.Count)
             {
-                ShowStatus(player, "BuildWorks: план чертежа повреждён; создай его заново.");
+                ShowStatus(player, BuildWorksLocalization.Text("placement.plan_corrupt"));
                 return false;
             }
             editorRootBeforePlacement = new TransformSnapshot(currentPosition, currentRotation);
@@ -5647,8 +5705,8 @@ namespace OstrixMods.BuildWorks
                 currentBlueprintPlacements.Clear();
             if (!SelectPlanPiece(player, placementPlanIndex))
             {
-                ShowStatus(player,
-                    "BuildWorks: первая деталь чертежа недоступна в текущем молотке.");
+                ShowStatus(player, BuildWorksLocalization.Text(
+                    "placement.first_piece_unavailable"));
                 return false;
             }
             currentPosition = placementPlan[0].Position;
@@ -5677,7 +5735,7 @@ namespace OstrixMods.BuildWorks
                 return false;
             }
 
-            ReopenEditor(player, "BuildWorks: Valheim отклонил положение. Исправь деталь и повтори.",
+            ReopenEditor(player, BuildWorksLocalization.Text("placement.position_rejected"),
                 preserveLayout: true);
             return false;
         }
@@ -5724,8 +5782,8 @@ namespace OstrixMods.BuildWorks
                 else RebuildBlueprintPlan();
                 if (!SelectPlanPiece(player, 0))
                 {
-                    ShowStatus(player,
-                        "BuildWorks: первая деталь чертежа больше недоступна.");
+                    ShowStatus(player, BuildWorksLocalization.Text(
+                        "placement.first_piece_gone"));
                     Finish();
                     return;
                 }
@@ -5917,9 +5975,9 @@ namespace OstrixMods.BuildWorks
             int failed = RetryPendingBlueprintRollbacks(force: true);
             precisionEnabled = false;
             Finish();
-            ShowStatus(player, failed == 0
-                ? "BuildWorks: незавершённый чертёж отменён; удалено деталей: " + requested + "."
-                : "BuildWorks: отмена завершается; повтор удаления деталей: " + failed + ".");
+            ShowStatus(player, BuildWorksLocalization.Text(failed == 0
+                ? "placement.rollback_complete"
+                : "placement.rollback_pending", failed == 0 ? requested : failed));
         }
 
         private int RetryPendingBlueprintRollbacks(bool force = false)
@@ -6457,9 +6515,9 @@ namespace OstrixMods.BuildWorks
         {
             switch (editorLightingPreset)
             {
-                case 1: return "СТУДИЯ";
-                case 2: return "ТЁПЛЫЙ";
-                default: return "МЯГКИЙ";
+                case 1: return BuildWorksLocalization.Text("lighting.studio");
+                case 2: return BuildWorksLocalization.Text("lighting.warm");
+                default: return BuildWorksLocalization.Text("lighting.soft");
             }
         }
 
@@ -6560,7 +6618,8 @@ namespace OstrixMods.BuildWorks
             {
                 Debug.LogWarning("BuildWorks could not restore Build Camera: " +
                     (exception.InnerException ?? exception));
-                ShowStatus(player, "BuildWorks: включи Build Camera вручную.");
+                ShowStatus(player, BuildWorksLocalization.Text(
+                    "placement.restore_build_camera_manually"));
             }
             finally
             {
@@ -6604,7 +6663,11 @@ namespace OstrixMods.BuildWorks
         {
             if (player)
             {
-                player.Message(MessageHud.MessageType.Center, text, 0, null);
+                player.Message(
+                    MessageHud.MessageType.Center,
+                    BuildWorksLocalization.ResolveUserText(text),
+                    0,
+                    null);
             }
         }
 

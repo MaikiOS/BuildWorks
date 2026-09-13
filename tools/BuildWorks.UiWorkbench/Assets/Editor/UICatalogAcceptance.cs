@@ -34,6 +34,10 @@ internal static class UICatalogAcceptance
 
     internal static string Run(TMP_FontAsset font)
     {
+        Require(
+            BuildWorksLocalization.Token("editor.view.title") ==
+                "$buildworks_editor_view_title",
+            "Valheim runtime localization token contains a dotted separator");
         var templateObject = new GameObject("CatalogAcceptanceFont", typeof(RectTransform));
         templateObject.SetActive(false);
         TMP_Text template = templateObject.AddComponent<TextMeshProUGUI>();
@@ -96,12 +100,20 @@ internal static class UICatalogAcceptance
                 {
                     string label = action.GetComponentInChildren<TMP_Text>().text;
                     contextLabels.Add(label);
-                    if (label == "ОПОРА ЧЕРТЕЖА") primaryAction = action;
+                    if (label == BuildWorksLocalization.Text("editor.view.blueprint_frame"))
+                        primaryAction = action;
                 }
-                foreach (string label in new[] { "ПЕРЕИМЕНОВАТЬ", "ПОКАЗАТЬ / СКРЫТЬ",
-                    "БЛОК / РАЗБЛОК", "СГРУППИРОВАТЬ", "РАЗГРУППИРОВАТЬ",
-                    "ДУБЛИРОВАТЬ", "УДАЛИТЬ", "В ROOT", "ОПОРА ЧЕРТЕЖА",
-                    "ОПОРА ГРУППЫ: Узел" })
+                foreach (string label in new[] {
+                    BuildWorksLocalization.Text("editor.view.rename"),
+                    BuildWorksLocalization.Text("editor.view.show_hide"),
+                    BuildWorksLocalization.Text("editor.view.lock_unlock"),
+                    BuildWorksLocalization.Text("editor.view.group"),
+                    BuildWorksLocalization.Text("editor.view.ungroup"),
+                    BuildWorksLocalization.Text("editor.view.duplicate"),
+                    BuildWorksLocalization.Text("editor.view.delete"),
+                    BuildWorksLocalization.Text("editor.view.to_root"),
+                    BuildWorksLocalization.Text("editor.view.blueprint_frame"),
+                    BuildWorksLocalization.Text("editor.view.group_pivot", "Узел") })
                     Require(contextLabels.Contains(label), "Outliner marking action is missing: " + label);
                 Require(primaryAction, "Outliner primary-part marking action is missing");
                 marking.position = Center((RectTransform)primaryAction.transform);
@@ -116,7 +128,8 @@ internal static class UICatalogAcceptance
                 marking = BeginRightHold(rowA.gameObject);
                 Button groupPivotAction = null;
                 foreach (Button action in markingMenu.GetComponentsInChildren<Button>(true))
-                    if (action.GetComponentInChildren<TMP_Text>().text == "ОПОРА ГРУППЫ: Узел")
+                    if (action.GetComponentInChildren<TMP_Text>().text ==
+                        BuildWorksLocalization.Text("editor.view.group_pivot", "Узел"))
                         groupPivotAction = action;
                 Require(groupPivotAction, "Outliner group-pivot marking action is missing");
                 marking.position = Center((RectTransform)groupPivotAction.transform);
@@ -128,7 +141,8 @@ internal static class UICatalogAcceptance
                 Canvas.ForceUpdateCanvases();
                 Button clippedDelete = null;
                 foreach (Button action in markingMenu.GetComponentsInChildren<Button>(true))
-                    if (action.GetComponentInChildren<TMP_Text>().text == "УДАЛИТЬ") clippedDelete = action;
+                    if (action.GetComponentInChildren<TMP_Text>().text ==
+                        BuildWorksLocalization.Text("editor.view.delete")) clippedDelete = action;
                 Require(clippedDelete, "Clipped context delete action is missing");
                 marking.position = Center((RectTransform)clippedDelete.transform);
                 Require(!RectTransformUtility.RectangleContainsScreenPoint(
@@ -167,8 +181,11 @@ internal static class UICatalogAcceptance
                     document.SetPartProperties("a", "Стена", new Point3(0,0,0),
                         new Rotation3(0,0,0,1), new Point3(scale, scale, scale));
                     view.Bind(document, true, null, Vector3.one);
-                    Require(Field<TMP_Text>(view, "detailInfo").text.Contains(
-                        "Масштаб: " + (scale * 100).ToString("0") + "%"),
+                    string expectedScaleLine = BuildWorksLocalization.Text(
+                        "editor.view.part_info", string.Empty,
+                        (scale * 100).ToString("0") + "%", string.Empty, string.Empty)
+                        .Split('\n')[1];
+                    Require(Field<TMP_Text>(view, "detailInfo").text.Contains(expectedScaleLine),
                         "Detail inspector reports constant or incorrect uniform scale");
                 }
                 view.SetTool(BlueprintEditorTool.Select);
@@ -302,7 +319,8 @@ internal static class UICatalogAcceptance
         Require(grid.transform.parent == Field<RectTransform>(view, "viewportControls") &&
             projection.transform.parent == grid.transform.parent && grid.GetComponent<BlueprintEditorHoverTarget>() &&
             projection.GetComponent<BlueprintEditorHoverTarget>(), "Viewport icons are hidden inside settings or have no tooltip");
-        Require(Button(view, "View").GetComponentInChildren<TMP_Text>().text == "НАСТРОЙКИ",
+        Require(Button(view, "View").GetComponentInChildren<TMP_Text>().text ==
+            BuildWorksLocalization.Text("editor.view.settings"),
             "Direct header settings control is not labelled clearly");
         float uiScale = 0f;
         view.UiScaleChanged += value => uiScale = value;
@@ -362,7 +380,8 @@ internal static class UICatalogAcceptance
             "Bottom context hints are missing or intercept pointer input");
         view.ShowError("НЕЛЬЗЯ СОХРАНИТЬ", "Некорректные данные.", canRetry: false);
         Require(!ButtonObject(view, "SaveExit").activeSelf &&
-            Button(view, "Cancel").GetComponentInChildren<TMP_Text>().text == "ВЕРНУТЬСЯ",
+            Button(view, "Cancel").GetComponentInChildren<TMP_Text>().text ==
+                BuildWorksLocalization.Text("editor.view.return"),
             "Non-retryable validation error still offers a meaningless retry");
         view.HideDialog();
         int moveStepRequests = 0, angleStepRequests = 0;
@@ -456,7 +475,9 @@ internal static class UICatalogAcceptance
         Require(afterFirstTick < 1f && scroll.verticalNormalizedPosition < afterFirstTick,
             "Short Outliner does not continuously edge-scroll while the pointer stays still");
         DropTree(view, pointer, Button(view, "Row_target").gameObject);
-        Require(!Field<bool>(view, "outlinerDragging") && Field<TMP_Text>(view, "outlinerTitle").text == "ДЕРЕВО ОБЪЕКТОВ",
+        Require(!Field<bool>(view, "outlinerDragging") &&
+            Field<TMP_Text>(view, "outlinerTitle").text ==
+                BuildWorksLocalization.Text("editor.view.outliner"),
             "Drop leaves a stale root target caption / dragging state");
         int beforeCancel = routed;
         pointer = BeginTreeDrag(view, "Row_d2");

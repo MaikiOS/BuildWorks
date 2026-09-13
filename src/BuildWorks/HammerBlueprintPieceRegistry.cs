@@ -92,7 +92,7 @@ namespace OstrixMods.BuildWorks
             };
             categoryMarker.transform.SetParent(holder.transform, false);
             Piece markerPiece = categoryMarker.AddComponent<Piece>();
-            markerPiece.m_name = "ЧЕРТЕЖИ";
+            markerPiece.m_name = BuildWorksLocalization.Token("catalog.category.blueprints");
             markerPiece.m_category = UnifiedHammerCatalog.BlueprintCategory;
             markerPiece.m_enabled = false;
             markerPiece.m_resources = Array.Empty<Piece.Requirement>();
@@ -322,7 +322,7 @@ namespace OstrixMods.BuildWorks
             }
 
             int insertAt = pieces.FindIndex(piece =>
-                HammerCatalogOrganizer.Group(piece) == "ДЕЙСТВИЯ");
+                HammerCatalogOrganizer.Group(piece) == HammerCatalogOrganizer.ActionsGroup);
             if (insertAt >= 0)
             {
                 Piece repairPiece = pieces[insertAt];
@@ -363,8 +363,8 @@ namespace OstrixMods.BuildWorks
 
             Piece piece = prefab.AddComponent<Piece>();
             piece.m_name = blueprint.name;
-            piece.m_description = "BuildWorks: " + blueprint.parts.Count +
-                " деталей. ЛКМ установить. Редактирование — из библиотеки чертежей.";
+            piece.m_description = "BuildWorks: " + BuildWorksLocalization.Text(
+                "blueprint.piece.description", blueprint.parts.Count);
             piece.m_category = UnifiedHammerCatalog.BlueprintCategory;
             piece.m_usage = Piece.UsageTagFlags.Misc;
             piece.m_canRotate = true;

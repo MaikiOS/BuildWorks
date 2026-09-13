@@ -85,26 +85,26 @@ namespace OstrixMods.BuildWorks
                 : surface == Surface.Hover ? new Color32(161, 141, 103, 255)
                 : new Color32(113, 100, 77, 255);
             for (int y = 0; y < Size; ++y)
-            for (int x = 0; x < Size; ++x)
-            {
-                int edgeX = Math.Min(x, Size - 1 - x);
-                int edgeY = Math.Min(y, Size - 1 - y);
-                int edge = Math.Min(edgeX, edgeY);
-                if (edgeX + edgeY < 3) continue; // chamfered outer corners
-                Color32 color = fill;
-                if (edge == 0) color = new Color32(9, 10, 10, 220);
-                else if (edge == 1) color = bronze;
-                else if (edge == 2)
+                for (int x = 0; x < Size; ++x)
                 {
-                    bool raisedEdge = y > Size / 2 || x < Size / 2 && edgeX < edgeY;
-                    color = Tint(bronze, raisedEdge != inset ? 1.32f : 0.45f);
+                    int edgeX = Math.Min(x, Size - 1 - x);
+                    int edgeY = Math.Min(y, Size - 1 - y);
+                    int edge = Math.Min(edgeX, edgeY);
+                    if (edgeX + edgeY < 3) continue; // chamfered outer corners
+                    Color32 color = fill;
+                    if (edge == 0) color = new Color32(9, 10, 10, 220);
+                    else if (edge == 1) color = bronze;
+                    else if (edge == 2)
+                    {
+                        bool raisedEdge = y > Size / 2 || x < Size / 2 && edgeX < edgeY;
+                        color = Tint(bronze, raisedEdge != inset ? 1.32f : 0.45f);
+                    }
+                    else if (edge == 3) color = new Color32(9, 10, 10, 255);
+                    else if (edgeX <= 7 && edgeY <= 7 && edgeX + edgeY == 11)
+                        color = Tint(bronze, 0.82f); // small corner metal inlays
+                    else if (y >= Size - 6) color = Tint(fill, inset ? 0.78f : 1.12f);
+                    pixels[y * Size + x] = color;
                 }
-                else if (edge == 3) color = new Color32(9, 10, 10, 255);
-                else if (edgeX <= 7 && edgeY <= 7 && edgeX + edgeY == 11)
-                    color = Tint(bronze, 0.82f); // small corner metal inlays
-                else if (y >= Size - 6) color = Tint(fill, inset ? 0.78f : 1.12f);
-                pixels[y * Size + x] = color;
-            }
             return pixels;
         }
 

@@ -9,10 +9,16 @@ using UnityEngine;
 
 namespace OstrixMods.BuildWorks
 {
+    /// <summary>
+    /// Validates, migrates, clones, and atomically persists the blueprint
+    /// library. This type deliberately has no UI-localization responsibility.
+    /// </summary>
     internal sealed class CompositeBlueprintStore
     {
         internal const int MaximumParts = 128;
-        internal const string DefaultCategory = "ПРОЧЕЕ";
+        internal const string DefaultCategory = "OTHER";
+        private const string LegacyDefaultCategory = "ПРОЧЕЕ";
+        private const string LocalizationPrefix = "$buildworks_";
         private const int FormatVersion = 9;
         private const int MaximumBlueprints = 32;
         private const int MaximumCategories = 12;
@@ -50,13 +56,27 @@ namespace OstrixMods.BuildWorks
                 out blueprint,
                 out error);
 
+        public bool TrySave(
+            string name,
+            IReadOnlyList<Part> parts,
+            IReadOnlyList<VectorData> anchors,
+            out Blueprint blueprint,
+            out string error) => TrySaveDocument(
+                name,
+                DefaultCategory,
+                parts,
+                Array.Empty<Group>(),
+                anchors,
+                out blueprint,
+                out error);
+
         public bool TrySaveDocument(
             IReadOnlyList<Part> parts,
             IReadOnlyList<Group> groups,
             IReadOnlyList<VectorData> anchors,
             out Blueprint blueprint,
             out string error) => TrySaveDocument(
-                "Группа " + (data.blueprints.Count + 1),
+                "Group " + (data.blueprints.Count + 1),
                 DefaultCategory,
                 parts,
                 groups,
@@ -110,49 +130,49 @@ namespace OstrixMods.BuildWorks
             if (name.Length < 1 || name.Length > 48 ||
                 category.Length < 1 || category.Length > 24)
             {
-                error = "имя или категория чертежа имеют неверную длину";
+                error = UserError("store.invalid_metadata");
                 return false;
             }
             bool addCategory = !data.categories.Contains(category);
             if (addCategory && data.categories.Count >= MaximumCategories)
             {
-                error = "достигнут лимит категорий";
+                error = UserError("store.category_limit");
                 return false;
             }
             if (parts == null || parts.Count < 2 || parts.Count > MaximumParts ||
                 groups == null || groups.Count > MaximumGroups || anchors == null ||
                 anchors.Count > MaximumAnchors)
             {
-                error = "некорректный состав чертежа";
+                error = UserError("store.invalid_composition");
                 return false;
             }
             if (data.blueprints.Count >= MaximumBlueprints)
             {
-                error = "достигнут лимит 32 чертежа";
+                error = UserError("store.blueprint_limit");
                 return false;
             }
             List<Part> preparedParts = PrepareParts(parts);
             List<Group> preparedGroups = CloneGroups(groups);
             if (!ValidDocument(preparedParts, preparedGroups))
             {
-                error = "чертёж содержит некорректные детали или группы";
+                error = UserError("store.invalid_parts_or_groups");
                 return false;
             }
             if (!ValidPrimaryPart(preparedParts, primaryPartId))
             {
-                error = "главная деталь не найдена в чертеже";
+                error = UserError("store.primary_part_missing");
                 return false;
             }
             if (!ValidPrimaryGroup(preparedParts, preparedGroups, primaryGroupId))
             {
-                error = "главная группа не найдена в чертеже";
+                error = UserError("store.primary_group_missing");
                 return false;
             }
             foreach (VectorData anchor in anchors)
             {
                 if (!Valid(anchor))
                 {
-                    error = "чертёж содержит некорректную точку";
+                    error = UserError("store.invalid_anchor");
                     return false;
                 }
             }
@@ -192,7 +212,7 @@ namespace OstrixMods.BuildWorks
             name = (name ?? string.Empty).Trim();
             if (!CanWrite(blueprint, out error) || name.Length < 1 || name.Length > 48)
             {
-                if (error == null) error = "имя должно содержать от 1 до 48 символов";
+                if (error == null) error = UserError("store.invalid_name");
                 return false;
             }
             string previous = blueprint.name;
@@ -215,7 +235,7 @@ namespace OstrixMods.BuildWorks
             category = NormalizeCategory(category);
             if (!CanWrite(blueprint, out error) || !data.categories.Contains(category))
             {
-                if (error == null) error = "категория не найдена";
+                if (error == null) error = UserError("store.category_missing");
                 return false;
             }
             string previous = blueprint.category;
@@ -234,18 +254,18 @@ namespace OstrixMods.BuildWorks
             }
             if (category.Length < 1 || category.Length > 24)
             {
-                error = "название категории должно содержать от 1 до 24 символов";
+                error = UserError("store.invalid_category_name");
                 return false;
             }
             if (data.categories.Exists(value => string.Equals(
                 value, category, StringComparison.OrdinalIgnoreCase)))
             {
-                error = "такая категория уже существует";
+                error = UserError("store.duplicate_category");
                 return false;
             }
             if (data.categories.Count >= MaximumCategories)
             {
-                error = "достигнут лимит категорий";
+                error = UserError("store.category_limit");
                 return false;
             }
             data.categories.Add(category);
@@ -264,7 +284,7 @@ namespace OstrixMods.BuildWorks
             int index = data.categories.IndexOf(category);
             if (index < 0 || string.Equals(category, DefaultCategory, StringComparison.Ordinal))
             {
-                error = "эту категорию удалить нельзя";
+                error = UserError("store.protected_category");
                 return false;
             }
             var moved = new List<Blueprint>();
@@ -294,7 +314,7 @@ namespace OstrixMods.BuildWorks
             if (!CanWrite(blueprint, out error) || !IsFinite(yaw) || !IsFinite(pitch) ||
                 !IsFinite(zoom) || pitch < -80f || pitch > 80f || zoom < 0.5f || zoom > 3f)
             {
-                if (error == null) error = "некорректный ракурс превью";
+                if (error == null) error = UserError("store.invalid_preview");
                 return false;
             }
             float previousYaw = blueprint.previewYaw;
@@ -399,43 +419,43 @@ namespace OstrixMods.BuildWorks
                 groups.Count > MaximumGroups ||
                 anchors.Count > MaximumAnchors)
             {
-                if (error == null) error = "некорректный состав чертежа";
+                if (error == null) error = UserError("store.invalid_composition");
                 return false;
             }
             if (name.Length < 1 || name.Length > 48 ||
                 category.Length < 1 || category.Length > 24)
             {
-                error = "имя или категория чертежа имеют неверную длину";
+                error = UserError("store.invalid_metadata");
                 return false;
             }
             bool addCategory = !data.categories.Contains(category);
             if (addCategory && data.categories.Count >= MaximumCategories)
             {
-                error = "достигнут лимит категорий";
+                error = UserError("store.category_limit");
                 return false;
             }
             List<Part> preparedParts = PrepareParts(parts);
             List<Group> preparedGroups = CloneGroups(groups);
             if (!ValidDocument(preparedParts, preparedGroups))
             {
-                error = "чертёж содержит некорректные детали или группы";
+                error = UserError("store.invalid_parts_or_groups");
                 return false;
             }
             if (!ValidPrimaryPart(preparedParts, primaryPartId))
             {
-                error = "главная деталь не найдена в чертеже";
+                error = UserError("store.primary_part_missing");
                 return false;
             }
             if (!ValidPrimaryGroup(preparedParts, preparedGroups, primaryGroupId))
             {
-                error = "главная группа не найдена в чертеже";
+                error = UserError("store.primary_group_missing");
                 return false;
             }
             foreach (VectorData anchor in anchors)
             {
                 if (!Valid(anchor))
                 {
-                    error = "чертёж содержит некорректную точку";
+                    error = UserError("store.invalid_anchor");
                     return false;
                 }
             }
@@ -530,7 +550,7 @@ namespace OstrixMods.BuildWorks
                 LibraryData loaded = Deserialize(File.ReadAllText(path));
                 if (loaded == null || loaded.version < 1 || loaded.version > FormatVersion)
                 {
-                    writeBlockReason = "неизвестная версия файла blueprints.json";
+                    writeBlockReason = UserError("store.unknown_version");
                     return;
                 }
                 loaded.blueprints = loaded.blueprints ?? new List<Blueprint>();
@@ -595,14 +615,13 @@ namespace OstrixMods.BuildWorks
                     if (Valid(blueprint) && ids.Add(blueprint.id)) valid.Add(blueprint);
                 }
                 if (valid.Count != loaded.blueprints.Count)
-                    writeBlockReason = "файл blueprints.json содержит повреждённые " +
-                        "или повторяющиеся записи";
+                    writeBlockReason = UserError("store.corrupt_entries");
                 loaded.blueprints = valid;
                 data = loaded;
             }
             catch (Exception exception)
             {
-                writeBlockReason = "файл blueprints.json повреждён: " + exception.Message;
+                writeBlockReason = UserError("store.corrupt_file", exception.Message);
                 Debug.LogWarning("BuildWorks blueprint library was not loaded: " + exception);
             }
         }
@@ -621,13 +640,11 @@ namespace OstrixMods.BuildWorks
                     verified.blueprints == null || verified.categories == null ||
                     verified.blueprints.Count != data.blueprints.Count ||
                     verified.categories.Count != data.categories.Count)
-                    throw new InvalidDataException(
-                        "проверка файла чертежей после записи не пройдена");
+                    throw new InvalidDataException(UserError("store.verify_file_failed"));
                 var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (Blueprint blueprint in verified.blueprints)
                     if (!Valid(blueprint) || !ids.Add(blueprint.id))
-                        throw new InvalidDataException(
-                            "проверка данных чертежей после записи не пройдена");
+                        throw new InvalidDataException(UserError("store.verify_data_failed"));
                 if (File.Exists(path))
                 {
                     string backup = path + ".bak";
@@ -667,7 +684,7 @@ namespace OstrixMods.BuildWorks
             error = writeBlockReason;
             if (!string.IsNullOrEmpty(error)) return false;
             if (blueprint != null && data.blueprints.Contains(blueprint)) return true;
-            error = "чертёж не найден";
+            error = UserError("store.blueprint_missing");
             return false;
         }
 
@@ -687,8 +704,16 @@ namespace OstrixMods.BuildWorks
             }
         }
 
-        private static string NormalizeCategory(string value) =>
-            (value ?? string.Empty).Trim().ToUpperInvariant();
+        private static string NormalizeCategory(string value)
+        {
+            string normalized = (value ?? string.Empty).Trim().ToUpperInvariant();
+            return string.Equals(normalized, LegacyDefaultCategory, StringComparison.Ordinal)
+                ? DefaultCategory
+                : normalized;
+        }
+
+        private static string UserError(string key, string detail = null) =>
+            LocalizationPrefix + key + (detail == null ? string.Empty : "\t" + detail);
 
         private static void NormalizeCategories(LibraryData library)
         {
@@ -950,6 +975,8 @@ namespace OstrixMods.BuildWorks
                 return serializer.ReadObject(stream) as LibraryData;
         }
 
+        // These lower-case field names are the persisted JSON schema. Renaming
+        // them is a file-format migration, not a code-style cleanup.
         [DataContract]
         private sealed class LibraryData
         {

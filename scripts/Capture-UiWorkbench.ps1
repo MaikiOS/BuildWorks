@@ -52,6 +52,8 @@ $sourceProof = foreach ($name in $runtimeFiles) {
     }
     "$name $hash"
 }
+$englishCatalog = Join-Path $repositoryRoot 'src\BuildWorks\Translations\English.tsv'
+Copy-Item -LiteralPath $englishCatalog -Destination (Join-Path $runtimeSources 'English.tsv') -Force
 $iconDestination = Join-Path $projectPath 'Assets\Resources\BuildWorks\Icons'
 New-Item -ItemType Directory -Path $iconDestination -Force | Out-Null
 Get-ChildItem -LiteralPath (Join-Path $repositoryRoot 'src\BuildWorks\Assets\BlueprintEditorIcons') -Filter '*.png' |

@@ -331,7 +331,7 @@ namespace OstrixMods.BuildWorks.StoreTests
 
             Require(!store.TryRename(blueprint, "Must roll back", out error),
                 "blocked write unexpectedly succeeded");
-            Equal("Группа 1", blueprint.name, "failed rename rollback");
+            Equal("Group 1", blueprint.name, "failed rename rollback");
             Require(!store.TryUpdateDocument(
                 blueprint,
                 "Must roll back",
@@ -340,7 +340,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 Array.Empty<CompositeBlueprintStore.Group>(),
                 Array.Empty<CompositeBlueprintStore.VectorData>(),
                 out error), "blocked metadata write unexpectedly succeeded");
-            Equal("Группа 1", blueprint.name, "failed metadata name rollback");
+            Equal("Group 1", blueprint.name, "failed metadata name rollback");
             Equal(CompositeBlueprintStore.DefaultCategory, blueprint.category,
                 "failed metadata category rollback");
             Require(!store.Categories().Contains("NEW CATEGORY"),

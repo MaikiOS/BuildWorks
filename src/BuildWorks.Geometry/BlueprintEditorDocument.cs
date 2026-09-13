@@ -653,7 +653,7 @@ namespace OstrixMods.BuildWorks.Geometry
             });
         }
 
-        public bool DuplicateSelection(Point3 offset)
+        public bool DuplicateSelection(Point3 offset, string copyLabel = "copy")
         {
             BlueprintEditorPart.Validate(offset, nameof(offset));
             List<string> roots = MovableSelectedNodes();
@@ -686,7 +686,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 string pivotPartId = group.PivotPartId;
                 if (pivotPartId != null && partIds.TryGetValue(pivotPartId, out string copyPivot))
                     pivotPartId = copyPivot;
-                groupCopies.Add(new BlueprintEditorGroup(copyId, group.Name + " копия",
+                groupCopies.Add(new BlueprintEditorGroup(copyId, group.Name + " " + copyLabel,
                     group.Visible, group.Locked, parentId, pivotPartId));
             }
             var copies = new List<BlueprintEditorPart>(targets.Count);
@@ -703,7 +703,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 copies.Add(new BlueprintEditorPart(
                     copyId,
                     part.PrefabName,
-                    part.DisplayName + " копия",
+                    part.DisplayName + " " + copyLabel,
                     part.Position + offset,
                     part.Rotation,
                     parentId,
@@ -773,9 +773,10 @@ namespace OstrixMods.BuildWorks.Geometry
             double scaleStep,
             Point3 backAnchor,
             Point3 frontAnchor,
-            Point3? pivot = null) => BuildArrayCopies(
+            Point3? pivot = null,
+            string copyLabel = "array") => BuildArrayCopies(
                 countX, countY, stepX, stepY, rotationAxis, rotationDegrees, rise,
-                symmetric, scaleStep, backAnchor, frontAnchor, pivot).AsReadOnly();
+                symmetric, scaleStep, backAnchor, frontAnchor, pivot, copyLabel).AsReadOnly();
 
         public bool ApplyArray(
             int countX,
@@ -789,11 +790,12 @@ namespace OstrixMods.BuildWorks.Geometry
             double scaleStep,
             Point3 backAnchor,
             Point3 frontAnchor,
-            Point3? pivot = null)
+            Point3? pivot = null,
+            string copyLabel = "array")
         {
             List<BlueprintEditorPart> copies = BuildArrayCopies(
                 countX, countY, stepX, stepY, rotationAxis, rotationDegrees, rise,
-                symmetric, scaleStep, backAnchor, frontAnchor, pivot);
+                symmetric, scaleStep, backAnchor, frontAnchor, pivot, copyLabel);
             if (copies.Count == 0) return false;
             return Commit(() =>
             {
@@ -807,16 +809,18 @@ namespace OstrixMods.BuildWorks.Geometry
         public IReadOnlyList<BlueprintEditorPart> PreviewContour(
             IReadOnlyList<string> orderedSupportIds,
             bool closed,
-            double scaleStep) => BuildContourCopies(
-                orderedSupportIds, closed, scaleStep).AsReadOnly();
+            double scaleStep,
+            string copyLabel = "contour") => BuildContourCopies(
+                orderedSupportIds, closed, scaleStep, copyLabel).AsReadOnly();
 
         public bool ApplyContour(
             IReadOnlyList<string> orderedSupportIds,
             bool closed,
-            double scaleStep)
+            double scaleStep,
+            string copyLabel = "contour")
         {
             List<BlueprintEditorPart> copies = BuildContourCopies(
-                orderedSupportIds, closed, scaleStep);
+                orderedSupportIds, closed, scaleStep, copyLabel);
             if (copies.Count == 0) return false;
             return Commit(() =>
             {
@@ -985,7 +989,8 @@ namespace OstrixMods.BuildWorks.Geometry
             double scaleStep,
             Point3 backAnchor,
             Point3 frontAnchor,
-            Point3? requestedPivot)
+            Point3? requestedPivot,
+            string copyLabel)
         {
             if (countX < 1 || countY < 1 || countX > MaximumParts || countY > MaximumParts)
                 throw new ArgumentOutOfRangeException(nameof(countX));
@@ -1033,7 +1038,7 @@ namespace OstrixMods.BuildWorks.Geometry
                             source.Scale * sample.UniformScale, nameof(scaleStep));
                         copies.Add(new BlueprintEditorPart(
                             Guid.NewGuid().ToString("N"), source.PrefabName,
-                            source.DisplayName + " массив " + (x + 1) + ":" + (y + 1),
+                            source.DisplayName + " " + copyLabel + " " + (x + 1) + ":" + (y + 1),
                             sample.Position + stepY * logicalY +
                                 turn.Rotate((source.Position - pivot) * sample.UniformScale),
                             Multiply(turn, source.Rotation).Normalized(), source.ParentGroupId,
@@ -1047,7 +1052,8 @@ namespace OstrixMods.BuildWorks.Geometry
         private List<BlueprintEditorPart> BuildContourCopies(
             IReadOnlyList<string> orderedSupportIds,
             bool closed,
-            double scaleStep)
+            double scaleStep,
+            string copyLabel)
         {
             if (orderedSupportIds == null || orderedSupportIds.Count < (closed ? 3 : 2))
                 throw new ArgumentOutOfRangeException(nameof(orderedSupportIds));
@@ -1118,7 +1124,7 @@ namespace OstrixMods.BuildWorks.Geometry
                     copies.Add(new BlueprintEditorPart(
                         Guid.NewGuid().ToString("N"),
                         source.PrefabName,
-                        source.DisplayName + " контур " + (index + 1),
+                        source.DisplayName + " " + copyLabel + " " + (index + 1),
                         support.Position + support.Rotation.Rotate(localPosition),
                         Multiply(support.Rotation, localRotation).Normalized(),
                         source.ParentGroupId,

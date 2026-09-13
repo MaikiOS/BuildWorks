@@ -84,7 +84,8 @@ internal static class F9HudAcceptance
                 Require(clickedMode == GizmoMode.Repeat && dispatches == 1,
                     "F9 Array button does not dispatch Repeat");
                 Show(view, clickedMode);
-                Require(Text(view, "countText").text == "МАССИВ: 3×2" &&
+                Require(Text(view, "countText").text ==
+                    BuildWorksLocalization.Text("hud.array_count", 3, 2) &&
                     Button(view, "distributionText").gameObject.activeInHierarchy,
                     "F9 Repeat does not expose its two-dimensional layout controls");
                 Click(guide);
@@ -92,7 +93,8 @@ internal static class F9HudAcceptance
                     "F9 Contour button does not dispatch Guide");
                 Show(view, clickedMode);
                 Require(!Button(view, "distributionText").gameObject.activeInHierarchy &&
-                    Text(view, "countText").text == "КОНТУР: 3",
+                    Text(view, "countText").text ==
+                        BuildWorksLocalization.Text("hud.contour_count", 3),
                     "F9 Contour still displays Array parameters");
 
                 Show(view, GizmoMode.Move, blueprint: true);
@@ -102,14 +104,16 @@ internal static class F9HudAcceptance
                 Require(clickedMode == GizmoMode.Repeat && dispatches == 3,
                     "Whole-blueprint Array button does not dispatch Repeat");
                 Show(view, clickedMode, blueprint: true);
-                Require(Text(view, "countText").text == "МАССИВ: 3×2" &&
+                Require(Text(view, "countText").text ==
+                    BuildWorksLocalization.Text("hud.array_count", 3, 2) &&
                     Button(view, "distributionText").gameObject.activeInHierarchy,
                     "Whole-blueprint Repeat parameters remain hidden");
                 Click(guide);
                 Require(clickedMode == GizmoMode.Guide && dispatches == 4,
                     "Whole-blueprint Contour button does not dispatch Guide");
                 Show(view, clickedMode, blueprint: true);
-                Require(Text(view, "countText").text == "КОНТУР: 3" &&
+                Require(Text(view, "countText").text ==
+                    BuildWorksLocalization.Text("hud.contour_count", 3) &&
                     !Button(view, "distributionText").gameObject.activeInHierarchy,
                     "Whole-blueprint Contour still displays Array parameters");
                 view.ShowArmed(1, 3, false, false, false, paused: true, pauseReason: "resources");

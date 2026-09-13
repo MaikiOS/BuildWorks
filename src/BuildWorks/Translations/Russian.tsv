@@ -1,0 +1,597 @@
+# Stable key<TAB>Russian translation
+adaptive_gable.name	BuildWorks: адаптивная фронтонная панель
+adaptive_gable.description	Оригинальная изменяемая панель для сложных скатов.
+catalog.category.blueprints	ЧЕРТЕЖИ
+catalog.category.favorites	ИЗБРАННОЕ
+catalog.group.all	ВСЕ
+catalog.group.vanilla	ВАНИЛЬНОЕ
+catalog.group.blueprints	ЧЕРТЕЖИ
+catalog.group.actions	ДЕЙСТВИЯ
+catalog.group.wood	ДЕРЕВО
+catalog.group.core_wood	КРУГЛЯК
+catalog.group.dark_wood	ТЁМНОЕ ДЕРЕВО
+catalog.group.ash_wood	ЯСЕНЬ
+catalog.group.stone	КАМЕНЬ
+catalog.group.black_marble	ЧЁРНЫЙ МРАМОР
+catalog.group.grausten	ГРАУСТЕН
+catalog.group.metal	МЕТАЛЛ
+catalog.group.glass	СТЕКЛО
+catalog.group.other	ПРОЧЕЕ
+blueprint.category.default	ПРОЧЕЕ
+blueprint.default_name	Группа {0}
+blueprint.piece.description	{0} деталей. ЛКМ установить. Редактирование — из библиотеки чертежей.
+blueprint.scene.chain_aim	Наведи курсор на деталь опорной цепи или кольца.
+blueprint.scene.choose_support	Выбери опору, а не исходную деталь.
+blueprint.scene.edge_pair_missing	У выбранного ребра нет пары штатных точек соединения.
+blueprint.scene.chain_too_short	Нужна цепь минимум из двух одинаковых опор.
+blueprint.scene.chain_invalid	Эта опора не входит в простую цепь или кольцо без развилок.
+blueprint.scene.preview_piece_missing	Не найдена деталь предпросмотра: {0}
+blueprint.scene.piece_missing	Не найдена деталь: {0}
+blueprint.scene.show_failed	Не удалось показать деталь: {0}
+blueprint.snap.middle	СЕРЕДИНА
+blueprint.snap.bottom	НИЗ
+blueprint.snap.top	ВЕРХ
+blueprint.snap.center	ЦЕНТР
+blueprint.snap.left	ЛЕВО
+blueprint.snap.right	ПРАВО
+blueprint.snap.back	НАЗАД
+blueprint.snap.front	ВПЕРЁД
+blueprint.snap.point	ТОЧКА
+editor.open_failed	BuildWorks: не удалось открыть редактор: {0}
+store.invalid_metadata	Имя или категория чертежа имеют неверную длину.
+store.category_limit	Достигнут лимит категорий.
+store.invalid_composition	Некорректный состав чертежа.
+store.blueprint_limit	Достигнут лимит 32 чертежа.
+store.invalid_parts_or_groups	Чертёж содержит некорректные детали или группы.
+store.primary_part_missing	Главная деталь не найдена в чертеже.
+store.primary_group_missing	Главная группа не найдена в чертеже.
+store.invalid_anchor	Чертёж содержит некорректную точку.
+store.invalid_name	Имя должно содержать от 1 до 48 символов.
+store.category_missing	Категория не найдена.
+store.invalid_category_name	Название категории должно содержать от 1 до 24 символов.
+store.duplicate_category	Такая категория уже существует.
+store.protected_category	Эту категорию удалить нельзя.
+store.invalid_preview	Некорректный ракурс превью.
+store.unknown_version	Неизвестная версия файла blueprints.json.
+store.corrupt_entries	Файл blueprints.json содержит повреждённые или повторяющиеся записи.
+store.corrupt_file	Файл blueprints.json повреждён: {0}
+store.verify_file_failed	Проверка файла чертежей после записи не пройдена.
+store.verify_data_failed	Проверка данных чертежей после записи не пройдена.
+store.blueprint_missing	Чертёж не найден.
+catalog.title.blueprints	ЧЕРТЕЖИ  {0}
+catalog.title.catalog	КАТАЛОГ  {0}
+catalog.action.repair	РЕМОНТ
+catalog.action.search	ПОИСК
+catalog.action.search_value	ПОИСК: {0}
+catalog.prompt.search	ПОИСК ПО КАТАЛОГУ
+catalog.action.vanilla_hammer	ВАНИЛЬНЫЙ МОЛОТОК
+catalog.action.index_mode	РЕЖИМ ИНДЕКСА
+catalog.action.create_blueprint	+ СОЗДАТЬ ЧЕРТЁЖ
+catalog.action.select_in_world	ВЫБРАТЬ В МИРЕ
+catalog.action.add_category	+ КАТЕГОРИЯ
+catalog.prompt.new_category	НОВАЯ КАТЕГОРИЯ ЧЕРТЕЖЕЙ
+catalog.action.delete_category	− УДАЛИТЬ КАТ.
+catalog.empty	Чертежей пока нет. Нажми «+ СОЗДАТЬ ЧЕРТЁЖ» слева.\nСоздание бесплатно; ресурсы нужны только при размещении в мире.
+catalog.card.parts	{0} дет.
+catalog.action.place	РАЗМЕСТИТЬ
+catalog.action.edit	РЕДАКТИРОВАТЬ
+catalog.action.rename	ПЕРЕИМЕНОВАТЬ
+catalog.prompt.blueprint_name	ИМЯ ЧЕРТЕЖА
+catalog.action.category	КАТЕГОРИЯ: {0}
+catalog.action.refresh_preview	ОБНОВИТЬ ПРЕВЬЮ
+catalog.action.resources	РЕСУРСЫ
+catalog.action.hide_resources	СКРЫТЬ РЕСУРСЫ
+catalog.action.delete	УДАЛИТЬ
+catalog.action.confirm_delete	ПОДТВЕРДИТЬ УДАЛЕНИЕ
+catalog.choose_blueprint	Выбери чертёж
+catalog.blueprint_summary	{0} деталей  ·  {1}
+catalog.resources.none	Ресурсы не требуются
+catalog.preview.open_failed	Не удалось открыть камеру превью.
+catalog.preview.title	КАМЕРА ПРЕВЬЮ — {0}
+catalog.preview.controls	СКМ: вращать  ·  колесо: масштаб  ·  F: вписать
+catalog.preview.auto	АВТОРАКУРС
+catalog.preview.reset	СБРОСИТЬ
+catalog.preview.cancel	ОТМЕНА
+catalog.preview.save	СОХРАНИТЬ ПРЕВЬЮ
+catalog.preview.save_failed	Не удалось сохранить превью.
+hud.title.select_blueprint	BUILDWORKS — СОЗДАНИЕ ЧЕРТЕЖА
+hud.title.part_precision	BUILDWORKS — ТОЧНОЕ ПОЛОЖЕНИЕ ДЕТАЛИ
+hud.title.blueprint_precision	BUILDWORKS — ТОЧНАЯ УСТАНОВКА ЧЕРТЕЖА
+hud.title.blueprint_editor	BUILDWORKS — РЕДАКТОР ЧЕРТЕЖА
+hud.title.precision	BUILDWORKS — ТОЧНАЯ УСТАНОВКА
+hud.hint.select_blueprint	ЛКМ: деталь или рамка  ·  Ctrl: убрать  ·  первая деталь задаёт оси
+hud.hint.auto_align	Стрелки: сдвиг  ·  Кольца: вращение  ·  Автостык: оси + точки  ·  Ctrl+точка: ручной магнит
+hud.hint.transform	Стрелки: сдвиг  ·  Кольца: вращение  ·  Ctrl+точка: магнит
+hud.selection_summary	Выбрано деталей: {0}\nНажми СОХРАНИТЬ ВЫБОР, когда состав готов.
+hud.move_step	СДВИГ {0}
+hud.angle_step	УГОЛ {0}
+hud.array	МАССИВ
+hud.contour	КОНТУР
+hud.array_count	МАССИВ: {0}×{1}
+hud.contour_count	КОНТУР: {0}
+hud.part_count	ДЕТАЛЕЙ: {0}
+hud.axes_local	ОСИ: ЛОК.
+hud.axes_world	ОСИ: МИР.
+hud.array_step	ШАГ МАССИВА: {0}
+hud.points_all	ТОЧКИ: ВСЕ
+hud.points_near	ТОЧКИ: РЯДОМ
+hud.handles	РУЧКИ {0}
+hud.distribution_fit	РАСТЯНУТЬ
+hud.distribution_exact	ТОЧН. ШАГ
+hud.distribution_pack	УПАКОВАТЬ
+hud.rise	ПОДЪЁМ {0} м
+hud.turn	ПОВОРОТ {0}°
+hud.pitch	НАКЛОН {0}°
+hud.roll	КРЕН {0}°
+hud.scale	МАСШТАБ {0}%
+hud.symmetry	СИММЕТРИЯ
+hud.snap_mesh	МАГНИТ: МЕШ
+hud.snap_game	МАГНИТ: ИГРА
+hud.auto_align_on	АВТОСТЫК: ВКЛ
+hud.auto_align_off	АВТОСТЫК: ВЫКЛ
+hud.save_selection	СОХРАНИТЬ ВЫБОР · {0}
+hud.select_in_world	ВЫБРАТЬ В МИРЕ
+hud.target_temporary	ЦЕЛЬ: ВРЕМЕННАЯ ДЕТАЛЬ
+hud.target_group	ЦЕЛЬ: ВСЯ ГРУППА
+hud.target_part	ЦЕЛЬ: ДЕТАЛЬ {0}/{1}
+hud.blueprint_world	● {0} · редактируется вся группа
+hud.blueprint_part	● {0} · клик по детали или Tab — следующая
+hud.light	СВЕТ: {0}
+hud.constraint_free	СВОБ.
+hud.constraint_x	ВОКРУГ X
+hud.constraint_y	ВОКРУГ Y
+hud.constraint_z	ВОКРУГ Z
+hud.undo	ОТМЕНИТЬ ({0})
+hud.redo	ВЕРНУТЬ ({0})
+hud.save	СОХРАНИТЬ
+hud.install	УСТАНОВИТЬ
+hud.apply	ПРИМЕНИТЬ
+hud.armed.paused	BUILDWORKS — ПАУЗА {0}/{1}
+hud.armed.selection	BUILDWORKS — ВЫБЕРИ ПРЕЖНЮЮ ДЕТАЛЬ {0}/{1}
+hud.armed.tool	BUILDWORKS — ЗАМЕНИ МОЛОТОК {0}/{1}
+hud.armed.stamina	BUILDWORKS — ЖДЁМ ВЫНОСЛИВОСТЬ {0}/{1}
+hud.armed.installing	BUILDWORKS — УСТАНОВКА {0}/{1}
+hud.armed.paused_hint	Оставшиеся детали сохранены · продолжение с детали {0}
+hud.armed.selection_hint	Курсор свободен: выбери ту же деталь на новом молотке · серия сохранена
+hud.armed.tool_hint	Курсор свободен: открой инвентарь и возьми исправный молоток · серия сохранена
+hud.armed.stamina_hint	Серия продолжится сама после восстановления · F9 или Esc — отмена
+hud.armed.installing_hint	Детали устанавливаются автоматически · F9 или Esc — отмена
+hud.frozen.title	BUILDWORKS — ПОЛОЖЕНИЕ ЗАМОРОЖЕНО
+hud.frozen.hint	Esc: продолжить редактирование · F9: вернуться в обычное строительство
+hud.passive.continuation	BUILDWORKS — ЕСТЬ ПРОДОЛЖЕНИЕ РЯДА
+hud.passive.enabled	BUILDWORKS — ПОМОЩНИК ВКЛЮЧЁН
+hud.passive.continuation_hint	Alt+ось: продолжить от конечной точки  ·  F9: редактировать новый объект
+hud.passive.hint	ЛКМ: обычно  ·  Alt+ось: ряд  ·  F9: открыть точное редактирование
+hud.workspace.new	BUILDWORKS — НОВЫЙ ЧЕРТЕЖ
+hud.workspace.edit	BUILDWORKS — РЕДАКТОР: {0}
+hud.workspace.hint	ЛКМ: поставить · СКМ: удалить · ПКМ: каталог/обзор · колесо: повернуть · Ctrl+колесо: масштаб
+hud.workspace.parts	ДЕТАЛЕЙ: {0}{1}
+hud.workspace.resume	ПРОДОЛЖИТЬ · ENTER
+hud.workspace.finish	ЗАКОНЧИТЬ СЕРИЮ · ESC
+hud.workspace.catalog	КАТАЛОГ
+hud.cancel	ОТМЕНА
+hud.reset	СБРОСИТЬ
+hud.disable	ВЫКЛЮЧИТЬ
+placement.scale_persistence_unsupported	Размещённая деталь не поддерживает сохранение масштаба Valheim.
+catalog.group.my_blueprints	МОИ ЧЕРТЕЖИ
+catalog.group.crafting	РЕМЕСЛО
+catalog.group.building	СТРОИТЕЛЬСТВО
+catalog.group.heavy_building	ТЯЖ. ПОСТРОЙКИ
+catalog.group.furniture	МЕБЕЛЬ
+catalog.group.misc	ПРОЧЕЕ
+placement.close_ui_first	BuildWorks: сначала закрой меню или другой интерфейс.
+placement.selection_cancelled	BuildWorks: выбор деталей отменён.
+placement.sequence_finished	BuildWorks: серия закончена; уже установленные детали сохранены.
+placement.cancelled_reopen	BuildWorks: установка отменена, редактирование продолжено.
+placement.blueprint_unavailable	BuildWorks: чертёж сейчас недоступен в молотке.
+placement.build_camera_disable_failed	BuildWorks: не удалось временно отключить Build Camera.
+placement.game_camera_missing	BuildWorks: игровая камера не найдена.
+placement.blueprint_ghost_prepare_failed	BuildWorks: не удалось подготовить призрак чертежа.
+placement.blueprint_ghost_front_failed	BuildWorks: не удалось поставить призрак перед персонажем.
+placement.blueprint_ghost_missing	BuildWorks: Valheim не создал видимый призрак чертежа.
+placement.blueprint_place_hint	BuildWorks: ЛКМ установить; редактирование открывается только из библиотеки.
+placement.hammer_piece_missing	BuildWorks: в текущем молотке нет детали {0}.
+placement.editor_piece_missing	BuildWorks: нет обычной детали для открытия редактора чертежей.
+placement.editor_piece_prepare_failed	BuildWorks: не удалось подготовить деталь редактора.
+placement.editor_open_failed	BuildWorks: не удалось открыть редактор чертежа.
+placement.editor_temp_missing	BuildWorks: Valheim не создал временную деталь редактора.
+placement.editor_temp_copy_failed	BuildWorks: не удалось создать временную копию детали {0}.
+placement.editor_empty_opened	BuildWorks: пустой редактор открыт — выбери детали молотком и построй чертёж.
+placement.editor_loaded	BuildWorks: {0} открыт как отдельные временные детали.
+placement.temp_add_limit	BuildWorks: достигнут лимит или деталь не поддерживается.
+placement.temp_added	BuildWorks: временная деталь добавлена без расхода ресурсов.
+placement.temp_deleted	BuildWorks: временная деталь удалена.
+placement.aim_temp_f9	BuildWorks: наведи курсор на временную деталь и нажми F9.
+placement.temp_precision_hint	BuildWorks: F9 редактирует только эту временную деталь; ПРИМЕНИТЬ вернёт к строительству чертежа.
+placement.temp_change_cancelled	BuildWorks: изменение положения временной детали отменено.
+placement.temp_change_applied	BuildWorks: положение временной детали применено.
+placement.blueprint_cannot_place	BuildWorks: чертёж сейчас нельзя установить.
+placement.primary_unavailable	BuildWorks: опорная деталь чертежа больше недоступна.
+placement.blueprint_bounds_failed	BuildWorks: не удалось определить общие границы чертежа.
+placement.blueprint_precision_hint	BuildWorks: F9 — точное положение всего чертежа; ПРИМЕНИТЬ установит его в мире.
+placement.blueprint_prepare_failed	BuildWorks: чертёж не удалось подготовить к установке.
+placement.pause.scale	деталь не поддерживает сохранение масштаба Valheim
+placement.pause.resources	не хватает ресурсов
+placement.pause.validation	следующая деталь не проходит проверку Valheim
+placement.pause.tool_missing	нужная деталь недоступна в текущем молотке
+placement.pause.native_start	Valheim не начал установку; проверь молоток и выносливость
+placement.pause.native_rejected	Valheim отклонил следующую деталь
+placement.progress.tool	BuildWorks: установлено {0}/{1} — возьми исправный молоток, продолжим автоматически.
+placement.progress.stamina	BuildWorks: ждём восстановления выносливости — {0}/{1}.
+placement.complete.skipped	BuildWorks: серия завершена; пропущено из-за персонажа: {0}.
+placement.complete.blueprint	BuildWorks: чертёж установлен — {0} деталей.
+placement.paused	BuildWorks: установлено {0}/{1} — {2}. Enter — продолжить с детали {3}; Esc — закончить серию.
+placement.cell_skipped	BuildWorks: ячейка {0} занята персонажем — пропускаем.
+placement.error	BuildWorks: ошибка установки. Проверь мир перед повторной попыткой.
+placement.select_build_piece	BuildWorks: выбери строительную деталь молотом.
+placement.snap_visible_first	BuildWorks: сначала наведи видимую деталь на точку привязки.
+placement.special_unsupported	BuildWorks: эта специальная деталь пока не поддерживается.
+layout.row_ready	BuildWorks: ряд {0}×1 готов. Для ширины потяни другую золотую стрелку.
+layout.plane_ready	BuildWorks: площадка {0}×{1} готова.
+layout.scale_positive	МАССИВ: уменьши шаг масштаба или количество — масштаб копии должен быть положительным
+layout.scale_bounds	МАССИВ: масштаб каждой детали должен оставаться в пределах 1–400%; уменьши шаг или количество
+layout.distribution.fit	ПО ОТРЕЗКУ
+layout.distribution.size	ПО РАЗМЕРУ
+layout.distribution.size_gap	РАЗМЕР + {0} см
+contour.click_highlighted	BuildWorks: щёлкни подсвеченную цепь или кольцо.
+contour.closed_found	BuildWorks: замкнутый контур найден — {0} деталей; исходник связан с ближайшей опорой.
+contour.open_found	BuildWorks: открытый контур найден — {0} деталей; исходник связан с ближайшей опорой.
+contour.aim_installed	BuildWorks: наведи курсор на установленную деталь цепи или кольца.
+contour.edge_points_missing	BuildWorks: у выбранного ребра нет пары штатных точек соединения.
+contour.chain_missing	BuildWorks: рядом не найдена цепь минимум из двух одинаковых деталей.
+contour.simple_path_missing	BuildWorks: не найдена простая цепь или петля без развилок.
+snap.pin_other_first	BuildWorks: для вращения штатной точки сначала закрепи другую опору через Shift.
+snap.mesh_enabled	BuildWorks: магнит по модели — Ctrl совмещает только выбранные точки.
+snap.native_only	BuildWorks: магнит использует только штатные точки Valheim.
+snap.auto_align_enabled	BuildWorks: автостык включён — ориентация и штатные точки совмещаются вместе.
+snap.auto_align_disabled	BuildWorks: автостык выключен.
+blueprint.save_failed	BuildWorks: {0}
+blueprint.world_saved	BuildWorks: {0} сохранён в ЧЕРТЕЖИ → {1}. Детали мира сохранены на месте.
+blueprint.select_part_count	выбери от 2 до {0} деталей
+blueprint.selected_piece_unavailable	выбранная деталь больше недоступна в молотке
+blueprint.piece_scale_range	масштаб детали {0} вне поддерживаемого диапазона
+blueprint.piece_scale_persistence	масштаб детали {0} нельзя сохранить штатно
+blueprint.world_selection_hint	BuildWorks: выбирай детали ЛКМ или рамкой; Ctrl удаляет из выбора.
+blueprint.missing_piece	BuildWorks: в текущем молотке нет детали {0}.
+blueprint.frame_select_failed	BuildWorks: не удалось выбрать опорную деталь чертежа.
+blueprint.frame_bounds_failed	BuildWorks: у опорной детали чертежа не удалось определить границы.
+blueprint.anchors_restore_failed	BuildWorks: у чертежа не удалось восстановить общие границы.
+blueprint.frame_edit_select_failed	BuildWorks: не удалось выбрать опорную деталь для редактирования.
+blueprint.loaded	BuildWorks: загружена {0} — {1} деталей; клик или Tab переключает детали.
+blueprint.edit_switch_failed	BuildWorks: не удалось переключить редактируемую деталь.
+blueprint.anchors_recalc_failed	не удалось пересчитать точки привязки
+blueprint.scale_persistence_suffix	{0} (нет штатного сохранения масштаба Valheim)
+placement.anchor_geometry_missing	BuildWorks: у детали не найдена геометрия опор.
+common.local_short	Лок.
+common.world_short	Мир.
+common.first	1-е
+common.second	2-е
+unit.centimeters	{0} см
+unit.meters	{0} м
+hud.offset_values	{0} смещение  X {1:F2}  Y {2:F2}  Z {3:F2} м
+hud.rotation_values	{0} вращение  X {1:F1}°  Y {2:F1}°  Z {3:F1}°
+hint.blueprint_part	ДЕТАЛЬ ЧЕРТЕЖА: стрелки и кольца меняют только её · F9/ПРИМЕНИТЬ — вернуться к строительству · ОТМЕНА — откатить
+hint.blueprint_limit	ЧЕРТЕЖ: превышен безопасный предел {0} деталей; уменьши массив
+hint.repeat_begin	ПОТЯНИ ЗОЛОТУЮ СТРЕЛКУ — задай ряд; параметры применятся к следующим копиям
+hint.repeat_direction	Колесо: {0} направление · Ctrl+колесо: камера · параметры на каждую следующую копию
+hint.blueprint_world	ЧЕРТЕЖ В МИРЕ: двигается вся группа · МАССИВ / КОНТУР повторяют группу · УСТАНОВИТЬ — разместить · F9/Esc — вернуться
+hint.blueprint_group_edit	{0}: двигается вся группа · клик/Tab — выбрать деталь · ПРИМЕНИТЬ — сохранить · Esc — выйти
+hint.blueprint_piece_edit	{0}: деталь {1}/{2} · клик/Tab — выбрать другую · ПРИМЕНИТЬ — сохранить · Esc — выйти
+hint.contour_ring_hover	Кольцо подсвечено: {0} деталей; ЛКМ выбирает этот контур
+hint.contour_chain_hover	Цепь подсвечена: {0} деталей; ЛКМ выбирает этот контур
+hint.contour_aim	КОНТУР: наведи на видимое ребро цепи — она подсветится; ЛКМ выбирает
+hint.contour_closed_ready	Замкнутый контур готов: {0} деталей сохраняют точное положение исходной; УСТАНОВИТЬ размещает цепь
+hint.contour_open_ready	Открытый контур готов: {0} деталей сохраняют точное положение исходной; УСТАНОВИТЬ размещает цепь
+editor.save_failed	BuildWorks: не удалось сохранить правки чертежа — {0}.
+editor.saved	BuildWorks: {0} сохранён; редактор закрыт без размещения в мире.
+editor.minimum_parts	нужно построить минимум две детали
+editor.temp_bounds_failed	не удалось определить границы временной детали
+editor.temp_layout_invalid	временная конструкция не имеет корректных границ
+editor.closed_without_saving	BuildWorks: редактор чертежа закрыт без сохранения.
+placement.array_limit	BuildWorks: уменьши массив — максимум {0} деталей за одну установку.
+placement.finish_layout_first	BuildWorks: сначала закончи разметку.
+placement.plan_corrupt	BuildWorks: план чертежа повреждён; создай его заново.
+placement.first_piece_unavailable	BuildWorks: первая деталь чертежа недоступна в текущем молотке.
+placement.position_rejected	BuildWorks: Valheim отклонил положение. Исправь деталь и повтори.
+placement.first_piece_gone	BuildWorks: первая деталь чертежа больше недоступна.
+placement.rollback_complete	BuildWorks: незавершённый чертёж отменён; удалено деталей: {0}.
+placement.rollback_pending	BuildWorks: отмена завершается; повтор удаления деталей: {0}.
+placement.restore_build_camera_manually	BuildWorks: включи Build Camera вручную.
+lighting.studio	СТУДИЯ
+lighting.warm	ТЁПЛЫЙ
+lighting.soft	МЯГКИЙ
+editor.new_blueprint	Новый чертёж
+editor.open_data_failed	Не удалось открыть данные чертежа: {0}
+editor.already_disposed	редактор уже отключён
+editor.already_open	редактор уже открыт
+editor.group_name	Группа {0}
+editor.hint.modal	Esc — продолжить редактирование · выбери действие в окне
+editor.hint.context_menu	Удерживай ПКМ · наведи на действие · отпусти · вне меню — отмена
+editor.hint.outliner_menu	ЛКМ — выбрать действие · Esc — закрыть меню дерева
+editor.hint.viewport_settings	ЛКМ — изменить настройки вида · Esc — закрыть настройки
+editor.hint.catalog_input	Ввод текста · Esc — закрыть каталог
+editor.hint.catalog	ЛКМ — выбрать · Q/E или PgUp/PgDn — страницы · Esc — закрыть
+editor.hint.reparent	Отпусти над группой — перенести · над корнем — в ROOT · Esc — отменить
+editor.hint.numeric_scrub	Тяни — изменить · Shift — точнее · Ctrl — быстрее · ПКМ — сброс
+editor.hint.text_input	Ввод значения · Enter — применить · Esc — отменить ввод
+editor.hint.part_placement	ЛКМ — добавить · колесо — повернуть · Q/E — точка привязки · СКМ — удалить · Ctrl+Z/Y — история · G — трансформация · ПКМ — каталог
+editor.hint.gizmo_drag	Отпусти ЛКМ — применить · Esc — отменить · Shift — без шага
+editor.hint.camera	WASD — камера · Q/E — вниз/вверх · Shift — быстрее · отпусти ПКМ — закончить
+editor.hint.array_ready	Enter — создать копии · Esc — отменить · колесо — количество · Ctrl+колесо — камера
+editor.hint.array_begin	Потяни золотую стрелку — первый ряд · другую — второй · Esc — отменить
+editor.hint.contour_ready	ЛКМ — другая цепь · Enter — создать копии · Esc — отменить
+editor.hint.contour_begin	ЛКМ по опоре — найти цепь · Esc — отменить
+editor.hint.transform	Тяни — изменить · N — общий frame · H/Shift+H/Ctrl+H/Alt+H — видимость · Q — выбор
+editor.hint.empty	Tab — добавить деталь · СКМ — камера
+editor.hint.select	ЛКМ — выбрать · G — трансформация · N — общий frame · H/Shift+H/Ctrl+H/Alt+H — видимость · Tab — добавить
+editor.anchor_controls	Shift + ЛКМ закрепляет точку · Ctrl + тяни — магнитное перемещение.
+editor.anchor_on_axis	Точка лежит на оси вращения. Выбери другую точку или ось.
+editor.anchor_drag_magnetic	Магнит: тяни к точке другой детали · Shift — свободно.
+editor.anchor_drag_rotate	Вращение вокруг закреплённой точки · X/Y/Z задают ось до перетаскивания.
+editor.array_drag_ready	Массив: {0} × {1} · другая золотая стрелка задаёт второе направление · Enter применить.
+editor.anchor_rotation_free	Вращение точки: свободное.
+editor.anchor_rotation_axis	Вращение точки: ось {0}. Повторное нажатие снимает ограничение.
+editor.anchor_unpinned	Закрепление точки снято.
+editor.anchor_pinned	Точка закреплена: тяни другую точку для вращения.
+editor.select_available_first	Сначала выбери доступную деталь или группу.
+editor.contour_tool_hint	Контур: ЛКМ по ребру опоры — найти цепь · Enter применить · Esc отменить.
+editor.array_tool_hint	Массив: потяни золотую стрелку для ряда, другую — для площадки · Enter применить · Esc отменить.
+editor.transform_tool_hint	Точка: вращение · Shift+ЛКМ: закрепить · Ctrl+тяни: магнит · X/Y/Z: ось · ПКМ+WASD: камера
+editor.select_tool_hint	ЛКМ: выбор · Ctrl+ЛКМ: добавить к выбору · рамка: несколько деталей · ПКМ: каталог
+editor.catalog_empty	Каталог деталей пуст.
+editor.catalog_open_failed	Не удалось открыть каталог деталей.
+editor.part_has_no_snaps	У детали нет штатных точек привязки.
+editor.snap_free	Точка привязки: СВОБОДНО
+editor.snap_selected	Точка привязки: {0}
+editor.snap_mode_free	СВОБОДНО
+editor.snap_mode_auto	АВТО
+editor.part_placement_started	ЛКМ — добавить «{0}» · колесо — поворот · Q/E — точка · ПКМ+WASD — камера · Esc — закончить
+editor.part_added	Добавлено. ЛКМ — ещё одна · колесо — поворот · G — трансформация · Esc — закончить.
+editor.part_placement_finished	Добавление детали завершено.
+editor.array_fit	ПО ДЛИНЕ
+editor.array_exact_step	{0} М
+editor.array_no_gap	БЕЗ ЗАЗОРА
+editor.array_gap	+ {0} М
+editor.array_step_info	Шаг: {0} / {1} м
+editor.array_preview	Массив: {0} × {1} · колесо: количество · Ctrl+колесо: масштаб вида · Enter: применить.
+editor.array_rejected	Массив отклонён: {0}
+editor.array_preview_required	Массив: сначала настрой корректный предпросмотр.
+editor.array_applied	Массив применён: {0} копий · одна операция Undo.
+editor.array_cancelled	Массив отменён.
+editor.generated.copy	копия
+editor.generated.array	массив
+editor.generated.contour	контур
+editor.array_limit_direction	Массив: для этого направления недостаточно места в лимите 128 деталей.
+editor.contour_warning	Контур: {0}
+editor.contour_ring_preview	Контур: кольцо из {0} опор · {1} копий · Enter применить · Esc отменить.
+editor.contour_chain_preview	Контур: цепь из {0} опор · {1} копий · Enter применить · Esc отменить.
+editor.contour_rejected	Контур отклонён: {0}
+editor.contour_select_chain_first	Контур: сначала выбери опорную цепь.
+editor.contour_applied	Контур применён: {0} копий · одна операция Undo.
+editor.contour_cancelled	Контур отменён.
+editor.part_count	{0} деталей
+editor.snap_steps	Шаг: {0} м · {1}°
+editor.axes_local	Оси: локальные.
+editor.axes_world	Оси: мировые.
+editor.anchors_all	Точки: показаны все точки выбранной детали.
+editor.anchors_nearby	Точки: показаны только ближайшие видимые точки.
+editor.mesh_snap	Магнит: ванильные точки и границы моделей.
+editor.native_snap	Магнит: только ванильные точки соединения.
+editor.pivot_selection	Pivot: центр выбранного.
+editor.pivot_active	Pivot: активная деталь.
+editor.pivot_bounds	Pivot: точка границ {0}/9.
+editor.transform_reset	Трансформация выбранного сброшена одной операцией Undo.
+editor.transform_already_reset	Трансформация уже сброшена.
+editor.cannot_save_title	НЕЛЬЗЯ СОХРАНИТЬ
+editor.minimum_two_parts	Для чертежа нужны минимум две детали.
+editor.part_not_found	Не найдена деталь: {0}
+editor.save_error_title	ОШИБКА СОХРАНЕНИЯ
+editor.blueprint_saved	Чертёж сохранён.
+editor.library_refresh_failed	Чертёж сохранён, но список библиотеки не обновился.
+editor.blueprint_points_failed	Не удалось определить точки чертежа.
+editor.view.active_short	АКТИВ.
+editor.view.all	ВСЕ
+editor.view.all_categories	ВСЕ КАТЕГОРИИ
+editor.view.all_materials	ВСЕ МАТЕРИАЛЫ
+editor.view.all_sources	ВСЕ ИСТОЧНИКИ
+editor.view.all_types	ВСЕ ТИПЫ
+editor.view.angle_step_tooltip	Шаг вращения в градусах. Клик — ввод, тяни — изменить.
+editor.view.angle_step_value	ШАГ °: {0}
+editor.view.apply	ПРИМЕНИТЬ
+editor.view.apply_name	ПРИМЕНИТЬ ИМЯ
+editor.view.array_angle_step_tooltip	Шаг drag для поворота, наклона и крена: те же значения, что в F9.
+editor.view.array_arrows	Стрелки массива
+editor.view.array_direction	Потяни золотую стрелку — задай направление
+editor.view.array_gap_tooltip	Дополнительный зазор между повторами. Ориентацию задают Поворот, Наклон и Крен.
+editor.view.array_move_step_tooltip	Шаг drag для подъёма: те же значения, что в F9.
+editor.view.array_wheel_help	Колесо: количество · Ctrl: масштаб вида
+editor.view.auto_group_center	Авто: центр группы
+editor.view.axes_local	ОСИ: ЛОК.
+editor.view.axes_world	ОСИ: МИР.
+editor.view.axis_rotation_tooltip	Вращение точки вокруг оси {0}. Повторное нажатие снимает ограничение.
+editor.view.back	НАЗАД
+editor.view.blueprint	ЧЕРТЁЖ
+editor.view.blueprint_category	КАТЕГОРИЯ ЧЕРТЕЖА
+editor.view.blueprint_frame	ОПОРА ЧЕРТЕЖА
+editor.view.blueprint_frame_marker	\n◆ Опора чертежа
+editor.view.blueprint_info	Деталей: {0} · групп: {1}\nГраницы: {2}\nОшибки prefab: {3}\nПревью: текущий вид\n{4}
+editor.view.blueprint_name	ИМЯ ЧЕРТЕЖА
+editor.view.blueprint_properties	СВОЙСТВА ЧЕРТЕЖА
+editor.view.blueprints	ЧЕРТЕЖИ
+editor.view.bounds_pivot	PIVOT ПО ГРАНИЦАМ
+editor.view.bounds_m	{0} × {1} × {2} м
+editor.view.cancel	ОТМЕНА
+editor.view.catalog	КАТАЛОГ
+editor.view.catalog_breadcrumb	{0}  ›  {1}  ›  {2}{3}     ·     Найдено: {4}
+editor.view.catalog_search	ПОИСК ПО НАЗВАНИЮ, PREFAB И #…
+editor.view.categories_down	КАТЕГОРИИ ↓
+editor.view.categories_up	↑ КАТЕГОРИИ
+editor.view.category	КАТЕГОРИЯ
+editor.view.center	ЦЕНТР
+editor.view.chain_parts	цепь · {0} деталей
+editor.view.changes_saved	Изменения сохранены
+editor.view.close	ЗАКРЫТЬ
+editor.view.contour	КОНТУР
+editor.view.contour_info	ИСТОЧНИК: {0}\nОПОРА: {1}\nКОПИЙ: {2}\n\nЛКМ по опоре — выбрать цепь.\nEnter: применить · Esc: отмена.
+editor.view.copies_enter_esc	Копий: {0} · Enter / Esc
+editor.view.copy_suffix	 + {0} копий
+editor.view.delete	УДАЛИТЬ
+editor.view.discard_exit	ВЫЙТИ БЕЗ СОХРАНЕНИЯ
+editor.view.duplicate	ДУБЛИРОВАТЬ
+editor.view.empty_group	Пустая группа
+editor.view.exact_step	ТОЧНЫЙ ШАГ
+editor.view.exit	ВЫЙТИ
+editor.view.frame_all	ВСЁ В КАДР
+editor.view.frame_blueprint	ПОКАЗАТЬ ВЕСЬ ЧЕРТЁЖ
+editor.view.frame_selected	ВЫДЕЛЕННОЕ
+editor.view.free_rotation_tooltip	Свободное вращение выбранной точки вокруг опоры.
+editor.view.free_short	СВОБ.
+editor.view.gizmo_size	РАЗМЕР МАНИПУЛЯТОРОВ · %
+editor.view.grid_tooltip	Показать / скрыть сетку
+editor.view.group	СГРУППИРОВАТЬ
+editor.view.group_info	Группа · {0} деталей\n◇ Опора: {1}\nEye/Lock наследуются дочерними деталями.
+editor.view.group_pivot	ОПОРА ГРУППЫ: {0}
+editor.view.group_root	ГРУППА: ROOT
+editor.view.group_selection	Сгруппировать выбранное (Ctrl+G)
+editor.view.group_short	ГР
+editor.view.group_two_objects	Для группы выбери минимум два соседних объекта
+editor.view.group_value	ГРУППА: {0}
+editor.view.hidden	СКРЫТ
+editor.view.hide_object	Скрыть объект
+editor.view.hide_selected	СКРЫТЬ ВЫБРАННОЕ
+editor.view.in_row	В РЯДУ
+editor.view.interface_scale	ИНТЕРФЕЙС: {0}%
+editor.view.invalid_array_values	Проверь числа: количество 1–128, шаг масштаба от −300% до 300%.
+editor.view.invalid_metadata	Имя: 1–48 символов, категория: 1–24.
+editor.view.invalid_red_field	Красное поле содержит некорректное значение.
+editor.view.invalid_scale_step	Шаг масштаба: от −99% до 300%; 0 или не меньше 1% по модулю.
+editor.view.invalid_steps	Шаг: 0,001–10 м; угол: 0,1–90°.
+editor.view.light	СВЕТ
+editor.view.light_neutral	НЕЙТР.
+editor.view.light_outline	КОНТУР
+editor.view.light_warm	ТЁПЛЫЙ
+editor.view.lock	БЛОКИРОВКА
+editor.view.lock_object	Заблокировать объект
+editor.view.lock_selected	ЗАБЛОКИРОВАТЬ
+editor.view.lock_unlock	БЛОК / РАЗБЛОК
+editor.view.locked	ЗАМОК
+editor.view.magnet_game	МАГНИТ: ИГРА
+editor.view.magnet_mesh	МАГНИТ: МЕШ
+editor.view.material	МАТЕРИАЛ
+editor.view.materials_down	МАТЕРИАЛЫ ↓
+editor.view.materials_up	↑ МАТЕРИАЛЫ
+editor.view.missing	НЕТ
+editor.view.mixed	СМЕШАННАЯ
+editor.view.move_arrows	Стрелки
+editor.view.move_step_short	Δм
+editor.view.move_step_tooltip	Шаг перемещения в метрах. Клик — ввод, тяни — изменить, Shift — точно, Ctrl — крупно.
+editor.view.move_step_value	ШАГ М: {0}
+editor.view.move_to_root	ПЕРЕНЕСИ В КОРЕНЬ
+editor.view.multi_selection_info	{0} объектов\nКоманды ниже применяются ко всему выбору одной операцией Undo.
+editor.view.name	ИМЯ
+editor.view.name_short	ИМЯ
+editor.view.new_group_short	+ГР
+editor.view.no_geometry	нет геометрии
+editor.view.non_uniform_scale	неравномерный (из чертежа)
+editor.view.not_selected	не выбрана
+editor.view.nothing_selected	Ничего не выбрано
+editor.view.numeric_axis_tooltip	{0} · {1}. Клик — ввод, горизонтальное перетягивание — изменение.
+editor.view.object_count	{0} объектов
+editor.view.object_properties	СВОЙСТВА ОБЪЕКТА
+editor.view.objects	ОБЪЕКТЫ
+editor.view.offset_delta_m	СМЕЩЕНИЕ Δ · М
+editor.view.operation_metrics	Выбрано: {0}    Δ {1} / {2} / {3} м    Поворот {4} / {5} / {6}°    Масштаб {7}%    {8}/128{9}
+editor.view.outliner	ДЕРЕВО ОБЪЕКТОВ
+editor.view.outliner_commands	Команды дерева объектов
+editor.view.pack	УПАКОВАТЬ
+editor.view.page_help	Страница · Q / E · колесо над деталями · PgUp / PgDn
+editor.view.part	ДЕТАЛЬ
+editor.view.part_info	Prefab: {0}\nМасштаб: {1}\nГруппа: {2}{3}
+editor.view.part_properties	СВОЙСТВА ДЕТАЛИ
+editor.view.part_type	ТИП ДЕТАЛИ
+editor.view.parts	ДЕТАЛИ
+editor.view.parts_delta	{0} деталей · DELTA
+editor.view.pin	ЗАКРЕПИТЬ
+editor.view.pin_anchor_tooltip	Закрепить выбранную точку для вращения вокруг неё. Shift + ЛКМ по точке делает то же самое.
+editor.view.pitch_deg	НАКЛОН · °
+editor.view.points	Точки
+editor.view.points_all	ТОЧКИ: ВСЕ
+editor.view.points_nearby	ТОЧКИ: РЯДОМ
+editor.view.position_m	ПОЛОЖЕНИЕ · М
+editor.view.projection_tooltip	Перспектива / ортографический вид
+editor.view.properties	СВОЙСТВА
+editor.view.redo_tooltip	Повторить (Ctrl+Y)
+editor.view.remove_blueprint_frame	УБРАТЬ ОПОРУ ЧЕРТЕЖА
+editor.view.remove_group_pivot	УБРАТЬ ОПОРУ: {0}
+editor.view.remove_old_frame	УБРАТЬ СТАРУЮ ОПОРУ
+editor.view.rename	ПЕРЕИМЕНОВАТЬ
+editor.view.rename_one_object	Для имени выбери один объект
+editor.view.rename_selection	Переименовать выбранный объект
+editor.view.reparent_selection	Перенести выбранное в группу
+editor.view.reparent_short	→ГР
+editor.view.reset	СБРОСИТЬ
+editor.view.reset_settings	СБРОСИТЬ НАСТРОЙКИ
+editor.view.retry	ПОВТОРИТЬ
+editor.view.return	ВЕРНУТЬСЯ
+editor.view.ring_parts	кольцо · {0} деталей
+editor.view.rise_m	ПОДЪЁМ · М
+editor.view.roll_deg	КРЕН · °
+editor.view.root_drop_tooltip	Перетащи выбранные объекты сюда, чтобы вынести их из группы в корень.
+editor.view.rotation_deg	ПОВОРОТ · °
+editor.view.rotation_delta_deg	ПОВОРОТ Δ · °
+editor.view.rotation_rings	Кольца вращения
+editor.view.rows	РЯДОВ
+editor.view.save	СОХРАНИТЬ
+editor.view.save_exit	СОХРАНИТЬ И ВЫЙТИ
+editor.view.saved_blueprints	СОХРАНЁННЫЕ ЧЕРТЕЖИ
+editor.view.scale_handle	Ручка масштаба
+editor.view.scale_step	ШАГ МАСШТАБА · %
+editor.view.scale_step_label	Шаг масштаба · %
+editor.view.scale_step_repeat_tooltip	Равномерное изменение масштаба на каждый повтор, в процентах.
+editor.view.scale_step_tooltip	Шаг равномерного масштаба в процентных пунктах. Shift — без шага. ПКМ — 10%.
+editor.view.search	ПОИСК…
+editor.view.select	ВЫБРАТЬ
+editor.view.select_first	Сначала выбери деталь или группу
+editor.view.select_in_viewport	Ничего не выбрано\n\nВыбери деталь во viewport или дереве объектов.
+editor.view.select_object_or_group	Сначала выбери объект или группу
+editor.view.selection	ВЫБОР
+editor.view.selection_help	ВЫБОР ОБЪЕКТА\n\nЛКМ — выбрать деталь\nShift / Ctrl + ЛКМ — добавить или убрать\nShift в дереве — диапазон строк\nCtrl+A — всё доступное\nТяни по пустоте — рамка выбора\n\nКАМЕРА\nСКМ — вращать вид\nShift + СКМ — двигать вид\nПКМ + WASD — полёт\nКолесо — приблизить / отдалить\n\nEsc — отмена инструмента / снять выбор\nВыбрано: {0}
+editor.view.selection_locked_hidden	Выбор скрыт или заблокирован. Разблокируй его во вкладке ДЕТАЛЬ.
+editor.view.selection_scale	МАСШТАБ ВЫБОРА · %
+editor.view.selection_unavailable	Выбранные детали скрыты или заблокированы
+editor.view.settings	НАСТРОЙКИ
+editor.view.settings_tooltip	Сетка, проекция, кадрирование и размеры манипуляторов
+editor.view.show_all	ПОКАЗАТЬ ВСЁ
+editor.view.show_hide	ПОКАЗАТЬ / СКРЫТЬ
+editor.view.show_object	Показать объект
+editor.view.show_selected	ПОКАЗАТЬ ВЫБРАННОЕ
+editor.view.source	ИСТОЧНИК
+editor.view.step_percent	ШАГ, %
+editor.view.symmetry	СИММЕТРИЯ
+editor.view.title	BUILDWORKS · ЧЕРТЁЖ
+editor.view.to_group	В ГРУППУ: {0}
+editor.view.to_root	В ROOT
+editor.view.toggle_lock	Заблокировать или разблокировать выбранное
+editor.view.toggle_visibility	Показать или скрыть выбранное
+editor.view.tool_array	Массив (A)\nПовторить выбранное по двум направлениям
+editor.view.tool_contour	Контур (C)\nПовторить выбранное по цепи штатных snap points
+editor.view.tool_parameters	ПАРАМЕТРЫ ИНСТРУМЕНТА
+editor.view.tool_select	Выбор (Q)\nShift + ЛКМ — добавить/убрать\nCtrl+A — выбрать всё доступное
+editor.view.tool_transform	Трансформация (G/F9)\nСтрелки — сдвиг, кольца — вращение\nAlt + тяни стрелку — копия\nОтдельный квадрат — общий масштаб
+editor.view.transform_short	ТРАНСФ.
+editor.view.turn_deg	ПОВОРОТ · °
+editor.view.type	ТИП
+editor.view.undo_tooltip	Отменить (Ctrl+Z)
+editor.view.ungroup	РАЗГРУППИРОВАТЬ
+editor.view.ungroup_selection	Разгруппировать выбранную группу
+editor.view.ungroup_short	−ГР
+editor.view.uniform_scale	РАВНОМЕРНЫЙ МАСШТАБ · %
+editor.view.unlock	РАЗБЛОКИРОВАТЬ
+editor.view.unlock_object	Разблокировать объект
+editor.view.unpin	ОТКРЕПИТЬ
+editor.view.unsaved_changes	Есть несохранённые изменения
+editor.view.unsaved_message	Сохранить изменения в «{0}» перед выходом?
+editor.view.unsaved_title	НЕСОХРАНЁННЫЕ ИЗМЕНЕНИЯ
+editor.view.viewport_help	F9/G трансформация  •  точки — match  •  СКМ orbit  •  Shift+СКМ pan  •  колесо zoom
+editor.view.viewport_settings	НАСТРОЙКИ ВИДА
+editor.view.visibility	ВИДИМОСТЬ

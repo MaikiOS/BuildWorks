@@ -17,20 +17,25 @@ This is a public direction summary. A feature status describes availability and 
 - [x] editor/world Array and Contour;
 - [x] Undo/Redo for primary operations;
 - [x] automated Unity Workbench and host-contract checks;
-- [ ] manual 0.19.33 smoke: slope/roof/furniture surface contact, Q/E below the grid, fresh Array;
+- [x] English-first runtime localization and complete Russian catalog;
+- [x] contributor architecture, localization, and verification documentation;
+- [x] accept English localization in-game on 0.19.35;
+- [x] accept the reported slanted-piece Q/E positioning in-game and keep the active editor snap mode visible;
+- [ ] verify Russian localization, 2 m nearby-target preview, unchanged 0.55 m magnetic threshold, then continue the pending roof/furniture, Q/E-below-grid, and fresh-Array scenarios;
 - [ ] complete save/exit/reload gate;
 - [ ] host + remote-client multiplayer gate;
 - [ ] expanded vanilla and modded prefab matrix.
 
 ## Required foundation: runtime localization
 
-- [ ] replace BuildWorks-owned display strings with stable language keys;
-- [ ] make English the default runtime language and provide a complete Russian catalog;
-- [ ] follow the current Valheim language automatically, with an explicit BepInEx override if needed;
-- [ ] keep internal category/material identifiers language-neutral;
-- [ ] localize contextual hints, errors, tool parameters, catalog, outliner, HUD, and adaptive-piece metadata;
-- [ ] add missing-key, fallback, formatting-argument, and English/Russian coverage checks;
-- [ ] verify both locales in the Unity Workbench and then in Valheim.
+- [x] replace current BuildWorks-owned display strings with stable language keys;
+- [x] make English the fallback and provide a complete Russian catalog;
+- [x] follow the current Valheim language automatically;
+- [x] keep internal category/material/source identifiers language-neutral;
+- [x] localize current hints, errors, tool parameters, catalog, outliner, and HUD;
+- [x] check catalog parity, key syntax, formatting arguments, static usage, embedded resources, and source literals;
+- [x] verify English in Valheim;
+- [ ] verify Russian in Valheim; automated registration already passes.
 
 ## Next product stage: persistent operations
 

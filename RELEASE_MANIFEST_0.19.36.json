@@ -1,0 +1,23 @@
+{
+  "name": "BuildWorks",
+  "version": "0.19.36",
+  "channel": "alpha-source",
+  "game": "Valheim 1.0",
+  "hostSteamBuild": "25185596",
+  "installedInIsolatedTestProfile": true,
+  "manualRuntimeSmoke": "partial",
+  "asset": null,
+  "verifiedBuildOutputs": [
+    {
+      "path": "artifacts/bin/BuildWorks.dll",
+      "fileVersion": "0.19.36.0",
+      "sha256": "446CA165398F73882B20222E4BDDFE90BD21EC644CF3BA23BEB85870F4514AAB"
+    },
+    {
+      "path": "artifacts/bin/BuildWorks.Geometry.dll",
+      "fileVersion": "0.1.0.0",
+      "sha256": "29746E620709B0964A6345613A8AA75C261B35D9C22887F5F67A0AF0877AAB82"
+    }
+  ],
+  "note": "Hashes identify local verified outputs only. English localization is accepted; slope/railing parity and Russian localization remain manual gates. No 0.19.36 binary package is staged."
+}

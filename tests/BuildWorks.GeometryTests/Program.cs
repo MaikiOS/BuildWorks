@@ -1695,11 +1695,13 @@ namespace OstrixMods.BuildWorks.GeometryTests
             BlueprintEditorDocument document = GroupedEditorDocument();
             document.MarkClean();
 
-            Equal(true, document.DuplicateSelection(new Point3(0.5, 0.0, 0.0)));
+            Equal(true, document.DuplicateSelection(
+                new Point3(0.5, 0.0, 0.0), "копия"));
             Equal(4, document.Parts.Count);
             Equal(1, document.Selection.Count);
             Equal(2, document.Groups.Count);
             Equal(document.Selection[0], document.Parts[2].ParentGroupId);
+            Equal("Part part-a копия", document.Parts[2].DisplayName);
             Near(new Point3(1.5, 0.0, 0.0), document.Parts[2].Position);
             Equal(true, document.IsDirty);
 
@@ -1855,7 +1857,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             document.SelectOnly("part-a");
             document.MarkClean();
 
-            IReadOnlyList<BlueprintEditorPart> preview = document.PreviewArray(3, 1, new Point3(1.0, 0.0, 0.0), new Point3(0.0, 0.0, 2.0), new Point3(0, 1, 0), 90.0, 0, false, -0.10, (new Point3(1.0, 0.0, 0.0)) * -0.5, (new Point3(1.0, 0.0, 0.0)) * 0.5);
+            IReadOnlyList<BlueprintEditorPart> preview = document.PreviewArray(3, 1, new Point3(1.0, 0.0, 0.0), new Point3(0.0, 0.0, 2.0), new Point3(0, 1, 0), 90.0, 0, false, -0.10, (new Point3(1.0, 0.0, 0.0)) * -0.5, (new Point3(1.0, 0.0, 0.0)) * 0.5, null, "массив");
             Equal(2, preview.Count);
             Equal(1, document.Parts.Count);
             Equal(false, document.IsDirty);
@@ -1863,6 +1865,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Near(new Point3(.1, 0.0, -.9), preview[1].Position);
             Near(new Point3(0.9, 0.9, 0.9), preview[0].Scale);
             Near(new Point3(0.8, 0.8, 0.8), preview[1].Scale);
+            Equal("Part part-a массив 3:1", preview[1].DisplayName);
             double halfRoot = Math.Sqrt(0.5);
             Near(halfRoot, preview[0].Rotation.Y);
             Near(halfRoot, preview[0].Rotation.W);
@@ -1991,13 +1994,14 @@ namespace OstrixMods.BuildWorks.GeometryTests
             string[] supports = { "left", "center", "right" };
 
             IReadOnlyList<BlueprintEditorPart> preview = document.PreviewContour(
-                supports, false, -0.10);
+                supports, false, -0.10, "контур");
             Equal(2, preview.Count);
             Equal(4, document.Parts.Count);
             Equal(false, document.IsDirty);
             Near(new Point3(-2.0, 1.0, 0.5), preview[0].Position);
             Near(new Point3(2.5, 1.0, 0.0), preview[1].Position);
             Near(new Point3(0.9, 0.9, 0.9), preview[1].Scale);
+            Equal("Beam контур 3", preview[1].DisplayName);
             Near(halfRoot, preview[1].Rotation.Y);
             Near(halfRoot, preview[1].Rotation.W);
 

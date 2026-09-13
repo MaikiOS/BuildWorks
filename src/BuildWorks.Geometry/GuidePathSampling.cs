@@ -232,7 +232,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 int logical = symmetric ? SymmetricIndex(index) : index;
                 double scale = 1.0 + scaleStep * logical;
                 if (!GeometryMath.IsFinite(scale) || scale <= 0.0)
-                    throw new ArgumentOutOfRangeException(nameof(scaleStep), "Масштаб каждого повтора должен быть больше нуля.");
+                    throw new ArgumentOutOfRangeException(nameof(scaleStep), "Each repeated scale must be greater than zero.");
                 result[index] = new LayoutTransform3(
                     origin + RepeatOffset(
                         backAnchor,

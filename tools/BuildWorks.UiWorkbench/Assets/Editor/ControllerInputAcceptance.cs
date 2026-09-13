@@ -81,7 +81,8 @@ internal static class ControllerInputAcceptance
         uiCamera.targetTexture = target;
         var errors = new List<string>();
         using (var controller = new BlueprintEditorController(new CompositeBlueprintStore(Path.Combine(output, "input-fixture.json")),
-            template, font, _ => source, name => name, () => catalog, errors.Add, editorInput: input))
+            template, font, _ => source, name => name, () => catalog, errors.Add,
+            editorInput: input, initialPlacementSnapPointProvider: () => 0))
         try
         {
             Require(controller.OpenNew(out string error), error);
@@ -108,12 +109,14 @@ internal static class ControllerInputAcceptance
             Frame(controller, input, Vector2.zero); yield return null;
             NativeClick(view, uiCamera, "View");
             Frame(controller, input, Vector2.zero); yield return null;
-            Require(Field<TMP_Text>(view, "statusHintText").text.Contains("настройки вида"),
+            Require(Field<TMP_Text>(view, "statusHintText").text ==
+                BuildWorksLocalization.Text("editor.hint.viewport_settings"),
                 "Viewport settings retain unavailable tool shortcuts in the footer");
             Frame(controller, input, Vector2.zero, 0, KeyCode.Escape); yield return null;
             NativeClick(view, uiCamera, "OutlinerMenuButton");
             Frame(controller, input, Vector2.zero); yield return null;
-            Require(Field<TMP_Text>(view, "statusHintText").text.Contains("меню дерева"),
+            Require(Field<TMP_Text>(view, "statusHintText").text ==
+                BuildWorksLocalization.Text("editor.hint.outliner_menu"),
                 "Outliner drawer retains unavailable tool shortcuts in the footer");
             Frame(controller, input, Vector2.zero, 0, KeyCode.Escape); yield return null;
             int catalogRequests = 0;
@@ -311,6 +314,8 @@ internal static class ControllerInputAcceptance
             NativeClick(view, uiCamera, "Catalog_fixture"); yield return null;
             Frame(controller, input, left); yield return null;
             Require(Field<BlueprintEditorCatalogItem>(controller, "placementItem") != null, "Catalog card did not start placement");
+            Require(Field<int>(controller, "placementManualSnapPoint") == 0,
+                "Part placement did not inherit the active vanilla snap point");
             Frame(controller, input, left, 2); yield return null;
             Frame(controller, input, left); yield return null;
             Require(Field<BlueprintEditorCatalogItem>(controller, "placementItem") == null && view.HasCatalog && doc.Parts.Count == 4,
@@ -327,6 +332,9 @@ internal static class ControllerInputAcceptance
                     true, out Vector3 belowGrid, out string snapWarning, 5) &&
                 string.IsNullOrEmpty(snapWarning) && belowGrid.y < scene.GroundHeight - .1f,
                 "Native upper source point cannot snap below the editor grid");
+            Require(scene.PlacementSnapPreviewTargets.Count > 0 &&
+                scene.PlacementSnapPreviewTargets.Count == scene.PlacementSnapPreviewNative.Count,
+                "Part placement does not preview compatible targets inside two metres");
             Vector2 deleteDuringPlacement = scene.Camera.WorldToScreenPoint(V(doc.Parts[0].Position));
             Require(scene.TryPick(deleteDuringPlacement, out _),
                 "Placement-delete fixture is not pickable");
@@ -370,9 +378,11 @@ internal static class ControllerInputAcceptance
             Require(placementSnapPoints > 0, "Placement fixture has no native source snap points");
             Frame(controller, input, left, 0, KeyCode.E); yield return null;
             Require(Math.Abs(Field<float>(controller, "placementYaw") - 22.5f) < .001 &&
-                Field<int>(controller, "placementManualSnapPoint") == 0 &&
-                Field<TMP_Text>(view, "statusText").text.Contains("Точка привязки"),
-                "E did not select the first source snap point without rotating placement");
+                Field<int>(controller, "placementManualSnapPoint") == 1 &&
+                Field<TMP_Text>(view, "statusText").text.Contains(
+                    BuildWorksLocalization.Text("editor.snap_selected", string.Empty)) &&
+                Field<TMP_Text>(view, "statusHintText").text.Contains("2/"),
+                "E did not select the next source snap point without rotating placement");
             Frame(controller, input, left); yield return null;
             Vector2 placeMouse = view.ViewportScreenRect().center + Vector2.down * 120;
             Frame(controller, input, placeMouse); yield return null;
@@ -753,7 +763,9 @@ internal static class ControllerInputAcceptance
             Mathf.Abs(Field<float>(controller, "arrayRise")) < .0001f,
             "Fresh Array session inherited the previous distribution or profile");
         Require(Field<int>(controller, "arrayPreviewCount") == 0 &&
-            Field<TMP_Text>(view, "arrayInfo").text.Contains("Потяни золотую стрелку"), "Array has no explicit pending-direction state");
+            Field<TMP_Text>(view, "arrayInfo").text ==
+                BuildWorksLocalization.Text("editor.view.array_direction"),
+            "Array has no explicit pending-direction state");
         foreach (GizmoAxis axis in new[] { GizmoAxis.X, GizmoAxis.Z })
         {
             Vector2 start = LayoutHandle(controller, scene, axis);
@@ -813,7 +825,9 @@ internal static class ControllerInputAcceptance
             "Exact spacing button failed");
         NativeClick(view, uiCamera, "ArrayDistribution"); yield return null;
         NativeClick(view, uiCamera, "ArrayStep"); yield return null;
-        Require(Field<TMP_Text>(view, "arrayInfo").text.Contains("Шаг:") &&
+        string stepPrefix = BuildWorksLocalization.Text(
+            "editor.array_step_info", string.Empty, string.Empty).Split(':')[0] + ":";
+        Require(Field<TMP_Text>(view, "arrayInfo").text.StartsWith(stepPrefix) &&
             (VisibleButtonText(view, "ArrayStep").Contains("0,01") ||
             VisibleButtonText(view, "ArrayStep").Contains("0.01")),
             "Current spacing is hidden on or below the spacing button");
@@ -840,7 +854,8 @@ internal static class ControllerInputAcceptance
         liveScrub.OnDrag(liveScrubPointer);
         controller.GetType().GetMethod("RefreshContextHints", Private).Invoke(controller, null);
         Require(view.IsNumericScrubbing &&
-            Field<TMP_Text>(view, "statusHintText").text.Contains("Ctrl — быстрее"),
+            Field<TMP_Text>(view, "statusHintText").text ==
+                BuildWorksLocalization.Text("editor.hint.numeric_scrub"),
             "Numeric scrub does not replace unavailable tool shortcuts in the footer");
         IList liveAfter = Field<IList>(scene, "contourPreviews");
         bool movedBeforeRelease = liveAfter.Count > 0 && liveAfter.Count == liveBeforePositions.Count;

@@ -7,6 +7,10 @@ using UnityEngine.UI;
 
 namespace OstrixMods.BuildWorks
 {
+    /// <summary>
+    /// Coordinates editor input and transactions between the deterministic
+    /// document, Unity scene projection, UI view, and persistent store.
+    /// </summary>
     internal sealed class BlueprintEditorController : IDisposable
     {
         private enum EditorState
@@ -24,6 +28,7 @@ namespace OstrixMods.BuildWorks
         private readonly Func<string, GameObject> resolveVisualSource;
         private readonly Func<string, string> resolveDisplayName;
         private readonly Func<IReadOnlyList<BlueprintEditorCatalogItem>> catalogItems;
+        private readonly Func<int> initialPlacementSnapPoint;
         private readonly Action<string> logError;
         private readonly Action<CompositeBlueprintStore.Blueprint> saved;
         private readonly List<Canvas> hiddenGameCanvases = new List<Canvas>();
@@ -151,7 +156,8 @@ namespace OstrixMods.BuildWorks
             Func<IReadOnlyList<BlueprintEditorCatalogItem>> catalogItemProvider,
             Action<string> errorLogger,
             Action<CompositeBlueprintStore.Blueprint> onSaved = null,
-            IBlueprintEditorInput editorInput = null)
+            IBlueprintEditorInput editorInput = null,
+            Func<int> initialPlacementSnapPointProvider = null)
         {
             store = blueprintStore ?? throw new ArgumentNullException(nameof(blueprintStore));
             cameraTemplate = editorCameraTemplate
@@ -163,6 +169,7 @@ namespace OstrixMods.BuildWorks
             resolveDisplayName = displayNameResolver ?? (name => name);
             catalogItems = catalogItemProvider ??
                 (() => Array.Empty<BlueprintEditorCatalogItem>());
+            initialPlacementSnapPoint = initialPlacementSnapPointProvider ?? (() => -1);
             logError = errorLogger ?? (_ => { });
             saved = onSaved;
             input = editorInput ?? UnityBlueprintEditorInput.Instance;
@@ -178,7 +185,7 @@ namespace OstrixMods.BuildWorks
         internal bool OpenNew(out string error) => Open(
             new BlueprintEditorDocument(
                 null,
-                "Новый чертёж",
+                BuildWorksLocalization.Text("editor.new_blueprint"),
                 CompositeBlueprintStore.DefaultCategory),
             null,
             out error);
@@ -194,7 +201,8 @@ namespace OstrixMods.BuildWorks
             }
             catch (Exception exception)
             {
-                error = "Не удалось открыть данные чертежа: " + exception.Message;
+                error = BuildWorksLocalization.Text(
+                    "editor.open_data_failed", exception.Message);
                 logError("BuildWorks blueprint conversion failed: " + exception);
                 return false;
             }
@@ -338,12 +346,12 @@ namespace OstrixMods.BuildWorks
             error = null;
             if (disposed)
             {
-                error = "редактор уже отключён";
+                error = BuildWorksLocalization.Text("editor.already_disposed");
                 return false;
             }
             if (state != EditorState.Closed)
             {
-                error = "редактор уже открыт";
+                error = BuildWorksLocalization.Text("editor.already_open");
                 return false;
             }
 
@@ -387,9 +395,11 @@ namespace OstrixMods.BuildWorks
             view.UndoRequested += () => ApplyHistory(document.Undo, document.Redo);
             view.RedoRequested += () => ApplyHistory(document.Redo, document.Undo);
             view.GroupRequested += () => ApplyDocumentEdit(() => document.CreateGroup(
-                Guid.NewGuid().ToString("N"), "Группа " + (document.Groups.Count + 1)));
+                Guid.NewGuid().ToString("N"), BuildWorksLocalization.Text(
+                    "editor.group_name", document.Groups.Count + 1)));
             view.CreateGroupRequested += () => ApplyDocumentEdit(() => document.CreateEmptyGroup(
-                Guid.NewGuid().ToString("N"), "Группа " + (document.Groups.Count + 1)));
+                Guid.NewGuid().ToString("N"), BuildWorksLocalization.Text(
+                    "editor.group_name", document.Groups.Count + 1)));
             view.ShowAllRequested += () => ApplyDocumentEdit(document.ShowAll);
             view.HideSelectionRequested += () => ApplyDocumentEdit(() =>
                 document.SetSelectionVisibility(false));
@@ -399,7 +409,8 @@ namespace OstrixMods.BuildWorks
             view.MoveSelectionToGroupRequested += groupId => ApplyDocumentEdit(() =>
                 document.SetSelectionGroup(groupId));
             view.DuplicateSelectionRequested += () => ApplyDocumentEdit(() =>
-                document.DuplicateSelection(new Point3(0.5, 0.0, 0.5)));
+                document.DuplicateSelection(new Point3(0.5, 0.0, 0.5),
+                    BuildWorksLocalization.Text("editor.generated.copy")));
             view.DeleteSelectionRequested += () => ApplyDocumentEdit(() =>
                 document.DeleteSelection(false));
             view.PrimaryPartRequested += stableId => ApplyDocumentEdit(() =>
@@ -622,13 +633,15 @@ namespace OstrixMods.BuildWorks
             if (control && input.GetKeyDown(KeyCode.D))
             {
                 ApplyDocumentEdit(() =>
-                    document.DuplicateSelection(new Point3(0.5, 0.0, 0.5)));
+                    document.DuplicateSelection(new Point3(0.5, 0.0, 0.5),
+                        BuildWorksLocalization.Text("editor.generated.copy")));
                 return true;
             }
             if (control && input.GetKeyDown(KeyCode.G))
             {
                 ApplyDocumentEdit(() => document.CreateGroup(
-                    Guid.NewGuid().ToString("N"), "Группа " + (document.Groups.Count + 1)));
+                    Guid.NewGuid().ToString("N"), BuildWorksLocalization.Text(
+                        "editor.group_name", document.Groups.Count + 1)));
                 return true;
             }
             if (input.GetKeyDown(KeyCode.H))
@@ -683,44 +696,47 @@ namespace OstrixMods.BuildWorks
         {
             string hints;
             if (view.HasModal)
-                hints = "Esc — продолжить редактирование · выбери действие в окне";
+                hints = BuildWorksLocalization.Text("editor.hint.modal");
             else if (view.HasOutlinerContextMenu)
-                hints = "Удерживай ПКМ · наведи на действие · отпусти · вне меню — отмена";
+                hints = BuildWorksLocalization.Text("editor.hint.context_menu");
             else if (view.HasOutlinerMenu)
-                hints = "ЛКМ — выбрать действие · Esc — закрыть меню дерева";
+                hints = BuildWorksLocalization.Text("editor.hint.outliner_menu");
             else if (view.HasViewportSettings)
-                hints = "ЛКМ — изменить настройки вида · Esc — закрыть настройки";
+                hints = BuildWorksLocalization.Text("editor.hint.viewport_settings");
             else if (view.HasCatalog)
                 hints = view.IsTextInputFocused
-                    ? "Ввод текста · Esc — закрыть каталог"
-                    : "ЛКМ — выбрать · Q/E или PgUp/PgDn — страницы · Esc — закрыть";
+                    ? BuildWorksLocalization.Text("editor.hint.catalog_input")
+                    : BuildWorksLocalization.Text("editor.hint.catalog");
             else if (view.IsOutlinerDragging)
-                hints = "Отпусти над группой — перенести · над корнем — в ROOT · Esc — отменить";
+                hints = BuildWorksLocalization.Text("editor.hint.reparent");
             else if (view.IsNumericScrubbing)
-                hints = "Тяни — изменить · Shift — точнее · Ctrl — быстрее · ПКМ — сброс";
+                hints = BuildWorksLocalization.Text("editor.hint.numeric_scrub");
             else if (view.IsTextInputFocused)
-                hints = "Ввод значения · Enter — применить · Esc — отменить ввод";
+                hints = BuildWorksLocalization.Text("editor.hint.text_input");
             else if (placementItem != null)
-                hints = "ЛКМ — добавить · колесо — повернуть · Q/E — точка привязки · СКМ — удалить · Ctrl+Z/Y — история · G — трансформация · ПКМ — каталог";
+                hints = BuildWorksLocalization.Text("editor.hint.part_placement") + " · " +
+                    BuildWorksLocalization.Text(
+                        "editor.snap_selected",
+                        PlacementSnapLabel(scene.PlacementSourceSnapPointCount));
             else if (IsGizmoDragging)
-                hints = "Отпусти ЛКМ — применить · Esc — отменить · Shift — без шага";
+                hints = BuildWorksLocalization.Text("editor.hint.gizmo_drag");
             else if (rightCameraTracking || input.GetMouseButton(1) &&
                 view.ViewportScreenRect().Contains(input.MousePosition))
-                hints = "WASD — камера · Q/E — вниз/вверх · Shift — быстрее · отпусти ПКМ — закончить";
+                hints = BuildWorksLocalization.Text("editor.hint.camera");
             else if (activeTool == BlueprintEditorTool.Array)
                 hints = arrayPreviewCount > 0
-                    ? "Enter — создать копии · Esc — отменить · колесо — количество · Ctrl+колесо — камера"
-                    : "Потяни золотую стрелку — первый ряд · другую — второй · Esc — отменить";
+                    ? BuildWorksLocalization.Text("editor.hint.array_ready")
+                    : BuildWorksLocalization.Text("editor.hint.array_begin");
             else if (activeTool == BlueprintEditorTool.Contour)
                 hints = contourPreviewCount > 0
-                    ? "ЛКМ — другая цепь · Enter — создать копии · Esc — отменить"
-                    : "ЛКМ по опоре — найти цепь · Esc — отменить";
+                    ? BuildWorksLocalization.Text("editor.hint.contour_ready")
+                    : BuildWorksLocalization.Text("editor.hint.contour_begin");
             else if (activeTool == BlueprintEditorTool.Transform)
-                hints = "Тяни — изменить · N — общий frame · H/Shift+H/Ctrl+H/Alt+H — видимость · Q — выбор";
+                hints = BuildWorksLocalization.Text("editor.hint.transform");
             else if (document.Parts.Count == 0)
-                hints = "Tab — добавить деталь · СКМ — камера";
+                hints = BuildWorksLocalization.Text("editor.hint.empty");
             else
-                hints = "ЛКМ — выбрать · G — трансформация · N — общий frame · H/Shift+H/Ctrl+H/Alt+H — видимость · Tab — добавить";
+                hints = BuildWorksLocalization.Text("editor.hint.select");
             view.SetContextHints(hints);
         }
 
@@ -937,7 +953,7 @@ namespace OstrixMods.BuildWorks
                 if (!dragMagneticMove && (fixedAnchor < 0 || fixedAnchor == anchor))
                 {
                     dragIds.Clear();
-                    view.SetStatus("Shift + ЛКМ закрепляет точку · Ctrl + тяни — магнитное перемещение.");
+                    view.SetStatus(BuildWorksLocalization.Text("editor.anchor_controls"));
                     return true;
                 }
                 dragAnchorPoint = anchor;
@@ -951,7 +967,7 @@ namespace OstrixMods.BuildWorks
                 {
                     ResetGizmoDrag();
                     UpdateGizmo();
-                    view.SetStatus("Точка лежит на оси вращения. Выбери другую точку или ось.");
+                    view.SetStatus(BuildWorksLocalization.Text("editor.anchor_on_axis"));
                     return true;
                 }
                 dragStartMouse = mouse;
@@ -959,9 +975,9 @@ namespace OstrixMods.BuildWorks
                 dragRotation = Quaternion.identity;
                 dragScale = 1f;
                 selectionPending = false;
-                view.SetStatus(dragMagneticMove
-                    ? "Магнит: тяни к точке другой детали · Shift — свободно."
-                    : "Вращение вокруг закреплённой точки · X/Y/Z задают ось до перетаскивания.");
+                view.SetStatus(BuildWorksLocalization.Text(dragMagneticMove
+                    ? "editor.anchor_drag_magnetic"
+                    : "editor.anchor_drag_rotate"));
                 return true;
             }
 
@@ -974,7 +990,11 @@ namespace OstrixMods.BuildWorks
                 (input.GetKey(KeyCode.LeftAlt) || input.GetKey(KeyCode.RightAlt));
             if (dragDuplicate)
             {
-                try { CopyDocument(document).DuplicateSelection(default); }
+                try
+                {
+                    CopyDocument(document).DuplicateSelection(default,
+                        BuildWorksLocalization.Text("editor.generated.copy"));
+                }
                 catch (Exception exception)
                 {
                     ResetGizmoDrag();
@@ -1174,7 +1194,8 @@ namespace OstrixMods.BuildWorks
             if (dragDuplicate)
             {
                 var preview = CopyDocument(document);
-                preview.DuplicateSelection(ToPoint(dragTranslation));
+                preview.DuplicateSelection(ToPoint(dragTranslation),
+                    BuildWorksLocalization.Text("editor.generated.copy"));
                 scene.ShowDuplicatePreview(NewParts(preview));
             }
             else
@@ -1193,8 +1214,8 @@ namespace OstrixMods.BuildWorks
                 ResetGizmoDrag();
                 RefreshModifierPreview();
                 UpdateGizmo();
-                view.SetStatus("Массив: " + arrayCountX + " × " + arrayCountY +
-                    " · другая золотая стрелка задаёт второе направление · Enter применить.");
+                view.SetStatus(BuildWorksLocalization.Text(
+                    "editor.array_drag_ready", arrayCountX, arrayCountY));
                 return;
             }
             Vector3 translation = dragTranslation;
@@ -1210,7 +1231,8 @@ namespace OstrixMods.BuildWorks
                 return;
             }
             if (duplicate)
-                ApplyDocumentEdit(() => document.DuplicateSelection(ToPoint(translation)));
+                ApplyDocumentEdit(() => document.DuplicateSelection(ToPoint(translation),
+                    BuildWorksLocalization.Text("editor.generated.copy")));
             else ApplyTransformDelta(translation, rotation, pivot, scale);
         }
 
@@ -1259,16 +1281,16 @@ namespace OstrixMods.BuildWorks
                 if (!ConfigureAnchorConstraint(orientation))
                 {
                     CancelGizmoDrag();
-                    view.SetStatus("Точка лежит на оси вращения. Выбери другую точку или ось.");
+                    view.SetStatus(BuildWorksLocalization.Text("editor.anchor_on_axis"));
                     return;
                 }
                 dragRotation = Quaternion.identity;
                 scene.PreviewTransform(document, dragIds, Vector3.zero, Quaternion.identity, dragPivot);
                 RefreshModifierPreview();
             }
-            view.SetStatus(anchorConstraintAxis == GizmoAxis.None
-                ? "Вращение точки: свободное."
-                : "Вращение точки: ось " + anchorConstraintAxis + ". Повторное нажатие снимает ограничение.");
+            view.SetStatus(BuildWorksLocalization.Text(anchorConstraintAxis == GizmoAxis.None
+                ? "editor.anchor_rotation_free"
+                : "editor.anchor_rotation_axis", anchorConstraintAxis));
             UpdateGizmo();
         }
 
@@ -1293,8 +1315,9 @@ namespace OstrixMods.BuildWorks
             pinnedAnchorWorld = pinned ? (Vector3?)null : selectedAnchorWorld;
             pinnedAnchorPoint = -1;
             UpdateGizmo();
-            view.SetStatus(pinned ? "Закрепление точки снято."
-                : "Точка закреплена: тяни другую точку для вращения.");
+            view.SetStatus(BuildWorksLocalization.Text(pinned
+                ? "editor.anchor_unpinned"
+                : "editor.anchor_pinned"));
         }
 
         private BlueprintEditorDocument ModifierDocument()
@@ -1353,7 +1376,8 @@ namespace OstrixMods.BuildWorks
             {
                 activeTool = BlueprintEditorTool.Select;
                 view.SetTool(activeTool);
-                view.SetStatus("Сначала выбери доступную деталь или группу.", error: true);
+                view.SetStatus(BuildWorksLocalization.Text(
+                    "editor.select_available_first"), error: true);
                 return;
             }
             if (IsGizmoDragging) CancelGizmoDrag();
@@ -1368,18 +1392,16 @@ namespace OstrixMods.BuildWorks
             if (tool == BlueprintEditorTool.Contour)
             {
                 RefreshContourPanel();
-                view.SetStatus(
-                    "Контур: ЛКМ по ребру опоры — найти цепь · Enter применить · Esc отменить.");
+                view.SetStatus(BuildWorksLocalization.Text("editor.contour_tool_hint"));
             }
             else if (tool == BlueprintEditorTool.Array)
             {
                 PreviewArray();
-                view.SetStatus(
-                    "Массив: потяни золотую стрелку для ряда, другую — для площадки · Enter применить · Esc отменить.");
+                view.SetStatus(BuildWorksLocalization.Text("editor.array_tool_hint"));
             }
             else if (tool == BlueprintEditorTool.Transform)
-                view.SetStatus("Точка: вращение · Shift+ЛКМ: закрепить · Ctrl+тяни: магнит · X/Y/Z: ось · ПКМ+WASD: камера");
-            else view.SetStatus("ЛКМ: выбор · Ctrl+ЛКМ: добавить к выбору · рамка: несколько деталей · ПКМ: каталог");
+                view.SetStatus(BuildWorksLocalization.Text("editor.transform_tool_hint"));
+            else view.SetStatus(BuildWorksLocalization.Text("editor.select_tool_hint"));
         }
 
         private void UpdateGizmo()
@@ -1758,7 +1780,8 @@ namespace OstrixMods.BuildWorks
                 IReadOnlyList<BlueprintEditorCatalogItem> items = catalogItems();
                 if (items == null || items.Count == 0)
                 {
-                    view.SetStatus("Каталог деталей пуст.", error: true);
+                    view.SetStatus(BuildWorksLocalization.Text(
+                        "editor.catalog_empty"), error: true);
                     return;
                 }
                 view.ShowCatalog(items);
@@ -1767,7 +1790,8 @@ namespace OstrixMods.BuildWorks
             catch (Exception exception)
             {
                 logError("BuildWorks blueprint editor catalog failed: " + exception);
-                view.SetStatus("Не удалось открыть каталог деталей.", error: true);
+                view.SetStatus(BuildWorksLocalization.Text(
+                    "editor.catalog_open_failed"), error: true);
             }
         }
 
@@ -1784,7 +1808,9 @@ namespace OstrixMods.BuildWorks
             placementItem = item;
             placementYaw = 0f;
             placementSnap = snap;
-            placementManualSnapPoint = -1;
+            placementManualSnapPoint = snap && placementBlueprint == null
+                ? Math.Max(-1, initialPlacementSnapPoint())
+                : -1;
             activeTool = BlueprintEditorTool.Select;
             view.SetTool(activeTool);
             scene.ShowGizmo(
@@ -1811,20 +1837,22 @@ namespace OstrixMods.BuildWorks
             {
                 placementManualSnapPoint = -1;
                 view.SetTransientStatus(placementSnap
-                    ? "У детали нет штатных точек привязки."
-                    : "Точка привязки: СВОБОДНО");
+                    ? BuildWorksLocalization.Text("editor.part_has_no_snaps")
+                    : BuildWorksLocalization.Text("editor.snap_free"));
                 return;
             }
             placementManualSnapPoint += direction;
             if (placementManualSnapPoint < -1) placementManualSnapPoint = count - 1;
             else if (placementManualSnapPoint >= count) placementManualSnapPoint = -1;
-            view.SetTransientStatus("Точка привязки: " + PlacementSnapLabel(count));
+            view.SetTransientStatus(BuildWorksLocalization.Text(
+                "editor.snap_selected", PlacementSnapLabel(count)));
+            RefreshContextHints();
         }
 
         private string PlacementSnapLabel(int count) => !placementSnap
-            ? "СВОБОДНО"
+            ? BuildWorksLocalization.Text("editor.snap_mode_free")
             : placementManualSnapPoint < 0 || count <= 0
-                ? "АВТО"
+                ? BuildWorksLocalization.Text("editor.snap_mode_auto")
                 : (placementManualSnapPoint + 1) + "/" + count +
                     (string.IsNullOrEmpty(scene.PlacementSnapPointLabel(placementManualSnapPoint))
                         ? string.Empty
@@ -1833,9 +1861,8 @@ namespace OstrixMods.BuildWorks
         private void SetPlacementStatus()
         {
             if (placementItem == null) return;
-            view.SetStatus(
-                "ЛКМ — добавить «" + placementItem.DisplayName +
-                "» · колесо — поворот · Q/E — точка · ПКМ+WASD — камера · Esc — закончить");
+            view.SetStatus(BuildWorksLocalization.Text(
+                "editor.part_placement_started", placementItem.DisplayName));
         }
 
         private static BlueprintEditorDocument DocumentFromBlueprint(CompositeBlueprintStore.Blueprint source)
@@ -1938,6 +1965,9 @@ namespace OstrixMods.BuildWorks
                 return;
             }
             scene.ShowPlacementTarget(scene.PlacementSnapTarget ?? point, scene.PlacementSnapTarget.HasValue);
+            scene.ShowSnapCandidates(
+                scene.PlacementSnapPreviewTargets,
+                scene.PlacementSnapPreviewNative);
             if (!input.GetMouseButtonDown(0) || cameraDragging || rightCameraTracking) return;
             BlueprintEditorCatalogItem item = placementItem;
             bool added = placementBlueprint != null
@@ -1950,8 +1980,7 @@ namespace OstrixMods.BuildWorks
                 ToPoint(placementPosition),
                 ToRotation(Quaternion.Euler(0f, placementYaw, 0f)))));
             if (!added) return;
-            view.SetStatus(
-                "Добавлено. ЛКМ — ещё одна · колесо — поворот · G — трансформация · Esc — закончить.");
+            view.SetStatus(BuildWorksLocalization.Text("editor.part_added"));
         }
 
         private void DeleteViewportPart(string stableId)
@@ -1971,7 +2000,7 @@ namespace OstrixMods.BuildWorks
             scene?.ClearBlueprintPlacementPreview();
             scene?.HidePlacementTarget();
             SetSelectionTool();
-            Bind("Добавление детали завершено.");
+            Bind(BuildWorksLocalization.Text("editor.part_placement_finished"));
         }
 
         private void ChangeArrayParameters(int countX, int countY, float rise,
@@ -2026,11 +2055,19 @@ namespace OstrixMods.BuildWorks
         private void PreviewArray()
         {
             if (!IsEditing || activeTool != BlueprintEditorTool.Array) return;
-            string stepLabel = arrayDistribution == RepeatDistributionMode.Fit ? "ПО ДЛИНЕ" :
-                arrayDistribution == RepeatDistributionMode.Exact ? ArrayExactSteps[arrayExactIndex].ToString("0.##") + " М" :
-                ArrayGaps[arraySpacingIndex] == 0f ? "БЕЗ ЗАЗОРА" : "+ " + ArrayGaps[arraySpacingIndex].ToString("0.##") + " М";
-            string stepInfo = "Шаг: " + arrayStepX.magnitude.ToString("0.###") + " / " +
-                (arrayCountY > 1 ? arrayStepY.magnitude.ToString("0.###") : "—") + " м";
+            string stepLabel = arrayDistribution == RepeatDistributionMode.Fit
+                ? BuildWorksLocalization.Text("editor.array_fit")
+                : arrayDistribution == RepeatDistributionMode.Exact
+                    ? BuildWorksLocalization.Text(
+                        "editor.array_exact_step", ArrayExactSteps[arrayExactIndex].ToString("0.##"))
+                    : ArrayGaps[arraySpacingIndex] == 0f
+                        ? BuildWorksLocalization.Text("editor.array_no_gap")
+                        : BuildWorksLocalization.Text(
+                            "editor.array_gap", ArrayGaps[arraySpacingIndex].ToString("0.##"));
+            string stepInfo = BuildWorksLocalization.Text(
+                "editor.array_step_info",
+                arrayStepX.magnitude.ToString("0.###"),
+                arrayCountY > 1 ? arrayStepY.magnitude.ToString("0.###") : "—");
             view.SetArrayParameters(arrayCountX, arrayCountY, arrayDistribution, stepLabel,
                 arraySymmetric, arrayPrimaryAxis != GizmoAxis.None, stepInfo,
                 translationStep, rotationStep);
@@ -2048,18 +2085,20 @@ namespace OstrixMods.BuildWorks
                 IReadOnlyList<BlueprintEditorPart> preview = ModifierDocument().PreviewArray(
                     arrayCountX, arrayCountY, ToPoint(stepX), ToPoint(stepY), ToPoint(axis),
                     degrees, arrayRise, arraySymmetric, arrayScaleStepX, ToPoint(back),
-                    ToPoint(front), ToPoint(pivot));
+                    ToPoint(front), ToPoint(pivot),
+                    BuildWorksLocalization.Text("editor.generated.array"));
                 arrayPreviewCount = preview.Count;
                 scene.ShowArrayPreview(preview);
                 view.SetArrayState(preview.Count);
-                view.SetStatus("Массив: " + arrayCountX + " × " + arrayCountY +
-                    " · колесо: количество · Ctrl+колесо: масштаб вида · Enter: применить.");
+                view.SetStatus(BuildWorksLocalization.Text(
+                    "editor.array_preview", arrayCountX, arrayCountY));
             }
             catch (Exception exception)
             {
                 arrayPreviewCount = 0;
                 scene.ClearArrayPreview();
-                view.SetArrayState(0, "Массив отклонён: " + exception.Message);
+                view.SetArrayState(0, BuildWorksLocalization.Text(
+                    "editor.array_rejected", exception.Message));
             }
         }
 
@@ -2067,7 +2106,8 @@ namespace OstrixMods.BuildWorks
         {
             if (activeTool != BlueprintEditorTool.Array || arrayPreviewCount == 0)
             {
-                view.SetStatus("Массив: сначала настрой корректный предпросмотр.", error: true);
+                view.SetStatus(BuildWorksLocalization.Text(
+                    "editor.array_preview_required"), error: true);
                 return;
             }
             int copies = arrayPreviewCount;
@@ -2079,9 +2119,9 @@ namespace OstrixMods.BuildWorks
             if (!ApplyDocumentEdit(() => document.ApplyArray(countX, countY,
                 ToPoint(stepX), ToPoint(stepY), ToPoint(axis), degrees, rise,
                 symmetric, scaleStep, ToPoint(back), ToPoint(front),
-                ToPoint(pivot)))) return;
+                ToPoint(pivot), BuildWorksLocalization.Text("editor.generated.array")))) return;
             SetActiveTool(BlueprintEditorTool.Transform);
-            view.SetStatus("Массив применён: " + copies + " копий · одна операция Undo.");
+            view.SetStatus(BuildWorksLocalization.Text("editor.array_applied", copies));
         }
 
         private void CancelArray()
@@ -2090,7 +2130,7 @@ namespace OstrixMods.BuildWorks
             SetActiveTool(document.EditablePartSelectionCount > 0
                 ? BlueprintEditorTool.Transform
                 : BlueprintEditorTool.Select);
-            view.SetStatus("Массив отменён.");
+            view.SetStatus(BuildWorksLocalization.Text("editor.array_cancelled"));
         }
 
         private void ClearArrayState()
@@ -2154,7 +2194,8 @@ namespace OstrixMods.BuildWorks
             int maximumCount = maximumInstances / Math.Max(1, otherCount);
             if (maximumCount < 2)
             {
-                view.SetStatus("Массив: для этого направления недостаточно места в лимите 128 деталей.", error: true);
+                view.SetStatus(BuildWorksLocalization.Text(
+                    "editor.array_limit_direction"), error: true);
                 return;
             }
             int count = arrayDistribution == RepeatDistributionMode.Fit
@@ -2230,7 +2271,8 @@ namespace OstrixMods.BuildWorks
                 out string warning))
             {
                 ClearContourState();
-                view.SetStatus("Контур: " + warning, error: true);
+                view.SetStatus(BuildWorksLocalization.Text(
+                    "editor.contour_warning", warning), error: true);
                 return;
             }
             try
@@ -2246,15 +2288,16 @@ namespace OstrixMods.BuildWorks
                 scene.ShowContourPreview(preview);
                 RefreshContourPanel();
                 UpdateGizmo();
-                view.SetStatus(
-                    "Контур: " + (closed ? "кольцо" : "цепь") + " из " +
-                    supports.Count + " опор · " + preview.Count +
-                    " копий · Enter применить · Esc отменить.");
+                view.SetStatus(BuildWorksLocalization.Text(
+                    closed ? "editor.contour_ring_preview" : "editor.contour_chain_preview",
+                    supports.Count,
+                    preview.Count));
             }
             catch (Exception exception)
             {
                 ClearContourState();
-                view.SetStatus("Контур отклонён: " + exception.Message, error: true);
+                view.SetStatus(BuildWorksLocalization.Text(
+                    "editor.contour_rejected", exception.Message), error: true);
             }
         }
 
@@ -2270,7 +2313,8 @@ namespace OstrixMods.BuildWorks
             try
             {
                 IReadOnlyList<BlueprintEditorPart> preview = ModifierDocument().PreviewContour(
-                    contourSupportIds, contourClosed, contourScaleStep);
+                    contourSupportIds, contourClosed, contourScaleStep,
+                    BuildWorksLocalization.Text("editor.generated.contour"));
                 contourPreviewCount = preview.Count;
                 scene.ShowContourPreview(preview);
                 RefreshContourPanel();
@@ -2280,7 +2324,8 @@ namespace OstrixMods.BuildWorks
             {
                 contourPreviewCount = 0;
                 scene.ClearContourPreview();
-                view.SetStatus("Контур отклонён: " + exception.Message, error: true);
+                view.SetStatus(BuildWorksLocalization.Text(
+                    "editor.contour_rejected", exception.Message), error: true);
                 RefreshContourPanel();
             }
         }
@@ -2297,7 +2342,8 @@ namespace OstrixMods.BuildWorks
         {
             if (contourSupportIds.Count < 2 || contourPreviewCount == 0)
             {
-                view.SetStatus("Контур: сначала выбери опорную цепь.", error: true);
+                view.SetStatus(BuildWorksLocalization.Text(
+                    "editor.contour_select_chain_first"), error: true);
                 return;
             }
             var supports = new List<string>(contourSupportIds);
@@ -2305,9 +2351,10 @@ namespace OstrixMods.BuildWorks
             int copies = contourPreviewCount;
             ClearContourState();
             if (!ApplyDocumentEdit(() => document.ApplyContour(
-                supports, closed, contourScaleStep))) return;
+                supports, closed, contourScaleStep,
+                BuildWorksLocalization.Text("editor.generated.contour")))) return;
             SetActiveTool(BlueprintEditorTool.Transform);
-            view.SetStatus("Контур применён: " + copies + " копий · одна операция Undo.");
+            view.SetStatus(BuildWorksLocalization.Text("editor.contour_applied", copies));
         }
 
         private void CancelContour()
@@ -2316,7 +2363,7 @@ namespace OstrixMods.BuildWorks
             SetActiveTool(document.EditablePartSelectionCount > 0
                 ? BlueprintEditorTool.Transform
                 : BlueprintEditorTool.Select);
-            view.SetStatus("Контур отменён.");
+            view.SetStatus(BuildWorksLocalization.Text("editor.contour_cancelled"));
         }
 
         private void ClearContourState()
@@ -2336,7 +2383,8 @@ namespace OstrixMods.BuildWorks
             string source = active != null
                 ? active.DisplayName
                 : document.EditablePartSelectionCount > 0
-                    ? document.EditablePartSelectionCount + " деталей"
+                    ? BuildWorksLocalization.Text(
+                        "editor.part_count", document.EditablePartSelectionCount)
                     : null;
             view.SetContourState(
                 source,
@@ -2349,8 +2397,10 @@ namespace OstrixMods.BuildWorks
         {
             translationStep = Mathf.Clamp(moveStep, 0.001f, 10f);
             rotationStep = Mathf.Clamp(angleStep, 0.1f, 90f);
-            string status = "Шаг: " + translationStep.ToString("0.###") +
-                " м · " + rotationStep.ToString("0.#") + "°";
+            string status = BuildWorksLocalization.Text(
+                "editor.snap_steps",
+                translationStep.ToString("0.###"),
+                rotationStep.ToString("0.#"));
             UpdateTransformContext();
             view.SetStatus(status);
         }
@@ -2367,9 +2417,10 @@ namespace OstrixMods.BuildWorks
             localSpace = !localSpace;
             UpdateTransformContext();
             UpdateGizmo();
-            view.SetStatus(localSpace && ActiveEditablePart() != null
-                ? "Оси: локальные."
-                : "Оси: мировые.");
+            view.SetStatus(BuildWorksLocalization.Text(
+                localSpace && ActiveEditablePart() != null
+                    ? "editor.axes_local"
+                    : "editor.axes_world"));
         }
 
         private void ToggleAnchorVisibility()
@@ -2377,9 +2428,9 @@ namespace OstrixMods.BuildWorks
             showAllAnchors = !showAllAnchors;
             UpdateTransformContext();
             UpdateGizmo();
-            view.SetStatus(showAllAnchors
-                ? "Точки: показаны все точки выбранной детали."
-                : "Точки: показаны только ближайшие видимые точки.");
+            view.SetStatus(BuildWorksLocalization.Text(showAllAnchors
+                ? "editor.anchors_all"
+                : "editor.anchors_nearby"));
         }
 
         private void ToggleMeshSnap()
@@ -2391,9 +2442,9 @@ namespace OstrixMods.BuildWorks
             snapPreviewNative.Clear();
             UpdateTransformContext();
             UpdateGizmo();
-            view.SetStatus(meshSnapEnabled
-                ? "Магнит: ванильные точки и границы моделей."
-                : "Магнит: только ванильные точки соединения.");
+            view.SetStatus(BuildWorksLocalization.Text(meshSnapEnabled
+                ? "editor.mesh_snap"
+                : "editor.native_snap"));
         }
 
         private void TogglePivotMode()
@@ -2404,13 +2455,13 @@ namespace OstrixMods.BuildWorks
                 pivotMode = BlueprintEditorPivotMode.SelectionCenter;
                 UpdateTransformContext();
                 UpdateGizmo();
-                view.SetStatus("Pivot: центр выбранного.");
+                view.SetStatus(BuildWorksLocalization.Text("editor.pivot_selection"));
                 return;
             }
             customPivot = false;
             pivotMode = BlueprintEditorPivotMode.SelectionCenter;
             SetActiveTool(BlueprintEditorTool.Transform);
-            view.SetStatus("Pivot: центр выбранного.");
+            view.SetStatus(BuildWorksLocalization.Text("editor.pivot_selection"));
         }
 
         private void SetPivotMode(BlueprintEditorPivotMode mode)
@@ -2422,9 +2473,10 @@ namespace OstrixMods.BuildWorks
                 : mode;
             UpdateTransformContext();
             UpdateGizmo();
-            view.SetStatus(pivotMode == BlueprintEditorPivotMode.ActiveObject
-                ? "Pivot: активная деталь."
-                : "Pivot: центр выбранного.");
+            view.SetStatus(BuildWorksLocalization.Text(
+                pivotMode == BlueprintEditorPivotMode.ActiveObject
+                    ? "editor.pivot_active"
+                    : "editor.pivot_selection"));
         }
 
         private void SetBoundsPivot(int index)
@@ -2434,7 +2486,8 @@ namespace OstrixMods.BuildWorks
             pivotMode = BlueprintEditorPivotMode.Bounds;
             UpdateTransformContext();
             UpdateGizmo();
-            view.SetStatus("Pivot: точка границ " + (boundsPivotIndex + 1) + "/9.");
+            view.SetStatus(BuildWorksLocalization.Text(
+                "editor.pivot_bounds", boundsPivotIndex + 1));
         }
 
         private void ResetSelectionTransform()
@@ -2443,8 +2496,8 @@ namespace OstrixMods.BuildWorks
                 return;
             customPivot = false;
             if (ApplyTransformDelta(-pivot, Quaternion.Inverse(orientation), pivot))
-                view.SetStatus("Трансформация выбранного сброшена одной операцией Undo.");
-            else view.SetStatus("Трансформация уже сброшена.");
+                view.SetStatus(BuildWorksLocalization.Text("editor.transform_reset"));
+            else view.SetStatus(BuildWorksLocalization.Text("editor.transform_already_reset"));
         }
 
         private void UpdateTransformContext()
@@ -2468,16 +2521,20 @@ namespace OstrixMods.BuildWorks
             saveClosesOnSuccess = closeAfterSave;
             if (document.Parts.Count < 2)
             {
-                view.ShowError("НЕЛЬЗЯ СОХРАНИТЬ",
-                    "Для чертежа нужны минимум две детали.", canRetry: false);
+                view.ShowError(
+                    BuildWorksLocalization.Text("editor.cannot_save_title"),
+                    BuildWorksLocalization.Text("editor.minimum_two_parts"),
+                    canRetry: false);
                 return false;
             }
             foreach (BlueprintEditorPart part in document.Parts)
             {
                 if (!ResolveVisualSource(part.PrefabName))
                 {
-                    view.ShowError("НЕЛЬЗЯ СОХРАНИТЬ",
-                        "Не найдена деталь: " + part.PrefabName, canRetry: false);
+                    view.ShowError(
+                        BuildWorksLocalization.Text("editor.cannot_save_title"),
+                        BuildWorksLocalization.Text("editor.part_not_found", part.PrefabName),
+                        canRetry: false);
                     return false;
                 }
             }
@@ -2515,14 +2572,15 @@ namespace OstrixMods.BuildWorks
                 if (!success)
                 {
                     state = EditorState.Editing;
-                    view.ShowError("ОШИБКА СОХРАНЕНИЯ", error);
+                    view.ShowError(
+                        BuildWorksLocalization.Text("editor.save_error_title"), error);
                     return false;
                 }
                 document.AdoptSavedIdentity(
                     sourceBlueprint.id, sourceBlueprint.name, sourceBlueprint.category);
                 document.MarkClean();
                 state = EditorState.Editing;
-                Bind("Чертёж сохранён.");
+                Bind(BuildWorksLocalization.Text("editor.blueprint_saved"));
                 try
                 {
                     saved?.Invoke(sourceBlueprint);
@@ -2531,8 +2589,8 @@ namespace OstrixMods.BuildWorks
                 {
                     logError("BuildWorks blueprint saved callback failed: " +
                         callbackException);
-                    view.SetStatus(
-                        "Чертёж сохранён, но список библиотеки не обновился.", error: true);
+                    view.SetStatus(BuildWorksLocalization.Text(
+                        "editor.library_refresh_failed"), error: true);
                 }
                 if (closeAfterSave) Cleanup();
                 return true;
@@ -2541,7 +2599,8 @@ namespace OstrixMods.BuildWorks
             {
                 state = EditorState.Editing;
                 logError("BuildWorks blueprint editor save failed: " + exception);
-                view.ShowError("ОШИБКА СОХРАНЕНИЯ", exception.Message);
+                view.ShowError(
+                    BuildWorksLocalization.Text("editor.save_error_title"), exception.Message);
                 return false;
             }
         }
@@ -2604,7 +2663,8 @@ namespace OstrixMods.BuildWorks
                     ids.Add(blueprintPart.StableId);
             }
             if (!scene.TryGetGizmoAnchors(ids, out Vector3[] anchors, out _))
-                throw new InvalidOperationException("Не удалось определить точки чертежа.");
+                throw new InvalidOperationException(BuildWorksLocalization.Text(
+                    "editor.blueprint_points_failed"));
             var result = new List<CompositeBlueprintStore.VectorData>(
                 Math.Min(anchors.Length, 512));
             for (int index = 0; index < anchors.Length && index < 512; ++index)

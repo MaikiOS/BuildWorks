@@ -183,8 +183,8 @@ Assert-Contract ($editorDocumentSource -match 'public string PivotPartId' -and
     $editorDocumentSource -match 'ClearInvalidGroupPivots' -and
     $editorDocumentSource -match 'partIds\.TryGetValue\(pivotPartId' -and
     $editorControllerSource -match 'pivotPartId = group\.PivotPartId' -and
-    $editorViewSource -match 'ОПОРА ЧЕРТЕЖА' -and
-    $editorViewSource -match 'ОПОРА ГРУППЫ') `
+    $editorViewSource -match 'editor\.view\.blueprint_frame' -and
+    $editorViewSource -match 'editor\.view\.group_pivot') `
     'Blueprint world/group anchor hierarchy or copied-pivot remapping is missing.'
 Assert-Contract (([regex]::Matches($sessionSource,
         'TryAddBlueprintLayoutInstance\(')).Count -eq 3 -and
@@ -363,8 +363,8 @@ Assert-Contract ($editorControllerSource -match 'OpenNew' -and
     $editorControllerSource -match 'snapTargetIsNative' -and
     $editorSceneSource -match 'MaximumSnapPreviewTargets = 24' -and
     $editorSceneSource -match 'nativeAnchorStart' -and
-    $editorViewSource -match 'ТОЧКИ: ВСЕ' -and
-    $editorViewSource -match 'МАГНИТ: ИГРА' -and
+    $editorViewSource -match 'editor\.view\.points_all' -and
+    $editorViewSource -match 'editor\.view\.magnet_game' -and
     $gizmoSource -match 'camera\.cullingMask' -and
     $editorControllerSource -match 'if \(IsGizmoDragging\)[\s\S]*?return false;' -and
     $editorControllerSource -match '!IsGizmoDragging &&\s*input\.GetMouseButtonDown\(1\)' -and
@@ -804,7 +804,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.33.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.37.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -1124,18 +1124,18 @@ $hudShowEditing = $pluginMethods | Where-Object {
 $hudShowOperands = @(
     $hudShowEditing.Body.Instructions | ForEach-Object { [string]$_.Operand }
 ) -join "`n"
-Assert-Contract ($hudShowOperands -match 'МАССИВ' -and $hudShowOperands -match 'КОНТУР') `
+Assert-Contract ($hudShowOperands -match 'hud\.array' -and $hudShowOperands -match 'hud\.contour') `
     'Compiled HUD does not expose the unified Array and Guide controls.'
-Assert-Contract ($hudShowOperands -match 'ТОЧКИ: ВСЕ' -and
-    $hudShowOperands -match 'ТОЧКИ: РЯДОМ' -and
-    $hudShowOperands -match 'РУЧКИ') `
+Assert-Contract ($hudShowOperands -match 'hud\.points_all' -and
+    $hudShowOperands -match 'hud\.points_near' -and
+    $hudShowOperands -match 'hud\.handles') `
     'Compiled HUD does not expose contextual anchor visibility and scale.'
-Assert-Contract ($hudShowOperands -match 'МАГНИТ: ИГРА' -and
-    $hudShowOperands -match 'МАГНИТ: МЕШ') `
+Assert-Contract ($hudShowOperands -match 'hud\.snap_game' -and
+    $hudShowOperands -match 'hud\.snap_mesh') `
     'Compiled HUD does not expose separate vanilla and mesh snap modes.'
-Assert-Contract ($hudShowOperands -match 'АВТОСТЫК: ВКЛ' -and
-    $hudShowOperands -match 'АВТОСТЫК: ВЫКЛ' -and
-    $hudShowOperands -match 'ВЕРНУТЬ') `
+Assert-Contract ($hudShowOperands -match 'hud\.auto_align_on' -and
+    $hudShowOperands -match 'hud\.auto_align_off' -and
+    $hudShowOperands -match 'hud\.redo') `
     'Compiled HUD does not expose automatic joining and redo.'
 foreach ($method in @(
     'RefreshSnapTargets',
@@ -1253,7 +1253,7 @@ Assert-Contract ($blueprintRegistrySource -match 'CategoryMarker' -and
 Assert-Contract ($blueprintRegistrySource -match
     'if \(markerPiece\) pieces\.Remove\(markerPiece\)' -and
     $blueprintRegistrySource -match
-        'HammerCatalogOrganizer\.Group\(piece\) == "ДЕЙСТВИЯ"' -and
+        'HammerCatalogOrganizer\.Group\(piece\) == HammerCatalogOrganizer\.ActionsGroup' -and
     $blueprintRegistrySource -match 'pieces\.Insert\(0, repairPiece\)') `
     'The blueprint category can expose its marker or put Repair after blueprints.'
 Assert-Contract ($blueprintRegistrySource -match
@@ -1417,7 +1417,7 @@ $favoriteOperands = @(
     $populateFavorites.Body.Instructions + $toggleFavorite.Body.Instructions |
         ForEach-Object { [string]$_.Operand }
 ) -join "`n"
-Assert-Contract ($catalogSource -match 'FavoriteCategoryName = "ИЗБРАННОЕ"' -and
+Assert-Contract ($catalogSource -match 'FavoriteCategoryName[\s\S]{0,100}catalog\.category\.favorites' -and
     $catalogSource -match 'AddFavoriteCategoryKeeper' -and
     $favoriteOperands -match 'BuildUi::IsFavoritePiece' -and
     $favoriteOperands -match 'BuildUi::ToggleFavorite' -and
@@ -1521,18 +1521,18 @@ Assert-Contract ($blueprintCardSource -match 'HammerCatalogPointerClick' -and
     $blueprintCardSource -match 'if \(doubleClick\) blueprintAction\?\.Invoke\(blueprint, false\)' -and
     $blueprintCardSource -match 'else Invalidate\(\)' -and
     $blueprintCardSource -match 'AddBlueprintContextMenu' -and
-    $blueprintCardSource -match '"РАЗМЕСТИТЬ"' -and
-    $blueprintCardSource -match '"РЕДАКТИРОВАТЬ"' -and
-    $blueprintCardSource -match '"ПЕРЕИМЕНОВАТЬ"' -and
-    $blueprintCardSource -match '"ОБНОВИТЬ ПРЕВЬЮ"' -and
+    $blueprintCardSource -match 'catalog\.action\.place' -and
+    $blueprintCardSource -match 'catalog\.action\.edit' -and
+    $blueprintCardSource -match 'catalog\.action\.rename' -and
+    $blueprintCardSource -match 'catalog\.action\.refresh_preview' -and
     $catalogSource -match 'ShouldCaptureBlueprintContext' -and
     $catalogSource -match 'Input\.GetMouseButtonDown\(1\)' -and
     $catalogSource -match 'eventSystem\.RaycastAll\(pointer, hits\)' -and
     $catalogSource -match 'GetComponentInParent<HammerCatalogPointerClick>' -and
     $pluginSource -match
         '\[HarmonyPatch\(typeof\(BuildUi\), "NavigationUpdate"\)\][\s\S]{0,260}?ShouldCaptureBlueprintContext' -and
-    $blueprintCardSource -match '"РЕСУРСЫ"' -and
-    $blueprintCardSource -match '"УДАЛИТЬ"') `
+    $blueprintCardSource -match 'catalog\.action\.resources' -and
+    $blueprintCardSource -match 'catalog\.action\.delete') `
     'Blueprint cards lost single-click selection, double-click placement, or the RMB action menu.'
 Assert-Contract ($catalogSource -match 'ApplyLayout\(hud, table\)' -and
     $catalogSource -match 'Screen\.safeArea' -and
@@ -1558,7 +1558,7 @@ Assert-Contract ($catalogSource -match 'private const int IndexVisibleColumns = 
     $catalogSource -match 'RequestedPages\.Remove\(key\)') `
     'Hammer index no longer keeps every piece reachable through stable pages.'
 Assert-Contract ($catalogSource -match 'private static void AddModeToggle' -and
-    $catalogSource -match '"РЕЖИМ ИНДЕКСА"' -and
+    $catalogSource -match 'catalog\.action\.index_mode' -and
     $catalogSource -match 'indexMode \? layoutRailWidth \+ 20f : 12f' -and
     $catalogSource -match 'indexMode \? 8f : -36f' -and
     $catalogSource -match 'VanillaPreviousPage[\s\S]{0,1100}new Vector2\(164f, -36f\)' -and
@@ -1693,8 +1693,7 @@ Assert-Contract (@($plugin.MainModule.AssemblyReferences | Where-Object {
 }).Count -eq 0) 'The unified catalog gained a hard dependency on another gameplay mod.'
 Assert-Contract (@($pluginTypes | Where-Object Name -eq 'HammerBlueprintLibraryView').Count -eq 0) `
     'The obsolete custom Hammer blueprint tab is still compiled.'
-Assert-Contract ($hudSource -notmatch 'ЗАГР\. ЧЕРТЕЖ' -and
-    $hudSource -notmatch 'BlueprintPrevious|BlueprintNext') `
+Assert-Contract ($hudSource -notmatch 'BlueprintPrevious|BlueprintNext') `
     'The F9 editor still contains blueprint-library navigation.'
 $blueprintStore = $pluginTypes | Where-Object Name -eq 'CompositeBlueprintStore'
 Assert-Contract ($null -ne $blueprintStore) `
@@ -1881,8 +1880,7 @@ Assert-Contract ($beginBlueprintPlacement.Parameters.Count -eq 3 -and
     $beginBlueprintPlacementOperands -notmatch 'TryBegin\(' -and
     $sessionSource -match
         'BeginBlueprintPlacement\(player, blueprint, editBeforePlacement: true\)' -and
-    $sessionSource -notmatch
-        'редактор чертежа открывается только кнопкой РЕДАКТИРОВАТЬ') `
+    $sessionSource -notmatch 'OpenBlueprintEditorFromWorld') `
     'World blueprint F9 no longer enters its separate whole-group precision path.'
 $placementInstructions = $beginBlueprintPlacement.Body.Instructions
 $plainPlacementModeReset = $placementInstructions | Where-Object {
@@ -1994,8 +1992,8 @@ Assert-Contract ($sessionSource -match 'OpenBlueprintWorkspaceCatalog\(\)' -and
     $sessionSource -match
         '(?s)HandleBlueprintWorkspaceCameraInput\(\s*freeViewCamera,\s*Input\.mousePosition\).*if \(!GameplayInputAvailable\(player\)\)' -and
     $hudSource -match '"WorkspaceCatalog"' -and
-    $hudSource -match '"КАТАЛОГ"' -and
-    $hudSource -match '"ВЫБРАТЬ В МИРЕ"' -and
+    $hudSource -match 'hud\.workspace\.catalog' -and
+    $hudSource -match 'hud\.select_in_world' -and
     $hudSource -match 'SetButtonVisible\(blueprintSaveText,\s*!blueprintWorkspacePartEditing') `
     'Blueprint workspace no longer has reliable Hammer catalog access.'
 $worldCapture = $pluginMethods | Where-Object {
@@ -2017,10 +2015,10 @@ Assert-Contract ($null -ne $worldCapture -and
     $sessionSource -match 'pendingWorldBlueprintSelection && GameplayInputAvailable' -and
     $sessionSource -match
         'private void Finish\([^)]*\)\s*\{[\s\S]{0,180}?pendingWorldBlueprintSelection = false;' -and
-    $hudSource -match 'confirmText.text = selectingBlueprint \? "СОХРАНИТЬ"' -and
+    $hudSource -match 'confirmText\.text = selectingBlueprint \? BuildWorksLocalization\.Text\("hud\.save"\)' -and
     $sessionSource -match 'if \(selectingBlueprint\)\s*\{\s*SaveCurrentBlueprint\(\);\s*return;' -and
     $sessionSource -match 'TrySaveWorldSelection[\s\S]*?Finish\(\);\s*RefreshBlueprintEditorLibrary' -and
-    $catalogSource -match '"ВЫБРАТЬ В МИРЕ"') `
+    $catalogSource -match 'catalog\.action\.select_in_world') `
     'World selection save is unreachable, bypasses validation, or mutates world transforms.'
 Assert-Contract ($null -ne $beginWorldSelection -and
     $beginWorldSelectionCalls -match 'TrySuspendExternalBuildCamera' -and
@@ -2095,7 +2093,7 @@ Assert-Contract ($beginFreeViewOperands -match 'Camera::set_cullingMask' -and
     $sessionSource -match 'Shader\.Find\("Unlit/Color"\)' -and
     $sessionSource -match 'ConfigureEditorLighting\(\)' -and
     $sessionSource -match 'CycleEditorLighting\(\)' -and
-    $hudSource -match 'СВЕТ: " \+ editorLighting' -and
+    $hudSource -match 'BuildWorksLocalization\.Text\("hud\.light", editorLighting\)' -and
     $sessionSource -notmatch 'Shader\.Find\("Standard"\)' -and
     $sessionSource -match 'DisableEditorCameraEffects\(camera\)' -and
     $sessionSource -match 'BeginFreeView\(camera, isolateBlueprint: true\)' -and
@@ -2131,7 +2129,7 @@ Assert-Contract ($thumbnailSource -match
 Assert-Contract ($sessionSource -match
     'MovePieceWithoutMovingCameraFocus\(candidate\);[\s\S]{0,120}TryAutoAlignToTouchingPiece\(\)') `
     'Dragging a move arrow can still drag the editor camera together with the object.'
-Assert-Contract ($catalogSource -match '"\+ СОЗДАТЬ ЧЕРТЁЖ"' -and
+Assert-Contract ($catalogSource -match 'catalog\.action\.create_blueprint' -and
     $sessionSource -match 'HandleCreateBlueprintCatalogAction' -and
     $sessionSource -match 'ContinueBlueprintCreation') `
     'The blueprint library no longer exposes its creation workflow.'
@@ -2363,7 +2361,7 @@ $showFrozen = $pluginMethods | Where-Object {
 $showFrozenOperands = @(
     $showFrozen.Body.Instructions | ForEach-Object { [string]$_.Operand }
 ) -join "`n"
-Assert-Contract ($showFrozenOperands -match 'ПОЛОЖЕНИЕ ЗАМОРОЖЕНО') `
+Assert-Contract ($showFrozenOperands -match 'hud\.frozen\.title') `
     'Compiled HUD has no explicit frozen editor state.'
 Assert-Contract ($showFrozen.Parameters.Count -eq 0) `
     'Ordinary F9 frozen HUD still accepts blueprint-editor state.'
@@ -2556,9 +2554,9 @@ $hudShowArmed = $pluginMethods | Where-Object {
 $hudShowArmedOperands = @(
     $hudShowArmed.Body.Instructions | ForEach-Object { [string]$_.Operand }
 ) -join "`n"
-Assert-Contract ($hudShowArmedOperands -match 'ЗАМЕНИ МОЛОТОК' -and
-    $hudShowArmedOperands -match 'ВЫБЕРИ ПРЕЖНЮЮ ДЕТАЛЬ' -and
-    $hudShowArmedOperands -match 'ЖДЁМ ВЫНОСЛИВОСТЬ') `
+Assert-Contract ($hudShowArmedOperands -match 'hud\.armed\.tool_hint' -and
+    $hudShowArmedOperands -match 'hud\.armed\.selection_hint' -and
+    $hudShowArmedOperands -match 'hud\.armed\.stamina_hint') `
     'Armed HUD no longer distinguishes broken-tool and stamina waits.'
 $hudCreateText = $pluginMethods | Where-Object {
     $_.Name -eq 'CreateText' -and
@@ -2572,8 +2570,7 @@ Assert-Contract ($hudCreateTextOperands -match 'UnityEngine.Object::Instantiate'
 Assert-Contract ($hudSource -match
     'background\.raycastTarget = false;') `
     'Precision HUD background can intercept inventory clicks during a tool wait.'
-Assert-Contract ($sessionSource -match
-    'установлено " \+ placementPlanIndex \+ "/" \+\s*placementPlan\.Count \+ " — возьми исправный молоток') `
+Assert-Contract ($sessionSource -match 'placement\.progress\.tool') `
     'Broken Hammer wait is silent and can look like a missing blueprint part.'
 Assert-Contract ($sessionSource -match
     'if \(!SelectPlanPiece\(player, placementPlanIndex\)\)\s*\{\s*if \(automaticWaitingForTool\)\s*\{\s*UpdateHud\(\);\s*return;') `
@@ -2595,8 +2592,7 @@ $armPlacementOperands = @(
 ) -join "`n"
 Assert-Contract ($armPlacementOperands -match 'requestAutomaticPlacement') `
     'The HUD Install action no longer starts the native placement series directly.'
-Assert-Contract ($sessionSource -match
-    'BuildWorks: чертёж установлен — " \+\s*placementPlan\.Count \+ " деталей') `
+Assert-Contract ($sessionSource -match 'placement\.complete\.blueprint') `
     'Completed blueprint placement no longer reports the confirmed native piece count.'
 $pluginUpdate = $pluginMethods | Where-Object {
     $_.Name -eq 'Update' -and $_.DeclaringType.Name -eq 'BuildWorksPlugin'
@@ -2710,4 +2706,4 @@ if (Test-Path -LiteralPath $buildCameraPath -PathType Leaf) {
     }).Count -eq 1) 'Installed Build Camera no longer exposes its saved view state.'
 }
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.33 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.37 and Valheim Steam build 25185596.'

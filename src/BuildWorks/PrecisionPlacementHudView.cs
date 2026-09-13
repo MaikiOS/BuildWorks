@@ -194,72 +194,83 @@ namespace OstrixMods.BuildWorks
             pausedControls.SetActive(false);
             panel.sizeDelta = new Vector2(580f, 350f);
             title.text = selectingBlueprint
-                ? "BUILDWORKS — СОЗДАНИЕ ЧЕРТЕЖА"
+                ? BuildWorksLocalization.Text("hud.title.select_blueprint")
                 : blueprintWorkspacePartEditing
-                    ? "BUILDWORKS — ТОЧНОЕ ПОЛОЖЕНИЕ ДЕТАЛИ"
+                    ? BuildWorksLocalization.Text("hud.title.part_precision")
                 : blueprintWorldPlacement
-                    ? "BUILDWORKS — ТОЧНАЯ УСТАНОВКА ЧЕРТЕЖА"
+                    ? BuildWorksLocalization.Text("hud.title.blueprint_precision")
                 : !string.IsNullOrEmpty(blueprintName)
-                    ? "BUILDWORKS — РЕДАКТОР ЧЕРТЕЖА"
-                    : "BUILDWORKS — ТОЧНАЯ УСТАНОВКА";
+                    ? BuildWorksLocalization.Text("hud.title.blueprint_editor")
+                    : BuildWorksLocalization.Text("hud.title.precision");
             hint.text = selectingBlueprint
-                ? "ЛКМ: деталь или рамка  ·  Ctrl: убрать  ·  первая деталь задаёт оси"
+                ? BuildWorksLocalization.Text("hud.hint.select_blueprint")
                 : !string.IsNullOrEmpty(modeHint)
                 ? modeHint
                 : autoAlignmentEnabled
-                    ? "Стрелки: сдвиг  ·  Кольца: вращение  ·  Автостык: оси + точки  ·  Ctrl+точка: ручной магнит"
-                    : "Стрелки: сдвиг  ·  Кольца: вращение  ·  Ctrl+точка: магнит";
+                    ? BuildWorksLocalization.Text("hud.hint.auto_align")
+                    : BuildWorksLocalization.Text("hud.hint.transform");
             values.text = selectingBlueprint
-                ? "Выбрано деталей: " + selectedBlueprintParts +
-                    "\nНажми СОХРАНИТЬ ВЫБОР, когда состав готов."
+                ? BuildWorksLocalization.Text(
+                    "hud.selection_summary", selectedBlueprintParts)
                 : offset + "\n" + rotation;
-            moveText.text = "СДВИГ " + translationStep;
-            rotateText.text = "УГОЛ " + rotationStep;
-            repeatText.text = mode == GizmoMode.Repeat ? "● МАССИВ" : "МАССИВ";
-            guideText.text = mode == GizmoMode.Guide ? "● КОНТУР" : "КОНТУР";
+            moveText.text = BuildWorksLocalization.Text("hud.move_step", translationStep);
+            rotateText.text = BuildWorksLocalization.Text("hud.angle_step", rotationStep);
+            repeatText.text = Selected(BuildWorksLocalization.Text("hud.array"),
+                mode == GizmoMode.Repeat);
+            guideText.text = Selected(BuildWorksLocalization.Text("hud.contour"),
+                mode == GizmoMode.Guide);
             countText.text = mode == GizmoMode.Repeat
-                ? "МАССИВ: " + copyCount + "×" + Math.Max(1, planeCount)
+                ? BuildWorksLocalization.Text(
+                    "hud.array_count", copyCount, Math.Max(1, planeCount))
                 : mode == GizmoMode.Guide
-                    ? "КОНТУР: " + copyCount
-                    : "ДЕТАЛЕЙ: " + copyCount;
-            spaceText.text = localSpace ? "ОСИ: ЛОК." : "ОСИ: МИР.";
-            stepText.text = "ШАГ МАССИВА: " + step;
-            anchorVisibilityText.text = showAllAnchors ? "ТОЧКИ: ВСЕ" : "ТОЧКИ: РЯДОМ";
-            handleScaleText.text = "РУЧКИ " + handleScale;
+                    ? BuildWorksLocalization.Text("hud.contour_count", copyCount)
+                    : BuildWorksLocalization.Text("hud.part_count", copyCount);
+            spaceText.text = BuildWorksLocalization.Text(
+                localSpace ? "hud.axes_local" : "hud.axes_world");
+            stepText.text = BuildWorksLocalization.Text("hud.array_step", step);
+            anchorVisibilityText.text = BuildWorksLocalization.Text(
+                showAllAnchors ? "hud.points_all" : "hud.points_near");
+            handleScaleText.text = BuildWorksLocalization.Text("hud.handles", handleScale);
             distributionText.text = distribution == RepeatDistributionMode.Fit
-                ? "РАСТЯНУТЬ"
-                : distribution == RepeatDistributionMode.Exact ? "ТОЧН. ШАГ" : "УПАКОВАТЬ";
-            riseControl.SetValue(rise, "ПОДЪЁМ " + rise.ToString("+0.##;-0.##;0") + " м");
+                ? BuildWorksLocalization.Text("hud.distribution_fit")
+                : BuildWorksLocalization.Text(distribution == RepeatDistributionMode.Exact
+                    ? "hud.distribution_exact" : "hud.distribution_pack");
+            riseControl.SetValue(rise, BuildWorksLocalization.Text(
+                "hud.rise", rise.ToString("+0.##;-0.##;0")));
             repeatTurnControl.SetValue(repeatTurn,
-                "ПОВОРОТ " + repeatTurn.ToString("+0.###;-0.###;0") + "°");
+                BuildWorksLocalization.Text(
+                    "hud.turn", repeatTurn.ToString("+0.###;-0.###;0")));
             repeatPitchControl.SetValue(repeatPitch,
-                "НАКЛОН " + repeatPitch.ToString("+0.###;-0.###;0") + "°");
+                BuildWorksLocalization.Text(
+                    "hud.pitch", repeatPitch.ToString("+0.###;-0.###;0")));
             repeatRollControl.SetValue(repeatRoll,
-                "КРЕН " + repeatRoll.ToString("+0.###;-0.###;0") + "°");
+                BuildWorksLocalization.Text(
+                    "hud.roll", repeatRoll.ToString("+0.###;-0.###;0")));
             repeatScaleControl.SetValue(repeatScaleStep,
-                "МАСШТАБ " + repeatScaleStep.ToString("+0.##;-0.##;0") + "%");
-            symmetryText.text = symmetric ? "● СИММЕТРИЯ" : "СИММЕТРИЯ";
-            snapModeText.text = meshSnapEnabled ? "МАГНИТ: МЕШ" : "МАГНИТ: ИГРА";
-            alignmentText.text = autoAlignmentEnabled
-                ? "АВТОСТЫК: ВКЛ"
-                : "АВТОСТЫК: ВЫКЛ";
+                BuildWorksLocalization.Text(
+                    "hud.scale", repeatScaleStep.ToString("+0.##;-0.##;0")));
+            symmetryText.text = Selected(BuildWorksLocalization.Text("hud.symmetry"), symmetric);
+            snapModeText.text = BuildWorksLocalization.Text(
+                meshSnapEnabled ? "hud.snap_mesh" : "hud.snap_game");
+            alignmentText.text = BuildWorksLocalization.Text(
+                autoAlignmentEnabled ? "hud.auto_align_on" : "hud.auto_align_off");
             blueprintSaveText.text = selectingBlueprint
-                ? "СОХРАНИТЬ ВЫБОР · " + selectedBlueprintParts
-                : canSaveBlueprint ? "ВЫБРАТЬ В МИРЕ"
+                ? BuildWorksLocalization.Text("hud.save_selection", selectedBlueprintParts)
+                : canSaveBlueprint ? BuildWorksLocalization.Text("hud.select_in_world")
                 : blueprintWorkspacePartEditing
-                    ? "ЦЕЛЬ: ВРЕМЕННАЯ ДЕТАЛЬ"
+                    ? BuildWorksLocalization.Text("hud.target_temporary")
                 : !string.IsNullOrEmpty(blueprintName)
                     ? blueprintEditPartIndex < 0
-                        ? "ЦЕЛЬ: ВСЯ ГРУППА"
-                        : "ЦЕЛЬ: ДЕТАЛЬ " + (blueprintEditPartIndex + 1) + "/" +
-                            blueprintParts
-                    : "ВЫБРАТЬ В МИРЕ";
+                        ? BuildWorksLocalization.Text("hud.target_group")
+                        : BuildWorksLocalization.Text("hud.target_part",
+                            blueprintEditPartIndex + 1, blueprintParts)
+                    : BuildWorksLocalization.Text("hud.select_in_world");
             blueprintText.text = !string.IsNullOrEmpty(blueprintName)
                 ? blueprintWorldPlacement
-                    ? "● " + blueprintName + " · редактируется вся группа"
-                    : "● " + blueprintName + " · клик по детали или Tab — следующая"
+                    ? BuildWorksLocalization.Text("hud.blueprint_world", blueprintName)
+                    : BuildWorksLocalization.Text("hud.blueprint_part", blueprintName)
                 : string.Empty;
-            editorLightingText.text = "СВЕТ: " + editorLighting;
+            editorLightingText.text = BuildWorksLocalization.Text("hud.light", editorLighting);
             SetButtonVisible(blueprintSaveText,
                 !blueprintWorkspacePartEditing &&
                     (canSaveBlueprint || !string.IsNullOrEmpty(blueprintName)));
@@ -298,19 +309,23 @@ namespace OstrixMods.BuildWorks
             SetButtonVisible(xConstraintText, anchorControls);
             SetButtonVisible(yConstraintText, anchorControls);
             SetButtonVisible(zConstraintText, anchorControls);
-            freeConstraintText.text = constraintAxis == GizmoAxis.None ? "● СВОБ." : "СВОБ.";
-            xConstraintText.text = constraintAxis == GizmoAxis.X ? "● ВОКРУГ X" : "ВОКРУГ X";
-            yConstraintText.text = constraintAxis == GizmoAxis.Y ? "● ВОКРУГ Y" : "ВОКРУГ Y";
-            zConstraintText.text = constraintAxis == GizmoAxis.Z ? "● ВОКРУГ Z" : "ВОКРУГ Z";
-            undoText.text = "ОТМЕНИТЬ (" + undoCount + ")";
-            redoText.text = "ВЕРНУТЬ (" + redoCount + ")";
-            confirmText.text = selectingBlueprint ? "СОХРАНИТЬ"
+            freeConstraintText.text = Selected(BuildWorksLocalization.Text("hud.constraint_free"),
+                constraintAxis == GizmoAxis.None);
+            xConstraintText.text = Selected(BuildWorksLocalization.Text("hud.constraint_x"),
+                constraintAxis == GizmoAxis.X);
+            yConstraintText.text = Selected(BuildWorksLocalization.Text("hud.constraint_y"),
+                constraintAxis == GizmoAxis.Y);
+            zConstraintText.text = Selected(BuildWorksLocalization.Text("hud.constraint_z"),
+                constraintAxis == GizmoAxis.Z);
+            undoText.text = BuildWorksLocalization.Text("hud.undo", undoCount);
+            redoText.text = BuildWorksLocalization.Text("hud.redo", redoCount);
+            confirmText.text = selectingBlueprint ? BuildWorksLocalization.Text("hud.save")
                 : blueprintWorldPlacement
-                ? "УСТАНОВИТЬ"
+                ? BuildWorksLocalization.Text("hud.install")
                 : blueprintWorkspacePartEditing ||
                 !string.IsNullOrEmpty(blueprintName)
-                ? "ПРИМЕНИТЬ"
-                : "УСТАНОВИТЬ";
+                ? BuildWorksLocalization.Text("hud.apply")
+                : BuildWorksLocalization.Text("hud.install");
         }
 
         public void ShowArmed(
@@ -333,23 +348,23 @@ namespace OstrixMods.BuildWorks
             panel.sizeDelta = new Vector2(580f, paused ? 132f : 66f);
             pauseReasonText.text = pauseReason ?? string.Empty;
             title.text = paused
-                ? "BUILDWORKS — ПАУЗА " + placed + "/" + total
+                ? BuildWorksLocalization.Text("hud.armed.paused", placed, total)
                 : waitingForSelection
-                ? "BUILDWORKS — ВЫБЕРИ ПРЕЖНЮЮ ДЕТАЛЬ " + placed + "/" + total
+                ? BuildWorksLocalization.Text("hud.armed.selection", placed, total)
                 : waitingForTool
-                ? "BUILDWORKS — ЗАМЕНИ МОЛОТОК " + placed + "/" + total
+                ? BuildWorksLocalization.Text("hud.armed.tool", placed, total)
                 : waitingForStamina
-                    ? "BUILDWORKS — ЖДЁМ ВЫНОСЛИВОСТЬ " + placed + "/" + total
-                    : "BUILDWORKS — УСТАНОВКА " + placed + "/" + total;
+                    ? BuildWorksLocalization.Text("hud.armed.stamina", placed, total)
+                    : BuildWorksLocalization.Text("hud.armed.installing", placed, total);
             hint.text = paused
-                ? "Оставшиеся детали сохранены · продолжение с детали " + (placed + 1)
+                ? BuildWorksLocalization.Text("hud.armed.paused_hint", placed + 1)
                 : waitingForSelection
-                ? "Курсор свободен: выбери ту же деталь на новом молотке · серия сохранена"
+                ? BuildWorksLocalization.Text("hud.armed.selection_hint")
                 : waitingForTool
-                ? "Курсор свободен: открой инвентарь и возьми исправный молоток · серия сохранена"
+                ? BuildWorksLocalization.Text("hud.armed.tool_hint")
                 : waitingForStamina
-                    ? "Серия продолжится сама после восстановления · F9 или Esc — отмена"
-                    : "Детали устанавливаются автоматически · F9 или Esc — отмена";
+                    ? BuildWorksLocalization.Text("hud.armed.stamina_hint")
+                    : BuildWorksLocalization.Text("hud.armed.installing_hint");
         }
 
         public void ShowFrozen()
@@ -360,8 +375,8 @@ namespace OstrixMods.BuildWorks
             workspaceControls.SetActive(false);
             pausedControls.SetActive(false);
             panel.sizeDelta = new Vector2(580f, 66f);
-            title.text = "BUILDWORKS — ПОЛОЖЕНИЕ ЗАМОРОЖЕНО";
-            hint.text = "Esc: продолжить редактирование · F9: вернуться в обычное строительство";
+            title.text = BuildWorksLocalization.Text("hud.frozen.title");
+            hint.text = BuildWorksLocalization.Text("hud.frozen.hint");
         }
 
         public void ShowSelectionBox(Vector2 start, Vector2 end)
@@ -391,11 +406,11 @@ namespace OstrixMods.BuildWorks
             pausedControls.SetActive(false);
             panel.sizeDelta = new Vector2(580f, 58f);
             title.text = continuation
-                ? "BUILDWORKS — ЕСТЬ ПРОДОЛЖЕНИЕ РЯДА"
-                : "BUILDWORKS — ПОМОЩНИК ВКЛЮЧЁН";
+                ? BuildWorksLocalization.Text("hud.passive.continuation")
+                : BuildWorksLocalization.Text("hud.passive.enabled");
             hint.text = continuation
-                ? "Alt+ось: продолжить от конечной точки  ·  F9: редактировать новый объект"
-                : "ЛКМ: обычно  ·  Alt+ось: ряд  ·  F9: открыть точное редактирование";
+                ? BuildWorksLocalization.Text("hud.passive.continuation_hint")
+                : BuildWorksLocalization.Text("hud.passive.hint");
         }
 
         public void ShowBlueprintWorkspace(
@@ -411,12 +426,14 @@ namespace OstrixMods.BuildWorks
             pausedControls.SetActive(false);
             panel.sizeDelta = new Vector2(580f, 98f);
             title.text = string.IsNullOrEmpty(blueprintName)
-                ? "BUILDWORKS — НОВЫЙ ЧЕРТЕЖ"
-                : "BUILDWORKS — РЕДАКТОР: " + blueprintName;
-            hint.text = "ЛКМ: поставить · СКМ: удалить · ПКМ: каталог/обзор · колесо: повернуть · Ctrl+колесо: масштаб";
-            workspaceCountText.text = "ДЕТАЛЕЙ: " + partCount +
-                (string.IsNullOrEmpty(selectedPiece) ? string.Empty : " · " + selectedPiece);
-            workspaceLightingText.text = "СВЕТ: " + lighting;
+                ? BuildWorksLocalization.Text("hud.workspace.new")
+                : BuildWorksLocalization.Text("hud.workspace.edit", blueprintName);
+            hint.text = BuildWorksLocalization.Text("hud.workspace.hint");
+            workspaceCountText.text = BuildWorksLocalization.Text(
+                "hud.workspace.parts",
+                partCount,
+                string.IsNullOrEmpty(selectedPiece) ? string.Empty : " · " + selectedPiece);
+            workspaceLightingText.text = BuildWorksLocalization.Text("hud.light", lighting);
         }
 
         public bool ContainsScreenPoint(Vector2 point)
@@ -541,9 +558,11 @@ namespace OstrixMods.BuildWorks
             pauseReasonText = CreateText("PauseReason", pausedRect, new Vector2(10f, -57f),
                 new Vector2(560f, 28f), 11f, TextAlignmentOptions.Center, fontTemplate);
             CreateButton("ResumePlacement", pausedRect, new Vector2(10f, -92f),
-                new Vector2(274f, 28f), buttonTemplate, fontTemplate, confirm).text = "ПРОДОЛЖИТЬ · ENTER";
+                new Vector2(274f, 28f), buttonTemplate, fontTemplate, confirm).text =
+                BuildWorksLocalization.Text("hud.workspace.resume");
             CreateButton("CancelPlacement", pausedRect, new Vector2(290f, -92f),
-                new Vector2(280f, 28f), buttonTemplate, fontTemplate, cancel).text = "ЗАКОНЧИТЬ СЕРИЮ · ESC";
+                new Vector2(280f, 28f), buttonTemplate, fontTemplate, cancel).text =
+                BuildWorksLocalization.Text("hud.workspace.finish");
             pausedControls.SetActive(false);
             workspaceControls = new GameObject("BlueprintWorkspaceControls", typeof(RectTransform));
             workspaceControls.transform.SetParent(root.transform, false);
@@ -557,16 +576,19 @@ namespace OstrixMods.BuildWorks
                 11f, TextAlignmentOptions.MidlineLeft, fontTemplate);
             CreateButton("WorkspaceCatalog", workspaceRect,
                 new Vector2(172f, -58f), new Vector2(68f, 28f),
-                buttonTemplate, fontTemplate, openWorkspaceCatalog).text = "КАТАЛОГ";
+                buttonTemplate, fontTemplate, openWorkspaceCatalog).text =
+                BuildWorksLocalization.Text("hud.workspace.catalog");
             workspaceLightingText = CreateButton("WorkspaceLighting", workspaceRect,
                 new Vector2(244f, -58f), new Vector2(106f, 28f),
                 buttonTemplate, fontTemplate, cycleEditorLighting);
             CreateButton("WorkspaceCancel", workspaceRect,
                 new Vector2(354f, -58f), new Vector2(96f, 28f),
-                buttonTemplate, fontTemplate, cancel).text = "ОТМЕНА";
+                buttonTemplate, fontTemplate, cancel).text =
+                BuildWorksLocalization.Text("hud.cancel");
             CreateButton("WorkspaceSave", workspaceRect,
                 new Vector2(454f, -58f), new Vector2(116f, 28f),
-                buttonTemplate, fontTemplate, confirm).text = "СОХРАНИТЬ";
+                buttonTemplate, fontTemplate, confirm).text =
+                BuildWorksLocalization.Text("hud.save");
             workspaceControls.SetActive(false);
 
             moveText = CreateButton("Move", controlsRect, new Vector2(10f, -56f),
@@ -643,7 +665,7 @@ namespace OstrixMods.BuildWorks
             blueprintSaveText = CreateButton("BlueprintSave", controlsRect,
                 new Vector2(10f, -226f), new Vector2(170f, 28f),
                 buttonTemplate, fontTemplate, saveBlueprint);
-            blueprintSaveText.text = "СОХР. ЧЕРТЕЖ";
+            blueprintSaveText.text = BuildWorksLocalization.Text("hud.save");
             blueprintText = CreateText("Blueprint", controlsRect,
                 new Vector2(190f, -226f), new Vector2(244f, 28f),
                 12f, TextAlignmentOptions.MidlineLeft, fontTemplate);
@@ -659,12 +681,14 @@ namespace OstrixMods.BuildWorks
             redoText = CreateButton("Redo", controlsRect, new Vector2(120f, -312f),
                 new Vector2(106f, 28f), buttonTemplate, fontTemplate, redo);
             CreateButton("Reset", controlsRect, new Vector2(230f, -312f),
-                new Vector2(106f, 28f), buttonTemplate, fontTemplate, reset).text = "СБРОСИТЬ";
+                new Vector2(106f, 28f), buttonTemplate, fontTemplate, reset).text =
+                BuildWorksLocalization.Text("hud.reset");
             CreateButton("Cancel", controlsRect, new Vector2(340f, -312f),
-                new Vector2(106f, 28f), buttonTemplate, fontTemplate, cancel).text = "ВЫКЛЮЧИТЬ";
+                new Vector2(106f, 28f), buttonTemplate, fontTemplate, cancel).text =
+                BuildWorksLocalization.Text("hud.disable");
             confirmText = CreateButton("Confirm", controlsRect, new Vector2(450f, -312f),
                 new Vector2(120f, 28f), buttonTemplate, fontTemplate, confirm);
-            confirmText.text = "УСТАНОВИТЬ";
+            confirmText.text = BuildWorksLocalization.Text("hud.install");
 
             ApplyDock();
             return true;
@@ -675,6 +699,9 @@ namespace OstrixMods.BuildWorks
             if (label && label.transform.parent)
                 label.transform.parent.gameObject.SetActive(visible);
         }
+
+        private static string Selected(string label, bool selected) =>
+            selected ? "● " + label : label;
 
         private void CycleDock()
         {

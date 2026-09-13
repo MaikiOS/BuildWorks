@@ -8,8 +8,8 @@
   "manualRuntimeSmoke": "pending",
   "asset": {
     "path": "release/BuildWorks-0.19.33-alpha.zip",
-    "bytes": 310676,
-    "sha256": "BCFC1DD4E2716742F55647630916B3024F22DE98A0546C3D20095B1F84DA945F"
+    "bytes": 311623,
+    "sha256": "D5836FAC29AEE8796909D383BFBA8356DCE4047CCB8A921B9AC5A960A49CB2AF"
   },
   "files": [
     {

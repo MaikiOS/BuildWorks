@@ -1,23 +1,26 @@
 # BuildWorks 0.19.33 alpha
 
-Предварительная тестовая версия для Valheim 1.0.
+**English** | [Русский](https://github.com/MaikiOS/BuildWorks/blob/main/release-notes-0.19.33_RU.md)
 
-## Изменения
+Pre-release test build for Valheim 1.0.
 
-- точный контакт одиночных скосов, крыш и мебели с выбранной поверхностью редактора;
-- Q/E совмещает выбранную source snap point с курсором и показывает направление;
-- семь editor-only точек для мебели/декора без vanilla snap points;
-- новый Array сбрасывается в `УПАКОВАТЬ / БЕЗ ЗАЗОРА`, 2×1;
-- исправлено сохранение профиля Array при Apply и один atomic Undo.
+## Changes
 
-## Проверки
+- precise visible-mesh contact for individual slopes, roofs, and furniture in the editor;
+- Q/E aligns the selected source snap point with the cursor and displays its direction;
+- seven editor-only snap points for furniture and decorations without vanilla snap points;
+- a new Array starts in `PACK / NO GAP`, 2×1;
+- fixed Array profile persistence on Apply with a single atomic Undo step.
 
-Release 0/0, Geometry 104, Store, EditorBridge 3, WorldLayout 10, HostContract и Unity Workbench 81/81 — PASS. Actual prefab gate: `woodwall`, `wood_beam_26`, `wood_roof`, `piece_chair`.
+## Verification
 
-## Известные ограничения
+Release 0/0, Geometry 104, Store, EditorBridge 3, WorldLayout 10, HostContract, and Unity Workbench 81/81 — PASS. Actual prefab gate: `woodwall`, `wood_beam_26`, `wood_roof`, `piece_chair`.
 
-- ручной игровой smoke 0.19.33 ещё не завершён;
-- это pre-release alpha, не стабильная версия;
-- multiplayer, полный save/reload, import/export и procedural curves не прошли финальные ворота.
+## Known limitations
 
-Установка и полное описание находятся в репозитории.
+- the manual in-game smoke test for 0.19.33 is not complete;
+- the BuildWorks UI is currently Russian-only; a real English-first localization layer is planned and is not claimed by this release;
+- this is a pre-release alpha, not a stable release;
+- multiplayer, complete save/reload validation, import/export, and procedural curves have not passed their final gates.
+
+Installation and complete documentation are available in the repository.

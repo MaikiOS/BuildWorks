@@ -1,64 +1,66 @@
 # BuildWorks
 
-> Альфа 0.19.33 для Valheim 1.0. Автоматические проверки пройдены; ручная игровая проверка 0.19.33 ещё продолжается.
+**English** | [Русский](README_RU.md)
 
-![Концептуальная обложка BuildWorks](docs/images/buildworks-hero-concept.png)
+> Alpha 0.19.33 for Valheim 1.0. Automated checks pass; the manual in-game validation of 0.19.33 is still in progress.
 
-BuildWorks — конструктор точного строительства для Valheim. Он расширяет обычный молоток индексным каталогом, позволяет собирать составные чертежи в отдельном редакторе и точно размещать детали или весь чертёж в мире.
+![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
 
-Главная идея: игрок по-прежнему строит настоящими деталями Valheim. BuildWorks не заменяет постройку одной декоративной моделью и не изменяет землю скрытно.
+BuildWorks is a precision construction toolkit for Valheim. It extends the regular hammer with an indexed catalog, lets players assemble composite blueprints in a dedicated editor, and provides precise placement for individual pieces or an entire blueprint in the world.
+
+The central rule is simple: players still build real Valheim pieces. BuildWorks does not replace a structure with one decorative model and does not alter terrain behind the scenes.
 
 ```mermaid
 flowchart LR
-    A[Обычный молоток] --> B[Индекс BuildWorks]
-    B --> C[Одна деталь]
-    B --> D[Библиотека чертежей]
-    D --> E[Редактор чертежа]
-    E --> F[Детали и группы]
-    E --> G[Array и Contour]
-    E --> H[Опора чертежа]
-    C --> I[F9: точное размещение]
+    A[Vanilla hammer] --> B[BuildWorks index]
+    B --> C[Single piece]
+    B --> D[Blueprint library]
+    D --> E[Blueprint Editor]
+    E --> F[Pieces and groups]
+    E --> G[Array and Contour]
+    E --> H[Blueprint anchor]
+    C --> I[F9 precision placement]
     D --> I
-    I --> J[Native-проверка Valheim]
-    J --> K[Настоящие детали в мире]
+    I --> J[Native Valheim validation]
+    J --> K[Real pieces in the world]
 ```
 
-## Что уже работает
+## What works now
 
-- индексный интерфейс молотка: категории, материалы, недавнее, избранное, поиск и чертежи;
-- создание чертежа из деталей мира или с нуля;
-- отдельный редактор с каталогом, камерой, сеткой, деревом объектов и Undo/Redo;
-- точные перемещение, вращение по трём осям и равномерный масштаб;
-- группы, вложенность, локальная опора группы и отдельная мировая опора чертежа;
-- Array: ряд/плоскость, Pack/Fit/точный шаг, подъём, поворот, наклон, крен, масштаб и симметрия;
-- Contour: повтор выбранной детали или группы вдоль связанной цепочки;
-- мировое F9-редактирование детали или составного чертежа;
-- последовательная установка настоящих деталей с обычными ресурсами, правами и ограничениями Valheim.
+- indexed hammer UI with categories, materials, recents, favorites, search, and blueprints;
+- creating a blueprint from world pieces or from an empty document;
+- a dedicated editor with a catalog, camera, grid, object tree, and Undo/Redo;
+- precise translation, three-axis rotation, and uniform scaling;
+- groups, nesting, local group anchors, and a separate world anchor for the blueprint;
+- Array with line/plane layouts, Pack/Fit/exact spacing, rise, heading, pitch, roll, scale step, and symmetry;
+- Contour repetition of a selected piece or group along a connected chain;
+- F9 world editing for a piece or composite blueprint;
+- sequential construction of real pieces using normal Valheim resources, permissions, and restrictions.
 
-Полное описание: [функции и взаимодействия](docs/FEATURES_RU.md), [управление](docs/CONTROLS_RU.md), [установка](docs/INSTALL_RU.md), [ROADMAP](docs/ROADMAP_RU.md).
+Full documentation: [features and interactions](docs/FEATURES.md), [controls](docs/CONTROLS.md), [installation](docs/INSTALL.md), and [roadmap](docs/ROADMAP.md).
 
-## Статус альфы
+## Alpha status
 
-0.19.33 прошла Release build без ошибок и предупреждений, Geometry 104, Store, EditorBridge, WorldLayout, HostContract и Unity Workbench 81/81. Последние изменения точек привязки, контакта скосов/крыш/мебели и начального режима Array требуют ручного smoke в Valheim.
+Version 0.19.33 passes a Release build with zero errors and warnings, Geometry 104, Store, EditorBridge, WorldLayout, HostContract, and Unity Workbench 81/81. The latest snap-point, slope/roof/furniture contact, and initial Array-mode changes still require a manual smoke test in Valheim.
 
-Подробности: [статус 0.19.33](docs/ALPHA_0.19.33_RU.md).
+See [the 0.19.33 status report](docs/ALPHA_0.19.33.md).
 
-## Лицензия и Pull Request
+## License and pull requests
 
-BuildWorks — proprietary/source-available проект, а не open-source. Официальную DLL разрешено устанавливать для личного некоммерческого тестирования. Код можно просматривать и делать fork для подготовки Pull Request; любое включение кода или оригинальных материалов в другой проект, распространение либо коммерческое использование требует предварительного письменного разрешения владельца.
+BuildWorks is proprietary/source-available software, not open-source software. The official binaries may be installed for personal, non-commercial testing. You may inspect and fork the source solely to prepare a pull request. Reusing BuildWorks code or original materials in another project, redistributing them, or using them commercially requires prior written permission from the owner.
 
-Полные условия: [LICENSE](LICENSE). Предложить исправление: [CONTRIBUTING.md](CONTRIBUTING.md).
+See [LICENSE](LICENSE) for the complete terms and [CONTRIBUTING.md](CONTRIBUTING.md) to propose a change.
 
-## Зависимости
+## Dependencies
 
 - Valheim;
 - BepInExPack Valheim 5.4.x.
 
-Jotunn, TerrainRamp и EarthWorks не являются зависимостями BuildWorks.
+Jotunn, TerrainRamp, and EarthWorks are not BuildWorks dependencies.
 
-## Сборка из исходников
+## Building from source
 
-Нужны .NET SDK, установленный Valheim и BepInExPack. BuildWorks напрямую компилируется против host assemblies Valheim, поэтому укажите локальные пути без добавления игровых DLL в репозиторий:
+You need the .NET SDK, an installed copy of Valheim, and BepInExPack. BuildWorks compiles directly against Valheim host assemblies, so provide local paths without committing game DLLs to the repository:
 
 ```powershell
 dotnet build .\src\BuildWorks\BuildWorks.csproj -c Release `
@@ -66,16 +68,14 @@ dotnet build .\src\BuildWorks\BuildWorks.csproj -c Release `
   -p:ValheimManagedDir="C:\path\to\Valheim\valheim_Data\Managed"
 ```
 
-Детерминированные проверки геометрии:
+Deterministic geometry checks:
 
 ```powershell
 dotnet run --project .\tests\BuildWorks.GeometryTests\BuildWorks.GeometryTests.csproj -c Release
 ```
 
-## Важное ограничение
+## Important limitation
 
-Это ранняя альфа для тестирования, не стабильный публичный релиз. Перед использованием сделайте резервную копию мира и персонажа. Multiplayer, полный save/reload-набор, импорт/экспорт чертежей и будущие процедурные кривые ещё не прошли финальные ворота.
+This is an early testing alpha, not a stable public release. Back up the world and character before use. Multiplayer, the complete save/exit/reload matrix, blueprint import/export, and future procedural curves have not passed their final gates.
 
-Концептуальная обложка выше создана для репозитория и не является игровым скриншотом. Остальные изображения документации — снимки фактического интерфейса из Unity Workbench.
-
-Происхождение изображений описано в [IMAGES.md](docs/IMAGES.md).
+The concept cover above was created for this repository and is not an in-game screenshot. The remaining documentation images are captures of the implemented UI from the Unity Workbench. See [IMAGES.md](docs/IMAGES.md) for provenance.

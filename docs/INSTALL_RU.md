@@ -1,5 +1,7 @@
 # Установка BuildWorks 0.19.33 alpha
 
+[English](INSTALL.md) | **Русский**
+
 ## Перед установкой
 
 1. Закройте Valheim и сервер Valheim.
@@ -40,4 +42,3 @@ BepInEx/plugins/Ostrix-BuildWorks/
 ```
 
 Сохранённые чертежи не следует удалять до отдельного резервного копирования.
-

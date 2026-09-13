@@ -1,14 +1,15 @@
-# Как предложить изменение
+# Contributing to BuildWorks
 
-BuildWorks — proprietary/source-available проект. Pull Request приветствуются, но код не становится open-source.
+**English** | [Русский](CONTRIBUTING_RU.md)
 
-1. Сначала откройте Issue и опишите проблему или изменение.
-2. Сделайте fork только для подготовки Pull Request в официальный репозиторий.
-3. Не добавляйте чужие meshes, textures, code или другие материалы без подтверждённого права на их использование.
-4. Сохраняйте native-проверки Valheim, Undo/Redo и существующие ограничения; не ослабляйте тесты.
-5. В Pull Request укажите фактические проверки и отдельно то, что не было проверено в игре.
+BuildWorks is a proprietary/source-available project. Pull requests are welcome, but the code is not open-source software.
 
-Отправляя Pull Request, вы соглашаетесь с разделом `Contributions` файла [LICENSE](LICENSE): авторство вашего вклада сохраняется, а владелец BuildWorks получает право использовать и распространять его внутри BuildWorks.
+1. Open an issue first and describe the problem or proposed change.
+2. Fork the repository only to prepare a pull request for the official project.
+3. Do not add third-party meshes, textures, code, or other materials unless you can demonstrate the right to use them.
+4. Preserve native Valheim validation, Undo/Redo behavior, and existing safety limits. Do not weaken tests.
+5. In the pull request, list the checks you actually ran and clearly state what was not tested in Valheim.
 
-Для использования BuildWorks или его кода вне этих условий сначала получите письменное разрешение владельца через Issue либо контакт GitHub-профиля.
+By submitting a pull request, you accept the `Contributions` section of [LICENSE](LICENSE): you retain copyright in your contribution, while the BuildWorks owner receives the rights required to use and distribute it as part of BuildWorks.
 
+For any use of BuildWorks or its source outside these terms, obtain prior written permission from the owner through a GitHub issue or the contact method on the owner's GitHub profile.

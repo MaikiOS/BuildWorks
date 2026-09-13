@@ -1,0 +1,74 @@
+BuildWorks Proprietary Source-Available License 1.0
+
+Copyright (c) 2026 Ostrix / MaikiOS. All rights reserved.
+
+BuildWorks, including its source code, binaries, documentation, original
+artwork, user interface assets, and other original project materials
+(collectively, the "Software"), is proprietary intellectual property.
+
+1. Personal binary use
+
+You may download, install, and run an official unmodified BuildWorks binary
+release for personal, non-commercial testing and gameplay with Valheim.
+This permission does not include redistribution, sublicensing, sale, rental,
+hosting as a download, or inclusion in a mod pack or other product.
+
+2. Source access and pull requests
+
+You may view the source code in the official GitHub repository. Subject to
+GitHub's Terms of Service, you may fork and reproduce the repository through
+GitHub solely to study the code and to prepare and submit a pull request to
+the official BuildWorks repository.
+
+This permission does not allow you to use BuildWorks source code or original
+assets in another project, publish a derivative work, distribute a modified
+build, or operate an independent BuildWorks fork as a released product.
+
+3. Contributions
+
+By submitting a pull request or other contribution, you represent that you
+have the right to submit it. You retain copyright in your contribution and
+grant the BuildWorks owner a perpetual, worldwide, royalty-free, irrevocable,
+non-exclusive right to use, reproduce, modify, sublicense, and distribute the
+contribution as part of BuildWorks and its successor versions under any terms
+chosen by the owner.
+
+Submitting a contribution does not grant you rights to the rest of the
+Software. Acceptance of a contribution is at the owner's discretion.
+
+4. Written permission for other use
+
+Any use not expressly permitted above requires prior written permission from
+the BuildWorks owner. Request permission by opening an issue in the official
+repository or by using a contact method listed on the owner's GitHub profile.
+
+5. Restrictions
+
+Except where applicable law cannot be excluded, you may not:
+
+- copy, modify, redistribute, publish, sell, sublicense, rent, or commercially
+  exploit the Software outside the permissions above;
+- include the Software or its original assets in another mod, mod pack,
+  application, service, dataset, or commercial offering;
+- remove or alter copyright, attribution, or license notices;
+- use the BuildWorks name, identity, or artwork to imply an official or
+  endorsed release without written permission.
+
+No patent, trademark, or other intellectual-property rights are granted except
+for the limited copyright permissions expressly stated in this license.
+
+6. Termination
+
+These permissions terminate automatically if you violate this license. Upon
+termination, you must stop using and distributing all copies under your
+control, except for repository copies that GitHub independently retains under
+its Terms of Service.
+
+7. Disclaimer
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. TO THE MAXIMUM EXTENT PERMITTED
+BY LAW, THE COPYRIGHT OWNER IS NOT LIABLE FOR ANY CLAIM, DAMAGE, DATA LOSS, OR
+OTHER LIABILITY ARISING FROM THE SOFTWARE OR ITS USE.
+

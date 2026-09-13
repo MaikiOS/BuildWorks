@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+tools/BuildWorks.UiWorkbench/Library/
+tools/BuildWorks.UiWorkbench/Logs/
+tools/BuildWorks.UiWorkbench/Temp/
+tools/BuildWorks.UiWorkbench/UserSettings/
+tools/BuildWorks.UiWorkbench/MemoryCaptures/
+tools/BuildWorks.UiWorkbench/Assets/Plugins/
+tools/BuildWorks.UiWorkbench/Assets/LocalVanillaPreview/
+release/package/
+release/*.zip
+PUBLISH_CHECKLIST.md

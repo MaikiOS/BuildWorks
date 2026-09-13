@@ -1,0 +1,26 @@
+{
+  "name": "BuildWorks",
+  "version": "0.19.33",
+  "channel": "alpha",
+  "githubPrerelease": true,
+  "game": "Valheim 1.0",
+  "hostSteamBuild": "25185596",
+  "manualRuntimeSmoke": "pending",
+  "asset": {
+    "path": "release/BuildWorks-0.19.33-alpha.zip",
+    "bytes": 310676,
+    "sha256": "BCFC1DD4E2716742F55647630916B3024F22DE98A0546C3D20095B1F84DA945F"
+  },
+  "files": [
+    {
+      "path": "BepInEx/plugins/Ostrix-BuildWorks/BuildWorks.dll",
+      "fileVersion": "0.19.33.0",
+      "sha256": "ED3F13157FD9BE4E05AC98FBB982147FE3C8AB0894C24C1FC5089E8A1E607B63"
+    },
+    {
+      "path": "BepInEx/plugins/Ostrix-BuildWorks/BuildWorks.Geometry.dll",
+      "fileVersion": "0.1.0.0",
+      "sha256": "A9B4A6408F2C2F10F3C0C04228D0664D8217EE0C6FF8B0BE6CB6BDAE17FEC60C"
+    }
+  ]
+}

@@ -31,7 +31,8 @@ dotnet run --project .\tests\BuildWorks.GeometryTests\BuildWorks.GeometryTests.c
 dotnet run --project .\tests\BuildWorks.StoreTests\BuildWorks.StoreTests.csproj -c Release
 .\tests\BuildWorks.EditorBridgeChecks\Run.ps1
 .\tests\BuildWorks.WorldLayoutChecks\Run.ps1
-.\scripts\Test-HostContract.ps1
+.\scripts\Test-HostContract.ps1 -ProfileRoot "C:\path\to\TerrainRamp-1.0-Test"
+.\tests\BuildWorks.DeploymentChecks\Run.ps1
 .\scripts\Capture-UiWorkbench.ps1
 ```
 

@@ -178,6 +178,8 @@ namespace OstrixMods.BuildWorks
         private static MethodInfo externalBuildCameraDisableMethod;
         private static MethodInfo externalBuildCameraEnableMethod;
         private static FieldInfo externalBuildCameraViewField;
+        private static FieldInfo externalBuildCameraYawField;
+        private static FieldInfo externalBuildCameraPitchField;
         private static readonly float[] RepeatSpacings = { 0f, 0.01f, 0.05f, 0.10f, 0.50f };
         private static readonly float[] ExactRepeatSteps = { 0.25f, 0.50f, 1f, 2f, 4f };
         private static readonly float[] HandleScales = { 0.50f, 0.75f, 1f };
@@ -320,6 +322,8 @@ namespace OstrixMods.BuildWorks
         private bool freeViewFlyLooking;
         private bool externalBuildCameraSuspended;
         private object externalBuildCameraView;
+        private object externalBuildCameraYaw;
+        private object externalBuildCameraPitch;
         private bool probingNativeInput;
         private bool allowNativeGhostUpdate;
         private bool requestAutomaticPlacement;
@@ -6573,6 +6577,8 @@ namespace OstrixMods.BuildWorks
                 }
 
                 externalBuildCameraView = externalBuildCameraViewField?.GetValue(null);
+                externalBuildCameraYaw = externalBuildCameraYawField?.GetValue(null);
+                externalBuildCameraPitch = externalBuildCameraPitchField?.GetValue(null);
                 externalBuildCameraSuspended = true;
                 externalBuildCameraDisableMethod.Invoke(null, null);
                 if (externalBuildCameraInModeMethod.Invoke(null, null) is bool stillActive &&
@@ -6603,6 +6609,8 @@ namespace OstrixMods.BuildWorks
             if (!player || externalBuildCameraEnableMethod == null)
             {
                 externalBuildCameraView = null;
+                externalBuildCameraYaw = null;
+                externalBuildCameraPitch = null;
                 return;
             }
 
@@ -6612,6 +6620,14 @@ namespace OstrixMods.BuildWorks
                 if (externalBuildCameraView != null && externalBuildCameraViewField != null)
                 {
                     externalBuildCameraViewField.SetValue(null, externalBuildCameraView);
+                }
+                if (externalBuildCameraYaw != null && externalBuildCameraYawField != null)
+                {
+                    externalBuildCameraYawField.SetValue(null, externalBuildCameraYaw);
+                }
+                if (externalBuildCameraPitch != null && externalBuildCameraPitchField != null)
+                {
+                    externalBuildCameraPitchField.SetValue(null, externalBuildCameraPitch);
                 }
             }
             catch (Exception exception)
@@ -6624,6 +6640,8 @@ namespace OstrixMods.BuildWorks
             finally
             {
                 externalBuildCameraView = null;
+                externalBuildCameraYaw = null;
+                externalBuildCameraPitch = null;
             }
         }
 
@@ -6655,6 +6673,8 @@ namespace OstrixMods.BuildWorks
                 Type plugin = assembly.GetType(ExternalBuildCameraPluginTypeName, false);
                 externalBuildCameraViewField = plugin?.GetField(
                     "buildCameraViewDirection", methods);
+                externalBuildCameraYawField = plugin?.GetField("CameraYaw", methods);
+                externalBuildCameraPitchField = plugin?.GetField("CameraPitch", methods);
                 return;
             }
         }

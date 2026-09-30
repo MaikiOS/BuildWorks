@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.37";
+        internal const string PluginVersion = "0.19.38";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -29,7 +29,6 @@ namespace OstrixMods.BuildWorks
         internal static ConfigEntry<int> InterfaceScalePercent { get; private set; }
 
         private static BuildWorksPlugin instance;
-        private static bool placementInjectionInstalled;
         private Harmony harmony;
         private PrecisionPlacementSession session;
         private BlueprintEditorController blueprintEditor;
@@ -90,10 +89,9 @@ namespace OstrixMods.BuildWorks
             try
             {
                 hammerCatalog = new UnifiedHammerCatalog(Logger);
-                placementInjectionInstalled = false;
                 harmony = Harmony.CreateAndPatchAll(typeof(BuildWorksPlugin).Assembly, PluginGuid);
                 BuildWorksLocalization.RegisterCurrent();
-                if (!placementInjectionInstalled)
+                if (!HasRegisteredPlacementTranspiler())
                 {
                     throw new InvalidOperationException(
                         "UpdatePlacementGhost validation injection was not installed.");
@@ -109,6 +107,20 @@ namespace OstrixMods.BuildWorks
             }
 
             Logger.LogInfo("BuildWorks " + PluginVersion + " loaded.");
+        }
+
+        private static bool HasRegisteredPlacementTranspiler()
+        {
+            var target = AccessTools.Method(typeof(Player), "UpdatePlacementGhost");
+            var patches = target == null ? null : Harmony.GetPatchInfo(target);
+            if (patches == null) return false;
+            foreach (Patch patch in patches.Transpilers)
+            {
+                if (patch.owner == PluginGuid &&
+                    patch.PatchMethod?.DeclaringType == typeof(TransformGhostBeforeNativeValidationPatch))
+                    return true;
+            }
+            return false;
         }
 
         private void Update()
@@ -712,7 +724,6 @@ namespace OstrixMods.BuildWorks
                 contactCode.Add(new CodeInstruction(OpCodes.Call, contactMethod));
                 code.InsertRange(contactInjection, contactCode);
 
-                placementInjectionInstalled = true;
                 return code;
             }
         }

@@ -2,7 +2,7 @@
 
 **English** | [Русский](README_RU.md)
 
-> Alpha 0.19.37 source baseline for Valheim 1.0. Automated checks pass; English localization and the reported slanted-piece Q/E positioning are accepted in-game. Russian localization and the new nearby-target preview remain manual gates.
+> Source baseline 0.19.38 for Valheim 1.0.16. The latest existing binary prerelease remains 0.19.37; this checkpoint does not publish a new binary. Development tests use only TerrainRamp-1.0-Test; full owner acceptance remains pending.
 
 ![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
 
@@ -43,9 +43,9 @@ Full documentation: [features and interactions](docs/FEATURES.md), [controls](do
 
 ## Alpha status
 
-Version 0.19.37 keeps the active editor Q/E snap mode visible in the footer and previews target points on nearby pieces within 2 m. The magnetic snap threshold remains 0.55 m. It passes a Release build with zero errors and warnings, 596 collision-free runtime tokens, isolated English/Russian registration, Geometry 104, Store, EditorBridge 3, WorldLayout 10, HostContract, and Unity Workbench 81/81. English localization and the reported slanted-piece positioning are accepted in-game; Russian localization and the target preview still require owner-run checks.
+Source 0.19.38 adapts the placement-transpiler registration check for the current host and preserves the external build camera orientation across editor transitions. The active Q/E footer, 2 m target preview and 0.55 m capture threshold remain. The checkpoint passes Release, geometry/store/localization, editor bridge, world layout, host contract and deployment rejection checks. Previous Workbench captures are historical; a fresh game series in the dedicated profile, Russian UI, full persistence and multiplayer remain owner gates.
 
-See [the 0.19.37 status report](docs/ALPHA_0.19.37.md).
+See [the ordered development roadmap](docs/ROADMAP.md) and [current acceptance series](specs/roadmap/current-pass.md). [0.19.37](docs/ALPHA_0.19.37.md) remains historical release evidence.
 
 ## License and pull requests
 

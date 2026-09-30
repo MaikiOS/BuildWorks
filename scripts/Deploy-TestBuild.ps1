@@ -14,17 +14,17 @@ $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $sourceProfileRoot = Split-Path -Parent $projectRoot
 $profilesRoot = Split-Path -Parent $sourceProfileRoot
 
-if ((Split-Path -Leaf $projectRoot) -ine 'BuildWorks' -or
-    (Split-Path -Leaf $sourceProfileRoot) -ine 'Default') {
-    throw 'Expected source code at profiles\Default\BuildWorks. This directory is not an installed mod.'
-}
-
 if ($TargetProfile -ieq 'Default') {
     throw 'Refusing to deploy BuildWorks into Default.'
 }
 
 if ($TargetProfile -ine 'TerrainRamp-1.0-Test') {
     throw "BuildWorks test builds may target only TerrainRamp-1.0-Test, not '$TargetProfile'."
+}
+
+if ((Split-Path -Leaf $projectRoot) -ine 'BuildWorks' -or
+    (Split-Path -Leaf $sourceProfileRoot) -ine 'Default') {
+    throw 'Expected source code at profiles\Default\BuildWorks. This directory is not an installed mod.'
 }
 
 $targetProfileRoot = Join-Path $profilesRoot $TargetProfile
@@ -218,7 +218,7 @@ if ($needsDeploy) {
     }
 }
 else {
-    Write-Output 'TerrainRamp-1.0-Test already contains the current artifact pair; no files copied.'
+    Write-Output "$TargetProfile already contains the current artifact pair; no files copied."
 }
 
 foreach ($name in $dllNames) {

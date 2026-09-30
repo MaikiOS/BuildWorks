@@ -1,13 +1,17 @@
 [CmdletBinding()]
 param(
-    [string] $ValheimManagedDir = 'C:\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed'
+    [string] $ValheimManagedDir = 'C:\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed',
+    [string] $ProfileRoot = ''
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$profileRoot = Split-Path -Parent $projectRoot
+if ([string]::IsNullOrWhiteSpace($ProfileRoot)) {
+    $ProfileRoot = Join-Path (Split-Path -Parent (Split-Path -Parent $projectRoot)) 'TerrainRamp-1.0-Test'
+}
+$profileRoot = [IO.Path]::GetFullPath($ProfileRoot)
 $cecilPath = Join-Path $profileRoot 'BepInEx\core\Mono.Cecil.dll'
 $hostPath = Join-Path $ValheimManagedDir 'assembly_valheim.dll'
 $utilsPath = Join-Path $ValheimManagedDir 'assembly_utils.dll'
@@ -48,7 +52,7 @@ $requiredEditorIcons = @(
     'menu', 'close'
 )
 $buildCameraPath = Join-Path $profileRoot `
-    'BepInEx\plugins\Azumatt-Build_Camera_Custom_Hammers_Edition\Build Camera.dll'
+    'BepInEx\plugins\Matheba-Build_Camera_Custom_Hammers_Edition\Build Camera.dll'
 
 foreach ($path in @(
     $cecilPath,
@@ -804,7 +808,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.37.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.38.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -827,6 +831,21 @@ foreach ($type in $plugin.MainModule.Types) {
     $pluginTypes += @(Get-AllPluginTypes $type)
 }
 $pluginMethods = @($pluginTypes | ForEach-Object Methods)
+$awake = $pluginMethods | Where-Object {
+    $_.Name -eq 'Awake' -and $_.DeclaringType.Name -eq 'BuildWorksPlugin'
+}
+$registrationCheck = $pluginMethods | Where-Object {
+    $_.Name -eq 'HasRegisteredPlacementTranspiler' -and
+    $_.DeclaringType.Name -eq 'BuildWorksPlugin'
+}
+$awakeOperands = @($awake.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+$registrationOperands = @($registrationCheck.Body.Instructions |
+    ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($awakeOperands -match 'HasRegisteredPlacementTranspiler' -and
+    $registrationOperands -match 'Harmony::GetPatchInfo' -and
+    $registrationOperands -match 'Patches::Transpilers' -and
+    $registrationOperands -match 'Patch::get_PatchMethod') `
+    'Startup must verify the registered placement transpiler, not its eager execution.'
 $geometry = [Mono.Cecil.AssemblyDefinition]::ReadAssembly($geometryPath)
 $anchorAdjustment = $geometry.MainModule.Types | Where-Object {
     $_.FullName -eq 'OstrixMods.BuildWorks.Geometry.AnchorAdjustment'
@@ -2701,9 +2720,22 @@ if (Test-Path -LiteralPath $buildCameraPath -PathType Leaf) {
     $buildCameraPlugin = $buildCameraAssembly.MainModule.Types | Where-Object {
         $_.FullName -eq 'Valheim_Build_Camera.Valheim_Build_CameraPlugin'
     }
-    Assert-Contract (@($buildCameraPlugin.Fields | Where-Object {
+    $legacyView = @($buildCameraPlugin.Fields | Where-Object {
         $_.Name -eq 'buildCameraViewDirection' -and $_.IsStatic
-    }).Count -eq 1) 'Installed Build Camera no longer exposes its saved view state.'
+    }).Count -eq 1
+    $yaw = @($buildCameraPlugin.Fields | Where-Object {
+        $_.Name -eq 'CameraYaw' -and $_.IsStatic -and $_.FieldType.FullName -eq 'System.Single'
+    }).Count -eq 1
+    $pitch = @($buildCameraPlugin.Fields | Where-Object {
+        $_.Name -eq 'CameraPitch' -and $_.IsStatic -and $_.FieldType.FullName -eq 'System.Single'
+    }).Count -eq 1
+    Assert-Contract ($legacyView -or ($yaw -and $pitch)) `
+        'Installed Build Camera no longer exposes restorable view state.'
+    Assert-Contract ($sessionSource -match 'externalBuildCameraYawField.*GetValue' -and
+        $sessionSource -match 'externalBuildCameraPitchField.*GetValue' -and
+        $sessionSource -match 'externalBuildCameraYawField\.SetValue' -and
+        $sessionSource -match 'externalBuildCameraPitchField\.SetValue') `
+        'BuildWorks does not restore the current Build Camera yaw and pitch.'
 }
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.37 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.38 and Valheim Steam build 25185596.'

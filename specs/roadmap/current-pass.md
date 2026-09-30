@@ -3,8 +3,8 @@
 **English** | [Русский](current-pass_RU.md)
 
 Updated 2026-09-30 from Ostrix's feedback. **TerrainRamp-1.0-Test only**,
-BuildWorks **0.19.39 candidate**, Valheim 1.0.16. Do not test the old DLL as this candidate.
-This candidate is installed in the dedicated profile; Valheim was not launched automatically.
+BuildWorks **0.19.40 candidate**, Valheim 1.0.16. Do not test the old DLL as this candidate.
+Install only with Valheim closed; Valheim is not launched automatically.
 Start with the short series below. Run the rest in separate sessions, not all at once.
 Use a disposable world and blueprint copy, not an important build.
 
@@ -13,31 +13,41 @@ Use a disposable world and blueprint copy, not an important build.
 - Passed by owner report: held-RMB menu, furniture Q/E, nearby snap markers,
   below-grid placement, group pivots, Array, two-part save/reopen, world reload,
   camera through ground, and editor English. Do not repeat these wholesale.
-- Open: hover indication, category chooser, contour preview and mode switching,
-  invisible selection box, shortcut discoverability and native tab language refresh.
+- 0.19.39 owner report accepts menu hover, native tab language refresh and F framing.
+  Selection/box behavior is provisionally accepted; report exact steps if it recurs.
+- Open: contour hover/cleanup and shortcut discoverability. Category chooser,
+  resource panel and rebinding require their UI gates. Editor translucency UI
+  was approved and is included in this candidate for game acceptance.
 - Esc removes the partial build and restores its ghost, but refunds drop on the
   ground. Count-based accounting and multiplayer remain pending.
 - One-piece save is currently disallowed; two pieces save correctly by report.
 
-## Next focused checks after installing 0.19.39
+## Next focused checks after installing 0.19.40
 
-1. **Hammer menu:** open `BLUEPRINTS`, hold RMB on a card, move between actions.
-   The hovered action should brighten before release. Existing Resources popup
-   and cyclic category behavior are unchanged pending the UI redesign below.
-2. **Language:** switch Russian → English in game settings, reopen our Hammer.
-   `Favorites` and `Blueprints` must both update without restarting the game.
-3. **Editor box and Transform selection:** edit a test blueprint with three parts.
-   Press G, click a different part away from gizmo handles. It should select
-   without Esc or moving either piece. Drag on empty viewport space around parts:
-   a border must appear during the drag and disappear on release.
-4. **Contour calculation:** place three identical wooden walls side by side with
-   touching edges, plus a separate pole. Stop adding, select the pole and enter
-   Contour from the left tool rail. **Click** near the top edge of a wall, not
-   merely hover. A connected three-wall guide should be found. Then press G and
-   click another part away from handles: selection must work without Esc.
-5. **Hints and existing camera framing:** select a part, verify the footer shows
-   Ctrl+G and F. Press F: the selected object should fit the viewport. Double-click
-   framing and the full rebinding page are not implemented yet.
+1. **Hover without copies:** edit a disposable blueprint containing three touching
+   wooden walls and a separate pole. Stop adding, select the pole and press C over
+   the viewport. Hover near a wall's top edge without clicking: a blue guide should
+   appear, but no copies. Move onto empty space: the hover guide should disappear.
+2. **Clear the contour:** click that edge to preview copies, then click `CANCEL`.
+   The guide and copies must disappear. Press G and select another part; no old
+   line should return. Repeat starting with C and a click, but cancel with Esc,
+   or switch directly with G/Q, or delete the selected source with Delete.
+3. **Readable keys:** select a part. At the bottom of the viewport, find mode keys
+   Q/G/A/C, Ctrl+G, Ctrl+D, history, visibility and camera controls. Switch through
+   G, A and C: tool actions must change without losing the common mode keys.
+   Open the catalog with Tab and type: hints must describe catalog/text input,
+   not commands that would interfere with typing. Check Russian and English.
+
+4. **See-through:** place a wall in front of another part. Select the rear part
+   in the Outliner, press F7 or click `See-through F7` at the viewport's top right.
+   The front wall becomes a translucent silhouette, the selected part stays solid.
+   Orbit around it: parts no longer blocking the selection regain their materials.
+   Toggle off: all materials return. Clear selection or select the front wall:
+   it must not remain transparent. Hidden parts must remain hidden. Repeat F7
+   outside the editor only to verify BuildWorks does not handle it there; another
+   installed mod may own that key in the world. Picking remains unchanged.
+
+Double-click framing and shortcut rebinding are not shipped.
 
 The full scenarios below are a reference, not a request to repeat passed checks.
 

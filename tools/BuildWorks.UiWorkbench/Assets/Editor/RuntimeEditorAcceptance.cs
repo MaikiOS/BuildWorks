@@ -137,6 +137,8 @@ public static class RuntimeEditorAcceptance
             checks.Add(PlacementContactAcceptance.Run());
             checks.Add(UICatalogAcceptance.Run(fontTemplate.font));
             foreach (object step in ControllerInputAcceptance.Run(template, fontTemplate, output)) yield return step;
+            foreach (object step in ControllerInputAcceptance.RunContourLifecycle(template, fontTemplate, output)) yield return step;
+            checks.Add("Actual contour input: hover guide without copies, leave clears, click previews, cancel/tool switch/delete clear guide permanently");
             checks.Add("Actual Controller.Update/LateUpdate frame chords and native EventSystem raycasts: Ctrl+A, Shift rows/viewport, pin, shared gizmo, Alt move preview/commit/cancel/Undo, scale, placement RMB catalog reopen/camera and compound import; single Outliner context subscriptions; Array arrows/wheel/Ctrl zoom/Fit/spacing/shared step presets/live scrub before release/all TMP profile/atomic apply");
             TestEditorGestures(template, fontTemplate);
             yield return null;
@@ -298,6 +300,7 @@ public static class RuntimeEditorAcceptance
                 TestContourNativeEdges(template);
                 TestNestedSelection(template, source["woodwall"]);
                 TestHoverAppearance(template);
+                TestOccluderFade(template, output);
                 TestGizmoHits(template);
                 controller.Close(true);
                 Require(controller.OpenNew(out error), "Reopen: " + error);
@@ -344,6 +347,9 @@ public static class RuntimeEditorAcceptance
                 Require(!text.isTextOverflowing, "Button text overflows: " + text.text);
             if (text.name == "ContourInfo" || text.name == "ArrayInfo")
                 Require(!text.isTextOverflowing, "Tool instructions overflow: " + text.name);
+            if (text.name == "StatusHints")
+                Require(!text.isTextTruncated && !text.isTextOverflowing,
+                    "Context hotkeys are clipped: " + text.text);
         }
         foreach (TMP_InputField input in clip.GetComponentsInChildren<TMP_InputField>()) EnsureInside(clip, input.GetComponent<RectTransform>());
         foreach (Button button in clip.GetComponentsInChildren<Button>()) EnsureInside(clip, button.GetComponent<RectTransform>());
@@ -782,6 +788,57 @@ public static class RuntimeEditorAcceptance
         }
         Object.Destroy(sphere);
         checks.Add("Hover uses reversible vanilla cyan; selected and selected+hover preserve original materials, no outlines");
+    }
+
+    private static void TestOccluderFade(Camera template, string output)
+    {
+        GameObject wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        wall.transform.localScale = new Vector3(2,2,.2f); wall.SetActive(false);
+        Material sourceMaterial = wall.GetComponent<Renderer>().sharedMaterial;
+        using (var scene = new BlueprintEditorScene(template, _ => wall))
+        {
+            var doc = new BlueprintEditorDocument(null, "See-through", "Other", new[] {
+                new BlueprintEditorPart("selected","wall","Selected",new Point3(0,1,0),new Rotation3(0,0,0,1)),
+                new BlueprintEditorPart("front","wall","Front",new Point3(0,1,-2),new Rotation3(0,0,0,1)),
+                new BlueprintEditorPart("behind","wall","Behind",new Point3(0,1,2),new Rotation3(0,0,0,1)),
+                new BlueprintEditorPart("side","wall","Side",new Point3(4,1,-2),new Rotation3(0,0,0,1)),
+                new BlueprintEditorPart("hidden","wall","Hidden",new Point3(0,1,-4),new Rotation3(0,0,0,1),visible:false) });
+            doc.SelectOnly("selected");
+            Require(scene.TrySync(doc, out string error), error);
+            scene.SetViewport(new Rect(0,0,512,512));
+            scene.SetCameraPose(new Vector3(0,1,-10), Quaternion.identity);
+            var visuals = Field<IDictionary>(scene, "visuals");
+            Renderer front = Field<Renderer[]>(visuals["front"], "Renderers")[0];
+            Renderer selected = Field<Renderer[]>(visuals["selected"], "Renderers")[0];
+            Material original = front.sharedMaterial, selectionMaterial = selected.sharedMaterial;
+            var target = new RenderTexture(512,512,24);
+            scene.Camera.targetTexture = target;
+            scene.Camera.Render(); SavePixels(target, Path.Combine(output,"see-through-off.png"));
+            scene.SetOccluderFade(true);
+            Require(front.sharedMaterial != original && front.sharedMaterial.color.a < .3f &&
+                front.sharedMaterial.GetInt("_ZWrite") == 0, "Front occluder is not transparent without depth writes");
+            foreach (string id in new[] {"selected","behind","side","hidden"})
+                Require(!Field<bool>(visuals[id], "SeeThrough"), "Non-occluder or selection faded: " + id);
+            Require(selected.sharedMaterial == selectionMaterial && wall.GetComponent<Renderer>().sharedMaterial == sourceMaterial,
+                "See-through mutated selection or source prefab materials");
+            scene.SetHovered("front",doc); scene.UpdateOccluders();
+            Require(!front.HasPropertyBlock(), "Hover overrides occluder alpha");
+            scene.Camera.Render(); SavePixels(target, Path.Combine(output,"see-through-on.png"));
+            scene.SetCameraPose(new Vector3(10,1,0), Quaternion.LookRotation(Vector3.left)); scene.UpdateOccluders();
+            Require(front.sharedMaterial == original, "Camera movement leaves stale transparent parts");
+            scene.SetCameraPose(new Vector3(0,1,-10), Quaternion.identity); scene.UpdateOccluders();
+            doc.SelectOnly("front"); scene.TrySync(doc,out _); scene.UpdateOccluders();
+            Require(front.sharedMaterial == original, "New selection stays transparent");
+            doc.SelectOnly("selected"); scene.TrySync(doc,out _); scene.UpdateOccluders();
+            scene.SetOccluderFade(false);
+            Require(front.sharedMaterial == original, "Turning off does not restore exact original material");
+            scene.SetOccluderFade(true); doc.ClearSelection(); scene.TrySync(doc,out _); scene.UpdateOccluders();
+            Require(front.sharedMaterial == original && !doc.IsEffectivelyVisible("hidden") && doc.Parts.Count == 5,
+                "Clearing selection leaves transparency or changes document visibility");
+            scene.Camera.targetTexture = null; Object.Destroy(target);
+        }
+        Object.Destroy(wall);
+        checks.Add("Editor see-through: F7/button; only mesh occluders fade; selection/source solid; hover, camera, selection and off restore exact materials; hidden parts unchanged");
     }
 
     private static IEnumerable TestSkin()

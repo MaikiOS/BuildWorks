@@ -320,10 +320,17 @@ editor.hint.camera	WASD — camera · Q/E — down/up · Shift — faster · rel
 editor.hint.array_ready	ARRAY: wheel — count · Enter — create · Esc — cancel · Ctrl+wheel — camera
 editor.hint.array_begin	ARRAY: drag gold arrow — first row · another — second row · Esc — cancel
 editor.hint.contour_ready	CONTOUR: LMB — another chain · Enter — create · G — gizmo · Esc — cancel
-editor.hint.contour_begin	CONTOUR: LMB on an unselected support edge — chain · G — gizmo · Esc — cancel
-editor.hint.transform	LMB — select · drag — edit · Ctrl+G — group · Ctrl+Z/Y — history · F — frame · N — composite pivot · Q — select · H/Shift+H/Ctrl+H/Alt+H — visibility
+editor.hint.contour_begin	CONTOUR: hover an unselected support edge — guide only · LMB — preview copies · Enter — create · Esc — cancel
+editor.hint.transform	LMB — select · arrows/rings — edit · Alt+arrow — copy · Shift+LMB — pin · Ctrl+point drag — snap · X/Y/Z — constraint · hold N — composite pivot · Space — axes · Shift+S — move step
 editor.hint.empty	Tab — add part · MMB — camera
-editor.hint.select	LMB — select · Shift+LMB — add · Ctrl+G — group · Ctrl+D — copy · Del — delete · G — gizmo · F — frame · Tab — add · H/Shift+H/Ctrl+H/Alt+H — visibility
+editor.hint.select	LMB — select · Ctrl/Shift+LMB — add/remove · drag empty space — box · MMB on a part — delete · Esc — clear selection
+editor.hint.modes_selected	MODES: Q — select · G/R/F9 — transform · A — array · C — contour · Tab/Shift+A — catalog
+editor.hint.modes_empty	MODES: Q — select · Tab/Shift+A — catalog · select a part to enable transform, array and contour
+editor.hint.commands	Ctrl+A — select all · Ctrl+Z/Y (Ctrl+Shift+Z) — history · Ctrl+S — save (2+ parts) · F — frame selection · Home — frame all
+editor.hint.visibility_selected	Ctrl+G — group · Ctrl+D — duplicate · Del — delete · H — hide · Shift+H — isolate · Ctrl+H — all except selected · Alt+H — show all
+editor.hint.visibility_empty	Alt+H — show all hidden parts · Esc — exit
+editor.hint.camera_idle	CAMERA: MMB on empty space — orbit · Shift+MMB — pan · wheel — zoom · RMB+WASD — fly · RMB+Q/E — down/up · Shift — faster · F7 — see-through
+editor.view.see_through	See-through F7
 editor.anchor_controls	Shift + LMB pins the point · Ctrl + drag performs magnetic movement.
 editor.anchor_on_axis	The point lies on the rotation axis. Choose another point or axis.
 editor.anchor_drag_magnetic	Magnet: drag to a point on another part · Shift — free.

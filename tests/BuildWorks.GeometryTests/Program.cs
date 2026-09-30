@@ -2203,6 +2203,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
                     Equal(false, layout.Rail.Overlaps(layout.Viewport));
                     Equal(false, layout.Viewport.Overlaps(layout.RightColumn));
                     Equal(false, layout.Status.Overlaps(layout.Viewport));
+                    Equal(false, layout.Status.Overlaps(layout.RightColumn));
                     Near(0.0,
                         (layout.Outliner.Height - BlueprintEditorLayout.OutlinerHeaderHeight) %
                         BlueprintEditorLayout.OutlinerRowHeight);

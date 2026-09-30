@@ -1,8 +1,12 @@
-# BuildWorks 0.19.33 controls
+# BuildWorks controls
 
 **English** | [Русский](CONTROLS_RU.md)
 
 The editor footer and world HUD display only the actions available in the current state. The tables below are a reference, not a replacement for those contextual hints.
+
+The editor footer reserves a separate area beneath the viewport for mode keys,
+current tool actions, history/group/visibility and camera controls. Text fields,
+menus and dragging show their own hints instead. The Inspector keeps its height.
 
 ## Indexed hammer
 
@@ -17,7 +21,7 @@ The editor footer and world HUD display only the actions available in the curren
 
 | Action | Control |
 | --- | --- |
-| Catalog | Tab |
+| Catalog | Tab or Shift+A |
 | Select mode | Q |
 | Transform mode | G or F9; R also opens Transform |
 | Array | A |
@@ -51,7 +55,16 @@ The editor footer and world HUD display only the actions available in the curren
 | Isolate selection or group | Shift+H |
 | Show everything except selected | Ctrl+H |
 | Show all | Alt+H |
+| Toggle see-through occluders | F7 or the viewport `See-through F7` button |
 | Delete | Delete or middle mouse button on a piece |
+
+See-through starts off and is editor-only. Unselected mesh parts blocking sampled
+rays to the visible selection become translucent silhouettes; selected parts stay
+solid. Camera/selection changes and turning it off restore the original editor
+materials. Hidden flags, picking, source prefabs and saved/world data are unchanged.
+
+In Contour (C), hovering a connected support edge shows only the blue guide;
+LMB creates preview copies. Cancel, Esc, G/Q and deleting the source clear both.
 
 ## Editor camera
 

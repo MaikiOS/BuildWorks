@@ -318,6 +318,7 @@ namespace OstrixMods.BuildWorks
             {
                 HideGameCanvases(view.RootCanvas);
                 ApplyCamera();
+                scene.UpdateOccluders();
                 if (view.HasCatalog || view.HasModal) scene.HideGizmo();
                 else UpdateGizmo();
             }
@@ -444,6 +445,7 @@ namespace OstrixMods.BuildWorks
             view.ViewportSettingsChanged += (move, rotation, array, points, scale, grid) =>
                 scene.SetViewportSettings(move, rotation, array, points, scale, grid);
             view.ProjectionChanged += value => { orthographic = value; ApplyCamera(); };
+            view.OccluderFadeRequested += ToggleOccluderFade;
             view.NodeClicked += SelectNode;
             view.VisibilityChanged += (id, visible) => ApplyDocumentEdit(() =>
                 document.SetVisibility(id, visible));
@@ -557,6 +559,11 @@ namespace OstrixMods.BuildWorks
             }
             if (rightCameraTracking || input.GetMouseButton(1) &&
                 view.ViewportScreenRect().Contains(input.MousePosition)) return false;
+            if (input.GetKeyDown(KeyCode.F7))
+            {
+                ToggleOccluderFade();
+                return true;
+            }
             if (input.GetKeyDown(KeyCode.Tab))
             {
                 RequestCatalog();
@@ -739,8 +746,31 @@ namespace OstrixMods.BuildWorks
             else if (document.Parts.Count == 0)
                 hints = BuildWorksLocalization.Text("editor.hint.empty");
             else
+            {
                 hints = BuildWorksLocalization.Text("editor.hint.select");
+                if (document.EditablePartSelectionCount > 0)
+                    hints += "\n" + BuildWorksLocalization.Text("editor.hint.transform");
+            }
+            if (!view.HasModal && !view.HasOutlinerContextMenu && !view.HasOutlinerMenu &&
+                !view.HasViewportSettings && !view.HasCatalog && !view.IsOutlinerDragging &&
+                !view.IsNumericScrubbing && !view.IsTextInputFocused && placementItem == null &&
+                !IsGizmoDragging && !rightCameraTracking && !input.GetMouseButton(1))
+            {
+                bool selected = document.EditablePartSelectionCount > 0;
+                hints = BuildWorksLocalization.Text(selected
+                    ? "editor.hint.modes_selected" : "editor.hint.modes_empty") + "\n" + hints + "\n" +
+                    BuildWorksLocalization.Text("editor.hint.commands") + "\n" +
+                    BuildWorksLocalization.Text(selected
+                        ? "editor.hint.visibility_selected" : "editor.hint.visibility_empty") + "\n" +
+                    BuildWorksLocalization.Text("editor.hint.camera_idle");
+            }
             view.SetContextHints(hints);
+        }
+
+        private void ToggleOccluderFade()
+        {
+            scene.SetOccluderFade(!scene.OccluderFadeEnabled);
+            view.SetOccluderFade(scene.OccluderFadeEnabled);
         }
 
         private void HandleViewport(Rect viewport)
@@ -1379,6 +1409,8 @@ namespace OstrixMods.BuildWorks
                 document.EditablePartSelectionCount > 0;
             if (!available)
             {
+                ClearArrayState();
+                ClearContourState();
                 activeTool = BlueprintEditorTool.Select;
                 view.SetTool(activeTool);
                 view.SetStatus(BuildWorksLocalization.Text(
@@ -1415,7 +1447,19 @@ namespace OstrixMods.BuildWorks
             if (placementItem != null) return;
             scene.SetTemporarySelectionHighlight(ShiftHeld && !IsGizmoDragging, document);
             if (activeTool == BlueprintEditorTool.Contour)
-                scene.ShowContourGuide(contourGuidePoints, contourClosed);
+            {
+                if (contourSupportIds.Count == 0 && document.EditablePartSelectionCount > 0 &&
+                    !IsGizmoDragging && !cameraDragging &&
+                    !rightCameraTracking && !input.GetMouseButton(1) && !view.HasModal &&
+                    !view.HasCatalog && !view.HasOutlinerMenu && !view.HasOutlinerContextMenu &&
+                    !view.HasViewportSettings && !view.IsTextInputFocused &&
+                    view.ViewportScreenRect().Contains(input.MousePosition) &&
+                    !view.IsViewportControlHit(input.MousePosition) &&
+                    scene.TryFindContourSupports(document, input.MousePosition, out _,
+                        out List<Vector3> hoverGuide, out bool hoverClosed, out _))
+                    scene.ShowContourGuide(hoverGuide, hoverClosed);
+                else scene.ShowContourGuide(contourGuidePoints, contourClosed);
+            }
             if (TrySelectionPivot(out Vector3 pivot, out Quaternion orientation, gizmoIds))
             {
                 UsePrimaryGizmoFrame(gizmoIds);

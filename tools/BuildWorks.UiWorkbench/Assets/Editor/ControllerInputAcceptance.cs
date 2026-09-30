@@ -497,6 +497,76 @@ internal static class ControllerInputAcceptance
         }
     }
 
+    internal static IEnumerable RunContourLifecycle(Camera template, TMP_Text font, string output)
+    {
+        GameObject wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        wall.transform.localScale = new Vector3(2,2,.2f);
+        foreach (Vector3 point in new[] { new Vector3(-.5f,-.5f,0), new Vector3(.5f,-.5f,0),
+            new Vector3(-.5f,.5f,0), new Vector3(.5f,.5f,0) })
+        {
+            var snap = new GameObject("NativeSnap"); snap.tag = "snappoint";
+            snap.transform.SetParent(wall.transform, false); snap.transform.localPosition = point;
+        }
+        wall.SetActive(false);
+        var input = new InputFrames();
+        using (var controller = new BlueprintEditorController(
+            new CompositeBlueprintStore(Path.Combine(output, "contour-input-fixture.json")),
+            template, font, _ => wall, name => name, null, error => { throw new Exception(error); },
+            editorInput: input))
+        try
+        {
+            Require(controller.OpenNew(out string error), error);
+            BlueprintEditorDocument doc = controller.Document;
+            doc.AddPart(new BlueprintEditorPart("source", "pole", "Source", new Point3(-3,1,0), new Rotation3(0,0,0,1)));
+            for (int index = 0; index < 3; ++index)
+                doc.AddPart(new BlueprintEditorPart("wall" + index, "wall", "Wall",
+                    new Point3(index * 2,1,0), new Rotation3(0,0,0,1)));
+            doc.SelectOnly("source");
+            var scene = Field<BlueprintEditorScene>(controller, "scene");
+            var view = Field<BlueprintEditorView>(controller, "view");
+            Require(scene.TrySync(doc, out error), error); view.Bind(doc, true, null, null);
+            Set(controller, "cameraFocus", new Vector3(2,1,0)); Set(controller, "cameraDistance", 10f);
+            Set(controller, "cameraYaw", 0f); Set(controller, "cameraPitch", 20f);
+            yield return null;
+            Frame(controller, input, Vector2.zero); yield return null;
+            LineRenderer guide = Field<LineRenderer>(Field<TransformGizmoView>(scene, "gizmo"), "contactGuide");
+            Require(!scene.OccluderFadeEnabled, "See-through must start disabled");
+            Frame(controller, input, Vector2.zero, 0, KeyCode.F7); yield return null;
+            Require(scene.OccluderFadeEnabled, "F7 did not enable editor see-through");
+            NativeClick(view, null, "OccluderFadeToggle"); yield return null;
+            Require(!scene.OccluderFadeEnabled, "Viewport button did not disable see-through");
+            Vector2 edge = scene.Camera.WorldToScreenPoint(new Vector3(0,1.96f,-.1f));
+            foreach (KeyCode finish in new[] { KeyCode.None, KeyCode.Escape, KeyCode.G, KeyCode.Q, KeyCode.Delete })
+            {
+                Frame(controller, input, Vector2.zero, 0, KeyCode.C); yield return null;
+                Frame(controller, input, edge); yield return null;
+                Require(guide.gameObject.activeInHierarchy && Field<int>(controller, "contourPreviewCount") == 0 &&
+                    Field<List<string>>(controller, "contourSupportIds").Count == 0 && doc.Parts.Count == 4,
+                    "Contour hover must show only the guide without locking supports, copying or editing");
+                Frame(controller, input, Vector2.zero); yield return null;
+                Require(!guide.gameObject.activeSelf, "Contour guide remains after leaving the edge");
+                Frame(controller, input, edge, 1); yield return null;
+                Frame(controller, input, edge); yield return null;
+                Require(Field<int>(controller, "contourPreviewCount") > 0 && guide.gameObject.activeInHierarchy,
+                    "Click did not commit hovered chain to the copy preview");
+                if (finish == KeyCode.None) NativeClick(view, null, "CancelContour");
+                else Frame(controller, input, Vector2.zero, 0, finish);
+                yield return null;
+                Frame(controller, input, Vector2.zero); yield return null;
+                Require(!guide.gameObject.activeSelf && Field<IList>(scene, "contourPreviews").Count == 0,
+                    "Contour guide or ghosts survive cancel/tool change/delete: " + finish);
+                if (finish == KeyCode.Delete) break;
+                NativeClick(view, null, "Row_wall1"); yield return null;
+                Frame(controller, input, Vector2.zero); yield return null;
+                Require(!guide.gameObject.activeSelf, "Selecting another part resurrects the old contour guide");
+                NativeClick(view, null, "Row_source"); yield return null;
+            }
+            File.WriteAllText(Path.Combine(output, "contour-input-check.txt"),
+                "PASS actual Update/LateUpdate: hover guide only; leave clears; click previews; Cancel/Esc/G/Q/Delete clear guides and ghosts; new selection cannot resurrect guide; F7/button toggle see-through.");
+        }
+        finally { controller.Close(true); Object.Destroy(wall); }
+    }
+
     private static IEnumerable TestOutlinerDragCancel(BlueprintEditorController controller, InputFrames input,
         BlueprintEditorScene scene, BlueprintEditorView view, Camera uiCamera, string originalGroup)
     {

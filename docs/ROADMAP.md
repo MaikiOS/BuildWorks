@@ -9,8 +9,10 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Current source candidate: **0.19.39**, Store v9, Valheim 1.0.16.
-Installed in the dedicated profile; focused owner checks remain pending.
+Current source candidate: **0.19.40**, Store v9, Valheim 1.0.16.
+0.19.39 owner feedback accepts menu hover, language refresh and camera framing;
+Transform selection is provisionally accepted. Contour and footer regressions
+require the focused 0.19.40 game checks.
 All development deployments, upgrades and game tests use **only
 `TerrainRamp-1.0-Test`**. `Default/BuildWorks` is the source/artifact tree,
 not an installed mod. Do not modify other profiles, mods or saves as a side effect.
@@ -39,7 +41,7 @@ dependent changes wait for its gate, unrelated preparation may continue.
 
 | ID | Deliverable | Dependency | Status |
 | --- | --- | --- | --- |
-| BW-00 | Dedicated-profile baseline and reliable handoff | Current core | Partial owner acceptance; contour, live language labels and interaction regressions require 0.19.39 retest; networking pending |
+| BW-00 | Dedicated-profile baseline and reliable handoff | Current core | Partial owner acceptance; contour hover/cleanup and expanded hints require 0.19.40 retest; networking pending |
 | BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | Planned; visible UI/icon design approval required |
 | BW-02 | Group layout operations without resizing pieces | BW-01 | Planned; focused operation UI approval required |
 | BW-03 | Persistent Array and minimal recipe persistence | BW-02 | Planned; safe Store migration and editing/Bake gate |
@@ -75,8 +77,13 @@ The next UI approval covers an explicit category chooser (cycling a single categ
 looks inert), aggregate resources and required stations in the native piece panel
 instead of a Resources popup, a per-mode shortcut settings page with rebinding,
 and double-click Outliner framing while retaining F. Do not auto-jump the camera
-after every placement. Contour currently needs a click on a support edge; hover-only
-chain preview is a separate pending UI change. Community translation overrides
+after every placement. 0.19.40 previews the contour guide on hover; click alone
+creates temporary copies. Its cancellation cleanup and expanded footer await
+game acceptance. Ostrix approved editor-only translucency: 0.19.40 adds the
+viewport button and F7, off by default, without changing hidden flags, saved data
+or world materials. It uses sampled mesh rays, not pixel-perfect occlusion;
+transparent parts become tinted silhouettes and picking is unchanged.
+Community translation overrides
 need a documented file format and fallback/reload tests before shipping.
 
 Approve a small wireframe before visible UI/icon changes. Distinguish placement

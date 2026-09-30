@@ -808,7 +808,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.39.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.40.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -2738,4 +2738,4 @@ if (Test-Path -LiteralPath $buildCameraPath -PathType Leaf) {
         'BuildWorks does not restore the current Build Camera yaw and pitch.'
 }
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.39 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.40 and Valheim Steam build 25185596.'

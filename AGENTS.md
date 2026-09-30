@@ -42,7 +42,7 @@ this checkout; its local inference is for the owner's source layout.
 
 For non-trivial diffs obtain independent correctness and complexity review before
 commit. Record automated results separately from Workbench/game/save/reload/network
-acceptance. Current source candidate is 0.19.39; future recipe/curve code is not implemented.
+acceptance. Current source/deployment evidence is in HANDOFF.md; future recipe/curve code is not implemented.
 
 After an owner-authorized verified checkpoint update EN/RU statuses, commit and
 push normally. Preserve unrelated changes and never force-push. Do not publish

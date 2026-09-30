@@ -34,7 +34,8 @@ namespace OstrixMods.BuildWorks.Geometry
     public sealed class BlueprintEditorLayout
     {
         public const double TopHeight = 72.0;
-        public const double StatusHeight = 48.0;
+        public const double StatusHeight = 144.0;
+        private const double RightColumnBottomInset = 48.0;
         public const double RailWidth = 56.0;
         public const double StandardRightWidth = 360.0;
         public const double CompactRightWidth = 280.0;
@@ -96,6 +97,7 @@ namespace OstrixMods.BuildWorks.Geometry
 
             var safe = new EditorRect(0.0, 0.0, logicalWidth, logicalHeight);
             double bodyHeight = logicalHeight - TopHeight - StatusHeight;
+            double rightHeight = logicalHeight - TopHeight - RightColumnBottomInset;
             bool compact = logicalWidth < RailWidth + MinimumViewportWidth +
                 StandardRightWidth;
             double rightWidth = compact ? CompactRightWidth : StandardRightWidth;
@@ -111,26 +113,26 @@ namespace OstrixMods.BuildWorks.Geometry
             var viewport = new EditorRect(
                 RailWidth, TopHeight, viewportWidth, bodyHeight);
             var right = new EditorRect(
-                RailWidth + viewportWidth, TopHeight, rightWidth, bodyHeight);
+                RailWidth + viewportWidth, TopHeight, rightWidth, rightHeight);
             double desiredOutlinerBody = Math.Max(
                 OutlinerRowHeight,
-                Math.Min(bodyHeight * 0.44 - OutlinerHeaderHeight,
-                    bodyHeight - MinimumInspectorHeight - OutlinerHeaderHeight));
+                Math.Min(rightHeight * 0.44 - OutlinerHeaderHeight,
+                    rightHeight - MinimumInspectorHeight - OutlinerHeaderHeight));
             double outlinerBody = Math.Floor(desiredOutlinerBody / OutlinerRowHeight) *
                 OutlinerRowHeight;
             double outlinerHeight = Math.Min(
-                bodyHeight - 180.0,
+                rightHeight - 180.0,
                 OutlinerHeaderHeight + outlinerBody);
             var outliner = new EditorRect(right.X, right.Y, right.Width, outlinerHeight);
             var inspector = new EditorRect(
                 right.X,
                 right.Y + outlinerHeight,
                 right.Width,
-                bodyHeight - outlinerHeight);
+                rightHeight - outlinerHeight);
             var status = new EditorRect(
                 0.0,
                 logicalHeight - StatusHeight,
-                logicalWidth,
+                RailWidth + viewportWidth,
                 StatusHeight);
             return new BlueprintEditorLayout(
                 safe, top, rail, viewport, right, outliner, inspector, status, compact);

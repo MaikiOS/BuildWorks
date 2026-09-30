@@ -133,6 +133,8 @@ namespace OstrixMods.BuildWorks
             public bool Selected;
             public bool ActiveSelection;
             public bool Hovered;
+            public bool SeeThrough;
+            public readonly List<Material[]> SolidMaterials = new List<Material[]>();
             public readonly List<PickSurface> PickSurfaces = new List<PickSurface>();
             public readonly List<Vector3> SnapLocal = new List<Vector3>();
             public int NativeSnapCount;
@@ -209,6 +211,9 @@ namespace OstrixMods.BuildWorks
         private BlueprintEditorLightingPreset lightingPreset;
         private string hoveredId;
         private bool temporarySelectionHighlight;
+        private bool occludersDirty = true;
+        private Material occluderMaterial;
+        internal bool OccluderFadeEnabled { get; private set; }
         private float groundHeight;
         private bool disposed;
         private readonly MaterialPropertyBlock hoverProperties = new MaterialPropertyBlock();
@@ -283,6 +288,7 @@ namespace OstrixMods.BuildWorks
             if (pixelRect.width <= 0f || pixelRect.height <= 0f) return;
             if (camera.pixelRect == pixelRect) return;
             camera.pixelRect = pixelRect;
+            occludersDirty = true;
         }
 
         internal void SetCameraPose(Vector3 position, Quaternion rotation)
@@ -290,6 +296,7 @@ namespace OstrixMods.BuildWorks
             ThrowIfDisposed();
             if (camera.transform.position == position && camera.transform.rotation == rotation) return;
             camera.transform.SetPositionAndRotation(position, rotation);
+            occludersDirty = true;
             RecenterEnvironment(position);
         }
 
@@ -305,10 +312,83 @@ namespace OstrixMods.BuildWorks
         internal void SetProjection(bool orthographic, float focusDistance)
         {
             ThrowIfDisposed();
+            float size = Mathf.Max(0.01f, focusDistance) *
+                Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
+            if (camera.orthographic != orthographic || orthographic && camera.orthographicSize != size)
+                occludersDirty = true;
             camera.orthographic = orthographic;
             if (orthographic)
-                camera.orthographicSize = Mathf.Max(0.01f, focusDistance) *
-                    Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
+                camera.orthographicSize = size;
+        }
+
+        internal void SetOccluderFade(bool enabled)
+        {
+            ThrowIfDisposed();
+            if (OccluderFadeEnabled == enabled) return;
+            if (enabled && !occluderMaterial)
+                occluderMaterial = CreateColorMaterial("Occluder", new Color(.6f, .7f, .8f, .18f), true);
+            OccluderFadeEnabled = enabled;
+            occludersDirty = true;
+            UpdateOccluders();
+        }
+
+        internal void UpdateOccluders()
+        {
+            ThrowIfDisposed();
+            if (!occludersDirty) return;
+            occludersDirty = false;
+            var occluders = new HashSet<VisualNode>();
+            if (OccluderFadeEnabled)
+            {
+                // ponytail: seven sampled rays per selection, bounded to 512 parts;
+                // reuse mesh picking, add spatial indexing only if large-scene profiling needs it.
+                foreach (VisualNode selected in visuals.Values)
+                {
+                    if (!selected.Selected || !TryBounds(selected, out Bounds bounds)) continue;
+                    for (int sample = 0; sample < 7; ++sample)
+                    {
+                        Vector3 point = bounds.center;
+                        if (sample > 0)
+                        {
+                            int axis = (sample - 1) / 2;
+                            point[axis] += bounds.extents[axis] * (sample % 2 == 0 ? .8f : -.8f);
+                        }
+                        Vector3 screen = camera.WorldToViewportPoint(point);
+                        if (screen.z <= 0f || screen.x < 0f || screen.x > 1f || screen.y < 0f || screen.y > 1f)
+                            continue;
+                        Ray ray = camera.ViewportPointToRay(screen);
+                        if (!TryMeshHit(selected, ray, out float targetDistance)) continue;
+                        foreach (VisualNode candidate in visuals.Values)
+                        {
+                            if (candidate.Selected || occluders.Contains(candidate) ||
+                                !TryBounds(candidate, out Bounds candidateBounds) ||
+                                !candidateBounds.IntersectRay(ray, out float near) || near >= targetDistance)
+                                continue;
+                            if (TryMeshHit(candidate, ray, out float hit) && hit < targetDistance - .001f)
+                                occluders.Add(candidate);
+                        }
+                    }
+                }
+            }
+            foreach (VisualNode visual in visuals.Values)
+            {
+                bool fade = occluders.Contains(visual);
+                if (visual.SeeThrough == fade) continue;
+                visual.SeeThrough = fade;
+                for (int index = 0; index < visual.Renderers.Length; ++index)
+                {
+                    Renderer renderer = visual.Renderers[index];
+                    if (!renderer) continue;
+                    Material[] materials = visual.SolidMaterials[index];
+                    if (fade)
+                    {
+                        materials = new Material[materials.Length];
+                        for (int slot = 0; slot < materials.Length; ++slot) materials[slot] = occluderMaterial;
+                    }
+                    renderer.sharedMaterials = materials;
+                }
+                ApplyAppearance(visual);
+            }
         }
 
         internal bool TrySync(BlueprintEditorDocument document, out string warning)
@@ -729,6 +809,7 @@ namespace OstrixMods.BuildWorks
             ThrowIfDisposed();
             if (points == null || points.Count < 2)
             {
+                gizmo.ShowLayout(camera, null, false, null, false, null, null);
                 gizmo.Hide();
                 return;
             }
@@ -773,6 +854,7 @@ namespace OstrixMods.BuildWorks
         internal void ClearContourPreview()
         {
             ClearTemporaryPreview(contourPreviews);
+            gizmo.ShowLayout(camera, null, false, null, false, null, null);
         }
 
         private static void ClearTemporaryPreview(List<VisualNode> target)
@@ -1682,6 +1764,7 @@ namespace OstrixMods.BuildWorks
                         });
                     }
                     renderer.sharedMaterials = previewMaterials;
+                    result.SolidMaterials.Add(previewMaterials);
                 }
                 if (selectable || captureSurfaces) CapturePickSurfaces(result);
                 if (result.PlacementLocal.Count == 0) AddBoundsPlacementPoints(result);
@@ -1902,7 +1985,7 @@ namespace OstrixMods.BuildWorks
         private void ApplyAppearance(VisualNode visual)
         {
             bool selected = visual.Selected || visual.ActiveSelection;
-            MaterialPropertyBlock properties = selected ? temporarySelectionHighlight ? hoverProperties : null
+            MaterialPropertyBlock properties = visual.SeeThrough ? null : selected ? temporarySelectionHighlight ? hoverProperties : null
                 : visual.Hovered ? hoverProperties : null;
             foreach (Renderer renderer in visual.Renderers)
                 if (renderer) renderer.SetPropertyBlock(properties);
@@ -1965,6 +2048,7 @@ namespace OstrixMods.BuildWorks
             BlueprintEditorDocument document,
             IReadOnlyDictionary<string, VisualNode> sourceVisuals)
         {
+            occludersDirty = true;
             List<string> active = ExpandedPartIds(
                 document,
                 string.IsNullOrEmpty(document.ActiveNodeId)

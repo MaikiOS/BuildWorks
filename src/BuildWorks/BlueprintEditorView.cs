@@ -409,6 +409,7 @@ namespace OstrixMods.BuildWorks
         private readonly GameObject viewportSettings;
         private readonly Button interfaceScaleButton;
         private readonly RectTransform viewportControls;
+        private readonly Button occluderFadeButton;
         private readonly TMP_InputField scaleStepInput;
         public float ScaleStepPercent { get; private set; } = 10f;
         private readonly TMP_InputField[] viewportScaleInputs = new TMP_InputField[5];
@@ -1017,11 +1018,12 @@ namespace OstrixMods.BuildWorks
                 statusText.color = MutedColor;
                 statusText.raycastTarget = false;
                 statusText.overflowMode = TextOverflowModes.Ellipsis;
-                SetInsets((RectTransform)statusText.transform, 12f, 2f, 12f, 24f);
+                SetTopAnchored((RectTransform)statusText.transform, 12f, 2f, 12f, 22f);
                 statusHintText = CreateText("StatusHints", status, string.Empty,
-                    12f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+                    12f, FontStyles.Normal, TextAlignmentOptions.TopLeft);
                 statusHintText.color = TextColor;
                 statusHintText.raycastTarget = false;
+                statusHintText.textWrappingMode = TextWrappingModes.Normal;
                 statusHintText.overflowMode = TextOverflowModes.Ellipsis;
                 SetInsets((RectTransform)statusHintText.transform, 12f, 24f, 12f, 2f);
 
@@ -1036,14 +1038,17 @@ namespace OstrixMods.BuildWorks
                 tooltip.gameObject.SetActive(false);
 
                 viewportControls = CreatePanel("ViewportControls", viewport, Color.clear, null);
-                SetTopRight(viewportControls, 12f, 12f, 84f, 38f);
+                SetTopRight(viewportControls, 12f, 12f, 214f, 38f);
+                occluderFadeButton = CreateButton("OccluderFadeToggle", viewportControls,
+                    T("editor.view.see_through"), 122f, () => OccluderFadeRequested?.Invoke());
+                SetTopLeft((RectTransform)occluderFadeButton.transform, 0f, 0f, 122f, 38f);
                 gridButton = CreateIconButton("GridToggle", viewportControls, null, "#", 38f,
                     () => { showGrid = !showGrid; PublishViewportSettings(); }, T("editor.view.grid_tooltip"));
-                SetTopLeft((RectTransform)gridButton.transform, 0f, 0f, 38f, 38f);
+                SetTopLeft((RectTransform)gridButton.transform, 130f, 0f, 38f, 38f);
                 projectionButton = CreateIconButton("ProjectionToggle", viewportControls, "frame", "◈", 38f,
                     () => { SetProjection(!orthographic); ProjectionChanged?.Invoke(orthographic); },
                     T("editor.view.projection_tooltip"));
-                SetTopLeft((RectTransform)projectionButton.transform, 46f, 0f, 38f, 38f);
+                SetTopLeft((RectTransform)projectionButton.transform, 176f, 0f, 38f, 38f);
                 SetSelected(gridButton, showGrid);
                 viewportSettings = CreatePanel("ViewportSettings", viewport, PanelRaised).gameObject;
                 SetTopRight((RectTransform)viewportSettings.transform, 12f, 56f, 320f, 454f);
@@ -1322,6 +1327,8 @@ namespace OstrixMods.BuildWorks
         internal event Action<BlueprintEditorLightingPreset> LightingChanged;
         internal event Action<float, float, float, float, float, bool> ViewportSettingsChanged;
         internal event Action<bool> ProjectionChanged;
+        internal event Action OccluderFadeRequested;
+        internal void SetOccluderFade(bool enabled) => SetSelected(occluderFadeButton, enabled);
         internal event Action<string, bool, bool> NodeClicked;
         internal event Action<string, bool> VisibilityChanged;
         internal event Action<string, bool> LockChanged;

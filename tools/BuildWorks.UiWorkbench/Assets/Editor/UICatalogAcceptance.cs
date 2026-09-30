@@ -59,7 +59,8 @@ internal static class UICatalogAcceptance
                 Canvas.ForceUpdateCanvases();
                 RectTransform outliner = Field<RectTransform>(view, "outliner");
                 RectTransform rows = Field<RectTransform>(view, "outlinerRowViewport");
-                Require(rows.offsetMin.x == 4f && rows.offsetMax.x == -4f,
+                Require(rows.offsetMin.x == 4f && rows.offsetMax.x == -18f &&
+                    rows.offsetMax.y == -(float)BlueprintEditorLayout.OutlinerHeaderHeight,
                     "Outliner rows still cover the left/right frame");
                 EnsureInside(outliner, rows);
                 int newGroups = 0;
@@ -268,6 +269,36 @@ internal static class UICatalogAcceptance
                 TestNumericDefaults(view, input);
                 view.HideViewportSettings();
                 TestOutlinerDragDrop(view);
+                document.SetPrimaryPart("a"); view.Bind(document, true, null, Vector3.one);
+                Canvas.ForceUpdateCanvases();
+                TMP_Text badge = Button(view, "Row_a").transform.Find("AnchorRole").GetComponent<TMP_Text>();
+                Require(badge.raycastTarget && badge.text.Contains("★") && badge.GetComponent<BlueprintEditorHoverTarget>(),
+                    "Blueprint anchor badge cannot receive hover");
+                badge.GetComponent<BlueprintEditorHoverTarget>().OnPointerEnter(new PointerEventData(EventSystem.current));
+                input.Pointer = Center(badge.rectTransform); view.Tick();
+                Require(Field<string>(view, "pendingTooltipText") == BuildWorksLocalization.Text("editor.view.blueprint_anchor"),
+                    "Anchor badge did not dispatch its role tooltip");
+                badge.GetComponent<BlueprintEditorHoverTarget>().OnPointerExit(new PointerEventData(EventSystem.current));
+                Image plainRow = Button(view, "Row_b").GetComponent<Image>();
+                Color stripe = plainRow.color;
+                view.SetHoveredNode("b"); view.SetHoveredNode(null);
+                Require(plainRow.color == stripe, "Hover leave changed the row stripe");
+                var many = new List<BlueprintEditorPart>();
+                for (int index = 0; index < 40; ++index)
+                    many.Add(new BlueprintEditorPart("scroll" + index, "wall", "Wall " + index,
+                        new Point3(index,0,0), new Rotation3(0,0,0,1)));
+                var crowded = new BlueprintEditorDocument(null, "Scroll", "Other", many);
+                crowded.SelectOnly("scroll0"); view.Bind(crowded, true, null, Vector3.one);
+                Canvas.ForceUpdateCanvases();
+                ScrollRect treeScroll = outliner.GetComponent<ScrollRect>();
+                treeScroll.Rebuild(CanvasUpdate.PostLayout);
+                Require(treeScroll.verticalScrollbar && treeScroll.verticalScrollbar.gameObject.activeSelf &&
+                    treeScroll.verticalScrollbar.size < 1f && treeScroll.scrollSensitivity == 132f,
+                    "Overflowing Outliner has no visible scrollbar or accelerated wheel");
+                treeScroll.verticalNormalizedPosition = 1f;
+                Scroll(treeScroll.gameObject, -1f); Canvas.ForceUpdateCanvases();
+                Require(treeScroll.verticalNormalizedPosition < 1f && crowded.IsPartSelected("scroll0"),
+                    "Tree scrolling changed selection or did not scroll");
                 return "Actual UI: card-only wheel/QE/typing guard, materials retain native scroll, numeric RMB defaults and uniform step/free scrub, live Array scrub and shared step controls, Outliner row RMB tree-only context with blueprint/group anchor actions, native ProcessDrag/ReleaseMouse multi-selection group/root drops with Undo/cycle/lock/edge-scroll, catalog payload and viewport settings passed";
             }
             finally { Object.Destroy(templateObject); }

@@ -543,6 +543,13 @@ internal static class ControllerInputAcceptance
                 Require(guide.gameObject.activeInHierarchy && Field<int>(controller, "contourPreviewCount") == 0 &&
                     Field<List<string>>(controller, "contourSupportIds").Count == 0 && doc.Parts.Count == 4,
                     "Contour hover must show only the guide without locking supports, copying or editing");
+                var guideBefore = new Vector3[guide.positionCount]; guide.GetPositions(guideBefore);
+                Vector2 sameEdge = scene.Camera.WorldToScreenPoint(new Vector3(.4f,1.96f,-.1f));
+                Frame(controller, input, sameEdge); yield return null;
+                Require(guide.positionCount == guideBefore.Length, "Moving along an edge changed guide size");
+                for (int point = 0; point < guideBefore.Length; ++point)
+                    Require((guide.GetPosition(point) - guideBefore[point]).sqrMagnitude < .000001f,
+                        "Contour guide follows cursor instead of actual edge endpoints");
                 Frame(controller, input, Vector2.zero); yield return null;
                 Require(!guide.gameObject.activeSelf, "Contour guide remains after leaving the edge");
                 Frame(controller, input, edge, 1); yield return null;
@@ -652,6 +659,26 @@ internal static class ControllerInputAcceptance
         Require(Field<Transform>(scene, "majorGrid").gameObject.activeSelf &&
             Field<Transform>(scene, "minorGrid").gameObject.activeSelf && !scene.Camera.orthographic,
             "Viewport toolbar fixture did not restore grid/perspective");
+        Camera template = Field<Camera>(controller, "cameraTemplate");
+        float worldFov = template.fieldOfView;
+        NativeClick(view, uiCamera, "View"); yield return null;
+        Slider fov = Field<Slider>(view, "fieldOfViewSlider");
+        TMP_InputField fovInput = Field<TMP_InputField>(view, "fieldOfViewInput");
+        fov.value = 85f; yield return null;
+        Require(Mathf.Abs(scene.Camera.fieldOfView - 85f) < .001f && template.fieldOfView == worldFov,
+            "FOV slider did not change only the editor camera");
+        fovInput.SetTextWithoutNotify("55"); fovInput.onEndEdit.Invoke("55"); yield return null;
+        Require(Mathf.Abs(scene.Camera.fieldOfView - 55f) < .001f && Mathf.Abs(fov.value - 55f) < .001f,
+            "Numeric FOV did not synchronize camera and slider");
+        NativeClick(view, uiCamera, "FieldOfViewReset"); yield return null;
+        Require(Mathf.Abs(scene.Camera.fieldOfView - worldFov) < .001f, "FOV reset differs from game camera");
+        view.HideViewportSettings();
+        NativeClick(view, uiCamera, "ProjectionToggle"); yield return null;
+        Require(!fov.interactable && !fovInput.interactable && !Field<Button>(view, "fieldOfViewReset").interactable,
+            "Orthographic view leaves perspective FOV controls active");
+        NativeClick(view, uiCamera, "ProjectionToggle"); yield return null;
+        Require(fov.interactable && fovInput.interactable && template.fieldOfView == worldFov,
+            "Perspective did not restore editor FOV controls or changed world camera");
     }
 
     private static IEnumerable TestTransformContract(BlueprintEditorController controller, InputFrames input,

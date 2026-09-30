@@ -34,14 +34,14 @@ namespace OstrixMods.BuildWorks.Geometry
     public sealed class BlueprintEditorLayout
     {
         public const double TopHeight = 72.0;
-        public const double StatusHeight = 144.0;
+        public const double StatusHeight = 216.0;
         private const double RightColumnBottomInset = 48.0;
         public const double RailWidth = 56.0;
         public const double StandardRightWidth = 360.0;
         public const double CompactRightWidth = 280.0;
         public const double MinimumViewportWidth = 720.0;
         public const double OutlinerHeaderHeight = 116.0;
-        public const double OutlinerRowHeight = 44.0;
+        public const double OutlinerRowHeight = 30.0;
         public const double MinimumInspectorHeight = 440.0;
         public const int CatalogColumns = 12;
         public const int CatalogRows = 4;

@@ -808,7 +808,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.40.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.41.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -1017,7 +1017,10 @@ $editorContourEdgeOperands = @(
 ) -join "`n"
 Assert-Contract ($editorContourEdgeOperands -match 'AnchorAdjustment::ConnectableSnapEdges' -and
     $editorContourEdgeOperands -match 'Camera::WorldToScreenPoint' -and
-    $editorContourEdgeOperands -match 'AnchorAdjustment::PerspectiveSegmentParameter') `
+    $editorContourEdgeOperands -match 'UnityEngine.Mathf::Clamp01' -and
+    $editorContourDiscoveryOperands -match 'Edge3::get_Start' -and
+    $editorContourDiscoveryOperands -match 'Edge3::get_End' -and
+    $editorContourDiscoveryOperands -notmatch 'selectedPointLocal') `
     'Blueprint editor contour no longer follows a visible native snap edge.'
 $editorView = $pluginTypes | Where-Object Name -eq 'BlueprintEditorView'
 Assert-Contract (@($editorView).Count -eq 1) `
@@ -2738,4 +2741,4 @@ if (Test-Path -LiteralPath $buildCameraPath -PathType Leaf) {
         'BuildWorks does not restore the current Build Camera yaw and pitch.'
 }
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.40 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.41 and Valheim Steam build 25185596.'

@@ -445,6 +445,14 @@ namespace OstrixMods.BuildWorks
             view.ViewportSettingsChanged += (move, rotation, array, points, scale, grid) =>
                 scene.SetViewportSettings(move, rotation, array, points, scale, grid);
             view.ProjectionChanged += value => { orthographic = value; ApplyCamera(); };
+            view.FieldOfViewChanged += degrees => { scene.SetFieldOfView(degrees); ApplyCamera(); };
+            view.FieldOfViewResetRequested += () =>
+            {
+                scene.SetFieldOfView(cameraTemplate.fieldOfView);
+                view.SetFieldOfView(scene.Camera.fieldOfView, orthographic);
+                ApplyCamera();
+            };
+            view.SetFieldOfView(scene.Camera.fieldOfView, orthographic);
             view.OccluderFadeRequested += ToggleOccluderFade;
             view.NodeClicked += SelectNode;
             view.VisibilityChanged += (id, visible) => ApplyDocumentEdit(() =>
@@ -749,7 +757,7 @@ namespace OstrixMods.BuildWorks
             {
                 hints = BuildWorksLocalization.Text("editor.hint.select");
                 if (document.EditablePartSelectionCount > 0)
-                    hints += "\n" + BuildWorksLocalization.Text("editor.hint.transform");
+                    hints = BuildWorksLocalization.Text("editor.hint.transform");
             }
             if (!view.HasModal && !view.HasOutlinerContextMenu && !view.HasOutlinerMenu &&
                 !view.HasViewportSettings && !view.HasCatalog && !view.IsOutlinerDragging &&
@@ -757,12 +765,14 @@ namespace OstrixMods.BuildWorks
                 !IsGizmoDragging && !rightCameraTracking && !input.GetMouseButton(1))
             {
                 bool selected = document.EditablePartSelectionCount > 0;
-                hints = BuildWorksLocalization.Text(selected
-                    ? "editor.hint.modes_selected" : "editor.hint.modes_empty") + "\n" + hints + "\n" +
-                    BuildWorksLocalization.Text("editor.hint.commands") + "\n" +
-                    BuildWorksLocalization.Text(selected
-                        ? "editor.hint.visibility_selected" : "editor.hint.visibility_empty") + "\n" +
-                    BuildWorksLocalization.Text("editor.hint.camera_idle");
+                view.SetContextHintGroups(
+                    BuildWorksLocalization.Text(selected ? "editor.hint.modes_selected" : "editor.hint.modes_empty"),
+                    hints,
+                    BuildWorksLocalization.Text(selected ? "editor.hint.selection_actions" : "editor.hint.selection_empty"),
+                    BuildWorksLocalization.Text("editor.hint.commands"),
+                    BuildWorksLocalization.Text(selected ? "editor.hint.visibility_selected" : "editor.hint.visibility_empty"),
+                    BuildWorksLocalization.Text("editor.hint.camera_idle"));
+                return;
             }
             view.SetContextHints(hints);
         }

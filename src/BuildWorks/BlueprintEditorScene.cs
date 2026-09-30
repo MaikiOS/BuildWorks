@@ -134,7 +134,7 @@ namespace OstrixMods.BuildWorks
             public bool ActiveSelection;
             public bool Hovered;
             public bool SeeThrough;
-            public readonly List<Material[]> SolidMaterials = new List<Material[]>();
+            public readonly List<bool> OriginalRenderingOff = new List<bool>();
             public readonly List<PickSurface> PickSurfaces = new List<PickSurface>();
             public readonly List<Vector3> SnapLocal = new List<Vector3>();
             public int NativeSnapCount;
@@ -212,7 +212,6 @@ namespace OstrixMods.BuildWorks
         private string hoveredId;
         private bool temporarySelectionHighlight;
         private bool occludersDirty = true;
-        private Material occluderMaterial;
         internal bool OccluderFadeEnabled { get; private set; }
         private float groundHeight;
         private bool disposed;
@@ -321,12 +320,18 @@ namespace OstrixMods.BuildWorks
                 camera.orthographicSize = size;
         }
 
+        internal void SetFieldOfView(float degrees)
+        {
+            ThrowIfDisposed();
+            if (float.IsNaN(degrees) || float.IsInfinity(degrees)) return;
+            camera.fieldOfView = Mathf.Clamp(degrees, 10f, 120f);
+            occludersDirty = true;
+        }
+
         internal void SetOccluderFade(bool enabled)
         {
             ThrowIfDisposed();
             if (OccluderFadeEnabled == enabled) return;
-            if (enabled && !occluderMaterial)
-                occluderMaterial = CreateColorMaterial("Occluder", new Color(.6f, .7f, .8f, .18f), true);
             OccluderFadeEnabled = enabled;
             occludersDirty = true;
             UpdateOccluders();
@@ -379,13 +384,8 @@ namespace OstrixMods.BuildWorks
                 {
                     Renderer renderer = visual.Renderers[index];
                     if (!renderer) continue;
-                    Material[] materials = visual.SolidMaterials[index];
-                    if (fade)
-                    {
-                        materials = new Material[materials.Length];
-                        for (int slot = 0; slot < materials.Length; ++slot) materials[slot] = occluderMaterial;
-                    }
-                    renderer.sharedMaterials = materials;
+                    // Hide drawing only: mesh picking still supplies occlusion and snap geometry.
+                    renderer.forceRenderingOff = fade || visual.OriginalRenderingOff[index];
                 }
                 ApplyAppearance(visual);
             }
@@ -521,7 +521,7 @@ namespace OstrixMods.BuildWorks
             foreach (KeyValuePair<string, VisualNode> entry in visuals)
             {
                 VisualNode visual = entry.Value;
-                if (!includeLocked && visual.Locked || !visual.Root.activeInHierarchy ||
+                if (!includeLocked && visual.Locked || visual.SeeThrough || !visual.Root.activeInHierarchy ||
                     !TryBounds(visual, out Bounds bounds) ||
                     !bounds.IntersectRay(ray) ||
                     !TryMeshHit(visual, ray, out float distance, out Vector3 hitNormal) ||
@@ -612,8 +612,7 @@ namespace OstrixMods.BuildWorks
             BlueprintEditorPart seed = FindPart(document, seedId);
             if (seed == null || !visuals.TryGetValue(seedId, out VisualNode seedVisual) ||
                 !TrySelectEditorContourEdge(
-                    seedVisual, screenPosition, out Edge3 selectedEdge,
-                    out Vector3 pathPointLocal))
+                    seedVisual, screenPosition, out Edge3 selectedEdge))
             {
                 warning = BuildWorksLocalization.Text("blueprint.scene.edge_pair_missing");
                 return false;
@@ -668,8 +667,22 @@ namespace OstrixMods.BuildWorks
             {
                 string stableId = candidateIds[index];
                 orderedSupportIds.Add(stableId);
-                guidePoints.Add(visuals[stableId].Root.transform.TransformPoint(pathPointLocal));
+                Transform support = visuals[stableId].Root.transform;
+                Vector3 start = support.TransformPoint(ToUnity(selectedEdge.Start));
+                Vector3 end = support.TransformPoint(ToUnity(selectedEdge.End));
+                Vector3 toward = guidePoints.Count > 0 ? guidePoints[guidePoints.Count - 1] :
+                    visuals[candidateIds[ordered[1]]].Root.transform.TransformPoint(
+                        ToUnity((selectedEdge.Start + selectedEdge.End) * .5));
+                bool reverse = guidePoints.Count > 0
+                    ? (end - toward).sqrMagnitude < (start - toward).sqrMagnitude
+                    : (start - toward).sqrMagnitude < (end - toward).sqrMagnitude;
+                if (reverse) { Vector3 swap = start; start = end; end = swap; }
+                if (guidePoints.Count == 0 || (start - toward).sqrMagnitude > .000001f)
+                    guidePoints.Add(start);
+                guidePoints.Add(end);
             }
+            if (closed && (guidePoints[0] - guidePoints[guidePoints.Count - 1]).sqrMagnitude < .000001f)
+                guidePoints.RemoveAt(guidePoints.Count - 1);
             return true;
         }
 
@@ -875,11 +888,9 @@ namespace OstrixMods.BuildWorks
         private bool TrySelectEditorContourEdge(
             VisualNode visual,
             Vector2 mouse,
-            out Edge3 selected,
-            out Vector3 selectedPointLocal)
+            out Edge3 selected)
         {
             selected = default;
-            selectedPointLocal = Vector3.zero;
             var native = new List<Point3>(visual.NativeSnapCount);
             for (int index = 0; index < visual.NativeSnapCount; ++index)
                 native.Add(ToGeometry(visual.SnapLocal[index]));
@@ -906,9 +917,6 @@ namespace OstrixMods.BuildWorks
                 if (distance >= best) continue;
                 best = distance;
                 selected = edge;
-                float perspectiveParameter = (float)AnchorAdjustment.PerspectiveSegmentParameter(
-                    screenParameter, startScreen.z, endScreen.z);
-                selectedPointLocal = Vector3.Lerp(start, end, perspectiveParameter);
             }
             return best < maximum;
         }
@@ -920,7 +928,7 @@ namespace OstrixMods.BuildWorks
             foreach (KeyValuePair<string, VisualNode> entry in visuals)
             {
                 VisualNode visual = entry.Value;
-                if (visual.Locked || !visual.Root.activeInHierarchy ||
+                if (visual.Locked || visual.SeeThrough || !visual.Root.activeInHierarchy ||
                     !TryBounds(visual, out Bounds bounds)) continue;
                 if (ScreenRectIntersectsBounds(camera, screenRect, bounds))
                     result.Add(entry.Key);
@@ -1764,7 +1772,7 @@ namespace OstrixMods.BuildWorks
                         });
                     }
                     renderer.sharedMaterials = previewMaterials;
-                    result.SolidMaterials.Add(previewMaterials);
+                    result.OriginalRenderingOff.Add(renderer.forceRenderingOff);
                 }
                 if (selectable || captureSurfaces) CapturePickSurfaces(result);
                 if (result.PlacementLocal.Count == 0) AddBoundsPlacementPoints(result);

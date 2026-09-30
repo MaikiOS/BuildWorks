@@ -347,7 +347,7 @@ public static class RuntimeEditorAcceptance
                 Require(!text.isTextOverflowing, "Button text overflows: " + text.text);
             if (text.name == "ContourInfo" || text.name == "ArrayInfo")
                 Require(!text.isTextOverflowing, "Tool instructions overflow: " + text.name);
-            if (text.name == "StatusHints")
+            if (text.name.StartsWith("StatusHints", StringComparison.Ordinal))
                 Require(!text.isTextTruncated && !text.isTextOverflowing,
                     "Context hotkeys are clipped: " + text.text);
         }
@@ -815,30 +815,33 @@ public static class RuntimeEditorAcceptance
             scene.Camera.targetTexture = target;
             scene.Camera.Render(); SavePixels(target, Path.Combine(output,"see-through-off.png"));
             scene.SetOccluderFade(true);
-            Require(front.sharedMaterial != original && front.sharedMaterial.color.a < .3f &&
-                front.sharedMaterial.GetInt("_ZWrite") == 0, "Front occluder is not transparent without depth writes");
+            Require(front.forceRenderingOff && front.enabled && front.sharedMaterial == original,
+                "Front occluder was not fully hidden without changing its material or mesh");
             foreach (string id in new[] {"selected","behind","side","hidden"})
                 Require(!Field<bool>(visuals[id], "SeeThrough"), "Non-occluder or selection faded: " + id);
-            Require(selected.sharedMaterial == selectionMaterial && wall.GetComponent<Renderer>().sharedMaterial == sourceMaterial,
+            Require(!selected.forceRenderingOff && selected.sharedMaterial == selectionMaterial && wall.GetComponent<Renderer>().sharedMaterial == sourceMaterial,
                 "See-through mutated selection or source prefab materials");
+            Vector2 center = scene.Camera.WorldToScreenPoint(new Vector3(0,1,0));
+            Require(scene.TryPickPoint(center, out string picked, out _) && picked == "selected",
+                "Invisible occluder intercepts the selected part");
             scene.SetHovered("front",doc); scene.UpdateOccluders();
             Require(!front.HasPropertyBlock(), "Hover overrides occluder alpha");
             scene.Camera.Render(); SavePixels(target, Path.Combine(output,"see-through-on.png"));
             scene.SetCameraPose(new Vector3(10,1,0), Quaternion.LookRotation(Vector3.left)); scene.UpdateOccluders();
-            Require(front.sharedMaterial == original, "Camera movement leaves stale transparent parts");
+            Require(!front.forceRenderingOff && front.sharedMaterial == original, "Camera movement leaves stale hidden occluders");
             scene.SetCameraPose(new Vector3(0,1,-10), Quaternion.identity); scene.UpdateOccluders();
             doc.SelectOnly("front"); scene.TrySync(doc,out _); scene.UpdateOccluders();
-            Require(front.sharedMaterial == original, "New selection stays transparent");
+            Require(!front.forceRenderingOff && front.sharedMaterial == original, "New selection stays hidden");
             doc.SelectOnly("selected"); scene.TrySync(doc,out _); scene.UpdateOccluders();
             scene.SetOccluderFade(false);
-            Require(front.sharedMaterial == original, "Turning off does not restore exact original material");
+            Require(!front.forceRenderingOff && front.sharedMaterial == original, "Turning off does not restore original drawing state");
             scene.SetOccluderFade(true); doc.ClearSelection(); scene.TrySync(doc,out _); scene.UpdateOccluders();
-            Require(front.sharedMaterial == original && !doc.IsEffectivelyVisible("hidden") && doc.Parts.Count == 5,
+            Require(!front.forceRenderingOff && front.sharedMaterial == original && !doc.IsEffectivelyVisible("hidden") && doc.Parts.Count == 5,
                 "Clearing selection leaves transparency or changes document visibility");
             scene.Camera.targetTexture = null; Object.Destroy(target);
         }
         Object.Destroy(wall);
-        checks.Add("Editor see-through: F7/button; only mesh occluders fade; selection/source solid; hover, camera, selection and off restore exact materials; hidden parts unchanged");
+        checks.Add("Editor see-through: F7/button; mesh occluders fully hidden; selection/source solid; camera, selection and off restore drawing; materials and document visibility unchanged");
     }
 
     private static IEnumerable TestSkin()

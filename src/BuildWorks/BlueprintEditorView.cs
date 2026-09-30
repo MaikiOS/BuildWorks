@@ -374,6 +374,10 @@ namespace OstrixMods.BuildWorks
         private readonly Button contourApplyButton;
         private readonly TMP_Text statusText;
         private readonly TMP_Text statusHintText;
+        private readonly TMP_Text[] contextHintGroups = new TMP_Text[6];
+        private TMP_InputField fieldOfViewInput;
+        private Slider fieldOfViewSlider;
+        private Button fieldOfViewReset;
         private float statusMessageUntil;
         private readonly Button undoButton;
         private readonly Button redoButton;
@@ -640,13 +644,25 @@ namespace OstrixMods.BuildWorks
                 SetTopRight((RectTransform)outlinerFilterButton.transform, 8f, 76f, 76f, 32f);
                 RectTransform rowViewport = CreateRect("RowsViewport", outliner);
                 outlinerRowViewport = rowViewport;
-                SetInsets(rowViewport, 4f, (float)BlueprintEditorLayout.OutlinerHeaderHeight - 4f, 4f, 4f);
+                SetInsets(rowViewport, 4f, (float)BlueprintEditorLayout.OutlinerHeaderHeight, 18f, 4f);
                 rowViewport.gameObject.AddComponent<RectMask2D>();
                 ScrollRect rowScroll = outliner.gameObject.AddComponent<ScrollRect>();
                 rowScroll.horizontal = false;
                 rowScroll.vertical = true;
                 rowScroll.movementType = ScrollRect.MovementType.Clamped;
-                rowScroll.scrollSensitivity = 88f;
+                rowScroll.scrollSensitivity = 132f;
+                RectTransform scrollTrack = CreatePanel("OutlinerScrollTrack", outliner, ButtonColor, null);
+                SetTopRight(scrollTrack, 4f, (float)BlueprintEditorLayout.OutlinerHeaderHeight, 10f, 0f);
+                scrollTrack.anchorMin = new Vector2(1f, 0f);
+                scrollTrack.offsetMin = new Vector2(-14f, 4f);
+                RectTransform scrollThumb = CreatePanel("Thumb", scrollTrack, MutedColor, null);
+                SetInsets(scrollThumb, 1f, 1f, 1f, 1f);
+                Scrollbar scrollbar = scrollTrack.gameObject.AddComponent<Scrollbar>();
+                scrollbar.handleRect = scrollThumb;
+                scrollbar.targetGraphic = scrollThumb.GetComponent<Image>();
+                scrollbar.direction = Scrollbar.Direction.BottomToTop;
+                rowScroll.verticalScrollbar = scrollbar;
+                rowScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
                 outlinerRows = CreateRect("Rows", rowViewport);
                 outlinerRows.anchorMin = new Vector2(0f, 1f);
                 outlinerRows.anchorMax = new Vector2(1f, 1f);
@@ -1026,6 +1042,31 @@ namespace OstrixMods.BuildWorks
                 statusHintText.textWrappingMode = TextWrappingModes.Normal;
                 statusHintText.overflowMode = TextOverflowModes.Ellipsis;
                 SetInsets((RectTransform)statusHintText.transform, 12f, 24f, 12f, 2f);
+                for (int index = 0; index < contextHintGroups.Length; ++index)
+                {
+                    TMP_Text hint = CreateText("StatusHints" + index, status, string.Empty,
+                        12f, FontStyles.Normal, TextAlignmentOptions.TopLeft);
+                    hint.raycastTarget = false;
+                    hint.textWrappingMode = TextWrappingModes.Normal;
+                    hint.overflowMode = TextOverflowModes.Ellipsis;
+                    RectTransform area = hint.rectTransform;
+                    int column = index % 3, row = index / 3;
+                    area.anchorMin = new Vector2(column / 3f, row == 0 ? .5f : 0f);
+                    area.anchorMax = new Vector2((column + 1) / 3f, row == 0 ? 1f : .5f);
+                    area.offsetMin = new Vector2(12f, 4f);
+                    area.offsetMax = new Vector2(-12f, row == 0 ? -26f : -4f);
+                    contextHintGroups[index] = hint;
+                    hint.gameObject.SetActive(false);
+                    if (column > 0)
+                    {
+                        RectTransform divider = CreatePanel("HintDivider" + index, status, new Color(.5f, .45f, .3f, .3f), null);
+                        divider.GetComponent<Image>().raycastTarget = false;
+                        divider.anchorMin = new Vector2(column / 3f, row == 0 ? .5f : 0f);
+                        divider.anchorMax = new Vector2(column / 3f, row == 0 ? 1f : .5f);
+                        divider.offsetMin = new Vector2(0f, 8f);
+                        divider.offsetMax = new Vector2(1f, row == 0 ? -28f : -8f);
+                    }
+                }
 
                 tooltip = CreatePanel("Tooltip", safeRoot, new Color(0.06f, 0.07f, 0.08f, 0.99f), BlueprintEditorSkin.Surface.Tooltip);
                 tooltip.GetComponent<Image>().raycastTarget = false;
@@ -1051,7 +1092,7 @@ namespace OstrixMods.BuildWorks
                 SetTopLeft((RectTransform)projectionButton.transform, 176f, 0f, 38f, 38f);
                 SetSelected(gridButton, showGrid);
                 viewportSettings = CreatePanel("ViewportSettings", viewport, PanelRaised).gameObject;
-                SetTopRight((RectTransform)viewportSettings.transform, 12f, 56f, 320f, 454f);
+                SetTopRight((RectTransform)viewportSettings.transform, 12f, 56f, 320f, 536f);
                 TMP_Text viewTitle = CreateText("ViewportSettingsTitle", viewportSettings.transform,
                     T("editor.view.viewport_settings"), 15f, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
                 SetTopLeft((RectTransform)viewTitle.transform, 12f, 8f, 240f, 28f);
@@ -1098,6 +1139,31 @@ namespace OstrixMods.BuildWorks
                 interfaceScaleButton = CreateButton("InterfaceScale", viewportSettings.transform,
                     T("editor.view.interface_scale", 100), 294f, CycleUiScale);
                 SetTopLeft((RectTransform)interfaceScaleButton.transform, 12f, 354f, 294f, 36f);
+                TMP_Text fovLabel = CreateText("FieldOfViewLabel", viewportSettings.transform,
+                    T("editor.view.field_of_view"), 13f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+                SetTopLeft(fovLabel.rectTransform, 12f, 398f, 190f, 32f);
+                fieldOfViewInput = CreateInput("FieldOfView", viewportSettings.transform,
+                    new Vector2(212f, -398f), 94f, .1f, 10f, 120f);
+                ((RectTransform)fieldOfViewInput.transform).sizeDelta = new Vector2(94f, 32f);
+                fieldOfViewInput.onEndEdit.AddListener(_ =>
+                {
+                    if (TryRead(fieldOfViewInput, out float degrees) && !float.IsNaN(degrees) && !float.IsInfinity(degrees))
+                    { SetFieldOfView(degrees, orthographic); FieldOfViewChanged?.Invoke(fieldOfViewSlider.value); }
+                });
+                RectTransform fovTrack = CreatePanel("FieldOfViewSlider", viewportSettings.transform, ButtonColor, null);
+                SetTopLeft(fovTrack, 12f, 442f, 170f, 24f);
+                RectTransform fovHandle = CreatePanel("Handle", fovTrack, AccentColor, null);
+                fovHandle.anchorMin = fovHandle.anchorMax = new Vector2(0f, .5f);
+                fovHandle.sizeDelta = new Vector2(12f, 18f);
+                fieldOfViewSlider = fovTrack.gameObject.AddComponent<Slider>();
+                fieldOfViewSlider.minValue = 10f; fieldOfViewSlider.maxValue = 120f;
+                fieldOfViewSlider.handleRect = fovHandle;
+                fieldOfViewSlider.targetGraphic = fovHandle.GetComponent<Image>();
+                fieldOfViewSlider.onValueChanged.AddListener(value =>
+                { fieldOfViewInput.SetTextWithoutNotify(value.ToString("0.#", CultureInfo.InvariantCulture)); FieldOfViewChanged?.Invoke(value); });
+                fieldOfViewReset = CreateButton("FieldOfViewReset", viewportSettings.transform,
+                    T("editor.view.game_fov"), 116f, () => FieldOfViewResetRequested?.Invoke());
+                SetTopLeft((RectTransform)fieldOfViewReset.transform, 190f, 436f, 116f, 32f);
                 Button resetView = CreateButton("ViewportSettingsReset", viewportSettings.transform,
                     T("editor.view.reset_settings"), 294f, () =>
                     {
@@ -1106,7 +1172,7 @@ namespace OstrixMods.BuildWorks
                         SetViewportSettings(1f, 1f, 1f, 1f, 1f, true);
                         PublishViewportSettings();
                     });
-                SetTopLeft((RectTransform)resetView.transform, 12f, 404f, 294f, 36f);
+                SetTopLeft((RectTransform)resetView.transform, 12f, 488f, 294f, 36f);
                 viewportSettings.SetActive(false);
 
                 catalog = CreatePanel(
@@ -1327,6 +1393,16 @@ namespace OstrixMods.BuildWorks
         internal event Action<BlueprintEditorLightingPreset> LightingChanged;
         internal event Action<float, float, float, float, float, bool> ViewportSettingsChanged;
         internal event Action<bool> ProjectionChanged;
+        internal event Action<float> FieldOfViewChanged;
+        internal event Action FieldOfViewResetRequested;
+
+        internal void SetFieldOfView(float degrees, bool orthographicView)
+        {
+            degrees = Mathf.Clamp(degrees, 10f, 120f);
+            fieldOfViewInput.SetTextWithoutNotify(degrees.ToString("0.#", CultureInfo.InvariantCulture));
+            fieldOfViewSlider.SetValueWithoutNotify(degrees);
+            fieldOfViewInput.interactable = fieldOfViewSlider.interactable = fieldOfViewReset.interactable = !orthographicView;
+        }
         internal event Action OccluderFadeRequested;
         internal void SetOccluderFade(bool enabled) => SetSelected(occluderFadeButton, enabled);
         internal event Action<string, bool, bool> NodeClicked;
@@ -1631,8 +1707,39 @@ namespace OstrixMods.BuildWorks
             statusMessageUntil = Time.unscaledTime + Mathf.Max(0.1f, seconds);
         }
 
-        internal void SetContextHints(string text) =>
+        internal void SetContextHints(string text)
+        {
+            statusHintText.gameObject.SetActive(true);
             statusHintText.text = text ?? string.Empty;
+            foreach (TMP_Text group in contextHintGroups) group.gameObject.SetActive(false);
+            foreach (Transform child in status)
+                if (child.name.StartsWith("HintDivider", StringComparison.Ordinal)) child.gameObject.SetActive(false);
+        }
+
+        internal void SetContextHintGroups(params string[] groups)
+        {
+            statusHintText.gameObject.SetActive(false);
+            foreach (Transform child in status)
+                if (child.name.StartsWith("HintDivider", StringComparison.Ordinal)) child.gameObject.SetActive(true);
+            string[] titles = { "editor.hint.section_modes", "editor.hint.section_tool",
+                "editor.hint.section_selection", "editor.hint.section_history",
+                "editor.hint.section_visibility", "editor.hint.section_camera" };
+            for (int index = 0; index < contextHintGroups.Length; ++index)
+            {
+                TMP_Text group = contextHintGroups[index];
+                group.gameObject.SetActive(true);
+                string[] commands = groups[index].Split(new[] { " · " }, StringSplitOptions.None);
+                for (int command = 0; command < commands.Length; ++command)
+                {
+                    int separator = commands[command].IndexOf(" — ", StringComparison.Ordinal);
+                    if (separator > 0) commands[command] = "<b><mark=#78634340>" +
+                        commands[command].Substring(0, separator) + "</mark></b>" +
+                        commands[command].Substring(separator);
+                }
+                group.text = "<b>" + T(titles[index]) + "</b>\n" +
+                    string.Join(" · ", commands);
+            }
+        }
 
         internal void SetSelectionBox(Vector2 start, Vector2 end, bool visible)
         {
@@ -1687,7 +1794,8 @@ namespace OstrixMods.BuildWorks
             Transform row = outlinerRows.Find("Row_" + stableId);
             if (row) row.GetComponent<Image>().color = Contains(boundDocument.Selection, stableId)
                 ? SelectedColor : stableId == hoveredNodeId
-                    ? new Color(0.07f, 0.22f, 0.32f, 1f) : ButtonColor;
+                    ? new Color(0.07f, 0.22f, 0.32f, 1f) :
+                        row.GetSiblingIndex() % 2 == 0 ? PanelColor : PanelRaised;
         }
 
         internal void ShowUnsavedDialog(string blueprintName)
@@ -1737,6 +1845,7 @@ namespace OstrixMods.BuildWorks
         {
             orthographic = value;
             SetSelected(projectionButton, value);
+            if (fieldOfViewSlider) SetFieldOfView(fieldOfViewSlider.value, value);
         }
 
         public bool IsViewportControlHit(Vector2 position)
@@ -2399,7 +2508,8 @@ namespace OstrixMods.BuildWorks
         {
             RectTransform row = CreatePanel("Row_" + stableId, outlinerRows,
                 Contains(document.Selection, stableId) ? SelectedColor :
-                    stableId == hoveredNodeId ? new Color(0.07f, 0.22f, 0.32f, 1f) : ButtonColor, null);
+                    stableId == hoveredNodeId ? new Color(0.07f, 0.22f, 0.32f, 1f) :
+                        outlinerRows.childCount % 2 == 0 ? PanelColor : PanelRaised, null);
             LayoutElement rowLayout = row.gameObject.AddComponent<LayoutElement>();
             rowLayout.preferredHeight = (float)BlueprintEditorLayout.OutlinerRowHeight;
             rowLayout.minHeight = (float)BlueprintEditorLayout.OutlinerRowHeight;
@@ -2420,7 +2530,7 @@ namespace OstrixMods.BuildWorks
             bool groupPivot = false;
             foreach (BlueprintEditorGroup group in document.Groups)
                 if (group.PivotPartId == stableId) { groupPivot = true; break; }
-            string marker = part && document.PrimaryPartId == stableId ? "◆ " : string.Empty;
+            string marker = part && document.PrimaryPartId == stableId ? "★ " : string.Empty;
             if (part && groupPivot) marker += "◇ ";
             if (!part)
             {
@@ -2428,40 +2538,76 @@ namespace OstrixMods.BuildWorks
                 if (group != null && group.PivotPartId != null) marker += "◇ ";
                 if (document.PrimaryGroupId == stableId) marker += "★ ";
             }
-            name.text = marker + labelText +
+            name.text = labelText +
                 (part && missingPrefabNodes.Contains(stableId) ? "  !" : string.Empty);
             SetInsets((RectTransform)name.transform,
-                40f + depth * 18f, 0f, 96f, 0f);
+                40f + depth * 15f, 0f, 88f, 0f);
+            RectTransform kindRect = CreateRect("NodeKind", row);
+            SetTopLeft(kindRect, 22f + depth * 15f, 7f, 16f, 16f);
+            Image kind = kindRect.gameObject.AddComponent<Image>();
+            kind.sprite = icons.Get(part ? "duplicate" : "group");
+            kind.color = AccentColor; kind.preserveAspect = true; kind.raycastTarget = false;
+            TMP_Text role = CreateText("AnchorRole", row, marker.Trim(), 12f, FontStyles.Normal,
+                TextAlignmentOptions.MidlineRight);
+            SetTopRight(role.rectTransform, 58f, 0f, 30f, 30f);
+            role.color = AccentColor;
+            if (marker.Length > 0)
+            {
+                role.raycastTarget = true;
+                bool primary = part ? document.PrimaryPartId == stableId : document.PrimaryGroupId == stableId;
+                string label = primary ? T("editor.view.blueprint_anchor") : string.Empty;
+                if (marker.Contains("◇")) label += (label.Length > 0 ? " · " : string.Empty) + T("editor.view.group_anchor");
+                AddTooltip(role.rectTransform, label);
+            }
             if (!part)
             {
                 Button disclosure = CreateButton(
-                    "Disclosure", row, collapsed ? ">" : "v", 32f,
+                    "Disclosure", row, collapsed ? "▸" : "▾", 20f,
                     () => ToggleGroupCollapsed(stableId));
                 RectTransform disclosureRect = (RectTransform)disclosure.transform;
                 disclosureRect.anchorMin = disclosureRect.anchorMax = new Vector2(0f, 0.5f);
                 disclosureRect.pivot = new Vector2(0f, 0.5f);
-                disclosureRect.anchoredPosition = new Vector2(depth * 18f, 0f);
-                disclosureRect.sizeDelta = new Vector2(32f, 44f);
+                disclosureRect.anchoredPosition = new Vector2(depth * 15f, 0f);
+                disclosureRect.sizeDelta = new Vector2(20f, 28f);
+                StyleTreeControl(disclosure);
             }
             Button eye = CreateIconButton(
-                "Eye", row, visible ? "visibility" : "hidden", visible ? "●" : "○", 44f,
+                "Eye", row, visible ? "visibility" : "hidden", visible ? "●" : "○", 28f,
                 () => VisibilityChanged?.Invoke(stableId, !visible),
                 T(visible ? "editor.view.hide_object" : "editor.view.show_object"));
             RectTransform eyeRect = (RectTransform)eye.transform;
             eyeRect.anchorMin = eyeRect.anchorMax = new Vector2(1f, 0.5f);
             eyeRect.pivot = new Vector2(1f, 0.5f);
-            eyeRect.anchoredPosition = new Vector2(-48f, 0f);
-            eyeRect.sizeDelta = new Vector2(44f, 44f);
+            eyeRect.anchoredPosition = new Vector2(-30f, 0f);
+            eyeRect.sizeDelta = new Vector2(28f, 28f);
+            StyleTreeControl(eye);
             Button lockButton = CreateIconButton(
-                "Lock", row, locked ? "lock" : "unlock", locked ? "■" : "□", 44f,
+                "Lock", row, locked ? "lock" : "unlock", locked ? "■" : "□", 28f,
                 () => LockChanged?.Invoke(stableId, !locked),
                 T(locked ? "editor.view.unlock_object" : "editor.view.lock_object"));
             RectTransform lockRect = (RectTransform)lockButton.transform;
             lockRect.anchorMin = lockRect.anchorMax = new Vector2(1f, 0.5f);
             lockRect.pivot = new Vector2(1f, 0.5f);
             lockRect.anchoredPosition = new Vector2(-2f, 0f);
-            lockRect.sizeDelta = new Vector2(44f, 44f);
+            lockRect.sizeDelta = new Vector2(28f, 28f);
+            StyleTreeControl(lockButton);
+            Image lockIcon = lockButton.transform.Find("Icon")?.GetComponent<Image>();
+            if (lockIcon) lockIcon.color = locked ? AccentColor : MutedColor;
             if (!part) name.color = AccentColor;
+            if (!visible) name.color = MutedColor;
+        }
+
+        private static void StyleTreeControl(Button button)
+        {
+            Image image = button.GetComponent<Image>();
+            image.sprite = null; image.overrideSprite = null; image.color = Color.white;
+            button.transition = Selectable.Transition.ColorTint;
+            ColorBlock colors = button.colors;
+            colors.normalColor = Color.clear;
+            colors.highlightedColor = new Color(.5f, .45f, .3f, .3f);
+            colors.pressedColor = new Color(.6f, .5f, .3f, .5f);
+            colors.selectedColor = colors.highlightedColor;
+            button.colors = colors;
         }
 
         private bool PassesOutlinerFilter(
@@ -3567,6 +3713,8 @@ namespace OstrixMods.BuildWorks
             Place(top, layout.Top);
             Place(rail, layout.Rail);
             Place(viewport, layout.Viewport);
+            viewportSettings.transform.localScale = Vector3.one *
+                Mathf.Min(1f, Mathf.Max(0.1f, ((float)layout.Viewport.Height - 56f) / 536f));
             Place(rightColumn, layout.RightColumn);
             Place(outliner, layout.Outliner);
             Place(inspector, layout.Inspector);

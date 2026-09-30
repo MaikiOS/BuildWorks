@@ -3,7 +3,7 @@
 **English** | [Русский](current-pass_RU.md)
 
 Updated 2026-09-30 from Ostrix's feedback. **TerrainRamp-1.0-Test only**,
-BuildWorks **0.19.40 candidate**, Valheim 1.0.16. Do not test the old DLL as this candidate.
+BuildWorks **0.19.41 candidate**, Valheim 1.0.16. Do not test the old DLL as this candidate.
 Install only with Valheim closed; Valheim is not launched automatically.
 Start with the short series below. Run the rest in separate sessions, not all at once.
 Use a disposable world and blueprint copy, not an important build.
@@ -15,24 +15,28 @@ Use a disposable world and blueprint copy, not an important build.
   camera through ground, and editor English. Do not repeat these wholesale.
 - 0.19.39 owner report accepts menu hover, native tab language refresh and F framing.
   Selection/box behavior is provisionally accepted; report exact steps if it recurs.
-- Open: contour hover/cleanup and shortcut discoverability. Category chooser,
-  resource panel and rebinding require their UI gates. Editor translucency UI
-  was approved and is included in this candidate for game acceptance.
+- Owner accepts contour hover/cleanup and shortcut availability. The approved
+  0.19.41 editor improvements below need game acceptance. Category chooser,
+  resource panel and rebinding still require their separate UI gates.
 - Esc removes the partial build and restores its ghost, but refunds drop on the
   ground. Count-based accounting and multiplayer remain pending.
 - One-piece save is currently disallowed; two pieces save correctly by report.
 
-## Next focused checks after installing 0.19.40
+## Next focused checks after installing 0.19.41
 
 1. **Hover without copies:** edit a disposable blueprint containing three touching
    wooden walls and a separate pole. Stop adding, select the pole and press C over
    the viewport. Hover near a wall's top edge without clicking: a blue guide should
    appear, but no copies. Move onto empty space: the hover guide should disappear.
+   Move along the same edge first: the guide must stay on full edge endpoints,
+   not slide with the cursor. Different edges can deliberately select a different chain.
 2. **Clear the contour:** click that edge to preview copies, then click `CANCEL`.
    The guide and copies must disappear. Press G and select another part; no old
    line should return. Repeat starting with C and a click, but cancel with Esc,
    or switch directly with G/Q, or delete the selected source with Delete.
-3. **Readable keys:** select a part. At the bottom of the viewport, find mode keys
+3. **Readable keys:** select a part. At the bottom of the viewport, find six blocks:
+   Modes, Current tool, Selection/groups, History/save, Visibility and Camera.
+   Within those blocks, find mode keys
    Q/G/A/C, Ctrl+G, Ctrl+D, history, visibility and camera controls. Switch through
    G, A and C: tool actions must change without losing the common mode keys.
    Open the catalog with Tab and type: hints must describe catalog/text input,
@@ -40,12 +44,20 @@ Use a disposable world and blueprint copy, not an important build.
 
 4. **See-through:** place a wall in front of another part. Select the rear part
    in the Outliner, press F7 or click `See-through F7` at the viewport's top right.
-   The front wall becomes a translucent silhouette, the selected part stays solid.
-   Orbit around it: parts no longer blocking the selection regain their materials.
-   Toggle off: all materials return. Clear selection or select the front wall:
-   it must not remain transparent. Hidden parts must remain hidden. Repeat F7
+   The front wall disappears completely, the selected part stays solid and can
+   be picked through it. Orbit around it: parts no longer blocking the selection
+   return. Toggle off: all temporary hiding ends. Clear selection or select the
+   front wall in the tree: it must return. Manually hidden parts stay hidden. Repeat F7
    outside the editor only to verify BuildWorks does not handle it there; another
-   installed mod may own that key in the world. Picking remains unchanged.
+   installed mod may own that key in the world.
+
+5. **Camera and tree:** open Settings in the editor header. Change Field of view
+   with its slider and degree input; As in game must restore the game camera's
+   value. Projection toggle at the viewport disables these controls in orthographic
+   mode. Close the editor: the world camera must be unchanged. Reopen a disposable
+   blueprint with more parts than its tree can fit: scroll by wheel and drag the
+   visible right scrollbar. Rows must stay below Search, names and anchor badges
+   must not cover the eye/lock columns, and scrolling must not change selection.
 
 Double-click framing and shortcut rebinding are not shipped.
 
@@ -292,8 +304,9 @@ respect resources and permissions. Without a second client, record “not tested
 
 ## Reporting results
 
-For now report **1b, 3b, 4a** only. For example: `1b — menu vanished on movement;
-3b — chair, label changes, held point does not; 4a — markers appear early, attaches`.
+For now report **1–5 from the short 0.19.41 series above**, not the historical
+scenarios. For example: `1 — guide stays fixed; 2 — cancellation clears it;
+3 — hints readable; 4 — occluder disappears; 5 — FOV and tree scrolling work`.
 If a step is impossible, give its number and what appears instead; do not guess
 where the tool is hidden. Do not repeat the remaining scenarios yet.
 Read profile logs locally; do not publish personal data. BW-00 stays open;

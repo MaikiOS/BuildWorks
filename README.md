@@ -2,7 +2,7 @@
 
 **English** | [Русский](README_RU.md)
 
-> Source baseline 0.19.40 for Valheim 1.0.16. The latest existing binary prerelease remains 0.19.37; this checkpoint does not publish a new binary. Development tests use only TerrainRamp-1.0-Test; full owner acceptance remains pending.
+> Source baseline 0.19.41 for Valheim 1.0.16. The latest existing binary prerelease remains 0.19.37; this checkpoint does not publish a new binary. Development tests use only TerrainRamp-1.0-Test; full owner acceptance remains pending.
 
 ![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
 
@@ -43,7 +43,7 @@ Full documentation: [features and interactions](docs/FEATURES.md), [controls](do
 
 ## Alpha status
 
-Candidate 0.19.40 adds contour hover guides, clears stale guides on cancellation/tool changes/deletion, exposes mode/group/visibility/camera keys below the viewport, and adds approved editor-only see-through via F7/button. Release, geometry/store/localization, editor bridge, world layout, host/deployment checks and 81 fresh Unity Workbench captures plus contour/occluder regressions pass. A focused game series and multiplayer remain owner gates.
+Candidate 0.19.41 fixes the contour guide to full edge endpoints, fully hides editor occluders with F7/button, organizes shortcuts into six groups, adds editor-only FOV controls with game reset, and compacts the object tree with anchor badges, eye/lock columns and an overflow scrollbar. Release, geometry/store/localization, editor bridge, world layout, host/deployment checks and 81 fresh Unity Workbench captures plus input regressions pass. A focused game series and multiplayer remain owner gates.
 
 See [the ordered development roadmap](docs/ROADMAP.md) and [current acceptance series](specs/roadmap/current-pass.md). [0.19.37](docs/ALPHA_0.19.37.md) remains historical release evidence.
 

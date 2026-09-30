@@ -324,12 +324,24 @@ editor.hint.contour_begin	КОНТУР: наведи на ребро невыб�
 editor.hint.transform	ЛКМ — выбор · стрелки/кольца — правка · Alt+стрелка — копия · Shift+ЛКМ — опора · Ctrl+тяни точку — магнит · X/Y/Z — ось · держи N — общий центр · Space — оси · Shift+S — шаг сдвига
 editor.hint.empty	Tab — добавить деталь · СКМ — камера
 editor.hint.select	ЛКМ — выбор · Ctrl/Shift+ЛКМ — добавить/убрать · тяни по пустоте — рамка · СКМ по детали — удалить · Esc — снять выбор
-editor.hint.modes_selected	РЕЖИМЫ: Q — выбор · G/R/F9 — гизма · A — массив · C — контур · Tab/Shift+A — каталог
-editor.hint.modes_empty	РЕЖИМЫ: Q — выбор · Tab/Shift+A — каталог · выбери деталь для гизмы, массива и контура
-editor.hint.commands	Ctrl+A — выбрать всё · Ctrl+Z/Y (Ctrl+Shift+Z) — история · Ctrl+S — сохранить (от 2 деталей) · F — выбранное в кадр · Home — всё в кадр
-editor.hint.visibility_selected	Ctrl+G — группа · Ctrl+D — копия · Del — удалить · H — скрыть · Shift+H — изолировать · Ctrl+H — всё кроме выбора · Alt+H — показать всё
+editor.hint.modes_selected	Q — выбор · G/R/F9 — гизма · A — массив · C — контур · Tab/Shift+A — каталог
+editor.hint.modes_empty	Q — выбор · Tab/Shift+A — каталог · выбери деталь для гизмы, массива и контура
+editor.hint.commands	Ctrl+Z/Y или Ctrl+Shift+Z — отмена/возврат · Ctrl+S — сохранить (от 2 деталей)
+editor.hint.selection_actions	ЛКМ — выбор · Ctrl/Shift+ЛКМ — добавить/убрать · тяни пустоту — рамка · Ctrl+A — всё · Ctrl+G — группа · Ctrl+D — копия · Del/СКМ по детали — удалить · Esc — снять выбор
+editor.hint.selection_empty	ЛКМ — выбор · тяни пустоту — рамка · Ctrl+A — выбрать всё · Esc — выйти
+editor.hint.visibility_selected	H — скрыть · Shift+H — изолировать · Ctrl+H — всё кроме выбора · Alt+H — показать всё
 editor.hint.visibility_empty	Alt+H — показать скрытое · Esc — выйти
-editor.hint.camera_idle	КАМЕРА: СКМ на пустоте — вращать · Shift+СКМ — сдвиг · колесо — приблизить · ПКМ+WASD — полёт · ПКМ+Q/E — вниз/вверх · Shift — быстрее · F7 — просвечивание
+editor.hint.camera_idle	СКМ на пустоте — вращать · Shift+СКМ — сдвиг · колесо — приблизить · ПКМ+WASD — полёт · ПКМ+Q/E — вниз/вверх · Shift — быстрее · F/Home — выбор/всё в кадр · F7 — открыть выбор
+editor.hint.section_modes	РЕЖИМЫ
+editor.hint.section_tool	ТЕКУЩИЙ ИНСТРУМЕНТ
+editor.hint.section_selection	ВЫБОР / ГРУППЫ
+editor.hint.section_history	ИСТОРИЯ / СОХРАНЕНИЕ
+editor.hint.section_visibility	ВИДИМОСТЬ
+editor.hint.section_camera	КАМЕРА
+editor.view.field_of_view	Угол обзора · °
+editor.view.game_fov	Как в игре
+editor.view.blueprint_anchor	Опора чертежа
+editor.view.group_anchor	Опора группы
 editor.view.see_through	Просвет F7
 editor.anchor_controls	Shift + ЛКМ закрепляет точку · Ctrl + тяни — магнитное перемещение.
 editor.anchor_on_axis	Точка лежит на оси вращения. Выбери другую точку или ось.

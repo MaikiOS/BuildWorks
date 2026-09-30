@@ -295,6 +295,7 @@ public static class RuntimeEditorAcceptance
                 }
                 TestUnreadablePicking(template);
                 TestPlacementSurface(template);
+                TestContourNativeEdges(template);
                 TestNestedSelection(template, source["woodwall"]);
                 TestHoverAppearance(template);
                 TestGizmoHits(template);
@@ -985,6 +986,42 @@ public static class RuntimeEditorAcceptance
         }
         finally { Object.Destroy(support); Object.Destroy(placed); }
         checks.Add("Placement ray returns the raised locked support normal; rotated preview rests its mesh on that surface; missed ray falls back to ground in perspective/orthographic");
+    }
+
+    private static void TestContourNativeEdges(Camera template)
+    {
+        GameObject wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        wall.transform.localScale = new Vector3(2,2,.2f);
+        foreach (Vector3 point in new[] { new Vector3(-.5f,-.5f,0), new Vector3(.5f,-.5f,0),
+            new Vector3(-.5f,.5f,0), new Vector3(.5f,.5f,0) })
+        {
+            var snap = new GameObject("NativeSnap");
+            snap.tag = "snappoint";
+            snap.transform.SetParent(wall.transform, false);
+            snap.transform.localPosition = point;
+        }
+        wall.SetActive(false);
+        var doc = new BlueprintEditorDocument(null, "Contour edges", "Test", new[] {
+            new BlueprintEditorPart("source", "source", "Source", new Point3(-3,1,0), new Rotation3(0,0,0,1)),
+            new BlueprintEditorPart("wall0", "wall", "Wall", new Point3(0,1,0), new Rotation3(0,0,0,1)),
+            new BlueprintEditorPart("wall1", "wall", "Wall", new Point3(2,1,0), new Rotation3(0,0,0,1)),
+            new BlueprintEditorPart("wall2", "wall", "Wall", new Point3(4,1,0), new Rotation3(0,0,0,1)) });
+        doc.SelectOnly("source");
+        try
+        {
+            using (var scene = new BlueprintEditorScene(template, _ => wall))
+            {
+                Require(scene.TrySync(doc, out string error), "Contour fixture sync: " + error);
+                scene.SetViewport(new Rect(0,0,1920,1080));
+                scene.SetCameraPose(new Vector3(2,6,-9), Quaternion.LookRotation(new Vector3(0,-4,9)));
+                Vector2 edge = scene.Camera.WorldToScreenPoint(new Vector3(0,1.96f,-.1f));
+                Require(scene.TryFindContourSupports(doc, edge, out List<string> supports, out _, out _,
+                    out string warning) && supports.Count == 3,
+                    "Generated midpoint snaps must not split the connected three-wall contour: " + warning);
+            }
+        }
+        finally { Object.Destroy(wall); }
+        checks.Add("Native edges connect three adjacent walls despite generated midpoint snap points");
     }
 
     private static void TestUnreadablePicking(Camera template)

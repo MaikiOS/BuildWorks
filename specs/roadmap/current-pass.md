@@ -3,20 +3,43 @@
 **English** | [Русский](current-pass_RU.md)
 
 Updated 2026-09-30 from Ostrix's feedback. **TerrainRamp-1.0-Test only**,
-BuildWorks **0.19.38**, Valheim 1.0.16. This pass changes no runtime code.
+BuildWorks **0.19.39 candidate**, Valheim 1.0.16. Do not test the old DLL as this candidate.
+This candidate is installed in the dedicated profile; Valheim was not launched automatically.
 Start with the short series below. Run the rest in separate sessions, not all at once.
 Use a disposable world and blueprint copy, not an important build.
 
 ## Results already reported
 
-- **1 partially passed.** Ordinary Hammer pieces work, except for the blueprint
-  card issues recorded below. Do not repeat ordinary favorites.
-- **2 Outliner passed by owner report.** RMB works in the editor's part list.
-  Text entry has not been checked separately.
-- **3 structural pieces passed.** Q/E changes attachment. Furniture reportedly
-  does not respond; a separate scenario must identify the exact mode.
-- **4 not tested.** The previous instructions failed to distinguish editor and F9.
-- **5–12 not tested.** A general impression does not count as acceptance.
+- Passed by owner report: held-RMB menu, furniture Q/E, nearby snap markers,
+  below-grid placement, group pivots, Array, two-part save/reopen, world reload,
+  camera through ground, and editor English. Do not repeat these wholesale.
+- Open: hover indication, category chooser, contour preview and mode switching,
+  invisible selection box, shortcut discoverability and native tab language refresh.
+- Esc removes the partial build and restores its ghost, but refunds drop on the
+  ground. Count-based accounting and multiplayer remain pending.
+- One-piece save is currently disallowed; two pieces save correctly by report.
+
+## Next focused checks after installing 0.19.39
+
+1. **Hammer menu:** open `BLUEPRINTS`, hold RMB on a card, move between actions.
+   The hovered action should brighten before release. Existing Resources popup
+   and cyclic category behavior are unchanged pending the UI redesign below.
+2. **Language:** switch Russian → English in game settings, reopen our Hammer.
+   `Favorites` and `Blueprints` must both update without restarting the game.
+3. **Editor box and Transform selection:** edit a test blueprint with three parts.
+   Press G, click a different part away from gizmo handles. It should select
+   without Esc or moving either piece. Drag on empty viewport space around parts:
+   a border must appear during the drag and disappear on release.
+4. **Contour calculation:** place three identical wooden walls side by side with
+   touching edges, plus a separate pole. Stop adding, select the pole and enter
+   Contour from the left tool rail. **Click** near the top edge of a wall, not
+   merely hover. A connected three-wall guide should be found. Then press G and
+   click another part away from handles: selection must work without Esc.
+5. **Hints and existing camera framing:** select a part, verify the footer shows
+   Ctrl+G and F. Press F: the selected object should fit the viewport. Double-click
+   framing and the full rebinding page are not implemented yet.
+
+The full scenarios below are a reference, not a request to repeat passed checks.
 
 ## Entering each mode
 
@@ -41,7 +64,7 @@ F9. The precision panel and arrows/rings appear. This is a separate mode:
 an ordinary arrow moves along one axis at the configured step. That behavior
 alone does not demonstrate broken snapping.
 
-## Check only these three scenarios now
+## Earlier reproduction scenarios
 
 ### 1b Blueprint card menu
 

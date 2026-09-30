@@ -1327,6 +1327,8 @@ namespace OstrixMods.BuildWorks
                 signature = signature * 31 +
                     (layoutCanvasRect ? layoutCanvasRect.rect.height.GetHashCode() : 0);
                 signature = signature * 31 + HammerCatalogOrganizer.Search.GetHashCode();
+                signature = signature * 31 + BuildWorksLocalization.Text("catalog.category.blueprints").GetHashCode();
+                signature = signature * 31 + BuildWorksLocalization.Text("catalog.category.favorites").GetHashCode();
                 signature = signature * 31 +
                     (HammerCatalogOrganizer.IndexEnabled ? 1 : 0);
                 signature = signature * 31 + HammerCatalogOrganizer.GetSourceFilter(
@@ -2057,6 +2059,13 @@ namespace OstrixMods.BuildWorks
                     string prefix = bracket >= 0
                         ? text.Substring(0, bracket)
                         : text.TrimEnd() + " ";
+                    Piece.PieceCategory category = table.m_categories[index];
+                    if (UnifiedHammerCatalog.BlueprintCategoryReady &&
+                        category == UnifiedHammerCatalog.BlueprintCategory)
+                        prefix = BuildWorksLocalization.Text("catalog.category.blueprints") + " ";
+                    else if (UnifiedHammerCatalog.FavoriteCategoryReady &&
+                        category == UnifiedHammerCatalog.FavoriteCategory)
+                        prefix = BuildWorksLocalization.Text("catalog.category.favorites") + " ";
                     label.text = prefix + "[<color=yellow>" + total + "</color>]";
                 }
             }
@@ -2678,6 +2687,10 @@ namespace OstrixMods.BuildWorks
                     : new Color(0.27f, 0.14f, 0.065f, 0.86f);
             Button button = root.GetComponent<Button>();
             button.targetGraphic = image;
+            ColorBlock colors = button.colors;
+            colors.highlightedColor = new Color(1.8f, 1.8f, 1.5f, 1f);
+            colors.fadeDuration = 0.06f;
+            button.colors = colors;
             button.onClick.AddListener(() => action());
             if (!string.IsNullOrEmpty(label))
                 AddRailText(hud, root.transform, label, Vector2.zero, 14f,

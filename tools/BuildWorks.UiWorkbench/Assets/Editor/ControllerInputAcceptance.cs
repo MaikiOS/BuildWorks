@@ -479,7 +479,7 @@ internal static class ControllerInputAcceptance
             Require(errors.Count == 0, "Controller logged errors: " + string.Join("; ", errors));
             File.WriteAllText(Path.Combine(output, "controller-input-check.txt"),
                 "PASS: actual Update/LateUpdate with deterministic key/button edges; actual EventSystem GraphicRaycaster and pointer handlers. " +
-                "Ctrl+A editable; Select Shift rows/viewport/blue-release-gizmo; Transform clicks/box do not change selection; " +
+                "Ctrl+A editable; Select Shift rows/viewport/blue-release-gizmo; Transform clicks/visible box update selection without moving parts; " +
                 "multi-selection Shift pin behind unselected mesh, X/Y/Z constrained anchor rotation about fixed pin; " +
                 "native pin; Outliner native drag blocks Ctrl+A/Delete, Esc preserves selection and late drop cannot reparent; " +
                 "Alt Move preview+commit+Undo+cancel; group copy hierarchy; uniform 10% scale step/Shift free/cancel; " +
@@ -597,23 +597,35 @@ internal static class ControllerInputAcceptance
         Vector2 empty = EmptyTransformPoint(controller, scene, view, originalLeft);
         foreach (KeyCode[] keys in new[] { Array.Empty<KeyCode>(), new[] { KeyCode.LeftShift }, new[] { KeyCode.LeftControl } })
         {
+            Frame(controller, input, Vector2.zero); NativeClick(view, uiCamera, "Row_left");
             Frame(controller, input, otherSurface, 1, keys); yield return null;
-            Require(!Field<bool>(controller, "selectionPending"), "Transform started a selection on another piece");
+            Require(Field<bool>(controller, "selectionPending"), "Transform did not start selection on another piece");
             Frame(controller, input, otherSurface, 0, keys); yield return null;
+            Require(doc.IsPartSelected("right") && doc.Selection.Count == (keys.Length == 0 ? 1 : 2),
+                "Transform click did not replace/add selection as requested");
+            empty = EmptyTransformPoint(controller, scene, view, originalRight);
             Frame(controller, input, empty, 1, keys); yield return null;
             Frame(controller, input, empty, 0, keys); yield return null;
-            Require(doc.Selection.Count == 1 && doc.IsPartSelected("left") && !doc.IsPartSelected("right"),
-                "Transform click changed selection, including modifier click");
+            Require(doc.Selection.Count == (keys.Length == 0 ? 0 : 2) &&
+                V(doc.Parts[0].Position) == originalLeft && V(doc.Parts[1].Position) == originalRight,
+                "Empty-space selection modified geometry or lost modifier selection");
             Frame(controller, input, empty); yield return null;
         }
-        Frame(controller, input, otherSurface, 1); yield return null;
+        Frame(controller, input, Vector2.zero); NativeClick(view, uiCamera, "Row_left");
+        empty = EmptyTransformPoint(controller, scene, view, originalLeft);
         Frame(controller, input, empty, 1); yield return null;
-        Frame(controller, input, empty); yield return null;
-        Require(doc.Selection.Count == 1 && doc.IsPartSelected("left") &&
+        Frame(controller, input, otherSurface, 1); yield return null;
+        RectTransform box = Field<RectTransform>(view, "selectionBox");
+        Require(box.gameObject.activeSelf && box.sizeDelta.x > 0f && box.sizeDelta.y > 0f &&
+            !box.GetComponent<Image>().raycastTarget && !box.GetComponent<Image>().fillCenter,
+            "Selection rectangle is invisible, filled or intercepts pointer input");
+        Frame(controller, input, otherSurface); yield return null;
+        Require(doc.IsPartSelected("right") && !box.gameObject.activeSelf &&
             V(doc.Parts[0].Position) == originalLeft && V(doc.Parts[1].Position) == originalRight,
-            "Transform empty-space box changed selection or source transforms");
+            "Transform box did not select the target, hide on release, or preserved geometry incorrectly");
 
         // Select is still additive. Both selected parts must rotate around the same native pin.
+        Frame(controller, input, Vector2.zero); NativeClick(view, uiCamera, "Row_left"); yield return null;
         Frame(controller, input, Vector2.zero, 0, KeyCode.LeftShift);
         NativeClick(view, uiCamera, "Row_right"); yield return null;
         NativeClick(view, uiCamera, Field<Dictionary<BlueprintEditorTool, Button>>(view, "toolButtons")[BlueprintEditorTool.Transform]);

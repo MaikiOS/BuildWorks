@@ -135,6 +135,7 @@ namespace OstrixMods.BuildWorks
             public bool Hovered;
             public readonly List<PickSurface> PickSurfaces = new List<PickSurface>();
             public readonly List<Vector3> SnapLocal = new List<Vector3>();
+            public int NativeSnapCount;
             public readonly List<Vector3> PlacementLocal = new List<Vector3>();
             public readonly List<string> PlacementLabels = new List<string>();
             public readonly List<PreviewMaterial> Materials = new List<PreviewMaterial>();
@@ -797,8 +798,9 @@ namespace OstrixMods.BuildWorks
         {
             selected = default;
             selectedPointLocal = Vector3.zero;
-            var native = new List<Point3>(visual.SnapLocal.Count);
-            foreach (Vector3 point in visual.SnapLocal) native.Add(ToGeometry(point));
+            var native = new List<Point3>(visual.NativeSnapCount);
+            for (int index = 0; index < visual.NativeSnapCount; ++index)
+                native.Add(ToGeometry(visual.SnapLocal[index]));
             IReadOnlyList<Edge3> edges = AnchorAdjustment.ConnectableSnapEdges(native);
             float maximum = ContourEdgeScreenDistance * ContourEdgeScreenDistance;
             float best = maximum;
@@ -1659,7 +1661,7 @@ namespace OstrixMods.BuildWorks
                 result.Root.transform.SetParent(root.transform, false);
                 if (source) result.Root.transform.localScale = source.transform.lossyScale;
                 result.BaseScale = result.Root.transform.localScale;
-                if (source) CaptureSnapPoints(
+                if (source) result.NativeSnapCount = CaptureSnapPoints(
                     source.transform, result.SnapLocal,
                     result.PlacementLocal, result.PlacementLabels);
                 result.Renderers = result.Root.GetComponentsInChildren<Renderer>(true);
@@ -1693,7 +1695,7 @@ namespace OstrixMods.BuildWorks
             }
         }
 
-        private static void CaptureSnapPoints(
+        private static int CaptureSnapPoints(
             Transform source,
             List<Vector3> points,
             List<Vector3> placementPoints,
@@ -1718,7 +1720,8 @@ namespace OstrixMods.BuildWorks
                     placementLabels.Add(PlacementPointLabel(
                         nativeNames[index], placementPoints[index], bounds));
             }
-            if (points.Count < 2) return;
+            int nativeCount = points.Count;
+            if (nativeCount < 2) return nativeCount;
             var native = new Point3[points.Count];
             for (int index = 0; index < native.Length; ++index)
                 native[index] = ToGeometry(points[index]);
@@ -1734,6 +1737,7 @@ namespace OstrixMods.BuildWorks
                     placementLabels.Add(BuildWorksLocalization.Text("blueprint.snap.middle"));
                 }
             }
+            return nativeCount;
         }
 
         private static string PlacementPointLabel(string name, Vector3 point, Bounds bounds)

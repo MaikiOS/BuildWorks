@@ -2,7 +2,7 @@
 
 **English** | [Русский](README_RU.md)
 
-> Source baseline 0.19.38 for Valheim 1.0.16. The latest existing binary prerelease remains 0.19.37; this checkpoint does not publish a new binary. Development tests use only TerrainRamp-1.0-Test; full owner acceptance remains pending.
+> Source baseline 0.19.39 for Valheim 1.0.16. The latest existing binary prerelease remains 0.19.37; this checkpoint does not publish a new binary. Development tests use only TerrainRamp-1.0-Test; full owner acceptance remains pending.
 
 ![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
 
@@ -43,7 +43,7 @@ Full documentation: [features and interactions](docs/FEATURES.md), [controls](do
 
 ## Alpha status
 
-Source 0.19.38 adapts the placement-transpiler registration check for the current host and preserves the external build camera orientation across editor transitions. The active Q/E footer, 2 m target preview and 0.55 m capture threshold remain. The checkpoint passes Release, geometry/store/localization, editor bridge, world layout, host contract and deployment rejection checks. Previous Workbench captures are historical; a fresh game series in the dedicated profile, Russian UI, full persistence and multiplayer remain owner gates.
+Candidate 0.19.39 fixes Transform selection, the selection border, contour native-edge calculation, live language labels and action hints. Release, geometry/store/localization, editor bridge, world layout, host/deployment checks and 81 fresh Unity Workbench captures pass. A focused game series and multiplayer remain owner gates.
 
 See [the ordered development roadmap](docs/ROADMAP.md) and [current acceptance series](specs/roadmap/current-pass.md). [0.19.37](docs/ALPHA_0.19.37.md) remains historical release evidence.
 

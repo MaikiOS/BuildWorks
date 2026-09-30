@@ -259,6 +259,7 @@ namespace OstrixMods.BuildWorks
             HideGameCanvases(view.RootCanvas);
             scene.EnsureWorldCamerasExcludeEditorLayer();
             view.Tick();
+            view.SetSelectionBox(selectionStart, input.MousePosition, false);
             RefreshContextHints();
             Rect viewport = view.ViewportScreenRect();
             scene.SetViewport(viewport);
@@ -305,6 +306,8 @@ namespace OstrixMods.BuildWorks
             if (HandleShortcuts() || !IsEditing) return;
             ApplyCamera();
             HandleViewport(viewport);
+            view.SetSelectionBox(selectionStart, input.MousePosition,
+                selectionPending && input.GetMouseButton(0));
             ApplyCamera();
             UpdateGizmo();
         }
@@ -896,7 +899,8 @@ namespace OstrixMods.BuildWorks
                 {
                     return;
                 }
-                else if (activeTool == BlueprintEditorTool.Select)
+                else if (activeTool == BlueprintEditorTool.Select ||
+                    activeTool == BlueprintEditorTool.Transform)
                 {
                     selectionStart = mouse;
                     selectionPending = true;
@@ -913,7 +917,8 @@ namespace OstrixMods.BuildWorks
             }
 
             string hovered = null;
-            if (inside && activeTool == BlueprintEditorTool.Select &&
+            if (inside && (activeTool == BlueprintEditorTool.Select ||
+                activeTool == BlueprintEditorTool.Transform) &&
                 !cameraDragging && !IsGizmoDragging)
                 scene.TryPick(mouse, out hovered);
             scene.SetHovered(hovered, document);

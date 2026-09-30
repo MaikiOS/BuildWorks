@@ -296,6 +296,7 @@ namespace OstrixMods.BuildWorks
         private readonly RectTransform top;
         private readonly RectTransform rail;
         private readonly RectTransform viewport;
+        private readonly RectTransform selectionBox;
         private readonly RectTransform rightColumn;
         private readonly RectTransform outliner;
         private readonly RectTransform inspector;
@@ -501,6 +502,14 @@ namespace OstrixMods.BuildWorks
                 rail = CreatePanel("ToolRail", safeRoot, PanelColor);
                 viewport = CreatePanel("ViewportInput", safeRoot, Color.clear, null);
                 viewport.GetComponent<Image>().raycastTarget = false;
+                selectionBox = CreatePanel("SelectionBox", viewport, Color.white,
+                    BlueprintEditorSkin.Surface.Focus);
+                selectionBox.anchorMin = selectionBox.anchorMax = new Vector2(0.5f, 0.5f);
+                selectionBox.pivot = new Vector2(0.5f, 0.5f);
+                Image selectionImage = selectionBox.GetComponent<Image>();
+                selectionImage.fillCenter = false;
+                selectionImage.raycastTarget = false;
+                selectionBox.gameObject.SetActive(false);
                 rightColumn = CreatePanel("RightColumn", safeRoot, PanelColor, null);
                 outliner = CreatePanel("Outliner", safeRoot, PanelRaised);
                 inspector = CreatePanel("Inspector", safeRoot, PanelRaised);
@@ -1617,6 +1626,23 @@ namespace OstrixMods.BuildWorks
 
         internal void SetContextHints(string text) =>
             statusHintText.text = text ?? string.Empty;
+
+        internal void SetSelectionBox(Vector2 start, Vector2 end, bool visible)
+        {
+            visible &= (end - start).sqrMagnitude > 36f;
+            selectionBox.gameObject.SetActive(visible);
+            if (!visible) return;
+            Rect area = ViewportScreenRect();
+            start = new Vector2(Mathf.Clamp(start.x, area.xMin, area.xMax),
+                Mathf.Clamp(start.y, area.yMin, area.yMax));
+            end = new Vector2(Mathf.Clamp(end.x, area.xMin, area.xMax),
+                Mathf.Clamp(end.y, area.yMin, area.yMax));
+            Camera uiCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(viewport, start, uiCamera, out Vector2 first);
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(viewport, end, uiCamera, out Vector2 last);
+            selectionBox.anchoredPosition = (first + last) * 0.5f - viewport.rect.center;
+            selectionBox.sizeDelta = new Vector2(Mathf.Abs(last.x - first.x), Mathf.Abs(last.y - first.y));
+        }
 
         internal void SetOperationMetrics(int selectedCount, Vector3 translation,
             Vector3 rotationDegrees, float scale, int previewCount, int totalCount)

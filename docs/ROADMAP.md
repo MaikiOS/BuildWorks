@@ -9,7 +9,8 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Current source: **0.19.38**, Store v9, Valheim 1.0.16.
+Current source candidate: **0.19.39**, Store v9, Valheim 1.0.16.
+Installed in the dedicated profile; focused owner checks remain pending.
 All development deployments, upgrades and game tests use **only
 `TerrainRamp-1.0-Test`**. `Default/BuildWorks` is the source/artifact tree,
 not an installed mod. Do not modify other profiles, mods or saves as a side effect.
@@ -38,7 +39,7 @@ dependent changes wait for its gate, unrelated preparation may continue.
 
 | ID | Deliverable | Dependency | Status |
 | --- | --- | --- | --- |
-| BW-00 | Dedicated-profile baseline and reliable handoff | Current core | Partial owner acceptance; blueprint-card UI gaps and furniture report open; remaining scenarios pending |
+| BW-00 | Dedicated-profile baseline and reliable handoff | Current core | Partial owner acceptance; contour, live language labels and interaction regressions require 0.19.39 retest; networking pending |
 | BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | Planned; visible UI/icon design approval required |
 | BW-02 | Group layout operations without resizing pieces | BW-01 | Planned; focused operation UI approval required |
 | BW-03 | Persistent Array and minimal recipe persistence | BW-02 | Planned; safe Store migration and editing/Bake gate |
@@ -63,6 +64,20 @@ Inspect missing/unsupported parts and explain blocking errors; preserve placehol
 data. Full dependency manifests belong to BW-05.
 
 ## BW-01 Make existing controls understandable
+
+Latest owner feedback confirms furniture Q/E, nearby targets, below-grid placement,
+group pivots, Array, two-part save/reopen, world reload and near-ground camera.
+The partial-build Esc cleanup restores the same ghost, but returned resources
+drop on the ground; exact cost/refund accounting still needs a count-based check.
+One-part saves remain deliberately blocked by the current two-part blueprint contract.
+
+The next UI approval covers an explicit category chooser (cycling a single category
+looks inert), aggregate resources and required stations in the native piece panel
+instead of a Resources popup, a per-mode shortcut settings page with rebinding,
+and double-click Outliner framing while retaining F. Do not auto-jump the camera
+after every placement. Contour currently needs a click on a support edge; hover-only
+chain preview is a separate pending UI change. Community translation overrides
+need a documented file format and fallback/reload tests before shipping.
 
 Approve a small wireframe before visible UI/icon changes. Distinguish placement
 anchor, transform pivot, local/world axes and source/target snap points. Select

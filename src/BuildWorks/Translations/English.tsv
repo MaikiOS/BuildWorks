@@ -317,13 +317,13 @@ editor.hint.text_input	Type a value · Enter — apply · Esc — cancel input
 editor.hint.part_placement	LMB — add · wheel — rotate · Q/E — snap point · MMB — delete · Ctrl+Z/Y — history · G — transform · RMB — catalog
 editor.hint.gizmo_drag	Release LMB — apply · Esc — cancel · Shift — no step
 editor.hint.camera	WASD — camera · Q/E — down/up · Shift — faster · release RMB — finish
-editor.hint.array_ready	Enter — create copies · Esc — cancel · wheel — count · Ctrl+wheel — camera
-editor.hint.array_begin	Drag one gold arrow for the first row · the other for the second · Esc — cancel
-editor.hint.contour_ready	LMB — another chain · Enter — create copies · Esc — cancel
-editor.hint.contour_begin	LMB on support — find chain · Esc — cancel
-editor.hint.transform	Drag — change · N — composite frame · H/Shift+H/Ctrl+H/Alt+H — visibility · Q — select
+editor.hint.array_ready	ARRAY: wheel — count · Enter — create · Esc — cancel · Ctrl+wheel — camera
+editor.hint.array_begin	ARRAY: drag gold arrow — first row · another — second row · Esc — cancel
+editor.hint.contour_ready	CONTOUR: LMB — another chain · Enter — create · G — gizmo · Esc — cancel
+editor.hint.contour_begin	CONTOUR: LMB on an unselected support edge — chain · G — gizmo · Esc — cancel
+editor.hint.transform	LMB — select · drag — edit · Ctrl+G — group · Ctrl+Z/Y — history · F — frame · N — composite pivot · Q — select · H/Shift+H/Ctrl+H/Alt+H — visibility
 editor.hint.empty	Tab — add part · MMB — camera
-editor.hint.select	LMB — select · G — transform · N — composite frame · H/Shift+H/Ctrl+H/Alt+H — visibility · Tab — add
+editor.hint.select	LMB — select · Shift+LMB — add · Ctrl+G — group · Ctrl+D — copy · Del — delete · G — gizmo · F — frame · Tab — add · H/Shift+H/Ctrl+H/Alt+H — visibility
 editor.anchor_controls	Shift + LMB pins the point · Ctrl + drag performs magnetic movement.
 editor.anchor_on_axis	The point lies on the rotation axis. Choose another point or axis.
 editor.anchor_drag_magnetic	Magnet: drag to a point on another part · Shift — free.

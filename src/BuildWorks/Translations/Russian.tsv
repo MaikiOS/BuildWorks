@@ -317,13 +317,13 @@ editor.hint.text_input	Ввод значения · Enter — применить
 editor.hint.part_placement	ЛКМ — добавить · колесо — повернуть · Q/E — точка привязки · СКМ — удалить · Ctrl+Z/Y — история · G — трансформация · ПКМ — каталог
 editor.hint.gizmo_drag	Отпусти ЛКМ — применить · Esc — отменить · Shift — без шага
 editor.hint.camera	WASD — камера · Q/E — вниз/вверх · Shift — быстрее · отпусти ПКМ — закончить
-editor.hint.array_ready	Enter — создать копии · Esc — отменить · колесо — количество · Ctrl+колесо — камера
-editor.hint.array_begin	Потяни золотую стрелку — первый ряд · другую — второй · Esc — отменить
-editor.hint.contour_ready	ЛКМ — другая цепь · Enter — создать копии · Esc — отменить
-editor.hint.contour_begin	ЛКМ по опоре — найти цепь · Esc — отменить
-editor.hint.transform	Тяни — изменить · N — общий frame · H/Shift+H/Ctrl+H/Alt+H — видимость · Q — выбор
+editor.hint.array_ready	МАССИВ: колесо — количество · Enter — создать · Esc — отменить · Ctrl+колесо — камера
+editor.hint.array_begin	МАССИВ: тяни золотую стрелку — первый ряд · другую — второй · Esc — отменить
+editor.hint.contour_ready	КОНТУР: ЛКМ — другая цепь · Enter — создать · G — гизма · Esc — отменить
+editor.hint.contour_begin	КОНТУР: ЛКМ по ребру невыбранной опоры — цепь · G — гизма · Esc — отменить
+editor.hint.transform	ЛКМ — выбор · тяни — правка · Ctrl+G — группа · Ctrl+Z/Y — история · F — в кадр · N — общий центр · Q — выбор · H/Shift+H/Ctrl+H/Alt+H — видимость
 editor.hint.empty	Tab — добавить деталь · СКМ — камера
-editor.hint.select	ЛКМ — выбрать · G — трансформация · N — общий frame · H/Shift+H/Ctrl+H/Alt+H — видимость · Tab — добавить
+editor.hint.select	ЛКМ — выбор · Shift+ЛКМ — добавить · Ctrl+G — группа · Ctrl+D — копия · Del — удалить · G — гизма · F — в кадр · Tab — добавить · H/Shift+H/Ctrl+H/Alt+H — видимость
 editor.anchor_controls	Shift + ЛКМ закрепляет точку · Ctrl + тяни — магнитное перемещение.
 editor.anchor_on_axis	Точка лежит на оси вращения. Выбери другую точку или ось.
 editor.anchor_drag_magnetic	Магнит: тяни к точке другой детали · Shift — свободно.

@@ -38,7 +38,7 @@ dependent changes wait for its gate, unrelated preparation may continue.
 
 | ID | Deliverable | Dependency | Status |
 | --- | --- | --- | --- |
-| BW-00 | Dedicated-profile baseline and reliable handoff | Current core | Awaiting owner; automated checks and dedicated-profile installation verified |
+| BW-00 | Dedicated-profile baseline and reliable handoff | Current core | Partial owner acceptance; blueprint-card UI gaps and furniture report open; remaining scenarios pending |
 | BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | Planned; visible UI/icon design approval required |
 | BW-02 | Group layout operations without resizing pieces | BW-01 | Planned; focused operation UI approval required |
 | BW-03 | Persistent Array and minimal recipe persistence | BW-02 | Planned; safe Store migration and editing/Bake gate |

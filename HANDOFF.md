@@ -20,6 +20,14 @@ The previous pair was backed up. Installed SHA-256:
 Independent correctness review passed without blockers. Complexity review:
 Lean already. Ship. Other profiles/mods/saves were not modified.
 
+Owner feedback after deployment: ordinary Hammer/favorites, Outliner RMB and
+structural-piece Q/E passed by report. Blueprint cards have no MMB favorite
+handler; `⋯` selects a card instead of opening a popup (code confirmed).
+Furniture reportedly does not respond to Q/E; its exact mode needs reproduction.
+Snap was not tested because the old checklist mixed editor placement and world F9.
+Checks 5–12 remain untested. The revised guide requests only 1b, 3b, 4a next.
+No runtime change, rebuild or deployment accompanied this guide update.
+
 Next: owner game series, then bounded fixes if needed; approve visible UI/icons
 before BW-01 redesign. Discuss guides/curves again before Line A/B implementation.
 After each verified step update EN/RU docs, checkpoint commit and normal GitHub push.

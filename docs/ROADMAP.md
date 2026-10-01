@@ -93,8 +93,9 @@ control families with matched hit tests, collapsible hints and compact viewer
 dropdowns. A target-only outline could retain attachment context under F7;
 interior snap eligibility is a separate decision. These are proposals, not shipped
 features; await owner approval before visible changes.
-The refined action/axis proposal keeps G/F9 and adds proposed M/R/S actions,
-cursor-following movement of existing editor parts with exact cancellation/one
+The revised keyboard proposal replaces M/R/S with Q/W/E/R/T tool selection,
+Space action start and V world/local axes; G/F9 remain compatibility entries.
+It proposes editor MMB navigation-only and cursor-following existing-part movement with exact cancellation/one
 Undo, prominent next-step guidance, and original game-styled handles. Bindings,
 constraint/snap priority and a visual mockup require approval before implementation.
 Community translation overrides

@@ -9,7 +9,8 @@ less crowded manipulators, attachment context while seeing through, and compact
 viewer settings. This document proposes changes; none are implemented or installed.
 Ostrix's follow-up makes alternative 2 conditional on fast action/axis switching,
 moving an existing editor part like a placement ghost, prominent next-step guidance
-and original game-styled handles. The refined interaction below still needs approval.
+and original game-styled handles. The subsequent keyboard review replaces the
+M/R/S draft with a compact tool cluster and a separate action start. It needs approval.
 
 ## Why the selected part disappears under controls
 
@@ -38,8 +39,8 @@ behavior. An explicit family makes the available action visible before the click
 
 ## Proposed manipulator behavior
 
-Keep Q/G/A/C mode switching and existing gestures. A visible family selector chooses
-idle handles; direct action keys start a temporary operation without finding a menu.
+Keep existing world gestures; reorganize isolated-editor shortcuts as proposed below.
+A visible family selector and matching keys choose idle handles without moving the part.
 Move shows
 arrows/planes, Rotate shows rings, Points shows attachment/pivot controls.
 Scale stays explicitly accessible. Active, pinned and current target marks remain
@@ -54,33 +55,84 @@ No new manipulator framework or replacement snap mathematics is needed.
 
 ## Proposed action and axis workflow
 
-These assignments are proposals, not current bindings. G/F9 still opens Transform
-handles; Q/A/C keep Select/Array/Contour. R currently aliases Transform; making it
-start rotation is an explicit interaction change for owner approval.
+These assignments replace the earlier M/R/S draft; they are not current bindings.
+Prefer Q/W/E/R: frequent tool choices are adjacent under the left hand. A tool
+choice changes visible handles, not geometry. Space starts its cursor-driven action;
+dragging a visible handle starts directly. This costs one extra key versus direct
+G/R/S actions, but clearly separates choosing a tool from starting an edit.
+There are no double-tap/hold-to-switch gestures or automatic tool switches.
 
 | Input with editable selection | Proposed next action |
 | --- | --- |
-| M or Take and move button | Pick up existing selection for cursor-following preview |
-| R or Rotate button | Start rotation preview, initially around the current frame's Y axis |
-| S or Scale button | Start uniform scale preview; do not imply per-axis resizing |
+| Q / W / E / R while idle | Choose Select / Move / Rotate / Uniform Scale; keep the part stationary |
+| T while idle | Choose Points handles; retain explicit pin/attachment gestures |
+| Space or Start button in Move / Rotate / Scale | Start cursor-following Move, Y-axis rotation or uniform scale preview respectively |
+| Space in Select / Points | No transform; show the applicable tool choices or point gestures |
 | X/Y/Z during Move | Constrain movement to an axis; repeat the same axis to clear |
 | X/Y/Z during Rotate | Choose the rotation axis; repeating it keeps that axis |
 | Shift+X/Y/Z during Move | Move in the plane excluding that axis |
-| Space during Move or Rotate | Switch world/local frame, with an explicit label |
-| Viewport LMB or Enter | Confirm once; the starting UI click cannot also confirm |
+| V in transform tools or their preview | Switch world/local frame, with an explicit label; replaces the old Space assignment |
+| Viewport LMB or Enter during a Space-started preview | Confirm once; the starting UI click cannot also confirm |
 | Esc | Restore the exact starting state, keeping selection |
 
-Examples: select wall → M → point at neighbor → LMB. Precise move: M → X →
-move mouse → Enter. Rotate: R → Y → move mouse → Enter.
+Examples: select wall → W → Space → point at neighbor → LMB. Precise move:
+W → Space → X → move mouse → Enter. Rotate: E → Space → X → move mouse → Enter.
+Ordinary handle dragging still confirms on releasing LMB; it does not require Enter.
+For an already active Move tool, Space is the one-key pickup. G/F9 remain compatibility
+entries to the last transform family (Move initially), not new direct pickup aliases;
+omit those duplicates from the compact main hint strip. A/C keep Array/Contour;
+Tab is the primary catalog key. Existing Shift+A remains a secondary compatibility shortcut.
+The adjacent tool cluster is also used by [Maya's Tool Box](https://help.autodesk.com/cloudhelp/2024/ENU/Maya-Basics/files/GUID-B345E162-0149-4E09-AC98-48DCFC227F33.htm).
 This uses Blender's action-then-axis principle, not identical bindings or repeated-axis
 semantics: [Blender Axis Locking](https://docs.blender.org/manual/en/5.2/scene_layout/object/editing/transform/control/axis_locking.html).
 
-Ctrl+G grouping, Ctrl+S saving and Shift+S step input keep priority while idle.
-Camera flight with RMB and text entry own their inputs. During a pending operation,
+Input ownership is explicit: focused UI/text/dialog/catalog first, then camera
+navigation over the viewport, then pending preview, then idle tools. E chooses
+Rotate only while idle; in Surface Move it advances the source point. Q likewise
+selects only while idle. During new placement Q/E/wheel retain their construction
+meaning, not tool switching. Return from navigation/UI must re-arm movement without
+a jump; tool input must not leak into text fields or the world session.
+During a pending operation,
 save/history/catalog/selection-changing commands must not commit or undo some other
-edit; show Confirm or cancel first. Escape or loss of application focus cancels.
+edit; show Confirm or cancel first. This includes Q/W/E/R/T and A/C, except contextual
+Q/E source selection. Space must not restart a pending operation. Escape or loss of application focus cancels.
 Navigation freezes the preview; resume without a jump. Changing axis/frame or source
 point rebases the interaction to the current preview instead of snapping unexpectedly.
+
+## Remaining keyboard and mouse commands
+
+Keep familiar commands instead of relocating every key merely to make the cluster smaller:
+Ctrl+A all, Ctrl+D copy, Ctrl+G group, Ctrl+S save, Ctrl+Z undo, Ctrl+Y or
+Ctrl+Shift+Z redo. Modified chords have priority over single keys. F frames selection,
+Home frames all. H/Shift+H/Ctrl+H/Alt+H keep hide/isolate/show-except/show-all;
+F7 keeps see-through. N remains the temporary composite pivot override, Shift+S
+focuses the step field. No numeric keys replace geometric X/Y/Z labels.
+
+The mouse proposal deliberately separates navigation from deletion: MMB orbit,
+Shift+MMB pan, RMB+WASD/QE fly, wheel zoom, Shift while flying faster. Delete is
+the sole viewport deletion key in the editor; remove tap-MMB deletion there, including
+new-part placement, so a failed orbit never deletes a part. World MMB removal is
+unchanged. This editor/world difference needs explicit owner approval.
+Ctrl+wheel always zooms the editor camera; ordinary wheel rotates in Surface Move/new
+placement, changes count in Array, and zooms otherwise. During pending previews,
+navigation pauses/rebases the preview; it cannot confirm, delete or open the catalog.
+Short RMB over the idle viewport keeps catalog access; RMB in the tree keeps its
+context menu. Panels own wheel scrolling and their mouse gestures.
+
+LMB selection, Ctrl/Shift+LMB additive selection, empty-space box selection, Alt+arrow
+copy, Shift+point pin and Ctrl+point magnetic drag remain contextual gestures.
+Do not turn Ctrl into a global magnet toggle: it already owns text/selection commands.
+Array/Contour still use Enter to apply and Esc to cancel; Space does not start a second
+operation. New-part placement still adds repeatedly by LMB; confirming an existing-part
+move finishes that one operation. Esc while idle keeps current clear-selection/exit behavior.
+
+Expose one per-context shortcut list in Settings with reassignment and reset, as already
+planned in BW-01. Conflicts in overlapping contexts must be rejected or explicitly
+resolved; resetting must not silently discard saved custom bindings. Labels and hints
+must use the effective binding, not fixed text. Display Latin key identities in EN/RU;
+test actual Unity input on Russian and English keyboard layouts rather than assuming
+physical-key behavior. This is a future settings requirement, not an implemented service.
+No extra layout presets, command palette, keyboard framework or world remapping in this pass.
 
 ## Move existing parts like the placement ghost
 
@@ -120,7 +172,8 @@ Show only meaningful continuations for the current state:
 
 | State | Example guidance |
 | --- | --- |
-| Selected | Wall selected · M move · R rotate · S uniform scale |
+| Selected | Wall selected · W Move · E Rotate · R Scale · T Points |
+| Move tool idle | Move selected · Space pick up · or drag an arrow |
 | Surface Move | Point at a surface · X/Y/Z axis · Q/E source point |
 | Axis Move | Move along X · World · X release axis · Enter confirm · Esc restore |
 | Valid target | Target: wall · Point 3/8 · LMB/Enter confirm · Esc restore |
@@ -130,7 +183,9 @@ Show only meaningful continuations for the current state:
 Axes remain available as clickable controls, not keyboard-only actions. Proposed
 footer strings must be localized; these examples are not new runtime keys.
 Do not color every command equally. Errors have text/icon meaning as well as color.
-Expanded six-group hints remain a reference, not the main instruction.
+Expanded six-group hints remain a reference, not the main instruction. The compact
+footer groups tool choice, current action and confirm/cancel into distinct blocks;
+show only the applicable block plus the next step, not every keyboard command.
 
 ## Original game styled manipulators
 
@@ -187,7 +242,8 @@ and [Houdini control selection sets](https://www.sidefx.com/docs/houdini/charact
 
 ## Implementation and approval gates
 
-Approve M/R/S, surface-following fallback, contextual Q/E/wheel, constraint priority,
+Approve Q/W/E/R/T tools, Space start/V axes, editor MMB navigation-only,
+surface-following fallback, contextual Q/E/wheel, constraint priority,
 next-step strip and visual mockup before code/icons.
 Implement in bounded steps: footer collapse/guidance; explicit manipulator families
 with matched hit tests; existing-part cursor preview with atomic confirmation;

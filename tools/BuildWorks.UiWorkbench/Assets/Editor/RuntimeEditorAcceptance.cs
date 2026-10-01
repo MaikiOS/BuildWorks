@@ -141,6 +141,7 @@ public static class RuntimeEditorAcceptance
             checks.Add("Actual contour input: hover guide without copies, leave clears, click previews, cancel/tool switch/delete clear guide permanently");
             checks.Add("Actual Controller.Update/LateUpdate frame chords and native EventSystem raycasts: Ctrl+A, Shift rows/viewport, pin, shared gizmo, Alt move preview/commit/cancel/Undo, scale, placement RMB catalog reopen/camera and compound import; single Outliner context subscriptions; Array arrows/wheel/Ctrl zoom/Fit/spacing/shared step presets/live scrub before release/all TMP profile/atomic apply");
             TestEditorGestures(template, fontTemplate);
+            TestNativeSocketTargets(template);
             yield return null;
             string storePath = Path.Combine(output, "acceptance-" + Guid.NewGuid().ToString("N") + ".json");
             var store = new CompositeBlueprintStore(storePath);
@@ -757,7 +758,7 @@ public static class RuntimeEditorAcceptance
                 object visual = visuals[id];
                 Require(Field<bool>(visual, "Selected") && Field<bool>(visual, "ActiveSelection"), "Nested highlight omits " + id);
                 foreach (Renderer renderer in Field<Renderer[]>(visual, "Renderers"))
-                    Require(renderer.HasPropertyBlock(), "Selected descendant is not highlighted: " + id);
+                    Require(!renderer.HasPropertyBlock(), "Selected descendant must retain original materials: " + id);
             }
             Require(scene.TryGetSelectionBounds(doc, out Bounds selected), "Nested selection bounds missing");
             Require(scene.TryGetBounds(new[] { "a", "b" }, out Bounds all), "Nested parts bounds missing");
@@ -775,8 +776,49 @@ public static class RuntimeEditorAcceptance
             Require(Vector3.Distance(instances[0].transform.localScale,
                 Vector3.Scale(source.transform.lossyScale, new Vector3(1.2f,0.5f,2f))) < 0.001f, "World preview discarded per-part scale");
         }
-        checks.Add("Nested descendants have matching bounds and persistent selection tint; selecting a leaf stays local");
+        checks.Add("Nested descendants have matching bounds and original selection materials; selecting a leaf stays local");
         checks.Add("World ghost preview consumes non-unit XYZ scale");
+    }
+
+    private static void TestNativeSocketTargets(Camera template)
+    {
+        GameObject source = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        source.SetActive(false);
+        var socket = new GameObject("InteriorNativeSocket"); socket.tag = "snappoint";
+        socket.transform.SetParent(source.transform, false);
+        var doc = new BlueprintEditorDocument(null, "Native socket", "Test", new[] {
+            new BlueprintEditorPart("socket", "socket", "Socket", new Point3(0,0,0), new Rotation3(0,0,0,1)) });
+        using (var scene = new BlueprintEditorScene(template, _ => source))
+        {
+            scene.SetViewport(new Rect(0,0,1920,1080));
+            scene.SetCameraPose(new Vector3(0,0,-4), Quaternion.identity);
+            Require(scene.TrySync(doc, out string error), "Native socket sync: " + error);
+            var targets = new List<Vector3>(); var nativeFlags = new List<bool>();
+            Vector2 mouse = scene.Camera.WorldToScreenPoint(Vector3.zero);
+            Require(!scene.IsEditorPointVisible(Vector3.zero), "Socket fixture must be inside its own mesh");
+            Require(scene.TryFindEditorSnapTarget(Array.Empty<string>(), mouse, false, targets, nativeFlags,
+                out Vector3 target, out bool native) && native && target == Vector3.zero,
+                "Native socket inside its own mesh must still be eligible in Game mode");
+            foreach (bool flag in nativeFlags) Require(flag, "Game mode leaked a generated midpoint");
+        }
+        var secondSocket = new GameObject("OuterNativeSocket"); secondSocket.tag = "snappoint";
+        secondSocket.transform.SetParent(source.transform, false);
+        secondSocket.transform.localPosition = Vector3.right * 2f;
+        using (var scene = new BlueprintEditorScene(template, _ => source))
+        {
+            scene.SetViewport(new Rect(0,0,1920,1080));
+            scene.SetCameraPose(new Vector3(0,0,-4), Quaternion.identity);
+            Require(scene.TrySync(doc, out string error), error);
+            var targets = new List<Vector3>(); var nativeFlags = new List<bool>();
+            Vector2 mouse = scene.Camera.WorldToScreenPoint(Vector3.right);
+            Require(!scene.TryFindEditorSnapTarget(Array.Empty<string>(), mouse, false, targets, nativeFlags,
+                out _, out _), "Game mode must not attach to a generated midpoint between native sockets");
+            Require(scene.TryFindEditorSnapTarget(Array.Empty<string>(), mouse, true, targets, nativeFlags,
+                out Vector3 target, out bool native) && !native && target == Vector3.right,
+                "Mesh mode must offer that generated midpoint");
+        }
+        Object.Destroy(source);
+        checks.Add("Game snapping accepts native sockets inside their own mesh, not generated midpoints");
     }
 
     private static void TestHoverAppearance(Camera template)
@@ -802,8 +844,8 @@ public static class RuntimeEditorAcceptance
             Require(material.color == original, "Hover mutated base material");
             doc.SelectOnly("sphere"); scene.TrySync(doc, out _);
             renderer.GetPropertyBlock(block);
-            Require(block.GetColor("_Color") == new Color(1f,.78f,.38f,1f) && material.color == original,
-                "Selected+hover must retain reversible gold selection, not cyan hover");
+            Require(block.isEmpty && material.color == original,
+                "Selected model must retain its material, even under the pointer");
             doc.ClearSelection(); scene.TrySync(doc, out _);
             Require(renderer.HasPropertyBlock(), "Deselecting under pointer did not restore hover");
             scene.SetHovered(null, doc);
@@ -813,7 +855,7 @@ public static class RuntimeEditorAcceptance
                 Require(child.name != "GeometryOutline", "Selection outline renderer remains in visual");
         }
         Object.Destroy(sphere);
-        checks.Add("Reversible cyan hover/gold selection on editor copies; material identity/colour restored on deselection, no outlines");
+        checks.Add("Reversible cyan hover on editor copies; selection stays untinted with unchanged material identity, no outlines");
     }
 
     private static void TestOccluderFade(Camera template, string output)
@@ -929,7 +971,7 @@ public static class RuntimeEditorAcceptance
                 true, 1, false, Vector3.zero, false, GizmoAxis.None, false,
                 Vector3.zero, Vector3.zero, 0, allowExtended: true);
             Vector2 center = camera.WorldToScreenPoint(Vector3.zero);
-            float hitRadius = native ? 18f : 14f;
+            float hitRadius = native ? 18f : 8f;
             Require(gizmo.HitTestAnchor(camera, anchors, center + new Vector2(hitRadius - 0.5f,0)) == 0,
                 "Visible anchor edge cannot be hit at distance " + distance);
             Require(gizmo.HitTestAnchor(camera, anchors, center + new Vector2(hitRadius + 0.5f,0)) < 0,
@@ -938,7 +980,7 @@ public static class RuntimeEditorAcceptance
             float radius = 0;
             for (int i = 0; i < anchor.positionCount; ++i)
                 radius = Mathf.Max(radius, Vector2.Distance(center, camera.WorldToScreenPoint(anchor.GetPosition(i))));
-            Require(Mathf.Abs(radius - (native ? 16.25f : 11.25f)) < 0.1f,
+            Require(Mathf.Abs(radius - (native ? 16.25f : 6.5625f)) < 0.1f,
                 "Native/helper anchor glyph is not constant pixels");
             float widthPixels = Vector2.Distance(center,
                 camera.WorldToScreenPoint(camera.transform.right * anchor.startWidth));
@@ -954,12 +996,13 @@ public static class RuntimeEditorAcceptance
             Require(gizmo.HitTestScale(camera, scale + new Vector2(5,4)), "Filled scale interior is not hittable");
             Require(!gizmo.HitTestScale(camera, scale + new Vector2(25,25)), "Scale steals clicks outside its silhouette");
             var artwork = Field<Dictionary<LineRenderer,Mesh>>(gizmo, "artworkMeshes");
-            Require(artwork.ContainsKey(anchor) && artwork.ContainsKey(scaleHandle) &&
+            Require(!artwork.ContainsKey(anchor) && artwork.ContainsKey(scaleHandle) &&
                 scaleHandle.transform.Find("Engraving").GetComponent<MeshRenderer>().sharedMaterial.mainTexture,
-                "Original source/target or filled scale artwork missing");
-            Require(anchor.enabled && (native ? anchor.GetPosition(0) == anchor.GetPosition(4)
-                : anchor.GetPosition(0) != anchor.GetPosition(4)), "Native diamond/helper open glyph distinction missing");
-            Require(artwork[anchor].colors[0].a == (native ? .72f : .42f), "Snap artwork ignored its provenance brightness");
+                "Snap marker must be plain; scale must retain its original artwork");
+            Require(anchor.enabled && (native ? anchor.positionCount == 5 : anchor.positionCount == 9),
+                "Native diamond/helper circle distinction missing");
+            Require(anchor.startColor.a >= (native ? .72f : .42f) - 1f / 255f && anchor.startColor.a <= 1f,
+                "Snap marker lost provenance brightness during neighbouring handle hover");
             gizmo.EditorMouse = scale + Vector2.right * 40;
             ShowFeedback();
             float nearAlpha = artwork[scaleHandle].colors[0].a;
@@ -969,6 +1012,21 @@ public static class RuntimeEditorAcceptance
             Require(artwork[scaleHandle].colors[0].a == 1f && anchor.startColor.a < 1f,
                 "Scale hover does not exclusively highlight its winner");
             gizmo.EditorMouse = new Vector2(-1000,-1000);
+            var helperPoints = new Vector3[9];
+            gizmo.Show(camera, Vector3.zero, Quaternion.identity, false, GizmoMode.Move,
+                GizmoHandleKind.None, GizmoAxis.None, helperPoints, -1, -1, 9,
+                true, 1, false, Vector3.zero, false, GizmoAxis.None, false,
+                Vector3.zero, Vector3.zero, 0, allowExtended: true);
+            Require(Field<List<LineRenderer>>(gizmo, "anchorHandles")[0].positionCount == 9 &&
+                Field<List<LineRenderer>>(gizmo, "anchorHandles")[8].positionCount == 5,
+                "Blue corners must be circles and green midpoints crosses");
+            gizmo.Show(camera, Vector3.zero, Quaternion.identity, false, GizmoMode.Move,
+                GizmoHandleKind.None, GizmoAxis.None, helperPoints, 0, 8, 8,
+                true, 1, false, Vector3.zero, false, GizmoAxis.None, false,
+                Vector3.zero, Vector3.zero, 0, allowExtended: true);
+            for (int index = 0; index < helperPoints.Length; ++index)
+                Require(Field<List<LineRenderer>>(gizmo, "anchorHandles")[index].gameObject.activeInHierarchy,
+                    "Selecting or pinning a coincident point must not hide other provenance markers");
             void ShowFeedback() => gizmo.Show(camera, Vector3.zero, Quaternion.identity, false, GizmoMode.Move,
                 GizmoHandleKind.None, GizmoAxis.None, anchors, -1, -1, native ? 0 : 1,
                 true, 1, false, Vector3.zero, false, GizmoAxis.None, false,
@@ -1016,7 +1074,7 @@ public static class RuntimeEditorAcceptance
                 "F9 legacy 18px move-axis hit zone changed: depth=" + distance + "; inside=" + inside +
                 "; outside=" + outside + "; axis offset=" + (onAxis - center) + "; pixelRect=" + camera.pixelRect);
         }
-        checks.Add("Gizmo: engraved closed native diamond/open helper, filled scale picking, proximity/exclusive hover; native16.25/helper11.25px, hit18/14; F9 sizing and axis18/anchor16 unchanged");
+        checks.Add("Gizmo: plain native diamond/compact helper circle-cross, filled scale picking, proximity/exclusive hover; native16.25/helper6.56px, hit18/8; F9 sizing and axis18/anchor16 unchanged");
     }
 
     private static void EnsureInside(RectTransform parent, RectTransform child)

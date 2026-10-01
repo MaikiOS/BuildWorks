@@ -25,6 +25,7 @@ internal static class UICatalogAcceptance
         public Vector2 MouseScrollDelta => Vector2.zero;
         public float UnscaledDeltaTime => 1f / 60f;
         public bool HasFocus => true;
+        public string InputString => "";
         public bool GetKey(KeyCode key) => Keys.Contains(key);
         public bool GetKeyDown(KeyCode key) => Keys.Contains(key);
         public bool GetMouseButton(int button) => MouseButtons.Contains(button);

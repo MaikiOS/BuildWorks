@@ -354,14 +354,7 @@ namespace OstrixMods.BuildWorks
                         ? pointVisibility(anchorPoints[i]) : IsPointVisible(camera, anchorPoints[i])));
                 if (screenSpaceSizing && showAnchor)
                 {
-                    // Appended selected/pinned points can coincide with a native or
-                    // bounds handle. One glyph owns that position; pin has priority.
-                    bool sharesPin = pinnedAnchor >= 0 && pinnedAnchor < anchorCount && i != pinnedAnchor &&
-                        (anchorPoints[i] - anchorPoints[pinnedAnchor]).sqrMagnitude < 0.00000001f;
-                    bool sharesSelection = selectedAnchor >= 0 && selectedAnchor < anchorCount &&
-                        i != selectedAnchor && i != pinnedAnchor &&
-                        (anchorPoints[i] - anchorPoints[selectedAnchor]).sqrMagnitude < 0.00000001f;
-                    showAnchor = !sharesPin && !sharesSelection;
+                    // Keep coincident provenance visible: compact helpers fit inside native diamonds.
                     anchorHandles[i].sortingOrder = i == pinnedAnchor ? short.MaxValue
                         : i == selectedAnchor ? short.MaxValue - 1 : short.MaxValue - 2;
                 }
@@ -381,7 +374,7 @@ namespace OstrixMods.BuildWorks
                         anchorPoints[i],
                         color,
                         (nativeAnchor ? screenSpaceSizing ? .065f : hovered ? 0.17f : 0.115f
-                            : screenSpaceSizing ? 0.06f : hovered ? 0.12f : 0.075f) * handleScale,
+                            : screenSpaceSizing ? 0.035f : hovered ? 0.12f : 0.075f) * handleScale,
                         hovered ? 0.018f * handleScale + 0.003f
                             : nativeAnchor ? 0.010f : 0.007f, nativeAnchor,
                         i == pinnedAnchor);
@@ -730,7 +723,7 @@ namespace OstrixMods.BuildWorks
         private float AnchorHitRadius(int index)
         {
             return screenSpaceSizing
-                ? (index >= nativeAnchorStartIndex ? 18f : 14f) * anchorHandleScale
+                ? (index >= nativeAnchorStartIndex ? 18f : 8f) * anchorHandleScale
                 : 16f;
         }
 
@@ -1087,15 +1080,43 @@ namespace OstrixMods.BuildWorks
             Vector3 up = camera.transform.up * size;
             if (screenSpaceSizing)
             {
-                bool target = line == snapTargetHandle || snapCandidateHandles.Contains(line);
-                Vector3 side = target ? -right : right;
-                line.positionCount = pinned ? 8 : 5;
-                line.SetPosition(0, position + (nativeAnchor ? up : up * .7f + side * .35f));
-                line.SetPosition(1, position + (nativeAnchor ? right : up * .7f - side * .55f));
-                line.SetPosition(2, position + (nativeAnchor ? -up : -side));
-                line.SetPosition(3, position + (nativeAnchor ? -right : -up * .7f - side * .55f));
-                line.SetPosition(4, nativeAnchor ? line.GetPosition(0) : position - up * .7f + side * .35f);
-                if (pinned)
+                Transform pinAccent = line.transform.Find("PinAccent");
+                bool nativePin = pinned && nativeAnchor;
+                if (nativePin)
+                {
+                    LineRenderer accent = pinAccent ? pinAccent.GetComponent<LineRenderer>() : CreateLine("PinAccent", 5);
+                    if (!pinAccent) accent.transform.SetParent(line.transform, false);
+                    accent.gameObject.SetActive(true);
+                    accent.sharedMaterial = line.sharedMaterial;
+                    accent.sortingOrder = short.MaxValue;
+                    accent.SetPosition(0, position + up * .4f);
+                    accent.SetPosition(1, position + right * .4f);
+                    accent.SetPosition(2, position - up * .4f);
+                    accent.SetPosition(3, position - right * .4f);
+                    accent.SetPosition(4, accent.GetPosition(0));
+                    SetColorAndWidth(accent, color, width);
+                    accent.startWidth = accent.endWidth = width * pointScale;
+                    color = new Color(1f, .62f, .12f, color.a);
+                }
+                else if (pinAccent) pinAccent.gameObject.SetActive(false);
+                bool pinGlyph = pinned && !nativePin;
+                bool circle = !nativeAnchor && !pinGlyph && color.b > color.g;
+                line.positionCount = circle ? 9 : pinGlyph ? 8 : 5;
+                if (circle)
+                    for (int index = 0; index < 9; ++index)
+                    {
+                        float angle = index * Mathf.PI / 4f;
+                        line.SetPosition(index, position + right * Mathf.Cos(angle) + up * Mathf.Sin(angle));
+                    }
+                else
+                {
+                    line.SetPosition(0, position + up);
+                    line.SetPosition(1, position + (nativeAnchor || pinGlyph ? right : -up));
+                    line.SetPosition(2, nativeAnchor || pinGlyph ? position - up : position);
+                    line.SetPosition(3, position - right);
+                    line.SetPosition(4, nativeAnchor || pinGlyph ? line.GetPosition(0) : position + right);
+                }
+                if (pinGlyph)
                 {
                     line.SetPosition(5, position);
                     line.SetPosition(6, position - up * .4f);
@@ -1103,12 +1124,9 @@ namespace OstrixMods.BuildWorks
                 }
                 SetColorAndWidth(line, color, width);
                 line.startWidth = line.endWidth = width * pointScale;
-                DrawArtwork(line, nativeAnchor ? "gizmo-plane" : target ? "gizmo-target" : "gizmo-source", position,
-                    nativeAnchor ? (right + up) * .65f : right * 1.2f,
-                    nativeAnchor ? (up - right) * .65f : up);
-                Color fill = nativeAnchor ? new Color(1f, 1f, 1f, color.a) : color;
-                artworkMeshes[line].colors = new[] { fill, fill, fill, fill };
-                line.enabled = true; // Gold closed diamond = vanilla; open coloured glyph = geometry helper.
+                Transform engraving = line.transform.Find("Engraving");
+                if (engraving) engraving.gameObject.SetActive(false);
+                line.enabled = true; // Plain diamond/circle/cross leave coincident markers readable.
                 return;
             }
             line.SetPosition(0, position + up);
@@ -1127,7 +1145,7 @@ namespace OstrixMods.BuildWorks
             int nativeAnchorStart)
         {
             if (index == pinned) return new Color(0.85f, 0.3f, 1f, 1f);
-            if (index == selected) return new Color(1f, 0.9f, 0.2f, 1f);
+            if (index == selected && index < nativeAnchorStart) return Color.white;
             if (index >= nativeAnchorStart) return new Color(1f, 0.62f, 0.12f, 1f);
             if (index == AnchorAdjustment.CenterAnchorIndex)
                 return new Color(1f, 0.4f, 0.8f, 1f);

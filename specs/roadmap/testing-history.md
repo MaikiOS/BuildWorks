@@ -1,6 +1,9 @@
 # BuildWorks historical test scenarios
 
-Frozen scenarios before 0.19.44, not a current answer list.
+Frozen scenarios before 0.19.45, not a current answer list.
+The .44 owner pass accepted exact move/scale, MMB gestures, tool cancellation and
+UI ownership; its remaining feedback is implemented in .45. Old numbers below
+are historical only.
 [Go to the current tests](current-pass.md).
 
 # Step by step BuildWorks game checks

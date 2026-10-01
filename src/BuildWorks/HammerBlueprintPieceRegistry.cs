@@ -265,6 +265,27 @@ namespace OstrixMods.BuildWorks
             return result;
         }
 
+        internal string Description(CompositeBlueprintStore.Blueprint blueprint)
+        {
+            var resources = new List<string>();
+            foreach (ResourceInfo resource in Resources(blueprint))
+                resources.Add(resource.Amount + " × " + resource.Name);
+            var stations = new SortedSet<string>(StringComparer.CurrentCultureIgnoreCase);
+            if (blueprint != null && sourcePiecesByBlueprintId.TryGetValue(blueprint.id, out IReadOnlyList<Piece> pieces))
+                foreach (Piece source in pieces)
+                    if (source && source.m_craftingStation)
+                        stations.Add(Localization.instance != null
+                            ? Localization.instance.Localize(source.m_craftingStation.m_name)
+                            : source.m_craftingStation.m_name);
+            string description = "BuildWorks: " + BuildWorksLocalization.Text(
+                "blueprint.piece.description", blueprint?.parts.Count ?? 0);
+            if (resources.Count > 0) description += "\n" + BuildWorksLocalization.Text(
+                "blueprint.piece.resources", string.Join(" · ", resources));
+            if (stations.Count > 0) description += "\n" + BuildWorksLocalization.Text(
+                "blueprint.piece.stations", string.Join(", ", stations));
+            return description;
+        }
+
         public Sprite RefreshThumbnail(
             CompositeBlueprintStore.Blueprint blueprint)
         {

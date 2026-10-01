@@ -20,6 +20,8 @@ catalog.group.other	ПРОЧЕЕ
 blueprint.category.default	ПРОЧЕЕ
 blueprint.default_name	Группа {0}
 blueprint.piece.description	{0} деталей. ЛКМ установить. Редактирование — из библиотеки чертежей.
+blueprint.piece.resources	Ресурсы: {0}
+blueprint.piece.stations	Станки: {0}
 blueprint.scene.chain_aim	Наведи курсор на деталь опорной цепи или кольца.
 blueprint.scene.choose_support	Выбери опору, а не исходную деталь.
 blueprint.scene.edge_pair_missing	У выбранного ребра нет пары штатных точек соединения.
@@ -624,7 +626,7 @@ editor.view.family_rotate	Вращение
 editor.view.family_scale	Масштаб
 editor.view.focus_view	Весь вид / вернуть панели
 editor.hint.tools_menu	1–4 — инструмент · ↑/↓ — выбор · Enter — включить · Esc — закрыть
-editor.hint.next_selected	<mark=#78634360>G</mark> По поверхности · <mark=#78634360>R</mark> Вращать · <mark=#78634360>S</mark> Масштаб · Клик СКМ — удалить · Золотые ромбы — ваниль · Открытые знаки — геометрия
+editor.hint.next_selected	G — перенос · R — вращать · S — масштаб · СКМ — удалить · Золото — ваниль · Синие — углы · Зелёные — середины · Розовая — центр · Фиолетовая — опора · Белая — активная
 editor.hint.next_empty	ЛКМ — выбрать деталь · Tab — добавить · Space — инструменты
 editor.view.surface	Поверхность
 editor.view.surface_controls	Поверхность · Q/E точка · колесо поворот · XYZ ось · P плоскость
@@ -633,6 +635,6 @@ editor.view.screen_plane	Плоскость экрана
 editor.view.no_surface	Нет поверхности — наведи иначе или нажми P для Плоскости
 editor.hint.preview	{0} · {1} · {2} · <b>Enter/ЛКМ</b> применить · <b>Esc</b> восстановить
 editor.hint.open_gizmo	Сначала выбери деталь · клик СКМ/Delete — удалить
-editor.hint.gizmo_ready	<mark=#78634360>G</mark> По поверхности · <mark=#78634360>X/Y/Z</mark> По оси · <mark=#78634360>R</mark> Вращать · <mark=#78634360>S</mark> Масштаб · Золотые ромбы — ваниль · Открытые знаки — геометрия
+editor.hint.gizmo_ready	G — перенос · XYZ — ось · R — вращать · S — масштаб · Золото — ваниль · Синие — углы · Зелёные — середины · Розовая — центр · Фиолетовая — опора · Белая — активная
 editor.hint.numeric_value	<b>Значение: {0}</b> · {1}
 editor.hint.numeric_invalid	Неполное/вне диапазона; для переноса выбери одну ось · Backspace — правка · Delete — очистить

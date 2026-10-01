@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.44";
+        internal const string PluginVersion = "0.19.45";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -808,6 +808,7 @@ namespace OstrixMods.BuildWorks
                 {
                     HammerCatalogOrganizer.EnsureCategoryNavigation(player, __state);
                     HammerCatalogView.Apply(__instance, player);
+                    instance?.session?.UpdateBlueprintPieceInfo(__instance, player);
                 }
                 catch (Exception exception)
                 {

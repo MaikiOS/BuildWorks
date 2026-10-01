@@ -2,7 +2,7 @@
 
 **English** | [Русский](current-pass_RU.md)
 
-Test **0.19.44**, only in **TerrainRamp-1.0-Test**. This is the single current
+Test **0.19.45**, only in **TerrainRamp-1.0-Test**. This is the single current
 answer list: report results for **1–12 below**. Old scenarios are
 [archived separately](testing-history.md); do not answer their numbers.
 
@@ -21,25 +21,30 @@ Before each new test, finish/cancel the previous action and select one wall agai
 
 1. **Recognizable selection.** Press Ctrl+1 for Select. Click one wall row in the
    object tree, then move the pointer away from the model.
-   **Expected:** that wall stays gold-tinted; the others retain their original
-   appearance. All default gizmo handles appear immediately, without G. Click a
-   different wall in the viewport: its highlight and gizmo replace the first.
+   **Expected:** every wall keeps its original material, including the selected
+   wall. Its tree row is highlighted and all gizmo handles appear immediately,
+   without G. Click a different wall: the tree highlight and gizmo move to it.
 
 2. **Vanilla versus geometry points.** With a wooden wall selected, press Ctrl+2
    to reset to the combined gizmo; set Points to All in Tool parameters.
    Inspect the points while moving the camera closer/further.
-   **Expected:** vanilla points are larger, brighter, closed gold diamonds with
-   engraving. Geometry/bounds/midpoint helpers are smaller open coloured marks.
-   A pinned point remains purple. The bottom action line explains both kinds.
+   **Expected:** gold = vanilla sockets (plain large diamonds); blue = bounds
+   corners (small circles); green = edge midpoints (small crosses); pink = bounds
+   centre; purple = pinned point; white = active helper. No point is hidden or
+   moved to avoid overlap. Coincident helpers fit inside the gold diamond.
+   The bottom line explains every colour. Arrows/scale retain their engraving.
 
-3. **Readable larger gizmo.** Keep the same wall selected. Move the pointer away
-   from every handle, approach an arrow/ring, then hover the scale badge.
-   **Expected:** the gizmo is larger than .43; idle handles remain readable,
-   proximity gradually brightens them, and only the winning control is strongly
-   highlighted. Scale can be dragged from its filled centre. Esc cancels a drag.
+3. **Hover feedback and scale grip.** Keep the wall selected. Without pressing
+   a mouse button, approach an arrow, then a rotation ring, then the filled scale
+   badge outside the rings. Finally drag the badge with LMB and press Esc.
+   **Expected:** approaching brightens each control; hovering clearly identifies
+   the winning handle. Hover alone never transforms the wall. Dragging the badge
+   changes scale; Esc restores the original scale. No size comparison is needed.
 
-4. **Exact rotation from the start.** Select one wall. Press R, then X, move the
-   mouse to turn it, type 30, press Enter.
+4. **Exact rotation from the start.** Select one wall. Press R and move the
+   mouse until it turns visibly. Press X without moving the mouse.
+   **Expected now:** the wall returns to its pose before R. Move the mouse again,
+   then type 30 and press Enter.
    **Expected:** rotation is exactly 30° from its pose before R, not 30° added
    to the mouse preview. Ctrl+Z restores the original pose; Ctrl+Y restores the
    30° result. Press Ctrl+Z once more before the next test.
@@ -56,12 +61,14 @@ Before each new test, finish/cancel the previous action and select one wall agai
    Zero is visibly invalid and does not commit. Esc cancels it; the original
    wall and its selected gizmo remain.
 
-7. **Move an existing part like a ghost.** Select one wall and press G once.
-   Move the pointer onto another wall, press Q/E and turn the wheel; press Esc.
-   **Expected:** G starts surface-move preview immediately. Q/E changes the source
-   point, wheel changes yaw, nearby target points are shown. Esc restores the
-   original pose with no extra piece. Repeat G and confirm with LMB; Ctrl+Z
-   restores the original in one step.
+7. **Immediate Q/E and native snapping.** In Tool parameters set Magnet to Game.
+   Select a wall, press G and aim near a gold socket on the other wall. Keep the
+   mouse stationary and press Q, then E. Turn the wheel; press Esc. Repeat with
+   Magnet set to Mesh, then confirm with LMB and undo with Ctrl+Z.
+   **Expected:** Q/E changes the source point and repositions the preview in that
+   same frame, without moving the mouse. Game targets native sockets, including
+   sockets inside their own mesh; Mesh also offers generated helpers. Nearby
+   targets appear; wheel changes yaw. Esc/Undo restore the original, no copy.
 
 8. **MMB click removes only a placed part.** Press Ctrl+1. Click/release MMB on
    a placed wall; Ctrl+Z. Then Tab → choose a wall → return to the viewport
@@ -89,12 +96,15 @@ Before each new test, finish/cancel the previous action and select one wall agai
     tools. The field changes only its text until Apply; leaving it does not start
     an old mouse gesture. Close the editor without saving this test change.
 
-12. **English and compact hints.** Switch the game language to English normally.
-    Reopen the test blueprint → Edit → select a wall. Open Manipulator and inspect
-    the bottom hints; collapse Hints and reopen it.
-    **Expected:** labels and the vanilla/geometry legend are English, with no raw
-    localization keys. The action line remains when hints are collapsed. At the
-    UI scale you normally use, labels/tooltips fit their panels.
+12. **English world description, resources and hints.** Save a test blueprint
+    containing exactly two wooden walls. Check an ordinary wall's resource cost
+    in the Hammer, then select the blueprint for world placement, without placing
+    it. Switch the game language to English and select that same blueprint again.
+    **Expected:** the bottom native description is English and lists the summed
+    cost of both walls (e.g. 4 Wood if one wall costs 2), plus required stations.
+    Your own saved blueprint name is not translated. Open Edit → select a wall:
+    the colour legend is English; collapse Hints and reopen it. The action line
+    remains while collapsed. Report a screenshot if description/hints are clipped.
 
 ## How to reply
 
@@ -104,5 +114,5 @@ what happened instead; attach a screenshot if visual. Write “not tested” if 
 did not run that step. No additional lettered series is requested.
 
 Do not run multiplayer, other-profile or curve tests now. Curves still require
-a separate discussion. Save/reload, resources and network proof are not implied
-by passing this editor series.
+a separate discussion. Actual resource consumption, save/reload and network
+behaviour are not proven by this series; step 12 checks display only.

@@ -2,7 +2,51 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
-## Verified candidate 0.19.44 — 2026-10-01
+## Verified candidate 0.19.45 — 2026-10-01
+
+Active gate: BW-01 owner Valheim acceptance in TerrainRamp-1.0-Test.
+Owner accepted .44 exact move/scale, MMB click versus drag, tool cleanup and UI
+input ownership. This revision addresses the remaining visual, rotation and snap
+feedback, not a new tool workflow. Selection keeps original materials and still
+shows the combined gizmo immediately.
+
+Plain gold native diamonds, compact blue corner circles and green midpoint crosses
+retain their true coordinates. No coincidence suppression; native pin keeps its
+gold rim with a purple accent inside. Pink centre, purple pin and white active
+helper are explained alongside gold/blue/green in English and Russian.
+Arrow/ring/scale artwork stays engraved. World/F9 sizing and Store v9 unchanged.
+
+Choosing an axis resets mouse preview to the immutable action-start pose; typed
+values replace mouse deltas. Q/E reevaluates attachment immediately at a stationary
+cursor. Game targets native sockets, including ones inside their own mesh; Mesh
+also offers generated helpers. Other parts still occlude native sockets.
+
+World blueprint HUD description refreshes with language and shows aggregate
+resources plus deduplicated stations. It reuses registry resource aggregation;
+marker requirements remain empty, so no second aggregate cost is charged.
+This text-only integration has compiled host-contract proof, not game HUD layout
+or actual resource-consumption proof.
+
+Release: zero warnings/errors. Geometry, Store, Localization (639 matching keys
+and built resources), HostContract, EditorBridge, WorldLayout and profile guards
+pass. Format exits 0 with a workspace-loading warning. Fresh Unity 6000.0.61f1:
+81 captures and actual Controller/EventSystem checks pass at
+2026-10-01T19:42:07.8611315Z, including coincident glyphs, blue/green shapes,
+axis reset, same-frame Q/E, native interior socket and Game/Mesh midpoint checks.
+Independent correctness and complexity reviews pass. Workbench physical input
+is substituted; game acceptance, save/reload and multiplayer are not claimed.
+
+Installed only in TerrainRamp-1.0-Test with Valheim closed through the guarded
+script. Hashes match the tested build:
+- BuildWorks: F1C0F506D4A2897A6435877E20175870FB6B8489486B11DDA73C54585AC93F3F
+- Geometry: 3EF58DB30AE547E99293DD2B90E97BF8FEE005534C055D23656714FA09D9EA16
+
+Previous .44 pair: artifacts/checkpoint-0.19.45/preinstall.
+Next: only steps 1–12 in [the current owner test series](specs/roadmap/current-pass.md).
+Step 12 checks world language/resource display without placing a blueprint.
+No game launch or binary release; source-only GitHub synchronization.
+
+## Historical candidate 0.19.44 — 2026-10-01
 
 Active gate: BW-01 owner Valheim acceptance in TerrainRamp-1.0-Test.
 Selection now keeps a clear gold tint and immediately shows Combined handles,

@@ -87,8 +87,8 @@ public static class EditorInteractionAcceptance
                 pinned[pinned.Length - 1] = anchors[nativeIndex];
                 gizmo.EditorMouse = new Vector2(-1000,-1000);
                 Show(scene, pivot, pinned, nativeStart, pinned.Length - 1);
-                Require(!handles[nativeIndex].gameObject.activeSelf && handles[pinned.Length - 1].gameObject.activeInHierarchy,
-                    "Coincident native glyph overrides appended pin");
+                Require(handles[nativeIndex].gameObject.activeInHierarchy && handles[pinned.Length - 1].gameObject.activeInHierarchy,
+                    "Coincident native provenance must remain visible beside the pin accent");
                 Color32[] purple = Render(scene.Camera, Path.Combine(outputDirectory, "actual-native-pin-purple.png"));
                 int purplePixels = ChangedPixels(clean, purple, nativePixel, pixel =>
                     pixel.r > 120 && pixel.b > 150 && pixel.b > pixel.g + 35 && pixel.r > pixel.g + 35);
@@ -112,7 +112,7 @@ public static class EditorInteractionAcceptance
                 scene.SetTemporarySelectionHighlight(false, doc);
                 foreach (string id in ids)
                     foreach (Renderer renderer in Field<Renderer[]>(visuals[id], "Renderers"))
-                        Require(renderer.HasPropertyBlock(), "Shift release lost persistent selection tint: " + id);
+                        Require(!renderer.HasPropertyBlock(), "Shift release must restore original materials: " + id);
                 Require(ReferenceEquals(cache, Field<object>(scene, "cachedGizmoAnchors")),
                     "Camera/settings/Shift invalidated geometry-only anchor cache");
                 anchors[0] = Vector3.one * 999f;

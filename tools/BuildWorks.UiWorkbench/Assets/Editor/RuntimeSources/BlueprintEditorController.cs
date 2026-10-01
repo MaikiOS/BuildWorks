@@ -626,6 +626,10 @@ namespace OstrixMods.BuildWorks
                     int step = input.GetKeyDown(KeyCode.E) ? 1 : -1;
                     keyboardSourceIndex = (keyboardSourceIndex + step + dragSourceAnchors.Length) % dragSourceAnchors.Length;
                     RebaseKeyboardPreview(input.MousePosition);
+                    // A new source point must attach at the current cursor, not preserve
+                    // the old point's offset until a later mouse movement.
+                    keyboardSurfaceOffset = Vector3.zero;
+                    keyboardMoved = true;
                 }
                 return false;
             }
@@ -1243,7 +1247,14 @@ namespace OstrixMods.BuildWorks
             keyboardSurface = false;
             if (dragHandle != GizmoHandleKind.Rotate)
                 dragHandle = ShiftHeld ? GizmoHandleKind.MovePlane : GizmoHandleKind.Move;
+            // Changing constraint starts at the original operation pose. Camera
+            // rebasing still retains the preview; it is a different operation.
+            dragTranslation = Vector3.zero;
+            dragRotation = Quaternion.identity;
+            dragScale = 1f;
+            scene.PreviewTransform(document, dragIds, dragTranslation, dragRotation, dragPivot, dragScale);
             RebaseKeyboardPreview(input.MousePosition);
+            UpdateGizmo();
         }
 
         private void PreviewKeyboardTransform(Vector2 mouse)
@@ -1259,11 +1270,12 @@ namespace OstrixMods.BuildWorks
             keyboardValid = true;
             if (keyboardSurface)
             {
-                keyboardValid = scene.TryMoveSurface(mouse, dragIds, out Vector3 target);
-                if (!keyboardValid)
-                { snapTargetVisible = false; snapPreviewTargets.Clear(); snapPreviewNative.Clear(); return; }
+                bool surfaceHit = scene.TryMoveSurface(mouse, dragIds, out Vector3 target);
                 snapTargetVisible = !ShiftHeld && scene.TryFindEditorSnapTarget(dragIds, mouse,
                     meshSnapEnabled, snapPreviewTargets, snapPreviewNative, out snapTargetWorld, out snapTargetIsNative);
+                keyboardValid = surfaceHit || snapTargetVisible;
+                if (!keyboardValid)
+                { snapTargetVisible = false; snapPreviewTargets.Clear(); snapPreviewNative.Clear(); return; }
                 Vector3 source = keyboardSourceIndex >= 0 && dragSourceAnchors.Length > 0
                     ? dragSourceAnchors[keyboardSourceIndex] : dragPivot;
                 if (!keyboardSurfaceOriginValid)

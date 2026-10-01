@@ -178,7 +178,7 @@ internal static class ControllerInputAcceptance
             foreach (string id in new[] { "left", "right" }) Require(IsPainted(scene, id), "Shift-held selection is not blue: " + id);
             Save(scene, view, uiCamera, target, Path.Combine(output, "input-shift-selection.png"));
             Frame(controller, input, right); yield return null;
-            foreach (string id in new[] { "left", "right" }) Require(IsPainted(scene, id), "Shift release lost persistent selection tint: " + id);
+            foreach (string id in new[] { "left", "right" }) Require(!IsPainted(scene, id), "Shift release must restore original selection materials: " + id);
             Require(Field<GameObject>(Field<TransformGizmoView>(scene, "gizmo"), "root").activeSelf, "Select must immediately show handles");
 
             Frame(controller, input, Vector2.zero); NativeClick(view, uiCamera, "Row_left"); yield return null;
@@ -727,11 +727,19 @@ internal static class ControllerInputAcceptance
         Vector2 surface = scene.Camera.WorldToScreenPoint(V(doc.Parts[1].Position));
         Frame(controller, input, surface, 0, KeyCode.LeftShift); yield return null;
         Require(Field<bool>(controller, "keyboardValid"), "Surface fixture did not hit an unmoved part");
-        Vector3 beforeSource = VisualRoot(scene, "left").transform.position;
         Frame(controller, input, surface, 0, KeyCode.LeftShift, KeyCode.Q); yield return null;
-        Frame(controller, input, surface + Vector2.right * 2, 0, KeyCode.LeftShift); yield return null;
-        Require(Vector3.Distance(beforeSource, VisualRoot(scene, "left").transform.position) < .15f,
-            "Source rebase jumped by the distance between anchors");
+        int sourceIndex = Field<int>(controller, "keyboardSourceIndex");
+        Vector3 selectedSource = Field<Vector3[]>(controller, "dragSourceAnchors")[sourceIndex];
+        Vector3 sourcePivot = Field<Vector3>(controller, "dragPivot");
+        Vector3 sourceWorld = sourcePivot + Field<Quaternion>(controller, "dragRotation") *
+            (selectedSource - sourcePivot) * Field<float>(controller, "dragScale") + Field<Vector3>(controller, "dragTranslation");
+        Require(scene.TryMoveSurface(surface, new[] { "left" }, out Vector3 sourceTarget) &&
+            Vector3.Distance(sourceWorld, sourceTarget) < .001f,
+            "Q did not attach the new source at the unchanged mouse position in the same frame");
+        Frame(controller, input, surface, 0, KeyCode.LeftShift); yield return null;
+        Frame(controller, input, surface, 0, KeyCode.LeftShift, KeyCode.E); yield return null;
+        Require(Field<int>(controller, "keyboardSourceIndex") != sourceIndex && Field<bool>(controller, "keyboardValid"),
+            "E at the same cursor did not select and evaluate the next point");
         Frame(controller, input, empty, 0, KeyCode.Return); yield return null;
         Require(Field<bool>(controller, "keyboardPreview") && !Field<bool>(controller, "keyboardValid") &&
             Field<IList>(doc, "undo").Count == history, "Same-frame miss+Enter committed a stale surface hit");
@@ -855,9 +863,9 @@ internal static class ControllerInputAcceptance
         int history = Field<IList>(doc, "undo").Count;
         var gizmo = Field<TransformGizmoView>(scene, "gizmo");
         Frame(controller, input, mouse); yield return null;
-        Require(Field<GameObject>(gizmo, "root").activeSelf && IsPainted(scene, "left") &&
+        Require(Field<GameObject>(gizmo, "root").activeSelf && !IsPainted(scene, "left") &&
             Field<GizmoFamily>(controller, "gizmoFamily") == GizmoFamily.Combined && Field<IList>(doc, "undo").Count == history,
-            "Selection must show all handles and highlight immediately without editing");
+            "Selection must show all handles immediately without material overrides or editing");
         Frame(controller, input, mouse, 0, KeyCode.R); yield return null;
         Require(Field<bool>(controller, "keyboardPreview"), "R must be available directly from selection");
         Frame(controller, input, mouse, 0, KeyCode.Escape); yield return null;
@@ -868,6 +876,22 @@ internal static class ControllerInputAcceptance
         Frame(controller, input, mouse, 0, KeyCode.Escape); yield return null;
         Require(doc.IsPartSelected("left") && Field<GameObject>(gizmo, "root").activeSelf, "Esc lost selection or its handles after preview cancellation");
         Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Alpha2); yield return null;
+        Vector2 rotationCenter = scene.Camera.WorldToScreenPoint(Field<Vector3>(controller, "dragPivot"));
+        Vector2 rotationStart = rotationCenter + Vector2.right * 100;
+        Vector2 rotationMoved = rotationCenter + Vector2.up * 100;
+        Frame(controller, input, rotationStart, 0, KeyCode.R); yield return null;
+        Frame(controller, input, rotationMoved); yield return null;
+        Require(Quaternion.Angle(Field<Quaternion>(controller, "dragRotation"), Quaternion.identity) > 5,
+            "Free rotation fixture did not change before axis selection");
+        Frame(controller, input, rotationMoved, 0, KeyCode.X); yield return null;
+        Require(Quaternion.Angle(Field<Quaternion>(controller, "dragRotation"), Quaternion.identity) < .001f &&
+            Vector3.Distance(VisualRoot(scene, "left").transform.position, original) < .001f,
+            "Axis choice must reset all prior mouse rotation and position to operation start");
+        Frame(controller, input, rotationMoved + Vector2.right * 50); yield return null;
+        TextFrame(controller, input, rotationMoved + Vector2.right * 50, "30"); yield return null;
+        Require(Quaternion.Angle(Field<Quaternion>(controller, "dragRotation"), Quaternion.AngleAxis(30, Vector3.right)) < .001f,
+            "Axis mouse motion must be replaced, not accumulated, by numeric rotation");
+        Frame(controller, input, mouse, 0, KeyCode.Escape); yield return null;
         Frame(controller, input, mouse, 0, KeyCode.R); yield return null;
         Frame(controller, input, mouse, 0, KeyCode.X); yield return null;
         Frame(controller, input, mouse + Vector2.up * 80); yield return null;
@@ -983,7 +1007,7 @@ internal static class ControllerInputAcceptance
             Math.Abs(doc.Parts[0].Scale.X - 1) < .00001f, "Focus loss leaked numeric preview");
         Frame(controller, input, mouse); yield return null;
         File.WriteAllText(Path.Combine(output, "input-revision-check.txt"),
-            "PASS actual Update/LateUpdate: immediate Combined selection gizmo/gold highlight; G surface preview; R/X mouse then 30; signed Move/comma/keypad; S1.5; invalid input; edit/clear; axis repeat; one Undo/Redo; camera baseline; Ctrl1-4/action replacement; MMB click/drag/modifier; focus cleanup.");
+            "PASS actual Update/LateUpdate: immediate Combined selection gizmo/original materials; G surface preview; R/X mouse then 30; signed Move/comma/keypad; S1.5; invalid input; edit/clear; axis repeat; one Undo/Redo; camera baseline; Ctrl1-4/action replacement; MMB click/drag/modifier; focus cleanup.");
     }
 
     private static IEnumerable TestTransformContract(BlueprintEditorController controller, InputFrames input,

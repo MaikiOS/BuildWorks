@@ -813,7 +813,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.44.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.45.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -1251,6 +1251,18 @@ foreach ($method in @(
 $blueprintRegistry = $pluginTypes | Where-Object Name -eq 'HammerBlueprintPieceRegistry'
 Assert-Contract ($null -ne $blueprintRegistry) `
     'Compiled plugin has no native Hammer blueprint-piece registry.'
+$registryDescription = $blueprintRegistry.Methods | Where-Object Name -eq 'Description'
+$registryDescriptionOperands = @($registryDescription.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+$pieceInfoUpdate = $precisionSessionType.Methods | Where-Object Name -eq 'UpdateBlueprintPieceInfo'
+$pieceInfoOperands = @($pieceInfoUpdate.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($registryDescriptionOperands -match 'HammerBlueprintPieceRegistry::Resources' -and
+    $registryDescriptionOperands -match 'Piece::m_craftingStation' -and
+    $registryDescriptionOperands -match 'Localization::Localize' -and
+    $registryDescriptionOperands -notmatch 'Piece::m_resources' -and
+    $pieceInfoOperands -match 'Localization::GetSelectedLanguage' -and
+    $pieceInfoOperands -match 'TMP_Text::set_text' -and
+    $pluginSource -match 'UpdateBlueprintPieceInfo\(__instance, player\)') `
+    'Blueprint HUD must refresh localized aggregate costs as display-only information.'
 $thumbnailRenderer = $pluginTypes | Where-Object Name -eq 'BlueprintThumbnailRenderer'
 Assert-Contract ($null -ne $thumbnailRenderer -and @(
     $thumbnailRenderer.Methods | Where-Object Name -eq 'GetOrQueue'
@@ -2746,4 +2758,4 @@ if (Test-Path -LiteralPath $buildCameraPath -PathType Leaf) {
         'BuildWorks does not restore the current Build Camera yaw and pitch.'
 }
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.44 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.45 and Valheim Steam build 25185596.'

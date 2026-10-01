@@ -2,8 +2,8 @@
 
 **English** | [Русский](editor-input-revision_RU.md)
 
-Approved by Ostrix, 2026-10-01; .44 feedback supersedes the .43 first-G gate.
-Selection highlights and shows handles immediately; world/F9 controls are unchanged. Automated
+Approved by Ostrix, 2026-10-01; .45 removes selection tint, retaining .44 immediate handles.
+Selection preserves the original material; world/F9 controls are unchanged. Automated
 evidence is recorded in HANDOFF; owner Valheim acceptance remains pending.
 
 ## Findings in .42 before this revision
@@ -27,13 +27,13 @@ evidence is recorded in HANDOFF; owner Valheim acceptance remains pending.
 
 | State | Input | Result |
 | --- | --- | --- |
-| Select with an editable selection | Select part | Highlight and show the combined gizmo immediately, no edit |
+| Select with an editable selection | Select part | Original material, selected tree row and immediate combined gizmo; no edit |
 | Select or combined gizmo ready | G | Start cursor Surface Move of existing selection |
 | Gizmo ready | X, Y or Z | Start axis Move without a second G |
 | Gizmo ready | R or S | Start Rotate or uniform Scale |
-| Pending Move or Rotate | X, Y or Z | Constrain; repeat toggles World/Local |
+| Pending Move or Rotate | X, Y or Z | Reset mouse preview to original pose and constrain; repeat toggles World/Local |
 | Pending Move | Shift plus axis | Plane excluding that axis |
-| Pending Surface Move | Q/E, wheel | Source point, yaw; P explicitly chooses screen plane |
+| Pending Surface Move | Q/E, wheel | Source point updates attachment immediately, yaw; P chooses screen plane |
 | Pending transform | Typed number | Replace mouse result using the original action snapshot |
 | Pending transform | Enter or viewport LMB | Validate and confirm exactly one edit |
 | Pending transform | Esc | Exact rollback; return to combined gizmo |
@@ -115,6 +115,18 @@ about 35 logical pixels across, offset away from crowded rings. Its entire visib
 silhouette is clickable with small padding; overlap resolution is deterministic.
 Check engraving at actual small size, not just a large concept image.
 
+Snap points use plain shapes: gold native diamond, smaller blue corner circle and
+green midpoint cross, pink centre, purple pin accent, white active helper. A native
+pin retains its gold rim with a compact purple accent inside. Coordinates remain
+unchanged; no decluttering hides or offsets points. The bottom legend names all
+colours. Game mode targets native sockets even inside their own mesh; other pieces
+still occlude. Furniture without natives retains helper fallback.
+
+World blueprint description refreshes with language and displays summed resources
+and deduplicated required stations. HUD text only: marker requirements stay empty,
+preserving native per-child checks and consumption. Layout and actual costs still
+require owner game acceptance.
+
 ## Required regressions
 
 Reuse actual Controller.Update/LateUpdate and native EventSystem Workbench checks;
@@ -122,7 +134,7 @@ do not test a disconnected imitation of the proposed state machine.
 
 | Case | Gesture | Required result |
 | --- | --- | --- |
-| Visibility | Select in tree/viewport; G; Esc | Gold selection and handles immediately; G previews; Esc cancels and retains selection |
+| Visibility | Select in tree/viewport; G; Esc | Original material and immediate handles; G previews; Esc cancels and retains selection |
 | Precision baseline | R X; mouse turn; type 30; Enter | Exactly 30 degrees from original; one Undo restores exact pose |
 | Move and scale | Axis Move; mouse; type -2,5; S then 1.5 | Original reference, culture/keypad parity, uniform bounded scale |
 | Input parser | Empty, minus, comma, backspace, overflow, NaN-like text | No accidental confirm, NaN, deletion or document mutation |

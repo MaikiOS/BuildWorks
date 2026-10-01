@@ -9,7 +9,7 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Current source candidate: **0.19.44**, Store v9, Valheim 1.0.16.
+Current source candidate: **0.19.45**, Store v9, Valheim 1.0.16.
 0.19.39 owner feedback accepts menu hover, language refresh and camera framing;
 Transform selection is provisionally accepted. The owner accepts contour cleanup;
 the focused 0.19.41 game series is accepted by owner report on 2026-10-01.
@@ -57,7 +57,7 @@ dependent changes wait for its gate, unrelated preparation may continue.
 | ID | Deliverable | Dependency | Status |
 | --- | --- | --- | --- |
 | BW-00 | Dedicated-profile baseline and reliable handoff | Current core | Focused 0.19.41 owner series accepted; cost/refund accounting and networking pending |
-| BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | .43 revised editor input/art; owner game acceptance pending; world F9 retained |
+| BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | .45 untinted selection, plain fixed-position snap glyphs, axis reset/QE and localized resource HUD; owner acceptance pending; world F9 retained |
 | BW-02 | Group layout operations without resizing pieces | BW-01 | Planned; focused operation UI approval required |
 | BW-03 | Persistent Array and minimal recipe persistence | BW-02 | Planned; safe Store migration and editing/Bake gate |
 | BW-04 | Guides and curves in accepted slices | BW-03 + renewed owner discussion | Tool-semantics discussion required before coding |

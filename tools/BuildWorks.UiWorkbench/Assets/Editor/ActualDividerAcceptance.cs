@@ -196,8 +196,8 @@ public static class ActualDividerAcceptance
                 Require(scene.TrySync(document, out error), "Select exact nested group: " + error);
                 foreach (string id in new[] { "divider-left", "divider-right", "wall" })
                     AssertHover(scene, id, false);
-                evidence.Add("PASS exact mesh reversible cyan hover/gold selection; unhover/deselect restore; nested group highlights all descendants.");
-                evidence.Add("Selected gold and hover blue images captured with real Scene and real native mesh.");
+                evidence.Add("PASS exact mesh reversible cyan hover; selected mesh retains original materials; nested descendants stay untinted.");
+                evidence.Add("Untinted selection and hover blue images captured with real Scene and real native mesh.");
             }
             evidence.Add("PASS exact installed asset; LOD0 meshes=" + meshCount + "; unreadable=" + unreadable);
             Debug.Log("BUILDWORKS_ACTUAL_DIVIDER_OK");
@@ -362,9 +362,7 @@ public static class ActualDividerAcceptance
                     properties.GetColor("_EmissionColor") == tint * 0.4f,
                     "Exact native hover tint/emission missing: " + id + "/" + renderer.name);
             }
-            else if ((bool)visual.GetType().GetField("Selected", flags).GetValue(visual))
-                Require(properties.GetColor("_Color") == new Color(1f, .78f, .38f, 1f), "Exact selected mesh lacks gold tint: " + id);
-            else Require(properties.isEmpty, "Unselected/unhovered exact mesh retains tint: " + id);
+            else Require(properties.isEmpty, "Unhovered exact mesh retains tint: " + id);
         }
     }
 

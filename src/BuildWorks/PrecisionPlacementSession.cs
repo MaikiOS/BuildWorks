@@ -215,6 +215,26 @@ namespace OstrixMods.BuildWorks
         private readonly PrecisionPlacementHudView hud;
         private readonly CompositeBlueprintStore blueprintStore = new CompositeBlueprintStore();
         private readonly HammerBlueprintPieceRegistry blueprintPieceRegistry;
+        private Piece descriptionPiece;
+        private string descriptionLanguage;
+        private string descriptionText;
+
+        internal void UpdateBlueprintPieceInfo(Hud hud, Player player)
+        {
+            Piece piece = player ? player.GetSelectedPiece() : null;
+            if (!hud || !hud.m_pieceDescription ||
+                !blueprintPieceRegistry.TryGetBlueprint(piece, out CompositeBlueprintStore.Blueprint blueprint)) return;
+            string language = Localization.instance?.GetSelectedLanguage();
+            if (piece != descriptionPiece || language != descriptionLanguage)
+            {
+                descriptionPiece = piece;
+                descriptionLanguage = language;
+                descriptionText = blueprintPieceRegistry.Description(blueprint);
+            }
+            // Display-only: marker requirements remain empty. Native per-part
+            // placement retains all cost, station, ownership and network checks.
+            hud.m_pieceDescription.text = descriptionText;
+        }
         private PlacementState state;
         private SessionMode sessionMode;
         private bool precisionEnabled;

@@ -222,7 +222,6 @@ namespace OstrixMods.BuildWorks
         private float groundHeight;
         private bool disposed;
         private readonly MaterialPropertyBlock hoverProperties = new MaterialPropertyBlock();
-        private readonly MaterialPropertyBlock selectionProperties = new MaterialPropertyBlock();
         private string[] cachedAnchorIds;
         private Vector3[] cachedGizmoAnchors;
         private int cachedNativeAnchorStart;
@@ -240,10 +239,6 @@ namespace OstrixMods.BuildWorks
             hoverProperties.SetColor("_Color", hoverColor);
             hoverProperties.SetColor("_BaseColor", hoverColor);
             hoverProperties.SetColor("_EmissionColor", hoverColor * 0.4f);
-            Color selectionColor = new Color(1f, 0.78f, 0.38f, 1f);
-            selectionProperties.SetColor("_Color", selectionColor);
-            selectionProperties.SetColor("_BaseColor", selectionColor);
-            selectionProperties.SetColor("_EmissionColor", selectionColor * 0.4f);
             editorLayer = FindUnusedEditorLayer();
             root = new GameObject("BuildWorks_BlueprintEditorScene")
             {
@@ -592,7 +587,7 @@ namespace OstrixMods.BuildWorks
         }
 
         internal bool IsEditorPointVisible(
-            Vector3 point, IReadOnlyList<string> excludedStableIds = null)
+            Vector3 point, IReadOnlyList<string> excludedStableIds = null, GameObject ownerRoot = null)
         {
             ThrowIfDisposed();
             Vector3 screen = camera.WorldToScreenPoint(point);
@@ -608,7 +603,7 @@ namespace OstrixMods.BuildWorks
                     for (int index = 0; index < excludedStableIds.Count; ++index)
                         if (excludedStableIds[index] == entry.Key) { excluded = true; break; }
                 VisualNode visual = entry.Value;
-                if (excluded || !visual.Root.activeInHierarchy ||
+                if (excluded || visual.Root == ownerRoot || !visual.Root.activeInHierarchy ||
                     !TryBounds(visual, out Bounds bounds) || !bounds.IntersectRay(ray)) continue;
                 if (TryMeshHit(visual, ray, out float hit) && hit < maximum) return false;
             }
@@ -1509,7 +1504,8 @@ namespace OstrixMods.BuildWorks
             {
                 VisualNode visual = entry.Value;
                 if (excluded.Contains(entry.Key) || !visual.Root.activeInHierarchy) continue;
-                for (int index = 0; index < visual.SnapLocal.Count; ++index)
+                for (int index = 0; index < (includeMeshTargets || visual.NativeSnapCount == 0
+                    ? visual.SnapLocal.Count : visual.NativeSnapCount); ++index)
                     AddSnapCandidate(
                         candidates,
                         mousePosition,
@@ -1542,7 +1538,10 @@ namespace OstrixMods.BuildWorks
             SnapCandidate? edgeWinner = null;
             foreach (SnapCandidate candidate in candidates)
             {
-                if (!IsEditorPointVisible(candidate.Point, excludedStableIds)) continue;
+                // Native prefab points often lie inside their own mesh. That mesh
+                // must not block its sockets; other parts still occlude them.
+                if (!IsEditorPointVisible(candidate.Point, excludedStableIds,
+                    candidate.Native ? candidate.Visual?.Root : null)) continue;
                 previewTargets.Add(candidate.Point);
                 previewNative.Add(candidate.Native);
                 if (!candidate.Edge && !pointWinner.HasValue &&
@@ -2071,7 +2070,7 @@ namespace OstrixMods.BuildWorks
         private void ApplyAppearance(VisualNode visual)
         {
             bool selected = visual.Selected || visual.ActiveSelection;
-            MaterialPropertyBlock properties = visual.SeeThrough ? null : selected ? temporarySelectionHighlight ? hoverProperties : selectionProperties
+            MaterialPropertyBlock properties = visual.SeeThrough ? null : selected ? temporarySelectionHighlight ? hoverProperties : null
                 : visual.Hovered ? hoverProperties : null;
             foreach (Renderer renderer in visual.Renderers)
                 if (renderer) renderer.SetPropertyBlock(properties);

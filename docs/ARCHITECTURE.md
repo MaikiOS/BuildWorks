@@ -38,6 +38,13 @@ The indexed Hammer never places a blueprint by itself. It selects a normal piece
 
 The Blueprint Editor is isolated from the world session. `BlueprintEditorController` coordinates input, view and temporary scene objects. The authoritative editable state is `BlueprintEditorDocument`; UI objects are projections of that state. Persistence only crosses through `CompositeBlueprintStore`.
 
+Editor G/R/S reuse the existing drag snapshots and `Scene.PreviewTransform`;
+they do not edit the document until one atomic confirmation. Current-frame surface
+validation owns Enter/click, camera/source changes rebase the preview, and cancel
+restores the scene. `TransformGizmoView.Family` gates both drawing and hit tests;
+world callers retain Combined and their existing behavior. Dropdowns reparent
+existing controls rather than duplicate handlers. Layout state is editor-only.
+
 ## Invariants
 
 - Do not add a hard Jotunn dependency.

@@ -296,6 +296,7 @@ namespace OstrixMods.BuildWorks
         private readonly RectTransform top;
         private readonly RectTransform rail;
         private readonly RectTransform viewport;
+        private readonly RectTransform selectionBox;
         private readonly RectTransform rightColumn;
         private readonly RectTransform outliner;
         private readonly RectTransform inspector;
@@ -373,6 +374,14 @@ namespace OstrixMods.BuildWorks
         private readonly Button contourApplyButton;
         private readonly TMP_Text statusText;
         private readonly TMP_Text statusHintText;
+        private readonly TMP_Text[] contextHintGroups = new TMP_Text[6];
+        private readonly TMP_Text nextActionText;
+        private readonly Button hintsToggle;
+        private readonly Button[] previewAxisButtons = new Button[3];
+        private bool hintsExpanded = true;
+        private TMP_InputField fieldOfViewInput;
+        private Slider fieldOfViewSlider;
+        private Button fieldOfViewReset;
         private float statusMessageUntil;
         private readonly Button undoButton;
         private readonly Button redoButton;
@@ -406,8 +415,23 @@ namespace OstrixMods.BuildWorks
         private readonly TMP_InputField catalogPageInput;
         private readonly ScrollRect catalogMaterialScroll;
         private readonly GameObject viewportSettings;
+        private readonly GameObject[] viewportSections = new GameObject[3];
+        private readonly Button[] viewportSectionButtons = new Button[3];
+        private readonly Button[] familyButtons = new Button[4];
+        private readonly RectTransform hintGroupsArea;
+        private readonly RectTransform paneSplitter;
+        private bool viewportFocused, splitterDragging;
+        private float outlinerFraction = .44f;
+        private int viewportSection;
+        private readonly GameObject toolsMenu;
+        private readonly RectTransform toolsPanel;
+        private readonly TMP_InputField toolsSearch;
+        private readonly List<Button> toolsEntries = new List<Button>();
+        private int toolsMenuIndex;
+        internal bool HasToolsMenu => toolsMenu && toolsMenu.activeSelf;
         private readonly Button interfaceScaleButton;
         private readonly RectTransform viewportControls;
+        private readonly Button occluderFadeButton;
         private readonly TMP_InputField scaleStepInput;
         public float ScaleStepPercent { get; private set; } = 10f;
         private readonly TMP_InputField[] viewportScaleInputs = new TMP_InputField[5];
@@ -501,6 +525,14 @@ namespace OstrixMods.BuildWorks
                 rail = CreatePanel("ToolRail", safeRoot, PanelColor);
                 viewport = CreatePanel("ViewportInput", safeRoot, Color.clear, null);
                 viewport.GetComponent<Image>().raycastTarget = false;
+                selectionBox = CreatePanel("SelectionBox", viewport, Color.white,
+                    BlueprintEditorSkin.Surface.Focus);
+                selectionBox.anchorMin = selectionBox.anchorMax = new Vector2(0.5f, 0.5f);
+                selectionBox.pivot = new Vector2(0.5f, 0.5f);
+                Image selectionImage = selectionBox.GetComponent<Image>();
+                selectionImage.fillCenter = false;
+                selectionImage.raycastTarget = false;
+                selectionBox.gameObject.SetActive(false);
                 rightColumn = CreatePanel("RightColumn", safeRoot, PanelColor, null);
                 outliner = CreatePanel("Outliner", safeRoot, PanelRaised);
                 inspector = CreatePanel("Inspector", safeRoot, PanelRaised);
@@ -630,13 +662,25 @@ namespace OstrixMods.BuildWorks
                 SetTopRight((RectTransform)outlinerFilterButton.transform, 8f, 76f, 76f, 32f);
                 RectTransform rowViewport = CreateRect("RowsViewport", outliner);
                 outlinerRowViewport = rowViewport;
-                SetInsets(rowViewport, 4f, (float)BlueprintEditorLayout.OutlinerHeaderHeight - 4f, 4f, 4f);
+                SetInsets(rowViewport, 4f, (float)BlueprintEditorLayout.OutlinerHeaderHeight, 18f, 4f);
                 rowViewport.gameObject.AddComponent<RectMask2D>();
                 ScrollRect rowScroll = outliner.gameObject.AddComponent<ScrollRect>();
                 rowScroll.horizontal = false;
                 rowScroll.vertical = true;
                 rowScroll.movementType = ScrollRect.MovementType.Clamped;
-                rowScroll.scrollSensitivity = 88f;
+                rowScroll.scrollSensitivity = 132f;
+                RectTransform scrollTrack = CreatePanel("OutlinerScrollTrack", outliner, ButtonColor, null);
+                SetTopRight(scrollTrack, 4f, (float)BlueprintEditorLayout.OutlinerHeaderHeight, 10f, 0f);
+                scrollTrack.anchorMin = new Vector2(1f, 0f);
+                scrollTrack.offsetMin = new Vector2(-14f, 4f);
+                RectTransform scrollThumb = CreatePanel("Thumb", scrollTrack, MutedColor, null);
+                SetInsets(scrollThumb, 1f, 1f, 1f, 1f);
+                Scrollbar scrollbar = scrollTrack.gameObject.AddComponent<Scrollbar>();
+                scrollbar.handleRect = scrollThumb;
+                scrollbar.targetGraphic = scrollThumb.GetComponent<Image>();
+                scrollbar.direction = Scrollbar.Direction.BottomToTop;
+                rowScroll.verticalScrollbar = scrollbar;
+                rowScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
                 outlinerRows = CreateRect("Rows", rowViewport);
                 outlinerRows.anchorMin = new Vector2(0f, 1f);
                 outlinerRows.anchorMax = new Vector2(1f, 1f);
@@ -1008,13 +1052,61 @@ namespace OstrixMods.BuildWorks
                 statusText.color = MutedColor;
                 statusText.raycastTarget = false;
                 statusText.overflowMode = TextOverflowModes.Ellipsis;
-                SetInsets((RectTransform)statusText.transform, 12f, 2f, 12f, 24f);
+                SetTopAnchored((RectTransform)statusText.transform, 12f, 2f, 12f, 22f);
+                nextActionText = CreateText("NextAction", status, string.Empty,
+                    13f, FontStyles.Bold, TextAlignmentOptions.TopLeft);
+                nextActionText.color = AccentColor;
+                nextActionText.raycastTarget = false;
+                nextActionText.textWrappingMode = TextWrappingModes.Normal;
+                SetTopAnchored(nextActionText.rectTransform, 12f, 26f, 222f, 40f);
+                hintsToggle = CreateButton("HintsToggle", status, T("editor.view.hints"), 92f, () =>
+                {
+                    hintsExpanded = !hintsExpanded;
+                    ApplySafeAreaAndLayout(force: true);
+                });
+                SetTopRight((RectTransform)hintsToggle.transform, 8f, 28f, 92f, 30f);
+                for (int index = 0; index < previewAxisButtons.Length; ++index)
+                {
+                    GizmoAxis axis = (GizmoAxis)(index + 1);
+                    previewAxisButtons[index] = CreateButton("PreviewAxis" + axis, status, axis.ToString(), 28f,
+                        () => PreviewAxisRequested?.Invoke(axis));
+                    SetTopRight((RectTransform)previewAxisButtons[index].transform, 112f + index * 34f, 28f, 28f, 30f);
+                    previewAxisButtons[index].gameObject.SetActive(false);
+                }
                 statusHintText = CreateText("StatusHints", status, string.Empty,
-                    12f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+                    12f, FontStyles.Normal, TextAlignmentOptions.TopLeft);
                 statusHintText.color = TextColor;
                 statusHintText.raycastTarget = false;
+                statusHintText.textWrappingMode = TextWrappingModes.Normal;
                 statusHintText.overflowMode = TextOverflowModes.Ellipsis;
-                SetInsets((RectTransform)statusHintText.transform, 12f, 24f, 12f, 2f);
+                SetInsets((RectTransform)statusHintText.transform, 12f, 70f, 12f, 2f);
+                hintGroupsArea = CreateRect("HintGroups", status);
+                SetInsets(hintGroupsArea, 0f, 70f, 0f, 0f);
+                for (int index = 0; index < contextHintGroups.Length; ++index)
+                {
+                    TMP_Text hint = CreateText("StatusHints" + index, hintGroupsArea, string.Empty,
+                        12f, FontStyles.Normal, TextAlignmentOptions.TopLeft);
+                    hint.raycastTarget = false;
+                    hint.textWrappingMode = TextWrappingModes.Normal;
+                    hint.overflowMode = TextOverflowModes.Ellipsis;
+                    RectTransform area = hint.rectTransform;
+                    int column = index % 3, row = index / 3;
+                    area.anchorMin = new Vector2(column / 3f, row == 0 ? .5f : 0f);
+                    area.anchorMax = new Vector2((column + 1) / 3f, row == 0 ? 1f : .5f);
+                    area.offsetMin = new Vector2(12f, 4f);
+                    area.offsetMax = new Vector2(-12f, -4f);
+                    contextHintGroups[index] = hint;
+                    hint.gameObject.SetActive(false);
+                    if (column > 0)
+                    {
+                        RectTransform divider = CreatePanel("HintDivider" + index, hintGroupsArea, new Color(.5f, .45f, .3f, .3f), null);
+                        divider.GetComponent<Image>().raycastTarget = false;
+                        divider.anchorMin = new Vector2(column / 3f, row == 0 ? .5f : 0f);
+                        divider.anchorMax = new Vector2(column / 3f, row == 0 ? 1f : .5f);
+                        divider.offsetMin = new Vector2(0f, 8f);
+                        divider.offsetMax = new Vector2(1f, -8f);
+                    }
+                }
 
                 tooltip = CreatePanel("Tooltip", safeRoot, new Color(0.06f, 0.07f, 0.08f, 0.99f), BlueprintEditorSkin.Surface.Tooltip);
                 tooltip.GetComponent<Image>().raycastTarget = false;
@@ -1027,17 +1119,20 @@ namespace OstrixMods.BuildWorks
                 tooltip.gameObject.SetActive(false);
 
                 viewportControls = CreatePanel("ViewportControls", viewport, Color.clear, null);
-                SetTopRight(viewportControls, 12f, 12f, 84f, 38f);
+                SetTopRight(viewportControls, 12f, 12f, 214f, 38f);
+                occluderFadeButton = CreateButton("OccluderFadeToggle", viewportControls,
+                    T("editor.view.see_through"), 122f, () => OccluderFadeRequested?.Invoke());
+                SetTopLeft((RectTransform)occluderFadeButton.transform, 0f, 0f, 122f, 38f);
                 gridButton = CreateIconButton("GridToggle", viewportControls, null, "#", 38f,
                     () => { showGrid = !showGrid; PublishViewportSettings(); }, T("editor.view.grid_tooltip"));
-                SetTopLeft((RectTransform)gridButton.transform, 0f, 0f, 38f, 38f);
+                SetTopLeft((RectTransform)gridButton.transform, 130f, 0f, 38f, 38f);
                 projectionButton = CreateIconButton("ProjectionToggle", viewportControls, "frame", "◈", 38f,
                     () => { SetProjection(!orthographic); ProjectionChanged?.Invoke(orthographic); },
                     T("editor.view.projection_tooltip"));
-                SetTopLeft((RectTransform)projectionButton.transform, 46f, 0f, 38f, 38f);
+                SetTopLeft((RectTransform)projectionButton.transform, 176f, 0f, 38f, 38f);
                 SetSelected(gridButton, showGrid);
                 viewportSettings = CreatePanel("ViewportSettings", viewport, PanelRaised).gameObject;
-                SetTopRight((RectTransform)viewportSettings.transform, 12f, 56f, 320f, 454f);
+                SetTopRight((RectTransform)viewportSettings.transform, 12f, 56f, 320f, 536f);
                 TMP_Text viewTitle = CreateText("ViewportSettingsTitle", viewportSettings.transform,
                     T("editor.view.viewport_settings"), 15f, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
                 SetTopLeft((RectTransform)viewTitle.transform, 12f, 8f, 240f, 28f);
@@ -1084,6 +1179,31 @@ namespace OstrixMods.BuildWorks
                 interfaceScaleButton = CreateButton("InterfaceScale", viewportSettings.transform,
                     T("editor.view.interface_scale", 100), 294f, CycleUiScale);
                 SetTopLeft((RectTransform)interfaceScaleButton.transform, 12f, 354f, 294f, 36f);
+                TMP_Text fovLabel = CreateText("FieldOfViewLabel", viewportSettings.transform,
+                    T("editor.view.field_of_view"), 13f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+                SetTopLeft(fovLabel.rectTransform, 12f, 398f, 190f, 32f);
+                fieldOfViewInput = CreateInput("FieldOfView", viewportSettings.transform,
+                    new Vector2(212f, -398f), 94f, .1f, 10f, 120f);
+                ((RectTransform)fieldOfViewInput.transform).sizeDelta = new Vector2(94f, 32f);
+                fieldOfViewInput.onEndEdit.AddListener(_ =>
+                {
+                    if (TryRead(fieldOfViewInput, out float degrees) && !float.IsNaN(degrees) && !float.IsInfinity(degrees))
+                    { SetFieldOfView(degrees, orthographic); FieldOfViewChanged?.Invoke(fieldOfViewSlider.value); }
+                });
+                RectTransform fovTrack = CreatePanel("FieldOfViewSlider", viewportSettings.transform, ButtonColor, null);
+                SetTopLeft(fovTrack, 12f, 442f, 170f, 24f);
+                RectTransform fovHandle = CreatePanel("Handle", fovTrack, AccentColor, null);
+                fovHandle.anchorMin = fovHandle.anchorMax = new Vector2(0f, .5f);
+                fovHandle.sizeDelta = new Vector2(12f, 18f);
+                fieldOfViewSlider = fovTrack.gameObject.AddComponent<Slider>();
+                fieldOfViewSlider.minValue = 10f; fieldOfViewSlider.maxValue = 120f;
+                fieldOfViewSlider.handleRect = fovHandle;
+                fieldOfViewSlider.targetGraphic = fovHandle.GetComponent<Image>();
+                fieldOfViewSlider.onValueChanged.AddListener(value =>
+                { fieldOfViewInput.SetTextWithoutNotify(value.ToString("0.#", CultureInfo.InvariantCulture)); FieldOfViewChanged?.Invoke(value); });
+                fieldOfViewReset = CreateButton("FieldOfViewReset", viewportSettings.transform,
+                    T("editor.view.game_fov"), 116f, () => FieldOfViewResetRequested?.Invoke());
+                SetTopLeft((RectTransform)fieldOfViewReset.transform, 190f, 436f, 116f, 32f);
                 Button resetView = CreateButton("ViewportSettingsReset", viewportSettings.transform,
                     T("editor.view.reset_settings"), 294f, () =>
                     {
@@ -1092,8 +1212,100 @@ namespace OstrixMods.BuildWorks
                         SetViewportSettings(1f, 1f, 1f, 1f, 1f, true);
                         PublishViewportSettings();
                     });
-                SetTopLeft((RectTransform)resetView.transform, 12f, 404f, 294f, 36f);
+                SetTopLeft((RectTransform)resetView.transform, 12f, 488f, 294f, 36f);
+
+                // Keep the existing handlers and fields; only their grouping changes.
+                string[] sectionKeys = { "editor.view.camera_menu", "editor.view.display_menu", "editor.view.manipulator_menu" };
+                for (int index = 0; index < viewportSections.Length; ++index)
+                {
+                    RectTransform section = CreateRect("ViewportSection" + index, viewportSettings.transform);
+                    SetInsets(section, 0f, 40f, 0f, 0f);
+                    viewportSections[index] = section.gameObject;
+                    int choice = index;
+                    Button button = CreateButton("ViewportSectionButton" + index, viewportControls,
+                        T(sectionKeys[index]), 90f, () => ToggleViewportSection(choice));
+                    SetTopLeft((RectTransform)button.transform, index * 96f, 0f, 90f, 32f);
+                    viewportSectionButtons[index] = button;
+                }
+                SetTopRight(viewportControls, 8f, 8f, 324f, 32f);
+                Button focusView = CreateIconButton("ViewportFocus", viewportControls, "frame", "□", 32f,
+                    () => { viewportFocused = !viewportFocused; ApplySafeAreaAndLayout(true); }, T("editor.view.focus_view"));
+                SetTopLeft((RectTransform)focusView.transform, 292f, 0f, 32f, 32f);
+                RepositionViewControl(frameAll.transform, 0, 12f, 4f, 142f, 32f);
+                RepositionViewControl(frameSelected.transform, 0, 164f, 4f, 142f, 32f);
+                RepositionViewControl(fovLabel.transform, 0, 12f, 48f, 190f, 32f);
+                RepositionViewControl(fieldOfViewInput.transform, 0, 212f, 48f, 94f, 32f);
+                RepositionViewControl(fovTrack, 0, 12f, 92f, 170f, 24f);
+                RepositionViewControl(fieldOfViewReset.transform, 0, 190f, 86f, 116f, 32f);
+                RepositionViewControl(projectionButton.transform, 0, 12f, 132f, 294f, 32f);
+                SetButtonLabel(projectionButton, T("editor.view.projection_tooltip"));
+                Transform projectionIcon = projectionButton.transform.Find("Icon");
+                if (projectionIcon) projectionIcon.gameObject.SetActive(false);
+                RepositionViewControl(occluderFadeButton.transform, 1, 12f, 4f, 294f, 32f);
+                RepositionViewControl(gridButton.transform, 1, 12f, 44f, 294f, 32f);
+                SetButtonLabel(gridButton, T("editor.view.grid_tooltip"));
+                RepositionViewControl(interfaceScaleButton.transform, 1, 12f, 84f, 294f, 32f);
+                GizmoFamily[] families = { GizmoFamily.Move, GizmoFamily.Rotate, GizmoFamily.Points, GizmoFamily.Scale };
+                string[] familyKeys = { "editor.view.family_move", "editor.view.family_rotate", "editor.view.points", "editor.view.family_scale" };
+                for (int index = 0; index < families.Length; ++index)
+                {
+                    GizmoFamily family = families[index];
+                    familyButtons[index] = CreateButton("GizmoFamily" + family, viewportSections[2].transform,
+                        T(familyKeys[index]), 142f, () => GizmoFamilySelected?.Invoke(family));
+                    SetTopLeft((RectTransform)familyButtons[index].transform, index % 2 == 0 ? 12f : 164f,
+                        4f + index / 2 * 36f, 142f, 32f);
+                }
+                RepositionViewControl(sizeTitle.transform, 2, 12f, 82f, 294f, 26f);
+                for (int index = 0; index < viewportScaleInputs.Length; ++index)
+                {
+                    RepositionViewControl(viewportSettings.transform.Find("GizmoSizeLabel" + index), 2, 12f, 114f + index * 38f, 192f, 32f);
+                    RepositionViewControl(viewportScaleInputs[index].transform, 2, 212f, 114f + index * 38f, 94f, 32f);
+                }
+                RepositionViewControl(scaleStepLabel.transform, 2, 12f, 308f, 192f, 32f);
+                RepositionViewControl(scaleStepInput.transform, 2, 212f, 308f, 94f, 32f);
+                RepositionViewControl(resetView.transform, 2, 12f, 352f, 294f, 32f);
                 viewportSettings.SetActive(false);
+
+                paneSplitter = CreatePanel("PaneSplitter", safeRoot, new Color(.55f, .43f, .22f, .8f), null);
+
+                toolsMenu = CreatePanel("ToolsMenuOverlay", safeRoot, new Color(0f, 0f, 0f, .12f), null).gameObject;
+                SetInsets((RectTransform)toolsMenu.transform, 0f, 0f, 0f, 0f);
+                toolsMenu.AddComponent<Button>().onClick.AddListener(HideToolsMenu);
+                toolsPanel = CreatePanel("ToolsMenu", toolsMenu.transform, PanelRaised);
+                toolsPanel.anchorMin = toolsPanel.anchorMax = new Vector2(.5f, .5f);
+                toolsPanel.pivot = new Vector2(0f, 1f);
+                toolsPanel.sizeDelta = new Vector2(310f, 236f);
+                TMP_Text toolsTitle = CreateText("ToolsTitle", toolsPanel, T("editor.view.tools"), 15f,
+                    FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+                SetTopLeft(toolsTitle.rectTransform, 12f, 8f, 286f, 28f);
+                RectTransform toolsSearchPanel = CreatePanel("ToolsSearch", toolsPanel, ButtonColor);
+                SetTopLeft(toolsSearchPanel, 12f, 42f, 286f, 32f);
+                TMP_Text searchText = CreateText("Text", toolsSearchPanel, "", 13f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+                SetInsets(searchText.rectTransform, 8f, 2f, 8f, 2f);
+                TMP_Text placeholder = CreateText("Placeholder", toolsSearchPanel, T("editor.view.search"), 13f,
+                    FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+                placeholder.color = MutedColor;
+                SetInsets(placeholder.rectTransform, 8f, 2f, 8f, 2f);
+                toolsSearch = toolsSearchPanel.gameObject.AddComponent<TMP_InputField>();
+                toolsSearch.textComponent = searchText;
+                toolsSearch.placeholder = placeholder;
+                toolsSearch.lineType = TMP_InputField.LineType.SingleLine;
+                toolsSearch.characterLimit = 48;
+                skin.Apply(toolsSearch, input: true);
+                toolsSearch.onValueChanged.AddListener(_ => FilterTools());
+                BlueprintEditorTool[] tools = { BlueprintEditorTool.Select, BlueprintEditorTool.Transform,
+                    BlueprintEditorTool.Array, BlueprintEditorTool.Contour };
+                string[] toolNames = { "editor.view.tool_select", "editor.view.tool_transform", "editor.view.tool_array", "editor.view.tool_contour" };
+                for (int index = 0; index < tools.Length; ++index)
+                {
+                    BlueprintEditorTool tool = tools[index];
+                    Button entry = CreateButton("ToolsEntry" + index, toolsPanel,
+                        T(toolNames[index]).Split('\n')[0], 286f, () =>
+                        { HideToolsMenu(); ToolSelected?.Invoke(tool); });
+                    SetTopLeft((RectTransform)entry.transform, 12f, 82f + index * 36f, 286f, 32f);
+                    toolsEntries.Add(entry);
+                }
+                toolsMenu.SetActive(false);
 
                 catalog = CreatePanel(
                     "CatalogOverlay", safeRoot, new Color(0f, 0f, 0f, 0.72f), null).gameObject;
@@ -1312,7 +1524,21 @@ namespace OstrixMods.BuildWorks
         internal event Action<BlueprintEditorTool> ToolSelected;
         internal event Action<BlueprintEditorLightingPreset> LightingChanged;
         internal event Action<float, float, float, float, float, bool> ViewportSettingsChanged;
+        internal event Action<GizmoFamily> GizmoFamilySelected;
+        internal event Action<GizmoAxis> PreviewAxisRequested;
         internal event Action<bool> ProjectionChanged;
+        internal event Action<float> FieldOfViewChanged;
+        internal event Action FieldOfViewResetRequested;
+
+        internal void SetFieldOfView(float degrees, bool orthographicView)
+        {
+            degrees = Mathf.Clamp(degrees, 10f, 120f);
+            fieldOfViewInput.SetTextWithoutNotify(degrees.ToString("0.#", CultureInfo.InvariantCulture));
+            fieldOfViewSlider.SetValueWithoutNotify(degrees);
+            fieldOfViewInput.interactable = fieldOfViewSlider.interactable = fieldOfViewReset.interactable = !orthographicView;
+        }
+        internal event Action OccluderFadeRequested;
+        internal void SetOccluderFade(bool enabled) => SetSelected(occluderFadeButton, enabled);
         internal event Action<string, bool, bool> NodeClicked;
         internal event Action<string, bool> VisibilityChanged;
         internal event Action<string, bool> LockChanged;
@@ -1423,6 +1649,20 @@ namespace OstrixMods.BuildWorks
                 RefreshStatusText();
             }
             ApplySafeAreaAndLayout(force: false);
+            Camera uiCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+            if (!HasModal && !HasCatalog && !IsTextInputFocused && paneSplitter.gameObject.activeSelf &&
+                input.GetMouseButtonDown(0) && RectTransformUtility.RectangleContainsScreenPoint(paneSplitter, input.MousePosition, uiCamera))
+                splitterDragging = true;
+            if (splitterDragging)
+            {
+                if (!input.GetMouseButton(0)) splitterDragging = false;
+                else if (RectTransformUtility.ScreenPointToLocalPointInRectangle(rightColumn, input.MousePosition, uiCamera, out Vector2 point))
+                {
+                    outlinerFraction = Mathf.Clamp(-point.y / rightColumn.rect.height,
+                        146f / rightColumn.rect.height, 1f - (float)BlueprintEditorLayout.MinimumInspectorHeight / rightColumn.rect.height);
+                    ApplySafeAreaAndLayout(true);
+                }
+            }
             if (outlinerContextTracking && !input.GetMouseButton(1))
                 ReleaseOutlinerContext(input.MousePosition);
             if (outlinerDragging) ScrollOutlinerDrag();
@@ -1615,8 +1855,126 @@ namespace OstrixMods.BuildWorks
             statusMessageUntil = Time.unscaledTime + Mathf.Max(0.1f, seconds);
         }
 
-        internal void SetContextHints(string text) =>
+        internal void SetContextHints(string text)
+        {
+            statusHintText.gameObject.SetActive(hintsExpanded);
             statusHintText.text = text ?? string.Empty;
+            foreach (TMP_Text group in contextHintGroups) group.gameObject.SetActive(false);
+            foreach (Transform child in hintGroupsArea)
+                if (child.name.StartsWith("HintDivider", StringComparison.Ordinal)) child.gameObject.SetActive(false);
+        }
+
+        internal void SetContextHintGroups(params string[] groups)
+        {
+            statusHintText.gameObject.SetActive(false);
+            foreach (Transform child in hintGroupsArea)
+                if (child.name.StartsWith("HintDivider", StringComparison.Ordinal)) child.gameObject.SetActive(hintsExpanded);
+            string[] titles = { "editor.hint.section_modes", "editor.hint.section_tool",
+                "editor.hint.section_selection", "editor.hint.section_history",
+                "editor.hint.section_visibility", "editor.hint.section_camera" };
+            for (int index = 0; index < contextHintGroups.Length; ++index)
+            {
+                TMP_Text group = contextHintGroups[index];
+                group.gameObject.SetActive(hintsExpanded);
+                string[] commands = groups[index].Split(new[] { " · " }, StringSplitOptions.None);
+                for (int command = 0; command < commands.Length; ++command)
+                {
+                    int separator = commands[command].IndexOf(" — ", StringComparison.Ordinal);
+                    if (separator > 0) commands[command] = "<b><mark=#78634340>" +
+                        commands[command].Substring(0, separator) + "</mark></b>" +
+                        commands[command].Substring(separator);
+                }
+                group.text = "<b>" + T(titles[index]) + "</b>\n" +
+                    string.Join(" · ", commands);
+            }
+        }
+
+        internal void SetNextAction(string text) => nextActionText.text = text ?? string.Empty;
+
+        internal void SetPreviewControls(bool pending)
+        {
+            foreach (RectTransform panel in new[] { top, rail, outliner, inspector })
+                panel.GetComponent<CanvasGroup>().interactable = !pending;
+        }
+
+        internal void ShowToolsMenu(Vector2 mouse, bool searchFocused)
+        {
+            HideViewportSettings();
+            HideOutlinerMenu();
+            EndTooltip();
+            toolsSearch.SetTextWithoutNotify("");
+            toolsMenu.SetActive(true);
+            Camera uiCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(safeRoot, mouse, uiCamera, out Vector2 point);
+            Rect safe = safeRoot.rect;
+            toolsPanel.anchoredPosition = new Vector2(Mathf.Clamp(point.x, safe.xMin, safe.xMax - toolsPanel.rect.width),
+                Mathf.Clamp(point.y, safe.yMin + toolsPanel.rect.height, safe.yMax));
+            FilterTools();
+            if (searchFocused) toolsSearch.ActivateInputField();
+        }
+
+        internal void HideToolsMenu()
+        {
+            toolsMenu.SetActive(false);
+            if (EventSystem.current && EventSystem.current.currentSelectedGameObject &&
+                EventSystem.current.currentSelectedGameObject.transform.IsChildOf(toolsMenu.transform))
+                EventSystem.current.SetSelectedGameObject(null);
+        }
+
+        private void FilterTools()
+        {
+            int row = 0;
+            foreach (Button entry in toolsEntries)
+            {
+                string label = entry.GetComponentInChildren<TMP_Text>().text;
+                bool match = label.IndexOf(toolsSearch.text, StringComparison.OrdinalIgnoreCase) >= 0;
+                entry.gameObject.SetActive(match);
+                entry.interactable = entry.name == "ToolsEntry0" || boundDocument?.EditablePartSelectionCount > 0;
+                if (match) SetTopLeft((RectTransform)entry.transform, 12f, 82f + row++ * 36f, 286f, 32f);
+            }
+            toolsMenuIndex = 0;
+            RefreshToolsHighlight();
+        }
+
+        private void RefreshToolsHighlight()
+        {
+            int row = 0;
+            foreach (Button entry in toolsEntries)
+                if (entry.gameObject.activeSelf && entry.interactable) SetSelected(entry, row++ == toolsMenuIndex);
+        }
+
+        internal void HandleToolsMenuInput()
+        {
+            if (input.GetKeyDown(KeyCode.Escape)) { HideToolsMenu(); return; }
+            var available = toolsEntries.FindAll(button => button.gameObject.activeSelf && button.interactable);
+            if (available.Count == 0) return;
+            if (input.GetKeyDown(KeyCode.DownArrow)) toolsMenuIndex = (toolsMenuIndex + 1) % available.Count;
+            if (input.GetKeyDown(KeyCode.UpArrow)) toolsMenuIndex = (toolsMenuIndex + available.Count - 1) % available.Count;
+            RefreshToolsHighlight();
+            if (input.GetKeyDown(KeyCode.Return) || input.GetKeyDown(KeyCode.KeypadEnter))
+                available[Mathf.Clamp(toolsMenuIndex, 0, available.Count - 1)].onClick.Invoke();
+            else if (!toolsSearch.isFocused)
+                for (int index = 0; index < toolsEntries.Count; ++index)
+                    if (input.GetKeyDown(KeyCode.Alpha1 + index) && toolsEntries[index].interactable)
+                    { toolsEntries[index].onClick.Invoke(); return; }
+        }
+
+        internal void SetSelectionBox(Vector2 start, Vector2 end, bool visible)
+        {
+            visible &= (end - start).sqrMagnitude > 36f;
+            selectionBox.gameObject.SetActive(visible);
+            if (!visible) return;
+            Rect area = ViewportScreenRect();
+            start = new Vector2(Mathf.Clamp(start.x, area.xMin, area.xMax),
+                Mathf.Clamp(start.y, area.yMin, area.yMax));
+            end = new Vector2(Mathf.Clamp(end.x, area.xMin, area.xMax),
+                Mathf.Clamp(end.y, area.yMin, area.yMax));
+            Camera uiCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(viewport, start, uiCamera, out Vector2 first);
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(viewport, end, uiCamera, out Vector2 last);
+            selectionBox.anchoredPosition = (first + last) * 0.5f - viewport.rect.center;
+            selectionBox.sizeDelta = new Vector2(Mathf.Abs(last.x - first.x), Mathf.Abs(last.y - first.y));
+        }
 
         internal void SetOperationMetrics(int selectedCount, Vector3 translation,
             Vector3 rotationDegrees, float scale, int previewCount, int totalCount)
@@ -1654,7 +2012,8 @@ namespace OstrixMods.BuildWorks
             Transform row = outlinerRows.Find("Row_" + stableId);
             if (row) row.GetComponent<Image>().color = Contains(boundDocument.Selection, stableId)
                 ? SelectedColor : stableId == hoveredNodeId
-                    ? new Color(0.07f, 0.22f, 0.32f, 1f) : ButtonColor;
+                    ? new Color(0.07f, 0.22f, 0.32f, 1f) :
+                        row.GetSiblingIndex() % 2 == 0 ? PanelColor : PanelRaised;
         }
 
         internal void ShowUnsavedDialog(string blueprintName)
@@ -1704,12 +2063,15 @@ namespace OstrixMods.BuildWorks
         {
             orthographic = value;
             SetSelected(projectionButton, value);
+            if (fieldOfViewSlider) SetFieldOfView(fieldOfViewSlider.value, value);
         }
 
         public bool IsViewportControlHit(Vector2 position)
         {
             Camera uiCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
-            return viewportControls.gameObject.activeInHierarchy &&
+            return splitterDragging || viewportSettings.activeSelf &&
+                RectTransformUtility.RectangleContainsScreenPoint((RectTransform)viewportSettings.transform, position, uiCamera) ||
+                viewportControls.gameObject.activeInHierarchy &&
                 RectTransformUtility.RectangleContainsScreenPoint(viewportControls, position, uiCamera);
         }
 
@@ -1735,12 +2097,65 @@ namespace OstrixMods.BuildWorks
 
         private void ToggleViewportSettings()
         {
+            ToggleViewportSection(2);
+        }
+
+        private void RepositionViewControl(Transform control, int section, float left, float topOffset, float width, float height)
+        {
+            control.SetParent(viewportSections[section].transform, false);
+            SetTopLeft((RectTransform)control, left, topOffset, width, height);
+        }
+
+        internal void SetGizmoFamily(GizmoFamily family)
+        {
+            for (int index = 0; index < familyButtons.Length; ++index)
+                SetSelected(familyButtons[index], (int)family == index + 1);
+        }
+
+        internal void SetPreviewAxes(bool available, GizmoAxis active)
+        {
+            for (int index = 0; index < previewAxisButtons.Length; ++index)
+            {
+                previewAxisButtons[index].gameObject.SetActive(available);
+                SetSelected(previewAxisButtons[index], (int)active == index + 1);
+            }
+        }
+
+        private void ToggleViewportSection(int section)
+        {
             HideOutlinerMenu();
-            viewportSettings.SetActive(!viewportSettings.activeSelf);
+            bool open = !viewportSettings.activeSelf || viewportSection != section;
+            viewportSection = section;
+            viewportSettings.SetActive(open);
+            string[] keys = { "editor.view.camera_menu", "editor.view.display_menu", "editor.view.manipulator_menu" };
+            viewportSettings.transform.Find("ViewportSettingsTitle").GetComponent<TMP_Text>().text = T(keys[section]);
+            for (int index = 0; index < viewportSections.Length; ++index)
+            {
+                viewportSections[index].SetActive(index == section);
+                SetSelected(viewportSectionButtons[index], open && index == section);
+            }
+            SetTopRight((RectTransform)viewportSettings.transform, 8f, 48f, 320f,
+                section == 0 ? 216f : section == 1 ? 176f : 440f);
+            FitViewportSettings();
             EndTooltip();
         }
 
-        internal void HideViewportSettings() => viewportSettings.SetActive(false);
+        private void FitViewportSettings()
+        {
+            float available = Mathf.Max(1f, viewport.rect.height - 56f);
+            float height = ((RectTransform)viewportSettings.transform).rect.height;
+            viewportSettings.transform.localScale = Vector3.one * Mathf.Min(1f, available / height);
+        }
+
+        internal void HideViewportSettings()
+        {
+            viewportSettings.SetActive(false);
+            foreach (Button button in viewportSectionButtons) SetSelected(button, false);
+        }
+
+        internal bool IsViewportSettingsHit(Vector2 position) => RectTransformUtility.RectangleContainsScreenPoint(
+            (RectTransform)viewportSettings.transform, position,
+            canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera) || IsViewportControlHit(position);
 
         private RectTransform CreateCatalogFilterStrip(string name, string label, float top)
         {
@@ -2366,7 +2781,8 @@ namespace OstrixMods.BuildWorks
         {
             RectTransform row = CreatePanel("Row_" + stableId, outlinerRows,
                 Contains(document.Selection, stableId) ? SelectedColor :
-                    stableId == hoveredNodeId ? new Color(0.07f, 0.22f, 0.32f, 1f) : ButtonColor, null);
+                    stableId == hoveredNodeId ? new Color(0.07f, 0.22f, 0.32f, 1f) :
+                        outlinerRows.childCount % 2 == 0 ? PanelColor : PanelRaised, null);
             LayoutElement rowLayout = row.gameObject.AddComponent<LayoutElement>();
             rowLayout.preferredHeight = (float)BlueprintEditorLayout.OutlinerRowHeight;
             rowLayout.minHeight = (float)BlueprintEditorLayout.OutlinerRowHeight;
@@ -2387,7 +2803,7 @@ namespace OstrixMods.BuildWorks
             bool groupPivot = false;
             foreach (BlueprintEditorGroup group in document.Groups)
                 if (group.PivotPartId == stableId) { groupPivot = true; break; }
-            string marker = part && document.PrimaryPartId == stableId ? "◆ " : string.Empty;
+            string marker = part && document.PrimaryPartId == stableId ? "★ " : string.Empty;
             if (part && groupPivot) marker += "◇ ";
             if (!part)
             {
@@ -2395,40 +2811,76 @@ namespace OstrixMods.BuildWorks
                 if (group != null && group.PivotPartId != null) marker += "◇ ";
                 if (document.PrimaryGroupId == stableId) marker += "★ ";
             }
-            name.text = marker + labelText +
+            name.text = labelText +
                 (part && missingPrefabNodes.Contains(stableId) ? "  !" : string.Empty);
             SetInsets((RectTransform)name.transform,
-                40f + depth * 18f, 0f, 96f, 0f);
+                40f + depth * 15f, 0f, 88f, 0f);
+            RectTransform kindRect = CreateRect("NodeKind", row);
+            SetTopLeft(kindRect, 22f + depth * 15f, 7f, 16f, 16f);
+            Image kind = kindRect.gameObject.AddComponent<Image>();
+            kind.sprite = icons.Get(part ? "duplicate" : "group");
+            kind.color = AccentColor; kind.preserveAspect = true; kind.raycastTarget = false;
+            TMP_Text role = CreateText("AnchorRole", row, marker.Trim(), 12f, FontStyles.Normal,
+                TextAlignmentOptions.MidlineRight);
+            SetTopRight(role.rectTransform, 58f, 0f, 30f, 30f);
+            role.color = AccentColor;
+            if (marker.Length > 0)
+            {
+                role.raycastTarget = true;
+                bool primary = part ? document.PrimaryPartId == stableId : document.PrimaryGroupId == stableId;
+                string label = primary ? T("editor.view.blueprint_anchor") : string.Empty;
+                if (marker.Contains("◇")) label += (label.Length > 0 ? " · " : string.Empty) + T("editor.view.group_anchor");
+                AddTooltip(role.rectTransform, label);
+            }
             if (!part)
             {
                 Button disclosure = CreateButton(
-                    "Disclosure", row, collapsed ? ">" : "v", 32f,
+                    "Disclosure", row, collapsed ? "▸" : "▾", 20f,
                     () => ToggleGroupCollapsed(stableId));
                 RectTransform disclosureRect = (RectTransform)disclosure.transform;
                 disclosureRect.anchorMin = disclosureRect.anchorMax = new Vector2(0f, 0.5f);
                 disclosureRect.pivot = new Vector2(0f, 0.5f);
-                disclosureRect.anchoredPosition = new Vector2(depth * 18f, 0f);
-                disclosureRect.sizeDelta = new Vector2(32f, 44f);
+                disclosureRect.anchoredPosition = new Vector2(depth * 15f, 0f);
+                disclosureRect.sizeDelta = new Vector2(20f, 28f);
+                StyleTreeControl(disclosure);
             }
             Button eye = CreateIconButton(
-                "Eye", row, visible ? "visibility" : "hidden", visible ? "●" : "○", 44f,
+                "Eye", row, visible ? "visibility" : "hidden", visible ? "●" : "○", 28f,
                 () => VisibilityChanged?.Invoke(stableId, !visible),
                 T(visible ? "editor.view.hide_object" : "editor.view.show_object"));
             RectTransform eyeRect = (RectTransform)eye.transform;
             eyeRect.anchorMin = eyeRect.anchorMax = new Vector2(1f, 0.5f);
             eyeRect.pivot = new Vector2(1f, 0.5f);
-            eyeRect.anchoredPosition = new Vector2(-48f, 0f);
-            eyeRect.sizeDelta = new Vector2(44f, 44f);
+            eyeRect.anchoredPosition = new Vector2(-30f, 0f);
+            eyeRect.sizeDelta = new Vector2(28f, 28f);
+            StyleTreeControl(eye);
             Button lockButton = CreateIconButton(
-                "Lock", row, locked ? "lock" : "unlock", locked ? "■" : "□", 44f,
+                "Lock", row, locked ? "lock" : "unlock", locked ? "■" : "□", 28f,
                 () => LockChanged?.Invoke(stableId, !locked),
                 T(locked ? "editor.view.unlock_object" : "editor.view.lock_object"));
             RectTransform lockRect = (RectTransform)lockButton.transform;
             lockRect.anchorMin = lockRect.anchorMax = new Vector2(1f, 0.5f);
             lockRect.pivot = new Vector2(1f, 0.5f);
             lockRect.anchoredPosition = new Vector2(-2f, 0f);
-            lockRect.sizeDelta = new Vector2(44f, 44f);
+            lockRect.sizeDelta = new Vector2(28f, 28f);
+            StyleTreeControl(lockButton);
+            Image lockIcon = lockButton.transform.Find("Icon")?.GetComponent<Image>();
+            if (lockIcon) lockIcon.color = locked ? AccentColor : MutedColor;
             if (!part) name.color = AccentColor;
+            if (!visible) name.color = MutedColor;
+        }
+
+        private static void StyleTreeControl(Button button)
+        {
+            Image image = button.GetComponent<Image>();
+            image.sprite = null; image.overrideSprite = null; image.color = Color.white;
+            button.transition = Selectable.Transition.ColorTint;
+            ColorBlock colors = button.colors;
+            colors.normalColor = Color.clear;
+            colors.highlightedColor = new Color(.5f, .45f, .3f, .3f);
+            colors.pressedColor = new Color(.6f, .5f, .3f, .5f);
+            colors.selectedColor = colors.highlightedColor;
+            button.colors = colors;
         }
 
         private bool PassesOutlinerFilter(
@@ -3484,6 +3936,11 @@ namespace OstrixMods.BuildWorks
         {
             if (modal.activeSelf) return;
             tooltipText.text = pendingTooltipText;
+            tooltipText.textWrappingMode = TextWrappingModes.Normal;
+            float width = Mathf.Min(360f, safeRoot.rect.width - 20f);
+            Vector2 preferred = tooltipText.GetPreferredValues(pendingTooltipText, width - 20f, Mathf.Infinity);
+            tooltip.sizeDelta = new Vector2(width, Mathf.Min(safeRoot.rect.height - 12f,
+                Mathf.Max(36f, preferred.y + 12f)));
             Vector3[] corners = new Vector3[4];
             pendingTooltipAnchor.GetWorldCorners(corners);
             Vector2 bottomLeft, topRight;
@@ -3526,7 +3983,15 @@ namespace OstrixMods.BuildWorks
             Canvas.ForceUpdateCanvases();
             double width = safeRoot.rect.width;
             double height = safeRoot.rect.height;
-            BlueprintEditorLayout layout = BlueprintEditorLayout.Compute(width, height);
+            BlueprintEditorLayout layout = BlueprintEditorLayout.Compute(width, height, hintsExpanded);
+            if (!hintsExpanded)
+            {
+                statusHintText.gameObject.SetActive(false);
+                foreach (TMP_Text group in contextHintGroups) group.gameObject.SetActive(false);
+                foreach (Transform child in hintGroupsArea)
+                    if (child.name.StartsWith("HintDivider", StringComparison.Ordinal)) child.gameObject.SetActive(false);
+            }
+            SetSelected(hintsToggle, hintsExpanded);
             float catalogScale = (float)Math.Min(
                 1.0,
                 Math.Min(width * 0.94 / 1420.0, height * 0.90 / 680.0));
@@ -3534,10 +3999,21 @@ namespace OstrixMods.BuildWorks
             Place(top, layout.Top);
             Place(rail, layout.Rail);
             Place(viewport, layout.Viewport);
+            FitViewportSettings();
             Place(rightColumn, layout.RightColumn);
             Place(outliner, layout.Outliner);
             Place(inspector, layout.Inspector);
             Place(status, layout.Status);
+            paneSplitter.gameObject.SetActive(!layout.Compact && !viewportFocused);
+            if (!layout.Compact)
+            {
+                double treeHeight = 116 + Math.Floor((layout.RightColumn.Height * outlinerFraction - 116) / 30.0) * 30.0;
+                double maximumTree = 116 + Math.Floor((layout.RightColumn.Height - BlueprintEditorLayout.MinimumInspectorHeight - 116) / 30) * 30;
+                treeHeight = Math.Max(146, Math.Min(treeHeight, maximumTree));
+                Place(outliner, new EditorRect(layout.RightColumn.X, layout.RightColumn.Y, layout.RightColumn.Width, treeHeight));
+                Place(inspector, new EditorRect(layout.RightColumn.X, layout.RightColumn.Y + treeHeight, layout.RightColumn.Width, layout.RightColumn.Height - treeHeight));
+                Place(paneSplitter, new EditorRect(layout.RightColumn.X, layout.RightColumn.Y + treeHeight - 3, layout.RightColumn.Width, 6));
+            }
             compact = layout.Compact;
             fullTitle.SetActive(!compact);
             compactPaneButton.gameObject.SetActive(compact);
@@ -3566,6 +4042,16 @@ namespace OstrixMods.BuildWorks
                 outliner.gameObject.SetActive(true);
                 inspector.gameObject.SetActive(true);
             }
+            if (viewportFocused)
+            {
+                rail.gameObject.SetActive(false);
+                rightColumn.gameObject.SetActive(false);
+                outliner.gameObject.SetActive(false);
+                inspector.gameObject.SetActive(false);
+                Place(viewport, new EditorRect(0, layout.Viewport.Y, width, layout.Viewport.Height));
+                Place(status, new EditorRect(0, layout.Status.Y, width, layout.Status.Height));
+            }
+            else { rail.gameObject.SetActive(true); rightColumn.gameObject.SetActive(true); }
             double visibleRailHeight = Math.Floor(layout.Rail.Height / 48.0) * 48.0;
             SetTopAnchored(railViewport, 0f, 0f, 0f, (float)visibleRailHeight);
         }

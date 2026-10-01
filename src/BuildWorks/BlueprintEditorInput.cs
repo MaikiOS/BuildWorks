@@ -8,6 +8,7 @@ namespace OstrixMods.BuildWorks
         Vector2 MousePosition { get; }
         Vector2 MouseScrollDelta { get; }
         float UnscaledDeltaTime { get; }
+        bool HasFocus { get; }
         bool GetKey(KeyCode key);
         bool GetKeyDown(KeyCode key);
         bool GetMouseButton(int button);
@@ -23,6 +24,7 @@ namespace OstrixMods.BuildWorks
         public Vector2 MousePosition => Input.mousePosition;
         public Vector2 MouseScrollDelta => Input.mouseScrollDelta;
         public float UnscaledDeltaTime => Time.unscaledDeltaTime;
+        public bool HasFocus => Application.isFocused;
         public bool GetKey(KeyCode key) => Input.GetKey(key);
         public bool GetKeyDown(KeyCode key) => Input.GetKeyDown(key);
         public bool GetMouseButton(int button) => Input.GetMouseButton(button);

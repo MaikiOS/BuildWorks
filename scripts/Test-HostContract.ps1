@@ -371,7 +371,9 @@ Assert-Contract ($editorControllerSource -match 'OpenNew' -and
     $editorViewSource -match 'editor\.view\.magnet_game' -and
     $gizmoSource -match 'camera\.cullingMask' -and
     $editorControllerSource -match 'if \(IsGizmoDragging\)[\s\S]*?return false;' -and
-    $editorControllerSource -match '!IsGizmoDragging &&\s*input\.GetMouseButtonDown\(1\)' -and
+    $editorControllerSource -match '\(!IsGizmoDragging \|\| keyboardPreview\) &&\s*input\.GetMouseButtonDown\(1\)' -and
+    $editorControllerSource -match 'keyboardPreview && !input\.HasFocus' -and
+    $editorControllerSource -match 'scene\.PreviewTransform\(document, dragIds, dragTranslation, dragRotation, dragPivot, dragScale\)' -and
     $editorSceneSource -match 'allowMove: true' -and
     $editorSceneSource -match 'allowRotate: true' -and
     $editorControllerSource -match 'TryGetDocumentBounds' -and
@@ -808,7 +810,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.41.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.42.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -2741,4 +2743,4 @@ if (Test-Path -LiteralPath $buildCameraPath -PathType Leaf) {
         'BuildWorks does not restore the current Build Camera yaw and pitch.'
 }
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.41 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.42 and Valheim Steam build 25185596.'

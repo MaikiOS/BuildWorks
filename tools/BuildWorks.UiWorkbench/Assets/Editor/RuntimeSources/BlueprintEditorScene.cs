@@ -133,8 +133,11 @@ namespace OstrixMods.BuildWorks
             public bool Selected;
             public bool ActiveSelection;
             public bool Hovered;
+            public bool SeeThrough;
+            public readonly List<bool> OriginalRenderingOff = new List<bool>();
             public readonly List<PickSurface> PickSurfaces = new List<PickSurface>();
             public readonly List<Vector3> SnapLocal = new List<Vector3>();
+            public int NativeSnapCount;
             public readonly List<Vector3> PlacementLocal = new List<Vector3>();
             public readonly List<string> PlacementLabels = new List<string>();
             public readonly List<PreviewMaterial> Materials = new List<PreviewMaterial>();
@@ -159,6 +162,7 @@ namespace OstrixMods.BuildWorks
 
         private struct SnapCandidate
         {
+            public VisualNode Visual;
             public Vector3 Point;
             public bool Native;
             public bool Edge;
@@ -194,6 +198,8 @@ namespace OstrixMods.BuildWorks
         private readonly Light fillLight;
         private readonly Light rimLight;
         private readonly TransformGizmoView gizmo;
+        internal GizmoFamily GizmoFamily { get => gizmo.Family; set => gizmo.Family = value; }
+        internal Vector2 GizmoMouse { set => gizmo.EditorMouse = value; }
         private readonly List<VisualNode> contourPreviews = new List<VisualNode>();
         private readonly List<VisualNode> duplicatePreviews = new List<VisualNode>();
         private readonly List<Vector3> placementSnapPreviewTargets = new List<Vector3>();
@@ -208,6 +214,11 @@ namespace OstrixMods.BuildWorks
         private BlueprintEditorLightingPreset lightingPreset;
         private string hoveredId;
         private bool temporarySelectionHighlight;
+        private bool occludersDirty = true;
+        private VisualNode activeSnapVisual;
+        private Mesh targetOutlineMesh;
+        private GameObject targetOutline;
+        internal bool OccluderFadeEnabled { get; private set; }
         private float groundHeight;
         private bool disposed;
         private readonly MaterialPropertyBlock hoverProperties = new MaterialPropertyBlock();
@@ -248,6 +259,16 @@ namespace OstrixMods.BuildWorks
                     new Color(0.42f, 0.46f, 0.50f, 0.70f)).transform;
                 gizmo = new TransformGizmoView(screenSpaceSizing: true);
                 gizmo.SetLayer(editorLayer);
+                targetOutline = new GameObject("SnapTargetOutline", typeof(MeshFilter), typeof(MeshRenderer));
+                targetOutline.hideFlags = HideFlags.HideAndDontSave;
+                targetOutline.layer = editorLayer;
+                targetOutline.transform.SetParent(root.transform, false);
+                targetOutlineMesh = new Mesh { name = "BuildWorks_TargetOutline" };
+                ownedAssets.Add(targetOutlineMesh);
+                targetOutline.GetComponent<MeshFilter>().sharedMesh = targetOutlineMesh;
+                targetOutline.GetComponent<MeshRenderer>().sharedMaterial = CreateColorMaterial("TargetOutline",
+                    new Color(.85f, .65f, .3f, .55f), true, overlay: true);
+                targetOutline.SetActive(false);
                 ConfigureStudioLighting();
                 EnsureWorldCamerasExcludeEditorLayer();
             }
@@ -282,6 +303,7 @@ namespace OstrixMods.BuildWorks
             if (pixelRect.width <= 0f || pixelRect.height <= 0f) return;
             if (camera.pixelRect == pixelRect) return;
             camera.pixelRect = pixelRect;
+            occludersDirty = true;
         }
 
         internal void SetCameraPose(Vector3 position, Quaternion rotation)
@@ -289,6 +311,7 @@ namespace OstrixMods.BuildWorks
             ThrowIfDisposed();
             if (camera.transform.position == position && camera.transform.rotation == rotation) return;
             camera.transform.SetPositionAndRotation(position, rotation);
+            occludersDirty = true;
             RecenterEnvironment(position);
         }
 
@@ -304,10 +327,84 @@ namespace OstrixMods.BuildWorks
         internal void SetProjection(bool orthographic, float focusDistance)
         {
             ThrowIfDisposed();
+            float size = Mathf.Max(0.01f, focusDistance) *
+                Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
+            if (camera.orthographic != orthographic || orthographic && camera.orthographicSize != size)
+                occludersDirty = true;
             camera.orthographic = orthographic;
             if (orthographic)
-                camera.orthographicSize = Mathf.Max(0.01f, focusDistance) *
-                    Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
+                camera.orthographicSize = size;
+        }
+
+        internal void SetFieldOfView(float degrees)
+        {
+            ThrowIfDisposed();
+            if (float.IsNaN(degrees) || float.IsInfinity(degrees)) return;
+            camera.fieldOfView = Mathf.Clamp(degrees, 10f, 120f);
+            occludersDirty = true;
+        }
+
+        internal void SetOccluderFade(bool enabled)
+        {
+            ThrowIfDisposed();
+            if (OccluderFadeEnabled == enabled) return;
+            OccluderFadeEnabled = enabled;
+            occludersDirty = true;
+            UpdateOccluders();
+        }
+
+        internal void UpdateOccluders()
+        {
+            ThrowIfDisposed();
+            if (!occludersDirty) return;
+            occludersDirty = false;
+            var occluders = new HashSet<VisualNode>();
+            if (OccluderFadeEnabled)
+            {
+                // ponytail: seven sampled rays per selection, bounded to 512 parts;
+                // reuse mesh picking, add spatial indexing only if large-scene profiling needs it.
+                foreach (VisualNode selected in visuals.Values)
+                {
+                    if (!selected.Selected || !TryBounds(selected, out Bounds bounds)) continue;
+                    for (int sample = 0; sample < 7; ++sample)
+                    {
+                        Vector3 point = bounds.center;
+                        if (sample > 0)
+                        {
+                            int axis = (sample - 1) / 2;
+                            point[axis] += bounds.extents[axis] * (sample % 2 == 0 ? .8f : -.8f);
+                        }
+                        Vector3 screen = camera.WorldToViewportPoint(point);
+                        if (screen.z <= 0f || screen.x < 0f || screen.x > 1f || screen.y < 0f || screen.y > 1f)
+                            continue;
+                        Ray ray = camera.ViewportPointToRay(screen);
+                        if (!TryMeshHit(selected, ray, out float targetDistance)) continue;
+                        foreach (VisualNode candidate in visuals.Values)
+                        {
+                            if (candidate.Selected || occluders.Contains(candidate) ||
+                                !TryBounds(candidate, out Bounds candidateBounds) ||
+                                !candidateBounds.IntersectRay(ray, out float near) || near >= targetDistance)
+                                continue;
+                            if (TryMeshHit(candidate, ray, out float hit) && hit < targetDistance - .001f)
+                                occluders.Add(candidate);
+                        }
+                    }
+                }
+            }
+            foreach (VisualNode visual in visuals.Values)
+            {
+                bool fade = occluders.Contains(visual);
+                if (visual.SeeThrough == fade) continue;
+                visual.SeeThrough = fade;
+                for (int index = 0; index < visual.Renderers.Length; ++index)
+                {
+                    Renderer renderer = visual.Renderers[index];
+                    if (!renderer) continue;
+                    // Hide drawing only: mesh picking still supplies occlusion and snap geometry.
+                    renderer.forceRenderingOff = fade || visual.OriginalRenderingOff[index];
+                }
+                ApplyAppearance(visual);
+            }
         }
 
         internal bool TrySync(BlueprintEditorDocument document, out string warning)
@@ -429,7 +526,8 @@ namespace OstrixMods.BuildWorks
             bool includeLocked,
             out string stableId,
             out Vector3 point,
-            out Vector3 normal)
+            out Vector3 normal,
+            IReadOnlyList<string> excludedIds = null)
         {
             ThrowIfDisposed();
             Ray ray = camera.ScreenPointToRay(screenPosition);
@@ -439,8 +537,9 @@ namespace OstrixMods.BuildWorks
             normal = Vector3.up;
             foreach (KeyValuePair<string, VisualNode> entry in visuals)
             {
+                if (excludedIds != null && Contains(excludedIds, entry.Key)) continue;
                 VisualNode visual = entry.Value;
-                if (!includeLocked && visual.Locked || !visual.Root.activeInHierarchy ||
+                if (!includeLocked && visual.Locked || visual.SeeThrough || !visual.Root.activeInHierarchy ||
                     !TryBounds(visual, out Bounds bounds) ||
                     !bounds.IntersectRay(ray) ||
                     !TryMeshHit(visual, ray, out float distance, out Vector3 hitNormal) ||
@@ -457,6 +556,15 @@ namespace OstrixMods.BuildWorks
         internal bool TryPlacementSurface(Vector2 screenPosition, out Vector3 point)
         {
             return TryPlacementSurface(screenPosition, out point, out _);
+        }
+
+        internal bool TryMoveSurface(Vector2 screenPosition, IReadOnlyList<string> excludedIds, out Vector3 point) =>
+            TryPickPoint(screenPosition, true, out _, out point, out _, excludedIds);
+
+        private static bool Contains(IReadOnlyList<string> ids, string id)
+        {
+            for (int index = 0; index < ids.Count; ++index) if (ids[index] == id) return true;
+            return false;
         }
 
         internal bool TryPlacementSurface(
@@ -531,8 +639,7 @@ namespace OstrixMods.BuildWorks
             BlueprintEditorPart seed = FindPart(document, seedId);
             if (seed == null || !visuals.TryGetValue(seedId, out VisualNode seedVisual) ||
                 !TrySelectEditorContourEdge(
-                    seedVisual, screenPosition, out Edge3 selectedEdge,
-                    out Vector3 pathPointLocal))
+                    seedVisual, screenPosition, out Edge3 selectedEdge))
             {
                 warning = BuildWorksLocalization.Text("blueprint.scene.edge_pair_missing");
                 return false;
@@ -587,8 +694,22 @@ namespace OstrixMods.BuildWorks
             {
                 string stableId = candidateIds[index];
                 orderedSupportIds.Add(stableId);
-                guidePoints.Add(visuals[stableId].Root.transform.TransformPoint(pathPointLocal));
+                Transform support = visuals[stableId].Root.transform;
+                Vector3 start = support.TransformPoint(ToUnity(selectedEdge.Start));
+                Vector3 end = support.TransformPoint(ToUnity(selectedEdge.End));
+                Vector3 toward = guidePoints.Count > 0 ? guidePoints[guidePoints.Count - 1] :
+                    visuals[candidateIds[ordered[1]]].Root.transform.TransformPoint(
+                        ToUnity((selectedEdge.Start + selectedEdge.End) * .5));
+                bool reverse = guidePoints.Count > 0
+                    ? (end - toward).sqrMagnitude < (start - toward).sqrMagnitude
+                    : (start - toward).sqrMagnitude < (end - toward).sqrMagnitude;
+                if (reverse) { Vector3 swap = start; start = end; end = swap; }
+                if (guidePoints.Count == 0 || (start - toward).sqrMagnitude > .000001f)
+                    guidePoints.Add(start);
+                guidePoints.Add(end);
             }
+            if (closed && (guidePoints[0] - guidePoints[guidePoints.Count - 1]).sqrMagnitude < .000001f)
+                guidePoints.RemoveAt(guidePoints.Count - 1);
             return true;
         }
 
@@ -728,6 +849,7 @@ namespace OstrixMods.BuildWorks
             ThrowIfDisposed();
             if (points == null || points.Count < 2)
             {
+                gizmo.ShowLayout(camera, null, false, null, false, null, null);
                 gizmo.Hide();
                 return;
             }
@@ -772,6 +894,7 @@ namespace OstrixMods.BuildWorks
         internal void ClearContourPreview()
         {
             ClearTemporaryPreview(contourPreviews);
+            gizmo.ShowLayout(camera, null, false, null, false, null, null);
         }
 
         private static void ClearTemporaryPreview(List<VisualNode> target)
@@ -792,13 +915,12 @@ namespace OstrixMods.BuildWorks
         private bool TrySelectEditorContourEdge(
             VisualNode visual,
             Vector2 mouse,
-            out Edge3 selected,
-            out Vector3 selectedPointLocal)
+            out Edge3 selected)
         {
             selected = default;
-            selectedPointLocal = Vector3.zero;
-            var native = new List<Point3>(visual.SnapLocal.Count);
-            foreach (Vector3 point in visual.SnapLocal) native.Add(ToGeometry(point));
+            var native = new List<Point3>(visual.NativeSnapCount);
+            for (int index = 0; index < visual.NativeSnapCount; ++index)
+                native.Add(ToGeometry(visual.SnapLocal[index]));
             IReadOnlyList<Edge3> edges = AnchorAdjustment.ConnectableSnapEdges(native);
             float maximum = ContourEdgeScreenDistance * ContourEdgeScreenDistance;
             float best = maximum;
@@ -822,9 +944,6 @@ namespace OstrixMods.BuildWorks
                 if (distance >= best) continue;
                 best = distance;
                 selected = edge;
-                float perspectiveParameter = (float)AnchorAdjustment.PerspectiveSegmentParameter(
-                    screenParameter, startScreen.z, endScreen.z);
-                selectedPointLocal = Vector3.Lerp(start, end, perspectiveParameter);
             }
             return best < maximum;
         }
@@ -836,7 +955,7 @@ namespace OstrixMods.BuildWorks
             foreach (KeyValuePair<string, VisualNode> entry in visuals)
             {
                 VisualNode visual = entry.Value;
-                if (visual.Locked || !visual.Root.activeInHierarchy ||
+                if (visual.Locked || visual.SeeThrough || !visual.Root.activeInHierarchy ||
                     !TryBounds(visual, out Bounds bounds)) continue;
                 if (ScreenRectIntersectsBounds(camera, screenRect, bounds))
                     result.Add(entry.Key);
@@ -916,6 +1035,30 @@ namespace OstrixMods.BuildWorks
                 allowRotate: true,
                 allowExtended: true,
                 pointVisibility: point => IsEditorPointVisible(point));
+            ShowTargetOutline(showSnapTarget);
+        }
+
+        private void ShowTargetOutline(bool show)
+        {
+            bool visible = show && OccluderFadeEnabled && activeSnapVisual != null &&
+                activeSnapVisual.Root && activeSnapVisual.Root.activeInHierarchy && activeSnapVisual.SeeThrough;
+            targetOutline.SetActive(visible);
+            if (!visible) return;
+            var vertices = new List<Vector3>();
+            // ponytail: at most 2048 cached mesh edges for one target; simplify the outline if profiling warrants it.
+            foreach (PickSurface surface in activeSnapVisual.PickSurfaces)
+            foreach (Edge3 edge in surface.Edges)
+            {
+                if (vertices.Count >= 4096) break;
+                vertices.Add(activeSnapVisual.Root.transform.TransformPoint(ToUnity(edge.Start)));
+                vertices.Add(activeSnapVisual.Root.transform.TransformPoint(ToUnity(edge.End)));
+            }
+            int[] indices = new int[vertices.Count];
+            for (int index = 0; index < indices.Length; ++index) indices[index] = index;
+            targetOutlineMesh.Clear();
+            targetOutlineMesh.SetVertices(vertices);
+            targetOutlineMesh.SetIndices(indices, MeshTopology.Lines, 0);
+            targetOutlineMesh.RecalculateBounds();
         }
 
         internal void ShowSnapCandidates(
@@ -983,6 +1126,7 @@ namespace OstrixMods.BuildWorks
         {
             ThrowIfDisposed();
             gizmo.Hide();
+            targetOutline.SetActive(false);
         }
 
         internal void ShowArrayPreview(IReadOnlyList<BlueprintEditorPart> preview) =>
@@ -1347,12 +1491,12 @@ namespace OstrixMods.BuildWorks
                         candidates,
                         mousePosition,
                         visual.Root.transform.TransformPoint(localPoint),
-                        native: true);
+                        native: true, visual: visual);
                 if (!includeMeshTargets || !TryBounds(visual, out Bounds bounds)) continue;
                 var boundsAnchors = new List<Vector3>(AnchorAdjustment.SelectableAnchorCount);
                 AddBoundsAnchors(bounds, boundsAnchors);
                 foreach (Vector3 point in boundsAnchors)
-                    AddSnapCandidate(candidates, mousePosition, point, native: false);
+                    AddSnapCandidate(candidates, mousePosition, point, native: false, visual: visual);
                 foreach (PickSurface surface in visual.PickSurfaces)
                 {
                     if (!surface.Renderer || !surface.Renderer.enabled ||
@@ -1365,7 +1509,7 @@ namespace OstrixMods.BuildWorks
                             camera, mousePosition, start, end, out float screenDistance,
                             out float parameter) && screenDistance <= SnapPreviewScreenDistance)
                             AddSnapCandidate(candidates, mousePosition,
-                                Vector3.Lerp(start, end, parameter), native: false, edge: true);
+                                Vector3.Lerp(start, end, parameter), native: false, edge: true, visual: visual);
                     }
                 }
             }
@@ -1385,9 +1529,10 @@ namespace OstrixMods.BuildWorks
                 if (previewTargets.Count == MaximumSnapPreviewTargets) break;
             }
             SnapCandidate? winner = pointWinner ?? edgeWinner;
-            if (!winner.HasValue) return false;
+            if (!winner.HasValue) { activeSnapVisual = null; return false; }
             target = winner.Value.Point;
             targetIsNative = winner.Value.Native;
+            activeSnapVisual = winner.Value.Visual;
             return true;
         }
 
@@ -1396,7 +1541,8 @@ namespace OstrixMods.BuildWorks
             Vector2 mouse,
             Vector3 point,
             bool native,
-            bool edge = false)
+            bool edge = false,
+            VisualNode visual = null)
         {
             Vector3 screen = camera.WorldToScreenPoint(point);
             if (screen.z <= 0f || !camera.pixelRect.Contains(screen)) return;
@@ -1414,6 +1560,7 @@ namespace OstrixMods.BuildWorks
             candidates.Add(new SnapCandidate
             {
                 Point = point,
+                Visual = visual,
                 Native = native,
                 Edge = edge,
                 Distance = distance
@@ -1659,7 +1806,7 @@ namespace OstrixMods.BuildWorks
                 result.Root.transform.SetParent(root.transform, false);
                 if (source) result.Root.transform.localScale = source.transform.lossyScale;
                 result.BaseScale = result.Root.transform.localScale;
-                if (source) CaptureSnapPoints(
+                if (source) result.NativeSnapCount = CaptureSnapPoints(
                     source.transform, result.SnapLocal,
                     result.PlacementLocal, result.PlacementLabels);
                 result.Renderers = result.Root.GetComponentsInChildren<Renderer>(true);
@@ -1680,6 +1827,7 @@ namespace OstrixMods.BuildWorks
                         });
                     }
                     renderer.sharedMaterials = previewMaterials;
+                    result.OriginalRenderingOff.Add(renderer.forceRenderingOff);
                 }
                 if (selectable || captureSurfaces) CapturePickSurfaces(result);
                 if (result.PlacementLocal.Count == 0) AddBoundsPlacementPoints(result);
@@ -1693,7 +1841,7 @@ namespace OstrixMods.BuildWorks
             }
         }
 
-        private static void CaptureSnapPoints(
+        private static int CaptureSnapPoints(
             Transform source,
             List<Vector3> points,
             List<Vector3> placementPoints,
@@ -1718,7 +1866,8 @@ namespace OstrixMods.BuildWorks
                     placementLabels.Add(PlacementPointLabel(
                         nativeNames[index], placementPoints[index], bounds));
             }
-            if (points.Count < 2) return;
+            int nativeCount = points.Count;
+            if (nativeCount < 2) return nativeCount;
             var native = new Point3[points.Count];
             for (int index = 0; index < native.Length; ++index)
                 native[index] = ToGeometry(points[index]);
@@ -1734,6 +1883,7 @@ namespace OstrixMods.BuildWorks
                     placementLabels.Add(BuildWorksLocalization.Text("blueprint.snap.middle"));
                 }
             }
+            return nativeCount;
         }
 
         private static string PlacementPointLabel(string name, Vector3 point, Bounds bounds)
@@ -1898,7 +2048,7 @@ namespace OstrixMods.BuildWorks
         private void ApplyAppearance(VisualNode visual)
         {
             bool selected = visual.Selected || visual.ActiveSelection;
-            MaterialPropertyBlock properties = selected ? temporarySelectionHighlight ? hoverProperties : null
+            MaterialPropertyBlock properties = visual.SeeThrough ? null : selected ? temporarySelectionHighlight ? hoverProperties : null
                 : visual.Hovered ? hoverProperties : null;
             foreach (Renderer renderer in visual.Renderers)
                 if (renderer) renderer.SetPropertyBlock(properties);
@@ -1961,6 +2111,7 @@ namespace OstrixMods.BuildWorks
             BlueprintEditorDocument document,
             IReadOnlyDictionary<string, VisualNode> sourceVisuals)
         {
+            occludersDirty = true;
             List<string> active = ExpandedPartIds(
                 document,
                 string.IsNullOrEmpty(document.ActiveNodeId)

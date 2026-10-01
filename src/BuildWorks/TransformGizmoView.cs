@@ -39,6 +39,8 @@ namespace OstrixMods.BuildWorks
         Scale
     }
 
+    internal enum GizmoFamily { Combined, Move, Rotate, Points, Scale }
+
     internal sealed class TransformGizmoView : IDisposable
     {
         private const int RingSegments = 48;
@@ -51,9 +53,16 @@ namespace OstrixMods.BuildWorks
         };
 
         private readonly GameObject root;
+        internal GizmoFamily Family { get; set; } = GizmoFamily.Combined;
+        internal Vector2? EditorMouse { get; set; }
+        private readonly Dictionary<LineRenderer, Mesh> tipMeshes = new Dictionary<LineRenderer, Mesh>();
+        private readonly Dictionary<LineRenderer, LineRenderer> tipRims = new Dictionary<LineRenderer, LineRenderer>();
         private readonly Material material;
         private readonly Material anchorMaterial;
+        private readonly Material occludedMaterial;
+        private readonly Dictionary<LineRenderer, Mesh> occludedMeshes = new Dictionary<LineRenderer, Mesh>();
         private readonly LineRenderer[] moveLines = new LineRenderer[3];
+        private readonly LineRenderer[] axisLabels = new LineRenderer[3];
         private readonly LineRenderer[] movePlanes = new LineRenderer[3];
         private readonly LineRenderer scaleHandle;
         private readonly LineRenderer[] rotationRings = new LineRenderer[3];
@@ -109,10 +118,16 @@ namespace OstrixMods.BuildWorks
             if (anchorMaterial.HasProperty("_ZTest"))
                 anchorMaterial.SetInt("_ZTest", (int)CompareFunction.LessEqual);
             anchorMaterial.renderQueue = (int)RenderQueue.Transparent;
+            if (screenSpaceSizing)
+            {
+                occludedMaterial = new Material(anchorMaterial) { name = "BuildWorks_OccludedGizmo", hideFlags = HideFlags.HideAndDontSave };
+                if (occludedMaterial.HasProperty("_ZTest")) occludedMaterial.SetInt("_ZTest", (int)CompareFunction.Greater);
+            }
 
             for (int i = 0; i < 3; ++i)
             {
                 moveLines[i] = CreateLine("Move" + ((GizmoAxis)(i + 1)), 5);
+                if (screenSpaceSizing) axisLabels[i] = CreateLine("AxisLabel" + ((GizmoAxis)(i + 1)), 6);
                 movePlanes[i] = CreateLine("MovePlane" + ((GizmoAxis)(i + 1)), 5);
                 rotationRings[i] = CreateLine("Rotate" + ((GizmoAxis)(i + 1)), RingSegments + 1);
                 rotationRings[i].loop = false;
@@ -191,8 +206,11 @@ namespace OstrixMods.BuildWorks
             root.SetActive(true);
             foreach (LineRenderer line in alignmentAxisLines)
                 line.gameObject.SetActive(false);
-            bool showMove = allowMove && mode != GizmoMode.Guide && mode != GizmoMode.Plane;
-            bool showRotation = allowRotate && mode != GizmoMode.Plane;
+            bool combined = !screenSpaceSizing || Family == GizmoFamily.Combined;
+            bool showMove = allowMove && mode != GizmoMode.Guide && mode != GizmoMode.Plane &&
+                (combined || Family == GizmoFamily.Move);
+            bool showRotation = allowRotate && mode != GizmoMode.Plane &&
+                (combined || Family == GizmoFamily.Rotate);
             bool showLayoutAxes = mode == GizmoMode.Repeat || mode == GizmoMode.Plane;
             for (int i = 0; i < 3; ++i)
             {
@@ -206,13 +224,27 @@ namespace OstrixMods.BuildWorks
                 Color layoutColor = selectedHandle == GizmoHandleKind.Layout && axis == selectedAxis
                     ? new Color(1f, 0.95f, 0.35f, 1f)
                     : new Color(1f, 0.72f, 0.12f, 0.9f);
+                if (screenSpaceSizing && selectedHandle != GizmoHandleKind.None && axis != selectedAxis && selectedAxis != GizmoAxis.None)
+                { moveColor.a = rotateColor.a = layoutColor.a = .16f; }
                 moveLines[i].gameObject.SetActive(showMove);
                 movePlanes[i].gameObject.SetActive(showMove && allowExtended);
                 if (showMove && allowExtended)
                 {
                     PlaneBasis(axis, rotation, localSpace, out Vector3 first, out Vector3 second);
                     float low = Scale * moveSize * 0.18f, high = Scale * moveSize * 0.35f;
-                    movePlanes[i].SetPositions(new[] {
+                    float corner = (high - low) * .2f;
+                    movePlanes[i].positionCount = screenSpaceSizing ? 9 : 5;
+                    if (screenSpaceSizing) movePlanes[i].SetPositions(new[] {
+                        pivot + first * (low + corner) + second * low,
+                        pivot + first * (high - corner) + second * low,
+                        pivot + first * high + second * (low + corner),
+                        pivot + first * high + second * (high - corner),
+                        pivot + first * (high - corner) + second * high,
+                        pivot + first * (low + corner) + second * high,
+                        pivot + first * low + second * (high - corner),
+                        pivot + first * low + second * (low + corner),
+                        pivot + first * (low + corner) + second * low });
+                    else movePlanes[i].SetPositions(new[] {
                         pivot + first * low + second * low, pivot + first * high + second * low,
                         pivot + first * high + second * high, pivot + first * low + second * high,
                         pivot + first * low + second * low });
@@ -221,15 +253,30 @@ namespace OstrixMods.BuildWorks
                 }
                 rotationRings[i].gameObject.SetActive(showRotation);
                 layoutAxisLines[i].gameObject.SetActive(showLayoutAxes);
+                if (screenSpaceSizing)
+                {
+                    axisLabels[i].gameObject.SetActive(showMove || showRotation || showLayoutAxes);
+                    if (axisLabels[i].gameObject.activeSelf)
+                        DrawAxisLabel(axisLabels[i], camera, pivot, AxisVector(axis, rotation, localSpace), i,
+                            showMove ? moveColor : showRotation ? rotateColor : layoutColor,
+                            showLayoutAxes ? 1.9f : showRotation ? .76f : .99f);
+                }
                 if (showMove)
                 {
                     Vector3 direction = AxisVector(axis, rotation, localSpace);
                     DrawArrow(moveLines[i], camera, pivot, direction, moveColor, 0f, 0.85f, moveSize);
+                    if (screenSpaceSizing) DrawDepthContinuation(moveLines[i], moveColor);
                 }
                 if (showRotation)
                 {
                     Vector3 direction = AxisVector(axis, rotation, localSpace);
                     DrawRing(rotationRings[i], pivot, direction, rotateColor, Scale * rotationSize * 0.62f);
+                    if (screenSpaceSizing)
+                    {
+                        if (selectedHandle == GizmoHandleKind.None && DistanceToLine(camera, EditorMouse ?? (Vector2)Input.mousePosition, rotationRings[i]) <= 6f)
+                        { rotateColor.a = 1f; SetColorAndWidth(rotationRings[i], rotateColor, .025f); }
+                        DrawDepthContinuation(rotationRings[i], rotateColor);
+                    }
                 }
                 if (showLayoutAxes)
                 {
@@ -267,10 +314,13 @@ namespace OstrixMods.BuildWorks
                         start,
                         end,
                         arraySize);
+                    if (screenSpaceSizing) DrawDepthContinuation(layoutAxisLines[i], layoutColor);
                 }
             }
-            scaleHandle.gameObject.SetActive(allowExtended && showMove);
-            if (allowExtended && showMove)
+            bool showScale = allowExtended && (mode == GizmoMode.Move || combined && mode == GizmoMode.Repeat) &&
+                (combined || Family == GizmoFamily.Scale);
+            scaleHandle.gameObject.SetActive(showScale);
+            if (showScale)
             {
                 Color color = selectedHandle == GizmoHandleKind.Scale ? Color.yellow : Color.white;
                 if (screenSpaceSizing) DrawScaleSquare(camera, pivot, color);
@@ -280,7 +330,7 @@ namespace OstrixMods.BuildWorks
             int anchorCount = anchorPoints?.Length ?? 0;
             EnsureAnchorHandleCount(anchorCount);
             bool showAnchors = mode != GizmoMode.Plane && anchorCount > 0;
-            Vector2 mouse = Input.mousePosition;
+            Vector2 mouse = EditorMouse ?? (Vector2)Input.mousePosition;
             for (int i = 0; i < anchorHandles.Count; ++i)
             {
                 bool important = i == selectedAnchor || i == pinnedAnchor;
@@ -291,7 +341,8 @@ namespace OstrixMods.BuildWorks
                     ? Vector2.Distance(mouse, new Vector2(screen.x, screen.y))
                     : float.PositiveInfinity;
                 bool hovered = screenDistance <= AnchorHitRadius(i);
-                bool showAnchor = showAnchors && i < anchorCount && screen.z > 0f &&
+                bool showAnchor = showAnchors && (combined || Family == GizmoFamily.Points || important ||
+                    mode == GizmoMode.Guide) && i < anchorCount && screen.z > 0f &&
                     (showAllAnchors || important || screenDistance <= 120f) &&
                     (showAllAnchors || (pointVisibility != null
                         ? pointVisibility(anchorPoints[i]) : IsPointVisible(camera, anchorPoints[i])));
@@ -323,10 +374,11 @@ namespace OstrixMods.BuildWorks
                         camera,
                         anchorPoints[i],
                         color,
-                        (nativeAnchor ? hovered ? 0.17f : 0.115f
+                        (nativeAnchor ? screenSpaceSizing ? .055f : hovered ? 0.17f : 0.115f
                             : screenSpaceSizing ? 0.06f : hovered ? 0.12f : 0.075f) * handleScale,
                         hovered ? 0.018f * handleScale + 0.003f
-                            : nativeAnchor ? 0.010f : 0.007f, nativeAnchor);
+                            : nativeAnchor ? 0.010f : 0.007f, nativeAnchor,
+                        i == pinnedAnchor);
                 }
             }
             bool drawSnapTarget = showAnchors && showSnapTarget;
@@ -335,7 +387,7 @@ namespace OstrixMods.BuildWorks
             {
                 Vector3 targetScreen = camera.WorldToScreenPoint(snapTarget);
                 bool targetHovered = targetScreen.z > 0f && Vector2.Distance(
-                    Input.mousePosition,
+                    mouse,
                     new Vector2(targetScreen.x, targetScreen.y)) <= 16f;
                 Color targetColor = snapTargetIsNative
                     ? new Color(1f, 0.95f, 0.25f, 1f)
@@ -346,7 +398,7 @@ namespace OstrixMods.BuildWorks
                     camera,
                     snapTarget,
                     targetColor,
-                    (targetHovered ? 0.17f : snapTargetIsNative ? 0.115f : 0.06f) *
+                    (screenSpaceSizing ? .055f : targetHovered ? 0.17f : snapTargetIsNative ? 0.115f : 0.06f) *
                         handleScale,
                     targetHovered ? 0.018f * handleScale + 0.003f
                         : snapTargetIsNative ? 0.010f : 0.006f, snapTargetIsNative);
@@ -422,7 +474,7 @@ namespace OstrixMods.BuildWorks
                         index < nativeCandidates.Count && nativeCandidates[index];
                     Vector3 screen = camera.WorldToScreenPoint(candidates[index]);
                     float distance = Vector2.Distance(
-                        Input.mousePosition,
+                        EditorMouse ?? (Vector2)Input.mousePosition,
                         new Vector2(screen.x, screen.y));
                     bool close = distance <= 16f;
                     DrawAnchor(
@@ -432,7 +484,7 @@ namespace OstrixMods.BuildWorks
                         new Color(1f, native ? 0.95f : 0.82f, native ? 0.25f : 0.2f,
                             close ? 0.98f : screenSpaceSizing ? native ? 0.85f : 0.6f
                                 : native ? 0.42f : 0.08f),
-                        (close ? native ? 0.17f : 0.12f
+                        (screenSpaceSizing ? .055f : close ? native ? 0.17f : 0.12f
                             : native ? 0.115f : 0.04f) * handleScale,
                         close ? 0.018f * handleScale + 0.003f
                             : native ? 0.010f : 0.005f, native);
@@ -479,13 +531,14 @@ namespace OstrixMods.BuildWorks
             bool localSpace, Vector2 mouse, out GizmoAxis axis)
         {
             axis = GizmoAxis.None;
-            if (!camera || !scaleHandle.gameObject.activeInHierarchy) return GizmoHandleKind.None;
+            if (!camera || !root.activeInHierarchy) return GizmoHandleKind.None;
             if (HitTestScale(camera, mouse)) return GizmoHandleKind.Scale;
             float scale = GizmoScale(camera, pivot) * moveSize;
             Ray ray = camera.ScreenPointToRay(mouse);
             float closest = float.PositiveInfinity;
             for (int i = 0; i < 3; ++i)
             {
+                if (!movePlanes[i].gameObject.activeInHierarchy) continue;
                 GizmoAxis candidate = (GizmoAxis)(i + 1);
                 Vector3 normal = AxisVector(candidate, rotation, localSpace);
                 if (Mathf.Abs(Vector3.Dot(ray.direction, normal)) < 0.15f) continue;
@@ -494,6 +547,7 @@ namespace OstrixMods.BuildWorks
                 Vector3 point = (ray.GetPoint(distance) - pivot) / scale;
                 float u = Vector3.Dot(point, first), v = Vector3.Dot(point, second);
                 if (u < 0.18f || u > 0.35f || v < 0.18f || v > 0.35f) continue;
+                if (screenSpaceSizing && (Mathf.Min(u - .18f, .35f - u) + Mathf.Min(v - .18f, .35f - v)) < .034f) continue;
                 axis = candidate;
                 closest = distance;
             }
@@ -508,8 +562,7 @@ namespace OstrixMods.BuildWorks
             if (first.z <= 0f || opposite.z <= 0f) return false;
             Vector2 center = (new Vector2(first.x, first.y) + new Vector2(opposite.x, opposite.y)) * 0.5f;
             if (!screenSpaceSizing) return Vector2.Distance(mouse, center) <= 8f;
-            float half = Mathf.Abs(opposite.x - first.x) * 0.5f + 3f;
-            return Mathf.Abs(mouse.x - center.x) <= half && Mathf.Abs(mouse.y - center.y) <= half;
+            return DistanceToLine(camera, mouse, scaleHandle) <= 6f;
         }
 
         private void DrawScaleSquare(Camera camera, Vector3 pivot, Color color)
@@ -517,8 +570,13 @@ namespace OstrixMods.BuildWorks
             Vector3 center = pivot + (camera.transform.right - camera.transform.up) * Scale * 1.05f;
             float half = Scale * 0.1f * uniformScaleHandleSize;
             Vector3 right = camera.transform.right * half, up = camera.transform.up * half;
-            scaleHandle.SetPositions(new[] { center - right - up, center + right - up,
-                center + right + up, center - right + up, center - right - up });
+            scaleHandle.positionCount = 10;
+            scaleHandle.SetPositions(new[] { center - right - up * .35f, center - right - up,
+                center - right * .35f - up, center, center + right * .35f + up,
+                center + right + up, center + right + up * .35f, center,
+                center - right - up, center + right + up });
+            if (DistanceToLine(camera, EditorMouse ?? (Vector2)Input.mousePosition, scaleHandle) <= 6f)
+                color = new Color(1f, .77f, .3f, 1f);
             SetColorAndWidth(scaleHandle, color, 0.025f * uniformScaleHandleSize);
         }
 
@@ -543,7 +601,8 @@ namespace OstrixMods.BuildWorks
             for (int i = 0; i < 3; ++i)
             {
                 GizmoAxis axis = (GizmoAxis)(i + 1);
-                float distance = ScreenDistanceToRing(
+                if (!rotationRings[i].gameObject.activeInHierarchy) continue;
+                float distance = screenSpaceSizing ? DistanceToLine(camera, mousePosition, rotationRings[i]) : ScreenDistanceToRing(
                     camera,
                     mousePosition,
                     pivot,
@@ -574,6 +633,8 @@ namespace OstrixMods.BuildWorks
                 if (!line.gameObject.activeInHierarchy) continue;
                 float distance = ScreenDistanceToSegment(
                     camera, mousePosition, line.GetPosition(0), line.GetPosition(1));
+                if (tipRims.TryGetValue(line, out LineRenderer rim))
+                    distance = Mathf.Min(distance, DistanceToLine(camera, mousePosition, rim));
                 if (distance >= bestDistance) continue;
                 bestDistance = distance;
                 bestAxis = (GizmoAxis)(index + 1);
@@ -597,6 +658,7 @@ namespace OstrixMods.BuildWorks
             for (int i = 0; i < 3; ++i)
             {
                 GizmoAxis axis = (GizmoAxis)(i + 1);
+                if (!moveLines[i].gameObject.activeInHierarchy) continue;
                 Vector3 axisWorld = AxisVector(axis, rotation, localSpace);
                 float scale = AxisGizmoScale(camera, pivot, axisWorld, sizeScale);
                 float distance = ScreenDistanceToSegment(
@@ -604,6 +666,8 @@ namespace OstrixMods.BuildWorks
                     mousePosition,
                     pivot + axisWorld * scale * startFraction,
                     pivot + axisWorld * scale * endFraction);
+                if (tipRims.TryGetValue(moveLines[i], out LineRenderer rim))
+                    distance = Mathf.Min(distance, DistanceToLine(camera, mousePosition, rim));
                 if (distance < bestDistance)
                 {
                     bestDistance = distance;
@@ -615,7 +679,8 @@ namespace OstrixMods.BuildWorks
 
         public int HitTestAnchor(Camera camera, Vector3[] points, Vector2 mousePosition)
         {
-            if (!camera || points == null)
+            if (!camera || points == null || !root.activeInHierarchy ||
+                screenSpaceSizing && Family != GizmoFamily.Combined && Family != GizmoFamily.Points)
             {
                 return -1;
             }
@@ -652,7 +717,7 @@ namespace OstrixMods.BuildWorks
         private float AnchorHitRadius(int index)
         {
             return screenSpaceSizing
-                ? (index >= nativeAnchorStartIndex ? 36f : 12f) * anchorHandleScale
+                ? 12f * anchorHandleScale
                 : 16f;
         }
 
@@ -771,6 +836,9 @@ namespace OstrixMods.BuildWorks
 
         public void Dispose()
         {
+            foreach (Mesh mesh in tipMeshes.Values) UnityEngine.Object.Destroy(mesh);
+            foreach (Mesh mesh in occludedMeshes.Values) UnityEngine.Object.Destroy(mesh);
+            if (occludedMaterial) UnityEngine.Object.Destroy(occludedMaterial);
             if (material)
             {
                 UnityEngine.Object.Destroy(material);
@@ -890,6 +958,47 @@ namespace OstrixMods.BuildWorks
                 side = Vector3.Cross(axis, Vector3.right);
             }
             side.Normalize();
+            if (screenSpaceSizing)
+            {
+                line.positionCount = 2;
+                line.SetPosition(0, start);
+                line.SetPosition(1, end);
+                SetColorAndWidth(line, color, .012f);
+                if (!tipMeshes.TryGetValue(line, out Mesh mesh))
+                {
+                    mesh = new Mesh { name = "BuildWorks_LeafTip", hideFlags = HideFlags.HideAndDontSave };
+                    GameObject fill = new GameObject("LeafTip", typeof(MeshFilter), typeof(MeshRenderer));
+                    fill.hideFlags = HideFlags.HideAndDontSave;
+                    fill.layer = root.layer;
+                    fill.transform.SetParent(line.transform, false);
+                    fill.GetComponent<MeshFilter>().sharedMesh = mesh;
+                    fill.GetComponent<MeshRenderer>().sharedMaterial = material;
+                    LineRenderer rim = CreateLine("LeafRim", 7);
+                    rim.transform.SetParent(line.transform, false);
+                    tipMeshes.Add(line, mesh);
+                    tipRims.Add(line, rim);
+                }
+                Vector3[] vertices = {
+                    end, end - axis * length * .12f + side * length * .05f,
+                    end - axis * length * .30f + side * length * .085f,
+                    end - axis * length * .40f,
+                    end - axis * length * .30f - side * length * .085f,
+                    end - axis * length * .12f - side * length * .05f };
+                mesh.vertices = vertices;
+                mesh.triangles = new[] { 0,1,2, 0,2,3, 0,3,4, 0,4,5, 2,1,0, 3,2,0, 4,3,0, 5,4,0 };
+                Color metal = new Color(.11f, .12f, .12f, color.a);
+                mesh.colors = new[] { metal, metal, metal, metal, metal, metal };
+                mesh.RecalculateBounds();
+                LineRenderer edge = tipRims[line];
+                for (int index = 0; index < vertices.Length; ++index) edge.SetPosition(index, vertices[index]);
+                edge.SetPosition(6, vertices[0]);
+                bool hovered = color.a > .2f && (DistanceToLine(camera, EditorMouse ?? (Vector2)Input.mousePosition, edge) <= 6f ||
+                    ScreenDistanceToSegment(camera, EditorMouse ?? (Vector2)Input.mousePosition, start, end) <= 6f);
+                if (hovered) { color.a = 1f; SetColorAndWidth(line, color, .018f); }
+                SetColorAndWidth(edge, hovered || color.r > .9f && color.g > .8f
+                    ? new Color(1f, .77f, .3f, color.a) : new Color(.67f, .53f, .31f, color.a), .016f);
+                return;
+            }
             Vector3 back = -axis * length * 0.28f;
             Vector3 wing = side * length * 0.13f;
             line.SetPosition(0, start);
@@ -900,6 +1009,21 @@ namespace OstrixMods.BuildWorks
             SetColorAndWidth(line, color);
         }
 
+        private void DrawAxisLabel(LineRenderer line, Camera camera, Vector3 pivot, Vector3 axis, int index, Color color, float offset)
+        {
+            Vector3 center = pivot + axis * AxisGizmoScale(camera, pivot, axis, 1f) * offset;
+            float size = GizmoScale(camera, center) * .022f;
+            Vector3 right = camera.transform.right * size, up = camera.transform.up * size;
+            Vector3[] points = index == 0
+                ? new[] { center - right - up, center + right + up, center, center - right + up, center + right - up }
+                : index == 1
+                ? new[] { center - right + up, center, center + right + up, center, center - up }
+                : new[] { center - right + up, center + right + up, center - right - up, center + right - up };
+            line.positionCount = points.Length;
+            line.SetPositions(points);
+            SetColorAndWidth(line, color, .012f);
+        }
+
         private void DrawRing(
             LineRenderer line,
             Vector3 pivot,
@@ -908,12 +1032,21 @@ namespace OstrixMods.BuildWorks
             float radius)
         {
             RingBasis(axis, out Vector3 first, out Vector3 second);
+            bool open = screenSpaceSizing && line != constraintPath;
+            line.positionCount = RingSegments + 1 + (open ? 2 : 0);
             for (int i = 0; i <= RingSegments; ++i)
             {
-                float angle = (float)(Math.PI * 2.0 * i / RingSegments);
+                float angle = open ? Mathf.Deg2Rad * (30f + 300f * i / RingSegments)
+                    : (float)(Math.PI * 2.0 * i / RingSegments);
                 line.SetPosition(
                     i,
                     pivot + (first * Mathf.Cos(angle) + second * Mathf.Sin(angle)) * radius);
+            }
+            if (open)
+            {
+                Vector3 end = line.GetPosition(RingSegments);
+                line.SetPosition(RingSegments + 1, end + first * radius * .08f + second * radius * .12f);
+                line.SetPosition(RingSegments + 2, end + first * radius * .13f);
             }
             SetColorAndWidth(line, color);
         }
@@ -925,7 +1058,8 @@ namespace OstrixMods.BuildWorks
             Color color,
             float sizeFraction,
             float width,
-            bool nativeAnchor = false)
+            bool nativeAnchor = false,
+            bool pinned = false)
         {
             if (screenSpaceSizing)
             {
@@ -936,6 +1070,26 @@ namespace OstrixMods.BuildWorks
             float size = pointScale * sizeFraction;
             Vector3 right = camera.transform.right * size;
             Vector3 up = camera.transform.up * size;
+            if (screenSpaceSizing)
+            {
+                bool target = line == snapTargetHandle || snapCandidateHandles.Contains(line);
+                Vector3 side = target ? -right : right;
+                line.positionCount = pinned ? 8 : 5;
+                line.SetPosition(0, position + up * .7f + side * .35f);
+                line.SetPosition(1, position + up * .7f - side * .55f);
+                line.SetPosition(2, position - side);
+                line.SetPosition(3, position - up * .7f - side * .55f);
+                line.SetPosition(4, position - up * .7f + side * .35f);
+                if (pinned)
+                {
+                    line.SetPosition(5, position);
+                    line.SetPosition(6, position - up * .4f);
+                    line.SetPosition(7, position + up * .4f);
+                }
+                SetColorAndWidth(line, color, width);
+                line.startWidth = line.endWidth = width * pointScale;
+                return;
+            }
             line.SetPosition(0, position + up);
             line.SetPosition(1, position + right);
             line.SetPosition(2, position - up);
@@ -971,6 +1125,46 @@ namespace OstrixMods.BuildWorks
             line.startWidth = line.endWidth = screenSpaceSizing ? width * Scale : width;
         }
 
+        private void DrawDepthContinuation(LineRenderer line, Color color)
+        {
+            line.sharedMaterial = anchorMaterial;
+            if (!occludedMeshes.TryGetValue(line, out Mesh mesh))
+            {
+                mesh = new Mesh { name = "BuildWorks_BrokenContinuation", hideFlags = HideFlags.HideAndDontSave };
+                GameObject child = new GameObject("OccludedContinuation", typeof(MeshFilter), typeof(MeshRenderer));
+                child.hideFlags = HideFlags.HideAndDontSave;
+                child.layer = root.layer;
+                child.transform.SetParent(line.transform, false);
+                child.GetComponent<MeshFilter>().sharedMesh = mesh;
+                child.GetComponent<MeshRenderer>().sharedMaterial = occludedMaterial;
+                occludedMeshes.Add(line, mesh);
+            }
+            int count = line.positionCount == 2 ? 12 : line.positionCount - 1;
+            var vertices = new List<Vector3>();
+            for (int index = 0; index < count; index += 2)
+            {
+                if (line.positionCount == 2)
+                {
+                    vertices.Add(Vector3.Lerp(line.GetPosition(0), line.GetPosition(1), (float)index / count));
+                    vertices.Add(Vector3.Lerp(line.GetPosition(0), line.GetPosition(1), (float)(index + 1) / count));
+                }
+                else { vertices.Add(line.GetPosition(index)); vertices.Add(line.GetPosition(index + 1)); }
+            }
+            int[] indices = new int[vertices.Count];
+            Color[] colors = new Color[vertices.Count];
+            color.a = .18f;
+            for (int index = 0; index < vertices.Count; ++index) { indices[index] = index; colors[index] = color; }
+            mesh.Clear();
+            mesh.SetVertices(vertices);
+            mesh.colors = colors;
+            mesh.SetIndices(indices, MeshTopology.Lines, 0);
+            mesh.RecalculateBounds();
+            // Keep only the compact tip identifiable when the pivot is inside the selected mesh.
+            if (tipRims.TryGetValue(line, out LineRenderer rim)) rim.sharedMaterial = material;
+            Transform tip = line.transform.Find("LeafTip");
+            if (tip) tip.GetComponent<MeshRenderer>().sharedMaterial = material;
+        }
+
         private static void RingBasis(Vector3 axis, out Vector3 first, out Vector3 second)
         {
             Vector3 reference = Mathf.Abs(Vector3.Dot(axis, Vector3.up)) < 0.9f
@@ -998,6 +1192,15 @@ namespace OstrixMods.BuildWorks
                 previous = current;
             }
             return best;
+        }
+
+        private static float DistanceToLine(Camera camera, Vector2 mouse, LineRenderer line)
+        {
+            float distance = float.PositiveInfinity;
+            for (int index = 1; index < line.positionCount; ++index)
+                distance = Mathf.Min(distance, ScreenDistanceToSegment(camera, mouse,
+                    line.GetPosition(index - 1), line.GetPosition(index)));
+            return distance;
         }
 
         private static float ScreenDistanceToSegment(

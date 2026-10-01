@@ -162,6 +162,7 @@ namespace OstrixMods.BuildWorks
 
         private struct SnapCandidate
         {
+            public VisualNode Visual;
             public Vector3 Point;
             public bool Native;
             public bool Edge;
@@ -197,6 +198,8 @@ namespace OstrixMods.BuildWorks
         private readonly Light fillLight;
         private readonly Light rimLight;
         private readonly TransformGizmoView gizmo;
+        internal GizmoFamily GizmoFamily { get => gizmo.Family; set => gizmo.Family = value; }
+        internal Vector2 GizmoMouse { set => gizmo.EditorMouse = value; }
         private readonly List<VisualNode> contourPreviews = new List<VisualNode>();
         private readonly List<VisualNode> duplicatePreviews = new List<VisualNode>();
         private readonly List<Vector3> placementSnapPreviewTargets = new List<Vector3>();
@@ -212,6 +215,9 @@ namespace OstrixMods.BuildWorks
         private string hoveredId;
         private bool temporarySelectionHighlight;
         private bool occludersDirty = true;
+        private VisualNode activeSnapVisual;
+        private Mesh targetOutlineMesh;
+        private GameObject targetOutline;
         internal bool OccluderFadeEnabled { get; private set; }
         private float groundHeight;
         private bool disposed;
@@ -253,6 +259,16 @@ namespace OstrixMods.BuildWorks
                     new Color(0.42f, 0.46f, 0.50f, 0.70f)).transform;
                 gizmo = new TransformGizmoView(screenSpaceSizing: true);
                 gizmo.SetLayer(editorLayer);
+                targetOutline = new GameObject("SnapTargetOutline", typeof(MeshFilter), typeof(MeshRenderer));
+                targetOutline.hideFlags = HideFlags.HideAndDontSave;
+                targetOutline.layer = editorLayer;
+                targetOutline.transform.SetParent(root.transform, false);
+                targetOutlineMesh = new Mesh { name = "BuildWorks_TargetOutline" };
+                ownedAssets.Add(targetOutlineMesh);
+                targetOutline.GetComponent<MeshFilter>().sharedMesh = targetOutlineMesh;
+                targetOutline.GetComponent<MeshRenderer>().sharedMaterial = CreateColorMaterial("TargetOutline",
+                    new Color(.85f, .65f, .3f, .55f), true, overlay: true);
+                targetOutline.SetActive(false);
                 ConfigureStudioLighting();
                 EnsureWorldCamerasExcludeEditorLayer();
             }
@@ -510,7 +526,8 @@ namespace OstrixMods.BuildWorks
             bool includeLocked,
             out string stableId,
             out Vector3 point,
-            out Vector3 normal)
+            out Vector3 normal,
+            IReadOnlyList<string> excludedIds = null)
         {
             ThrowIfDisposed();
             Ray ray = camera.ScreenPointToRay(screenPosition);
@@ -520,6 +537,7 @@ namespace OstrixMods.BuildWorks
             normal = Vector3.up;
             foreach (KeyValuePair<string, VisualNode> entry in visuals)
             {
+                if (excludedIds != null && Contains(excludedIds, entry.Key)) continue;
                 VisualNode visual = entry.Value;
                 if (!includeLocked && visual.Locked || visual.SeeThrough || !visual.Root.activeInHierarchy ||
                     !TryBounds(visual, out Bounds bounds) ||
@@ -538,6 +556,15 @@ namespace OstrixMods.BuildWorks
         internal bool TryPlacementSurface(Vector2 screenPosition, out Vector3 point)
         {
             return TryPlacementSurface(screenPosition, out point, out _);
+        }
+
+        internal bool TryMoveSurface(Vector2 screenPosition, IReadOnlyList<string> excludedIds, out Vector3 point) =>
+            TryPickPoint(screenPosition, true, out _, out point, out _, excludedIds);
+
+        private static bool Contains(IReadOnlyList<string> ids, string id)
+        {
+            for (int index = 0; index < ids.Count; ++index) if (ids[index] == id) return true;
+            return false;
         }
 
         internal bool TryPlacementSurface(
@@ -1008,6 +1035,30 @@ namespace OstrixMods.BuildWorks
                 allowRotate: true,
                 allowExtended: true,
                 pointVisibility: point => IsEditorPointVisible(point));
+            ShowTargetOutline(showSnapTarget);
+        }
+
+        private void ShowTargetOutline(bool show)
+        {
+            bool visible = show && OccluderFadeEnabled && activeSnapVisual != null &&
+                activeSnapVisual.Root && activeSnapVisual.Root.activeInHierarchy && activeSnapVisual.SeeThrough;
+            targetOutline.SetActive(visible);
+            if (!visible) return;
+            var vertices = new List<Vector3>();
+            // ponytail: at most 2048 cached mesh edges for one target; simplify the outline if profiling warrants it.
+            foreach (PickSurface surface in activeSnapVisual.PickSurfaces)
+            foreach (Edge3 edge in surface.Edges)
+            {
+                if (vertices.Count >= 4096) break;
+                vertices.Add(activeSnapVisual.Root.transform.TransformPoint(ToUnity(edge.Start)));
+                vertices.Add(activeSnapVisual.Root.transform.TransformPoint(ToUnity(edge.End)));
+            }
+            int[] indices = new int[vertices.Count];
+            for (int index = 0; index < indices.Length; ++index) indices[index] = index;
+            targetOutlineMesh.Clear();
+            targetOutlineMesh.SetVertices(vertices);
+            targetOutlineMesh.SetIndices(indices, MeshTopology.Lines, 0);
+            targetOutlineMesh.RecalculateBounds();
         }
 
         internal void ShowSnapCandidates(
@@ -1075,6 +1126,7 @@ namespace OstrixMods.BuildWorks
         {
             ThrowIfDisposed();
             gizmo.Hide();
+            targetOutline.SetActive(false);
         }
 
         internal void ShowArrayPreview(IReadOnlyList<BlueprintEditorPart> preview) =>
@@ -1439,12 +1491,12 @@ namespace OstrixMods.BuildWorks
                         candidates,
                         mousePosition,
                         visual.Root.transform.TransformPoint(localPoint),
-                        native: true);
+                        native: true, visual: visual);
                 if (!includeMeshTargets || !TryBounds(visual, out Bounds bounds)) continue;
                 var boundsAnchors = new List<Vector3>(AnchorAdjustment.SelectableAnchorCount);
                 AddBoundsAnchors(bounds, boundsAnchors);
                 foreach (Vector3 point in boundsAnchors)
-                    AddSnapCandidate(candidates, mousePosition, point, native: false);
+                    AddSnapCandidate(candidates, mousePosition, point, native: false, visual: visual);
                 foreach (PickSurface surface in visual.PickSurfaces)
                 {
                     if (!surface.Renderer || !surface.Renderer.enabled ||
@@ -1457,7 +1509,7 @@ namespace OstrixMods.BuildWorks
                             camera, mousePosition, start, end, out float screenDistance,
                             out float parameter) && screenDistance <= SnapPreviewScreenDistance)
                             AddSnapCandidate(candidates, mousePosition,
-                                Vector3.Lerp(start, end, parameter), native: false, edge: true);
+                                Vector3.Lerp(start, end, parameter), native: false, edge: true, visual: visual);
                     }
                 }
             }
@@ -1477,9 +1529,10 @@ namespace OstrixMods.BuildWorks
                 if (previewTargets.Count == MaximumSnapPreviewTargets) break;
             }
             SnapCandidate? winner = pointWinner ?? edgeWinner;
-            if (!winner.HasValue) return false;
+            if (!winner.HasValue) { activeSnapVisual = null; return false; }
             target = winner.Value.Point;
             targetIsNative = winner.Value.Native;
+            activeSnapVisual = winner.Value.Visual;
             return true;
         }
 
@@ -1488,7 +1541,8 @@ namespace OstrixMods.BuildWorks
             Vector2 mouse,
             Vector3 point,
             bool native,
-            bool edge = false)
+            bool edge = false,
+            VisualNode visual = null)
         {
             Vector3 screen = camera.WorldToScreenPoint(point);
             if (screen.z <= 0f || !camera.pixelRect.Contains(screen)) return;
@@ -1506,6 +1560,7 @@ namespace OstrixMods.BuildWorks
             candidates.Add(new SnapCandidate
             {
                 Point = point,
+                Visual = visual,
                 Native = native,
                 Edge = edge,
                 Distance = distance

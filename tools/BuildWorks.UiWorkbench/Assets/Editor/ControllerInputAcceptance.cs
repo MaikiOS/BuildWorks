@@ -28,6 +28,7 @@ internal static class ControllerInputAcceptance
         public Vector2 MousePosition { get; private set; }
         public Vector2 MouseScrollDelta { get; set; }
         public float UnscaledDeltaTime => 1f / 30f;
+        public bool HasFocus { get; set; } = true;
         public float MouseX, MouseY;
         public bool GetKey(KeyCode key) => keys.Contains(key);
         public bool GetKeyDown(KeyCode key) => keys.Contains(key) && !previousKeys.Contains(key);
@@ -101,7 +102,8 @@ internal static class ControllerInputAcceptance
                 "Outliner context actions are subscribed more than once");
             Require(scene.TrySync(doc, out error), error); view.Bind(doc, true, null, null);
             view.RootCanvas.renderMode = RenderMode.ScreenSpaceCamera;
-            view.RootCanvas.worldCamera = uiCamera; view.RootCanvas.planeDistance = 1f;
+            // Keep UI geometry away from near-plane precision loss in native rectangle raycasts.
+            view.RootCanvas.worldCamera = uiCamera; view.RootCanvas.planeDistance = 10f;
             scene.Camera.targetTexture = target;
             Set(controller, "cameraFocus", new Vector3(0,.5f,0)); Set(controller, "cameraDistance", 8f);
             Set(controller, "cameraYaw", 20f); Set(controller, "cameraPitch", 20f);
@@ -187,6 +189,8 @@ internal static class ControllerInputAcceptance
 
             foreach (object tick in TestTransformContract(controller, input, scene, view, uiCamera, target, output))
                 yield return tick;
+            foreach (object tick in TestCursorPreview(controller, input, scene, view, uiCamera, target, output))
+                yield return tick;
 
             Frame(controller, input, Vector2.zero); NativeClick(view, uiCamera, "Row_left"); yield return null;
             NativeClick(view, uiCamera, Field<Dictionary<BlueprintEditorTool, Button>>(view, "toolButtons")[BlueprintEditorTool.Transform]);
@@ -194,6 +198,8 @@ internal static class ControllerInputAcceptance
             Frame(controller, input, left); yield return null;
             Vector3[] anchors = Field<Vector3[]>(controller, "gizmoAnchors");
             int native = Field<int>(controller, "gizmoNativeAnchorStart");
+            Set(controller, "gizmoFamily", GizmoFamily.Points);
+            Frame(controller, input, left); yield return null;
             Vector2 anchorMouse = scene.Camera.WorldToScreenPoint(anchors[native]);
             Frame(controller, input, anchorMouse, 1, KeyCode.LeftShift); yield return null;
             Frame(controller, input, anchorMouse, 0, KeyCode.LeftShift); yield return null;
@@ -203,6 +209,8 @@ internal static class ControllerInputAcceptance
 
             // Alt is latched on pointer-down. Preview is separate; releasing Alt before mouse-up keeps the copy operation.
             Vector3 original = V(doc.Parts[0].Position);
+            Set(controller, "gizmoFamily", GizmoFamily.Move);
+            Frame(controller, input, left); yield return null;
             Vector2 moveStart = MoveHandle(scene, original, GizmoAxis.X);
             Frame(controller, input, moveStart, 1, KeyCode.LeftAlt); yield return null;
             Require(Field<GizmoHandleKind>(controller, "dragHandle") == GizmoHandleKind.Move &&
@@ -262,6 +270,8 @@ internal static class ControllerInputAcceptance
             Frame(controller, input, left); yield return null;
 
             // Separate uniform scale square wins the real controller hit ordering.
+            Set(controller, "gizmoFamily", GizmoFamily.Scale);
+            Frame(controller, input, left); yield return null;
             var gizmo = Field<TransformGizmoView>(scene, "gizmo");
             var scaleLine = Field<LineRenderer>(gizmo, "scaleHandle");
             Vector2 scaleMouse = scene.Camera.WorldToScreenPoint((scaleLine.GetPosition(0) + scaleLine.GetPosition(2)) * .5f);
@@ -303,6 +313,8 @@ internal static class ControllerInputAcceptance
             Frame(controller, input, left); yield return null;
             Require(V(doc.Parts[0].Position) == beforeBlocked && Field<GizmoHandleKind>(controller, "dragHandle") == GizmoHandleKind.None,
                 "Viewport options allow click-through transform");
+            Require(!view.HasViewportSettings, "Outside click did not dismiss viewport options");
+            NativeClick(view, uiCamera, "View"); yield return null;
             NativeClick(view, uiCamera, "ViewportSettingsReset"); yield return null;
             Frame(controller, input, left, 0, KeyCode.Escape); yield return null;
             Require(!view.HasViewportSettings && controller.IsOpen, "Esc closes editor instead of viewport options");
@@ -340,6 +352,8 @@ internal static class ControllerInputAcceptance
                 "Placement-delete fixture is not pickable");
             Frame(controller, input, deleteDuringPlacement, 4); yield return null;
             Frame(controller, input, deleteDuringPlacement); yield return null;
+            Require(doc.Parts.Count == 4, "MMB tap deleted a part during placement instead of navigating");
+            Frame(controller, input, deleteDuringPlacement, 0, KeyCode.Delete); yield return null;
             Require(doc.Parts.Count == 3 && Field<BlueprintEditorCatalogItem>(controller, "placementItem") != null,
                 "MMB click did not delete a part while catalog placement stayed active");
             Frame(controller, input, deleteDuringPlacement, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
@@ -420,6 +434,8 @@ internal static class ControllerInputAcceptance
             Require(doc.IsPartSelected(newId), "Newly inserted part click did not select it: " + clickDiagnostic + "; position=" + placedAt);
             Frame(controller, input, newPartMouse, 4); yield return null;
             Frame(controller, input, newPartMouse); yield return null;
+            Require(doc.Parts.Count == 5, "MMB tap deleted the selected part instead of navigating");
+            Frame(controller, input, newPartMouse, 0, KeyCode.Delete); yield return null;
             Require(doc.Parts.Count == 4, "MMB click did not delete the selected viewport part");
             Frame(controller, input, newPartMouse, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
             Frame(controller, input, newPartMouse); yield return null;
@@ -470,6 +486,7 @@ internal static class ControllerInputAcceptance
             Frame(controller, input, placeMouse); yield return null;
             foreach (object tick in TestArrayInput(controller, input, scene, view, uiCamera, target, output))
                 yield return tick;
+            NativeClick(view, uiCamera, "ViewportSectionButton0"); yield return null;
             NativeClick(view, uiCamera, "ProjectionToggle"); yield return null;
             Require(scene.Camera.orthographic, "Projection precondition before reopen");
             controller.Close(true);
@@ -533,10 +550,12 @@ internal static class ControllerInputAcceptance
             Require(!scene.OccluderFadeEnabled, "See-through must start disabled");
             Frame(controller, input, Vector2.zero, 0, KeyCode.F7); yield return null;
             Require(scene.OccluderFadeEnabled, "F7 did not enable editor see-through");
+            NativeClick(view, null, "ViewportSectionButton1"); yield return null;
             NativeClick(view, null, "OccluderFadeToggle"); yield return null;
+            view.HideViewportSettings();
             Require(!scene.OccluderFadeEnabled, "Viewport button did not disable see-through");
             Vector2 edge = scene.Camera.WorldToScreenPoint(new Vector3(0,1.96f,-.1f));
-            foreach (KeyCode finish in new[] { KeyCode.None, KeyCode.Escape, KeyCode.G, KeyCode.Q, KeyCode.Delete })
+            foreach (KeyCode finish in new[] { KeyCode.None, KeyCode.Escape, KeyCode.Alpha2, KeyCode.Alpha1, KeyCode.Delete })
             {
                 Frame(controller, input, Vector2.zero, 0, KeyCode.C); yield return null;
                 Frame(controller, input, edge); yield return null;
@@ -630,6 +649,8 @@ internal static class ControllerInputAcceptance
         float yaw = Field<float>(controller, "cameraYaw"), pitch = Field<float>(controller, "cameraPitch");
         foreach (string field in new[] { "gridButton", "projectionButton", "gridButton", "projectionButton" })
         {
+            view.HideViewportSettings();
+            NativeClick(view, uiCamera, field == "gridButton" ? "ViewportSectionButton1" : "ViewportSectionButton0");
             Button button = Field<Button>(view, field);
             var rect = (RectTransform)button.transform;
             Vector2 mouse = RectTransformUtility.WorldToScreenPoint(uiCamera, rect.TransformPoint(rect.rect.center));
@@ -661,7 +682,8 @@ internal static class ControllerInputAcceptance
             "Viewport toolbar fixture did not restore grid/perspective");
         Camera template = Field<Camera>(controller, "cameraTemplate");
         float worldFov = template.fieldOfView;
-        NativeClick(view, uiCamera, "View"); yield return null;
+        view.HideViewportSettings();
+        NativeClick(view, uiCamera, "ViewportSectionButton0"); yield return null;
         Slider fov = Field<Slider>(view, "fieldOfViewSlider");
         TMP_InputField fovInput = Field<TMP_InputField>(view, "fieldOfViewInput");
         fov.value = 85f; yield return null;
@@ -673,12 +695,144 @@ internal static class ControllerInputAcceptance
         NativeClick(view, uiCamera, "FieldOfViewReset"); yield return null;
         Require(Mathf.Abs(scene.Camera.fieldOfView - worldFov) < .001f, "FOV reset differs from game camera");
         view.HideViewportSettings();
+        NativeClick(view, uiCamera, "ViewportSectionButton0"); yield return null;
         NativeClick(view, uiCamera, "ProjectionToggle"); yield return null;
         Require(!fov.interactable && !fovInput.interactable && !Field<Button>(view, "fieldOfViewReset").interactable,
             "Orthographic view leaves perspective FOV controls active");
         NativeClick(view, uiCamera, "ProjectionToggle"); yield return null;
         Require(fov.interactable && fovInput.interactable && template.fieldOfView == worldFov,
             "Perspective did not restore editor FOV controls or changed world camera");
+        view.HideViewportSettings();
+    }
+
+    private static IEnumerable TestCursorPreview(BlueprintEditorController controller, InputFrames input,
+        BlueprintEditorScene scene, BlueprintEditorView view, Camera uiCamera, RenderTexture target, string output)
+    {
+        BlueprintEditorDocument doc = controller.Document;
+        Frame(controller, input, Vector2.zero); NativeClick(view, uiCamera, "Row_left"); yield return null;
+        Vector3 original = V(doc.Parts[0].Position);
+        Vector2 start = scene.Camera.WorldToScreenPoint(original);
+        int history = Field<IList>(doc, "undo").Count;
+        Frame(controller, input, start, 0, KeyCode.G); yield return null;
+        Require(Field<bool>(controller, "keyboardPreview") && V(doc.Parts[0].Position) == original,
+            "G did not start a non-destructive cursor preview");
+        Vector2 empty = new Vector2(scene.Camera.pixelRect.xMin + 30, scene.Camera.pixelRect.yMin + 30);
+        Frame(controller, input, empty); yield return null;
+        Require(!Field<bool>(controller, "keyboardValid") && V(doc.Parts[0].Position) == original,
+            "Surface move jumped to the ground or moved the document without a surface");
+        Frame(controller, input, empty, 0, KeyCode.Return); yield return null;
+        Require(Field<bool>(controller, "keyboardPreview"), "Missing surface confirmed a move");
+        Vector2 surface = scene.Camera.WorldToScreenPoint(V(doc.Parts[1].Position));
+        Frame(controller, input, surface, 0, KeyCode.LeftShift); yield return null;
+        Require(Field<bool>(controller, "keyboardValid"), "Surface fixture did not hit an unmoved part");
+        Vector3 beforeSource = VisualRoot(scene, "left").transform.position;
+        Frame(controller, input, surface, 0, KeyCode.LeftShift, KeyCode.Q); yield return null;
+        Frame(controller, input, surface + Vector2.right * 2, 0, KeyCode.LeftShift); yield return null;
+        Require(Vector3.Distance(beforeSource, VisualRoot(scene, "left").transform.position) < .15f,
+            "Source rebase jumped by the distance between anchors");
+        Frame(controller, input, empty, 0, KeyCode.Return); yield return null;
+        Require(Field<bool>(controller, "keyboardPreview") && !Field<bool>(controller, "keyboardValid") &&
+            Field<IList>(doc, "undo").Count == history, "Same-frame miss+Enter committed a stale surface hit");
+        Frame(controller, input, surface, 0, KeyCode.LeftShift); yield return null;
+        Frame(controller, input, new Vector2(20, 1050), 0, KeyCode.Return); yield return null;
+        Require(Field<bool>(controller, "keyboardPreview"), "Enter over UI confirmed a cursor move");
+        Frame(controller, input, start, 0, KeyCode.Escape); yield return null;
+        Frame(controller, input, start); yield return null;
+        Frame(controller, input, start, 0, KeyCode.G); yield return null;
+        Frame(controller, input, empty, 0, KeyCode.Delete, KeyCode.LeftControl, KeyCode.Z); yield return null;
+        Require(doc.Parts.Count == 4 && Field<IList>(doc, "undo").Count == history, "Pending move deleted/undid document state");
+        Frame(controller, input, start, 0, KeyCode.P); yield return null;
+        Frame(controller, input, start, 0, KeyCode.X); yield return null;
+        Vector2 end = start + Field<Vector2>(controller, "dragScreenDirection") * 60;
+        Frame(controller, input, end); yield return null;
+        Frame(controller, input, start); yield return null;
+        Require(Vector3.Distance(VisualRoot(scene, "left").transform.position, original) < .0001f,
+            "Returning to the axis start retained a stale nonzero delta");
+        Frame(controller, input, end); yield return null;
+        Vector3 pose = VisualRoot(scene, "left").transform.position;
+        Require(Vector3.Distance(pose, original) > .05f && V(doc.Parts[0].Position) == original,
+            "Axis cursor preview did not move only the temporary visual");
+        Save(scene, view, uiCamera, target, Path.Combine(output, "input-cursor-move.png"));
+        Frame(controller, input, end, 4); yield return null;
+        Frame(controller, input, end + new Vector2(25,10), 4); yield return null;
+        Frame(controller, input, end + new Vector2(25,10)); yield return null;
+        Frame(controller, input, end + new Vector2(25,10)); yield return null;
+        Require(Vector3.Distance(VisualRoot(scene, "left").transform.position, pose) < .0001f &&
+            Field<bool>(controller, "keyboardPreview"), "Camera navigation confirmed or jumped the cursor preview");
+        Frame(controller, input, end + new Vector2(25,10), 0, KeyCode.Return); yield return null;
+        Require(!Field<bool>(controller, "keyboardPreview") && Vector3.Distance(V(doc.Parts[0].Position), pose) < .001f &&
+            Field<IList>(doc, "undo").Count == history + 1, "Cursor move did not commit exactly one Undo");
+        Frame(controller, input, start, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
+        Require(V(doc.Parts[0].Position) == original && Field<IList>(doc, "undo").Count == history,
+            "One Undo did not restore the cursor move");
+        Frame(controller, input, start); yield return null;
+        Frame(controller, input, start, 0, KeyCode.S); yield return null;
+        Frame(controller, input, start, 0, KeyCode.Return); yield return null;
+        Require(Field<IList>(doc, "undo").Count == history, "Zero-delta preview added Undo");
+        Frame(controller, input, start); yield return null;
+        Frame(controller, input, start, 0, KeyCode.G); yield return null;
+        Frame(controller, input, start, 0, KeyCode.P); yield return null;
+        Frame(controller, input, start + Vector2.right * 40); yield return null;
+        input.HasFocus = false;
+        Frame(controller, input, start + Vector2.right * 40); yield return null;
+        input.HasFocus = true;
+        Require(!Field<bool>(controller, "keyboardPreview") && V(doc.Parts[0].Position) == original &&
+            Vector3.Distance(VisualRoot(scene, "left").transform.position, original) < .0001f,
+            "Focus loss did not restore the document and visual");
+        foreach (KeyCode action in new[] { KeyCode.R, KeyCode.S })
+        {
+            Vector2 origin = scene.Camera.WorldToScreenPoint(original);
+            Vector2 begin = origin + Vector2.right * 100;
+            Frame(controller, input, begin); yield return null;
+            Frame(controller, input, begin, 0, action); yield return null;
+            Frame(controller, input, begin + Vector2.up * 45); yield return null;
+            Require(Field<bool>(controller, "keyboardPreview") && V(doc.Parts[0].Position) == original,
+                action + " changed the document before confirmation");
+            Frame(controller, input, begin + Vector2.up * 45, 0, KeyCode.Return); yield return null;
+            Require(Field<IList>(doc, "undo").Count == history + 1, action + " was not one committed Undo");
+            Frame(controller, input, begin, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
+            Require(Field<IList>(doc, "undo").Count == history && Math.Abs(doc.Parts[0].Scale.X - 1) < .0001 &&
+                Quaternion.Angle(VisualRoot(scene, "left").transform.rotation, Quaternion.identity) < .001f,
+                action + " did not undo exactly");
+        }
+        Frame(controller, input, start); yield return null;
+        Rect before = view.ViewportScreenRect();
+        NativeClick(view, uiCamera, "HintsToggle"); Frame(controller, input, start); yield return null;
+        Require(view.ViewportScreenRect().height > before.height + 100 &&
+            Field<TMP_Text>(view, "nextActionText").gameObject.activeInHierarchy, "Hints collapse did not recover viewport space");
+        NativeClick(view, uiCamera, "HintsToggle"); Frame(controller, input, start); yield return null;
+        Require(Mathf.Abs(view.ViewportScreenRect().height - before.height) < .01f, "Hints expand did not restore layout");
+        NativeClick(view, uiCamera, "ViewportFocus"); Frame(controller, input, start); yield return null;
+        Require(!Field<RectTransform>(view, "outliner").gameObject.activeSelf && view.ViewportScreenRect().width > before.width,
+            "Focus did not reclaim the side panel");
+        NativeClick(view, uiCamera, "ViewportFocus"); Frame(controller, input, start); yield return null;
+        Frame(controller, input, start, 0, KeyCode.Space); yield return null;
+        Require(view.HasToolsMenu, "Space did not open the single tool menu");
+        Frame(controller, input, start, 0, KeyCode.Alpha2); yield return null;
+        Require(!view.HasToolsMenu && Field<BlueprintEditorTool>(controller, "activeTool") == BlueprintEditorTool.Transform,
+            "Tool menu numeric choice did not select the persistent gizmo");
+        Frame(controller, input, start); yield return null;
+        NativeClick(view, uiCamera, "ViewportSectionButton2"); yield return null;
+        NativeClick(view, uiCamera, "GizmoFamilyPoints"); yield return null;
+        view.HideViewportSettings();
+        Frame(controller, input, start); yield return null;
+        Require(Field<GizmoFamily>(controller, "gizmoFamily") == GizmoFamily.Points, "Manipulator family did not update");
+        // Tooltip measurements use the actual font and the safe canvas, not character counts.
+        RectTransform anchor = Field<RectTransform>(view, "top");
+        foreach (float scale in new[] { 1f, 1.2f, 1.4f })
+        foreach (string help in new[] { BuildWorksLocalization.Text("editor.view.tool_transform"),
+            "Перемещение, вращение и масштаб выбранной детали. X/Y/Z — ось; повтор — локальные координаты; Esc — отмена без изменения чертежа." })
+        {
+            view.SetUiScale(scale);
+            view.GetType().GetMethod("BeginTooltip", Private).Invoke(view, new object[] { anchor, help });
+            view.GetType().GetMethod("ShowTooltipNow", Private).Invoke(view, null);
+            Canvas.ForceUpdateCanvases();
+            TMP_Text tooltip = Field<TMP_Text>(view, "tooltipText"); tooltip.ForceMeshUpdate();
+            Require(!tooltip.isTextOverflowing && !tooltip.raycastTarget, "Measured EN/RU tooltip is clipped or captures input at " + scale);
+        }
+        view.SetUiScale(1f);
+        Set(controller, "gizmoFamily", GizmoFamily.Move);
+        Frame(controller, input, start); yield return null;
     }
 
     private static IEnumerable TestTransformContract(BlueprintEditorController controller, InputFrames input,
@@ -728,6 +882,8 @@ internal static class ControllerInputAcceptance
         NativeClick(view, uiCamera, Field<Dictionary<BlueprintEditorTool, Button>>(view, "toolButtons")[BlueprintEditorTool.Transform]);
         Frame(controller, input, empty); yield return null;
         Require(doc.EditablePartSelectionCount == 2, "Pin fixture lacks multi-selection");
+        Set(controller, "gizmoFamily", GizmoFamily.Points);
+        Frame(controller, input, empty); yield return null;
         Vector3[] anchors = Field<Vector3[]>(controller, "gizmoAnchors");
         Vector3 pin = anchors[Field<int>(controller, "gizmoNativeAnchorStart")];
         Vector3 occluder = pin + (scene.Camera.transform.position - pin).normalized * 0.7f;
@@ -1192,6 +1348,7 @@ internal static class ControllerInputAcceptance
         string name = expected.name;
         var rect = (RectTransform)expected.transform;
         Vector2 position = RectTransformUtility.WorldToScreenPoint(uiCamera, rect.TransformPoint(rect.rect.center));
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(rect, position, uiCamera, out Vector2 diagnosticLocal);
         var pointer = new PointerEventData(EventSystem.current) { position = position, button = PointerEventData.InputButton.Left };
         GameObject target = expected.gameObject;
         if (verifyRaycast)
@@ -1200,7 +1357,16 @@ internal static class ControllerInputAcceptance
             Require(hits.Count > 0, "No actual UI raycast at " + name);
             target = ExecuteEvents.GetEventHandler<IPointerClickHandler>(hits[0].gameObject);
             Require(target == expected.gameObject, "UI raycast intercepted " + name + " by " + (target ? target.name : "null") +
-                "; first=" + hits[0].gameObject.name + "; position=" + position);
+                "; first=" + hits[0].gameObject.name + "; position=" + position +
+                "; active=" + expected.gameObject.activeInHierarchy + "; interactable=" + expected.IsInteractable() +
+                "; rect=" + rect.rect + "; graphic=" + expected.targetGraphic.raycastTarget + "/" + expected.targetGraphic.depth +
+                "/" + expected.targetGraphic.canvasRenderer.cull + "; layer=" + expected.gameObject.layer +
+                "; contains=" + RectTransformUtility.RectangleContainsScreenPoint(rect, position, uiCamera) +
+                "; accepts=" + expected.targetGraphic.Raycast(position, uiCamera) + "; canvas=" + expected.targetGraphic.canvas.name +
+                "; pose=" + rect.position.ToString("F7") + "/" + rect.lossyScale.ToString("F7") + "/" + rect.rotation +
+                "; local=" + rect.localScale.ToString("F7") + "; parent=" + rect.parent.localScale.ToString("F7") +
+                "; localHit=" + diagnosticLocal.ToString("F4") + "; mode=" + view.RootCanvas.renderMode +
+                "; hits=" + string.Join(",", hits.ConvertAll(hit => hit.gameObject.name)));
         }
         ExecuteEvents.Execute(target, pointer, ExecuteEvents.pointerDownHandler);
         ExecuteEvents.Execute(target, pointer, ExecuteEvents.pointerUpHandler);

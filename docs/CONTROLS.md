@@ -22,15 +22,14 @@ menus and dragging show their own hints instead. The Inspector keeps its height.
 | Action | Control |
 | --- | --- |
 | Catalog | Tab or Shift+A |
-| Select mode | Q |
-| Transform mode | G or F9; R also opens Transform |
-| Array | A |
-| Contour | C |
+| Select / Gizmo / Array / Contour | 1 / 2 / 3 / 4 (F9 also opens Gizmo) |
+| Temporary Move / Rotate / uniform Scale | G / R / S |
+| Single tools menu / search | Space / F3 |
 | Undo / Redo | Ctrl+Z / Ctrl+Y |
 | Save | Ctrl+S |
 | Duplicate | Ctrl+D |
 | Group | Ctrl+G |
-| Select all | Ctrl+A |
+| Select all | A or Ctrl+A |
 | Clear selection / cancel tool | Esc |
 | Frame selection | F |
 | Frame all | Home |
@@ -43,7 +42,7 @@ menus and dragging show their own hints instead. The Inspector keeps its height.
 | Place preview | Left mouse button |
 | Rotate | Mouse wheel |
 | Change source snap point | Q/E |
-| Delete hovered placed piece | Middle mouse button |
+| Delete hovered placed piece | Delete |
 | Cancel current placement | Esc |
 
 ## Editor: selection and visibility
@@ -55,16 +54,17 @@ menus and dragging show their own hints instead. The Inspector keeps its height.
 | Isolate selection or group | Shift+H |
 | Show everything except selected | Ctrl+H |
 | Show all | Alt+H |
-| Toggle see-through occluders | F7 or the viewport `See-through F7` button |
-| Delete | Delete or middle mouse button on a piece |
+| Toggle see-through occluders | F7 or Display → See-through |
+| Delete | Delete |
 
 See-through starts off and is editor-only. Unselected mesh parts blocking sampled
-rays to the visible selection become translucent silhouettes; selected parts stay
-solid. Camera/selection changes and turning it off restore the original editor
-materials. Hidden flags, picking, source prefabs and saved/world data are unchanged.
+rays to the visible selection disappear; selected parts stay solid. Camera/selection
+changes and turning it off restore drawing. Only the active hidden snap target
+gets a restrained outline. Document hidden flags, materials, source prefabs and
+saved/world data are unchanged; temporary blockers do not intercept selection.
 
 In Contour (C), hovering a connected support edge shows only the blue guide;
-LMB creates preview copies. Cancel, Esc, G/Q and deleting the source clear both.
+LMB creates preview copies. Cancel, Esc, tool changes and deleting the source clear both.
 
 ## Editor camera
 
@@ -72,12 +72,21 @@ LMB creates preview copies. Cancel, Esc, G/Q and deleting the source clear both.
 | --- | --- |
 | Orbit | Middle mouse button + move |
 | Pan | Shift + middle mouse button + move |
-| Zoom | Mouse wheel |
+| Zoom | Mouse wheel; Ctrl+wheel during placement/Surface Move |
 | Free look | Hold right mouse button |
 | Fly | Right mouse button + WASD, Q/E up/down |
 | Faster flight | Shift |
 
 ## Transform
+
+G follows another real surface, excluding the selected parts; no ray hit means no
+confirmation, not distant-ground fallback. P explicitly chooses screen-plane Move.
+R rotates in the camera-facing plane until constrained; S scales uniformly.
+During these previews XYZ constrains an axis, repeating it switches World/Local,
+Shift+axis excludes that axis. Surface Q/E cycles source points and wheel changes yaw.
+Enter/LMB confirms once; Esc cancels exactly. Camera navigation pauses/rebases the
+preview. Persistent Gizmo families are selected in Manipulator; hidden handles
+cannot be picked. The collapsible footer keeps a highlighted next-action strip.
 
 | Action | Control |
 | --- | --- |

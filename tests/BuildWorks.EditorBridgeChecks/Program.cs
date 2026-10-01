@@ -32,7 +32,7 @@ internal static class Program
         controllerType.GetField("document", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(controller, document);
         object parts = controllerType.GetMethod("BuildStoreParts", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(controller, null);
         Type storeType = asm.GetType("OstrixMods.BuildWorks.CompositeBlueprintStore", true);
-        string pathOut = Path.Combine(args[1], "bridge-roundtrip.json");
+        string pathOut = Path.Combine(args[1], "bridge-roundtrip-" + Guid.NewGuid().ToString("N") + ".json");
         object store = Activator.CreateInstance(storeType, BindingFlags.NonPublic | BindingFlags.Instance,
             null, new object[] { pathOut }, null);
         MethodInfo save = storeType.GetMethods().Single(m => m.Name == "TrySaveDocument" && m.GetParameters().Length == 7);

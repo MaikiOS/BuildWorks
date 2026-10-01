@@ -24,6 +24,7 @@ internal static class UICatalogAcceptance
         public Vector2 MousePosition => Pointer;
         public Vector2 MouseScrollDelta => Vector2.zero;
         public float UnscaledDeltaTime => 1f / 60f;
+        public bool HasFocus => true;
         public bool GetKey(KeyCode key) => Keys.Contains(key);
         public bool GetKeyDown(KeyCode key) => Keys.Contains(key);
         public bool GetMouseButton(int button) => MouseButtons.Contains(button);
@@ -346,15 +347,16 @@ internal static class UICatalogAcceptance
         Reset(step, "10", focused: true);
         Require(view.ScaleStepPercent == 10f, "RMB does not apply step10 to the actual View property");
         foreach (TMP_InputField size in Field<TMP_InputField[]>(view, "viewportScaleInputs")) Reset(size, "100");
-        Button grid = Button(view, "GridToggle"), projection = Button(view, "ProjectionToggle");
-        Require(grid.transform.parent == Field<RectTransform>(view, "viewportControls") &&
-            projection.transform.parent == grid.transform.parent && grid.GetComponent<BlueprintEditorHoverTarget>() &&
-            projection.GetComponent<BlueprintEditorHoverTarget>(), "Viewport icons are hidden inside settings or have no tooltip");
+        Button grid = Field<Button>(view, "gridButton"), projection = Field<Button>(view, "projectionButton");
+        Require(grid.transform.parent.name == "ViewportSection1" && projection.transform.parent.name == "ViewportSection0" &&
+            grid.GetComponent<BlueprintEditorHoverTarget>() && projection.GetComponent<BlueprintEditorHoverTarget>(),
+            "Grid/projection are not grouped in Display/Camera or have no tooltip");
         Require(Button(view, "View").GetComponentInChildren<TMP_Text>().text ==
             BuildWorksLocalization.Text("editor.view.settings"),
             "Direct header settings control is not labelled clearly");
         float uiScale = 0f;
         view.UiScaleChanged += value => uiScale = value;
+        Click(Button(view, "ViewportSectionButton1"));
         Click(Button(view, "InterfaceScale"));
         Require(Mathf.Abs(uiScale - .6f) < .0001f &&
             Mathf.Abs(view.RootCanvas.GetComponent<CanvasScaler>().referenceResolution.x - 3200f) < .1f,

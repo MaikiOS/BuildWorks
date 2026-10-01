@@ -232,13 +232,13 @@ public static class EditorInteractionAcceptance
         float arrayLength = Vector3.Distance(array.GetPosition(1), array.GetPosition(0));
         float squareWidth = Vector3.Distance(square.GetPosition(0), square.GetPosition(1));
         float pointRadius = Vector3.Distance(point.GetPosition(0), anchors[nativeStart]);
-        Vector3 squareCenter = (square.GetPosition(0) + square.GetPosition(2)) * 0.5f;
+        Vector3 squareCenter = (square.GetPosition(0) + square.GetPosition(1)) * 0.5f;
         Vector2 pixel = scene.Camera.WorldToScreenPoint(squareCenter);
         Require(scene.HitTestScale(pixel) && scene.HitTestGizmo(BlueprintEditorTool.Array, pivot,
             Quaternion.identity, false, pixel, out _) == GizmoHandleKind.Scale,
             "Uniform scale square loses hit priority to array/planes");
-        Require(Mathf.Abs(Vector3.Dot((square.GetPosition(1)-square.GetPosition(0)).normalized,
-            scene.Camera.transform.right)) > 0.999f, "Scale glyph is still an anchor diamond");
+        Require(square.positionCount == 10 && Mathf.Abs(Vector3.Dot((square.GetPosition(1)-square.GetPosition(0)).normalized,
+            scene.Camera.transform.up)) > 0.999f, "Split scale cradle does not match its drawn hit geometry");
         scene.SetViewportSettings(2,0.5f,1.5f,2,2.5f,false);
         Show(scene, pivot, anchors, nativeStart);
         Require(Near(Vector3.Distance(move.GetPosition(1), pivot), moveLength * 2f) &&
@@ -249,9 +249,10 @@ public static class EditorInteractionAcceptance
             "Independent editor size settings cross-coupled");
         Require(!Field<Transform>(scene, "minorGrid").gameObject.activeSelf &&
             !Field<Transform>(scene, "majorGrid").gameObject.activeSelf, "Grid toggle leaves a grid visible");
-        squareCenter = (square.GetPosition(0) + square.GetPosition(2)) * 0.5f;
+        squareCenter = (square.GetPosition(0) + square.GetPosition(1)) * 0.5f;
         pixel = scene.Camera.WorldToScreenPoint(squareCenter);
-        Require(scene.HitTestScale(pixel + Vector2.right * 24f), "Scaled square hit bounds do not match its glyph");
+        Require(scene.HitTestScale(pixel) && !scene.HitTestScale(pixel + Vector2.left * 20f),
+            "Scaled cradle strokes and hit bounds disagree");
         scene.SetViewportSettings(1,1,1,1,1,true);
         Show(scene, pivot, anchors, nativeStart);
         Require(Near(Vector3.Distance(move.GetPosition(1), pivot), moveLength), "Settings reset did not restore baseline");

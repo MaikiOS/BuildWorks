@@ -2170,6 +2170,12 @@ namespace OstrixMods.BuildWorks.GeometryTests
 
         private static void BlueprintLayoutStaysInsideSafeArea()
         {
+            BlueprintEditorLayout expanded = BlueprintEditorLayout.Compute(1920, 1080);
+            BlueprintEditorLayout collapsed = BlueprintEditorLayout.Compute(1920, 1080, false);
+            Near(144, collapsed.Viewport.Height - expanded.Viewport.Height);
+            Near(72, collapsed.Status.Height);
+            Equal(true, collapsed.SafeArea.Contains(collapsed.Status));
+            Equal(false, collapsed.Status.Overlaps(collapsed.Viewport));
             BlueprintEditorLayout enlarged = BlueprintEditorLayout.Compute(1920.0 / 1.4, 1080.0 / 1.4);
             Equal(true, (enlarged.Outliner.Height - BlueprintEditorLayout.OutlinerHeaderHeight) /
                 BlueprintEditorLayout.OutlinerRowHeight >= 2);

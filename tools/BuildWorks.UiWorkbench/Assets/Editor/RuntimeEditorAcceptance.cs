@@ -209,9 +209,9 @@ public static class RuntimeEditorAcceptance
                 view.SetStatus("Проверочное сообщение");
                 Require(Field<TMP_Text>(view, "statusText").text.StartsWith(metrics), "Status message erased operation metrics");
                 Set(controller, "cameraFocus", new Vector3(1000,1000,1000));
-                Field<RectTransform>(view, "top").Find("View").GetComponent<Button>().onClick.Invoke();
+                Field<RectTransform>(view, "viewportControls").Find("ViewportSectionButton0").GetComponent<Button>().onClick.Invoke();
                 Require(view.HasViewportSettings, "View button must open viewport settings");
-                Field<GameObject>(view, "viewportSettings").transform.Find("ViewportFrameSelection").GetComponent<Button>().onClick.Invoke();
+                Field<GameObject>(view, "viewportSettings").transform.Find("ViewportSection0/ViewportFrameSelection").GetComponent<Button>().onClick.Invoke();
                 Require(Field<Vector3>(controller, "cameraFocus").sqrMagnitude < 1000, "Viewport frame-selection action is disconnected");
                 view.HideViewportSettings();
                 checks.Add("Real TMP events: percentage, scrub, invalid value and hover row");
@@ -233,7 +233,7 @@ public static class RuntimeEditorAcceptance
                 uiCamera.farClipPlane = 100f;
                 view.RootCanvas.renderMode = RenderMode.ScreenSpaceCamera;
                 view.RootCanvas.worldCamera = uiCamera;
-                view.RootCanvas.planeDistance = 1f;
+                view.RootCanvas.planeDistance = 10f;
                 foreach (Transform child in view.RootCanvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer = 5;
                 int count = 0;
                 foreach (int width in new[] { 1920, 2560, 3440 })
@@ -608,6 +608,7 @@ public static class RuntimeEditorAcceptance
                 Field<Button>(view, "undoButton").onClick.Invoke();
                 Require(doc.Parts.Count == 1, "Array Apply requires more than one Undo");
 
+                Set(controller, "gizmoFamily", GizmoFamily.Points);
                 Call(controller, "UpdateGizmo");
                 Require(scene.TryGetGizmoAnchors(new[] { id }, out Vector3[] anchors, out int nativeStart) && anchors.Length - nativeStart == 8,
                     "Native snap points and mids were lost against bounds helpers");
@@ -902,7 +903,7 @@ public static class RuntimeEditorAcceptance
                 true, 1, false, Vector3.zero, false, GizmoAxis.None, false,
                 Vector3.zero, Vector3.zero, 0, allowExtended: true);
             Vector2 center = camera.WorldToScreenPoint(Vector3.zero);
-            float hitRadius = native ? 36f : 12f;
+            float hitRadius = 12f;
             Require(gizmo.HitTestAnchor(camera, anchors, center + new Vector2(hitRadius - 0.5f,0)) == 0,
                 "Visible anchor edge cannot be hit at distance " + distance);
             Require(gizmo.HitTestAnchor(camera, anchors, center + new Vector2(hitRadius + 0.5f,0)) < 0,
@@ -912,7 +913,7 @@ public static class RuntimeEditorAcceptance
             for (int i = 0; i < anchor.positionCount; ++i)
                 radius = Mathf.Max(radius, Vector2.Distance(center, camera.WorldToScreenPoint(anchor.GetPosition(i))));
             bool hovered = Vector2.Distance(Input.mousePosition, center) <= hitRadius;
-            Require(Mathf.Abs(radius - (native ? hovered ? 34f : 23f : 9f)) < 0.1f,
+            Require(Mathf.Abs(radius - (native ? 11f : 9f)) < 0.1f,
                 "Native/helper anchor glyph is not constant pixels");
             float widthPixels = Vector2.Distance(center,
                 camera.WorldToScreenPoint(camera.transform.right * anchor.startWidth));
@@ -928,6 +929,24 @@ public static class RuntimeEditorAcceptance
             Vector2 plane = camera.WorldToScreenPoint(new Vector3(0.26f,0.26f,0) * gizmo.Scale);
             Require(gizmo.HitTestExtra(camera, Vector3.zero, Quaternion.identity, false, plane, out GizmoAxis normal) ==
                 GizmoHandleKind.MovePlane && normal == GizmoAxis.Z, "XY plane glyph is not hittable");
+            foreach (GizmoFamily family in new[] { GizmoFamily.Move, GizmoFamily.Rotate, GizmoFamily.Points, GizmoFamily.Scale })
+            {
+                gizmo.Family = family;
+                gizmo.Show(camera, Vector3.zero, Quaternion.identity, false, GizmoMode.Move,
+                    GizmoHandleKind.None, GizmoAxis.None, anchors, -1, -1, native ? 0 : 1,
+                    true, 1, false, Vector3.zero, false, GizmoAxis.None, false,
+                    Vector3.zero, Vector3.zero, 0, allowExtended: true);
+                Require(scaleHandle.gameObject.activeSelf == (family == GizmoFamily.Scale), "Wrong scale family visibility");
+                Require(gizmo.HitTestScale(camera, scale) == (family == GizmoFamily.Scale), "Hidden scale captures input");
+                Require((gizmo.HitTestAnchor(camera, anchors, center) == 0) == (family == GizmoFamily.Points), "Hidden point family captures input");
+                if (family != GizmoFamily.Move)
+                    Require(gizmo.HitTestMove(camera, Vector3.zero, Quaternion.identity, false,
+                        camera.WorldToScreenPoint(Vector3.right * gizmo.Scale * .7f)) == GizmoAxis.None, "Hidden move captures input");
+                if (family != GizmoFamily.Rotate)
+                    Require(gizmo.HitTestRotation(camera, Vector3.zero, Quaternion.identity, false, center) == GizmoAxis.None,
+                        "Hidden rotation captures input");
+            }
+            gizmo.Family = GizmoFamily.Combined;
         }
         using (var gizmo = new TransformGizmoView())
         foreach (float distance in new[] { 2f, 50f })
@@ -950,7 +969,7 @@ public static class RuntimeEditorAcceptance
                 "F9 legacy 18px move-axis hit zone changed: depth=" + distance + "; inside=" + inside +
                 "; outside=" + outside + "; axis offset=" + (onAxis - center) + "; pixelRect=" + camera.pixelRect);
         }
-        checks.Add("Gizmo: editor native gold 23/34px hit36 width>=2px, helper9px hit12 width>=1.5px; F9 default world sizing and axis18/anchor16 hit zones");
+        checks.Add("Gizmo: compact editor native11/helper9px, hit12, native width>=2px; F9 default world sizing and axis18/anchor16 hit zones");
     }
 
     private static void EnsureInside(RectTransform parent, RectTransform child)

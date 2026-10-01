@@ -3,11 +3,47 @@
 **English** | [Русский](current-pass_RU.md)
 
 Updated 2026-10-01 from Ostrix's feedback. **TerrainRamp-1.0-Test only**,
-BuildWorks **0.19.41 candidate**, Valheim 1.0.16. Do not test the old DLL as this candidate.
+BuildWorks **0.19.42 candidate**, Valheim 1.0.16. Do not test the old DLL as this candidate.
 Install only with Valheim closed; Valheim is not launched automatically.
-The short series below is accepted by owner report. Do not repeat it wholesale.
-Next is [editor design approval](editor-visibility-proposal.md), not a new game series.
+The .41 series is accepted by owner report. Do not repeat it wholesale.
+The approved editor redesign now needs the focused .42 series below.
 Use a disposable world and blueprint copy, not an important build.
+
+## New 0.19.42 editor series
+
+Enter our Hammer → Blueprints → select a disposable two-part blueprint → Edit.
+Put the pointer over the viewport for keyboard steps; not over a text field.
+
+1. Select one part in the tree. Press **2**, open **Manipulator**, choose Move,
+   Rotate, Points, then Scale. Only that family should be editable; hidden controls
+   must not intercept clicks. Inspect a small part and dense group: Nordic leaf
+   tips, angular planes, open rotation arcs and source/target glyphs should stay
+   readable. Hover emphasizes a handle; dragging dims unrelated axes.
+2. Select a part; press **G**, point at another part's surface and move the mouse.
+   The existing selection previews without copies. **Q/E** changes its source point,
+   wheel changes yaw. Aim at empty sky and press Enter: do not commit to distant
+   ground. Press **P** for explicit screen-plane motion, **X/Y/Z** to constrain;
+   repeat an axis for World/Local, Shift+axis for its excluded plane. **Esc** must
+   restore exactly; Enter/left click confirms once, **Ctrl+Z** restores in one step.
+3. Press **R**, move the pointer, then choose an axis and repeat it; check visible
+   World/Local guidance. Confirm and Undo. Repeat with **S** (uniform scale).
+   During any preview, navigate with MMB or RMB flight, release and continue:
+   no jump or accidental confirmation. Click a panel or lose application focus:
+   no unintended edit. MMB orbits; Delete deletes in the editor only.
+4. Press **1/2/3/4** for Select/Gizmo/Array/Contour. **Space** opens the single tools
+   menu; **F3** opens its search. Pick a tool, close with Esc; typing/search must not
+   run viewport commands. Verify Array and Contour still apply/cancel with one Undo.
+5. Click **Hints**: groups collapse, the viewport grows and the gold next-step strip
+   remains. Expand, resize the tree/inspector boundary, toggle viewport Focus and
+   restore it. Open Camera/Display/Manipulator dropdowns; Esc/outside click closes
+   without passing a placement click through. Inspect EN/RU at 100/120/140% UI scale,
+   including long tooltips at screen edges. Report clipped text with a screenshot.
+6. Select behind a blocker and enable F7. While actually snapping, only the active
+   hidden target gets a restrained outline; it disappears when no target is active
+   or F7 is off. This does not promise access to all interior snap points.
+
+Reply by step: passed, or exact key/mouse sequence and screenshot. The Workbench
+checks do not replace these Valheim tests. Do not retest networking as editor proof.
 
 ## Results already reported
 

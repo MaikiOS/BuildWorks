@@ -2,11 +2,12 @@
 
 **English** | [Русский](editor-visibility-proposal_RU.md)
 
-Draft for owner approval, 2026-10-01. Ostrix accepts the focused 0.19.41 game
+Approved design, implemented in candidate 0.19.42 on 2026-10-01. Ostrix accepts the focused 0.19.41 game
 series by report: stationary contour, cleanup, readable translated hints,
 see-through, camera and tree. Remaining usability requests are collapsible hints,
 less crowded manipulators, attachment context while seeing through, and compact
-viewer settings. This document proposes changes; none are implemented or installed.
+viewer settings. The original proposal below remains the design rationale;
+implementation follows the resolved contract here and awaits owner game acceptance.
 Ostrix's follow-up makes alternative 2 conditional on fast action/axis switching,
 moving an existing editor part like a placement ghost, prominent next-step guidance
 and original game-styled handles. The keyboard proposal now keeps Blender-style
@@ -15,7 +16,14 @@ tool menu for future growth. It replaces the rejected Q/W/E/R/T and Space-start
 draft. Ostrix approved the G/R/S, 1–4 and Space/F3 direction on 2026-10-01 and
 explicitly requested a complete manipulator redraw, not just recoloring.
 Ostrix approved the Scandinavian form study below on 2026-10-01.
-Runtime treatment and the remaining interaction gates are still open.
+Runtime game acceptance is still open; the implementation request resolves the
+design gate. Editor MMB is navigation, Delete removes; world/F9 input is unchanged.
+G follows actual surfaces without self-hit or automatic ground fallback; P is
+an explicit screen plane. R is camera-facing until constrained; S is uniform.
+XYZ chooses an axis, repeat toggles World/Local, Shift+axis chooses its excluded
+plane. Surface Q/E/wheel selects source/yaw. UI, camera navigation and focus loss
+must not accidentally confirm. Enter validates the current frame; cancel is exact,
+confirmation is one Undo. No Store schema, world camera or snap eligibility change.
 
 ## Why the selected part disappears under controls
 
@@ -328,11 +336,9 @@ screen corners, including long object names and effective custom bindings.
 
 ## Implementation and approval gates
 
-G/R/S actions, 1–4 persistent tools and one Space/F3 tool popup are approved in
-principle. Before changing interaction resolve unconstrained Move/Rotate and depth behavior, editor MMB navigation-only,
-surface-following fallback, contextual Q/E/wheel, constraint priority,
-and the next-step strip. These input gates do not block a bounded Unity preview
-of the approved v3 shapes with existing interaction unchanged.
+The original design gates are resolved by the contract at the top and owner
+implementation authorization. Candidate .42 now awaits the focused Valheim series,
+not another choice of keyboard layout. The following checks remain acceptance criteria.
 Implement in bounded steps: footer collapse/guidance; explicit manipulator families
 with matched hit tests; existing-part cursor preview with atomic confirmation;
 compact panels; then target context outline. Preview each visible
@@ -348,4 +354,5 @@ UI-start click guarding and modifier/text priority.
 Check tool keys versus modal numeric input, popup letter/search focus, repeat-axis
 orientation, camera flight priority, effective bindings and measured tooltip fit.
 Then run an explicit owner game series only in TerrainRamp-1.0-Test.
-No version bump, deployment or release is part of this proposal.
+Owner subsequently authorized implementation and the guarded candidate installation.
+Candidate .42 is not a published binary release or completed Valheim acceptance.

@@ -314,16 +314,35 @@ editor.hint.catalog	LMB — select · Q/E or PgUp/PgDn — pages · Esc — clos
 editor.hint.reparent	Release over a group to move · over root to ungroup · Esc — cancel
 editor.hint.numeric_scrub	Drag — change · Shift — fine · Ctrl — coarse · RMB — reset
 editor.hint.text_input	Type a value · Enter — apply · Esc — cancel input
-editor.hint.part_placement	LMB — add · wheel — rotate · Q/E — snap point · MMB — delete · Ctrl+Z/Y — history · G — transform · RMB — catalog
+editor.hint.part_placement	LMB — add · wheel — rotate · Q/E — snap point · Delete — remove · Ctrl+Z/Y — history · 2 — gizmo · RMB — catalog
 editor.hint.gizmo_drag	Release LMB — apply · Esc — cancel · Shift — no step
 editor.hint.camera	WASD — camera · Q/E — down/up · Shift — faster · release RMB — finish
-editor.hint.array_ready	Enter — create copies · Esc — cancel · wheel — count · Ctrl+wheel — camera
-editor.hint.array_begin	Drag one gold arrow for the first row · the other for the second · Esc — cancel
-editor.hint.contour_ready	LMB — another chain · Enter — create copies · Esc — cancel
-editor.hint.contour_begin	LMB on support — find chain · Esc — cancel
-editor.hint.transform	Drag — change · N — composite frame · H/Shift+H/Ctrl+H/Alt+H — visibility · Q — select
+editor.hint.array_ready	ARRAY: wheel — count · Enter — create · Esc — cancel · Ctrl+wheel — camera
+editor.hint.array_begin	ARRAY: drag gold arrow — first row · another — second row · Esc — cancel
+editor.hint.contour_ready	CONTOUR: LMB — another chain · Enter — create · 2 — gizmo · Esc — cancel
+editor.hint.contour_begin	CONTOUR: hover an unselected support edge — guide only · LMB — preview copies · Enter — create · Esc — cancel
+editor.hint.transform	Drag visible handle — edit · Alt+arrow — copy · Points: Shift+click — pin, Ctrl+drag — snap · hold N — composite pivot · Shift+S — step
 editor.hint.empty	Tab — add part · MMB — camera
-editor.hint.select	LMB — select · G — transform · N — composite frame · H/Shift+H/Ctrl+H/Alt+H — visibility · Tab — add
+editor.hint.select	LMB — select · Ctrl/Shift+LMB — add/remove · drag empty space — box · Delete — remove · Esc — clear selection
+editor.hint.modes_selected	1 — select · 2 — gizmo · 3 — array · 4 — contour · Space/F3 — tools · Tab — catalog
+editor.hint.modes_empty	1 — select · Space/F3 — tools · Tab/Shift+A — catalog
+editor.hint.commands	Ctrl+Z/Y or Ctrl+Shift+Z — undo/redo · Ctrl+S — save (2+ parts)
+editor.hint.selection_actions	Ctrl/Shift+LMB — add/remove · empty drag — box · A — all · Ctrl+G — group · Ctrl+D — copy · Delete — remove · Esc — clear
+editor.hint.selection_empty	LMB — select · drag empty space — box · Ctrl+A — select all · Esc — exit
+editor.hint.visibility_selected	H — hide · Shift+H — isolate · Ctrl+H — all except selected · Alt+H — show all
+editor.hint.visibility_empty	Alt+H — show all hidden parts · Esc — exit
+editor.hint.camera_idle	MMB — orbit · Shift+MMB — pan · Ctrl+wheel — zoom · RMB+WASD/QE — fly · Shift — faster · F/Home — frame · F7 — see through
+editor.hint.section_modes	MODES
+editor.hint.section_tool	CURRENT TOOL
+editor.hint.section_selection	SELECTION / GROUPS
+editor.hint.section_history	HISTORY / SAVE
+editor.hint.section_visibility	VISIBILITY
+editor.hint.section_camera	CAMERA
+editor.view.field_of_view	Field of view · °
+editor.view.game_fov	As in game
+editor.view.blueprint_anchor	Blueprint anchor
+editor.view.group_anchor	Group anchor
+editor.view.see_through	See-through F7
 editor.anchor_controls	Shift + LMB pins the point · Ctrl + drag performs magnetic movement.
 editor.anchor_on_axis	The point lies on the rotation axis. Choose another point or axis.
 editor.anchor_drag_magnetic	Magnet: drag to a point on another part · Shift — free.
@@ -573,11 +592,11 @@ editor.view.to_group	TO GROUP: {0}
 editor.view.to_root	TO ROOT
 editor.view.toggle_lock	Lock or unlock selection
 editor.view.toggle_visibility	Show or hide selection
-editor.view.tool_array	Array (A)\nRepeat the selection in two directions
-editor.view.tool_contour	Contour (C)\nRepeat the selection along native snap-point chains
+editor.view.tool_array	3 · Array\nRepeat the selection in two directions
+editor.view.tool_contour	4 · Contour\nRepeat the selection along native snap-point chains
 editor.view.tool_parameters	TOOL PARAMETERS
-editor.view.tool_select	Select (Q)\nShift + LMB — add/remove\nCtrl+A — select all available
-editor.view.tool_transform	Transform (G/F9)\nArrows — move, rings — rotate\nAlt + drag arrow — duplicate\nSeparate square — uniform scale
+editor.view.tool_select	1 · Select\nShift+LMB — add/remove · A — all
+editor.view.tool_transform	2 · Gizmo\nChoose Move, Rotate, Points or Scale in Manipulator\nG/R/S — cursor previews · Alt+arrow — copy
 editor.view.transform_short	TRANSFORM
 editor.view.turn_deg	TURN · °
 editor.view.type	TYPE
@@ -592,6 +611,24 @@ editor.view.unpin	UNPIN
 editor.view.unsaved_changes	There are unsaved changes
 editor.view.unsaved_message	Save changes to “{0}” before exiting?
 editor.view.unsaved_title	UNSAVED CHANGES
-editor.view.viewport_help	F9/G transform  •  points — match  •  MMB orbit  •  Shift+MMB pan  •  wheel zoom
+editor.view.viewport_help	1–4 tools · G/R/S cursor preview · Space tools · MMB camera
 editor.view.viewport_settings	VIEW SETTINGS
 editor.view.visibility	VISIBILITY
+editor.view.hints	Hints
+editor.view.tools	Tools
+editor.view.camera_menu	Camera
+editor.view.display_menu	Display
+editor.view.manipulator_menu	Manipulator
+editor.view.family_move	Move
+editor.view.family_rotate	Rotate
+editor.view.family_scale	Scale
+editor.view.focus_view	Focus viewport / restore panels
+editor.hint.tools_menu	1–4 — choose tool · ↑/↓ — navigate · Enter — choose · Esc — close
+editor.hint.next_selected	<mark=#78634360>G</mark> Move · <mark=#78634360>R</mark> Rotate · <mark=#78634360>S</mark> Scale · <mark=#78634360>Space</mark> Tools
+editor.hint.next_empty	LMB — select a part · Tab — add · Space — tools
+editor.view.surface	Surface
+editor.view.surface_controls	Surface · Q/E source · wheel yaw · XYZ axis · P plane
+editor.hint.cursor_preview	X/Y/Z — axis · repeat axis — World/Local · Shift+axis — plane · P — Surface/Plane · Q/E — surface source · wheel — surface yaw · MMB — camera · Shift — no step
+editor.view.screen_plane	Screen plane
+editor.view.no_surface	No surface — point elsewhere or press P for Plane
+editor.hint.preview	{0} · {1} · {2} · <b>Enter/LMB</b> confirm · <b>Esc</b> restore

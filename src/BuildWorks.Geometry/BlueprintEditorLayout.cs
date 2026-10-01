@@ -88,7 +88,8 @@ namespace OstrixMods.BuildWorks.Geometry
 
         public static BlueprintEditorLayout Compute(
             double logicalWidth,
-            double logicalHeight)
+            double logicalHeight,
+            bool hintsExpanded = true)
         {
             if (!GeometryMath.IsFinite(logicalWidth) ||
                 !GeometryMath.IsFinite(logicalHeight) ||
@@ -96,7 +97,8 @@ namespace OstrixMods.BuildWorks.Geometry
                 throw new ArgumentOutOfRangeException(nameof(logicalWidth));
 
             var safe = new EditorRect(0.0, 0.0, logicalWidth, logicalHeight);
-            double bodyHeight = logicalHeight - TopHeight - StatusHeight;
+            double statusHeight = hintsExpanded ? StatusHeight : 72.0;
+            double bodyHeight = logicalHeight - TopHeight - statusHeight;
             double rightHeight = logicalHeight - TopHeight - RightColumnBottomInset;
             bool compact = logicalWidth < RailWidth + MinimumViewportWidth +
                 StandardRightWidth;
@@ -131,9 +133,9 @@ namespace OstrixMods.BuildWorks.Geometry
                 rightHeight - outlinerHeight);
             var status = new EditorRect(
                 0.0,
-                logicalHeight - StatusHeight,
+                logicalHeight - statusHeight,
                 RailWidth + viewportWidth,
-                StatusHeight);
+                statusHeight);
             return new BlueprintEditorLayout(
                 safe, top, rail, viewport, right, outliner, inspector, status, compact);
         }

@@ -15,7 +15,8 @@ Transform selection is provisionally accepted. The owner accepts contour cleanup
 the focused 0.19.41 game series is accepted by owner report on 2026-10-01.
 New requests concern collapsible hints, manipulator clutter, hidden attachment
 context and compact viewer settings. Keyboard/tool access is approved in principle;
-the complete manipulator redraw still needs visual approval.
+Ostrix approved the Scandinavian manipulator form study on 2026-10-01.
+Runtime rendering and interaction acceptance remain pending.
 All development deployments, upgrades and game tests use **only
 `TerrainRamp-1.0-Test`**. `Default/BuildWorks` is the source/artifact tree,
 not an installed mod. Do not modify other profiles, mods or saves as a side effect.
@@ -45,7 +46,7 @@ dependent changes wait for its gate, unrelated preparation may continue.
 | ID | Deliverable | Dependency | Status |
 | --- | --- | --- | --- |
 | BW-00 | Dedicated-profile baseline and reliable handoff | Current core | Focused 0.19.41 owner series accepted; cost/refund accounting and networking pending |
-| BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | G/R/S and keyboard tool access approved; full manipulator redraw awaiting visual approval |
+| BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | Keyboard direction and Scandinavian forms approved; Unity preview and remaining input decisions pending |
 | BW-02 | Group layout operations without resizing pieces | BW-01 | Planned; focused operation UI approval required |
 | BW-03 | Persistent Array and minimal recipe persistence | BW-02 | Planned; safe Store migration and editing/Bake gate |
 | BW-04 | Guides and curves in accepted slices | BW-03 + renewed owner discussion | Tool-semantics discussion required before coding |
@@ -101,7 +102,7 @@ modal digits belong to numeric entry, not tool switching. It proposes editor MMB
 navigation-only, cursor-following existing-part movement with exact cancellation/
 one Undo, prominent next-step guidance and original game-styled handles. Remaining
 mouse/input decisions, unconstrained Move/Rotate depth behavior, constraint/snap
-priority and a visual mockup require approval; G/R/S, 1–4 and Space/F3 access is approved in principle
+priority require approval; the Scandinavian form study is owner-approved, and G/R/S, 1–4 and Space/F3 access is approved in principle
 on 2026-10-01, not yet implemented. Redraw arrows/planes, rotation, uniform scale,
 snap glyphs and Array/Contour guides, with separate idle/hover/drag/occluded states.
 A static audit found fixed runtime tooltip dimensions

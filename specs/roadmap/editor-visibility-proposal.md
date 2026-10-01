@@ -14,7 +14,8 @@ G/R/S actions, restores direct persistent-tool switching, and adds one keyboard
 tool menu for future growth. It replaces the rejected Q/W/E/R/T and Space-start
 draft. Ostrix approved the G/R/S, 1–4 and Space/F3 direction on 2026-10-01 and
 explicitly requested a complete manipulator redraw, not just recoloring.
-Exact visual treatment and the remaining interaction gates below are still open.
+Ostrix approved the Scandinavian form study below on 2026-10-01.
+Runtime treatment and the remaining interaction gates are still open.
 
 ## Why the selected part disappears under controls
 
@@ -234,21 +235,31 @@ and verify any shared visual changes in both contexts before installing.
 
 Hover does not enlarge the hit area or change which handle wins. Hidden families
 cannot receive hits; retained pin marks are informative unless the active family
-allows manipulating them. Exact color/opacity/icon shapes need an owner-approved
-visual mockup before implementation. A generated concept is art direction only,
+allows manipulating them. Use the approved v3 silhouettes; runtime sizes, opacity
+and state treatments still need preview validation. A generated concept is art direction only,
 not evidence of Unity depth, picking, glow or performance. Prove those separately
 in the actual runtime Workbench on small/large pieces, overlapping points, wood,
 bright ground and dark grid, perspective/orthographic views and supported scales.
 No Blender/Houdini/other-mod assets are copied.
 
-![Original BuildWorks manipulator style concept](../../docs/images/manipulator-style-concept-v1.png)
+![Approved Scandinavian manipulator form study](../../docs/images/manipulator-scandinavian-form-study-v3.png)
 
-Visual approval board generated with the built-in image tool on 2026-10-01:
-six current control families and idle/hover/drag/occluded treatment, dark metal
-and bronze details, sparse points, visible timber. Illustrative geometry,
-materials and guide placements are not exact runtime output or altered snap data.
-It is not a manipulator texture sheet; implement approved shapes in the existing
-renderer and validate them in Unity. Visual approval is pending.
+Ostrix approved this original form study on 2026-10-01: leaf-shaped movement
+tips, open rotation bands with angular ends, paired source/target cradles and
+a distinct split uniform-scale mark. Scandinavian character belongs in the
+silhouette and joints, not merely recoloring generic arrows or adding ornaments.
+Small XYZ inlays and a restrained warm hover rim preserve direction and contrast.
+The earlier v1/v2 boards are superseded as the shape reference. Extend this
+approved vocabulary to movement planes and Array/Contour controls; their exact
+runtime forms still need a Unity preview, not an assumption of image approval.
+
+Generated with the built-in image tool; this is art direction, not a texture
+sheet or runtime proof. Next, implement a bounded visual-only preview in the
+existing renderer without changing snap math, document transforms or world
+gestures. Verify drawn/pickable shapes together, small-part visibility, hover,
+drag and occluded segments in the Workbench before a dedicated-profile game
+series. Input gates below remain separate; no code, version bump, deployment
+or binary release is implied by visual approval.
 
 ## Proposed see through context
 
@@ -318,9 +329,10 @@ screen corners, including long object names and effective custom bindings.
 ## Implementation and approval gates
 
 G/R/S actions, 1–4 persistent tools and one Space/F3 tool popup are approved in
-principle. Before implementation resolve unconstrained Move/Rotate and depth behavior, editor MMB navigation-only,
+principle. Before changing interaction resolve unconstrained Move/Rotate and depth behavior, editor MMB navigation-only,
 surface-following fallback, contextual Q/E/wheel, constraint priority,
-next-step strip and visual mockup before code/icons.
+and the next-step strip. These input gates do not block a bounded Unity preview
+of the approved v3 shapes with existing interaction unchanged.
 Implement in bounded steps: footer collapse/guidance; explicit manipulator families
 with matched hit tests; existing-part cursor preview with atomic confirmation;
 compact panels; then target context outline. Preview each visible

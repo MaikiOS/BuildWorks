@@ -610,8 +610,12 @@ public static class RuntimeEditorAcceptance
 
                 Set(controller, "gizmoFamily", GizmoFamily.Points);
                 Call(controller, "UpdateGizmo");
-                Require(scene.TryGetGizmoAnchors(new[] { id }, out Vector3[] anchors, out int nativeStart) && anchors.Length - nativeStart == 8,
-                    "Native snap points and mids were lost against bounds helpers");
+                Require(scene.TryGetGizmoAnchors(new[] { id }, out Vector3[] anchors, out int nativeStart) &&
+                    anchors.Length - nativeStart == 4 && nativeStart == AnchorAdjustment.SelectableAnchorCount + 4,
+                    "Four native points and four generated midpoints must retain distinct provenance");
+                foreach (Vector3 native in localAnchors)
+                    Require(Array.Exists(anchors, point => Vector3.Distance(point, original + native) < .0001f),
+                        "Native snap coordinate was lost by classification");
                 Vector3 pin = original + localAnchors[0], moving = original + localAnchors[1];
                 Require((bool)Call(controller, "TryBeginGizmoDrag", (Vector2)scene.Camera.WorldToScreenPoint(pin)),
                     "Native anchor cannot be selected through actual hit test");
@@ -673,9 +677,11 @@ public static class RuntimeEditorAcceptance
             using (var scene = new BlueprintEditorScene(template, _ => source))
             {
                 Require(scene.TrySync(doc, out string error), "Group snap sync: " + error);
-                Require(scene.TryGetGizmoAnchors(ids, out Vector3[] points, out int start) && points.Length - start == 12,
-                    "Three-part group must retain twelve exterior native/midpoints; scale=" + scale);
-                for (int index = start; index < points.Length; ++index)
+                Require(scene.TryGetGizmoAnchors(ids, out Vector3[] points, out int start) &&
+                    points.Length - start == 4 && start == AnchorAdjustment.SelectableAnchorCount + 8,
+                    "Three-part group must retain four exterior native and eight generated points; scale=" + scale +
+                    "; native=" + (points.Length - start) + "; helpers=" + (start - AnchorAdjustment.SelectableAnchorCount));
+                for (int index = AnchorAdjustment.SelectableAnchorCount; index < points.Length; ++index)
                     Require(Math.Abs(points[index].x - 0.5 * scale) > 0.0001 &&
                         Math.Abs(points[index].x - 1.5 * scale) > 0.0001,
                         "Shared internal group snap remains visible");
@@ -693,12 +699,29 @@ public static class RuntimeEditorAcceptance
                 scene.TrySync(doc, out _); scene.TryGetGizmoAnchors(ids, out points, out start);
                 Require(points[start] == repeated[start], "Scene sync did not invalidate preview group anchors");
                 doc.SetLocked("b", true); doc.SetVisibility("c", false); scene.TrySync(doc, out _);
-                Require(scene.TryGetGizmoAnchors(ids, out points, out start) && points.Length - start == 8,
+                Require(scene.TryGetGizmoAnchors(ids, out points, out start) && points.Length - start == 4 &&
+                    start == AnchorAdjustment.SelectableAnchorCount + 4,
                     "Hidden/locked members still contribute group native points");
                 Require(source.transform.childCount == 4, "Group native extraction mutated source hierarchy");
             }
         }
-        checks.Add("Three-part native/midpoint group anchors: twelve exterior points, no shared internals, stable ordering, hidden/locked excluded, 100%/1% scale, source immutable");
+        var crowded = new List<BlueprintEditorPart>();
+        var crowdedIds = new List<string>();
+        for (int index = 0; index < BlueprintEditorDocument.MaximumParts; ++index)
+        {
+            string id = "crowded" + index;
+            crowdedIds.Add(id);
+            crowded.Add(new BlueprintEditorPart(id, "fixture", id, new Point3(index * 3,0,0), new Rotation3(0,0,0,1)));
+        }
+        using (var scene = new BlueprintEditorScene(template, _ => source))
+        {
+            var doc = new BlueprintEditorDocument(null, "Native budget", "Test", crowded);
+            Require(scene.TrySync(doc, out string error), error);
+            Require(scene.TryGetGizmoAnchors(crowdedIds, out Vector3[] points, out int start) &&
+                points.Length == AnchorAdjustment.SelectableAnchorCount + 512 && points.Length - start == 512,
+                "Generated midpoint helpers must not exhaust the 512 exterior-point budget before native points");
+        }
+        checks.Add("Native/midpoint provenance: exterior shared joins excluded, stable cache, 100%/1% scale; 128-part budget reserves 512 native points before generated helpers");
     }
 
     private static void DragArray(BlueprintEditorController controller, GizmoAxis axis, int count, int sign)
@@ -734,7 +757,7 @@ public static class RuntimeEditorAcceptance
                 object visual = visuals[id];
                 Require(Field<bool>(visual, "Selected") && Field<bool>(visual, "ActiveSelection"), "Nested highlight omits " + id);
                 foreach (Renderer renderer in Field<Renderer[]>(visual, "Renderers"))
-                    Require(!renderer.HasPropertyBlock(), "Selected descendant is still painted: " + id);
+                    Require(renderer.HasPropertyBlock(), "Selected descendant is not highlighted: " + id);
             }
             Require(scene.TryGetSelectionBounds(doc, out Bounds selected), "Nested selection bounds missing");
             Require(scene.TryGetBounds(new[] { "a", "b" }, out Bounds all), "Nested parts bounds missing");
@@ -752,7 +775,7 @@ public static class RuntimeEditorAcceptance
             Require(Vector3.Distance(instances[0].transform.localScale,
                 Vector3.Scale(source.transform.lossyScale, new Vector3(1.2f,0.5f,2f))) < 0.001f, "World preview discarded per-part scale");
         }
-        checks.Add("Nested descendants have matching bounds and clean selected materials; selecting a leaf stays local");
+        checks.Add("Nested descendants have matching bounds and persistent selection tint; selecting a leaf stays local");
         checks.Add("World ghost preview consumes non-unit XYZ scale");
     }
 
@@ -778,7 +801,9 @@ public static class RuntimeEditorAcceptance
                 "Hover must use vanilla cyan material override");
             Require(material.color == original, "Hover mutated base material");
             doc.SelectOnly("sphere"); scene.TrySync(doc, out _);
-            Require(!renderer.HasPropertyBlock(), "Selected+hover still paints the source");
+            renderer.GetPropertyBlock(block);
+            Require(block.GetColor("_Color") == new Color(1f,.78f,.38f,1f) && material.color == original,
+                "Selected+hover must retain reversible gold selection, not cyan hover");
             doc.ClearSelection(); scene.TrySync(doc, out _);
             Require(renderer.HasPropertyBlock(), "Deselecting under pointer did not restore hover");
             scene.SetHovered(null, doc);
@@ -788,7 +813,7 @@ public static class RuntimeEditorAcceptance
                 Require(child.name != "GeometryOutline", "Selection outline renderer remains in visual");
         }
         Object.Destroy(sphere);
-        checks.Add("Hover uses reversible vanilla cyan; selected and selected+hover preserve original materials, no outlines");
+        checks.Add("Reversible cyan hover/gold selection on editor copies; material identity/colour restored on deselection, no outlines");
     }
 
     private static void TestOccluderFade(Camera template, string output)
@@ -904,7 +929,7 @@ public static class RuntimeEditorAcceptance
                 true, 1, false, Vector3.zero, false, GizmoAxis.None, false,
                 Vector3.zero, Vector3.zero, 0, allowExtended: true);
             Vector2 center = camera.WorldToScreenPoint(Vector3.zero);
-            float hitRadius = 12f;
+            float hitRadius = native ? 18f : 14f;
             Require(gizmo.HitTestAnchor(camera, anchors, center + new Vector2(hitRadius - 0.5f,0)) == 0,
                 "Visible anchor edge cannot be hit at distance " + distance);
             Require(gizmo.HitTestAnchor(camera, anchors, center + new Vector2(hitRadius + 0.5f,0)) < 0,
@@ -913,12 +938,12 @@ public static class RuntimeEditorAcceptance
             float radius = 0;
             for (int i = 0; i < anchor.positionCount; ++i)
                 radius = Mathf.Max(radius, Vector2.Distance(center, camera.WorldToScreenPoint(anchor.GetPosition(i))));
-            Require(Mathf.Abs(radius - (native ? 11f : 9f)) < 0.1f,
+            Require(Mathf.Abs(radius - (native ? 16.25f : 11.25f)) < 0.1f,
                 "Native/helper anchor glyph is not constant pixels");
             float widthPixels = Vector2.Distance(center,
                 camera.WorldToScreenPoint(camera.transform.right * anchor.startWidth));
             Require(widthPixels >= (native ? 2f : 1.5f) - 0.01f &&
-                Mathf.Abs(anchor.startColor.a - .24f) <= 1f / 255f,
+                Mathf.Abs(anchor.startColor.a - (native ? .72f : .42f)) <= 1f / 255f,
                 "Editor anchor lost its default thickness or visibility: native=" + native +
                 "; distance=" + distance + "; widthPixels=" + widthPixels +
                 "; alpha=" + anchor.startColor.a);
@@ -932,10 +957,13 @@ public static class RuntimeEditorAcceptance
             Require(artwork.ContainsKey(anchor) && artwork.ContainsKey(scaleHandle) &&
                 scaleHandle.transform.Find("Engraving").GetComponent<MeshRenderer>().sharedMaterial.mainTexture,
                 "Original source/target or filled scale artwork missing");
+            Require(anchor.enabled && (native ? anchor.GetPosition(0) == anchor.GetPosition(4)
+                : anchor.GetPosition(0) != anchor.GetPosition(4)), "Native diamond/helper open glyph distinction missing");
+            Require(artwork[anchor].colors[0].a == (native ? .72f : .42f), "Snap artwork ignored its provenance brightness");
             gizmo.EditorMouse = scale + Vector2.right * 40;
             ShowFeedback();
             float nearAlpha = artwork[scaleHandle].colors[0].a;
-            Require(nearAlpha > .24f && nearAlpha < 1f, "Scale proximity does not brighten smoothly");
+            Require(nearAlpha > .32f && nearAlpha < 1f, "Scale proximity does not brighten smoothly");
             gizmo.EditorMouse = scale;
             ShowFeedback();
             Require(artwork[scaleHandle].colors[0].a == 1f && anchor.startColor.a < 1f,
@@ -988,7 +1016,7 @@ public static class RuntimeEditorAcceptance
                 "F9 legacy 18px move-axis hit zone changed: depth=" + distance + "; inside=" + inside +
                 "; outside=" + outside + "; axis offset=" + (onAxis - center) + "; pixelRect=" + camera.pixelRect);
         }
-        checks.Add("Gizmo: original source/target/scale textures, filled scale hit silhouette, dim/proximity/exclusive hover; native11/helper9px, hit12; F9 sizing and axis18/anchor16 unchanged");
+        checks.Add("Gizmo: engraved closed native diamond/open helper, filled scale picking, proximity/exclusive hover; native16.25/helper11.25px, hit18/14; F9 sizing and axis18/anchor16 unchanged");
     }
 
     private static void EnsureInside(RectTransform parent, RectTransform child)

@@ -2,8 +2,8 @@
 
 **English** | [Русский](editor-input-revision_RU.md)
 
-Approved by Ostrix, 2026-10-01, following testing of 0.19.42. Implemented in .43;
-this revision supersedes .42 editor input, not world/F9 controls. Automated
+Approved by Ostrix, 2026-10-01; .44 feedback supersedes the .43 first-G gate.
+Selection highlights and shows handles immediately; world/F9 controls are unchanged. Automated
 evidence is recorded in HANDOFF; owner Valheim acceptance remains pending.
 
 ## Findings in .42 before this revision
@@ -27,8 +27,8 @@ evidence is recorded in HANDOFF; owner Valheim acceptance remains pending.
 
 | State | Input | Result |
 | --- | --- | --- |
-| Select with an editable selection | G | Open combined gizmo without moving anything |
-| Combined gizmo ready | G again | Start cursor Surface Move of existing selection |
+| Select with an editable selection | Select part | Highlight and show the combined gizmo immediately, no edit |
+| Select or combined gizmo ready | G | Start cursor Surface Move of existing selection |
 | Gizmo ready | X, Y or Z | Start axis Move without a second G |
 | Gizmo ready | R or S | Start Rotate or uniform Scale |
 | Pending Move or Rotate | X, Y or Z | Constrain; repeat toggles World/Local |
@@ -37,15 +37,15 @@ evidence is recorded in HANDOFF; owner Valheim acceptance remains pending.
 | Pending transform | Typed number | Replace mouse result using the original action snapshot |
 | Pending transform | Enter or viewport LMB | Validate and confirm exactly one edit |
 | Pending transform | Esc | Exact rollback; return to combined gizmo |
-| Gizmo ready | Esc | Return to Select, retain selection, hide handles |
+| Gizmo ready | Esc | Return to Select with its gizmo; Esc in Select clears selection |
 | Any viewport tool | Ctrl+1/2/3/4 | Select/Gizmo/Array/Contour; cancel pending preview first |
 | Ready Select or adding | MMB click on a placed part | Remove that one eligible part on release |
 | Viewport | MMB drag, Shift+MMB | Orbit, pan; never remove |
 
-Direct R/S in Select should not silently display handles before G: show a concise
-"G to edit" hint. Ctrl+2 is the explicit equivalent of opening Gizmo. Combined
+G/R/S/axis operations are available directly from Select; no first-G gate remains.
+Ctrl+2 selects the explicit Gizmo tool. Combined
 includes translation, planes, rotation, uniform scale and source/pin controls.
-Keep optional manual display filters; G opens the combined default. Array and
+Keep optional manual display filters; a transform action opens the combined default. Array and
 Contour keep their own parameters and geometry, not shared transform state.
 
 ## Numeric entry and operation ownership
@@ -111,7 +111,7 @@ Default handles are dim, smoothly brighten by screen-space distance to their
 actual shape, then strongly emphasize the winning hovered/dragged control.
 No glow over every control and no dependence on world distance. Axis identity
 remains readable. Replace scale's tiny open strokes with a filled, engraved badge
-about 28 logical pixels across, offset away from crowded rings. Its entire visible
+about 35 logical pixels across, offset away from crowded rings. Its entire visible
 silhouette is clickable with small padding; overlap resolution is deterministic.
 Check engraving at actual small size, not just a large concept image.
 
@@ -122,7 +122,7 @@ do not test a disconnected imitation of the proposed state machine.
 
 | Case | Gesture | Required result |
 | --- | --- | --- |
-| Visibility | Select in tree/viewport; G; Esc | No handles before G; all on G; no edit; Esc hides retaining selection |
+| Visibility | Select in tree/viewport; G; Esc | Gold selection and handles immediately; G previews; Esc cancels and retains selection |
 | Precision baseline | R X; mouse turn; type 30; Enter | Exactly 30 degrees from original; one Undo restores exact pose |
 | Move and scale | Axis Move; mouse; type -2,5; S then 1.5 | Original reference, culture/keypad parity, uniform bounded scale |
 | Input parser | Empty, minus, comma, backspace, overflow, NaN-like text | No accidental confirm, NaN, deletion or document mutation |

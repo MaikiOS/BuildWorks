@@ -9,17 +9,20 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Current source candidate: **0.19.43**, Store v9, Valheim 1.0.16.
+Current source candidate: **0.19.44**, Store v9, Valheim 1.0.16.
 0.19.39 owner feedback accepts menu hover, language refresh and camera framing;
 Transform selection is provisionally accepted. The owner accepts contour cleanup;
 the focused 0.19.41 game series is accepted by owner report on 2026-10-01.
 New requests concern collapsible hints, manipulator clutter, hidden attachment
 context and compact viewer settings. Keyboard/tool access is approved in principle;
 Ostrix approved the Scandinavian manipulator form study on 2026-10-01.
-The full editor implementation is authorized. Owner testing supersedes .42 input:
-.43 hides handles in Select, opens the combined gizmo with G, starts surface Move
-with another G, and supports R/S/axis operations with numbers relative to their
-original pose. Ctrl+1–4 selects tools; MMB click deletes in Select/adding while
+The full editor implementation is authorized. Owner feedback supersedes the .43
+first-G gate: .44 highlights selection and shows the combined gizmo immediately.
+G starts surface Move; R/S/axes retain exact operation-start numbers. Editor
+handles are 25% larger. Vanilla points are brighter closed gold diamonds;
+generated helpers, including midpoints, are smaller open coloured marks.
+Current game tests have one answer list; older scenarios are archived.
+Ctrl+1–4 selects tools; MMB click deletes in Select/adding while
 MMB drag orbits. Six original engraved SVG/texture assets, filled scale and
 screen-distance hover feedback extend the accepted Scandinavian forms.
 Collapsible hints, compact dropdowns and active hidden-target context remain.
@@ -104,18 +107,19 @@ dropdowns. A target-only outline could retain attachment context under F7;
 interior snap eligibility is a separate decision. These editor changes are implemented
 in .42 after owner approval; they await the focused game series, not another design vote.
 The [approved input revision](../specs/roadmap/editor-input-revision.md) replaces
-.42 direct-action/plain-digit/MMB-navigation-only controls with the G visibility
-gate, R/S actions, Ctrl+1–4 tools and MMB click deletion in Select/adding. One Space
+.42 direct-action/plain-digit/MMB-navigation-only controls. In .44 selection shows
+Combined immediately; G starts Surface Move, R/S start actions, Ctrl+1–4 selects
+tools and MMB click deletes in Select/adding. One Space
 popup with F3 search remains. Future tools must not renumber existing bindings;
 modal digits belong to numeric entry. Typed values replace mouse deltas from the
 original operation snapshot, with exact cancel/one Undo and next-step guidance.
-Repeated G follows real surfaces excluding the selection; a ray miss
+G follows real surfaces excluding the selection; a ray miss
 cannot confirm or silently use distant ground. P explicitly chooses the screen
 plane; R uses the camera-facing plane until constrained, S is uniform. XYZ chooses
 an axis, repeated XYZ switches World/Local, Shift+axis excludes that axis.
 Q/E and wheel retain source-point/yaw behavior in surface placement. Independent
-Move/Rotate/Points/Scale filters have matching visibility and hit tests; G opens
-Combined by default and Array retains its controls. Tooltips use actual glyph measurements and bounded
+Move/Rotate/Points/Scale filters have matching visibility and hit tests; selection
+shows Combined by default and Array retains its controls. Tooltips use actual glyph measurements and bounded
 wrapping; EN/RU fit and supported scales remain part of owner UI acceptance.
 Community translation overrides
 need a documented file format and fallback/reload tests before shipping.

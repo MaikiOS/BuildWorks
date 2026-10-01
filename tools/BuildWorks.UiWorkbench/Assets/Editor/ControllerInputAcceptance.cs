@@ -168,7 +168,7 @@ internal static class ControllerInputAcceptance
             Require(doc.Selection.Count == 2 && doc.IsPartSelected("left") && doc.IsPartSelected("right") &&
                 !doc.IsPartSelected("locked") && !doc.IsPartSelected("hidden"), "Ctrl+A includes hidden/locked or misses editable parts");
             Frame(controller, input, left); yield return null;
-            Require(!Field<GameObject>(Field<TransformGizmoView>(scene, "gizmo"), "root").activeSelf, "Select-all reveals handles before G");
+            Require(Field<GameObject>(Field<TransformGizmoView>(scene, "gizmo"), "root").activeSelf, "Select-all must immediately show handles");
 
             // Actual outliner row callbacks use the same Shift/Ctrl source as controller Update.
             Frame(controller, input, Vector2.zero); NativeClick(view, uiCamera, "Row_left"); yield return null;
@@ -178,8 +178,8 @@ internal static class ControllerInputAcceptance
             foreach (string id in new[] { "left", "right" }) Require(IsPainted(scene, id), "Shift-held selection is not blue: " + id);
             Save(scene, view, uiCamera, target, Path.Combine(output, "input-shift-selection.png"));
             Frame(controller, input, right); yield return null;
-            foreach (string id in new[] { "left", "right" }) Require(!IsPainted(scene, id), "Shift release retained selection paint: " + id);
-            Require(!Field<GameObject>(Field<TransformGizmoView>(scene, "gizmo"), "root").activeSelf, "Select reveals handles before G");
+            foreach (string id in new[] { "left", "right" }) Require(IsPainted(scene, id), "Shift release lost persistent selection tint: " + id);
+            Require(Field<GameObject>(Field<TransformGizmoView>(scene, "gizmo"), "root").activeSelf, "Select must immediately show handles");
 
             Frame(controller, input, Vector2.zero); NativeClick(view, uiCamera, "Row_left"); yield return null;
             NativeClick(view, uiCamera, Field<Dictionary<BlueprintEditorTool, Button>>(view, "toolButtons")[BlueprintEditorTool.Select]);
@@ -854,15 +854,19 @@ internal static class ControllerInputAcceptance
         Vector2 mouse = scene.Camera.WorldToScreenPoint(original) + Vector3.right * 100;
         int history = Field<IList>(doc, "undo").Count;
         var gizmo = Field<TransformGizmoView>(scene, "gizmo");
-        Frame(controller, input, mouse, 0, KeyCode.R); yield return null;
-        Require(!Field<bool>(controller, "keyboardPreview") && !Field<GameObject>(gizmo, "root").activeSelf,
-            "R bypasses the explicit G gate");
-        Frame(controller, input, mouse, 0, KeyCode.G); yield return null;
-        Require(!Field<bool>(controller, "keyboardPreview") && Field<GameObject>(gizmo, "root").activeSelf &&
+        Frame(controller, input, mouse); yield return null;
+        Require(Field<GameObject>(gizmo, "root").activeSelf && IsPainted(scene, "left") &&
             Field<GizmoFamily>(controller, "gizmoFamily") == GizmoFamily.Combined && Field<IList>(doc, "undo").Count == history,
-            "First G must show all handles without editing");
+            "Selection must show all handles and highlight immediately without editing");
+        Frame(controller, input, mouse, 0, KeyCode.R); yield return null;
+        Require(Field<bool>(controller, "keyboardPreview"), "R must be available directly from selection");
         Frame(controller, input, mouse, 0, KeyCode.Escape); yield return null;
-        Require(doc.IsPartSelected("left") && !Field<GameObject>(gizmo, "root").activeSelf, "Esc did not hide handles and retain selection");
+        Frame(controller, input, mouse, 0, KeyCode.G); yield return null;
+        Require(Field<bool>(controller, "keyboardPreview") && Field<GameObject>(gizmo, "root").activeSelf &&
+            Field<GizmoFamily>(controller, "gizmoFamily") == GizmoFamily.Combined && Field<IList>(doc, "undo").Count == history,
+            "G must start surface preview without a document edit");
+        Frame(controller, input, mouse, 0, KeyCode.Escape); yield return null;
+        Require(doc.IsPartSelected("left") && Field<GameObject>(gizmo, "root").activeSelf, "Esc lost selection or its handles after preview cancellation");
         Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Alpha2); yield return null;
         Frame(controller, input, mouse, 0, KeyCode.R); yield return null;
         Frame(controller, input, mouse, 0, KeyCode.X); yield return null;
@@ -979,7 +983,7 @@ internal static class ControllerInputAcceptance
             Math.Abs(doc.Parts[0].Scale.X - 1) < .00001f, "Focus loss leaked numeric preview");
         Frame(controller, input, mouse); yield return null;
         File.WriteAllText(Path.Combine(output, "input-revision-check.txt"),
-            "PASS actual Update/LateUpdate: explicit Combined G gate; R/X mouse then 30; signed Move/comma/keypad; S1.5; invalid input; edit/clear; axis repeat; one Undo/Redo; camera baseline; Ctrl1-4/action replacement; MMB click/drag/modifier; focus cleanup.");
+            "PASS actual Update/LateUpdate: immediate Combined selection gizmo/gold highlight; G surface preview; R/X mouse then 30; signed Move/comma/keypad; S1.5; invalid input; edit/clear; axis repeat; one Undo/Redo; camera baseline; Ctrl1-4/action replacement; MMB click/drag/modifier; focus cleanup.");
     }
 
     private static IEnumerable TestTransformContract(BlueprintEditorController controller, InputFrames input,

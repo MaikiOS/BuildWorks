@@ -812,12 +812,12 @@ namespace OstrixMods.BuildWorks
                 SetActiveTool(BlueprintEditorTool.Transform);
             else if (input.GetKeyDown(KeyCode.G))
             {
-                if (activeTool == BlueprintEditorTool.Transform) BeginKeyboardPreview(GizmoHandleKind.Move);
+                if (SelectionGizmoTool == BlueprintEditorTool.Transform) BeginKeyboardPreview(GizmoHandleKind.Move);
                 else SetActiveTool(BlueprintEditorTool.Transform);
             }
             else if (input.GetKeyDown(KeyCode.R) || input.GetKeyDown(KeyCode.S))
             {
-                if (activeTool == BlueprintEditorTool.Transform)
+                if (SelectionGizmoTool == BlueprintEditorTool.Transform)
                     BeginKeyboardPreview(input.GetKeyDown(KeyCode.R) ? GizmoHandleKind.Rotate : GizmoHandleKind.Scale);
                 else view.SetStatus(BuildWorksLocalization.Text("editor.hint.open_gizmo"));
             }
@@ -827,9 +827,9 @@ namespace OstrixMods.BuildWorks
             else if (input.GetKeyDown(KeyCode.X) || input.GetKeyDown(KeyCode.Y) || input.GetKeyDown(KeyCode.Z))
             {
                 GizmoAxis axis = input.GetKeyDown(KeyCode.X) ? GizmoAxis.X : input.GetKeyDown(KeyCode.Y) ? GizmoAxis.Y : GizmoAxis.Z;
-                if (activeTool == BlueprintEditorTool.Transform && gizmoFamily != GizmoFamily.Points)
+                if (SelectionGizmoTool == BlueprintEditorTool.Transform && gizmoFamily != GizmoFamily.Points)
                 { BeginKeyboardPreview(GizmoHandleKind.Move); if (keyboardPreview) SetKeyboardAxis(axis); }
-                else if (activeTool == BlueprintEditorTool.Transform) SetAnchorConstraint(axis);
+                else if (SelectionGizmoTool == BlueprintEditorTool.Transform) SetAnchorConstraint(axis);
             }
             else if (input.GetKeyDown(KeyCode.Escape))
             {
@@ -897,7 +897,7 @@ namespace OstrixMods.BuildWorks
             {
                 hints = BuildWorksLocalization.Text("editor.hint.select");
                 if (document.EditablePartSelectionCount > 0)
-                    hints = BuildWorksLocalization.Text("editor.hint.open_gizmo");
+                    hints = BuildWorksLocalization.Text("editor.hint.transform");
             }
             view.SetNextAction(keyboardPreview
                 ? BuildWorksLocalization.Text("editor.hint.preview", BuildWorksLocalization.Text(
@@ -1391,7 +1391,10 @@ namespace OstrixMods.BuildWorks
 
         private bool TryBeginGizmoDrag(Vector2 mouse)
         {
-            if (activeTool == BlueprintEditorTool.Select) return false;
+            // Additive object selection wins over handles on a different object.
+            if (activeTool == BlueprintEditorTool.Select &&
+                (ShiftHeld || input.GetKey(KeyCode.LeftControl) || input.GetKey(KeyCode.RightControl)) &&
+                scene.TryPick(mouse, out string pointedId) && !document.IsPartSelected(pointedId)) return false;
             if (!TrySelectionPivot(
                     out Vector3 pivot, out Quaternion orientation, dragIds)) return false;
             UpdateGizmo();
@@ -2016,7 +2019,8 @@ namespace OstrixMods.BuildWorks
 
         private bool ShiftHeld => input.GetKey(KeyCode.LeftShift) || input.GetKey(KeyCode.RightShift);
         private bool IgnorePrimaryFrame => input.GetKey(KeyCode.N);
-        private BlueprintEditorTool SelectionGizmoTool => activeTool;
+        private BlueprintEditorTool SelectionGizmoTool => activeTool == BlueprintEditorTool.Select
+            ? BlueprintEditorTool.Transform : activeTool;
 
         private void SetSelectionTool() => SetActiveTool(activeTool != BlueprintEditorTool.Select &&
             document.EditablePartSelectionCount > 0 ? BlueprintEditorTool.Transform : BlueprintEditorTool.Select);

@@ -595,7 +595,7 @@ editor.view.toggle_visibility	Show or hide selection
 editor.view.tool_array	Ctrl+3 · Array\nRepeat the selection in two directions
 editor.view.tool_contour	Ctrl+4 · Contour\nRepeat the selection along native snap-point chains
 editor.view.tool_parameters	TOOL PARAMETERS
-editor.view.tool_select	Ctrl+1 · Select\nG — show all handles · MMB click/Delete — remove
+editor.view.tool_select	Ctrl+1 · Select\nSelection shows handles · G — surface move · MMB click/Delete — remove
 editor.view.tool_transform	G / Ctrl+2 · Gizmo\nG — surface move · X/Y/Z — axis move · R — rotate · S — uniform scale\nType a number — exact delta from the action start
 editor.view.transform_short	TRANSFORM
 editor.view.turn_deg	TURN · °
@@ -624,7 +624,7 @@ editor.view.family_rotate	Rotate
 editor.view.family_scale	Scale
 editor.view.focus_view	Focus viewport / restore panels
 editor.hint.tools_menu	1–4 — choose tool · ↑/↓ — navigate · Enter — choose · Esc — close
-editor.hint.next_selected	<mark=#78634360>G</mark> Show all handles · <mark=#78634360>MMB click</mark> Remove · <mark=#78634360>Space</mark> Tools
+editor.hint.next_selected	<mark=#78634360>G</mark> Surface move · <mark=#78634360>R</mark> Rotate · <mark=#78634360>S</mark> Scale · MMB click — remove · Gold diamonds — vanilla · Open marks — geometry
 editor.hint.next_empty	LMB — select a part · Tab — add · Space — tools
 editor.view.surface	Surface
 editor.view.surface_controls	Surface · Q/E source · wheel yaw · XYZ axis · P plane
@@ -632,7 +632,7 @@ editor.hint.cursor_preview	Type number — from start · X/Y/Z — axis · repea
 editor.view.screen_plane	Screen plane
 editor.view.no_surface	No surface — point elsewhere or press P for Plane
 editor.hint.preview	{0} · {1} · {2} · <b>Enter/LMB</b> confirm · <b>Esc</b> restore
-editor.hint.open_gizmo	G — show all handles first · MMB click/Delete — remove
-editor.hint.gizmo_ready	<mark=#78634360>G</mark> Surface move · <mark=#78634360>X/Y/Z</mark> Axis move · <mark=#78634360>R</mark> Rotate · <mark=#78634360>S</mark> Scale · <b>Esc</b> Hide handles
+editor.hint.open_gizmo	Select a part first · MMB click/Delete — remove
+editor.hint.gizmo_ready	<mark=#78634360>G</mark> Surface move · <mark=#78634360>X/Y/Z</mark> Axis move · <mark=#78634360>R</mark> Rotate · <mark=#78634360>S</mark> Scale · Gold diamonds — vanilla · Open marks — geometry
 editor.hint.numeric_value	<b>Value: {0}</b> · {1}
 editor.hint.numeric_invalid	Incomplete/out of range; Move requires one axis · Backspace — edit · Delete — clear

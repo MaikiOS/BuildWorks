@@ -222,6 +222,7 @@ namespace OstrixMods.BuildWorks
         private float groundHeight;
         private bool disposed;
         private readonly MaterialPropertyBlock hoverProperties = new MaterialPropertyBlock();
+        private readonly MaterialPropertyBlock selectionProperties = new MaterialPropertyBlock();
         private string[] cachedAnchorIds;
         private Vector3[] cachedGizmoAnchors;
         private int cachedNativeAnchorStart;
@@ -234,11 +235,15 @@ namespace OstrixMods.BuildWorks
             resolveVisualSource = visualSourceResolver ??
                 throw new ArgumentNullException(nameof(visualSourceResolver));
             // WearNTear.Highlight uses this tint and emission through MaterialMan.
-            // Apply it only to our visual copies; selection retains the original material.
+            // Apply overrides only to editor copies, never to prefab materials.
             Color hoverColor = new Color(0.6f, 0.8f, 1f, 1f);
             hoverProperties.SetColor("_Color", hoverColor);
             hoverProperties.SetColor("_BaseColor", hoverColor);
             hoverProperties.SetColor("_EmissionColor", hoverColor * 0.4f);
+            Color selectionColor = new Color(1f, 0.78f, 0.38f, 1f);
+            selectionProperties.SetColor("_Color", selectionColor);
+            selectionProperties.SetColor("_BaseColor", selectionColor);
+            selectionProperties.SetColor("_EmissionColor", selectionColor * 0.4f);
             editorLayer = FindUnusedEditorLayer();
             root = new GameObject("BuildWorks_BlueprintEditorScene")
             {
@@ -1286,7 +1291,7 @@ namespace OstrixMods.BuildWorks
                         if (distance <= PlacementSnapPreviewRadius * PlacementSnapPreviewRadius)
                             AddPlacementSnapPreviewTarget(
                                 targetWorld,
-                                targetIndex < visual.SnapLocal.Count);
+                                targetIndex < visual.NativeSnapCount);
                         if (distance >= best) continue;
                         best = distance;
                         offset = targetWorld - sourceWorld;
@@ -1415,24 +1420,41 @@ namespace OstrixMods.BuildWorks
             AddBoundsAnchors(bounds, result);
             nativeAnchorStart = result.Count;
             var snapSets = new List<IReadOnlyList<Point3>>();
+            var nativePoints = new List<Vector3>();
             foreach (string stableId in stableIds)
             {
                 if (!visuals.TryGetValue(stableId, out VisualNode visual) ||
                     visual.Locked || !visual.Root.activeInHierarchy) continue;
                 var points = new Point3[visual.SnapLocal.Count];
                 for (int index = 0; index < points.Length; ++index)
+                {
                     points[index] = ToGeometry(visual.Root.transform.TransformPoint(
                         visual.SnapLocal[index]));
+                    if (index < visual.NativeSnapCount) nativePoints.Add(ToUnity(points[index]));
+                }
                 snapSets.Add(points);
             }
-            // Use the same exterior points as whole-blueprint placement. Keep their
-            // native indices even where they coincide with ordinary bounds anchors.
-            foreach (Point3 point in AnchorAdjustment.ExternalCompositeSnapPoints(
-                snapSets, tolerance: 0.0001))
+            // Use the same exterior points as whole-blueprint placement.
+            IReadOnlyList<Point3> exterior = AnchorAdjustment.ExternalCompositeSnapPoints(
+                snapSets, tolerance: 0.0001);
+            // Midpoints are generated helpers, not vanilla points. Keep the shared
+            // index boundary honest without changing snap coordinates or persistence.
+            var nativeExterior = new List<Vector3>();
+            foreach (Point3 point in exterior)
             {
-                if (result.Count - nativeAnchorStart >= MaximumNativeAnchors) break;
-                result.Add(ToUnity(point));
+                Vector3 worldPoint = ToUnity(point);
+                // ponytail: cached tolerance scan for at most 128 parts; spatial hash if profiling warrants it.
+                if (nativePoints.Exists(native => (native - worldPoint).sqrMagnitude < 0.00000001f))
+                {
+                    if (nativeExterior.Count < MaximumNativeAnchors) nativeExterior.Add(worldPoint);
+                }
+                else if (result.Count - AnchorAdjustment.SelectableAnchorCount < MaximumNativeAnchors)
+                    result.Add(worldPoint);
             }
+            int maximumHelpers = AnchorAdjustment.SelectableAnchorCount + MaximumNativeAnchors - nativeExterior.Count;
+            if (result.Count > maximumHelpers) result.RemoveRange(maximumHelpers, result.Count - maximumHelpers);
+            nativeAnchorStart = result.Count;
+            result.AddRange(nativeExterior);
             cachedAnchorIds = new string[stableIds.Count];
             for (int index = 0; index < stableIds.Count; ++index)
                 cachedAnchorIds[index] = stableIds[index];
@@ -1487,12 +1509,12 @@ namespace OstrixMods.BuildWorks
             {
                 VisualNode visual = entry.Value;
                 if (excluded.Contains(entry.Key) || !visual.Root.activeInHierarchy) continue;
-                foreach (Vector3 localPoint in visual.SnapLocal)
+                for (int index = 0; index < visual.SnapLocal.Count; ++index)
                     AddSnapCandidate(
                         candidates,
                         mousePosition,
-                        visual.Root.transform.TransformPoint(localPoint),
-                        native: true, visual: visual);
+                        visual.Root.transform.TransformPoint(visual.SnapLocal[index]),
+                        native: index < visual.NativeSnapCount, visual: visual);
                 if (!includeMeshTargets || !TryBounds(visual, out Bounds bounds)) continue;
                 var boundsAnchors = new List<Vector3>(AnchorAdjustment.SelectableAnchorCount);
                 AddBoundsAnchors(bounds, boundsAnchors);
@@ -2049,7 +2071,7 @@ namespace OstrixMods.BuildWorks
         private void ApplyAppearance(VisualNode visual)
         {
             bool selected = visual.Selected || visual.ActiveSelection;
-            MaterialPropertyBlock properties = visual.SeeThrough ? null : selected ? temporarySelectionHighlight ? hoverProperties : null
+            MaterialPropertyBlock properties = visual.SeeThrough ? null : selected ? temporarySelectionHighlight ? hoverProperties : selectionProperties
                 : visual.Hovered ? hoverProperties : null;
             foreach (Renderer renderer in visual.Renderers)
                 if (renderer) renderer.SetPropertyBlock(properties);

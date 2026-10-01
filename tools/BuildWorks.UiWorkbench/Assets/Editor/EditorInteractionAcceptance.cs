@@ -112,7 +112,7 @@ public static class EditorInteractionAcceptance
                 scene.SetTemporarySelectionHighlight(false, doc);
                 foreach (string id in ids)
                     foreach (Renderer renderer in Field<Renderer[]>(visuals[id], "Renderers"))
-                        Require(!renderer.HasPropertyBlock(), "Shift release retained selection tint: " + id);
+                        Require(renderer.HasPropertyBlock(), "Shift release lost persistent selection tint: " + id);
                 Require(ReferenceEquals(cache, Field<object>(scene, "cachedGizmoAnchors")),
                     "Camera/settings/Shift invalidated geometry-only anchor cache");
                 anchors[0] = Vector3.one * 999f;
@@ -254,7 +254,9 @@ public static class EditorInteractionAcceptance
             !Field<Transform>(scene, "majorGrid").gameObject.activeSelf, "Grid toggle leaves a grid visible");
         squareCenter = (square.GetPosition(0) + square.GetPosition(2)) * 0.5f;
         pixel = scene.Camera.WorldToScreenPoint(squareCenter);
-        Require(scene.HitTestScale(pixel + new Vector2(10,10)) && !scene.HitTestScale(pixel + Vector2.left * 45f),
+        float halfWidth = Vector2.Distance(scene.Camera.WorldToScreenPoint(square.GetPosition(0)),
+            scene.Camera.WorldToScreenPoint(square.GetPosition(1))) * .5f;
+        Require(scene.HitTestScale(pixel + new Vector2(10,10)) && !scene.HitTestScale(pixel + Vector2.left * (halfWidth + 4f)),
             "Scaled badge silhouette and hit bounds disagree");
         scene.SetViewportSettings(1,1,1,1,1,true);
         Show(scene, pivot, anchors, nativeStart);

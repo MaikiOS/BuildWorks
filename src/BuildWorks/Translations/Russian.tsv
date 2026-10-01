@@ -595,7 +595,7 @@ editor.view.toggle_visibility	Показать или скрыть выбран�
 editor.view.tool_array	Ctrl+3 · Массив\nПовторить выбор в двух направлениях
 editor.view.tool_contour	Ctrl+4 · Контур\nПовторить выбор по цепи точек привязки
 editor.view.tool_parameters	ПАРАМЕТРЫ ИНСТРУМЕНТА
-editor.view.tool_select	Ctrl+1 · Выбор\nG — показать все ручки · клик СКМ/Delete — удалить
+editor.view.tool_select	Ctrl+1 · Выбор\nРучки сразу при выборе · G — перенос по поверхности · клик СКМ/Delete — удалить
 editor.view.tool_transform	G / Ctrl+2 · Гизма\nG — перенос по поверхности · X/Y/Z — перенос по оси · R — вращать · S — равномерный масштаб\nВвод числа — точное изменение от начала действия
 editor.view.transform_short	ТРАНСФ.
 editor.view.turn_deg	ПОВОРОТ · °
@@ -624,7 +624,7 @@ editor.view.family_rotate	Вращение
 editor.view.family_scale	Масштаб
 editor.view.focus_view	Весь вид / вернуть панели
 editor.hint.tools_menu	1–4 — инструмент · ↑/↓ — выбор · Enter — включить · Esc — закрыть
-editor.hint.next_selected	<mark=#78634360>G</mark> Показать все ручки · <mark=#78634360>клик СКМ</mark> Удалить · <mark=#78634360>Space</mark> Инструменты
+editor.hint.next_selected	<mark=#78634360>G</mark> По поверхности · <mark=#78634360>R</mark> Вращать · <mark=#78634360>S</mark> Масштаб · Клик СКМ — удалить · Золотые ромбы — ваниль · Открытые знаки — геометрия
 editor.hint.next_empty	ЛКМ — выбрать деталь · Tab — добавить · Space — инструменты
 editor.view.surface	Поверхность
 editor.view.surface_controls	Поверхность · Q/E точка · колесо поворот · XYZ ось · P плоскость
@@ -632,7 +632,7 @@ editor.hint.cursor_preview	Ввод числа — от начала · X/Y/Z �
 editor.view.screen_plane	Плоскость экрана
 editor.view.no_surface	Нет поверхности — наведи иначе или нажми P для Плоскости
 editor.hint.preview	{0} · {1} · {2} · <b>Enter/ЛКМ</b> применить · <b>Esc</b> восстановить
-editor.hint.open_gizmo	G — сначала показать все ручки · клик СКМ/Delete — удалить
-editor.hint.gizmo_ready	<mark=#78634360>G</mark> По поверхности · <mark=#78634360>X/Y/Z</mark> По оси · <mark=#78634360>R</mark> Вращать · <mark=#78634360>S</mark> Масштаб · <b>Esc</b> Скрыть ручки
+editor.hint.open_gizmo	Сначала выбери деталь · клик СКМ/Delete — удалить
+editor.hint.gizmo_ready	<mark=#78634360>G</mark> По поверхности · <mark=#78634360>X/Y/Z</mark> По оси · <mark=#78634360>R</mark> Вращать · <mark=#78634360>S</mark> Масштаб · Золотые ромбы — ваниль · Открытые знаки — геометрия
 editor.hint.numeric_value	<b>Значение: {0}</b> · {1}
 editor.hint.numeric_invalid	Неполное/вне диапазона; для переноса выбери одну ось · Backspace — правка · Delete — очистить

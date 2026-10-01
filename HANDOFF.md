@@ -2,7 +2,41 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
-## Verified candidate 0.19.43 — 2026-10-01
+## Verified candidate 0.19.44 — 2026-10-01
+
+Active gate: BW-01 owner Valheim acceptance in TerrainRamp-1.0-Test.
+Selection now keeps a clear gold tint and immediately shows Combined handles,
+without a first-G gate. G starts Surface Move; R/S/XYZ remain exact actions from
+the original operation pose. Select keeps MMB click deletion and drag navigation;
+additive selection takes priority over handles on an unselected part.
+
+Editor gizmo is 25% larger. Native snap points are larger, brighter closed gold
+diamonds with existing engraving; generated bounds/midpoints are smaller open
+colored markers. Classification uses captured prefab provenance, not the name
+or position of a point. The 128-part budget reserves all 512 native exterior
+points before generated helpers. World/F9 sizing and document/store format are
+unchanged. The purple pinned point stays visible above its engraving.
+
+Release build: zero warnings/errors. Geometry, Store, EditorBridge, WorldLayout,
+Localization (637 keys and built resources), HostContract and forbidden-profile
+deployment checks pass. Format verification exits 0 with a workspace-loading
+warning. Unity 6000.0.61f1: 81 captures; actual installed asset rendering,
+Controller.Update/LateUpdate and EventSystem checks pass, completed
+2026-10-01T16:57:24.9419102Z. Independent correctness review PASS; complexity
+review found no actionable cuts. Workbench substitutes physical input:
+game-host/save/reload/resource/network acceptance is not claimed.
+
+Installed only in TerrainRamp-1.0-Test with Valheim closed through the guarded
+script. Installed hashes match the checked build:
+- BuildWorks: 9EAC47B84796A25C345FEA3D31737209B0B8E4E4B0B5F9832825D493578729AE
+- Geometry: 3EF58DB30AE547E99293DD2B90E97BF8FEE005534C055D23656714FA09D9EA16
+
+Previous .43 pair: artifacts/checkpoint-0.19.44/preinstall.
+Next: only steps 1–12 in [the current owner test series](specs/roadmap/current-pass.md).
+Older test lists are frozen separately in testing-history.md; they are not an
+additional answer series. No game launch or automatic binary release.
+
+## Historical candidate 0.19.43 — 2026-10-01
 
 Active gate: BW-01 owner Valheim acceptance. .43 supersedes .42 editor input,
 not world/F9 controls. Select hides handles; G opens Combined, repeated G starts

@@ -2,6 +2,43 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Verified candidate 0.19.43 — 2026-10-01
+
+Active gate: BW-01 owner Valheim acceptance. .43 supersedes .42 editor input,
+not world/F9 controls. Select hides handles; G opens Combined, repeated G starts
+Surface Move. R/S/XYZ edit with numbers relative to the original operation pose.
+Ctrl+1–4 selects tools and cancels pending previews. MMB click removes a placed
+part in Select/adding; drag, modifiers, other buttons or UI takeover never remove.
+The adding ghost remains. Esc rolls back; ready-gizmo Esc hides retaining selection.
+
+Six original editable Nordic SVGs and transparent exported textures add engraving,
+metal gradients and rivets. Idle controls dim; screen proximity brightens; winning
+hover/active control is emphasized. Filled scale has whole-silhouette picking.
+Pinned point retains its purple meaning. Existing icon export/loader is reused.
+
+Release zero warnings/errors; Geometry, Store, EditorBridge, WorldLayout,
+Localization (637 matching keys/built resources), HostContract and forbidden-profile
+deployment checks pass. Format verification exits 0 with workspace-loading warnings.
+Unity 6000.0.61f1: 81 fresh UI captures, real installed asset rendering and actual
+Controller.Update/LateUpdate plus EventSystem checks pass, completed
+2026-10-01T15:54:50.0544740Z. Independent read-only review and final MMB follow-up
+PASS; ponytail review finds no worthwhile new abstraction to remove.
+Workbench uses substituted physical input; this is not Valheim OS-key interception,
+save/reload, resource accounting or multiplayer proof.
+
+Installed only in TerrainRamp-1.0-Test with Valheim closed through the guarded
+deployment script. Installed hashes match the build:
+- BuildWorks: C85E2247EA8167BA636A2154387496B4C92AB4B6C2DC028B4E2FA849DA6DE167
+- Geometry: 3EF58DB30AE547E99293DD2B90E97BF8FEE005534C055D23656714FA09D9EA16
+
+Previous .42 pair: artifacts/checkpoint-0.19.43/preinstall.
+Next: six focused owner steps in specs/roadmap/current-pass.md (Russian duplicate).
+Source-only synchronization targets MaikiOS/BuildWorks main; no binary release,
+Valheim launch, save/other-profile/other-mod mutation is part of this checkpoint.
+
+
+## Historical handoff before .43
+
 Updated 2026-10-01. Active work: **BW-01 owner game acceptance**; BW-00 accounting/network
 gates remain open. Source candidate 0.19.42, Store v9,
 Valheim 1.0.16. Current authorized development/test profile: TerrainRamp-1.0-Test

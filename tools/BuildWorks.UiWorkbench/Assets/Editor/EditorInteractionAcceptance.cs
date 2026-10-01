@@ -76,6 +76,8 @@ public static class EditorInteractionAcceptance
                 Vector2 nativePixel = scene.Camera.WorldToScreenPoint(anchors[nativeIndex]);
                 evidence.Add("Native sample=" + nativeIndex + "; pixel=" + nativePixel +
                     "; pixelRect=" + scene.Camera.pixelRect);
+                gizmo.EditorMouse = nativePixel;
+                Show(scene, pivot, anchors, nativeStart);
                 Color32[] gold = Render(scene.Camera, Path.Combine(outputDirectory, "actual-native-gold.png"));
                 int goldPixels = ChangedPixels(clean, gold, nativePixel, pixel =>
                     pixel.r > 150 && pixel.g > 85 && pixel.b < 190 && pixel.r > pixel.g + 15);
@@ -83,6 +85,7 @@ public static class EditorInteractionAcceptance
                 var pinned = new Vector3[anchors.Length + 1];
                 Array.Copy(anchors, pinned, anchors.Length);
                 pinned[pinned.Length - 1] = anchors[nativeIndex];
+                gizmo.EditorMouse = new Vector2(-1000,-1000);
                 Show(scene, pivot, pinned, nativeStart, pinned.Length - 1);
                 Require(!handles[nativeIndex].gameObject.activeSelf && handles[pinned.Length - 1].gameObject.activeInHierarchy,
                     "Coincident native glyph overrides appended pin");
@@ -232,13 +235,13 @@ public static class EditorInteractionAcceptance
         float arrayLength = Vector3.Distance(array.GetPosition(1), array.GetPosition(0));
         float squareWidth = Vector3.Distance(square.GetPosition(0), square.GetPosition(1));
         float pointRadius = Vector3.Distance(point.GetPosition(0), anchors[nativeStart]);
-        Vector3 squareCenter = (square.GetPosition(0) + square.GetPosition(1)) * 0.5f;
+        Vector3 squareCenter = (square.GetPosition(0) + square.GetPosition(2)) * 0.5f;
         Vector2 pixel = scene.Camera.WorldToScreenPoint(squareCenter);
         Require(scene.HitTestScale(pixel) && scene.HitTestGizmo(BlueprintEditorTool.Array, pivot,
             Quaternion.identity, false, pixel, out _) == GizmoHandleKind.Scale,
             "Uniform scale square loses hit priority to array/planes");
-        Require(square.positionCount == 10 && Mathf.Abs(Vector3.Dot((square.GetPosition(1)-square.GetPosition(0)).normalized,
-            scene.Camera.transform.up)) > 0.999f, "Split scale cradle does not match its drawn hit geometry");
+        Require(square.positionCount == 5 && Mathf.Abs(Vector3.Dot((square.GetPosition(1)-square.GetPosition(0)).normalized,
+            scene.Camera.transform.right)) > 0.999f, "Filled scale badge does not match its drawn hit geometry");
         scene.SetViewportSettings(2,0.5f,1.5f,2,2.5f,false);
         Show(scene, pivot, anchors, nativeStart);
         Require(Near(Vector3.Distance(move.GetPosition(1), pivot), moveLength * 2f) &&
@@ -249,10 +252,10 @@ public static class EditorInteractionAcceptance
             "Independent editor size settings cross-coupled");
         Require(!Field<Transform>(scene, "minorGrid").gameObject.activeSelf &&
             !Field<Transform>(scene, "majorGrid").gameObject.activeSelf, "Grid toggle leaves a grid visible");
-        squareCenter = (square.GetPosition(0) + square.GetPosition(1)) * 0.5f;
+        squareCenter = (square.GetPosition(0) + square.GetPosition(2)) * 0.5f;
         pixel = scene.Camera.WorldToScreenPoint(squareCenter);
-        Require(scene.HitTestScale(pixel) && !scene.HitTestScale(pixel + Vector2.left * 20f),
-            "Scaled cradle strokes and hit bounds disagree");
+        Require(scene.HitTestScale(pixel + new Vector2(10,10)) && !scene.HitTestScale(pixel + Vector2.left * 45f),
+            "Scaled badge silhouette and hit bounds disagree");
         scene.SetViewportSettings(1,1,1,1,1,true);
         Show(scene, pivot, anchors, nativeStart);
         Require(Near(Vector3.Distance(move.GetPosition(1), pivot), moveLength), "Settings reset did not restore baseline");

@@ -49,7 +49,7 @@ $requiredEditorIcons = @(
     'select', 'move', 'rotate', 'pivot', 'axes', 'snap', 'add', 'duplicate',
     'delete', 'group', 'undo', 'redo', 'lighting', 'visibility', 'hidden',
     'lock', 'unlock', 'frame', 'save', 'exit', 'back', 'search', 'filter',
-    'menu', 'close'
+    'menu', 'close', 'gizmo-move', 'gizmo-plane', 'gizmo-rotate', 'gizmo-scale', 'gizmo-source', 'gizmo-target'
 )
 $buildCameraPath = Join-Path $profileRoot `
     'BepInEx\plugins\Matheba-Build_Camera_Custom_Hammers_Edition\Build Camera.dll'
@@ -372,7 +372,10 @@ Assert-Contract ($editorControllerSource -match 'OpenNew' -and
     $gizmoSource -match 'camera\.cullingMask' -and
     $editorControllerSource -match 'if \(IsGizmoDragging\)[\s\S]*?return false;' -and
     $editorControllerSource -match '\(!IsGizmoDragging \|\| keyboardPreview\) &&\s*input\.GetMouseButtonDown\(1\)' -and
-    $editorControllerSource -match 'keyboardPreview && !input\.HasFocus' -and
+    $editorControllerSource -match '!input\.HasFocus[\s\S]*?IsGizmoDragging\) CancelGizmoDrag' -and
+    $editorControllerSource -match 'ReadKeyboardNumber' -and
+    $editorControllerSource -match 'PreviewKeyboardNumber' -and
+    $editorControllerSource -match 'middleDeleteTarget' -and
     $editorControllerSource -match 'scene\.PreviewTransform\(document, dragIds, dragTranslation, dragRotation, dragPivot, dragScale\)' -and
     $editorSceneSource -match 'allowMove: true' -and
     $editorSceneSource -match 'allowRotate: true' -and
@@ -810,7 +813,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.42.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.43.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -2743,4 +2746,4 @@ if (Test-Path -LiteralPath $buildCameraPath -PathType Leaf) {
         'BuildWorks does not restore the current Build Camera yaw and pitch.'
 }
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.42 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.43 and Valheim Steam build 25185596.'

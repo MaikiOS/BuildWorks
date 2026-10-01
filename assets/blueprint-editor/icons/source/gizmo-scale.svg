@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+ <defs><linearGradient id="metal" x2="1" y2="1"><stop stop-color="#cbb788"/><stop offset=".24" stop-color="#324045"/><stop offset=".6" stop-color="#786443"/><stop offset="1" stop-color="#17252d"/></linearGradient></defs>
+ <path d="M26 3H102L125 26V102L102 125H26L3 102V26Z" fill="url(#metal)" stroke="#e1ba73" stroke-width="4"/>
+ <path d="M32 13H96L115 32V96L96 115H32L13 96V32Z" fill="none" stroke="#978057" stroke-width="2"/>
+ <path d="m39 89 50-50m-32-4h36v36M35 57v36h36" fill="none" stroke="#111d22" stroke-width="12" stroke-linejoin="round"/>
+ <path d="m39 89 50-50m-32-4h36v36M35 57v36h36" fill="none" stroke="#f0d9a4" stroke-width="4" stroke-linejoin="round"/>
+ <path d="m51 55 13-10 12 10-12 10-13-10m0 22 13-10 12 10-12 10-13-10" fill="none" stroke="#b99659" stroke-width="2"/>
+ <g fill="#eed0a1"><circle cx="27" cy="27" r="3"/><circle cx="101" cy="101" r="3"/></g>
+</svg>

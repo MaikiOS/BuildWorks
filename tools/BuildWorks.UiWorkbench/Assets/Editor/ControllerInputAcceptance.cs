@@ -29,6 +29,7 @@ internal static class ControllerInputAcceptance
         public Vector2 MouseScrollDelta { get; set; }
         public float UnscaledDeltaTime => 1f / 30f;
         public bool HasFocus { get; set; } = true;
+        public string InputString { get; set; } = "";
         public float MouseX, MouseY;
         public bool GetKey(KeyCode key) => keys.Contains(key);
         public bool GetKeyDown(KeyCode key) => keys.Contains(key) && !previousKeys.Contains(key);
@@ -41,6 +42,7 @@ internal static class ControllerInputAcceptance
             previousKeys = keys; keys = new HashSet<KeyCode>(heldKeys);
             previousButtons = buttons; buttons = heldButtons; MousePosition = mouse;
             MouseScrollDelta = Vector2.zero; MouseX = MouseY = 0f;
+            InputString = "";
         }
     }
 
@@ -166,7 +168,7 @@ internal static class ControllerInputAcceptance
             Require(doc.Selection.Count == 2 && doc.IsPartSelected("left") && doc.IsPartSelected("right") &&
                 !doc.IsPartSelected("locked") && !doc.IsPartSelected("hidden"), "Ctrl+A includes hidden/locked or misses editable parts");
             Frame(controller, input, left); yield return null;
-            Require(Field<GameObject>(Field<TransformGizmoView>(scene, "gizmo"), "root").activeSelf, "Ctrl+A release has no shared gizmo");
+            Require(!Field<GameObject>(Field<TransformGizmoView>(scene, "gizmo"), "root").activeSelf, "Select-all reveals handles before G");
 
             // Actual outliner row callbacks use the same Shift/Ctrl source as controller Update.
             Frame(controller, input, Vector2.zero); NativeClick(view, uiCamera, "Row_left"); yield return null;
@@ -177,7 +179,7 @@ internal static class ControllerInputAcceptance
             Save(scene, view, uiCamera, target, Path.Combine(output, "input-shift-selection.png"));
             Frame(controller, input, right); yield return null;
             foreach (string id in new[] { "left", "right" }) Require(!IsPainted(scene, id), "Shift release retained selection paint: " + id);
-            Require(Field<GameObject>(Field<TransformGizmoView>(scene, "gizmo"), "root").activeSelf, "Shift release hides shared gizmo");
+            Require(!Field<GameObject>(Field<TransformGizmoView>(scene, "gizmo"), "root").activeSelf, "Select reveals handles before G");
 
             Frame(controller, input, Vector2.zero); NativeClick(view, uiCamera, "Row_left"); yield return null;
             NativeClick(view, uiCamera, Field<Dictionary<BlueprintEditorTool, Button>>(view, "toolButtons")[BlueprintEditorTool.Select]);
@@ -190,6 +192,8 @@ internal static class ControllerInputAcceptance
             foreach (object tick in TestTransformContract(controller, input, scene, view, uiCamera, target, output))
                 yield return tick;
             foreach (object tick in TestCursorPreview(controller, input, scene, view, uiCamera, target, output))
+                yield return tick;
+            foreach (object tick in TestInputRevision(controller, input, scene, view, uiCamera, target, output))
                 yield return tick;
 
             Frame(controller, input, Vector2.zero); NativeClick(view, uiCamera, "Row_left"); yield return null;
@@ -352,8 +356,6 @@ internal static class ControllerInputAcceptance
                 "Placement-delete fixture is not pickable");
             Frame(controller, input, deleteDuringPlacement, 4); yield return null;
             Frame(controller, input, deleteDuringPlacement); yield return null;
-            Require(doc.Parts.Count == 4, "MMB tap deleted a part during placement instead of navigating");
-            Frame(controller, input, deleteDuringPlacement, 0, KeyCode.Delete); yield return null;
             Require(doc.Parts.Count == 3 && Field<BlueprintEditorCatalogItem>(controller, "placementItem") != null,
                 "MMB click did not delete a part while catalog placement stayed active");
             Frame(controller, input, deleteDuringPlacement, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
@@ -434,8 +436,6 @@ internal static class ControllerInputAcceptance
             Require(doc.IsPartSelected(newId), "Newly inserted part click did not select it: " + clickDiagnostic + "; position=" + placedAt);
             Frame(controller, input, newPartMouse, 4); yield return null;
             Frame(controller, input, newPartMouse); yield return null;
-            Require(doc.Parts.Count == 5, "MMB tap deleted the selected part instead of navigating");
-            Frame(controller, input, newPartMouse, 0, KeyCode.Delete); yield return null;
             Require(doc.Parts.Count == 4, "MMB click did not delete the selected viewport part");
             Frame(controller, input, newPartMouse, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
             Frame(controller, input, newPartMouse); yield return null;
@@ -576,6 +576,8 @@ internal static class ControllerInputAcceptance
                 Require(Field<int>(controller, "contourPreviewCount") > 0 && guide.gameObject.activeInHierarchy,
                     "Click did not commit hovered chain to the copy preview");
                 if (finish == KeyCode.None) NativeClick(view, null, "CancelContour");
+                else if (finish == KeyCode.Alpha1 || finish == KeyCode.Alpha2)
+                    Frame(controller, input, Vector2.zero, 0, KeyCode.LeftControl, finish);
                 else Frame(controller, input, Vector2.zero, 0, finish);
                 yield return null;
                 Frame(controller, input, Vector2.zero); yield return null;
@@ -739,7 +741,7 @@ internal static class ControllerInputAcceptance
         Frame(controller, input, start, 0, KeyCode.Escape); yield return null;
         Frame(controller, input, start); yield return null;
         Frame(controller, input, start, 0, KeyCode.G); yield return null;
-        Frame(controller, input, empty, 0, KeyCode.Delete, KeyCode.LeftControl, KeyCode.Z); yield return null;
+        Frame(controller, input, empty, 0, KeyCode.Delete); yield return null;
         Require(doc.Parts.Count == 4 && Field<IList>(doc, "undo").Count == history, "Pending move deleted/undid document state");
         Frame(controller, input, start, 0, KeyCode.P); yield return null;
         Frame(controller, input, start, 0, KeyCode.X); yield return null;
@@ -835,6 +837,151 @@ internal static class ControllerInputAcceptance
         Frame(controller, input, start); yield return null;
     }
 
+    private static void TextFrame(BlueprintEditorController controller, InputFrames input, Vector2 mouse,
+        string text, params KeyCode[] keys)
+    {
+        input.Next(mouse, 0, keys); input.InputString = text;
+        controller.Update(); controller.LateUpdate(); Canvas.ForceUpdateCanvases();
+    }
+
+    private static IEnumerable TestInputRevision(BlueprintEditorController controller, InputFrames input,
+        BlueprintEditorScene scene, BlueprintEditorView view, Camera uiCamera, RenderTexture target, string output)
+    {
+        BlueprintEditorDocument doc = controller.Document;
+        Frame(controller, input, Vector2.zero); NativeClick(view, uiCamera, "Row_left"); yield return null;
+        NativeClick(view, uiCamera, Field<Dictionary<BlueprintEditorTool, Button>>(view, "toolButtons")[BlueprintEditorTool.Select]);
+        Vector3 original = V(doc.Parts[0].Position);
+        Vector2 mouse = scene.Camera.WorldToScreenPoint(original) + Vector3.right * 100;
+        int history = Field<IList>(doc, "undo").Count;
+        var gizmo = Field<TransformGizmoView>(scene, "gizmo");
+        Frame(controller, input, mouse, 0, KeyCode.R); yield return null;
+        Require(!Field<bool>(controller, "keyboardPreview") && !Field<GameObject>(gizmo, "root").activeSelf,
+            "R bypasses the explicit G gate");
+        Frame(controller, input, mouse, 0, KeyCode.G); yield return null;
+        Require(!Field<bool>(controller, "keyboardPreview") && Field<GameObject>(gizmo, "root").activeSelf &&
+            Field<GizmoFamily>(controller, "gizmoFamily") == GizmoFamily.Combined && Field<IList>(doc, "undo").Count == history,
+            "First G must show all handles without editing");
+        Frame(controller, input, mouse, 0, KeyCode.Escape); yield return null;
+        Require(doc.IsPartSelected("left") && !Field<GameObject>(gizmo, "root").activeSelf, "Esc did not hide handles and retain selection");
+        Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Alpha2); yield return null;
+        Frame(controller, input, mouse, 0, KeyCode.R); yield return null;
+        Frame(controller, input, mouse, 0, KeyCode.X); yield return null;
+        Frame(controller, input, mouse + Vector2.up * 80); yield return null;
+        TextFrame(controller, input, mouse + Vector2.up * 80, "30", KeyCode.Alpha3, KeyCode.Alpha0); yield return null;
+        Require(Quaternion.Angle(Field<Quaternion>(controller, "dragRotation"), Quaternion.AngleAxis(30, Vector3.right)) < .001f &&
+            Field<BlueprintEditorTool>(controller, "activeTool") == BlueprintEditorTool.Transform,
+            "Typed rotation adds to mouse rotation or digits change tools");
+        Vector3 numericPose = VisualRoot(scene, "left").transform.position;
+        Frame(controller, input, mouse, 4); yield return null;
+        Frame(controller, input, mouse + new Vector2(40,20), 4); yield return null;
+        Frame(controller, input, mouse + new Vector2(40,20)); yield return null;
+        Frame(controller, input, mouse + new Vector2(40,20)); yield return null;
+        Require(Quaternion.Angle(Field<Quaternion>(controller, "dragRotation"), Quaternion.AngleAxis(30, Vector3.right)) < .001f &&
+            Vector3.Distance(numericPose, VisualRoot(scene, "left").transform.position) < .0001f && doc.Parts.Count == 4,
+            "Camera rebasing changes numeric baseline or deletes a preview target");
+        Frame(controller, input, mouse, 0, KeyCode.Return); yield return null;
+        Require(Field<IList>(doc, "undo").Count == history + 1, "Numeric rotation is not one transaction");
+        Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
+        Require(Quaternion.Angle(VisualRoot(scene, "left").transform.rotation, Quaternion.identity) < .001f &&
+            Field<IList>(doc, "undo").Count == history, "Numeric rotation Undo failed");
+        Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Y); yield return null;
+        Require(Field<IList>(doc, "undo").Count == history + 1, "Numeric rotation Redo failed");
+        Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
+        Frame(controller, input, mouse, 0, KeyCode.X); yield return null;
+        Frame(controller, input, mouse + Vector2.right * 40); yield return null;
+        TextFrame(controller, input, mouse, "-2,5", KeyCode.Keypad2); yield return null;
+        Require(Vector3.Distance(Field<Vector3>(controller, "dragTranslation"), Vector3.left * 2.5f) < .0001f,
+            "Signed comma/keypad Move is not relative to operation start");
+        Frame(controller, input, mouse, 0, KeyCode.Return); yield return null;
+        Require(Vector3.Distance(V(doc.Parts[0].Position), original + Vector3.left * 2.5f) < .001f, "Numeric axis Move did not commit");
+        Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
+        Frame(controller, input, mouse, 0, KeyCode.S); yield return null;
+        Frame(controller, input, mouse + Vector2.up * 50); yield return null;
+        TextFrame(controller, input, mouse, "1.5"); yield return null;
+        Require(Math.Abs(Field<float>(controller, "dragScale") - 1.5f) < .00001f, "Numeric scale multiplied the mouse result");
+        Save(scene, view, uiCamera, target, Path.Combine(output, "input-numeric-scale.png"));
+        Frame(controller, input, mouse, 0, KeyCode.Return); yield return null;
+        Require(Math.Abs(doc.Parts[0].Scale.X - 1.5) < .00001f && Field<IList>(doc, "undo").Count == history + 1,
+            "Uniform numeric scale commit/history failed");
+        Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
+        foreach (string invalid in new[] { "-", "1,", "0", "-1", "4.01", "99999999999999999999999999999999" })
+        {
+            Frame(controller, input, mouse, 0, KeyCode.S); yield return null;
+            TextFrame(controller, input, mouse, invalid); yield return null;
+            Frame(controller, input, mouse, 0, KeyCode.Return); yield return null;
+            Require(Field<bool>(controller, "keyboardPreview") && !Field<bool>(controller, "keyboardValid") &&
+                Field<IList>(doc, "undo").Count == history, "Invalid number committed: " + invalid);
+            Frame(controller, input, mouse, 0, KeyCode.Escape); yield return null;
+        }
+        Frame(controller, input, mouse, 0, KeyCode.G); yield return null;
+        Require(Field<bool>(controller, "keyboardPreview"), "Repeated G did not start surface Move");
+        TextFrame(controller, input, mouse, "2"); yield return null;
+        Frame(controller, input, mouse, 0, KeyCode.Return); yield return null;
+        Require(!Field<bool>(controller, "keyboardValid") && Field<bool>(controller, "keyboardPreview"), "Free Move accepted an ambiguous scalar");
+        Frame(controller, input, mouse, 0, KeyCode.X); yield return null;
+        Require(Field<bool>(controller, "keyboardValid"), "Axis selection did not validate the pending scalar");
+        Frame(controller, input, mouse); yield return null;
+        Frame(controller, input, mouse, 0, KeyCode.X); yield return null;
+        Require(Field<bool>(controller, "keyboardSavedLocalSpace") != Field<bool>(controller, "localSpace"), "Repeated axis did not toggle coordinates");
+        TextFrame(controller, input, mouse, "\b"); yield return null;
+        Require(Field<string>(controller, "keyboardNumber") == "", "Backspace did not clear numeric ownership");
+        Frame(controller, input, mouse, 0, KeyCode.R); yield return null;
+        Require(Field<GizmoHandleKind>(controller, "dragHandle") == GizmoHandleKind.Rotate &&
+            Field<Vector3>(controller, "dragTranslation") == Vector3.zero, "Action replacement retained previous Move");
+        TextFrame(controller, input, mouse, "45"); yield return null;
+        Frame(controller, input, mouse, 0, KeyCode.Delete); yield return null;
+        Require(doc.Parts.Count == 4 && Field<string>(controller, "keyboardNumber") == "", "Delete did not clear only the numeric buffer");
+        Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
+        Require(!Field<bool>(controller, "keyboardPreview") && Field<IList>(doc, "undo").Count == history &&
+            V(doc.Parts[0].Position) == original, "Preview Undo also undid a document transaction");
+        foreach (KeyCode tool in new[] { KeyCode.Alpha3, KeyCode.Alpha4, KeyCode.Alpha1, KeyCode.Alpha2 })
+        {
+            Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Alpha2); yield return null;
+            Frame(controller, input, mouse, 0, KeyCode.S); yield return null;
+            TextFrame(controller, input, mouse, "1.5"); yield return null;
+            Frame(controller, input, mouse, 0, KeyCode.LeftControl, tool); yield return null;
+            Require(!Field<bool>(controller, "keyboardPreview") && Field<string>(controller, "keyboardNumber") == "" &&
+                Math.Abs(doc.Parts[0].Scale.X - 1) < .00001f, "Ctrl+tool leaked or committed preview: " + tool);
+        }
+        Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Alpha1); yield return null;
+        mouse = scene.Camera.WorldToScreenPoint(original);
+        Frame(controller, input, mouse, 4); yield return null;
+        Frame(controller, input, mouse + Vector2.right * 30, 4); yield return null;
+        Frame(controller, input, mouse, 4); yield return null;
+        Frame(controller, input, mouse); yield return null;
+        Require(doc.Parts.Count == 4, "MMB drag returning to origin became deletion");
+        mouse = scene.Camera.WorldToScreenPoint(original);
+        Frame(controller, input, mouse, 4, KeyCode.LeftShift); yield return null;
+        Frame(controller, input, mouse); yield return null;
+        Require(doc.Parts.Count == 4, "Modified MMB click deleted a part");
+        Frame(controller, input, mouse, 4); yield return null;
+        Frame(controller, input, mouse, 4, KeyCode.LeftControl); yield return null;
+        Frame(controller, input, mouse, 4); yield return null;
+        Frame(controller, input, mouse); yield return null;
+        Require(doc.Parts.Count == 4, "Modifier during MMB gesture became a deletion after release");
+        Frame(controller, input, mouse, 4); yield return null;
+        view.ShowToolsMenu(mouse, false);
+        Frame(controller, input, mouse); yield return null;
+        Require(!Field<bool>(controller, "cameraDragging") && Field<string>(controller, "middleDeleteTarget") == null,
+            "Tools popup retained an MMB deletion gesture");
+        Frame(controller, input, mouse, 0, KeyCode.Escape); yield return null;
+        Require(doc.Parts.Count == 4, "Popup MMB release deleted a part");
+        Frame(controller, input, mouse, 4); yield return null;
+        Frame(controller, input, mouse); yield return null;
+        Require(doc.Parts.Count == 3 && Field<IList>(doc, "undo").Count == history + 1, "Select MMB click did not delete once");
+        Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
+        Require(doc.Parts.Count == 4 && doc.IsPartSelected("left"), "Select MMB deletion Undo failed");
+        Frame(controller, input, mouse, 0, KeyCode.G); yield return null;
+        Frame(controller, input, mouse, 0, KeyCode.S); yield return null;
+        TextFrame(controller, input, mouse, "1.5"); yield return null;
+        input.HasFocus = false; Frame(controller, input, mouse); yield return null; input.HasFocus = true;
+        Require(!Field<bool>(controller, "keyboardPreview") && Field<string>(controller, "keyboardNumber") == "" &&
+            Math.Abs(doc.Parts[0].Scale.X - 1) < .00001f, "Focus loss leaked numeric preview");
+        Frame(controller, input, mouse); yield return null;
+        File.WriteAllText(Path.Combine(output, "input-revision-check.txt"),
+            "PASS actual Update/LateUpdate: explicit Combined G gate; R/X mouse then 30; signed Move/comma/keypad; S1.5; invalid input; edit/clear; axis repeat; one Undo/Redo; camera baseline; Ctrl1-4/action replacement; MMB click/drag/modifier; focus cleanup.");
+    }
+
     private static IEnumerable TestTransformContract(BlueprintEditorController controller, InputFrames input,
         BlueprintEditorScene scene, BlueprintEditorView view, Camera uiCamera, RenderTexture target, string output)
     {
@@ -907,6 +1054,7 @@ internal static class ControllerInputAcceptance
         doc.SelectOnly("left"); doc.ToggleSelection("right");
         Require(scene.TrySync(doc, out error), error); view.Bind(doc, true, null, null);
         NativeClick(view, uiCamera, Field<Dictionary<BlueprintEditorTool, Button>>(view, "toolButtons")[BlueprintEditorTool.Transform]);
+        Set(controller, "gizmoFamily", GizmoFamily.Points);
         Frame(controller, input, empty); yield return null;
         foreach (GizmoAxis axis in new[] { GizmoAxis.X, GizmoAxis.Y, GizmoAxis.Z })
         {

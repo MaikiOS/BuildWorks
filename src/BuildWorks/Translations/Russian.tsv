@@ -314,24 +314,24 @@ editor.hint.catalog	ЛКМ — выбрать · Q/E или PgUp/PgDn — стр
 editor.hint.reparent	Отпусти над группой — перенести · над корнем — в ROOT · Esc — отменить
 editor.hint.numeric_scrub	Тяни — изменить · Shift — точнее · Ctrl — быстрее · ПКМ — сброс
 editor.hint.text_input	Ввод значения · Enter — применить · Esc — отменить ввод
-editor.hint.part_placement	ЛКМ — добавить · колесо — повернуть · Q/E — точка привязки · Delete — удалить · Ctrl+Z/Y — история · 2 — гизма · ПКМ — каталог
+editor.hint.part_placement	ЛКМ — добавить · колесо — повернуть · Q/E — точка привязки · клик СКМ — удалить · Ctrl+Z/Y — история · G — гизма · ПКМ — каталог
 editor.hint.gizmo_drag	Отпусти ЛКМ — применить · Esc — отменить · Shift — без шага
 editor.hint.camera	WASD — камера · Q/E — вниз/вверх · Shift — быстрее · отпусти ПКМ — закончить
 editor.hint.array_ready	МАССИВ: колесо — количество · Enter — создать · Esc — отменить · Ctrl+колесо — камера
 editor.hint.array_begin	МАССИВ: тяни золотую стрелку — первый ряд · другую — второй · Esc — отменить
-editor.hint.contour_ready	КОНТУР: ЛКМ — другая цепь · Enter — создать · 2 — гизма · Esc — отменить
+editor.hint.contour_ready	КОНТУР: ЛКМ — другая цепь · Enter — создать · Ctrl+2 — гизма · Esc — отменить
 editor.hint.contour_begin	КОНТУР: наведи на ребро невыбранной опоры — только линия · ЛКМ — призраки · Enter — создать · Esc — отменить
-editor.hint.transform	Тяни видимую ручку — правка · Alt+стрелка — копия · Точки: Shift+клик — опора, Ctrl+тяни — магнит · держи N — общий центр · Shift+S — шаг
+editor.hint.transform	G — перенос по поверхности · X/Y/Z — перенос по оси · R — вращать · S — масштаб · тяни ручку — правка · Alt+стрелка — копия · Shift+точка — опора · Ctrl+точка — магнит
 editor.hint.empty	Tab — добавить деталь · СКМ — камера
-editor.hint.select	ЛКМ — выбор · Ctrl/Shift+ЛКМ — добавить/убрать · тяни по пустоте — рамка · Delete — удалить · Esc — снять выбор
-editor.hint.modes_selected	1 — выбор · 2 — гизма · 3 — массив · 4 — контур · Space/F3 — инструменты · Tab — каталог
-editor.hint.modes_empty	1 — выбор · Space/F3 — инструменты · Tab/Shift+A — каталог
+editor.hint.select	ЛКМ — выбор · Ctrl/Shift+ЛКМ — добавить/убрать · тяни пустоту — рамка · клик СКМ/Delete — удалить · G — открыть гизму
+editor.hint.modes_selected	Ctrl+1 — выбор · Ctrl+2 — гизма · Ctrl+3 — массив · Ctrl+4 — контур · Space/F3 — инструменты · Tab — каталог
+editor.hint.modes_empty	Ctrl+1 — выбор · Space/F3 — инструменты · Tab/Shift+A — каталог
 editor.hint.commands	Ctrl+Z/Y или Ctrl+Shift+Z — отмена/возврат · Ctrl+S — сохранить (от 2 деталей)
-editor.hint.selection_actions	Ctrl/Shift+ЛКМ — добавить/убрать · тяни пустоту — рамка · A — всё · Ctrl+G — группа · Ctrl+D — копия · Delete — удалить · Esc — снять выбор
+editor.hint.selection_actions	Ctrl/Shift+ЛКМ — добавить/убрать · тяни пустоту — рамка · A — всё · Ctrl+G — группа · Ctrl+D — копия · Delete — удалить · Esc — назад
 editor.hint.selection_empty	ЛКМ — выбор · тяни пустоту — рамка · Ctrl+A — выбрать всё · Esc — выйти
 editor.hint.visibility_selected	H — скрыть · Shift+H — изолировать · Ctrl+H — всё кроме выбора · Alt+H — показать всё
 editor.hint.visibility_empty	Alt+H — показать скрытое · Esc — выйти
-editor.hint.camera_idle	СКМ — вращать · Shift+СКМ — сдвиг · Ctrl+колесо — приблизить · ПКМ+WASD/QE — полёт · Shift — быстрее · F/Home — в кадр · F7 — просвечивание
+editor.hint.camera_idle	Тяни СКМ — вращать · Shift+СКМ — сдвиг · Ctrl+колесо — приблизить · ПКМ+WASD/QE — полёт · Shift — быстрее · F/Home — в кадр · F7 — просвечивание
 editor.hint.section_modes	РЕЖИМЫ
 editor.hint.section_tool	ТЕКУЩИЙ ИНСТРУМЕНТ
 editor.hint.section_selection	ВЫБОР / ГРУППЫ
@@ -592,11 +592,11 @@ editor.view.to_group	В ГРУППУ: {0}
 editor.view.to_root	В ROOT
 editor.view.toggle_lock	Заблокировать или разблокировать выбранное
 editor.view.toggle_visibility	Показать или скрыть выбранное
-editor.view.tool_array	3 · Массив\nПовторить выбор в двух направлениях
-editor.view.tool_contour	4 · Контур\nПовторить выбор по цепи точек привязки
+editor.view.tool_array	Ctrl+3 · Массив\nПовторить выбор в двух направлениях
+editor.view.tool_contour	Ctrl+4 · Контур\nПовторить выбор по цепи точек привязки
 editor.view.tool_parameters	ПАРАМЕТРЫ ИНСТРУМЕНТА
-editor.view.tool_select	1 · Выбор\nShift+ЛКМ — добавить/убрать · A — всё
-editor.view.tool_transform	2 · Гизма\nВыбери Перемещение, Вращение, Точки или Масштаб в Манипуляторе\nG/R/S — правка курсором · Alt+стрелка — копия
+editor.view.tool_select	Ctrl+1 · Выбор\nG — показать все ручки · клик СКМ/Delete — удалить
+editor.view.tool_transform	G / Ctrl+2 · Гизма\nG — перенос по поверхности · X/Y/Z — перенос по оси · R — вращать · S — равномерный масштаб\nВвод числа — точное изменение от начала действия
 editor.view.transform_short	ТРАНСФ.
 editor.view.turn_deg	ПОВОРОТ · °
 editor.view.type	ТИП
@@ -611,7 +611,7 @@ editor.view.unpin	ОТКРЕПИТЬ
 editor.view.unsaved_changes	Есть несохранённые изменения
 editor.view.unsaved_message	Сохранить изменения в «{0}» перед выходом?
 editor.view.unsaved_title	НЕСОХРАНЁННЫЕ ИЗМЕНЕНИЯ
-editor.view.viewport_help	1–4 инструменты · G/R/S правка курсором · Space инструменты · СКМ камера
+editor.view.viewport_help	Ctrl+1–4 инструменты · G гизма/перенос · R поворот · S масштаб · СКМ тянуть камера/клик удалить в Выборе
 editor.view.viewport_settings	НАСТРОЙКИ ВИДА
 editor.view.visibility	ВИДИМОСТЬ
 editor.view.hints	Подсказки
@@ -624,11 +624,15 @@ editor.view.family_rotate	Вращение
 editor.view.family_scale	Масштаб
 editor.view.focus_view	Весь вид / вернуть панели
 editor.hint.tools_menu	1–4 — инструмент · ↑/↓ — выбор · Enter — включить · Esc — закрыть
-editor.hint.next_selected	<mark=#78634360>G</mark> Переместить · <mark=#78634360>R</mark> Вращать · <mark=#78634360>S</mark> Масштаб · <mark=#78634360>Space</mark> Инструменты
+editor.hint.next_selected	<mark=#78634360>G</mark> Показать все ручки · <mark=#78634360>клик СКМ</mark> Удалить · <mark=#78634360>Space</mark> Инструменты
 editor.hint.next_empty	ЛКМ — выбрать деталь · Tab — добавить · Space — инструменты
 editor.view.surface	Поверхность
 editor.view.surface_controls	Поверхность · Q/E точка · колесо поворот · XYZ ось · P плоскость
-editor.hint.cursor_preview	X/Y/Z — ось · повтор оси — Мир/Локальные · Shift+ось — плоскость · P — Поверхность/Плоскость · Q/E — точка на поверхности · колесо — поворот · СКМ — камера · Shift — без шага
+editor.hint.cursor_preview	Ввод числа — от начала · X/Y/Z — ось · повтор — Мир/Локальные · Shift+ось — плоскость · G/R/S — сменить действие · P — Поверхность/Плоскость · Q/E — точка · колесо — поворот · тяни СКМ — камера
 editor.view.screen_plane	Плоскость экрана
 editor.view.no_surface	Нет поверхности — наведи иначе или нажми P для Плоскости
 editor.hint.preview	{0} · {1} · {2} · <b>Enter/ЛКМ</b> применить · <b>Esc</b> восстановить
+editor.hint.open_gizmo	G — сначала показать все ручки · клик СКМ/Delete — удалить
+editor.hint.gizmo_ready	<mark=#78634360>G</mark> По поверхности · <mark=#78634360>X/Y/Z</mark> По оси · <mark=#78634360>R</mark> Вращать · <mark=#78634360>S</mark> Масштаб · <b>Esc</b> Скрыть ручки
+editor.hint.numeric_value	<b>Значение: {0}</b> · {1}
+editor.hint.numeric_invalid	Неполное/вне диапазона; для переноса выбери одну ось · Backspace — правка · Delete — очистить

@@ -9,16 +9,20 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Current source candidate: **0.19.42**, Store v9, Valheim 1.0.16.
+Current source candidate: **0.19.43**, Store v9, Valheim 1.0.16.
 0.19.39 owner feedback accepts menu hover, language refresh and camera framing;
 Transform selection is provisionally accepted. The owner accepts contour cleanup;
 the focused 0.19.41 game series is accepted by owner report on 2026-10-01.
 New requests concern collapsible hints, manipulator clutter, hidden attachment
 context and compact viewer settings. Keyboard/tool access is approved in principle;
 Ostrix approved the Scandinavian manipulator form study on 2026-10-01.
-The full editor implementation is authorized. Candidate .42 adds explicit control
-families, Scandinavian forms, temporary G/R/S actions, 1–4/Space/F3 access,
-collapsible hints, compact dropdowns and active hidden-target context.
+The full editor implementation is authorized. Owner testing supersedes .42 input:
+.43 hides handles in Select, opens the combined gizmo with G, starts surface Move
+with another G, and supports R/S/axis operations with numbers relative to their
+original pose. Ctrl+1–4 selects tools; MMB click deletes in Select/adding while
+MMB drag orbits. Six original engraved SVG/texture assets, filled scale and
+screen-distance hover feedback extend the accepted Scandinavian forms.
+Collapsible hints, compact dropdowns and active hidden-target context remain.
 Automated evidence and the pending owner series are in the active pass; runtime
 Valheim rendering and interaction acceptance remain pending.
 All development deployments, upgrades and game tests use **only
@@ -50,7 +54,7 @@ dependent changes wait for its gate, unrelated preparation may continue.
 | ID | Deliverable | Dependency | Status |
 | --- | --- | --- | --- |
 | BW-00 | Dedicated-profile baseline and reliable handoff | Current core | Focused 0.19.41 owner series accepted; cost/refund accounting and networking pending |
-| BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | .42 approved editor implementation; owner game acceptance pending; world F9 retained |
+| BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | .43 revised editor input/art; owner game acceptance pending; world F9 retained |
 | BW-02 | Group layout operations without resizing pieces | BW-01 | Planned; focused operation UI approval required |
 | BW-03 | Persistent Array and minimal recipe persistence | BW-02 | Planned; safe Store migration and editing/Bake gate |
 | BW-04 | Guides and curves in accepted slices | BW-03 + renewed owner discussion | Tool-semantics discussion required before coding |
@@ -99,18 +103,19 @@ control families with matched hit tests, collapsible hints and compact viewer
 dropdowns. A target-only outline could retain attachment context under F7;
 interior snap eligibility is a separate decision. These editor changes are implemented
 in .42 after owner approval; they await the focused game series, not another design vote.
-The revised keyboard proposal replaces the rejected Q/W/E/R/T and Space-start
-draft with immediate G/R/S actions, top-row 1–4 persistent tools and one Space
-tool popup with F3 search. Future tools must not renumber existing bindings;
-modal digits belong to numeric entry, not tool switching. Candidate .42 implements
-editor MMB navigation-only (Delete removes), exact cancel/one Undo and prominent
-next-step guidance. G follows real surfaces excluding the selection; a ray miss
+The [approved input revision](../specs/roadmap/editor-input-revision.md) replaces
+.42 direct-action/plain-digit/MMB-navigation-only controls with the G visibility
+gate, R/S actions, Ctrl+1–4 tools and MMB click deletion in Select/adding. One Space
+popup with F3 search remains. Future tools must not renumber existing bindings;
+modal digits belong to numeric entry. Typed values replace mouse deltas from the
+original operation snapshot, with exact cancel/one Undo and next-step guidance.
+Repeated G follows real surfaces excluding the selection; a ray miss
 cannot confirm or silently use distant ground. P explicitly chooses the screen
 plane; R uses the camera-facing plane until constrained, S is uniform. XYZ chooses
 an axis, repeated XYZ switches World/Local, Shift+axis excludes that axis.
 Q/E and wheel retain source-point/yaw behavior in surface placement. Independent
-Move/Rotate/Points/Scale families have matching visibility and hit tests; Array
-retains combined handles. Tooltips now use actual glyph measurements and bounded
+Move/Rotate/Points/Scale filters have matching visibility and hit tests; G opens
+Combined by default and Array retains its controls. Tooltips use actual glyph measurements and bounded
 wrapping; EN/RU fit and supported scales remain part of owner UI acceptance.
 Community translation overrides
 need a documented file format and fallback/reload tests before shipping.

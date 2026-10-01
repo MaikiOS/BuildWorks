@@ -897,6 +897,7 @@ public static class RuntimeEditorAcceptance
         foreach (float distance in new[] { 2f, 50f })
         foreach (bool native in new[] { false, true })
         {
+            gizmo.EditorMouse = new Vector2(-1000,-1000);
             camera.transform.SetPositionAndRotation(new Vector3(0,0,-distance), Quaternion.identity);
             gizmo.Show(camera, Vector3.zero, Quaternion.identity, false, GizmoMode.Move,
                 GizmoHandleKind.None, GizmoAxis.None, anchors, -1, -1, native ? 0 : 1,
@@ -912,13 +913,12 @@ public static class RuntimeEditorAcceptance
             float radius = 0;
             for (int i = 0; i < anchor.positionCount; ++i)
                 radius = Mathf.Max(radius, Vector2.Distance(center, camera.WorldToScreenPoint(anchor.GetPosition(i))));
-            bool hovered = Vector2.Distance(Input.mousePosition, center) <= hitRadius;
             Require(Mathf.Abs(radius - (native ? 11f : 9f)) < 0.1f,
                 "Native/helper anchor glyph is not constant pixels");
             float widthPixels = Vector2.Distance(center,
                 camera.WorldToScreenPoint(camera.transform.right * anchor.startWidth));
             Require(widthPixels >= (native ? 2f : 1.5f) - 0.01f &&
-                anchor.startColor.a >= (native ? 0.95f : 0.75f) - 1f / 255f,
+                Mathf.Abs(anchor.startColor.a - .24f) <= 1f / 255f,
                 "Editor anchor lost its default thickness or visibility: native=" + native +
                 "; distance=" + distance + "; widthPixels=" + widthPixels +
                 "; alpha=" + anchor.startColor.a);
@@ -926,6 +926,25 @@ public static class RuntimeEditorAcceptance
             Vector2 scale = camera.WorldToScreenPoint((scaleHandle.GetPosition(0) + scaleHandle.GetPosition(2)) * 0.5f);
             Require(gizmo.HitTestExtra(camera, Vector3.zero, Quaternion.identity, false, scale, out _) == GizmoHandleKind.Scale,
                 "Uniform scale glyph is not hittable");
+            Require(gizmo.HitTestScale(camera, scale + new Vector2(5,4)), "Filled scale interior is not hittable");
+            Require(!gizmo.HitTestScale(camera, scale + new Vector2(25,25)), "Scale steals clicks outside its silhouette");
+            var artwork = Field<Dictionary<LineRenderer,Mesh>>(gizmo, "artworkMeshes");
+            Require(artwork.ContainsKey(anchor) && artwork.ContainsKey(scaleHandle) &&
+                scaleHandle.transform.Find("Engraving").GetComponent<MeshRenderer>().sharedMaterial.mainTexture,
+                "Original source/target or filled scale artwork missing");
+            gizmo.EditorMouse = scale + Vector2.right * 40;
+            ShowFeedback();
+            float nearAlpha = artwork[scaleHandle].colors[0].a;
+            Require(nearAlpha > .24f && nearAlpha < 1f, "Scale proximity does not brighten smoothly");
+            gizmo.EditorMouse = scale;
+            ShowFeedback();
+            Require(artwork[scaleHandle].colors[0].a == 1f && anchor.startColor.a < 1f,
+                "Scale hover does not exclusively highlight its winner");
+            gizmo.EditorMouse = new Vector2(-1000,-1000);
+            void ShowFeedback() => gizmo.Show(camera, Vector3.zero, Quaternion.identity, false, GizmoMode.Move,
+                GizmoHandleKind.None, GizmoAxis.None, anchors, -1, -1, native ? 0 : 1,
+                true, 1, false, Vector3.zero, false, GizmoAxis.None, false,
+                Vector3.zero, Vector3.zero, 0, allowExtended: true);
             Vector2 plane = camera.WorldToScreenPoint(new Vector3(0.26f,0.26f,0) * gizmo.Scale);
             Require(gizmo.HitTestExtra(camera, Vector3.zero, Quaternion.identity, false, plane, out GizmoAxis normal) ==
                 GizmoHandleKind.MovePlane && normal == GizmoAxis.Z, "XY plane glyph is not hittable");
@@ -969,7 +988,7 @@ public static class RuntimeEditorAcceptance
                 "F9 legacy 18px move-axis hit zone changed: depth=" + distance + "; inside=" + inside +
                 "; outside=" + outside + "; axis offset=" + (onAxis - center) + "; pixelRect=" + camera.pixelRect);
         }
-        checks.Add("Gizmo: compact editor native11/helper9px, hit12, native width>=2px; F9 default world sizing and axis18/anchor16 hit zones");
+        checks.Add("Gizmo: original source/target/scale textures, filled scale hit silhouette, dim/proximity/exclusive hover; native11/helper9px, hit12; F9 sizing and axis18/anchor16 unchanged");
     }
 
     private static void EnsureInside(RectTransform parent, RectTransform child)

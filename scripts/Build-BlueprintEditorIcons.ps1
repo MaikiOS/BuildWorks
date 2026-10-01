@@ -34,7 +34,7 @@ $sheetPath = Join-Path $projectRoot 'specs\blueprint-editor-icon-sheet-v1.png'
 $montageArguments = @(
     'montage', '-background', '#202830', '-fill', '#F2D79B',
     '-font', 'Arial', '-pointsize', '14', '-label', '%t'
-) + $outputs + @('-tile', '5x5', '-geometry', '128x128+16+32', $sheetPath)
+) + $outputs + @('-tile', '5x', '-geometry', '128x128+16+32', $sheetPath)
 & $magick.Source @montageArguments
 if ($LASTEXITCODE -ne 0) {
     throw 'ImageMagick failed to build the Blueprint Editor icon sheet.'

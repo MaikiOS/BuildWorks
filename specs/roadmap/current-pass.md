@@ -3,44 +3,47 @@
 **English** | [Русский](current-pass_RU.md)
 
 Updated 2026-10-01 from Ostrix's feedback. **TerrainRamp-1.0-Test only**,
-BuildWorks **0.19.42 candidate**, Valheim 1.0.16. Do not test the old DLL as this candidate.
+BuildWorks **0.19.43 candidate**, Valheim 1.0.16. Do not test the old DLL as this candidate.
 Install only with Valheim closed; Valheim is not launched automatically.
 The .41 series is accepted by owner report. Do not repeat it wholesale.
-The approved editor redesign now needs the focused .42 series below.
+The revised editor controls now need the focused .43 series below.
 Use a disposable world and blueprint copy, not an important build.
 
-## New 0.19.42 editor series
+## New 0.19.43 editor series
 
 Enter our Hammer → Blueprints → select a disposable two-part blueprint → Edit.
 Put the pointer over the viewport for keyboard steps; not over a text field.
 
-1. Select one part in the tree. Press **2**, open **Manipulator**, choose Move,
-   Rotate, Points, then Scale. Only that family should be editable; hidden controls
-   must not intercept clicks. Inspect a small part and dense group: Nordic leaf
-   tips, angular planes, open rotation arcs and source/target glyphs should stay
-   readable. Hover emphasizes a handle; dragging dims unrelated axes.
-2. Select a part; press **G**, point at another part's surface and move the mouse.
-   The existing selection previews without copies. **Q/E** changes its source point,
-   wheel changes yaw. Aim at empty sky and press Enter: do not commit to distant
-   ground. Press **P** for explicit screen-plane motion, **X/Y/Z** to constrain;
-   repeat an axis for World/Local, Shift+axis for its excluded plane. **Esc** must
-   restore exactly; Enter/left click confirms once, **Ctrl+Z** restores in one step.
-3. Press **R**, move the pointer, then choose an axis and repeat it; check visible
-   World/Local guidance. Confirm and Undo. Repeat with **S** (uniform scale).
-   During any preview, navigate with MMB or RMB flight, release and continue:
-   no jump or accidental confirmation. Click a panel or lose application focus:
-   no unintended edit. MMB orbits; Delete deletes in the editor only.
-4. Press **1/2/3/4** for Select/Gizmo/Array/Contour. **Space** opens the single tools
-   menu; **F3** opens its search. Pick a tool, close with Esc; typing/search must not
-   run viewport commands. Verify Array and Contour still apply/cancel with one Undo.
-5. Click **Hints**: groups collapse, the viewport grows and the gold next-step strip
-   remains. Expand, resize the tree/inspector boundary, toggle viewport Focus and
-   restore it. Open Camera/Display/Manipulator dropdowns; Esc/outside click closes
-   without passing a placement click through. Inspect EN/RU at 100/120/140% UI scale,
-   including long tooltips at screen edges. Report clipped text with a screenshot.
-6. Select behind a blocker and enable F7. While actually snapping, only the active
-   hidden target gets a restrained outline; it disappears when no target is active
-   or F7 is off. This does not promise access to all interior snap points.
+1. **Visibility and art.** Select one part in the tree: no handles. Press **G**:
+   all handles appear without moving it. **Esc** hides them but retains selection.
+   Press G again. Move the pointer toward/away from a handle: dim at rest, smoothly
+   brighter nearby, clear on hover. Scale is a filled engraved badge; click its
+   centre, not just its edge. Optional Manipulator filters remain available.
+2. **Exact values.** With the gizmo ready, **R → X**, move the mouse, type **30**,
+   Enter: 30° from the pose before R, not added to the mouse result. Ctrl+Z restores;
+   Ctrl+Y reapplies; Undo again. **X**, move the mouse, type **-2.5**, Enter: -2.5 m
+   from the start. Undo. **S**, move, type **1.5**, Enter: initial scale ×1.5. Undo.
+   Repeat with comma/keypad. A lone minus or scale 0 must not confirm. Esc restores.
+3. **Surface Move and camera.** Open with G, then **G again**, aim at another part;
+   existing selection moves like a ghost. Q/E chooses source, wheel turns, P chooses
+   screen plane, XYZ constrains; repeat axis switches World/Local. Enter/LMB confirms,
+   Ctrl+Z restores. Esc cancels exactly. During R/X/30, orbit with MMB or fly with RMB,
+   release: number remains relative to start, no jump/confirmation. Lose focus while
+   previewing: exact cancel, no leftover operation. Empty sky cannot confirm Surface Move.
+4. **MMB safety.** Ctrl+1 selects Select. Click/release MMB on a placed part: only
+   that part disappears; Ctrl+Z restores. Start an MMB drag on that part, move away
+   and return before releasing: camera only, no deletion. Shift+MMB pans only.
+   Tab → pick a catalog part → return to viewport without placing; MMB-click an
+   existing part: deletion works, adding ghost remains. Undo, then Esc stops adding.
+5. **Tools and input owner.** Ctrl+1/2/3/4 selects Select/Gizmo/Array/Contour. Start
+   S, type 1.5, then Ctrl+3: scale preview cancels, Array is ready. Repeat switching
+   from a pending operation to Contour and Select: no old preview/guide survives.
+   Check Array/Contour Apply/Cancel with one Undo. Space/F3 opens tools/search;
+   typing there or in a numeric field must not run viewport commands.
+6. **Hints and languages.** Inspect EN/RU hints in Select, ready G, R/X and S/number:
+   the gold strip describes the next step, tool keys show Ctrl+digits. Collapse Hints:
+   viewport grows but the next-step strip remains. Check 100/120/140% UI scale and
+   tooltips at the screen edge; send a screenshot if text is clipped.
 
 Reply by step: passed, or exact key/mouse sequence and screenshot. The Workbench
 checks do not replace these Valheim tests. Do not retest networking as editor proof.

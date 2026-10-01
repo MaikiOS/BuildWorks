@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using OstrixMods.BuildWorks.Geometry;
 using TMPro;
 using UnityEngine;
@@ -86,7 +87,9 @@ namespace OstrixMods.BuildWorks
         private bool contourClosed;
         private int contourPreviewCount;
         private GizmoHandleKind dragHandle;
-        private GizmoFamily gizmoFamily = GizmoFamily.Move;
+        private GizmoFamily gizmoFamily = GizmoFamily.Combined;
+        private string keyboardNumber = "";
+        private Vector3 keyboardStartViewAxis;
         private bool keyboardPreview;
         private bool keyboardPaused;
         private bool keyboardValid;
@@ -159,6 +162,7 @@ namespace OstrixMods.BuildWorks
         private bool cameraDragging;
         private Vector2 middleCameraStart;
         private bool middleCameraMoved;
+        private string middleDeleteTarget;
         private bool rightCameraTracking;
         private bool cameraFlying;
         private bool orthographic;
@@ -285,7 +289,23 @@ namespace OstrixMods.BuildWorks
             Rect viewport = view.ViewportScreenRect();
             scene.SetViewport(viewport);
             scene.SetTemporarySelectionHighlight(ShiftHeld && !IsGizmoDragging, document);
-            if (keyboardPreview && !input.HasFocus) CancelGizmoDrag();
+            if (!input.HasFocus)
+            {
+                if (IsGizmoDragging) CancelGizmoDrag();
+                cameraDragging = middleCameraMoved = rightCameraTracking = cameraFlying = selectionPending = false;
+                middleDeleteTarget = null;
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+                ApplyCamera();
+                return;
+            }
+            if (cameraDragging && (view.HasModal || view.HasCatalog || view.HasOutlinerMenu ||
+                view.HasViewportSettings || view.HasToolsMenu || view.IsTextInputFocused || view.IsOutlinerDragging))
+            { cameraDragging = false; middleDeleteTarget = null; }
+            if (cameraDragging && (input.GetMouseButton(0) || input.GetMouseButton(1) || ShiftHeld ||
+                input.GetKey(KeyCode.LeftControl) || input.GetKey(KeyCode.RightControl) ||
+                input.GetKey(KeyCode.LeftAlt) || input.GetKey(KeyCode.RightAlt)))
+                middleDeleteTarget = null;
             if (view.HasModal)
             {
                 if (input.GetKeyDown(KeyCode.Escape)) view.HideDialog();
@@ -550,17 +570,41 @@ namespace OstrixMods.BuildWorks
 
         private bool HandleShortcuts()
         {
+            bool control = input.GetKey(KeyCode.LeftControl) || input.GetKey(KeyCode.RightControl);
+            bool shift = ShiftHeld;
+            bool alt = input.GetKey(KeyCode.LeftAlt) || input.GetKey(KeyCode.RightAlt);
+            if (control && !alt && !shift && !cameraDragging && !rightCameraTracking &&
+                !input.GetMouseButton(1) && !input.GetMouseButton(2))
+            {
+                for (int index = 0; index < 4; ++index)
+                    if (input.GetKeyDown(KeyCode.Alpha1 + index))
+                    {
+                        if (placementItem != null) CancelPartPlacement();
+                        SetActiveTool((BlueprintEditorTool)index);
+                        return true;
+                    }
+            }
             if (keyboardPreview)
             {
                 if (input.GetKeyDown(KeyCode.Escape)) { CancelGizmoDrag(); return true; }
                 if (input.GetMouseButton(1) || input.GetMouseButton(2)) return false;
+                if (control && (input.GetKeyDown(KeyCode.Z) || input.GetKeyDown(KeyCode.Y)))
+                { CancelGizmoDrag(); return true; }
+                if (control || alt) return false;
+                if (!shift && (input.GetKeyDown(KeyCode.G) || input.GetKeyDown(KeyCode.R) || input.GetKeyDown(KeyCode.S)))
+                {
+                    GizmoHandleKind next = input.GetKeyDown(KeyCode.R) ? GizmoHandleKind.Rotate :
+                        input.GetKeyDown(KeyCode.S) ? GizmoHandleKind.Scale : GizmoHandleKind.Move;
+                    CancelGizmoDrag();
+                    BeginKeyboardPreview(next);
+                    return true;
+                }
+                ReadKeyboardNumber();
                 if (input.GetKeyDown(KeyCode.Return) || input.GetKeyDown(KeyCode.KeypadEnter))
                 {
                     keyboardConfirmRequested = true;
                     return false;
                 }
-                if (input.GetKey(KeyCode.LeftControl) || input.GetKey(KeyCode.RightControl) ||
-                    input.GetKey(KeyCode.LeftAlt) || input.GetKey(KeyCode.RightAlt)) return false;
                 GizmoAxis axis = input.GetKeyDown(KeyCode.X) ? GizmoAxis.X :
                     input.GetKeyDown(KeyCode.Y) ? GizmoAxis.Y :
                     input.GetKeyDown(KeyCode.Z) ? GizmoAxis.Z : GizmoAxis.None;
@@ -576,7 +620,7 @@ namespace OstrixMods.BuildWorks
                     dragHandle = keyboardSurface ? GizmoHandleKind.Move : GizmoHandleKind.MovePlane;
                     RebaseKeyboardPreview(input.MousePosition);
                 }
-                else if (keyboardSurface && dragSourceAnchors.Length > 0 &&
+                else if (keyboardNumber.Length == 0 && keyboardSurface && dragSourceAnchors.Length > 0 &&
                     (input.GetKeyDown(KeyCode.Q) || input.GetKeyDown(KeyCode.E)))
                 {
                     int step = input.GetKeyDown(KeyCode.E) ? 1 : -1;
@@ -591,7 +635,7 @@ namespace OstrixMods.BuildWorks
                 return true;
             }
             if (placementItem != null &&
-                (input.GetKeyDown(KeyCode.G) || input.GetKeyDown(KeyCode.F9) || input.GetKeyDown(KeyCode.Alpha2)))
+                (input.GetKeyDown(KeyCode.G) || input.GetKeyDown(KeyCode.F9)))
             {
                 CancelPartPlacement();
                 SetActiveTool(BlueprintEditorTool.Transform);
@@ -689,12 +733,6 @@ namespace OstrixMods.BuildWorks
                     return true;
                 }
             }
-            bool control = input.GetKey(KeyCode.LeftControl) ||
-                input.GetKey(KeyCode.RightControl);
-            bool shift = input.GetKey(KeyCode.LeftShift) ||
-                input.GetKey(KeyCode.RightShift);
-            bool alt = input.GetKey(KeyCode.LeftAlt) ||
-                input.GetKey(KeyCode.RightAlt);
             if (!alt && !shift && input.GetKeyDown(KeyCode.A))
             {
                 document.ClearSelection();
@@ -770,22 +808,33 @@ namespace OstrixMods.BuildWorks
                 return true;
             }
             if (control || alt || shift) return false;
-            if (input.GetKeyDown(KeyCode.Alpha1)) SetActiveTool(BlueprintEditorTool.Select);
-            else if (input.GetKeyDown(KeyCode.Alpha2) || input.GetKeyDown(KeyCode.F9))
+            if (input.GetKeyDown(KeyCode.F9))
                 SetActiveTool(BlueprintEditorTool.Transform);
-            else if (input.GetKeyDown(KeyCode.Alpha3)) SetActiveTool(BlueprintEditorTool.Array);
-            else if (input.GetKeyDown(KeyCode.Alpha4)) SetActiveTool(BlueprintEditorTool.Contour);
-            else if (input.GetKeyDown(KeyCode.G)) BeginKeyboardPreview(GizmoHandleKind.Move);
-            else if (input.GetKeyDown(KeyCode.R)) BeginKeyboardPreview(GizmoHandleKind.Rotate);
-            else if (input.GetKeyDown(KeyCode.S)) BeginKeyboardPreview(GizmoHandleKind.Scale);
+            else if (input.GetKeyDown(KeyCode.G))
+            {
+                if (activeTool == BlueprintEditorTool.Transform) BeginKeyboardPreview(GizmoHandleKind.Move);
+                else SetActiveTool(BlueprintEditorTool.Transform);
+            }
+            else if (input.GetKeyDown(KeyCode.R) || input.GetKeyDown(KeyCode.S))
+            {
+                if (activeTool == BlueprintEditorTool.Transform)
+                    BeginKeyboardPreview(input.GetKeyDown(KeyCode.R) ? GizmoHandleKind.Rotate : GizmoHandleKind.Scale);
+                else view.SetStatus(BuildWorksLocalization.Text("editor.hint.open_gizmo"));
+            }
             else if (input.GetKeyDown(KeyCode.C)) SetActiveTool(BlueprintEditorTool.Contour);
             else if (input.GetKeyDown(KeyCode.Space) || input.GetKeyDown(KeyCode.F3))
                 view.ShowToolsMenu(input.MousePosition, input.GetKeyDown(KeyCode.F3));
-            else if (input.GetKeyDown(KeyCode.X)) SetAnchorConstraint(GizmoAxis.X);
-            else if (input.GetKeyDown(KeyCode.Y)) SetAnchorConstraint(GizmoAxis.Y);
-            else if (input.GetKeyDown(KeyCode.Z)) SetAnchorConstraint(GizmoAxis.Z);
+            else if (input.GetKeyDown(KeyCode.X) || input.GetKeyDown(KeyCode.Y) || input.GetKeyDown(KeyCode.Z))
+            {
+                GizmoAxis axis = input.GetKeyDown(KeyCode.X) ? GizmoAxis.X : input.GetKeyDown(KeyCode.Y) ? GizmoAxis.Y : GizmoAxis.Z;
+                if (activeTool == BlueprintEditorTool.Transform && gizmoFamily != GizmoFamily.Points)
+                { BeginKeyboardPreview(GizmoHandleKind.Move); if (keyboardPreview) SetKeyboardAxis(axis); }
+                else if (activeTool == BlueprintEditorTool.Transform) SetAnchorConstraint(axis);
+            }
             else if (input.GetKeyDown(KeyCode.Escape))
             {
+                if (activeTool == BlueprintEditorTool.Transform)
+                { SetActiveTool(BlueprintEditorTool.Select); return true; }
                 if (document.Selection.Count > 0)
                 {
                     document.ClearSelection();
@@ -848,7 +897,7 @@ namespace OstrixMods.BuildWorks
             {
                 hints = BuildWorksLocalization.Text("editor.hint.select");
                 if (document.EditablePartSelectionCount > 0)
-                    hints = BuildWorksLocalization.Text("editor.hint.transform");
+                    hints = BuildWorksLocalization.Text("editor.hint.open_gizmo");
             }
             view.SetNextAction(keyboardPreview
                 ? BuildWorksLocalization.Text("editor.hint.preview", BuildWorksLocalization.Text(
@@ -857,12 +906,15 @@ namespace OstrixMods.BuildWorks
                     keyboardSurface ? BuildWorksLocalization.Text("editor.view.surface_controls") :
                     dragAxis == GizmoAxis.None ? BuildWorksLocalization.Text("editor.view.screen_plane") :
                     dragAxis + " · " + BuildWorksLocalization.Text(localSpace ? "editor.view.axes_local" : "editor.view.axes_world"),
+                    keyboardNumber.Length > 0 ? BuildWorksLocalization.Text("editor.hint.numeric_value", keyboardNumber,
+                        keyboardValid ? "" : BuildWorksLocalization.Text("editor.hint.numeric_invalid")) :
                     keyboardValid ? "" : BuildWorksLocalization.Text("editor.view.no_surface"))
                 : !IsGizmoDragging && placementItem == null && !view.HasModal && !view.HasCatalog &&
                     !view.HasToolsMenu && !view.HasViewportSettings &&
                     (activeTool == BlueprintEditorTool.Select || activeTool == BlueprintEditorTool.Transform)
                     ? BuildWorksLocalization.Text(document.EditablePartSelectionCount > 0 ?
-                        "editor.hint.next_selected" : "editor.hint.next_empty") : hints);
+                        activeTool == BlueprintEditorTool.Transform ? "editor.hint.gizmo_ready" : "editor.hint.next_selected" :
+                        "editor.hint.next_empty") : hints);
             view.SetPreviewAxes(keyboardPreview && dragHandle != GizmoHandleKind.Scale, dragAxis);
             if (!view.HasModal && !view.HasOutlinerContextMenu && !view.HasOutlinerMenu &&
                 !view.HasViewportSettings && !view.HasToolsMenu && !view.HasCatalog && !view.IsOutlinerDragging &&
@@ -904,7 +956,7 @@ namespace OstrixMods.BuildWorks
             if (inside && input.MouseScrollDelta.y != 0f)
             {
                 bool control = input.GetKey(KeyCode.LeftControl) || input.GetKey(KeyCode.RightControl);
-                if (keyboardPreview && keyboardSurface && !control && !input.GetMouseButton(1))
+                if (keyboardPreview && keyboardNumber.Length == 0 && keyboardSurface && !control && !input.GetMouseButton(1))
                 {
                 Vector3 source = keyboardSourceIndex >= 0 && dragSourceAnchors.Length > 0
                         ? dragSourceAnchors[keyboardSourceIndex] : dragPivot;
@@ -932,6 +984,13 @@ namespace OstrixMods.BuildWorks
             if (inside && (!IsGizmoDragging || keyboardPreview) && input.GetMouseButtonDown(2))
             {
                 cameraDragging = true;
+                middleDeleteTarget = null;
+                if (!keyboardPreview && (activeTool == BlueprintEditorTool.Select || placementItem != null) &&
+                    !input.GetMouseButton(0) && !input.GetMouseButton(1) &&
+                    !ShiftHeld && !input.GetKey(KeyCode.LeftControl) && !input.GetKey(KeyCode.RightControl) &&
+                    !input.GetKey(KeyCode.LeftAlt) && !input.GetKey(KeyCode.RightAlt) &&
+                    scene.TryPick(mouse, out string deleteTarget) && !document.IsEffectivelyLocked(deleteTarget))
+                    middleDeleteTarget = deleteTarget;
                 if (keyboardPreview) keyboardPaused = true;
                 middleCameraStart = mouse;
                 middleCameraMoved = false;
@@ -969,6 +1028,18 @@ namespace OstrixMods.BuildWorks
             if (cameraDragging && input.GetMouseButtonUp(2))
             {
                 cameraDragging = false;
+                string target = middleDeleteTarget;
+                middleDeleteTarget = null;
+                if (!middleCameraMoved && inside && !view.IsViewportControlHit(mouse) && !keyboardPreview &&
+                    !ShiftHeld && !input.GetKey(KeyCode.LeftControl) && !input.GetKey(KeyCode.RightControl) &&
+                    !input.GetKey(KeyCode.LeftAlt) && !input.GetKey(KeyCode.RightAlt) && target != null &&
+                    (activeTool == BlueprintEditorTool.Select || placementItem != null) &&
+                    scene.TryPick(mouse, out string currentTarget) && currentTarget == target &&
+                    document.IsEffectivelyVisible(target) && !document.IsEffectivelyLocked(target))
+                {
+                    DeleteViewportPart(target);
+                    return;
+                }
             }
 
             if (inside && !cameraDragging && (!IsGizmoDragging || keyboardPreview) &&
@@ -1101,6 +1172,8 @@ namespace OstrixMods.BuildWorks
             keyboardSavedPin = pinnedAnchorWorld;
             keyboardSavedConstraint = anchorConstraintAxis;
             keyboardSavedLocalSpace = localSpace;
+            keyboardStartViewAxis = scene.Camera.transform.forward;
+            keyboardNumber = "";
             dragPivot = selectedAnchorWorld ?? pivot;
             dragSourceAnchors = (Vector3[])gizmoAnchors.Clone();
             keyboardSourceIndex = selectedAnchorPoint >= 0 && selectedAnchorPoint < dragSourceAnchors.Length
@@ -1112,8 +1185,7 @@ namespace OstrixMods.BuildWorks
             dragAxis = GizmoAxis.None;
             keyboardPreview = true;
             keyboardSurface = handle == GizmoHandleKind.Move;
-            gizmoFamily = handle == GizmoHandleKind.Rotate ? GizmoFamily.Rotate :
-                handle == GizmoHandleKind.Scale ? GizmoFamily.Scale : GizmoFamily.Move;
+            gizmoFamily = GizmoFamily.Combined;
             view.SetGizmoFamily(gizmoFamily);
             view.SetPreviewControls(true);
             RebaseKeyboardPreview(input.MousePosition);
@@ -1176,6 +1248,8 @@ namespace OstrixMods.BuildWorks
 
         private void PreviewKeyboardTransform(Vector2 mouse)
         {
+            if (keyboardNumber.Length > 0)
+            { PreviewKeyboardNumber(); return; }
             if (!keyboardMoved && (mouse - dragStartMouse).sqrMagnitude < 1f)
             {
                 if (keyboardSurface) keyboardValid = scene.TryMoveSurface(mouse, dragIds, out _);
@@ -1251,20 +1325,81 @@ namespace OstrixMods.BuildWorks
             UpdateGizmo();
         }
 
+        private void ReadKeyboardNumber()
+        {
+            string previous = keyboardNumber;
+            foreach (char character in input.InputString ?? "")
+            {
+                if (character == '\b')
+                    keyboardNumber = keyboardNumber.Length == 0 ? "" : keyboardNumber.Substring(0, keyboardNumber.Length - 1);
+                else if (keyboardNumber.Length < 32 &&
+                    (character >= '0' && character <= '9' || character == '-' || character == '.' || character == ','))
+                    keyboardNumber += character;
+            }
+            if (input.GetKeyDown(KeyCode.Delete)) keyboardNumber = "";
+            if (previous.Length > 0 && keyboardNumber.Length == 0)
+                RebaseKeyboardPreview(input.MousePosition);
+        }
+
+        private void PreviewKeyboardNumber()
+        {
+            // Numeric values replace the entire mouse delta. The document/pivot stay
+            // unchanged throughout the preview, even when camera navigation rebases input.
+            float value = 0f;
+            keyboardValid = !keyboardNumber.EndsWith(".", StringComparison.Ordinal) &&
+                !keyboardNumber.EndsWith(",", StringComparison.Ordinal) &&
+                float.TryParse(keyboardNumber.Replace(',', '.'), NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
+                    CultureInfo.InvariantCulture, out value) && !float.IsNaN(value) && !float.IsInfinity(value);
+            if (!keyboardValid) return;
+            Vector3 axis = dragAxis == GizmoAxis.None ? keyboardStartViewAxis :
+                TransformGizmoView.AxisVector(dragAxis, keyboardOrientation, localSpace);
+            Vector3 translation = Vector3.zero;
+            Quaternion rotation = Quaternion.identity;
+            float scale = 1f;
+            if (dragHandle == GizmoHandleKind.Rotate)
+                rotation = Quaternion.AngleAxis(value, axis);
+            else if (dragHandle == GizmoHandleKind.Scale)
+            {
+                scale = value;
+                keyboardValid = scale > 0f;
+                foreach (BlueprintEditorPart part in document.Parts)
+                {
+                    if (!dragIds.Contains(part.StableId)) continue;
+                    Vector3 candidate = ToVector(part.Scale) * scale;
+                    keyboardValid &= Mathf.Min(candidate.x, candidate.y, candidate.z) >= .01f &&
+                        Mathf.Max(candidate.x, candidate.y, candidate.z) <= 4f;
+                }
+            }
+            else
+            {
+                keyboardValid = dragAxis != GizmoAxis.None && dragHandle == GizmoHandleKind.Move;
+                translation = axis * value;
+                keyboardValid &= IsFinite(translation.sqrMagnitude);
+            }
+            if (!keyboardValid) return;
+            dragTranslation = translation;
+            dragRotation = rotation;
+            dragScale = scale;
+            snapTargetVisible = false;
+            snapPreviewTargets.Clear();
+            snapPreviewNative.Clear();
+            scene.PreviewTransform(document, dragIds, dragTranslation, dragRotation, dragPivot, dragScale);
+            UpdateGizmo();
+        }
+
+        private static bool IsFinite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
+
         private bool TryBeginGizmoDrag(Vector2 mouse)
         {
+            if (activeTool == BlueprintEditorTool.Select) return false;
             if (!TrySelectionPivot(
                     out Vector3 pivot, out Quaternion orientation, dragIds)) return false;
-            if (activeTool == BlueprintEditorTool.Select &&
-                (input.GetKey(KeyCode.LeftControl) || input.GetKey(KeyCode.RightControl) || ShiftHeld) &&
-                scene.TryPick(mouse, out string pointedId) && !document.IsPartSelected(pointedId))
-                return false;
             UpdateGizmo();
             GizmoHandleKind hoveredHandle = scene.HitTestGizmo(
                 SelectionGizmoTool, pivot, orientation, localSpace, mouse, out GizmoAxis hoveredAxis);
             bool copyArrow = (input.GetKey(KeyCode.LeftAlt) || input.GetKey(KeyCode.RightAlt)) &&
                 hoveredHandle == GizmoHandleKind.Move;
-            int anchor = gizmoFamily != GizmoFamily.Points && activeTool != BlueprintEditorTool.Array ||
+            int anchor = gizmoFamily != GizmoFamily.Points && gizmoFamily != GizmoFamily.Combined && activeTool != BlueprintEditorTool.Array ||
                 hoveredHandle == GizmoHandleKind.Scale || copyArrow ||
                 activeTool == BlueprintEditorTool.Array && hoveredHandle == GizmoHandleKind.Layout
                 ? -1 : scene.HitTestAnchor(gizmoAnchors, mouse);
@@ -1586,6 +1721,7 @@ namespace OstrixMods.BuildWorks
 
         private void ResetGizmoDrag()
         {
+            keyboardNumber = "";
             keyboardPreview = keyboardPaused = keyboardConfirmRequested = keyboardMoved = keyboardSurfaceOriginValid = false;
             view?.SetPreviewControls(false);
             scene?.ClearDuplicatePreview();
@@ -1711,7 +1847,7 @@ namespace OstrixMods.BuildWorks
 
         private void SetActiveTool(BlueprintEditorTool tool)
         {
-            if (keyboardPreview) return;
+            if (IsGizmoDragging) CancelGizmoDrag();
             bool available = tool == BlueprintEditorTool.Select ||
                 document.EditablePartSelectionCount > 0;
             if (!available)
@@ -1724,12 +1860,13 @@ namespace OstrixMods.BuildWorks
                     "editor.select_available_first"), error: true);
                 return;
             }
-            if (IsGizmoDragging) CancelGizmoDrag();
             if (tool != BlueprintEditorTool.Array) ClearArrayState();
             else if (activeTool != BlueprintEditorTool.Array) ClearArrayState();
             if (tool != BlueprintEditorTool.Contour) ClearContourState();
             else if (activeTool != BlueprintEditorTool.Contour) ClearContourState();
             activeTool = tool;
+            if (tool == BlueprintEditorTool.Transform)
+            { gizmoFamily = GizmoFamily.Combined; view.SetGizmoFamily(gizmoFamily); }
             selectionPending = false;
             view.SetTool(tool);
             UpdateGizmo();
@@ -1879,8 +2016,7 @@ namespace OstrixMods.BuildWorks
 
         private bool ShiftHeld => input.GetKey(KeyCode.LeftShift) || input.GetKey(KeyCode.RightShift);
         private bool IgnorePrimaryFrame => input.GetKey(KeyCode.N);
-        private BlueprintEditorTool SelectionGizmoTool => activeTool == BlueprintEditorTool.Select
-            ? BlueprintEditorTool.Transform : activeTool;
+        private BlueprintEditorTool SelectionGizmoTool => activeTool;
 
         private void SetSelectionTool() => SetActiveTool(activeTool != BlueprintEditorTool.Select &&
             document.EditablePartSelectionCount > 0 ? BlueprintEditorTool.Transform : BlueprintEditorTool.Select);
@@ -3121,6 +3257,7 @@ namespace OstrixMods.BuildWorks
             state = EditorState.Closing;
             selectionPending = false;
             cameraDragging = false;
+            middleDeleteTarget = null;
             rightCameraTracking = cameraFlying = false;
             placementItem = null;
             contourSupportIds.Clear();

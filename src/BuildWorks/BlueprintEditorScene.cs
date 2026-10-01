@@ -1102,6 +1102,7 @@ namespace OstrixMods.BuildWorks
         {
             ThrowIfDisposed();
             axis = GizmoAxis.None;
+            if (tool == BlueprintEditorTool.Select) return GizmoHandleKind.None;
             if (gizmo.HitTestScale(camera, mousePosition)) return GizmoHandleKind.Scale;
             if (tool == BlueprintEditorTool.Array)
             {

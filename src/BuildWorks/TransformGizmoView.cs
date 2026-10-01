@@ -57,6 +57,9 @@ namespace OstrixMods.BuildWorks
         internal Vector2? EditorMouse { get; set; }
         private readonly Dictionary<LineRenderer, Mesh> tipMeshes = new Dictionary<LineRenderer, Mesh>();
         private readonly Dictionary<LineRenderer, LineRenderer> tipRims = new Dictionary<LineRenderer, LineRenderer>();
+        private readonly BlueprintEditorIconLibrary artwork = new BlueprintEditorIconLibrary();
+        private readonly Dictionary<string, Material> artworkMaterials = new Dictionary<string, Material>();
+        private readonly Dictionary<LineRenderer, Mesh> artworkMeshes = new Dictionary<LineRenderer, Mesh>();
         private readonly Material material;
         private readonly Material anchorMaterial;
         private readonly Material occludedMaterial;
@@ -250,6 +253,9 @@ namespace OstrixMods.BuildWorks
                         pivot + first * low + second * low });
                     SetColorAndWidth(movePlanes[i], selectedHandle == GizmoHandleKind.MovePlane && axis == selectedAxis
                         ? Color.yellow : AxisColors[i]);
+                    if (screenSpaceSizing)
+                        DrawArtwork(movePlanes[i], "gizmo-plane", pivot + (first + second) * (low + high) * .5f,
+                            first * (high - low) * .5f, second * (high - low) * .5f);
                 }
                 rotationRings[i].gameObject.SetActive(showRotation);
                 layoutAxisLines[i].gameObject.SetActive(showLayoutAxes);
@@ -273,8 +279,8 @@ namespace OstrixMods.BuildWorks
                     DrawRing(rotationRings[i], pivot, direction, rotateColor, Scale * rotationSize * 0.62f);
                     if (screenSpaceSizing)
                     {
-                        if (selectedHandle == GizmoHandleKind.None && DistanceToLine(camera, EditorMouse ?? (Vector2)Input.mousePosition, rotationRings[i]) <= 6f)
-                        { rotateColor.a = 1f; SetColorAndWidth(rotationRings[i], rotateColor, .025f); }
+                        DrawArtwork(rotationRings[i], "gizmo-rotate", rotationRings[i].GetPosition(RingSegments),
+                            camera.transform.right * Scale * .07f, camera.transform.up * Scale * .07f);
                         DrawDepthContinuation(rotationRings[i], rotateColor);
                     }
                 }
@@ -415,6 +421,9 @@ namespace OstrixMods.BuildWorks
                     AxisColors[(int)constraintAxis - 1],
                     constraintRadius > 0.001f ? constraintRadius : Scale * 0.72f);
             }
+            if (screenSpaceSizing)
+                UpdateEditorFeedback(camera, pivot, rotation, localSpace, mode, selectedHandle, selectedAxis,
+                    anchorPoints, selectedAnchor, pinnedAnchor);
         }
 
         public void ShowLayout(
@@ -562,22 +571,26 @@ namespace OstrixMods.BuildWorks
             if (first.z <= 0f || opposite.z <= 0f) return false;
             Vector2 center = (new Vector2(first.x, first.y) + new Vector2(opposite.x, opposite.y)) * 0.5f;
             if (!screenSpaceSizing) return Vector2.Distance(mouse, center) <= 8f;
-            return DistanceToLine(camera, mouse, scaleHandle) <= 6f;
+            // Filled badge, not a one-pixel edge: the complete chamfered silhouette owns the click.
+            Vector3 screenRight = camera.WorldToScreenPoint(scaleHandle.GetPosition(1));
+            float half = Mathf.Abs(screenRight.x - first.x) * .5f;
+            Vector2 delta = mouse - center;
+            float extent = half + 3f;
+            return Mathf.Abs(delta.x) <= extent && Mathf.Abs(delta.y) <= extent &&
+                Mathf.Abs(delta.x) + Mathf.Abs(delta.y) <= extent * 1.8f;
         }
 
         private void DrawScaleSquare(Camera camera, Vector3 pivot, Color color)
         {
             Vector3 center = pivot + (camera.transform.right - camera.transform.up) * Scale * 1.05f;
-            float half = Scale * 0.1f * uniformScaleHandleSize;
+            float half = Scale * 0.14f * uniformScaleHandleSize;
             Vector3 right = camera.transform.right * half, up = camera.transform.up * half;
-            scaleHandle.positionCount = 10;
-            scaleHandle.SetPositions(new[] { center - right - up * .35f, center - right - up,
-                center - right * .35f - up, center, center + right * .35f + up,
-                center + right + up, center + right + up * .35f, center,
-                center - right - up, center + right + up });
-            if (DistanceToLine(camera, EditorMouse ?? (Vector2)Input.mousePosition, scaleHandle) <= 6f)
-                color = new Color(1f, .77f, .3f, 1f);
+            scaleHandle.positionCount = 5;
+            scaleHandle.SetPositions(new[] { center - right - up, center + right - up,
+                center + right + up, center - right + up, center - right - up });
+            DrawArtwork(scaleHandle, "gizmo-scale", center, right, up);
             SetColorAndWidth(scaleHandle, color, 0.025f * uniformScaleHandleSize);
+            scaleHandle.enabled = false; // The authored outline is part of the texture.
         }
 
         private static void PlaneBasis(GizmoAxis normal, Quaternion rotation, bool localSpace,
@@ -836,6 +849,9 @@ namespace OstrixMods.BuildWorks
 
         public void Dispose()
         {
+            foreach (Mesh mesh in artworkMeshes.Values) UnityEngine.Object.Destroy(mesh);
+            foreach (Material owned in artworkMaterials.Values) UnityEngine.Object.Destroy(owned);
+            artwork.Dispose();
             foreach (Mesh mesh in tipMeshes.Values) UnityEngine.Object.Destroy(mesh);
             foreach (Mesh mesh in occludedMeshes.Values) UnityEngine.Object.Destroy(mesh);
             if (occludedMaterial) UnityEngine.Object.Destroy(occludedMaterial);
@@ -992,11 +1008,10 @@ namespace OstrixMods.BuildWorks
                 LineRenderer edge = tipRims[line];
                 for (int index = 0; index < vertices.Length; ++index) edge.SetPosition(index, vertices[index]);
                 edge.SetPosition(6, vertices[0]);
-                bool hovered = color.a > .2f && (DistanceToLine(camera, EditorMouse ?? (Vector2)Input.mousePosition, edge) <= 6f ||
-                    ScreenDistanceToSegment(camera, EditorMouse ?? (Vector2)Input.mousePosition, start, end) <= 6f);
-                if (hovered) { color.a = 1f; SetColorAndWidth(line, color, .018f); }
-                SetColorAndWidth(edge, hovered || color.r > .9f && color.g > .8f
+                SetColorAndWidth(edge, color.r > .9f && color.g > .8f
                     ? new Color(1f, .77f, .3f, color.a) : new Color(.67f, .53f, .31f, color.a), .016f);
+                DrawArtwork(line, "gizmo-move", end - axis * length * .2f,
+                    side * length * .085f, axis * length * .2f);
                 return;
             }
             Vector3 back = -axis * length * 0.28f;
@@ -1088,6 +1103,9 @@ namespace OstrixMods.BuildWorks
                 }
                 SetColorAndWidth(line, color, width);
                 line.startWidth = line.endWidth = width * pointScale;
+                DrawArtwork(line, target ? "gizmo-target" : "gizmo-source", position,
+                    right * 1.2f, up);
+                line.enabled = pinned; // Pin accent remains; the glyph has an engraved authored rim.
                 return;
             }
             line.SetPosition(0, position + up);
@@ -1123,6 +1141,105 @@ namespace OstrixMods.BuildWorks
             line.startColor = color;
             line.endColor = color;
             line.startWidth = line.endWidth = screenSpaceSizing ? width * Scale : width;
+        }
+
+        private void DrawArtwork(LineRenderer owner, string name, Vector3 center, Vector3 right, Vector3 up)
+        {
+            if (!artworkMaterials.TryGetValue(name, out Material textureMaterial))
+            {
+                Sprite sprite = artwork.Get(name);
+                Shader shader = Shader.Find("UI/Default") ?? Shader.Find("Sprites/Default");
+                if (!sprite || !shader) throw new InvalidOperationException("Missing gizmo artwork: " + name);
+                textureMaterial = new Material(shader) { name = "BuildWorks_" + name,
+                    hideFlags = HideFlags.HideAndDontSave, mainTexture = sprite.texture,
+                    renderQueue = (int)RenderQueue.Overlay };
+                textureMaterial.SetInt("unity_GUIZTestMode", (int)CompareFunction.Always);
+                if (textureMaterial.HasProperty("_ZWrite")) textureMaterial.SetInt("_ZWrite", 0);
+                artworkMaterials.Add(name, textureMaterial);
+            }
+            if (!artworkMeshes.TryGetValue(owner, out Mesh mesh))
+            {
+                mesh = new Mesh { name = "BuildWorks_EngravedBadge", hideFlags = HideFlags.HideAndDontSave };
+                var child = new GameObject("Engraving", typeof(MeshFilter), typeof(MeshRenderer))
+                    { hideFlags = HideFlags.HideAndDontSave, layer = root.layer };
+                child.transform.SetParent(owner.transform, false);
+                child.GetComponent<MeshFilter>().sharedMesh = mesh;
+                child.GetComponent<MeshRenderer>().sortingOrder = short.MaxValue;
+                artworkMeshes.Add(owner, mesh);
+            }
+            owner.transform.Find("Engraving").GetComponent<MeshRenderer>().sharedMaterial = textureMaterial;
+            mesh.vertices = new[] { center - right - up, center + right - up, center + right + up, center - right + up };
+            mesh.uv = new[] { Vector2.zero, Vector2.right, Vector2.one, Vector2.up };
+            mesh.triangles = new[] { 0,1,2, 0,2,3 };
+            mesh.colors = new[] { Color.white, Color.white, Color.white, Color.white };
+            mesh.RecalculateBounds();
+        }
+
+        private void UpdateEditorFeedback(Camera camera, Vector3 pivot, Quaternion rotation, bool localSpace,
+            GizmoMode mode, GizmoHandleKind selected, GizmoAxis selectedAxis, Vector3[] anchors, int selectedPoint, int pinnedPoint)
+        {
+            Vector2 mouse = EditorMouse ?? (Vector2)Input.mousePosition;
+            GizmoAxis hoverAxis = GizmoAxis.None;
+            GizmoHandleKind hover = HitTestScale(camera, mouse) ? GizmoHandleKind.Scale : GizmoHandleKind.None;
+            if (hover == GizmoHandleKind.None && mode == GizmoMode.Repeat)
+            {
+                hoverAxis = HitTestLayout(camera, pivot, rotation, localSpace, mouse);
+                if (hoverAxis != GizmoAxis.None) hover = GizmoHandleKind.Layout;
+            }
+            if (hover == GizmoHandleKind.None)
+                hover = HitTestExtra(camera, pivot, rotation, localSpace, mouse, out hoverAxis);
+            if (hover == GizmoHandleKind.None)
+            {
+                hoverAxis = HitTestMove(camera, pivot, rotation, localSpace, mouse);
+                if (hoverAxis != GizmoAxis.None) hover = GizmoHandleKind.Move;
+            }
+            if (hover == GizmoHandleKind.None)
+            {
+                hoverAxis = HitTestRotation(camera, pivot, rotation, localSpace, mouse);
+                if (hoverAxis != GizmoAxis.None) hover = GizmoHandleKind.Rotate;
+            }
+            int point = hover == GizmoHandleKind.Scale || hover == GizmoHandleKind.Layout ? -1 : HitTestAnchor(camera, anchors, mouse);
+            if (point >= 0) hover = GizmoHandleKind.None;
+            for (int i = 0; i < 3; ++i)
+            {
+                GizmoAxis axis = (GizmoAxis)(i + 1);
+                Feedback(moveLines[i], GizmoHandleKind.Move, axis);
+                Feedback(movePlanes[i], GizmoHandleKind.MovePlane, axis);
+                Feedback(rotationRings[i], GizmoHandleKind.Rotate, axis);
+                Feedback(layoutAxisLines[i], GizmoHandleKind.Layout, axis);
+            }
+            Feedback(scaleHandle, GizmoHandleKind.Scale, GizmoAxis.None);
+            for (int index = 0; index < anchorHandles.Count; ++index)
+                if (anchorHandles[index].gameObject.activeInHierarchy)
+                    SetFeedback(anchorHandles[index], index == point && selected == GizmoHandleKind.None,
+                        index == selectedPoint || index == pinnedPoint, selected != GizmoHandleKind.None, true);
+            void Feedback(LineRenderer line, GizmoHandleKind kind, GizmoAxis axis)
+            {
+                if (!line.gameObject.activeInHierarchy) return;
+                SetFeedback(line, selected == GizmoHandleKind.None && hover == kind && hoverAxis == axis,
+                    selected == kind && (selectedAxis == axis || selectedAxis == GizmoAxis.None), selected != GizmoHandleKind.None);
+            }
+            void SetFeedback(LineRenderer line, bool hovered, bool active, bool dragging, bool point = false)
+            {
+                float distance = DistanceToLine(camera, mouse, line);
+                if (artworkMeshes.TryGetValue(line, out Mesh artMesh))
+                {
+                    Vector3[] vertices = artMesh.vertices;
+                    for (int index = 0; index < vertices.Length; ++index)
+                        distance = Mathf.Min(distance, ScreenDistanceToSegment(camera, mouse, vertices[index], vertices[(index + 1) % vertices.Length]));
+                }
+                float proximity = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(distance / 64f));
+                float alpha = active || hovered ? 1f : dragging ? .16f : Mathf.Lerp(.24f, .66f, proximity);
+                Color color = hovered || active && !point ? new Color(1f, .78f, .32f, alpha) : line.startColor;
+                color.a = alpha;
+                line.startColor = line.endColor = color;
+                if (tipRims.TryGetValue(line, out LineRenderer rim))
+                { Color edge = hovered || active ? color : rim.startColor; edge.a = alpha; rim.startColor = rim.endColor = edge; }
+                Color fill = new Color(1f, 1f, 1f, alpha);
+                if (artMesh) artMesh.colors = new[] { fill, fill, fill, fill };
+                if (tipMeshes.TryGetValue(line, out Mesh tip))
+                { var colors = tip.colors; for (int i = 0; i < colors.Length; ++i) colors[i].a = alpha; tip.colors = colors; }
+            }
         }
 
         private void DrawDepthContinuation(LineRenderer line, Color color)

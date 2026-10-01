@@ -2,7 +2,8 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
-Updated 2026-09-30. Active stage: **BW-00**. Source candidate 0.19.41, Store v9,
+Updated 2026-10-01. Active work: **BW-01 design approval**; BW-00 accounting/network
+gates remain open. Source candidate 0.19.41, Store v9,
 Valheim 1.0.16. Current authorized development/test profile: TerrainRamp-1.0-Test
 only. Earlier integration-profile permission is superseded.
 
@@ -12,11 +13,12 @@ host/deployment-guard checks pass. Formatting verification exits successfully wi
 workspace-loading warnings. Unity Workbench passes 81 captures and actual input
 regressions for stationary contour guides, cancel/tool switching/deletion, F7/button,
 occluder drawing restoration and picking, camera FOV and outliner overflow.
-English/Russian catalogs contain 615 matching keys. No candidate Valheim or multiplayer
-acceptance is claimed. No new binary release is published.
+English/Russian catalogs contain 615 matching keys. The focused 0.19.41 game series
+is accepted by Ostrix's report on 2026-10-01, not independently observed.
+Cost/refund accounting and multiplayer remain untested. No new binary release is published.
 
 0.19.41 is installed in TerrainRamp-1.0-Test through the guarded script with
-Valheim closed; BW-00 awaits the focused owner series. The previous .40 DLL pair
+Valheim closed; its focused owner series is accepted. The previous .40 DLL pair
 was backed up. Installed SHA-256:
 - BuildWorks.dll: `A1D1CAF28246E6E4D2A8E9908B06BDD56AE8C6492FBD1CB2EBD7D7DE5DE0F10C`
 - BuildWorks.Geometry.dll: `B449F58CE647F6FB92127015710B9EC9657F5E7F816DFCEA1ACE04C26151FCED`
@@ -40,9 +42,13 @@ double-click framing and external translations await their
 UI/format gates. One-piece save remains blocked by the two-part contract.
 Esc removes partial placement and restores its ghost; dropped-resource amounts
 still need accounting. Multiplayer is deferred; no other profile transfer authorized.
-Use the revised five checks, not the entire previously accepted series.
+The five focused checks remain a regression reference, not a request to repeat them.
 
-Next: owner game series, then bounded fixes if needed; approve visible UI/icons
-before BW-01 redesign. Discuss guides/curves again before Line A/B implementation.
+Next: approve the [editor visibility proposal](specs/roadmap/editor-visibility-proposal.md).
+Three alternatives were assessed; explicit Move/Rotate/Points control families
+are recommended with collapsible hints and compact viewer dropdowns. Target-only
+outlines are proposed for F7 attachment context; interior snap access is a separate
+decision. No proposal is implemented or installed. Discuss guides/curves again
+before Line A/B implementation.
 After each verified step update EN/RU docs, checkpoint commit and normal GitHub push.
 Keep game binaries, saves and personal logs out of the repository.

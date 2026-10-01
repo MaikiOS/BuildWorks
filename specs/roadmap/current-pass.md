@@ -2,10 +2,11 @@
 
 **English** | [Русский](current-pass_RU.md)
 
-Updated 2026-09-30 from Ostrix's feedback. **TerrainRamp-1.0-Test only**,
+Updated 2026-10-01 from Ostrix's feedback. **TerrainRamp-1.0-Test only**,
 BuildWorks **0.19.41 candidate**, Valheim 1.0.16. Do not test the old DLL as this candidate.
 Install only with Valheim closed; Valheim is not launched automatically.
-Start with the short series below. Run the rest in separate sessions, not all at once.
+The short series below is accepted by owner report. Do not repeat it wholesale.
+Next is [editor design approval](editor-visibility-proposal.md), not a new game series.
 Use a disposable world and blueprint copy, not an important build.
 
 ## Results already reported
@@ -16,13 +17,15 @@ Use a disposable world and blueprint copy, not an important build.
 - 0.19.39 owner report accepts menu hover, native tab language refresh and F framing.
   Selection/box behavior is provisionally accepted; report exact steps if it recurs.
 - Owner accepts contour hover/cleanup and shortcut availability. The approved
-  0.19.41 editor improvements below need game acceptance. Category chooser,
+  0.19.41 editor improvements below are accepted by the 2026-10-01 owner report.
+  Collapsible hints, manipulator clutter and attachment context are new UI requests.
+  Category chooser,
   resource panel and rebinding still require their separate UI gates.
 - Esc removes the partial build and restores its ghost, but refunds drop on the
   ground. Count-based accounting and multiplayer remain pending.
 - One-piece save is currently disallowed; two pieces save correctly by report.
 
-## Next focused checks after installing 0.19.41
+## Accepted 0.19.41 checks for regression reference
 
 1. **Hover without copies:** edit a disposable blueprint containing three touching
    wooden walls and a separate pole. Stop adding, select the pole and press C over
@@ -304,9 +307,8 @@ respect resources and permissions. Without a second client, record “not tested
 
 ## Reporting results
 
-For now report **1–5 from the short 0.19.41 series above**, not the historical
-scenarios. For example: `1 — guide stays fixed; 2 — cancellation clears it;
-3 — hints readable; 4 — occluder disappears; 5 — FOV and tree scrolling work`.
+The five focused checks are accepted; no further result is requested now.
+If a regression appears, report the relevant step, selected part and active mode.
 If a step is impossible, give its number and what appears instead; do not guess
 where the tool is hidden. Do not repeat the remaining scenarios yet.
 Read profile logs locally; do not publish personal data. BW-00 stays open;

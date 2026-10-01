@@ -2,7 +2,7 @@
 
 **English** | [Русский](ROADMAP_RU.md)
 
-Updated 2026-09-30. Ostrix approved this order after the development review.
+Updated 2026-10-01. Ostrix approved this order after the development review.
 The goal is predictable building with real Valheim pieces, then useful group
 operations and editable generators. Each stage delivers a complete workflow,
 not just a button or a mathematical helper.
@@ -12,8 +12,9 @@ not just a button or a mathematical helper.
 Current source candidate: **0.19.41**, Store v9, Valheim 1.0.16.
 0.19.39 owner feedback accepts menu hover, language refresh and camera framing;
 Transform selection is provisionally accepted. The owner accepts contour cleanup;
-the fixed edge guide, stronger see-through, grouped hints, FOV and compact tree
-require the focused 0.19.41 game checks. Their UI design is approved.
+the focused 0.19.41 game series is accepted by owner report on 2026-10-01.
+New requests concern collapsible hints, manipulator clutter, hidden attachment
+context and compact viewer settings. Their proposed design is awaiting approval.
 All development deployments, upgrades and game tests use **only
 `TerrainRamp-1.0-Test`**. `Default/BuildWorks` is the source/artifact tree,
 not an installed mod. Do not modify other profiles, mods or saves as a side effect.
@@ -42,8 +43,8 @@ dependent changes wait for its gate, unrelated preparation may continue.
 
 | ID | Deliverable | Dependency | Status |
 | --- | --- | --- | --- |
-| BW-00 | Dedicated-profile baseline and reliable handoff | Current core | Partial owner acceptance; approved editor improvements automatically verified in 0.19.41, awaiting focused game checks; networking pending |
-| BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | Planned; visible UI/icon design approval required |
+| BW-00 | Dedicated-profile baseline and reliable handoff | Current core | Focused 0.19.41 owner series accepted; cost/refund accounting and networking pending |
+| BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | Editor visibility proposal prepared; visible UI/icon design approval required |
 | BW-02 | Group layout operations without resizing pieces | BW-01 | Planned; focused operation UI approval required |
 | BW-03 | Persistent Array and minimal recipe persistence | BW-02 | Planned; safe Store migration and editing/Bake gate |
 | BW-04 | Guides and curves in accepted slices | BW-03 + renewed owner discussion | Tool-semantics discussion required before coding |
@@ -85,7 +86,13 @@ selection, and document visibility/materials are unchanged. Sampled mesh rays
 are still a heuristic, not pixel-perfect occlusion. Six labeled hint groups,
 editor-only FOV slider/input/game reset and compact tree rows with anchor badges,
 eye/lock columns and an overflow scrollbar are automatically verified. Their
-approved design still needs in-game acceptance; FOV is disabled in orthographic view.
+design is accepted by owner report; FOV is disabled in orthographic view.
+The [next editor proposal](../specs/roadmap/editor-visibility-proposal.md)
+compares three ways to reduce manipulator clutter and recommends explicit active
+control families with matched hit tests, collapsible hints and compact viewer
+dropdowns. A target-only outline could retain attachment context under F7;
+interior snap eligibility is a separate decision. These are proposals, not shipped
+features; await owner approval before visible changes.
 Community translation overrides
 need a documented file format and fallback/reload tests before shipping.
 

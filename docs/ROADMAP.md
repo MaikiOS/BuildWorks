@@ -93,11 +93,15 @@ control families with matched hit tests, collapsible hints and compact viewer
 dropdowns. A target-only outline could retain attachment context under F7;
 interior snap eligibility is a separate decision. These are proposals, not shipped
 features; await owner approval before visible changes.
-The revised keyboard proposal replaces M/R/S with Q/W/E/R/T tool selection,
-Space action start and V world/local axes; G/F9 remain compatibility entries.
-It proposes editor MMB navigation-only and cursor-following existing-part movement with exact cancellation/one
-Undo, prominent next-step guidance, and original game-styled handles. Bindings,
-constraint/snap priority and a visual mockup require approval before implementation.
+The revised keyboard proposal replaces the rejected Q/W/E/R/T and Space-start
+draft with immediate G/R/S actions, top-row 1–4 persistent tools and one Space
+tool popup with F3 search. Future tools must not renumber existing bindings;
+modal digits belong to numeric entry, not tool switching. It proposes editor MMB
+navigation-only, cursor-following existing-part movement with exact cancellation/
+one Undo, prominent next-step guidance and original game-styled handles. Bindings,
+unconstrained Move/Rotate depth behavior, constraint/snap priority and a visual
+mockup require approval. A static audit found fixed runtime tooltip dimensions
+without content measurement; EN/RU tooltip-fit checks are required before UI acceptance.
 Community translation overrides
 need a documented file format and fallback/reload tests before shipping.
 

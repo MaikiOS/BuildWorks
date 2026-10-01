@@ -9,8 +9,10 @@ less crowded manipulators, attachment context while seeing through, and compact
 viewer settings. This document proposes changes; none are implemented or installed.
 Ostrix's follow-up makes alternative 2 conditional on fast action/axis switching,
 moving an existing editor part like a placement ghost, prominent next-step guidance
-and original game-styled handles. The subsequent keyboard review replaces the
-M/R/S draft with a compact tool cluster and a separate action start. It needs approval.
+and original game-styled handles. The keyboard proposal now keeps Blender-style
+G/R/S actions, restores direct persistent-tool switching, and adds one keyboard
+tool menu for future growth. It replaces the rejected Q/W/E/R/T and Space-start
+draft; the revised interaction still needs approval.
 
 ## Why the selected part disappears under controls
 
@@ -55,54 +57,68 @@ No new manipulator framework or replacement snap mathematics is needed.
 
 ## Proposed action and axis workflow
 
-These assignments replace the earlier M/R/S draft; they are not current bindings.
-Prefer Q/W/E/R: frequent tool choices are adjacent under the left hand. A tool
-choice changes visible handles, not geometry. Space starts its cursor-driven action;
-dragging a visible handle starts directly. This costs one extra key versus direct
-G/R/S actions, but clearly separates choosing a tool from starting an edit.
-There are no double-tap/hold-to-switch gestures or automatic tool switches.
+These are proposed bindings, not current behavior. Keep immediate actions separate
+from persistent tools: G/R/S begins a temporary preview directly; selecting a tool
+changes its idle controls without modifying geometry. Neither path requires a
+preparatory toolbar click or Space to start a transform.
 
 | Input with editable selection | Proposed next action |
 | --- | --- |
-| Q / W / E / R while idle | Choose Select / Move / Rotate / Uniform Scale; keep the part stationary |
-| T while idle | Choose Points handles; retain explicit pin/attachment gestures |
-| Space or Start button in Move / Rotate / Scale | Start cursor-following Move, Y-axis rotation or uniform scale preview respectively |
-| Space in Select / Points | No transform; show the applicable tool choices or point gestures |
-| X/Y/Z during Move | Constrain movement to an axis; repeat the same axis to clear |
-| X/Y/Z during Rotate | Choose the rotation axis; repeating it keeps that axis |
+| G / R / S while idle | Start Move / Rotate / Uniform Scale preview immediately |
+| Top-row 1 / 2 / 3 / 4 while idle | Choose Select / Gizmo / Array / Contour; Gizmo remembers its last control family |
+| Space while idle | Open Tools under the cursor; select by a shown key or click |
+| F3 while idle | Open the same Tools popup with search focused; type a name, arrows and Enter to choose |
+| X/Y/Z during Move or Rotate | Choose an axis; repeat that axis to switch current/alternate world-local orientation, showing both axis and frame |
 | Shift+X/Y/Z during Move | Move in the plane excluding that axis |
-| V in transform tools or their preview | Switch world/local frame, with an explicit label; replaces the old Space assignment |
-| Viewport LMB or Enter during a Space-started preview | Confirm once; the starting UI click cannot also confirm |
+| Viewport LMB or Enter during a keyboard-started preview | Confirm once; a starting UI click cannot also confirm |
 | Esc | Restore the exact starting state, keeping selection |
 
-Examples: select wall → W → Space → point at neighbor → LMB. Precise move:
-W → Space → X → move mouse → Enter. Rotate: E → Space → X → move mouse → Enter.
+Examples: select wall → G → point at neighbor → LMB. Precise move:
+G → X → move mouse → Enter. Rotate: R → X → move mouse → Enter.
 Ordinary handle dragging still confirms on releasing LMB; it does not require Enter.
-For an already active Move tool, Space is the one-key pickup. G/F9 remain compatibility
-entries to the last transform family (Move initially), not new direct pickup aliases;
-omit those duplicates from the compact main hint strip. A/C keep Array/Contour;
-Tab is the primary catalog key. Existing Shift+A remains a secondary compatibility shortcut.
-The adjacent tool cluster is also used by [Maya's Tool Box](https://help.autodesk.com/cloudhelp/2024/ENU/Maya-Basics/files/GUID-B345E162-0149-4E09-AC98-48DCFC227F33.htm).
-This uses Blender's action-then-axis principle, not identical bindings or repeated-axis
-semantics: [Blender Axis Locking](https://docs.blender.org/manual/en/5.2/scene_layout/object/editing/transform/control/axis_locking.html).
+Uniform scale does not offer S → X/Y/Z: nonuniform scaling is outside this proposal.
+Unconstrained G depth behavior and R rotation must be decided before promising
+Blender's third repeated-axis press to clear the constraint. Valheim uses Y-up;
+Blender uses Z-up, so screen-facing rotation cannot silently mean world Y.
+F9 can remain a compatibility entry to Gizmo; omit duplicates from the main hints.
+Tab remains the catalog key, with existing Shift+A as a compatibility shortcut.
+
+The 1–4 map is our proposal, not Blender's tool map; numpad keys are not implicitly
+included. A becomes Select All, Array moves to 3; C may remain a Contour compatibility
+alias, not a second advertised primary. Do not auto-renumber tools or reserve 5–0
+for imaginary tools. New tools get a stable command identity and appear in Tools;
+an optional direct binding can be assigned without displacing existing/custom keys.
+Reuse the current tool enumeration and planned binding settings, not a new framework.
+
+Space → shown key is sequential, not a held chord. It leaves text letters available
+outside the popup. Search takes keyboard focus only on explicit field activation
+or F3; the same letter cannot simultaneously select a tool and enter search text.
+Both paths call the same existing tool handlers. Blender provides this pattern as
+the configurable Spacebar Action **Tools**, not the default Play behavior:
+[Blender Keymap](https://docs.blender.org/manual/vi/5.2/editors/preferences/keymap.html).
+Its [F3 Search](https://docs.blender.org/manual/en/3.6/interface/controls/templates/operator_search.html)
+supports name lookup. Axis orientation follows the
+[Blender Axis Locking principle](https://docs.blender.org/manual/en/5.2/scene_layout/object/editing/transform/control/axis_locking.html),
+subject to the unconstrained-action gate above.
 
 Input ownership is explicit: focused UI/text/dialog/catalog first, then camera
-navigation over the viewport, then pending preview, then idle tools. E chooses
-Rotate only while idle; in Surface Move it advances the source point. Q likewise
-selects only while idle. During new placement Q/E/wheel retain their construction
-meaning, not tool switching. Return from navigation/UI must re-arm movement without
+navigation over the viewport, then pending preview, then idle tools. During Surface
+Move/new placement Q/E/wheel retain their construction meaning, not tool switching.
+Return from navigation/UI must re-arm movement without
 a jump; tool input must not leak into text fields or the world session.
 During a pending operation,
 save/history/catalog/selection-changing commands must not commit or undo some other
-edit; show Confirm or cancel first. This includes Q/W/E/R/T and A/C, except contextual
-Q/E source selection. Space must not restart a pending operation. Escape or loss of application focus cancels.
+edit; show Confirm or cancel first. This includes tool changes, Space/F3 and a new
+G/R/S action, except contextual Q/E source selection. Digits during a modal transform
+are reserved for numeric entry, not 1–4 tool switching; this is a future input
+requirement, not shipped numeric-entry support. Escape or loss of application focus cancels.
 Navigation freezes the preview; resume without a jump. Changing axis/frame or source
 point rebases the interaction to the current preview instead of snapping unexpectedly.
 
 ## Remaining keyboard and mouse commands
 
 Keep familiar commands instead of relocating every key merely to make the cluster smaller:
-Ctrl+A all, Ctrl+D copy, Ctrl+G group, Ctrl+S save, Ctrl+Z undo, Ctrl+Y or
+A all (Ctrl+A compatibility), Ctrl+D copy, Ctrl+G group, Ctrl+S save, Ctrl+Z undo, Ctrl+Y or
 Ctrl+Shift+Z redo. Modified chords have priority over single keys. F frames selection,
 Home frames all. H/Shift+H/Ctrl+H/Alt+H keep hide/isolate/show-except/show-all;
 F7 keeps see-through. N remains the temporary composite pivot override, Shift+S
@@ -132,13 +148,15 @@ resolved; resetting must not silently discard saved custom bindings. Labels and 
 must use the effective binding, not fixed text. Display Latin key identities in EN/RU;
 test actual Unity input on Russian and English keyboard layouts rather than assuming
 physical-key behavior. This is a future settings requirement, not an implemented service.
-No extra layout presets, command palette, keyboard framework or world remapping in this pass.
+Space/F3 shares one tool list; do not add a second command palette, layout presets,
+keyboard framework or world remapping in this pass.
 
 ## Move existing parts like the placement ghost
 
 Surface following best matches construction. A screen-parallel plane is steadier
-but hides depth control; offer it as an explicit fallback rather than automatically
-switching movement methods. Axis/plane constraints use the chosen world/local frame.
+but hides depth control. The proposed pair is Surface with an explicit Plane
+fallback, not automatic switching; the initial G method and depth interaction
+remain an approval gate. Axis/plane constraints use the chosen world/local frame.
 
 Start from the existing selected point, otherwise the current selection pivot;
 keep initial pose until deliberate mouse movement. Exclude all moving parts from
@@ -172,10 +190,10 @@ Show only meaningful continuations for the current state:
 
 | State | Example guidance |
 | --- | --- |
-| Selected | Wall selected · W Move · E Rotate · R Scale · T Points |
-| Move tool idle | Move selected · Space pick up · or drag an arrow |
+| Selected | Wall selected · G Move · R Rotate · S Scale · Space Tools |
+| Persistent tool choice | 1 Select · 2 Gizmo · 3 Array · 4 Contour; highlight the active tool |
 | Surface Move | Point at a surface · X/Y/Z axis · Q/E source point |
-| Axis Move | Move along X · World · X release axis · Enter confirm · Esc restore |
+| Axis Move | Move along X · World · X switch to Local · Enter confirm · Esc restore |
 | Valid target | Target: wall · Point 3/8 · LMB/Enter confirm · Esc restore |
 | Missing target | No surface · Point elsewhere or choose Plane · Esc restore |
 | Confirmed | Moved · Ctrl+Z undo, then return to selection guidance |
@@ -240,9 +258,36 @@ See [Blender Gizmos](https://docs.blender.org/manual/en/latest/editors/3dview/di
 [Blender View settings](https://docs.blender.org/manual/en/latest/editors/3dview/sidebar.html),
 and [Houdini control selection sets](https://www.sidefx.com/docs/houdini/character/kinefx/selectionsets.html).
 
+## Viewport space and tooltip fit
+
+Borrow Blender's resizeable area boundaries, collapsible side regions and reversible
+viewport maximization, not its whole window/docking system. Start with the existing
+tree/inspector split and minimum readable widths; compact icon toolbar, dropdowns
+and a Focus button must restore the previous layout. Keep the next-action strip
+visible while focused. Available space belongs to the model, not more permanent
+buttons. [Blender Areas](https://docs.blender.org/manual/en/5.2/interface/window_system/areas.html)
+documents resizing and maximization; these are proposed adaptations, not shipped controls.
+Do not copy Blender N for a sidebar: N already owns the composite-pivot override.
+
+Static audit: runtime `BlueprintEditorView` creates a fixed 250×58 tooltip with
+10/4-pixel insets and places that box inside `safeRoot`. `ShowTooltipNow` does not
+measure text or resize for content. This confirms a fit risk, not a reproduction
+of the owner's exact clipped string. The synthetic Workbench uses character-count
+width estimates; those are not actual glyph measurements. The inspected runtime
+acceptance checks buttons and status hints, but has no dedicated tooltip-fit gate.
+
+Fix shared tooltip sizing: measure localized text at a bounded width, wrap and
+derive height including padding, then clamp the measured rectangle to the safe
+viewport. Keep readable font size and non-intercepting tooltip input. If content
+cannot fit even then, shorten the tooltip and put detail in explicit help; do not
+silently clip or shrink it to illegibility. Validate real runtime tooltip text,
+not only the synthetic UI, in EN/RU at supported UI scales, narrow windows and
+screen corners, including long object names and effective custom bindings.
+
 ## Implementation and approval gates
 
-Approve Q/W/E/R/T tools, Space start/V axes, editor MMB navigation-only,
+Approve G/R/S actions, 1–4 persistent tools and one Space/F3 tool popup,
+unconstrained Move/Rotate and depth behavior, editor MMB navigation-only,
 surface-following fallback, contextual Q/E/wheel, constraint priority,
 next-step strip and visual mockup before code/icons.
 Implement in bounded steps: footer collapse/guidance; explicit manipulator families
@@ -257,5 +302,7 @@ viewport space, and camera/document/world F9 behavior must remain unchanged.
 Test exact cancellation/one Undo, zero-delta commit, group IDs/anchors, self-hit
 exclusion, ray misses, axis/frame/source changes, camera navigation/focus loss,
 UI-start click guarding and modifier/text priority.
+Check tool keys versus modal numeric input, popup letter/search focus, repeat-axis
+orientation, camera flight priority, effective bindings and measured tooltip fit.
 Then run an explicit owner game series only in TerrainRamp-1.0-Test.
 No version bump, deployment or release is part of this proposal.

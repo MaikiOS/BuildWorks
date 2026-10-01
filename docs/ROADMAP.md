@@ -14,7 +14,8 @@ Current source candidate: **0.19.41**, Store v9, Valheim 1.0.16.
 Transform selection is provisionally accepted. The owner accepts contour cleanup;
 the focused 0.19.41 game series is accepted by owner report on 2026-10-01.
 New requests concern collapsible hints, manipulator clutter, hidden attachment
-context and compact viewer settings. Their proposed design is awaiting approval.
+context and compact viewer settings. Keyboard/tool access is approved in principle;
+the complete manipulator redraw still needs visual approval.
 All development deployments, upgrades and game tests use **only
 `TerrainRamp-1.0-Test`**. `Default/BuildWorks` is the source/artifact tree,
 not an installed mod. Do not modify other profiles, mods or saves as a side effect.
@@ -44,7 +45,7 @@ dependent changes wait for its gate, unrelated preparation may continue.
 | ID | Deliverable | Dependency | Status |
 | --- | --- | --- | --- |
 | BW-00 | Dedicated-profile baseline and reliable handoff | Current core | Focused 0.19.41 owner series accepted; cost/refund accounting and networking pending |
-| BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | Editor visibility proposal prepared; visible UI/icon design approval required |
+| BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | G/R/S and keyboard tool access approved; full manipulator redraw awaiting visual approval |
 | BW-02 | Group layout operations without resizing pieces | BW-01 | Planned; focused operation UI approval required |
 | BW-03 | Persistent Array and minimal recipe persistence | BW-02 | Planned; safe Store migration and editing/Bake gate |
 | BW-04 | Guides and curves in accepted slices | BW-03 + renewed owner discussion | Tool-semantics discussion required before coding |
@@ -98,9 +99,12 @@ draft with immediate G/R/S actions, top-row 1–4 persistent tools and one Space
 tool popup with F3 search. Future tools must not renumber existing bindings;
 modal digits belong to numeric entry, not tool switching. It proposes editor MMB
 navigation-only, cursor-following existing-part movement with exact cancellation/
-one Undo, prominent next-step guidance and original game-styled handles. Bindings,
-unconstrained Move/Rotate depth behavior, constraint/snap priority and a visual
-mockup require approval. A static audit found fixed runtime tooltip dimensions
+one Undo, prominent next-step guidance and original game-styled handles. Remaining
+mouse/input decisions, unconstrained Move/Rotate depth behavior, constraint/snap
+priority and a visual mockup require approval; G/R/S, 1–4 and Space/F3 access is approved in principle
+on 2026-10-01, not yet implemented. Redraw arrows/planes, rotation, uniform scale,
+snap glyphs and Array/Contour guides, with separate idle/hover/drag/occluded states.
+A static audit found fixed runtime tooltip dimensions
 without content measurement; EN/RU tooltip-fit checks are required before UI acceptance.
 Community translation overrides
 need a documented file format and fallback/reload tests before shipping.

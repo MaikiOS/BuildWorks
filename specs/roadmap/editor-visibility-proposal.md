@@ -12,7 +12,9 @@ moving an existing editor part like a placement ghost, prominent next-step guida
 and original game-styled handles. The keyboard proposal now keeps Blender-style
 G/R/S actions, restores direct persistent-tool switching, and adds one keyboard
 tool menu for future growth. It replaces the rejected Q/W/E/R/T and Space-start
-draft; the revised interaction still needs approval.
+draft. Ostrix approved the G/R/S, 1–4 and Space/F3 direction on 2026-10-01 and
+explicitly requested a complete manipulator redraw, not just recoloring.
+Exact visual treatment and the remaining interaction gates below are still open.
 
 ## Why the selected part disappears under controls
 
@@ -57,7 +59,7 @@ No new manipulator framework or replacement snap mathematics is needed.
 
 ## Proposed action and axis workflow
 
-These are proposed bindings, not current behavior. Keep immediate actions separate
+The binding direction is owner-approved, not implemented behavior. Keep immediate actions separate
 from persistent tools: G/R/S begins a temporary preview directly; selecting a tool
 changes its idle controls without modifying geometry. Neither path requires a
 preparatory toolbar click or Space to start a transform.
@@ -207,17 +209,46 @@ show only the applicable block plus the next step, not every keyboard command.
 
 ## Original game styled manipulators
 
-Use restrained metal arrowheads, thin rotation arcs and small point marks with an
-open center over the part. Preserve distinguishable XYZ colors and letter labels.
-Dark edging should retain contrast against both wood and the grid; bronze/gold
-belongs to hover, selection and peripheral UI, not elaborate ornaments on the mesh.
-Inactive lines are subdued; hover brightens/thickens the approached handle;
-drag shows the active control, source/pin/target and necessary constraints.
+Redraw the full current handle vocabulary: movement arrows and planes, rotation
+arcs, uniform scale, source/pinned/target points, Array spacing/direction and
+Contour guides. This is not a palette-only change. Use small chamfered dark-metal
+arrowheads, thin arcs, open point marks and restrained bronze edging, matching
+the existing BuildWorks frames without heavy ornaments over the model.
+Preserve distinguishable XYZ colors and letter labels, Y-up and a readable part.
+
+| Situation | Proposed drawing |
+| --- | --- |
+| Active family at rest | Thin subdued axis-colored lines, dark contrast edge, compact metal tips; open center |
+| Hover | Clear brighter rim and slight line emphasis on one pickable handle; narrow warm halo, not scene bloom |
+| Drag | Strong active axis/control and a precise guide; only essential source, pin and target marks remain |
+| Behind geometry | Faint broken continuation for orientation; front segments remain clear; no equally bright full ring through the part |
+| Inactive family | Hidden, not a translucent pile of competing controls; informative pin/target marks may remain |
+| Snap or layout | Small distinct source/target glyphs, sparse nearby candidates, Array marks outside the silhouette and Contour guide on the actual edge |
+
+Do not depend on Valheim post-processing bloom for hover feedback: an optional
+small drawn halo must read without it. Contrast comes first; glow supplements it.
+Use the existing renderer and small original shapes, not imported DCC meshes,
+a new rendering framework or rewritten snap mathematics. The shared renderer
+also serves world F9: stage editor controls first, retain world gestures/defaults,
+and verify any shared visual changes in both contexts before installing.
 
 Hover does not enlarge the hit area or change which handle wins. Hidden families
 cannot receive hits; retained pin marks are informative unless the active family
 allows manipulating them. Exact color/opacity/icon shapes need an owner-approved
-visual mockup before implementation. No Blender/Houdini/other-mod assets are copied.
+visual mockup before implementation. A generated concept is art direction only,
+not evidence of Unity depth, picking, glow or performance. Prove those separately
+in the actual runtime Workbench on small/large pieces, overlapping points, wood,
+bright ground and dark grid, perspective/orthographic views and supported scales.
+No Blender/Houdini/other-mod assets are copied.
+
+![Original BuildWorks manipulator style concept](../../docs/images/manipulator-style-concept-v1.png)
+
+Visual approval board generated with the built-in image tool on 2026-10-01:
+six current control families and idle/hover/drag/occluded treatment, dark metal
+and bronze details, sparse points, visible timber. Illustrative geometry,
+materials and guide placements are not exact runtime output or altered snap data.
+It is not a manipulator texture sheet; implement approved shapes in the existing
+renderer and validate them in Unity. Visual approval is pending.
 
 ## Proposed see through context
 
@@ -286,8 +317,8 @@ screen corners, including long object names and effective custom bindings.
 
 ## Implementation and approval gates
 
-Approve G/R/S actions, 1–4 persistent tools and one Space/F3 tool popup,
-unconstrained Move/Rotate and depth behavior, editor MMB navigation-only,
+G/R/S actions, 1–4 persistent tools and one Space/F3 tool popup are approved in
+principle. Before implementation resolve unconstrained Move/Rotate and depth behavior, editor MMB navigation-only,
 surface-following fallback, contextual Q/E/wheel, constraint priority,
 next-step strip and visual mockup before code/icons.
 Implement in bounded steps: footer collapse/guidance; explicit manipulator families

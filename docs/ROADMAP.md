@@ -2,7 +2,7 @@
 
 **English** | [Русский](ROADMAP_RU.md)
 
-Updated 2026-10-01. Ostrix approved this order after the development review.
+Updated 2026-10-02. Ostrix approved this order after the development review.
 The goal is predictable building with real Valheim pieces, then useful group
 operations and editable generators. Each stage delivers a complete workflow,
 not just a button or a mathematical helper.
@@ -17,7 +17,7 @@ New requests concern collapsible hints, manipulator clutter, hidden attachment
 context and compact viewer settings. Keyboard/tool access is approved in principle;
 Ostrix approved the Scandinavian manipulator form study on 2026-10-01.
 The full editor implementation is authorized. Owner feedback supersedes the .43
-first-G gate: .44 highlights selection and shows the combined gizmo immediately.
+first-G gate: .45 keeps the original model material and shows the combined gizmo immediately.
 G starts surface Move; R/S/axes retain exact operation-start numbers. Editor
 handles are 25% larger. Vanilla points are brighter closed gold diamonds;
 generated helpers, including midpoints, are smaller open coloured marks.
@@ -26,8 +26,11 @@ Ctrl+1–4 selects tools; MMB click deletes in Select/adding while
 MMB drag orbits. Six original engraved SVG/texture assets, filled scale and
 screen-distance hover feedback extend the accepted Scandinavian forms.
 Collapsible hints, compact dropdowns and active hidden-target context remain.
-Automated evidence and the pending owner series are in the active pass; runtime
-Valheim rendering and interaction acceptance remain pending.
+Ostrix's .45 report on 2026-10-02 accepts tests 1, 3–6 and 8–11, plus language
+refresh in 12. BW-01 remains open: thematic snap artwork, native-first/Auto cursor
+movement and native-style resource/station cards are not accepted yet.
+The [next design proposal](../specs/roadmap/snap-art-and-hud-proposal.md) records
+these three gaps and requires artwork/source-selection approval before coding.
 All development deployments, upgrades and game tests use **only
 `TerrainRamp-1.0-Test`**. `Default/BuildWorks` is the source/artifact tree,
 not an installed mod. Do not modify other profiles, mods or saves as a side effect.
@@ -57,7 +60,7 @@ dependent changes wait for its gate, unrelated preparation may continue.
 | ID | Deliverable | Dependency | Status |
 | --- | --- | --- | --- |
 | BW-00 | Dedicated-profile baseline and reliable handoff | Current core | Focused 0.19.41 owner series accepted; cost/refund accounting and networking pending |
-| BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | .45 untinted selection, plain fixed-position snap glyphs, axis reset/QE and localized resource HUD; owner acceptance pending; world F9 retained |
+| BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | .45 transforms/input accepted; thematic points, native-first/Auto snapping and resource cards remain open; design approval next |
 | BW-02 | Group layout operations without resizing pieces | BW-01 | Planned; focused operation UI approval required |
 | BW-03 | Persistent Array and minimal recipe persistence | BW-02 | Planned; safe Store migration and editing/Bake gate |
 | BW-04 | Guides and curves in accepted slices | BW-03 + renewed owner discussion | Tool-semantics discussion required before coding |

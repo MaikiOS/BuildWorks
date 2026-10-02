@@ -2,6 +2,17 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Owner feedback and design gate 2026-10-02
+
+Ostrix accepts .45 tests 1, 3–6 and 8–11 and language refresh in 12.
+Remaining gaps: 2 needs thematic point artwork, including Shift pin; 7 needs
+vanilla-like surface movement, a short native-only cycle and Auto; 12 needs
+resource/station icon cards, not text totals. No new binary or deployment.
+Installed version stays .45. The [design proposal](specs/roadmap/snap-art-and-hud-proposal.md)
+and generated style board await artwork/source-selection approval. The existing
+numbered tests remain historical evidence for this feedback, not another request
+to repeat accepted steps. Curves and later roadmap stages remain gated.
+
 ## Verified candidate 0.19.45 — 2026-10-01
 
 Active gate: BW-01 owner Valheim acceptance in TerrainRamp-1.0-Test.

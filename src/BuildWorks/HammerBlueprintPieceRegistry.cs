@@ -251,10 +251,11 @@ namespace OstrixMods.BuildWorks
                         ? Localization.instance.Localize(item.m_itemData.m_shared.m_name)
                         : item.m_itemData.m_shared.m_name;
                     Sprite icon = item.m_itemData.GetIcon();
-                    if (amounts.TryGetValue(key, out ResourceInfo existing))
-                        amounts[key] = new ResourceInfo(name, icon, existing.Amount + amount);
-                    else
-                        amounts.Add(key, new ResourceInfo(name, icon, amount));
+                    amounts.TryGetValue(key, out ResourceInfo existing);
+                    bool craft = piece.FreeBuildKey() == GlobalKeys.NoCraftCost;
+                    amounts[key] = new ResourceInfo(name, icon, existing.Amount + amount, item,
+                        existing.BuildAmount + (craft ? 0 : amount),
+                        existing.CraftAmount + (craft ? amount : 0));
                 }
             }
             result.AddRange(amounts.Values);
@@ -266,25 +267,8 @@ namespace OstrixMods.BuildWorks
         }
 
         internal string Description(CompositeBlueprintStore.Blueprint blueprint)
-        {
-            var resources = new List<string>();
-            foreach (ResourceInfo resource in Resources(blueprint))
-                resources.Add(resource.Amount + " × " + resource.Name);
-            var stations = new SortedSet<string>(StringComparer.CurrentCultureIgnoreCase);
-            if (blueprint != null && sourcePiecesByBlueprintId.TryGetValue(blueprint.id, out IReadOnlyList<Piece> pieces))
-                foreach (Piece source in pieces)
-                    if (source && source.m_craftingStation)
-                        stations.Add(Localization.instance != null
-                            ? Localization.instance.Localize(source.m_craftingStation.m_name)
-                            : source.m_craftingStation.m_name);
-            string description = "BuildWorks: " + BuildWorksLocalization.Text(
+            => "BuildWorks: " + BuildWorksLocalization.Text(
                 "blueprint.piece.description", blueprint?.parts.Count ?? 0);
-            if (resources.Count > 0) description += "\n" + BuildWorksLocalization.Text(
-                "blueprint.piece.resources", string.Join(" · ", resources));
-            if (stations.Count > 0) description += "\n" + BuildWorksLocalization.Text(
-                "blueprint.piece.stations", string.Join(", ", stations));
-            return description;
-        }
 
         public Sprite RefreshThumbnail(
             CompositeBlueprintStore.Blueprint blueprint)
@@ -723,16 +707,23 @@ namespace OstrixMods.BuildWorks
 
         internal readonly struct ResourceInfo
         {
-            public ResourceInfo(string name, Sprite icon, int amount)
+            public ResourceInfo(string name, Sprite icon, int amount, ItemDrop item,
+                int buildAmount, int craftAmount)
             {
                 Name = name;
                 Icon = icon;
                 Amount = amount;
+                Item = item;
+                BuildAmount = buildAmount;
+                CraftAmount = craftAmount;
             }
 
             public string Name { get; }
             public Sprite Icon { get; }
             public int Amount { get; }
+            public ItemDrop Item { get; }
+            public int BuildAmount { get; }
+            public int CraftAmount { get; }
         }
     }
 }

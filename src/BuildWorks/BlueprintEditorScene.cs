@@ -571,9 +571,13 @@ namespace OstrixMods.BuildWorks
             Vector2 screenPosition,
             out Vector3 point,
             out Vector3 normal)
+            => TryCursorSurface(screenPosition, null, out point, out normal);
+
+        internal bool TryCursorSurface(Vector2 screenPosition, IReadOnlyList<string> excludedIds,
+            out Vector3 point, out Vector3 normal)
         {
             if (TryPickPoint(
-                screenPosition, includeLocked: true, out _, out point, out normal)) return true;
+                screenPosition, includeLocked: true, out _, out point, out normal, excludedIds)) return true;
             Ray ray = camera.ScreenPointToRay(screenPosition);
             var plane = new Plane(Vector3.up, new Vector3(0f, groundHeight, 0f));
             if (!plane.Raycast(ray, out float distance))
@@ -584,6 +588,75 @@ namespace OstrixMods.BuildWorks
             point = ray.GetPoint(distance);
             normal = Vector3.up;
             return true;
+        }
+
+        internal Vector3 CursorContactOffset(IReadOnlyList<string> ids, Vector3 point, Vector3 normal)
+        {
+            float contact = float.NegativeInfinity;
+            foreach (string id in ids)
+                if (visuals.TryGetValue(id, out VisualNode visual) && visual.Root.activeInHierarchy)
+                    contact = Mathf.Max(contact, Vector3.Dot(PlacementContactOffset(visual, point, normal), normal));
+            return float.IsInfinity(contact) ? Vector3.zero : normal * contact;
+        }
+
+        internal bool TryCursorSnap(IReadOnlyList<string> excludedIds, Vector3[] sourcePoints,
+            IReadOnlyList<int> sourceIndices, int nativeStart, int nativeEnd, bool helpers,
+            List<Vector3> previewTargets, List<bool> previewNative,
+            out int sourceIndex, out Vector3 target, out bool targetNative,
+            int previousSource = -1, Vector3? previousTarget = null)
+        {
+            previewTargets.Clear(); previewNative.Clear();
+            sourceIndex = -1; target = Vector3.zero; targetNative = false;
+            activeSnapVisual = null;
+            // ponytail: bounded editor scan; spatial indexing only after measured frame cost warrants it.
+            // Native pairs win, but enabled helper candidates remain visible.
+            for (int pass = 0; pass < 2; ++pass)
+            {
+                bool nativeWinner = pass == 1 && sourceIndex >= 0;
+                float best = .55f * .55f;
+                bool retained = false;
+                foreach (KeyValuePair<string, VisualNode> entry in visuals)
+                {
+                    VisualNode visual = entry.Value;
+                    if (Contains(excludedIds, entry.Key) || !visual.Root.activeInHierarchy) continue;
+                    int count = helpers || visual.NativeSnapCount == 0 ? visual.SnapLocal.Count : visual.NativeSnapCount;
+                    for (int ti = 0; ti < count; ++ti)
+                    {
+                        bool native = ti < visual.NativeSnapCount;
+                        Vector3 point = visual.Root.transform.TransformPoint(visual.SnapLocal[ti]);
+                        bool visible = false, checkedVisibility = false;
+                        foreach (int si in sourceIndices)
+                        {
+                            bool nativePair = native && si >= nativeStart && si < nativeEnd;
+                            if (nativePair != (pass == 0)) continue;
+                            float distance = (point - sourcePoints[si]).sqrMagnitude;
+                            if (distance > PlacementSnapPreviewRadius * PlacementSnapPreviewRadius) continue;
+                            if (!checkedVisibility)
+                            {
+                                visible = IsEditorPointVisible(point, excludedIds, native ? visual.Root : null);
+                                checkedVisibility = true;
+                            }
+                            if (!visible) continue;
+                            AddCursorPreview(point, native);
+                            if (nativeWinner) continue;
+                            bool same = previousSource == si && previousTarget.HasValue &&
+                                (previousTarget.Value - point).sqrMagnitude < .000001f && distance < .7f * .7f;
+                            if (!same && (retained || distance >= best)) continue;
+                            retained = same; best = distance;
+                            sourceIndex = si; target = point; targetNative = native; activeSnapVisual = visual;
+                        }
+                    }
+                }
+            }
+            return sourceIndex >= 0;
+
+            void AddCursorPreview(Vector3 point, bool native)
+            {
+                for (int i = 0; i < previewTargets.Count; ++i)
+                    if ((previewTargets[i] - point).sqrMagnitude < .0004f) { previewNative[i] |= native; return; }
+                if (previewTargets.Count < MaximumSnapPreviewTargets)
+                { previewTargets.Add(point); previewNative.Add(native); }
+            }
         }
 
         internal bool IsEditorPointVisible(

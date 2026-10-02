@@ -2,7 +2,7 @@
 
 **English** | [Русский](README_RU.md)
 
-> Source candidate 0.19.45 for Valheim 1.0.16. The latest existing binary prerelease remains 0.19.37; this checkpoint does not publish a new binary. Development tests use only TerrainRamp-1.0-Test; the revised editor input awaits owner game acceptance.
+> Source candidate 0.19.46 for Valheim 1.0.16. The latest existing binary prerelease remains 0.19.37; this checkpoint does not publish a new binary. Development tests use only TerrainRamp-1.0-Test; thematic points, Auto attachment and native resource cards await owner game acceptance.
 
 ![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
 

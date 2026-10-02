@@ -2,16 +2,45 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
-## Owner feedback and design gate 2026-10-02
+## Verified candidate 0.19.46
 
-Ostrix accepts .45 tests 1, 3–6 and 8–11 and language refresh in 12.
-Remaining gaps: 2 needs thematic point artwork, including Shift pin; 7 needs
-vanilla-like surface movement, a short native-only cycle and Auto; 12 needs
-resource/station icon cards, not text totals. No new binary or deployment.
-Installed version stays .45. The [design proposal](specs/roadmap/snap-art-and-hud-proposal.md)
-and generated style board await artwork/source-selection approval. The existing
-numbered tests remain historical evidence for this feedback, not another request
-to repeat accepted steps. Curves and later roadmap stages remain gated.
+Ostrix approved artwork and controls on 2026-10-02. Six individual transparent
+PNGs are implemented: native clasp, corner, midpoint, centre, Shift pin and
+active source. Coordinates are unchanged; a coincident helper is picked in the
+centre, its native socket on the outer rim. Selected model materials stay untinted.
+[Assets and generation prompts](docs/artwork/snap-point-assets.md).
+
+G follows scene surfaces/ground like the placement ghost. Auto is default;
+Q/E cycles native-only, with opt-in helpers and explicit furniture fallback.
+Attachment previews/chooses real points without confirmation; an explicit
+source survives G → R → G. Native pair priority, 2 m previews, 0.55 m capture
+and 0.7 m winner retention are implemented. Accepted R/S/axes, Esc and one Undo remain.
+
+Blueprint HUD uses native resource cells and station icons. Resources aggregate;
+stations deduplicate; missing availability accounts for paid requirements.
+Cards widen/wrap; long lists have screen-bounded scrolling, including an active
+Canvas resize. Ordinary selection/errors/teardown restore original cell parents
+and geometry. Display-only: marker m_resources stays empty; costs are not changed.
+
+Release has zero warnings/errors. Geometry, Store, Localization, EditorBridge,
+WorldLayout, DeploymentChecks and HostContract pass. 647 matching keys and
+624 static references; embedded resources verified. Format exits 0 with a
+workspace-loading warning. Fresh Unity 6000.0.61f1: 81 captures and actual
+Controller/EventSystem, imported game meshes and HUD adapter checks pass at
+2026-10-02T19:44:17.4464874Z. Independent correctness/complexity review has no
+blockers. External host/physical input is substituted; native HUD hierarchy,
+in-game readability, costs/refunds, world reload and networking remain unproven.
+
+Artifacts:
+
+- BuildWorks SHA256: 5EABBC77C5D0ED0D0F7DC9A8F9CA56C5541F3293E723108F72F42368FA8AE9F6
+- Geometry SHA256: 3EF58DB30AE547E99293DD2B90E97BF8FEE005534C055D23656714FA09D9EA16
+
+Installed only in TerrainRamp-1.0-Test with the game closed, through the
+guarded script; hashes match. Previous .45: artifacts/checkpoint-0.19.46/preinstall.
+Next: one [owner series 1–8](specs/roadmap/current-pass.md).
+Accepted .45 evidence is preserved below and archived. BW-01 awaits game
+acceptance; later stages and curves stay gated. No binary release is published.
 
 ## Verified candidate 0.19.45 — 2026-10-01
 

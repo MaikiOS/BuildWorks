@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class Player : MonoBehaviour { public static Player m_localPlayer; }
 namespace BepInEx
 {
     public static class Paths { public static string ConfigPath => Application.temporaryCachePath; }

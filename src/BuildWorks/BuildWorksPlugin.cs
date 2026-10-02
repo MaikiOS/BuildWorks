@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.45";
+        internal const string PluginVersion = "0.19.46";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -181,6 +181,7 @@ namespace OstrixMods.BuildWorks
                 {
                     hammerCatalogViewFailed = true;
                     HammerCatalogView.Clear();
+                    instance?.session?.ClearBlueprintPieceInfo();
                     instance?.Logger.LogError(
                         "BuildWorks Hammer catalog view disabled; use PageUp/PageDown: " +
                         exception);
@@ -814,6 +815,7 @@ namespace OstrixMods.BuildWorks
                 {
                     hammerCatalogViewFailed = true;
                     HammerCatalogView.Clear();
+                    instance?.session?.ClearBlueprintPieceInfo();
                     instance?.Logger.LogError(
                         "BuildWorks Hammer catalog view disabled; use PageUp/PageDown: " +
                         exception);
@@ -884,6 +886,7 @@ namespace OstrixMods.BuildWorks
         {
             private static void Prefix()
             {
+                instance?.session?.ClearBlueprintPieceInfo();
                 HammerCatalogView.Clear();
             }
         }
@@ -893,7 +896,8 @@ namespace OstrixMods.BuildWorks
         {
             private static bool Prefix(ref float __result)
             {
-                if (!HammerCatalogView.ShouldCaptureWheel) return true;
+                if (!HammerCatalogView.ShouldCaptureWheel &&
+                    instance?.session?.CapturesBlueprintResourceWheel != true) return true;
                 __result = 0f;
                 return false;
             }

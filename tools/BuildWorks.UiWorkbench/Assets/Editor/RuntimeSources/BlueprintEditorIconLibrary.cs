@@ -76,7 +76,7 @@ namespace OstrixMods.BuildWorks
                     sprite = Sprite.Create(
                         texture,
                         new Rect(0f, 0f, texture.width, texture.height),
-                        new Vector2(0.5f, 0.5f),
+                        iconName == "snap-pin" ? new Vector2(.496f, .634f) : new Vector2(.5f, .5f),
                         100f);
                     sprite.name = "BuildWorks_EditorIcon_" + iconName;
                     sprite.hideFlags = HideFlags.HideAndDontSave;

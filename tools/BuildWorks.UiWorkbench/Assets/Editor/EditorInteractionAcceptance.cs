@@ -125,6 +125,7 @@ public static class EditorInteractionAcceptance
                 Require(scene.TrySync(doc, out error), "Restore native group: " + error);
                 scene.TryGetGizmoAnchors(ids, out Vector3[] restored, out _);
                 Require(Vector3.Distance(restored[0], original[0]) < 0.001f, "TrySync retained preview anchor positions");
+                TestCursorSnap(scene, visuals["wall"]);
 
                 scene.ShowContourPreview(new[] { Part("array", "woodwall", pivot + Vector3.right * 3f) });
                 scene.ShowDuplicatePreview(new[] { Part("duplicate", "woodwall", pivot + Vector3.left * 3f) });
@@ -267,6 +268,32 @@ public static class EditorInteractionAcceptance
             Require(Field<float>(world, "moveSize") == 1f && Field<float>(world, "pointSize") == 1f,
                 "Editor settings modified legacy world F9 sizes");
         }
+    }
+
+    private static void TestCursorSnap(BlueprintEditorScene scene, object visual)
+    {
+        GameObject root = Field<GameObject>(visual, "Root");
+        List<Vector3> local = Field<List<Vector3>>(visual, "SnapLocal");
+        int nativeCount = Field<int>(visual, "NativeSnapCount");
+        Vector3 target = Enumerable.Range(0, nativeCount).Select(index => root.transform.TransformPoint(local[index]))
+            .OrderBy(point => point.z).First();
+        var previews = new List<Vector3>(); var provenance = new List<bool>();
+        string[] excluded = { "left", "right" };
+        Vector3[] sources = { target, target + Vector3.left * .1f };
+        Require(scene.TryCursorSnap(excluded, sources, new[] { 0,1 }, 1,2,true,previews,provenance,
+            out int source, out Vector3 snapped, out bool native) && source == 1 && native &&
+            Vector3.Distance(snapped, target) < .001f, "A coincident helper wins before a nearby native pair");
+        sources[1] = target + Vector3.back * .65f;
+        Require(scene.TryCursorSnap(excluded, sources, new[] { 1 }, 1,2,false,previews,provenance,
+            out source, out snapped, out native, 1,target) && source == 1 && snapped == target,
+            "Cursor Auto loses the retained native pair before its release radius");
+        sources[1] = target + Vector3.back * .8f;
+        Require(!scene.TryCursorSnap(excluded, sources, new[] { 1 }, 1,2,false,previews,provenance,
+            out _, out _, out _, 1,target) && previews.Count > 0 && provenance.TrueForAll(value => value),
+            "Capture/release and two-metre native candidate preview are not separate");
+        sources[1] = target + Vector3.back * 2.1f;
+        Require(!scene.TryCursorSnap(excluded, sources, new[] { 1 }, 1,2,false,previews,provenance,
+            out _, out _, out _) && previews.Count == 0, "Candidate preview extends beyond two metres");
     }
 
     private static void Show(BlueprintEditorScene scene, Vector3 pivot, Vector3[] anchors, int nativeStart, int pin = -1) =>

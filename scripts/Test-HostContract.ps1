@@ -49,7 +49,8 @@ $requiredEditorIcons = @(
     'select', 'move', 'rotate', 'pivot', 'axes', 'snap', 'add', 'duplicate',
     'delete', 'group', 'undo', 'redo', 'lighting', 'visibility', 'hidden',
     'lock', 'unlock', 'frame', 'save', 'exit', 'back', 'search', 'filter',
-    'menu', 'close', 'gizmo-move', 'gizmo-plane', 'gizmo-rotate', 'gizmo-scale', 'gizmo-source', 'gizmo-target'
+    'menu', 'close', 'gizmo-move', 'gizmo-plane', 'gizmo-rotate', 'gizmo-scale', 'gizmo-source', 'gizmo-target',
+    'snap-native', 'snap-corner', 'snap-midpoint', 'snap-centre', 'snap-pin', 'snap-active'
 )
 $buildCameraPath = Join-Path $profileRoot `
     'BepInEx\plugins\Matheba-Build_Camera_Custom_Hammers_Edition\Build Camera.dll'
@@ -109,8 +110,9 @@ foreach ($iconName in $requiredEditorIcons) {
         $image = [Drawing.Image]::FromFile($iconPath)
         $bitmap = [Drawing.Bitmap]::new($image)
         [void] $bitmap.GetPixel(0, 0)
-        Assert-Contract ($bitmap.Width -eq 128 -and $bitmap.Height -eq 128) `
-            "Blueprint Editor icon must be 128x128: $iconPath"
+        $expectedSize = if ($iconName -like 'snap-*') { 1254 } else { 128 }
+        Assert-Contract ($bitmap.Width -eq $expectedSize -and $bitmap.Height -eq $expectedSize) `
+            "Blueprint Editor icon must be ${expectedSize}x${expectedSize}: $iconPath"
         Assert-Contract ([Drawing.Image]::IsAlphaPixelFormat($bitmap.PixelFormat)) `
             "Blueprint Editor icon has no alpha channel: $iconPath"
     } catch {
@@ -813,7 +815,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.45.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.46.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -1255,14 +1257,23 @@ $registryDescription = $blueprintRegistry.Methods | Where-Object Name -eq 'Descr
 $registryDescriptionOperands = @($registryDescription.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 $pieceInfoUpdate = $precisionSessionType.Methods | Where-Object Name -eq 'UpdateBlueprintPieceInfo'
 $pieceInfoOperands = @($pieceInfoUpdate.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
-Assert-Contract ($registryDescriptionOperands -match 'HammerBlueprintPieceRegistry::Resources' -and
-    $registryDescriptionOperands -match 'Piece::m_craftingStation' -and
-    $registryDescriptionOperands -match 'Localization::Localize' -and
+Assert-Contract ($registryDescriptionOperands -match 'BuildWorksLocalization::Text' -and
     $registryDescriptionOperands -notmatch 'Piece::m_resources' -and
     $pieceInfoOperands -match 'Localization::GetSelectedLanguage' -and
     $pieceInfoOperands -match 'TMP_Text::set_text' -and
+    $pieceInfoOperands -match 'BlueprintResourceHudView::Show' -and
     $pluginSource -match 'UpdateBlueprintPieceInfo\(__instance, player\)') `
-    'Blueprint HUD must refresh localized aggregate costs as display-only information.'
+    'Blueprint HUD must refresh localized description and native icon cards as display-only information.'
+$resourceHud = $pluginTypes | Where-Object Name -eq 'BlueprintResourceHudView'
+$resourceHudShow = $resourceHud.Methods | Where-Object Name -eq 'Show'
+$resourceHudOperands = @($resourceHudShow.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($resourceHudOperands -match 'InventoryGui::SetupRequirement' -and
+    $resourceHudOperands -match 'Inventory::CountItems' -and
+    $resourceHudOperands -match 'CraftingStation::HaveBuildStationInRange' -and
+    $resourceHudOperands -match 'CraftingStation::m_icon' -and
+    $resourceHudOperands -notmatch 'Piece::m_resources' -and
+    $resourceHudOperands -notmatch 'ConsumeResources') `
+    'Blueprint resource cards must use native item/station rendering without mutating placement costs.'
 $thumbnailRenderer = $pluginTypes | Where-Object Name -eq 'BlueprintThumbnailRenderer'
 Assert-Contract ($null -ne $thumbnailRenderer -and @(
     $thumbnailRenderer.Methods | Where-Object Name -eq 'GetOrQueue'
@@ -2758,4 +2769,4 @@ if (Test-Path -LiteralPath $buildCameraPath -PathType Leaf) {
         'BuildWorks does not restore the current Build Camera yaw and pitch.'
 }
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.45 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.46 and Valheim Steam build 25185596.'

@@ -41,7 +41,7 @@ New-Item -ItemType Directory -Path $runtimeSources -Force | Out-Null
 $runtimeFiles = @('BlueprintEditorView.cs', 'BlueprintEditorSkin.cs', 'BlueprintEditorInput.cs', 'BlueprintEditorController.cs',
     'BlueprintEditorScene.cs', 'BlueprintEditorMeshData.cs', 'BlueprintEditorIconLibrary.cs',
     'TransformGizmoView.cs', 'PlacementGhostPreviewView.cs', 'CompositeBlueprintStore.cs',
-    'PrecisionPlacementHudView.cs', 'WorldSelectionHighlight.cs', 'BuildWorksPlacementValidation.cs')
+    'PrecisionPlacementHudView.cs', 'BlueprintResourceHudView.cs', 'WorldSelectionHighlight.cs', 'BuildWorksPlacementValidation.cs')
 $sourceProof = foreach ($name in $runtimeFiles) {
     $source = Join-Path $repositoryRoot ('src\BuildWorks\' + $name)
     $destination = Join-Path $runtimeSources $name

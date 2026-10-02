@@ -630,6 +630,14 @@ editor.hint.next_selected	G — перенос · R — вращать · S — 
 editor.hint.next_empty	ЛКМ — выбрать деталь · Tab — добавить · Space — инструменты
 editor.view.surface	Поверхность
 editor.view.surface_controls	Поверхность · Q/E точка · колесо поворот · XYZ ось · P плоскость
+editor.view.attachment_menu	Привязка
+editor.view.source_begin	Выбери деталь и нажми G, чтобы выбрать точку соединения.
+editor.view.source_auto	Авто
+editor.view.source_native	Ванильная {0}
+editor.view.source_helper	Дополнительная {0}
+editor.view.source_helpers	Дополнительные точки
+editor.view.source_fallback	Ванильных точек нет: используем наши. Наведи на строку, чтобы увидеть точку.
+editor.view.source_native_first	Авто → ванильные точки. Наведение показывает точку. Смещения XYZ относительно опоры.
 editor.hint.cursor_preview	Ввод числа — от начала · X/Y/Z — ось · повтор — Мир/Локальные · Shift+ось — плоскость · G/R/S — сменить действие · P — Поверхность/Плоскость · Q/E — точка · колесо — поворот · тяни СКМ — камера
 editor.view.screen_plane	Плоскость экрана
 editor.view.no_surface	Нет поверхности — наведи иначе или нажми P для Плоскости

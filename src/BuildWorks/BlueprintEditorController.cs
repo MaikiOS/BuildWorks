@@ -96,8 +96,6 @@ namespace OstrixMods.BuildWorks
         private bool keyboardSurface;
         private bool keyboardConfirmRequested;
         private bool keyboardMoved;
-        private bool keyboardSurfaceOriginValid;
-        private Vector3 keyboardSurfaceOffset;
         private Vector3 keyboardBaseTranslation;
         private Quaternion keyboardBaseRotation;
         private float keyboardBaseScale;
@@ -105,6 +103,15 @@ namespace OstrixMods.BuildWorks
         private Vector3 keyboardPlaneFirst;
         private Vector3 keyboardPlaneSecond;
         private int keyboardSourceIndex;
+        private int preferredCursorSource = -1;
+        private readonly List<string> preferredCursorIds = new List<string>();
+        private int keyboardAutoSource = -1;
+        private int keyboardHoveredSource = -1;
+        private int dragNativeAnchorEnd;
+        private bool keyboardHelpersEnabled;
+        private bool keyboardSourceChanged;
+        private readonly List<int> keyboardSourceChoices = new List<int>();
+        private readonly List<int> keyboardSnapSources = new List<int>();
         private Vector3? keyboardSavedSelectionPoint;
         private Vector3? keyboardSavedPin;
         private GizmoAxis keyboardSavedConstraint;
@@ -149,6 +156,7 @@ namespace OstrixMods.BuildWorks
         private bool dragUsesRotationPlane;
         private Vector3[] gizmoAnchors = Array.Empty<Vector3>();
         private int gizmoNativeAnchorStart = AnchorAdjustment.SelectableAnchorCount;
+        private int gizmoNativeAnchorEnd;
         private int dragAnchorPoint = -1;
         private Vector3 dragAnchorStartWorld;
         private Plane dragAnchorPlane;
@@ -502,6 +510,13 @@ namespace OstrixMods.BuildWorks
                 UpdateGizmo();
             };
             view.PreviewAxisRequested += axis => { if (keyboardPreview) SetKeyboardAxis(axis); };
+            view.CursorSourceRequested += ChooseCursorSource;
+            view.CursorSourceHovered += index => { keyboardHoveredSource = index; UpdateGizmo(); };
+            view.CursorHelpersRequested += () =>
+            {
+                keyboardHelpersEnabled = !keyboardHelpersEnabled;
+                if (keyboardPreview && keyboardSurface) { RefreshCursorSources(); ChooseCursorSource(keyboardSourceIndex); }
+            };
             view.SetGizmoFamily(gizmoFamily);
             view.LightingChanged += scene.SetLighting;
             view.ViewportSettingsChanged += (move, rotation, array, points, scale, grid) =>
@@ -618,18 +633,17 @@ namespace OstrixMods.BuildWorks
                     keyboardSurface = !keyboardSurface;
                     dragAxis = GizmoAxis.None;
                     dragHandle = keyboardSurface ? GizmoHandleKind.Move : GizmoHandleKind.MovePlane;
+                    if (keyboardSurface) RefreshCursorSources();
+                    else view.SetCursorSourcesAvailable(false);
                     RebaseKeyboardPreview(input.MousePosition);
                 }
                 else if (keyboardNumber.Length == 0 && keyboardSurface && dragSourceAnchors.Length > 0 &&
                     (input.GetKeyDown(KeyCode.Q) || input.GetKeyDown(KeyCode.E)))
                 {
                     int step = input.GetKeyDown(KeyCode.E) ? 1 : -1;
-                    keyboardSourceIndex = (keyboardSourceIndex + step + dragSourceAnchors.Length) % dragSourceAnchors.Length;
-                    RebaseKeyboardPreview(input.MousePosition);
-                    // A new source point must attach at the current cursor, not preserve
-                    // the old point's offset until a later mouse movement.
-                    keyboardSurfaceOffset = Vector3.zero;
-                    keyboardMoved = true;
+                    int choice = keyboardSourceChoices.IndexOf(keyboardSourceIndex) + 1;
+                    choice = (choice + step + keyboardSourceChoices.Count + 1) % (keyboardSourceChoices.Count + 1);
+                    ChooseCursorSource(choice == 0 ? -1 : keyboardSourceChoices[choice - 1]);
                 }
                 return false;
             }
@@ -907,7 +921,11 @@ namespace OstrixMods.BuildWorks
                 ? BuildWorksLocalization.Text("editor.hint.preview", BuildWorksLocalization.Text(
                     dragHandle == GizmoHandleKind.Rotate ? "editor.view.family_rotate" :
                     dragHandle == GizmoHandleKind.Scale ? "editor.view.family_scale" : "editor.view.family_move"),
-                    keyboardSurface ? BuildWorksLocalization.Text("editor.view.surface_controls") :
+                    keyboardSurface ? BuildWorksLocalization.Text("editor.view.surface_controls") + " · " +
+                        (keyboardSourceIndex < 0 ? BuildWorksLocalization.Text("editor.view.source_auto") :
+                            BuildWorksLocalization.Text(keyboardSourceIndex >= gizmoNativeAnchorStart && keyboardSourceIndex < dragNativeAnchorEnd
+                                ? "editor.view.source_native" : "editor.view.source_helper",
+                                keyboardSourceIndex >= gizmoNativeAnchorStart ? keyboardSourceIndex - gizmoNativeAnchorStart + 1 : keyboardSourceIndex + 1)) :
                     dragAxis == GizmoAxis.None ? BuildWorksLocalization.Text("editor.view.screen_plane") :
                     dragAxis + " · " + BuildWorksLocalization.Text(localSpace ? "editor.view.axes_local" : "editor.view.axes_world"),
                     keyboardNumber.Length > 0 ? BuildWorksLocalization.Text("editor.hint.numeric_value", keyboardNumber,
@@ -962,8 +980,8 @@ namespace OstrixMods.BuildWorks
                 bool control = input.GetKey(KeyCode.LeftControl) || input.GetKey(KeyCode.RightControl);
                 if (keyboardPreview && keyboardNumber.Length == 0 && keyboardSurface && !control && !input.GetMouseButton(1))
                 {
-                Vector3 source = keyboardSourceIndex >= 0 && dragSourceAnchors.Length > 0
-                        ? dragSourceAnchors[keyboardSourceIndex] : dragPivot;
+                    int sourceIndex = keyboardSourceIndex >= 0 ? keyboardSourceIndex : keyboardAutoSource;
+                    Vector3 source = sourceIndex >= 0 ? dragSourceAnchors[sourceIndex] : dragPivot;
                     Vector3 offset = source - dragPivot;
                     Vector3 oldOffset = dragRotation * offset * dragScale;
                     dragRotation = Quaternion.AngleAxis(input.MouseScrollDelta.y > 0f ? 22.5f : -22.5f,
@@ -1112,7 +1130,8 @@ namespace OstrixMods.BuildWorks
             {
                 if (!inside || cameraDragging || input.GetMouseButton(1) || input.GetMouseButton(2))
                 { keyboardPaused = true; return; }
-                if (keyboardPaused) { RebaseKeyboardPreview(mouse); keyboardPaused = false; return; }
+                if (keyboardPaused)
+                { RebaseKeyboardPreview(mouse); keyboardMoved = keyboardSourceChanged; keyboardPaused = false; return; }
                 PreviewKeyboardTransform(mouse);
                 if ((input.GetMouseButtonDown(0) || keyboardConfirmRequested) && keyboardValid) CommitGizmoDrag();
                 return;
@@ -1180,8 +1199,13 @@ namespace OstrixMods.BuildWorks
             keyboardNumber = "";
             dragPivot = selectedAnchorWorld ?? pivot;
             dragSourceAnchors = (Vector3[])gizmoAnchors.Clone();
+            dragNativeAnchorEnd = gizmoNativeAnchorEnd;
             keyboardSourceIndex = selectedAnchorPoint >= 0 && selectedAnchorPoint < dragSourceAnchors.Length
                 ? selectedAnchorPoint : -1;
+            if (keyboardSourceIndex < 0 && preferredCursorIds.Count == dragIds.Count &&
+                preferredCursorIds.TrueForAll(id => dragIds.Contains(id)) &&
+                preferredCursorSource < dragSourceAnchors.Length)
+                keyboardSourceIndex = preferredCursorSource;
             dragTranslation = Vector3.zero;
             dragRotation = Quaternion.identity;
             dragScale = 1f;
@@ -1189,12 +1213,56 @@ namespace OstrixMods.BuildWorks
             dragAxis = GizmoAxis.None;
             keyboardPreview = true;
             keyboardSurface = handle == GizmoHandleKind.Move;
+            keyboardAutoSource = keyboardHoveredSource = -1;
+            keyboardSourceChanged = false;
+            RefreshCursorSources();
             gizmoFamily = GizmoFamily.Combined;
             view.SetGizmoFamily(gizmoFamily);
             view.SetPreviewControls(true);
+            if (!keyboardSurface) view.SetCursorSourcesAvailable(false);
             RebaseKeyboardPreview(input.MousePosition);
             selectionPending = false;
             UpdateGizmo();
+        }
+
+        private void RefreshCursorSources()
+        {
+            keyboardSourceChoices.Clear();
+            for (int index = gizmoNativeAnchorStart; index < dragNativeAnchorEnd; ++index)
+                keyboardSourceChoices.Add(index);
+            bool fallback = keyboardSourceChoices.Count == 0;
+            if (keyboardHelpersEnabled || fallback)
+                for (int index = 0; index < Mathf.Min(gizmoNativeAnchorStart, dragSourceAnchors.Length); ++index)
+                    keyboardSourceChoices.Add(index);
+            var labels = new List<string>();
+            foreach (int index in keyboardSourceChoices)
+            {
+                Vector3 delta = Quaternion.Inverse(keyboardOrientation) * (dragSourceAnchors[index] - dragPivot);
+                labels.Add(BuildWorksLocalization.Text(index >= gizmoNativeAnchorStart && index < dragNativeAnchorEnd
+                    ? "editor.view.source_native" : "editor.view.source_helper",
+                    index >= gizmoNativeAnchorStart ? index - gizmoNativeAnchorStart + 1 : index + 1) +
+                    " · " + delta.x.ToString("0.##", CultureInfo.CurrentCulture) + "/" +
+                    delta.y.ToString("0.##", CultureInfo.CurrentCulture) + "/" + delta.z.ToString("0.##", CultureInfo.CurrentCulture));
+            }
+            view.SetCursorSources(keyboardSourceChoices, gizmoNativeAnchorStart, dragNativeAnchorEnd,
+                keyboardSourceIndex, keyboardHelpersEnabled, fallback, labels);
+        }
+
+        private void ChooseCursorSource(int index)
+        {
+            if (!keyboardPreview || !keyboardSurface || index < -1 || index >= dragSourceAnchors.Length) return;
+            keyboardSourceIndex = index;
+            preferredCursorSource = index;
+            preferredCursorIds.Clear();
+            preferredCursorIds.AddRange(dragIds);
+            keyboardSourceChanged = true;
+            keyboardAutoSource = keyboardHoveredSource = -1;
+            snapTargetVisible = false;
+            RebaseKeyboardPreview(input.MousePosition);
+            keyboardMoved = true;
+            RefreshCursorSources();
+            // A chooser click remains UI input. Evaluate only when the cursor
+            // returns to the viewport; Q/E evaluates in this same frame.
         }
 
         private void RebaseKeyboardPreview(Vector2 mouse)
@@ -1211,13 +1279,6 @@ namespace OstrixMods.BuildWorks
             dragAnchorPlane = new Plane(dragAxisWorld, origin);
             Ray ray = scene.Camera.ScreenPointToRay(mouse);
             keyboardValid = !keyboardSurface && dragAnchorPlane.Raycast(ray, out _);
-            Vector3 hit = Vector3.zero;
-            keyboardSurfaceOriginValid = keyboardSurface && scene.TryMoveSurface(mouse, dragIds, out hit);
-            if (keyboardSurfaceOriginValid)
-            {
-                Vector3 source = keyboardSourceIndex >= 0 ? dragSourceAnchors[keyboardSourceIndex] : dragPivot;
-                keyboardSurfaceOffset = dragPivot + dragRotation * (source - dragPivot) * dragScale + dragTranslation - hit;
-            }
             dragPlaneStart = dragAnchorPlane.Raycast(ray, out float distance) ? ray.GetPoint(distance) : origin;
             keyboardPlaneFirst = Vector3.Cross(dragAxisWorld,
                 Mathf.Abs(Vector3.Dot(dragAxisWorld, Vector3.up)) < .9f ? Vector3.up : Vector3.right).normalized;
@@ -1245,6 +1306,7 @@ namespace OstrixMods.BuildWorks
             if (axis == dragAxis) localSpace = !localSpace;
             dragAxis = axis;
             keyboardSurface = false;
+            view.SetCursorSourcesAvailable(false);
             if (dragHandle != GizmoHandleKind.Rotate)
                 dragHandle = ShiftHeld ? GizmoHandleKind.MovePlane : GizmoHandleKind.Move;
             // Changing constraint starts at the original operation pose. Camera
@@ -1263,28 +1325,41 @@ namespace OstrixMods.BuildWorks
             { PreviewKeyboardNumber(); return; }
             if (!keyboardMoved && (mouse - dragStartMouse).sqrMagnitude < 1f)
             {
-                if (keyboardSurface) keyboardValid = scene.TryMoveSurface(mouse, dragIds, out _);
+                if (keyboardSurface) keyboardValid = scene.TryCursorSurface(mouse, dragIds, out _, out _);
                 return;
             }
             keyboardMoved = true;
             keyboardValid = true;
             if (keyboardSurface)
             {
-                bool surfaceHit = scene.TryMoveSurface(mouse, dragIds, out Vector3 target);
-                snapTargetVisible = !ShiftHeld && scene.TryFindEditorSnapTarget(dragIds, mouse,
-                    meshSnapEnabled, snapPreviewTargets, snapPreviewNative, out snapTargetWorld, out snapTargetIsNative);
-                keyboardValid = surfaceHit || snapTargetVisible;
+                bool surfaceHit = scene.TryCursorSurface(mouse, dragIds, out Vector3 target, out Vector3 normal);
+                keyboardValid = surfaceHit;
                 if (!keyboardValid)
                 { snapTargetVisible = false; snapPreviewTargets.Clear(); snapPreviewNative.Clear(); return; }
                 Vector3 source = keyboardSourceIndex >= 0 && dragSourceAnchors.Length > 0
                     ? dragSourceAnchors[keyboardSourceIndex] : dragPivot;
-                if (!keyboardSurfaceOriginValid)
-                {
-                    keyboardSurfaceOffset = dragPivot + dragRotation * (source - dragPivot) * dragScale + dragTranslation - target;
-                    keyboardSurfaceOriginValid = true;
-                }
-                target = snapTargetVisible ? snapTargetWorld : target + keyboardSurfaceOffset;
                 dragTranslation = target - (dragPivot + dragRotation * (source - dragPivot) * dragScale);
+                if (keyboardSourceIndex < 0)
+                {
+                    scene.PreviewTransform(document, dragIds, dragTranslation, dragRotation, dragPivot, dragScale);
+                    dragTranslation += scene.CursorContactOffset(dragIds, target, normal);
+                }
+                keyboardSnapSources.Clear();
+                if (keyboardSourceIndex >= 0) keyboardSnapSources.Add(keyboardSourceIndex);
+                else keyboardSnapSources.AddRange(keyboardSourceChoices);
+                var sources = new Vector3[dragSourceAnchors.Length];
+                for (int index = 0; index < sources.Length; ++index)
+                    sources[index] = dragPivot + dragRotation * (dragSourceAnchors[index] - dragPivot) * dragScale + dragTranslation;
+                bool wasSnapped = snapTargetVisible;
+                Vector3 previousTarget = snapTargetWorld;
+                snapTargetVisible = !ShiftHeld && scene.TryCursorSnap(dragIds, sources, keyboardSnapSources,
+                    gizmoNativeAnchorStart, dragNativeAnchorEnd, keyboardHelpersEnabled, snapPreviewTargets, snapPreviewNative,
+                    out keyboardAutoSource, out snapTargetWorld, out snapTargetIsNative,
+                    wasSnapped ? keyboardAutoSource : -1, wasSnapped ? previousTarget : (Vector3?)null);
+                if (snapTargetVisible) dragTranslation += snapTargetWorld - sources[keyboardAutoSource];
+                else keyboardAutoSource = -1;
+                if (ShiftHeld) { snapPreviewTargets.Clear(); snapPreviewNative.Clear(); }
+                keyboardSourceChanged = false;
             }
             else if (dragHandle == GizmoHandleKind.Move)
             {
@@ -1737,7 +1812,9 @@ namespace OstrixMods.BuildWorks
         private void ResetGizmoDrag()
         {
             keyboardNumber = "";
-            keyboardPreview = keyboardPaused = keyboardConfirmRequested = keyboardMoved = keyboardSurfaceOriginValid = false;
+            keyboardPreview = keyboardPaused = keyboardConfirmRequested = keyboardMoved = false;
+            keyboardSourceChanged = false;
+            keyboardAutoSource = keyboardHoveredSource = -1;
             view?.SetPreviewControls(false);
             scene?.ClearDuplicatePreview();
             dragDuplicate = false;
@@ -1944,6 +2021,7 @@ namespace OstrixMods.BuildWorks
                 }
                 if (!IsGizmoDragging)
                 {
+                    gizmoNativeAnchorEnd = gizmoAnchors.Length;
                     pinnedAnchorPoint = -1;
                     if (pinnedAnchorWorld.HasValue)
                     {
@@ -1973,7 +2051,8 @@ namespace OstrixMods.BuildWorks
                     dragHandle,
                     dragAxis,
                     gizmoAnchors,
-                    keyboardPreview && keyboardSurface ? keyboardSourceIndex :
+                    keyboardPreview && keyboardSurface ? keyboardHoveredSource >= 0 ? keyboardHoveredSource :
+                        keyboardSourceIndex >= 0 ? keyboardSourceIndex : keyboardAutoSource :
                         dragAnchorPoint >= 0 ? dragAnchorPoint : selectedAnchorPoint,
                     gizmoNativeAnchorStart,
                     showAllAnchors,

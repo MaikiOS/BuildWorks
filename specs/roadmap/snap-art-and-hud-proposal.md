@@ -2,10 +2,11 @@
 
 **English** | [Русский](snap-art-and-hud-proposal_RU.md)
 
-Design proposal, 2026-10-02. BuildWorks 0.19.45 remains installed. Ostrix accepted
-tests 1, 3–6 and 8–11; test 12 confirms language refresh, not the resource-card
-layout. Test 2 requests thematic artwork and test 7 reopens cursor snapping.
-No new controls or assets in this proposal are implemented or approved yet.
+Approved design, 2026-10-02. Ostrix accepted .45 tests 1, 3–6 and 8–11;
+language refresh in 12 did not accept text-only resources. The following design
+is now implemented and automatically verified in candidate 0.19.46.
+Actual in-game readability and HUD integration await the owner series.
+The pre-implementation problem statements below describe .45, not current code.
 
 ## Point artwork
 
@@ -23,8 +24,8 @@ Nordic motifs distinguish function by shape as well as colour:
 Keep exact attachment coordinates, original model materials and existing
 proximity feedback. Coincident markers share one centre; the smaller helper
 fits inside the native rim. Do not hide points or separate their screen centres.
-After approval, author individual assets and inspect them at real gameplay
-sizes; the board's enlarged previews do not prove small-size readability.
+Individual assets are generated and inspected in Unity; inspect them at real
+gameplay sizes too. The board's enlarged previews do not prove readability.
 Reduce fine engraving if it becomes noise, without reverting to generic glyphs.
 
 ## Source selection during cursor movement
@@ -53,7 +54,7 @@ Recommended proposal:
 
 Reuse the scene's existing source provenance and placement contact logic.
 Do not replace the accepted R/S/axis workflow or rewrite Array/Contour.
-The native-first policy and chooser require owner approval before implementation.
+The native-first policy and chooser are approved and implemented in .46.
 
 ## Native blueprint resource cards
 
@@ -76,12 +77,12 @@ the whole blueprint is valid merely because its first part is valid.
 
 ## Implementation gate and checks
 
-Artwork and source-selection approval are the next gate. No new binary release
-or deployment in this documentation checkpoint. After approval, checks must cover
+Approval is complete. Candidate .46 build and automated checks pass; no binary
+release is published. Checks cover
 same-position glyph picking, native-only versus helper cycles, stationary Q/E,
 Auto winner stability, furniture fallback, chooser input ownership, exact cancel
 and one Undo. Resource cards require exact totals, multiple station types,
 insufficient inventory, language refresh, overflow and ordinary-HUD restoration.
 
-Prepare one new numbered owner series only after implementation and automated
-checks. Do not ask the owner to rerun the accepted .45 points now.
+The [current owner series](current-pass.md) contains eight new numbered checks.
+Accepted .45 tests are not requested again.

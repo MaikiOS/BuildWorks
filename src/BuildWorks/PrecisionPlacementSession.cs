@@ -218,23 +218,53 @@ namespace OstrixMods.BuildWorks
         private Piece descriptionPiece;
         private string descriptionLanguage;
         private string descriptionText;
+        private readonly BlueprintResourceHudView blueprintResourceHud = new BlueprintResourceHudView();
+        private IReadOnlyList<HammerBlueprintPieceRegistry.ResourceInfo> descriptionResources;
+        private Piece.Requirement[] descriptionRequirements = Array.Empty<Piece.Requirement>();
+        private int[] descriptionPaidAmounts = Array.Empty<int>();
+        private readonly List<CraftingStation> descriptionStations = new List<CraftingStation>();
 
         internal void UpdateBlueprintPieceInfo(Hud hud, Player player)
         {
             Piece piece = player ? player.GetSelectedPiece() : null;
             if (!hud || !hud.m_pieceDescription ||
-                !blueprintPieceRegistry.TryGetBlueprint(piece, out CompositeBlueprintStore.Blueprint blueprint)) return;
+                !blueprintPieceRegistry.TryGetBlueprint(piece, out CompositeBlueprintStore.Blueprint blueprint))
+            { ClearBlueprintPieceInfo(); return; }
             string language = Localization.instance?.GetSelectedLanguage();
             if (piece != descriptionPiece || language != descriptionLanguage)
             {
                 descriptionPiece = piece;
                 descriptionLanguage = language;
                 descriptionText = blueprintPieceRegistry.Description(blueprint);
+                descriptionResources = blueprintPieceRegistry.Resources(blueprint);
+                descriptionRequirements = new Piece.Requirement[descriptionResources.Count];
+                descriptionPaidAmounts = new int[descriptionResources.Count];
+                for (int index = 0; index < descriptionResources.Count; ++index)
+                    descriptionRequirements[index] = new Piece.Requirement
+                    { m_resItem = descriptionResources[index].Item, m_amount = descriptionResources[index].Amount };
+                descriptionStations.Clear();
+                if (blueprintPieceRegistry.TryGetSourcePieces(blueprint, out IReadOnlyList<Piece> pieces))
+                    foreach (Piece source in pieces)
+                        if (source && source.m_craftingStation &&
+                            !descriptionStations.Exists(station => station.m_name == source.m_craftingStation.m_name))
+                            descriptionStations.Add(source.m_craftingStation);
             }
             // Display-only: marker requirements remain empty. Native per-part
             // placement retains all cost, station, ownership and network checks.
             hud.m_pieceDescription.text = descriptionText;
+            for (int index = 0; index < descriptionPaidAmounts.Length; ++index)
+                descriptionPaidAmounts[index] =
+                    (BlueprintResourceHudView.Free(GlobalKeys.NoBuildCost) ? 0 : descriptionResources[index].BuildAmount) +
+                    (BlueprintResourceHudView.Free(GlobalKeys.NoCraftCost) ? 0 : descriptionResources[index].CraftAmount);
+            blueprintResourceHud.Show(hud, player, descriptionRequirements, descriptionPaidAmounts, descriptionStations);
         }
+        internal void ClearBlueprintPieceInfo()
+        {
+            blueprintResourceHud.Restore();
+            descriptionPiece = null;
+            descriptionLanguage = null;
+        }
+        internal bool CapturesBlueprintResourceWheel => blueprintResourceHud.CapturesWheel;
         private PlacementState state;
         private SessionMode sessionMode;
         private bool precisionEnabled;
@@ -2613,6 +2643,7 @@ namespace OstrixMods.BuildWorks
 
         public void Dispose()
         {
+            blueprintResourceHud.Dispose();
             precisionEnabled = false;
             Cancel();
             HammerCatalogView.Unconfigure(blueprintStore);
@@ -2624,6 +2655,7 @@ namespace OstrixMods.BuildWorks
 
         public void DisposeForHostTransition()
         {
+            blueprintResourceHud.Dispose();
             precisionEnabled = false;
             Cancel(restoreCursor: false);
             HammerCatalogView.Unconfigure(blueprintStore);

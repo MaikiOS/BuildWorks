@@ -415,8 +415,11 @@ namespace OstrixMods.BuildWorks
         private readonly TMP_InputField catalogPageInput;
         private readonly ScrollRect catalogMaterialScroll;
         private readonly GameObject viewportSettings;
-        private readonly GameObject[] viewportSections = new GameObject[3];
-        private readonly Button[] viewportSectionButtons = new Button[3];
+        private readonly GameObject[] viewportSections = new GameObject[4];
+        private readonly Button[] viewportSectionButtons = new Button[4];
+        private readonly RectTransform cursorSourceRows;
+        private readonly Button cursorHelpersButton;
+        private readonly TMP_Text cursorSourceStatus;
         private readonly Button[] familyButtons = new Button[4];
         private readonly RectTransform hintGroupsArea;
         private readonly RectTransform paneSplitter;
@@ -1215,7 +1218,7 @@ namespace OstrixMods.BuildWorks
                 SetTopLeft((RectTransform)resetView.transform, 12f, 488f, 294f, 36f);
 
                 // Keep the existing handlers and fields; only their grouping changes.
-                string[] sectionKeys = { "editor.view.camera_menu", "editor.view.display_menu", "editor.view.manipulator_menu" };
+                string[] sectionKeys = { "editor.view.camera_menu", "editor.view.display_menu", "editor.view.manipulator_menu", "editor.view.attachment_menu" };
                 for (int index = 0; index < viewportSections.Length; ++index)
                 {
                     RectTransform section = CreateRect("ViewportSection" + index, viewportSettings.transform);
@@ -1227,10 +1230,10 @@ namespace OstrixMods.BuildWorks
                     SetTopLeft((RectTransform)button.transform, index * 96f, 0f, 90f, 32f);
                     viewportSectionButtons[index] = button;
                 }
-                SetTopRight(viewportControls, 8f, 8f, 324f, 32f);
+                SetTopRight(viewportControls, 8f, 8f, 420f, 32f);
                 Button focusView = CreateIconButton("ViewportFocus", viewportControls, "frame", "□", 32f,
                     () => { viewportFocused = !viewportFocused; ApplySafeAreaAndLayout(true); }, T("editor.view.focus_view"));
-                SetTopLeft((RectTransform)focusView.transform, 292f, 0f, 32f, 32f);
+                SetTopLeft((RectTransform)focusView.transform, 388f, 0f, 32f, 32f);
                 RepositionViewControl(frameAll.transform, 0, 12f, 4f, 142f, 32f);
                 RepositionViewControl(frameSelected.transform, 0, 164f, 4f, 142f, 32f);
                 RepositionViewControl(fovLabel.transform, 0, 12f, 48f, 190f, 32f);
@@ -1264,6 +1267,36 @@ namespace OstrixMods.BuildWorks
                 RepositionViewControl(scaleStepLabel.transform, 2, 12f, 308f, 192f, 32f);
                 RepositionViewControl(scaleStepInput.transform, 2, 212f, 308f, 94f, 32f);
                 RepositionViewControl(resetView.transform, 2, 12f, 352f, 294f, 32f);
+                cursorSourceStatus = CreateText("CursorSourceStatus", viewportSections[3].transform,
+                    T("editor.view.source_begin"), 12f, FontStyles.Normal, TextAlignmentOptions.TopLeft);
+                SetTopLeft(cursorSourceStatus.rectTransform, 12f, 4f, 294f, 42f);
+                cursorHelpersButton = CreateButton("CursorHelpers", viewportSections[3].transform,
+                    T("editor.view.source_helpers"), 294f, () => CursorHelpersRequested?.Invoke());
+                SetTopLeft((RectTransform)cursorHelpersButton.transform, 12f, 50f, 294f, 32f);
+                RectTransform sourceViewport = CreatePanel("CursorSourcesViewport", viewportSections[3].transform, PanelColor, null);
+                SetTopLeft(sourceViewport, 12f, 90f, 280f, 270f);
+                sourceViewport.gameObject.AddComponent<RectMask2D>();
+                ScrollRect sourceScroll = sourceViewport.gameObject.AddComponent<ScrollRect>();
+                sourceScroll.horizontal = false;
+                sourceScroll.movementType = ScrollRect.MovementType.Clamped;
+                sourceScroll.scrollSensitivity = 100f;
+                cursorSourceRows = CreateRect("CursorSources", sourceViewport);
+                cursorSourceRows.anchorMin = new Vector2(0f, 1f);
+                cursorSourceRows.anchorMax = Vector2.one;
+                cursorSourceRows.pivot = new Vector2(.5f, 1f);
+                cursorSourceRows.sizeDelta = Vector2.zero;
+                sourceScroll.content = cursorSourceRows; sourceScroll.viewport = sourceViewport;
+                RectTransform sourceTrack = CreatePanel("CursorSourcesScrollTrack", viewportSections[3].transform, ButtonColor, null);
+                SetTopLeft(sourceTrack, 296f, 90f, 10f, 270f);
+                RectTransform sourceThumb = CreatePanel("Thumb", sourceTrack, MutedColor, null);
+                SetInsets(sourceThumb, 1f, 1f, 1f, 1f);
+                Scrollbar sourceScrollbar = sourceTrack.gameObject.AddComponent<Scrollbar>();
+                sourceScrollbar.handleRect = sourceThumb;
+                sourceScrollbar.targetGraphic = sourceThumb.GetComponent<Image>();
+                sourceScrollbar.direction = Scrollbar.Direction.BottomToTop;
+                sourceScroll.verticalScrollbar = sourceScrollbar;
+                sourceScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+                SetCursorSourcesAvailable(false);
                 viewportSettings.SetActive(false);
 
                 paneSplitter = CreatePanel("PaneSplitter", safeRoot, new Color(.55f, .43f, .22f, .8f), null);
@@ -1526,6 +1559,9 @@ namespace OstrixMods.BuildWorks
         internal event Action<float, float, float, float, float, bool> ViewportSettingsChanged;
         internal event Action<GizmoFamily> GizmoFamilySelected;
         internal event Action<GizmoAxis> PreviewAxisRequested;
+        internal event Action<int> CursorSourceRequested;
+        internal event Action<int> CursorSourceHovered;
+        internal event Action CursorHelpersRequested;
         internal event Action<bool> ProjectionChanged;
         internal event Action<float> FieldOfViewChanged;
         internal event Action FieldOfViewResetRequested;
@@ -1895,6 +1931,51 @@ namespace OstrixMods.BuildWorks
         {
             foreach (RectTransform panel in new[] { top, rail, outliner, inspector })
                 panel.GetComponent<CanvasGroup>().interactable = !pending;
+            if (!pending) SetCursorSourcesAvailable(false);
+        }
+
+        internal void SetCursorSourcesAvailable(bool available)
+        {
+            cursorHelpersButton.interactable = available;
+            if (!available)
+            {
+                cursorSourceStatus.text = T("editor.view.source_begin");
+                for (int i = 0; i < cursorSourceRows.childCount; ++i)
+                    if (cursorSourceRows.GetChild(i).TryGetComponent(out Button button)) button.interactable = false;
+            }
+        }
+
+        internal void SetCursorSources(IReadOnlyList<int> indices, int nativeStart, int nativeEnd,
+            int selected, bool helpers, bool fallback, IReadOnlyList<string> labels = null)
+        {
+            for (int i = cursorSourceRows.childCount - 1; i >= 0; --i)
+            { GameObject row = cursorSourceRows.GetChild(i).gameObject; row.SetActive(false); UnityEngine.Object.Destroy(row); }
+            cursorSourceStatus.text = T(fallback ? "editor.view.source_fallback" : "editor.view.source_native_first");
+            cursorHelpersButton.interactable = true;
+            SetSelected(cursorHelpersButton, helpers);
+            cursorSourceRows.sizeDelta = new Vector2(0f, (indices.Count + 1) * 36f);
+            AddSource(-1, T("editor.view.source_auto"), 0);
+            for (int i = 0; i < indices.Count; ++i)
+            {
+                int index = indices[i];
+                string label = labels != null ? labels[i] : T(index >= nativeStart && index < nativeEnd
+                    ? "editor.view.source_native" : "editor.view.source_helper", i + 1);
+                AddSource(index, label, i + 1);
+            }
+            void AddSource(int index, string label, int row)
+            {
+                Button button = CreateButton("CursorSource_" + index, cursorSourceRows, label, 274f,
+                    () => CursorSourceRequested?.Invoke(index));
+                SetTopLeft((RectTransform)button.transform, 2f, row * 36f, 274f, 32f);
+                SetSelected(button, selected == index);
+                EventTrigger trigger = button.gameObject.AddComponent<EventTrigger>();
+                var enter = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
+                enter.callback.AddListener(_ => CursorSourceHovered?.Invoke(index));
+                var exit = new EventTrigger.Entry { eventID = EventTriggerType.PointerExit };
+                exit.callback.AddListener(_ => CursorSourceHovered?.Invoke(-1));
+                trigger.triggers.Add(enter); trigger.triggers.Add(exit);
+                AddTooltip((RectTransform)button.transform, label);
+            }
         }
 
         internal void ShowToolsMenu(Vector2 mouse, bool searchFocused)
@@ -2127,7 +2208,7 @@ namespace OstrixMods.BuildWorks
             bool open = !viewportSettings.activeSelf || viewportSection != section;
             viewportSection = section;
             viewportSettings.SetActive(open);
-            string[] keys = { "editor.view.camera_menu", "editor.view.display_menu", "editor.view.manipulator_menu" };
+            string[] keys = { "editor.view.camera_menu", "editor.view.display_menu", "editor.view.manipulator_menu", "editor.view.attachment_menu" };
             viewportSettings.transform.Find("ViewportSettingsTitle").GetComponent<TMP_Text>().text = T(keys[section]);
             for (int index = 0; index < viewportSections.Length; ++index)
             {
@@ -2135,7 +2216,7 @@ namespace OstrixMods.BuildWorks
                 SetSelected(viewportSectionButtons[index], open && index == section);
             }
             SetTopRight((RectTransform)viewportSettings.transform, 8f, 48f, 320f,
-                section == 0 ? 216f : section == 1 ? 176f : 440f);
+                section == 0 ? 216f : section == 1 ? 176f : section == 3 ? 416f : 440f);
             FitViewportSettings();
             EndTooltip();
         }

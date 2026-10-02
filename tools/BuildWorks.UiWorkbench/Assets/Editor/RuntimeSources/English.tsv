@@ -630,6 +630,14 @@ editor.hint.next_selected	G — surface move · R — rotate · S — scale · M
 editor.hint.next_empty	LMB — select a part · Tab — add · Space — tools
 editor.view.surface	Surface
 editor.view.surface_controls	Surface · Q/E source · wheel yaw · XYZ axis · P plane
+editor.view.attachment_menu	Attachment
+editor.view.source_begin	Select a part and press G to choose its attachment point.
+editor.view.source_auto	Auto
+editor.view.source_native	Native {0}
+editor.view.source_helper	Helper {0}
+editor.view.source_helpers	Additional points
+editor.view.source_fallback	No native sockets: using generated points. Hover a row to locate it.
+editor.view.source_native_first	Auto → native sockets. Hover a row to locate it. XYZ offsets are relative to the pivot.
 editor.hint.cursor_preview	Type number — from start · X/Y/Z — axis · repeat — World/Local · Shift+axis — plane · G/R/S — replace action · P — Surface/Plane · Q/E — source · wheel — yaw · MMB drag — camera
 editor.view.screen_plane	Screen plane
 editor.view.no_surface	No surface — point elsewhere or press P for Plane

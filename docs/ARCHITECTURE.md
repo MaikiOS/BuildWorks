@@ -17,6 +17,7 @@ BuildWorks has two assemblies. `BuildWorks.dll` integrates with Valheim and Unit
 | Editor camera, temporary objects, hit tests and snapping | `BlueprintEditorScene.cs` | `BlueprintEditorMeshData.cs` |
 | Deterministic blueprint document, Undo/Redo and hierarchy | `BuildWorks.Geometry/BlueprintEditorDocument.cs` | `AnchorAdjustment.cs`, `ConstructionLayout.cs` |
 | Localization | `BuildWorksLocalization.cs` | `Translations/English.tsv`, `Translations/Russian.tsv` |
+| Display-only blueprint requirements | `BlueprintResourceHudView.cs` | `HammerBlueprintPieceRegistry.cs`, `PrecisionPlacementSession.cs` |
 
 ## Main flows
 
@@ -46,6 +47,17 @@ world callers retain Combined and their existing behavior. Dropdowns reparent
 existing controls rather than duplicate handlers. Layout state is editor-only.
 
 ## Invariants
+
+G cursor movement queries the existing scene contact/snap data. Auto/native-only
+source policy and the chooser are editor state, not blueprint format fields.
+Explicit sources are retained by selected IDs across G/R/G; pin remains a
+separate pivot. Confirm owns one document transform; UI clicks cannot confirm it.
+
+World requirements reuse native Hud cells and InventoryGui formatting.
+`BlueprintResourceHudView` owns only cloned overflow cells and the temporary
+scroll viewport, restoring native parents/geometry on every exit. The session
+caches aggregate resources by marker/language, but recomputes availability live.
+Marker costs stay empty: the adapter never consumes or assigns resources.
 
 - Do not add a hard Jotunn dependency.
 - Do not mutate source prefabs to add editor-only snap points.

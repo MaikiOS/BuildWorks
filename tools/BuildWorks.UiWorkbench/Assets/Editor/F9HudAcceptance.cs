@@ -17,6 +17,9 @@ public class Hud : MonoBehaviour
     public GameObject m_pieceSelectionWindow;
     public GameObject m_pieceIconPrefab;
     public TMP_Text m_buildSelection;
+    public TMP_Text m_pieceDescription;
+    public Image m_buildIcon;
+    public GameObject[] m_requirementItems;
 }
 
 namespace OstrixMods.BuildWorks

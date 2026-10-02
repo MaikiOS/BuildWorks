@@ -720,15 +720,28 @@ internal static class ControllerInputAcceptance
             "G did not start a non-destructive cursor preview");
         Vector2 empty = new Vector2(scene.Camera.pixelRect.xMin + 30, scene.Camera.pixelRect.yMin + 30);
         Frame(controller, input, empty); yield return null;
+        Require(Field<bool>(controller, "keyboardValid") && V(doc.Parts[0].Position) == original,
+            "Auto surface move cannot use the workspace ground without modifying the document");
+        Vector3 cameraFocus = Field<Vector3>(controller, "cameraFocus");
+        float cameraPitch = Field<float>(controller, "cameraPitch");
+        Set(controller, "cameraFocus", Vector3.up * 100);
+        Set(controller, "cameraPitch", -89f);
+        Frame(controller, input, empty); yield return null;
         Require(!Field<bool>(controller, "keyboardValid") && V(doc.Parts[0].Position) == original,
-            "Surface move jumped to the ground or moved the document without a surface");
+            "Surface move accepts a ray with neither a piece nor ground contact");
         Frame(controller, input, empty, 0, KeyCode.Return); yield return null;
         Require(Field<bool>(controller, "keyboardPreview"), "Missing surface confirmed a move");
+        Set(controller, "cameraFocus", cameraFocus); Set(controller, "cameraPitch", cameraPitch);
+        Frame(controller, input, empty); yield return null;
         Vector2 surface = scene.Camera.WorldToScreenPoint(V(doc.Parts[1].Position));
         Frame(controller, input, surface, 0, KeyCode.LeftShift); yield return null;
         Require(Field<bool>(controller, "keyboardValid"), "Surface fixture did not hit an unmoved part");
         Frame(controller, input, surface, 0, KeyCode.LeftShift, KeyCode.Q); yield return null;
         int sourceIndex = Field<int>(controller, "keyboardSourceIndex");
+        int nativeStart = Field<int>(controller, "gizmoNativeAnchorStart");
+        int nativeEnd = Field<int>(controller, "dragNativeAnchorEnd");
+        foreach (int choice in Field<List<int>>(controller, "keyboardSourceChoices"))
+            Require(choice >= nativeStart && choice < nativeEnd, "Default Q/E cycle contains helpers before native points");
         Vector3 selectedSource = Field<Vector3[]>(controller, "dragSourceAnchors")[sourceIndex];
         Vector3 sourcePivot = Field<Vector3>(controller, "dragPivot");
         Vector3 sourceWorld = sourcePivot + Field<Quaternion>(controller, "dragRotation") *
@@ -740,9 +753,33 @@ internal static class ControllerInputAcceptance
         Frame(controller, input, surface, 0, KeyCode.LeftShift, KeyCode.E); yield return null;
         Require(Field<int>(controller, "keyboardSourceIndex") != sourceIndex && Field<bool>(controller, "keyboardValid"),
             "E at the same cursor did not select and evaluate the next point");
+        Require(Field<int>(controller, "keyboardSourceIndex") == -1, "Q then E does not return to Auto");
+        NativeClick(view, uiCamera, "ViewportSectionButton3"); yield return null;
+        int firstNative = Field<List<int>>(controller, "keyboardSourceChoices")[0];
+        NativeClick(view, uiCamera, "CursorSource_" + firstNative); yield return null;
+        Require(Field<bool>(controller, "keyboardPreview") && V(doc.Parts[0].Position) == original &&
+            Field<IList>(doc, "undo").Count == history && Field<int>(controller, "keyboardSourceIndex") == firstNative,
+            "Source chooser confirms/mutates document instead of only selecting a point");
+        NativeClick(view, uiCamera, "CursorHelpers"); yield return null;
+        Require(Field<List<int>>(controller, "keyboardSourceChoices").Exists(index => index < nativeStart),
+            "Additional points do not extend the explicitly enabled source set");
+        NativeClick(view, uiCamera, "CursorHelpers"); yield return null;
+        Require(Field<List<int>>(controller, "keyboardSourceChoices").TrueForAll(index => index >= nativeStart && index < nativeEnd),
+            "Disabling helpers still lengthens the native-only Q/E cycle");
+        view.HideViewportSettings();
+        Frame(controller, input, surface); yield return null;
+        Frame(controller, input, surface, 0, KeyCode.R); yield return null;
+        Frame(controller, input, surface); yield return null;
+        Frame(controller, input, surface, 0, KeyCode.G); yield return null;
+        Require(Field<int>(controller, "keyboardSourceIndex") == firstNative &&
+            Field<bool>(controller, "keyboardSurface") && V(doc.Parts[0].Position) == original,
+            "G to R to G loses the explicitly chosen attachment source or mutates the document");
+        Set(controller, "cameraFocus", Vector3.up * 100); Set(controller, "cameraPitch", -89f);
         Frame(controller, input, empty, 0, KeyCode.Return); yield return null;
         Require(Field<bool>(controller, "keyboardPreview") && !Field<bool>(controller, "keyboardValid") &&
             Field<IList>(doc, "undo").Count == history, "Same-frame miss+Enter committed a stale surface hit");
+        Set(controller, "cameraFocus", cameraFocus); Set(controller, "cameraPitch", cameraPitch);
+        Frame(controller, input, empty); yield return null;
         Frame(controller, input, surface, 0, KeyCode.LeftShift); yield return null;
         Frame(controller, input, new Vector2(20, 1050), 0, KeyCode.Return); yield return null;
         Require(Field<bool>(controller, "keyboardPreview"), "Enter over UI confirmed a cursor move");

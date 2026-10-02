@@ -9,7 +9,7 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Current source candidate: **0.19.45**, Store v9, Valheim 1.0.16.
+Current source candidate: **0.19.46**, Store v9, Valheim 1.0.16.
 0.19.39 owner feedback accepts menu hover, language refresh and camera framing;
 Transform selection is provisionally accepted. The owner accepts contour cleanup;
 the focused 0.19.41 game series is accepted by owner report on 2026-10-01.
@@ -27,10 +27,12 @@ MMB drag orbits. Six original engraved SVG/texture assets, filled scale and
 screen-distance hover feedback extend the accepted Scandinavian forms.
 Collapsible hints, compact dropdowns and active hidden-target context remain.
 Ostrix's .45 report on 2026-10-02 accepts tests 1, 3–6 and 8–11, plus language
-refresh in 12. BW-01 remains open: thematic snap artwork, native-first/Auto cursor
-movement and native-style resource/station cards are not accepted yet.
-The [next design proposal](../specs/roadmap/snap-art-and-hud-proposal.md) records
-these three gaps and requires artwork/source-selection approval before coding.
+refresh in 12. Ostrix approved the [design](../specs/roadmap/snap-art-and-hud-proposal.md)
+on 2026-10-02. Candidate .46 implements six thematic PNG point signs, Auto
+surface movement with native-only Q/E/opt-in helpers and an Attachment chooser,
+plus native resource/station icon cards with bounded overflow. Automated checks
+and independent review pass; BW-01 awaits the focused owner series 1–8.
+Earlier .45 plain shapes above are historical, not the .46 artwork.
 All development deployments, upgrades and game tests use **only
 `TerrainRamp-1.0-Test`**. `Default/BuildWorks` is the source/artifact tree,
 not an installed mod. Do not modify other profiles, mods or saves as a side effect.
@@ -60,7 +62,7 @@ dependent changes wait for its gate, unrelated preparation may continue.
 | ID | Deliverable | Dependency | Status |
 | --- | --- | --- | --- |
 | BW-00 | Dedicated-profile baseline and reliable handoff | Current core | Focused 0.19.41 owner series accepted; cost/refund accounting and networking pending |
-| BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | .45 transforms/input accepted; thematic points, native-first/Auto snapping and resource cards remain open; design approval next |
+| BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | .45 input accepted; .46 artwork/Auto/cards approved and automatically verified; awaiting owner series 1–8 |
 | BW-02 | Group layout operations without resizing pieces | BW-01 | Planned; focused operation UI approval required |
 | BW-03 | Persistent Array and minimal recipe persistence | BW-02 | Planned; safe Store migration and editing/Bake gate |
 | BW-04 | Guides and curves in accepted slices | BW-03 + renewed owner discussion | Tool-semantics discussion required before coding |

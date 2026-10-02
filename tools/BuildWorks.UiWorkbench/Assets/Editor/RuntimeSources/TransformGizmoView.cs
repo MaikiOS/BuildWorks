@@ -76,6 +76,7 @@ namespace OstrixMods.BuildWorks
         private readonly bool screenSpaceSizing;
         private float anchorHandleScale = 1f;
         private int nativeAnchorStartIndex = int.MaxValue;
+        private int pinnedAnchorIndex = -1;
         private float moveSize = 1f;
         private float rotationSize = 1f;
         private float arraySize = 1f;
@@ -206,6 +207,7 @@ namespace OstrixMods.BuildWorks
             handleScale *= pointSize;
             anchorHandleScale = handleScale;
             nativeAnchorStartIndex = nativeAnchorStart;
+            pinnedAnchorIndex = pinnedAnchor;
             root.SetActive(true);
             foreach (LineRenderer line in alignmentAxisLines)
                 line.gameObject.SetActive(false);
@@ -377,7 +379,9 @@ namespace OstrixMods.BuildWorks
                             : screenSpaceSizing ? 0.035f : hovered ? 0.12f : 0.075f) * handleScale,
                         hovered ? 0.018f * handleScale + 0.003f
                             : nativeAnchor ? 0.010f : 0.007f, nativeAnchor,
-                        i == pinnedAnchor);
+                        i == pinnedAnchor,
+                        i >= nativeAnchorStart ? "snap-native" : i == AnchorAdjustment.CenterAnchorIndex ? "snap-centre" :
+                            i < 8 ? "snap-corner" : "snap-midpoint", i == selectedAnchor);
                 }
             }
             bool drawSnapTarget = showAnchors && showSnapTarget;
@@ -709,8 +713,11 @@ namespace OstrixMods.BuildWorks
                     mousePosition,
                     new Vector2(screen.x, screen.y));
                 if (distance > AnchorHitRadius(i)) continue;
-                if (distance < bestDistance - 0.5f ||
-                    distance <= bestDistance + 0.5f && screen.z < bestDepth)
+                bool coincident = screenSpaceSizing && bestAnchor >= 0 &&
+                    Vector3.Distance(points[i], points[bestAnchor]) < .0001f;
+                bool smallerTarget = coincident && AnchorHitRadius(i) < AnchorHitRadius(bestAnchor);
+                if (smallerTarget || !coincident && (distance < bestDistance - 0.5f ||
+                    distance <= bestDistance + 0.5f && screen.z < bestDepth))
                 {
                     bestDistance = distance;
                     bestDepth = screen.z;
@@ -723,7 +730,7 @@ namespace OstrixMods.BuildWorks
         private float AnchorHitRadius(int index)
         {
             return screenSpaceSizing
-                ? (index >= nativeAnchorStartIndex ? 18f : 8f) * anchorHandleScale
+                ? (index >= nativeAnchorStartIndex && index != pinnedAnchorIndex ? 18f : 8f) * anchorHandleScale
                 : 16f;
         }
 
@@ -1067,7 +1074,9 @@ namespace OstrixMods.BuildWorks
             float sizeFraction,
             float width,
             bool nativeAnchor = false,
-            bool pinned = false)
+            bool pinned = false,
+            string pointArtwork = null,
+            bool activeSource = false)
         {
             if (screenSpaceSizing)
             {
@@ -1080,53 +1089,29 @@ namespace OstrixMods.BuildWorks
             Vector3 up = camera.transform.up * size;
             if (screenSpaceSizing)
             {
-                Transform pinAccent = line.transform.Find("PinAccent");
-                bool nativePin = pinned && nativeAnchor;
-                if (nativePin)
-                {
-                    LineRenderer accent = pinAccent ? pinAccent.GetComponent<LineRenderer>() : CreateLine("PinAccent", 5);
-                    if (!pinAccent) accent.transform.SetParent(line.transform, false);
-                    accent.gameObject.SetActive(true);
-                    accent.sharedMaterial = line.sharedMaterial;
-                    accent.sortingOrder = short.MaxValue;
-                    accent.SetPosition(0, position + up * .4f);
-                    accent.SetPosition(1, position + right * .4f);
-                    accent.SetPosition(2, position - up * .4f);
-                    accent.SetPosition(3, position - right * .4f);
-                    accent.SetPosition(4, accent.GetPosition(0));
-                    SetColorAndWidth(accent, color, width);
-                    accent.startWidth = accent.endWidth = width * pointScale;
-                    color = new Color(1f, .62f, .12f, color.a);
-                }
-                else if (pinAccent) pinAccent.gameObject.SetActive(false);
-                bool pinGlyph = pinned && !nativePin;
-                bool circle = !nativeAnchor && !pinGlyph && color.b > color.g;
-                line.positionCount = circle ? 9 : pinGlyph ? 8 : 5;
-                if (circle)
-                    for (int index = 0; index < 9; ++index)
-                    {
-                        float angle = index * Mathf.PI / 4f;
-                        line.SetPosition(index, position + right * Mathf.Cos(angle) + up * Mathf.Sin(angle));
-                    }
-                else
-                {
-                    line.SetPosition(0, position + up);
-                    line.SetPosition(1, position + (nativeAnchor || pinGlyph ? right : -up));
-                    line.SetPosition(2, nativeAnchor || pinGlyph ? position - up : position);
-                    line.SetPosition(3, position - right);
-                    line.SetPosition(4, nativeAnchor || pinGlyph ? line.GetPosition(0) : position + right);
-                }
-                if (pinGlyph)
-                {
-                    line.SetPosition(5, position);
-                    line.SetPosition(6, position - up * .4f);
-                    line.SetPosition(7, position + up * .4f);
-                }
+                line.positionCount = 5;
+                line.SetPosition(0, position + up);
+                line.SetPosition(1, position + right);
+                line.SetPosition(2, position - up);
+                line.SetPosition(3, position - right);
+                line.SetPosition(4, position + up);
                 SetColorAndWidth(line, color, width);
                 line.startWidth = line.endWidth = width * pointScale;
-                Transform engraving = line.transform.Find("Engraving");
-                if (engraving) engraving.gameObject.SetActive(false);
-                line.enabled = true; // Plain diamond/circle/cross leave coincident markers readable.
+                string name = pinned ? "snap-pin" : activeSource && !nativeAnchor ? "snap-active" :
+                    pointArtwork ?? (nativeAnchor ? "snap-native" : "snap-corner");
+                DrawArtwork(line, name, position, right, up);
+                line.transform.Find("Engraving").gameObject.SetActive(true);
+                line.enabled = false;
+                Transform accentRoot = line.transform.Find("ActiveAccent");
+                if (activeSource && nativeAnchor && !pinned)
+                {
+                    LineRenderer accent = accentRoot ? accentRoot.GetComponent<LineRenderer>() : CreateLine("ActiveAccent", 5);
+                    if (!accentRoot) accent.transform.SetParent(line.transform, false);
+                    accent.sortingOrder = short.MaxValue;
+                    accent.gameObject.SetActive(true); accent.enabled = false;
+                    DrawArtwork(accent, "snap-active", position, right * .48f, up * .48f);
+                }
+                else if (accentRoot) accentRoot.gameObject.SetActive(false);
                 return;
             }
             line.SetPosition(0, position + up);
@@ -1175,6 +1160,7 @@ namespace OstrixMods.BuildWorks
                     hideFlags = HideFlags.HideAndDontSave, mainTexture = sprite.texture,
                     renderQueue = (int)RenderQueue.Overlay };
                 textureMaterial.SetInt("unity_GUIZTestMode", (int)CompareFunction.Always);
+                  if (name == "snap-pin") textureMaterial.color = new Color(1.7f, 1.35f, 1.7f, 1f);
                 if (textureMaterial.HasProperty("_ZWrite")) textureMaterial.SetInt("_ZWrite", 0);
                 artworkMaterials.Add(name, textureMaterial);
             }
@@ -1190,6 +1176,9 @@ namespace OstrixMods.BuildWorks
             MeshRenderer engraving = owner.transform.Find("Engraving").GetComponent<MeshRenderer>();
             engraving.sharedMaterial = textureMaterial;
             engraving.sortingOrder = owner.sortingOrder - 1;
+            Sprite artworkSprite = artwork.Get(name);
+            Vector2 registration = artworkSprite.pivot / artworkSprite.rect.size;
+            center += right * (1f - 2f * registration.x) + up * (1f - 2f * registration.y);
             mesh.vertices = new[] { center - right - up, center + right - up, center + right + up, center - right + up };
             mesh.uv = new[] { Vector2.zero, Vector2.right, Vector2.one, Vector2.up };
             mesh.triangles = new[] { 0,1,2, 0,2,3 };
@@ -1259,7 +1248,7 @@ namespace OstrixMods.BuildWorks
                 line.startColor = line.endColor = color;
                 if (tipRims.TryGetValue(line, out LineRenderer rim))
                 { Color edge = hovered || active ? color : rim.startColor; edge.a = alpha; rim.startColor = rim.endColor = edge; }
-                Color fill = point && !native ? color : new Color(1f, 1f, 1f, alpha);
+                Color fill = new Color(1f, 1f, 1f, alpha);
                 if (artMesh) artMesh.colors = new[] { fill, fill, fill, fill };
                 if (tipMeshes.TryGetValue(line, out Mesh tip))
                 { var colors = tip.colors; for (int i = 0; i < colors.Length; ++i) colors[i].a = alpha; tip.colors = colors; }

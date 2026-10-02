@@ -133,6 +133,7 @@ public static class RuntimeEditorAcceptance
             fontTemplate.font = TMP_FontAsset.CreateFontAsset(Font.CreateDynamicFontFromOSFont("Arial", 20));
             fontTemplate.gameObject.SetActive(false);
             checks.Add(F9HudAcceptance.Run(fontTemplate.font));
+            checks.Add(BlueprintResourceHudAcceptance.Run(fontTemplate.font));
             checks.Add(WorldSelectionHighlightAcceptance.Run());
             checks.Add(PlacementContactAcceptance.Run());
             checks.Add(UICatalogAcceptance.Run(fontTemplate.font));
@@ -996,11 +997,13 @@ public static class RuntimeEditorAcceptance
             Require(gizmo.HitTestScale(camera, scale + new Vector2(5,4)), "Filled scale interior is not hittable");
             Require(!gizmo.HitTestScale(camera, scale + new Vector2(25,25)), "Scale steals clicks outside its silhouette");
             var artwork = Field<Dictionary<LineRenderer,Mesh>>(gizmo, "artworkMeshes");
-            Require(!artwork.ContainsKey(anchor) && artwork.ContainsKey(scaleHandle) &&
+            Require(artwork.ContainsKey(anchor) && artwork.ContainsKey(scaleHandle) &&
+                anchor.transform.Find("Engraving").GetComponent<MeshRenderer>().sharedMaterial.mainTexture.name.EndsWith(
+                    native ? "snap-native" : "snap-corner") &&
                 scaleHandle.transform.Find("Engraving").GetComponent<MeshRenderer>().sharedMaterial.mainTexture,
-                "Snap marker must be plain; scale must retain its original artwork");
-            Require(anchor.enabled && (native ? anchor.positionCount == 5 : anchor.positionCount == 9),
-                "Native diamond/helper circle distinction missing");
+                "Snap marker lost its authored provenance artwork or scale lost its original artwork");
+            Require(!anchor.enabled && anchor.positionCount == 5,
+                "Invisible hit bounds should not duplicate the authored snap artwork");
             Require(anchor.startColor.a >= (native ? .72f : .42f) - 1f / 255f && anchor.startColor.a <= 1f,
                 "Snap marker lost provenance brightness during neighbouring handle hover");
             gizmo.EditorMouse = scale + Vector2.right * 40;
@@ -1017,9 +1020,11 @@ public static class RuntimeEditorAcceptance
                 GizmoHandleKind.None, GizmoAxis.None, helperPoints, -1, -1, 9,
                 true, 1, false, Vector3.zero, false, GizmoAxis.None, false,
                 Vector3.zero, Vector3.zero, 0, allowExtended: true);
-            Require(Field<List<LineRenderer>>(gizmo, "anchorHandles")[0].positionCount == 9 &&
-                Field<List<LineRenderer>>(gizmo, "anchorHandles")[8].positionCount == 5,
-                "Blue corners must be circles and green midpoints crosses");
+            Require(Field<List<LineRenderer>>(gizmo, "anchorHandles")[0].transform.Find("Engraving")
+                    .GetComponent<MeshRenderer>().sharedMaterial.mainTexture.name.EndsWith("snap-corner") &&
+                Field<List<LineRenderer>>(gizmo, "anchorHandles")[8].transform.Find("Engraving")
+                    .GetComponent<MeshRenderer>().sharedMaterial.mainTexture.name.EndsWith("snap-midpoint"),
+                "Blue corners and green midpoints must use distinct thematic sprites");
             gizmo.Show(camera, Vector3.zero, Quaternion.identity, false, GizmoMode.Move,
                 GizmoHandleKind.None, GizmoAxis.None, helperPoints, 0, 8, 8,
                 true, 1, false, Vector3.zero, false, GizmoAxis.None, false,
@@ -1027,6 +1032,13 @@ public static class RuntimeEditorAcceptance
             for (int index = 0; index < helperPoints.Length; ++index)
                 Require(Field<List<LineRenderer>>(gizmo, "anchorHandles")[index].gameObject.activeInHierarchy,
                     "Selecting or pinning a coincident point must not hide other provenance markers");
+            gizmo.Show(camera, Vector3.zero, Quaternion.identity, false, GizmoMode.Move,
+                GizmoHandleKind.None, GizmoAxis.None, new[] { Vector3.zero, Vector3.zero }, -1, -1, 1,
+                true, 1, false, Vector3.zero, false, GizmoAxis.None, false,
+                Vector3.zero, Vector3.zero, 0, allowExtended: true);
+            Require(gizmo.HitTestAnchor(camera, new[] { Vector3.zero, Vector3.zero }, center) == 0 &&
+                gizmo.HitTestAnchor(camera, new[] { Vector3.zero, Vector3.zero }, center + Vector2.right * 14f) == 1,
+                "Coincident helper centre and native outer rim are not independently pickable");
             void ShowFeedback() => gizmo.Show(camera, Vector3.zero, Quaternion.identity, false, GizmoMode.Move,
                 GizmoHandleKind.None, GizmoAxis.None, anchors, -1, -1, native ? 0 : 1,
                 true, 1, false, Vector3.zero, false, GizmoAxis.None, false,
@@ -1074,7 +1086,7 @@ public static class RuntimeEditorAcceptance
                 "F9 legacy 18px move-axis hit zone changed: depth=" + distance + "; inside=" + inside +
                 "; outside=" + outside + "; axis offset=" + (onAxis - center) + "; pixelRect=" + camera.pixelRect);
         }
-        checks.Add("Gizmo: plain native diamond/compact helper circle-cross, filled scale picking, proximity/exclusive hover; native16.25/helper6.56px, hit18/8; F9 sizing and axis18/anchor16 unchanged");
+        checks.Add("Gizmo: thematic native/helper/pin sprites at true coordinates, helper centre/native rim picking, filled scale, proximity/exclusive hover; native hit18/helper8; F9 sizing unchanged");
     }
 
     private static void EnsureInside(RectTransform parent, RectTransform child)

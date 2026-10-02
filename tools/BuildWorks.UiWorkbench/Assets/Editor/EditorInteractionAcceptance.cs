@@ -76,6 +76,13 @@ public static class EditorInteractionAcceptance
                 Vector2 nativePixel = scene.Camera.WorldToScreenPoint(anchors[nativeIndex]);
                 evidence.Add("Native sample=" + nativeIndex + "; pixel=" + nativePixel +
                     "; pixelRect=" + scene.Camera.pixelRect);
+                gizmo.EditorMouse = new Vector2(-1000,-1000);
+                Show(scene, pivot, anchors, nativeStart);
+                Color32[] far = Render(scene.Camera, Path.Combine(outputDirectory, "actual-native-readable-idle.png"));
+                int idlePixels = ChangedPixels(clean, far, nativePixel, pixel =>
+                    pixel.r > 150 && pixel.g > 85 && pixel.b < 190 && pixel.r > pixel.g + 15);
+                Require(idlePixels >= 40, "Native point unreadable over wood away from cursor: " + idlePixels);
+                evidence.Add("PASS idle native contrast pixels=" + idlePixels);
                 gizmo.EditorMouse = nativePixel;
                 Show(scene, pivot, anchors, nativeStart);
                 Color32[] gold = Render(scene.Camera, Path.Combine(outputDirectory, "actual-native-gold.png"));

@@ -14,7 +14,6 @@ namespace OstrixMods.BuildWorks
         private readonly List<RectState> states = new List<RectState>();
         private readonly List<GameObject> extras = new List<GameObject>();
         private Vector2 cellSize;
-        private Vector2 firstCell;
         private float spacing;
         private RectTransform viewport, content;
         private ScrollRect scroll;
@@ -45,13 +44,13 @@ namespace OstrixMods.BuildWorks
                 { panel = null; return; }
                 host = hud;
                 states.Add(new RectState(panel));
-                states.Add(new RectState(hud.m_pieceDescription.rectTransform, panel));
-                states.Add(new RectState(hud.m_buildSelection.rectTransform, panel));
-                states.Add(new RectState(hud.m_buildIcon.rectTransform, panel));
+                states.Add(new RectState(hud.m_pieceDescription.rectTransform));
+                states.Add(new RectState(hud.m_buildSelection.rectTransform));
+                states.Add(new RectState(hud.m_buildIcon.rectTransform));
                 foreach (GameObject cell in hud.m_requirementItems)
                     states.Add(new RectState((RectTransform)cell.transform));
                 cellSize = first.rect.size;
-                firstCell = panel.InverseTransformPoint(first.position);
+                Vector2 firstCell = panel.InverseTransformPoint(first.position);
                 spacing = cellSize.x + 4f;
                 if (hud.m_requirementItems.Length > 1)
                 {
@@ -88,7 +87,6 @@ namespace OstrixMods.BuildWorks
                 scrollTrack = track.gameObject;
             }
             int count = resources.Count + stations.Count;
-            Layout(count);
             for (int index = 0; index < Mathf.Max(count, host.m_requirementItems.Length); ++index)
             {
                 GameObject cell = Cell(index);
@@ -117,6 +115,7 @@ namespace OstrixMods.BuildWorks
                     amount.color = available || Free(GlobalKeys.NoCraftCost) ? Color.white : MissingColor();
                 }
             }
+            Layout(count);
         }
 
         internal static bool Free(GlobalKeys key) => ZoneSystem.instance && ZoneSystem.instance.GetGlobalKey(key);
@@ -153,25 +152,33 @@ namespace OstrixMods.BuildWorks
             float width = Mathf.Max(original.width, columns * spacing + 32f);
             float rowHeight = cellSize.y + 8f;
             int rows = Mathf.Max(1, Mathf.CeilToInt((float)count / columns));
-            float extraHeight = Mathf.Min((rows - 1) * rowHeight,
-                Mathf.Max(0f, panelHeightLimit - original.height));
+            for (int index = 1; index < 4; ++index) states[index].Restore();
+            // The native description may wrap over several lines. Reserve its measured
+            // height instead of reusing the ordinary-piece card position.
+            float textWidth = Mathf.Max(1f, width - states[3].Size.width - 44f);
+            TMP_Text title = host.m_buildSelection;
+            TMP_Text description = host.m_pieceDescription;
+            title.textWrappingMode = description.textWrappingMode = TextWrappingModes.Normal;
+            float titleHeight = Mathf.Max(states[2].Size.height,
+                title.GetPreferredValues(title.text, textWidth, Mathf.Infinity).y);
+            float descriptionHeight = Mathf.Max(states[1].Size.height,
+                description.GetPreferredValues(description.text, textWidth, Mathf.Infinity).y);
+            float headerHeight = Mathf.Max(states[3].Size.height, titleHeight + 8f + descriptionHeight);
+            float cardTop = 16f + headerHeight + 16f;
+            float contentHeight = rows * rowHeight - 8f;
+            float extraHeight = Mathf.Clamp(cardTop + contentHeight + 16f - original.height,
+                0f, Mathf.Max(0f, panelHeightLimit - original.height));
             panel.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, width);
             panel.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, original.height + extraHeight);
             panel.anchoredPosition += Vector2.up * (extraHeight * panel.pivot.y);
-            // Preserve the native header's offsets from the panel's top-left.
-            Vector2 shift = new Vector2(-(width - original.width) * panel.pivot.x,
-                extraHeight * (1f - panel.pivot.y));
-            for (int index = 1; index < 4; ++index)
-            {
-                states[index].Restore();
-                states[index].Rect.position = panel.TransformPoint(states[index].PanelPosition + (Vector3)shift);
-            }
-            viewport.anchorMin = viewport.anchorMax = Vector2.zero;
-            viewport.pivot = Vector2.up;
-            viewport.sizeDelta = new Vector2(columns * spacing + 12f, cellSize.y + extraHeight);
-            viewport.anchoredPosition = firstCell + shift +
-                new Vector2(-cellSize.x * .5f - panel.rect.xMin, cellSize.y * .5f - panel.rect.yMin);
-            content.sizeDelta = new Vector2(columns * spacing, rows * rowHeight - 8f);
+            Place(host.m_buildIcon.rectTransform, panel, new Vector2(16f, -16f), states[3].Size.size);
+            float textLeft = 28f + states[3].Size.width;
+            Place(title.rectTransform, panel, new Vector2(textLeft, -16f), new Vector2(textWidth, titleHeight));
+            Place(description.rectTransform, panel, new Vector2(textLeft, -24f - titleHeight),
+                new Vector2(textWidth, descriptionHeight));
+            Place(viewport, panel, new Vector2(16f, -cardTop), new Vector2(columns * spacing + 12f,
+                Mathf.Min(contentHeight, Mathf.Max(1f, panel.rect.height - cardTop - 16f))));
+            content.sizeDelta = new Vector2(columns * spacing, contentHeight);
             scroll.enabled = content.rect.height > viewport.rect.height + .1f;
             scrollTrack.SetActive(scroll.enabled);
             if (!scroll.enabled) content.anchoredPosition = Vector2.zero;
@@ -188,6 +195,13 @@ namespace OstrixMods.BuildWorks
             }
             for (int index = 0; index < extras.Count; ++index)
                 if (index + host.m_requirementItems.Length >= count) extras[index].SetActive(false);
+        }
+
+        private static void Place(RectTransform rect, RectTransform parent, Vector2 position, Vector2 size)
+        {
+            if (rect.parent != parent) rect.SetParent(parent, false);
+            rect.anchorMin = rect.anchorMax = rect.pivot = Vector2.up;
+            rect.sizeDelta = size; rect.anchoredPosition = position;
         }
 
         internal void Restore()
@@ -209,20 +223,20 @@ namespace OstrixMods.BuildWorks
         {
             internal readonly RectTransform Rect;
             internal readonly Rect Size;
-            internal readonly Vector3 PanelPosition;
             private readonly Vector2 minimum, maximum, pivot, delta, position;
             private readonly Transform parent;
             private readonly int sibling;
+            private readonly TMP_Text text;
+            private readonly TextWrappingModes wrapping;
             internal RectState(RectTransform rect)
             {
                 Rect = rect; Size = rect.rect;
                 minimum = rect.anchorMin; maximum = rect.anchorMax; pivot = rect.pivot;
                 delta = rect.sizeDelta; position = rect.anchoredPosition;
                 parent = rect.parent; sibling = rect.GetSiblingIndex();
-                PanelPosition = Vector3.zero;
+                text = rect.GetComponent<TMP_Text>();
+                if (text) wrapping = text.textWrappingMode;
             }
-            internal RectState(RectTransform rect, RectTransform panel) : this(rect)
-            { PanelPosition = panel.InverseTransformPoint(rect.position); }
             internal void Restore()
             {
                 if (!Rect) return;
@@ -230,6 +244,7 @@ namespace OstrixMods.BuildWorks
                 Rect.SetSiblingIndex(sibling);
                 Rect.anchorMin = minimum; Rect.anchorMax = maximum; Rect.pivot = pivot;
                 Rect.sizeDelta = delta; Rect.anchoredPosition = position;
+                if (text) text.textWrappingMode = wrapping;
             }
         }
     }

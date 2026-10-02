@@ -8,6 +8,10 @@ Not vectors or game screenshots. Each is 1254 × 1254 with transparent backgroun
 Alpha, decode, actual sprite registration and picking are checked in Unity.
 Gameplay-distance readability still requires Ostrix's game feedback.
 
+In .47 the same artwork uses larger screen signs and a higher idle contrast;
+actual coordinates/pivots are unchanged. The .46 game report found the initial
+render too faint; game readability remains open after the correction.
+
 Directory: `src/BuildWorks/Assets/BlueprintEditorIcons/`.
 Gold snap-native = native clasp; blue snap-corner = bounds corner;
 green snap-midpoint = edge midpoint; pink snap-centre = centre;

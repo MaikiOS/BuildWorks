@@ -133,7 +133,7 @@ public static class RuntimeEditorAcceptance
             fontTemplate.font = TMP_FontAsset.CreateFontAsset(Font.CreateDynamicFontFromOSFont("Arial", 20));
             fontTemplate.gameObject.SetActive(false);
             checks.Add(F9HudAcceptance.Run(fontTemplate.font));
-            checks.Add(BlueprintResourceHudAcceptance.Run(fontTemplate.font));
+            checks.Add(BlueprintResourceHudAcceptance.Run(fontTemplate.font, output));
             checks.Add(WorldSelectionHighlightAcceptance.Run());
             checks.Add(PlacementContactAcceptance.Run());
             checks.Add(UICatalogAcceptance.Run(fontTemplate.font));
@@ -972,7 +972,7 @@ public static class RuntimeEditorAcceptance
                 true, 1, false, Vector3.zero, false, GizmoAxis.None, false,
                 Vector3.zero, Vector3.zero, 0, allowExtended: true);
             Vector2 center = camera.WorldToScreenPoint(Vector3.zero);
-            float hitRadius = native ? 18f : 8f;
+            float hitRadius = native ? 24f : 12f;
             Require(gizmo.HitTestAnchor(camera, anchors, center + new Vector2(hitRadius - 0.5f,0)) == 0,
                 "Visible anchor edge cannot be hit at distance " + distance);
             Require(gizmo.HitTestAnchor(camera, anchors, center + new Vector2(hitRadius + 0.5f,0)) < 0,
@@ -981,12 +981,12 @@ public static class RuntimeEditorAcceptance
             float radius = 0;
             for (int i = 0; i < anchor.positionCount; ++i)
                 radius = Mathf.Max(radius, Vector2.Distance(center, camera.WorldToScreenPoint(anchor.GetPosition(i))));
-            Require(Mathf.Abs(radius - (native ? 16.25f : 6.5625f)) < 0.1f,
+            Require(Mathf.Abs(radius - (native ? 21.25f : 11.25f)) < 0.1f,
                 "Native/helper anchor glyph is not constant pixels");
             float widthPixels = Vector2.Distance(center,
                 camera.WorldToScreenPoint(camera.transform.right * anchor.startWidth));
             Require(widthPixels >= (native ? 2f : 1.5f) - 0.01f &&
-                Mathf.Abs(anchor.startColor.a - (native ? .72f : .42f)) <= 1f / 255f,
+                Mathf.Abs(anchor.startColor.a - (native ? .96f : .88f)) <= 1f / 255f,
                 "Editor anchor lost its default thickness or visibility: native=" + native +
                 "; distance=" + distance + "; widthPixels=" + widthPixels +
                 "; alpha=" + anchor.startColor.a);
@@ -1004,12 +1004,12 @@ public static class RuntimeEditorAcceptance
                 "Snap marker lost its authored provenance artwork or scale lost its original artwork");
             Require(!anchor.enabled && anchor.positionCount == 5,
                 "Invisible hit bounds should not duplicate the authored snap artwork");
-            Require(anchor.startColor.a >= (native ? .72f : .42f) - 1f / 255f && anchor.startColor.a <= 1f,
+            Require(anchor.startColor.a >= (native ? .96f : .88f) - 1f / 255f && anchor.startColor.a <= 1f,
                 "Snap marker lost provenance brightness during neighbouring handle hover");
             gizmo.EditorMouse = scale + Vector2.right * 40;
             ShowFeedback();
             float nearAlpha = artwork[scaleHandle].colors[0].a;
-            Require(nearAlpha > .32f && nearAlpha < 1f, "Scale proximity does not brighten smoothly");
+            Require(nearAlpha > .64f && nearAlpha < 1f, "Scale proximity does not brighten smoothly");
             gizmo.EditorMouse = scale;
             ShowFeedback();
             Require(artwork[scaleHandle].colors[0].a == 1f && anchor.startColor.a < 1f,
@@ -1086,7 +1086,7 @@ public static class RuntimeEditorAcceptance
                 "F9 legacy 18px move-axis hit zone changed: depth=" + distance + "; inside=" + inside +
                 "; outside=" + outside + "; axis offset=" + (onAxis - center) + "; pixelRect=" + camera.pixelRect);
         }
-        checks.Add("Gizmo: thematic native/helper/pin sprites at true coordinates, helper centre/native rim picking, filled scale, proximity/exclusive hover; native hit18/helper8; F9 sizing unchanged");
+        checks.Add("Gizmo: readable thematic sprites at true coordinates; native/helper radius21.25/11.25px, far alpha0.96/0.88; helper centre/native rim picking; manipulator far alpha0.64 and exclusive hover; F9 unchanged");
     }
 
     private static void EnsureInside(RectTransform parent, RectTransform child)
@@ -1100,7 +1100,7 @@ public static class RuntimeEditorAcceptance
         }
     }
 
-    private static void SavePixels(RenderTexture target, string path)
+    internal static void SavePixels(RenderTexture target, string path)
     {
         var texture = new Texture2D(target.width, target.height, TextureFormat.RGB24, false);
         RenderTexture prior = RenderTexture.active;

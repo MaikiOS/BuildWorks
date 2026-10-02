@@ -2,6 +2,39 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Verified candidate 0.19.47
+
+Owner screenshots of .46 reopened two visual defects. Editor snap signs now
+have larger screen radii (native 21.25 px, helper 11.25 px at default settings)
+and a higher idle opacity floor (0.96/0.88); combined manipulator idle opacity
+is 0.64. Artwork, pivots, source coordinates and selected materials are unchanged.
+Hover stays stronger; dragging dims unused handles. World F9 is unchanged.
+
+The blueprint HUD measures wrapped title/description height and places native
+resource/station cards below that header with a 16 px gap. Native thumbnail size,
+labels, costs and availability logic are retained. Parent, sibling, geometry and
+text wrapping restore on ordinary selection/teardown. A regression covers the
+owner's two-resource/one-station panel and a nested native header.
+
+Release: zero warnings/errors. Geometry, Store, Localization, EditorBridge,
+WorldLayout, DeploymentChecks, HostContract and the built localization catalog
+pass (647 keys, 624 static references). Format exits 0 with a workspace-loading
+warning. Unity 6000.0.61f1 passed 81 UI captures at
+2026-10-02T20:14:19.1510813Z plus focused idle-art/HUD-layout captures.
+Independent correctness and Ponytail review found no blockers.
+Host/physical input are substituted on the Workbench; actual Valheim readability,
+native hierarchy, costs/refunds, reload and networking are not proven by it.
+
+- BuildWorks SHA256: 7D3355E79D700719359FEB85B5E7C4C98BC50179BE0260A372159D43E5807303
+- Geometry SHA256: 3EF58DB30AE547E99293DD2B90E97BF8FEE005534C055D23656714FA09D9EA16
+
+Installed with the game closed only in TerrainRamp-1.0-Test through the guarded
+script; hashes match. Previous .46 is backed up at
+artifacts/checkpoint-0.19.47/preinstall. First inspect readability and HUD spacing
+in [the same numbered series](specs/roadmap/current-pass.md), before continuing
+the full 1–8 run. No Valheim launch or binary release. BW-01 stays awaiting owner;
+later stages and curves remain gated.
+
 ## Verified candidate 0.19.46
 
 Ostrix approved artwork and controls on 2026-10-02. Six individual transparent

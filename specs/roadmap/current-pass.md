@@ -2,9 +2,11 @@
 
 **English** | [Русский](current-pass_RU.md)
 
-Test **0.19.46**, only in **TerrainRamp-1.0-Test**. Reply to **1–8 below**.
+Test **0.19.47**, only in **TerrainRamp-1.0-Test**. Reply to **1–8 below**.
 The [.45 series](archive/pass-0.19.45.md) is historical, not a request to repeat it.
-Unity passed; actual Valheim acceptance is still required.
+Unity passed; actual Valheim acceptance is still required. First inspect the
+readability in 1 and the non-overlapping header/cards in 5. Pause the full series
+if either is still unclear; the remaining numbers and controls are unchanged.
 
 ## Preparation
 

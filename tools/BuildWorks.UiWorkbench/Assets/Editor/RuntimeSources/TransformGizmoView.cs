@@ -375,8 +375,8 @@ namespace OstrixMods.BuildWorks
                         camera,
                         anchorPoints[i],
                         color,
-                        (nativeAnchor ? screenSpaceSizing ? .065f : hovered ? 0.17f : 0.115f
-                            : screenSpaceSizing ? 0.035f : hovered ? 0.12f : 0.075f) * handleScale,
+                        (nativeAnchor ? screenSpaceSizing ? .085f : hovered ? 0.17f : 0.115f
+                            : screenSpaceSizing ? .06f : hovered ? 0.12f : 0.075f) * handleScale,
                         hovered ? 0.018f * handleScale + 0.003f
                             : nativeAnchor ? 0.010f : 0.007f, nativeAnchor,
                         i == pinnedAnchor,
@@ -730,7 +730,7 @@ namespace OstrixMods.BuildWorks
         private float AnchorHitRadius(int index)
         {
             return screenSpaceSizing
-                ? (index >= nativeAnchorStartIndex && index != pinnedAnchorIndex ? 18f : 8f) * anchorHandleScale
+                ? (index >= nativeAnchorStartIndex && index != pinnedAnchorIndex ? 24f : 12f) * anchorHandleScale
                 : 16f;
         }
 
@@ -1160,7 +1160,8 @@ namespace OstrixMods.BuildWorks
                     hideFlags = HideFlags.HideAndDontSave, mainTexture = sprite.texture,
                     renderQueue = (int)RenderQueue.Overlay };
                 textureMaterial.SetInt("unity_GUIZTestMode", (int)CompareFunction.Always);
-                  if (name == "snap-pin") textureMaterial.color = new Color(1.7f, 1.35f, 1.7f, 1f);
+                textureMaterial.color = name.StartsWith("snap-", StringComparison.Ordinal)
+                    ? new Color(1.8f, 1.65f, 1.8f, 1f) : new Color(1.3f, 1.3f, 1.3f, 1f);
                 if (textureMaterial.HasProperty("_ZWrite")) textureMaterial.SetInt("_ZWrite", 0);
                 artworkMaterials.Add(name, textureMaterial);
             }
@@ -1241,8 +1242,8 @@ namespace OstrixMods.BuildWorks
                         distance = Mathf.Min(distance, ScreenDistanceToSegment(camera, mouse, vertices[index], vertices[(index + 1) % vertices.Length]));
                 }
                 float proximity = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(distance / 64f));
-                float alpha = active || hovered ? 1f : dragging ? .16f :
-                    Mathf.Lerp(point ? native ? .72f : .42f : .32f, native ? .95f : .72f, proximity);
+                float alpha = active || hovered ? 1f : dragging ? point ? .6f : .3f :
+                    Mathf.Lerp(point ? native ? .96f : .88f : .64f, point ? .98f : .9f, proximity);
                 Color color = (hovered || active) && !point ? new Color(1f, .78f, .32f, alpha) : line.startColor;
                 color.a = alpha;
                 line.startColor = line.endColor = color;

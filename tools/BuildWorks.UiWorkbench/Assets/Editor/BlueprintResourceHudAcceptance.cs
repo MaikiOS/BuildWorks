@@ -30,7 +30,7 @@ public static class InventoryGui
 
 internal static class BlueprintResourceHudAcceptance
 {
-    internal static string Run(TMP_FontAsset font)
+    internal static string Run(TMP_FontAsset font, string output)
     {
         var root = new GameObject("NativeHudCardFixture", typeof(RectTransform), typeof(Canvas), typeof(Hud), typeof(Player));
         var zone = new GameObject("FixtureZone", typeof(ZoneSystem));
@@ -50,16 +50,21 @@ internal static class BlueprintResourceHudAcceptance
             Hud hud = root.GetComponent<Hud>();
             hud.m_rootObject = root;
             hud.m_buildSelection = Text("Title", panel, new Vector2(240,140), "Blueprint");
-            hud.m_pieceDescription = Text("Description", panel, new Vector2(240,100), "Five parts");
+            hud.m_pieceDescription = Text("Description", panel, new Vector2(240,100),
+                "BuildWorks: 3 parts. LMB to place.\nEditing via the blueprint library.");
+            hud.m_pieceDescription.textWrappingMode = TextWrappingModes.NoWrap;
             hud.m_buildIcon = Rect("Icon", panel, new Vector2(64,64), new Vector2(-200,140)).gameObject.AddComponent<Image>();
             hud.m_requirementItems = new GameObject[4];
             for (int index = 0; index < 4; ++index)
             {
                 RectTransform cell = Rect("Requirement" + index, panel, new Vector2(80,80), new Vector2(-260 + index*84,44));
                 cell.gameObject.AddComponent<UITooltip>();
-                Rect("res_icon", cell, new Vector2(64,64), Vector2.zero).gameObject.AddComponent<Image>();
-                Text("res_name", cell, Vector2.up * 20, "");
-                Text("res_amount", cell, -Vector2.up * 25, "");
+                Image resourceIcon = Rect("res_icon", cell, new Vector2(40,40), Vector2.zero).gameObject.AddComponent<Image>();
+                resourceIcon.color = new Color(.25f,.3f,.35f);
+                TMP_Text name = Text("res_name", cell, Vector2.up * 26, "");
+                name.rectTransform.sizeDelta = new Vector2(80,28); name.fontSize = 14;
+                TMP_Text amount = Text("res_amount", cell, -Vector2.up * 25, "");
+                amount.rectTransform.sizeDelta = new Vector2(80,24); amount.fontSize = 18;
                 hud.m_requirementItems[index] = cell.gameObject;
             }
             Player player = root.GetComponent<Player>();
@@ -78,8 +83,37 @@ internal static class BlueprintResourceHudAcceptance
             Vector3 titlePosition = hud.m_buildSelection.transform.localPosition;
             using (var view = new BlueprintResourceHudView())
             {
+                // Reproduce the owner's short HUD: two resource types + one station,
+                // with a description taller than a single ordinary-piece line.
+                view.Show(hud, player, resources.GetRange(0,2), paid.GetRange(0,2), new[] { station });
+                RequireSeparated();
+                Camera camera = new GameObject("HudCapture", typeof(Camera)).GetComponent<Camera>();
+                var target = new RenderTexture((int)panel.rect.width + 64, (int)panel.rect.height + 64, 24);
+                try
+                {
+                    camera.enabled = false; camera.orthographic = true;
+                    camera.orthographicSize = target.height * .5f;
+                    camera.transform.position = panel.TransformPoint(panel.rect.center) - Vector3.forward * 10f;
+                    camera.clearFlags = CameraClearFlags.SolidColor; camera.backgroundColor = new Color(.08f,.1f,.12f);
+                    camera.targetTexture = target;
+                    Canvas.ForceUpdateCanvases(); camera.Render();
+                    RuntimeEditorAcceptance.SavePixels(target, System.IO.Path.Combine(output, "blueprint-hud-header-cards.png"));
+                }
+                finally { Object.DestroyImmediate(camera.gameObject); target.Release(); Object.DestroyImmediate(target); }
+                view.Restore();
+                Require(hud.m_pieceDescription.textWrappingMode == TextWrappingModes.NoWrap,
+                    "Ordinary description wrapping was not restored");
+                RectTransform nestedHeader = Rect("NativeNestedHeader", panel, new Vector2(640,190), Vector2.zero);
+                hud.m_pieceDescription.transform.SetParent(nestedHeader, true);
+                view.Show(hud, player, resources.GetRange(0,2), paid.GetRange(0,2), new[] { station });
+                RequireSeparated();
+                view.Restore();
+                Require(hud.m_pieceDescription.transform.parent == nestedHeader,
+                    "Nested native description parent not restored");
+                hud.m_pieceDescription.transform.SetParent(panel, true);
                 int calls = InventoryGui.Calls;
                 view.Show(hud, player, resources, paid, new[] { station });
+                RequireSeparated();
                 Require(InventoryGui.Calls - calls == 24, "Resources bypass native SetupRequirement");
                 Require(panel.rect.width > size.x && panel.rect.height > size.y, "Native panel does not widen and wrap");
                 Require(hud.m_requirementItems.Length == 4, "Adapter replaced native requirement array");
@@ -89,7 +123,7 @@ internal static class BlueprintResourceHudAcceptance
                     "Total quantity/icon or mixed paid amount availability incorrect");
                 Require(hud.m_buildSelection.transform.localPosition.y > titlePosition.y, "Header intersects new card rows");
                 var clones = new List<GameObject>();
-                foreach (Transform child in panel.Find("BuildWorks_RequirementViewport/Cards"))
+                foreach (Transform child in panel.GetComponentInChildren<ScrollRect>().content)
                     if (child.name == "BuildWorks_BlueprintRequirement") clones.Add(child.gameObject);
                 Require(clones.Count == 21 && clones[20].transform.Find("res_name").GetComponent<TMP_Text>().text == "workbench" &&
                     clones[20].GetComponent<UITooltip>().m_text == "$workbench" &&
@@ -144,6 +178,18 @@ internal static class BlueprintResourceHudAcceptance
                 TMP_Text text = rect.gameObject.AddComponent<TextMeshProUGUI>();
                 text.font = font; text.text = content;
                 return text;
+            }
+
+            void RequireSeparated()
+            {
+                var descriptionCorners = new Vector3[4];
+                var cardCorners = new Vector3[4];
+                hud.m_pieceDescription.rectTransform.GetWorldCorners(descriptionCorners);
+                panel.GetComponentInChildren<ScrollRect>().viewport.GetWorldCorners(cardCorners);
+                Require(cardCorners[1].y <= descriptionCorners[0].y - 15.9f,
+                    "Blueprint card labels overlap the measured multiline description");
+                Require(hud.m_buildIcon.rectTransform.rect.width == 64f,
+                    "Header layout changed native thumbnail size");
             }
         }
         finally

@@ -2,7 +2,44 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
-## Verified candidate 0.19.50
+## Verified candidate 0.19.51
+
+Ostrix accepted .50 checks 1–2, 4–5, 7 and 10 on 2026-10-03. This focused fix
+addresses incorrect mesh helpers, unreliable G capture and inaccessible View Z.
+Bounds corners and fabricated snap middles are no longer shown/used by editor
+helpers. Feature-edge topology yields actual corners; 128 coordinates per visual
+are spatially sampled, with 512 helper/512 native selection budgets. The detailed
+opt-in set includes shallower turns, uses the same ivory sign and stays off by
+default. Large meshes can omit corners; overlapping component vertices remain real.
+
+Legacy Array/span/save anchor calculations explicitly retain their previous set.
+G prioritizes actual pointer intent (24 px, up to 2 m from a source) rather than
+unconditionally preferring a native pair; unaimed capture stays 0.55 m/0.7 m retained.
+Adjacent targets can take over; the captured target stays visible at preview limit.
+The approved View Z depth badge uses up/down for away/towards camera, preserving
+G Z exact numbers, operation-start snapshots, one Undo and full Escape rollback.
+World/F9, Store v9, game costs, permissions and networking are unchanged.
+
+Release build: zero warnings/errors. Geometry, Store, Localization, EditorBridge,
+WorldLayout, DeploymentChecks and HostContract pass (Steam build 25185596).
+678 paired keys / 648 static references; embedded resources verified.
+Format exits 0 with the pre-existing workspace-loading warning.
+Unity 6000.0.61f1 passed 81 screenshots/UI cases at
+2026-10-03T16:42:15.7114349Z, including compound-chair exact corners, detailed-set
+cache/provenance, >24-target winner visibility, aimed helpers/adjacent switching,
+native filtering, depth drag/numeric/cancel/Undo and historical serialization.
+Independent correctness review PASSED. Ponytail found obsolete range state;
+it was removed, tests updated and affected checks rerun successfully.
+
+BuildWorks SHA256: E010B86605AC641A525B2112231B0E262193C1ABDDBFD5466DE0CCCDD4AB9EE5
+Geometry SHA256: 9280D140DC1DE633A14AE4C3633A9CDF14A2F862D1966CD7B13CED747B1E7626
+Installed only in TerrainRamp-1.0-Test with Valheim closed via the guarded script;
+SHA-256 matches both built DLLs. .50 backup: artifacts/checkpoint-0.19.51/preinstall.
+Source-only GitHub synchronization is authorized; no binary release was published.
+Valheim was not launched; game readability/native mesh behavior remain owner checks
+[1–6](specs/roadmap/current-pass.md). The .50 list is archived; no BW-02/curves advance.
+
+## Historical verified candidate 0.19.50
 
 Ostrix approved this focused revision on 2026-10-03 after the .49 game report.
 Model-relative 3D sizing is now the editor default; screen mode remains available.

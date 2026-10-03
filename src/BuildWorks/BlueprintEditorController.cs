@@ -961,6 +961,10 @@ namespace OstrixMods.BuildWorks
                         activeTool == BlueprintEditorTool.Transform ? "editor.hint.gizmo_ready" : "editor.hint.next_selected" :
                         "editor.hint.next_empty") : hints);
             view.SetPreviewAxes(keyboardPreview && dragHandle != GizmoHandleKind.Scale, dragAxis);
+            if (activeTool == BlueprintEditorTool.Transform && transformFrame == TransformFrame.View &&
+                localSpace && !view.HasCatalog && !view.HasModal && !view.HasViewportSettings &&
+                (!IsGizmoDragging || ViewDepthMove))
+                view.SetNextAction(BuildWorksLocalization.Text("editor.view.depth_hint"));
             if (!view.HasModal && !view.HasOutlinerContextMenu && !view.HasOutlinerMenu &&
                 !view.HasViewportSettings && !view.HasToolsMenu && !view.HasCatalog && !view.IsOutlinerDragging &&
                 !view.IsNumericScrubbing && !view.IsTextInputFocused && placementItem == null &&
@@ -1346,6 +1350,12 @@ namespace OstrixMods.BuildWorks
             Vector2 screenAxis = new Vector2(end.x - start.x, end.y - start.y);
             dragScreenDirection = screenAxis.normalized;
             dragWorldUnitsPerPixel = 1f / Mathf.Max(2f, screenAxis.magnitude);
+            if (ViewDepthMove)
+            {
+                dragScreenDirection = Vector2.up;
+                dragWorldUnitsPerPixel = ViewDepthUnitsPerPixel(origin);
+                keyboardValid = true;
+            }
             dragStartAngle = Mathf.Atan2(mouse.y - start.y, mouse.x - start.x) * Mathf.Rad2Deg;
             if (dragHandle == GizmoHandleKind.Rotate)
             {
@@ -1420,7 +1430,8 @@ namespace OstrixMods.BuildWorks
                 snapTargetVisible = !ShiftHeld && scene.TryCursorSnap(dragIds, sources, keyboardSnapSources,
                     gizmoNativeAnchorStart, dragNativeAnchorEnd, snapPreviewTargets, snapPreviewNative,
                     out keyboardAutoSource, out snapTargetWorld, out snapTargetIsNative,
-                    wasSnapped ? keyboardAutoSource : -1, wasSnapped ? previousTarget : (Vector3?)null);
+                    wasSnapped ? keyboardAutoSource : -1, wasSnapped ? previousTarget : (Vector3?)null,
+                    cursor: mouse);
                 // Reveal a new target for a complete frame before magnetic capture.
                 if (snapTargetVisible && !wasSnapped && !previouslyShown.Exists(p => (p - snapTargetWorld).sqrMagnitude < .000001f))
                     snapTargetVisible = false;
@@ -1657,13 +1668,21 @@ namespace OstrixMods.BuildWorks
                 Vector3 end = scene.Camera.WorldToScreenPoint(pivot + dragAxisWorld * axisLength);
                 Vector2 screenAxis = new Vector2(end.x - pivotScreen.x, end.y - pivotScreen.y);
                 float pixels = screenAxis.magnitude;
-                if (pixels < 2f)
+                if (ViewDepthMove)
+                {
+                    dragScreenDirection = Vector2.up;
+                    dragWorldUnitsPerPixel = ViewDepthUnitsPerPixel(pivot);
+                }
+                else if (pixels < 2f)
                 {
                     ResetGizmoDrag();
                     return false;
                 }
-                dragScreenDirection = screenAxis / pixels;
-                dragWorldUnitsPerPixel = axisLength / pixels;
+                else
+                {
+                    dragScreenDirection = screenAxis / pixels;
+                    dragWorldUnitsPerPixel = axisLength / pixels;
+                }
             }
             else if (dragHandle == GizmoHandleKind.MovePlane)
             {
@@ -2090,7 +2109,8 @@ namespace OstrixMods.BuildWorks
                             ((dragSourceAnchors[index] - dragPivot) * dragScale) + dragTranslation;
                 }
                 else if (!scene.TryGetGizmoAnchors(
-                    gizmoIds, out gizmoAnchors, out gizmoNativeAnchorStart))
+                    gizmoIds, out gizmoAnchors, out gizmoNativeAnchorStart,
+                    legacyLayoutAnchors: activeTool == BlueprintEditorTool.Array))
                 {
                     gizmoAnchors = Array.Empty<Vector3>();
                     gizmoNativeAnchorStart = AnchorAdjustment.SelectableAnchorCount;
@@ -2130,6 +2150,7 @@ namespace OstrixMods.BuildWorks
                             pinnedAnchorPoint = selectedAnchorPoint;
                     }
                 }
+                scene.ViewDepthHandle = transformFrame == TransformFrame.View && localSpace;
                 scene.ShowGizmo(
                     SelectionGizmoTool,
                     pivot,
@@ -2255,6 +2276,16 @@ namespace OstrixMods.BuildWorks
                 }
             }
             return true;
+        }
+
+        private bool ViewDepthMove => transformFrame == TransformFrame.View && localSpace &&
+            dragHandle == GizmoHandleKind.Move && dragAxis == GizmoAxis.Z;
+
+        private float ViewDepthUnitsPerPixel(Vector3 pivot)
+        {
+            Vector3 center = scene.Camera.WorldToScreenPoint(pivot);
+            Vector3 side = scene.Camera.WorldToScreenPoint(pivot + scene.Camera.transform.right);
+            return 1f / Mathf.Max(2f, Vector2.Distance(center, side));
         }
 
         private BlueprintEditorPart SelectedPrimaryPart()
@@ -2731,7 +2762,7 @@ namespace OstrixMods.BuildWorks
                 arrayRotation, arrayPitch, arrayRoll, out axis, out degrees);
             back = -stepX * .5f;
             front = stepX * .5f;
-            if (!scene.TryGetGizmoAnchors(gizmoIds, out Vector3[] anchors, out _) || anchors.Length < 8) return;
+            if (!scene.TryGetGizmoAnchors(gizmoIds, out Vector3[] anchors, out _, legacyLayoutAnchors: true) || anchors.Length < 8) return;
             Vector3 direction = stepX.normalized;
             Vector3 center = Vector3.zero;
             float minimum = float.PositiveInfinity, maximum = float.NegativeInfinity;
@@ -2856,7 +2887,7 @@ namespace OstrixMods.BuildWorks
         private float ArrayStepLength(Vector3 direction)
         {
             TrySelectionBasis(out _, out _, gizmoIds);
-            if (!scene.TryGetGizmoAnchors(gizmoIds, out Vector3[] points, out int nativeStart)) return 1f;
+            if (!scene.TryGetGizmoAnchors(gizmoIds, out Vector3[] points, out int nativeStart, legacyLayoutAnchors: true)) return 1f;
             float span = ProjectedAnchorSpan(points, direction, nativeStart, points.Length);
             if (span < 0.0001f) span = ProjectedAnchorSpan(points, direction, 0, Math.Min(8, points.Length));
             return span > 0.0001f ? span : 1f;
@@ -3376,14 +3407,13 @@ namespace OstrixMods.BuildWorks
                 foreach (BlueprintEditorPart blueprintPart in document.Parts)
                     ids.Add(blueprintPart.StableId);
             }
-            if (!scene.TryGetGizmoAnchors(ids, out Vector3[] anchors, out _))
+            if (!scene.TryGetGizmoAnchors(ids, out Vector3[] anchors, out _, legacyLayoutAnchors: true))
                 throw new InvalidOperationException(BuildWorksLocalization.Text(
                     "editor.blueprint_points_failed"));
             var result = new List<CompositeBlueprintStore.VectorData>(
                 Math.Min(anchors.Length, 512));
             for (int index = 0; index < anchors.Length && result.Count < 512; ++index)
             {
-                if (index >= scene.GeometryAnchorStart && index < scene.GeometryAnchorStart + scene.GeometryAnchorCount) continue;
                 result.Add(new CompositeBlueprintStore.VectorData(anchors[index]));
             }
             return result;

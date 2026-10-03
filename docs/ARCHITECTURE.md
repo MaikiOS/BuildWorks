@@ -68,11 +68,18 @@ Model-relative sizing is the editor default; the shared Native/Native+ours flag
 owns both G source choice and target scans, with no independent helper opt-in.
 The amber native clasp and ivory generated knot encode provenance; the selected
 locking collar is an overlay, not a new point type. Optional B lives in Attachment.
-Geometry endpoints are cached in VisualNode root-local coordinates from existing
-feature edges (32 per visual, 64 extras per selection), off by default. Their
-range precedes native anchors and is excluded by BuildBoundsAnchors when saving.
-Enabling/disabling invalidates the anchor cache; it never changes source prefabs,
-saved schema or world/F9. The option is locked during active transformations.
+Editor helpers now use actual feature-edge corners, never bounds corners or
+synthetic midpoints. FeatureCorners welds seams and rejects straight subdivisions;
+ordinary turns use 25 degrees, the opt-in detailed set 10 degrees. Each visual
+spatially samples at most 128 existing coordinates; selection limits helpers to
+512 and native sockets to 512. Large meshes can omit corners, never invent them.
+Legacy bounds/midpoint anchors are requested explicitly for Array and serialization,
+so saved/world coordinates are unchanged. Geometry toggle invalidates the cache
+and is locked during transformations. Detailed helpers share the ivory sign.
+G prioritizes explicit pointer aim within 24 px and 2 m of a source; unaimed
+capture keeps 0.55 m acquire/0.7 m retention. The winning target is always shown.
+View-frame Z uses a separate screen-facing depth handle and vertical mouse motion;
+exact input and cancel still consume the immutable operation-start snapshot.
 Catalogue labels resolve stable native type/material IDs; unknown/external IDs
 and user categories retain their original names.
 

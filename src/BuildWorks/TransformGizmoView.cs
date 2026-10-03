@@ -58,6 +58,7 @@ namespace OstrixMods.BuildWorks
         internal bool ModelSpaceSizing { get; set; }
         internal float ModelSize { get; set; } = 1f;
         internal bool NativePointsOnly { get; set; }
+        internal bool ViewDepthHandle { get; set; }
         private readonly List<float> anchorHitRadii = new List<float>();
         private readonly List<bool> anchorOccluded = new List<bool>();
         private readonly Dictionary<LineRenderer, Mesh> tipMeshes = new Dictionary<LineRenderer, Mesh>();
@@ -73,6 +74,7 @@ namespace OstrixMods.BuildWorks
         private readonly LineRenderer[] axisLabels = new LineRenderer[3];
         private readonly LineRenderer[] movePlanes = new LineRenderer[3];
         private readonly LineRenderer scaleHandle;
+        private readonly LineRenderer depthHandle;
         private readonly LineRenderer[] rotationRings = new LineRenderer[3];
         private readonly LineRenderer[] layoutAxisLines = new LineRenderer[3];
         private readonly LineRenderer[] alignmentAxisLines = new LineRenderer[3];
@@ -82,8 +84,6 @@ namespace OstrixMods.BuildWorks
         private float anchorHandleScale = 1f;
         private int nativeAnchorStartIndex = int.MaxValue;
         private int helperAnchorOverrideIndex = -1;
-        private int geometryAnchorStartIndex = -1;
-        private int geometryAnchorCount;
         private int pinnedAnchorIndex = -1;
         private float moveSize = 1f;
         private float rotationSize = 1f;
@@ -155,6 +155,7 @@ namespace OstrixMods.BuildWorks
             }
             snapTargetHandle = CreateLine("SnapTarget", 5, depthTested: true);
             scaleHandle = CreateLine("UniformScale", 5);
+            depthHandle = CreateLine("ViewDepth", 5);
             constraintPath = CreateLine("AnchorConstraintPath", RingSegments + 1);
             contactGuide = CreateLine("ContactGuide", 2);
             aimGuide = CreateLine("AimGuide", 2);
@@ -221,9 +222,7 @@ namespace OstrixMods.BuildWorks
             bool allowRotate = true,
             bool allowExtended = false,
             Func<Vector3, bool> pointVisibility = null,
-            int helperAnchorOverride = -1,
-            int geometryAnchorStart = -1,
-            int geometryPoints = 0)
+            int helperAnchorOverride = -1)
         {
             if (!camera)
             {
@@ -236,8 +235,6 @@ namespace OstrixMods.BuildWorks
             anchorHandleScale = handleScale;
             nativeAnchorStartIndex = nativeAnchorStart;
             helperAnchorOverrideIndex = helperAnchorOverride;
-            geometryAnchorStartIndex = geometryAnchorStart;
-            geometryAnchorCount = geometryPoints;
             pinnedAnchorIndex = pinnedAnchor;
             root.SetActive(true);
             foreach (LineRenderer line in alignmentAxisLines)
@@ -366,6 +363,20 @@ namespace OstrixMods.BuildWorks
                 else DrawAnchor(scaleHandle, camera, pivot - camera.transform.up * Scale * 0.9f,
                     color, 0.065f, 0.018f);
             }
+            depthHandle.gameObject.SetActive(screenSpaceSizing && ViewDepthHandle && showMove);
+            if (depthHandle.gameObject.activeSelf)
+            {
+                Vector3 center = DepthHandleCenter(camera, pivot);
+                float size = Scale * moveSize * .09f;
+                Vector3 right = camera.transform.right * size, up = camera.transform.up * size;
+                depthHandle.SetPositions(new[] { center - right - up, center + right - up,
+                    center + right + up, center - right + up, center - right - up });
+                Color color = selectedHandle == GizmoHandleKind.Move && selectedAxis == GizmoAxis.Z
+                    ? Color.yellow : AxisColors[2];
+                SetColorAndWidth(depthHandle, color, .018f);
+                DrawArtwork(depthHandle, "gizmo-plane", center, right, up);
+                DrawAxisLabel(axisLabels[2], camera, center, camera.transform.up, 2, color, .15f);
+            }
             int anchorCount = anchorPoints?.Length ?? 0;
             EnsureAnchorHandleCount(anchorCount);
             bool showAnchors = mode != GizmoMode.Plane && anchorCount > 0;
@@ -381,7 +392,6 @@ namespace OstrixMods.BuildWorks
                     : float.PositiveInfinity;
                 bool hovered = screenDistance <= AnchorHitRadius(i);
                 bool nativeAnchor = IsNativeAnchor(i);
-                bool geometryAnchor = i >= geometryAnchorStartIndex && i < geometryAnchorStartIndex + geometryAnchorCount;
                 bool unobstructed = !showAnchors || i >= anchorCount || (pointVisibility != null
                     ? pointVisibility(anchorPoints[i]) : IsPointVisible(camera, anchorPoints[i]));
                 bool showAnchor = showAnchors && (combined || Family == GizmoFamily.Points || important ||
@@ -412,17 +422,17 @@ namespace OstrixMods.BuildWorks
                         anchorPoints[i],
                         color,
                         (nativeAnchor ? screenSpaceSizing ? .128f : hovered ? 0.17f : 0.115f
-                            : screenSpaceSizing ? geometryAnchor ? .044f : .072f : hovered ? 0.12f : 0.075f) * handleScale,
+                            : screenSpaceSizing ? .072f : hovered ? 0.12f : 0.075f) * handleScale,
                         hovered ? 0.018f * handleScale + 0.003f
                             : nativeAnchor ? 0.010f : 0.007f, nativeAnchor,
                         i == pinnedAnchor,
-                        nativeAnchor ? "snap-native" : geometryAnchor ? "snap-geometry" : "snap-helper", i == selectedAnchor);
+                        nativeAnchor ? "snap-native" : "snap-helper", i == selectedAnchor);
                     // Picking follows the actual projected badge in both size modes.
                     Vector3 edge = camera.WorldToScreenPoint(anchorPoints[i] + camera.transform.right *
-                        GizmoScale(camera, anchorPoints[i]) * (nativeAnchor ? .128f : geometryAnchor ? .044f : .072f) * handleScale);
+                        GizmoScale(camera, anchorPoints[i]) * (nativeAnchor ? .128f : .072f) * handleScale);
                     while (anchorHitRadii.Count <= i) anchorHitRadii.Add(0f);
                     anchorHitRadii[i] = ModelSpaceSizing ? Vector2.Distance(screen, edge) + 2f
-                        : (nativeAnchor ? 18f : geometryAnchor ? 7.5f : 10.5f) * handleScale;
+                        : (nativeAnchor ? 18f : 10.5f) * handleScale;
                 }
             }
             bool drawSnapTarget = showAnchors && showSnapTarget;
@@ -572,8 +582,21 @@ namespace OstrixMods.BuildWorks
             bool localSpace,
             Vector2 mousePosition)
         {
+            if (camera && depthHandle.gameObject.activeInHierarchy)
+            {
+                Vector3 center = DepthHandleCenter(camera, pivot);
+                Vector3 screen = camera.WorldToScreenPoint(center);
+                Vector3 edge = camera.WorldToScreenPoint(center + camera.transform.right * GizmoScale(camera, pivot) * moveSize * .09f);
+                float radius = Mathf.Max(4f, Vector2.Distance(screen, edge));
+                if (screen.z > 0f && Mathf.Abs(mousePosition.x - screen.x) <= radius &&
+                    Mathf.Abs(mousePosition.y - screen.y) <= radius) return GizmoAxis.Z;
+            }
             return HitTestAxes(camera, pivot, rotation, localSpace, mousePosition, 0f, 0.85f, moveSize);
         }
+
+        private Vector3 DepthHandleCenter(Camera camera, Vector3 pivot) =>
+            pivot + (camera.transform.right * .28f - camera.transform.up * .3f) *
+            GizmoScale(camera, pivot) * moveSize;
 
         public GizmoHandleKind HitTestExtra(Camera camera, Vector3 pivot, Quaternion rotation,
             bool localSpace, Vector2 mouse, out GizmoAxis axis)
@@ -1184,8 +1207,7 @@ namespace OstrixMods.BuildWorks
                 if (index < nativeAnchorStart && index >= 8) return new Color(.35f, 1f, .45f, 1f);
             }
             if (IsNativeAnchor(index)) return new Color(1f, 0.62f, 0.12f, 1f);
-            if (screenSpaceSizing) return index >= geometryAnchorStartIndex && index < geometryAnchorStartIndex + geometryAnchorCount
-                ? new Color(1f, .72f, .24f, 1f) : new Color(1f, .92f, .76f, 1f);
+            if (screenSpaceSizing) return new Color(1f, .92f, .76f, 1f);
             return new Color(0.25f, 0.95f, 1f, 1f);
         }
 

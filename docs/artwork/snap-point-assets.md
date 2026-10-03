@@ -4,18 +4,18 @@
 
 ## Current point workflow
 
-.50 keeps amber `snap-native`; all ordinary generated helpers use the new ivory
+.51 keeps amber `snap-native`; all ordinary generated helpers use the new ivory
 `snap-helper` joining knot. Selected A/source adds `snap-selected`, a carved
-locking collar/rune, without replacing provenance. Opt-in geometry helpers use
-a smaller amber `snap-geometry` knot, not the native circular clasp. No corner/
+locking collar/rune, without replacing provenance. Detailed corners now use the same ivory helper sign and size.
+`snap-geometry` is historical .50 artwork, not a third current point type. No corner/
 midpoint/centre colour classes remain in the editor. World/F9 art is unchanged.
 
 Three original transparent 1254 × 1254 raster PNGs were generated individually
 through imagegen. Geometry is an edit of the helper, not a new native sign.
 All three register at (0.5,0.5). Neutral shader colour, mipmaps, trilinear filtering
 and uncompressed Workbench import match the embedded decoder.
-Model-relative 3D sizing is default; screen mode retains native/helper/geometry
-quad radii of 16/9/5.5 pixels. Selected overlay radius is 1.3× native or 2.1× helper.
+Model-relative 3D sizing is default; screen mode retains native/helper
+quad radii of 16/9 pixels. Selected overlay radius is 1.3× native or 2.1× helper.
 Near-cursor/depth feedback and the same projected hit geometry apply in both modes.
 Rendered acceptance is separate from Valheim approval; no concept is runtime proof.
 

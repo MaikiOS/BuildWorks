@@ -55,7 +55,7 @@ public static class EditorInteractionAcceptance
                 scene.Camera.orthographic = true;
                 scene.Camera.orthographicSize = Mathf.Max(bounds.extents.x, bounds.extents.y) * 1.7f;
                 scene.SetCameraPose(bounds.center - Vector3.forward * 6f, Quaternion.identity);
-                Require(scene.TryGetGizmoAnchors(ids, out Vector3[] anchors, out int nativeStart) &&
+                Require(scene.TryGetGizmoAnchors(ids, out Vector3[] anchors, out int nativeStart, legacyLayoutAnchors: true) &&
                     anchors.Length > nativeStart, "Exact group produced no native/midpoint anchors");
                 object cache = Field<object>(scene, "cachedGizmoAnchors");
                 var visuals = Field<IDictionary>(scene, "visuals");
@@ -170,14 +170,14 @@ public static class EditorInteractionAcceptance
                 Require(ReferenceEquals(cache, Field<object>(scene, "cachedGizmoAnchors")),
                     "Camera/settings/Shift invalidated geometry-only anchor cache");
                 anchors[0] = Vector3.one * 999f;
-                scene.TryGetGizmoAnchors(ids, out Vector3[] original, out _);
+                scene.TryGetGizmoAnchors(ids, out Vector3[] original, out _, legacyLayoutAnchors: true);
                 Require(original[0] != anchors[0], "Returned anchor array corrupts cached data");
                 scene.PreviewTransform(doc, ids, Vector3.up, Quaternion.identity, pivot);
-                scene.TryGetGizmoAnchors(ids, out Vector3[] moved, out _);
+                scene.TryGetGizmoAnchors(ids, out Vector3[] moved, out _, legacyLayoutAnchors: true);
                 Require(Vector3.Distance(moved[0], original[0] + Vector3.up) < 0.001f,
                     "Actual group preview kept stale cached anchors");
                 Require(scene.TrySync(doc, out error), "Restore native group: " + error);
-                scene.TryGetGizmoAnchors(ids, out Vector3[] restored, out _);
+                scene.TryGetGizmoAnchors(ids, out Vector3[] restored, out _, legacyLayoutAnchors: true);
                 Require(Vector3.Distance(restored[0], original[0]) < 0.001f, "TrySync retained preview anchor positions");
                 TestCursorSnap(scene, visuals["wall"]);
 

@@ -320,6 +320,7 @@ public static class RuntimeEditorAcceptance
                 TestGizmoHits(template);
                 TestModelSpaceGizmo(template);
                 TestExperimentalGeometry(template, fontTemplate);
+                TestFurnitureCornersAndCursorIntent(template);
                 controller.Close(true);
                 Require(controller.OpenNew(out error), "Reopen: " + error);
                 Require(Field<BlueprintEditorTool>(controller, "activeTool") == BlueprintEditorTool.Select,
@@ -631,7 +632,7 @@ public static class RuntimeEditorAcceptance
                 Set(controller, "gizmoFamily", GizmoFamily.Points);
                 Set(controller, "showAllAnchors", true);
                 Call(controller, "UpdateGizmo");
-                Require(scene.TryGetGizmoAnchors(new[] { id }, out Vector3[] anchors, out int nativeStart) &&
+                Require(scene.TryGetGizmoAnchors(new[] { id }, out Vector3[] anchors, out int nativeStart, legacyLayoutAnchors: true) &&
                     anchors.Length - nativeStart == 4 && nativeStart == AnchorAdjustment.SelectableAnchorCount + 4,
                     "Four native points and four generated midpoints must retain distinct provenance");
                 foreach (Vector3 native in localAnchors)
@@ -699,7 +700,7 @@ public static class RuntimeEditorAcceptance
             using (var scene = new BlueprintEditorScene(template, _ => source))
             {
                 Require(scene.TrySync(doc, out string error), "Group snap sync: " + error);
-                Require(scene.TryGetGizmoAnchors(ids, out Vector3[] points, out int start) &&
+                Require(scene.TryGetGizmoAnchors(ids, out Vector3[] points, out int start, legacyLayoutAnchors: true) &&
                     points.Length - start == 4 && start == AnchorAdjustment.SelectableAnchorCount + 8,
                     "Three-part group must retain four exterior native and eight generated points; scale=" + scale +
                     "; native=" + (points.Length - start) + "; helpers=" + (start - AnchorAdjustment.SelectableAnchorCount));
@@ -707,21 +708,21 @@ public static class RuntimeEditorAcceptance
                     Require(Math.Abs(points[index].x - 0.5 * scale) > 0.0001 &&
                         Math.Abs(points[index].x - 1.5 * scale) > 0.0001,
                         "Shared internal group snap remains visible");
-                Require(scene.TryGetGizmoAnchors(ids, out Vector3[] repeated, out int repeatedStart) &&
+                Require(scene.TryGetGizmoAnchors(ids, out Vector3[] repeated, out int repeatedStart, legacyLayoutAnchors: true) &&
                     repeatedStart == start && repeated.Length == points.Length, "Group snap count changes across refresh");
                 for (int index = 0; index < points.Length; ++index)
                     Require(points[index] == repeated[index], "Group snap identity changes across refresh");
                 points[start] += Vector3.one * 50f;
-                scene.TryGetGizmoAnchors(ids, out points, out start);
+                scene.TryGetGizmoAnchors(ids, out points, out start, legacyLayoutAnchors: true);
                 Require(points[start] == repeated[start], "Caller mutation corrupts cached group anchors");
                 scene.PreviewTransform(doc, ids, Vector3.up * 2f, Quaternion.identity, Vector3.zero);
-                scene.TryGetGizmoAnchors(ids, out points, out start);
+                scene.TryGetGizmoAnchors(ids, out points, out start, legacyLayoutAnchors: true);
                 Require(Vector3.Distance(points[start], repeated[start] + Vector3.up * 2f) < 0.00001f,
                     "Transform preview retains stale group anchor cache");
-                scene.TrySync(doc, out _); scene.TryGetGizmoAnchors(ids, out points, out start);
+                scene.TrySync(doc, out _); scene.TryGetGizmoAnchors(ids, out points, out start, legacyLayoutAnchors: true);
                 Require(points[start] == repeated[start], "Scene sync did not invalidate preview group anchors");
                 doc.SetLocked("b", true); doc.SetVisibility("c", false); scene.TrySync(doc, out _);
-                Require(scene.TryGetGizmoAnchors(ids, out points, out start) && points.Length - start == 4 &&
+                Require(scene.TryGetGizmoAnchors(ids, out points, out start, legacyLayoutAnchors: true) && points.Length - start == 4 &&
                     start == AnchorAdjustment.SelectableAnchorCount + 4,
                     "Hidden/locked members still contribute group native points");
                 Require(source.transform.childCount == 4, "Group native extraction mutated source hierarchy");
@@ -739,7 +740,7 @@ public static class RuntimeEditorAcceptance
         {
             var doc = new BlueprintEditorDocument(null, "Native budget", "Test", crowded);
             Require(scene.TrySync(doc, out string error), error);
-            Require(scene.TryGetGizmoAnchors(crowdedIds, out Vector3[] points, out int start) &&
+            Require(scene.TryGetGizmoAnchors(crowdedIds, out Vector3[] points, out int start, legacyLayoutAnchors: true) &&
                 points.Length == AnchorAdjustment.SelectableAnchorCount + 512 && points.Length - start == 512,
                 "Generated midpoint helpers must not exhaust the 512 exterior-point budget before native points");
         }
@@ -894,11 +895,11 @@ public static class RuntimeEditorAcceptance
     {
         GameObject source = GameObject.CreatePrimitive(PrimitiveType.Cube);
         Mesh originalMesh = source.GetComponent<MeshFilter>().sharedMesh;
-        Mesh mesh = Object.Instantiate(originalMesh);
-        Vector3[] vertices = mesh.vertices;
-        for (int i = 0; i < vertices.Length; ++i)
-            if (vertices[i] == new Vector3(-.5f,-.5f,-.5f)) vertices[i] = new Vector3(.2f,-.5f,-.2f);
-        mesh.vertices = vertices; mesh.RecalculateBounds();
+        Mesh mesh = new Mesh();
+        Vector3[] vertices = { new Vector3(-1,-.5f,0), new Vector3(0,-.5f,0),
+            new Vector3(1,-.25f,0), new Vector3(1,.5f,0), new Vector3(-1,.5f,0) };
+        mesh.vertices = vertices; mesh.triangles = new[] { 0,1,4, 1,2,4, 2,3,4 };
+        mesh.RecalculateNormals(); mesh.RecalculateBounds();
         source.GetComponent<MeshFilter>().sharedMesh = mesh;
         source.SetActive(false);
         var doc = new BlueprintEditorDocument(null, "Geometry experiment", "Test", new[] {
@@ -912,10 +913,9 @@ public static class RuntimeEditorAcceptance
             scene.TryGetGizmoAnchors(new[] { "model" }, out Vector3[] before, out int beforeNative);
             scene.ExperimentalGeometryPoints = true;
             scene.TryGetGizmoAnchors(new[] { "model" }, out Vector3[] expanded, out int expandedNative);
-            Require(scene.GeometryAnchorCount > 0 && scene.GeometryAnchorCount <= 32 &&
-                expandedNative - beforeNative == scene.GeometryAnchorCount,
-                "Opt-in geometry did not add bounded feature endpoints as helpers");
-            Vector3 point = expanded[scene.GeometryAnchorStart];
+            Require(beforeNative == 4 && expandedNative - beforeNative == 1,
+                "Detailed corners must add only the actual shallow bend, not midpoints or bounds");
+            Vector3 point = expanded[beforeNative];
             var targets = new List<Vector3>(); var flags = new List<bool>();
             Require(scene.TryCursorSnap(Array.Empty<string>(), new[] { point }, new[] { 0 }, 1, 1,
                 targets, flags, out _, out Vector3 snapped, out bool native) && !native && snapped == point &&
@@ -927,21 +927,19 @@ public static class RuntimeEditorAcceptance
             scene.ShowGizmo(BlueprintEditorTool.Transform, Vector3.zero, Quaternion.identity, false,
                 GizmoHandleKind.None, GizmoAxis.None, expanded, -1, expandedNative, true, false, default, false);
             var gizmo = Field<TransformGizmoView>(scene, "gizmo");
-            LineRenderer mark = Field<List<LineRenderer>>(gizmo, "anchorHandles")[scene.GeometryAnchorStart];
-            Require(mark.transform.Find("Engraving").GetComponent<MeshRenderer>().sharedMaterial.mainTexture.name.EndsWith("snap-geometry"),
-                "Geometry marker lost its small amber helper motif");
-            int geometryStart = scene.GeometryAnchorStart, geometryCount = scene.GeometryAnchorCount;
+            LineRenderer mark = Field<List<LineRenderer>>(gizmo, "anchorHandles")[beforeNative];
+            Require(mark.transform.Find("Engraving").GetComponent<MeshRenderer>().sharedMaterial.mainTexture.name.EndsWith("snap-helper"),
+                "Detailed corner introduced a third provenance sign");
             scene.PreviewTransform(doc, new[] { "model" }, Vector3.up, Quaternion.identity, Vector3.zero);
             var moved = Array.ConvertAll(expanded, p => p + Vector3.up);
             scene.ShowGizmo(BlueprintEditorTool.Transform, Vector3.up, Quaternion.identity, false,
                 GizmoHandleKind.None, GizmoAxis.None, moved, -1, expandedNative, true, false, default, false);
-            Require(scene.GeometryAnchorStart == geometryStart && scene.GeometryAnchorCount == geometryCount &&
-                mark.transform.Find("Engraving").GetComponent<MeshRenderer>().sharedMaterial.mainTexture.name.EndsWith("snap-geometry"),
+            Require(mark.transform.Find("Engraving").GetComponent<MeshRenderer>().sharedMaterial.mainTexture.name.EndsWith("snap-helper"),
                 "Transform preview lost frozen geometry provenance");
             Require(scene.TrySync(doc, out error), error);
             scene.ExperimentalGeometryPoints = false;
             scene.TryGetGizmoAnchors(new[] { "model" }, out Vector3[] restored, out int restoredNative);
-            Require(restoredNative == beforeNative && restored.Length == before.Length && scene.GeometryAnchorCount == 0,
+            Require(restoredNative == beforeNative && restored.Length == before.Length,
                 "Turning geometry off did not invalidate its cached anchors");
             for (int i = 0; i < before.Length; ++i) Require(restored[i] == before[i], "Geometry option changed the original coordinates");
             Require(source.GetComponent<MeshFilter>().sharedMesh == mesh &&
@@ -960,7 +958,7 @@ public static class RuntimeEditorAcceptance
             var before = (List<CompositeBlueprintStore.VectorData>)Call(controller, "BuildBoundsAnchors");
             scene.ExperimentalGeometryPoints = true;
             var after = (List<CompositeBlueprintStore.VectorData>)Call(controller, "BuildBoundsAnchors");
-            Require(scene.GeometryAnchorCount > 0 && after.Count == before.Count,
+            Require(after.Count == before.Count,
                 "Experimental geometry changed serialized blueprint anchor count");
             for (int i = 0; i < before.Count; ++i)
                 Require(after[i].x == before[i].x && after[i].y == before[i].y && after[i].z == before[i].z,
@@ -981,6 +979,92 @@ public static class RuntimeEditorAcceptance
         }
         Object.DestroyImmediate(source); Object.DestroyImmediate(mesh);
         checks.Add("Geometry experiment: off by default, bounded feature endpoints, exact helper targets, native-only exclusion, cache reset and no prefab/document mutation");
+    }
+
+    private static void TestFurnitureCornersAndCursorIntent(Camera template)
+    {
+        var chair = new GameObject("CornerChair");
+        var actualLocal = new List<Vector3>();
+        for (int index = 0; index < 6; ++index)
+        {
+            GameObject block = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            block.transform.SetParent(chair.transform, false);
+            if (index < 4)
+            {
+                block.transform.localPosition = new Vector3(index % 2 == 0 ? -.35f : .35f, -.3f, index < 2 ? -.35f : .35f);
+                block.transform.localScale = new Vector3(.12f,.7f,.12f);
+            }
+            else
+            {
+                block.transform.localPosition = index == 4 ? Vector3.zero : new Vector3(0,.45f,.35f);
+                block.transform.localScale = index == 4 ? new Vector3(.9f,.15f,.9f) : new Vector3(.9f,.9f,.12f);
+            }
+            foreach (Vector3 vertex in block.GetComponent<MeshFilter>().sharedMesh.vertices)
+            {
+                Vector3 point = chair.transform.InverseTransformPoint(block.transform.TransformPoint(vertex));
+                if (!actualLocal.Contains(point)) actualLocal.Add(point);
+            }
+        }
+        chair.SetActive(false);
+        Quaternion rotation = Quaternion.Euler(0,37,12);
+        var doc = new BlueprintEditorDocument(null, "Chair corners", "Test", new[] {
+            new BlueprintEditorPart("chair", "chair", "Chair", new Point3(0,0,0), new Rotation3(rotation.x,rotation.y,rotation.z,rotation.w)) });
+        using (var scene = new BlueprintEditorScene(template, _ => chair))
+        {
+            scene.SetViewport(new Rect(0,0,1920,1080)); scene.SetCameraPose(new Vector3(0,0,-4), Quaternion.identity);
+            Require(scene.TrySync(doc, out string error), error);
+            scene.TryGetGizmoAnchors(new[] { "chair" }, out Vector3[] corners, out int nativeStart);
+            Require(nativeStart == corners.Length && corners.Length == actualLocal.Count,
+                "Chair corners lost a leg/seat/back vertex or added bounds/middles");
+            foreach (Vector3 point in corners)
+                Require(actualLocal.Exists(local => Vector3.Distance(rotation * local, point) < .0001f),
+                    "Chair helper is not a transformed real mesh vertex");
+            var preview = new List<Vector3>(); var provenance = new List<bool>();
+            scene.NativePointsOnly = false;
+            Vector3 lateCorner = corners[corners.Length - 1];
+            Vector3[] closeGrip = { lateCorner + Vector3.back * .05f };
+            Vector2 aim = scene.Camera.WorldToScreenPoint(lateCorner);
+            Require(scene.TryCursorSnap(Array.Empty<string>(), closeGrip, new[] { 0 }, 0,0, preview,provenance,
+                out _, out Vector3 captured, out _, cursor: aim) && preview.Count == 24 &&
+                preview.Exists(p => Vector3.Distance(p, captured) < .0001f),
+                "Captured chair corner disappeared when the 24-target preview budget filled");
+            foreach (bool detailed in new[] { false, true })
+            {
+                scene.ExperimentalGeometryPoints = detailed;
+                scene.TryGetGizmoAnchors(new[] { "chair" }, out Vector3[] points, out _);
+                foreach (Vector3 point in points)
+                    Require(actualLocal.Exists(local => Vector3.Distance(rotation * local, point) < .0001f),
+                        "Detailed mode invented a non-mesh chair point");
+            }
+        }
+        Object.DestroyImmediate(chair);
+        GameObject source = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        source.SetActive(false);
+        var socket = new GameObject("NativeSocket"); socket.tag = "snappoint";
+        socket.transform.SetParent(source.transform, false);
+        doc = new BlueprintEditorDocument(null, "Cursor intent", "Test", new[] {
+            new BlueprintEditorPart("target", "target", "Target", new Point3(0,0,0), new Rotation3(0,0,0,1)) });
+        using (var scene = new BlueprintEditorScene(template, _ => source))
+        {
+            scene.SetViewport(new Rect(0,0,1920,1080)); scene.SetCameraPose(new Vector3(0,0,-4), Quaternion.identity);
+            Require(scene.TrySync(doc, out string error), error); scene.NativePointsOnly = false;
+            var targets = new List<Vector3>(); var flags = new List<bool>();
+            Vector3 left = new Vector3(-.5f,.5f,-.5f), right = new Vector3(.5f,.5f,-.5f);
+            Vector3[] grip = { new Vector3(0,.5f,-1.2f) };
+            Vector2 mouse = scene.Camera.WorldToScreenPoint(left);
+            Require(scene.TryCursorSnap(Array.Empty<string>(), grip, new[] { 0 }, 0,1, targets,flags,
+                out _, out Vector3 target, out bool native, cursor: mouse) && target == left && !native,
+                "Aimed helper outside 0.55m must capture instead of the nearby native socket");
+            mouse = scene.Camera.WorldToScreenPoint(right);
+            Require(scene.TryCursorSnap(Array.Empty<string>(), grip, new[] { 0 }, 0,1, targets,flags,
+                out _, out target, out native, 0,left, cursor: mouse) && target == right && !native,
+                "Previous helper capture blocked the explicitly aimed adjacent corner");
+            scene.NativePointsOnly = true;
+            Require(!scene.TryCursorSnap(Array.Empty<string>(), grip, new[] { 0 }, 0,1, targets,flags,
+                out _, out _, out _, cursor: mouse), "Native-only still captures a helper");
+        }
+        Object.DestroyImmediate(source);
+        checks.Add("Mesh corner regression: complete compound chair, exact rotated mesh vertices, no bounds/middles; aimed helper capture and adjacent target switching");
     }
 
     private static void TestNativeSocketTargets(Camera template)
@@ -1017,9 +1101,13 @@ public static class RuntimeEditorAcceptance
             Vector2 mouse = scene.Camera.WorldToScreenPoint(Vector3.right);
             Require(!scene.TryFindEditorSnapTarget(Array.Empty<string>(), mouse, false, targets, nativeFlags,
                 out _, out _), "Game mode must not attach to a generated midpoint between native sockets");
+            Require(!scene.TryFindEditorSnapTarget(Array.Empty<string>(), mouse, true, targets, nativeFlags,
+                out _, out _), "Mesh mode must not invent the old midpoint outside the mesh");
+            Vector3 corner = new Vector3(.5f,.5f,-.5f);
+            mouse = scene.Camera.WorldToScreenPoint(corner);
             Require(scene.TryFindEditorSnapTarget(Array.Empty<string>(), mouse, true, targets, nativeFlags,
-                out Vector3 target, out bool native) && !native && target == Vector3.right,
-                "Mesh mode must offer that generated midpoint");
+                out Vector3 target, out bool native) && !native && target == corner,
+                "Mesh mode must offer an actual corner instead");
         }
         Object.Destroy(source);
         checks.Add("Game snapping accepts native sockets inside their own mesh, not generated midpoints");

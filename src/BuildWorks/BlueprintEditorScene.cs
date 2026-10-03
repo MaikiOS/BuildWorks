@@ -110,7 +110,6 @@ namespace OstrixMods.BuildWorks
         private const float ContourEdgeScreenDistance = 30f;
         private const float SnapTargetScreenDistance = 52f;
         private const float SnapReleaseScreenDistance = 78f;
-        private const float SnapEdgeScreenDistance = 12f;
         private const float SnapPreviewScreenDistance = 120f;
         private const float PlacementSnapPreviewRadius = 2f;
         private const int MaximumSnapPreviewTargets = 24;
@@ -138,6 +137,7 @@ namespace OstrixMods.BuildWorks
             public readonly List<PickSurface> PickSurfaces = new List<PickSurface>();
             public readonly List<Vector3> SnapLocal = new List<Vector3>();
             public readonly List<Vector3> GeometryLocal = new List<Vector3>();
+            public readonly List<Vector3> CornerLocal = new List<Vector3>();
             public int NativeSnapCount;
             public readonly List<Vector3> PlacementLocal = new List<Vector3>();
             public readonly List<string> PlacementLabels = new List<string>();
@@ -166,7 +166,6 @@ namespace OstrixMods.BuildWorks
             public VisualNode Visual;
             public Vector3 Point;
             public bool Native;
-            public bool Edge;
             public float Distance;
         }
 
@@ -226,6 +225,7 @@ namespace OstrixMods.BuildWorks
         private string[] cachedAnchorIds;
         private Vector3[] cachedGizmoAnchors;
         private int cachedNativeAnchorStart;
+        private bool cachedLegacyAnchors;
 
         internal BlueprintEditorScene(
             Camera cameraTemplate,
@@ -285,14 +285,13 @@ namespace OstrixMods.BuildWorks
         internal float GizmoScale => gizmo?.Scale ?? 0f;
         internal bool ModelSpaceGizmo { get => gizmo.ModelSpaceSizing; set => gizmo.ModelSpaceSizing = value; }
         internal bool NativePointsOnly { get => gizmo.NativePointsOnly; set => gizmo.NativePointsOnly = value; }
+        internal bool ViewDepthHandle { get => gizmo.ViewDepthHandle; set => gizmo.ViewDepthHandle = value; }
         private bool experimentalGeometryPoints;
         internal bool ExperimentalGeometryPoints
         {
             get => experimentalGeometryPoints;
             set { if (experimentalGeometryPoints == value) return; experimentalGeometryPoints = value; InvalidateGizmoAnchors(); }
         }
-        internal int GeometryAnchorStart { get; private set; } = -1;
-        internal int GeometryAnchorCount { get; private set; }
 
         internal void SetGizmoModelSize(IReadOnlyList<string> ids)
         {
@@ -635,71 +634,92 @@ namespace OstrixMods.BuildWorks
             IReadOnlyList<int> sourceIndices, int nativeStart, int nativeEnd,
             List<Vector3> previewTargets, List<bool> previewNative,
             out int sourceIndex, out Vector3 target, out bool targetNative,
-            int previousSource = -1, Vector3? previousTarget = null)
+            int previousSource = -1, Vector3? previousTarget = null, Vector2? cursor = null)
         {
             previewTargets.Clear(); previewNative.Clear();
             sourceIndex = -1; target = Vector3.zero; targetNative = false;
             activeSnapVisual = null;
             var targetPoints = new List<Vector3>();
             // ponytail: bounded editor scan; spatial indexing only after measured frame cost warrants it.
-            // Native pairs win, but enabled helper candidates remain visible.
-            for (int pass = 0; pass < 2; ++pass)
+            float bestScreen = float.PositiveInfinity, bestGap = float.PositiveInfinity;
+            bool bestAimed = false, bestNativePair = false;
+            foreach (KeyValuePair<string, VisualNode> entry in visuals)
             {
-                bool nativeWinner = pass == 1 && sourceIndex >= 0;
-                float best = .55f * .55f;
-                bool retained = false;
-                foreach (KeyValuePair<string, VisualNode> entry in visuals)
+                VisualNode visual = entry.Value;
+                if (Contains(excludedIds, entry.Key) || !visual.Root.activeInHierarchy) continue;
+                targetPoints.Clear();
+                for (int ti = 0; ti < visual.NativeSnapCount; ++ti)
+                    targetPoints.Add(visual.Root.transform.TransformPoint(visual.SnapLocal[ti]));
+                if (!NativePointsOnly) AddEditorHelperTargets(visual, targetPoints);
+                for (int ti = 0; ti < targetPoints.Count; ++ti)
                 {
-                    VisualNode visual = entry.Value;
-                    if (Contains(excludedIds, entry.Key) || !visual.Root.activeInHierarchy) continue;
-                    targetPoints.Clear();
-                    int count = !NativePointsOnly ? visual.SnapLocal.Count : visual.NativeSnapCount;
-                    for (int ti = 0; ti < count; ++ti)
-                        targetPoints.Add(visual.Root.transform.TransformPoint(visual.SnapLocal[ti]));
-                    if (!NativePointsOnly)
+                    bool native = ti < visual.NativeSnapCount;
+                    Vector3 point = targetPoints[ti];
+                    Vector3 screen = camera.WorldToScreenPoint(point);
+                    float screenDistance = cursor.HasValue ? Vector2.Distance(cursor.Value, screen) : 0f;
+                    bool aimed = cursor.HasValue && screen.z > camera.nearClipPlane &&
+                        screenDistance <= 24f;
+                    bool visible = false, checkedVisibility = false;
+                    foreach (int si in sourceIndices)
                     {
-                        if (TryBounds(visual, out Bounds targetBounds)) AddBoundsAnchors(targetBounds, targetPoints);
-                        if (ExperimentalGeometryPoints)
-                            foreach (Vector3 local in visual.GeometryLocal)
-                                targetPoints.Add(visual.Root.transform.TransformPoint(local));
-                    }
-                    for (int ti = 0; ti < targetPoints.Count; ++ti)
-                    {
-                        bool native = ti < visual.NativeSnapCount;
-                        Vector3 point = targetPoints[ti];
-                        bool visible = false, checkedVisibility = false;
-                        foreach (int si in sourceIndices)
+                        if (si < 0 || si >= sourcePoints.Length) continue;
+                        float gap = (point - sourcePoints[si]).sqrMagnitude;
+                        if (gap > PlacementSnapPreviewRadius * PlacementSnapPreviewRadius) continue;
+                        if (!checkedVisibility)
                         {
-                            bool nativePair = native && si >= nativeStart && si < nativeEnd;
-                            if (nativePair != (pass == 0)) continue;
-                            float distance = (point - sourcePoints[si]).sqrMagnitude;
-                            if (distance > PlacementSnapPreviewRadius * PlacementSnapPreviewRadius) continue;
-                            if (!checkedVisibility)
-                            {
-                                visible = IsEditorPointVisible(point, excludedIds, visual.Root);
-                                checkedVisibility = true;
-                            }
-                            if (!visible) continue;
-                            AddCursorPreview(point, native);
-                            if (nativeWinner) continue;
-                            bool same = previousSource == si && previousTarget.HasValue &&
-                                (previousTarget.Value - point).sqrMagnitude < .000001f && distance < .7f * .7f;
-                            if (!same && (retained || distance >= best)) continue;
-                            retained = same; best = distance;
-                            sourceIndex = si; target = point; targetNative = native; activeSnapVisual = visual;
+                            visible = IsEditorPointVisible(point, excludedIds, visual.Root);
+                            checkedVisibility = true;
                         }
+                        if (!visible) continue;
+                        AddCursorPreview(point, native);
+                        bool same = previousSource == si && previousTarget.HasValue &&
+                            (previousTarget.Value - point).sqrMagnitude < .000001f;
+                        if (!aimed && gap > (same ? .7f * .7f : .55f * .55f)) continue;
+                        bool nativePair = native && si >= nativeStart && si < nativeEnd;
+                        // Pointer intent wins over native preference and old capture.
+                        // Prefer a native pair for equally aimed sockets; otherwise use the nearest source.
+                        float score = aimed ? screenDistance : 0f;
+                        bool better = sourceIndex < 0 || aimed && !bestAimed ||
+                            aimed == bestAimed && (score < bestScreen - .5f ||
+                                Mathf.Abs(score - bestScreen) <= .5f &&
+                                (nativePair && !bestNativePair ||
+                                    nativePair == bestNativePair && gap < bestGap - .000001f));
+                        if (!better) continue;
+                        bestAimed = aimed; bestScreen = score; bestGap = gap; bestNativePair = nativePair;
+                        sourceIndex = si; target = point; targetNative = native; activeSnapVisual = visual;
                     }
                 }
+            }
+            // A captured target must remain visible even when the preview budget is full.
+            Vector3 capturedTarget = target;
+            if (sourceIndex >= 0 && !previewTargets.Exists(point => (point - capturedTarget).sqrMagnitude < .00000001f))
+            {
+                if (previewTargets.Count == MaximumSnapPreviewTargets)
+                { previewTargets.RemoveAt(previewTargets.Count - 1); previewNative.RemoveAt(previewNative.Count - 1); }
+                previewTargets.Add(target); previewNative.Add(targetNative);
             }
             return sourceIndex >= 0;
 
             void AddCursorPreview(Vector3 point, bool native)
             {
                 for (int i = 0; i < previewTargets.Count; ++i)
-                    if ((previewTargets[i] - point).sqrMagnitude < .0004f) { previewNative[i] |= native; return; }
+                    if ((previewTargets[i] - point).sqrMagnitude < .00000001f) { previewNative[i] |= native; return; }
                 if (previewTargets.Count < MaximumSnapPreviewTargets)
                 { previewTargets.Add(point); previewNative.Add(native); }
             }
+        }
+
+        private void AddEditorHelperTargets(VisualNode visual, List<Vector3> points)
+        {
+            foreach (Vector3 local in visual.CornerLocal)
+                points.Add(visual.Root.transform.TransformPoint(local));
+            if (ExperimentalGeometryPoints)
+                foreach (Vector3 local in visual.GeometryLocal)
+                {
+                    Vector3 point = visual.Root.transform.TransformPoint(local);
+                    if (!points.Exists(existing => (existing - point).sqrMagnitude < .00000001f))
+                        points.Add(point);
+                }
         }
 
         internal bool IsEditorPointVisible(
@@ -1152,8 +1172,7 @@ namespace OstrixMods.BuildWorks
                 allowRotate: true,
                 allowExtended: true,
                 pointVisibility: point => IsEditorPointVisible(point),
-                helperAnchorOverride: helperAnchorOverride,
-                geometryAnchorStart: GeometryAnchorStart, geometryPoints: GeometryAnchorCount);
+                helperAnchorOverride: helperAnchorOverride);
             ShowTargetOutline(showSnapTarget);
         }
 
@@ -1269,7 +1288,7 @@ namespace OstrixMods.BuildWorks
             ThrowIfDisposed();
             if (document == null) throw new ArgumentNullException(nameof(document));
             // Controller draws its frozen source anchors during a transform preview.
-            InvalidateGizmoAnchors(preservePreviewRange: true);
+            InvalidateGizmoAnchors();
             var selected = new HashSet<string>(stableIds ?? Array.Empty<string>(),
                 StringComparer.Ordinal);
             foreach (BlueprintEditorPart part in document.Parts)
@@ -1517,13 +1536,15 @@ namespace OstrixMods.BuildWorks
         internal bool TryGetGizmoAnchors(
             IReadOnlyList<string> stableIds,
             out Vector3[] anchors,
-            out int nativeAnchorStart)
+            out int nativeAnchorStart,
+            bool legacyLayoutAnchors = false)
         {
             ThrowIfDisposed();
             anchors = Array.Empty<Vector3>();
             nativeAnchorStart = AnchorAdjustment.SelectableAnchorCount;
             if (stableIds == null) return false;
-            bool matches = cachedAnchorIds != null && cachedAnchorIds.Length == stableIds.Count;
+            bool matches = cachedAnchorIds != null && cachedAnchorIds.Length == stableIds.Count &&
+                cachedLegacyAnchors == legacyLayoutAnchors;
             for (int index = 0; matches && index < stableIds.Count; ++index)
                 matches = string.Equals(cachedAnchorIds[index], stableIds[index], StringComparison.Ordinal);
             if (matches)
@@ -1536,7 +1557,7 @@ namespace OstrixMods.BuildWorks
 
             var result = new List<Vector3>(
                 AnchorAdjustment.SelectableAnchorCount + 32);
-            AddBoundsAnchors(bounds, result);
+            if (legacyLayoutAnchors) AddBoundsAnchors(bounds, result);
             nativeAnchorStart = result.Count;
             var snapSets = new List<IReadOnlyList<Point3>>();
             var nativePoints = new List<Vector3>();
@@ -1544,7 +1565,7 @@ namespace OstrixMods.BuildWorks
             {
                 if (!visuals.TryGetValue(stableId, out VisualNode visual) ||
                     visual.Locked || !visual.Root.activeInHierarchy) continue;
-                var points = new Point3[visual.SnapLocal.Count];
+                var points = new Point3[legacyLayoutAnchors ? visual.SnapLocal.Count : visual.NativeSnapCount];
                 for (int index = 0; index < points.Length; ++index)
                 {
                     points[index] = ToGeometry(visual.Root.transform.TransformPoint(
@@ -1567,24 +1588,33 @@ namespace OstrixMods.BuildWorks
                 {
                     if (nativeExterior.Count < MaximumNativeAnchors) nativeExterior.Add(worldPoint);
                 }
-                else if (result.Count - AnchorAdjustment.SelectableAnchorCount < MaximumNativeAnchors)
+                else if (legacyLayoutAnchors && result.Count - AnchorAdjustment.SelectableAnchorCount < MaximumNativeAnchors)
                     result.Add(worldPoint);
             }
             int maximumHelpers = AnchorAdjustment.SelectableAnchorCount + MaximumNativeAnchors - nativeExterior.Count;
             if (result.Count > maximumHelpers) result.RemoveRange(maximumHelpers, result.Count - maximumHelpers);
-            GeometryAnchorStart = result.Count;
-            if (ExperimentalGeometryPoints)
+            if (!legacyLayoutAnchors)
+                foreach (string stableId in stableIds)
+                {
+                    if (!visuals.TryGetValue(stableId, out VisualNode visual) || visual.Locked || !visual.Root.activeInHierarchy) continue;
+                    foreach (Vector3 local in visual.CornerLocal)
+                    {
+                        if (result.Count >= 512) break;
+                        Vector3 point = visual.Root.transform.TransformPoint(local);
+                        if (!result.Exists(existing => (existing - point).sqrMagnitude < .00000001f)) result.Add(point);
+                    }
+                }
+            if (!legacyLayoutAnchors && ExperimentalGeometryPoints)
                 foreach (string stableId in stableIds)
                 {
                     if (!visuals.TryGetValue(stableId, out VisualNode visual) || visual.Locked || !visual.Root.activeInHierarchy) continue;
                     foreach (Vector3 local in visual.GeometryLocal)
                     {
-                        if (result.Count - GeometryAnchorStart >= 64) break;
+                        if (result.Count >= 512) break;
                         Vector3 point = visual.Root.transform.TransformPoint(local);
                         if (!result.Exists(existing => (existing - point).sqrMagnitude < .00000001f)) result.Add(point);
                     }
                 }
-            GeometryAnchorCount = result.Count - GeometryAnchorStart;
             nativeAnchorStart = result.Count;
             result.AddRange(nativeExterior);
             cachedAnchorIds = new string[stableIds.Count];
@@ -1592,19 +1622,15 @@ namespace OstrixMods.BuildWorks
                 cachedAnchorIds[index] = stableIds[index];
             cachedGizmoAnchors = result.ToArray();
             cachedNativeAnchorStart = nativeAnchorStart;
+            cachedLegacyAnchors = legacyLayoutAnchors;
             anchors = (Vector3[])cachedGizmoAnchors.Clone();
             return true;
         }
 
-        private void InvalidateGizmoAnchors(bool preservePreviewRange = false)
+        private void InvalidateGizmoAnchors()
         {
             cachedAnchorIds = null;
             cachedGizmoAnchors = null;
-            if (!preservePreviewRange)
-            {
-                GeometryAnchorStart = -1;
-                GeometryAnchorCount = 0;
-            }
         }
 
         internal bool TryFindEditorSnapTarget(
@@ -1632,7 +1658,7 @@ namespace OstrixMods.BuildWorks
                 Vector3 screen = camera.WorldToScreenPoint(previousTarget.Value);
                 if (screen.z > 0f && camera.pixelRect.Contains(screen) &&
                     Vector2.Distance(mousePosition, screen) <= SnapReleaseScreenDistance &&
-                    IsEditorPointVisible(previousTarget.Value, excludedStableIds))
+                    IsEditorPointVisible(previousTarget.Value, excludedStableIds, activeSnapVisual?.Root))
                 {
                     target = previousTarget.Value;
                     targetIsNative = previousTargetIsNative;
@@ -1646,57 +1672,34 @@ namespace OstrixMods.BuildWorks
             {
                 VisualNode visual = entry.Value;
                 if (excluded.Contains(entry.Key) || !visual.Root.activeInHierarchy) continue;
-                for (int index = 0; index < (!NativePointsOnly && includeMeshTargets
-                    ? visual.SnapLocal.Count : visual.NativeSnapCount); ++index)
+                for (int index = 0; index < visual.NativeSnapCount; ++index)
                     AddSnapCandidate(
                         candidates,
                         mousePosition,
                         visual.Root.transform.TransformPoint(visual.SnapLocal[index]),
                         native: index < visual.NativeSnapCount, visual: visual);
-                if (NativePointsOnly || !includeMeshTargets || !TryBounds(visual, out Bounds bounds)) continue;
-                if (ExperimentalGeometryPoints)
-                    foreach (Vector3 local in visual.GeometryLocal)
-                        AddSnapCandidate(candidates, mousePosition,
-                            visual.Root.transform.TransformPoint(local), native: false, visual: visual);
-                var boundsAnchors = new List<Vector3>(AnchorAdjustment.SelectableAnchorCount);
-                AddBoundsAnchors(bounds, boundsAnchors);
-                foreach (Vector3 point in boundsAnchors)
+                if (NativePointsOnly || !includeMeshTargets) continue;
+                var helpers = new List<Vector3>();
+                AddEditorHelperTargets(visual, helpers);
+                foreach (Vector3 point in helpers)
                     AddSnapCandidate(candidates, mousePosition, point, native: false, visual: visual);
-                foreach (PickSurface surface in visual.PickSurfaces)
-                {
-                    if (!surface.Renderer || !surface.Renderer.enabled ||
-                        !surface.Renderer.gameObject.activeInHierarchy) continue;
-                    foreach (Edge3 edge in surface.Edges)
-                    {
-                        Vector3 start = visual.Root.transform.TransformPoint(ToUnity(edge.Start));
-                        Vector3 end = visual.Root.transform.TransformPoint(ToUnity(edge.End));
-                        if (TransformGizmoView.TryClosestPointOnScreenSegment(
-                            camera, mousePosition, start, end, out float screenDistance,
-                            out float parameter) && screenDistance <= SnapPreviewScreenDistance)
-                            AddSnapCandidate(candidates, mousePosition,
-                                Vector3.Lerp(start, end, parameter), native: false, edge: true, visual: visual);
-                    }
-                }
             }
 
             candidates.Sort((left, right) => left.Distance.CompareTo(right.Distance));
             SnapCandidate? pointWinner = null;
-            SnapCandidate? edgeWinner = null;
             foreach (SnapCandidate candidate in candidates)
             {
                 // Native prefab points often lie inside their own mesh. That mesh
                 // must not block its sockets; other parts still occlude them.
                 if (!IsEditorPointVisible(candidate.Point, excludedStableIds,
-                    candidate.Native ? candidate.Visual?.Root : null)) continue;
+                    candidate.Visual?.Root)) continue;
                 previewTargets.Add(candidate.Point);
                 previewNative.Add(candidate.Native);
-                if (!candidate.Edge && !pointWinner.HasValue &&
+                if (!pointWinner.HasValue &&
                     candidate.Distance < SnapTargetScreenDistance) pointWinner = candidate;
-                if (candidate.Edge && !edgeWinner.HasValue &&
-                    candidate.Distance < SnapEdgeScreenDistance) edgeWinner = candidate;
                 if (previewTargets.Count == MaximumSnapPreviewTargets) break;
             }
-            SnapCandidate? winner = pointWinner ?? edgeWinner;
+            SnapCandidate? winner = pointWinner;
             if (!winner.HasValue) { activeSnapVisual = null; return false; }
             target = winner.Value.Point;
             targetIsNative = winner.Value.Native;
@@ -1709,7 +1712,6 @@ namespace OstrixMods.BuildWorks
             Vector2 mouse,
             Vector3 point,
             bool native,
-            bool edge = false,
             VisualNode visual = null)
         {
             Vector3 screen = camera.WorldToScreenPoint(point);
@@ -1719,9 +1721,8 @@ namespace OstrixMods.BuildWorks
             for (int index = 0; index < candidates.Count; ++index)
             {
                 SnapCandidate existing = candidates[index];
-                if ((existing.Point - point).sqrMagnitude >= 0.0004f) continue;
+                if ((existing.Point - point).sqrMagnitude >= 0.00000001f) continue;
                 existing.Native |= native;
-                existing.Edge &= edge;
                 candidates[index] = existing;
                 return;
             }
@@ -1730,7 +1731,6 @@ namespace OstrixMods.BuildWorks
                 Point = point,
                 Visual = visual,
                 Native = native,
-                Edge = edge,
                 Distance = distance
             });
         }
@@ -1998,6 +1998,7 @@ namespace OstrixMods.BuildWorks
                     result.OriginalRenderingOff.Add(renderer.forceRenderingOff);
                 }
                 if (selectable || captureSurfaces) CapturePickSurfaces(result);
+                CaptureGeometryCorners(result);
                 if (result.PlacementLocal.Count == 0) AddBoundsPlacementPoints(result);
                 if (selectable) ApplyAppearance(result);
                 return result;
@@ -2401,18 +2402,35 @@ namespace OstrixMods.BuildWorks
                 Edges = edges
             };
             visual.PickSurfaces.Add(surface);
-            // Original mesh feature endpoints, not every tessellation vertex.
-            // Keep a deterministic bounded set in model-local coordinates.
-            foreach (Edge3 edge in edges)
+        }
+
+        private static void CaptureGeometryCorners(VisualNode visual)
+        {
+            var edges = new List<Edge3>();
+            foreach (PickSurface surface in visual.PickSurfaces)
+                if (surface.Renderer && surface.Renderer.enabled && surface.Renderer.gameObject.activeInHierarchy)
+                    edges.AddRange(surface.Edges);
+            Add(AnchorAdjustment.FeatureCorners(edges), visual.CornerLocal);
+            Add(AnchorAdjustment.FeatureCorners(edges, turnDegrees: 10.0), visual.GeometryLocal);
+
+            // Sample existing coordinates spatially, not the first mesh/submesh's vertices.
+            // This gives disconnected chair legs and seat corners a fair budget.
+            void Add(IReadOnlyList<Point3> corners, List<Vector3> output)
             {
-                AddGeometryPoint(ToUnity(edge.Start));
-                AddGeometryPoint(ToUnity(edge.End));
-            }
-            void AddGeometryPoint(Vector3 point)
-            {
-                if (visual.GeometryLocal.Count < 32 &&
-                    !visual.GeometryLocal.Exists(existing => (existing - point).sqrMagnitude < .00000001f))
-                    visual.GeometryLocal.Add(point);
+                var remaining = new List<Vector3>();
+                foreach (Point3 point in corners) remaining.Add(ToUnity(point));
+                while (remaining.Count > 0 && output.Count < 128)
+                {
+                    int best = 0; float largest = -1f;
+                    for (int index = 0; index < remaining.Count; ++index)
+                    {
+                        float nearest = float.PositiveInfinity;
+                        foreach (Vector3 chosen in output)
+                            nearest = Mathf.Min(nearest, (remaining[index] - chosen).sqrMagnitude);
+                        if (nearest > largest) { largest = nearest; best = index; }
+                    }
+                    output.Add(remaining[best]); remaining.RemoveAt(best);
+                }
             }
         }
 

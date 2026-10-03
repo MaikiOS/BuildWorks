@@ -9,7 +9,7 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Current source candidate: **0.19.50**, Store v9, Valheim 1.0.16.
+Current source candidate: **0.19.51**, Store v9, Valheim 1.0.16.
 Ostrix's .49 report accepts the core point/pivot/frame/size workflow and resource
 cards; optional B, helper opt-in and catalogue translation needed clarification.
 .50 defaults to model-relative 3D sizing, retains screen mode, uses amber native
@@ -20,7 +20,11 @@ helper A remains an intentional exception. Optional B moves into Attachment and
 still defines X along A→B with pivot at A, not midpoint or curve construction.
 Experimental feature-endpoint markers are opt-in, bounded, editor-only and excluded
 from saved anchors. Native catalogue type/material labels translate by stable ID;
-external names stay intact. BW-01 awaits .50 owner tests 1–10, readability 1–3 first.
+external names stay intact. Ostrix accepts .50 checks 1–2, 4–5, 7 and 10;
+3/9 reopen real mesh corners, 6 view depth, 8 helper capture.
+.51 uses actual corners instead of editor bounds/middles, bounded spatial samples,
+aimed 2 m capture/adjacent switching and the approved View Z handle.
+Legacy Array/save anchors remain unchanged. BW-01 awaits focused .51 checks 1–6.
 Older lists are archived, not extra answer lists. F9 mechanics are unchanged.
 0.19.39 owner feedback accepts menu hover, language refresh and camera framing;
 Transform selection is provisionally accepted. The owner accepts contour cleanup;
@@ -61,7 +65,7 @@ not an installed mod. Do not modify other profiles, mods or saves as a side effe
 Existing capabilities: indexed Hammer/native favorites; isolated editor;
 numeric transforms, uniform scale 1–400%, nested groups, independent group/world
 anchors; Array/Contour, Undo/Redo and contextual hints; Q/E source selection,
-2 m target preview and 0.55 m magnetic capture; native world-series placement and
+2 m target preview/aimed editor capture; 0.55 m unaimed magnetic capture; native world-series placement and
 cancellation. Missing-prefab visuals already exist.
 
 Release, Geometry, Store, EditorBridge, WorldLayout, localization and HostContract
@@ -83,7 +87,7 @@ dependent changes wait for its gate, unrelated preparation may continue.
 | ID | Deliverable | Dependency | Status |
 | --- | --- | --- | --- |
 | BW-00 | Dedicated-profile baseline and reliable handoff | Current core | Focused 0.19.41 owner series accepted; cost/refund accounting and networking pending |
-| BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | .49 core accepted by owner; .50 unified point choice, artwork and catalogue labels automatically verified; awaiting owner series 1–10, first 1–3 |
+| BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | .50 partly accepted; .51 actual corners, aimed capture and View depth automatically verified; awaiting series 1–6 |
 | BW-02 | Group layout operations without resizing pieces | BW-01 | Planned; focused operation UI approval required |
 | BW-03 | Persistent Array and minimal recipe persistence | BW-02 | Planned; safe Store migration and editing/Bake gate |
 | BW-04 | Guides and curves in accepted slices | BW-03 + renewed owner discussion | Tool-semantics discussion required before coding |

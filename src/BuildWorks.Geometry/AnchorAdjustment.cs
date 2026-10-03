@@ -408,6 +408,49 @@ namespace OstrixMods.BuildWorks.Geometry
             return result;
         }
 
+        /// <summary>Actual vertices where feature edges end or change direction; never edge midpoints.</summary>
+        public static IReadOnlyList<Point3> FeatureCorners(IReadOnlyList<Edge3> edges, double turnDegrees = 25.0)
+        {
+            if (edges == null) throw new ArgumentNullException(nameof(edges));
+            if (!GeometryMath.IsFinite(turnDegrees) || turnDegrees <= 0.0 || turnDegrees > 90.0)
+                throw new ArgumentOutOfRangeException(nameof(turnDegrees));
+            var points = new List<Point3>();
+            var directions = new List<List<Point3>>();
+            var ids = new Dictionary<VertexKey, int>();
+            foreach (Edge3 edge in edges)
+            {
+                Add(edge.Start, edge.End);
+                Add(edge.End, edge.Start);
+            }
+            double opposite = -Math.Cos(turnDegrees * Math.PI / 180.0);
+            var result = new List<Point3>();
+            for (int index = 0; index < points.Count; ++index)
+            {
+                List<Point3> incident = directions[index];
+                if (incident.Count == 1 || incident.Count > 2 ||
+                    incident.Count == 2 && Dot(incident[0], incident[1]) > opposite)
+                    result.Add(points[index]);
+            }
+            return result;
+
+            void Add(Point3 point, Point3 neighbor)
+            {
+                if (!IsFinite(point) || !IsFinite(neighbor)) throw new ArgumentOutOfRangeException(nameof(edges));
+                Point3 vector = neighbor - point;
+                double length = Math.Sqrt(vector.LengthSquared);
+                if (length < 0.000001) return;
+                var key = new VertexKey(point);
+                if (!ids.TryGetValue(key, out int index))
+                {
+                    index = points.Count; ids.Add(key, index);
+                    points.Add(point); directions.Add(new List<Point3>());
+                }
+                Point3 direction = vector * (1.0 / length);
+                if (!directions[index].Exists(existing => Dot(existing, direction) > 0.999999))
+                    directions[index].Add(direction);
+            }
+        }
+
         public static double PerspectiveSegmentParameter(
             double screenParameter,
             double startDepth,

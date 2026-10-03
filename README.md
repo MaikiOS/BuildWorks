@@ -2,7 +2,7 @@
 
 **English** | [Русский](README_RU.md)
 
-> Source candidate 0.19.50 for Valheim 1.0.16. The latest existing binary prerelease remains 0.19.37; this checkpoint does not publish a new binary. Development tests use only TerrainRamp-1.0-Test; model-relative default sizing, unified snap choice, ivory helper/selected artwork and optional geometry markers await owner game acceptance.
+> Source candidate 0.19.51 for Valheim 1.0.16. The latest existing binary prerelease remains 0.19.37; this checkpoint does not publish a new binary. Development tests use only TerrainRamp-1.0-Test; actual mesh corners, aimed magnetic capture and the view-depth handle await owner checks 1–6.
 
 ![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
 
@@ -31,7 +31,7 @@ flowchart LR
 - creating a blueprint from world pieces or from an empty document;
 - a dedicated editor with a catalog, camera, grid, object tree, and Undo/Redo;
 - precise translation, three-axis rotation, and uniform scaling;
-- persistent editor Q/E snap-mode feedback and visible nearby target points within 2 m, without changing the 0.55 m magnetic snap threshold;
+- persistent editor Q/E snap-mode feedback and visible targets within 2 m; aimed editor capture uses that radius, unaimed capture remains 0.55 m;
 - groups, nesting, local group anchors, and a separate world anchor for the blueprint;
 - Array with line/plane layouts, Pack/Fit/exact spacing, rise, heading, pitch, roll, scale step, and symmetry;
 - Contour repetition of a selected piece or group along a connected chain;

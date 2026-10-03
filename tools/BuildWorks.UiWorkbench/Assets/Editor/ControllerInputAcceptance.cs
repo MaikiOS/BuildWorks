@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -231,6 +232,8 @@ internal static class ControllerInputAcceptance
             foreach (object tick in TestTransformContract(controller, input, scene, view, uiCamera, target, output))
                 yield return tick;
             foreach (object tick in TestPointFrames(controller, input, scene, view, uiCamera, target, output))
+                yield return tick;
+            foreach (object tick in TestViewDepth(controller, input, scene, view, uiCamera, target, output))
                 yield return tick;
             foreach (object tick in TestCursorPreview(controller, input, scene, view, uiCamera, target, output))
                 yield return tick;
@@ -1319,6 +1322,58 @@ internal static class ControllerInputAcceptance
                 Field<TMP_Text>(view, "nextActionText").text.Contains(caption),
                 "Header and modal hint disagree with actual working frame: " + caption);
         }
+    }
+
+    private static IEnumerable TestViewDepth(BlueprintEditorController controller, InputFrames input,
+        BlueprintEditorScene scene, BlueprintEditorView view, Camera uiCamera, RenderTexture target, string output)
+    {
+        Frame(controller, input, Vector2.zero); NativeClick(view, uiCamera, "Row_left"); yield return null;
+        Set(controller, "gizmoFamily", GizmoFamily.Combined);
+        Set(controller, "transformFrame", Enum.Parse(Field<object>(controller, "transformFrame").GetType(), "View"));
+        Set(controller, "localSpace", true);
+        Call(controller, "SetActiveTool", BlueprintEditorTool.Transform);
+        Call(controller, "UpdateTransformContext");
+        var gizmo = Field<TransformGizmoView>(scene, "gizmo");
+        var doc = Field<BlueprintEditorDocument>(controller, "document");
+        BlueprintEditorPart part = doc.Parts.First(p => p.StableId == "left");
+        Vector3 original = V(part.Position);
+        Frame(controller, input, Vector2.zero); yield return null;
+        var handle = Field<LineRenderer>(gizmo, "depthHandle");
+        Require(handle.gameObject.activeInHierarchy && gizmo.ViewDepthHandle, "View frame has no reachable depth handle");
+        Vector3 center = (handle.GetPosition(0) + handle.GetPosition(2)) * .5f;
+        Vector2 mouse = scene.Camera.WorldToScreenPoint(center);
+        Require(gizmo.HitTestMove(scene.Camera, original, scene.Camera.transform.rotation, true, mouse) == GizmoAxis.Z,
+            "Depth badge does not hit the actual camera Z axis");
+        Frame(controller, input, mouse); yield return null;
+        Save(scene, view, uiCamera, target, Path.Combine(output, "input-view-depth.png"));
+        Frame(controller, input, mouse, 1); yield return null;
+        Require(Field<GizmoHandleKind>(controller, "dragHandle") == GizmoHandleKind.Move &&
+            Field<GizmoAxis>(controller, "dragAxis") == GizmoAxis.Z, "Clicking depth badge did not start camera Z movement");
+        Frame(controller, input, mouse + Vector2.up * 50, 1); yield return null;
+        Vector3 delta = Field<Vector3>(controller, "dragTranslation");
+        Require(delta.magnitude > .01f && Vector3.Dot(delta.normalized, scene.Camera.transform.forward) > .999f &&
+            Vector3.Distance(V(part.Position), original) < .0001f, "Depth drag moved sideways or changed document before confirmation");
+        Frame(controller, input, mouse + Vector2.up * 50); yield return null;
+        Require(Vector3.Distance(V(doc.Parts.First(p => p.StableId == "left").Position), original + delta) < .0001f,
+            "Depth release did not commit the shown displacement");
+        Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Z); Frame(controller, input, mouse); yield return null;
+        Require(Vector3.Distance(V(doc.Parts.First(p => p.StableId == "left").Position), original) < .0001f,
+            "Depth drag needs more than one Undo");
+        Frame(controller, input, mouse, 0, KeyCode.G); Frame(controller, input, mouse); yield return null;
+        Frame(controller, input, mouse, 0, KeyCode.Z); Frame(controller, input, mouse); yield return null;
+        Frame(controller, input, mouse + Vector2.up * 50); yield return null;
+        Require(Field<bool>(controller, "keyboardValid") && Field<Vector3>(controller, "dragTranslation").magnitude > .01f,
+            "G Z remains immobile when the axis projects onto one pixel");
+        input.Next(mouse + Vector2.up * 50); input.InputString = "1"; controller.Update(); controller.LateUpdate(); yield return null;
+        Require(Vector3.Distance(Field<Vector3>(controller, "dragTranslation"), scene.Camera.transform.forward) < .0001f,
+            "View-depth numeric input adds mouse preview instead of replacing it from the operation start");
+        Frame(controller, input, mouse, 0, KeyCode.Escape); Frame(controller, input, mouse); yield return null;
+        Require(!Field<bool>(controller, "keyboardPreview") &&
+            Vector3.Distance(V(doc.Parts.First(p => p.StableId == "left").Position), original) < .0001f,
+            "Depth Esc leaks a modal transform or changes the document");
+        Set(controller, "transformFrame", Enum.Parse(Field<object>(controller, "transformFrame").GetType(), "Local"));
+        Call(controller, "UpdateTransformContext"); Frame(controller, input, Vector2.zero); yield return null;
+        Require(!handle.gameObject.activeSelf, "Depth badge leaked into a non-view frame");
     }
 
     private static Vector2 EmptyTransformPoint(BlueprintEditorController controller, BlueprintEditorScene scene,

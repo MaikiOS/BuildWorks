@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using OstrixMods.BuildWorks.Geometry;
 
 namespace OstrixMods.BuildWorks.GeometryTests
@@ -39,6 +40,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Run("Feature edges exclude flat triangulation", FeatureEdgesExcludeFlatTriangulation);
             Run("Feature edges keep visible creases", FeatureEdgesKeepVisibleCreases);
             Run("Feature edges weld duplicated seams", FeatureEdgesWeldDuplicatedSeams);
+            Run("Mesh corners exclude collinear subdivisions and generated middles", MeshCornersExcludeSubdivisions);
             Run("Non-manifold edges remain snap targets", NonManifoldEdgesRemainSnapTargets);
             Run("Screen edge selection is perspective correct", ScreenEdgeSelectionIsPerspectiveCorrect);
             Run("Composite snap points exclude internal joins", CompositeSnapPointsExcludeInternalJoins);
@@ -402,6 +404,23 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Equal(true, HasEdge(edges, points[0], points[1]));
             Equal(true, HasEdge(edges, points[1], points[2]));
             Equal(false, HasEdge(edges, points[0], points[2]));
+        }
+
+        private static void MeshCornersExcludeSubdivisions()
+        {
+            var a = new Point3(0, 0, 0); var b = new Point3(1, 0, 0);
+            var c = new Point3(2, 0, 0); var d = new Point3(2, 1, 0);
+            IReadOnlyList<Point3> corners = AnchorAdjustment.FeatureCorners(new[] {
+                new Edge3(a, b), new Edge3(b, c), new Edge3(c, d),
+                new Edge3(b, a) }); // Duplicate seam/edge must not create a junction.
+            if (corners.Count != 3 || corners.Contains(b) || !corners.Contains(a) ||
+                !corners.Contains(c) || !corners.Contains(d))
+                throw new InvalidOperationException("Feature corners contain a straight subdivision or lose a real turn");
+            var slight = new Point3(2, .25, 0);
+            var bent = new[] { new Edge3(a, b), new Edge3(b, slight) };
+            if (AnchorAdjustment.FeatureCorners(bent).Count != 2 ||
+                AnchorAdjustment.FeatureCorners(bent, 10).Count != 3)
+                throw new InvalidOperationException("Detailed corners do not preserve a smaller real bend");
         }
 
         private static void FeatureEdgesExcludeFlatTriangulation()

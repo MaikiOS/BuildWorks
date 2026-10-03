@@ -130,6 +130,11 @@ internal static class ControllerInputAcceptance
             doc.SelectOnly("left");
             var scene = Field<BlueprintEditorScene>(controller, "scene");
             var view = Field<BlueprintEditorView>(controller, "view");
+            Require(scene.ModelSpaceGizmo && scene.NativePointsOnly && !scene.ExperimentalGeometryPoints,
+                "New editor defaults must be model-space sizing, native snap and geometry experiment off");
+            // Legacy gesture regressions have explicit screen/all settings.
+            scene.ModelSpaceGizmo = false; scene.NativePointsOnly = false;
+            Call(controller, "UpdateTransformContext");
             Require(Field<Action>(view, "DuplicateSelectionRequested").GetInvocationList().Length == 1 &&
                 Field<Action>(view, "DeleteSelectionRequested").GetInvocationList().Length == 1 &&
                 Field<Action<string>>(view, "PrimaryPartRequested").GetInvocationList().Length == 1 &&
@@ -747,6 +752,7 @@ internal static class ControllerInputAcceptance
         BlueprintEditorScene scene, BlueprintEditorView view, Camera uiCamera, RenderTexture target, string output)
     {
         BlueprintEditorDocument doc = controller.Document;
+        scene.NativePointsOnly = true; Call(controller, "UpdateTransformContext");
         Frame(controller, input, Vector2.zero); NativeClick(view, uiCamera, "Row_left"); yield return null;
         Vector3 original = V(doc.Parts[0].Position);
         Vector2 start = scene.Camera.WorldToScreenPoint(original);
@@ -791,12 +797,17 @@ internal static class ControllerInputAcceptance
             "E at the same cursor did not select and evaluate the next point");
         Require(Field<int>(controller, "keyboardSourceIndex") == -1, "Q then E does not return to Auto");
         NativeClick(view, uiCamera, "ViewportSectionButton3"); yield return null;
+        Require(!Field<Button>(view, "geometryPointsButton").interactable &&
+            !Field<Button>(view, "edgeButton").interactable,
+            "Pending G allows geometry/frame settings to change frozen source indices");
+        NativeClick(view, uiCamera, "GeometryPoints"); yield return null;
+        Require(!scene.ExperimentalGeometryPoints, "Disabled geometry toggle changed anchors during G");
         int firstNative = Field<List<int>>(controller, "keyboardSourceChoices")[0];
         NativeClick(view, uiCamera, "CursorSource_" + firstNative); yield return null;
         Require(Field<bool>(controller, "keyboardPreview") && V(doc.Parts[0].Position) == original &&
             Field<IList>(doc, "undo").Count == history && Field<int>(controller, "keyboardSourceIndex") == firstNative,
             "Source chooser confirms/mutates document instead of only selecting a point");
-        NativeClick(view, uiCamera, "CursorHelpers"); yield return null;
+        NativeClick(view, uiCamera, "PointTypes"); yield return null;
         Require(Field<List<int>>(controller, "keyboardSourceChoices").Exists(index => index < nativeStart),
             "Additional points do not extend the explicitly enabled source set");
         NativeClick(view, uiCamera, "PointTypes"); yield return null;
@@ -805,7 +816,7 @@ internal static class ControllerInputAcceptance
         NativeClick(view, uiCamera, "PointTypes"); yield return null;
         Require(Field<List<int>>(controller, "keyboardSourceChoices").Exists(index => index < nativeStart),
             "Restoring both point types did not restore opted-in helper choices");
-        NativeClick(view, uiCamera, "CursorHelpers"); yield return null;
+        NativeClick(view, uiCamera, "PointTypes"); yield return null;
         Require(Field<List<int>>(controller, "keyboardSourceChoices").TrueForAll(index => index >= nativeStart && index < nativeEnd),
             "Disabling helpers still lengthens the native-only Q/E cycle");
         view.HideViewportSettings();
@@ -1226,19 +1237,23 @@ internal static class ControllerInputAcceptance
         Set(controller, "gizmoFamily", GizmoFamily.Points);
         Frame(controller, input, Vector2.zero); yield return null;
         var gizmo = Field<TransformGizmoView>(scene, "gizmo");
+        scene.ModelSpaceGizmo = true; scene.NativePointsOnly = true;
+        Call(controller, "UpdateTransformContext");
         Require(!Field<bool>(controller, "showAllAnchors"), "Default point policy is not near-cursor");
         NativeClick(view, uiCamera, "ViewportSectionButton2"); yield return null;
         NativeClick(view, uiCamera, "GizmoSizing"); yield return null;
-        Require(scene.ModelSpaceGizmo && gizmo.ModelSpaceSizing, "Size UI did not switch drawing and hit tests together");
+        Require(!scene.ModelSpaceGizmo && !gizmo.ModelSpaceSizing, "Size UI did not switch drawing and hit tests together");
         NativeClick(view, uiCamera, "GizmoSizing"); yield return null;
-        Require(!scene.ModelSpaceGizmo, "Size UI cannot restore fixed screen size");
+        Require(scene.ModelSpaceGizmo, "Size UI cannot restore default model size");
+        scene.ModelSpaceGizmo = false; Call(controller, "UpdateTransformContext");
         view.HideViewportSettings();
         NativeClick(view, uiCamera, "PointTypes"); Frame(controller, input, Vector2.zero); yield return null;
-        Require(scene.NativePointsOnly, "Native-only header toggle failed");
+        Require(!scene.NativePointsOnly, "Shared filter did not enable helpers");
         NativeClick(view, uiCamera, "PointTypes");
         NativeClick(view, uiCamera, "PointReveal"); Frame(controller, input, Vector2.zero); yield return null;
         Require(Field<bool>(controller, "showAllAnchors"), "Show-all header toggle failed");
         NativeClick(view, uiCamera, "PointReveal"); Frame(controller, input, Vector2.zero); yield return null;
+        NativeClick(view, uiCamera, "PointTypes"); Frame(controller, input, Vector2.zero); yield return null;
         Vector3[] anchors = Field<Vector3[]>(controller, "gizmoAnchors");
         int first = Field<int>(controller, "gizmoNativeAnchorStart");
         Vector3 a = anchors[first], b = anchors[first + 1];
@@ -1252,7 +1267,14 @@ internal static class ControllerInputAcceptance
         int selected = Field<int>(controller, "selectedAnchorPoint");
         Require(Field<List<LineRenderer>>(gizmo, "anchorHandles")[selected].gameObject.activeSelf,
             "Selected A is not persistent away from cursor");
-        NativeClick(view, uiCamera, "EdgeFrame"); yield return null;
+        NativeClick(view, uiCamera, "ViewportSectionButton3"); yield return null;
+        Require(Field<Button>(view, "edgeButton").transform.IsChildOf(Field<GameObject[]>(view, "viewportSections")[3].transform),
+            "Optional A/B still occupies the primary viewport toolbar");
+        NativeClick(view, uiCamera, "GeometryPoints"); yield return null;
+        Require(scene.ExperimentalGeometryPoints, "Geometry opt-in button is disconnected");
+        NativeClick(view, uiCamera, "GeometryPoints"); yield return null;
+        Require(!scene.ExperimentalGeometryPoints, "Geometry opt-out button is disconnected");
+        NativeClick(view, uiCamera, "EdgeFrame"); view.HideViewportSettings(); yield return null;
         Frame(controller, input, aMouse, 1); Frame(controller, input, aMouse); yield return null;
         Require(!Field<Vector3?>(controller, "framePointWorld").HasValue && Field<bool>(controller, "pickingFramePoint"),
             "Coincident A/B created an invalid working axis");
@@ -1282,7 +1304,8 @@ internal static class ControllerInputAcceptance
             Field<Vector3?>(controller, "selectedAnchorWorld") == a && Field<Vector3?>(controller, "framePointWorld") == b,
             "Esc leaked the modal preview or lost its original A/B frame");
         Save(scene, view, uiCamera, target, Path.Combine(output, "input-point-frame.png"));
-        NativeClick(view, uiCamera, "EdgeFrame"); Frame(controller, input, Vector2.zero); yield return null;
+        NativeClick(view, uiCamera, "ViewportSectionButton3"); yield return null;
+        NativeClick(view, uiCamera, "EdgeFrame"); view.HideViewportSettings(); Frame(controller, input, Vector2.zero); yield return null;
         Require(!Field<Vector3?>(controller, "framePointWorld").HasValue &&
             Field<object>(controller, "transformFrame").ToString() == "Local" &&
             !Field<LineRenderer>(gizmo, "frameGuide").gameObject.activeSelf, "Clearing B left an active edge frame");
@@ -1619,6 +1642,9 @@ internal static class ControllerInputAcceptance
         Require(scene.TrySync(doc, out error), error);
         view.Bind(doc, true, null, null);
     }
+
+    private static object Call(object target, string name, params object[] arguments) =>
+        target.GetType().GetMethod(name, Private).Invoke(target, arguments);
 
     private static Vector2 MoveHandle(BlueprintEditorScene scene, Vector3 pivot, GizmoAxis axis) =>
         scene.Camera.WorldToScreenPoint(Field<LineRenderer[]>(Field<TransformGizmoView>(scene, "gizmo"), "moveLines")[(int)axis - 1].GetPosition(1));

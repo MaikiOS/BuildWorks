@@ -78,8 +78,7 @@ namespace OstrixMods.BuildWorks
                     sprite = Sprite.Create(
                         texture,
                         new Rect(0f, 0f, texture.width, texture.height),
-                        // Register the blue inside elbow, not the PNG rectangle centre.
-                        iconName == "snap-corner" ? new Vector2(.43f, .42f) : new Vector2(.5f, .5f),
+                        new Vector2(.5f, .5f),
                         100f);
                     sprite.name = "BuildWorks_EditorIcon_" + iconName;
                     sprite.hideFlags = HideFlags.HideAndDontSave;

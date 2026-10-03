@@ -44,6 +44,8 @@ public static class EditorInteractionAcceptance
                 name => name == "woodwall" ? wall : name == "ashwood_decowall_divider" ? divider : null))
             {
                 Require(scene.TrySync(doc, out string error), "Actual native Scene: " + error);
+                // Explicit screen/all fixture keeps gameplay-distance pixel gates comparable.
+                scene.ModelSpaceGizmo = false; scene.NativePointsOnly = false;
                 var ids = new[] { "left", "wall", "right" };
                 Require(scene.TryGetContentBounds(out Bounds bounds), "Actual native bounds missing");
                 // Keep one target bound for both projection and rendering; swapping
@@ -96,14 +98,14 @@ public static class EditorInteractionAcceptance
                 Show(scene, pivot, pinned, nativeStart, pinned.Length - 1);
                 Require(handles[nativeIndex].gameObject.activeInHierarchy && handles[pinned.Length - 1].gameObject.activeInHierarchy,
                     "Coincident native provenance must remain visible beside the pin accent");
-                Color32[] purple = Render(scene.Camera, Path.Combine(outputDirectory, "actual-native-pin-purple.png"));
-                int purplePixels = ChangedPixels(clean, purple, nativePixel, pixel =>
-                    pixel.r > 90 && pixel.b > 120 && pixel.b > pixel.g + 35 && pixel.r > pixel.g + 35);
-                Require(purplePixels >= 8, "Appended pin has metadata but no purple pixels: " + purplePixels);
-                evidence.Add("PASS actual rendered gold=" + goldPixels + "; purple=" + purplePixels +
+                Color32[] collar = Render(scene.Camera, Path.Combine(outputDirectory, "actual-native-selected-collar.png"));
+                int collarPixels = ChangedPixels(clean, collar, nativePixel, pixel =>
+                    pixel.r > 160 && pixel.g > 150 && pixel.b > 120 && Math.Abs(pixel.r - pixel.g) < 40);
+                Require(collarPixels >= 8, "Selected collar has metadata but no ivory pixels: " + collarPixels);
+                evidence.Add("PASS actual rendered gold=" + goldPixels + "; collar=" + collarPixels +
                     "; editorLayer=" + layer + "; cameraMask=" + scene.Camera.cullingMask);
 
-                // All generated positions share blue provenance, including coincident active points.
+                // All generated positions share ivory provenance, including coincident active points.
                 foreach (int helper in new[] { 0, 8, AnchorAdjustment.CenterAnchorIndex })
                 {
                     var overlap = (Vector3[])anchors.Clone();
@@ -114,7 +116,7 @@ public static class EditorInteractionAcceptance
                     Color32[] mixed = Render(scene.Camera, Path.Combine(outputDirectory,
                         "actual-point-overlap-" + helper + ".png"));
                     int helperPixels = ChangedPixels(clean, mixed, nativePixel, p =>
-                        p.b > p.r + 35 && p.b > p.g + 10);
+                        p.r > 160 && p.g > 150 && p.b > 120 && Math.Abs(p.r - p.g) < 40);
                     int nativePixels = ChangedPixels(clean, mixed, nativePixel, p =>
                         p.r > 150 && p.g > 85 && p.b < 190 && p.r > p.g + 15);
                     Require(helperPixels >= 8 && nativePixels >= 40,
@@ -332,20 +334,22 @@ public static class EditorInteractionAcceptance
         var previews = new List<Vector3>(); var provenance = new List<bool>();
         string[] excluded = { "left", "right" };
         Vector3[] sources = { target, target + Vector3.left * .1f };
-        Require(scene.TryCursorSnap(excluded, sources, new[] { 0,1 }, 1,2,true,previews,provenance,
+        Require(scene.TryCursorSnap(excluded, sources, new[] { 0,1 }, 1,2,previews,provenance,
             out int source, out Vector3 snapped, out bool native) && source == 1 && native &&
             Vector3.Distance(snapped, target) < .001f, "A coincident helper wins before a nearby native pair");
         sources[1] = target + Vector3.back * .65f;
-        Require(scene.TryCursorSnap(excluded, sources, new[] { 1 }, 1,2,false,previews,provenance,
+        scene.NativePointsOnly = true;
+        Require(scene.TryCursorSnap(excluded, sources, new[] { 1 }, 1,2,previews,provenance,
             out source, out snapped, out native, 1,target) && source == 1 && snapped == target,
             "Cursor Auto loses the retained native pair before its release radius");
         sources[1] = target + Vector3.back * .8f;
-        Require(!scene.TryCursorSnap(excluded, sources, new[] { 1 }, 1,2,false,previews,provenance,
+        Require(!scene.TryCursorSnap(excluded, sources, new[] { 1 }, 1,2,previews,provenance,
             out _, out _, out _, 1,target) && previews.Count > 0 && provenance.TrueForAll(value => value),
             "Capture/release and two-metre native candidate preview are not separate");
         sources[1] = target + Vector3.back * 2.1f;
-        Require(!scene.TryCursorSnap(excluded, sources, new[] { 1 }, 1,2,false,previews,provenance,
+        Require(!scene.TryCursorSnap(excluded, sources, new[] { 1 }, 1,2,previews,provenance,
             out _, out _, out _) && previews.Count == 0, "Candidate preview extends beyond two metres");
+        scene.NativePointsOnly = false;
     }
 
     private static void Show(BlueprintEditorScene scene, Vector3 pivot, Vector3[] anchors, int nativeStart, int pin = -1) =>

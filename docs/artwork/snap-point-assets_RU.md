@@ -4,12 +4,40 @@
 
 ## Текущая система точек
 
-.49 использует золотой `snap-native` и синий `snap-corner` как знаки происхождения.
-Углы/середины/центр ниже — история рисунков .48, не текущие цвета. Опора/активная
-отметка — состояния, не дополнительные типы точек. Появление у курсора и постоянная
-A разгружают вид, не смещая координаты. Манипулятор → Размер переключает постоянные
-пиксели или размер относительно модели в 3D. Оба режима используют те же рисунки
-и согласованное попадание; новая генерация не выдаётся за доказательство в игре.
+.50 сохраняет янтарный `snap-native`; все обычные наши используют новый светлый
+соединительный узел `snap-helper`. Выбранная A/точка захвата получает резной обод
+со знаком закрепления `snap-selected`, не заменяя происхождение. Экспериментальные
+концы рёбер обозначены меньшим янтарным узлом `snap-geometry`, не ванильным кругом.
+Отдельных цветов угла/середины/центра нет. Рисунки мирового F9 не меняются.
+
+Три оригинальных прозрачных растровых PNG 1254 × 1254 сгенерированы по отдельности
+через imagegen. Геометрический знак — правка нашего узла, не новый ванильный.
+Регистрация всех (0.5,0.5). Нейтральный цвет шейдера, уменьшенные уровни текстуры,
+трёхлинейная фильтрация и импорт стенда без сжатия соответствуют встроенному декодеру.
+Размер от модели в 3D включён по умолчанию; в экранном режиме радиусы прямоугольников
+ваниль/наши/геометрия — 16/9/5,5 пикселей. Радиус обода — 1,3× ванильной или 2,1× нашей.
+Появление у курсора, глубина и согласованные области нажатия работают в обоих режимах.
+Проверка рендера не заменяет приёмку Valheim; концепт не считается результатом игры.
+
+## Точные запросы генерации .50
+
+Ниже настоящие английские запросы генерации/редактирования, не восстановленные описания.
+### snap-helper
+
+Use case: stylized-concept. Asset type: one production raster snap-point icon for BuildWorks Nordic construction editor, transparent square canvas, NOT a mockup or concept board. Create a compact pale IVORY forged carpenter's joining knot: four short chunky interwoven hooked lobes, softly rounded angular Viking carving, one broad dark incised groove. All lobes balanced symmetrically around an OPEN small transparent centre exactly at canvas centre. Recognizable as ONE generic attachment point, NOT an L-shaped corner, axis, compass or star. Slender charcoal outside rim, warm ivory enamel face, restrained shallow bevel. Very readable at only 18-28 pixels, strong silhouette and generous negative space. Motif occupies 85% canvas. No background, letters, numbers, scene, other icons, photoreal texture, fine ornament, rivets, blue/red/green/purple/pink, glitter, drop shadow, glow or specular white highlights. This is a standalone final sprite; geometry centre is its attachment centre.
+
+### snap-selected
+
+Use case: stylized-concept. Asset type: one production raster selected-pivot OVERLAY for BuildWorks Nordic construction editor, transparent square canvas, NOT a mockup. Draw a warm IVORY carved Nordic locking collar: an OPEN thin forged outer circular band with four broad incised chevron notches and a small clearly recognizable symmetrical locking rune at exact centre, with two short horizontal prongs. Mostly transparent interior, so underlying amber or ivory attachment point remains identifiable. Centre rune occupies no more than 22% motif width, band radius 43% canvas width, balanced centre exactly50%50%. Short chunky restrained bevel, dark charcoal outline and incision, warm ivory face. Readable at24-36 pixels. No filled medallion, background, letters, numbers, extra icons, scene, fine decorative loops, blue/red/green/purple/pink, jewels, drop shadow, rays, sparkle, bloom, metallic white highlights. Overlay shape must read unmistakably as SELECTED AND LOCKED pivot and be visibly different from an unselected simple point.
+
+### snap-geometry
+
+Edit target: attached production snap helper knot sprite. Change ONLY ivory enamel faces to muted warm amber-brass. Preserve exact hooked knot silhouette, dark charcoal outline, symmetric central registration, alpha transparency, canvas and margins, carved groove and bevel. No additions. This is a smaller experimental geometry-point sprite, NOT native circular socket; MUST keep the same four-hook helper knot shape so it remains distinguishable from native snap sign. No extra icons, text or background.
+
+## Исторические ресурсы .48/.49
+
+Цвета, регистрация и размеры ниже — история, не текущая легенда редактора.
+Старые файлы оставлены для воспроизводимости.
 
 Шесть новых растровых PNG созданы по отдельности через imagegen для .48.
 [Прежний концепт](../images/snap-point-style-proposal-v1.png) сохранён как история.

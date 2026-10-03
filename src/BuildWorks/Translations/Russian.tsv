@@ -626,7 +626,7 @@ editor.view.family_rotate	Вращение
 editor.view.family_scale	Масштаб
 editor.view.focus_view	Весь вид / вернуть панели
 editor.hint.tools_menu	1–4 — инструмент · ↑/↓ — выбор · Enter — включить · Esc — закрыть
-editor.hint.next_selected	Выбери точку опоры · G — перенос · R — вращать · S — масштаб · Золото — ваниль · Синие — BuildWorks
+editor.hint.next_selected	Выбери точку опоры · G — перенос · R — вращать · S — масштаб · Янтарный обод — ваниль · Светлый узел — наши
 editor.hint.next_empty	ЛКМ — выбрать деталь · Tab — добавить · Space — инструменты
 editor.view.surface	Поверхность
 editor.view.surface_controls	Поверхность · Q/E точка · колесо поворот · XYZ ось · P плоскость
@@ -644,19 +644,19 @@ editor.view.source_native	Ванильная {0}
 editor.view.source_helper	Дополнительная {0}
 editor.view.source_helpers	Дополнительные точки
 editor.view.source_fallback	Ванильных точек нет: используем наши. Наведи на строку, чтобы увидеть точку.
-editor.view.source_native_first	Авто → ванильные точки. Наведение показывает точку. Смещения XYZ относительно опоры.
+editor.view.source_native_first	Авто → сначала ваниль. «Ваниль + наши» включает и наши точки. Наведение показывает точку; смещения XYZ относительно опоры.
 editor.hint.cursor_preview	Ввод числа — от начала · X/Y/Z — ось · повтор — сменить систему осей · Shift+ось — плоскость · G/R/S — сменить действие · P — Поверхность/Плоскость · Q/E — точка · колесо — поворот · тяни СКМ — камера
 editor.view.screen_plane	Плоскость экрана
 editor.view.no_surface	Нет поверхности — наведи иначе или нажми P для Плоскости
 editor.hint.preview	{0} · {1} · {2} · <b>Enter/ЛКМ</b> применить · <b>Esc</b> восстановить
 editor.hint.open_gizmo	Сначала выбери деталь · клик СКМ/Delete — удалить
-editor.hint.gizmo_ready	G — перенос от A · XYZ — ограничить ось · R — вращать вокруг A · S — масштаб от A · Золото — ваниль · Синие — BuildWorks
+editor.hint.gizmo_ready	G — перенос от A · XYZ — ограничить ось · R — вращать вокруг A · S — масштаб от A · Янтарный обод — ваниль · Светлый узел — наши
 editor.view.point_helper	Точка BuildWorks
 editor.view.size_screen	Размер: на экране
 editor.view.size_model	Размер: в 3D
 editor.view.size_mode_tooltip	На экране: постоянный размер в пикселях. В 3D: размер относительно выбранной модели; приближение меняет видимый размер. Проценты меняют ручки, не саму модель.
-editor.view.types_all	Ваниль + наши
-editor.view.types_native	Только ваниль
+editor.view.types_all	Привязка: ваниль + наши
+editor.view.types_native	Привязка: ваниль
 editor.view.points_cursor	У курсора
 editor.view.frame_local	Оси: детали
 editor.view.frame_world	Оси: мира
@@ -668,6 +668,11 @@ editor.view.edge_clear	Сбросить A → B
 editor.edge_needs_point	Сначала выбери точку опоры A на выделенной детали.
 editor.edge_zero	A и B должны быть разными точками. Выбери другую точку.
 editor.edge_ready	A → B задаёт X. G X — вдоль линии; R X — вокруг неё. Без автоматического выравнивания и деформации.
-editor.point_selected	Опора A выбрана. G — перенос от A; R — вращение вокруг A; S — масштаб от A. Выбери B для направления оси.
+editor.point_selected	Опора A выбрана: обод с замком. G — перенос от A; R — вращение вокруг A; S — масштаб от A. Нажми поверхность детали для сброса опоры.
+editor.view.edge_tooltip	Дополнительно: выбери A на выделенной детали, затем здесь включи выбор B и нажми другую точку. X направлена A → B; центр остаётся в A, не в середине.
+editor.view.geometry_off	Точки геометрии: выкл. (эксперимент)
+editor.view.geometry_on	Точки геометрии: вкл. (эксперимент)
+editor.view.geometry_tooltip	Маленькие янтарные узлы на концах характерных рёбер модели. По умолчанию выключены. Для G включи Привязка: ваниль + наши. Только редактор; не сохраняются. Переключение — после завершения или отмены трансформации.
+editor.view.source_empty	Ванильных точек нет. Включи Привязка: ваниль + наши над вьюпортом, чтобы использовать наши точки.
 editor.hint.numeric_value	<b>Значение: {0}</b> · {1}
 editor.hint.numeric_invalid	Неполное/вне диапазона; для переноса выбери одну ось · Backspace — правка · Delete — очистить

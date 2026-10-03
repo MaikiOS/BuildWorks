@@ -9,16 +9,19 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Current source candidate: **0.19.49**, Store v9, Valheim 1.0.16.
-The .49 point workflow supersedes earlier visual subdivisions: only native gold
-and generated blue; near-cursor reveal by default, persistent selected pivot A,
-manual all/native-only filters and nearby G targets. Clicking A sets the transform
-centre and default G grip; optional B defines working X along A→B, not a guide
-or automatic edge alignment. Local/World/View/Edge frames are explicit.
-Manipulator offers screen-constant and model-relative 3D sizes with matching
-projected hit areas; model mode is independent of camera distance, FOV and
-projection. Existing art is reused. BW-01 awaits the new numbered owner series
-1–10, starting with 1–3; historical .48 tests are archived, not another answer list.
+Current source candidate: **0.19.50**, Store v9, Valheim 1.0.16.
+Ostrix's .49 report accepts the core point/pivot/frame/size workflow and resource
+cards; optional B, helper opt-in and catalogue translation needed clarification.
+.50 defaults to model-relative 3D sizing, retains screen mode, uses amber native
+clasps and newly authored ivory helper knots with a distinct selected locking
+collar. Near-cursor reveal, exact coordinates and untinted selection remain.
+One Native / Native+ours filter now governs G sources, Q/E and targets; explicit
+helper A remains an intentional exception. Optional B moves into Attachment and
+still defines X along A→B with pivot at A, not midpoint or curve construction.
+Experimental feature-endpoint markers are opt-in, bounded, editor-only and excluded
+from saved anchors. Native catalogue type/material labels translate by stable ID;
+external names stay intact. BW-01 awaits .50 owner tests 1–10, readability 1–3 first.
+Older lists are archived, not extra answer lists. F9 mechanics are unchanged.
 0.19.39 owner feedback accepts menu hover, language refresh and camera framing;
 Transform selection is provisionally accepted. The owner accepts contour cleanup;
 the focused 0.19.41 game series is accepted by owner report on 2026-10-01.
@@ -80,7 +83,7 @@ dependent changes wait for its gate, unrelated preparation may continue.
 | ID | Deliverable | Dependency | Status |
 | --- | --- | --- | --- |
 | BW-00 | Dedicated-profile baseline and reliable handoff | Current core | Focused 0.19.41 owner series accepted; cost/refund accounting and networking pending |
-| BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | .49 point pivots, working frames and two sizing modes automatically verified; owner series 1–10, readability 1–3 first |
+| BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | .49 core accepted by owner; .50 unified point choice, artwork and catalogue labels automatically verified; awaiting owner series 1–10, first 1–3 |
 | BW-02 | Group layout operations without resizing pieces | BW-01 | Planned; focused operation UI approval required |
 | BW-03 | Persistent Array and minimal recipe persistence | BW-02 | Planned; safe Store migration and editing/Bake gate |
 | BW-04 | Guides and curves in accepted slices | BW-03 + renewed owner discussion | Tool-semantics discussion required before coding |

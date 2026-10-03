@@ -254,6 +254,17 @@ internal static class UICatalogAcceptance
                 Require(selected != null && ReferenceEquals(selected.Blueprint, decor),
                     "Blueprint catalog selection loses the whole blueprint payload");
                 view.HideCatalog();
+                view.ShowCatalog(new[] { new BlueprintEditorCatalogItem("localized", "Part", null,
+                    "Building", "ash_wood", "OdinArchitect Decors", 0) });
+                Click(Button(view, "CatalogPartsMode"));
+                Require(Button(view, "Category_Building").GetComponentInChildren<TMP_Text>().text ==
+                    BuildWorksLocalization.CatalogLabel("Building") &&
+                    Button(view, "Material_ash_wood").GetComponentInChildren<TMP_Text>().text ==
+                    BuildWorksLocalization.CatalogLabel("ash_wood"),
+                    "Native catalog type/material buttons use raw IDs instead of localized labels");
+                Require(Button(view, "Source_OdinArchitect Decors").GetComponentInChildren<TMP_Text>().text ==
+                    "ODINARCHITECT DECORS", "External source name was translated as a native category");
+                view.HideCatalog();
                 float points = 0f, uniform = 0f;
                 bool grid = false;
                 view.ViewportSettingsChanged += (_, __, ___, pointSize, uniformSize, showGrid) =>

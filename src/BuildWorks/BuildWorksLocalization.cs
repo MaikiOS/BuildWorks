@@ -29,7 +29,7 @@ namespace OstrixMods.BuildWorks
 
         internal static string CatalogLabel(string id)
         {
-            string key = "catalog.group." + id;
+            string key = "catalog.group." + (id ?? string.Empty).ToLowerInvariant();
             return English.ContainsKey(key) ? Text(key) : id;
         }
 

@@ -64,6 +64,17 @@ geometry set carries an override, so it cannot be relabelled as a native socket.
 Screen size uses camera projection; model size uses rotation-independent local
 renderer dimensions and the selected model scale, frozen during a preview.
 Drawing and projected hit areas consume that same size. World/F9 is unchanged.
+Model-relative sizing is the editor default; the shared Native/Native+ours flag
+owns both G source choice and target scans, with no independent helper opt-in.
+The amber native clasp and ivory generated knot encode provenance; the selected
+locking collar is an overlay, not a new point type. Optional B lives in Attachment.
+Geometry endpoints are cached in VisualNode root-local coordinates from existing
+feature edges (32 per visual, 64 extras per selection), off by default. Their
+range precedes native anchors and is excluded by BuildBoundsAnchors when saving.
+Enabling/disabling invalidates the anchor cache; it never changes source prefabs,
+saved schema or world/F9. The option is locked during active transformations.
+Catalogue labels resolve stable native type/material IDs; unknown/external IDs
+and user categories retain their original names.
 
 World requirements reuse native Hud cells and InventoryGui formatting.
 `BlueprintResourceHudView` owns only cloned overflow cells and the temporary

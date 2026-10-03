@@ -2,6 +2,55 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Verified candidate 0.19.50
+
+Ostrix approved this focused revision on 2026-10-03 after the .49 game report.
+Model-relative 3D sizing is now the editor default; screen mode remains available.
+Native points keep amber clasps; ordinary helpers use a new ivory Nordic joining
+knot. Selected A/source gets a carved locking collar without losing provenance.
+Original model materials, near-cursor reveal and depth feedback remain.
+
+One Native/Native+ours header filter owns G source choices, Q/E and target scans.
+The old independent helper toggle is removed; furniture without native sockets
+requires Native+ours for helpers. Explicit helper A is an intentional exception.
+Optional B is in Attachment, not the primary header; A remains the pivot and
+A→B defines working X. Geometry feature endpoints are opt-in/off by default,
+bounded at 32 per visual and 64 extras per selection, with a small amber helper
+knot. They never change prefabs or serialized blueprint anchors. Changes to this
+set clear remembered source indices; preview retains frozen point provenance.
+Geometry/B controls are disabled while transforming.
+
+Native catalogue types/materials resolve localized labels by stable ID; external
+mod/source names and user categories are preserved. Three individual transparent
+1254 px PNGs, exact prompts and game-versus-concept limitations are in
+[the artwork record](docs/artwork/snap-point-assets.md). Five obsolete point PNGs
+remain historical source files but are excluded from the shipped assembly.
+No world/F9, Store v9, costs, input bindings or network behavior changed.
+
+Release: zero warnings/errors. Geometry, Store, Localization, EditorBridge,
+WorldLayout, DeploymentChecks and HostContract pass (Steam build 25185596);
+677 matching localization keys, 647 static references and embedded resources
+verified. Format exits 0 with the existing workspace-loading warning.
+Unity 6000.0.61f1 passed 81 actual UI cases at 2026-10-03T15:23:00.0325437Z,
+including exact resource imports, native/helper overlap, selected collar,
+default sizing, shared source filter, disabled pending controls, optional B,
+experimental coordinates/targets/cache reset, frozen preview provenance and
+unchanged serialized anchors. Read-only correctness and Ponytail reviews pass.
+Reviewer-found stale source index and preview colour regressions were fixed
+and covered before deployment.
+
+- BuildWorks SHA256: 42242C80D2D8E508EC0E9CA43DF285365737C741CF7F517C41DEFDE381AD16D7
+- Geometry SHA256: 3EF58DB30AE547E99293DD2B90E97BF8FEE005534C055D23656714FA09D9EA16
+
+Installed with Valheim closed only in TerrainRamp-1.0-Test through the guarded
+script; SHA256 matches. Previous .49 DLL pair is retained locally at
+artifacts/checkpoint-0.19.50/preinstall. No game launch, save mutation,
+other-profile deployment or new binary release. Real Valheim readability/input,
+costs/refunds, reload and networking remain separate owner gates.
+BW-01 awaits the single [owner series 1–10](specs/roadmap/current-pass.md),
+starting with 1–3. The .49 list is archived, not a second answer list.
+Stop at owner feedback.
+
 ## Verified candidate 0.19.49
 
 Ostrix approved the point-purpose workflow and two sizing modes on 2026-10-03.

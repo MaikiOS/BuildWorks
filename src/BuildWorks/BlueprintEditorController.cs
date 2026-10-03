@@ -114,7 +114,6 @@ namespace OstrixMods.BuildWorks
         private int keyboardAutoSource = -1;
         private int keyboardHoveredSource = -1;
         private int dragNativeAnchorEnd;
-        private bool keyboardHelpersEnabled;
         private bool keyboardSourceChanged;
         private readonly List<int> keyboardSourceChoices = new List<int>();
         private readonly List<int> keyboardSnapSources = new List<int>();
@@ -498,16 +497,14 @@ namespace OstrixMods.BuildWorks
             view.FrameSelectionRequested += FrameSelectionOrAll;
             view.AnchorVisibilityRequested += ToggleAnchorVisibility;
             view.GizmoSizingRequested += () => { scene.ModelSpaceGizmo = !scene.ModelSpaceGizmo; UpdateTransformContext(); UpdateGizmo(); };
-            view.PointTypesRequested += () =>
+            view.PointTypesRequested += TogglePointTypes;
+            view.GeometryPointsRequested += () =>
             {
-                scene.NativePointsOnly = !scene.NativePointsOnly;
-                if (keyboardPreview && keyboardSurface)
-                {
-                    RefreshCursorSources();
-                    // Explicit A remains visible and usable; hidden helpers never enter Auto/Q/E.
-                    if (keyboardSourceIndex >= 0 && !keyboardSourceChoices.Contains(keyboardSourceIndex) &&
-                        keyboardSourceIndex != selectedAnchorPoint) ChooseCursorSource(-1);
-                }
+                if (IsGizmoDragging) return;
+                scene.ExperimentalGeometryPoints = !scene.ExperimentalGeometryPoints;
+                // Adding helpers before native sockets invalidates remembered source indices.
+                preferredCursorSource = -1;
+                preferredCursorIds.Clear();
                 UpdateTransformContext(); UpdateGizmo();
             };
             view.FrameRequested += CycleTransformFrame;
@@ -543,11 +540,6 @@ namespace OstrixMods.BuildWorks
             view.PreviewAxisRequested += axis => { if (keyboardPreview) SetKeyboardAxis(axis); };
             view.CursorSourceRequested += ChooseCursorSource;
             view.CursorSourceHovered += index => { keyboardHoveredSource = index; UpdateGizmo(); };
-            view.CursorHelpersRequested += () =>
-            {
-                keyboardHelpersEnabled = !keyboardHelpersEnabled;
-                if (keyboardPreview && keyboardSurface) { RefreshCursorSources(); ChooseCursorSource(keyboardSourceIndex); }
-            };
             view.SetGizmoFamily(gizmoFamily);
             view.LightingChanged += scene.SetLighting;
             view.ViewportSettingsChanged += (move, rotation, array, points, scale, grid) =>
@@ -1273,6 +1265,7 @@ namespace OstrixMods.BuildWorks
             if (!keyboardSurface) view.SetCursorSourcesAvailable(false);
             RebaseKeyboardPreview(input.MousePosition);
             selectionPending = false;
+            UpdateTransformContext();
             UpdateGizmo();
         }
 
@@ -1282,7 +1275,7 @@ namespace OstrixMods.BuildWorks
             for (int index = gizmoNativeAnchorStart; index < dragNativeAnchorEnd; ++index)
                 keyboardSourceChoices.Add(index);
             bool fallback = !scene.NativePointsOnly && keyboardSourceChoices.Count == 0;
-            if (!scene.NativePointsOnly && (keyboardHelpersEnabled || fallback))
+            if (!scene.NativePointsOnly)
                 for (int index = 0; index < Mathf.Min(gizmoNativeAnchorStart, dragSourceAnchors.Length); ++index)
                     keyboardSourceChoices.Add(index);
             var labels = new List<string>();
@@ -1296,7 +1289,21 @@ namespace OstrixMods.BuildWorks
                     delta.y.ToString("0.##", CultureInfo.CurrentCulture) + "/" + delta.z.ToString("0.##", CultureInfo.CurrentCulture));
             }
             view.SetCursorSources(keyboardSourceChoices, gizmoNativeAnchorStart, dragNativeAnchorEnd,
-                keyboardSourceIndex, keyboardHelpersEnabled, fallback, labels);
+                keyboardSourceIndex, fallback, labels);
+        }
+
+        private void TogglePointTypes()
+        {
+            scene.NativePointsOnly = !scene.NativePointsOnly;
+            if (keyboardPreview && keyboardSurface)
+            {
+                RefreshCursorSources();
+                // An explicitly selected helper A is retained; ordinary Q/E follows the shared filter.
+                int source = keyboardSourceIndex >= 0 && !keyboardSourceChoices.Contains(keyboardSourceIndex) &&
+                    keyboardSourceIndex != selectedAnchorPoint ? -1 : keyboardSourceIndex;
+                ChooseCursorSource(source);
+            }
+            UpdateTransformContext(); UpdateGizmo();
         }
 
         private void ChooseCursorSource(int index)
@@ -1411,7 +1418,7 @@ namespace OstrixMods.BuildWorks
                 var previouslyShown = new List<Vector3>(snapPreviewTargets);
                 Vector3 previousTarget = snapTargetWorld;
                 snapTargetVisible = !ShiftHeld && scene.TryCursorSnap(dragIds, sources, keyboardSnapSources,
-                    gizmoNativeAnchorStart, dragNativeAnchorEnd, keyboardHelpersEnabled, snapPreviewTargets, snapPreviewNative,
+                    gizmoNativeAnchorStart, dragNativeAnchorEnd, snapPreviewTargets, snapPreviewNative,
                     out keyboardAutoSource, out snapTargetWorld, out snapTargetIsNative,
                     wasSnapped ? keyboardAutoSource : -1, wasSnapped ? previousTarget : (Vector3?)null);
                 // Reveal a new target for a complete frame before magnetic capture.
@@ -1582,6 +1589,7 @@ namespace OstrixMods.BuildWorks
                     if (!ConfigureAnchorConstraint(orientation)) { ResetGizmoDrag(); return true; }
                     dragStartMouse = mouse; dragTranslation = Vector3.zero;
                     dragRotation = Quaternion.identity; dragScale = 1f; selectionPending = false;
+                    UpdateTransformContext();
                     return true;
                 }
                 bool nativePoint = anchor == selectedAnchorPoint ? selectedAnchorNative :
@@ -1677,6 +1685,7 @@ namespace OstrixMods.BuildWorks
                     mouse, dragPivot, dragAxisWorld, out dragStartDirection);
             }
             selectionPending = false;
+            UpdateTransformContext();
             return true;
         }
 
@@ -1900,6 +1909,7 @@ namespace OstrixMods.BuildWorks
             dragConstraintRadius = 0f;
             dragWorldUnitsPerPixel = 0f;
             dragScreenDirection = Vector2.zero;
+            UpdateTransformContext();
         }
 
         private void SetAnchorConstraint(GizmoAxis axis)
@@ -3215,7 +3225,7 @@ namespace OstrixMods.BuildWorks
             view?.SetGizmoOptions(showAllAnchors, meshSnapEnabled);
             view?.SetPointContext(scene != null && scene.ModelSpaceGizmo, scene != null && scene.NativePointsOnly,
                   showAllAnchors, TransformFrameKey, pickingFramePoint,
-                framePointWorld.HasValue);
+                framePointWorld.HasValue, scene != null && scene.ExperimentalGeometryPoints, IsGizmoDragging);
         }
 
         private bool TrySave(bool closeAfterSave)
@@ -3371,8 +3381,11 @@ namespace OstrixMods.BuildWorks
                     "editor.blueprint_points_failed"));
             var result = new List<CompositeBlueprintStore.VectorData>(
                 Math.Min(anchors.Length, 512));
-            for (int index = 0; index < anchors.Length && index < 512; ++index)
+            for (int index = 0; index < anchors.Length && result.Count < 512; ++index)
+            {
+                if (index >= scene.GeometryAnchorStart && index < scene.GeometryAnchorStart + scene.GeometryAnchorCount) continue;
                 result.Add(new CompositeBlueprintStore.VectorData(anchors[index]));
+            }
             return result;
         }
 

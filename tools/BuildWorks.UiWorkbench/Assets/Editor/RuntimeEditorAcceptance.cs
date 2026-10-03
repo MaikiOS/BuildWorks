@@ -81,7 +81,7 @@ public static class RuntimeEditorAcceptance
     {
         Debug.Log("BUILDWORKS_RUNTIME_EDITOR_ENTER");
         // Match the embedded PNG decoder: no NPOT resize or compression; minify with mipmaps.
-        foreach (string icon in new[] { "native", "corner", "midpoint", "centre", "pin", "active" })
+        foreach (string icon in new[] { "native", "corner", "midpoint", "centre", "pin", "active", "helper", "selected", "geometry" })
         {
             var importer = (TextureImporter)AssetImporter.GetAtPath("Assets/Resources/BuildWorks/Icons/snap-" + icon + ".png");
             importer.npotScale = TextureImporterNPOTScale.None;
@@ -189,6 +189,9 @@ public static class RuntimeEditorAcceptance
                 Require(controller.AddPart("wood_pole", "Столб"), "Add native pole");
                 var view = Field<BlueprintEditorView>(controller, "view");
                 var scene = Field<BlueprintEditorScene>(controller, "scene");
+                Require(scene.ModelSpaceGizmo && scene.NativePointsOnly && !scene.ExperimentalGeometryPoints,
+                    "Editor defaults are not model sizing/native snap/experiment off");
+                scene.ModelSpaceGizmo = false; scene.NativePointsOnly = false;
                 var document = controller.Document;
                 string selected = document.Parts[0].StableId;
                 document.SelectOnly(selected);
@@ -316,6 +319,7 @@ public static class RuntimeEditorAcceptance
                 TestOccluderFade(template, output);
                 TestGizmoHits(template);
                 TestModelSpaceGizmo(template);
+                TestExperimentalGeometry(template, fontTemplate);
                 controller.Close(true);
                 Require(controller.OpenNew(out error), "Reopen: " + error);
                 Require(Field<BlueprintEditorTool>(controller, "activeTool") == BlueprintEditorTool.Select,
@@ -583,6 +587,8 @@ public static class RuntimeEditorAcceptance
                 var doc = controller.Document;
                 var scene = Field<BlueprintEditorScene>(controller, "scene");
                 var view = Field<BlueprintEditorView>(controller, "view");
+                // Legacy fixed-pixel gesture fixture; model-relative sizing has its own gates.
+                scene.ModelSpaceGizmo = false; scene.NativePointsOnly = false;
                 string id = doc.Parts[0].StableId;
                 Vector3 original = new Vector3((float)doc.Parts[0].Position.X, (float)doc.Parts[0].Position.Y, (float)doc.Parts[0].Position.Z);
                 scene.SetViewport(new Rect(0,0,1920,1080));
@@ -853,8 +859,8 @@ public static class RuntimeEditorAcceptance
                 GizmoHandleKind.None, GizmoAxis.None, points, 1, 1, 1, false, 1,
                 false, Vector3.zero, false, GizmoAxis.None, false, default, default, 0, helperAnchorOverride: 1);
             Color appended = Field<List<LineRenderer>>(gizmo, "anchorHandles")[1].startColor;
-            Require(appended.b > appended.r && appended.a == 1f,
-                "Appended helper A lost blue provenance behind native boundary");
+            Require(appended.r > appended.b && appended.g > appended.b && appended.a == 1f,
+                "Appended helper A lost ivory provenance behind native boundary");
         }
         Object.DestroyImmediate(camera);
         GameObject source = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -882,6 +888,99 @@ public static class RuntimeEditorAcceptance
         }
         Object.DestroyImmediate(source);
         checks.Add("Model-space gizmo: fixed metres, 4:1 apparent size, perspective/orthographic, projected hit area, persistent occluded pivot and native-only filter");
+    }
+
+    private static void TestExperimentalGeometry(Camera template, TMP_Text fontTemplate)
+    {
+        GameObject source = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        Mesh originalMesh = source.GetComponent<MeshFilter>().sharedMesh;
+        Mesh mesh = Object.Instantiate(originalMesh);
+        Vector3[] vertices = mesh.vertices;
+        for (int i = 0; i < vertices.Length; ++i)
+            if (vertices[i] == new Vector3(-.5f,-.5f,-.5f)) vertices[i] = new Vector3(.2f,-.5f,-.2f);
+        mesh.vertices = vertices; mesh.RecalculateBounds();
+        source.GetComponent<MeshFilter>().sharedMesh = mesh;
+        source.SetActive(false);
+        var doc = new BlueprintEditorDocument(null, "Geometry experiment", "Test", new[] {
+            new BlueprintEditorPart("model", "model", "Model", new Point3(0,0,0), new Rotation3(0,0,0,1)) });
+        using (var scene = new BlueprintEditorScene(template, _ => source))
+        {
+            scene.SetViewport(new Rect(0,0,1920,1080)); scene.SetCameraPose(new Vector3(0,1,-4), Quaternion.LookRotation(new Vector3(0,-1,4)));
+            Require(scene.TrySync(doc, out string error), error);
+            scene.NativePointsOnly = false;
+            Require(!scene.ExperimentalGeometryPoints, "Geometry experiment must be off initially");
+            scene.TryGetGizmoAnchors(new[] { "model" }, out Vector3[] before, out int beforeNative);
+            scene.ExperimentalGeometryPoints = true;
+            scene.TryGetGizmoAnchors(new[] { "model" }, out Vector3[] expanded, out int expandedNative);
+            Require(scene.GeometryAnchorCount > 0 && scene.GeometryAnchorCount <= 32 &&
+                expandedNative - beforeNative == scene.GeometryAnchorCount,
+                "Opt-in geometry did not add bounded feature endpoints as helpers");
+            Vector3 point = expanded[scene.GeometryAnchorStart];
+            var targets = new List<Vector3>(); var flags = new List<bool>();
+            Require(scene.TryCursorSnap(Array.Empty<string>(), new[] { point }, new[] { 0 }, 1, 1,
+                targets, flags, out _, out Vector3 snapped, out bool native) && !native && snapped == point &&
+                targets.Contains(point), "Geometry source/target must share exact feature coordinates");
+            scene.NativePointsOnly = true;
+            Require(!scene.TryCursorSnap(Array.Empty<string>(), new[] { point }, new[] { 0 }, 1, 1,
+                targets, flags, out _, out _, out _), "Native-only allows experimental targets");
+            scene.NativePointsOnly = false;
+            scene.ShowGizmo(BlueprintEditorTool.Transform, Vector3.zero, Quaternion.identity, false,
+                GizmoHandleKind.None, GizmoAxis.None, expanded, -1, expandedNative, true, false, default, false);
+            var gizmo = Field<TransformGizmoView>(scene, "gizmo");
+            LineRenderer mark = Field<List<LineRenderer>>(gizmo, "anchorHandles")[scene.GeometryAnchorStart];
+            Require(mark.transform.Find("Engraving").GetComponent<MeshRenderer>().sharedMaterial.mainTexture.name.EndsWith("snap-geometry"),
+                "Geometry marker lost its small amber helper motif");
+            int geometryStart = scene.GeometryAnchorStart, geometryCount = scene.GeometryAnchorCount;
+            scene.PreviewTransform(doc, new[] { "model" }, Vector3.up, Quaternion.identity, Vector3.zero);
+            var moved = Array.ConvertAll(expanded, p => p + Vector3.up);
+            scene.ShowGizmo(BlueprintEditorTool.Transform, Vector3.up, Quaternion.identity, false,
+                GizmoHandleKind.None, GizmoAxis.None, moved, -1, expandedNative, true, false, default, false);
+            Require(scene.GeometryAnchorStart == geometryStart && scene.GeometryAnchorCount == geometryCount &&
+                mark.transform.Find("Engraving").GetComponent<MeshRenderer>().sharedMaterial.mainTexture.name.EndsWith("snap-geometry"),
+                "Transform preview lost frozen geometry provenance");
+            Require(scene.TrySync(doc, out error), error);
+            scene.ExperimentalGeometryPoints = false;
+            scene.TryGetGizmoAnchors(new[] { "model" }, out Vector3[] restored, out int restoredNative);
+            Require(restoredNative == beforeNative && restored.Length == before.Length && scene.GeometryAnchorCount == 0,
+                "Turning geometry off did not invalidate its cached anchors");
+            for (int i = 0; i < before.Length; ++i) Require(restored[i] == before[i], "Geometry option changed the original coordinates");
+            Require(source.GetComponent<MeshFilter>().sharedMesh == mesh &&
+                mesh.vertices[0] == vertices[0] && doc.Parts[0].Scale.X == 1, "Experiment mutated prefab or document");
+        }
+        var socket = new GameObject("GeometrySourceSocket"); socket.tag = "snappoint";
+        socket.transform.SetParent(source.transform, false);
+        socket.transform.localPosition = new Vector3(.5f,.5f,-.5f);
+        using (var controller = new BlueprintEditorController(
+            new CompositeBlueprintStore(Path.Combine(Application.temporaryCachePath, "geometry-" + Guid.NewGuid().ToString("N") + ".json")),
+            template, fontTemplate, _ => source, name => name, () => Array.Empty<BlueprintEditorCatalogItem>(),
+            message => { throw new InvalidOperationException(message); }))
+        {
+            Require(controller.OpenNew(out string error) && controller.AddPart("model"), "Geometry controller: " + error);
+            var scene = Field<BlueprintEditorScene>(controller, "scene");
+            var before = (List<CompositeBlueprintStore.VectorData>)Call(controller, "BuildBoundsAnchors");
+            scene.ExperimentalGeometryPoints = true;
+            var after = (List<CompositeBlueprintStore.VectorData>)Call(controller, "BuildBoundsAnchors");
+            Require(scene.GeometryAnchorCount > 0 && after.Count == before.Count,
+                "Experimental geometry changed serialized blueprint anchor count");
+            for (int i = 0; i < before.Count; ++i)
+                Require(after[i].x == before[i].x && after[i].y == before[i].y && after[i].z == before[i].z,
+                    "Experimental geometry changed serialized blueprint coordinates");
+            Call(controller, "BeginKeyboardPreview", GizmoHandleKind.Move);
+            Call(controller, "ChooseCursorSource", Field<List<int>>(controller, "keyboardSourceChoices")[0]);
+            Call(controller, "CancelGizmoDrag");
+            Require(Field<int>(controller, "preferredCursorSource") >= 0, "Geometry source memory fixture did not choose a source");
+            var view = Field<BlueprintEditorView>(controller, "view");
+            Field<Button>(view, "geometryPointsButton").onClick.Invoke();
+            Require(!scene.ExperimentalGeometryPoints && Field<int>(controller, "preferredCursorSource") == -1 &&
+                Field<List<string>>(controller, "preferredCursorIds").Count == 0,
+                "Geometry toggle retained an index from a different anchor array");
+            Call(controller, "BeginKeyboardPreview", GizmoHandleKind.Move);
+            Require(Field<int>(controller, "keyboardSourceIndex") == -1,
+                "G after geometry toggle captured the wrong remembered point instead of Auto");
+            Call(controller, "CancelGizmoDrag");
+        }
+        Object.DestroyImmediate(source); Object.DestroyImmediate(mesh);
+        checks.Add("Geometry experiment: off by default, bounded feature endpoints, exact helper targets, native-only exclusion, cache reset and no prefab/document mutation");
     }
 
     private static void TestNativeSocketTargets(Camera template)
@@ -913,6 +1012,7 @@ public static class RuntimeEditorAcceptance
             scene.SetViewport(new Rect(0,0,1920,1080));
             scene.SetCameraPose(new Vector3(0,0,-4), Quaternion.identity);
             Require(scene.TrySync(doc, out string error), error);
+            scene.NativePointsOnly = false;
             var targets = new List<Vector3>(); var nativeFlags = new List<bool>();
             Vector2 mouse = scene.Camera.WorldToScreenPoint(Vector3.right);
             Require(!scene.TryFindEditorSnapTarget(Array.Empty<string>(), mouse, false, targets, nativeFlags,
@@ -1102,7 +1202,7 @@ public static class RuntimeEditorAcceptance
             var artwork = Field<Dictionary<LineRenderer,Mesh>>(gizmo, "artworkMeshes");
             Require(artwork.ContainsKey(anchor) && artwork.ContainsKey(scaleHandle) &&
                 anchor.transform.Find("Engraving").GetComponent<MeshRenderer>().sharedMaterial.mainTexture.name.EndsWith(
-                    native ? "snap-native" : "snap-corner") &&
+                    native ? "snap-native" : "snap-helper") &&
                 scaleHandle.transform.Find("Engraving").GetComponent<MeshRenderer>().sharedMaterial.mainTexture,
                 "Snap marker lost its authored provenance artwork or scale lost its original artwork");
             Require(!anchor.enabled && anchor.positionCount == 5,
@@ -1129,10 +1229,10 @@ public static class RuntimeEditorAcceptance
                 true, 1, false, Vector3.zero, false, GizmoAxis.None, false,
                 Vector3.zero, Vector3.zero, 0, allowExtended: true);
             Require(Field<List<LineRenderer>>(gizmo, "anchorHandles")[0].transform.Find("Engraving")
-                    .GetComponent<MeshRenderer>().sharedMaterial.mainTexture.name.EndsWith("snap-corner") &&
+                    .GetComponent<MeshRenderer>().sharedMaterial.mainTexture.name.EndsWith("snap-helper") &&
                 Field<List<LineRenderer>>(gizmo, "anchorHandles")[8].transform.Find("Engraving")
-                    .GetComponent<MeshRenderer>().sharedMaterial.mainTexture.name.EndsWith("snap-corner"),
-                "All generated helpers must use one blue thematic sprite");
+                    .GetComponent<MeshRenderer>().sharedMaterial.mainTexture.name.EndsWith("snap-helper"),
+                "All generated helpers must use one ivory thematic sprite");
             gizmo.Show(camera, Vector3.zero, Quaternion.identity, false, GizmoMode.Move,
                 GizmoHandleKind.None, GizmoAxis.None, helperPoints, 0, 8, 8,
                 true, 1, false, Vector3.zero, false, GizmoAxis.None, false,
@@ -1141,11 +1241,14 @@ public static class RuntimeEditorAcceptance
                 Require(Field<List<LineRenderer>>(gizmo, "anchorHandles")[index].gameObject.activeInHierarchy,
                     "Selecting or pinning a coincident point must not hide other provenance markers");
             Require(Field<List<LineRenderer>>(gizmo, "anchorHandles")[0].transform.Find("Engraving")
-                    .GetComponent<MeshRenderer>().sharedMaterial.mainTexture.name.EndsWith("snap-corner") &&
+                    .GetComponent<MeshRenderer>().sharedMaterial.mainTexture.name.EndsWith("snap-helper") &&
                 Field<List<LineRenderer>>(gizmo, "anchorHandles")[0].transform.Find("ActiveAccent").gameObject.activeSelf &&
                 Field<List<LineRenderer>>(gizmo, "anchorHandles")[8].transform.Find("PinAccent").gameObject.activeSelf &&
                 Field<List<LineRenderer>>(gizmo, "anchorHandles")[8].transform.Find("Engraving").gameObject.activeSelf,
                 "Active helper lost its type or appended pin invented native provenance");
+            Require(Field<List<LineRenderer>>(gizmo, "anchorHandles")[0].transform.Find("ActiveAccent")
+                    .Find("Engraving").GetComponent<MeshRenderer>().sharedMaterial.mainTexture.name.EndsWith("snap-selected"),
+                "Selected helper does not use the new locking collar artwork");
             gizmo.Show(camera, Vector3.zero, Quaternion.identity, false, GizmoMode.Move,
                 GizmoHandleKind.None, GizmoAxis.None, new[] { Vector3.zero, Vector3.zero }, -1, -1, 1,
                 true, 1, false, Vector3.zero, false, GizmoAxis.None, false,

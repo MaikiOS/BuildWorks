@@ -19,6 +19,9 @@ namespace OstrixMods.BuildWorks
                     "BUILDWORKS · BLUEPRINT",
                     BuildWorksLocalization.Text("editor.view.title"),
                     "English registration");
+                Equal("BUILDING", BuildWorksLocalization.CatalogLabel("Building"), "English enum category");
+                Equal("ASH WOOD", BuildWorksLocalization.CatalogLabel("ash_wood"), "English material");
+                Equal("OdinArchitect Decors", BuildWorksLocalization.CatalogLabel("OdinArchitect Decors"), "Mod name preserved");
                 Equal(
                     "The name must contain 1 to 48 characters.",
                     BuildWorksLocalization.ResolveUserText(
@@ -30,6 +33,10 @@ namespace OstrixMods.BuildWorks
                     "BUILDWORKS · ЧЕРТЁЖ",
                     BuildWorksLocalization.Text("editor.view.title"),
                     "Russian overlay");
+                Equal("СТРОИТЕЛЬСТВО", BuildWorksLocalization.CatalogLabel("Building"), "Russian enum category");
+                Equal("ЯСЕНЬ", BuildWorksLocalization.CatalogLabel("ash_wood"), "Russian material");
+                Equal("My Wood", BuildWorksLocalization.BlueprintCategoryLabel("My Wood"), "User category preserved");
+                Equal("Привязка: ваниль + наши", BuildWorksLocalization.Text("editor.view.types_all"), "Shared snap filter");
 
                 Equal(
                     "missing.key",

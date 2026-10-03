@@ -418,7 +418,6 @@ namespace OstrixMods.BuildWorks
         private readonly GameObject[] viewportSections = new GameObject[4];
         private readonly Button[] viewportSectionButtons = new Button[4];
         private readonly RectTransform cursorSourceRows;
-        private readonly Button cursorHelpersButton;
         private readonly TMP_Text cursorSourceStatus;
         private readonly Button[] familyButtons = new Button[4];
         private readonly RectTransform hintGroupsArea;
@@ -440,6 +439,7 @@ namespace OstrixMods.BuildWorks
         private readonly TMP_InputField[] viewportScaleInputs = new TMP_InputField[5];
         private readonly Button gizmoSizingButton;
         private readonly Button pointTypesButton;
+        private readonly Button geometryPointsButton;
         private readonly Button frameButton;
         private readonly Button edgeButton;
         private readonly Button pointRevealButton;
@@ -1278,23 +1278,26 @@ namespace OstrixMods.BuildWorks
                 RepositionViewControl(resetView.transform, 2, 12f, 392f, 294f, 32f);
                 frameButton = CreateButton("TransformFrame", viewportControls, T("editor.view.frame_local"), 112f,
                     () => FrameRequested?.Invoke());
-                edgeButton = CreateButton("EdgeFrame", viewportControls, T("editor.view.edge_pick"), 112f,
+                edgeButton = CreateButton("EdgeFrame", viewportSections[3].transform, T("editor.view.edge_pick"), 294f,
                     () => EdgeRequested?.Invoke());
-                pointTypesButton = CreateButton("PointTypes", viewportControls, T("editor.view.types_all"), 112f,
+                pointTypesButton = CreateButton("PointTypes", viewportControls, T("editor.view.types_native"), 192f,
                     () => PointTypesRequested?.Invoke());
                 pointRevealButton = CreateButton("PointReveal", viewportControls, T("editor.view.points_cursor"), 112f,
                     () => AnchorVisibilityRequested?.Invoke());
-                Button[] contextButtons = { frameButton, edgeButton, pointTypesButton, pointRevealButton };
-                for (int i = 0; i < contextButtons.Length; ++i)
-                    SetTopLeft((RectTransform)contextButtons[i].transform, i * 118f, 0f, 112f, 32f);
+                SetTopLeft((RectTransform)frameButton.transform, 0f, 0f, 112f, 32f);
+                SetTopLeft((RectTransform)pointTypesButton.transform, 118f, 0f, 192f, 32f);
+                SetTopLeft((RectTransform)pointRevealButton.transform, 316f, 0f, 112f, 32f);
+                SetTopLeft((RectTransform)edgeButton.transform, 12f, 4f, 294f, 32f);
+                AddTooltip((RectTransform)edgeButton.transform, T("editor.view.edge_tooltip"));
+                geometryPointsButton = CreateButton("GeometryPoints", viewportSections[3].transform,
+                    T("editor.view.geometry_off"), 294f, () => GeometryPointsRequested?.Invoke());
+                SetTopLeft((RectTransform)geometryPointsButton.transform, 12f, 44f, 294f, 32f);
+                AddTooltip((RectTransform)geometryPointsButton.transform, T("editor.view.geometry_tooltip"));
                 cursorSourceStatus = CreateText("CursorSourceStatus", viewportSections[3].transform,
                     T("editor.view.source_begin"), 12f, FontStyles.Normal, TextAlignmentOptions.TopLeft);
-                SetTopLeft(cursorSourceStatus.rectTransform, 12f, 4f, 294f, 42f);
-                cursorHelpersButton = CreateButton("CursorHelpers", viewportSections[3].transform,
-                    T("editor.view.source_helpers"), 294f, () => CursorHelpersRequested?.Invoke());
-                SetTopLeft((RectTransform)cursorHelpersButton.transform, 12f, 50f, 294f, 32f);
+                SetTopLeft(cursorSourceStatus.rectTransform, 12f, 84f, 294f, 42f);
                 RectTransform sourceViewport = CreatePanel("CursorSourcesViewport", viewportSections[3].transform, PanelColor, null);
-                SetTopLeft(sourceViewport, 12f, 90f, 280f, 270f);
+                SetTopLeft(sourceViewport, 12f, 130f, 280f, 230f);
                 sourceViewport.gameObject.AddComponent<RectMask2D>();
                 ScrollRect sourceScroll = sourceViewport.gameObject.AddComponent<ScrollRect>();
                 sourceScroll.horizontal = false;
@@ -1307,7 +1310,7 @@ namespace OstrixMods.BuildWorks
                 cursorSourceRows.sizeDelta = Vector2.zero;
                 sourceScroll.content = cursorSourceRows; sourceScroll.viewport = sourceViewport;
                 RectTransform sourceTrack = CreatePanel("CursorSourcesScrollTrack", viewportSections[3].transform, ButtonColor, null);
-                SetTopLeft(sourceTrack, 296f, 90f, 10f, 270f);
+                SetTopLeft(sourceTrack, 296f, 130f, 10f, 230f);
                 RectTransform sourceThumb = CreatePanel("Thumb", sourceTrack, MutedColor, null);
                 SetInsets(sourceThumb, 1f, 1f, 1f, 1f);
                 Scrollbar sourceScrollbar = sourceTrack.gameObject.AddComponent<Scrollbar>();
@@ -1567,15 +1570,19 @@ namespace OstrixMods.BuildWorks
         internal event Action AnchorVisibilityRequested;
         internal event Action GizmoSizingRequested;
         internal event Action PointTypesRequested;
+        internal event Action GeometryPointsRequested;
         internal event Action FrameRequested;
         internal event Action EdgeRequested;
-        private const float viewContextWidth = 480f;
+        private const float viewContextWidth = 440f;
 
-        internal void SetPointContext(bool modelSize, bool nativeOnly, bool all, string frameKey, bool edgePicking, bool hasEdge)
+        internal void SetPointContext(bool modelSize, bool nativeOnly, bool all, string frameKey, bool edgePicking, bool hasEdge,
+            bool geometryPoints, bool transforming)
         {
             SetButtonLabel(gizmoSizingButton, T(modelSize ? "editor.view.size_model" : "editor.view.size_screen"));
             SetButtonLabel(pointTypesButton, T(nativeOnly ? "editor.view.types_native" : "editor.view.types_all"));
             SetButtonLabel(pointRevealButton, T(all ? "editor.view.points_all" : "editor.view.points_cursor"));
+            SetButtonLabel(geometryPointsButton, T(geometryPoints ? "editor.view.geometry_on" : "editor.view.geometry_off"));
+            geometryPointsButton.interactable = edgeButton.interactable = !transforming;
             SetButtonLabel(frameButton, T(frameKey));
             SetButtonLabel(edgeButton, T(edgePicking ? "editor.view.edge_wait" : hasEdge ? "editor.view.edge_clear" : "editor.view.edge_pick"));
         }
@@ -1595,7 +1602,6 @@ namespace OstrixMods.BuildWorks
         internal event Action<GizmoAxis> PreviewAxisRequested;
         internal event Action<int> CursorSourceRequested;
         internal event Action<int> CursorSourceHovered;
-        internal event Action CursorHelpersRequested;
         internal event Action<bool> ProjectionChanged;
         internal event Action<float> FieldOfViewChanged;
         internal event Action FieldOfViewResetRequested;
@@ -1970,7 +1976,6 @@ namespace OstrixMods.BuildWorks
 
         internal void SetCursorSourcesAvailable(bool available)
         {
-            cursorHelpersButton.interactable = available;
             if (!available)
             {
                 cursorSourceStatus.text = T("editor.view.source_begin");
@@ -1980,13 +1985,12 @@ namespace OstrixMods.BuildWorks
         }
 
         internal void SetCursorSources(IReadOnlyList<int> indices, int nativeStart, int nativeEnd,
-            int selected, bool helpers, bool fallback, IReadOnlyList<string> labels = null)
+            int selected, bool fallback, IReadOnlyList<string> labels = null)
         {
             for (int i = cursorSourceRows.childCount - 1; i >= 0; --i)
             { GameObject row = cursorSourceRows.GetChild(i).gameObject; row.SetActive(false); UnityEngine.Object.Destroy(row); }
-            cursorSourceStatus.text = T(fallback ? "editor.view.source_fallback" : "editor.view.source_native_first");
-            cursorHelpersButton.interactable = true;
-            SetSelected(cursorHelpersButton, helpers);
+            cursorSourceStatus.text = T(fallback ? "editor.view.source_fallback"
+                : indices.Count == 0 ? "editor.view.source_empty" : "editor.view.source_native_first");
             cursorSourceRows.sizeDelta = new Vector2(0f, (indices.Count + 1) * 36f);
             AddSource(-1, T("editor.view.source_auto"), 0);
             for (int i = 0; i < indices.Count; ++i)
@@ -2533,10 +2537,11 @@ namespace OstrixMods.BuildWorks
                     selectedCatalogMaterial, StringComparison.CurrentCultureIgnoreCase)) sources.Add(item.Source);
             }
             foreach (string category in categories)
-                AddCatalogCategory(category.ToUpperInvariant(), category);
+                AddCatalogCategory(catalogBlueprintMode ? BuildWorksLocalization.BlueprintCategoryLabel(category)
+                    : BuildWorksLocalization.CatalogLabel(category), category);
             if (!catalogBlueprintMode)
                 foreach (string material in materials)
-                    AddCatalogMaterial(material.ToUpperInvariant(), material);
+                    AddCatalogMaterial(BuildWorksLocalization.CatalogLabel(material), material);
             foreach (string source in sources)
                 AddCatalogSource(source.ToUpperInvariant(), source);
         }

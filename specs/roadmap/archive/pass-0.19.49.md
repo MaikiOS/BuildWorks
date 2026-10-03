@@ -2,8 +2,8 @@
 
 **English** | [Русский](current-pass_RU.md)
 
-Test **0.19.50**, only in **TerrainRamp-1.0-Test**. Reply to the numbered
-tests below, not the [archived .49 list](archive/pass-0.19.49.md).
+Test **0.19.49**, only in **TerrainRamp-1.0-Test**. Reply to the numbered
+tests below, not the [archived .48 list](archive/pass-0.19.48.md).
 Workbench checks pass; actual Valheim readability and physical input remain unverified.
 First inspect **1–3**. If unreadable, send a screenshot before continuing.
 
@@ -16,16 +16,12 @@ in the tree, Ctrl+2 for the gizmo, pointer over the viewport, no focused text fi
 A is a temporary transform pivot, not the saved world/group anchor.
 B defines the direction A→B for working axis X; this is not a curve tool or
 edge-to-edge alignment. Both size modes change controls, never the piece itself.
-Default filter is **Snap: native**. **Snap: native + ours** enables helpers for
-both source and target. There is no second Additional points switch. Geometry
-points are a separate experiment, off by default; enable them only for test 9.
 
 ## Tests to answer
 
 1. **Fixed screen size.**
-   Start in a newly opened editor with one wall selected. Open Manipulator:
-   verify **Size: in 3D** is selected automatically. Then select **Size: on screen**.
-   Close the menu; zoom in and out
+   Start in the editor with one wall selected. Above the viewport open
+   Manipulator → select **Size: on screen**. Close the menu; zoom in and out
    using Ctrl+wheel over the viewport.
    **Expected:** arrows, rings and point badges retain approximately the same
    pixel size. The wall changes apparent size but its scale value stays unchanged.
@@ -42,13 +38,12 @@ points are a separate experiment, off by default; enable them only for test 9.
    verify test 1's behavior returns.
 
 3. **Two point types and reveal.**
-   Use **Snap: native + ours** and **Near cursor** above the viewport. Select a wall,
+   Use **Native + ours** and **Near cursor** above the viewport. Select a wall,
    then a sloped beam. Move the pointer toward/away from their point locations.
-   Toggle **Near cursor** to **All points**, then set the filter to
-   **Snap: native**. Return to Snap: native + ours / Near cursor.
-   **Expected:** amber outer clasp = native sockets; ivory joining knot = all
-   generated helpers, no separate corner/midpoint/centre colours or blue helpers.
-   Default points appear near the pointer.
+   Toggle **Near cursor** to **All points**, then toggle **Native + ours** to
+   **Native only**. Return to Native + ours / Near cursor.
+   **Expected:** gold = native sockets; blue = all generated helpers, no separate
+   corner/midpoint/centre colours. Default points appear near the pointer.
    All points shows the selected model's full set; Native only restricts it.
    Occluded unselected points are dimmer. Signs stay at true coordinates.
    At exact overlap the helper is inside the native rim, not displaced.
@@ -56,8 +51,7 @@ points are a separate experiment, off by default; enable them only for test 9.
 4. **Choose A and rotate from the original pose.**
    Wall → click a point with LMB. Move the pointer away; R, move the mouse,
    then X, move again, type 30, Enter. Press Ctrl+Z once.
-   **Expected:** a carved locking collar/rune marks the chosen point; its native
-   clasp or helper knot remains identifiable inside. The point stays selected;
+   **Expected:** the chosen point stays visibly selected with its type preserved;
    the gizmo moves to A. R rotates around A. Choosing X discards the earlier free
    rotation; 30 replaces the mouse preview with exactly 30° from the starting
    pose. A stays fixed; one Undo restores the whole action. No wall tint.
@@ -71,11 +65,9 @@ points are a separate experiment, off by default; enable them only for test 9.
    its filled centre is clickable, not only its border.
 
 6. **Optional A→B working frame.**
-   This is optional advanced work, not selecting two pieces. Wall → click point A
-   → open **Attachment** → **Choose B** → close Attachment → click a different
+   Wall → click point A → **Choose B** above the viewport → click a different
    point B. Press R → X; move the mouse → Esc. Repeat R → X → X → X → Esc.
-   Then open Attachment → **Clear A → B** → close it.
-   Use the Axes header button to cycle Local/World/View.
+   Then click **Clear A → B**. Use the Axes header button to cycle Local/World/View.
    **Expected:** line A→B is stable; A remains pivot, X follows A→B.
    Repeated X switches Edge → World → Edge with matching header and motion.
    Esc restores the prior frame. Clear A → B removes its line and returns Local.
@@ -93,44 +85,33 @@ points are a separate experiment, off by default; enable them only for test 9.
 
 8. **Auto and source filters.**
    Select the sloped beam (selection replacement clears A) → G → Attachment →
-   Auto; use **Snap: native** in the header. Close Attachment, stop the mouse
-   and press Q/E. Open Attachment to inspect the choices, then switch the header
-   to **Snap: native + ours**: helpers must join the list. Close it; try Q/E.
-   Switch back to native: helpers leave the list immediately. Esc.
-   Select a chair → **Snap: native + ours** → G → Attachment.
-   Choose a helper, close the menu and approach another chair; Esc to cancel.
+   Auto; keep Additional points off. Stop the mouse and press Q/E.
+   Enable Additional points, then select Native only in the header; try Q/E again.
+   Esc. Select a chair → G with Native + ours; open Attachment.
    **Expected:** default cycle is Auto/native points only and updates immediately
    at a stationary cursor. Native only also removes helpers from source/target
    choices; a deliberately selected helper A remains visible and usable.
    Furniture without native sockets offers helpers in Native + ours; Native only
    intentionally does not invent sockets. Menu clicks never confirm a transform.
 
-9. **Experimental geometry points — opt-in.**
-   Esc; select the chair → Native + ours → All points. Attachment → click
-   **Geometry points: off** to turn it on. Close the menu, inspect the chair and
-   sloped beam. Choose a small amber knot as A; G toward another piece, then Esc.
-   Select the piece again, disable geometry and restore Near cursor.
-   **Expected:** a bounded extra set of small amber helper knots appears where
-   extracted feature edges end; it is NOT the larger native circular clasp.
-   Endpoints already at existing helpers may add no extra signs. Coordinates
-   stay real. Selecting one adds the locking collar. Off removes only extras;
-   ordinary native/helper points remain. The experiment does not change prefab
-   geometry or saved blueprint anchors. Report useful points versus clutter.
+9. **Blueprint resource cards in the world.**
+   Save a separate blueprint of exactly two ordinary walls, exit the editor.
+   With Hammer choose an ordinary wall, then the blueprint without placing it.
+   Switch English/Russian and reselect. If available, also inspect a blueprint
+   using several resource types; scroll its long card list with the Hammer menu open.
+   **Expected:** thumbnail/name/short description above native resource icons,
+   summed quantities and deduplicated station icons. Typically Wood 4 for two
+   walls costing 2 each. No text/card overlap; translated labels refresh.
+   Your own blueprint name is not translated. Report long-list coverage separately.
 
 10. **Cleanup and language.**
     After blueprint preview select a wall, Repair, unequip/re-equip Hammer.
     Reopen the editor, switch English/Russian, choose A/B, start G and Esc;
     select a different part and switch Ctrl+1 / Ctrl+2 / Ctrl+3.
-    Tab → Parts: inspect BUILDING / FURNITURE and WOOD / ASHWOOD filters in both
-    languages, plus one external mod/source name. Save a two-part disposable
-    blueprint and reopen it.
     **Expected:** ordinary HUD restored; no extra cards/scrollbar. New header,
     hints and menus translate. Selection replacement clears A/B and its guide.
     Tool switching cancels pending transforms. No hanging operation, unintended
     deletion or confirmation.
-    Native types/materials translate; external names and your own categories stay
-    unchanged. Reopened parts/transforms survive; geometry experiment is off in
-    a freshly opened editor.
 
 ## Reply format
 

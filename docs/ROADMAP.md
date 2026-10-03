@@ -2,14 +2,14 @@
 
 **English** | [Русский](ROADMAP_RU.md)
 
-Updated 2026-10-02. Ostrix approved this order after the development review.
+Updated 2026-10-03. Ostrix approved this order after the development review.
 The goal is predictable building with real Valheim pieces, then useful group
 operations and editable generators. Each stage delivers a complete workflow,
 not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Current source candidate: **0.19.47**, Store v9, Valheim 1.0.16.
+Current source candidate: **0.19.48**, Store v9, Valheim 1.0.16.
 0.19.39 owner feedback accepts menu hover, language refresh and camera framing;
 Transform selection is provisionally accepted. The owner accepts contour cleanup;
 the focused 0.19.41 game series is accepted by owner report on 2026-10-01.
@@ -37,6 +37,11 @@ Owner screenshots of .46 reopen point/gizmo readability and HUD header spacing.
 below the measured multiline description. Shapes, snap positions and costs are
 unchanged. BW-01 remains gated on game readability before the full 1–8 series.
 Earlier .45 plain shapes above are historical, not the .46 artwork.
+.48 replaces six PNGs with broad forged motifs and open centres. Gold native
+radius is 16 px; coloured helpers 9 px. Pin/active states overlay instead of
+replacing type; hover names it. Neutral colour and mipmaps replace RGB overdrive.
+Workbench import now matches embedded texture dimensions/filtering. Coincident
+colour/picking and 81 UI cases pass; BW-01 waits for owner point readability.
 All development deployments, upgrades and game tests use **only
 `TerrainRamp-1.0-Test`**. `Default/BuildWorks` is the source/artifact tree,
 not an installed mod. Do not modify other profiles, mods or saves as a side effect.
@@ -66,7 +71,7 @@ dependent changes wait for its gate, unrelated preparation may continue.
 | ID | Deliverable | Dependency | Status |
 | --- | --- | --- | --- |
 | BW-00 | Dedicated-profile baseline and reliable handoff | Current core | Focused 0.19.41 owner series accepted; cost/refund accounting and networking pending |
-| BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | .45 input accepted; .47 readability/HUD layout correction automatically verified; owner readability check before series 1–8 |
+| BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | .45 input accepted; .48 compact point art automatically verified; owner point readability first, then series 1–8 |
 | BW-02 | Group layout operations without resizing pieces | BW-01 | Planned; focused operation UI approval required |
 | BW-03 | Persistent Array and minimal recipe persistence | BW-02 | Planned; safe Store migration and editing/Bake gate |
 | BW-04 | Guides and curves in accepted slices | BW-03 + renewed owner discussion | Tool-semantics discussion required before coding |

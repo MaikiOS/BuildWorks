@@ -356,7 +356,7 @@ namespace OstrixMods.BuildWorks
                         ? pointVisibility(anchorPoints[i]) : IsPointVisible(camera, anchorPoints[i])));
                 if (screenSpaceSizing && showAnchor)
                 {
-                    // Keep coincident provenance visible: compact helpers fit inside native diamonds.
+                    // Open native clasps surround compact helpers at the same real coordinates.
                     anchorHandles[i].sortingOrder = i == pinnedAnchor ? short.MaxValue
                         : i == selectedAnchor ? short.MaxValue - 1 : short.MaxValue - 2;
                 }
@@ -375,8 +375,8 @@ namespace OstrixMods.BuildWorks
                         camera,
                         anchorPoints[i],
                         color,
-                        (nativeAnchor ? screenSpaceSizing ? .085f : hovered ? 0.17f : 0.115f
-                            : screenSpaceSizing ? .06f : hovered ? 0.12f : 0.075f) * handleScale,
+                        (nativeAnchor ? screenSpaceSizing ? .128f : hovered ? 0.17f : 0.115f
+                            : screenSpaceSizing ? .072f : hovered ? 0.12f : 0.075f) * handleScale,
                         hovered ? 0.018f * handleScale + 0.003f
                             : nativeAnchor ? 0.010f : 0.007f, nativeAnchor,
                         i == pinnedAnchor,
@@ -401,7 +401,7 @@ namespace OstrixMods.BuildWorks
                     camera,
                     snapTarget,
                     targetColor,
-                    (screenSpaceSizing ? .055f : targetHovered ? 0.17f : snapTargetIsNative ? 0.115f : 0.06f) *
+                    (screenSpaceSizing ? snapTargetIsNative ? .128f : .072f : targetHovered ? 0.17f : snapTargetIsNative ? 0.115f : 0.06f) *
                         handleScale,
                     targetHovered ? 0.018f * handleScale + 0.003f
                         : snapTargetIsNative ? 0.010f : 0.006f, snapTargetIsNative);
@@ -490,7 +490,7 @@ namespace OstrixMods.BuildWorks
                         new Color(native ? 1f : 0.25f, 0.95f, native ? 0.25f : 1f,
                             close ? 0.98f : screenSpaceSizing ? native ? 0.85f : 0.6f
                                 : native ? 0.42f : 0.08f),
-                        (screenSpaceSizing ? .055f : close ? native ? 0.17f : 0.12f
+                        (screenSpaceSizing ? native ? .128f : .072f : close ? native ? 0.17f : 0.12f
                             : native ? 0.115f : 0.04f) * handleScale,
                         close ? 0.018f * handleScale + 0.003f
                             : native ? 0.010f : 0.005f, native);
@@ -730,7 +730,7 @@ namespace OstrixMods.BuildWorks
         private float AnchorHitRadius(int index)
         {
             return screenSpaceSizing
-                ? (index >= nativeAnchorStartIndex && index != pinnedAnchorIndex ? 24f : 12f) * anchorHandleScale
+                ? (index >= nativeAnchorStartIndex && index != pinnedAnchorIndex ? 18f : 10.5f) * anchorHandleScale
                 : 16f;
         }
 
@@ -1080,7 +1080,6 @@ namespace OstrixMods.BuildWorks
         {
             if (screenSpaceSizing)
             {
-                sizeFraction *= nativeAnchor ? 2f : 1.5f;
                 width = Mathf.Max(width, nativeAnchor ? 0.02f : 0.015f) * pointSize;
             }
             float pointScale = screenSpaceSizing ? GizmoScale(camera, position) : Scale;
@@ -1097,21 +1096,25 @@ namespace OstrixMods.BuildWorks
                 line.SetPosition(4, position + up);
                 SetColorAndWidth(line, color, width);
                 line.startWidth = line.endWidth = width * pointScale;
-                string name = pinned ? "snap-pin" : activeSource && !nativeAnchor ? "snap-active" :
-                    pointArtwork ?? (nativeAnchor ? "snap-native" : "snap-corner");
+                string name = pointArtwork ?? (nativeAnchor ? "snap-native" : "snap-corner");
                 DrawArtwork(line, name, position, right, up);
-                line.transform.Find("Engraving").gameObject.SetActive(true);
+                // A pin is appended state, not a new native socket. Original typed points stay visible.
+                line.transform.Find("Engraving").gameObject.SetActive(!pinned);
                 line.enabled = false;
-                Transform accentRoot = line.transform.Find("ActiveAccent");
-                if (activeSource && nativeAnchor && !pinned)
+                Accent("PinAccent", "snap-pin", pinned, 10.5f);
+                Accent("ActiveAccent", "snap-active", activeSource, 6.5f);
+                void Accent(string childName, string iconName, bool visible, float radiusPixels)
                 {
-                    LineRenderer accent = accentRoot ? accentRoot.GetComponent<LineRenderer>() : CreateLine("ActiveAccent", 5);
+                    Transform accentRoot = line.transform.Find(childName);
+                    if (!visible) { if (accentRoot) accentRoot.gameObject.SetActive(false); return; }
+                    LineRenderer accent = accentRoot ? accentRoot.GetComponent<LineRenderer>() : CreateLine(childName, 5);
                     if (!accentRoot) accent.transform.SetParent(line.transform, false);
                     accent.sortingOrder = short.MaxValue;
                     accent.gameObject.SetActive(true); accent.enabled = false;
-                    DrawArtwork(accent, "snap-active", position, right * .48f, up * .48f);
+                    float accentSize = pointScale * radiusPixels / 125f * anchorHandleScale;
+                    DrawArtwork(accent, iconName, position, camera.transform.right * accentSize,
+                        camera.transform.up * accentSize);
                 }
-                else if (accentRoot) accentRoot.gameObject.SetActive(false);
                 return;
             }
             line.SetPosition(0, position + up);
@@ -1161,7 +1164,7 @@ namespace OstrixMods.BuildWorks
                     renderQueue = (int)RenderQueue.Overlay };
                 textureMaterial.SetInt("unity_GUIZTestMode", (int)CompareFunction.Always);
                 textureMaterial.color = name.StartsWith("snap-", StringComparison.Ordinal)
-                    ? new Color(1.8f, 1.65f, 1.8f, 1f) : new Color(1.3f, 1.3f, 1.3f, 1f);
+                    ? Color.white : new Color(1.3f, 1.3f, 1.3f, 1f);
                 if (textureMaterial.HasProperty("_ZWrite")) textureMaterial.SetInt("_ZWrite", 0);
                 artworkMaterials.Add(name, textureMaterial);
             }
@@ -1183,7 +1186,8 @@ namespace OstrixMods.BuildWorks
             mesh.vertices = new[] { center - right - up, center + right - up, center + right + up, center - right + up };
             mesh.uv = new[] { Vector2.zero, Vector2.right, Vector2.one, Vector2.up };
             mesh.triangles = new[] { 0,1,2, 0,2,3 };
-            mesh.colors = new[] { Color.white, Color.white, Color.white, Color.white };
+            Color fill = new Color(1f, 1f, 1f, owner.startColor.a);
+            mesh.colors = new[] { fill, fill, fill, fill };
             mesh.RecalculateBounds();
         }
 

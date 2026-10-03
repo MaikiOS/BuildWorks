@@ -633,6 +633,13 @@ editor.view.surface_controls	Surface · Q/E source · wheel yaw · XYZ axis · P
 editor.view.attachment_menu	Attachment
 editor.view.source_begin	Select a part and press G to choose its attachment point.
 editor.view.source_auto	Auto
+editor.view.point_native	Native socket
+editor.view.point_corner	Bounds corner
+editor.view.point_midpoint	Edge midpoint
+editor.view.point_centre	Bounds centre
+editor.view.point_pin	Pinned pivot
+editor.view.point_active	Active source
+editor.view.point_hover	{0} · Shift + click — pin pivot · Ctrl + drag — snap
 editor.view.source_native	Native {0}
 editor.view.source_helper	Helper {0}
 editor.view.source_helpers	Additional points

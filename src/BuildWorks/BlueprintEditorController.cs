@@ -943,6 +943,25 @@ namespace OstrixMods.BuildWorks
                 !view.IsNumericScrubbing && !view.IsTextInputFocused && placementItem == null &&
                 !IsGizmoDragging && !rightCameraTracking && !input.GetMouseButton(1))
             {
+                if ((activeTool == BlueprintEditorTool.Select || activeTool == BlueprintEditorTool.Transform) &&
+                    view.ViewportScreenRect().Contains(input.MousePosition) &&
+                    !view.IsViewportControlHit(input.MousePosition) &&
+                    TrySelectionPivot(out Vector3 hoverPivot, out Quaternion hoverOrientation, gizmoIds))
+                {
+                    GizmoHandleKind hoverHandle = scene.HitTestGizmo(SelectionGizmoTool, hoverPivot,
+                        hoverOrientation, localSpace, input.MousePosition, out _);
+                    bool copyArrow = (input.GetKey(KeyCode.LeftAlt) || input.GetKey(KeyCode.RightAlt)) &&
+                        hoverHandle == GizmoHandleKind.Move;
+                    int point = hoverHandle == GizmoHandleKind.Scale || copyArrow
+                        ? -1 : scene.HitTestAnchor(gizmoAnchors, input.MousePosition);
+                    if (point >= 0)
+                        view.SetNextAction(BuildWorksLocalization.Text("editor.view.point_hover",
+                            BuildWorksLocalization.Text(point == pinnedAnchorPoint ? "editor.view.point_pin" :
+                                point >= gizmoNativeAnchorEnd ? "editor.view.point_active" :
+                                point >= gizmoNativeAnchorStart ? "editor.view.point_native" :
+                                point == AnchorAdjustment.CenterAnchorIndex ? "editor.view.point_centre" :
+                                point < 8 ? "editor.view.point_corner" : "editor.view.point_midpoint")));
+                }
                 bool selected = document.EditablePartSelectionCount > 0;
                 view.SetContextHintGroups(
                     BuildWorksLocalization.Text(selected ? "editor.hint.modes_selected" : "editor.hint.modes_empty"),

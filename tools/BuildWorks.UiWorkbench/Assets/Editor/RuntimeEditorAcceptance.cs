@@ -80,6 +80,17 @@ public static class RuntimeEditorAcceptance
     public static void CaptureAll()
     {
         Debug.Log("BUILDWORKS_RUNTIME_EDITOR_ENTER");
+        // Match the embedded PNG decoder: no NPOT resize or compression; minify with mipmaps.
+        foreach (string icon in new[] { "native", "corner", "midpoint", "centre", "pin", "active" })
+        {
+            var importer = (TextureImporter)AssetImporter.GetAtPath("Assets/Resources/BuildWorks/Icons/snap-" + icon + ".png");
+            importer.npotScale = TextureImporterNPOTScale.None;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.mipmapEnabled = true;
+            importer.filterMode = FilterMode.Trilinear;
+            importer.wrapMode = TextureWrapMode.Clamp;
+            importer.SaveAndReimport();
+        }
         if (!Resources.Load<TMP_Settings>("TMP Settings"))
         {
             string package = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(TMP_Text).Assembly).resolvedPath;
@@ -972,7 +983,7 @@ public static class RuntimeEditorAcceptance
                 true, 1, false, Vector3.zero, false, GizmoAxis.None, false,
                 Vector3.zero, Vector3.zero, 0, allowExtended: true);
             Vector2 center = camera.WorldToScreenPoint(Vector3.zero);
-            float hitRadius = native ? 24f : 12f;
+            float hitRadius = native ? 18f : 10.5f;
             Require(gizmo.HitTestAnchor(camera, anchors, center + new Vector2(hitRadius - 0.5f,0)) == 0,
                 "Visible anchor edge cannot be hit at distance " + distance);
             Require(gizmo.HitTestAnchor(camera, anchors, center + new Vector2(hitRadius + 0.5f,0)) < 0,
@@ -981,7 +992,7 @@ public static class RuntimeEditorAcceptance
             float radius = 0;
             for (int i = 0; i < anchor.positionCount; ++i)
                 radius = Mathf.Max(radius, Vector2.Distance(center, camera.WorldToScreenPoint(anchor.GetPosition(i))));
-            Require(Mathf.Abs(radius - (native ? 21.25f : 11.25f)) < 0.1f,
+            Require(Mathf.Abs(radius - (native ? 16f : 9f)) < 0.1f,
                 "Native/helper anchor glyph is not constant pixels");
             float widthPixels = Vector2.Distance(center,
                 camera.WorldToScreenPoint(camera.transform.right * anchor.startWidth));
@@ -1004,6 +1015,11 @@ public static class RuntimeEditorAcceptance
                 "Snap marker lost its authored provenance artwork or scale lost its original artwork");
             Require(!anchor.enabled && anchor.positionCount == 5,
                 "Invisible hit bounds should not duplicate the authored snap artwork");
+            Material pointMaterial = anchor.transform.Find("Engraving").GetComponent<MeshRenderer>().sharedMaterial;
+            Require(pointMaterial.color == Color.white && pointMaterial.mainTexture.width == 1254 &&
+                pointMaterial.mainTexture.filterMode == FilterMode.Trilinear &&
+                ((Texture2D)pointMaterial.mainTexture).mipmapCount > 1,
+                "Point capture differs from embedded texture size, colour or minification settings");
             Require(anchor.startColor.a >= (native ? .96f : .88f) - 1f / 255f && anchor.startColor.a <= 1f,
                 "Snap marker lost provenance brightness during neighbouring handle hover");
             gizmo.EditorMouse = scale + Vector2.right * 40;
@@ -1032,6 +1048,12 @@ public static class RuntimeEditorAcceptance
             for (int index = 0; index < helperPoints.Length; ++index)
                 Require(Field<List<LineRenderer>>(gizmo, "anchorHandles")[index].gameObject.activeInHierarchy,
                     "Selecting or pinning a coincident point must not hide other provenance markers");
+            Require(Field<List<LineRenderer>>(gizmo, "anchorHandles")[0].transform.Find("Engraving")
+                    .GetComponent<MeshRenderer>().sharedMaterial.mainTexture.name.EndsWith("snap-corner") &&
+                Field<List<LineRenderer>>(gizmo, "anchorHandles")[0].transform.Find("ActiveAccent").gameObject.activeSelf &&
+                Field<List<LineRenderer>>(gizmo, "anchorHandles")[8].transform.Find("PinAccent").gameObject.activeSelf &&
+                !Field<List<LineRenderer>>(gizmo, "anchorHandles")[8].transform.Find("Engraving").gameObject.activeSelf,
+                "Active helper lost its type or appended pin invented native provenance");
             gizmo.Show(camera, Vector3.zero, Quaternion.identity, false, GizmoMode.Move,
                 GizmoHandleKind.None, GizmoAxis.None, new[] { Vector3.zero, Vector3.zero }, -1, -1, 1,
                 true, 1, false, Vector3.zero, false, GizmoAxis.None, false,
@@ -1086,7 +1108,7 @@ public static class RuntimeEditorAcceptance
                 "F9 legacy 18px move-axis hit zone changed: depth=" + distance + "; inside=" + inside +
                 "; outside=" + outside + "; axis offset=" + (onAxis - center) + "; pixelRect=" + camera.pixelRect);
         }
-        checks.Add("Gizmo: readable thematic sprites at true coordinates; native/helper radius21.25/11.25px, far alpha0.96/0.88; helper centre/native rim picking; manipulator far alpha0.64 and exclusive hover; F9 unchanged");
+        checks.Add("Gizmo: compact thematic sprites at true coordinates; native/helper radius16/9px, unamplified colour; active preserves helper type, appended pin is state only; helper centre/native rim picking; F9 unchanged");
     }
 
     private static void EnsureInside(RectTransform parent, RectTransform child)

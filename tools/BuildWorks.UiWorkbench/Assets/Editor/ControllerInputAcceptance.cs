@@ -53,6 +53,39 @@ internal static class ControllerInputAcceptance
         controller.Update(); controller.LateUpdate(); Canvas.ForceUpdateCanvases();
     }
 
+    private static void TestPointHoverHints(BlueprintEditorController controller, InputFrames input,
+        BlueprintEditorScene scene, BlueprintEditorView view, BlueprintEditorDocument doc)
+    {
+        Frame(controller, input, Vector2.zero);
+        Vector3 pivot = V(doc.Parts[0].Position);
+        var gizmo = Field<TransformGizmoView>(scene, "gizmo");
+        var scale = Field<LineRenderer>(gizmo, "scaleHandle");
+        Vector3 scalePoint = (scale.GetPosition(0) + scale.GetPosition(2)) * .5f;
+        Vector3 axisPoint = pivot + Vector3.right * gizmo.Scale * .7f;
+        Vector3 freePoint = pivot + (scene.Camera.transform.right + scene.Camera.transform.up) * gizmo.Scale * .6f;
+        string pointCaption = BuildWorksLocalization.Text("editor.view.point_hover",
+            BuildWorksLocalization.Text("editor.view.point_native"));
+        foreach (Vector3 point in new[] { freePoint, scalePoint, axisPoint })
+        {
+            // Coincident fixture forces the same conflict as a dense real model.
+            Set(controller, "gizmoAnchors", new[] { point });
+            Set(controller, "gizmoNativeAnchorStart", 0);
+            Set(controller, "gizmoNativeAnchorEnd", 1);
+            scene.ShowGizmo(BlueprintEditorTool.Transform, pivot, Quaternion.identity, false,
+                GizmoHandleKind.None, GizmoAxis.None, new[] { point }, -1, 0, true,
+                false, Vector3.zero, false);
+            Frame(controller, input, scene.Camera.WorldToScreenPoint(point), 0,
+                point == axisPoint ? new[] { KeyCode.LeftAlt } : Array.Empty<KeyCode>());
+            Require((Field<TMP_Text>(view, "nextActionText").text == pointCaption) == (point == freePoint),
+                "Point caption disagrees with scale/Alt-arrow click priority: point=" + point +
+                "; free=" + freePoint + "; scale=" + scalePoint + "; axis=" + axisPoint +
+                "; actual=" + Field<TMP_Text>(view, "nextActionText").text);
+        }
+        Frame(controller, input, Vector2.zero);
+        Require(Field<TMP_Text>(view, "nextActionText").text != pointCaption,
+            "Leaving the viewport retains a stale point caption");
+    }
+
     internal static IEnumerable Run(Camera template, TMP_Text font, string output)
     {
         GameObject source = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -131,6 +164,7 @@ internal static class ControllerInputAcceptance
             view.HideCatalog();
             Frame(controller, input, Vector2.zero); yield return null;
             TestPrimaryGroupGizmo(controller, input, scene, view, doc);
+            TestPointHoverHints(controller, input, scene, view, doc);
             Vector2 left = scene.Camera.WorldToScreenPoint(new Vector3(-1.5f,.5f,0));
             Vector2 right = scene.Camera.WorldToScreenPoint(new Vector3(1.5f,.5f,0));
             Require(view.ViewportScreenRect().Contains(left) && view.ViewportScreenRect().Contains(right), "Fixture outside actual viewport");

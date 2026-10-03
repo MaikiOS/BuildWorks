@@ -2,15 +2,16 @@
 
 [English](snap-point-assets.md) | **Русский**
 
-Шесть оригинальных растровых PNG созданы через imagegen для .46 по
-[утверждённому концепту](../images/snap-point-style-proposal-v1.png).
+Шесть новых растровых PNG созданы по отдельности через imagegen для .48.
+[Прежний концепт](../images/snap-point-style-proposal-v1.png) сохранён как история.
 Это не вектор и не скриншот игры. Каждый файл 1254 × 1254 с прозрачным фоном.
 Alpha, декодирование, настоящий sprite и попадание проверены в Unity.
 Читаемость на игровом расстоянии ещё требует ответа Ostrix.
 
-В .47 те же рисунки отображаются крупнее и ярче без наведения;
-координаты/pivot сохранены. Отзыв по .46 показал слишком тусклую отрисовку;
-после исправления читаемость в игре ещё требует проверки.
+После скриншотов .47 Ostrix утвердил компактную систему вложенных знаков.
+Экранный радиус ванильных теперь 16 px, наших — 9 px при настройках по умолчанию.
+Опора и активная отметка — отдельные слои: тип нашей точки не заменяется.
+Настоящие координаты сохранены. Читаемость в игре ещё требует одобрения Ostrix.
 
 Каталог: `src/BuildWorks/Assets/BlueprintEditorIcons/`.
 Золотой snap-native — ванильный замок; синий snap-corner — угол;
@@ -30,43 +31,62 @@ Alpha, декодирование, настоящий sprite и попадани
 
 `snap-native.png`
 
-A gold interlocking timber-joint clasp: two opposed curved carved-metal jaw plates surrounding an OPEN transparent centre. Bronze-gold silhouette with ONE thick engraved interlace on each jaw. No disk fill.
+Muted amber-brass native socket: TWO thin opposed C-shaped forged jaw segments forming a slim outer circular clasp. Large EMPTY central aperture, at least 65% of full motif width, for a blue corner icon to fit INSIDE without overlap. Each jaw has one broad notch. It must read as a connection socket, NOT a wreath, wings, laurel, jewellery, or filled medallion. Uniform dark outside and inside rim. Warm gold face, not dazzling white.
 
 ### snap-corner
 
 `snap-corner.png`
 
-A BLUE notched forged right-angle carpentry bracket, like an L-shaped joint with a single broad engraved interlace and two large notches. Its inner hollow corner is the exact canvas centre. Keep most centre area open.
+Bright azure-blue carpentry corner: a compact forged L-shaped right-angle bracket with two short equally thick arms, one broad angular Nordic notch in each. The EMPTY INSIDE elbow is exactly at canvas centre (50%,50%); bracket lies mainly BELOW and LEFT of that centre; both arm ends balanced around it. Do NOT place the elbow at the bottom-left of the canvas. Compact silhouette that can fit in an outer gold ring. No long arms or detailed knots.
 
 ### snap-midpoint
 
 `snap-midpoint.png`
 
-A GREEN opposed pair of iron joint clamps, one above and one below the EXACT centre. Broad simple bevel and ONE engraved knot each. Open transparent central joint gap.
+Fresh jade-green midpoint clamp: TWO small opposed forged wedge jaws directly ABOVE and BELOW the exact canvas centre. Equal chunky short bars with inward triangular notches; open central gap, no other arms. Each has a single broad incised line. Symmetric, compact, clear green face and dark outline, can fit inside a gold outer socket.
 
 ### snap-centre
 
 `snap-centre.png`
 
-A PINK carpenter compass rosette: four short forged pointed arms and a narrow engraved circular rim surrounding an open centre. Nordic joinery craft, not a generic cross.
+Soft rose-pink Nordic carpenter compass: FOUR short tapered forged points around a SMALL hollow central diamond precisely at canvas centre. Broad dark edge, pink enamel face and one simple incised groove per point. Compact balanced star, no surrounding circle, no long needles, no glitter. Recognisable at 20 pixels, not ornate rosette.
 
 ### snap-pin
 
 `snap-pin.png`
 
-A PURPLE fixed pivot stake: narrow long forged Scandinavian pin with locking notch and a small open ring centred EXACTLY on canvas centre. Amethyst rim, sharp lower stake, two broad decorative grooves. Distinct silhouette.
+Amethyst-purple fixed pivot OVERLAY: a narrow locking pin with a hollow small diamond head exactly at canvas centre, two short prongs extending vertically upward and downward. Mostly transparent canvas, narrow silhouette. Purple colour and dark outline, one strong notch. Designed as a small centre overlay so the gold/blue/green BASE POINT remains visible around it. No large background disk, no long spear, no gemstone covering the centre.
 
 ### snap-active
 
 `snap-active.png`
 
-A WHITE luminous compact source hook: two opposing curved ivory-metal carved hooks around open exact centre. One broad Nordic interlace groove, bright pale bevel. Active attachment point, not arrow.
+Ivory-white active-source OVERLAY: FOUR SHORT inward-pointing forged corner ticks around an EMPTY transparent central opening exactly at canvas centre. Compact square aperture and one broad Nordic cut notch, graphite outer edge. Thin open shape that fits inside a larger snap icon, no filled disk, no rays, no sparkle, no runic letters.
 
-## Регистрация опоры
+## Регистрация и уменьшение рисунка
 
-Готовый snap-pin имеет открытый внешний обод вокруг заполненного аметистового
-центра, замковую насечку и не имеет общего фонового диска.
-Центр кольца не в геометрической середине PNG:
-sprite pivot `(0.496, 0.634)` регистрирует его точно на модели; остальные
-используют `(0.5, 0.5)`. DrawArtwork учитывает pivot, не смещая настоящую точку.
-Изменение рисунка требует повторных проверок alpha, попадания и малого размера.
+У синей скобы pivot `(0.43, 0.42)` задаёт внутренний угол; у остальных новых
+PNG — `(0.5, 0.5)`. DrawArtwork регистрирует мотив, не прозрачный прямоугольник.
+Добавленная опора — состояние, не новая ванильная точка: исходные типы видны.
+Радиус опоры 10,5 px, белых активных скоб 6,5 px. Это радиусы прямоугольника,
+не непрозрачной формы; прозрачные поля также уменьшают видимый размер.
+
+## Почему генерация отличается от игры
+
+Изображение 1254 px превращается в ванильный прямоугольник 32 px или наш 18 px.
+Мелкая гравировка не может остаться столь же подробной. Смещённый в PNG мотив
+также выглядит смещённым при правильных координатах точки.
+Шейдер .47 умножал RGB на 1,8/1,65/1,8, меняя цвет и контраст; в .48 множитель
+белый нейтральный. Стенд ранее изменял размер PNG и сжимал их иначе, чем декодер
+встроенного ресурса. Теперь оба пути сохраняют 1254 px, уменьшенные уровни текстуры
+(mipmaps) и трёхлинейную фильтрацию; на стенде нет сжатия. Эти уровни уменьшают
+мерцание мелких штрихов, но не возвращают потерянную детализацию.
+
+Проверяем настоящую отрисовку на дереве и сетке: совпадающие типы, активное
+состояние и опору, не увеличенный концепт. Тесты Unity требуют видимости цветов
+наших и ванильных знаков в одной координате. Внешний host/ввод подменены:
+камера Valheim, масштаб экрана и физическое управление остаются игровой проверкой.
+
+## Общий запрос генерации
+
+Use case: stylized-concept. Asset: one production raster snap-point icon for a Nordic Valheim-style construction editor, NOT a concept board. Transparent background, square canvas. Orthographic front-facing painted forged-metal UI emblem, no perspective. Readable when reduced to 20-28 pixels: broad simple silhouette, dark charcoal outer outline, strongly colored enamel face, one LARGE shallow engraved notch/interlace only. No photoreal fine texture, cracks, tiny rivets, bloom, drop shadow, text, letters, scene, labels, borders, or additional icons. All components centred precisely on the geometric canvas centre; centre of attachment is OPEN transparent and obvious. Occupy 80% of canvas, balanced 10% margins. Keep colour stable without white specular highlights. Restrained game-like bevel.

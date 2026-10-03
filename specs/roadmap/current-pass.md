@@ -2,11 +2,11 @@
 
 **English** | [Русский](current-pass_RU.md)
 
-Test **0.19.47**, only in **TerrainRamp-1.0-Test**. Reply to **1–8 below**.
+Test **0.19.48**, only in **TerrainRamp-1.0-Test**. For now reply only to **1**.
 The [.45 series](archive/pass-0.19.45.md) is historical, not a request to repeat it.
-Unity passed; actual Valheim acceptance is still required. First inspect the
-readability in 1 and the non-overlapping header/cards in 5. Pause the full series
-if either is still unclear; the remaining numbers and controls are unchanged.
+Unity passed; actual Valheim acceptance is still required. This iteration changes
+only point artwork/feedback. Inspect 1 at normal distance and closer; if unclear,
+send a screenshot before running 2–8. Those numbers and controls are unchanged.
 
 ## Preparation
 
@@ -21,10 +21,13 @@ world HUD; test 7 also opens the editor chooser. Do not place the blueprint.**
 1. **Point signs.** Select a wall → Ctrl+2 → Tool parameters → Points: All.
    Inspect gold native clasps, blue corner brackets, green midpoint clamps and
    pink centres. Shift+LMB pins a point: purple stake. Ctrl+LMB a helper selects
-   it for attachment: white active sign.
+   it for attachment: white brackets added to its coloured sign. Hover a marker:
+   the highlighted bottom line names its type and the Shift/Ctrl actions.
    **Expected:** no wall tint or displaced/hidden point. At coincident positions,
    the helper is inside the native rim: centre and rim can be picked separately.
-   Report which sign is unclear at normal viewing distance.
+   The pin does not invent a native socket; original signs remain visible.
+   Report whether types, exact centre and overlap are readable at normal viewing
+   distance. Compare a wall and a sloped beam. Reply to this number only for now.
 
 2. **G and short Q/E.** Select a sloped beam → G. Move over empty grid, then
    near another wall. Stop the mouse; press E until Auto returns, then Q.

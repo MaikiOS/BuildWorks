@@ -2,6 +2,42 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Verified candidate 0.19.48
+
+Ostrix approved trying compact nested point signs on 2026-10-03. Six individually
+generated transparent PNGs replace .47 artwork: native clasp, corner, midpoint,
+centre, pin and active brackets. Native/helper screen radii are 16/9 px; exact
+coordinates stay unchanged. A pin is appended state, not a new native socket.
+Pin/active overlays preserve original typed points; idle hover names the point.
+Scale and Alt-copy priority also gate that caption, with a controller regression.
+
+Snap RGB no longer exceeds white. Embedded icons use mipmaps/trilinear filtering;
+Workbench imports keep the same 1254 px dimensions without compression or NPOT
+resizing. The blue inside elbow is registered at (0.43,0.42); other pivots (0.5,0.5).
+[Assets, exact prompts and concept-to-runtime explanation](docs/artwork/snap-point-assets.md).
+These are raster sprites, not vectors. World F9, snap coordinates, input bindings,
+costs, Store v9, Array/Contour and the accepted .47 HUD layout are unchanged.
+
+Release: zero warnings/errors. Geometry, Store, Localization, EditorBridge,
+WorldLayout, DeploymentChecks, HostContract and built localization pass
+(654 keys, 631 static references). Format exits 0 with the existing workspace
+loading warning. Unity 6000.0.61f1 passed 81 UI captures at
+2026-10-03T10:35:17.6722987Z, plus actual wood overlap/pin captures.
+Native contrast and helper colours remain visible at coincident coordinates;
+the pin render has 10 contrast pixels under the neutral-colour palette test.
+Independent correctness and Ponytail review pass after the hover-priority fix.
+
+- BuildWorks SHA256: 1C4D56285740E5CDCEA301698B55BD19810A32FF9468C3CEBDB7BE263335B91F
+- Geometry SHA256: 3EF58DB30AE547E99293DD2B90E97BF8FEE005534C055D23656714FA09D9EA16
+
+Installed with Valheim closed only in TerrainRamp-1.0-Test via the guarded script;
+hashes match. Previous .47 DLL pair and artwork are backed up locally at
+artifacts/checkpoint-0.19.48/preinstall and artwork-before. No Valheim launch,
+save change or binary release. Workbench substitutes the external host/input;
+game readability, physical input, refunds, reload and networking remain unproven.
+BW-01 awaits the owner: reply only to point 1 of the
+[current pass](specs/roadmap/current-pass.md), then resume 2–8 after visual approval.
+
 ## Verified candidate 0.19.47
 
 Owner screenshots of .46 reopened two visual defects. Editor snap signs now

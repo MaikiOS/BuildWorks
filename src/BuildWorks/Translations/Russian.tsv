@@ -633,6 +633,13 @@ editor.view.surface_controls	Поверхность · Q/E точка · кол�
 editor.view.attachment_menu	Привязка
 editor.view.source_begin	Выбери деталь и нажми G, чтобы выбрать точку соединения.
 editor.view.source_auto	Авто
+editor.view.point_native	Ванильная точка
+editor.view.point_corner	Угол габаритов
+editor.view.point_midpoint	Середина ребра
+editor.view.point_centre	Центр габаритов
+editor.view.point_pin	Закреплённая опора
+editor.view.point_active	Активная точка
+editor.view.point_hover	{0} · Shift + щелчок — опора · Ctrl + тяни — привязка
 editor.view.source_native	Ванильная {0}
 editor.view.source_helper	Дополнительная {0}
 editor.view.source_helpers	Дополнительные точки

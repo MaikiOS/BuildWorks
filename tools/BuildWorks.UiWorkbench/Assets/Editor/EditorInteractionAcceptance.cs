@@ -98,10 +98,33 @@ public static class EditorInteractionAcceptance
                     "Coincident native provenance must remain visible beside the pin accent");
                 Color32[] purple = Render(scene.Camera, Path.Combine(outputDirectory, "actual-native-pin-purple.png"));
                 int purplePixels = ChangedPixels(clean, purple, nativePixel, pixel =>
-                    pixel.r > 120 && pixel.b > 150 && pixel.b > pixel.g + 35 && pixel.r > pixel.g + 35);
+                    pixel.r > 90 && pixel.b > 120 && pixel.b > pixel.g + 35 && pixel.r > pixel.g + 35);
                 Require(purplePixels >= 8, "Appended pin has metadata but no purple pixels: " + purplePixels);
                 evidence.Add("PASS actual rendered gold=" + goldPixels + "; purple=" + purplePixels +
                     "; editorLayer=" + layer + "; cameraMask=" + scene.Camera.cullingMask);
+
+                // Exercise every type at the SAME native coordinate, without moving or hiding points.
+                foreach (int helper in new[] { 0, 8, AnchorAdjustment.CenterAnchorIndex })
+                {
+                    var overlap = (Vector3[])anchors.Clone();
+                    overlap[helper] = anchors[nativeIndex];
+                    scene.ShowGizmo(BlueprintEditorTool.Transform, pivot, Quaternion.identity, false,
+                        GizmoHandleKind.None, GizmoAxis.None, overlap, helper, nativeStart, true, false,
+                        Vector3.zero, false);
+                    Color32[] mixed = Render(scene.Camera, Path.Combine(outputDirectory,
+                        "actual-point-overlap-" + helper + ".png"));
+                    int helperPixels = ChangedPixels(clean, mixed, nativePixel, p => helper == 0
+                        ? p.b > p.r + 35 && p.b > p.g + 10
+                        : helper == 8 ? p.g > p.r + 20 && p.g > p.b + 10
+                        : p.r > p.g + 30 && p.b > p.g + 15);
+                    int nativePixels = ChangedPixels(clean, mixed, nativePixel, p =>
+                        p.r > 150 && p.g > 85 && p.b < 190 && p.r > p.g + 15);
+                    Require(helperPixels >= 8 && nativePixels >= 40,
+                        "Coincident type/active overlay lost colour: helper=" + helper +
+                        "; helperPixels=" + helperPixels + "; nativePixels=" + nativePixels);
+                    evidence.Add("PASS coincident active type=" + helper + "; colour=" + helperPixels +
+                        "; native=" + nativePixels);
+                }
 
                 scene.ShowSnapCandidates(new[] { pivot + Vector3.up }, new[] { true });
                 foreach (LineRenderer line in Field<List<LineRenderer>>(gizmo, "snapCandidateHandles"))

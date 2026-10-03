@@ -4,11 +4,13 @@
 
 ## Current point workflow
 
-.51 keeps amber `snap-native`; all ordinary generated helpers use the new ivory
-`snap-helper` joining knot. Selected A/source adds `snap-selected`, a carved
-locking collar/rune, without replacing provenance. Detailed corners now use the same ivory helper sign and size.
-`snap-geometry` is historical .50 artwork, not a third current point type. No corner/
-midpoint/centre colour classes remain in the editor. World/F9 art is unchanged.
+.52 keeps amber `snap-native` and ivory `snap-helper` for ordinary bounds/middle
+helpers. Selected A/source adds the carved `snap-selected` collar, preserving
+provenance. Optional sharp mesh corners are small translucent warm dots drawn by
+LineRenderer, not the large helper PNG. Depth fades idle dots; hover/selection
+strengthens them and selected dots get the same collar. `snap-geometry` is historical
+.50 artwork, not the current experimental dot. There are still two provenance
+classes, native/ours; no corner/midpoint/centre colours. World/F9 art is unchanged.
 
 Three original transparent 1254 × 1254 raster PNGs were generated individually
 through imagegen. Geometry is an edit of the helper, not a new native sign.

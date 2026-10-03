@@ -2,7 +2,7 @@
 
 **English** | [Русский](README_RU.md)
 
-> Source candidate 0.19.51 for Valheim 1.0.16. The latest existing binary prerelease remains 0.19.37; this checkpoint does not publish a new binary. Development tests use only TerrainRamp-1.0-Test; actual mesh corners, aimed magnetic capture and the view-depth handle await owner checks 1–6.
+> Source candidate 0.19.52 for Valheim 1.0.16. The latest binary prerelease remains 0.19.37; no new binary release is published. Tests use only TerrainRamp-1.0-Test; restored ordinary helpers and optional small mesh dots await owner checks 1–3. The .51 magnet/view-depth checks are accepted.
 
 ![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
 

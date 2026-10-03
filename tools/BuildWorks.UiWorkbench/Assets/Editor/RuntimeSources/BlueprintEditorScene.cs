@@ -137,7 +137,7 @@ namespace OstrixMods.BuildWorks
             public readonly List<PickSurface> PickSurfaces = new List<PickSurface>();
             public readonly List<Vector3> SnapLocal = new List<Vector3>();
             public readonly List<Vector3> GeometryLocal = new List<Vector3>();
-            public readonly List<Vector3> CornerLocal = new List<Vector3>();
+            public bool GeometryCaptured;
             public int NativeSnapCount;
             public readonly List<Vector3> PlacementLocal = new List<Vector3>();
             public readonly List<string> PlacementLabels = new List<string>();
@@ -286,6 +286,8 @@ namespace OstrixMods.BuildWorks
         internal bool ModelSpaceGizmo { get => gizmo.ModelSpaceSizing; set => gizmo.ModelSpaceSizing = value; }
         internal bool NativePointsOnly { get => gizmo.NativePointsOnly; set => gizmo.NativePointsOnly = value; }
         internal bool ViewDepthHandle { get => gizmo.ViewDepthHandle; set => gizmo.ViewDepthHandle = value; }
+        internal int GeometryAnchorStart { get; private set; } = -1;
+        internal int GeometryAnchorCount { get; private set; }
         private bool experimentalGeometryPoints;
         internal bool ExperimentalGeometryPoints
         {
@@ -711,15 +713,46 @@ namespace OstrixMods.BuildWorks
 
         private void AddEditorHelperTargets(VisualNode visual, List<Vector3> points)
         {
-            foreach (Vector3 local in visual.CornerLocal)
-                points.Add(visual.Root.transform.TransformPoint(local));
+            AddOrdinaryHelperTargets(visual, points);
             if (ExperimentalGeometryPoints)
+            {
+                CaptureGeometryCorners(visual);
                 foreach (Vector3 local in visual.GeometryLocal)
                 {
                     Vector3 point = visual.Root.transform.TransformPoint(local);
-                    if (!points.Exists(existing => (existing - point).sqrMagnitude < .00000001f))
+                    if (!points.Exists(existing => (existing - point).sqrMagnitude < .000025f))
                         points.Add(point);
                 }
+            }
+        }
+
+        private static void AddOrdinaryHelperTargets(VisualNode visual, List<Vector3> points)
+        {
+            var helpers = new List<Vector3>();
+            if (TryBounds(visual, out Bounds bounds)) AddBoundsAnchors(bounds, helpers);
+            for (int index = visual.NativeSnapCount; index < visual.SnapLocal.Count; ++index)
+                helpers.Add(visual.Root.transform.TransformPoint(visual.SnapLocal[index]));
+            foreach (Vector3 point in helpers)
+                if (!points.Exists(existing => (existing - point).sqrMagnitude < .00000001f)) points.Add(point);
+        }
+
+        private bool IsExperimentalTarget(Vector3 point)
+        {
+            if (!ExperimentalGeometryPoints) return false;
+            bool geometry = false;
+            foreach (VisualNode visual in visuals.Values)
+            {
+                // Source geometry moves onto the target: it must never relabel that target.
+                if (visual.Selected || !visual.Root.activeInHierarchy) continue;
+                geometry |= visual.GeometryLocal.Exists(local =>
+                    (visual.Root.transform.TransformPoint(local) - point).sqrMagnitude < .00000001f);
+                var ordinary = new List<Vector3>();
+                for (int index = 0; index < visual.NativeSnapCount; ++index)
+                    ordinary.Add(visual.Root.transform.TransformPoint(visual.SnapLocal[index]));
+                AddOrdinaryHelperTargets(visual, ordinary);
+                if (ordinary.Exists(existing => (existing - point).sqrMagnitude < .000025f)) return false;
+            }
+            return geometry;
         }
 
         internal bool IsEditorPointVisible(
@@ -1172,7 +1205,9 @@ namespace OstrixMods.BuildWorks
                 allowRotate: true,
                 allowExtended: true,
                 pointVisibility: point => IsEditorPointVisible(point),
-                helperAnchorOverride: helperAnchorOverride);
+                helperAnchorOverride: helperAnchorOverride,
+                geometryAnchorStart: GeometryAnchorStart, geometryPoints: GeometryAnchorCount,
+                snapTargetIsGeometry: !snapTargetIsNative && IsExperimentalTarget(snapTarget));
             ShowTargetOutline(showSnapTarget);
         }
 
@@ -1202,7 +1237,7 @@ namespace OstrixMods.BuildWorks
         internal void ShowSnapCandidates(
             IReadOnlyList<Vector3> candidates,
             IReadOnlyList<bool> nativeCandidates) =>
-            gizmo.ShowSnapCandidates(camera, candidates, nativeCandidates, 1f);
+            gizmo.ShowSnapCandidates(camera, candidates, nativeCandidates, 1f, IsExperimentalTarget);
 
         internal void ShowEdgeFrame(Vector3? a, Vector3? b, Vector3 pivot, Vector3 translation,
             Quaternion rotation, float scale, bool preview) =>
@@ -1288,7 +1323,7 @@ namespace OstrixMods.BuildWorks
             ThrowIfDisposed();
             if (document == null) throw new ArgumentNullException(nameof(document));
             // Controller draws its frozen source anchors during a transform preview.
-            InvalidateGizmoAnchors();
+            InvalidateGizmoAnchors(preservePreviewRange: true);
             var selected = new HashSet<string>(stableIds ?? Array.Empty<string>(),
                 StringComparer.Ordinal);
             foreach (BlueprintEditorPart part in document.Parts)
@@ -1557,7 +1592,7 @@ namespace OstrixMods.BuildWorks
 
             var result = new List<Vector3>(
                 AnchorAdjustment.SelectableAnchorCount + 32);
-            if (legacyLayoutAnchors) AddBoundsAnchors(bounds, result);
+            AddBoundsAnchors(bounds, result);
             nativeAnchorStart = result.Count;
             var snapSets = new List<IReadOnlyList<Point3>>();
             var nativePoints = new List<Vector3>();
@@ -1565,7 +1600,7 @@ namespace OstrixMods.BuildWorks
             {
                 if (!visuals.TryGetValue(stableId, out VisualNode visual) ||
                     visual.Locked || !visual.Root.activeInHierarchy) continue;
-                var points = new Point3[legacyLayoutAnchors ? visual.SnapLocal.Count : visual.NativeSnapCount];
+                var points = new Point3[visual.SnapLocal.Count];
                 for (int index = 0; index < points.Length; ++index)
                 {
                     points[index] = ToGeometry(visual.Root.transform.TransformPoint(
@@ -1588,33 +1623,31 @@ namespace OstrixMods.BuildWorks
                 {
                     if (nativeExterior.Count < MaximumNativeAnchors) nativeExterior.Add(worldPoint);
                 }
-                else if (legacyLayoutAnchors && result.Count - AnchorAdjustment.SelectableAnchorCount < MaximumNativeAnchors)
+                else if (result.Count - AnchorAdjustment.SelectableAnchorCount < MaximumNativeAnchors &&
+                    (legacyLayoutAnchors || !result.Exists(existing => (existing - worldPoint).sqrMagnitude < .00000001f)))
                     result.Add(worldPoint);
             }
             int maximumHelpers = AnchorAdjustment.SelectableAnchorCount + MaximumNativeAnchors - nativeExterior.Count;
             if (result.Count > maximumHelpers) result.RemoveRange(maximumHelpers, result.Count - maximumHelpers);
             if (!legacyLayoutAnchors)
-                foreach (string stableId in stableIds)
-                {
-                    if (!visuals.TryGetValue(stableId, out VisualNode visual) || visual.Locked || !visual.Root.activeInHierarchy) continue;
-                    foreach (Vector3 local in visual.CornerLocal)
-                    {
-                        if (result.Count >= 512) break;
-                        Vector3 point = visual.Root.transform.TransformPoint(local);
-                        if (!result.Exists(existing => (existing - point).sqrMagnitude < .00000001f)) result.Add(point);
-                    }
-                }
+                for (int index = result.Count - 1; index >= 0; --index)
+                    if (result.FindIndex(point => (point - result[index]).sqrMagnitude < .00000001f) < index)
+                        result.RemoveAt(index);
+            GeometryAnchorStart = result.Count;
             if (!legacyLayoutAnchors && ExperimentalGeometryPoints)
                 foreach (string stableId in stableIds)
                 {
                     if (!visuals.TryGetValue(stableId, out VisualNode visual) || visual.Locked || !visual.Root.activeInHierarchy) continue;
+                    CaptureGeometryCorners(visual);
                     foreach (Vector3 local in visual.GeometryLocal)
                     {
                         if (result.Count >= 512) break;
                         Vector3 point = visual.Root.transform.TransformPoint(local);
-                        if (!result.Exists(existing => (existing - point).sqrMagnitude < .00000001f)) result.Add(point);
+                        if (!result.Exists(existing => (existing - point).sqrMagnitude < .000025f) &&
+                            !nativeExterior.Exists(existing => (existing - point).sqrMagnitude < .000025f)) result.Add(point);
                     }
                 }
+            GeometryAnchorCount = result.Count - GeometryAnchorStart;
             nativeAnchorStart = result.Count;
             result.AddRange(nativeExterior);
             cachedAnchorIds = new string[stableIds.Count];
@@ -1627,10 +1660,11 @@ namespace OstrixMods.BuildWorks
             return true;
         }
 
-        private void InvalidateGizmoAnchors()
+        private void InvalidateGizmoAnchors(bool preservePreviewRange = false)
         {
             cachedAnchorIds = null;
             cachedGizmoAnchors = null;
+            if (!preservePreviewRange) { GeometryAnchorStart = -1; GeometryAnchorCount = 0; }
         }
 
         internal bool TryFindEditorSnapTarget(
@@ -1998,7 +2032,6 @@ namespace OstrixMods.BuildWorks
                     result.OriginalRenderingOff.Add(renderer.forceRenderingOff);
                 }
                 if (selectable || captureSurfaces) CapturePickSurfaces(result);
-                CaptureGeometryCorners(result);
                 if (result.PlacementLocal.Count == 0) AddBoundsPlacementPoints(result);
                 if (selectable) ApplyAppearance(result);
                 return result;
@@ -2406,19 +2439,30 @@ namespace OstrixMods.BuildWorks
 
         private static void CaptureGeometryCorners(VisualNode visual)
         {
+            if (visual.GeometryCaptured) return;
+            visual.GeometryCaptured = true;
             var edges = new List<Edge3>();
+            var solids = new List<PickSurface>();
             foreach (PickSurface surface in visual.PickSurfaces)
                 if (surface.Renderer && surface.Renderer.enabled && surface.Renderer.gameObject.activeInHierarchy)
+                {
                     edges.AddRange(surface.Edges);
-            Add(AnchorAdjustment.FeatureCorners(edges), visual.CornerLocal);
-            Add(AnchorAdjustment.FeatureCorners(edges, turnDegrees: 10.0), visual.GeometryLocal);
+                    solids.AddRange(ClosedComponents(surface));
+                }
+            // A corner must turn at least 45 degrees; broad near-straight bends are not useful grips.
+            Add(AnchorAdjustment.FeatureCorners(edges, turnDegrees: 45.0), visual.GeometryLocal);
 
             // Sample existing coordinates spatially, not the first mesh/submesh's vertices.
             // This gives disconnected chair legs and seat corners a fair budget.
             void Add(IReadOnlyList<Point3> corners, List<Vector3> output)
             {
                 var remaining = new List<Vector3>();
-                foreach (Point3 point in corners) remaining.Add(ToUnity(point));
+                foreach (Point3 point in corners)
+                {
+                    Vector3 candidate = ToUnity(point);
+                    if (!solids.Exists(surface => IsInsideSurface(candidate, surface)))
+                        remaining.Add(candidate);
+                }
                 while (remaining.Count > 0 && output.Count < 128)
                 {
                     int best = 0; float largest = -1f;
@@ -2432,6 +2476,97 @@ namespace OstrixMods.BuildWorks
                     output.Add(remaining[best]); remaining.RemoveAt(best);
                 }
             }
+        }
+
+        private static IEnumerable<PickSurface> ClosedComponents(PickSurface surface)
+        {
+            // Split even a combined furniture mesh; weld UV/normal seams by position.
+            var welded = new Dictionary<Vector3Int, int>();
+            var positions = new List<Vector3>();
+            var ids = new int[surface.Vertices.Length];
+            for (int i = 0; i < ids.Length; ++i)
+            {
+                Vector3 v = surface.Vertices[i];
+                var key = new Vector3Int(Mathf.RoundToInt(v.x * 100000f),
+                    Mathf.RoundToInt(v.y * 100000f), Mathf.RoundToInt(v.z * 100000f));
+                if (!welded.TryGetValue(key, out int id))
+                { id = positions.Count; welded.Add(key, id); positions.Add(v); }
+                ids[i] = id;
+            }
+            var neighbours = new List<int>[positions.Count];
+            for (int i = 0; i < neighbours.Length; ++i) neighbours[i] = new List<int>();
+            int count = surface.Triangles.Length / 3;
+            for (int triangle = 0; triangle < count; ++triangle)
+                for (int corner = 0; corner < 3; ++corner)
+                    neighbours[ids[surface.Triangles[triangle * 3 + corner]]].Add(triangle);
+            var visited = new bool[count];
+            for (int start = 0; start < count; ++start)
+            {
+                if (visited[start]) continue;
+                var queue = new Queue<int>(); queue.Enqueue(start); visited[start] = true;
+                var triangles = new List<int>();
+                var uses = new Dictionary<(int, int), int>();
+                while (queue.Count > 0)
+                {
+                    int triangle = queue.Dequeue();
+                    for (int corner = 0; corner < 3; ++corner)
+                    {
+                        int a = ids[surface.Triangles[triangle * 3 + corner]];
+                        int b = ids[surface.Triangles[triangle * 3 + (corner + 1) % 3]];
+                        triangles.Add(a);
+                        var edge = a < b ? (a, b) : (b, a);
+                        uses.TryGetValue(edge, out int n); uses[edge] = n + 1;
+                        foreach (int next in neighbours[a])
+                            if (!visited[next]) { visited[next] = true; queue.Enqueue(next); }
+                    }
+                }
+                // Open/non-manifold meshes cannot safely hide another corner.
+                bool closed = uses.Count > 0;
+                foreach (int n in uses.Values) if (n != 2) { closed = false; break; }
+                if (closed) yield return new PickSurface { Vertices = positions.ToArray(), Triangles = triangles.ToArray() };
+            }
+        }
+
+        private static bool IsInsideSurface(Vector3 point, PickSurface surface)
+        {
+            // Camera-independent containment: boundary vertices are valid, buried component corners are not.
+            Vector3[] vertices = surface.Vertices;
+            int[] triangles = surface.Triangles;
+            if (vertices.Length == 0) return false;
+            if (triangles.Length == 0) return false;
+            Bounds bounds = new Bounds(vertices[triangles[0]], Vector3.zero);
+            foreach (int index in triangles) bounds.Encapsulate(vertices[index]);
+            const float epsilon = .0001f;
+            if (point.x <= bounds.min.x + epsilon || point.x >= bounds.max.x - epsilon ||
+                point.y <= bounds.min.y + epsilon || point.y >= bounds.max.y - epsilon ||
+                point.z <= bounds.min.z + epsilon || point.z >= bounds.max.z - epsilon) return false;
+            for (int index = 0; index + 2 < triangles.Length; index += 3)
+            {
+                Vector3 a = vertices[triangles[index]], b = vertices[triangles[index + 1]], c = vertices[triangles[index + 2]];
+                Vector3 ab = b - a, ac = c - a, offset = point - a;
+                Vector3 normal = Vector3.Cross(ab, ac);
+                float plane = Vector3.Dot(offset, normal);
+                if (normal.sqrMagnitude < .0000000001f || plane * plane > epsilon * epsilon * normal.sqrMagnitude) continue;
+                float aa = Vector3.Dot(ab, ab), bb = Vector3.Dot(ac, ac), cross = Vector3.Dot(ab, ac);
+                float determinant = aa * bb - cross * cross;
+                if (Mathf.Abs(determinant) < .0000000001f) continue;
+                float u = (bb * Vector3.Dot(offset, ab) - cross * Vector3.Dot(offset, ac)) / determinant;
+                float v = (aa * Vector3.Dot(offset, ac) - cross * Vector3.Dot(offset, ab)) / determinant;
+                if (u >= -epsilon && v >= -epsilon && u + v <= 1f + epsilon) return false;
+            }
+            // Requiring both directions on three oblique lines avoids treating an open sheet as a solid.
+            foreach (Vector3 direction in new[] { new Vector3(1,.371f,.529f), new Vector3(.413f,1,.637f), new Vector3(.719f,.283f,1) })
+                foreach (float sign in new[] { 1f, -1f })
+                {
+                    var distances = new List<float>();
+                    for (int index = 0; index + 2 < triangles.Length; index += 3)
+                        if (TryTriangleHit(point, direction.normalized * sign, vertices[triangles[index]],
+                            vertices[triangles[index + 1]], vertices[triangles[index + 2]], out float distance) &&
+                            !distances.Exists(existing => Mathf.Abs(existing - distance) < epsilon))
+                            distances.Add(distance);
+                    if (distances.Count % 2 == 0) return false;
+                }
+            return true;
         }
 
         private static bool TryMeshHit(VisualNode visual, Ray worldRay, out float distance)

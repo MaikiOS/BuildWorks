@@ -2,7 +2,44 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
-## Verified candidate 0.19.51
+## Verified candidate 0.19.52
+
+Ostrix accepted .51 checks 3–6 on 2026-10-03; 1–2 reopened ordinary helper restoration
+and experimental rendering. Ordinary bounds corners/middles/centre and generated
+snap middles are restored separately from the opt-in mesh-corner set. Amber native
+and ivory ordinary signs remain. Extra sharp corners use small translucent warm dots,
+depth fade and a selected collar, not the large knot texture. Exact coordinate
+overlaps within 5 mm of ordinary/native points receive no second mark.
+
+Experimental capture is lazy per visual. Welded feature corners require a turn of
+at least 45°; up to 128 real coordinates are sampled spatially. Corners strictly
+inside closed connected components are removed, including combined meshes.
+Open/non-manifold components conservatively do not hide corners; large meshes can
+omit some corners. The experimental range stays frozen during transform previews.
+Save/Array use their unchanged historical anchor layout. Source selection cannot
+relabel an ordinary target after alignment; screen-mode dot picking has its own radius.
+Accepted .51 magnet/depth controls, world/F9, Store v9, costs and networking stay unchanged.
+
+Release: zero warnings/errors. Geometry, Store, Localization, EditorBridge,
+WorldLayout, DeploymentChecks and HostContract pass (Steam build 25185596).
+678 paired localization keys / 648 static references, embedded resources verified.
+Format exits 0 with the existing workspace-loading warning. Unity 6000.0.61f1 passed
+81 UI cases at 2026-10-03T17:58:28.2261582Z: separate/combined chair geometry,
+buried/open/overlap behavior, sharp bend versus ordinary midpoint, actual screen
+hit/miss, experimental source → ordinary target identity and legacy save/Array.
+Two isolated chair renders at different distances use actual runtime drawing.
+Independent correctness review PASSED after hit-radius and provenance fixes;
+affected checks reran. Ponytail review: Lean already. No Valheim launch.
+
+BuildWorks SHA256: BC066E78A81A9C8D84212C694E1C598A6D12D4FE1B6590AAC0CE8EF9BD2147A7
+Geometry SHA256: 9280D140DC1DE633A14AE4C3633A9CDF14A2F862D1966CD7B13CED747B1E7626
+Installed only in TerrainRamp-1.0-Test with Valheim closed via the guarded script;
+both hashes match. .51 backup: artifacts/checkpoint-0.19.52/preinstall.
+Source-only synchronization remains authorized; no binary release published.
+Owner acceptance is pending the single [points series 1–3](specs/roadmap/current-pass.md).
+The .51 series is archived; accepted checks are not repeated. No BW-02/curves advance.
+
+## Historical verified candidate 0.19.51
 
 Ostrix accepted .50 checks 1–2, 4–5, 7 and 10 on 2026-10-03. This focused fix
 addresses incorrect mesh helpers, unreliable G capture and inaccessible View Z.
@@ -37,7 +74,7 @@ Installed only in TerrainRamp-1.0-Test with Valheim closed via the guarded scrip
 SHA-256 matches both built DLLs. .50 backup: artifacts/checkpoint-0.19.51/preinstall.
 Source-only GitHub synchronization is authorized; no binary release was published.
 Valheim was not launched; game readability/native mesh behavior remain owner checks
-[1–6](specs/roadmap/current-pass.md). The .50 list is archived; no BW-02/curves advance.
+[1–6](specs/roadmap/archive/pass-0.19.51.md). The .50 list is archived; no BW-02/curves advance.
 
 ## Historical verified candidate 0.19.50
 

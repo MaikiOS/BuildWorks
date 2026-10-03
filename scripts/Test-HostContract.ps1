@@ -815,7 +815,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.51.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.52.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -2401,7 +2401,7 @@ $showSnapCandidates = $pluginMethods | Where-Object {
     $_.Name -eq 'ShowSnapCandidates' -and
     $_.DeclaringType.Name -eq 'TransformGizmoView'
 }
-Assert-Contract ($showSnapCandidates.Parameters.Count -eq 4 -and
+Assert-Contract ($showSnapCandidates.Parameters.Count -eq 5 -and
     $showSnapCandidates.Parameters[2].ParameterType.FullName -eq
         'System.Collections.Generic.IReadOnlyList`1<System.Boolean>') `
     'Compiled magnetic preview no longer distinguishes native target points.'
@@ -2769,4 +2769,4 @@ if (Test-Path -LiteralPath $buildCameraPath -PathType Leaf) {
         'BuildWorks does not restore the current Build Camera yaw and pitch.'
 }
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.51 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.52 and Valheim Steam build 25185596.'

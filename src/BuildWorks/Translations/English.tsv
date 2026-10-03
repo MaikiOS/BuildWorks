@@ -672,7 +672,7 @@ editor.point_selected	Pivot A selected: locking collar. G moves from A; R rotate
 editor.view.edge_tooltip	Optional: choose A on the selected part, then choose B here and click another point. X follows A → B; pivot stays at A, not the midpoint.
 editor.view.geometry_off	Geometry points: off (experimental)
 editor.view.geometry_on	Geometry points: on (experimental)
-editor.view.geometry_tooltip	Additional real mesh corners, including smaller bends. No bounds corners, edge middles or invented points. Same ivory helper sign. Off by default; Snap: native + ours enables helpers for G. Editor only; not saved. Finish/cancel before changing.
+editor.view.geometry_tooltip	Extra sharp mesh corners as small translucent dots. Broad bends, buried component corners and overlaps with ordinary/native points are excluded. Ordinary ivory bounds/middle helpers remain. Off by default; Snap: native + ours enables G targets. Editor only; not saved. Finish/cancel before changing.
 editor.view.depth_hint	View Z: drag the depth handle up — away from camera, down — toward camera. G → Z uses the same motion; numbers replace the mouse preview.
 editor.view.source_empty	No native sockets. Set Snap: native + ours above the viewport to use generated points.
 editor.hint.numeric_value	<b>Value: {0}</b> · {1}

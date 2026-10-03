@@ -9,7 +9,7 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Current source candidate: **0.19.51**, Store v9, Valheim 1.0.16.
+Current source candidate: **0.19.52**, Store v9, Valheim 1.0.16.
 Ostrix's .49 report accepts the core point/pivot/frame/size workflow and resource
 cards; optional B, helper opt-in and catalogue translation needed clarification.
 .50 defaults to model-relative 3D sizing, retains screen mode, uses amber native
@@ -22,9 +22,12 @@ Experimental feature-endpoint markers are opt-in, bounded, editor-only and exclu
 from saved anchors. Native catalogue type/material labels translate by stable ID;
 external names stay intact. Ostrix accepts .50 checks 1–2, 4–5, 7 and 10;
 3/9 reopen real mesh corners, 6 view depth, 8 helper capture.
-.51 uses actual corners instead of editor bounds/middles, bounded spatial samples,
-aimed 2 m capture/adjacent switching and the approved View Z handle.
-Legacy Array/save anchors remain unchanged. BW-01 awaits focused .51 checks 1–6.
+.51 introduced aimed 2 m capture/adjacent switching and the approved View Z handle;
+Ostrix accepts its checks 3–6. Checks 1–2 exposed the incorrect replacement of ordinary
+bounds/middle helpers and duplicated large marks. .52 restores the ordinary set;
+optional sharp mesh corners use small translucent dots, skip ordinary/native overlaps
+and buried closed-component corners, including combined meshes. Legacy Array/save
+anchors remain unchanged. BW-01 awaits focused .52 checks 1–3.
 Older lists are archived, not extra answer lists. F9 mechanics are unchanged.
 0.19.39 owner feedback accepts menu hover, language refresh and camera framing;
 Transform selection is provisionally accepted. The owner accepts contour cleanup;
@@ -87,7 +90,7 @@ dependent changes wait for its gate, unrelated preparation may continue.
 | ID | Deliverable | Dependency | Status |
 | --- | --- | --- | --- |
 | BW-00 | Dedicated-profile baseline and reliable handoff | Current core | Focused 0.19.41 owner series accepted; cost/refund accounting and networking pending |
-| BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | .50 partly accepted; .51 actual corners, aimed capture and View depth automatically verified; awaiting series 1–6 |
+| BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | .51 checks 3–6 accepted; .52 ordinary helpers and optional mesh dots automatically verified; awaiting points series 1–3 |
 | BW-02 | Group layout operations without resizing pieces | BW-01 | Planned; focused operation UI approval required |
 | BW-03 | Persistent Array and minimal recipe persistence | BW-02 | Planned; safe Store migration and editing/Bake gate |
 | BW-04 | Guides and curves in accepted slices | BW-03 + renewed owner discussion | Tool-semantics discussion required before coding |

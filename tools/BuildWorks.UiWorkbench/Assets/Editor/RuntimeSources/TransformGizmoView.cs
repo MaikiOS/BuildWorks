@@ -84,6 +84,8 @@ namespace OstrixMods.BuildWorks
         private float anchorHandleScale = 1f;
         private int nativeAnchorStartIndex = int.MaxValue;
         private int helperAnchorOverrideIndex = -1;
+        private int geometryAnchorStartIndex = -1;
+        private int geometryAnchorCount;
         private int pinnedAnchorIndex = -1;
         private float moveSize = 1f;
         private float rotationSize = 1f;
@@ -222,7 +224,8 @@ namespace OstrixMods.BuildWorks
             bool allowRotate = true,
             bool allowExtended = false,
             Func<Vector3, bool> pointVisibility = null,
-            int helperAnchorOverride = -1)
+            int helperAnchorOverride = -1,
+            int geometryAnchorStart = -1, int geometryPoints = 0, bool snapTargetIsGeometry = false)
         {
             if (!camera)
             {
@@ -235,6 +238,8 @@ namespace OstrixMods.BuildWorks
             anchorHandleScale = handleScale;
             nativeAnchorStartIndex = nativeAnchorStart;
             helperAnchorOverrideIndex = helperAnchorOverride;
+            geometryAnchorStartIndex = geometryAnchorStart;
+            geometryAnchorCount = geometryPoints;
             pinnedAnchorIndex = pinnedAnchor;
             root.SetActive(true);
             foreach (LineRenderer line in alignmentAxisLines)
@@ -392,6 +397,7 @@ namespace OstrixMods.BuildWorks
                     : float.PositiveInfinity;
                 bool hovered = screenDistance <= AnchorHitRadius(i);
                 bool nativeAnchor = IsNativeAnchor(i);
+                bool geometryAnchor = IsGeometryAnchor(i);
                 bool unobstructed = !showAnchors || i >= anchorCount || (pointVisibility != null
                     ? pointVisibility(anchorPoints[i]) : IsPointVisible(camera, anchorPoints[i]));
                 bool showAnchor = showAnchors && (combined || Family == GizmoFamily.Points || important ||
@@ -412,27 +418,29 @@ namespace OstrixMods.BuildWorks
                 anchorHandles[i].sharedMaterial = showAllAnchors ? material : anchorMaterial;
                 if (showAnchor)
                 {
-                    Color color = AnchorColor(i, selectedAnchor, pinnedAnchor, nativeAnchorStart);
+                    Color color = geometryAnchor ? new Color(1f, .84f, .4f, .28f)
+                        : AnchorColor(i, selectedAnchor, pinnedAnchor, nativeAnchorStart);
                     color.a = hovered ? 1f : important ? 0.90f : nativeAnchor
                         ? screenSpaceSizing ? 0.95f : showAllAnchors ? 0.48f : 0.65f
                         : screenSpaceSizing ? 0.75f : showAllAnchors ? 0.22f : 0.45f;
+                    if (geometryAnchor) color.a = hovered || important ? .85f : .28f;
                     DrawAnchor(
                         anchorHandles[i],
                         camera,
                         anchorPoints[i],
                         color,
-                        (nativeAnchor ? screenSpaceSizing ? .128f : hovered ? 0.17f : 0.115f
+                        (geometryAnchor ? .02f : nativeAnchor ? screenSpaceSizing ? .128f : hovered ? 0.17f : 0.115f
                             : screenSpaceSizing ? .072f : hovered ? 0.12f : 0.075f) * handleScale,
                         hovered ? 0.018f * handleScale + 0.003f
                             : nativeAnchor ? 0.010f : 0.007f, nativeAnchor,
                         i == pinnedAnchor,
-                        nativeAnchor ? "snap-native" : "snap-helper", i == selectedAnchor);
+                        nativeAnchor ? "snap-native" : "snap-helper", i == selectedAnchor, geometryAnchor);
                     // Picking follows the actual projected badge in both size modes.
                     Vector3 edge = camera.WorldToScreenPoint(anchorPoints[i] + camera.transform.right *
-                        GizmoScale(camera, anchorPoints[i]) * (nativeAnchor ? .128f : .072f) * handleScale);
+                        GizmoScale(camera, anchorPoints[i]) * (geometryAnchor ? .035f : nativeAnchor ? .128f : .072f) * handleScale);
                     while (anchorHitRadii.Count <= i) anchorHitRadii.Add(0f);
                     anchorHitRadii[i] = ModelSpaceSizing ? Vector2.Distance(screen, edge) + 2f
-                        : (nativeAnchor ? 18f : 10.5f) * handleScale;
+                        : (geometryAnchor ? 5f : nativeAnchor ? 18f : 10.5f) * handleScale;
                 }
             }
             bool drawSnapTarget = showAnchors && showSnapTarget;
@@ -447,15 +455,16 @@ namespace OstrixMods.BuildWorks
                     ? new Color(1f, 0.95f, 0.25f, 1f)
                     : screenSpaceSizing ? new Color(1f, .92f, .76f, 1f) : new Color(0.25f, 0.95f, 1f, 1f);
                 targetColor.a = targetHovered ? 1f : screenSpaceSizing ? 0.85f : 0.35f;
+                if (snapTargetIsGeometry) targetColor = new Color(1f,.84f,.4f, targetHovered ? .9f : .6f);
                 DrawAnchor(
                     snapTargetHandle,
                     camera,
                     snapTarget,
                     targetColor,
-                    (screenSpaceSizing ? snapTargetIsNative ? .128f : .072f : targetHovered ? 0.17f : snapTargetIsNative ? 0.115f : 0.06f) *
+                    (screenSpaceSizing ? snapTargetIsGeometry ? .02f : snapTargetIsNative ? .128f : .072f : targetHovered ? 0.17f : snapTargetIsNative ? 0.115f : 0.06f) *
                         handleScale,
                     targetHovered ? 0.018f * handleScale + 0.003f
-                        : snapTargetIsNative ? 0.010f : 0.006f, snapTargetIsNative);
+                        : snapTargetIsNative ? 0.010f : 0.006f, snapTargetIsNative, geometryPoint: snapTargetIsGeometry);
             }
             bool drawConstraint = showAnchors && showConstraintPath &&
                 constraintAxis != GizmoAxis.None && constraintAxisWorld.sqrMagnitude > 0.001f;
@@ -509,7 +518,7 @@ namespace OstrixMods.BuildWorks
             Camera camera,
             IReadOnlyList<Vector3> candidates,
             IReadOnlyList<bool> nativeCandidates,
-            float handleScale)
+            float handleScale, Func<Vector3, bool> isGeometry = null)
         {
             handleScale *= pointSize;
             int count = candidates?.Count ?? 0;
@@ -534,18 +543,20 @@ namespace OstrixMods.BuildWorks
                         EditorMouse ?? (Vector2)Input.mousePosition,
                         new Vector2(screen.x, screen.y));
                     bool close = distance <= 16f;
+                    bool geometry = screenSpaceSizing && !native && isGeometry != null && isGeometry(candidates[index]);
                     DrawAnchor(
                         line,
                         camera,
                         candidates[index],
+                        geometry ? new Color(1f,.84f,.4f,close ? .85f : .28f) :
                         new Color(native || screenSpaceSizing ? 1f : 0.25f, screenSpaceSizing && !native ? .92f : .95f,
                             native ? .25f : screenSpaceSizing ? .76f : 1f,
                             close ? 0.98f : screenSpaceSizing ? native ? 0.85f : 0.6f
                                 : native ? 0.42f : 0.08f),
-                        (screenSpaceSizing ? native ? .128f : .072f : close ? native ? 0.17f : 0.12f
+                        (screenSpaceSizing ? geometry ? .02f : native ? .128f : .072f : close ? native ? 0.17f : 0.12f
                             : native ? 0.115f : 0.04f) * handleScale,
                         close ? 0.018f * handleScale + 0.003f
-                            : native ? 0.010f : 0.005f, native);
+                            : native ? 0.010f : 0.005f, native, geometryPoint: geometry);
                 }
             }
         }
@@ -795,7 +806,7 @@ namespace OstrixMods.BuildWorks
         private float AnchorHitRadius(int index)
         {
             return screenSpaceSizing
-                ? ModelSpaceSizing && index < anchorHitRadii.Count ? anchorHitRadii[index]
+                ? (ModelSpaceSizing || IsGeometryAnchor(index)) && index < anchorHitRadii.Count ? anchorHitRadii[index]
                     : (IsNativeAnchor(index) ? 18f : 10.5f) * anchorHandleScale
                 : 16f;
         }
@@ -1142,7 +1153,7 @@ namespace OstrixMods.BuildWorks
             bool nativeAnchor = false,
             bool pinned = false,
             string pointArtwork = null,
-            bool activeSource = false)
+            bool activeSource = false, bool geometryPoint = false)
         {
             if (screenSpaceSizing)
             {
@@ -1169,6 +1180,25 @@ namespace OstrixMods.BuildWorks
                 line.enabled = false;
                 Accent("PinAccent", "snap-selected", pinned && !activeSource);
                 Accent("ActiveAccent", "snap-selected", activeSource);
+                if (geometryPoint)
+                {
+                    line.transform.Find("Engraving").gameObject.SetActive(false);
+                    line.enabled = true;
+                    line.positionCount = 17;
+                    for (int index = 0; index <= 16; ++index)
+                    {
+                        float angle = index * Mathf.PI * 2f / 16f;
+                        line.SetPosition(index, position + right * Mathf.Cos(angle) + up * Mathf.Sin(angle));
+                    }
+                    line.startWidth = line.endWidth = size * 1.5f;
+                    if (pinned || activeSource)
+                    {
+                        Transform accent = line.transform.Find(activeSource ? "ActiveAccent" : "PinAccent");
+                        float radius = pointScale * .085f * anchorHandleScale;
+                        DrawArtwork(accent.GetComponent<LineRenderer>(), "snap-selected", position,
+                            camera.transform.right * radius, camera.transform.up * radius);
+                    }
+                }
                 void Accent(string childName, string iconName, bool visible)
                 {
                     Transform accentRoot = line.transform.Find(childName);
@@ -1213,6 +1243,8 @@ namespace OstrixMods.BuildWorks
 
         private bool IsNativeAnchor(int index) =>
             index >= nativeAnchorStartIndex && index != helperAnchorOverrideIndex;
+        private bool IsGeometryAnchor(int index) => screenSpaceSizing &&
+            index >= geometryAnchorStartIndex && index < geometryAnchorStartIndex + geometryAnchorCount;
 
         private void SetColorAndWidth(
             LineRenderer line,
@@ -1305,7 +1337,7 @@ namespace OstrixMods.BuildWorks
                 if (anchorHandles[index].gameObject.activeInHierarchy)
                     SetFeedback(anchorHandles[index], index == point && selected == GizmoHandleKind.None,
                         index == selectedPoint || index == pinnedPoint, selected != GizmoHandleKind.None, true,
-                        IsNativeAnchor(index), anchorOccluded[index]);
+                        IsNativeAnchor(index), anchorOccluded[index], IsGeometryAnchor(index));
             void Feedback(LineRenderer line, GizmoHandleKind kind, GizmoAxis axis)
             {
                 if (!line.gameObject.activeInHierarchy) return;
@@ -1313,7 +1345,7 @@ namespace OstrixMods.BuildWorks
                     selected == kind && (selectedAxis == axis || selectedAxis == GizmoAxis.None), selected != GizmoHandleKind.None);
             }
             void SetFeedback(LineRenderer line, bool hovered, bool active, bool dragging, bool point = false, bool native = false,
-                bool occluded = false)
+                bool occluded = false, bool geometry = false)
             {
                 float distance = DistanceToLine(camera, mouse, line);
                 if (artworkMeshes.TryGetValue(line, out Mesh artMesh))
@@ -1326,6 +1358,8 @@ namespace OstrixMods.BuildWorks
                 float alpha = active || hovered ? 1f : dragging ? point ? .6f : .3f :
                     Mathf.Lerp(point ? .55f : .64f, point ? .9f : .9f, proximity);
                 if (point && occluded && !active && !hovered) alpha *= .35f;
+                if (geometry) alpha = (active || hovered ? .85f : Mathf.Lerp(.22f, .5f, proximity)) *
+                    (occluded && !active && !hovered ? .25f : 1f);
                 Color color = (hovered || active) && !point ? new Color(1f, .78f, .32f, alpha) : line.startColor;
                 color.a = alpha;
                 line.startColor = line.endColor = color;

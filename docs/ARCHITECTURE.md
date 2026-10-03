@@ -68,14 +68,20 @@ Model-relative sizing is the editor default; the shared Native/Native+ours flag
 owns both G source choice and target scans, with no independent helper opt-in.
 The amber native clasp and ivory generated knot encode provenance; the selected
 locking collar is an overlay, not a new point type. Optional B lives in Attachment.
-Editor helpers now use actual feature-edge corners, never bounds corners or
-synthetic midpoints. FeatureCorners welds seams and rejects straight subdivisions;
-ordinary turns use 25 degrees, the opt-in detailed set 10 degrees. Each visual
-spatially samples at most 128 existing coordinates; selection limits helpers to
-512 and native sockets to 512. Large meshes can omit corners, never invent them.
-Legacy bounds/midpoint anchors are requested explicitly for Array and serialization,
-so saved/world coordinates are unchanged. Geometry toggle invalidates the cache
-and is locked during transformations. Detailed helpers share the ivory sign.
+Ordinary helpers retain bounds corners, edge middles, centre and generated snap
+middles. Optional mesh corners are extra editor-only coordinates, never saved.
+They are calculated lazily per visual: welded feature edges, turns at least 45°,
+up to 128 spatially sampled existing vertices. Corners strictly inside closed
+connected components are removed, including combined meshes; open/non-manifold
+components conservatively do not hide corners. Overlaps within 5 mm of ordinary/
+native points are omitted. Selection budgets remain 512 helpers/512 native points;
+large meshes can omit corners. Legacy Array/save retain their exact old layout.
+Experimental range metadata stays frozen during previews. Ordinary helpers use
+the ivory knot; experimental ones use small translucent warm dots, depth fade
+and a selected collar. Picking uses their projected size, including screen mode.
+Target classification excludes moving selection and prioritizes ordinary/native
+targets: an aligned source cannot relabel the target. Toggle clears the cache
+and is locked during transformations.
 G prioritizes explicit pointer aim within 24 px and 2 m of a source; unaimed
 capture keeps 0.55 m acquire/0.7 m retention. The winning target is always shown.
 View-frame Z uses a separate screen-facing depth handle and vertical mouse motion;

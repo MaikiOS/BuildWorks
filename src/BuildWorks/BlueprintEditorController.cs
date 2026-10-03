@@ -14,6 +14,12 @@ namespace OstrixMods.BuildWorks
     /// </summary>
     internal sealed class BlueprintEditorController : IDisposable
     {
+        private enum TransformFrame { Local, World, View, Edge }
+        private TransformFrame transformFrame;
+        private Vector3? framePointWorld;
+        private bool pickingFramePoint;
+        private bool selectedAnchorNative;
+        private TransformFrame keyboardSavedFrame;
         private enum EditorState
         {
             Closed,
@@ -160,7 +166,7 @@ namespace OstrixMods.BuildWorks
         private int dragAnchorPoint = -1;
         private Vector3 dragAnchorStartWorld;
         private Plane dragAnchorPlane;
-        private bool showAllAnchors = true;
+        private bool showAllAnchors;
         private bool meshSnapEnabled;
         private bool snapTargetVisible;
         private Vector3 snapTargetWorld;
@@ -269,6 +275,8 @@ namespace OstrixMods.BuildWorks
                     pinnedAnchorWorld = pivot + rotation * ((pinnedAnchorWorld.Value - pivot) * uniformScale) + translation;
                 if (selectedAnchorWorld.HasValue)
                     selectedAnchorWorld = pivot + rotation * ((selectedAnchorWorld.Value - pivot) * uniformScale) + translation;
+                if (framePointWorld.HasValue)
+                    framePointWorld = pivot + rotation * ((framePointWorld.Value - pivot) * uniformScale) + translation;
                 if (activeTool == BlueprintEditorTool.Array && localSpace)
                 {
                     arrayStepX = rotation * arrayStepX;
@@ -489,6 +497,29 @@ namespace OstrixMods.BuildWorks
             view.SpaceRequested += ToggleSpace;
             view.FrameSelectionRequested += FrameSelectionOrAll;
             view.AnchorVisibilityRequested += ToggleAnchorVisibility;
+            view.GizmoSizingRequested += () => { scene.ModelSpaceGizmo = !scene.ModelSpaceGizmo; UpdateTransformContext(); UpdateGizmo(); };
+            view.PointTypesRequested += () =>
+            {
+                scene.NativePointsOnly = !scene.NativePointsOnly;
+                if (keyboardPreview && keyboardSurface)
+                {
+                    RefreshCursorSources();
+                    // Explicit A remains visible and usable; hidden helpers never enter Auto/Q/E.
+                    if (keyboardSourceIndex >= 0 && !keyboardSourceChoices.Contains(keyboardSourceIndex) &&
+                        keyboardSourceIndex != selectedAnchorPoint) ChooseCursorSource(-1);
+                }
+                UpdateTransformContext(); UpdateGizmo();
+            };
+            view.FrameRequested += CycleTransformFrame;
+            view.EdgeRequested += () =>
+            {
+                if (IsGizmoDragging) return;
+                if (framePointWorld.HasValue || pickingFramePoint)
+                { framePointWorld = null; pickingFramePoint = false; transformFrame = TransformFrame.Local; localSpace = true; }
+                else if (selectedAnchorWorld.HasValue) pickingFramePoint = true;
+                else view.SetStatus(BuildWorksLocalization.Text("editor.edge_needs_point"));
+                UpdateTransformContext(); UpdateGizmo();
+            };
             view.MeshSnapRequested += ToggleMeshSnap;
             view.PinSelectedAnchorRequested += ToggleSelectedAnchorPin;
             view.AnchorConstraintRequested += SetAnchorConstraint;
@@ -927,7 +958,7 @@ namespace OstrixMods.BuildWorks
                                 ? "editor.view.source_native" : "editor.view.source_helper",
                                 keyboardSourceIndex >= gizmoNativeAnchorStart ? keyboardSourceIndex - gizmoNativeAnchorStart + 1 : keyboardSourceIndex + 1)) :
                     dragAxis == GizmoAxis.None ? BuildWorksLocalization.Text("editor.view.screen_plane") :
-                    dragAxis + " · " + BuildWorksLocalization.Text(localSpace ? "editor.view.axes_local" : "editor.view.axes_world"),
+                    dragAxis + " · " + BuildWorksLocalization.Text(TransformFrameKey),
                     keyboardNumber.Length > 0 ? BuildWorksLocalization.Text("editor.hint.numeric_value", keyboardNumber,
                         keyboardValid ? "" : BuildWorksLocalization.Text("editor.hint.numeric_invalid")) :
                     keyboardValid ? "" : BuildWorksLocalization.Text("editor.view.no_surface"))
@@ -957,10 +988,10 @@ namespace OstrixMods.BuildWorks
                     if (point >= 0)
                         view.SetNextAction(BuildWorksLocalization.Text("editor.view.point_hover",
                             BuildWorksLocalization.Text(point == pinnedAnchorPoint ? "editor.view.point_pin" :
+                                point == selectedAnchorPoint ? selectedAnchorNative ? "editor.view.point_native" : "editor.view.point_helper" :
                                 point >= gizmoNativeAnchorEnd ? "editor.view.point_active" :
                                 point >= gizmoNativeAnchorStart ? "editor.view.point_native" :
-                                point == AnchorAdjustment.CenterAnchorIndex ? "editor.view.point_centre" :
-                                point < 8 ? "editor.view.point_corner" : "editor.view.point_midpoint")));
+                                "editor.view.point_helper")));
                 }
                 bool selected = document.EditablePartSelectionCount > 0;
                 view.SetContextHintGroups(
@@ -1214,6 +1245,7 @@ namespace OstrixMods.BuildWorks
             keyboardSavedPin = pinnedAnchorWorld;
             keyboardSavedConstraint = anchorConstraintAxis;
             keyboardSavedLocalSpace = localSpace;
+            keyboardSavedFrame = transformFrame;
             keyboardStartViewAxis = scene.Camera.transform.forward;
             keyboardNumber = "";
             dragPivot = selectedAnchorWorld ?? pivot;
@@ -1249,8 +1281,8 @@ namespace OstrixMods.BuildWorks
             keyboardSourceChoices.Clear();
             for (int index = gizmoNativeAnchorStart; index < dragNativeAnchorEnd; ++index)
                 keyboardSourceChoices.Add(index);
-            bool fallback = keyboardSourceChoices.Count == 0;
-            if (keyboardHelpersEnabled || fallback)
+            bool fallback = !scene.NativePointsOnly && keyboardSourceChoices.Count == 0;
+            if (!scene.NativePointsOnly && (keyboardHelpersEnabled || fallback))
                 for (int index = 0; index < Mathf.Min(gizmoNativeAnchorStart, dragSourceAnchors.Length); ++index)
                     keyboardSourceChoices.Add(index);
             var labels = new List<string>();
@@ -1322,7 +1354,13 @@ namespace OstrixMods.BuildWorks
         private void SetKeyboardAxis(GizmoAxis axis)
         {
             if (dragHandle == GizmoHandleKind.Scale) return;
-            if (axis == dragAxis) localSpace = !localSpace;
+            if (axis == dragAxis)
+            {
+                localSpace = !localSpace;
+                transformFrame = localSpace ? keyboardSavedFrame == TransformFrame.World ? TransformFrame.Local : keyboardSavedFrame
+                    : TransformFrame.World;
+                UpdateTransformContext();
+            }
             dragAxis = axis;
             keyboardSurface = false;
             view.SetCursorSourcesAvailable(false);
@@ -1370,11 +1408,15 @@ namespace OstrixMods.BuildWorks
                 for (int index = 0; index < sources.Length; ++index)
                     sources[index] = dragPivot + dragRotation * (dragSourceAnchors[index] - dragPivot) * dragScale + dragTranslation;
                 bool wasSnapped = snapTargetVisible;
+                var previouslyShown = new List<Vector3>(snapPreviewTargets);
                 Vector3 previousTarget = snapTargetWorld;
                 snapTargetVisible = !ShiftHeld && scene.TryCursorSnap(dragIds, sources, keyboardSnapSources,
                     gizmoNativeAnchorStart, dragNativeAnchorEnd, keyboardHelpersEnabled, snapPreviewTargets, snapPreviewNative,
                     out keyboardAutoSource, out snapTargetWorld, out snapTargetIsNative,
                     wasSnapped ? keyboardAutoSource : -1, wasSnapped ? previousTarget : (Vector3?)null);
+                // Reveal a new target for a complete frame before magnetic capture.
+                if (snapTargetVisible && !wasSnapped && !previouslyShown.Exists(p => (p - snapTargetWorld).sqrMagnitude < .000001f))
+                    snapTargetVisible = false;
                 if (snapTargetVisible) dragTranslation += snapTargetWorld - sources[keyboardAutoSource];
                 else keyboardAutoSource = -1;
                 if (ShiftHeld) { snapPreviewTargets.Clear(); snapPreviewNative.Clear(); }
@@ -1514,46 +1556,45 @@ namespace OstrixMods.BuildWorks
                 ? -1 : scene.HitTestAnchor(gizmoAnchors, mouse);
             if (anchor >= 0)
             {
+                if (pickingFramePoint && selectedAnchorWorld.HasValue)
+                {
+                    if ((gizmoAnchors[anchor] - selectedAnchorWorld.Value).sqrMagnitude < .00000001f)
+                        view.SetStatus(BuildWorksLocalization.Text("editor.edge_zero"));
+                    else
+                    {
+                        framePointWorld = gizmoAnchors[anchor]; pickingFramePoint = false;
+                        transformFrame = TransformFrame.Edge; localSpace = true;
+                        view.SetStatus(BuildWorksLocalization.Text("editor.edge_ready"));
+                    }
+                    dragIds.Clear(); UpdateTransformContext(); UpdateGizmo(); return true;
+                }
+                if (activeTool == BlueprintEditorTool.Array)
+                {
+                    dragMagneticMove = input.GetKey(KeyCode.LeftControl) || input.GetKey(KeyCode.RightControl);
+                    int fixedAnchor = pinnedAnchorPoint >= 0 && pinnedAnchorPoint < gizmoAnchors.Length
+                        ? pinnedAnchorPoint : anchor < AnchorAdjustment.AnchorCount ? AnchorAdjustment.OppositeAnchor(anchor) : -1;
+                    if (!dragMagneticMove && (fixedAnchor < 0 || fixedAnchor == anchor)) { dragIds.Clear(); return true; }
+                    dragAnchorPoint = anchor;
+                    dragSourceAnchors = (Vector3[])gizmoAnchors.Clone();
+                    dragAnchorStartWorld = gizmoAnchors[anchor];
+                    dragPivot = dragMagneticMove ? pivot : gizmoAnchors[fixedAnchor];
+                    dragMovingVector = dragAnchorStartWorld - dragPivot;
+                    if (!ConfigureAnchorConstraint(orientation)) { ResetGizmoDrag(); return true; }
+                    dragStartMouse = mouse; dragTranslation = Vector3.zero;
+                    dragRotation = Quaternion.identity; dragScale = 1f; selectionPending = false;
+                    return true;
+                }
+                bool nativePoint = anchor == selectedAnchorPoint ? selectedAnchorNative :
+                    anchor >= gizmoNativeAnchorStart && anchor < gizmoNativeAnchorEnd;
                 selectedAnchorPoint = anchor;
                 selectedAnchorWorld = gizmoAnchors[anchor];
-                if (input.GetKey(KeyCode.LeftShift) || input.GetKey(KeyCode.RightShift))
-                {
-                    dragIds.Clear();
-                    ToggleSelectedAnchorPin();
-                    return true;
-                }
-                dragMagneticMove = input.GetKey(KeyCode.LeftControl) || input.GetKey(KeyCode.RightControl);
-                int fixedAnchor = pinnedAnchorPoint >= 0 && pinnedAnchorPoint < gizmoAnchors.Length
-                    ? pinnedAnchorPoint
-                    : anchor < AnchorAdjustment.AnchorCount ? AnchorAdjustment.OppositeAnchor(anchor) : -1;
-                if (!dragMagneticMove && (fixedAnchor < 0 || fixedAnchor == anchor))
-                {
-                    dragIds.Clear();
-                    view.SetStatus(BuildWorksLocalization.Text("editor.anchor_controls"));
-                    return true;
-                }
-                dragAnchorPoint = anchor;
-                dragSourceAnchors = (Vector3[])gizmoAnchors.Clone();
-                dragAnchorStartWorld = gizmoAnchors[anchor];
-                dragPivot = dragMagneticMove ? pivot : gizmoAnchors[fixedAnchor];
-                dragMovingVector = dragAnchorStartWorld - dragPivot;
-                dragAnchorPlane = new Plane(
-                    scene.Camera.transform.forward, dragAnchorStartWorld);
-                if (!ConfigureAnchorConstraint(orientation))
-                {
-                    ResetGizmoDrag();
-                    UpdateGizmo();
-                    view.SetStatus(BuildWorksLocalization.Text("editor.anchor_on_axis"));
-                    return true;
-                }
-                dragStartMouse = mouse;
-                dragTranslation = Vector3.zero;
-                dragRotation = Quaternion.identity;
-                dragScale = 1f;
-                selectionPending = false;
-                view.SetStatus(BuildWorksLocalization.Text(dragMagneticMove
-                    ? "editor.anchor_drag_magnetic"
-                    : "editor.anchor_drag_rotate"));
+                selectedAnchorNative = nativePoint;
+                pinnedAnchorWorld = selectedAnchorWorld;
+                framePointWorld = null;
+                if (transformFrame == TransformFrame.Edge) transformFrame = TransformFrame.Local;
+                dragIds.Clear();
+                UpdateTransformContext(); UpdateGizmo();
+                view.SetStatus(BuildWorksLocalization.Text("editor.point_selected"));
                 return true;
             }
 
@@ -1820,6 +1861,7 @@ namespace OstrixMods.BuildWorks
                 pinnedAnchorWorld = keyboardSavedPin;
                 anchorConstraintAxis = keyboardSavedConstraint;
                 localSpace = keyboardSavedLocalSpace;
+                transformFrame = keyboardSavedFrame;
             }
             if (dragHandle == GizmoHandleKind.Layout) RestoreArrayDrag();
             ResetGizmoDrag();
@@ -1999,6 +2041,11 @@ namespace OstrixMods.BuildWorks
         private void UpdateGizmo()
         {
             if (scene == null) return;
+            if (!selectedAnchorWorld.HasValue)
+            {
+                framePointWorld = null; pickingFramePoint = false;
+                if (transformFrame == TransformFrame.Edge) { transformFrame = TransformFrame.Local; localSpace = true; }
+            }
             scene.GizmoFamily = activeTool == BlueprintEditorTool.Array ? GizmoFamily.Combined : gizmoFamily;
             scene.GizmoMouse = input.MousePosition;
             if (placementItem != null) return;
@@ -2040,19 +2087,27 @@ namespace OstrixMods.BuildWorks
                 }
                 if (!IsGizmoDragging)
                 {
+                    scene.SetGizmoModelSize(gizmoIds);
                     gizmoNativeAnchorEnd = gizmoAnchors.Length;
                     pinnedAnchorPoint = -1;
-                    if (pinnedAnchorWorld.HasValue)
+                    if (pinnedAnchorWorld.HasValue && (!selectedAnchorWorld.HasValue ||
+                        (pinnedAnchorWorld.Value - selectedAnchorWorld.Value).sqrMagnitude > .000001f))
                     {
                         pinnedAnchorPoint = gizmoAnchors.Length;
                         Array.Resize(ref gizmoAnchors, gizmoAnchors.Length + 1);
                         gizmoAnchors[pinnedAnchorPoint] = pinnedAnchorWorld.Value;
                     }
+                    int preferredIndex = selectedAnchorPoint;
                     selectedAnchorPoint = -1;
                     if (selectedAnchorWorld.HasValue)
                     {
-                        for (int index = gizmoAnchors.Length - 1; index >= 0; --index)
-                            if ((gizmoAnchors[index] - selectedAnchorWorld.Value).sqrMagnitude < 0.000001f)
+                        if (preferredIndex >= 0 && preferredIndex < gizmoNativeAnchorEnd &&
+                            (preferredIndex >= gizmoNativeAnchorStart) == selectedAnchorNative &&
+                            (gizmoAnchors[preferredIndex] - selectedAnchorWorld.Value).sqrMagnitude < .000001f)
+                            selectedAnchorPoint = preferredIndex;
+                        for (int index = gizmoNativeAnchorEnd - 1; selectedAnchorPoint < 0 && index >= 0; --index)
+                            if ((index >= gizmoNativeAnchorStart) == selectedAnchorNative &&
+                                (gizmoAnchors[index] - selectedAnchorWorld.Value).sqrMagnitude < 0.000001f)
                             { selectedAnchorPoint = index; break; }
                         if (selectedAnchorPoint < 0)
                         {
@@ -2060,6 +2115,9 @@ namespace OstrixMods.BuildWorks
                             Array.Resize(ref gizmoAnchors, gizmoAnchors.Length + 1);
                             gizmoAnchors[selectedAnchorPoint] = selectedAnchorWorld.Value;
                         }
+                        if (pinnedAnchorWorld.HasValue &&
+                            (pinnedAnchorWorld.Value - selectedAnchorWorld.Value).sqrMagnitude < .000001f)
+                            pinnedAnchorPoint = selectedAnchorPoint;
                     }
                 }
                 scene.ShowGizmo(
@@ -2084,10 +2142,13 @@ namespace OstrixMods.BuildWorks
                     dragConstraintActive ? dragConstraintCenter : pinnedAnchorWorld ?? pivot,
                     dragConstraintActive ? dragAxisWorld
                         : TransformGizmoView.AxisVector(anchorConstraintAxis, orientation, localSpace),
-                    dragConstraintActive ? dragConstraintRadius : 0f);
+                    dragConstraintActive ? dragConstraintRadius : 0f,
+                    selectedAnchorNative ? -1 : selectedAnchorPoint);
                 scene.ShowSnapCandidates(
                     dragAnchorPoint >= 0 || keyboardSurface && keyboardPreview ? snapPreviewTargets : Array.Empty<Vector3>(),
                     dragAnchorPoint >= 0 || keyboardSurface && keyboardPreview ? snapPreviewNative : Array.Empty<bool>());
+                scene.ShowEdgeFrame(selectedAnchorWorld, framePointWorld, IsGizmoDragging ? dragPivot : pivot,
+                    dragTranslation, dragRotation, dragScale, IsGizmoDragging);
             }
             else scene.ShowGizmo(
                 BlueprintEditorTool.Select,
@@ -2167,6 +2228,21 @@ namespace OstrixMods.BuildWorks
             {
                 pivot = ToVector(primary.Position);
                 orientation = ToQuaternion(primary.Rotation);
+            }
+            // Point A wins over object/group fallback; orientation is a separate choice.
+            pivot = selectedAnchorWorld ?? pivot;
+            if (transformFrame == TransformFrame.View) orientation = scene.Camera.transform.rotation;
+            else if (transformFrame == TransformFrame.Edge && selectedAnchorWorld.HasValue && framePointWorld.HasValue)
+            {
+                Vector3 direction = framePointWorld.Value - selectedAnchorWorld.Value;
+                if (direction.sqrMagnitude > .00000001f)
+                {
+                    Vector3 from = orientation * Vector3.right;
+                    Quaternion align = Vector3.Dot(from, direction.normalized) < -.999999f
+                        ? Quaternion.AngleAxis(180f, orientation * Vector3.up)
+                        : Quaternion.FromToRotation(from, direction.normalized);
+                    orientation = align * orientation;
+                }
             }
             return true;
         }
@@ -3026,12 +3102,21 @@ namespace OstrixMods.BuildWorks
         private void ToggleSpace()
         {
             localSpace = !localSpace;
+            transformFrame = localSpace ? TransformFrame.Local : TransformFrame.World;
             UpdateTransformContext();
             UpdateGizmo();
             view.SetStatus(BuildWorksLocalization.Text(
                 localSpace && ActiveEditablePart() != null
                     ? "editor.axes_local"
                     : "editor.axes_world"));
+        }
+
+        private void CycleTransformFrame()
+        {
+            if (IsGizmoDragging) return;
+            transformFrame = (TransformFrame)(((int)transformFrame + 1) % (framePointWorld.HasValue ? 4 : 3));
+            localSpace = transformFrame != TransformFrame.World;
+            UpdateTransformContext(); UpdateGizmo();
         }
 
         private void ToggleAnchorVisibility()
@@ -3111,6 +3196,10 @@ namespace OstrixMods.BuildWorks
             else view.SetStatus(BuildWorksLocalization.Text("editor.transform_already_reset"));
         }
 
+        private string TransformFrameKey => transformFrame == TransformFrame.World ? "editor.view.frame_world" :
+            transformFrame == TransformFrame.View ? "editor.view.frame_view" :
+            transformFrame == TransformFrame.Edge ? "editor.view.frame_edge" : "editor.view.frame_local";
+
         private void UpdateTransformContext()
         {
             bool hasActivePart = ActiveEditablePart() != null;
@@ -3124,6 +3213,9 @@ namespace OstrixMods.BuildWorks
                 pivotMode,
                 boundsPivotIndex);
             view?.SetGizmoOptions(showAllAnchors, meshSnapEnabled);
+            view?.SetPointContext(scene != null && scene.ModelSpaceGizmo, scene != null && scene.NativePointsOnly,
+                  showAllAnchors, TransformFrameKey, pickingFramePoint,
+                framePointWorld.HasValue);
         }
 
         private bool TrySave(bool closeAfterSave)

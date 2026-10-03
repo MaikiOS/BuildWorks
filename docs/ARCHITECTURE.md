@@ -50,8 +50,20 @@ existing controls rather than duplicate handlers. Layout state is editor-only.
 
 G cursor movement queries the existing scene contact/snap data. Auto/native-only
 source policy and the chooser are editor state, not blueprint format fields.
-Explicit sources are retained by selected IDs across G/R/G; pin remains a
-separate pivot. Confirm owns one document transform; UI clicks cannot confirm it.
+Explicit sources are retained by selected IDs across G/R/G. Selected A overrides
+object/group fallback pivots and is the default G source grip; target capture never
+replaces it. Optional B defines working X along A→B, not an alignment/curve tool.
+The immutable operation snapshot owns exact values and cancel. Frame enum and
+local-space flag switch together; View/Edge restore on repeated axis and Esc.
+Confirm owns one document transform; UI clicks cannot confirm it.
+
+Editor points use two provenance signs (native/helper), near-cursor reveal and
+persistent A. Native-only applies to Auto/Q/E source sets and targets; explicit
+helper A is a visible intentional exception. A retained helper outside the current
+geometry set carries an override, so it cannot be relabelled as a native socket.
+Screen size uses camera projection; model size uses rotation-independent local
+renderer dimensions and the selected model scale, frozen during a preview.
+Drawing and projected hit areas consume that same size. World/F9 is unchanged.
 
 World requirements reuse native Hud cells and InventoryGui formatting.
 `BlueprintResourceHudView` owns only cloned overflow cells and the temporary

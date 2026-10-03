@@ -9,7 +9,16 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Current source candidate: **0.19.48**, Store v9, Valheim 1.0.16.
+Current source candidate: **0.19.49**, Store v9, Valheim 1.0.16.
+The .49 point workflow supersedes earlier visual subdivisions: only native gold
+and generated blue; near-cursor reveal by default, persistent selected pivot A,
+manual all/native-only filters and nearby G targets. Clicking A sets the transform
+centre and default G grip; optional B defines working X along A→B, not a guide
+or automatic edge alignment. Local/World/View/Edge frames are explicit.
+Manipulator offers screen-constant and model-relative 3D sizes with matching
+projected hit areas; model mode is independent of camera distance, FOV and
+projection. Existing art is reused. BW-01 awaits the new numbered owner series
+1–10, starting with 1–3; historical .48 tests are archived, not another answer list.
 0.19.39 owner feedback accepts menu hover, language refresh and camera framing;
 Transform selection is provisionally accepted. The owner accepts contour cleanup;
 the focused 0.19.41 game series is accepted by owner report on 2026-10-01.
@@ -71,7 +80,7 @@ dependent changes wait for its gate, unrelated preparation may continue.
 | ID | Deliverable | Dependency | Status |
 | --- | --- | --- | --- |
 | BW-00 | Dedicated-profile baseline and reliable handoff | Current core | Focused 0.19.41 owner series accepted; cost/refund accounting and networking pending |
-| BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | .45 input accepted; .48 compact point art automatically verified; owner point readability first, then series 1–8 |
+| BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | .49 point pivots, working frames and two sizing modes automatically verified; owner series 1–10, readability 1–3 first |
 | BW-02 | Group layout operations without resizing pieces | BW-01 | Planned; focused operation UI approval required |
 | BW-03 | Persistent Array and minimal recipe persistence | BW-02 | Planned; safe Store migration and editing/Bake gate |
 | BW-04 | Guides and curves in accepted slices | BW-03 + renewed owner discussion | Tool-semantics discussion required before coding |

@@ -2,6 +2,16 @@
 
 **English** | [Русский](snap-point-assets_RU.md)
 
+## Current point workflow
+
+.49 reuses only gold `snap-native` and blue `snap-corner` as provenance signs.
+Corner/midpoint/centre subdivisions below describe the historical .48 artwork,
+not current colours. Pin/active overlays are states, not additional point types.
+Default near-cursor reveal and persistent A reduce clutter without moving points.
+Manipulator → Size switches screen-constant pixels or model-relative 3D dimensions.
+The same assets and projected hit geometry are used in both modes; no new image
+generation is treated as runtime proof.
+
 Six replacement raster PNGs generated individually through imagegen for .48.
 The [earlier concept](../images/snap-point-style-proposal-v1.png) is historical.
 Not vectors or game screenshots. Each is 1254 × 1254 with transparent background.

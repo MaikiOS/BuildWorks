@@ -438,6 +438,11 @@ namespace OstrixMods.BuildWorks
         private readonly TMP_InputField scaleStepInput;
         public float ScaleStepPercent { get; private set; } = 10f;
         private readonly TMP_InputField[] viewportScaleInputs = new TMP_InputField[5];
+        private readonly Button gizmoSizingButton;
+        private readonly Button pointTypesButton;
+        private readonly Button frameButton;
+        private readonly Button edgeButton;
+        private readonly Button pointRevealButton;
         private readonly Button gridButton;
         private readonly Button projectionButton;
         private readonly IBlueprintEditorInput input;
@@ -471,7 +476,7 @@ namespace OstrixMods.BuildWorks
         private int transformBoundsPivot = 4;
         private float translationStep = 0.05f;
         private float rotationStep = 1f;
-        private bool showAllTransformAnchors = true;
+        private bool showAllTransformAnchors;
         private bool transformMeshSnap;
         private Vector3? blueprintBoundsSize;
         private BlueprintEditorDocument boundDocument;
@@ -1227,13 +1232,13 @@ namespace OstrixMods.BuildWorks
                     int choice = index;
                     Button button = CreateButton("ViewportSectionButton" + index, viewportControls,
                         T(sectionKeys[index]), 90f, () => ToggleViewportSection(choice));
-                    SetTopLeft((RectTransform)button.transform, index * 96f, 0f, 90f, 32f);
+                    SetTopLeft((RectTransform)button.transform, viewContextWidth + index * 96f, 0f, 90f, 32f);
                     viewportSectionButtons[index] = button;
                 }
-                SetTopRight(viewportControls, 8f, 8f, 420f, 32f);
+                SetTopRight(viewportControls, 8f, 8f, viewContextWidth + 420f, 32f);
                 Button focusView = CreateIconButton("ViewportFocus", viewportControls, "frame", "□", 32f,
                     () => { viewportFocused = !viewportFocused; ApplySafeAreaAndLayout(true); }, T("editor.view.focus_view"));
-                SetTopLeft((RectTransform)focusView.transform, 388f, 0f, 32f, 32f);
+                SetTopLeft((RectTransform)focusView.transform, viewContextWidth + 388f, 0f, 32f, 32f);
                 RepositionViewControl(frameAll.transform, 0, 12f, 4f, 142f, 32f);
                 RepositionViewControl(frameSelected.transform, 0, 164f, 4f, 142f, 32f);
                 RepositionViewControl(fovLabel.transform, 0, 12f, 48f, 190f, 32f);
@@ -1258,15 +1263,30 @@ namespace OstrixMods.BuildWorks
                     SetTopLeft((RectTransform)familyButtons[index].transform, index % 2 == 0 ? 12f : 164f,
                         4f + index / 2 * 36f, 142f, 32f);
                 }
-                RepositionViewControl(sizeTitle.transform, 2, 12f, 82f, 294f, 26f);
+                gizmoSizingButton = CreateButton("GizmoSizing", viewportSections[2].transform,
+                    T("editor.view.size_screen"), 294f, () => GizmoSizingRequested?.Invoke());
+                SetTopLeft((RectTransform)gizmoSizingButton.transform, 12f, 82f, 294f, 32f);
+                AddTooltip((RectTransform)gizmoSizingButton.transform, T("editor.view.size_mode_tooltip"));
+                RepositionViewControl(sizeTitle.transform, 2, 12f, 122f, 294f, 26f);
                 for (int index = 0; index < viewportScaleInputs.Length; ++index)
                 {
-                    RepositionViewControl(viewportSettings.transform.Find("GizmoSizeLabel" + index), 2, 12f, 114f + index * 38f, 192f, 32f);
-                    RepositionViewControl(viewportScaleInputs[index].transform, 2, 212f, 114f + index * 38f, 94f, 32f);
+                    RepositionViewControl(viewportSettings.transform.Find("GizmoSizeLabel" + index), 2, 12f, 154f + index * 38f, 192f, 32f);
+                    RepositionViewControl(viewportScaleInputs[index].transform, 2, 212f, 154f + index * 38f, 94f, 32f);
                 }
-                RepositionViewControl(scaleStepLabel.transform, 2, 12f, 308f, 192f, 32f);
-                RepositionViewControl(scaleStepInput.transform, 2, 212f, 308f, 94f, 32f);
-                RepositionViewControl(resetView.transform, 2, 12f, 352f, 294f, 32f);
+                RepositionViewControl(scaleStepLabel.transform, 2, 12f, 348f, 192f, 32f);
+                RepositionViewControl(scaleStepInput.transform, 2, 212f, 348f, 94f, 32f);
+                RepositionViewControl(resetView.transform, 2, 12f, 392f, 294f, 32f);
+                frameButton = CreateButton("TransformFrame", viewportControls, T("editor.view.frame_local"), 112f,
+                    () => FrameRequested?.Invoke());
+                edgeButton = CreateButton("EdgeFrame", viewportControls, T("editor.view.edge_pick"), 112f,
+                    () => EdgeRequested?.Invoke());
+                pointTypesButton = CreateButton("PointTypes", viewportControls, T("editor.view.types_all"), 112f,
+                    () => PointTypesRequested?.Invoke());
+                pointRevealButton = CreateButton("PointReveal", viewportControls, T("editor.view.points_cursor"), 112f,
+                    () => AnchorVisibilityRequested?.Invoke());
+                Button[] contextButtons = { frameButton, edgeButton, pointTypesButton, pointRevealButton };
+                for (int i = 0; i < contextButtons.Length; ++i)
+                    SetTopLeft((RectTransform)contextButtons[i].transform, i * 118f, 0f, 112f, 32f);
                 cursorSourceStatus = CreateText("CursorSourceStatus", viewportSections[3].transform,
                     T("editor.view.source_begin"), 12f, FontStyles.Normal, TextAlignmentOptions.TopLeft);
                 SetTopLeft(cursorSourceStatus.rectTransform, 12f, 4f, 294f, 42f);
@@ -1545,6 +1565,20 @@ namespace OstrixMods.BuildWorks
         internal event Action<float, float> SnapChanged;
         internal event Action SpaceRequested;
         internal event Action AnchorVisibilityRequested;
+        internal event Action GizmoSizingRequested;
+        internal event Action PointTypesRequested;
+        internal event Action FrameRequested;
+        internal event Action EdgeRequested;
+        private const float viewContextWidth = 480f;
+
+        internal void SetPointContext(bool modelSize, bool nativeOnly, bool all, string frameKey, bool edgePicking, bool hasEdge)
+        {
+            SetButtonLabel(gizmoSizingButton, T(modelSize ? "editor.view.size_model" : "editor.view.size_screen"));
+            SetButtonLabel(pointTypesButton, T(nativeOnly ? "editor.view.types_native" : "editor.view.types_all"));
+            SetButtonLabel(pointRevealButton, T(all ? "editor.view.points_all" : "editor.view.points_cursor"));
+            SetButtonLabel(frameButton, T(frameKey));
+            SetButtonLabel(edgeButton, T(edgePicking ? "editor.view.edge_wait" : hasEdge ? "editor.view.edge_clear" : "editor.view.edge_pick"));
+        }
         internal event Action MeshSnapRequested;
         internal event Action PinSelectedAnchorRequested;
         internal event Action<GizmoAxis> AnchorConstraintRequested;
@@ -2216,7 +2250,7 @@ namespace OstrixMods.BuildWorks
                 SetSelected(viewportSectionButtons[index], open && index == section);
             }
             SetTopRight((RectTransform)viewportSettings.transform, 8f, 48f, 320f,
-                section == 0 ? 216f : section == 1 ? 176f : section == 3 ? 416f : 440f);
+                section == 0 ? 216f : section == 1 ? 176f : section == 3 ? 416f : 480f);
             FitViewportSettings();
             EndTooltip();
         }
@@ -4080,6 +4114,7 @@ namespace OstrixMods.BuildWorks
             Place(top, layout.Top);
             Place(rail, layout.Rail);
             Place(viewport, layout.Viewport);
+            viewportControls.localScale = Vector3.one * Mathf.Min(1f, (viewport.rect.width - 16f) / (viewContextWidth + 420f));
             FitViewportSettings();
             Place(rightColumn, layout.RightColumn);
             Place(outliner, layout.Outliner);

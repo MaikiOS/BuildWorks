@@ -103,7 +103,7 @@ public static class EditorInteractionAcceptance
                 evidence.Add("PASS actual rendered gold=" + goldPixels + "; purple=" + purplePixels +
                     "; editorLayer=" + layer + "; cameraMask=" + scene.Camera.cullingMask);
 
-                // Exercise every type at the SAME native coordinate, without moving or hiding points.
+                // All generated positions share blue provenance, including coincident active points.
                 foreach (int helper in new[] { 0, 8, AnchorAdjustment.CenterAnchorIndex })
                 {
                     var overlap = (Vector3[])anchors.Clone();
@@ -113,10 +113,8 @@ public static class EditorInteractionAcceptance
                         Vector3.zero, false);
                     Color32[] mixed = Render(scene.Camera, Path.Combine(outputDirectory,
                         "actual-point-overlap-" + helper + ".png"));
-                    int helperPixels = ChangedPixels(clean, mixed, nativePixel, p => helper == 0
-                        ? p.b > p.r + 35 && p.b > p.g + 10
-                        : helper == 8 ? p.g > p.r + 20 && p.g > p.b + 10
-                        : p.r > p.g + 30 && p.b > p.g + 15);
+                    int helperPixels = ChangedPixels(clean, mixed, nativePixel, p =>
+                        p.b > p.r + 35 && p.b > p.g + 10);
                     int nativePixels = ChangedPixels(clean, mixed, nativePixel, p =>
                         p.r > 150 && p.g > 85 && p.b < 190 && p.r > p.g + 15);
                     Require(helperPixels >= 8 && nativePixels >= 40,
@@ -135,6 +133,30 @@ public static class EditorInteractionAcceptance
 
                 Show(scene, pivot, anchors, nativeStart);
                 TestIndependentSizes(scene, gizmo, pivot, anchors, nativeStart);
+                scene.SetGizmoModelSize(ids);
+                scene.ModelSpaceGizmo = true;
+                Vector3 previousPosition = scene.Camera.transform.position;
+                Quaternion previousRotation = scene.Camera.transform.rotation;
+                bool previousProjection = scene.Camera.orthographic;
+                try
+                {
+                    scene.Camera.orthographic = false;
+                    foreach (float distance in new[] { 4f, 12f })
+                    {
+                        scene.SetCameraPose(pivot - Vector3.forward * distance, Quaternion.identity);
+                        scene.ShowGizmo(BlueprintEditorTool.Transform, pivot, Quaternion.identity, false,
+                            GizmoHandleKind.None, GizmoAxis.None, anchors, nativeIndex, nativeStart, false,
+                            false, Vector3.zero, false, pinnedAnchor: nativeIndex);
+                        Render(scene.Camera, Path.Combine(outputDirectory, "actual-model-size-" + distance + "m.png"));
+                    }
+                }
+                finally
+                {
+                    scene.ModelSpaceGizmo = false;
+                    scene.Camera.orthographic = previousProjection;
+                    scene.SetCameraPose(previousPosition, previousRotation);
+                    Show(scene, pivot, anchors, nativeStart);
+                }
                 scene.SetTemporarySelectionHighlight(true, doc);
                 foreach (string id in ids)
                     foreach (Renderer renderer in Field<Renderer[]>(visuals[id], "Renderers"))

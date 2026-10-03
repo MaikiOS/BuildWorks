@@ -282,6 +282,29 @@ namespace OstrixMods.BuildWorks
         internal Camera Camera => camera;
         internal int Layer => editorLayer;
         internal float GizmoScale => gizmo?.Scale ?? 0f;
+        internal bool ModelSpaceGizmo { get => gizmo.ModelSpaceSizing; set => gizmo.ModelSpaceSizing = value; }
+        internal bool NativePointsOnly { get => gizmo.NativePointsOnly; set => gizmo.NativePointsOnly = value; }
+
+        internal void SetGizmoModelSize(IReadOnlyList<string> ids)
+        {
+            // Local dimensions transformed as vectors: rotation and camera cannot inflate the reference.
+            float diagonal = 0f;
+            foreach (string id in ids)
+            {
+                if (!visuals.TryGetValue(id, out VisualNode node)) continue;
+                foreach (Renderer renderer in node.Renderers)
+                {
+                    if (!renderer || !renderer.enabled) continue;
+                    Vector3 size = renderer.localBounds.size;
+                    Transform t = renderer.transform;
+                    float squared = t.TransformVector(Vector3.right * size.x).sqrMagnitude +
+                        t.TransformVector(Vector3.up * size.y).sqrMagnitude +
+                        t.TransformVector(Vector3.forward * size.z).sqrMagnitude;
+                    diagonal = Mathf.Max(diagonal, Mathf.Sqrt(squared));
+                }
+            }
+            gizmo.ModelSize = Mathf.Max(.0001f, diagonal * .4f);
+        }
         internal float GroundHeight => groundHeight;
 
         internal void EnsureWorldCamerasExcludeEditorLayer()
@@ -619,7 +642,8 @@ namespace OstrixMods.BuildWorks
                 {
                     VisualNode visual = entry.Value;
                     if (Contains(excludedIds, entry.Key) || !visual.Root.activeInHierarchy) continue;
-                    int count = helpers || visual.NativeSnapCount == 0 ? visual.SnapLocal.Count : visual.NativeSnapCount;
+                    int count = !NativePointsOnly && (helpers || visual.NativeSnapCount == 0)
+                        ? visual.SnapLocal.Count : visual.NativeSnapCount;
                     for (int ti = 0; ti < count; ++ti)
                     {
                         bool native = ti < visual.NativeSnapCount;
@@ -1073,7 +1097,8 @@ namespace OstrixMods.BuildWorks
             bool constraintActive = false,
             Vector3 constraintCenter = default,
             Vector3 constraintWorldAxis = default,
-            float constraintRadius = 0f)
+            float constraintRadius = 0f,
+            int helperAnchorOverride = -1)
         {
             ThrowIfDisposed();
             bool transform = tool != BlueprintEditorTool.Select;
@@ -1107,7 +1132,8 @@ namespace OstrixMods.BuildWorks
                 allowMove: true,
                 allowRotate: true,
                 allowExtended: true,
-                pointVisibility: point => IsEditorPointVisible(point));
+                pointVisibility: point => IsEditorPointVisible(point),
+                helperAnchorOverride: helperAnchorOverride);
             ShowTargetOutline(showSnapTarget);
         }
 
@@ -1120,12 +1146,12 @@ namespace OstrixMods.BuildWorks
             var vertices = new List<Vector3>();
             // ponytail: at most 2048 cached mesh edges for one target; simplify the outline if profiling warrants it.
             foreach (PickSurface surface in activeSnapVisual.PickSurfaces)
-            foreach (Edge3 edge in surface.Edges)
-            {
-                if (vertices.Count >= 4096) break;
-                vertices.Add(activeSnapVisual.Root.transform.TransformPoint(ToUnity(edge.Start)));
-                vertices.Add(activeSnapVisual.Root.transform.TransformPoint(ToUnity(edge.End)));
-            }
+                foreach (Edge3 edge in surface.Edges)
+                {
+                    if (vertices.Count >= 4096) break;
+                    vertices.Add(activeSnapVisual.Root.transform.TransformPoint(ToUnity(edge.Start)));
+                    vertices.Add(activeSnapVisual.Root.transform.TransformPoint(ToUnity(edge.End)));
+                }
             int[] indices = new int[vertices.Count];
             for (int index = 0; index < indices.Length; ++index) indices[index] = index;
             targetOutlineMesh.Clear();
@@ -1138,6 +1164,10 @@ namespace OstrixMods.BuildWorks
             IReadOnlyList<Vector3> candidates,
             IReadOnlyList<bool> nativeCandidates) =>
             gizmo.ShowSnapCandidates(camera, candidates, nativeCandidates, 1f);
+
+        internal void ShowEdgeFrame(Vector3? a, Vector3? b, Vector3 pivot, Vector3 translation,
+            Quaternion rotation, float scale, bool preview) =>
+            gizmo.ShowEdgeFrame(a, b, pivot, translation, rotation, scale, preview);
 
         internal int HitTestAnchor(Vector3[] anchorPoints, Vector2 mousePosition)
         {

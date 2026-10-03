@@ -225,6 +225,8 @@ internal static class ControllerInputAcceptance
 
             foreach (object tick in TestTransformContract(controller, input, scene, view, uiCamera, target, output))
                 yield return tick;
+            foreach (object tick in TestPointFrames(controller, input, scene, view, uiCamera, target, output))
+                yield return tick;
             foreach (object tick in TestCursorPreview(controller, input, scene, view, uiCamera, target, output))
                 yield return tick;
             foreach (object tick in TestInputRevision(controller, input, scene, view, uiCamera, target, output))
@@ -249,7 +251,7 @@ internal static class ControllerInputAcceptance
             Vector3 original = V(doc.Parts[0].Position);
             Set(controller, "gizmoFamily", GizmoFamily.Move);
             Frame(controller, input, left); yield return null;
-            Vector2 moveStart = MoveHandle(scene, original, GizmoAxis.X);
+            Vector2 moveStart = MoveHandle(scene, Field<Vector3?>(controller, "selectedAnchorWorld") ?? original, GizmoAxis.X);
             Frame(controller, input, moveStart, 1, KeyCode.LeftAlt); yield return null;
             Require(Field<GizmoHandleKind>(controller, "dragHandle") == GizmoHandleKind.Move &&
                 Field<bool>(controller, "dragDuplicate"), "Alt arrow did not start copy drag: handle=" +
@@ -531,7 +533,7 @@ internal static class ControllerInputAcceptance
             File.WriteAllText(Path.Combine(output, "controller-input-check.txt"),
                 "PASS: actual Update/LateUpdate with deterministic key/button edges; actual EventSystem GraphicRaycaster and pointer handlers. " +
                 "Ctrl+A editable; Select Shift rows/viewport/blue-release-gizmo; Transform clicks/visible box update selection without moving parts; " +
-                "multi-selection Shift pin behind unselected mesh, X/Y/Z constrained anchor rotation about fixed pin; " +
+                "multi-selection pivot behind unselected mesh, R+X/Y/Z numeric rotation about fixed A; A/B frame, axis repeat/cancel, UI sizing and point filters; " +
                 "native pin; Outliner native drag blocks Ctrl+A/Delete, Esc preserves selection and late drop cannot reparent; " +
                 "Alt Move preview+commit+Undo+cancel; group copy hierarchy; uniform 10% scale step/Shift free/cancel; " +
                 "viewport grid/projection icons via native raycast, no camera wheel/gizmo/selection interception; " +
@@ -797,6 +799,12 @@ internal static class ControllerInputAcceptance
         NativeClick(view, uiCamera, "CursorHelpers"); yield return null;
         Require(Field<List<int>>(controller, "keyboardSourceChoices").Exists(index => index < nativeStart),
             "Additional points do not extend the explicitly enabled source set");
+        NativeClick(view, uiCamera, "PointTypes"); yield return null;
+        Require(Field<List<int>>(controller, "keyboardSourceChoices").TrueForAll(index => index >= nativeStart && index < nativeEnd),
+            "Native-only header leaves hidden helpers in Q/E choices");
+        NativeClick(view, uiCamera, "PointTypes"); yield return null;
+        Require(Field<List<int>>(controller, "keyboardSourceChoices").Exists(index => index < nativeStart),
+            "Restoring both point types did not restore opted-in helper choices");
         NativeClick(view, uiCamera, "CursorHelpers"); yield return null;
         Require(Field<List<int>>(controller, "keyboardSourceChoices").TrueForAll(index => index >= nativeStart && index < nativeEnd),
             "Disabling helpers still lengthens the native-only Q/E cycle");
@@ -1157,6 +1165,7 @@ internal static class ControllerInputAcceptance
         Frame(controller, input, empty); yield return null;
         foreach (GizmoAxis axis in new[] { GizmoAxis.X, GizmoAxis.Y, GizmoAxis.Z })
         {
+            Set(controller, "gizmoFamily", GizmoFamily.Points);
             Vector2 pinMouse = scene.Camera.WorldToScreenPoint(pin);
             Require(scene.TryPick(pinMouse, out string picked) && picked == "pin-occluder",
                 "Pin regression precondition: unselected mesh does not occlude selected native point");
@@ -1174,36 +1183,22 @@ internal static class ControllerInputAcceptance
             Require(Field<LineRenderer>(Field<TransformGizmoView>(scene, "gizmo"), "constraintPath").gameObject.activeSelf,
                 "Pinned X/Y/Z has no constraint path before dragging " + axis);
             Vector3 axisWorld = axis == GizmoAxis.X ? Vector3.right : axis == GizmoAxis.Y ? Vector3.up : Vector3.forward;
-            anchors = Field<Vector3[]>(controller, "gizmoAnchors");
-            int moving = -1; float bestRadius = 0f;
-            for (int index = Field<int>(controller, "gizmoNativeAnchorStart"); index < anchors.Length; ++index)
-            {
-                Vector3 delta = anchors[index] - pin;
-                float radius = Vector3.Cross(delta, axisWorld).magnitude;
-                Vector2 point = scene.Camera.WorldToScreenPoint(anchors[index]);
-                int hit = scene.HitTestAnchor(anchors, point);
-                if (radius > bestRadius && radius > .25f && hit >= 0 &&
-                    Vector3.Distance(anchors[hit], anchors[index]) < .0001f && !scene.HitTestScale(point))
-                { moving = index; bestRadius = radius; }
-            }
-            Require(moving >= 0, "No non-collinear native point for constrained axis " + axis);
-            Vector3 movingPoint = anchors[moving];
-            Vector2 movingMouse = scene.Camera.WorldToScreenPoint(movingPoint);
-            Frame(controller, input, movingMouse, 1); yield return null;
-            Require(Field<bool>(controller, "dragConstraintActive") &&
-                Field<int>(controller, "dragAnchorPoint") >= 0 &&
+            Frame(controller, input, pinMouse, 0, KeyCode.R); yield return null;
+            Frame(controller, input, pinMouse); yield return null;
+            Frame(controller, input, pinMouse, 0, key); yield return null;
+            Require(Field<bool>(controller, "keyboardPreview") &&
+                Vector3.Distance(Field<Vector3>(controller, "dragPivot"), pin) < .0001f &&
                 Vector3.Dot(Field<Vector3>(controller, "dragAxisWorld"), axisWorld) > .999f,
-                "Pinned native drag did not enter constrained rotation " + axis);
+                "R + axis did not rotate around the selected native pivot " + axis);
             Quaternion expected = Quaternion.AngleAxis(30f, axisWorld);
-            Vector3 rotatedPoint = pin + expected * (movingPoint - pin);
-            Vector2 end = scene.Camera.WorldToScreenPoint(rotatedPoint);
-            Frame(controller, input, end, 1); yield return null;
+            input.Next(pinMouse); input.InputString = "30";
+            controller.Update(); controller.LateUpdate(); yield return null;
             Require(Quaternion.Angle(Field<Quaternion>(controller, "dragRotation"), expected) < .1f &&
                 Vector3.Distance(Field<Vector3?>(controller, "pinnedAnchorWorld").Value, pin) < .0001f,
-                "Constrained native drag rotates about a different axis or moves the pin " + axis);
+                "Numeric rotation uses a different axis or moves pivot A " + axis);
             if (axis == GizmoAxis.X)
                 Save(scene, view, uiCamera, target, Path.Combine(output, "input-transform-occluded-pin-x.png"));
-            Frame(controller, input, end); yield return null;
+            Frame(controller, input, pinMouse, 0, KeyCode.Return); yield return null;
             Require(Vector3.Distance(V(doc.Parts[0].Position), pin + expected * (originalLeft - pin)) < .002f &&
                 Vector3.Distance(V(doc.Parts[1].Position), pin + expected * (originalRight - pin)) < .002f &&
                 doc.EditablePartSelectionCount == 2 && !doc.IsPartSelected("pin-occluder"),
@@ -1217,10 +1212,90 @@ internal static class ControllerInputAcceptance
         // Undo restored the group poses; remove only the explicit occlusion fixture.
         doc.SelectOnly("pin-occluder"); Require(doc.DeleteSelection(true), "Pin fixture cleanup failed");
         doc.SelectOnly("left"); Require(scene.TrySync(doc, out error), error); view.Bind(doc, true, null, null);
+        Set(controller, "gizmoFamily", GizmoFamily.Points);
         Frame(controller, input, empty, 0, KeyCode.Z); yield return null;
         Frame(controller, input, empty); yield return null;
         Require(doc.Parts.Count == 4 && Field<GizmoAxis>(controller, "anchorConstraintAxis") == GizmoAxis.None,
             "Constrained pin fixture left a part or active axis behind");
+    }
+
+    private static IEnumerable TestPointFrames(BlueprintEditorController controller, InputFrames input,
+        BlueprintEditorScene scene, BlueprintEditorView view, Camera uiCamera, RenderTexture target, string output)
+    {
+        Frame(controller, input, Vector2.zero); NativeClick(view, uiCamera, "Row_left"); yield return null;
+        Set(controller, "gizmoFamily", GizmoFamily.Points);
+        Frame(controller, input, Vector2.zero); yield return null;
+        var gizmo = Field<TransformGizmoView>(scene, "gizmo");
+        Require(!Field<bool>(controller, "showAllAnchors"), "Default point policy is not near-cursor");
+        NativeClick(view, uiCamera, "ViewportSectionButton2"); yield return null;
+        NativeClick(view, uiCamera, "GizmoSizing"); yield return null;
+        Require(scene.ModelSpaceGizmo && gizmo.ModelSpaceSizing, "Size UI did not switch drawing and hit tests together");
+        NativeClick(view, uiCamera, "GizmoSizing"); yield return null;
+        Require(!scene.ModelSpaceGizmo, "Size UI cannot restore fixed screen size");
+        view.HideViewportSettings();
+        NativeClick(view, uiCamera, "PointTypes"); Frame(controller, input, Vector2.zero); yield return null;
+        Require(scene.NativePointsOnly, "Native-only header toggle failed");
+        NativeClick(view, uiCamera, "PointTypes");
+        NativeClick(view, uiCamera, "PointReveal"); Frame(controller, input, Vector2.zero); yield return null;
+        Require(Field<bool>(controller, "showAllAnchors"), "Show-all header toggle failed");
+        NativeClick(view, uiCamera, "PointReveal"); Frame(controller, input, Vector2.zero); yield return null;
+        Vector3[] anchors = Field<Vector3[]>(controller, "gizmoAnchors");
+        int first = Field<int>(controller, "gizmoNativeAnchorStart");
+        Vector3 a = anchors[first], b = anchors[first + 1];
+        Vector2 aMouse = scene.Camera.WorldToScreenPoint(a), bMouse = scene.Camera.WorldToScreenPoint(b);
+        Frame(controller, input, aMouse); yield return null;
+        Frame(controller, input, aMouse, 1); yield return null;
+        Frame(controller, input, aMouse); yield return null;
+        Require(Field<Vector3?>(controller, "selectedAnchorWorld") == a && !Field<bool>(controller, "keyboardPreview"),
+            "Choosing A started a transform instead of selecting its pivot");
+        Frame(controller, input, Vector2.zero); yield return null;
+        int selected = Field<int>(controller, "selectedAnchorPoint");
+        Require(Field<List<LineRenderer>>(gizmo, "anchorHandles")[selected].gameObject.activeSelf,
+            "Selected A is not persistent away from cursor");
+        NativeClick(view, uiCamera, "EdgeFrame"); yield return null;
+        Frame(controller, input, aMouse, 1); Frame(controller, input, aMouse); yield return null;
+        Require(!Field<Vector3?>(controller, "framePointWorld").HasValue && Field<bool>(controller, "pickingFramePoint"),
+            "Coincident A/B created an invalid working axis");
+        Frame(controller, input, bMouse); Frame(controller, input, bMouse, 1); yield return null;
+        Frame(controller, input, bMouse); yield return null;
+        Require(Field<Vector3?>(controller, "selectedAnchorWorld") == a &&
+            Field<Vector3?>(controller, "framePointWorld") == b &&
+            Field<object>(controller, "transformFrame").ToString() == "Edge", "Choosing B lost A or working frame");
+        Require(Field<LineRenderer>(gizmo, "frameGuide").gameObject.activeSelf, "A/B guide was not drawn");
+        Vector3 direction = (b-a).normalized;
+        Frame(controller, input, aMouse, 0, KeyCode.R); Frame(controller, input, aMouse); yield return null;
+        Frame(controller, input, aMouse, 0, KeyCode.X); Frame(controller, input, aMouse); yield return null;
+        Require(Vector3.Dot(Field<Vector3>(controller, "dragAxisWorld"), direction) > .999f,
+            "Edge X is not aligned to A→B");
+        AssertFrameText("editor.view.frame_edge");
+        Frame(controller, input, aMouse, 0, KeyCode.X); Frame(controller, input, aMouse); yield return null;
+        Require(Field<object>(controller, "transformFrame").ToString() == "World" && !Field<bool>(controller, "localSpace"),
+            "Repeated X switched maths but left the Edge header active");
+        AssertFrameText("editor.view.frame_world");
+        Frame(controller, input, aMouse, 0, KeyCode.X); Frame(controller, input, aMouse); yield return null;
+        Require(Field<object>(controller, "transformFrame").ToString() == "Edge" &&
+            Vector3.Dot(Field<Vector3>(controller, "dragAxisWorld"), direction) > .999f,
+            "Repeated X cannot restore the frozen Edge frame");
+        AssertFrameText("editor.view.frame_edge");
+        Frame(controller, input, aMouse, 0, KeyCode.Escape); Frame(controller, input, aMouse); yield return null;
+        Require(!Field<bool>(controller, "keyboardPreview") &&
+            Field<Vector3?>(controller, "selectedAnchorWorld") == a && Field<Vector3?>(controller, "framePointWorld") == b,
+            "Esc leaked the modal preview or lost its original A/B frame");
+        Save(scene, view, uiCamera, target, Path.Combine(output, "input-point-frame.png"));
+        NativeClick(view, uiCamera, "EdgeFrame"); Frame(controller, input, Vector2.zero); yield return null;
+        Require(!Field<Vector3?>(controller, "framePointWorld").HasValue &&
+            Field<object>(controller, "transformFrame").ToString() == "Local" &&
+            !Field<LineRenderer>(gizmo, "frameGuide").gameObject.activeSelf, "Clearing B left an active edge frame");
+        NativeClick(view, uiCamera, "Row_right"); yield return null;
+        NativeClick(view, uiCamera, "Row_left");
+        Frame(controller, input, Vector2.zero); yield return null;
+        void AssertFrameText(string key)
+        {
+            string caption = BuildWorksLocalization.Text(key);
+            Require(Field<Button>(view, "frameButton").GetComponentInChildren<TMP_Text>().text == caption &&
+                Field<TMP_Text>(view, "nextActionText").text.Contains(caption),
+                "Header and modal hint disagree with actual working frame: " + caption);
+        }
     }
 
     private static Vector2 EmptyTransformPoint(BlueprintEditorController controller, BlueprintEditorScene scene,

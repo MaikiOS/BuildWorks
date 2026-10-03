@@ -323,7 +323,7 @@ editor.hint.array_ready	МАССИВ: колесо — количество · E
 editor.hint.array_begin	МАССИВ: тяни золотую стрелку — первый ряд · другую — второй · Esc — отменить
 editor.hint.contour_ready	КОНТУР: ЛКМ — другая цепь · Enter — создать · Ctrl+2 — гизма · Esc — отменить
 editor.hint.contour_begin	КОНТУР: наведи на ребро невыбранной опоры — только линия · ЛКМ — призраки · Enter — создать · Esc — отменить
-editor.hint.transform	G — перенос по поверхности · X/Y/Z — перенос по оси · R — вращать · S — масштаб · тяни ручку — правка · Alt+стрелка — копия · Shift+точка — опора · Ctrl+точка — магнит
+editor.hint.transform	ЛКМ по точке — опора A · G — перенос от A · X/Y/Z — ограничить ось · R — вращать · S — масштаб · тяни ручку — правка · Alt+стрелка — копия
 editor.hint.empty	Tab — добавить деталь · СКМ — камера
 editor.hint.select	ЛКМ — выбор · Ctrl/Shift+ЛКМ — добавить/убрать · тяни пустоту — рамка · клик СКМ/Delete — удалить · G — открыть гизму
 editor.hint.modes_selected	Ctrl+1 — выбор · Ctrl+2 — гизма · Ctrl+3 — массив · Ctrl+4 — контур · Space/F3 — инструменты · Tab — каталог
@@ -345,7 +345,7 @@ editor.view.game_fov	Как в игре
 editor.view.blueprint_anchor	Опора чертежа
 editor.view.group_anchor	Опора группы
 editor.view.see_through	Просвет F7
-editor.anchor_controls	Shift + ЛКМ закрепляет точку · Ctrl + тяни — магнитное перемещение.
+editor.anchor_controls	ЛКМ по точке задаёт опору A. G переносит от A; точки соседних деталей предлагают магнит. Выбрать B — задать рабочую ось X.
 editor.anchor_on_axis	Точка лежит на оси вращения. Выбери другую точку или ось.
 editor.anchor_drag_magnetic	Магнит: тяни к точке другой детали · Shift — свободно.
 editor.anchor_drag_rotate	Вращение вокруг закреплённой точки · X/Y/Z задают ось до перетаскивания.
@@ -533,7 +533,7 @@ editor.view.part_type	ТИП ДЕТАЛИ
 editor.view.parts	ДЕТАЛИ
 editor.view.parts_delta	{0} деталей · DELTA
 editor.view.pin	ЗАКРЕПИТЬ
-editor.view.pin_anchor_tooltip	Закрепить выбранную точку для вращения вокруг неё. Shift + ЛКМ по точке делает то же самое.
+editor.view.pin_anchor_tooltip	Переключить закрепление выбранной опоры. ЛКМ по точке задаёт A; G, R и S используют A.
 editor.view.pitch_deg	НАКЛОН · °
 editor.view.points	Точки
 editor.view.points_all	ТОЧКИ: ВСЕ
@@ -626,7 +626,7 @@ editor.view.family_rotate	Вращение
 editor.view.family_scale	Масштаб
 editor.view.focus_view	Весь вид / вернуть панели
 editor.hint.tools_menu	1–4 — инструмент · ↑/↓ — выбор · Enter — включить · Esc — закрыть
-editor.hint.next_selected	G — перенос · R — вращать · S — масштаб · СКМ — удалить · Золото — ваниль · Синие — углы · Зелёные — середины · Розовая — центр · Фиолетовая — опора · Белая — активная
+editor.hint.next_selected	Выбери точку опоры · G — перенос · R — вращать · S — масштаб · Золото — ваниль · Синие — BuildWorks
 editor.hint.next_empty	ЛКМ — выбрать деталь · Tab — добавить · Space — инструменты
 editor.view.surface	Поверхность
 editor.view.surface_controls	Поверхность · Q/E точка · колесо поворот · XYZ ось · P плоскость
@@ -639,17 +639,35 @@ editor.view.point_midpoint	Середина ребра
 editor.view.point_centre	Центр габаритов
 editor.view.point_pin	Закреплённая опора
 editor.view.point_active	Активная точка
-editor.view.point_hover	{0} · Shift + щелчок — опора · Ctrl + тяни — привязка
+editor.view.point_hover	{0} · Щелчок — опора A · G — соединить от этой точки
 editor.view.source_native	Ванильная {0}
 editor.view.source_helper	Дополнительная {0}
 editor.view.source_helpers	Дополнительные точки
 editor.view.source_fallback	Ванильных точек нет: используем наши. Наведи на строку, чтобы увидеть точку.
 editor.view.source_native_first	Авто → ванильные точки. Наведение показывает точку. Смещения XYZ относительно опоры.
-editor.hint.cursor_preview	Ввод числа — от начала · X/Y/Z — ось · повтор — Мир/Локальные · Shift+ось — плоскость · G/R/S — сменить действие · P — Поверхность/Плоскость · Q/E — точка · колесо — поворот · тяни СКМ — камера
+editor.hint.cursor_preview	Ввод числа — от начала · X/Y/Z — ось · повтор — сменить систему осей · Shift+ось — плоскость · G/R/S — сменить действие · P — Поверхность/Плоскость · Q/E — точка · колесо — поворот · тяни СКМ — камера
 editor.view.screen_plane	Плоскость экрана
 editor.view.no_surface	Нет поверхности — наведи иначе или нажми P для Плоскости
 editor.hint.preview	{0} · {1} · {2} · <b>Enter/ЛКМ</b> применить · <b>Esc</b> восстановить
 editor.hint.open_gizmo	Сначала выбери деталь · клик СКМ/Delete — удалить
-editor.hint.gizmo_ready	G — перенос · XYZ — ось · R — вращать · S — масштаб · Золото — ваниль · Синие — углы · Зелёные — середины · Розовая — центр · Фиолетовая — опора · Белая — активная
+editor.hint.gizmo_ready	G — перенос от A · XYZ — ограничить ось · R — вращать вокруг A · S — масштаб от A · Золото — ваниль · Синие — BuildWorks
+editor.view.point_helper	Точка BuildWorks
+editor.view.size_screen	Размер: на экране
+editor.view.size_model	Размер: в 3D
+editor.view.size_mode_tooltip	На экране: постоянный размер в пикселях. В 3D: размер относительно выбранной модели; приближение меняет видимый размер. Проценты меняют ручки, не саму модель.
+editor.view.types_all	Ваниль + наши
+editor.view.types_native	Только ваниль
+editor.view.points_cursor	У курсора
+editor.view.frame_local	Оси: детали
+editor.view.frame_world	Оси: мира
+editor.view.frame_view	Оси: вида
+editor.view.frame_edge	Оси: A → B
+editor.view.edge_pick	Выбрать B
+editor.view.edge_wait	Нажми точку B
+editor.view.edge_clear	Сбросить A → B
+editor.edge_needs_point	Сначала выбери точку опоры A на выделенной детали.
+editor.edge_zero	A и B должны быть разными точками. Выбери другую точку.
+editor.edge_ready	A → B задаёт X. G X — вдоль линии; R X — вокруг неё. Без автоматического выравнивания и деформации.
+editor.point_selected	Опора A выбрана. G — перенос от A; R — вращение вокруг A; S — масштаб от A. Выбери B для направления оси.
 editor.hint.numeric_value	<b>Значение: {0}</b> · {1}
 editor.hint.numeric_invalid	Неполное/вне диапазона; для переноса выбери одну ось · Backspace — правка · Delete — очистить

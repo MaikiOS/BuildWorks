@@ -315,6 +315,7 @@ public static class RuntimeEditorAcceptance
                 TestHoverAppearance(template);
                 TestOccluderFade(template, output);
                 TestGizmoHits(template);
+                TestModelSpaceGizmo(template);
                 controller.Close(true);
                 Require(controller.OpenNew(out error), "Reopen: " + error);
                 Require(Field<BlueprintEditorTool>(controller, "activeTool") == BlueprintEditorTool.Select,
@@ -622,6 +623,7 @@ public static class RuntimeEditorAcceptance
                 Require(doc.Parts.Count == 1, "Array Apply requires more than one Undo");
 
                 Set(controller, "gizmoFamily", GizmoFamily.Points);
+                Set(controller, "showAllAnchors", true);
                 Call(controller, "UpdateGizmo");
                 Require(scene.TryGetGizmoAnchors(new[] { id }, out Vector3[] anchors, out int nativeStart) &&
                     anchors.Length - nativeStart == 4 && nativeStart == AnchorAdjustment.SelectableAnchorCount + 4,
@@ -635,6 +637,7 @@ public static class RuntimeEditorAcceptance
                 Call(controller, "CommitGizmoDrag");
                 Call(controller, "UpdateGizmo");
                 Field<List<Button>>(view, "anchorPinButtons")[0].onClick.Invoke();
+                Field<List<Button>>(view, "anchorPinButtons")[0].onClick.Invoke();
                 Require(Field<Vector3?>(controller, "pinnedAnchorWorld").HasValue &&
                     Vector3.Distance(Field<Vector3?>(controller, "pinnedAnchorWorld").Value, pin) < 0.0001f,
                     "Actual pin button did not pin selected native anchor");
@@ -647,16 +650,16 @@ public static class RuntimeEditorAcceptance
                 Button constraint = Field<List<Button>>(view, "anchorConstraintButtons")[2];
                 constraint.onClick.Invoke();
                 Require(Field<GizmoAxis>(controller, "anchorConstraintAxis") == GizmoAxis.Y, "Rotation axis UI did not select Y");
-                Require((bool)Call(controller, "TryBeginGizmoDrag", (Vector2)scene.Camera.WorldToScreenPoint(moving)) &&
-                    Field<int>(controller, "dragAnchorPoint") >= 0, "Native moving anchor did not start rotation");
-                Vector3 rotated = pin + Quaternion.AngleAxis(45, Vector3.up) * (moving - pin);
-                Call(controller, "PreviewGizmoDrag", (Vector2)scene.Camera.WorldToScreenPoint(rotated));
+                Call(controller, "BeginKeyboardPreview", GizmoHandleKind.Rotate);
+                Call(controller, "SetKeyboardAxis", GizmoAxis.Y);
+                Set(controller, "keyboardNumber", "45");
+                Call(controller, "PreviewKeyboardNumber");
                 Require(Quaternion.Angle(Field<Quaternion>(controller, "dragRotation"), Quaternion.AngleAxis(45, Vector3.up)) < 0.05f,
                     "Native anchor gesture did not rotate by constrained Y angle");
                 Call(controller, "CommitGizmoDrag");
                 for (int i = 0; i < 3; ++i) Call(controller, "UpdateGizmo");
                 Require(Vector3.Distance(Field<Vector3?>(controller, "pinnedAnchorWorld").Value, pin) < 0.0001f &&
-                    Vector3.Distance(Field<Vector3?>(controller, "selectedAnchorWorld").Value, rotated) < 0.001f,
+                    Vector3.Distance(Field<Vector3?>(controller, "selectedAnchorWorld").Value, pin) < 0.001f,
                     "Native selected/pinned point jumped after commit and bounds rebuild");
                 Field<Button>(view, "undoButton").onClick.Invoke();
                 Require(!Field<Vector3?>(controller, "pinnedAnchorWorld").HasValue &&
@@ -790,6 +793,95 @@ public static class RuntimeEditorAcceptance
         }
         checks.Add("Nested descendants have matching bounds and original selection materials; selecting a leaf stays local");
         checks.Add("World ghost preview consumes non-unit XYZ scale");
+    }
+
+    private static void TestModelSpaceGizmo(Camera template)
+    {
+        Camera camera = Object.Instantiate(template);
+        camera.pixelRect = new Rect(0, 0, 1920, 1080);
+        camera.fieldOfView = 60f;
+        using (var gizmo = new TransformGizmoView(screenSpaceSizing: true))
+        {
+            gizmo.ModelSpaceSizing = true; gizmo.ModelSize = 1.2f;
+            Vector3[] points = { Vector3.zero, Vector3.right * .2f };
+            foreach (bool orthographic in new[] { false, true })
+            {
+                camera.orthographic = orthographic;
+                float nearPixels = 0f;
+                foreach (float distance in new[] { 4f, 16f })
+                {
+                    camera.orthographicSize = distance;
+                    camera.transform.SetPositionAndRotation(new Vector3(0, 0, -distance), Quaternion.identity);
+                    gizmo.EditorMouse = new Vector2(-1000, -1000);
+                    gizmo.Show(camera, Vector3.zero, Quaternion.identity, false, GizmoMode.Move,
+                        GizmoHandleKind.None, GizmoAxis.None, points, 0, -1, 1, false, 1,
+                        false, Vector3.zero, false, GizmoAxis.None, false, default, default, 0, allowExtended: true,
+                        pointVisibility: _ => false);
+                    Require(Mathf.Abs(gizmo.Scale - 1.2f) < .00001f, "3D gizmo depends on camera distance/projection");
+                    var line = Field<List<LineRenderer>>(gizmo, "anchorHandles")[0];
+                    Require(line.gameObject.activeSelf && line.startColor.a == 1f,
+                        "Selected occluded point disappeared after cursor left");
+                    Vector2 centre = camera.WorldToScreenPoint(points[0]);
+                    float pixels = Vector2.Distance(centre, camera.WorldToScreenPoint(line.GetPosition(1)));
+                    Require(gizmo.HitTestAnchor(camera, points, centre + Vector2.right * (pixels - .5f)) == 0,
+                        "3D point drawing and picking disagree");
+                    Require(gizmo.HitTestAnchor(camera, points, centre + Vector2.up * (pixels + 3f)) < 0,
+                        "Far 3D point still captures its old fixed pixel area");
+                    if (distance == 4f) nearPixels = pixels;
+                    else Require(Mathf.Abs(nearPixels / pixels - 4f) < .001f, "3D point does not shrink with zoom");
+                    camera.fieldOfView = 90f;
+                    gizmo.Show(camera, Vector3.zero, Quaternion.identity, false, GizmoMode.Move,
+                        GizmoHandleKind.None, GizmoAxis.None, points, 0, -1, 1, false, 1,
+                        false, Vector3.zero, false, GizmoAxis.None, false, default, default, 0, allowExtended: true);
+                    Require(Mathf.Abs(gizmo.Scale - 1.2f) < .00001f, "3D size changes with FOV");
+                    camera.fieldOfView = 60f;
+                }
+            }
+            gizmo.NativePointsOnly = true;
+            gizmo.Show(camera, Vector3.zero, Quaternion.identity, false, GizmoMode.Move,
+                GizmoHandleKind.None, GizmoAxis.None, points, 0, -1, 1, true, 1,
+                false, Vector3.zero, false, GizmoAxis.None, false, default, default, 0);
+            Require(Field<List<LineRenderer>>(gizmo, "anchorHandles")[0].gameObject.activeSelf,
+                "Native-only hides the selected helper pivot");
+            gizmo.Show(camera, Vector3.zero, Quaternion.identity, false, GizmoMode.Move,
+                GizmoHandleKind.None, GizmoAxis.None, points, -1, -1, 1, true, 1,
+                false, Vector3.zero, false, GizmoAxis.None, false, default, default, 0);
+            Require(!Field<List<LineRenderer>>(gizmo, "anchorHandles")[0].gameObject.activeSelf &&
+                Field<List<LineRenderer>>(gizmo, "anchorHandles")[1].gameObject.activeSelf,
+                "Native-only shows/captures ordinary helpers");
+            gizmo.Show(camera, Vector3.zero, Quaternion.identity, false, GizmoMode.Move,
+                GizmoHandleKind.None, GizmoAxis.None, points, 1, 1, 1, false, 1,
+                false, Vector3.zero, false, GizmoAxis.None, false, default, default, 0, helperAnchorOverride: 1);
+            Color appended = Field<List<LineRenderer>>(gizmo, "anchorHandles")[1].startColor;
+            Require(appended.b > appended.r && appended.a == 1f,
+                "Appended helper A lost blue provenance behind native boundary");
+        }
+        Object.DestroyImmediate(camera);
+        GameObject source = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        source.transform.localScale = new Vector3(2, 1, .5f); source.SetActive(false);
+        var doc = new BlueprintEditorDocument(null, "Model size", "Test", new[] {
+            new BlueprintEditorPart("model", "model", "Model", new Point3(0,0,0), new Rotation3(0,0,0,1)) });
+        using (var scene = new BlueprintEditorScene(template, _ => source))
+        {
+            Require(scene.TrySync(doc, out string error), error);
+            scene.SetGizmoModelSize(new[] { "model" });
+            var gizmo = Field<TransformGizmoView>(scene, "gizmo");
+            float reference = gizmo.ModelSize;
+            Require(Mathf.Abs(reference - Mathf.Sqrt(5.25f) * .4f) < .0001f,
+                "Model reference does not match its actual 3D diagonal");
+            doc = new BlueprintEditorDocument(null, "Model size", "Test", new[] {
+                new BlueprintEditorPart("model", "model", "Model", new Point3(0,0,0),
+                    new Rotation3(0, Math.Sin(Math.PI/8), 0, Math.Cos(Math.PI/8))) });
+            Require(scene.TrySync(doc, out error), error); scene.SetGizmoModelSize(new[] { "model" });
+            Require(Mathf.Abs(gizmo.ModelSize - reference) < .0001f, "Model rotation changes reference size");
+            doc = new BlueprintEditorDocument(null, "Model size", "Test", new[] {
+                new BlueprintEditorPart("model", "model", "Model", new Point3(0,0,0),
+                    new Rotation3(0, Math.Sin(Math.PI/8), 0, Math.Cos(Math.PI/8)), scale: new Point3(4,4,4)) });
+            Require(scene.TrySync(doc, out error), error); scene.SetGizmoModelSize(new[] { "model" });
+            Require(Mathf.Abs(gizmo.ModelSize - reference * 4) < .0001f, "Actual model scale does not resize 3D gizmo");
+        }
+        Object.DestroyImmediate(source);
+        checks.Add("Model-space gizmo: fixed metres, 4:1 apparent size, perspective/orthographic, projected hit area, persistent occluded pivot and native-only filter");
     }
 
     private static void TestNativeSocketTargets(Camera template)
@@ -997,7 +1089,7 @@ public static class RuntimeEditorAcceptance
             float widthPixels = Vector2.Distance(center,
                 camera.WorldToScreenPoint(camera.transform.right * anchor.startWidth));
             Require(widthPixels >= (native ? 2f : 1.5f) - 0.01f &&
-                Mathf.Abs(anchor.startColor.a - (native ? .96f : .88f)) <= 1f / 255f,
+                Mathf.Abs(anchor.startColor.a - .55f) <= 1f / 255f,
                 "Editor anchor lost its default thickness or visibility: native=" + native +
                 "; distance=" + distance + "; widthPixels=" + widthPixels +
                 "; alpha=" + anchor.startColor.a);
@@ -1020,7 +1112,7 @@ public static class RuntimeEditorAcceptance
                 pointMaterial.mainTexture.filterMode == FilterMode.Trilinear &&
                 ((Texture2D)pointMaterial.mainTexture).mipmapCount > 1,
                 "Point capture differs from embedded texture size, colour or minification settings");
-            Require(anchor.startColor.a >= (native ? .96f : .88f) - 1f / 255f && anchor.startColor.a <= 1f,
+            Require(anchor.startColor.a >= .55f - 1f / 255f && anchor.startColor.a <= 1f,
                 "Snap marker lost provenance brightness during neighbouring handle hover");
             gizmo.EditorMouse = scale + Vector2.right * 40;
             ShowFeedback();
@@ -1039,8 +1131,8 @@ public static class RuntimeEditorAcceptance
             Require(Field<List<LineRenderer>>(gizmo, "anchorHandles")[0].transform.Find("Engraving")
                     .GetComponent<MeshRenderer>().sharedMaterial.mainTexture.name.EndsWith("snap-corner") &&
                 Field<List<LineRenderer>>(gizmo, "anchorHandles")[8].transform.Find("Engraving")
-                    .GetComponent<MeshRenderer>().sharedMaterial.mainTexture.name.EndsWith("snap-midpoint"),
-                "Blue corners and green midpoints must use distinct thematic sprites");
+                    .GetComponent<MeshRenderer>().sharedMaterial.mainTexture.name.EndsWith("snap-corner"),
+                "All generated helpers must use one blue thematic sprite");
             gizmo.Show(camera, Vector3.zero, Quaternion.identity, false, GizmoMode.Move,
                 GizmoHandleKind.None, GizmoAxis.None, helperPoints, 0, 8, 8,
                 true, 1, false, Vector3.zero, false, GizmoAxis.None, false,
@@ -1052,7 +1144,7 @@ public static class RuntimeEditorAcceptance
                     .GetComponent<MeshRenderer>().sharedMaterial.mainTexture.name.EndsWith("snap-corner") &&
                 Field<List<LineRenderer>>(gizmo, "anchorHandles")[0].transform.Find("ActiveAccent").gameObject.activeSelf &&
                 Field<List<LineRenderer>>(gizmo, "anchorHandles")[8].transform.Find("PinAccent").gameObject.activeSelf &&
-                !Field<List<LineRenderer>>(gizmo, "anchorHandles")[8].transform.Find("Engraving").gameObject.activeSelf,
+                Field<List<LineRenderer>>(gizmo, "anchorHandles")[8].transform.Find("Engraving").gameObject.activeSelf,
                 "Active helper lost its type or appended pin invented native provenance");
             gizmo.Show(camera, Vector3.zero, Quaternion.identity, false, GizmoMode.Move,
                 GizmoHandleKind.None, GizmoAxis.None, new[] { Vector3.zero, Vector3.zero }, -1, -1, 1,

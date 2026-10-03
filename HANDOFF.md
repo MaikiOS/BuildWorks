@@ -2,6 +2,49 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Verified candidate 0.19.49
+
+Ostrix approved the point-purpose workflow and two sizing modes on 2026-10-03.
+Editor points now have only native gold and generated blue provenance. Default
+near-cursor reveal, persistent selected A, manual All/Native-only and depth dimming
+replace the idle multi-colour cloud. Existing thematic PNGs are reused, not replaced
+by a concept. Explicit helper A remains visible/usable under Native-only; hidden
+helpers are excluded from Auto/Q/E and target scans.
+
+LMB selects A without starting a drag. The gizmo moves to A; G uses A as source
+grip, R/S use it as pivot. Target capture never replaces A. Optional B defines
+working X along A→B; coincident points are rejected and antiparallel direction
+uses deterministic original-up roll. This is not a guide/curve or automatic edge
+alignment. Local/World/View/Edge frames and their visible hints agree; repeat axis
+and Esc restore the original working frame. Operation-start numbers, atomic Undo,
+MMB behavior, Array/Contour and document/store format remain unchanged.
+
+Manipulator → Size switches fixed screen pixels or model-relative 3D dimensions.
+Model sizing uses rotated-local renderer dimensions and actual part scale, not
+camera distance/FOV/projection. Reference freezes during previews; independent
+size sliders still work. Drawing and projected point picking share the same size.
+World/F9 retains its old sizing, colours and occlusion contract.
+
+Release: zero warnings/errors. Geometry, Store, Localization, EditorBridge,
+WorldLayout, DeploymentChecks and HostContract pass; 672 matching localization
+keys and 643 static references, embedded resources checked. Format exits 0 with
+the existing workspace-loading warning. Unity 6000.0.61f1 passed 81 UI captures at
+2026-10-03T13:18:22.5621315Z, actual native-model near/far renders, A/B/axis/reset,
+visible frame text, Native-only choices, fixed model metres/FOV/projection,
+projected hit areas and appended helper-A provenance. Independent correctness
+and Ponytail reviews pass; the final text blocker was corrected and re-tested.
+
+- BuildWorks SHA256: 317B3D15F5B0AFF315D152C03D928BCEEFE9017550093B1EA2609F0FA40EECBC
+- Geometry SHA256: 3EF58DB30AE547E99293DD2B90E97BF8FEE005534C055D23656714FA09D9EA16
+
+Installed with Valheim closed only in TerrainRamp-1.0-Test through the guarded
+script; hashes match. Previous .48 DLL pair: artifacts/checkpoint-0.19.49/preinstall.
+No game launch, save change, other-profile mutation or binary release. Workbench
+substitutes external host/physical input; actual Valheim readability, costs/refunds,
+reload and networking remain owner gates. BW-01 awaits the single numbered
+[current series 1–10](specs/roadmap/current-pass.md), starting with readability 1–3.
+The .48 list is archived, not a second answer list. Stop at owner feedback.
+
 ## Verified candidate 0.19.48
 
 Ostrix approved trying compact nested point signs on 2026-10-03. Six individually

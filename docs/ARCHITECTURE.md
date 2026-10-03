@@ -76,6 +76,10 @@ connected components are removed, including combined meshes; open/non-manifold
 components conservatively do not hide corners. Overlaps within 5 mm of ordinary/
 native points are omitted. Selection budgets remain 512 helpers/512 native points;
 large meshes can omit corners. Legacy Array/save retain their exact old layout.
+Native Custom/Piece preview materials disable only `_RippleDistance` on owned
+editor copies. Visible vertices, mesh picking, contact and experimental grips then
+share exact geometry; textures and world/prefab materials remain unchanged.
+Other shaders' deformation is not covered by this native-specific rule.
 Experimental range metadata stays frozen during previews. Ordinary helpers use
 the ivory knot; experimental ones use small translucent warm dots, depth fade
 and a selected collar. Picking uses their projected size, including screen mode.

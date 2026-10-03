@@ -107,6 +107,7 @@ public static class ActualDividerAcceptance
             Camera template = cameraObject.GetComponent<Camera>();
             template.enabled = false;
             RunPlacementAcceptance(template, placementPrefabs, evidence);
+            DiagnoseChairCorners(template, LoadPrefab("piece_chair02"), outputDirectory, evidence);
             var document = new BlueprintEditorDocument(null, "Группа 1 — installed asset proof", "Test", new[]
             {
                 Part("divider-left", Divider, dividerPosition)
@@ -336,6 +337,85 @@ public static class ActualDividerAcceptance
     {
         const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
         return typeof(BlueprintEditorScene).GetField("placementPreview", flags).GetValue(scene);
+    }
+
+    private static void DiagnoseChairCorners(Camera template, GameObject chair,
+        string outputDirectory, ICollection<string> evidence)
+    {
+        Material[] originals = chair.GetComponentsInChildren<Renderer>(true)
+            .SelectMany(renderer => renderer.sharedMaterials).Where(material => material &&
+                material.shader.name == "Custom/Piece" && material.HasProperty("_RippleDistance")).Distinct().ToArray();
+        float[] originalNoise = originals.Select(material => material.GetFloat("_RippleDistance")).ToArray();
+        Require(originalNoise.Any(value => value > 0), "Native chair fixture lost its decorative vertex noise");
+        Quaternion rotation = Quaternion.Euler(0, 90, 0);
+        var document = new BlueprintEditorDocument(null, "Native chair corner proof", "Test", new[]
+        {
+            new BlueprintEditorPart("chair-corners", chair.name, "Chair", new Point3(4.387, 0, -.153),
+                new Rotation3(rotation.x, rotation.y, rotation.z, rotation.w))
+        });
+        using (var scene = new BlueprintEditorScene(template, _ => chair))
+        {
+            Require(scene.TrySync(document, out string error), error);
+            scene.ExperimentalGeometryPoints = true; scene.NativePointsOnly = false;
+            scene.TryGetGizmoAnchors(new[] { "chair-corners" }, out Vector3[] points, out int nativeStart);
+            Require(scene.GeometryAnchorCount > 0, "Native chair has no experimental corners");
+            var visuals = (IDictionary)typeof(BlueprintEditorScene).GetField("visuals",
+                BindingFlags.NonPublic | BindingFlags.Instance).GetValue(scene);
+            GameObject visual = VisualField<GameObject>(visuals["chair-corners"], "Root");
+            var vertices = new List<Vector3>();
+            Bounds bounds = default; bool first = true;
+            foreach (MeshFilter filter in visual.GetComponentsInChildren<MeshFilter>(true))
+            {
+                Renderer renderer = filter.GetComponent<Renderer>();
+                if (!renderer || !renderer.enabled || !renderer.gameObject.activeInHierarchy) continue;
+                Require(BlueprintEditorMeshData.TryRead(filter.sharedMesh, out Vector3[] raw, out _, out error), error);
+                foreach (Vector3 vertex in raw) vertices.Add(filter.transform.TransformPoint(vertex));
+                foreach (Material material in renderer.sharedMaterials)
+                    if (material.shader.name == "Custom/Piece" && material.HasProperty("_RippleDistance"))
+                    {
+                        Require(material.GetFloat("_RippleDistance") == 0, "Editor chair still deforms its visible vertices");
+                        Require(!originals.Contains(material), "Editor changed a shared native material");
+                    }
+                if (first) { bounds = renderer.bounds; first = false; } else bounds.Encapsulate(renderer.bounds);
+            }
+            int start = scene.GeometryAnchorStart, count = scene.GeometryAnchorCount;
+            float vertexError = 0, drawError = 0;
+            for (int point = start; point < start + count; ++point)
+                vertexError = Mathf.Max(vertexError, vertices.Min(vertex => Vector3.Distance(vertex, points[point])));
+            Require(vertexError < .00001f, "Native chair corner is offset from the actual mesh vertex");
+            scene.SetViewport(new Rect(0, 0, 1024, 1024));
+            scene.GizmoFamily = GizmoFamily.Points;
+            Vector3 cameraPosition = bounds.center + new Vector3(.85f, .35f, -1.05f);
+            scene.SetCameraPose(cameraPosition, Quaternion.LookRotation(bounds.center - cameraPosition));
+            scene.SetGizmoModelSize(new[] { "chair-corners" });
+            scene.ShowGizmo(BlueprintEditorTool.Transform, bounds.center, rotation, true,
+                GizmoHandleKind.None, GizmoAxis.None, points, -1, nativeStart, true, false, default, false);
+            TransformGizmoView gizmo = VisualField<TransformGizmoView>(scene, "gizmo");
+            var handles = VisualField<IList>(gizmo, "anchorHandles");
+            bool picked = false, snapped = false;
+            for (int point = start; point < start + count; ++point)
+            {
+                var line = (LineRenderer)handles[point];
+                Vector3 centre = (line.GetPosition(0) + line.GetPosition(8)) * .5f;
+                drawError = Mathf.Max(drawError, Vector3.Distance(centre, points[point]));
+                Vector3 screen = scene.Camera.WorldToScreenPoint(points[point]);
+                picked |= scene.HitTestAnchor(points, screen) == point;
+                var targets = new List<Vector3>(); var native = new List<bool>();
+                if (scene.TryCursorSnap(Array.Empty<string>(), new[] { points[point] + Vector3.back * .02f },
+                    new[] { 0 }, 0, 0, targets, native, out _, out Vector3 captured, out bool isNative, cursor: screen))
+                    snapped |= !isNative && Vector3.Distance(captured, points[point]) < .00001f;
+            }
+            Require(drawError < .00001f && picked && snapped, "Native chair dot draw/pick/magnet mismatch");
+            for (int point = 0; point < handles.Count; ++point)
+                if (point < start || point >= start + count) ((LineRenderer)handles[point]).gameObject.SetActive(false);
+            Capture(scene.Camera, Path.Combine(outputDirectory, "chair02-exact-corners.png"));
+            for (int index = 0; index < originals.Length; ++index)
+                Require(originals[index].GetFloat("_RippleDistance") == originalNoise[index],
+                    "Editor changed the world's native chair material");
+            evidence.Add("PASS native piece_chair02: " + count + " exact dots; vertex/draw errors=" +
+                vertexError.ToString("F9") + "/" + drawError.ToString("F9") +
+                "; point picking and helper magnet; editor-only noise disabled; native materials unchanged.");
+        }
     }
 
     private static T VisualField<T>(object visual, string name)

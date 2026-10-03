@@ -2220,6 +2220,11 @@ namespace OstrixMods.BuildWorks
             }
             material.name = "BuildWorks_BlueprintEditorPreviewMaterial";
             material.hideFlags = HideFlags.HideAndDontSave;
+            // Editor contact, picking and mesh grips use actual mesh vertices. Native
+            // Piece noise otherwise moves only the rendered corners away from them.
+            // This is an owned preview material; world/prefab materials stay unchanged.
+            if (material.shader.name == "Custom/Piece" && material.HasProperty("_RippleDistance"))
+                material.SetFloat("_RippleDistance", 0f);
             if (source && source.HasProperty("_MainTex") && material.HasProperty("_MainTex"))
             {
                 material.SetTexture("_MainTex", source.GetTexture("_MainTex"));

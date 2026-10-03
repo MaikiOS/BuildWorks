@@ -2,7 +2,38 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
-## Verified candidate 0.19.52
+## Verified candidate 0.19.53
+
+Ostrix accepted .52 checks 1–2; check 3 isolated the small yellow experimental
+mesh-corner dots on the actual wooden reclining chair `piece_chair02`, not the
+ordinary ivory bounds helpers. Native `Custom/Piece` uses `_RippleDistance=0.05`
+on this chair: shader displacement made the rendered corners differ from mesh
+vertices. Ostrix approved exact geometry in the Blueprint Editor.
+
+Owned editor preview materials now set only Custom/Piece `_RippleDistance` to
+zero. Textures and colour noise remain; source/world materials, world/F9,
+Store v9, costs and networking are unchanged. Other shader deformation is not
+covered. Ordinary bounds points and the .52 experimental extraction are unchanged.
+
+Release build: zero warnings/errors. Geometry, Store, Localization, EditorBridge,
+WorldLayout, DeploymentChecks and HostContract pass (Steam build 25185596).
+678 paired keys / 648 static references; embedded localization verified.
+Format exits 0 with the existing workspace-loading warning. Unity 6000.0.61f1
+passed 81 cases at 2026-10-03T19:44:28.2984593Z. Native piece_chair02 regression
+checks 38 exact dots, real vertex/draw centres, point picking, helper magnet and
+unchanged original materials. Maximum draw-centre error: 0.000000238 m.
+Independent correctness review PASSED; ponytail-review: Lean already. Ship.
+Valheim was not launched; owner runtime acceptance remains pending.
+
+BuildWorks SHA256: E45F2942817A06679E2507D0361C681DEB23DBB9F6ECAF57720387F3CA19AD43
+Geometry SHA256: 9280D140DC1DE633A14AE4C3633A9CDF14A2F862D1966CD7B13CED747B1E7626
+Installed only in TerrainRamp-1.0-Test with Valheim closed via the guarded script;
+both hashes match. .52 backup: artifacts/checkpoint-0.19.53/preinstall.
+Source-only synchronization remains authorized; no binary release published.
+Owner acceptance: one [chair series 1–2](specs/roadmap/current-pass.md).
+The .52 series is archived; no BW-02/curves advance.
+
+## Historical verified candidate 0.19.52
 
 Ostrix accepted .51 checks 3–6 on 2026-10-03; 1–2 reopened ordinary helper restoration
 and experimental rendering. Ordinary bounds corners/middles/centre and generated

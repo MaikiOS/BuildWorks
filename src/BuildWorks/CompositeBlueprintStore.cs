@@ -26,6 +26,7 @@ namespace OstrixMods.BuildWorks
         private const int MaximumGroups = 64;
         private readonly string path;
         private LibraryData data = new LibraryData();
+        private List<Blueprint> externalBlueprints;
         private string writeBlockReason;
 
         public CompositeBlueprintStore()
@@ -42,6 +43,16 @@ namespace OstrixMods.BuildWorks
         }
 
         public IReadOnlyList<Blueprint> All() => data.blueprints;
+
+        internal IReadOnlyList<Blueprint> CatalogAll()
+        {
+            if (externalBlueprints == null)
+                externalBlueprints = ExternalBlueprintLibrary.Load(
+                    Path.Combine(Path.GetDirectoryName(path), "imports"));
+            var result = new List<Blueprint>(data.blueprints);
+            result.AddRange(externalBlueprints);
+            return result;
+        }
 
         public IReadOnlyList<string> Categories() => data.categories;
 
@@ -991,6 +1002,11 @@ namespace OstrixMods.BuildWorks
         [DataContract]
         internal sealed class Blueprint
         {
+            // Transient read-only import diagnostics; deliberately NOT Store v9 fields.
+            public string importSource;
+            public string importError;
+            public int importPartCount;
+            internal bool IsExternal => importSource != null;
             [DataMember(Order = 0)]
             public string id;
             [DataMember(Order = 1)]

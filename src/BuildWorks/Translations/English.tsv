@@ -736,3 +736,15 @@ editor.catalog.no_station	Not required
 catalog.group.fine_wood	FINE WOOD
 catalog.group.flint	FLINT
 catalog.group.yggdrasil_wood	YGGDRASIL WOOD
+import.read_only	Source library: open and edit, or place a separate BuildWorks copy. Original files stay unchanged.
+import.place_copy	Import copy and place
+import.path	Library path is not a regular file.
+import.library_limit	Library is too large (maximum 2000 entries).
+import.file_limit	Blueprint exceeds the safe file-size limit.
+import.section	Unsupported blueprint section: {0}
+import.fields	Unsupported or malformed piece row (line {0}).
+import.object_data	This file contains object data/text that cannot yet be preserved (line {0}). No pieces were imported.
+import.chance	Random piece placement is unsupported (line {0}).
+import.transform	Invalid/out-of-range transform or scale (line {0}).
+import.part_limit	A usable blueprint must contain 2–128 pieces. Nothing is truncated.
+catalog.group.external_blueprints	SOURCE LIBRARIES

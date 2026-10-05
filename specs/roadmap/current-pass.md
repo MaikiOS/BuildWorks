@@ -2,7 +2,12 @@
 
 **English** | [Русский](current-pass_RU.md)
 
-Test **0.19.55**, only in **TerrainRamp-1.0-Test**. Reply only to **1–10 below**.
+Import .56 passes 144 Unity UI states and is deployed with the external source ZIP
+only to TerrainRamp-1.0-Test. Library limits/diagnostics:
+[blueprint-exchange-research.md](blueprint-exchange-research.md).
+Checks below are the existing catalog series, not import acceptance.
+
+Test catalog **0.19.56** (retains .55 changes), only in **TerrainRamp-1.0-Test**. Reply only to **1–10 below**.
 Your .54 answers accept 2, 3, 5, 6 and 7; repeat only changed checks **1, 4, 8, 9, 10** unless a regression appears.
 Ostrix accepted chair checks .53; [archived](archive/pass-0.19.53.md), no repeat.
 

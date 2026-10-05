@@ -244,7 +244,7 @@ namespace OstrixMods.BuildWorks
             root.SetActive(true);
             foreach (LineRenderer line in alignmentAxisLines)
                 line.gameObject.SetActive(false);
-            bool combined = !screenSpaceSizing || Family == GizmoFamily.Combined;
+            bool combined = Family == GizmoFamily.Combined;
             bool showMove = allowMove && mode != GizmoMode.Guide && mode != GizmoMode.Plane &&
                 (combined || Family == GizmoFamily.Move);
             bool showRotation = allowRotate && mode != GizmoMode.Plane &&
@@ -455,7 +455,7 @@ namespace OstrixMods.BuildWorks
                     ? new Color(1f, 0.95f, 0.25f, 1f)
                     : screenSpaceSizing ? new Color(1f, .92f, .76f, 1f) : new Color(0.25f, 0.95f, 1f, 1f);
                 targetColor.a = targetHovered ? 1f : screenSpaceSizing ? 0.85f : 0.35f;
-                if (snapTargetIsGeometry) targetColor = new Color(1f,.84f,.4f, targetHovered ? .9f : .6f);
+                if (snapTargetIsGeometry) targetColor = new Color(1f, .84f, .4f, targetHovered ? .9f : .6f);
                 DrawAnchor(
                     snapTargetHandle,
                     camera,
@@ -548,7 +548,7 @@ namespace OstrixMods.BuildWorks
                         line,
                         camera,
                         candidates[index],
-                        geometry ? new Color(1f,.84f,.4f,close ? .85f : .28f) :
+                        geometry ? new Color(1f, .84f, .4f, close ? .85f : .28f) :
                         new Color(native || screenSpaceSizing ? 1f : 0.25f, screenSpaceSizing && !native ? .92f : .95f,
                             native ? .25f : screenSpaceSizing ? .76f : 1f,
                             close ? 0.98f : screenSpaceSizing ? native ? 0.85f : 0.6f

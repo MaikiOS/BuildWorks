@@ -235,7 +235,13 @@ namespace OstrixMods.BuildWorks
             if (source == null) throw new ArgumentNullException(nameof(source));
             try
             {
-                return Open(DocumentFromBlueprint(source), source, out error);
+                if (!string.IsNullOrEmpty(source.importError))
+                { error = BuildWorksLocalization.ResolveUserText(source.importError); return false; }
+                foreach (CompositeBlueprintStore.Part part in source.parts)
+                    if (!ResolveVisualSource(part.prefabName))
+                    { error = BuildWorksLocalization.Text("editor.part_not_found", part.prefabName); return false; }
+                return Open(DocumentFromBlueprint(source.IsExternal ? ExternalBlueprintLibrary.DetachedCopy(source) : source),
+                    source.IsExternal ? null : source, out error);
             }
             catch (Exception exception)
             {
@@ -292,6 +298,8 @@ namespace OstrixMods.BuildWorks
         {
             if (view != null) view.SetUiScale(value);
         }
+
+        internal void UpdateCatalogThumbnail(string id, Sprite icon) => view?.UpdateCatalogThumbnail(id, icon);
 
         internal void Update()
         {
@@ -2537,6 +2545,12 @@ namespace OstrixMods.BuildWorks
         private void BeginPartPlacement(BlueprintEditorCatalogItem item, bool snap)
         {
             if (!IsEditing || item == null || keyboardPreview) return;
+            if (!string.IsNullOrEmpty(item.UnavailableReason))
+            { view.SetStatus(item.UnavailableReason, error: true); return; }
+            if (item.IsBlueprint)
+                foreach (CompositeBlueprintStore.Part part in item.Blueprint.parts)
+                    if (!ResolveVisualSource(part.prefabName))
+                    { view.SetStatus(BuildWorksLocalization.Text("editor.part_not_found", part.prefabName), error: true); return; }
             if (IsGizmoDragging) CancelGizmoDrag();
             ClearArrayState();
             ClearContourState();

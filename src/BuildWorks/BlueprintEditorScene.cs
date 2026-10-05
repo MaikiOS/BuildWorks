@@ -2560,7 +2560,7 @@ namespace OstrixMods.BuildWorks
                 if (u >= -epsilon && v >= -epsilon && u + v <= 1f + epsilon) return false;
             }
             // Requiring both directions on three oblique lines avoids treating an open sheet as a solid.
-            foreach (Vector3 direction in new[] { new Vector3(1,.371f,.529f), new Vector3(.413f,1,.637f), new Vector3(.719f,.283f,1) })
+            foreach (Vector3 direction in new[] { new Vector3(1, .371f, .529f), new Vector3(.413f, 1, .637f), new Vector3(.719f, .283f, 1) })
                 foreach (float sign in new[] { 1f, -1f })
                 {
                     var distances = new List<float>();

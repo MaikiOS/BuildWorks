@@ -9,7 +9,7 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Current source candidate: **0.19.55**, Store v9, Valheim 1.0.16.
+Installed verified build: **0.19.55**, Store v9, Valheim 1.0.16.
 .54 catalog acceptance: 2,3,5,6,7 accepted; 1,4,8 revised. .55 shrinks catalog
 contents 20%, reserves hints space, separates Lighting and Furniture families,
 filters actual recipe materials/tiers, adds icon costs/construction station and
@@ -18,9 +18,16 @@ survive part selection in both sizing modes. 144 Workbench cases and targeted
 checks pass; independent review PASSED. Installed only TerrainRamp-1.0-Test.
 Current owner series keeps stable IDs 1–10; only 1,4,8,9,10 require replies.
 Valheim is not tested. No BW-02/curves advance.
-BiomeBlueprints data archive inspected: 353 files, 100 within size limit but all
-with terrain and 27 with extended data. Import/export remains research, not delivery;
-terrain/object-data scope awaits owner choice. See blueprint-exchange-research.md.
+Verified test build **0.19.56** transfers external `.blueprint`/`.vbuild` sources
+into detached editor drafts/insertion/native Hammer copies. Originals stay untouched;
+terrain is excluded and unsupported object data blocks the whole file.
+BiomeBlueprints: 353 cards, 62 format-compatible, 291 with rejection reasons;
+host prefab availability remains separate. Build, targeted checks, source review and
+144 Unity UI states pass after licence activation. .56 and inert ZIP deployed only
+TerrainRamp-1.0-Test with verified SHA256; Valheim acceptance remains pending.
+The 128 limit, #SnapPoints and object data need further support;
+full BW-04/BW-05 export/interchange is not completed.
+See blueprint-exchange-research.md and artifacts/unity-workbench-capture.log.
 
 Historical .54 baseline:
 Ostrix accepts .53 chair checks 1–2. The approved catalog now has Atlas/Quick

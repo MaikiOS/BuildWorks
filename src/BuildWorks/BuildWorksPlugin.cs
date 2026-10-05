@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.55";
+        internal const string PluginVersion = "0.19.56";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -139,6 +139,8 @@ namespace OstrixMods.BuildWorks
 
             if (blueprintEditor?.BlocksWorldInput == true)
             {
+                if (session != null && session.ProcessBlueprintThumbnail(out string id, out Sprite icon))
+                    blueprintEditor.UpdateCatalogThumbnail(id, icon);
                 if (blueprintEditor.IsOpen) blueprintEditor.Update();
                 return;
             }

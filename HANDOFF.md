@@ -2,7 +2,29 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
-## Verified source candidate 0.19.55
+## Verified test build 0.19.56
+
+2026-10-05: approved construction-only external library adapter reads .blueprint,
+both .vbuild dialects and inert ZIP without extraction. External Edit opens a detached
+draft; one editor card click inserts the whole construction; Hammer Place copy saves
+a native copy before existing per-piece world validation. Originals remain untouched;
+Store v9 unchanged, no terrain execution or foreign DLL/assets installed.
+
+Release, Geometry(105), Store, Localization, EditorBridge, WorldLayout, DeploymentChecks,
+HostContract and 144 exact-source Unity UI states PASS; independent correctness and
+complexity review complete. verify skill absent. Hub activation resolved exit198;
+fixture local-name collisions CS0128/CS0841 fixed. UI includes import/edit/save-copy/
+insert/Cancel and thumbnail updates without resetting picker/page.
+Final whitespace verification also passes; old Scene/Gizmo and new reader spacing fixed.
+.56 and source ZIP installed only TerrainRamp-1.0-Test with verified SHA256.
+Default/worlds/saves unchanged. gameHostTested=false; no Valheim launch.
+
+353 library entries: 62 format-compatible, 291 blocked. Displayed reasons: 104 limit,
+124 #SnapPoints, 63 object data. Reasons overlap: 253 exceed128, maximum39,487.
+Large-size/snap/object-data support and BW-04/BW-05 full exchange remain pending.
+See specs/roadmap/blueprint-exchange-research.md. No library/package assets enter Git.
+
+## Historical verified source candidate 0.19.55
 
 2026-10-05: .54 owner feedback accepts catalog checks 2,3,5,6,7; changes 1,4,8
 and adds focused gizmo/save checks 9,10 in [the single current series](specs/roadmap/current-pass.md).

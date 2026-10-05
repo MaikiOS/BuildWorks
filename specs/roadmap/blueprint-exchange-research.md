@@ -1,4 +1,4 @@
-# External blueprint libraries — verified research, not implemented import
+# External blueprint libraries — verified test build 0.19.56
 
 2026-10-05. Ostrix asked us to find blueprint-capable mods and their ready-building libraries.
 No other gameplay mod was installed; no game/world/store was modified.
@@ -42,18 +42,46 @@ These are constructions made of game prefab references, not FBX/OBJ/glTF meshes.
 Installed mod pieces can be resolved by exact prefab ID without copying their assets.
 Do not guess mod ownership from a name or automatically install dependencies.
 
-## Next bounded stage — pending scope decision
+## Approved construction transfer: source candidate 0.19.56
 
-First support original versioned `.buildworks.json` exchange and read-only
-preflight for PlanBuild `.blueprint`; `.vbuild` can follow. Put the same Import/Export
-actions in blueprint catalog and Hammer library, not two independent implementations.
-Parse into a staging document; validate byte/count limits, finite transforms, scale
-range, hierarchy/IDs and exact prefab resolution before an atomic library write.
-Preserve creator/source URL and original file. Missing prefabs must be visible and
-must block placement, not disappear or silently be substituted.
+Ostrix approved game-piece constructions, editable in our editor and placeable in
+the world. Terrain is excluded. One shared adapter reads `.blueprint`, both `.vbuild`
+dialects and ZIP without extraction from `BepInEx/config/BuildWorks/imports` at the
+first library browse in a session. Later additions require a session restart;
+recursive directory discovery is not included.
 
-Owner question is outstanding: first import parts only, never applying terrain and
-explicitly rejecting unsupported object-data files, versus full terrain/object-data
-support. Terrain is a material expansion of world-edit authority, not a parser detail.
-The current Store v9 library file is internal persistence, not a public import format.
-No import/export button or library ingestion is claimed as implemented in 0.19.55.
+External source cards are separated by the External blueprints source filter.
+One editor-card click starts insertion of the whole construction. Edit opens a
+detached draft; save confirms name/category and creates a native copy with new IDs.
+Hammer's Place copy saves a native copy first, then uses existing per-piece resource
+and station checks. Originals remain untouched. Thumbnails use resolved game pieces,
+one per frame, never package images.
+
+Bounds: 2–128 pieces, finite positions within ±512, scale 0.01–4, exact prefab IDs,
+no substitutions. Nonempty info/ZDO, probabilistic pieces, unknown sections or invalid
+transforms block the entire source with a reason. Sign text and object contents are
+not supported. Creator/description remain in the original file, not the native v9 copy.
+Native limits remain 32 blueprints and 12 categories; browsing external files uses no slots.
+
+Release, Store, EditorBridge, WorldLayout, DeploymentChecks, HostContract and localization
+pass; independent source correctness review PASS. Actual archive: 353 cards, 62
+format-compatible, 291 blocked. CoffeeTable accepts; WoodCouch1 blocks on sign data.
+Host prefab availability is a separate game check. After Hub/licence activation,
+UI acceptance passes 144 states including open/edit/save/insert and thumbnail updates
+without resetting the picker. New fixture local-name collisions CS0128/CS0841 fixed.
+Log: `artifacts/unity-workbench-capture.log`; status:
+`artifacts/ui-runtime/verification-status.json` = passed_runtime_workbench,
+gameHostTested=false. .56 and inert source ZIP deployed only to TerrainRamp-1.0-Test;
+both DLL/archive SHA256 verified. Default, worlds and saves remain unchanged.
+
+Fresh diagnosis of all 353 sources: displayed reason is piece limit for 104,
+#SnapPoints for 124, object data for 63; 62 accepted. Reasons overlap: 253 exceed
+128 pieces, maximum 39,487. Of 100 within size bounds, 28 block on #SnapPoints and
+10 on object data. Terrain alone does not block. The 128 limit exists in reader,
+Store and BlueprintEditorDocument; raising it needs coordinated changes and large
+construction tests, not removing a single guard. SnapPoints/object-data support
+and larger blueprints are not implemented yet.
+
+Public `.buildworks.json`, lossless interchange, export and missing-piece substitution
+remain separate BW-04/BW-05 work. Store v9 is not a public interchange format.
+No foreign DLL, model or texture extraction; no automatic dependency installation.

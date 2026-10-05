@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using BepInEx.Logging;
 using TMPro;
@@ -1336,7 +1337,7 @@ namespace OstrixMods.BuildWorks
                     table.GetSelectedCategory()).GetHashCode();
                 if (blueprintStore != null)
                 {
-                    foreach (CompositeBlueprintStore.Blueprint blueprint in blueprintStore.All())
+                    foreach (CompositeBlueprintStore.Blueprint blueprint in blueprintStore.CatalogAll())
                     {
                         signature = signature * 31 + blueprint.id.GetHashCode();
                         signature = signature * 31 + blueprint.name.GetHashCode();
@@ -1399,7 +1400,7 @@ namespace OstrixMods.BuildWorks
                 signature = signature * 31 + Screen.width;
                 signature = signature * 31 + Screen.height;
                 foreach (CompositeBlueprintStore.Blueprint blueprint in
-                    blueprintStore?.All() ?? Array.Empty<CompositeBlueprintStore.Blueprint>())
+                    blueprintStore?.CatalogAll() ?? Array.Empty<CompositeBlueprintStore.Blueprint>())
                 {
                     signature = signature * 31 + blueprint.id.GetHashCode();
                     signature = signature * 31 + blueprint.name.GetHashCode();
@@ -1840,7 +1841,7 @@ namespace OstrixMods.BuildWorks
                 rail.transform,
                 blueprints
                     ? BuildWorksLocalization.Text(
-                        "catalog.title.blueprints", blueprintStore?.All().Count ?? 0)
+                        "catalog.title.blueprints", blueprintStore?.CatalogAll().Count ?? 0)
                     : BuildWorksLocalization.Text("catalog.title.catalog", info.Total),
                 new Vector2(10f, -8f),
                 19f,
@@ -2165,12 +2166,13 @@ namespace OstrixMods.BuildWorks
                 y -= 32f;
             }
             var categories = new List<string> { AllBlueprintCategories };
-            categories.AddRange(blueprintStore.Categories());
+            categories.AddRange(blueprintStore.Categories().Concat(
+                blueprintStore.CatalogAll().Select(x => x.category)).Distinct());
             foreach (string category in categories)
             {
                 string target = category;
                 int count = category == AllBlueprintCategories
-                    ? blueprintStore.All().Count
+                    ? blueprintStore.CatalogAll().Count
                     : CountBlueprints(category);
                 AddRailButton(
                     hud,
@@ -2287,7 +2289,7 @@ namespace OstrixMods.BuildWorks
             blueprintsPerPage = Math.Max(1, columns * rows);
 
             var filtered = new List<CompositeBlueprintStore.Blueprint>();
-            foreach (CompositeBlueprintStore.Blueprint blueprint in blueprintStore.All())
+            foreach (CompositeBlueprintStore.Blueprint blueprint in blueprintStore.CatalogAll())
             {
                 if (blueprintCategory != AllBlueprintCategories && !string.Equals(
                     blueprint.category,
@@ -2398,14 +2400,15 @@ namespace OstrixMods.BuildWorks
                 AddBlueprintContextMenu(hud, player, parent, blueprint, position);
             };
             pointer.RightReleased = ReleaseBlueprintContextMenu;
-            if (blueprintRegistry.TryGetPiece(blueprint, out Piece piece) && piece.m_icon)
-                AddIcon(card.transform, piece.m_icon, new Vector2(8f, -8f),
+            Sprite icon = blueprintRegistry.Icon(blueprint);
+            if (icon)
+                AddIcon(card.transform, icon, new Vector2(8f, -8f),
                     new Vector2(size.x - 16f, size.y - 42f));
             AddRailText(
                 hud,
                 card.transform,
                 blueprint.name + "\n" + BuildWorksLocalization.Text(
-                    "catalog.card.parts", blueprint.parts.Count),
+                    "catalog.card.parts", blueprint.IsExternal ? blueprint.importPartCount : blueprint.parts.Count),
                 new Vector2(8f, -(size.y - 35f)),
                 14f,
                 Color.white,
@@ -2463,12 +2466,18 @@ namespace OstrixMods.BuildWorks
             float y = -38f;
             float width = 224f;
             AddContextAction(hud, menu.transform,
-                BuildWorksLocalization.Text("catalog.action.place"), y, width,
+                BuildWorksLocalization.Text(blueprint.IsExternal ? "import.place_copy" : "catalog.action.place"), y, width,
                 () => { contextBlueprint = null; blueprintAction?.Invoke(blueprint, false); });
             y -= 30f;
             AddContextAction(hud, menu.transform,
                 BuildWorksLocalization.Text("catalog.action.edit"), y, width,
                 () => { contextBlueprint = null; blueprintAction?.Invoke(blueprint, true); });
+            if (blueprint.IsExternal)
+            {
+                AddRailText(hud, menu.transform, BuildWorksLocalization.Text("import.read_only"),
+                    new Vector2(10f, -105f), 14f, Color.white, FontStyles.Normal, width: width);
+                return;
+            }
             y -= 30f;
             AddContextAction(hud, menu.transform,
                 BuildWorksLocalization.Text("catalog.action.rename"), y, width,
@@ -2548,13 +2557,14 @@ namespace OstrixMods.BuildWorks
                 new Color(0.96f, 0.78f, 0.39f, 1f), FontStyles.Bold, width: width - 32f);
             AddRailText(hud, parent,
                 BuildWorksLocalization.Text("catalog.blueprint_summary",
-                    blueprint.parts.Count,
+                    blueprint.IsExternal ? blueprint.importPartCount : blueprint.parts.Count,
                     BuildWorksLocalization.BlueprintCategoryLabel(blueprint.category)),
                 new Vector2(16f, -46f), 14f,
                 new Color(0.88f, 0.80f, 0.66f, 1f), FontStyles.Normal,
                 width: width - 32f);
-            if (blueprintRegistry.TryGetPiece(blueprint, out Piece piece) && piece.m_icon)
-                AddIcon(parent, piece.m_icon, new Vector2(16f, -74f),
+            Sprite icon = blueprintRegistry.Icon(blueprint);
+            if (icon)
+                AddIcon(parent, icon, new Vector2(16f, -74f),
                     new Vector2(width - 32f, Mathf.Min(104f, height * 0.20f)));
 
             const float actionHeight = 28f;
@@ -2566,13 +2576,24 @@ namespace OstrixMods.BuildWorks
             float y = -actionTop;
             float buttonWidth = width - 32f;
             AddActionButton(hud, parent,
-                BuildWorksLocalization.Text("catalog.action.place"), y, buttonWidth,
+                BuildWorksLocalization.Text(blueprint.IsExternal ? "import.place_copy" : "catalog.action.place"), y, buttonWidth,
                 () => blueprintAction?.Invoke(blueprint, false));
             y -= actionHeight;
             AddActionButton(hud, parent,
                 BuildWorksLocalization.Text("catalog.action.edit"), y, buttonWidth,
                 () => blueprintAction?.Invoke(blueprint, true));
             y -= actionHeight;
+            if (blueprint.IsExternal)
+            {
+                string reason = BuildWorksLocalization.ResolveUserText(blueprint.importError);
+                if (string.IsNullOrEmpty(reason) && !PrecisionPlacementSession.TryResolveBlueprintPieces(
+                    player, blueprint, out _, out string missing))
+                    reason = BuildWorksLocalization.Text("placement.hammer_piece_missing", missing);
+                AddRailText(hud, parent, BuildWorksLocalization.Text("import.read_only") + "\n" +
+                    blueprint.importSource + "\n" + reason, new Vector2(16f, y), 13f,
+                    Color.white, FontStyles.Normal, width: buttonWidth);
+                return; // source library cannot be renamed/deleted in the native Store
+            }
             AddActionButton(hud, parent,
                 BuildWorksLocalization.Text("catalog.action.rename"), y, buttonWidth,
                 () => TextInput.instance?.RequestText(
@@ -3015,7 +3036,7 @@ namespace OstrixMods.BuildWorks
             int count = 0;
             if (blueprintStore != null)
             {
-                foreach (CompositeBlueprintStore.Blueprint blueprint in blueprintStore.All())
+                foreach (CompositeBlueprintStore.Blueprint blueprint in blueprintStore.CatalogAll())
                     if ((blueprintCategory == AllBlueprintCategories ||
                             blueprint.category == blueprintCategory) &&
                         (string.IsNullOrEmpty(HammerCatalogOrganizer.Search) ||
@@ -3031,7 +3052,7 @@ namespace OstrixMods.BuildWorks
         private static int CountBlueprints(string category)
         {
             int count = 0;
-            foreach (CompositeBlueprintStore.Blueprint blueprint in blueprintStore.All())
+            foreach (CompositeBlueprintStore.Blueprint blueprint in blueprintStore.CatalogAll())
                 if (blueprint.category == category) ++count;
             return count;
         }

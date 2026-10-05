@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using OstrixMods.BuildWorks;
 
@@ -8,7 +9,7 @@ namespace OstrixMods.BuildWorks.StoreTests
 {
     internal static class Program
     {
-        private static int Main()
+        private static int Main(string[] args)
         {
             string directory = Path.Combine(
                 Path.GetTempPath(), "BuildWorks.StoreTests." + Guid.NewGuid().ToString("N"));
@@ -25,6 +26,8 @@ namespace OstrixMods.BuildWorks.StoreTests
                 MigrateV3(Path.Combine(directory, "migration.json"));
                 RejectGroupCycle(Path.Combine(directory, "cycle.json"));
                 FailedWritePreservesOriginal(Path.Combine(directory, "failure.json"));
+                ExternalImports(directory);
+                if (args.Length > 0) InspectActualLibrary(args[0]);
                 Console.WriteLine("All BuildWorks store tests passed.");
                 return 0;
             }
@@ -37,6 +40,79 @@ namespace OstrixMods.BuildWorks.StoreTests
             {
                 Directory.Delete(directory, recursive: true);
             }
+        }
+
+        private static void ExternalImports(string directory)
+        {
+            const string rows = "wall;BuildingWorkbench;1;2;3;0;0;0;1;\"\";1;2;1\n" +
+                "beam;BuildingWorkbench;-4;5;6;0;.7071068;0;.7071068;\"\";1;1;1\n";
+            string source = "#Name:Example\n#Category:Building\n#Terrain\nsquare;NaN;malicious;ignored\n#Pieces\n" + rows;
+            var parsed = ExternalBlueprintLibrary.Parse(source, "example.blueprint");
+            Require(parsed.importError == null && parsed.parts.Count == 2 && parsed.IsExternal, "Basic blueprint/terrain separation failed");
+            Require(parsed.parts[0].position.x == 1 && parsed.parts[0].position.y == 2 && parsed.parts[0].position.z == 3 &&
+                parsed.parts[0].scale.y == 2 && Math.Abs(parsed.parts[1].rotation.y - .7071068f) < .000001f, "Position/rotation/scale ordering changed");
+            var vbuild = ExternalBlueprintLibrary.Parse("wall;0;0;0;1;1;2;3\nbeam;0;0;0;1;-4;5;6", "sample.vbuild");
+            Require(vbuild.importError == null && vbuild.parts[1].position.z == 6 && vbuild.parts[0].rotation.w == 1, "vbuild ordering");
+            var whitespace = ExternalBlueprintLibrary.Parse("wall 0 0 0 1 1 2 3\nbeam\t0 0 0 1 -4 5 6", "buildshare.vbuild");
+            Require(whitespace.importError == null && whitespace.parts[0].position.y == 2, "BuildShare whitespace dialect");
+            Require(ExternalBlueprintLibrary.Parse("#Pieces\n" + rows, "no-headers.blueprint").importError == null, "Header-light source");
+            var copyA = ExternalBlueprintLibrary.DetachedCopy(parsed);
+            var copyB = ExternalBlueprintLibrary.DetachedCopy(parsed);
+            Require(copyA.id != copyB.id && copyA.parts[0].stableId != copyB.parts[0].stableId &&
+                copyA.parts[0].stableId != parsed.parts[0].stableId, "Duplicate conversion identities collide");
+            foreach (string invalid in new[] {
+                source.Replace("1;2;3", "NaN;2;3"), source.Replace("1;2;3", "513;2;3"),
+                source.Replace("0;0;0;1;", "0;0;0;0;"), source.Replace("\"\"", "\"inventory\""),
+                source.Replace(";1;2;1", ";1;5;1"), source.Replace(";1;2;1", ";1;2;1;zdo"),
+                source.Replace(";1;2;1", ";1;2;1;;0.5"), source + "#FutureData\nnew data",
+                source.Replace("#Terrain", "#TerrainFuture"),
+                "#Pieces\n" + string.Concat(Enumerable.Repeat(rows, 65)), "#Pieces\n" + rows.Split('\n')[0]
+            })
+            {
+                var rejected = ExternalBlueprintLibrary.Parse(invalid, "bad.blueprint");
+                Require(rejected.importError != null && rejected.parts.Count == 0, "Unsafe/partial source was accepted");
+            }
+            string folder = Path.Combine(directory, "imports"); Directory.CreateDirectory(folder);
+            string original = Path.Combine(folder, "example.blueprint"); File.WriteAllText(original, source);
+            string zipPath = Path.Combine(folder, "archive.zip");
+            using (var output = File.Create(zipPath))
+            using (var zip = new ZipArchive(output, ZipArchiveMode.Create))
+            {
+                using (var writer = new StreamWriter(zip.CreateEntry("../outside.vbuild").Open())) writer.Write("wall;0;0;0;1;1;2;3\nbeam;0;0;0;1;4;5;6");
+                using (var writer = new StreamWriter(zip.CreateEntry("never-load.dll").Open())) writer.Write("not code");
+            }
+            var library = ExternalBlueprintLibrary.Load(folder);
+            Require(library.Count == 2 && !File.Exists(Path.Combine(directory, "outside.vbuild")), "Archive paths extracted or DLL treated as blueprint");
+            var store = new CompositeBlueprintStore(Path.Combine(directory, "import-copy.json"));
+            Require(store.All().Count == 0 && store.CatalogAll().Count == 2 && !File.Exists(Path.Combine(directory, "import-copy.json")), "Browsing sources mutated native store");
+            Require(!store.TryDelete(parsed, out _) && File.ReadAllText(original) == source, "Source library is writable");
+            Require(store.TrySaveDocument(copyA.name, copyA.category, copyA.parts, copyA.groups, copyA.anchors,
+                out CompositeBlueprintStore.Blueprint saved, out string error), error);
+            Require(saved.id != parsed.id && !saved.IsExternal, "Imported copy shares source identity");
+            var loaded = new CompositeBlueprintStore(Path.Combine(directory, "import-copy.json"));
+            Require(loaded.All().Count == 1 && loaded.All()[0].parts[0].scale.y == 2 && loaded.CatalogAll().Count == 3,
+                "Native copy cannot be reopened with original sources");
+            Require(File.ReadAllText(original) == source, "Import/save rewrote original file");
+            Console.WriteLine("PASS read-only .blueprint/.vbuild -> separate native v9 copy, exact poses/scales, terrain exclusion, rejection without partial pieces, inert archive");
+        }
+
+        private static void InspectActualLibrary(string path)
+        {
+            int total = 0, supported = 0, blocked = 0;
+            using (Stream input = File.OpenRead(path))
+            using (var zip = new ZipArchive(input, ZipArchiveMode.Read))
+                foreach (ZipArchiveEntry entry in zip.Entries.Where(x => x.FullName.EndsWith(".blueprint", StringComparison.OrdinalIgnoreCase)))
+                {
+                    using (var reader = new StreamReader(entry.Open()))
+                    {
+                        var parsed = ExternalBlueprintLibrary.Parse(reader.ReadToEnd(), entry.FullName);
+                        ++total; if (parsed.importError == null) ++supported; else ++blocked;
+                        if (parsed.name == "CoffeeTable") Require(parsed.importError == null && parsed.parts.Count == 4, "Actual CoffeeTable cannot be converted");
+                        if (parsed.name == "WoodCouch1") Require(parsed.importError?.Contains("object_data") == true, "Sign text was silently lost");
+                    }
+                }
+            Require(total == 353 && supported > 0 && total == supported + blocked, "Downloaded library coverage");
+            Console.WriteLine("PASS actual BiomeBlueprints: " + total + " visible source entries; " + supported + " format-compatible; " + blocked + " explicitly blocked (host prefab availability is separate)");
         }
 
         private static void RoundTripV9(string path)

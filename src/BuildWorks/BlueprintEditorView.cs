@@ -58,7 +58,8 @@ namespace OstrixMods.BuildWorks
             bool isStation = false, bool isUpgrade = false,
             IReadOnlyList<BlueprintEditorCatalogResource> resources = null,
             string requiredStation = null, Sprite requiredStationIcon = null,
-            IReadOnlyList<string> materials = null, int materialOrder = 0)
+            IReadOnlyList<string> materials = null, int materialOrder = 0,
+            string unavailableReason = null)
         {
             PrefabName = prefabName;
             DisplayName = displayName;
@@ -86,11 +87,12 @@ namespace OstrixMods.BuildWorks
             RequiredStationIcon = requiredStationIcon;
             Materials = materials ?? new[] { Material };
             MaterialOrder = materialOrder;
+            UnavailableReason = unavailableReason;
         }
 
         internal string PrefabName { get; }
         internal string DisplayName { get; }
-        internal Sprite Icon { get; }
+        internal Sprite Icon { get; set; }
         internal string Category { get; }
         internal string Material { get; }
         internal IReadOnlyList<string> Materials { get; }
@@ -102,6 +104,7 @@ namespace OstrixMods.BuildWorks
         internal int Index { get; }
         internal CompositeBlueprintStore.Blueprint Blueprint { get; }
         internal bool IsBlueprint => Blueprint != null;
+        internal string UnavailableReason { get; }
         internal string Section { get; }
         internal string Family { get; }
         internal string StationId { get; }

@@ -56,12 +56,7 @@ namespace OstrixMods.BuildWorks
                 }
                 return;
             }
-            if (thumbnailRenderer.ProcessOne(out string thumbnailId, out Sprite thumbnail) &&
-                thumbnail && piecesByBlueprintId.TryGetValue(thumbnailId, out Piece iconPiece))
-            {
-                iconPiece.m_icon = thumbnail;
-                HammerCatalogView.Invalidate();
-            }
+            ProcessThumbnail(out _, out _);
             PieceTable table = PrecisionPlacementSession.GetBuildPieceTable(player);
             string signature = BuildSignature(store.All(), table);
             if (table == registeredTable && signature == registeredSignature) return;
@@ -234,9 +229,7 @@ namespace OstrixMods.BuildWorks
             CompositeBlueprintStore.Blueprint blueprint)
         {
             var result = new List<ResourceInfo>();
-            if (blueprint == null || !sourcePiecesByBlueprintId.TryGetValue(
-                blueprint.id,
-                out IReadOnlyList<Piece> pieces)) return result;
+            if (!TrySources(blueprint, out IReadOnlyList<Piece> pieces)) return result;
             var amounts = new Dictionary<string, ResourceInfo>(StringComparer.Ordinal);
             foreach (Piece piece in pieces)
             {
@@ -270,12 +263,37 @@ namespace OstrixMods.BuildWorks
             => "BuildWorks: " + BuildWorksLocalization.Text(
                 "blueprint.piece.description", blueprint?.parts.Count ?? 0);
 
+        internal bool ProcessThumbnail(out string id, out Sprite thumbnail)
+        {
+            if (!thumbnailRenderer.ProcessOne(out id, out thumbnail) || !thumbnail) return false;
+            if (piecesByBlueprintId.TryGetValue(id, out Piece iconPiece)) iconPiece.m_icon = thumbnail;
+            HammerCatalogView.Invalidate();
+            return true;
+        }
+
+        private bool TrySources(CompositeBlueprintStore.Blueprint blueprint, out IReadOnlyList<Piece> pieces)
+        {
+            pieces = null;
+            if (blueprint == null) return false;
+            if (sourcePiecesByBlueprintId.TryGetValue(blueprint.id, out pieces)) return true;
+            if (!blueprint.IsExternal || !PrecisionPlacementSession.TryResolveBlueprintPieces(
+                Player.m_localPlayer, blueprint, out List<Piece> resolved, out _)) return false;
+            pieces = resolved;
+            sourcePiecesByBlueprintId[blueprint.id] = pieces;
+            return true;
+        }
+
+        internal Sprite Icon(CompositeBlueprintStore.Blueprint blueprint)
+        {
+            if (TryGetPiece(blueprint, out Piece piece)) return piece.m_icon;
+            return TrySources(blueprint, out IReadOnlyList<Piece> pieces)
+                ? thumbnailRenderer.GetOrQueue(blueprint, pieces) : null;
+        }
+
         public Sprite RefreshThumbnail(
             CompositeBlueprintStore.Blueprint blueprint)
         {
-            if (blueprint == null || !sourcePiecesByBlueprintId.TryGetValue(
-                blueprint.id,
-                out IReadOnlyList<Piece> pieces)) return null;
+            if (!TrySources(blueprint, out IReadOnlyList<Piece> pieces)) return null;
             Sprite sprite = thumbnailRenderer.Refresh(blueprint, pieces);
             if (sprite && piecesByBlueprintId.TryGetValue(
                 blueprint.id,
@@ -290,9 +308,7 @@ namespace OstrixMods.BuildWorks
         public BlueprintThumbnailRenderer.PreviewSession BeginPreview(
             CompositeBlueprintStore.Blueprint blueprint)
         {
-            return blueprint != null && sourcePiecesByBlueprintId.TryGetValue(
-                blueprint.id,
-                out IReadOnlyList<Piece> pieces)
+            return TrySources(blueprint, out IReadOnlyList<Piece> pieces)
                 ? thumbnailRenderer.BeginPreview(blueprint, pieces)
                 : null;
         }

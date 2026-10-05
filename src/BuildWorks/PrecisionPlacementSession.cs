@@ -618,14 +618,19 @@ namespace OstrixMods.BuildWorks
                 int material = left.MaterialOrder.CompareTo(right.MaterialOrder);
                 return material != 0 ? material : left.Index.CompareTo(right.Index);
             });
-            foreach (CompositeBlueprintStore.Blueprint blueprint in blueprintStore.All())
+            foreach (CompositeBlueprintStore.Blueprint blueprint in blueprintStore.CatalogAll())
             {
-                if (!blueprintPieceRegistry.TryGetPiece(blueprint, out Piece piece) || !piece)
-                    continue;
+                string unavailable = BuildWorksLocalization.ResolveUserText(blueprint.importError);
+                string missing = null;
+                List<Piece> blueprintParts = null;
+                bool resolved = string.IsNullOrEmpty(unavailable) && TryResolveBlueprintPieces(
+                    player, blueprint, out blueprintParts, out missing);
+                if (string.IsNullOrEmpty(unavailable) && !resolved)
+                    unavailable = BuildWorksLocalization.Text("placement.hammer_piece_missing", missing);
                 var costs = blueprintPieceRegistry.Resources(blueprint)
                     .Select(x => new BlueprintEditorCatalogResource(x.Name, x.Icon, x.Amount)).ToList();
                 string requiredStations = null; Sprite requiredIcon = null;
-                if (TryResolveBlueprintPieces(player, blueprint, out List<Piece> blueprintParts, out _))
+                if (resolved)
                 {
                     var stations = blueprintParts.Where(x => x.m_craftingStation)
                         .Select(x => x.m_craftingStation).GroupBy(x => x.m_name).Select(x => x.First()).ToList();
@@ -635,10 +640,11 @@ namespace OstrixMods.BuildWorks
                         requiredIcon = stations[0].m_icon;
                     }
                 }
-                result.Add(new BlueprintEditorCatalogItem(PrefabName(piece), blueprint.name,
-                    piece.m_icon, blueprint.category, HammerCatalogOrganizer.BlueprintsGroup,
-                    "my_blueprints",
-                    result.Count, blueprint, resources: costs, requiredStation: requiredStations, requiredStationIcon: requiredIcon));
+                result.Add(new BlueprintEditorCatalogItem("blueprint_" + blueprint.id, blueprint.name,
+                    blueprintPieceRegistry.Icon(blueprint), blueprint.category, HammerCatalogOrganizer.BlueprintsGroup,
+                    blueprint.IsExternal ? "external_blueprints" : "my_blueprints",
+                    result.Count, blueprint, resources: costs, requiredStation: requiredStations,
+                    requiredStationIcon: requiredIcon, unavailableReason: unavailable));
             }
             return result;
         }
@@ -747,6 +753,9 @@ namespace OstrixMods.BuildWorks
             if (Player.m_localPlayer) blueprintPieceRegistry.Update(Player.m_localPlayer);
             HammerCatalogView.Invalidate();
         }
+
+        internal bool ProcessBlueprintThumbnail(out string id, out Sprite thumbnail) =>
+            blueprintPieceRegistry.ProcessThumbnail(out id, out thumbnail);
 
         public void Update()
         {
@@ -982,7 +991,25 @@ namespace OstrixMods.BuildWorks
             bool edit)
         {
             Player player = Player.m_localPlayer;
-            if (!player || !blueprintPieceRegistry.TryGetPiece(blueprint, out _))
+            if (player && blueprint != null && blueprint.IsExternal)
+            {
+                if (!string.IsNullOrEmpty(blueprint.importError))
+                { ShowStatus(player, blueprint.importError); return; }
+                if (!TryResolveBlueprintPieces(player, blueprint, out _, out string missing))
+                { ShowStatus(player, BuildWorksLocalization.Text("placement.hammer_piece_missing", missing)); return; }
+                if (!edit)
+                {
+                    // Save a separate native copy only on explicit world-placement action.
+                    CompositeBlueprintStore.Blueprint copy = ExternalBlueprintLibrary.DetachedCopy(blueprint);
+                    if (!blueprintStore.TrySaveDocument(copy.name, copy.category,
+                        copy.parts, copy.groups, copy.anchors, copy.primaryPartId,
+                        copy.primaryGroupId, out CompositeBlueprintStore.Blueprint imported, out string error))
+                    { ShowStatus(player, error); return; }
+                    blueprint = imported;
+                    RefreshBlueprintEditorLibrary();
+                }
+            }
+            if (!player || (!edit && !blueprintPieceRegistry.TryGetPiece(blueprint, out _)))
             {
                 ShowStatus(player, BuildWorksLocalization.Text(
                     "placement.blueprint_unavailable"));
@@ -4897,24 +4924,28 @@ namespace OstrixMods.BuildWorks
             pieces = new List<Piece>(blueprint?.parts?.Count ?? 0);
             missingPrefab = string.Empty;
             if (!player || blueprint?.parts == null) return false;
+            if (!string.IsNullOrEmpty(blueprint.importError))
+            { missingPrefab = BuildWorksLocalization.ResolveUserText(blueprint.importError); return false; }
+            var unavailable = new HashSet<string>(StringComparer.Ordinal);
             foreach (CompositeBlueprintStore.Part part in blueprint.parts)
             {
                 if (!TryResolveBuildPiece(player, part.prefabName, out Piece piece) ||
                     !SupportsBlueprintWorkspacePiece(piece) || !CompositeBlueprintStore.ValidScale(part.scale))
                 {
-                    missingPrefab = part.prefabName;
-                    return false;
+                    unavailable.Add(part.prefabName);
+                    continue;
                 }
                 ZNetView view = piece.GetComponent<ZNetView>();
                 if (part.scale.ToVector3() != Vector3.one && (!view || !view.m_syncInitialScale))
                 {
-                    missingPrefab = BuildWorksLocalization.Text(
-                        "blueprint.scale_persistence_suffix", part.prefabName);
-                    return false;
+                    unavailable.Add(BuildWorksLocalization.Text(
+                        "blueprint.scale_persistence_suffix", part.prefabName));
+                    continue;
                 }
                 pieces.Add(piece);
             }
-            return pieces.Count >= 2;
+            missingPrefab = string.Join(", ", unavailable.OrderBy(x => x, StringComparer.Ordinal));
+            return unavailable.Count == 0 && pieces.Count >= 2;
         }
 
         private bool ApplyBlueprintAnchors()

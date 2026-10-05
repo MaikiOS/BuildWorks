@@ -376,6 +376,7 @@ public static class RuntimeEditorAcceptance
                     "Reopen must reset active tool");
                 controller.Close(true);
                 checks.Add("Reopening clears active operation");
+                TestExternalImportEditor(template, fontTemplate, source, output);
                 Require(runtimeErrors.Count == 0, "Runtime logged errors: " + string.Join("; ", runtimeErrors));
                 yield return null;
                 ActualDividerAcceptance.Run(output);
@@ -480,6 +481,49 @@ public static class RuntimeEditorAcceptance
         Require(Mathf.Abs(reloaded.All()[0].parts[0].scale.x - expected) < 0.0001f, "Store discarded scale");
         CheckReopenedCopy(controller, reloaded, expected);
         checks.Add("Controller save -> disk format9 -> new store -> OpenExisting retains scale and optional blueprint anchor");
+    }
+
+    private static void TestExternalImportEditor(Camera camera, TMP_Text font,
+        Dictionary<string, GameObject> sources, string output)
+    {
+        string path = Path.Combine(output, "external-copy-" + Guid.NewGuid().ToString("N") + ".json");
+        var store = new CompositeBlueprintStore(path);
+        var original = ExternalBlueprintLibrary.Parse("#Name:Import fixture\n#Category:OTHER\n#Pieces\n" +
+            "woodwall;0;1;2;3;0;0;0;1;\"\";1;1;1\nwood_pole;0;4;5;6;0;0;0;1;\"\";1;1;1", "fixture.blueprint");
+        using (var editor = new BlueprintEditorController(store, camera, font,
+            name => sources.TryGetValue(name, out GameObject prefab) ? prefab : null, name => name,
+            () => new[] { new BlueprintEditorCatalogItem("external-fixture", original.name, null,
+                "OTHER", "blueprints", "external_blueprints", 0, original) },
+            message => { throw new InvalidOperationException(message); }))
+        {
+            Require(editor.OpenExisting(original, out string error), "External editor open: " + error);
+            Require(Field<CompositeBlueprintStore.Blueprint>(editor, "sourceBlueprint") == null && store.All().Count == 0,
+                "External source is adopted as writable native blueprint");
+            var part = editor.Document.Parts[0];
+            Require(part.StableId != original.parts[0].stableId && part.Position.X == 1 && part.Position.Y == 2,
+                "External draft lost pose or retained source identity");
+            editor.Document.SelectOnly(part.StableId);
+            Require(editor.ApplyTransformDelta(Vector3.right, Quaternion.identity, Vector3.zero), "Imported part cannot use native transform editing");
+            Require(!(bool)Call(editor, "TrySave", false, false) && !File.Exists(path), "Import save wrote before metadata confirmation");
+            Field<BlueprintEditorView>(editor, "view").HideDialog();
+            Require(!File.Exists(path), "Cancel import save mutated storage");
+            Require((bool)Call(editor, "TrySave", false, true), "Import native-copy save failed");
+            var reopened = new CompositeBlueprintStore(path);
+            Require(reopened.All().Count == 1 && reopened.All()[0].parts[0].position.x == 2 &&
+                original.parts[0].position.x == 1 && !reopened.All()[0].IsExternal, "Save mutated source or lost edit");
+            editor.Close(true);
+            Require(editor.OpenExisting(reopened.All()[0], out error), "Saved import cannot reopen: " + error);
+            Call(editor, "RequestCatalog");
+            Call(editor, "BeginPartPlacement", new BlueprintEditorCatalogItem("external-fixture", original.name, null,
+                "OTHER", "blueprints", "external_blueprints", 0, original), true);
+            Require(Field<BlueprintEditorDocument>(editor, "placementBlueprint")?.Parts.Count == 2,
+                "One-click external card did not begin whole-blueprint placement");
+            Call(editor, "CancelPartPlacement");
+            Require(editor.Document.Parts.Count == 2 && Field<BlueprintEditorDocument>(editor, "placementBlueprint") == null,
+                "Cancel insert changed saved document or leaked ghost state");
+            editor.Close(true);
+        }
+        checks.Add("External .blueprint -> detached editable draft -> metadata Cancel no disk -> transform/save native v9 -> reopen -> whole-source insert preview/Cancel; original unchanged");
     }
 
     private static void TestScaleBoundaries(BlueprintEditorController controller, string path)

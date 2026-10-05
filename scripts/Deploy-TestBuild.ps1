@@ -4,7 +4,9 @@ param(
     [ValidateNotNullOrEmpty()]
     [string] $TargetProfile,
 
-    [switch] $ArmSkyCleanup
+    [switch] $ArmSkyCleanup,
+
+    [string] $BlueprintLibraryArchive
 )
 
 Set-StrictMode -Version Latest
@@ -82,6 +84,31 @@ function Assert-DefaultClean {
 }
 
 Assert-DefaultClean
+
+# Copy only an inert archive into BuildWorks' own config. Runtime reads bounded
+# text entries; no third-party DLL, terrain or code is extracted/installed.
+$librarySource = $null
+if ($BlueprintLibraryArchive) {
+    $librarySource = (Resolve-Path -LiteralPath $BlueprintLibraryArchive).Path
+    Assert-NotReparsePoint $librarySource
+    if ([IO.Path]::GetExtension($librarySource) -ine '.zip' -or
+        (Get-Item -LiteralPath $librarySource).Length -gt 64MB) {
+        throw 'Expected a blueprint ZIP archive no larger than 64 MiB.'
+    }
+    $libraryHash = (Get-FileHash -LiteralPath $librarySource -Algorithm SHA256).Hash
+    $libraryConfig = Join-Path $targetBepInEx 'config'
+    $libraryRoot = Join-Path $libraryConfig 'BuildWorks'
+    $libraryImports = Join-Path $libraryRoot 'imports'
+    foreach ($libraryDirectory in @($libraryConfig, $libraryRoot, $libraryImports)) {
+        Assert-NotReparsePoint $libraryDirectory
+    }
+    $libraryDestination = Join-Path $libraryImports ('library-' + $libraryHash + '.zip')
+    Assert-NotReparsePoint $libraryDestination
+    if ((Test-Path -LiteralPath $libraryDestination) -and
+        (Get-FileHash -LiteralPath $libraryDestination -Algorithm SHA256).Hash -ne $libraryHash) {
+        throw 'Existing blueprint library hash does not match; refusing overwrite.'
+    }
+}
 
 $sourceHashes = @{}
 $needsDeploy = $false
@@ -236,6 +263,17 @@ foreach ($name in $dllNames) {
 }
 
 Assert-DefaultClean
+
+if ($librarySource -and -not (Test-Path -LiteralPath $libraryDestination)) {
+    if ($PSCmdlet.ShouldProcess($libraryDestination, 'Add a read-only source blueprint library archive')) {
+        New-Item -ItemType Directory -Path $libraryImports -Force -Confirm:$false | Out-Null
+        Copy-Item -LiteralPath $librarySource -Destination $libraryDestination -Confirm:$false
+        if ((Get-FileHash -LiteralPath $libraryDestination -Algorithm SHA256).Hash -ne $libraryHash) {
+            throw 'Blueprint library SHA256 mismatch after copying.'
+        }
+        Write-Output "Read-only blueprint library SHA256 $libraryHash"
+    }
+}
 
 if ($ArmSkyCleanup) {
     $cleanupDirectory = Join-Path $targetBepInEx 'config\BuildWorks'

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Reflection;
 using OstrixMods.BuildWorks;
 using OstrixMods.BuildWorks.Geometry;
@@ -373,6 +374,34 @@ internal static class UICatalogAcceptance
                 Scroll(treeScroll.gameObject, -1f); Canvas.ForceUpdateCanvases();
                 Require(treeScroll.verticalNormalizedPosition < 1f && crowded.IsPartSelected("scroll0"),
                     "Tree scrolling changed selection or did not scroll");
+                var blockedSource = ExternalBlueprintLibrary.Parse("#Name:Blocked source\n#Pieces\nwall;0;0;0;0;0;0;0;1;\"contents\"\nwall;0;0;0;0;0;0;0;1;\"\"", "fixtures/blocked.blueprint");
+                string blockedReason = BuildWorksLocalization.ResolveUserText(blockedSource.importError);
+                view.ShowCatalog(new[] { new BlueprintEditorCatalogItem("external-card", blockedSource.name,
+                    null, "OTHER", "blueprints", "external_blueprints", 0, blockedSource, unavailableReason: blockedReason) });
+                Click(Button(view, "CatalogBlueprintsMode")); Click(Button(view, "CatalogReset"));
+                selected = null; Click(Button(view, "Catalog_external-card"));
+                Require(selected == null, "Blocked external source dispatched placement");
+                Require(Field<RectTransform>(view, "catalogPreview").GetComponentInChildren<ScrollRect>().content
+                    .GetComponentInChildren<TMP_Text>().text.Contains(blockedReason), "Blocked source reason absent from inspector");
+                Require(!Field<RectTransform>(view, "catalogPreview").GetComponentsInChildren<TMP_Text>()
+                    .Any(x => x.name == "RequiredStation"), "Unavailable source falsely says no station required");
+                Click(Button(view, "CatalogSources"));
+                RectTransform thumbnailPicker = Field<RectTransform>(view, "catalogPicker");
+                int pageBeforeThumbnail = Field<int>(view, "catalogPage");
+                var thumbnailTexture = new Texture2D(2, 2);
+                var thumbnailSprite = Sprite.Create(thumbnailTexture, new Rect(0, 0, 2, 2), Vector2.one * .5f);
+                try
+                {
+                    view.UpdateCatalogThumbnail(blockedSource.id, thumbnailSprite);
+                    Require(Button(view, "Catalog_external-card").transform.Find("Thumbnail").GetComponent<Image>().sprite == thumbnailSprite &&
+                        Field<RectTransform>(view, "catalogPreview").Find("PreviewIcon").GetComponent<Image>().sprite == thumbnailSprite,
+                        "Completed thumbnail did not update actual card and preview");
+                    Require(Field<RectTransform>(view, "catalogPicker") == thumbnailPicker &&
+                        Field<int>(view, "catalogPage") == pageBeforeThumbnail && selected == null,
+                        "Thumbnail completion reset picker/page or dispatched placement");
+                }
+                finally { Object.Destroy(thumbnailSprite); Object.Destroy(thumbnailTexture); }
+                view.HideCatalog();
                 return "Actual UI: card-only wheel/QE/typing guard, materials retain native scroll, numeric RMB defaults and uniform step/free scrub, live Array scrub and shared step controls, Outliner row RMB tree-only context with blueprint/group anchor actions, native ProcessDrag/ReleaseMouse multi-selection group/root drops with Undo/cycle/lock/edge-scroll, catalog payload and viewport settings passed";
             }
             finally { Object.Destroy(templateObject); }

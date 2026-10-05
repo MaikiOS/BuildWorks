@@ -13,6 +13,7 @@ namespace OstrixMods.BuildWorks
     {
         private GameObject catalog;
         private RectTransform catalogPanel, catalogGrid, catalogNavigation, catalogContext, catalogPreview, catalogPicker;
+        private BlueprintEditorCatalogItem catalogPreviewItem;
         private TMP_InputField catalogSearch, catalogPageInput;
         private TMP_Text catalogPageText, catalogBreadcrumb, catalogEmpty;
         private Button catalogPartsModeButton, catalogBlueprintsModeButton, catalogAtlasButton, catalogQuickButton,
@@ -186,12 +187,15 @@ namespace OstrixMods.BuildWorks
             BlueprintEditorCatalogItem captured = item;
             Button button = CreateButton("Catalog_" + item.PrefabName, catalogGrid, item.DisplayName, (float)catalogLayout.CellWidth, () =>
             {
+                if (!string.IsNullOrEmpty(captured.UnavailableReason))
+                { PreviewCatalogItem(captured); SetStatus(captured.UnavailableReason, error: true); return; }
                 catalogRecent.Remove(captured.PrefabName); catalogRecent.Insert(0, captured.PrefabName);
                 if (catalogRecent.Count > 32) catalogRecent.RemoveAt(32);
                 CatalogPartSelected?.Invoke(captured, true);
             });
             LayoutElement element = button.GetComponent<LayoutElement>(); element.minHeight = element.preferredHeight = 152;
             TMP_Text name = button.GetComponentInChildren<TMP_Text>(); name.enableAutoSizing = false; name.fontSize = 14;
+            if (!string.IsNullOrEmpty(item.UnavailableReason)) name.text = "[!] " + item.DisplayName;
             name.textWrappingMode = TextWrappingModes.Normal; name.alignment = TextAlignmentOptions.TopLeft;
             name.margin = Vector4.zero; name.maxVisibleLines = item.IsUpgrade ? 2 : 3;
             SetTopAnchored((RectTransform)name.transform, 8, 94, 8, item.IsUpgrade ? 36 : 52);
@@ -208,7 +212,7 @@ namespace OstrixMods.BuildWorks
                 SetTopAnchored((RectTransform)station.transform, 8, 130, 8, 18);
             }
             BlueprintEditorHoverTarget hover = button.gameObject.AddComponent<BlueprintEditorHoverTarget>();
-            hover.Initialize(item.DisplayName + "\n" + item.PrefabName + " · #" + (item.Index + 1),
+            hover.Initialize(item.DisplayName + "\n" + (item.UnavailableReason ?? item.PrefabName + " · #" + (item.Index + 1)),
                 (rect, text) => { PreviewCatalogItem(captured); BeginTooltip(rect, text); }, EndTooltip);
         }
         private void AddCatalogImage(Transform parent, string name, Sprite sprite, float x, float y, float w, float h)
@@ -281,6 +285,7 @@ namespace OstrixMods.BuildWorks
         }
         private void PreviewCatalogItem(BlueprintEditorCatalogItem item)
         {
+            catalogPreviewItem = item;
             ClearCatalogChildren(catalogPreview); if (item == null) return;
             TMP_Text title = CreateText("PreviewName", catalogPreview, item.DisplayName, 18, FontStyles.Bold, TextAlignmentOptions.TopLeft);
             title.textWrappingMode = TextWrappingModes.Normal; title.overflowMode = TextOverflowModes.Ellipsis;
@@ -289,6 +294,10 @@ namespace OstrixMods.BuildWorks
             AddCatalogImage(catalogPreview, "PreviewIcon", item.Icon, 12, 78, 220, 140);
             string description = BuildWorksLocalization.CatalogLabel(item.Material) + "\n" + BuildWorksLocalization.CatalogLabel(item.Source) +
                 "\n" + item.PrefabName + (item.IsUpgrade ? "\n\n" + CatalogText("upgrade_to") + "\n" + (item.StationName ?? CatalogText("unknown_station")) : "");
+            if (item.IsBlueprint && item.Blueprint.IsExternal)
+                description = BuildWorksLocalization.Text("import.read_only") + "\n" + item.Blueprint.importSource +
+                    "\n" + BuildWorksLocalization.Text("catalog.card.parts", item.Blueprint.importPartCount);
+            if (!string.IsNullOrEmpty(item.UnavailableReason)) description += "\n\n" + item.UnavailableReason;
             RectTransform viewport = CreatePanel("PreviewBody", catalogPreview, Color.clear, null);
             SetTopAnchored(viewport, 8, 224, 8, Mathf.Max(32, catalogPreview.rect.height - 286));
             viewport.gameObject.AddComponent<RectMask2D>();
@@ -301,6 +310,8 @@ namespace OstrixMods.BuildWorks
             float metadataHeight = body.GetPreferredValues(description, 204, Mathf.Infinity).y + 8;
             SetTopLeft((RectTransform)body.transform, 4, 0, 204, metadataHeight);
             float y = metadataHeight;
+            if (!string.IsNullOrEmpty(item.UnavailableReason))
+            { SetTopLeft(content, 0, 0, 212, metadataHeight); return; }
             TMP_Text costTitle = CreateText("PreviewCostTitle", content, CatalogText("build_cost"), 14, FontStyles.Bold, TextAlignmentOptions.TopLeft);
             SetTopLeft(costTitle.rectTransform, 4, y, 204, 24); y += 26;
             foreach (BlueprintEditorCatalogResource resource in item.Resources)
@@ -327,6 +338,21 @@ namespace OstrixMods.BuildWorks
                     CatalogFilter.Station = item.StationId; CatalogFilter.Page = 0; RebuildCatalog();
                 });
                 SetBottomLeft((RectTransform)station.transform, 50, 12, 178, 38);
+            }
+        }
+        internal void UpdateCatalogThumbnail(string id, Sprite icon)
+        {
+            foreach (BlueprintEditorCatalogItem item in shownCatalogItems)
+            {
+                if (item.Blueprint?.id != id) continue;
+                item.Icon = icon;
+                Transform image = catalogGrid ? catalogGrid.Find("Catalog_" + item.PrefabName + "/Thumbnail") : null;
+                if (image) { var graphic = image.GetComponent<Image>(); graphic.sprite = icon; graphic.color = Color.white; }
+                if (catalogPreviewItem == item && catalogPreview)
+                {
+                    Transform preview = catalogPreview.Find("PreviewIcon");
+                    if (preview) { var graphic = preview.GetComponent<Image>(); graphic.sprite = icon; graphic.color = Color.white; }
+                }
             }
         }
         private void OpenCatalogPicker(string kind)

@@ -9,7 +9,11 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.58**: [native signs and evidence](../specs/roadmap/blueprint-signs.md).
+Active source checkpoint **0.19.59**: [bounded material-sharing measurements](../specs/roadmap/blueprint-render-performance.md).
+512 actual walls: 10752 → 2 materials, sync 906 → 520 ms; renderer count unchanged.
+Fresh 144 Unity states PASS, gameHostTested=false; interactive budget remains 512.
+Heavy rendering/free-support authoring/world persistence/export remain incomplete.
+Previous source checkpoint **0.19.58**: [native signs and evidence](../specs/roadmap/blueprint-signs.md).
 v10/portable v1 preserve payloads; 109/353 external entries pass format. Native sign
 integration is source/adapter-tested; actual world/reload/network acceptance remains.
 [Free support frames](../specs/roadmap/blueprint-support-frames.md) are researched,

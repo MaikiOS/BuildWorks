@@ -2,6 +2,16 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Source checkpoint 0.19.59 — not deployed; development remains active
+
+2026-10-06: [bounded rendering measurements](specs/roadmap/blueprint-render-performance.md)
+share scene-owned materials only for document visuals; tinted previews remain isolated.
+512 actual walls: 10752 → 2 materials, sync 906 → 520 ms in single-machine samples.
+Renderer hierarchy and most memory remain; interactive budget 512 stays unchanged.
+Release/targeted checks and fresh 144 Unity states PASS (2026-10-05T21:49:45Z,
+gameHostTested=false). Free supports/heavy-scene batching/export/world acceptance remain.
+Installed .56 and worlds/saves unchanged. Earlier sections are historical.
+
 ## Source checkpoint 0.19.58 — not deployed; development remains active
 
 2026-10-06: [native signs](specs/roadmap/blueprint-signs.md) now follow each placement

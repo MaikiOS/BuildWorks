@@ -188,6 +188,8 @@ namespace OstrixMods.BuildWorks
             new List<UnityEngine.Object>();
         private readonly Dictionary<Mesh, MeshSnapshot> meshSnapshots =
             new Dictionary<Mesh, MeshSnapshot>();
+        private readonly Dictionary<Material, Material> sharedPreviewMaterials =
+            new Dictionary<Material, Material>();
         private readonly int editorLayer;
         private readonly GameObject root;
         private readonly Camera camera;
@@ -485,7 +487,7 @@ namespace OstrixMods.BuildWorks
                     if (!visuals.TryGetValue(part.StableId, out VisualNode visual) ||
                         visual.PrefabName != part.PrefabName || visual.Placeholder != placeholder)
                     {
-                        visual = CreateVisual(part, source);
+                        visual = CreateVisual(part, source, cacheMaterials: true);
                         visual.Root.SetActive(false);
                         staged.Add(visual);
                     }
@@ -1847,6 +1849,7 @@ namespace OstrixMods.BuildWorks
             foreach (VisualNode visual in visuals.Values) DestroyVisual(visual);
             visuals.Clear();
             meshSnapshots.Clear();
+            sharedPreviewMaterials.Clear();
             if (root) UnityEngine.Object.Destroy(root);
             foreach (UnityEngine.Object asset in ownedAssets)
                 if (asset) UnityEngine.Object.Destroy(asset);
@@ -1996,7 +1999,8 @@ namespace OstrixMods.BuildWorks
             BlueprintEditorPart part,
             GameObject source,
             bool selectable = true,
-            bool captureSurfaces = false)
+            bool captureSurfaces = false,
+            bool cacheMaterials = false)
         {
             var result = new VisualNode
             {
@@ -2023,8 +2027,15 @@ namespace OstrixMods.BuildWorks
                     var previewMaterials = new Material[sourceMaterials.Length];
                     for (int index = 0; index < sourceMaterials.Length; ++index)
                     {
-                        Material preview = CreatePreviewMaterial(
-                            sourceMaterials[index], !source, result.OwnedAssets);
+                        // Only document visuals share immutable base materials. Temporary
+                        // previews mutate their tint and retain per-visual ownership.
+                        bool share = cacheMaterials && source && sourceMaterials[index];
+                        if (!share || !sharedPreviewMaterials.TryGetValue(sourceMaterials[index], out Material preview))
+                        {
+                            preview = CreatePreviewMaterial(sourceMaterials[index], !source,
+                                share ? ownedAssets : result.OwnedAssets);
+                            if (share) sharedPreviewMaterials.Add(sourceMaterials[index], preview);
+                        }
                         previewMaterials[index] = preview;
                         result.Materials.Add(new PreviewMaterial
                         {

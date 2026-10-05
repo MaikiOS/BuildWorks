@@ -174,6 +174,8 @@ public static class RuntimeEditorAcceptance
             checks.Add("Actual contour input: hover guide without copies, leave clears, click previews, cancel/tool switch/delete clear guide permanently");
             checks.Add("Actual Controller.Update/LateUpdate frame chords and native EventSystem raycasts: Ctrl+A, Shift rows/viewport, pin, shared gizmo, Alt move preview/commit/cancel/Undo, scale, placement RMB catalog reopen/camera and compound import; single Outliner context subscriptions; Array arrows/wheel/Ctrl zoom/Fit/spacing/shared step presets/live scrub before release/all TMP profile/atomic apply");
             TestEditorGestures(template, fontTemplate);
+            foreach (object step in BlueprintScenePerformanceAcceptance.Run(template, output)) yield return step;
+            checks.Add("Bounded actual woodwall scenes: 128/512 parts, sync/resync/mesh-pick timings, material counts and disposal; not large-scene/FPS proof.");
             TestNativeSocketTargets(template);
             yield return null;
             string storePath = Path.Combine(output, "acceptance-" + Guid.NewGuid().ToString("N") + ".json");

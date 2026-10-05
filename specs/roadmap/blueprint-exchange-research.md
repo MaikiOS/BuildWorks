@@ -1,5 +1,8 @@
 # External blueprint libraries — verified test build 0.19.56
 
+Historical installed baseline. Current source work and changed limits are tracked in
+[blueprint-format.md](blueprint-format.md); this report retains the original measurements.
+
 2026-10-05. Ostrix asked us to find blueprint-capable mods and their ready-building libraries.
 No other gameplay mod was installed; no game/world/store was modified.
 

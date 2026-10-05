@@ -9,8 +9,10 @@ namespace OstrixMods.BuildWorks.GeometryTests
     {
         private static int failures;
 
-        private static int Main()
+        private static int Main(string[] args)
         {
+            if (args.Length > 0 && args[0] == "--benchmark")
+                return BlueprintDocumentBenchmark.Run(args);
             Run("Cubic curve keeps exact endpoints", CurveEndpointsAreExact);
             Run("Cubic curve midpoint is exact", CurveMidpointIsExact);
             Run("Cubic curve sampling is deterministic", CurveSamplingIsDeterministic);
@@ -74,6 +76,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Run("Guide pairing rejects mismatches and collisions", GuidePairingRejectsMismatchesAndCollisions);
             Run("Invalid anchor values are rejected", InvalidAnchorValuesAreRejected);
             Run("Blueprint document deep copies source", BlueprintDocumentDeepCopiesSource);
+            Run("Blueprint payload survives insertion and cached history", BlueprintPayloadSurvivesHistory);
             Run("Blueprint selection does not dirty document", BlueprintSelectionDoesNotDirtyDocument);
             Run("Blueprint range selection follows tree order", BlueprintRangeSelectionFollowsTreeOrder);
             Run("Blueprint range selection stays inside parent", BlueprintRangeSelectionStaysInsideParent);
@@ -1869,6 +1872,31 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Equal(false, document.CanUndo);
         }
 
+        private static void BlueprintPayloadSurvivesHistory()
+        {
+            var source = new BlueprintEditorDocument(null, "Source", "OTHER", new[] {
+                new BlueprintEditorPart("sign", "sign", "Sign", new Point3(1, 0, 0), new Rotation3(0, 0, 0, 1), signText: "Надпись\nДом") },
+                sourceCustomSnapPoints: new[] { new Point3(2, 3, 4) });
+            var document = EditorDocument(EditorPart("wall", 0, 0, 0));
+            document.InsertBlueprint(source, new Point3(10, 0, 0), new Rotation3(0, 0, 0, 1));
+            Near(new Point3(12, 3, 4), document.CustomSnapPoints[0]);
+            Equal("Надпись\nДом", document.Parts[1].SignText);
+            Equal(true, document.Undo());
+            Equal(0, document.CustomSnapPoints.Count);
+            Equal(true, document.Redo());
+            Equal(1, document.CustomSnapPoints.Count);
+            document.SelectOnly(document.Parts[1].StableId);
+            document.ApplyTransformDelta(new Point3(1, 0, 0), new Rotation3(0, 0, 0, 1), new Point3());
+            document.Undo(); // same item count: the cached part must be rebuilt
+            document.ApplyTransformDelta(new Point3(2, 0, 0), new Rotation3(0, 0, 0, 1), new Point3());
+            Near(new Point3(13, 0, 0), document.Parts[1].Position);
+            Equal("Надпись\nДом", document.Parts[1].SignText);
+            document.DuplicateSelection(new Point3(1, 0, 0));
+            Equal("Надпись\nДом", document.Parts[2].SignText);
+            document.Undo();
+            Equal(2, document.Parts.Count);
+        }
+
         private static void BlueprintArrayPreviewMatchesApply()
         {
             BlueprintEditorDocument document = EditorDocument(
@@ -1910,7 +1938,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Throws<ArgumentOutOfRangeException>(() => document.PreviewArray(4, 1, new Point3(1.0, 0.0, 0.0), new Point3(0.0, 0.0, 1.0), new Point3(0, 1, 0), 0.0, 0, false, -0.50, (new Point3(1.0, 0.0, 0.0)) * -0.5, (new Point3(1.0, 0.0, 0.0)) * 0.5));
             Near(.995, document.PreviewArray(2, 1, new Point3(1.0, 0.0, 0.0), new Point3(0.0, 0.0, 1.0), new Point3(0, 1, 0), 0.0, 0, false, -0.005, (new Point3(1.0, 0.0, 0.0)) * -0.5, (new Point3(1.0, 0.0, 0.0)) * 0.5)[0].Scale.X);
             Equal(127, document.PreviewArray(128, 1, new Point3(1.0, 0.0, 0.0), new Point3(0.0, 0.0, 1.0), new Point3(0, 1, 0), 0.0, 0, false, 0.0, (new Point3(1.0, 0.0, 0.0)) * -0.5, (new Point3(1.0, 0.0, 0.0)) * 0.5).Count);
-            Throws<InvalidOperationException>(() => document.ApplyArray(128, 2, new Point3(1.0, 0.0, 0.0), new Point3(0.0, 0.0, 1.0), new Point3(0, 1, 0), 0.0, 0, false, 0.0, (new Point3(1.0, 0.0, 0.0)) * -0.5, (new Point3(1.0, 0.0, 0.0)) * 0.5));
+            Throws<InvalidOperationException>(() => document.ApplyArray(BlueprintEditorDocument.MaximumParts, 2, new Point3(1.0, 0.0, 0.0), new Point3(0.0, 0.0, 1.0), new Point3(0, 1, 0), 0.0, 0, false, 0.0, (new Point3(1.0, 0.0, 0.0)) * -0.5, (new Point3(1.0, 0.0, 0.0)) * 0.5));
             Equal(1, document.Parts.Count);
             Equal(false, document.IsDirty);
         }

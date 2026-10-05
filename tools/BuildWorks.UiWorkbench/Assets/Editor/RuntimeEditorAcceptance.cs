@@ -480,7 +480,7 @@ public static class RuntimeEditorAcceptance
         Require(reloaded.All().Count == 1, "Actual disk library roundtrip");
         Require(Mathf.Abs(reloaded.All()[0].parts[0].scale.x - expected) < 0.0001f, "Store discarded scale");
         CheckReopenedCopy(controller, reloaded, expected);
-        checks.Add("Controller save -> disk format9 -> new store -> OpenExisting retains scale and optional blueprint anchor");
+        checks.Add("Controller save -> disk format10 -> new store -> OpenExisting retains scale and optional blueprint anchor");
     }
 
     private static void TestExternalImportEditor(Camera camera, TMP_Text font,
@@ -523,7 +523,7 @@ public static class RuntimeEditorAcceptance
                 "Cancel insert changed saved document or leaked ghost state");
             editor.Close(true);
         }
-        checks.Add("External .blueprint -> detached editable draft -> metadata Cancel no disk -> transform/save native v9 -> reopen -> whole-source insert preview/Cancel; original unchanged");
+        checks.Add("External .blueprint -> detached editable draft -> metadata Cancel no disk -> transform/save native v10 -> reopen -> whole-source insert preview/Cancel; original unchanged");
     }
 
     private static void TestScaleBoundaries(BlueprintEditorController controller, string path)
@@ -835,7 +835,7 @@ public static class RuntimeEditorAcceptance
         }
         var crowded = new List<BlueprintEditorPart>();
         var crowdedIds = new List<string>();
-        for (int index = 0; index < BlueprintEditorDocument.MaximumParts; ++index)
+        for (int index = 0; index < CompositeBlueprintStore.InteractivePartBudget; ++index)
         {
             string id = "crowded" + index;
             crowdedIds.Add(id);
@@ -848,8 +848,14 @@ public static class RuntimeEditorAcceptance
             Require(scene.TryGetGizmoAnchors(crowdedIds, out Vector3[] points, out int start, legacyLayoutAnchors: true) &&
                 points.Length == AnchorAdjustment.SelectableAnchorCount + 512 && points.Length - start == 512,
                 "Generated midpoint helpers must not exhaust the 512 exterior-point budget before native points");
+            crowded.Add(new BlueprintEditorPart("over-budget", "fixture", "over-budget", new Point3(), new Rotation3(0,0,0,1)));
+            var heavy = new BlueprintEditorDocument(null, "Over budget", "Test", crowded);
+            Require(!scene.TrySync(heavy, out string budgetError) && !string.IsNullOrEmpty(budgetError),
+                "Storage ceiling must not bypass the GPU preview budget");
+            Require(scene.TryGetGizmoAnchors(crowdedIds, out Vector3[] retained, out _, legacyLayoutAnchors: true) &&
+                retained.Length == points.Length, "Over-budget sync changed the previous scene");
         }
-        checks.Add("Native/midpoint provenance: exterior shared joins excluded, stable cache, 100%/1% scale; 128-part budget reserves 512 native points before generated helpers");
+        checks.Add("Native/midpoint provenance: exterior shared joins excluded, stable cache, 100%/1% scale; 512-part interactive budget reserves 512 native points before generated helpers");
     }
 
     private static void DragArray(BlueprintEditorController controller, GizmoAxis axis, int count, int sign)

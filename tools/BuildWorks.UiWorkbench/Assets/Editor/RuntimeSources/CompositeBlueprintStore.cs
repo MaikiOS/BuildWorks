@@ -15,11 +15,15 @@ namespace OstrixMods.BuildWorks
     /// </summary>
     internal sealed class CompositeBlueprintStore
     {
-        internal const int MaximumParts = 128;
+        internal const int MaximumParts = Geometry.BlueprintEditorDocument.MaximumParts;
+        internal const int InteractivePartBudget = 512;
+        internal static string InteractiveError(int count) => count > InteractivePartBudget
+            ? UserError("import.interactive_limit", count + "/" + InteractivePartBudget) : null;
+        private const int MaximumLibraryParts = 100000;
         internal const string DefaultCategory = "OTHER";
         private const string LegacyDefaultCategory = "ПРОЧЕЕ";
         private const string LocalizationPrefix = "$buildworks_";
-        private const int FormatVersion = 9;
+        private const int FormatVersion = 10;
         private const int MaximumBlueprints = 32;
         private const int MaximumCategories = 12;
         private const int MaximumAnchors = 512;
@@ -125,7 +129,8 @@ namespace OstrixMods.BuildWorks
             string primaryPartId,
             string primaryGroupId,
             out Blueprint blueprint,
-            out string error)
+            out string error,
+            IReadOnlyList<VectorData> customSnapPoints = null)
         {
             blueprint = null;
             error = null;
@@ -157,9 +162,21 @@ namespace OstrixMods.BuildWorks
                 error = UserError("store.invalid_composition");
                 return false;
             }
+            if (!ValidCustomSnapPoints(customSnapPoints))
+            {
+                error = UserError("store.invalid_anchor");
+                return false;
+            }
             if (data.blueprints.Count >= MaximumBlueprints)
             {
                 error = UserError("store.blueprint_limit");
+                return false;
+            }
+            int libraryParts = parts.Count;
+            foreach (Blueprint existing in data.blueprints) libraryParts += existing.parts.Count;
+            if (libraryParts > MaximumLibraryParts)
+            {
+                error = UserError("store.invalid_composition");
                 return false;
             }
             List<Part> preparedParts = PrepareParts(parts);
@@ -197,6 +214,7 @@ namespace OstrixMods.BuildWorks
                 parts = preparedParts,
                 groups = preparedGroups,
                 anchors = new List<VectorData>(anchors),
+                customSnapPoints = customSnapPoints == null ? null : new List<VectorData>(customSnapPoints),
                 primaryPartId = primaryPartId,
                 primaryGroupId = primaryGroupId
             };
@@ -417,13 +435,15 @@ namespace OstrixMods.BuildWorks
             IReadOnlyList<VectorData> anchors,
             string primaryPartId,
             string primaryGroupId,
-            out string error)
+            out string error,
+            IReadOnlyList<VectorData> customSnapPoints = null)
         {
             error = null;
             name = (name ?? string.Empty).Trim();
             category = NormalizeCategory(category);
             primaryPartId = string.IsNullOrWhiteSpace(primaryPartId) ? null : primaryPartId.Trim();
             primaryGroupId = string.IsNullOrWhiteSpace(primaryGroupId) ? null : primaryGroupId.Trim();
+            customSnapPoints = customSnapPoints ?? blueprint?.customSnapPoints;
             if (!CanWrite(blueprint, out error) || parts == null || groups == null ||
                 anchors == null ||
                 parts.Count < 2 || parts.Count > MaximumParts ||
@@ -431,6 +451,14 @@ namespace OstrixMods.BuildWorks
                 anchors.Count > MaximumAnchors)
             {
                 if (error == null) error = UserError("store.invalid_composition");
+                return false;
+            }
+            int libraryParts = parts.Count;
+            foreach (Blueprint existing in data.blueprints)
+                if (!ReferenceEquals(existing, blueprint)) libraryParts += existing.parts.Count;
+            if (libraryParts > MaximumLibraryParts || !ValidCustomSnapPoints(customSnapPoints))
+            {
+                error = UserError("store.invalid_composition");
                 return false;
             }
             if (name.Length < 1 || name.Length > 48 ||
@@ -474,6 +502,7 @@ namespace OstrixMods.BuildWorks
             List<Part> previousParts = blueprint.parts;
             List<Group> previousGroups = blueprint.groups;
             List<VectorData> previousAnchors = blueprint.anchors;
+            List<VectorData> previousCustomSnapPoints = blueprint.customSnapPoints;
             string previousName = blueprint.name;
             string previousCategory = blueprint.category;
             string previousPrimaryPartId = blueprint.primaryPartId;
@@ -485,6 +514,7 @@ namespace OstrixMods.BuildWorks
             blueprint.parts = preparedParts;
             blueprint.groups = preparedGroups;
             blueprint.anchors = new List<VectorData>(anchors);
+            blueprint.customSnapPoints = customSnapPoints == null ? null : new List<VectorData>(customSnapPoints);
             blueprint.primaryPartId = primaryPartId;
             blueprint.primaryGroupId = primaryGroupId;
             blueprint.prefabName = PrimaryPrefabName(preparedParts, primaryPartId);
@@ -493,6 +523,7 @@ namespace OstrixMods.BuildWorks
                 blueprint.parts = previousParts;
                 blueprint.groups = previousGroups;
                 blueprint.anchors = previousAnchors;
+                blueprint.customSnapPoints = previousCustomSnapPoints;
                 blueprint.name = previousName;
                 blueprint.category = previousCategory;
                 blueprint.primaryPartId = previousPrimaryPartId;
@@ -523,7 +554,8 @@ namespace OstrixMods.BuildWorks
                     displayName = part.displayName,
                     parentGroupId = part.parentGroupId,
                     editorVisible = part.editorVisible,
-                    editorLocked = part.editorLocked
+                    editorLocked = part.editorLocked,
+                    signText = part.signText
                 });
             }
             return clone;
@@ -558,12 +590,16 @@ namespace OstrixMods.BuildWorks
             if (!File.Exists(path)) return;
             try
             {
-                LibraryData loaded = Deserialize(File.ReadAllText(path));
+                if (new FileInfo(path).Length > 128L * 1024 * 1024)
+                    throw new InvalidDataException(UserError("store.invalid_composition"));
+                string json = File.ReadAllText(path);
+                LibraryData loaded = Deserialize(json);
                 if (loaded == null || loaded.version < 1 || loaded.version > FormatVersion)
                 {
                     writeBlockReason = UserError("store.unknown_version");
                     return;
                 }
+                BlueprintExchangeFormat.ValidateLibraryJson(json, requireFields: loaded.version >= 6);
                 loaded.blueprints = loaded.blueprints ?? new List<Blueprint>();
                 loaded.categories = loaded.categories ?? new List<string>();
                 if (loaded.version == 1)
@@ -628,6 +664,10 @@ namespace OstrixMods.BuildWorks
                 if (valid.Count != loaded.blueprints.Count)
                     writeBlockReason = UserError("store.corrupt_entries");
                 loaded.blueprints = valid;
+                int libraryParts = 0;
+                foreach (Blueprint blueprint in valid) libraryParts += blueprint.parts.Count;
+                if (libraryParts > MaximumLibraryParts || valid.Count > MaximumBlueprints)
+                    throw new InvalidDataException(UserError("store.invalid_composition"));
                 data = loaded;
             }
             catch (Exception exception)
@@ -643,6 +683,8 @@ namespace OstrixMods.BuildWorks
             Directory.CreateDirectory(directory);
             string temporary = path + ".tmp";
             string json = Serialize(data);
+            if (Encoding.UTF8.GetByteCount(json) > 128L * 1024 * 1024)
+                throw new InvalidDataException(UserError("store.invalid_composition"));
             try
             {
                 File.WriteAllText(temporary, json, new UTF8Encoding(false));
@@ -755,7 +797,7 @@ namespace OstrixMods.BuildWorks
             }
         }
 
-        private static bool Valid(Blueprint blueprint)
+        internal static bool Valid(Blueprint blueprint)
         {
             if (blueprint == null || string.IsNullOrWhiteSpace(blueprint.id) ||
                 !Guid.TryParseExact(blueprint.id, "N", out _) ||
@@ -765,7 +807,7 @@ namespace OstrixMods.BuildWorks
                 blueprint.parts.Count > MaximumParts || blueprint.anchors == null ||
                 blueprint.anchors.Count > MaximumAnchors || blueprint.groups == null ||
                 blueprint.groups.Count > MaximumGroups ||
-                !ValidDocument(blueprint.parts, blueprint.groups) ||
+                !ValidDocument(blueprint.parts, blueprint.groups) || !ValidCustomSnapPoints(blueprint.customSnapPoints) ||
                 !ValidPrimaryPart(blueprint.parts, blueprint.primaryPartId) ||
                 !ValidPrimaryGroup(blueprint.parts, blueprint.groups, blueprint.primaryGroupId))
                 return false;
@@ -776,12 +818,21 @@ namespace OstrixMods.BuildWorks
             return true;
         }
 
+        private static bool ValidCustomSnapPoints(IReadOnlyList<VectorData> points)
+        {
+            if (points == null) return true;
+            if (points.Count > MaximumAnchors) return false;
+            foreach (VectorData point in points) if (!Valid(point)) return false;
+            return true;
+        }
+
         private static bool Valid(Part part)
         {
             if (part == null || string.IsNullOrWhiteSpace(part.prefabName) ||
                 string.IsNullOrWhiteSpace(part.stableId) ||
                 string.IsNullOrWhiteSpace(part.displayName) ||
-                !Valid(part.position) || !Valid(part.rotation) || !ValidScale(part.scale)) return false;
+                !Valid(part.position) || !Valid(part.rotation) || !ValidScale(part.scale) ||
+                !Geometry.BlueprintEditorPart.IsValidSignText(part.signText)) return false;
             float length = part.rotation.x * part.rotation.x +
                 part.rotation.y * part.rotation.y +
                 part.rotation.z * part.rotation.z +
@@ -989,7 +1040,7 @@ namespace OstrixMods.BuildWorks
         // These lower-case field names are the persisted JSON schema. Renaming
         // them is a file-format migration, not a code-style cleanup.
         [DataContract]
-        private sealed class LibraryData
+        internal sealed class LibraryData
         {
             [DataMember(Order = 0)]
             public int version = FormatVersion;
@@ -1002,7 +1053,7 @@ namespace OstrixMods.BuildWorks
         [DataContract]
         internal sealed class Blueprint
         {
-            // Transient read-only import diagnostics; deliberately NOT Store v9 fields.
+            // Transient read-only import diagnostics; not persisted library fields.
             public string importSource;
             public string importError;
             public int importPartCount;
@@ -1031,6 +1082,8 @@ namespace OstrixMods.BuildWorks
             public string primaryPartId;
             [DataMember(Order = 11, EmitDefaultValue = false)]
             public string primaryGroupId;
+            [DataMember(Order = 12, EmitDefaultValue = false)]
+            public List<VectorData> customSnapPoints;
         }
 
         [DataContract]
@@ -1054,6 +1107,8 @@ namespace OstrixMods.BuildWorks
             public bool editorLocked;
             [DataMember(Order = 8)]
             public VectorData scale = new VectorData { x = 1f, y = 1f, z = 1f };
+            [DataMember(Order = 9, EmitDefaultValue = false)]
+            public string signText;
         }
 
         [DataContract]

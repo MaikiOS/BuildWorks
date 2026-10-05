@@ -237,6 +237,8 @@ namespace OstrixMods.BuildWorks
             {
                 if (!string.IsNullOrEmpty(source.importError))
                 { error = BuildWorksLocalization.ResolveUserText(source.importError); return false; }
+                string budgetError = CompositeBlueprintStore.InteractiveError(source.parts.Count);
+                if (budgetError != null) { error = BuildWorksLocalization.ResolveUserText(budgetError); return false; }
                 foreach (CompositeBlueprintStore.Part part in source.parts)
                     if (!ResolveVisualSource(part.prefabName))
                     { error = BuildWorksLocalization.Text("editor.part_not_found", part.prefabName); return false; }
@@ -2547,6 +2549,8 @@ namespace OstrixMods.BuildWorks
             if (!IsEditing || item == null || keyboardPreview) return;
             if (!string.IsNullOrEmpty(item.UnavailableReason))
             { view.SetStatus(item.UnavailableReason, error: true); return; }
+            if (item.IsBlueprint && CompositeBlueprintStore.InteractiveError(item.Blueprint.parts.Count) is string budgetError)
+            { view.SetStatus(BuildWorksLocalization.ResolveUserText(budgetError), error: true); return; }
             if (item.IsBlueprint)
                 foreach (CompositeBlueprintStore.Part part in item.Blueprint.parts)
                     if (!ResolveVisualSource(part.prefabName))
@@ -2628,10 +2632,11 @@ namespace OstrixMods.BuildWorks
             foreach (CompositeBlueprintStore.Part part in source.parts ?? new List<CompositeBlueprintStore.Part>())
                 parts.Add(new BlueprintEditorPart(part.stableId, part.prefabName, part.displayName,
                     ToPoint(part.position.ToVector3()), ToRotation(part.rotation.ToQuaternion()), part.parentGroupId,
-                    part.editorVisible, part.editorLocked, ToPoint(part.scale.ToVector3())));
+                    part.editorVisible, part.editorLocked, ToPoint(part.scale.ToVector3()), part.signText));
             return new BlueprintEditorDocument(source.id, source.name,
                 source.category ?? CompositeBlueprintStore.DefaultCategory, parts, groups,
-                source.primaryPartId, source.primaryGroupId);
+                source.primaryPartId, source.primaryGroupId,
+                source.customSnapPoints?.Select(point => ToPoint(point.ToVector3())));
         }
 
         private void ApplyInspector(
@@ -2941,7 +2946,7 @@ namespace OstrixMods.BuildWorks
                 RefreshModifierPreview();
                 return;
             }
-            int maximumInstances = 1 + (BlueprintEditorDocument.MaximumParts - document.Parts.Count) /
+            int maximumInstances = 1 + (CompositeBlueprintStore.InteractivePartBudget - document.Parts.Count) /
                 Math.Max(1, document.EditablePartSelectionCount);
             int otherCount = dragArraySecond ? arrayCountX : arrayCountY;
             int maximumCount = maximumInstances / Math.Max(1, otherCount);
@@ -3003,7 +3008,7 @@ namespace OstrixMods.BuildWorks
 
         private void AdjustArrayCount(int delta)
         {
-            int budget = 1 + (BlueprintEditorDocument.MaximumParts - document.Parts.Count) /
+            int budget = 1 + (CompositeBlueprintStore.InteractivePartBudget - document.Parts.Count) /
                 Math.Max(1, document.EditablePartSelectionCount);
             int other = arrayLastSecond ? arrayCountX : arrayCountY;
             int maximum = Math.Max(1, budget / Math.Max(1, other));
@@ -3324,6 +3329,8 @@ namespace OstrixMods.BuildWorks
             {
                 List<CompositeBlueprintStore.Part> parts = BuildStoreParts();
                 List<CompositeBlueprintStore.VectorData> anchors = BuildBoundsAnchors();
+                CompositeBlueprintStore.VectorData[] customPoints = document.CustomSnapPoints
+                    .Select(point => new CompositeBlueprintStore.VectorData(ToVector(point))).ToArray();
                 bool success;
                 string error;
                 List<CompositeBlueprintStore.Group> groups = BuildStoreGroups();
@@ -3337,7 +3344,7 @@ namespace OstrixMods.BuildWorks
                         document.PrimaryPartId,
                         document.PrimaryGroupId,
                         out sourceBlueprint,
-                        out error);
+                        out error, customPoints);
                 else
                     success = store.TryUpdateDocument(
                         sourceBlueprint,
@@ -3348,7 +3355,7 @@ namespace OstrixMods.BuildWorks
                         anchors,
                         document.PrimaryPartId,
                         document.PrimaryGroupId,
-                        out error);
+                        out error, customPoints);
                 if (!success)
                 {
                     state = EditorState.Editing;
@@ -3400,7 +3407,8 @@ namespace OstrixMods.BuildWorks
                     displayName = part.DisplayName,
                     parentGroupId = part.ParentGroupId,
                     editorVisible = part.Visible,
-                    editorLocked = part.Locked
+                    editorLocked = part.Locked,
+                    signText = part.SignText
                 });
             }
             return result;

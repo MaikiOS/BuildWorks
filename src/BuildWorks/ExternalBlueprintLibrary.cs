@@ -36,7 +36,7 @@ namespace OstrixMods.BuildWorks
             {
                 if (result.Count >= MaximumFiles) break;
                 string extension = Path.GetExtension(path).ToLowerInvariant();
-                if (extension != ".zip" && extension != ".blueprint" && extension != ".vbuild") continue;
+                if (extension != ".zip" && !Supported(path)) continue;
                 try
                 {
                     if (new FileInfo(path).Length > 64L * 1024 * 1024)
@@ -73,11 +73,14 @@ namespace OstrixMods.BuildWorks
 
         private static bool Supported(string name) =>
             name.EndsWith(".blueprint", StringComparison.OrdinalIgnoreCase) ||
-            name.EndsWith(".vbuild", StringComparison.OrdinalIgnoreCase);
+            name.EndsWith(".vbuild", StringComparison.OrdinalIgnoreCase) ||
+            name.EndsWith(".buildworks.json", StringComparison.OrdinalIgnoreCase);
 
         private static CompositeBlueprintStore.Blueprint Read(Stream stream, long length, string source, ref long budget)
         {
-            if (length < 0 || length > MaximumFileBytes || length > budget)
+            int limit = source.EndsWith(".buildworks.json", StringComparison.OrdinalIgnoreCase)
+                ? BlueprintExchangeFormat.MaximumBytes : MaximumFileBytes;
+            if (length < 0 || length > limit || length > budget)
                 return Blocked(source, "$buildworks_import.file_limit");
             budget -= length;
             try
@@ -116,10 +119,22 @@ namespace OstrixMods.BuildWorks
 
         internal static CompositeBlueprintStore.Blueprint Parse(string text, string source)
         {
+            if (source.EndsWith(".buildworks.json", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var native = BlueprintExchangeFormat.Decode(text);
+                    native.id = Identity(source + "\n" + text);
+                    native.importSource = source;
+                    native.importPartCount = native.parts.Count;
+                    return native;
+                }
+                catch (InvalidDataException exception) { return Blocked(source, exception.Message); }
+            }
             var blueprint = Blocked(source, null);
             blueprint.id = Identity(source + "\n" + text);
             bool vbuild = source.EndsWith(".vbuild", StringComparison.OrdinalIgnoreCase);
-            bool pieces = vbuild, seenPieces = vbuild;
+            bool pieces = vbuild, seenPieces = vbuild, snapPoints = false;
             int lineNumber = 0;
             using (var reader = new StringReader(text.TrimStart('\uFEFF')))
             {
@@ -132,11 +147,30 @@ namespace OstrixMods.BuildWorks
                     {
                         if (line.StartsWith("#Name:", StringComparison.Ordinal)) blueprint.name = line.Substring(6).Trim();
                         else if (line.StartsWith("#Category:", StringComparison.Ordinal)) blueprint.category = line.Substring(10).Trim();
-                        else if (line == "#Pieces") { pieces = true; seenPieces = true; }
-                        else if (line == "#Terrain") pieces = false;
+                        else if (line == "#Pieces") { pieces = true; seenPieces = true; snapPoints = false; }
+                        else if (line == "#SnapPoints") { pieces = false; snapPoints = true; }
+                        else if (line == "#Terrain") { pieces = false; snapPoints = false; }
                         else if (!line.StartsWith("#Creator:", StringComparison.Ordinal) &&
                             !line.StartsWith("#Description:", StringComparison.Ordinal))
                             blueprint.importError = "$buildworks_import.section\t" + line;
+                        continue;
+                    }
+                    if (snapPoints)
+                    {
+                        try
+                        {
+                            string[] coordinates = line.Split(';');
+                            if (coordinates.Length != 3) throw new InvalidDataException("$buildworks_import.fields");
+                            var point = new CompositeBlueprintStore.VectorData
+                            { x = Number(coordinates[0]), y = Number(coordinates[1]), z = Number(coordinates[2]) };
+                            if (Math.Abs(point.x) > 512 || Math.Abs(point.y) > 512 || Math.Abs(point.z) > 512)
+                                throw new InvalidDataException("$buildworks_import.transform");
+                            if (blueprint.customSnapPoints == null) blueprint.customSnapPoints = new List<CompositeBlueprintStore.VectorData>();
+                            if (blueprint.customSnapPoints.Count >= 512) throw new InvalidDataException("$buildworks_import.fields");
+                            blueprint.customSnapPoints.Add(point);
+                        }
+                        catch (Exception exception) when (exception is InvalidDataException || exception is FormatException || exception is OverflowException)
+                        { if (blueprint.importError == null) blueprint.importError = exception.Message + "\t" + lineNumber; }
                         continue;
                     }
                     if (!pieces) continue; // terrain has no execution path
@@ -205,16 +239,32 @@ namespace OstrixMods.BuildWorks
         {
             if (!source.IsExternal || source.importError != null) throw new InvalidDataException("$buildworks_import.fields");
             var result = new CompositeBlueprintStore.Blueprint
-            { id = Guid.NewGuid().ToString("N"), name = source.name, category = source.category, prefabName = source.prefabName };
+            { id = Guid.NewGuid().ToString("N"), name = source.name, category = source.category, prefabName = source.prefabName,
+                anchors = new List<CompositeBlueprintStore.VectorData>(source.anchors),
+                customSnapPoints = source.customSnapPoints == null ? null : new List<CompositeBlueprintStore.VectorData>(source.customSnapPoints),
+                previewYaw = source.previewYaw, previewPitch = source.previewPitch, previewZoom = source.previewZoom };
+            var ids = source.parts.Select(part => part.stableId).Concat(source.groups.Select(group => group.stableId))
+                .ToDictionary(id => id, id => Guid.NewGuid().ToString("N"), StringComparer.Ordinal);
+            result.primaryPartId = source.primaryPartId == null ? null : ids[source.primaryPartId];
+            result.primaryGroupId = source.primaryGroupId == null ? null : ids[source.primaryGroupId];
+            foreach (CompositeBlueprintStore.Group group in source.groups)
+                result.groups.Add(new CompositeBlueprintStore.Group
+                { stableId = ids[group.stableId], name = group.name, editorVisible = group.editorVisible, editorLocked = group.editorLocked,
+                    parentGroupId = group.parentGroupId == null ? null : ids[group.parentGroupId],
+                    pivotPartId = group.pivotPartId == null ? null : ids[group.pivotPartId] });
             foreach (CompositeBlueprintStore.Part part in source.parts)
                 result.parts.Add(new CompositeBlueprintStore.Part
                 {
-                    stableId = Guid.NewGuid().ToString("N"),
+                    stableId = ids[part.stableId],
                     prefabName = part.prefabName,
                     displayName = part.displayName,
                     position = part.position,
                     rotation = part.rotation,
-                    scale = part.scale
+                    scale = part.scale,
+                    parentGroupId = part.parentGroupId == null ? null : ids[part.parentGroupId],
+                    editorVisible = part.editorVisible,
+                    editorLocked = part.editorLocked,
+                    signText = part.signText
                 });
             return result;
         }

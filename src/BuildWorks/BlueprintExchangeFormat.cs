@@ -1,0 +1,163 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Runtime.Serialization;
+using System.Runtime.Serialization.Json;
+using System.Text;
+using System.Xml;
+
+namespace OstrixMods.BuildWorks
+{
+    // A portable construction document, never Unity meshes, arbitrary ZDO, or executable assets.
+    internal static class BlueprintExchangeFormat
+    {
+        internal const int MaximumBytes = 32 * 1024 * 1024;
+        private const string FormatName = "buildworks-blueprint";
+        private const int Version = 1;
+
+        [DataContract]
+        private sealed class Envelope
+        {
+            [DataMember(IsRequired = true)] public string format;
+            [DataMember(IsRequired = true)] public int version;
+            [DataMember(IsRequired = true)] public List<string> requiredPrefabIds;
+            [DataMember(IsRequired = true)] public CompositeBlueprintStore.Blueprint blueprint;
+        }
+
+        private static readonly Dictionary<Type, Dictionary<string, Type>> Fields =
+            new[] { typeof(Envelope), typeof(CompositeBlueprintStore.Blueprint), typeof(CompositeBlueprintStore.Part),
+                typeof(CompositeBlueprintStore.Group), typeof(CompositeBlueprintStore.VectorData), typeof(CompositeBlueprintStore.QuaternionData),
+                typeof(CompositeBlueprintStore.LibraryData) }
+                .ToDictionary(type => type, type => type.GetFields(BindingFlags.Instance | BindingFlags.Public)
+                    .Where(field => field.GetCustomAttribute<DataMemberAttribute>() != null)
+                    .ToDictionary(field => field.GetCustomAttribute<DataMemberAttribute>().Name ?? field.Name,
+                        field => field.FieldType, StringComparer.Ordinal));
+        private static readonly Dictionary<Type, string[]> RequiredFields = Fields.Keys.ToDictionary(type => type,
+            type => type.GetFields(BindingFlags.Instance | BindingFlags.Public)
+                .Where(field => field.GetCustomAttribute<DataMemberAttribute>() is DataMemberAttribute member &&
+                    (member.EmitDefaultValue || member.IsRequired))
+                .Select(field => field.GetCustomAttribute<DataMemberAttribute>().Name ?? field.Name).ToArray());
+
+        internal static void ValidateLibraryJson(string text, bool requireFields) => ValidateStructure(
+            Encoding.UTF8.GetBytes(text), typeof(CompositeBlueprintStore.LibraryData), requireFields);
+
+        private static void ValidateStructure(byte[] bytes, Type expected, bool requireFields = true)
+        {
+            using (XmlDictionaryReader reader = JsonReaderWriterFactory.CreateJsonReader(bytes,
+                new XmlDictionaryReaderQuotas { MaxDepth = 16, MaxStringContentLength = 32768,
+                    MaxArrayLength = bytes.Length, MaxBytesPerRead = 8192, MaxNameTableCharCount = 16384 }))
+            {
+                reader.MoveToContent();
+                ValidateNode(reader, expected, requireFields);
+                if (reader.MoveToContent() != XmlNodeType.None) throw new InvalidDataException("$buildworks_import.fields");
+            }
+        }
+
+        internal static byte[] Encode(CompositeBlueprintStore.Blueprint blueprint)
+        {
+            ValidateBlueprint(blueprint);
+            using (var output = new MemoryStream())
+            {
+                new DataContractJsonSerializer(typeof(Envelope)).WriteObject(output, new Envelope
+                { format = FormatName, version = Version, requiredPrefabIds = Prefabs(blueprint), blueprint = blueprint });
+                if (output.Length > MaximumBytes) throw new InvalidDataException("$buildworks_import.file_limit");
+                return output.ToArray();
+            }
+        }
+
+        internal static CompositeBlueprintStore.Blueprint Decode(string text)
+        {
+            if (text == null || Encoding.UTF8.GetByteCount(text) > MaximumBytes)
+                throw new InvalidDataException("$buildworks_import.file_limit");
+            byte[] bytes = new UTF8Encoding(false, true).GetBytes(text.TrimStart('\uFEFF'));
+            try
+            {
+                ValidateStructure(bytes, typeof(Envelope));
+                Envelope envelope;
+                using (var input = new MemoryStream(bytes))
+                    envelope = (Envelope)new DataContractJsonSerializer(typeof(Envelope)).ReadObject(input);
+                if (envelope == null || envelope.format != FormatName || envelope.version != Version)
+                    throw new InvalidDataException("$buildworks_store.unknown_version");
+                ValidateBlueprint(envelope.blueprint);
+                if (envelope.requiredPrefabIds == null ||
+                    !envelope.requiredPrefabIds.SequenceEqual(Prefabs(envelope.blueprint), StringComparer.Ordinal))
+                    throw new InvalidDataException("$buildworks_import.fields");
+                return envelope.blueprint;
+            }
+            catch (Exception exception) when (exception is SerializationException || exception is XmlException ||
+                exception is ArgumentException || exception is FormatException || exception is OverflowException)
+            { throw new InvalidDataException("$buildworks_import.fields", exception); }
+        }
+
+        private static List<string> Prefabs(CompositeBlueprintStore.Blueprint blueprint) => blueprint.parts
+            .Select(part => part.prefabName).Distinct(StringComparer.Ordinal).OrderBy(name => name, StringComparer.Ordinal).ToList();
+
+        private static void ValidateBlueprint(CompositeBlueprintStore.Blueprint blueprint)
+        {
+            if (!CompositeBlueprintStore.Valid(blueprint) || !SafeLabel(blueprint.name, 48) ||
+                !SafeLabel(blueprint.category, 24) || blueprint.parts.Any(part => !SafeLabel(part.prefabName, 128) ||
+                    part.prefabName.IndexOfAny(new[] { '/', '\\' }) >= 0 || !SafeLabel(part.stableId, 128) ||
+                    !SafeLabel(part.displayName, 256)) || blueprint.groups.Any(group => !SafeLabel(group.stableId, 128) ||
+                    !SafeLabel(group.name, 128)) || float.IsNaN(blueprint.previewYaw) || float.IsInfinity(blueprint.previewYaw) ||
+                    float.IsNaN(blueprint.previewPitch) || blueprint.previewPitch < -80 || blueprint.previewPitch > 80 ||
+                    float.IsNaN(blueprint.previewZoom) || blueprint.previewZoom < .5f || blueprint.previewZoom > 3)
+                throw new InvalidDataException("$buildworks_import.fields");
+        }
+
+        private static bool SafeLabel(string value, int limit) => !string.IsNullOrWhiteSpace(value) &&
+            value.Length <= limit && value == value.Trim() && !value.Any(c => char.IsControl(c) || c == '<' || c == '>');
+
+        // Reject unknown and duplicate fields rather than silently converting a newer document with data loss.
+        private static void ValidateNode(XmlReader reader, Type expected, bool requireFields)
+        {
+            string kind = reader.GetAttribute("type");
+            if (kind == "null")
+            {
+                if (expected.IsValueType) throw new InvalidDataException("$buildworks_import.fields");
+                reader.Skip(); return;
+            }
+            if (expected.IsGenericType && expected.GetGenericTypeDefinition() == typeof(List<>))
+            {
+                if (kind != "array") throw new InvalidDataException("$buildworks_import.fields");
+                Type item = expected.GetGenericArguments()[0];
+                int count = 0, limit = item == typeof(CompositeBlueprintStore.Part) || item == typeof(string)
+                    ? CompositeBlueprintStore.MaximumParts : item == typeof(CompositeBlueprintStore.Group) ? 64 : 512;
+                if (reader.IsEmptyElement) { reader.Read(); return; }
+                reader.ReadStartElement();
+                while (reader.MoveToContent() == XmlNodeType.Element)
+                {
+                    if (reader.LocalName != "item" || ++count > limit) throw new InvalidDataException("$buildworks_import.fields");
+                    ValidateNode(reader, item, requireFields);
+                }
+                reader.ReadEndElement();
+                return;
+            }
+            if (!Fields.TryGetValue(expected, out Dictionary<string, Type> fields))
+            {
+                string scalarKind = expected == typeof(string) ? "string" : expected == typeof(bool) ? "boolean" : "number";
+                if (kind != scalarKind) throw new InvalidDataException("$buildworks_import.fields");
+                reader.ReadElementContentAsString();
+                return;
+            }
+            if (kind != "object") throw new InvalidDataException("$buildworks_import.fields");
+            if (reader.IsEmptyElement)
+            {
+                if (requireFields && RequiredFields[expected].Length != 0) throw new InvalidDataException("$buildworks_import.fields");
+                reader.Read(); return;
+            }
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            reader.ReadStartElement();
+            while (reader.MoveToContent() == XmlNodeType.Element)
+            {
+                if (!fields.TryGetValue(reader.LocalName, out Type field) || !seen.Add(reader.LocalName))
+                    throw new InvalidDataException("$buildworks_import.fields");
+                ValidateNode(reader, field, requireFields);
+            }
+            if (requireFields && RequiredFields[expected].Any(name => !seen.Contains(name)))
+                throw new InvalidDataException("$buildworks_import.fields");
+            reader.ReadEndElement();
+        }
+    }
+}

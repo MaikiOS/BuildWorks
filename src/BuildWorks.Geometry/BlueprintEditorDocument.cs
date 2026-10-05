@@ -15,7 +15,8 @@ namespace OstrixMods.BuildWorks.Geometry
             string parentGroupId = null,
             bool visible = true,
             bool locked = false,
-            Point3? scale = null)
+            Point3? scale = null,
+            string signText = null)
         {
             StableId = Required(stableId, nameof(stableId));
             PrefabName = Required(prefabName, nameof(prefabName));
@@ -27,6 +28,9 @@ namespace OstrixMods.BuildWorks.Geometry
             ParentGroupId = parentGroupId;
             Visible = visible;
             Locked = locked;
+            if (!IsValidSignText(signText))
+                throw new ArgumentOutOfRangeException(nameof(signText));
+            SignText = signText;
         }
 
         public string StableId { get; }
@@ -38,6 +42,15 @@ namespace OstrixMods.BuildWorks.Geometry
         public string ParentGroupId { get; internal set; }
         public bool Visible { get; internal set; }
         public bool Locked { get; internal set; }
+        public string SignText { get; }
+        public static bool IsValidSignText(string value)
+        {
+            if (value == null) return true;
+            if (value.Length > 4096) return false;
+            foreach (char c in value)
+                if (char.IsControl(c) && c != '\n' && c != '\r' && c != '\t') return false;
+            return true;
+        }
 
         internal BlueprintEditorPart Clone() => new BlueprintEditorPart(
             StableId,
@@ -48,7 +61,8 @@ namespace OstrixMods.BuildWorks.Geometry
             ParentGroupId,
             Visible,
             Locked,
-            Scale);
+            Scale,
+            SignText);
 
         internal static string Required(string value, string name)
         {
@@ -132,7 +146,8 @@ namespace OstrixMods.BuildWorks.Geometry
 
     public sealed class BlueprintEditorDocument
     {
-        public const int MaximumParts = 128;
+        // Storage safety ceiling, not a verified Unity/game rendering budget.
+        public const int MaximumParts = 50000;
         public const int MaximumGroups = 64;
         public const int MaximumHistory = 32;
         public const double MinimumScale = 0.01;
@@ -145,6 +160,7 @@ namespace OstrixMods.BuildWorks.Geometry
             public string Category;
             public List<BlueprintEditorPart> Parts;
             public List<BlueprintEditorGroup> Groups;
+            public List<Point3> CustomSnapPoints;
             public List<string> Selection;
             public string ActiveNodeId;
             public string PrimaryPartId;
@@ -154,6 +170,12 @@ namespace OstrixMods.BuildWorks.Geometry
         private readonly List<BlueprintEditorPart> parts = new List<BlueprintEditorPart>();
         private readonly List<BlueprintEditorGroup> groups = new List<BlueprintEditorGroup>();
         private readonly List<string> selection = new List<string>();
+        private readonly List<Point3> customSnapPoints = new List<Point3>();
+        private readonly ReadOnlyCollection<Point3> customSnapPointsView;
+        private readonly Dictionary<string, BlueprintEditorPart> partIndex = new Dictionary<string, BlueprintEditorPart>(StringComparer.Ordinal);
+        private readonly Dictionary<string, BlueprintEditorGroup> groupIndex = new Dictionary<string, BlueprintEditorGroup>(StringComparer.Ordinal);
+        private int indexedPartCount = -1;
+        private int indexedGroupCount = -1;
         private readonly ReadOnlyCollection<BlueprintEditorPart> partsView;
         private readonly ReadOnlyCollection<BlueprintEditorGroup> groupsView;
         private readonly ReadOnlyCollection<string> selectionView;
@@ -172,11 +194,14 @@ namespace OstrixMods.BuildWorks.Geometry
             IEnumerable<BlueprintEditorPart> sourceParts = null,
             IEnumerable<BlueprintEditorGroup> sourceGroups = null,
             string primaryPartId = null,
-            string primaryGroupId = null)
+            string primaryGroupId = null,
+            IEnumerable<Point3> sourceCustomSnapPoints = null)
         {
             partsView = parts.AsReadOnly();
             groupsView = groups.AsReadOnly();
             selectionView = selection.AsReadOnly();
+            customSnapPointsView = customSnapPoints.AsReadOnly();
+            if (sourceCustomSnapPoints != null) customSnapPoints.AddRange(sourceCustomSnapPoints);
             SourceBlueprintId = string.IsNullOrWhiteSpace(sourceBlueprintId)
                 ? null
                 : sourceBlueprintId.Trim();
@@ -213,6 +238,7 @@ namespace OstrixMods.BuildWorks.Geometry
         public IReadOnlyList<BlueprintEditorPart> Parts => partsView;
         public IReadOnlyList<BlueprintEditorGroup> Groups => groupsView;
         public IReadOnlyList<string> Selection => selectionView;
+        public IReadOnlyList<Point3> CustomSnapPoints => customSnapPointsView;
         public string ActiveNodeId { get; private set; }
         public string PrimaryPartId { get; private set; }
         public string PrimaryGroupId { get; private set; }
@@ -709,7 +735,7 @@ namespace OstrixMods.BuildWorks.Geometry
                     parentId,
                     part.Visible,
                     part.Locked,
-                    part.Scale));
+                    part.Scale, part.SignText));
                 if (rootIds.Contains(part.StableId)) copiedRoots.Add(copyId);
             }
             return Commit(() =>
@@ -729,7 +755,8 @@ namespace OstrixMods.BuildWorks.Geometry
             Rotation3 orientation = rotation.Normalized();
             if (source.parts.Count == 0) return false;
             if (parts.Count + source.parts.Count > MaximumParts ||
-                groups.Count + source.groups.Count + 1 > MaximumGroups)
+                groups.Count + source.groups.Count + 1 > MaximumGroups ||
+                customSnapPoints.Count + source.customSnapPoints.Count > 512)
                 throw new InvalidOperationException("Maximum blueprint size reached.");
             string rootId = Guid.NewGuid().ToString("N");
             var groupIds = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -752,11 +779,13 @@ namespace OstrixMods.BuildWorks.Geometry
                     part.PrefabName, part.DisplayName, position + orientation.Rotate(part.Position),
                     Multiply(orientation, part.Rotation).Normalized(),
                     part.ParentGroupId == null ? rootId : groupIds[part.ParentGroupId],
-                    part.Visible, part.Locked, part.Scale));
+                    part.Visible, part.Locked, part.Scale, part.SignText));
             return Commit(() =>
             {
                 groups.AddRange(newGroups);
                 parts.AddRange(newParts);
+                foreach (Point3 point in source.customSnapPoints)
+                    customSnapPoints.Add(position + orientation.Rotate(point));
                 SelectOnly(rootId);
             });
         }
@@ -971,8 +1000,9 @@ namespace OstrixMods.BuildWorks.Geometry
         private List<BlueprintEditorPart> SelectedEditableParts()
         {
             var result = new List<BlueprintEditorPart>();
+            var selectedIds = new HashSet<string>(selection, StringComparer.Ordinal);
             foreach (BlueprintEditorPart part in parts)
-                if (IsPartSelected(part.StableId) && IsEffectivelyVisible(part.StableId) &&
+                if ((selectedIds.Contains(part.StableId) || HasSelectedAncestor(part.ParentGroupId, selectedIds)) && IsEffectivelyVisible(part.StableId) &&
                     !IsEffectivelyLocked(part.StableId)) result.Add(part);
             return result;
         }
@@ -1014,7 +1044,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 pivot = pivot * (1.0 / sources.Count);
             }
 
-            if ((long)sources.Count * (countX * countY - 1) + parts.Count > MaximumParts)
+            if ((long)sources.Count * ((long)countX * countY - 1) + parts.Count > MaximumParts)
                 throw new InvalidOperationException("Maximum part count reached.");
             IReadOnlyList<LayoutTransform3> row = countX == 1
                 ? new[] { new LayoutTransform3(pivot, new Point3(0, 1, 0), 0) }
@@ -1042,7 +1072,7 @@ namespace OstrixMods.BuildWorks.Geometry
                             sample.Position + stepY * logicalY +
                                 turn.Rotate((source.Position - pivot) * sample.UniformScale),
                             Multiply(turn, source.Rotation).Normalized(), source.ParentGroupId,
-                            source.Visible, source.Locked, copyScale));
+                            source.Visible, source.Locked, copyScale, source.SignText));
                     }
                 }
             }
@@ -1130,7 +1160,7 @@ namespace OstrixMods.BuildWorks.Geometry
                         source.ParentGroupId,
                         source.Visible,
                         source.Locked,
-                        copyScale));
+                        copyScale, source.SignText));
                 }
             }
             return copies;
@@ -1138,6 +1168,8 @@ namespace OstrixMods.BuildWorks.Geometry
 
         private void ValidateDocument()
         {
+            if (customSnapPoints.Count > 512) throw new InvalidOperationException("Maximum custom snap points reached.");
+            foreach (Point3 point in customSnapPoints) BlueprintEditorPart.Validate(point, nameof(CustomSnapPoints));
             if (parts.Count > MaximumParts || groups.Count > MaximumGroups)
                 throw new ArgumentOutOfRangeException("Document limits exceeded.");
             var ids = new HashSet<string>(StringComparer.Ordinal);
@@ -1259,11 +1291,29 @@ namespace OstrixMods.BuildWorks.Geometry
             return group?.StableId;
         }
 
-        private BlueprintEditorPart FindPart(string stableId) =>
-            parts.Find(part => part.StableId == stableId);
+        private BlueprintEditorPart FindPart(string stableId)
+        {
+            if (stableId == null) return null;
+            if (indexedPartCount != parts.Count)
+            {
+                partIndex.Clear();
+                foreach (BlueprintEditorPart part in parts) partIndex[part.StableId] = part;
+                indexedPartCount = parts.Count;
+            }
+            return partIndex.TryGetValue(stableId, out BlueprintEditorPart result) ? result : null;
+        }
 
-        private BlueprintEditorGroup FindGroup(string stableId) =>
-            stableId == null ? null : groups.Find(group => group.StableId == stableId);
+        private BlueprintEditorGroup FindGroup(string stableId)
+        {
+            if (stableId == null) return null;
+            if (indexedGroupCount != groups.Count)
+            {
+                groupIndex.Clear();
+                foreach (BlueprintEditorGroup group in groups) groupIndex[group.StableId] = group;
+                indexedGroupCount = groups.Count;
+            }
+            return groupIndex.TryGetValue(stableId, out BlueprintEditorGroup result) ? result : null;
+        }
 
         private void ClearInvalidGroupPivots()
         {
@@ -1281,6 +1331,7 @@ namespace OstrixMods.BuildWorks.Geometry
             Category = Category,
             Parts = CopyParts(),
             Groups = CopyGroups(),
+            CustomSnapPoints = new List<Point3>(customSnapPoints),
             Selection = new List<string>(selection),
             ActiveNodeId = ActiveNodeId,
             PrimaryPartId = PrimaryPartId,
@@ -1289,11 +1340,14 @@ namespace OstrixMods.BuildWorks.Geometry
 
         private void Restore(State state)
         {
+            indexedPartCount = indexedGroupCount = -1;
             Name = state.Name;
             Category = state.Category;
             parts.Clear();
             groups.Clear();
             selection.Clear();
+            customSnapPoints.Clear();
+            customSnapPoints.AddRange(state.CustomSnapPoints);
             foreach (BlueprintEditorPart part in state.Parts) parts.Add(part.Clone());
             foreach (BlueprintEditorGroup group in state.Groups) groups.Add(group.Clone());
             selection.AddRange(state.Selection);
@@ -1308,7 +1362,8 @@ namespace OstrixMods.BuildWorks.Geometry
             if (state.Name != Name || state.Category != Category ||
                 state.Parts.Count != parts.Count || state.Groups.Count != groups.Count ||
                 state.Selection.Count != selection.Count || state.ActiveNodeId != ActiveNodeId ||
-                state.PrimaryPartId != PrimaryPartId || state.PrimaryGroupId != PrimaryGroupId)
+                state.PrimaryPartId != PrimaryPartId || state.PrimaryGroupId != PrimaryGroupId ||
+                state.CustomSnapPoints.Count != customSnapPoints.Count)
                 return false;
             for (int index = 0; index < parts.Count; ++index)
             {
@@ -1316,7 +1371,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 BlueprintEditorPart right = parts[index];
                 if (left.StableId != right.StableId || left.PrefabName != right.PrefabName ||
                     left.DisplayName != right.DisplayName || left.ParentGroupId != right.ParentGroupId ||
-                    left.Visible != right.Visible || left.Locked != right.Locked ||
+                    left.Visible != right.Visible || left.Locked != right.Locked || left.SignText != right.SignText ||
                     !Same(left.Position, right.Position) || !Same(left.Rotation, right.Rotation) ||
                     !Same(left.Scale, right.Scale))
                     return false;
@@ -1333,6 +1388,8 @@ namespace OstrixMods.BuildWorks.Geometry
             }
             for (int index = 0; index < selection.Count; ++index)
                 if (state.Selection[index] != selection[index]) return false;
+            for (int index = 0; index < customSnapPoints.Count; ++index)
+                if (!Same(state.CustomSnapPoints[index], customSnapPoints[index])) return false;
             return true;
         }
 

@@ -26,7 +26,7 @@ internal static class Program
         Assembly asm = Assembly.LoadFrom(Path.Combine(root, "artifacts", "bin", "BuildWorks.dll"));
         var document = new BlueprintEditorDocument(null, "Scale regression", "OTHER",
             new[] { new BlueprintEditorPart("a", "woodwall", "A", new Point3(),
-                new Rotation3(0,0,0,1), scale: new Point3(2,0.5,1.25)), Part("b",2) });
+                new Rotation3(0,0,0,1), scale: new Point3(2,0.5,1.25), signText: "Дом\nOstrix"), Part("b",2) });
         Type controllerType = asm.GetType("OstrixMods.BuildWorks.BlueprintEditorController", true);
         object controller = FormatterServices.GetUninitializedObject(controllerType);
         controllerType.GetField("document", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(controller, document);
@@ -47,7 +47,12 @@ internal static class Program
             (float)scale.GetType().GetField("z").GetValue(scale) == 1.25f,
             "Nonuniform scale lost between Controller and Store");
         Require(File.ReadAllText(pathOut).Contains("\"scale\""), "Disk scale missing");
+        Require((string)savedPart.GetType().GetField("signText").GetValue(savedPart) == "Дом\nOstrix", "Controller stripped sign text");
+        var restored = (BlueprintEditorDocument)controllerType.GetMethod("DocumentFromBlueprint", BindingFlags.NonPublic|BindingFlags.Static)
+            .Invoke(null, new[] {call[5]});
+        Require(restored.Parts[0].SignText == "Дом\nOstrix", "Controller reopen stripped sign text");
         Console.WriteLine("PASS actual Controller.BuildStoreParts -> Store.TrySaveDocument preserves XYZ scale");
+        Console.WriteLine("PASS actual Controller/store/reopen preserves sign text");
 
         var grouped = new BlueprintEditorDocument(null, "Group", "OTHER", new[] { Part("a",0), Part("b",2) });
         grouped.SelectOnly("a"); grouped.ToggleSelection("b"); grouped.CreateGroup("g", "Group");

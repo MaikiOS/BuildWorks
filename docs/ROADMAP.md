@@ -9,6 +9,12 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
+Active source checkpoint **0.19.57**: [format and large-construction work](../specs/roadmap/blueprint-format.md).
+v10 and portable v1 preserve sign/socket data, 96/353 external entries pass format;
+native payload placement, socket authoring/world persistence, heavy Unity rendering
+and export UI remain required. Installed **0.19.56** is unchanged; the older figures
+below describe their respective historical builds, not current source limits.
+
 Installed verified build: **0.19.55**, Store v9, Valheim 1.0.16.
 .54 catalog acceptance: 2,3,5,6,7 accepted; 1,4,8 revised. .55 shrinks catalog
 contents 20%, reserves hints space, separates Lighting and Furniture families,

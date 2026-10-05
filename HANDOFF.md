@@ -2,6 +2,16 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+
+## Source checkpoint 0.19.57 — not deployed; development remains active
+
+2026-10-05: [format and large-construction contract](specs/roadmap/blueprint-format.md)
+records v10/sign/socket payload, portable v1, strict conversion and measured CPU
+indexes. 96/353 archive entries now pass format checks; prefab availability is separate.
+Storage 50000 parts is not rendering capacity: the synchronous budget stays 512.
+Sign/socket world placement is explicitly blocked until native integration is ready.
+Installed .56, worlds and saves remain unchanged. The .56 figures below are historical.
+
 ## Verified test build 0.19.56
 
 2026-10-05: approved construction-only external library adapter reads .blueprint,

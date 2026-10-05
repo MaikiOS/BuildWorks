@@ -63,7 +63,7 @@ namespace OstrixMods.BuildWorks
         {
             if (blueprint == null || string.IsNullOrWhiteSpace(blueprint.id) ||
                 blueprint.parts == null || pieces == null ||
-                blueprint.parts.Count != pieces.Count)
+                blueprint.parts.Count != pieces.Count || CompositeBlueprintStore.InteractiveError(blueprint.parts.Count) != null)
                 return null;
             if (sprites.TryGetValue(blueprint.id, out Sprite cached)) return cached;
             if (failures.Contains(blueprint.id)) return null;
@@ -130,7 +130,7 @@ namespace OstrixMods.BuildWorks
             IReadOnlyList<Piece> pieces)
         {
             if (blueprint == null || blueprint.parts == null || pieces == null ||
-                blueprint.parts.Count != pieces.Count) return null;
+                blueprint.parts.Count != pieces.Count || CompositeBlueprintStore.InteractiveError(blueprint.parts.Count) != null) return null;
             try
             {
                 return new PreviewSession(blueprint, pieces);
@@ -147,7 +147,7 @@ namespace OstrixMods.BuildWorks
             IReadOnlyList<Piece> pieces)
         {
             if (blueprint == null || blueprint.parts == null || pieces == null ||
-                blueprint.parts.Count != pieces.Count) return null;
+                blueprint.parts.Count != pieces.Count || CompositeBlueprintStore.InteractiveError(blueprint.parts.Count) != null) return null;
 
             Sprite rendered = null;
             string temporary = null;
@@ -521,6 +521,10 @@ namespace OstrixMods.BuildWorks
                 CompositeBlueprintStore.Blueprint blueprint,
                 IReadOnlyList<Piece> pieces)
             {
+                if (blueprint?.parts == null || pieces == null || blueprint.parts.Count != pieces.Count)
+                    throw new ArgumentException("Blueprint preview pieces do not match.");
+                if (CompositeBlueprintStore.InteractiveError(pieces.Count) is string budgetError)
+                    throw new InvalidOperationException(BuildWorksLocalization.ResolveUserText(budgetError));
                 root = new GameObject("BuildWorks_BlueprintPreview")
                 {
                     hideFlags = HideFlags.HideAndDontSave,

@@ -648,6 +648,8 @@ namespace OstrixMods.BuildWorks
                 }
                 int partCount = blueprint?.parts?.Count ?? 0;
                 signature.Append(partCount).Append(':');
+                if (CompositeBlueprintStore.InteractiveError(partCount) != null)
+                { signature.Append("over-budget;"); continue; }
                 for (int partIndex = 0; partIndex < partCount; ++partIndex)
                 {
                     CompositeBlueprintStore.Part part = blueprint.parts[partIndex];
@@ -656,11 +658,16 @@ namespace OstrixMods.BuildWorks
                     AppendVector(signature, part.position);
                     AppendQuaternion(signature, part.rotation);
                     AppendVector(signature, part.scale);
+                    AppendText(signature, part.signText);
                 }
                 int anchorCount = blueprint?.anchors?.Count ?? 0;
                 signature.Append(anchorCount).Append(':');
                 for (int anchorIndex = 0; anchorIndex < anchorCount; ++anchorIndex)
                     AppendVector(signature, blueprint.anchors[anchorIndex]);
+                int customCount = blueprint?.customSnapPoints?.Count ?? 0;
+                signature.Append(customCount).Append(':');
+                for (int pointIndex = 0; pointIndex < customCount; ++pointIndex)
+                    AppendVector(signature, blueprint.customSnapPoints[pointIndex]);
             }
 
             int catalogCount = 0;

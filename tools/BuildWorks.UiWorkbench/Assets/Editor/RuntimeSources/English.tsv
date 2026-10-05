@@ -746,5 +746,7 @@ import.fields	Unsupported or malformed piece row (line {0}).
 import.object_data	This file contains object data/text that cannot yet be preserved (line {0}). No pieces were imported.
 import.chance	Random piece placement is unsupported (line {0}).
 import.transform	Invalid/out-of-range transform or scale (line {0}).
-import.part_limit	A usable blueprint must contain 2–128 pieces. Nothing is truncated.
+import.part_limit	A blueprint file must contain 2–50000 pieces. Nothing is truncated.
+import.interactive_limit	This construction is preserved, but exceeds the current interactive preview budget ({0}). Large-scene rendering is not ready yet.
+import.payload_pending	Sign text/custom sockets are preserved in the document. Their world-placement integration is not ready; placement is blocked rather than losing them.
 catalog.group.external_blueprints	SOURCE LIBRARIES

@@ -1003,7 +1003,7 @@ namespace OstrixMods.BuildWorks
                     CompositeBlueprintStore.Blueprint copy = ExternalBlueprintLibrary.DetachedCopy(blueprint);
                     if (!blueprintStore.TrySaveDocument(copy.name, copy.category,
                         copy.parts, copy.groups, copy.anchors, copy.primaryPartId,
-                        copy.primaryGroupId, out CompositeBlueprintStore.Blueprint imported, out string error))
+                        copy.primaryGroupId, out CompositeBlueprintStore.Blueprint imported, out string error, copy.customSnapPoints))
                     { ShowStatus(player, error); return; }
                     blueprint = imported;
                     RefreshBlueprintEditorLibrary();
@@ -1291,7 +1291,7 @@ namespace OstrixMods.BuildWorks
             Quaternion rotation,
             Vector3? scale = null)
         {
-            if (!source || blueprintWorkspaceParts.Count >= CompositeBlueprintStore.MaximumParts)
+            if (!source || blueprintWorkspaceParts.Count >= CompositeBlueprintStore.InteractivePartBudget)
                 return false;
             GameObject visual = PlacementGhostPreviewView.CreateVisualClone(
                 source.gameObject,
@@ -3263,7 +3263,7 @@ namespace OstrixMods.BuildWorks
                 }
                 return;
             }
-            if (selected || blueprintSelection.Count >= CompositeBlueprintStore.MaximumParts)
+            if (selected || blueprintSelection.Count >= CompositeBlueprintStore.InteractivePartBudget)
                 return;
             blueprintSelection.Add(piece);
             SetBlueprintPieceHighlight(piece, true);
@@ -4538,9 +4538,9 @@ namespace OstrixMods.BuildWorks
             saved = null;
             PruneBlueprintSelection();
             error = BuildWorksLocalization.Text(
-                "blueprint.select_part_count", CompositeBlueprintStore.MaximumParts);
+                "blueprint.select_part_count", CompositeBlueprintStore.InteractivePartBudget);
             if (blueprintSelection.Count < 2 ||
-                blueprintSelection.Count > CompositeBlueprintStore.MaximumParts) return false;
+                blueprintSelection.Count > CompositeBlueprintStore.InteractivePartBudget) return false;
             Quaternion rotation = blueprintSelection[0].transform.rotation;
             Quaternion inverse = Quaternion.Inverse(rotation);
             Vector3 origin = blueprintSelection[0].transform.position;
@@ -4926,6 +4926,10 @@ namespace OstrixMods.BuildWorks
             if (!player || blueprint?.parts == null) return false;
             if (!string.IsNullOrEmpty(blueprint.importError))
             { missingPrefab = BuildWorksLocalization.ResolveUserText(blueprint.importError); return false; }
+            if (CompositeBlueprintStore.InteractiveError(blueprint.parts.Count) is string budgetError)
+            { missingPrefab = BuildWorksLocalization.ResolveUserText(budgetError); return false; }
+            if (blueprint.customSnapPoints?.Count > 0 || blueprint.parts.Any(part => part.signText != null))
+            { missingPrefab = BuildWorksLocalization.Text("import.payload_pending"); return false; }
             var unavailable = new HashSet<string>(StringComparer.Ordinal);
             foreach (CompositeBlueprintStore.Part part in blueprint.parts)
             {

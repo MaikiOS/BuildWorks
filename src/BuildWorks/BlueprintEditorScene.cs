@@ -444,6 +444,8 @@ namespace OstrixMods.BuildWorks
         {
             ThrowIfDisposed();
             if (document == null) throw new ArgumentNullException(nameof(document));
+            if (CompositeBlueprintStore.InteractiveError(document.Parts.Count) is string budgetError)
+            { warning = BuildWorksLocalization.ResolveUserText(budgetError); return false; }
             InvalidateGizmoAnchors();
 
             var missingPrefabs = new List<string>();
@@ -574,7 +576,7 @@ namespace OstrixMods.BuildWorks
                 VisualNode visual = entry.Value;
                 if (!includeLocked && visual.Locked || visual.SeeThrough || !visual.Root.activeInHierarchy ||
                     !TryBounds(visual, out Bounds bounds) ||
-                    !bounds.IntersectRay(ray) ||
+                    !bounds.IntersectRay(ray, out float boundsDistance) || boundsDistance >= nearest ||
                     !TryMeshHit(visual, ray, out float distance, out Vector3 hitNormal) ||
                     distance >= nearest)
                     continue;
@@ -969,6 +971,8 @@ namespace OstrixMods.BuildWorks
         {
             ThrowIfDisposed();
             if (preview == null) { ClearTemporaryPreview(target); return; }
+            if (CompositeBlueprintStore.InteractiveError(preview.Count) is string budgetError)
+                throw new InvalidOperationException(BuildWorksLocalization.ResolveUserText(budgetError));
             try
             {
                 for (int index = 0; index < preview.Count; ++index)

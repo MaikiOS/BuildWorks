@@ -10,8 +10,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\BuildWorks.Geometry\BuildWorks.Geometry.csproj" />
     <Compile Include="..\..\src\BuildWorks\CompositeBlueprintStore.cs" Link="CompositeBlueprintStore.cs" />
     <Compile Include="..\..\src\BuildWorks\ExternalBlueprintLibrary.cs" Link="ExternalBlueprintLibrary.cs" />
+    <Compile Include="..\..\src\BuildWorks\BlueprintExchangeFormat.cs" Link="BlueprintExchangeFormat.cs" />
     <Reference Include="System.IO.Compression" />
   </ItemGroup>
 

@@ -748,5 +748,8 @@ import.chance	Random piece placement is unsupported (line {0}).
 import.transform	Invalid/out-of-range transform or scale (line {0}).
 import.part_limit	A blueprint file must contain 2–50000 pieces. Nothing is truncated.
 import.interactive_limit	This construction is preserved, but exceeds the current interactive preview budget ({0}). Large-scene rendering is not ready yet.
-import.payload_pending	Sign text/custom sockets are preserved in the document. Their world-placement integration is not ready; placement is blocked rather than losing them.
+import.payload_pending	Custom sockets are preserved in the document. Their persistent world integration is not ready; placement is blocked rather than losing them.
+blueprint.sign_unsupported	Sign text is unsupported or exceeds this piece's native text limit: {0}
+blueprint.sign_capture_failed	Sign text is unavailable or invalid: {0}. Nothing was saved.
+blueprint.sign_apply_failed	The piece was placed, but its sign text was refused or failed. Check access and the sign; subsequent placement is paused if there are more pieces.
 catalog.group.external_blueprints	SOURCE LIBRARIES

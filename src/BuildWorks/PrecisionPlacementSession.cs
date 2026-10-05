@@ -61,6 +61,19 @@ namespace OstrixMods.BuildWorks
             }
             if (sessionMode == SessionMode.BlueprintWorldPlacement)
                 currentBlueprintPlacements.Add(placed);
+            pendingNativePiece = placed;
+            pendingNativePlanIndex = placementPlanIndex;
+        }
+
+        private bool TakePendingPlacementSign(bool succeeded, out GameObject placed, out string text)
+        {
+            placed = pendingNativePiece;
+            int index = pendingNativePlanIndex;
+            pendingNativePiece = null;
+            pendingNativePlanIndex = -1;
+            text = succeeded && !ReferenceEquals(placed, null) && index == placementPlanIndex &&
+                index >= 0 && index < placementPlan.Count ? placementPlan[index].SignText : null;
+            return text != null;
         }
 
         private enum PlacementState
@@ -85,21 +98,24 @@ namespace OstrixMods.BuildWorks
             public Piece Source;
             public GameObject Visual;
             public Vector3 Scale = Vector3.one;
+            public string SignText;
             public readonly List<Vector3> SnapLocal = new List<Vector3>();
         }
 
         internal readonly struct TransformSnapshot
         {
-            public TransformSnapshot(Vector3 position, Quaternion rotation, Vector3? scale = null)
+            public TransformSnapshot(Vector3 position, Quaternion rotation, Vector3? scale = null, string signText = null)
             {
                 Position = position;
                 Rotation = rotation;
                 Scale = scale ?? Vector3.one;
+                SignText = signText;
             }
 
             public Vector3 Position { get; }
             public Quaternion Rotation { get; }
             public Vector3 Scale { get; }
+            public string SignText { get; }
         }
 
         private readonly struct SnapEdge
@@ -389,6 +405,8 @@ namespace OstrixMods.BuildWorks
         private int suppressPlacementFrame = -1;
         private readonly List<TransformSnapshot> placementPlan = new List<TransformSnapshot>();
         private readonly List<Piece> placementPlanPieces = new List<Piece>();
+        private GameObject pendingNativePiece;
+        private int pendingNativePlanIndex = -1;
         private readonly List<GameObject> currentBlueprintPlacements = new List<GameObject>();
         private readonly List<BlueprintRollbackItem> pendingBlueprintRollbacks = new List<BlueprintRollbackItem>();
         private float nextBlueprintRollbackRetry;
@@ -1266,7 +1284,7 @@ namespace OstrixMods.BuildWorks
                         pieces[index],
                         EditorWorkspaceOrigin + part.position.ToVector3(),
                         part.rotation.ToQuaternion(),
-                        part.scale.ToVector3()))
+                        part.scale.ToVector3(), part.signText))
                     {
                         Finish();
                         ShowStatus(player, BuildWorksLocalization.Text(
@@ -1289,7 +1307,8 @@ namespace OstrixMods.BuildWorks
             Piece source,
             Vector3 position,
             Quaternion rotation,
-            Vector3? scale = null)
+            Vector3? scale = null,
+            string signText = null)
         {
             if (!source || blueprintWorkspaceParts.Count >= CompositeBlueprintStore.InteractivePartBudget)
                 return false;
@@ -1327,7 +1346,8 @@ namespace OstrixMods.BuildWorks
             {
                 Source = source,
                 Visual = visual,
-                Scale = partScale
+                Scale = partScale,
+                SignText = signText
             };
             var sourceSnaps = new List<Transform>();
             source.GetSnapPoints(sourceSnaps);
@@ -2649,6 +2669,8 @@ namespace OstrixMods.BuildWorks
             if (state == PlacementState.Armed && player == Player.m_localPlayer &&
                 piece && piece == selectedPiece)
             {
+                pendingNativePiece = null;
+                pendingNativePlanIndex = -1;
                 automaticPlacementReachedTryPlace = automaticPlacementRunning;
                 allowNativeGhostUpdate = true;
                 requestAutomaticPlacement = false;
@@ -2669,6 +2691,17 @@ namespace OstrixMods.BuildWorks
                 return;
             }
 
+            bool signFailed = placed && placementPlanIndex < placementPlan.Count &&
+                placementPlan[placementPlanIndex].SignText != null;
+            if (TakePendingPlacementSign(placed, out GameObject created, out string signText))
+            {
+                try { signFailed = !BlueprintSignText.TryApply(created, signText); }
+                catch (Exception error)
+                {
+                    signFailed = true;
+                    Debug.LogWarning("BuildWorks native sign apply failed: " + error.GetType().Name);
+                }
+            }
             if (placed)
             {
                 automaticCooldownOverridden = false;
@@ -2680,6 +2713,11 @@ namespace OstrixMods.BuildWorks
                     TransformSnapshot next = placementPlan[placementPlanIndex];
                     currentPosition = next.Position;
                     currentRotation = next.Rotation;
+                    if (signFailed)
+                    {
+                        PauseAutomaticPlacement(player, BuildWorksLocalization.Text("blueprint.sign_apply_failed"));
+                        return;
+                    }
                     requestAutomaticPlacement = true;
                     return;
                 }
@@ -2696,6 +2734,7 @@ namespace OstrixMods.BuildWorks
                 CaptureContinuation();
                 currentBlueprintPlacements.Clear();
                 Finish(preserveContinuation: true);
+                if (signFailed) ShowStatus(player, BuildWorksLocalization.Text("blueprint.sign_apply_failed"));
                 return;
             }
 
@@ -2759,6 +2798,11 @@ namespace OstrixMods.BuildWorks
 
         public void OnNativePlacementException(Player player, Piece piece)
         {
+            if (player == Player.m_localPlayer)
+            {
+                pendingNativePiece = null;
+                pendingNativePlanIndex = -1;
+            }
             allowNativeGhostUpdate = false;
             RestoreAutomaticCooldown(player);
             if (state == PlacementState.Armed && player == Player.m_localPlayer &&
@@ -4451,7 +4495,7 @@ namespace OstrixMods.BuildWorks
                     position + rotation * (localPosition * uniformScale),
                     rotation * localRotation,
                     ToUnity(BlueprintEditorPart.NormalizeScale(
-                        ToGeometry(part.scale.ToVector3()) * uniformScale, nameof(uniformScale)))));
+                        ToGeometry(part.scale.ToVector3()) * uniformScale, nameof(uniformScale))), part.signText));
                 placementPlanPieces.Add(activeBlueprintPieces[index]);
             }
             return true;
@@ -4572,12 +4616,18 @@ namespace OstrixMods.BuildWorks
                         "blueprint.piece_scale_persistence", PrefabName(piece));
                     return false;
                 }
+                if (!BlueprintSignText.TryCapture(piece, out string signText))
+                {
+                    error = BuildWorksLocalization.Text("blueprint.sign_capture_failed", PrefabName(piece));
+                    return false;
+                }
                 parts.Add(new CompositeBlueprintStore.Part
                 {
                     prefabName = PrefabName(piece),
                     position = new CompositeBlueprintStore.VectorData(inverse * (piece.transform.position - origin)),
                     rotation = new CompositeBlueprintStore.QuaternionData(inverse * piece.transform.rotation),
-                    scale = scale
+                    scale = scale,
+                    signText = signText
                 });
                 var points = new List<Transform>();
                 piece.GetSnapPoints(points);
@@ -4928,7 +4978,7 @@ namespace OstrixMods.BuildWorks
             { missingPrefab = BuildWorksLocalization.ResolveUserText(blueprint.importError); return false; }
             if (CompositeBlueprintStore.InteractiveError(blueprint.parts.Count) is string budgetError)
             { missingPrefab = BuildWorksLocalization.ResolveUserText(budgetError); return false; }
-            if (blueprint.customSnapPoints?.Count > 0 || blueprint.parts.Any(part => part.signText != null))
+            if (blueprint.customSnapPoints?.Count > 0)
             { missingPrefab = BuildWorksLocalization.Text("import.payload_pending"); return false; }
             var unavailable = new HashSet<string>(StringComparer.Ordinal);
             foreach (CompositeBlueprintStore.Part part in blueprint.parts)
@@ -4940,6 +4990,11 @@ namespace OstrixMods.BuildWorks
                     continue;
                 }
                 ZNetView view = piece.GetComponent<ZNetView>();
+                if (!BlueprintSignText.CanApply(piece, part.signText))
+                {
+                    unavailable.Add(BuildWorksLocalization.Text("blueprint.sign_unsupported", part.prefabName));
+                    continue;
+                }
                 if (part.scale.ToVector3() != Vector3.one && (!view || !view.m_syncInitialScale))
                 {
                     unavailable.Add(BuildWorksLocalization.Text(
@@ -5153,6 +5208,8 @@ namespace OstrixMods.BuildWorks
 
         private void ClearLayout()
         {
+            pendingNativePiece = null;
+            pendingNativePlanIndex = -1;
             placementPlan.Clear();
             placementPlanPieces.Clear();
             previewContacts.Clear();
@@ -5825,7 +5882,8 @@ namespace OstrixMods.BuildWorks
                     position = new CompositeBlueprintStore.VectorData(
                         visual.position - rootPosition),
                     rotation = new CompositeBlueprintStore.QuaternionData(visual.rotation),
-                    scale = new CompositeBlueprintStore.VectorData(workspacePart.Scale)
+                    scale = new CompositeBlueprintStore.VectorData(workspacePart.Scale),
+                    signText = workspacePart.SignText
                 });
                 var snaps = new List<Point3>(workspacePart.SnapLocal.Count);
                 foreach (Vector3 snapLocal in workspacePart.SnapLocal)

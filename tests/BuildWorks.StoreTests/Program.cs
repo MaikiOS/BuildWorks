@@ -28,6 +28,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 RejectGroupCycle(Path.Combine(directory, "cycle.json"));
                 FailedWritePreservesOriginal(Path.Combine(directory, "failure.json"));
                 ExternalImports(directory);
+                ForeignSignText();
                 ExchangeRoundTrip(Path.Combine(directory, "exchange-library.json"));
                 if (args.Length > 0) InspectActualLibrary(args[0]);
                 Console.WriteLine("All BuildWorks store tests passed.");
@@ -42,6 +43,32 @@ namespace OstrixMods.BuildWorks.StoreTests
             {
                 Directory.Delete(directory, recursive: true);
             }
+        }
+
+        private static void ForeignSignText()
+        {
+            const string prefix = "#Pieces\nwall;;0;0;0;0;0;0;1;\"\"\nsign;;1;0;0;0;0;0;1;";
+            foreach (var sample in new[] {
+                Tuple.Create("\"Добро пожаловать!\\n\\\"Дом\\\"\"", "Добро пожаловать!\n\"Дом\""),
+                Tuple.Create(" <color=white>Dock 1 ", " <color=white>Dock 1 "),
+                Tuple.Create("\"\"", (string)null), Tuple.Create("null", (string)null)
+            })
+            {
+                var result = ExternalBlueprintLibrary.Parse(prefix + sample.Item1, "sign.blueprint");
+                Require(result.importError == null && result.parts.Count == 2 && result.parts[1].signText == sample.Item2,
+                    "Foreign sign text changed or failed to decode");
+            }
+            foreach (string text in new[] { "\"broken", "\"valid\" trailing", "\"Bad\\u0001text\"", new string('x', 4097) })
+            {
+                var result = ExternalBlueprintLibrary.Parse(prefix + text, "bad-sign.blueprint");
+                Require(result.importError != null && result.parts.Count == 0, "Invalid sign accepted partially");
+            }
+            foreach (string prefab in new[] { "wood_door", "itemstand", "ArmorStand", "piece_chest", "mod_sign" })
+                Require(ExternalBlueprintLibrary.Parse(prefix.Replace("\nsign;", "\n" + prefab + ";") + "\"1\"", "data.blueprint").parts.Count == 0,
+                    "Ambiguous object info was treated as sign text");
+            Require(ExternalBlueprintLibrary.Parse(prefix + "\"Text\";1;1;1;opaque", "zdo.blueprint").parts.Count == 0,
+                "Extended sign ZDO was discarded");
+            Console.WriteLine("PASS PlanBuild sign-only quoted/raw/blank conversion; exact whitespace/markup; malformed/opaque/ambiguous data reject atomically");
         }
 
         private static void ExternalImports(string directory)
@@ -131,7 +158,9 @@ namespace OstrixMods.BuildWorks.StoreTests
                         var parsed = ExternalBlueprintLibrary.Parse(reader.ReadToEnd(), entry.FullName);
                         ++total; if (parsed.importError == null) ++supported; else ++blocked;
                         if (parsed.name == "CoffeeTable") Require(parsed.importError == null && parsed.parts.Count == 4, "Actual CoffeeTable cannot be converted");
-                        if (parsed.name == "WoodCouch1") Require(parsed.importError?.Contains("object_data") == true, "Sign text was silently lost");
+                        if (parsed.name == "WoodCouch1") Require(parsed.importError == null &&
+                            parsed.parts.Count(part => part.prefabName == "sign" && part.signText == "...") == 2,
+                            "Actual WoodCouch1 sign text was lost or changed");
                     }
                 }
             Require(total == 353 && supported > 0 && total == supported + blocked, "Downloaded library coverage");

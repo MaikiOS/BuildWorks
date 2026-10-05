@@ -9,10 +9,12 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.57**: [format and large-construction work](../specs/roadmap/blueprint-format.md).
-v10 and portable v1 preserve sign/socket data, 96/353 external entries pass format;
-native payload placement, socket authoring/world persistence, heavy Unity rendering
-and export UI remain required. Installed **0.19.56** is unchanged; the older figures
+Active source checkpoint **0.19.58**: [native signs and evidence](../specs/roadmap/blueprint-signs.md).
+v10/portable v1 preserve payloads; 109/353 external entries pass format. Native sign
+integration is source/adapter-tested; actual world/reload/network acceptance remains.
+[Free support frames](../specs/roadmap/blueprint-support-frames.md) are researched,
+not implemented; socket persistence, heavy Unity rendering and export UI remain.
+Installed **0.19.56** is unchanged; the older figures
 below describe their respective historical builds, not current source limits.
 
 Installed verified build: **0.19.55**, Store v9, Valheim 1.0.16.

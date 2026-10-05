@@ -5,9 +5,9 @@
     <Nullable>disable</Nullable>
     <AssemblyName>BuildWorks</AssemblyName>
     <RootNamespace>OstrixMods.BuildWorks</RootNamespace>
-    <Version>0.19.57</Version>
-    <AssemblyVersion>0.19.57.0</AssemblyVersion>
-    <FileVersion>0.19.57.0</FileVersion>
+    <Version>0.19.58</Version>
+    <AssemblyVersion>0.19.58.0</AssemblyVersion>
+    <FileVersion>0.19.58.0</FileVersion>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <OutputPath>$(MSBuildThisFileDirectory)..\..\artifacts\bin\</OutputPath>
     <ProfileRoot Condition="'$(ProfileRoot)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..\'))</ProfileRoot>
@@ -65,6 +65,10 @@
     </Reference>
     <Reference Include="assembly_valheim">
       <HintPath>$(ValheimManagedDir)\assembly_valheim.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Splatform">
+      <HintPath>$(ValheimManagedDir)\Splatform.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="assembly_utils">

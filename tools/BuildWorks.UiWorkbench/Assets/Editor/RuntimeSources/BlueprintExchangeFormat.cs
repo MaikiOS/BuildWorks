@@ -43,6 +43,27 @@ namespace OstrixMods.BuildWorks
         internal static void ValidateLibraryJson(string text, bool requireFields) => ValidateStructure(
             Encoding.UTF8.GetBytes(text), typeof(CompositeBlueprintStore.LibraryData), requireFields);
 
+        internal static string DecodeSignText(string token)
+        {
+            if (token == "" || token == "\"\"" || token == "null") return null;
+            string text = token;
+            if (token.TrimStart().StartsWith("\"", StringComparison.Ordinal))
+            {
+                try
+                {
+                    byte[] bytes = new UTF8Encoding(false, true).GetBytes(token);
+                    ValidateStructure(bytes, typeof(string));
+                    using (var input = new MemoryStream(bytes))
+                        text = (string)new DataContractJsonSerializer(typeof(string)).ReadObject(input);
+                }
+                catch (Exception error) when (error is SerializationException || error is XmlException || error is ArgumentException)
+                { throw new InvalidDataException("$buildworks_import.object_data", error); }
+            }
+            if (!OstrixMods.BuildWorks.Geometry.BlueprintEditorPart.IsValidSignText(text))
+                throw new InvalidDataException("$buildworks_import.object_data");
+            return text;
+        }
+
         private static void ValidateStructure(byte[] bytes, Type expected, bool requireFields = true)
         {
             using (XmlDictionaryReader reader = JsonReaderWriterFactory.CreateJsonReader(bytes,

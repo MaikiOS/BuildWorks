@@ -2,6 +2,10 @@
 
 **English** | [Русский](blueprint-format_RU.md)
 
+Current source **0.19.58**: [native sign integration and evidence](blueprint-signs.md).
+Free support-frame clarification: [researched proposal, not implemented](blueprint-support-frames.md).
+The .57 measurements and pending list below are that checkpoint's historical record.
+
 2026-10-05. Approved by Ostrix: preserve prefab-built constructions, large documents,
 sign text, authored snap points and conversion from other building mods. This does
 not authorize arbitrary mesh extraction, terrain editing or world/save changes.

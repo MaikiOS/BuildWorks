@@ -141,10 +141,12 @@ namespace OstrixMods.BuildWorks
                 string line;
                 while ((line = reader.ReadLine()) != null)
                 {
-                    ++lineNumber; line = line.Trim();
-                    if (line.Length == 0) continue;
-                    if (line[0] == '#')
+                    ++lineNumber;
+                    string structural = line.Trim();
+                    if (structural.Length == 0) continue;
+                    if (structural[0] == '#')
                     {
+                        line = structural;
                         if (line.StartsWith("#Name:", StringComparison.Ordinal)) blueprint.name = line.Substring(6).Trim();
                         else if (line.StartsWith("#Category:", StringComparison.Ordinal)) blueprint.category = line.Substring(10).Trim();
                         else if (line == "#Pieces") { pieces = true; seenPieces = true; snapPoints = false; }
@@ -187,15 +189,16 @@ namespace OstrixMods.BuildWorks
                         if (fields.Length < basic || fields.Length > (vbuild ? 10 : 15) ||
                             (!vbuild && (fields.Length == 11 || fields.Length == 12)))
                             throw new InvalidDataException("$buildworks_import.fields");
-                        // A quote/semicolon in object data is deliberately not interpreted.
-                        if (!vbuild && fields[9] != "" && fields[9] != "\"\"")
+                        string prefab = fields[0].Trim();
+                        // PlanBuild reuses info for doors, inventory and signs. Only its exact native sign is unambiguous.
+                        if (!vbuild && prefab != "sign" && fields[9] != "" && fields[9] != "\"\"" && fields[9] != "null")
                             throw new InvalidDataException("$buildworks_import.object_data");
+                        string signText = !vbuild && prefab == "sign" ? BlueprintExchangeFormat.DecodeSignText(fields[9]) : null;
                         int dataIndex = vbuild ? 8 : 13;
                         if (fields.Length > dataIndex && fields[dataIndex] != "" && fields[dataIndex] != "\"\"")
                             throw new InvalidDataException("$buildworks_import.object_data");
                         if (fields.Length > dataIndex + 1 && fields[dataIndex + 1] != "" && Number(fields[dataIndex + 1]) != 1f)
                             throw new InvalidDataException("$buildworks_import.chance");
-                        string prefab = fields[0].Trim();
                         if (prefab.Length == 0 || prefab.Length > 128 || prefab.Any(c => char.IsControl(c) || c == '/' || c == '\\'))
                             throw new InvalidDataException("$buildworks_import.fields");
                         int p = vbuild ? 5 : 2, q = vbuild ? 1 : 5;
@@ -206,7 +209,8 @@ namespace OstrixMods.BuildWorks
                             displayName = prefab,
                             position = new CompositeBlueprintStore.VectorData { x = Number(fields[p]), y = Number(fields[p + 1]), z = Number(fields[p + 2]) },
                             rotation = new CompositeBlueprintStore.QuaternionData { x = Number(fields[q]), y = Number(fields[q + 1]), z = Number(fields[q + 2]), w = Number(fields[q + 3]) },
-                            scale = new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 }
+                            scale = new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 },
+                            signText = signText
                         };
                         if (Math.Abs(part.position.x) > 512 || Math.Abs(part.position.y) > 512 || Math.Abs(part.position.z) > 512)
                             throw new InvalidDataException("$buildworks_import.transform");

@@ -2,6 +2,17 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Source checkpoint 0.19.58 — not deployed; development remains active
+
+2026-10-06: [native signs](specs/roadmap/blueprint-signs.md) now follow each placement
+step and use native permission-gated SetText; capture and legacy workspace preserve
+raw text. Exact foreign `sign` info is decoded conservatively. Archive 109/353 format
+compatible; host prefab/world behavior remains separate. Release/targeted checks and
+144 Unity states PASS (2026-10-05T21:14:51Z, gameHostTested=false); independent review PASS.
+Owner clarified [free support frames](specs/roadmap/blueprint-support-frames.md): researched
+only, no new point-authoring UI/world persistence yet. Heavy rendering/export UI remain.
+Installed .56, worlds/saves unchanged. Older checkpoint sections below are historical.
+
 
 ## Source checkpoint 0.19.57 — not deployed; development remains active
 

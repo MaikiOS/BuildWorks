@@ -739,7 +739,7 @@ $checkedHostMembers = 0
 foreach ($member in $plugin.MainModule.GetMemberReferences()) {
     $scopeName = $member.DeclaringType.Scope.Name
     if ($scopeName -notlike 'Unity*' -and
-        $scopeName -notin @('assembly_valheim', 'assembly_utils', 'assembly_guiutils')) {
+        $scopeName -notin @('assembly_valheim', 'assembly_utils', 'assembly_guiutils', 'Splatform')) {
         continue
     }
     ++$checkedHostMembers
@@ -816,7 +816,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.57.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.58.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -2783,4 +2783,18 @@ if (Test-Path -LiteralPath $buildCameraPath -PathType Leaf) {
         'BuildWorks does not restore the current Build Camera yaw and pitch.'
 }
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.57 and Valheim Steam build 25185596.'
+$signType = $hostAssembly.MainModule.Types | Where-Object Name -eq 'Sign'
+Assert-Contract (@($signType.Fields | Where-Object { $_.Name -eq 'm_isViewable' -and $_.IsPrivate -and $_.FieldType.FullName -eq 'System.Boolean' }).Count -eq 1) 'Sign view permission field changed.'
+Assert-Contract (@($signType.Fields | Where-Object { $_.Name -eq 'm_characterLimit' -and $_.IsPublic -and $_.FieldType.FullName -eq 'System.Int32' }).Count -eq 1) 'Sign character limit changed.'
+$nativeSignSetter = $signType.Methods | Where-Object { $_.Name -eq 'SetText' -and $_.Parameters.Count -eq 1 -and $_.Parameters[0].ParameterType.FullName -eq 'System.String' }
+$nativeSignCalls = ($nativeSignSetter.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($nativeSignCalls -match 'PrivateArea::CheckAccess' -and $nativeSignCalls -match 'ZNetView::ClaimOwnership' -and $nativeSignCalls -match 'ZDOVars::s_text') 'Native sign access/ownership/storage changed.'
+$signApply = $pluginMethods | Where-Object { $_.Name -eq 'TryApply' -and $_.DeclaringType.Name -eq 'BlueprintSignText' }
+$signCalls = ($signApply.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($signCalls -match 'Sign::SetText' -and $signCalls -match 'CheckPrivilege' -and $signCalls -match 'ZDO::GetString' -and $signCalls -notmatch 'ZDO::Set\(') 'Blueprint sign writes bypass native setters or do not verify stored text.'
+$nativeFinished = $pluginMethods | Where-Object { $_.Name -eq 'OnNativePlacementFinished' -and $_.DeclaringType.Name -eq 'PrecisionPlacementSession' }
+$signInstruction = @($nativeFinished.Body.Instructions | Where-Object { [string]$_.Operand -match 'BlueprintSignText::TryApply' })
+$indexWrite = @($nativeFinished.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'stfld' -and [string]$_.Operand -match '::placementPlanIndex$' })
+Assert-Contract ($signInstruction.Count -eq 1 -and $indexWrite.Count -gt 0 -and $signInstruction[0].Offset -lt $indexWrite[0].Offset) 'Sign payload must apply before advancing the native queue.'
+
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.58 and Valheim Steam build 25185596.'

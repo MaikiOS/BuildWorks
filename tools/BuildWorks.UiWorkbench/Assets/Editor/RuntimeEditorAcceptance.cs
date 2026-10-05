@@ -167,6 +167,7 @@ public static class RuntimeEditorAcceptance
             checks.Add(BlueprintResourceHudAcceptance.Run(fontTemplate.font, output));
             checks.Add(WorldSelectionHighlightAcceptance.Run());
             checks.Add(PlacementContactAcceptance.Run());
+            TestSignPayload();
             checks.Add(UICatalogAcceptance.Run(fontTemplate.font));
             foreach (object step in ControllerInputAcceptance.Run(template, fontTemplate, output)) yield return step;
             foreach (object step in ControllerInputAcceptance.RunContourLifecycle(template, fontTemplate, output)) yield return step;
@@ -469,6 +470,44 @@ public static class RuntimeEditorAcceptance
         }
         if (state == "save-metadata") EnsureInside(Field<RectTransform>(view, "safeRoot"),
             (RectTransform)Field<TMP_Text>(view, "modalTitle").transform.parent);
+    }
+
+    private static void TestSignPayload()
+    {
+        GameObject root = new GameObject("Sign payload test", typeof(Piece), typeof(ZNetView), typeof(Sign));
+        var provider = Splatform.PlatformManager.DistributionPlatform.PrivilegeProvider;
+        try
+        {
+            Piece piece = root.GetComponent<Piece>();
+            Sign sign = root.GetComponent<Sign>();
+            ZNetView view = root.GetComponent<ZNetView>();
+            Require(BlueprintSignText.CanApply(piece, null), "Absent sign payload rejected");
+            Require(!BlueprintSignText.CanApply(piece, new string('x', 51)) &&
+                !BlueprintSignText.CanApply(piece, "Bad\u0001text"), "Unsafe/over-limit sign accepted");
+            Require(BlueprintSignText.TryCapture(piece, out string original) && original == "Default", "Default sign text lost");
+            view.GetZDO().Set(ZDOVars.s_text, "Дом\n<b>Ostrix</b>");
+            Require(BlueprintSignText.TryCapture(piece, out original) && original == "Дом\n<b>Ostrix</b>", "Raw sign text changed");
+            typeof(Sign).GetField("m_isViewable", Private).SetValue(sign, false);
+            Require(!BlueprintSignText.TryCapture(piece, out _), "Hidden sign text exposed");
+            typeof(Sign).GetField("m_isViewable", Private).SetValue(sign, true);
+            provider.Granted = false;
+            Require(!BlueprintSignText.TryApply(root, "New") && sign.Calls == 0, "Denied privilege called native sign setter");
+            provider.Granted = true;
+            sign.Denied = true;
+            Require(!BlueprintSignText.TryApply(root, "New") && view.GetZDO().GetString(ZDOVars.s_text, "") == original,
+                "Native denial mutated sign or reported success");
+            sign.Denied = false;
+            Require(BlueprintSignText.TryApply(root, "") && view.GetZDO().GetString(ZDOVars.s_text, "Missing") == "",
+                "Explicit empty sign did not persist");
+            view.Valid = false;
+            Require(!BlueprintSignText.TryCapture(piece, out _) && !BlueprintSignText.TryApply(root, "Invalid"), "Invalid ZDO accepted");
+            view.Valid = true;
+            UnityEngine.Object.DestroyImmediate(sign);
+            Require(!BlueprintSignText.CanApply(piece, "Unsupported") && !BlueprintSignText.TryApply(root, "Unsupported"),
+                "Non-sign piece accepted text");
+            checks.Add("Actual sign adapter on Unity objects: raw UTF-8/default capture, hidden/invalid denial, native limits, platform denial, setter result mismatch and explicit blank. Host Sign permissions/reload/network remain game acceptance.");
+        }
+        finally { provider.Granted = true; UnityEngine.Object.DestroyImmediate(root); }
     }
 
     private static void TestSaveRoundtrip(BlueprintEditorController controller, string path)

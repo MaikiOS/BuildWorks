@@ -39,6 +39,7 @@ internal static class Program
             rotationType = append.GetParameters()[1].ParameterType;
             pieceType = sessionType.GetField("selectedPiece", Instance).FieldType;
             TestGridComposition();
+            TestSignPayloadLifecycle();
             TestPivotLayoutComposition();
             TestHistorySurvivesPivotFrameSwitch();
             TestRotatedRoots();
@@ -125,6 +126,45 @@ internal static class Program
         CheckVector(Get(parts[1], "scale"), new Point3(0.01,4,1));
         Require((int)Get(session, "placementPlanIndex") == 0, "Preview advanced native placement index");
         Console.WriteLine("PASS actual Session: 3x2 root grid expands ordered parts, position/rotation/XYZ scale; source/index unchanged");
+    }
+
+    private static void TestSignPayloadLifecycle()
+    {
+        object session = Session(2);
+        IList parts = (IList)Get(Get(session, "activeBlueprint"), "parts");
+        Set(parts[0], "signText", "Дом\n<b>Ostrix</b>");
+        Set(parts[1], "signText", "");
+        Require(Add(session, new Point3(0,0,0), Rotation(0,0,0,1)), "Sign root append failed");
+        Require(Add(session, new Point3(5,0,0), Rotation(0,0,0,1)), "Sign repeat append failed");
+        IList plan = (IList)Get(session, "placementPlan");
+        for (int index = 0; index < plan.Count; ++index)
+            Require((string)Property(plan[index], "SignText") == (index % 2 == 0 ? "Дом\n<b>Ostrix</b>" : ""),
+                "Repeat sign payload follows the wrong part");
+        Type objectType = sessionType.GetField("pendingNativePiece", Instance).FieldType;
+        object created = RuntimeHelpers.GetUninitializedObject(objectType);
+        MethodInfo take = sessionType.GetMethod("TakePendingPlacementSign", Instance);
+        foreach (bool succeeded in new[] { false, true })
+        {
+            Set(session, "pendingNativePiece", created);
+            Set(session, "pendingNativePlanIndex", 2);
+            Set(session, "placementPlanIndex", 2);
+            object[] result = { succeeded, null, null };
+            Require((bool)take.Invoke(session, result) == succeeded, "Native rejection applied sign payload");
+            Require(!succeeded || ReferenceEquals(result[1], created) && (string)result[2] == "Дом\n<b>Ostrix</b>",
+                "Native success returned a different object or text");
+            Require(Get(session, "pendingNativePiece") == null && (int)Get(session, "pendingNativePlanIndex") == -1,
+                "Pending sign payload survived completion/rejection");
+            Require(!(bool)take.Invoke(session, new object[] { true, null, null }), "Sign payload applied twice");
+        }
+        Set(session, "pendingNativePiece", created);
+        Set(session, "pendingNativePlanIndex", 1);
+        Require(!(bool)take.Invoke(session, new object[] { true, null, null }), "Stale previous step applied text");
+        Set(session, "pendingNativePiece", created);
+        Set(session, "pendingNativePlanIndex", 3);
+        Set(session, "placementPlanIndex", 3);
+        object[] empty = { true, null, null };
+        Require((bool)take.Invoke(session, empty) && (string)empty[2] == "", "Explicit blank sign lost its payload");
+        Console.WriteLine("PASS actual Session: sign text follows repeated steps; native rejection/stale steps consume without apply; success/blank text are one-shot");
     }
 
     private static void TestRotatedRoots()

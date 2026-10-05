@@ -135,6 +135,7 @@ $midpointSource = Get-Content -LiteralPath $midpointSourcePath -Raw
 $editorDocumentSource = Get-Content -LiteralPath $editorDocumentSourcePath -Raw
 $editorSceneSource = Get-Content -LiteralPath $editorSceneSourcePath -Raw
 $editorViewSource = Get-Content -LiteralPath $editorViewSourcePath -Raw
+$editorViewSource += Get-Content -LiteralPath (Join-Path $projectRoot 'src\BuildWorks\BlueprintEditorCatalogView.cs') -Raw
 $editorControllerSource = Get-Content -LiteralPath $editorControllerSourcePath -Raw
 $gizmoSource = Get-Content -LiteralPath $gizmoSourcePath -Raw
 $editorIconLibrarySource = Get-Content -LiteralPath $editorIconLibrarySourcePath -Raw
@@ -291,15 +292,15 @@ Assert-Contract ($editorViewSource -match 'Screen\.safeArea' -and
     $editorViewSource -match 'SetUiScale' -and
     $editorViewSource -match 'catalogSearch' -and
     $editorViewSource -match 'RebuildCatalog' -and
-    $editorViewSource -match 'BlueprintEditorLayout\.CatalogPageSize' -and
-    $editorViewSource -match 'RebuildCatalogFilters' -and
-    $editorViewSource -match 'selectedCatalogMaterial' -and
-    $editorViewSource -match 'selectedCatalogSource' -and
-    $editorViewSource -match 'catalogSources' -and
-    $editorViewSource -match 'catalogCategoryTabs' -and
-    $editorViewSource -match 'Matches\("#" \+ \(item\.Index \+ 1\), filter\)' -and
+    $editorViewSource -match 'BlueprintCatalogLayout\.Compute' -and
+    $editorViewSource -match 'OpenCatalogPicker' -and
+    $editorViewSource -match 'CatalogFilter\.Material' -and
+    $editorViewSource -match 'CatalogFilter\.Source' -and
+    $editorViewSource -match 'catalogPartFilters' -and
+    $editorViewSource -match 'catalogBlueprintFilters' -and
+    $editorViewSource -match 'Matches\("#" \+ \(item\.Index \+ 1\), f.Query\)' -and
     $editorViewSource -match 'CatalogPartSelected\?\.Invoke\(captured, true\)' -and
-    $editorViewSource -notmatch 'CatalogDetails|CatalogAdd|CatalogDoubleClick' -and
+    $editorViewSource -notmatch 'CatalogAdd|CatalogDoubleClick' -and
     $editorViewSource -match 'collapsedGroups' -and
     $editorViewSource -match 'MoveSelectionToGroupRequested' -and
     $editorViewSource -match 'inspectorTabButtons' -and
@@ -315,10 +316,10 @@ Assert-Contract ($editorViewSource -match 'Screen\.safeArea' -and
     $editorViewSource -match 'CreateRect\("InspectorViewport"' -and
     $editorViewSource -match 'inspectorViewport\.gameObject\.AddComponent<RectMask2D>' -and
     $editorViewSource -notmatch 'inspectorScroll' -and
-    $editorViewSource -match 'CreateRect\(\s*"CatalogCategoryViewport"' -and
-    $editorViewSource -match 'categoryScroll\.content = catalogCategories' -and
-    $editorViewSource -match 'catalogPanel\.localScale' -and
-    $editorViewSource -match 'width \* 0\.94 / 1420\.0' -and
+    $editorViewSource -match 'CreateRect\(\s*"CatalogPickerViewport"' -and
+    $editorViewSource -match 'scroll\.content = content' -and
+    $editorViewSource -match 'catalogPanel\.localScale = Vector3.one' -and
+    $editorViewSource -match 'grid\.constraintCount = catalogLayout.Columns' -and
     $editorViewSource -match 'IsTextInputFocused' -and
     $editorViewSource -match 'CancelTextEdit' -and
     $editorViewSource -match 'catch\s*\{\s*Dispose\(\);\s*throw;' -and
@@ -815,7 +816,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.53.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.54.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -1885,6 +1886,16 @@ foreach ($workspaceGateName in @('BlueprintEditorCatalogItems', 'EnableNativePie
         $workspaceGateOperands -notmatch 'SupportsPrecisionPlacement') `
         "Furniture support is still cut off before save/place: $workspaceGateName"
 }
+$catalogItemsMethod = $pluginMethods | Where-Object { $_.Name -eq 'BlueprintEditorCatalogItems' -and $_.DeclaringType.Name -eq 'PrecisionPlacementSession' }
+$catalogItemsOperands = @($catalogItemsMethod.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($catalogItemsOperands -match 'StationExtension::m_craftingStation' -and
+    $catalogItemsOperands -match 'CraftingStation::m_name' -and
+    $catalogItemsOperands -match 'CraftingStation::m_icon' -and
+    $catalogItemsOperands -notmatch 'Piece::m_craftingStation' -and
+    $sessionSource -match 'piece.m_usage' -and
+    $sessionSource -match 'UsageTagFlags.Stacks' -and
+    $sessionSource -match 'UsageTagFlags.Decor') `
+    'Editor catalog must classify semantic piece usage and link upgrades to their actual workstation, not building requirement.'
 $workspacePredicate = @($pluginMethods | Where-Object {
     $_.Name -eq 'SupportsBlueprintWorkspacePiece' -and $_.DeclaringType.Name -eq 'PrecisionPlacementSession'
 })
@@ -2769,4 +2780,4 @@ if (Test-Path -LiteralPath $buildCameraPath -PathType Leaf) {
         'BuildWorks does not restore the current Build Camera yaw and pitch.'
 }
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.53 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.54 and Valheim Steam build 25185596.'

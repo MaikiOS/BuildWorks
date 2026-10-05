@@ -2,7 +2,36 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
-## Verified candidate 0.19.53
+## Verified source candidate 0.19.54
+
+2026-10-05: Ostrix accepts the .53 chair series. Catalog implementation uses
+the real View/Controller and native hammer inventory: Atlas/Quick, immediate
+card placement, five sections, building families, named cards, native icons,
+material/source pickers and actual StationExtension target-station groups.
+Unknown mod categories stay in All/search. Favorites/recent are editor-session
+only; filters are shared between views and separate between tabs. Reserved
+user category names cannot collide with navigation IDs. Own star icon added;
+eye/reset/close reuse existing art. No external plugin/dependency added.
+
+Release zero warnings/errors. Geometry (105), Store, Localization, EditorBridge,
+WorldLayout, DeploymentChecks and HostContract pass (Steam build 25185596).
+717 paired keys / 646 static references, embedded DLL resources verified.
+Unity 6000.0.61f1: 132 states, 2026-10-05T13:56:26Z; 1280×720, 1920×1080,
+2560×1440, 3440×1440 at 100/120/140%. Native overlay raycasts run at matching
+GameView sizes; camera mode is screenshot composition only. Original camera
+controller regressions also pass. Long preview text is bounded. Screenshot
+items/stations are fixtures, not a game inventory/correctness claim.
+Independent correctness review PASSED; ponytail-review: Lean already.
+Valheim not launched, saves untouched. Installed only in TerrainRamp-1.0-Test
+with Valheim closed via Deploy-TestBuild.ps1; both SHA256 hashes match.
+Previous .53 pair backed up at artifacts/checkpoint-0.19.54/preinstall.
+
+BuildWorks SHA256: E52529D4E9E76CBDD19C58609724AC02752BF78C682856AAA6FE76765DA58A8A
+Geometry SHA256: 2AB3EAD788D610EE5DED3DA3C64C1DE98FC9EAC52257920950372CDF849D26B2
+Owner acceptance: one [catalog series 1–8](specs/roadmap/current-pass.md).
+.53 is archived/accepted. No BW-02/curves advance.
+
+## Historical verified candidate 0.19.53
 
 Ostrix accepted .52 checks 1–2; check 3 isolated the small yellow experimental
 mesh-corner dots on the actual wooden reclining chair `piece_chair02`, not the

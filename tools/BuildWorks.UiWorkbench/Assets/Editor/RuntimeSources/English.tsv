@@ -677,3 +677,42 @@ editor.view.depth_hint	View Z: drag the depth handle up — away from camera, do
 editor.view.source_empty	No native sockets. Set Snap: native + ours above the viewport to use generated points.
 editor.hint.numeric_value	<b>Value: {0}</b> · {1}
 editor.hint.numeric_invalid	Incomplete/out of range; Move requires one axis · Backspace — edit · Delete — clear
+editor.catalog.parts	Parts
+editor.catalog.blueprints	Blueprints
+editor.catalog.atlas	Atlas
+editor.catalog.quick	Quick
+editor.catalog.details	Details (hidden on narrow screens)
+editor.catalog.search	Part name, prefab or #index…
+editor.catalog.reset	Reset filters
+editor.catalog.no_results	No matching parts. Reset filters or change search.
+editor.catalog.page_help	Page · Q/E, wheel over cards, PgUp/PgDn
+editor.catalog.found	Found
+editor.catalog.click_help	Click — place · star — favorite · hover — inspect
+editor.catalog.all_materials	All materials
+editor.catalog.all_sources	All sources
+editor.catalog.unknown_station	Station not specified
+editor.catalog.all	All parts
+editor.catalog.favorites	Favorites
+editor.catalog.recent	Recent
+editor.catalog.building	Building
+editor.catalog.decor	Decor
+editor.catalog.furniture	Furniture
+editor.catalog.resources	Resources
+editor.catalog.crafting	Crafting
+editor.catalog.categories	Categories
+editor.catalog.walls	Walls
+editor.catalog.floors	Floors
+editor.catalog.roofs	Roofs
+editor.catalog.frame	Frame
+editor.catalog.openings	Openings
+editor.catalog.stairs	Stairs
+editor.catalog.workstation	Workstation…
+editor.catalog.stations	Stations
+editor.catalog.upgrades	Upgrades
+editor.catalog.devices	Devices
+editor.catalog.upgrade_to	Upgrade for:
+editor.catalog.station_group	Station group →
+editor.catalog.material	Material
+editor.catalog.source	Source
+editor.catalog.station	Workstation
+editor.catalog.category	Category

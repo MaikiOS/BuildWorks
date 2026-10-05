@@ -86,6 +86,7 @@ $sourceText = ($sourceFiles | ForEach-Object { [IO.File]::ReadAllText($_.FullNam
 $nonLocalizationDottedLiterals = @(
     'blueprints.json',
     'catalog.group.',
+    'editor.catalog.',
     'com.jotunn.jotunn',
     'ostrmod.buildworks'
 )
@@ -94,6 +95,9 @@ $usedKeys = @([regex]::Matches($sourceText, $keyPattern) |
     ForEach-Object { $_.Groups[1].Value } |
     Where-Object { $_ -notin $nonLocalizationDottedLiterals } |
     Sort-Object -Unique)
+$usedKeys += @([regex]::Matches($sourceText, 'CatalogText\("([a-z_]+)"\)') |
+    ForEach-Object { 'editor.catalog.' + $_.Groups[1].Value })
+$usedKeys = @($usedKeys | Sort-Object -Unique)
 $missingRuntimeKeys = @($usedKeys | Where-Object { -not $english.Contains($_) })
 if ($missingRuntimeKeys.Count -gt 0) {
     throw "Runtime keys are missing from the catalogs: $($missingRuntimeKeys -join ', ')."

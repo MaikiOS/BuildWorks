@@ -2,14 +2,25 @@
 
 **English** | [Русский](ROADMAP_RU.md)
 
-Updated 2026-10-03. Ostrix approved this order after the development review.
+Updated 2026-10-05. Ostrix approved this order after the development review.
 The goal is predictable building with real Valheim pieces, then useful group
 operations and editable generators. Each stage delivers a complete workflow,
 not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Current source candidate: **0.19.53**, Store v9, Valheim 1.0.16.
+Current source candidate: **0.19.54**, Store v9, Valheim 1.0.16.
+Ostrix accepts .53 chair checks 1–2. The approved catalog now has Atlas/Quick
+views, one-click placement, shared view filters, per-tab query state, named cards,
+five main sections and workstation-linked upgrades from native StationExtension.
+Unknown mod categories remain in All/search; current unlocked hammer inventory
+is authoritative. Favorites/recent are editor-session only. Original control
+icons compact favorites, details, reset and close; no new dependency/plugin.
+132 Workbench states pass at four resolutions and 100/120/140% UI scale;
+actual overlay raycasts use matching GameView sizes, camera mode is capture-only.
+Long preview labels wrap, reserved user category IDs have a regression check.
+Release/targeted checks and independent review pass. Valheim is not yet tested;
+BW-01 awaits the single catalog game series 1–8. No BW-02/curves advance.
 Ostrix's .49 report accepts the core point/pivot/frame/size workflow and resource
 cards; optional B, helper opt-in and catalogue translation needed clarification.
 .50 defaults to model-relative 3D sizing, retains screen mode, uses amber native
@@ -31,7 +42,7 @@ anchors remain unchanged. Ostrix accepts .52 checks 1–2; the chair screenshot
 reopens exact rendered corners. Native piece_chair02 uses decorative shader noise
 while grips use undeformed vertices. Ostrix chose exact editor geometry: .53
 disables native Piece ripple only on owned preview materials. Native chair draw,
-point picking and helper magnet pass; BW-01 awaits .53 checks 1–2.
+point picking and helper magnet pass; Ostrix accepts .53 checks 1–2.
 Older lists are archived, not extra answer lists. F9 mechanics are unchanged.
 0.19.39 owner feedback accepts menu hover, language refresh and camera framing;
 Transform selection is provisionally accepted. The owner accepts contour cleanup;
@@ -94,7 +105,7 @@ dependent changes wait for its gate, unrelated preparation may continue.
 | ID | Deliverable | Dependency | Status |
 | --- | --- | --- | --- |
 | BW-00 | Dedicated-profile baseline and reliable handoff | Current core | Focused 0.19.41 owner series accepted; cost/refund accounting and networking pending |
-| BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | .52 checks 1–2 accepted; .53 native chair corners, picking and magnet automatically verified; awaiting chair series 1–2 |
+| BW-01 | Consistent input, clear pivots/snap/working plane, compact F9 | BW-00 | .53 chair series accepted; .54 catalog/layout/native UI input automatically verified; awaiting catalog game series 1–8 |
 | BW-02 | Group layout operations without resizing pieces | BW-01 | Planned; focused operation UI approval required |
 | BW-03 | Persistent Array and minimal recipe persistence | BW-02 | Planned; safe Store migration and editing/Bake gate |
 | BW-04 | Guides and curves in accepted slices | BW-03 + renewed owner discussion | Tool-semantics discussion required before coding |

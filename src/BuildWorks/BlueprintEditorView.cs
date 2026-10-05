@@ -43,7 +43,10 @@ namespace OstrixMods.BuildWorks
             string material,
             string source,
             int index,
-            CompositeBlueprintStore.Blueprint blueprint = null)
+            CompositeBlueprintStore.Blueprint blueprint = null,
+            string section = "building", string family = null,
+            string stationId = null, string stationName = null, Sprite stationIcon = null,
+            bool isStation = false, bool isUpgrade = false)
         {
             PrefabName = prefabName;
             DisplayName = displayName;
@@ -59,6 +62,13 @@ namespace OstrixMods.BuildWorks
                 : source;
             Index = Math.Max(0, index);
             Blueprint = blueprint;
+            Section = section;
+            Family = family;
+            StationId = stationId;
+            StationName = stationName;
+            StationIcon = stationIcon;
+            IsStation = isStation;
+            IsUpgrade = isUpgrade;
         }
 
         internal string PrefabName { get; }
@@ -70,6 +80,13 @@ namespace OstrixMods.BuildWorks
         internal int Index { get; }
         internal CompositeBlueprintStore.Blueprint Blueprint { get; }
         internal bool IsBlueprint => Blueprint != null;
+        internal string Section { get; }
+        internal string Family { get; }
+        internal string StationId { get; }
+        internal string StationName { get; }
+        internal Sprite StationIcon { get; }
+        internal bool IsStation { get; }
+        internal bool IsUpgrade { get; }
     }
 
     internal sealed class BlueprintEditorHoverTarget : MonoBehaviour,
@@ -273,7 +290,7 @@ namespace OstrixMods.BuildWorks
     /// Builds and updates the Blueprint Editor canvas, tool inspector, catalog,
     /// status/help bars, and object-tree interactions.
     /// </summary>
-    internal sealed class BlueprintEditorView : IDisposable
+    internal sealed partial class BlueprintEditorView : IDisposable
     {
         private static string T(string key, params object[] arguments) =>
             BuildWorksLocalization.Text(key, arguments);
@@ -396,24 +413,6 @@ namespace OstrixMods.BuildWorks
             new Dictionary<BlueprintEditorTool, Button>();
         private readonly RectTransform tooltip;
         private readonly TMP_Text tooltipText;
-        private readonly GameObject catalog;
-        private readonly RectTransform catalogPanel;
-        private readonly RectTransform catalogGrid;
-        private readonly RectTransform catalogCategories;
-        private readonly RectTransform catalogCategoryTabs;
-        private readonly RectTransform catalogSources;
-        private readonly TMP_InputField catalogSearch;
-        private readonly Button catalogPreviousPage;
-        private readonly Button catalogNextPage;
-        private readonly Button catalogMaterialsPrevious;
-        private readonly Button catalogMaterialsNext;
-        private readonly TMP_Text catalogPageText;
-        private readonly TMP_Text catalogBreadcrumb;
-        private readonly TMP_Text catalogMaterialTitle;
-        private readonly Button catalogPartsModeButton;
-        private readonly Button catalogBlueprintsModeButton;
-        private readonly TMP_InputField catalogPageInput;
-        private readonly ScrollRect catalogMaterialScroll;
         private readonly GameObject viewportSettings;
         private readonly GameObject[] viewportSections = new GameObject[4];
         private readonly Button[] viewportSectionButtons = new Button[4];
@@ -486,21 +485,14 @@ namespace OstrixMods.BuildWorks
             new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> missingPrefabNodes =
             new HashSet<string>(StringComparer.Ordinal);
-        private string selectedCatalogCategory;
         private string hoveredNodeId;
         private string operationMetrics = string.Empty;
         private string statusMessage = string.Empty;
-        private string selectedCatalogMaterial;
-        private string selectedCatalogSource;
-        private int catalogPage;
-        private int catalogPageCount = 1;
-        private bool catalogBlueprintMode;
         private bool showGrid = true;
         private bool orthographic;
         private int outlinerFilter;
         private bool outlinerReparentOnly;
         private bool outlinerContextTracking;
-        private bool catalogStateInitialized;
         private float requestedUiScale = 1f;
         private bool disposed;
 
@@ -1363,149 +1355,7 @@ namespace OstrixMods.BuildWorks
                 }
                 toolsMenu.SetActive(false);
 
-                catalog = CreatePanel(
-                    "CatalogOverlay", safeRoot, new Color(0f, 0f, 0f, 0.72f), null).gameObject;
-                catalogPanel = CreatePanel("Catalog", catalog.transform, PanelRaised);
-                catalogPanel.anchorMin = catalogPanel.anchorMax = new Vector2(0.5f, 0.5f);
-                catalogPanel.pivot = new Vector2(0.5f, 0.5f);
-                catalogPanel.sizeDelta = new Vector2(1420f, 680f);
-                TMP_Text catalogTitle = CreateText(
-                    "CatalogTitle", catalogPanel, T("editor.view.catalog"), 18f,
-                    FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
-                SetTopAnchored((RectTransform)catalogTitle.transform, 324f, 12f, 120f, 44f);
-                catalogPartsModeButton = CreateButton("CatalogPartsMode", catalogPanel,
-                    T("editor.view.parts"), 140f, () => SetCatalogMode(false), true);
-                SetTopLeft((RectTransform)catalogPartsModeButton.transform, 20f, 12f, 140f, 44f);
-                catalogBlueprintsModeButton = CreateButton("CatalogBlueprintsMode", catalogPanel,
-                    T("editor.view.blueprints"), 140f, () => SetCatalogMode(true));
-                SetTopLeft((RectTransform)catalogBlueprintsModeButton.transform, 168f, 12f, 140f, 44f);
-                Button catalogClose = CreateButton(
-                    "CatalogClose", catalogPanel, T("editor.view.close"), 88f, HideCatalog);
-                RectTransform catalogCloseRect = (RectTransform)catalogClose.transform;
-                catalogCloseRect.anchorMin = catalogCloseRect.anchorMax = new Vector2(1f, 1f);
-                catalogCloseRect.pivot = new Vector2(1f, 1f);
-                catalogCloseRect.anchoredPosition = new Vector2(-16f, -12f);
-                catalogCloseRect.sizeDelta = new Vector2(88f, 44f);
-                RectTransform catalogSearchPanel = CreatePanel(
-                    "CatalogSearch", catalogPanel, ButtonColor);
-                SetTopAnchored(catalogSearchPanel, 20f, 64f, 20f, 36f);
-                TMP_Text catalogSearchText = CreateText(
-                    "Text", catalogSearchPanel, string.Empty, 13f,
-                    FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
-                catalogSearchText.raycastTarget = true;
-                SetInsets((RectTransform)catalogSearchText.transform, 8f, 0f, 8f, 0f);
-                TMP_Text catalogSearchPlaceholder = CreateText(
-                    "Placeholder", catalogSearchPanel, T("editor.view.catalog_search"), 13f,
-                    FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
-                catalogSearchPlaceholder.color = MutedColor;
-                SetInsets((RectTransform)catalogSearchPlaceholder.transform, 8f, 0f, 8f, 0f);
-                catalogSearch = catalogSearchPanel.gameObject.AddComponent<TMP_InputField>();
-                skin.Apply(catalogSearch, input: true);
-                catalogSearch.textComponent = catalogSearchText;
-                catalogSearch.placeholder = catalogSearchPlaceholder;
-                catalogSearch.lineType = TMP_InputField.LineType.SingleLine;
-                catalogSearch.characterLimit = 48;
-                catalogSearch.onValueChanged.AddListener(_ =>
-                {
-                    catalogPage = 0;
-                    RebuildCatalog();
-                });
-                catalogCategoryTabs = CreateCatalogFilterStrip("CatalogCategoryTabs", T("editor.view.part_type"), 108f);
-                catalogSources = CreateCatalogFilterStrip("CatalogSources", T("editor.view.source"), 150f);
-                catalogMaterialTitle = CreateText("CatalogMaterialTitle", catalogPanel,
-                    T("editor.view.material"), 13f, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
-                SetTopLeft((RectTransform)catalogMaterialTitle.transform, 20f, 196f, 308f, 28f);
-                RectTransform catalogCategoryViewport = CreateRect(
-                    "CatalogCategoryViewport", catalogPanel);
-                SetTopLeft(catalogCategoryViewport, 20f, 232f, 308f, 360f);
-                catalogCategoryViewport.gameObject.AddComponent<RectMask2D>();
-                catalogCategories = CreateRect("CatalogCategories", catalogCategoryViewport);
-                catalogCategories.anchorMin = new Vector2(0f, 1f);
-                catalogCategories.anchorMax = new Vector2(1f, 1f);
-                catalogCategories.pivot = new Vector2(0.5f, 1f);
-                catalogCategories.anchoredPosition = Vector2.zero;
-                var categoryLayout = catalogCategories.gameObject.AddComponent<GridLayoutGroup>();
-                categoryLayout.cellSize = new Vector2(152f, 36f);
-                categoryLayout.spacing = new Vector2(4f, 4f);
-                categoryLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-                categoryLayout.constraintCount = 2;
-                ContentSizeFitter categoryFitter =
-                    catalogCategories.gameObject.AddComponent<ContentSizeFitter>();
-                categoryFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-                ScrollRect categoryScroll =
-                    catalogCategoryViewport.gameObject.AddComponent<ScrollRect>();
-                catalogMaterialScroll = categoryScroll;
-                categoryScroll.horizontal = false;
-                categoryScroll.vertical = true;
-                categoryScroll.movementType = ScrollRect.MovementType.Clamped;
-                categoryScroll.scrollSensitivity = 120f;
-                categoryScroll.viewport = catalogCategoryViewport;
-                categoryScroll.content = catalogCategories;
-                RectTransform catalogViewport = CreateRect("CatalogViewport", catalogPanel);
-                SetTopLeft(
-                    catalogViewport,
-                    348f,
-                    196f,
-                    (float)BlueprintEditorLayout.CatalogGridWidth,
-                    (float)BlueprintEditorLayout.CatalogGridHeight);
-                catalogViewport.gameObject.AddComponent<RectMask2D>();
-                catalogViewport.gameObject.AddComponent<Image>().color = Color.clear;
-                catalogViewport.gameObject.AddComponent<BlueprintEditorCatalogScroll>().Scroll = delta =>
-                {
-                    if (!HasCatalog || HasModal || IsTextInputFocused) return;
-                    if (delta < 0f) NextCatalogPage();
-                    else if (delta > 0f) PreviousCatalogPage();
-                };
-                catalogGrid = CreateRect("CatalogGrid", catalogViewport);
-                catalogGrid.anchorMin = new Vector2(0f, 1f);
-                catalogGrid.anchorMax = new Vector2(1f, 1f);
-                catalogGrid.pivot = new Vector2(0.5f, 1f);
-                var catalogLayout = catalogGrid.gameObject.AddComponent<GridLayoutGroup>();
-                catalogLayout.cellSize = new Vector2(
-                    (float)BlueprintEditorLayout.CatalogCellWidth,
-                    (float)BlueprintEditorLayout.CatalogCellHeight);
-                catalogLayout.spacing = Vector2.one * (float)BlueprintEditorLayout.CatalogCellGap;
-                catalogLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-                catalogLayout.constraintCount = BlueprintEditorLayout.CatalogColumns;
-                catalogLayout.childAlignment = TextAnchor.UpperLeft;
-                ContentSizeFitter catalogFitter =
-                    catalogGrid.gameObject.AddComponent<ContentSizeFitter>();
-                catalogFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-                catalogPreviousPage = CreateButton(
-                    "CatalogPrevious", catalogPanel, "<", 44f, PreviousCatalogPage);
-                SetBottomLeft((RectTransform)catalogPreviousPage.transform, 348f, 14f, 44f, 36f);
-                catalogPageText = CreateText(
-                    "CatalogPage", catalogPanel, "1 / 1", 13f,
-                    FontStyles.Bold, TextAlignmentOptions.Center);
-                RectTransform catalogPageRect = (RectTransform)catalogPageText.transform;
-                catalogPageRect.anchorMin = catalogPageRect.anchorMax = new Vector2(0f, 0f);
-                catalogPageRect.pivot = new Vector2(0f, 0f);
-                catalogPageRect.anchoredPosition = new Vector2(400f, 14f);
-                catalogPageRect.sizeDelta = new Vector2(100f, 36f);
-                catalogNextPage = CreateButton(
-                    "CatalogNext", catalogPanel, ">", 44f, NextCatalogPage);
-                SetBottomLeft((RectTransform)catalogNextPage.transform, 508f, 14f, 44f, 36f);
-                catalogPageInput = CreateInput("CatalogPageJump", catalogPanel,
-                    new Vector2(570f, -630f), 68f, 0f, resetValue: 1f);
-                ((RectTransform)catalogPageInput.transform).sizeDelta = new Vector2(68f, 36f);
-                catalogPageInput.contentType = TMP_InputField.ContentType.IntegerNumber;
-                catalogPageInput.onEndEdit.AddListener(_ => JumpCatalogPage());
-                TMP_Text pageHint = CreateText("CatalogPageHint", catalogPanel,
-                    T("editor.view.page_help"), 12f,
-                    FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
-                SetTopLeft((RectTransform)pageHint.transform, 648f, 630f, 600f, 36f);
-                catalogBreadcrumb = CreateText("CatalogBreadcrumb", catalogPanel, string.Empty, 12f,
-                    FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
-                catalogBreadcrumb.overflowMode = TextOverflowModes.Ellipsis;
-                SetTopLeft((RectTransform)catalogBreadcrumb.transform, 20f, 598f, 1380f, 28f);
-                catalogMaterialsPrevious = CreateButton("MaterialsPageUp", catalogPanel, T("editor.view.materials_up"), 148f,
-                    () => ScrollCatalogMaterials(1f));
-                SetBottomLeft((RectTransform)catalogMaterialsPrevious.transform, 20f, 14f, 148f, 36f);
-                catalogMaterialsNext = CreateButton("MaterialsPageDown", catalogPanel, T("editor.view.materials_down"), 152f,
-                    () => ScrollCatalogMaterials(-1f));
-                SetBottomLeft((RectTransform)catalogMaterialsNext.transform, 176f, 14f, 152f, 36f);
-                catalog.SetActive(false);
+                InitializeCatalog();
 
                 modal = CreatePanel("Modal", safeRoot, new Color(0f, 0f, 0f, 0.72f), null).gameObject;
                 RectTransform dialog = CreatePanel("Dialog", modal.transform, PanelRaised);
@@ -1742,12 +1592,12 @@ namespace OstrixMods.BuildWorks
             if (outlinerContextTracking && !input.GetMouseButton(1))
                 ReleaseOutlinerContext(input.MousePosition);
             if (outlinerDragging) ScrollOutlinerDrag();
-            if (HasCatalog && !HasModal && !IsTextInputFocused)
+            if (HasCatalog && !catalogPicker && !HasModal && !IsTextInputFocused)
             {
                 if (input.GetKeyDown(KeyCode.PageUp) || input.GetKeyDown(KeyCode.Q)) PreviousCatalogPage();
                 else if (input.GetKeyDown(KeyCode.PageDown) || input.GetKeyDown(KeyCode.E)) NextCatalogPage();
-                if (input.GetKeyDown(KeyCode.Home)) { catalogPage = 0; RebuildCatalog(); }
-                if (input.GetKeyDown(KeyCode.End)) { catalogPage = catalogPageCount - 1; RebuildCatalog(); }
+                if (input.GetKeyDown(KeyCode.Home)) { CatalogFilter.Page = 0; RebuildCatalog(); }
+                if (input.GetKeyDown(KeyCode.End)) { CatalogFilter.Page = catalogPageCount - 1; RebuildCatalog(); }
             }
             if (pendingTooltipAnchor && !tooltip.gameObject.activeSelf &&
                 Time.unscaledTime >= tooltipAt)
@@ -2276,369 +2126,11 @@ namespace OstrixMods.BuildWorks
             (RectTransform)viewportSettings.transform, position,
             canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera) || IsViewportControlHit(position);
 
-        private RectTransform CreateCatalogFilterStrip(string name, string label, float top)
-        {
-            TMP_Text caption = CreateText(name + "Label", catalogPanel, label, 12f,
-                FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
-            SetTopLeft((RectTransform)caption.transform, 20f, top, 120f, 36f);
-            RectTransform strip = CreatePanel(name + "Viewport", catalogPanel, Color.clear, null);
-            SetTopLeft(strip, 148f, top, 1168f, 36f);
-            strip.gameObject.AddComponent<RectMask2D>();
-            RectTransform content = CreateRect(name, strip);
-            content.anchorMin = content.anchorMax = new Vector2(0f, 1f);
-            content.pivot = new Vector2(0f, 1f);
-            content.anchoredPosition = Vector2.zero;
-            content.sizeDelta = new Vector2(0f, 36f);
-            HorizontalLayoutGroup layout = content.gameObject.AddComponent<HorizontalLayoutGroup>();
-            layout.spacing = 6f;
-            layout.childControlHeight = true;
-            layout.childControlWidth = false;
-            layout.childForceExpandHeight = true;
-            layout.childForceExpandWidth = false;
-            content.gameObject.AddComponent<ContentSizeFitter>().horizontalFit =
-                ContentSizeFitter.FitMode.PreferredSize;
-            ScrollRect scroll = strip.gameObject.AddComponent<ScrollRect>();
-            scroll.horizontal = true;
-            scroll.vertical = false;
-            scroll.scrollSensitivity = 160f;
-            scroll.movementType = ScrollRect.MovementType.Clamped;
-            scroll.viewport = strip;
-            scroll.content = content;
-            Button previous = CreateButton(name + "Previous", catalogPanel, "‹", 36f,
-                () => ScrollFilterStrip(scroll, -1f));
-            SetTopLeft((RectTransform)previous.transform, 1324f, top, 36f, 36f);
-            Button next = CreateButton(name + "Next", catalogPanel, "›", 36f,
-                () => ScrollFilterStrip(scroll, 1f));
-            SetTopLeft((RectTransform)next.transform, 1364f, top, 36f, 36f);
-            return content;
-        }
-
-        private static void ScrollFilterStrip(ScrollRect scroll, float direction)
-        {
-            Canvas.ForceUpdateCanvases();
-            float extent = scroll.content.rect.width - scroll.viewport.rect.width;
-            if (extent <= 0f) return;
-            scroll.horizontalNormalizedPosition = Mathf.Clamp01(scroll.horizontalNormalizedPosition +
-                direction * scroll.viewport.rect.width * 0.85f / extent);
-        }
-
-        private void ScrollCatalogMaterials(float direction)
-        {
-            Canvas.ForceUpdateCanvases();
-            float extent = catalogCategories.rect.height - catalogMaterialScroll.viewport.rect.height;
-            if (extent <= 0f) return;
-            catalogMaterialScroll.verticalNormalizedPosition = Mathf.Clamp01(
-                catalogMaterialScroll.verticalNormalizedPosition + direction * 320f / extent);
-        }
-
-        private void SetCatalogMode(bool blueprints)
-        {
-            catalogBlueprintMode = blueprints;
-            selectedCatalogCategory = selectedCatalogMaterial = selectedCatalogSource = null;
-            catalogPage = 0;
-            catalogMaterialScroll.verticalNormalizedPosition = 1f;
-            RebuildCatalogFilters();
-            RebuildCatalog();
-        }
-
-        private void JumpCatalogPage()
-        {
-            if (int.TryParse(catalogPageInput.text, out int page))
-                catalogPage = Mathf.Clamp(page - 1, 0, catalogPageCount - 1);
-            RebuildCatalog();
-        }
-
-        private void FitCatalogFilterLabel(Button button, string fullLabel)
-        {
-            TMP_Text label = button.GetComponentInChildren<TMP_Text>();
-            label.enableAutoSizing = true;
-            label.fontSizeMin = 9f;
-            label.fontSizeMax = 12f;
-            label.textWrappingMode = TextWrappingModes.Normal;
-            AddTooltip((RectTransform)button.transform, fullLabel);
-        }
-
-        internal void ShowCatalog(IReadOnlyList<BlueprintEditorCatalogItem> items)
-        {
-            EndTooltip();
-            HideViewportSettings();
-            HideOutlinerMenu();
-            shownCatalogItems.Clear();
-            if (items != null)
-                for (int index = 0; index < items.Count; ++index)
-                    if (items[index] != null) shownCatalogItems.Add(items[index]);
-            bool firstOpen = !catalogStateInitialized;
-            if (firstOpen)
-            {
-                selectedCatalogCategory = null;
-                selectedCatalogMaterial = null;
-                selectedCatalogSource = null;
-                catalogPage = 0;
-                catalogBlueprintMode = false;
-                catalogSearch.SetTextWithoutNotify(string.Empty);
-                catalogStateInitialized = true;
-            }
-            RebuildCatalogFilters();
-            RebuildCatalog();
-            SetPanelsInteractable(false);
-            catalog.SetActive(true);
-            catalog.transform.SetAsLastSibling();
-            status.SetAsLastSibling();
-            if (firstOpen && EventSystem.current)
-                EventSystem.current.SetSelectedGameObject(catalogSearch.gameObject);
-        }
-
-        private void RebuildCatalog()
-        {
-            ClearChildren(catalogGrid);
-            string filter = (catalogSearch.text ?? string.Empty).Trim();
-            var filtered = new List<BlueprintEditorCatalogItem>();
-            foreach (BlueprintEditorCatalogItem item in shownCatalogItems)
-            {
-                if (item.IsBlueprint != catalogBlueprintMode) continue;
-                if (selectedCatalogCategory != null &&
-                    !string.Equals(item.Category, selectedCatalogCategory,
-                        StringComparison.CurrentCultureIgnoreCase)) continue;
-                if (selectedCatalogMaterial != null &&
-                    !string.Equals(item.Material, selectedCatalogMaterial,
-                        StringComparison.CurrentCultureIgnoreCase)) continue;
-                if (selectedCatalogSource != null &&
-                    !string.Equals(item.Source, selectedCatalogSource,
-                        StringComparison.CurrentCultureIgnoreCase)) continue;
-                if (!Matches(item.DisplayName, filter) &&
-                    !Matches(item.PrefabName, filter) &&
-                    !Matches((item.Index + 1).ToString(), filter) &&
-                    !Matches("#" + (item.Index + 1), filter)) continue;
-                filtered.Add(item);
-            }
-            int pageSize = BlueprintEditorLayout.CatalogPageSize;
-            int pageCount = Mathf.Max(1, Mathf.CeilToInt(filtered.Count / (float)pageSize));
-            catalogPageCount = pageCount;
-            catalogPage = Mathf.Clamp(catalogPage, 0, pageCount - 1);
-            int first = catalogPage * pageSize;
-            int last = Mathf.Min(first + pageSize, filtered.Count);
-            for (int index = first; index < last; ++index)
-            {
-                BlueprintEditorCatalogItem item = filtered[index];
-                BlueprintEditorCatalogItem captured = item;
-                Button card = CreateButton(
-                    "Catalog_" + item.PrefabName,
-                    catalogGrid,
-                    item.IsBlueprint ? item.DisplayName : "#" + (item.Index + 1),
-                    (float)BlueprintEditorLayout.CatalogCellWidth,
-                    () => CatalogPartSelected?.Invoke(captured, true));
-                RectTransform cardRect = (RectTransform)card.transform;
-                cardRect.sizeDelta = new Vector2(
-                    (float)BlueprintEditorLayout.CatalogCellWidth,
-                    (float)BlueprintEditorLayout.CatalogCellHeight);
-                TMP_Text label = card.GetComponentInChildren<TMP_Text>();
-                label.fontSize = 10f;
-                label.alignment = TextAlignmentOptions.TopLeft;
-                label.color = MutedColor;
-                SetTopAnchored((RectTransform)label.transform, 5f, 3f, 5f, 18f);
-                if (item.IsBlueprint)
-                {
-                    label.alignment = TextAlignmentOptions.Top;
-                    label.color = TextColor;
-                    label.enableAutoSizing = true;
-                    label.fontSizeMin = 8f;
-                    label.fontSizeMax = 10f;
-                    label.textWrappingMode = TextWrappingModes.Normal;
-                    label.overflowMode = TextOverflowModes.Ellipsis;
-                    label.maxVisibleLines = 2;
-                    SetTopAnchored((RectTransform)label.transform, 4f, 66f, 4f, 26f);
-                }
-                if (item.Icon)
-                {
-                    RectTransform iconRect = CreateRect("Icon", card.transform);
-                    iconRect.anchorMin = new Vector2(0.5f, 1f);
-                    iconRect.anchorMax = new Vector2(0.5f, 1f);
-                    iconRect.pivot = new Vector2(0.5f, 1f);
-                    iconRect.anchoredPosition = new Vector2(0f, item.IsBlueprint ? -4f : -18f);
-                    iconRect.sizeDelta = item.IsBlueprint ? new Vector2(60f, 60f) : new Vector2(68f, 68f);
-                    Image image = iconRect.gameObject.AddComponent<Image>();
-                    image.sprite = item.Icon;
-                    image.preserveAspect = true;
-                    image.raycastTarget = false;
-                }
-                BlueprintEditorHoverTarget hover =
-                    card.gameObject.AddComponent<BlueprintEditorHoverTarget>();
-                hover.Initialize(
-                    "#" + (item.Index + 1) + " · " + item.DisplayName +
-                    "\n" + BuildWorksLocalization.CatalogLabel(item.Material) + " · " +
-                    BuildWorksLocalization.CatalogLabel(item.Source),
-                    BeginTooltip,
-                    EndTooltip);
-            }
-            catalogPageText.text = (catalogPage + 1) + " / " + pageCount;
-            catalogPageInput.SetTextWithoutNotify((catalogPage + 1).ToString(CultureInfo.InvariantCulture));
-            string categoryLabel = selectedCatalogCategory == null
-                ? T("editor.view.all_types")
-                : catalogBlueprintMode
-                    ? BuildWorksLocalization.BlueprintCategoryLabel(selectedCatalogCategory)
-                    : BuildWorksLocalization.CatalogLabel(selectedCatalogCategory);
-            string materialLabel = selectedCatalogMaterial == null
-                ? T("editor.view.all_materials")
-                : BuildWorksLocalization.CatalogLabel(selectedCatalogMaterial);
-            string sourceLabel = selectedCatalogSource == null
-                ? T("editor.view.all_sources")
-                : BuildWorksLocalization.CatalogLabel(selectedCatalogSource);
-            catalogBreadcrumb.text = T(
-                "editor.view.catalog_breadcrumb",
-                catalogBlueprintMode ? T("editor.view.blueprints") : T("editor.view.parts"),
-                categoryLabel,
-                catalogBlueprintMode ? string.Empty : materialLabel + "  ›  ",
-                sourceLabel,
-                filtered.Count);
-            catalogPreviousPage.interactable = catalogPage > 0;
-            catalogNextPage.interactable = catalogPage + 1 < pageCount;
-        }
-
-        private void RebuildCatalogFilters()
-        {
-            ClearChildren(catalogCategories);
-            ClearChildren(catalogCategoryTabs);
-            ClearChildren(catalogSources);
-            SetSelected(catalogPartsModeButton, !catalogBlueprintMode);
-            SetSelected(catalogBlueprintsModeButton, catalogBlueprintMode);
-            catalogMaterialTitle.text = catalogBlueprintMode
-                ? T("editor.view.blueprint_category")
-                : T("editor.view.material");
-            catalogPanel.Find("CatalogCategoryTabsLabel").GetComponent<TMP_Text>().text =
-                catalogBlueprintMode ? T("editor.view.type") : T("editor.view.part_type");
-            SetButtonLabel(catalogMaterialsPrevious, catalogBlueprintMode
-                ? T("editor.view.categories_up")
-                : T("editor.view.materials_up"));
-            SetButtonLabel(catalogMaterialsNext, catalogBlueprintMode
-                ? T("editor.view.categories_down")
-                : T("editor.view.materials_down"));
-            if (!catalogBlueprintMode) AddCatalogMaterial(T("editor.view.all_materials"), null);
-            AddCatalogCategory(catalogBlueprintMode
-                ? T("editor.view.all_categories")
-                : T("editor.view.all_types"), null);
-            if (catalogBlueprintMode)
-                CreateButton("BlueprintType", catalogCategoryTabs,
-                    T("editor.view.saved_blueprints"), 240f, null).interactable = false;
-            AddCatalogSource(T("editor.view.all_sources"), null);
-            var categories = new SortedSet<string>(
-                StringComparer.CurrentCultureIgnoreCase);
-            var materials = new SortedSet<string>(
-                StringComparer.CurrentCultureIgnoreCase);
-            var sources = new SortedSet<string>(
-                StringComparer.CurrentCultureIgnoreCase);
-            foreach (BlueprintEditorCatalogItem item in shownCatalogItems)
-            {
-                if (item.IsBlueprint != catalogBlueprintMode) continue;
-                categories.Add(item.Category);
-                if (selectedCatalogCategory != null && !string.Equals(item.Category,
-                    selectedCatalogCategory, StringComparison.CurrentCultureIgnoreCase)) continue;
-                materials.Add(item.Material);
-                if (selectedCatalogMaterial == null || string.Equals(item.Material,
-                    selectedCatalogMaterial, StringComparison.CurrentCultureIgnoreCase)) sources.Add(item.Source);
-            }
-            foreach (string category in categories)
-                AddCatalogCategory(catalogBlueprintMode ? BuildWorksLocalization.BlueprintCategoryLabel(category)
-                    : BuildWorksLocalization.CatalogLabel(category), category);
-            if (!catalogBlueprintMode)
-                foreach (string material in materials)
-                    AddCatalogMaterial(BuildWorksLocalization.CatalogLabel(material), material);
-            foreach (string source in sources)
-                AddCatalogSource(source.ToUpperInvariant(), source);
-        }
-
-        private void AddCatalogCategory(string label, string category)
-        {
-            string captured = category;
-            Button button = CreateButton(
-                "Category_" + (category ?? "All"),
-                catalogBlueprintMode ? catalogCategories : catalogCategoryTabs,
-                label,
-                132f,
-                () =>
-                {
-                    selectedCatalogCategory = captured;
-                    selectedCatalogMaterial = selectedCatalogSource = null;
-                    catalogMaterialScroll.verticalNormalizedPosition = 1f;
-                    catalogPage = 0;
-                    RebuildCatalogFilters();
-                    RebuildCatalog();
-                },
-                string.Equals(selectedCatalogCategory, category,
-                    StringComparison.CurrentCultureIgnoreCase));
-            RectTransform rect = (RectTransform)button.transform;
-            rect.sizeDelta = new Vector2(132f, 36f);
-            LayoutElement layout = button.GetComponent<LayoutElement>();
-            layout.minWidth = layout.preferredWidth = 132f;
-            layout.minHeight = layout.preferredHeight = 36f;
-            FitCatalogFilterLabel(button, label);
-        }
-
-        private void AddCatalogSource(string label, string source)
-        {
-            string captured = source;
-            Button button = CreateButton(
-                "Source_" + (source ?? "All"),
-                catalogSources,
-                label,
-                152f,
-                () =>
-                {
-                    selectedCatalogSource = captured;
-                    catalogPage = 0;
-                    RebuildCatalogFilters();
-                    RebuildCatalog();
-                },
-                string.Equals(selectedCatalogSource, source,
-                    StringComparison.CurrentCultureIgnoreCase));
-            RectTransform rect = (RectTransform)button.transform;
-            rect.sizeDelta = new Vector2(152f, 36f);
-            LayoutElement layout = button.GetComponent<LayoutElement>();
-            layout.minWidth = layout.preferredWidth = 152f;
-            layout.minHeight = layout.preferredHeight = 36f;
-            FitCatalogFilterLabel(button, label);
-        }
-
-        private void AddCatalogMaterial(string label, string material)
-        {
-            string captured = material;
-            Button button = CreateButton(
-                "Material_" + (material ?? "All"),
-                catalogCategories,
-                label,
-                116f,
-                () =>
-                {
-                    selectedCatalogMaterial = captured;
-                    selectedCatalogSource = null;
-                    catalogPage = 0;
-                    RebuildCatalogFilters();
-                    RebuildCatalog();
-                },
-                string.Equals(selectedCatalogMaterial, material,
-                    StringComparison.CurrentCultureIgnoreCase));
-            RectTransform rect = (RectTransform)button.transform;
-            rect.sizeDelta = new Vector2(116f, 36f);
-            LayoutElement layout = button.GetComponent<LayoutElement>();
-            layout.minHeight = layout.preferredHeight = 36f;
-            FitCatalogFilterLabel(button, label);
-        }
-
-        private void PreviousCatalogPage()
-        {
-            if (catalogPage <= 0) return;
-            --catalogPage;
-            RebuildCatalog();
-        }
-
-        private void NextCatalogPage()
-        {
-            ++catalogPage;
-            RebuildCatalog();
-        }
 
         internal void HideCatalog()
         {
             if (!catalog.activeSelf) return;
+            CloseCatalogPicker();
             if (EventSystem.current)
                 EventSystem.current.SetSelectedGameObject(null);
             catalog.SetActive(false);
@@ -4112,10 +3604,8 @@ namespace OstrixMods.BuildWorks
                     if (child.name.StartsWith("HintDivider", StringComparison.Ordinal)) child.gameObject.SetActive(false);
             }
             SetSelected(hintsToggle, hintsExpanded);
-            float catalogScale = (float)Math.Min(
-                1.0,
-                Math.Min(width * 0.94 / 1420.0, height * 0.90 / 680.0));
-            catalogPanel.localScale = Vector3.one * catalogScale;
+            LayoutCatalog();
+            if (HasCatalog) RebuildCatalog();
             Place(top, layout.Top);
             Place(rail, layout.Rail);
             Place(viewport, layout.Viewport);

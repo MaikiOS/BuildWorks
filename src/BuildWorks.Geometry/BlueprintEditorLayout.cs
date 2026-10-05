@@ -43,16 +43,6 @@ namespace OstrixMods.BuildWorks.Geometry
         public const double OutlinerHeaderHeight = 116.0;
         public const double OutlinerRowHeight = 30.0;
         public const double MinimumInspectorHeight = 440.0;
-        public const int CatalogColumns = 12;
-        public const int CatalogRows = 4;
-        public const int CatalogPageSize = CatalogColumns * CatalogRows;
-        public const double CatalogCellWidth = 84.0;
-        public const double CatalogCellHeight = 96.0;
-        public const double CatalogCellGap = 4.0;
-        public const double CatalogGridWidth =
-            CatalogColumns * CatalogCellWidth + (CatalogColumns - 1) * CatalogCellGap;
-        public const double CatalogGridHeight =
-            CatalogRows * CatalogCellHeight + (CatalogRows - 1) * CatalogCellGap;
 
         private BlueprintEditorLayout(
             EditorRect safeArea,

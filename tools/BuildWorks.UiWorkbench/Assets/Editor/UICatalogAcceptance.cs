@@ -199,7 +199,7 @@ internal static class UICatalogAcceptance
                         null, "Стены", "Материал " + (index % 36).ToString("00"),
                         "Источник " + index % 2, index));
                 var roof = new CompositeBlueprintStore.Blueprint { id = "roof", name = "Крыша", category = "Крыши" };
-                var decor = new CompositeBlueprintStore.Blueprint { id = "decor", name = "Перегородка", category = "Декор" };
+                var decor = new CompositeBlueprintStore.Blueprint { id = "decor", name = "Перегородка", category = "favorites" };
                 catalog.Add(new BlueprintEditorCatalogItem("blueprint-roof", roof.name, null,
                     roof.category, "Чертёж", "Мои чертежи", 96, roof));
                 catalog.Add(new BlueprintEditorCatalogItem("blueprint-decor", decor.name, null,
@@ -208,63 +208,70 @@ internal static class UICatalogAcceptance
                 view.CatalogPartSelected += (item, _) => selected = item;
                 view.ShowCatalog(catalog);
                 Canvas.ForceUpdateCanvases();
-                Require(Field<RectTransform>(view, "catalogGrid").GetComponentsInChildren<Button>().Length == 48,
-                    "Part mode no longer uses a full 48-card page");
-                Require(Field<TMP_Text>(view, "catalogBreadcrumb").text.Contains("96"),
-                    "Catalog count includes blueprints in part mode");
-                Require(Button(view, "Catalog_piece0").GetComponentInChildren<TMP_Text>().text == "#1",
-                    "Native part card lost its index label");
-                Require(Field<RectTransform>(view, "catalogCategories").GetComponent<GridLayoutGroup>().constraintCount == 2,
-                    "Materials remain a slow single-column list");
-                if (EventSystem.current) EventSystem.current.SetSelectedGameObject(null);
-                input.Keys.Add(KeyCode.PageDown); view.Tick(); input.Keys.Clear();
-                Require(Field<TMP_Text>(view, "catalogPageText").text == "2 / 2", "PageDown does not advance card page");
+                int pageSize = Field<BlueprintCatalogLayout>(view, "catalogLayout").PageSize;
+                Require(Field<RectTransform>(view, "catalogGrid").childCount == Math.Min(96, pageSize),
+                    "Catalog does not fill the available whole-card page");
+                Require(Field<TMP_Text>(view, "catalogBreadcrumb").text.Contains("96"), "Part count includes blueprints");
+                Require(Button(view, "Catalog_piece0").GetComponentInChildren<TMP_Text>().text == "Деталь 0",
+                    "Part name is not visible");
                 TestCatalogNavigation(view, input);
                 TMP_InputField jump = Field<TMP_InputField>(view, "catalogPageInput");
-                jump.SetTextWithoutNotify("1"); jump.onEndEdit.Invoke("1");
-                Require(Field<TMP_Text>(view, "catalogPageText").text == "1 / 2", "Page number jump does not work");
-                Click(Button(view, "MaterialsPageDown"));
-                Click(Button(view, "MaterialsPageDown"));
-                Require(Field<ScrollRect>(view, "catalogMaterialScroll").verticalNormalizedPosition <= 0.001f,
-                    "Material page buttons do not reach the last material");
+                jump.onEndEdit.Invoke("999");
+                Require(Field<int>(view, "catalogPage") == Field<int>(view, "catalogPageCount") - 1, "Page jump is not clamped");
+                jump.onEndEdit.Invoke("1");
+                Click(Button(view, "CatalogMaterials"));
+                RectTransform picker = Field<RectTransform>(view, "catalogPicker");
+                ScrollRect materialScroll = picker.GetComponentInChildren<ScrollRect>();
+                Canvas.ForceUpdateCanvases(); materialScroll.verticalNormalizedPosition = 0;
                 Canvas.ForceUpdateCanvases();
-                Button lastMaterial = Button(view, "Material_Материал 35");
-                EnsureInside(Field<ScrollRect>(view, "catalogMaterialScroll").viewport,
-                    (RectTransform)lastMaterial.transform);
-                Click(lastMaterial);
-                Require(Field<TMP_Text>(view, "catalogBreadcrumb").text.Contains("Материал 35"),
-                    "Last material does not filter or update the breadcrumb");
-                Require(Field<RectTransform>(view, "catalogGrid").GetComponentsInChildren<Button>().Length == 2,
-                    "Material filter does not match actual item metadata");
+                EnsureInside(materialScroll.viewport, (RectTransform)Button(view, "CatalogOption_Материал 35").transform);
+                Click(Button(view, "CatalogOption_Материал 35"));
+                Require(Field<RectTransform>(view, "catalogGrid").childCount == 2, "Material filter does not match metadata");
+                Click(Button(view, "CatalogQuick"));
+                Require(Field<RectTransform>(view, "catalogGrid").childCount == 2, "Quick view lost the shared material filter");
+                Click(Button(view, "CatalogAtlas"));
                 Click(Button(view, "CatalogBlueprintsMode"));
-                Require(Button(view, "Category_Крыши").gameObject.activeInHierarchy &&
-                    Button(view, "Category_Декор").gameObject.activeInHierarchy,
-                    "Blueprint user subcategories are missing");
-                Click(Button(view, "Category_Декор"));
+                Require(Field<RectTransform>(view, "catalogGrid").childCount == 2, "Part filters leaked into blueprint tab");
+                Click(Button(view, "Category_favorites"));
+                Require(Field<RectTransform>(view, "catalogGrid").childCount == 0,
+                    "User category collides with the built-in favorites section");
+                Click(Button(view, "Category_category:favorites"));
+                Require(Field<RectTransform>(view, "catalogGrid").childCount == 1,
+                    "User category named favorites cannot be selected separately");
                 Button blueprintCard = Button(view, "Catalog_blueprint-decor");
-                TMP_Text blueprintLabel = blueprintCard.GetComponentInChildren<TMP_Text>();
-                blueprintLabel.ForceMeshUpdate();
-                Require(blueprintLabel.text == decor.name && blueprintLabel.maxVisibleLines == 2 &&
-                    !blueprintLabel.isTextOverflowing && blueprintLabel.gameObject.activeInHierarchy,
-                    "Blueprint card does not visibly show its name without hovering");
-                Require(((RectTransform)blueprintLabel.transform).anchoredPosition.y <= -66f,
-                    "Blueprint name overlaps the thumbnail area");
-                EnsureInside((RectTransform)blueprintCard.transform, (RectTransform)blueprintLabel.transform);
+                Require(blueprintCard.GetComponentInChildren<TMP_Text>().text == decor.name, "Blueprint name is missing");
                 Click(blueprintCard);
-                Require(selected != null && ReferenceEquals(selected.Blueprint, decor),
-                    "Blueprint catalog selection loses the whole blueprint payload");
-                view.HideCatalog();
-                view.ShowCatalog(new[] { new BlueprintEditorCatalogItem("localized", "Part", null,
-                    "Building", "ash_wood", "OdinArchitect Decors", 0) });
+                Require(selected != null && ReferenceEquals(selected.Blueprint, decor), "Single-click loses blueprint payload");
                 Click(Button(view, "CatalogPartsMode"));
-                Require(Button(view, "Category_Building").GetComponentInChildren<TMP_Text>().text ==
-                    BuildWorksLocalization.CatalogLabel("Building") &&
-                    Button(view, "Material_ash_wood").GetComponentInChildren<TMP_Text>().text ==
-                    BuildWorksLocalization.CatalogLabel("ash_wood"),
-                    "Native catalog type/material buttons use raw IDs instead of localized labels");
-                Require(Button(view, "Source_OdinArchitect Decors").GetComponentInChildren<TMP_Text>().text ==
-                    "ODINARCHITECT DECORS", "External source name was translated as a native category");
+                Require(Field<RectTransform>(view, "catalogGrid").childCount == 2, "Part filters were not restored");
+                Click(Button(view, "CatalogReset"));
+                Button first = Button(view, "Catalog_piece0");
+                Click(first.transform.Find("CatalogFavorite").GetComponent<Button>());
+                Click(Button(view, "Category_favorites"));
+                Require(Field<RectTransform>(view, "catalogGrid").childCount == 1, "Favorite click placed a part or lost favorite");
+                Click(Button(view, "CatalogQuick"));
+                Require(Field<RectTransform>(view, "catalogGrid").childCount == 1, "Favorite differs between views");
                 view.HideCatalog();
+                view.ShowCatalog(new[] {
+                    new BlueprintEditorCatalogItem("station", "Workbench", null, "crafting", "wood", "Vanilla", 0,
+                        section: "crafting", stationId: "$workbench", stationName: "Workbench", isStation: true),
+                    new BlueprintEditorCatalogItem("upgrade", "Chopping block", null, "crafting", "wood", "Vanilla", 1,
+                        section: "crafting", stationId: "$workbench", stationName: "Workbench", isUpgrade: true),
+                    new BlueprintEditorCatalogItem("unknown", "Unknown mod part", null, "custom", "ash_wood", "Mod", 2, section: "other")
+                });
+                Click(Button(view, "CatalogReset")); Click(Button(view, "CatalogAtlas"));
+                Require(Field<RectTransform>(view, "catalogGrid").childCount == 3, "Unknown categories disappeared from All");
+                Click(Button(view, "Category_crafting")); Click(Button(view, "CatalogFamily_upgrades"));
+                Require(Field<RectTransform>(view, "catalogGrid").childCount == 1 &&
+                    Button(view, "Catalog_upgrade").transform.Find("StationRelation").GetComponent<TMP_Text>().text.Contains("Workbench"),
+                    "Upgrade is not linked visibly to its station");
+                selected = null; Click(Button(view, "CatalogFamily_workstation"));
+                Click(Button(view, "CatalogOption_$workbench"));
+                Require(selected == null && Field<RectTransform>(view, "catalogGrid").childCount == 2,
+                    "Station group transition placed a piece or did not include the station");
+                Click(Button(view, "CatalogMaterials")); view.CancelCatalog();
+                Require(view.HasCatalog && !Field<RectTransform>(view, "catalogPicker"), "Escape did not close the picker first");
+                view.CancelCatalog(); Require(!view.HasCatalog, "Second Escape did not close catalog");
                 float points = 0f, uniform = 0f;
                 bool grid = false;
                 view.ViewportSettingsChanged += (_, __, ___, pointSize, uniformSize, showGrid) =>
@@ -320,29 +327,26 @@ internal static class UICatalogAcceptance
 
     private static void TestCatalogNavigation(BlueprintEditorView view, InputState input)
     {
-        string Page() => Field<TMP_Text>(view, "catalogPageText").text;
-        input.Keys.Add(KeyCode.Q); view.Tick(); input.Keys.Clear();
-        Require(Page() == "1 / 2", "Catalog Q does not page backward");
-        Scroll(Button(view, "Catalog_piece0").gameObject, -1f);
-        Require(Page() == "2 / 2", "Wheel over a native card does not page forward through its hierarchy");
-        Scroll(Button(view, "Catalog_piece48").gameObject, 1f);
-        Require(Page() == "1 / 2", "Card wheel does not page backward");
         input.Keys.Add(KeyCode.E); view.Tick(); input.Keys.Clear();
-        Require(Page() == "2 / 2", "Catalog E does not page forward");
-        ScrollRect materials = Field<ScrollRect>(view, "catalogMaterialScroll");
-        Canvas.ForceUpdateCanvases(); materials.verticalNormalizedPosition = 1f;
-        Scroll(Button(view, "Material_Материал 00").gameObject, -1f);
-        Require(Page() == "2 / 2" && materials.verticalNormalizedPosition < 1f,
-            "Material wheel was stolen by card paging or stopped scrolling");
-        TMP_InputField search = Field<TMP_InputField>(view, "catalogSearch");
-        Focus(search);
-        input.Keys.Add(KeyCode.Q); input.Keys.Add(KeyCode.PageUp); view.Tick(); input.Keys.Clear();
-        Scroll(Button(view, "Catalog_piece48").gameObject, 1f);
-        Require(Page() == "2 / 2" && view.IsTextInputFocused,
-            "Catalog paging consumes Q/wheel/PgUp while native TMP is editing");
-        search.DeactivateInputField(); EventSystem.current.SetSelectedGameObject(null);
+        Require(Field<int>(view, "catalogPage") == 1, "E did not advance page");
         input.Keys.Add(KeyCode.Q); view.Tick(); input.Keys.Clear();
-        Require(Page() == "1 / 2", "Catalog paging did not resume after TMP focus ended");
+        Require(Field<int>(view, "catalogPage") == 0, "Q did not return page");
+        Scroll(Button(view, "Catalog_piece0").gameObject, -1f);
+        Require(Field<int>(view, "catalogPage") == 1, "Card wheel did not advance page");
+        TMP_InputField search = Field<TMP_InputField>(view, "catalogSearch"); Focus(search);
+        input.Keys.Add(KeyCode.Q); input.Keys.Add(KeyCode.PageUp); view.Tick(); input.Keys.Clear();
+        Require(Field<int>(view, "catalogPage") == 1 && view.IsTextInputFocused, "Typing consumes Q/PgUp");
+        search.DeactivateInputField(); EventSystem.current.SetSelectedGameObject(null);
+        input.Keys.Add(KeyCode.Home); view.Tick(); input.Keys.Clear();
+        Require(Field<int>(view, "catalogPage") == 0, "Home did not reset page");
+        Click(Button(view, "CatalogMaterials")); input.Keys.Add(KeyCode.E); view.Tick(); input.Keys.Clear();
+        Require(Field<int>(view, "catalogPage") == 0, "Open picker consumes E");
+        view.CancelCatalog();
+        search.text = "#96"; Require(Field<RectTransform>(view, "catalogGrid").childCount == 1, "Index search lost last item");
+        search.text = "not-an-existing-part";
+        Require(Field<RectTransform>(view, "catalogGrid").childCount == 0 && Field<TMP_Text>(view, "catalogEmpty").gameObject.activeSelf,
+            "Empty search has no explanation");
+        search.text = ""; EventSystem.current.SetSelectedGameObject(null);
     }
 
     private static void TestNumericDefaults(BlueprintEditorView view, InputState input)

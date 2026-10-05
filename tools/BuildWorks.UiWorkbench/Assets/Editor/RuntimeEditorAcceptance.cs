@@ -36,7 +36,7 @@ public static class RuntimeEditorAcceptance
         public bool exactAssetPassed;
         public bool nativeInteractionPassed;
         public int uiCases;
-        public string graphicRaycastResolution = "1920x1080 at 100/120/140%; other matrix resolutions render actual UI with direct native pointer dispatch";
+        public string graphicRaycastResolution = "1280x720,1920x1080,2560x1440,3440x1440 at 100/120/140%; exact GameView size, native ScreenSpaceOverlay raycasts as in Valheim; camera mode only for screenshot composition";
         public bool gameHostTested = false;
     }
     static RuntimeEditorAcceptance()
@@ -76,6 +76,26 @@ public static class RuntimeEditorAcceptance
         instance.GetType().GetMethod(name, Private).Invoke(instance, args);
     private static void Require(bool value, string reason)
     { if (!value) throw new InvalidOperationException(reason); }
+
+    private static Action UseGameViewSize(int width, int height)
+    {
+        // Unity 6000.0.61f1 verified editor API. In-memory only: do not save user sizes.
+        var asm = typeof(EditorWindow).Assembly;
+        Type sizesType = asm.GetType("UnityEditor.GameViewSizes");
+        object sizes = asm.GetType("UnityEditor.ScriptableSingleton`1").MakeGenericType(sizesType)
+            .GetProperty("instance").GetValue(null);
+        object group = sizesType.GetProperty("currentGroup").GetValue(sizes);
+        Type groupType = group.GetType();
+        int index = (int)groupType.GetMethod("GetTotalCount").Invoke(group, null);
+        object size = Activator.CreateInstance(asm.GetType("UnityEditor.GameViewSize"),
+            Enum.Parse(asm.GetType("UnityEditor.GameViewSizeType"), "FixedResolution"), width, height, "BuildWorks Acceptance");
+        groupType.GetMethod("AddCustomSize").Invoke(group, new[] { size });
+        var window = EditorWindow.GetWindow(asm.GetType("UnityEditor.GameView"), false, "BuildWorks Acceptance", false);
+        var selection = window.GetType().GetMethod("SizeSelectionCallback");
+        int original = (int)window.GetType().GetProperty("selectedSizeIndex", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).GetValue(window);
+        selection.Invoke(window, new object[] { index, null }); window.Repaint();
+        return () => { selection.Invoke(window, new object[] { original, null }); groupType.GetMethod("RemoveCustomSize").Invoke(group, new object[] { index }); };
+    }
 
     public static void CaptureAll()
     {
@@ -170,8 +190,13 @@ public static class RuntimeEditorAcceptance
             var catalog = new List<BlueprintEditorCatalogItem>();
             for (int i = 0; i < 96; ++i)
                 catalog.Add(new BlueprintEditorCatalogItem(i % 2 == 0 ? "woodwall" : "wood_pole",
-                    "Деталь " + i, thumbnails[i % 2 == 0 ? "woodwall" : "wood_pole"], "Строительство",
-                    "Материал " + (i % 36).ToString("00"), "Ванильное", i));
+                    i < 93 ? "Деталь " + i : i == 93 ? "Workbench — layout fixture" : i == 94 ? "Upgrade — layout fixture" : "Device — layout fixture",
+                    thumbnails[i % 2 == 0 ? "woodwall" : "wood_pole"], "Строительство",
+                    "Материал " + (i % 36).ToString("00"), "Ванильное", i,
+                    section: i < 93 ? "building" : "crafting", family: "walls",
+                    stationId: i == 93 || i == 94 ? "$fixture_workbench" : null,
+                    stationName: i == 93 || i == 94 ? "Workbench — fixture" : null,
+                    stationIcon: thumbnails["woodwall"], isStation: i == 93, isUpgrade: i == 94));
             foreach (string category in new[] { "Декор", "Крыши" })
             {
                 var blueprint = new CompositeBlueprintStore.Blueprint { id = "matrix-" + category, name = category + " — пример", category = category };
@@ -247,17 +272,23 @@ public static class RuntimeEditorAcceptance
                 uiCamera.cullingMask = 1 << 5;
                 uiCamera.nearClipPlane = 0.1f;
                 uiCamera.farClipPlane = 100f;
-                view.RootCanvas.renderMode = RenderMode.ScreenSpaceCamera;
+                view.RootCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
                 view.RootCanvas.worldCamera = uiCamera;
                 view.RootCanvas.planeDistance = 10f;
                 foreach (Transform child in view.RootCanvas.GetComponentsInChildren<Transform>(true)) child.gameObject.layer = 5;
                 int count = 0;
-                foreach (int width in new[] { 1920, 2560, 3440 })
+                foreach (int width in new[] { 1280, 1920, 2560, 3440 })
                 foreach (float uiScale in new[] { 1f, 1.2f, 1.4f })
                 {
-                    int height = width == 1920 ? 1080 : 1440;
+                    int height = width == 1280 ? 720 : width == 1920 ? 1080 : 1440;
+                    Action restoreScreen = UseGameViewSize(width, height);
+                    yield return null; yield return null;
+                    Require(Screen.width == width && Screen.height == height,
+                        "GameView size mismatch: " + Screen.width + "x" + Screen.height + " instead of " + width + "x" + height);
                     var target = new RenderTexture(width, height, 24);
                     uiCamera.targetTexture = target;
+                    uiCamera.pixelRect = new Rect(0, 0, width, height);
+                    uiCamera.ResetAspect(); uiCamera.ResetProjectionMatrix();
                     scene.Camera.targetTexture = target;
                     view.SetUiScale(uiScale);
                     yield return null;
@@ -267,7 +298,7 @@ public static class RuntimeEditorAcceptance
                     scene.SetViewport(view.ViewportScreenRect());
                     Call(controller, "FrameAll");
                     foreach (string state in new[] { "select", "transform", "array", "contour", "catalog",
-                        "outliner", "settings", "catalog-blueprints", "catalog-materials" })
+                        "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting" })
                     {
                         view.HideCatalog();
                         view.HideOutlinerMenu();
@@ -283,33 +314,48 @@ public static class RuntimeEditorAcceptance
                             Canvas.ForceUpdateCanvases();
                             ControllerInputAcceptance.NativeClick(view, uiCamera,
                                 state == "catalog-blueprints" ? "CatalogBlueprintsMode" : "CatalogPartsMode",
-                                width == 1920);
+                                true);
+                            yield return null;
+                            ControllerInputAcceptance.NativeClick(view, uiCamera, "CatalogReset");
+                            yield return null;
+                            ControllerInputAcceptance.NativeClick(view, uiCamera,
+                                state == "catalog-quick" ? "CatalogQuick" : "CatalogAtlas");
+                            yield return null;
                             TMP_InputField page = Field<TMP_InputField>(view, "catalogPageInput");
                             page.SetTextWithoutNotify("1");
                             page.onEndEdit.Invoke("1");
+                            yield return null;
                             if (state == "catalog-materials")
                             {
-                                ControllerInputAcceptance.NativeClick(view, uiCamera, "MaterialsPageDown", width == 1920);
-                                ControllerInputAcceptance.NativeClick(view, uiCamera, "MaterialsPageDown", width == 1920);
+                                ControllerInputAcceptance.NativeClick(view, uiCamera, "CatalogMaterials");
+                                Field<RectTransform>(view, "catalogPicker").GetComponentInChildren<ScrollRect>().verticalNormalizedPosition = 0;
                             }
+                            if (state == "catalog-crafting") ControllerInputAcceptance.NativeClick(view, uiCamera, "Category_crafting");
                         }
-                        else if (state == "outliner") ControllerInputAcceptance.NativeClick(view, uiCamera, "OutlinerMenuButton", width == 1920);
-                        else if (state == "settings") ControllerInputAcceptance.NativeClick(view, uiCamera, "View", width == 1920);
+                        else if (state == "outliner") ControllerInputAcceptance.NativeClick(view, uiCamera, "OutlinerMenuButton");
+                        else if (state == "settings") ControllerInputAcceptance.NativeClick(view, uiCamera, "View");
                         else Call(controller, "UpdateGizmo");
                         // Product Destroy() and TMP rebuilds must see a real frame.
                         yield return null;
                         Call(controller, "RefreshContextHints");
                         Canvas.ForceUpdateCanvases();
                         ValidateControls(view, state);
+                        // Test input in the product's overlay mode; the off-screen camera is only a capture adapter.
+                        view.RootCanvas.renderMode = RenderMode.ScreenSpaceCamera;
+                        yield return null;
+                        Canvas.ForceUpdateCanvases();
                         scene.Camera.Render();
                         uiCamera.Render();
                         string name = state + "-" + width + "x" + height + "-" + Mathf.RoundToInt(uiScale * 100);
                         SavePixels(target, Path.Combine(output, name + ".png"));
                         ++count;
+                        view.RootCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                        yield return null;
                     }
                     uiCamera.targetTexture = null;
                     scene.Camera.targetTexture = null;
                     Object.DestroyImmediate(target);
+                    restoreScreen();
                 }
                 TestUnreadablePicking(template);
                 TestPlacementSurface(template);
@@ -366,6 +412,8 @@ public static class RuntimeEditorAcceptance
                 Require(!text.isTextOverflowing, "Button text overflows: " + text.text);
             if (text.name == "ContourInfo" || text.name == "ArrayInfo")
                 Require(!text.isTextOverflowing, "Tool instructions overflow: " + text.name);
+            if (text.name == "PreviewName" || text.name == "PreviewMetadata")
+                Require(!text.isTextOverflowing, "Catalog preview text overflows: " + text.name);
             if (text.name.StartsWith("StatusHints", StringComparison.Ordinal))
                 Require(!text.isTextTruncated && !text.isTextOverflowing,
                     "Context hotkeys are clipped: " + text.text);
@@ -387,7 +435,8 @@ public static class RuntimeEditorAcceptance
         if (state == "catalog")
         {
             RectTransform grid = Field<RectTransform>(view, "catalogGrid");
-            Require(grid.childCount == 48, "Actual catalog first page must have 48 entries");
+            Require(grid.childCount == Math.Min(96, Field<BlueprintCatalogLayout>(view, "catalogLayout").PageSize),
+                "Actual catalog does not fill its adaptive page");
             for (int i = 0; i < grid.childCount; ++i) EnsureInside(grid, (RectTransform)grid.GetChild(i));
         }
         if (state == "settings")
@@ -401,11 +450,13 @@ public static class RuntimeEditorAcceptance
             (RectTransform)Field<GameObject>(view, "outlinerMenu").transform);
         if (state == "catalog-blueprints") Require(Field<RectTransform>(view, "catalogGrid").childCount == 2,
             "Blueprint mode should show both stored category examples");
+        if (state == "catalog-crafting") Require(Field<RectTransform>(view, "catalogGrid").childCount == 3,
+            "Crafting fixture must expose station, upgrade and device");
         if (state == "catalog-materials")
         {
-            ScrollRect scroll = Field<ScrollRect>(view, "catalogMaterialScroll");
+            ScrollRect scroll = Field<RectTransform>(view, "catalogPicker").GetComponentInChildren<ScrollRect>();
             Require(scroll.verticalNormalizedPosition <= .001f, "Material paging did not reach last items");
-            EnsureInside(scroll.viewport, (RectTransform)Field<RectTransform>(view, "catalogCategories").Find("Material_Материал 35"));
+            EnsureInside(scroll.viewport, (RectTransform)scroll.content.Find("CatalogOption_Материал 35"));
         }
     }
 

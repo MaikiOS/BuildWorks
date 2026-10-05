@@ -1748,6 +1748,7 @@ internal static class ControllerInputAcceptance
     private static void NativeClick(BlueprintEditorView view, Camera uiCamera, Button expected, bool verifyRaycast = true)
     {
         Canvas.ForceUpdateCanvases();
+        if (view.RootCanvas.renderMode == RenderMode.ScreenSpaceOverlay) uiCamera = null;
         string name = expected.name;
         var rect = (RectTransform)expected.transform;
         Vector2 position = RectTransformUtility.WorldToScreenPoint(uiCamera, rect.TransformPoint(rect.rect.center));
@@ -1759,6 +1760,14 @@ internal static class ControllerInputAcceptance
             var hits = new List<RaycastResult>(); EventSystem.current.RaycastAll(pointer, hits);
             Require(hits.Count > 0, "No actual UI raycast at " + name);
             target = ExecuteEvents.GetEventHandler<IPointerClickHandler>(hits[0].gameObject);
+            if (target != expected.gameObject)
+            {
+                var corners = new Vector3[4]; rect.GetWorldCorners(corners);
+                Debug.Log("Raycast diagnostic " + name + "; Screen=" + Screen.width + "x" + Screen.height +
+                    "; camera=" + (uiCamera ? uiCamera.pixelRect + "/" + uiCamera.aspect + "/" + uiCamera.targetTexture : "overlay") +
+                    "; corners=" + string.Join(";", Array.ConvertAll(corners, point => point.ToString("F7"))) +
+                    "; screens=" + string.Join(";", Array.ConvertAll(corners, point => RectTransformUtility.WorldToScreenPoint(uiCamera, point).ToString("F4"))));
+            }
             Require(target == expected.gameObject, "UI raycast intercepted " + name + " by " + (target ? target.name : "null") +
                 "; first=" + hits[0].gameObject.name + "; position=" + position +
                 "; active=" + expected.gameObject.activeInHierarchy + "; interactable=" + expected.IsInteractable() +

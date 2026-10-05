@@ -677,3 +677,42 @@ editor.view.depth_hint	Z вида: тяни ручку глубины вверх
 editor.view.source_empty	Ванильных точек нет. Включи Привязка: ваниль + наши над вьюпортом, чтобы использовать наши точки.
 editor.hint.numeric_value	<b>Значение: {0}</b> · {1}
 editor.hint.numeric_invalid	Неполное/вне диапазона; для переноса выбери одну ось · Backspace — правка · Delete — очистить
+editor.catalog.parts	Детали
+editor.catalog.blueprints	Чертежи
+editor.catalog.atlas	Атлас
+editor.catalog.quick	Быстрый
+editor.catalog.details	Подробности (скрыты на узком экране)
+editor.catalog.search	Название детали, prefab или #номер…
+editor.catalog.reset	Сбросить фильтры
+editor.catalog.no_results	Ничего не найдено. Сбрось фильтры или измени поиск.
+editor.catalog.page_help	Страница · Q/E, колесо над карточками, PgUp/PgDn
+editor.catalog.found	Найдено
+editor.catalog.click_help	ЛКМ — разместить · звезда — избранное · наведение — подробности
+editor.catalog.all_materials	Все материалы
+editor.catalog.all_sources	Все источники
+editor.catalog.unknown_station	Станок не указан
+editor.catalog.all	Все детали
+editor.catalog.favorites	Избранное
+editor.catalog.recent	Недавние
+editor.catalog.building	Строительство
+editor.catalog.decor	Декор
+editor.catalog.furniture	Мебель
+editor.catalog.resources	Ресурсы
+editor.catalog.crafting	Ремесло
+editor.catalog.categories	Категории
+editor.catalog.walls	Стены
+editor.catalog.floors	Полы
+editor.catalog.roofs	Крыши
+editor.catalog.frame	Каркас
+editor.catalog.openings	Проёмы
+editor.catalog.stairs	Лестницы
+editor.catalog.workstation	Станок…
+editor.catalog.stations	Станки
+editor.catalog.upgrades	Улучшения
+editor.catalog.devices	Устройства
+editor.catalog.upgrade_to	Улучшение для:
+editor.catalog.station_group	Группа станка →
+editor.catalog.material	Материал
+editor.catalog.source	Источник
+editor.catalog.station	Станок
+editor.catalog.category	Категория

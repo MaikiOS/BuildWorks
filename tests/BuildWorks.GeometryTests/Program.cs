@@ -115,7 +115,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Run("Blueprint collection views cannot mutate document", BlueprintCollectionViewsCannotMutateDocument);
             Run("Blueprint limits and history are bounded", BlueprintLimitsAndHistoryAreBounded);
             Run("Blueprint layout stays inside safe area", BlueprintLayoutStaysInsideSafeArea);
-            Run("Blueprint catalog uses whole twelve by four pages", BlueprintCatalogUsesWholePages);
+                Run("Blueprint catalog reflows whole cards across resolutions and modes", BlueprintCatalogUsesWholePages);
 
             if (failures == 0)
             {
@@ -2243,11 +2243,22 @@ namespace OstrixMods.BuildWorks.GeometryTests
 
         private static void BlueprintCatalogUsesWholePages()
         {
-            Equal(12, BlueprintEditorLayout.CatalogColumns);
-            Equal(4, BlueprintEditorLayout.CatalogRows);
-            Equal(48, BlueprintEditorLayout.CatalogPageSize);
-            Near(1052.0, BlueprintEditorLayout.CatalogGridWidth);
-            Near(396.0, BlueprintEditorLayout.CatalogGridHeight);
+            foreach (var size in new[] { new[] { 640.0, 480.0 }, new[] { 1280.0, 720.0 },
+                new[] { 1920.0, 1080.0 }, new[] { 2560.0, 1440.0 }, new[] { 3440.0, 1440.0 } })
+            foreach (bool quick in new[] { false, true })
+            foreach (bool details in new[] { false, true })
+            {
+                var layout = BlueprintCatalogLayout.Compute(size[0], size[1], quick, details);
+                Equal(true, layout.Columns > 0 && layout.Rows > 0 && layout.CellWidth >= 112);
+                Equal(layout.Columns * layout.Rows, layout.PageSize);
+                foreach (EditorRect rect in new[] { layout.Navigation, layout.Context, layout.Grid, layout.Details })
+                    Equal(true, rect.X >= 0 && rect.Y >= 0 && rect.Right <= layout.Width && rect.Bottom <= layout.Height);
+                Equal(false, layout.Grid.Overlaps(layout.Navigation));
+                Equal(false, layout.Grid.Overlaps(layout.Context));
+                Equal(false, layout.Grid.Overlaps(layout.Details));
+                Equal(true, layout.Grid.Bottom <= layout.Height - 68);
+                Equal(details && layout.Width >= 1100, layout.Details.Width > 0);
+            }
         }
 
         private static void BlueprintArrayUsesResolvedGroupPivot()

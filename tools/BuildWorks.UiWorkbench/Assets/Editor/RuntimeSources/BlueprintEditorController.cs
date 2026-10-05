@@ -330,7 +330,7 @@ namespace OstrixMods.BuildWorks
             }
             if (view.HasCatalog)
             {
-                if (input.GetKeyDown(KeyCode.Escape)) view.HideCatalog();
+                if (input.GetKeyDown(KeyCode.Escape)) view.CancelCatalog();
                 scene.HideGizmo();
                 ApplyCamera();
                 return;

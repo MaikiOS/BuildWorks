@@ -573,6 +573,10 @@ namespace OstrixMods.BuildWorks
                     blueprintPieceRegistry.TryGetBlueprint(piece, out _)) continue;
                 string prefabName = PrefabName(piece);
                 if (!names.Add(prefabName)) continue;
+                CraftingStation ownStation = prefab.GetComponent<CraftingStation>();
+                StationExtension extension = prefab.GetComponent<StationExtension>();
+                CraftingStation targetStation = extension ? extension.m_craftingStation : ownStation;
+                string section = BlueprintCatalogSection(piece, ownStation || extension);
                 result.Add(new BlueprintEditorCatalogItem(
                     prefabName,
                     ResolveBlueprintEditorName(prefabName),
@@ -581,7 +585,11 @@ namespace OstrixMods.BuildWorks
                     HammerCatalogOrganizer.Group(piece),
                     UnifiedHammerCatalog.OdinSourceGroup(piece) ??
                         HammerCatalogOrganizer.VanillaSource,
-                    index));
+                    index, section: section, family: BlueprintCatalogFamily(piece),
+                    stationId: targetStation ? targetStation.m_name : null,
+                    stationName: targetStation ? Localization.instance?.Localize(targetStation.m_name) ?? targetStation.m_name : null,
+                    stationIcon: targetStation ? targetStation.m_icon : null,
+                    isStation: ownStation, isUpgrade: extension));
             }
             result.Sort((left, right) =>
             {
@@ -606,6 +614,45 @@ namespace OstrixMods.BuildWorks
                 StringComparison.Ordinal);
             bool building = string.Equals(item.Category, "building", StringComparison.Ordinal);
             return vanilla && building ? 0 : vanilla ? 1 : building ? 2 : 3;
+        }
+
+        private static string BlueprintCatalogSection(Piece piece, bool workstation)
+        {
+            Piece.UsageTagFlags usage = piece.m_usage;
+            if (workstation || (usage & Piece.UsageTagFlags.Crafting) != 0) return "crafting";
+            if ((usage & Piece.UsageTagFlags.Stacks) != 0) return "resources";
+            if ((usage & (Piece.UsageTagFlags.Decor | Piece.UsageTagFlags.Lighting)) != 0) return "decor";
+            if ((usage & (Piece.UsageTagFlags.Furniture | Piece.UsageTagFlags.Storage)) != 0) return "furniture";
+            if ((usage & (Piece.UsageTagFlags.Building | Piece.UsageTagFlags.Floor | Piece.UsageTagFlags.Wall |
+                Piece.UsageTagFlags.Roof | Piece.UsageTagFlags.Architecture | Piece.UsageTagFlags.Stairs | Piece.UsageTagFlags.Doors)) != 0) return "building";
+            switch (piece.m_category)
+            {
+                case Piece.PieceCategory.Crafting: return "crafting";
+                case Piece.PieceCategory.Furniture: return "furniture";
+                case Piece.PieceCategory.BuildingWorkbench:
+                case Piece.PieceCategory.BuildingStonecutter: return "building";
+                default: return "other"; // Unknown mod categories remain available under All/search.
+            }
+        }
+
+        private static string BlueprintCatalogFamily(Piece piece)
+        {
+            Piece.UsageTagFlags usage = piece.m_usage;
+            if ((usage & Piece.UsageTagFlags.Doors) != 0) return "openings";
+            if ((usage & Piece.UsageTagFlags.Stairs) != 0) return "stairs";
+            if ((usage & Piece.UsageTagFlags.Roof) != 0) return "roofs";
+            if ((usage & Piece.UsageTagFlags.Floor) != 0) return "floors";
+            if ((usage & Piece.UsageTagFlags.Wall) != 0) return "walls";
+            if ((usage & Piece.UsageTagFlags.Architecture) != 0) return "frame";
+            // ponytail: mods without semantic usage flags use the existing prefab naming convention.
+            string name = PrefabName(piece).ToLowerInvariant();
+            if (name.Contains("door") || name.Contains("gate")) return "openings";
+            if (name.Contains("stair") || name.Contains("ladder")) return "stairs";
+            if (name.Contains("roof")) return "roofs";
+            if (name.Contains("floor")) return "floors";
+            if (name.Contains("wall")) return "walls";
+            if (name.Contains("pole") || name.Contains("beam")) return "frame";
+            return null;
         }
 
         private static string BlueprintEditorCategoryName(Piece.PieceCategory category)

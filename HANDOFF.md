@@ -24,7 +24,9 @@ items/stations are fixtures, not a game inventory/correctness claim.
 Independent correctness review PASSED; ponytail-review: Lean already.
 Valheim not launched, saves untouched. Installed only in TerrainRamp-1.0-Test
 with Valheim closed via Deploy-TestBuild.ps1; both SHA256 hashes match.
-Previous .53 pair backed up at artifacts/checkpoint-0.19.54/preinstall.
+Separate preinstall DLL backup was not created because the caller used the wrong
+profile-parent path. The deploy script's transactional guard and installed hashes
+passed; .53 source remains recoverable at checkpoint b00af77, not as a saved DLL pair.
 
 BuildWorks SHA256: E52529D4E9E76CBDD19C58609724AC02752BF78C682856AAA6FE76765DA58A8A
 Geometry SHA256: 2AB3EAD788D610EE5DED3DA3C64C1DE98FC9EAC52257920950372CDF849D26B2

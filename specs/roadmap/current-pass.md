@@ -2,7 +2,8 @@
 
 **English** | [Русский](current-pass_RU.md)
 
-Test **0.19.54**, only in **TerrainRamp-1.0-Test**. Reply only to **1–8 below**.
+Test **0.19.55**, only in **TerrainRamp-1.0-Test**. Reply only to **1–10 below**.
+Your .54 answers accept 2, 3, 5, 6 and 7; repeat only changed checks **1, 4, 8, 9, 10** unless a regression appears.
 Ostrix accepted chair checks .53; [archived](archive/pass-0.19.53.md), no repeat.
 
 ## Preparation
@@ -17,7 +18,9 @@ it does not unlock recipes or expose arbitrary non-hammer prefabs.
 ## Reply checks
 
 1. **Layout/readability.** Try normal/smaller resolution and 100/140% UI.
-   **Expected:** close/search/pages fit; cards reflow without overlap.
+   **Expected:** catalog contents are 20% smaller by default, fit above hints,
+   and reflow without overlap. On small screens hints temporarily compact while
+   the catalog is open and restore afterwards; your expanded setting is retained.
    Names read clearly; full long names appear on hover. Details hide when
    space is insufficient; category selection never stretches navigation.
    **Report:** good, or screenshot + resolution/UI scale.
@@ -32,10 +35,14 @@ it does not unlock recipes or expose arbitrary non-hammer prefabs.
    **Expected:** both views share results; tabs retain their own queries/filters.
    **Report:** good, or the lost filter.
 
-4. **Sections/completeness.** Building, Decor, Furniture, Resources, Crafting;
+4. **Sections/completeness/materials.** Building, Decor, Lighting, Furniture, Resources, Crafting;
    building families Walls/Floors/Roofs/Frame/Openings/Stairs. Reset filters
    and search a familiar modded piece.
-   **Expected:** all available items remain in All parts, including unknown categories.
+   Furniture has seating/beds/storage/tables/rugs/other. Pick basic wood and then
+   another material used in a mixed-material part.
+   **Expected:** filters use actual ingredients, basic wood is first, building
+   parts follow ingredient tiers. This is not a record of historical unlock order.
+   All available items remain in All parts, including unknown categories.
    **Report:** good, or name/prefab and expected section.
 
 5. **Correct upgrade station.** Crafting → Workstation → Workbench/Forge → Upgrades.
@@ -62,7 +69,24 @@ it does not unlock recipes or expose arbitrary non-hammer prefabs.
    **Expected:** text stays inside panels; full tooltips fit. Own sections/materials
    translate; external mod names stay intact. Recognizable star/eye/close/reset,
    no missing-glyph squares.
+   Details include resource icons/counts and the construction station, or explicit
+   “Not required”; long lists scroll. A blueprint shows aggregate requirements.
    **Report:** good, or screenshot + language.
+
+9. **Manipulator settings.** Clear selection. Manipulator → Show: Scale, then
+   click a part once. Repeat Move/Rotate/Points in model and screen size modes.
+   **Expected:** settings close immediately; the first part click shows the chosen
+   handles. Choosing the same family again restores all handles. These buttons
+   choose visible handles; dragging or G/R/S starts the transformation.
+   **Report:** good, or button/mode and the missing or unexpected handles.
+
+10. **Save name/category.** Save a test copy. Rename it, choose an existing
+    category, then save another copy with a new category typed in. Try Cancel;
+    finally Exit → Save and exit.
+    **Expected:** every save asks name/category; Cancel changes no file. Existing
+    and new categories persist after reopening; Save and exit closes only after
+    successful saving. Empty names/categories are rejected.
+    **Report:** good, or the action and the incorrect saved result.
 
 ## Reply format
 

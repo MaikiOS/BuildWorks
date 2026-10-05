@@ -2,6 +2,45 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Verified source candidate 0.19.55
+
+2026-10-05: .54 owner feedback accepts catalog checks 2,3,5,6,7; changes 1,4,8
+and adds focused gizmo/save checks 9,10 in [the single current series](specs/roadmap/current-pass.md).
+Catalog defaults to 80% contents and fits between header and hints; short viewports
+temporarily compact hints and restore their expanded preference afterwards.
+Lighting is independent from Decor; Furniture has seating/beds/storage/tables/rugs/other.
+Material filtering uses actual recipe ingredients (including mixed recipes), basic
+wood first; building order follows resource tiers, not personal historical unlock order.
+The current native hammer inventory remains authoritative; no recipe unlock bypass.
+
+Details show resource icons/counts plus the construction station or explicit none,
+separate from the StationExtension target used for upgrade grouping. Long cost lists
+receive native scrolling. Saves request name and existing/new category; Cancel/Esc
+do not write, SaveAndExit retains its success-only close path. Handle-family buttons
+are labelled Show, close settings immediately and survive the first part click;
+same-family click restores Combined. Both sizing modes respect the chosen family.
+
+Release build, Geometry(105), Store, Localization, EditorBridge, WorldLayout,
+DeploymentChecks, HostContract pass; 737 paired keys / 656 static references.
+Unity 6000.0.61f1 checks 144 cases at 1280×720,1920×1080,2560×1440,3440×1440
+and 100/120/140%, including save metadata. Actual overlay raycasts and source hashes
+are checked. Fixtures do not establish Valheim inventory/placement acceptance.
+Independent correctness review PASSED. ponytail removed duplicate catalog rebuild.
+No verify skill is installed; direct checks and independent review were used instead.
+Final Workbench proof: 2026-10-05T18:01:03Z. Installed only TerrainRamp-1.0-Test
+using Deploy-TestBuild.ps1 with Valheim closed; SHA256 matches both built DLLs.
+BuildWorks: `67135798B6E5C14FFF52D430CE8F9A7CEFF7A10204F39C51839D1438242F3C5C`.
+Geometry: `9C29006B05007C608DEDCB0EFCF275B0F04F9673EE423FD94DCFDF6C4C258D86`.
+Verified .54 DLL backup: `artifacts/checkpoint-0.19.55/preinstall`.
+Valheim not launched, saves untouched; owner game acceptance remains open.
+
+External research: downloaded BiomeBlueprints 1.0.3 as data only; 353 files, 100
+within 2–128 parts, all those have terrain markers and 27 have extended object data.
+No third-party DLL/art installed or bundled. See
+[exchange research](specs/roadmap/blueprint-exchange-research.md). Import/export
+is not implemented; first-stage terrain/object-data scope awaits Ostrix's answer.
+SocratiCode indexes BuildWorks through parent Default; no separate index is needed.
+
 ## Verified source candidate 0.19.54
 
 2026-10-05: Ostrix accepts the .53 chair series. Catalog implementation uses

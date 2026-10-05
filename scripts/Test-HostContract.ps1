@@ -816,7 +816,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.54.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.55.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -1891,11 +1891,14 @@ $catalogItemsOperands = @($catalogItemsMethod.Body.Instructions | ForEach-Object
 Assert-Contract ($catalogItemsOperands -match 'StationExtension::m_craftingStation' -and
     $catalogItemsOperands -match 'CraftingStation::m_name' -and
     $catalogItemsOperands -match 'CraftingStation::m_icon' -and
-    $catalogItemsOperands -notmatch 'Piece::m_craftingStation' -and
+    $catalogItemsOperands -match 'Piece::m_craftingStation' -and
+    $sessionSource -match 'CraftingStation targetStation = extension \? extension.m_craftingStation : ownStation;' -and
+    $sessionSource -match 'stationId: targetStation' -and
+    $sessionSource -match 'requiredStation: piece.m_craftingStation' -and
     $sessionSource -match 'piece.m_usage' -and
     $sessionSource -match 'UsageTagFlags.Stacks' -and
     $sessionSource -match 'UsageTagFlags.Decor') `
-    'Editor catalog must classify semantic piece usage and link upgrades to their actual workstation, not building requirement.'
+    'Editor catalog must keep the actual upgrade workstation separate from the construction station requirement.'
 $workspacePredicate = @($pluginMethods | Where-Object {
     $_.Name -eq 'SupportsBlueprintWorkspacePiece' -and $_.DeclaringType.Name -eq 'PrecisionPlacementSession'
 })
@@ -2780,4 +2783,4 @@ if (Test-Path -LiteralPath $buildCameraPath -PathType Leaf) {
         'BuildWorks does not restore the current Build Camera yaw and pitch.'
 }
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.54 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.55 and Valheim Steam build 25185596.'

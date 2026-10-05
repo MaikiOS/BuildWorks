@@ -716,3 +716,23 @@ editor.catalog.material	Material
 editor.catalog.source	Source
 editor.catalog.station	Workstation
 editor.catalog.category	Category
+editor.gizmo_family_help	Choose visible grips, not an operation. Select a part, then drag a grip or use G/R/S. Click the same set again to show all grips.
+editor.gizmo_show_family	Show: {0}
+editor.save_title	SAVE BLUEPRINT
+editor.save_name	Name
+editor.save_category	Category
+editor.save_choose	Existing…
+editor.save_metadata_help	Choose an existing category or type a new one. Cancel leaves the file unchanged.
+editor.catalog.lighting	Lighting
+editor.catalog.seating	Seating
+editor.catalog.beds	Beds
+editor.catalog.storage	Storage
+editor.catalog.tables	Tables
+editor.catalog.rugs	Rugs
+editor.catalog.other_furniture	Other furniture
+editor.catalog.build_cost	Construction cost
+editor.catalog.required_station	Required station
+editor.catalog.no_station	Not required
+catalog.group.fine_wood	FINE WOOD
+catalog.group.flint	FLINT
+catalog.group.yggdrasil_wood	YGGDRASIL WOOD

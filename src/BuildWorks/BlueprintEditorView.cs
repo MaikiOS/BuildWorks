@@ -33,6 +33,15 @@ namespace OstrixMods.BuildWorks
         Acknowledge
     }
 
+    internal sealed class BlueprintEditorCatalogResource
+    {
+        internal BlueprintEditorCatalogResource(string name, Sprite icon, int amount)
+        { Name = name; Icon = icon; Amount = amount; }
+        internal string Name { get; }
+        internal Sprite Icon { get; }
+        internal int Amount { get; }
+    }
+
     internal sealed class BlueprintEditorCatalogItem
     {
         internal BlueprintEditorCatalogItem(
@@ -46,7 +55,10 @@ namespace OstrixMods.BuildWorks
             CompositeBlueprintStore.Blueprint blueprint = null,
             string section = "building", string family = null,
             string stationId = null, string stationName = null, Sprite stationIcon = null,
-            bool isStation = false, bool isUpgrade = false)
+            bool isStation = false, bool isUpgrade = false,
+            IReadOnlyList<BlueprintEditorCatalogResource> resources = null,
+            string requiredStation = null, Sprite requiredStationIcon = null,
+            IReadOnlyList<string> materials = null, int materialOrder = 0)
         {
             PrefabName = prefabName;
             DisplayName = displayName;
@@ -69,6 +81,11 @@ namespace OstrixMods.BuildWorks
             StationIcon = stationIcon;
             IsStation = isStation;
             IsUpgrade = isUpgrade;
+            Resources = resources ?? Array.Empty<BlueprintEditorCatalogResource>();
+            RequiredStation = requiredStation;
+            RequiredStationIcon = requiredStationIcon;
+            Materials = materials ?? new[] { Material };
+            MaterialOrder = materialOrder;
         }
 
         internal string PrefabName { get; }
@@ -76,6 +93,11 @@ namespace OstrixMods.BuildWorks
         internal Sprite Icon { get; }
         internal string Category { get; }
         internal string Material { get; }
+        internal IReadOnlyList<string> Materials { get; }
+        internal int MaterialOrder { get; }
+        internal IReadOnlyList<BlueprintEditorCatalogResource> Resources { get; }
+        internal string RequiredStation { get; }
+        internal Sprite RequiredStationIcon { get; }
         internal string Source { get; }
         internal int Index { get; }
         internal CompositeBlueprintStore.Blueprint Blueprint { get; }
@@ -396,6 +418,9 @@ namespace OstrixMods.BuildWorks
         private readonly Button hintsToggle;
         private readonly Button[] previewAxisButtons = new Button[3];
         private bool hintsExpanded = true;
+        private RectTransform saveMetadataFields;
+        private TMP_InputField saveMetadataName, saveMetadataCategory;
+        private Action<string, string> saveMetadataAccepted;
         private TMP_InputField fieldOfViewInput;
         private Slider fieldOfViewSlider;
         private Button fieldOfViewReset;
@@ -1251,7 +1276,8 @@ namespace OstrixMods.BuildWorks
                 {
                     GizmoFamily family = families[index];
                     familyButtons[index] = CreateButton("GizmoFamily" + family, viewportSections[2].transform,
-                        T(familyKeys[index]), 142f, () => GizmoFamilySelected?.Invoke(family));
+                        T("editor.gizmo_show_family", T(familyKeys[index])), 142f, () => GizmoFamilySelected?.Invoke(family));
+                    AddTooltip((RectTransform)familyButtons[index].transform, T("editor.gizmo_family_help"));
                     SetTopLeft((RectTransform)familyButtons[index].transform, index % 2 == 0 ? 12f : 164f,
                         4f + index / 2 * 36f, 142f, 32f);
                 }
@@ -1371,17 +1397,22 @@ namespace OstrixMods.BuildWorks
                 SetInsets((RectTransform)modalMessage.transform, 20f, 64f, 20f, 90f);
                 dialogPrimaryButton = CreateDialogButton(
                     dialog, "SaveExit", T("editor.view.save_exit"), 20f,
-                    () => DialogDecided?.Invoke(errorDialog
-                        ? BlueprintEditorDialogDecision.Retry
-                        : BlueprintEditorDialogDecision.SaveAndExit), true);
+                    () =>
+                    {
+                        if (saveMetadataAccepted != null) SubmitSaveMetadata();
+                        else DialogDecided?.Invoke(errorDialog ? BlueprintEditorDialogDecision.Retry : BlueprintEditorDialogDecision.SaveAndExit);
+                    }, true);
                 dialogDiscardButton = CreateDialogButton(
                     dialog, "Discard", T("editor.view.discard_exit"), 190f,
                     () => DialogDecided?.Invoke(BlueprintEditorDialogDecision.DiscardAndExit), false);
                 dialogCancelButton = CreateDialogButton(
                     dialog, "Cancel", T("editor.view.cancel"), 380f,
-                    () => DialogDecided?.Invoke(errorDialog
-                        ? BlueprintEditorDialogDecision.Acknowledge
-                        : BlueprintEditorDialogDecision.Cancel), false);
+                    () =>
+                    {
+                        if (saveMetadataAccepted != null) HideDialog();
+                        else DialogDecided?.Invoke(errorDialog
+                            ? BlueprintEditorDialogDecision.Acknowledge : BlueprintEditorDialogDecision.Cancel);
+                    }, false);
                 modal.SetActive(false);
 
                 foreach (RectTransform panel in new[] { top, rail, viewport, rightColumn,
@@ -1783,7 +1814,7 @@ namespace OstrixMods.BuildWorks
 
         internal void SetContextHints(string text)
         {
-            statusHintText.gameObject.SetActive(hintsExpanded);
+            statusHintText.gameObject.SetActive(hintsExpanded && !CompactCatalogHints);
             statusHintText.text = text ?? string.Empty;
             foreach (TMP_Text group in contextHintGroups) group.gameObject.SetActive(false);
             foreach (Transform child in hintGroupsArea)
@@ -1794,14 +1825,14 @@ namespace OstrixMods.BuildWorks
         {
             statusHintText.gameObject.SetActive(false);
             foreach (Transform child in hintGroupsArea)
-                if (child.name.StartsWith("HintDivider", StringComparison.Ordinal)) child.gameObject.SetActive(hintsExpanded);
+                if (child.name.StartsWith("HintDivider", StringComparison.Ordinal)) child.gameObject.SetActive(hintsExpanded && !CompactCatalogHints);
             string[] titles = { "editor.hint.section_modes", "editor.hint.section_tool",
                 "editor.hint.section_selection", "editor.hint.section_history",
                 "editor.hint.section_visibility", "editor.hint.section_camera" };
             for (int index = 0; index < contextHintGroups.Length; ++index)
             {
                 TMP_Text group = contextHintGroups[index];
-                group.gameObject.SetActive(hintsExpanded);
+                group.gameObject.SetActive(hintsExpanded && !CompactCatalogHints);
                 string[] commands = groups[index].Split(new[] { " · " }, StringSplitOptions.None);
                 for (int command = 0; command < commands.Length; ++command)
                 {
@@ -1987,6 +2018,7 @@ namespace OstrixMods.BuildWorks
 
         internal void ShowUnsavedDialog(string blueprintName)
         {
+            ResetSaveMetadata();
             errorDialog = false;
             modalTitle.text = T("editor.view.unsaved_title");
             modalMessage.text = T("editor.view.unsaved_message", blueprintName);
@@ -1999,6 +2031,7 @@ namespace OstrixMods.BuildWorks
 
         internal void ShowError(string titleText, string message, bool canRetry = true)
         {
+            ResetSaveMetadata();
             errorDialog = true;
             modalTitle.text = BuildWorksLocalization.ResolveUserText(titleText);
             modalMessage.text = BuildWorksLocalization.ResolveUserText(message);
@@ -2013,8 +2046,72 @@ namespace OstrixMods.BuildWorks
 
         internal void HideDialog()
         {
+            ResetSaveMetadata();
             modal.SetActive(false);
             foreach (CanvasGroup group in modalBlockedGroups) group.interactable = true;
+        }
+
+        private void ResetSaveMetadata()
+        {
+            saveMetadataAccepted = null;
+            if (saveMetadataFields) saveMetadataFields.gameObject.SetActive(false);
+            ((RectTransform)modalTitle.transform.parent).sizeDelta = new Vector2(520, 260);
+            SetInsets(modalMessage.rectTransform, 20, 64, 20, 90);
+        }
+
+        internal void ShowSaveMetadata(string name, string category, IEnumerable<string> categories, Action<string, string> accepted)
+        {
+            ResetSaveMetadata();
+            RectTransform dialog = (RectTransform)modalTitle.transform.parent;
+            dialog.sizeDelta = new Vector2(520, 450);
+            if (saveMetadataFields) UnityEngine.Object.Destroy(saveMetadataFields.gameObject);
+            saveMetadataFields = CreateRect("SaveMetadata", dialog);
+            SetInsets(saveMetadataFields, 20, 108, 20, 90);
+            TMP_Text nameLabel = CreateText("SaveNameLabel", saveMetadataFields, T("editor.save_name"), 14, FontStyles.Bold, TextAlignmentOptions.TopLeft);
+            SetTopLeft(nameLabel.rectTransform, 0, 0, 460, 22);
+            saveMetadataName = CreateInput("SaveBlueprintName", saveMetadataFields, new Vector2(0, -24), 460);
+            saveMetadataName.SetTextWithoutNotify(name);
+            TMP_Text categoryLabel = CreateText("SaveCategoryLabel", saveMetadataFields, T("editor.save_category"), 14, FontStyles.Bold, TextAlignmentOptions.TopLeft);
+            SetTopLeft(categoryLabel.rectTransform, 0, 66, 460, 22);
+            saveMetadataCategory = CreateInput("SaveBlueprintCategory", saveMetadataFields, new Vector2(0, -90), 300);
+            saveMetadataCategory.SetTextWithoutNotify(category);
+            RectTransform options = CreatePanel("SaveCategoryOptions", saveMetadataFields, PanelColor);
+            SetTopLeft(options, 0, 132, 460, 112);
+            options.gameObject.AddComponent<RectMask2D>();
+            ScrollRect scroll = options.gameObject.AddComponent<ScrollRect>();
+            RectTransform content = CreateRect("SaveCategoryContent", options);
+            var values = new List<string>(categories ?? Array.Empty<string>());
+            values.Sort(StringComparer.CurrentCultureIgnoreCase);
+            SetTopLeft(content, 0, 0, 460, values.Count * 34);
+            scroll.viewport = options; scroll.content = content; scroll.horizontal = false;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            for (int i = 0; i < values.Count; i++)
+            {
+                string value = values[i];
+                Button entry = CreateButton("SaveCategory_" + i, content, BuildWorksLocalization.BlueprintCategoryLabel(value), 460,
+                    () => { saveMetadataCategory.SetTextWithoutNotify(value); options.gameObject.SetActive(false); });
+                SetTopLeft((RectTransform)entry.transform, 0, i * 34, 460, 30);
+            }
+            Button choose = CreateButton("SaveChooseCategory", saveMetadataFields, T("editor.save_choose"), 152,
+                () => options.gameObject.SetActive(!options.gameObject.activeSelf));
+            SetTopLeft((RectTransform)choose.transform, 308, 90, 152, 36);
+            options.gameObject.SetActive(false);
+            modalTitle.text = T("editor.save_title"); modalMessage.text = T("editor.save_metadata_help");
+            SetTopAnchored(modalMessage.rectTransform, 20, 64, 20, 40);
+            SetButtonLabel(dialogPrimaryButton, T("editor.view.save"));
+            SetButtonLabel(dialogCancelButton, T("editor.view.cancel"));
+            dialogPrimaryButton.gameObject.SetActive(true); dialogDiscardButton.gameObject.SetActive(false);
+            errorDialog = false; saveMetadataAccepted = accepted; ShowDialog();
+        }
+
+        private void SubmitSaveMetadata()
+        {
+            string name = (saveMetadataName.text ?? "").Trim(), category = (saveMetadataCategory.text ?? "").Trim();
+            bool validName = name.Length >= 1 && name.Length <= 48, validCategory = category.Length >= 1 && category.Length <= 24;
+            SetInputValid(saveMetadataName, validName); SetInputValid(saveMetadataCategory, validCategory);
+            if (!validName || !validCategory) { modalMessage.text = T("editor.view.invalid_metadata"); return; }
+            Action<string, string> accepted = saveMetadataAccepted;
+            HideDialog(); accepted?.Invoke(name, category);
         }
 
         internal void SetViewportSettings(float move, float rotation, float array,
@@ -2136,6 +2233,7 @@ namespace OstrixMods.BuildWorks
             catalog.SetActive(false);
             SetPanelsInteractable(true);
             EndTooltip();
+            ApplySafeAreaAndLayout(true);
         }
 
         internal void HideOutlinerMenu()
@@ -3480,6 +3578,10 @@ namespace OstrixMods.BuildWorks
         private void ShowDialog()
         {
             EndTooltip();
+            RectTransform dialog = (RectTransform)modalTitle.transform.parent;
+            float fit = Mathf.Min(1f, (safeRoot.rect.width - 24f) / dialog.sizeDelta.x,
+                (safeRoot.rect.height - 24f) / dialog.sizeDelta.y);
+            dialog.localScale = Vector3.one * fit;
             SetPanelsInteractable(false);
             modal.SetActive(true);
             modal.transform.SetAsLastSibling();
@@ -3595,8 +3697,8 @@ namespace OstrixMods.BuildWorks
             Canvas.ForceUpdateCanvases();
             double width = safeRoot.rect.width;
             double height = safeRoot.rect.height;
-            BlueprintEditorLayout layout = BlueprintEditorLayout.Compute(width, height, hintsExpanded);
-            if (!hintsExpanded)
+            BlueprintEditorLayout layout = BlueprintEditorLayout.Compute(width, height, hintsExpanded && !CompactCatalogHints);
+            if (!hintsExpanded || CompactCatalogHints)
             {
                 statusHintText.gameObject.SetActive(false);
                 foreach (TMP_Text group in contextHintGroups) group.gameObject.SetActive(false);

@@ -917,9 +917,30 @@ internal static class ControllerInputAcceptance
         Frame(controller, input, start); yield return null;
         NativeClick(view, uiCamera, "ViewportSectionButton2"); yield return null;
         NativeClick(view, uiCamera, "GizmoFamilyPoints"); yield return null;
-        view.HideViewportSettings();
+        Require(!view.HasViewportSettings, "Choosing a handle family must close settings before the next part click");
         Frame(controller, input, start); yield return null;
         Require(Field<GizmoFamily>(controller, "gizmoFamily") == GizmoFamily.Points, "Manipulator family did not update");
+        foreach (bool modelSpace in new[] { true, false })
+        {
+            scene.ModelSpaceGizmo = modelSpace;
+            doc.ClearSelection(); view.Bind(doc, true, null, Vector3.one);
+            Frame(controller, input, Vector2.zero); yield return null;
+            NativeClick(view, uiCamera, "ViewportSectionButton2"); yield return null;
+            NativeClick(view, uiCamera, "GizmoFamilyScale"); yield return null;
+            Require(!view.HasViewportSettings, "Scale settings swallow the next click");
+            NativeClick(view, uiCamera, "Row_left");
+            Frame(controller, input, start); yield return null;
+            Require(Field<GizmoFamily>(controller, "gizmoFamily") == GizmoFamily.Scale &&
+                Field<LineRenderer>(Field<TransformGizmoView>(scene, "gizmo"), "scaleHandle").gameObject.activeInHierarchy &&
+                !Field<LineRenderer[]>(Field<TransformGizmoView>(scene, "gizmo"), "moveLines")[0].gameObject.activeInHierarchy,
+                "First part click lost Scale handles in sizing mode " + modelSpace);
+            NativeClick(view, uiCamera, "ViewportSectionButton2"); yield return null;
+            NativeClick(view, uiCamera, "GizmoFamilyScale");
+            Frame(controller, input, start); yield return null;
+            Require(Field<GizmoFamily>(controller, "gizmoFamily") == GizmoFamily.Combined,
+                "Repeated handle button did not restore all handles");
+        }
+        scene.ModelSpaceGizmo = true;
         // Tooltip measurements use the actual font and the safe canvas, not character counts.
         RectTransform anchor = Field<RectTransform>(view, "top");
         foreach (float scale in new[] { 1f, 1.2f, 1.4f })

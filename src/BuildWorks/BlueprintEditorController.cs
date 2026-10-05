@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using OstrixMods.BuildWorks.Geometry;
 using TMPro;
 using UnityEngine;
@@ -533,9 +534,11 @@ namespace OstrixMods.BuildWorks
             view.GizmoFamilySelected += family =>
             {
                 if (IsGizmoDragging) return;
-                gizmoFamily = family;
-                view.SetGizmoFamily(family);
+                gizmoFamily = gizmoFamily == family ? GizmoFamily.Combined : family;
+                view.HideViewportSettings();
+                view.SetGizmoFamily(gizmoFamily);
                 UpdateGizmo();
+                view.SetStatus(BuildWorksLocalization.Text("editor.gizmo_family_help"));
             };
             view.PreviewAxisRequested += axis => { if (keyboardPreview) SetKeyboardAxis(axis); };
             view.CursorSourceRequested += ChooseCursorSource;
@@ -2047,7 +2050,7 @@ namespace OstrixMods.BuildWorks
             if (tool != BlueprintEditorTool.Contour) ClearContourState();
             else if (activeTool != BlueprintEditorTool.Contour) ClearContourState();
             activeTool = tool;
-            if (tool == BlueprintEditorTool.Transform)
+            if (tool == BlueprintEditorTool.Transform || tool == BlueprintEditorTool.Select)
             { gizmoFamily = GizmoFamily.Combined; view.SetGizmoFamily(gizmoFamily); }
             selectionPending = false;
             view.SetTool(tool);
@@ -2224,8 +2227,16 @@ namespace OstrixMods.BuildWorks
         private BlueprintEditorTool SelectionGizmoTool => activeTool == BlueprintEditorTool.Select
             ? BlueprintEditorTool.Transform : activeTool;
 
-        private void SetSelectionTool() => SetActiveTool(activeTool != BlueprintEditorTool.Select &&
-            document.EditablePartSelectionCount > 0 ? BlueprintEditorTool.Transform : BlueprintEditorTool.Select);
+        private void SetSelectionTool()
+        {
+            GizmoFamily selectedFamily = gizmoFamily;
+            SetActiveTool(activeTool != BlueprintEditorTool.Select && document.EditablePartSelectionCount > 0
+                ? BlueprintEditorTool.Transform : BlueprintEditorTool.Select);
+            // Selecting another part keeps the explicitly chosen handles; choosing the tool resets them.
+            gizmoFamily = selectedFamily;
+            view.SetGizmoFamily(gizmoFamily);
+            UpdateGizmo();
+        }
 
         private bool TrySelectionPivot(
             out Vector3 pivot,
@@ -3259,7 +3270,7 @@ namespace OstrixMods.BuildWorks
                 framePointWorld.HasValue, scene != null && scene.ExperimentalGeometryPoints, IsGizmoDragging);
         }
 
-        private bool TrySave(bool closeAfterSave)
+        private bool TrySave(bool closeAfterSave, bool metadataConfirmed = false)
         {
             if (keyboardPreview) return false;
             if (!IsEditing) return false;
@@ -3284,6 +3295,16 @@ namespace OstrixMods.BuildWorks
                 }
             }
 
+            if (!metadataConfirmed)
+            {
+                view.ShowSaveMetadata(document.Name, document.Category,
+                    store.All().Select(x => x.category).Distinct(), (name, category) =>
+                    {
+                        document.SetMetadata(name, category);
+                        TrySave(closeAfterSave, metadataConfirmed: true);
+                    });
+                return false;
+            }
             state = EditorState.Saving;
             try
             {

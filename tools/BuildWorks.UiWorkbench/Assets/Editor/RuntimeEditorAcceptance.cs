@@ -298,11 +298,12 @@ public static class RuntimeEditorAcceptance
                     scene.SetViewport(view.ViewportScreenRect());
                     Call(controller, "FrameAll");
                     foreach (string state in new[] { "select", "transform", "array", "contour", "catalog",
-                        "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting" })
+                        "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "save-metadata" })
                     {
                         view.HideCatalog();
                         view.HideOutlinerMenu();
                         view.HideViewportSettings();
+                        view.HideDialog();
                         BlueprintEditorTool tool = state == "array" ? BlueprintEditorTool.Array :
                             state == "contour" ? BlueprintEditorTool.Contour :
                             state == "select" ? BlueprintEditorTool.Select : BlueprintEditorTool.Transform;
@@ -334,6 +335,8 @@ public static class RuntimeEditorAcceptance
                         }
                         else if (state == "outliner") ControllerInputAcceptance.NativeClick(view, uiCamera, "OutlinerMenuButton");
                         else if (state == "settings") ControllerInputAcceptance.NativeClick(view, uiCamera, "View");
+                        else if (state == "save-metadata") view.ShowSaveMetadata("Новый чертёж", "Дома",
+                            new[] { "Дома", "Мебель" }, (_, __) => { });
                         else Call(controller, "UpdateGizmo");
                         // Product Destroy() and TMP rebuilds must see a real frame.
                         yield return null;
@@ -434,6 +437,11 @@ public static class RuntimeEditorAcceptance
         }
         if (state == "catalog")
         {
+            RectTransform panel = Field<RectTransform>(view, "catalogPanel");
+            EnsureInside(Field<RectTransform>(view, "safeRoot"), panel);
+            Vector3[] panelCorners = new Vector3[4], statusCorners = new Vector3[4];
+            panel.GetWorldCorners(panelCorners); Field<RectTransform>(view, "status").GetWorldCorners(statusCorners);
+            Require(panelCorners[0].y >= statusCorners[2].y - .5f, "Catalog overlaps expanded context hints");
             RectTransform grid = Field<RectTransform>(view, "catalogGrid");
             Require(grid.childCount == Math.Min(96, Field<BlueprintCatalogLayout>(view, "catalogLayout").PageSize),
                 "Actual catalog does not fill its adaptive page");
@@ -458,12 +466,14 @@ public static class RuntimeEditorAcceptance
             Require(scroll.verticalNormalizedPosition <= .001f, "Material paging did not reach last items");
             EnsureInside(scroll.viewport, (RectTransform)scroll.content.Find("CatalogOption_Материал 35"));
         }
+        if (state == "save-metadata") EnsureInside(Field<RectTransform>(view, "safeRoot"),
+            (RectTransform)Field<TMP_Text>(view, "modalTitle").transform.parent);
     }
 
     private static void TestSaveRoundtrip(BlueprintEditorController controller, string path)
     {
         float expected = (float)controller.Document.Parts[0].Scale.X;
-        Require((bool)Call(controller, "TrySave", false), "Product controller save failed");
+        Require((bool)Call(controller, "TrySave", false, true), "Product controller save failed");
         Require(!controller.Document.IsDirty, "Saved document stays dirty");
         var reloaded = new CompositeBlueprintStore(path);
         Require(reloaded.All().Count == 1, "Actual disk library roundtrip");
@@ -485,7 +495,7 @@ public static class RuntimeEditorAcceptance
             input.onEndEdit.Invoke(input.text);
             Require(Math.Abs(controller.Document.Parts[0].Scale.X - percent / 100.0) < 0.00001,
                 "Actual TMP scale rejects " + percent + "%");
-            Require((bool)Call(controller, "TrySave", false), "Saving scale boundary failed");
+            Require((bool)Call(controller, "TrySave", false, true), "Saving scale boundary failed");
             var reloaded = new CompositeBlueprintStore(path);
             CheckReopenedCopy(controller, reloaded, percent / 100.0);
         }

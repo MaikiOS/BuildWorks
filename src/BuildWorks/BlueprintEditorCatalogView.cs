@@ -31,6 +31,8 @@ namespace OstrixMods.BuildWorks
         }
 
         private string CatalogText(string key) => T("editor.catalog." + key);
+        private bool CompactCatalogHints => HasCatalog && safeRoot.rect.height -
+            BlueprintEditorLayout.TopHeight - BlueprintEditorLayout.StatusHeight < 300;
         private void InitializeCatalog()
         {
             catalog = CreatePanel("CatalogOverlay", safeRoot, new Color(0f, 0f, 0f, 0.68f), null).gameObject;
@@ -97,9 +99,14 @@ namespace OstrixMods.BuildWorks
 
         private void LayoutCatalog()
         {
-            catalogLayout = BlueprintCatalogLayout.Compute(safeRoot.rect.width, safeRoot.rect.height, catalogQuick, catalogDetails);
+            float bottom = hintsExpanded && !CompactCatalogHints ? (float)BlueprintEditorLayout.StatusHeight : 72f;
+            float availableHeight = safeRoot.rect.height - (float)BlueprintEditorLayout.TopHeight - bottom;
+            float scale = Mathf.Min(.8f, availableHeight / 456f);
+            catalogLayout = BlueprintCatalogLayout.Compute(safeRoot.rect.width / scale,
+                Mathf.Max(480, availableHeight / scale), catalogQuick, catalogDetails);
             catalogPanel.sizeDelta = new Vector2((float)catalogLayout.Width, (float)catalogLayout.Height);
-            catalogPanel.localScale = Vector3.one;
+            catalogPanel.localScale = Vector3.one * scale;
+            catalogPanel.anchoredPosition = new Vector2(0, (bottom - (float)BlueprintEditorLayout.TopHeight) * .5f);
             SetTopLeft((RectTransform)catalogPartsModeButton.transform, 12, 12, 102, 36);
             SetTopLeft((RectTransform)catalogBlueprintsModeButton.transform, 120, 12, 112, 36);
             SetTopRight((RectTransform)catalogAtlasButton.transform, 280, 12, 88, 36);
@@ -127,7 +134,8 @@ namespace OstrixMods.BuildWorks
             shownCatalogItems.Clear(); if (items != null) shownCatalogItems.AddRange(items);
             catalogStateInitialized = true; catalog.SetActive(true); catalog.transform.SetAsLastSibling();
             SetPanelsInteractable(false); catalogSearch.SetTextWithoutNotify(CatalogFilter.Query);
-            RebuildCatalog(); EndTooltip();
+            ApplySafeAreaAndLayout(true);
+            EndTooltip();
         }
         private void SetCatalogMode(bool blueprint)
         {
@@ -148,7 +156,7 @@ namespace OstrixMods.BuildWorks
                 (f.Section == null || (f.Section == "favorites" ? catalogFavorites.Contains(item.PrefabName) :
                  f.Section == "recent" ? catalogRecent.Contains(item.PrefabName) :
                  catalogBlueprintMode ? f.Section == "category:" + item.Category : item.Section == f.Section)) &&
-                (f.Family == null || item.Family == f.Family) && (f.Material == null || item.Material == f.Material) &&
+                (f.Family == null || item.Family == f.Family) && (f.Material == null || item.Materials.Contains(f.Material)) &&
                 (f.Source == null || item.Source == f.Source) && (f.Station == null || item.StationId == f.Station) &&
                 (f.Kind == null || (f.Kind == "upgrades" ? item.IsUpgrade : f.Kind == "stations" ? item.IsStation : !item.IsUpgrade && !item.IsStation)) &&
                 (string.IsNullOrWhiteSpace(f.Query) || Matches(item.DisplayName, f.Query) || Matches(item.PrefabName, f.Query) ||
@@ -214,7 +222,7 @@ namespace OstrixMods.BuildWorks
             ClearCatalogChildren(catalogNavigation);
             var values = new List<string> { "all", "favorites", "recent" };
             if (catalogBlueprintMode) values.AddRange(shownCatalogItems.Where(x => x.IsBlueprint).Select(x => "category:" + x.Category).Distinct());
-            else values.AddRange(new[] { "building", "decor", "furniture", "resources", "crafting" });
+            else values.AddRange(new[] { "building", "decor", "lighting", "furniture", "resources", "crafting" });
             // ponytail: blueprint user categories scroll in Atlas; Quick has a compact category picker.
             if (catalogBlueprintMode && catalogQuick && values.Count > 8) values = new List<string> { "all", "favorites", "recent", "categories" };
             int columns = catalogQuick ? Math.Max(1, (int)Math.Floor(catalogNavigation.rect.width / 116)) : 1;
@@ -249,6 +257,7 @@ namespace OstrixMods.BuildWorks
             ClearCatalogChildren(catalogContext);
             var values = new List<string>();
             if (!catalogBlueprintMode && CatalogFilter.Section == "building") values.AddRange(new[] { "all", "walls", "floors", "roofs", "frame", "openings", "stairs" });
+            if (!catalogBlueprintMode && CatalogFilter.Section == "furniture") values.AddRange(new[] { "all", "seating", "beds", "storage", "tables", "rugs", "other_furniture" });
             if (!catalogBlueprintMode && CatalogFilter.Section == "crafting") values.AddRange(new[] { "workstation", "all", "stations", "upgrades", "devices" });
             if (values.Count == 0) return;
             ScrollRect scroll = catalogContext.GetComponent<ScrollRect>() ?? catalogContext.gameObject.AddComponent<ScrollRect>();
@@ -280,9 +289,35 @@ namespace OstrixMods.BuildWorks
             AddCatalogImage(catalogPreview, "PreviewIcon", item.Icon, 12, 78, 220, 140);
             string description = BuildWorksLocalization.CatalogLabel(item.Material) + "\n" + BuildWorksLocalization.CatalogLabel(item.Source) +
                 "\n" + item.PrefabName + (item.IsUpgrade ? "\n\n" + CatalogText("upgrade_to") + "\n" + (item.StationName ?? CatalogText("unknown_station")) : "");
-            TMP_Text body = CreateText("PreviewMetadata", catalogPreview, description, 14, FontStyles.Normal, TextAlignmentOptions.TopLeft);
+            RectTransform viewport = CreatePanel("PreviewBody", catalogPreview, Color.clear, null);
+            SetTopAnchored(viewport, 8, 224, 8, Mathf.Max(32, catalogPreview.rect.height - 286));
+            viewport.gameObject.AddComponent<RectMask2D>();
+            ScrollRect scroll = viewport.gameObject.AddComponent<ScrollRect>();
+            RectTransform content = CreateRect("PreviewBodyContent", viewport);
+            scroll.viewport = viewport; scroll.content = content; scroll.horizontal = false;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            TMP_Text body = CreateText("PreviewMetadata", content, description, 14, FontStyles.Normal, TextAlignmentOptions.TopLeft);
             body.textWrappingMode = TextWrappingModes.Normal; body.overflowMode = TextOverflowModes.Ellipsis;
-            SetTopAnchored((RectTransform)body.transform, 12, 230, 12, Mathf.Max(60, catalogPreview.rect.height - 300));
+            float metadataHeight = body.GetPreferredValues(description, 204, Mathf.Infinity).y + 8;
+            SetTopLeft((RectTransform)body.transform, 4, 0, 204, metadataHeight);
+            float y = metadataHeight;
+            TMP_Text costTitle = CreateText("PreviewCostTitle", content, CatalogText("build_cost"), 14, FontStyles.Bold, TextAlignmentOptions.TopLeft);
+            SetTopLeft(costTitle.rectTransform, 4, y, 204, 24); y += 26;
+            foreach (BlueprintEditorCatalogResource resource in item.Resources)
+            {
+                AddCatalogImage(content, "ResourceIcon", resource.Icon, 4, y, 28, 28);
+                TMP_Text row = CreateText("ResourceCost", content, resource.Name + " × " + resource.Amount, 13, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+                row.textWrappingMode = TextWrappingModes.Normal;
+                float rowHeight = Mathf.Max(32, row.GetPreferredValues(row.text, 166, Mathf.Infinity).y + 4);
+                SetTopLeft(row.rectTransform, 38, y, 166, rowHeight); y += rowHeight;
+            }
+            AddCatalogImage(content, "RequiredStationIcon", item.RequiredStationIcon, 4, y, 28, 28);
+            TMP_Text required = CreateText("RequiredStation", content,
+                CatalogText("required_station") + ": " + (item.RequiredStation ?? CatalogText("no_station")), 13, FontStyles.Normal, TextAlignmentOptions.TopLeft);
+            required.textWrappingMode = TextWrappingModes.Normal;
+            float stationHeight = Mathf.Max(36, required.GetPreferredValues(required.text, 166, Mathf.Infinity).y + 8);
+            SetTopLeft(required.rectTransform, 38, y, 166, stationHeight);
+            SetTopLeft(content, 0, 0, 212, y + stationHeight);
             if (!string.IsNullOrEmpty(item.StationId))
             {
                 AddCatalogImage(catalogPreview, "StationIcon", item.StationIcon, 12, catalogPreview.rect.height - 54, 32, 32);
@@ -311,7 +346,9 @@ namespace OstrixMods.BuildWorks
             var values = new List<KeyValuePair<string, string>> { new KeyValuePair<string, string>(null, CatalogText("all")) };
             if (kind == "station") values.AddRange(items.Where(x => x.StationId != null).GroupBy(x => x.StationId)
                 .Select(x => new KeyValuePair<string, string>(x.Key, x.First().StationName ?? x.Key)).OrderBy(x => x.Value));
-            else values.AddRange(items.Select(x => kind == "material" ? x.Material : kind == "source" ? x.Source : x.Category)
+            else if (kind == "material") values.AddRange(items.OrderBy(x => x.MaterialOrder).SelectMany(x => x.Materials)
+                .Distinct().Select(x => new KeyValuePair<string, string>(x, BuildWorksLocalization.CatalogLabel(x))));
+            else values.AddRange(items.Select(x => kind == "source" ? x.Source : x.Category)
                 .Distinct().OrderBy(x => x).Select(x => new KeyValuePair<string, string>(x, BuildWorksLocalization.CatalogLabel(x))));
             SetTopLeft(content, 0, 0, 284, values.Count * 38);
             scroll.viewport = viewport; scroll.content = content; scroll.horizontal = false; scroll.vertical = true;

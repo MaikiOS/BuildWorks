@@ -716,3 +716,23 @@ editor.catalog.material	Материал
 editor.catalog.source	Источник
 editor.catalog.station	Станок
 editor.catalog.category	Категория
+editor.gizmo_family_help	Выбирается набор видимых ручек, не действие. Выбери деталь и тяни ручку либо нажми G/R/S. Повторный выбор набора возвращает все ручки.
+editor.gizmo_show_family	Показать: {0}
+editor.save_title	СОХРАНИТЬ ЧЕРТЁЖ
+editor.save_name	Имя
+editor.save_category	Категория
+editor.save_choose	Существующие…
+editor.save_metadata_help	Выбери существующую категорию или введи новую. Отмена не меняет файл.
+editor.catalog.lighting	Освещение
+editor.catalog.seating	Сиденья
+editor.catalog.beds	Кровати
+editor.catalog.storage	Хранение
+editor.catalog.tables	Столы
+editor.catalog.rugs	Ковры
+editor.catalog.other_furniture	Прочая мебель
+editor.catalog.build_cost	Ресурсы для строительства
+editor.catalog.required_station	Нужный станок
+editor.catalog.no_station	Не требуется
+catalog.group.fine_wood	КАЧЕСТВЕННАЯ ДРЕВЕСИНА
+catalog.group.flint	КРЕМЕНЬ
+catalog.group.yggdrasil_wood	ДРЕВЕСИНА ИГГДРАСИЛЯ

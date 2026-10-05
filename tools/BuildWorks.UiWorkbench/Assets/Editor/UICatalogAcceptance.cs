@@ -272,6 +272,60 @@ internal static class UICatalogAcceptance
                 Click(Button(view, "CatalogMaterials")); view.CancelCatalog();
                 Require(view.HasCatalog && !Field<RectTransform>(view, "catalogPicker"), "Escape did not close the picker first");
                 view.CancelCatalog(); Require(!view.HasCatalog, "Second Escape did not close catalog");
+                view.ShowCatalog(new[] {
+                    new BlueprintEditorCatalogItem("lamp", "Lamp", null, "lighting", "metal", "Vanilla", 1,
+                        section: "lighting"),
+                    new BlueprintEditorCatalogItem("chair", "Chair", null, "furniture", "wood", "Vanilla", 0,
+                        section: "furniture", family: "seating", materials: new[] { "wood", "metal" },
+                        resources: new[] { new BlueprintEditorCatalogResource("Древесина", null, 4),
+                            new BlueprintEditorCatalogResource("Качественная древесина", null, 4),
+                            new BlueprintEditorCatalogResource("Камень", null, 40),
+                            new BlueprintEditorCatalogResource("Железо", null, 20),
+                            new BlueprintEditorCatalogResource("Смола", null, 20),
+                            new BlueprintEditorCatalogResource("Кожа", null, 20),
+                            new BlueprintEditorCatalogResource("Бронза", null, 20),
+                            new BlueprintEditorCatalogResource("Древняя кора", null, 20) },
+                        requiredStation: "Верстак"),
+                    new BlueprintEditorCatalogItem("ornament", "Ornament", null, "decor", "stone", "Vanilla", 2,
+                        section: "decor")
+                });
+                Click(Button(view, "CatalogReset")); Click(Button(view, "Category_lighting"));
+                Require(Field<RectTransform>(view, "catalogGrid").childCount == 1, "Lighting is not independent from decor");
+                Click(Button(view, "Category_furniture")); Click(Button(view, "CatalogFamily_seating"));
+                Require(Field<RectTransform>(view, "catalogGrid").childCount == 1, "Furniture seating filter is missing");
+                Click(Button(view, "CatalogMaterials")); Click(Button(view, "CatalogOption_metal"));
+                Require(Field<RectTransform>(view, "catalogGrid").childCount == 1, "Mixed-material part lost its second material");
+                view.GetType().GetMethod("PreviewCatalogItem", Fields).Invoke(view, new object[] {
+                    Field<List<BlueprintEditorCatalogItem>>(view, "shownCatalogItems").Find(item => item.PrefabName == "chair") });
+                RectTransform preview = Field<RectTransform>(view, "catalogPreview");
+                Require(preview.Find("PreviewBody/PreviewBodyContent/ResourceCost").GetComponent<TMP_Text>().text == "Древесина × 4" &&
+                    preview.Find("PreviewBody/PreviewBodyContent/RequiredStation").GetComponent<TMP_Text>().text.Contains("Верстак"),
+                    "Details omit actual resource counts or the construction station");
+                RectTransform costs = preview.Find("PreviewBody") as RectTransform;
+                Require(costs.GetComponent<Image>()?.raycastTarget == true,
+                    "Scrollable costs cannot receive pointer/wheel input");
+                ScrollRect costsScroll = costs.GetComponent<ScrollRect>();
+                Canvas.ForceUpdateCanvases();
+                costsScroll.OnScroll(new PointerEventData(EventSystem.current) { scrollDelta = Vector2.down * 10 });
+                Canvas.ForceUpdateCanvases();
+                Require(costsScroll.verticalNormalizedPosition < .999f, "Long construction costs do not scroll");
+                view.HideCatalog();
+                string savedName = null, savedCategory = null;
+                Action<string, string> save = (name, category) => { savedName = name; savedCategory = category; };
+                view.ShowSaveMetadata("Original", "Декор", new[] { "Декор", "Дома" }, save);
+                Click(Field<Button>(view, "dialogCancelButton"));
+                Require(savedName == null && !view.HasModal, "Cancel submitted save metadata");
+                view.ShowSaveMetadata("Original", "Декор", new[] { "Декор", "Дома" }, save);
+                TMP_InputField saveName = Field<TMP_InputField>(view, "saveMetadataName");
+                TMP_InputField saveCategory = Field<TMP_InputField>(view, "saveMetadataCategory");
+                saveName.SetTextWithoutNotify(" "); Click(Field<Button>(view, "dialogPrimaryButton"));
+                Require(savedName == null && view.HasModal, "Invalid save name was accepted");
+                Click(Button(view, "SaveChooseCategory")); Click(Button(view, "SaveCategory_1"));
+                Require(saveCategory.text == "Дома", "Existing save category could not be selected");
+                saveName.SetTextWithoutNotify(" Новый дом "); saveCategory.SetTextWithoutNotify(" Новая категория ");
+                Click(Field<Button>(view, "dialogPrimaryButton"));
+                Require(savedName == "Новый дом" && savedCategory == "Новая категория" && !view.HasModal,
+                    "New save name/category were not submitted exactly once");
                 float points = 0f, uniform = 0f;
                 bool grid = false;
                 view.ViewportSettingsChanged += (_, __, ___, pointSize, uniformSize, showGrid) =>

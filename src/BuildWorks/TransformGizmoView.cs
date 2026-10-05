@@ -244,7 +244,7 @@ namespace OstrixMods.BuildWorks
             root.SetActive(true);
             foreach (LineRenderer line in alignmentAxisLines)
                 line.gameObject.SetActive(false);
-            bool combined = !screenSpaceSizing || Family == GizmoFamily.Combined;
+            bool combined = Family == GizmoFamily.Combined;
             bool showMove = allowMove && mode != GizmoMode.Guide && mode != GizmoMode.Plane &&
                 (combined || Family == GizmoFamily.Move);
             bool showRotation = allowRotate && mode != GizmoMode.Plane &&

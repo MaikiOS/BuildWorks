@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using UnityEngine;
 using AnchorAdjustment = OstrixMods.BuildWorks.Geometry.AnchorAdjustment;
@@ -577,33 +578,67 @@ namespace OstrixMods.BuildWorks
                 StationExtension extension = prefab.GetComponent<StationExtension>();
                 CraftingStation targetStation = extension ? extension.m_craftingStation : ownStation;
                 string section = BlueprintCatalogSection(piece, ownStation || extension);
+                var resources = new List<BlueprintEditorCatalogResource>();
+                var materials = new List<string>();
+                int materialOrder = 0;
+                foreach (Piece.Requirement requirement in piece.m_resources ?? Array.Empty<Piece.Requirement>())
+                {
+                    ItemDrop item = requirement?.m_resItem;
+                    int amount = requirement?.GetAmount(1) ?? 0;
+                    if (!item || amount <= 0) continue;
+                    resources.Add(new BlueprintEditorCatalogResource(
+                        Localization.instance?.Localize(item.m_itemData.m_shared.m_name) ?? item.m_itemData.m_shared.m_name,
+                        item.m_itemData.GetIcon(), amount));
+                    string group = BlueprintCatalogMaterial(item.gameObject.name, out int order);
+                    if (group == item.gameObject.name) group = item.m_itemData.m_shared.m_name;
+                    if (!materials.Contains(group)) materials.Add(group);
+                    materialOrder = Math.Max(materialOrder, order);
+                }
                 result.Add(new BlueprintEditorCatalogItem(
                     prefabName,
                     ResolveBlueprintEditorName(prefabName),
                     piece.m_icon,
                     BlueprintEditorCategoryName(piece.m_category),
-                    HammerCatalogOrganizer.Group(piece),
+                    materials.Count > 0 ? materials[0] : HammerCatalogOrganizer.OtherGroup,
                     UnifiedHammerCatalog.OdinSourceGroup(piece) ??
                         HammerCatalogOrganizer.VanillaSource,
                     index, section: section, family: BlueprintCatalogFamily(piece),
                     stationId: targetStation ? targetStation.m_name : null,
                     stationName: targetStation ? Localization.instance?.Localize(targetStation.m_name) ?? targetStation.m_name : null,
                     stationIcon: targetStation ? targetStation.m_icon : null,
-                    isStation: ownStation, isUpgrade: extension));
+                    isStation: ownStation, isUpgrade: extension,
+                    resources: resources, materials: materials, materialOrder: materialOrder,
+                    requiredStation: piece.m_craftingStation ? Localization.instance?.Localize(piece.m_craftingStation.m_name) ?? piece.m_craftingStation.m_name : null,
+                    requiredStationIcon: piece.m_craftingStation ? piece.m_craftingStation.m_icon : null));
             }
             result.Sort((left, right) =>
             {
                 int priority = CatalogPriority(left).CompareTo(CatalogPriority(right));
-                return priority != 0 ? priority : left.Index.CompareTo(right.Index);
+                if (priority != 0) return priority;
+                int material = left.MaterialOrder.CompareTo(right.MaterialOrder);
+                return material != 0 ? material : left.Index.CompareTo(right.Index);
             });
             foreach (CompositeBlueprintStore.Blueprint blueprint in blueprintStore.All())
             {
                 if (!blueprintPieceRegistry.TryGetPiece(blueprint, out Piece piece) || !piece)
                     continue;
+                var costs = blueprintPieceRegistry.Resources(blueprint)
+                    .Select(x => new BlueprintEditorCatalogResource(x.Name, x.Icon, x.Amount)).ToList();
+                string requiredStations = null; Sprite requiredIcon = null;
+                if (TryResolveBlueprintPieces(player, blueprint, out List<Piece> blueprintParts, out _))
+                {
+                    var stations = blueprintParts.Where(x => x.m_craftingStation)
+                        .Select(x => x.m_craftingStation).GroupBy(x => x.m_name).Select(x => x.First()).ToList();
+                    if (stations.Count > 0)
+                    {
+                        requiredStations = string.Join(", ", stations.Select(x => Localization.instance?.Localize(x.m_name) ?? x.m_name));
+                        requiredIcon = stations[0].m_icon;
+                    }
+                }
                 result.Add(new BlueprintEditorCatalogItem(PrefabName(piece), blueprint.name,
                     piece.m_icon, blueprint.category, HammerCatalogOrganizer.BlueprintsGroup,
                     "my_blueprints",
-                    result.Count, blueprint));
+                    result.Count, blueprint, resources: costs, requiredStation: requiredStations, requiredStationIcon: requiredIcon));
             }
             return result;
         }
@@ -612,8 +647,8 @@ namespace OstrixMods.BuildWorks
         {
             bool vanilla = string.Equals(item.Source, HammerCatalogOrganizer.VanillaSource,
                 StringComparison.Ordinal);
-            bool building = string.Equals(item.Category, "building", StringComparison.Ordinal);
-            return vanilla && building ? 0 : vanilla ? 1 : building ? 2 : 3;
+            bool building = string.Equals(item.Section, "building", StringComparison.Ordinal);
+            return building ? 0 : vanilla ? 1 : 2;
         }
 
         private static string BlueprintCatalogSection(Piece piece, bool workstation)
@@ -621,7 +656,8 @@ namespace OstrixMods.BuildWorks
             Piece.UsageTagFlags usage = piece.m_usage;
             if (workstation || (usage & Piece.UsageTagFlags.Crafting) != 0) return "crafting";
             if ((usage & Piece.UsageTagFlags.Stacks) != 0) return "resources";
-            if ((usage & (Piece.UsageTagFlags.Decor | Piece.UsageTagFlags.Lighting)) != 0) return "decor";
+            if ((usage & Piece.UsageTagFlags.Lighting) != 0) return "lighting";
+            if ((usage & Piece.UsageTagFlags.Decor) != 0) return "decor";
             if ((usage & (Piece.UsageTagFlags.Furniture | Piece.UsageTagFlags.Storage)) != 0) return "furniture";
             if ((usage & (Piece.UsageTagFlags.Building | Piece.UsageTagFlags.Floor | Piece.UsageTagFlags.Wall |
                 Piece.UsageTagFlags.Roof | Piece.UsageTagFlags.Architecture | Piece.UsageTagFlags.Stairs | Piece.UsageTagFlags.Doors)) != 0) return "building";
@@ -637,6 +673,16 @@ namespace OstrixMods.BuildWorks
 
         private static string BlueprintCatalogFamily(Piece piece)
         {
+            string prefab = PrefabName(piece).ToLowerInvariant();
+            if (BlueprintCatalogSection(piece, false) == "furniture")
+            {
+                if ((piece.m_usage & Piece.UsageTagFlags.Storage) != 0) return "storage";
+                if (piece.GetComponent<Bed>()) return "beds";
+                if (prefab.Contains("chair") || prefab.Contains("bench") || prefab.Contains("stool") || prefab.Contains("throne")) return "seating";
+                if (prefab.Contains("table")) return "tables";
+                if (prefab.Contains("rug") || prefab.Contains("carpet")) return "rugs";
+                return "other_furniture";
+            }
             Piece.UsageTagFlags usage = piece.m_usage;
             if ((usage & Piece.UsageTagFlags.Doors) != 0) return "openings";
             if ((usage & Piece.UsageTagFlags.Stairs) != 0) return "stairs";
@@ -653,6 +699,28 @@ namespace OstrixMods.BuildWorks
             if (name.Contains("wall")) return "walls";
             if (name.Contains("pole") || name.Contains("beam")) return "frame";
             return null;
+        }
+
+        private static string BlueprintCatalogMaterial(string prefab, out int order)
+        {
+            // Native requirement IDs, not the piece name or its visual appearance.
+            switch (prefab)
+            {
+                case "Wood": order = 0; return "wood";
+                case "Stone": order = 1; return "stone";
+                case "Flint": order = 1; return "flint";
+                case "RoundLog": order = 2; return "core_wood";
+                case "FineWood": order = 2; return "fine_wood";
+                case "Copper": case "Bronze": order = 3; return "metal";
+                case "Iron": order = 4; return "metal";
+                case "Crystal": order = 5; return "glass";
+                case "Tar": order = 6; return "dark_wood";
+                case "YggdrasilWood": order = 7; return "yggdrasil_wood";
+                case "BlackMarble": order = 7; return "black_marble";
+                case "Grausten": order = 8; return "grausten";
+                case "Ashwood": order = 8; return "ash_wood";
+                default: order = 9; return prefab;
+            }
         }
 
         private static string BlueprintEditorCategoryName(Piece.PieceCategory category)

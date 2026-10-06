@@ -753,3 +753,33 @@ blueprint.sign_unsupported	Sign text is unsupported or exceeds this piece's nati
 blueprint.sign_capture_failed	Sign text is unavailable or invalid: {0}. Nothing was saved.
 blueprint.sign_apply_failed	The piece was placed, but its sign text was refused or failed. Check access and the sign; subsequent placement is paused if there are more pieces.
 catalog.group.external_blueprints	SOURCE LIBRARIES
+editor.support.name	Support {0}
+editor.support.branch	Supports ({0})
+editor.support.create	+ Create support
+editor.support.limit	Maximum supports: {0}
+editor.support.title	Support · {0}
+editor.support.centre	Use as transform centre
+editor.support.placement	Use for placement
+editor.support.clear_placement	Clear placement support
+editor.support.placement_role	Placement
+editor.support.delete	Delete support
+editor.support.reset_centre	Reset transform centre
+editor.support.select_parts	Select editable parts first, then select this support.
+editor.support.edit_hint	Editing the support only. G — move; R — rotate; Enter — apply; Esc — cancel. Parts stay unchanged. Scale does not apply to supports.
+editor.support.no_scale	Supports have no scale. Use G or R; the current preview stays active.
+editor.support.centre_clear	Normal transform centre restored. Parts are editable again.
+editor.support.centre_hint	The support is now the transform centre of the selected parts. The support itself stays unchanged.
+editor.support.preview	Support preview only: XYZ {0} / {1} / {2} m; rotation {3} / {4} / {5}°. Enter — apply; Esc — cancel. Parts stay unchanged.
+editor.support.scope	Support: {0} · G — move · R — rotate · Enter — apply · Esc — cancel
+editor.support.actions	Delete — remove support · click a piece — edit pieces
+editor.support.centre_role	Transform centre
+editor.support.modes	Ctrl+1 — select · Ctrl+2 — gizmo · Space/F3 — tools · Tab — catalog
+exchange.import	Import file
+exchange.export	Export file
+exchange.path_help	Full path to .buildworks.json, .blueprint, .vbuild or .zip. A separate copy goes to BuildWorks/imports; the original stays unchanged.
+exchange.loading	Loading blueprint library in the background…
+exchange.ready	Blueprint library updated. Use ⋯ to edit/export; click a card to place.
+exchange.exported	Export saved: {0}
+exchange.exists	The library already contains this file: {0}
+import.format	Unsupported blueprint file format.
+editor.support.add_short	+ Support

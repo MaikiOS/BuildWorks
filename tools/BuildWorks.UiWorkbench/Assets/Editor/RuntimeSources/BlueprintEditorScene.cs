@@ -203,6 +203,7 @@ namespace OstrixMods.BuildWorks
         private readonly Light rimLight;
         private readonly TransformGizmoView gizmo;
         internal GizmoFamily GizmoFamily { get => gizmo.Family; set => gizmo.Family = value; }
+        internal bool GizmoScaleEnabled { set => gizmo.ScaleEnabled = value; }
         internal Vector2 GizmoMouse { set => gizmo.EditorMouse = value; }
         private readonly List<VisualNode> contourPreviews = new List<VisualNode>();
         private readonly List<VisualNode> duplicatePreviews = new List<VisualNode>();
@@ -220,6 +221,10 @@ namespace OstrixMods.BuildWorks
         private bool temporarySelectionHighlight;
         private bool occludersDirty = true;
         private VisualNode activeSnapVisual;
+        internal Quaternion SnapTargetRotation => activeSnapVisual?.Root
+            ? activeSnapVisual.Root.transform.rotation : Quaternion.identity;
+        internal Quaternion PlacementFinalRotation { get; private set; }
+        private Vector3 placementSnapSourceWorld;
         private Mesh targetOutlineMesh;
         private GameObject targetOutline;
         internal bool OccluderFadeEnabled { get; private set; }
@@ -299,7 +304,7 @@ namespace OstrixMods.BuildWorks
             set { if (experimentalGeometryPoints == value) return; experimentalGeometryPoints = value; InvalidateGizmoAnchors(); }
         }
 
-        internal void SetGizmoModelSize(IReadOnlyList<string> ids)
+        internal void SetGizmoModelSize(IReadOnlyList<string> ids, float minimum = .0001f)
         {
             // Local dimensions transformed as vectors: rotation and camera cannot inflate the reference.
             float diagonal = 0f;
@@ -317,7 +322,7 @@ namespace OstrixMods.BuildWorks
                     diagonal = Mathf.Max(diagonal, Mathf.Sqrt(squared));
                 }
             }
-            gizmo.ModelSize = Mathf.Max(.0001f, diagonal * .4f);
+            gizmo.ModelSize = Mathf.Max(minimum, diagonal * .4f);
         }
         internal float GroundHeight => groundHeight;
 
@@ -929,9 +934,11 @@ namespace OstrixMods.BuildWorks
 
         internal void ShowBlueprintPlacementPreview(IReadOnlyList<BlueprintEditorPart> preview,
             Vector3 surfacePoint, out Vector3 offset, bool snap = false,
-            int manualSnapPoint = -1)
+            int manualSnapPoint = -1, Quaternion? inputRotation = null)
         {
             PlacementSnapTarget = null;
+            PlacementFinalRotation = inputRotation ?? Quaternion.identity;
+            activeSnapVisual = null;
             placementSnapPreviewTargets.Clear();
             placementSnapPreviewNative.Clear();
             ShowDuplicatePreview(preview);
@@ -956,6 +963,19 @@ namespace OstrixMods.BuildWorks
                 foreach (VisualNode visual in duplicatePreviews)
                     AccumulatePlacementSnapOffset(
                         visual, manualSnapPoint, ref sourceIndex, ref best, ref snapOffset);
+                if (PlacementSnapTarget.HasValue)
+                {
+                    Quaternion alignment = SnapTargetRotation;
+                    Vector3 pivot = surfacePoint + offset;
+                    snapOffset = PlacementSnapTarget.Value - (pivot + alignment * (placementSnapSourceWorld - pivot));
+                    foreach (VisualNode visual in duplicatePreviews)
+                    {
+                        Transform root = visual.Root.transform;
+                        root.position = pivot + alignment * (root.position - pivot);
+                        root.rotation = alignment * root.rotation;
+                    }
+                    PlacementFinalRotation = alignment * PlacementFinalRotation;
+                }
                 foreach (VisualNode visual in duplicatePreviews)
                     visual.Root.transform.position += snapOffset;
                 offset += snapOffset;
@@ -1386,6 +1406,8 @@ namespace OstrixMods.BuildWorks
             placementSnapPreviewTargets.Clear();
             placementSnapPreviewNative.Clear();
             warning = null;
+            PlacementFinalRotation = rotation;
+            activeSnapVisual = null;
             try
             {
                 if (placementPreview == null ||
@@ -1429,7 +1451,13 @@ namespace OstrixMods.BuildWorks
                     int sourceIndex = 0;
                     AccumulatePlacementSnapOffset(
                         placementPreview, manualSnapPoint, ref sourceIndex, ref best, ref offset);
-                    position += offset;
+                    if (PlacementSnapTarget.HasValue)
+                    {
+                        Vector3 sourceLocal = placementPreview.Root.transform.InverseTransformPoint(placementSnapSourceWorld);
+                        PlacementFinalRotation = SnapTargetRotation * rotation;
+                        placementPreview.Root.transform.rotation = PlacementFinalRotation;
+                        position += PlacementSnapTarget.Value - placementPreview.Root.transform.TransformPoint(sourceLocal);
+                    }
                 }
                 placementPreview.Root.transform.localPosition = position;
                 finalPosition = position;
@@ -1453,10 +1481,12 @@ namespace OstrixMods.BuildWorks
             ref Vector3 offset)
         {
             if (source == null || source.PlacementLocal.Count == 0) return;
+            int firstSourceIndex = sourceIndex;
             foreach (Vector3 sourceLocal in source.PlacementLocal)
             {
                 bool enabled = manualSnapPoint < 0 || manualSnapPoint == sourceIndex;
                 ++sourceIndex;
+                if (NativePointsOnly && sourceIndex - firstSourceIndex - 1 >= source.NativeSnapCount && manualSnapPoint < 0) continue;
                 if (!enabled) continue;
                 Vector3 sourceWorld = source.Root.transform.TransformPoint(sourceLocal);
                 foreach (VisualNode visual in visuals.Values)
@@ -1466,6 +1496,7 @@ namespace OstrixMods.BuildWorks
                         targetIndex < visual.PlacementLocal.Count;
                         ++targetIndex)
                     {
+                        if (NativePointsOnly && targetIndex >= visual.NativeSnapCount) continue;
                         Vector3 targetLocal = visual.PlacementLocal[targetIndex];
                         Vector3 targetWorld = visual.Root.transform.TransformPoint(targetLocal);
                         float distance = (targetWorld - sourceWorld).sqrMagnitude;
@@ -1477,6 +1508,8 @@ namespace OstrixMods.BuildWorks
                         best = distance;
                         offset = targetWorld - sourceWorld;
                         PlacementSnapTarget = targetWorld;
+                        placementSnapSourceWorld = sourceWorld;
+                        activeSnapVisual = visual;
                     }
                 }
             }

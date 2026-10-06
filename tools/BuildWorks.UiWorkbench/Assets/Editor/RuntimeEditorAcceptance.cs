@@ -183,6 +183,8 @@ public static class RuntimeEditorAcceptance
             checks.Add(PlacementContactAcceptance.Run());
             TestSignPayload();
             TestPlacementSupportFrame();
+            foreach (object step in ItemStandPreviewAcceptance.Run(template, output)) yield return step;
+            checks.Add("Actual ItemStand renderer-only adapter: horizontal/wall offsets, quality/variant, nested/duplicate anchors, holder XYZ scale/rotation, selection/move/Undo, temporary copies and content cache replacement; invalid/missing contents explain failure without data loss; thumbnail/rotatable preview, source/material/script isolation. Native inventory/world/armour remain unverified.");
             checks.Add(UICatalogAcceptance.Run(fontTemplate.font));
             foreach (object step in ControllerInputAcceptance.Run(template, fontTemplate, output)) yield return step;
             foreach (object step in ControllerInputAcceptance.RunSupportLifecycle(template, fontTemplate, output)) yield return step;

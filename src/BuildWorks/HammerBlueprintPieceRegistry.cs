@@ -306,10 +306,11 @@ namespace OstrixMods.BuildWorks
         }
 
         public Sprite RefreshThumbnail(
-            CompositeBlueprintStore.Blueprint blueprint)
+            CompositeBlueprintStore.Blueprint blueprint, out string error)
         {
+            error = null;
             if (!TrySources(blueprint, out IReadOnlyList<Piece> pieces)) return null;
-            Sprite sprite = thumbnailRenderer.Refresh(blueprint, pieces);
+            Sprite sprite = thumbnailRenderer.Refresh(blueprint, pieces, out error);
             if (sprite && piecesByBlueprintId.TryGetValue(
                 blueprint.id,
                 out Piece iconPiece))
@@ -321,10 +322,11 @@ namespace OstrixMods.BuildWorks
         }
 
         public BlueprintThumbnailRenderer.PreviewSession BeginPreview(
-            CompositeBlueprintStore.Blueprint blueprint)
+            CompositeBlueprintStore.Blueprint blueprint, out string error)
         {
+            error = null;
             return TrySources(blueprint, out IReadOnlyList<Piece> pieces)
-                ? thumbnailRenderer.BeginPreview(blueprint, pieces)
+                ? thumbnailRenderer.BeginPreview(blueprint, pieces, out error)
                 : null;
         }
 

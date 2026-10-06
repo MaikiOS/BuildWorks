@@ -5,9 +5,9 @@
     <Nullable>disable</Nullable>
     <AssemblyName>BuildWorks</AssemblyName>
     <RootNamespace>OstrixMods.BuildWorks</RootNamespace>
-<Version>0.19.69</Version>
-<AssemblyVersion>0.19.69.0</AssemblyVersion>
-<FileVersion>0.19.69.0</FileVersion>
+<Version>0.19.70</Version>
+<AssemblyVersion>0.19.70.0</AssemblyVersion>
+<FileVersion>0.19.70.0</FileVersion>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <OutputPath>$(MSBuildThisFileDirectory)..\..\artifacts\bin\</OutputPath>
     <ProfileRoot Condition="'$(ProfileRoot)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..\'))</ProfileRoot>
@@ -49,6 +49,10 @@
     </Reference>
     <Reference Include="UnityEngine.PhysicsModule">
       <HintPath>$(ValheimManagedDir)\UnityEngine.PhysicsModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.ParticleSystemModule">
+      <HintPath>$(ValheimManagedDir)\UnityEngine.ParticleSystemModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.UI">

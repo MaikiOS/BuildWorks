@@ -97,7 +97,7 @@ namespace OstrixMods.BuildWorks
                 blueprintId = item.Blueprint.id;
                 if (!queued.Remove(blueprintId)) continue;
                 if (failures.Contains(blueprintId)) continue;
-                sprite = RenderAndStore(item.Blueprint, item.Pieces);
+                sprite = RenderAndStore(item.Blueprint, item.Pieces, out _);
                 return sprite;
             }
             return false;
@@ -105,14 +105,12 @@ namespace OstrixMods.BuildWorks
 
         public Sprite Refresh(
             CompositeBlueprintStore.Blueprint blueprint,
-            IReadOnlyList<Piece> pieces)
+            IReadOnlyList<Piece> pieces, out string error)
         {
+            error = null;
             if (blueprint == null || string.IsNullOrWhiteSpace(blueprint.id)) return null;
-            RemoveCached(blueprint.id);
-            failures.Remove(blueprint.id);
-            queued.Remove(blueprint.id);
-            RemovePending(blueprint.id);
-            return RenderAndStore(blueprint, pieces);
+            Delete(blueprint.id);
+            return RenderAndStore(blueprint, pieces, out error);
         }
 
         public void Delete(string blueprintId)
@@ -136,8 +134,9 @@ namespace OstrixMods.BuildWorks
 
         public PreviewSession BeginPreview(
             CompositeBlueprintStore.Blueprint blueprint,
-            IReadOnlyList<Piece> pieces)
+            IReadOnlyList<Piece> pieces, out string error)
         {
+            error = null;
             if (blueprint == null || blueprint.parts == null || pieces == null ||
                 blueprint.parts.Count != pieces.Count || CompositeBlueprintStore.InteractiveError(blueprint.parts.Count) != null) return null;
             try
@@ -146,6 +145,7 @@ namespace OstrixMods.BuildWorks
             }
             catch (Exception exception)
             {
+                error = exception.Message;
                 Debug.LogWarning("BuildWorks could not open blueprint preview: " + exception);
                 return null;
             }
@@ -153,8 +153,9 @@ namespace OstrixMods.BuildWorks
 
         private Sprite RenderAndStore(
             CompositeBlueprintStore.Blueprint blueprint,
-            IReadOnlyList<Piece> pieces)
+            IReadOnlyList<Piece> pieces, out string error)
         {
+            error = null;
             if (blueprint == null || blueprint.parts == null || pieces == null ||
                 blueprint.parts.Count != pieces.Count || CompositeBlueprintStore.InteractiveError(blueprint.parts.Count) != null) return null;
 
@@ -186,6 +187,7 @@ namespace OstrixMods.BuildWorks
             }
             catch (Exception exception)
             {
+                error = exception.Message;
                 try
                 {
                     if (!string.IsNullOrEmpty(temporary) && File.Exists(temporary))
@@ -291,7 +293,7 @@ namespace OstrixMods.BuildWorks
 
         private string ThumbnailPath(string blueprintId) => Path.Combine(
             directory,
-            Path.GetFileName(blueprintId) + ".png");
+            Path.GetFileName(blueprintId) + "-contents-v1.png");
 
         private static Sprite Render(
             CompositeBlueprintStore.Blueprint blueprint,
@@ -318,6 +320,9 @@ namespace OstrixMods.BuildWorks
                         "Part_" + index,
                         ThumbnailLayer);
                     visual.transform.SetParent(root.transform, false);
+                    BlueprintItemStandPreview.TryAdd(piece.gameObject, visual,
+                        blueprint.parts[index].foreignData?.ToGeometry(), out string warning);
+                    if (warning != null) throw new InvalidOperationException(warning);
                     visual.transform.localPosition = blueprint.parts[index].position.ToVector3();
                     visual.transform.localRotation = blueprint.parts[index].rotation.ToQuaternion();
                     visual.transform.localScale = Vector3.Scale(
@@ -564,6 +569,9 @@ namespace OstrixMods.BuildWorks
                             "Part_" + index,
                             ThumbnailLayer);
                         visual.transform.SetParent(root.transform, false);
+                        BlueprintItemStandPreview.TryAdd(piece.gameObject, visual,
+                            blueprint.parts[index].foreignData?.ToGeometry(), out string warning);
+                        if (warning != null) throw new InvalidOperationException(warning);
                         visual.transform.localPosition = blueprint.parts[index].position.ToVector3();
                         visual.transform.localRotation = blueprint.parts[index].rotation.ToQuaternion();
                         visual.transform.localScale = Vector3.Scale(

@@ -749,7 +749,7 @@ import.transform	Invalid/out-of-range transform or scale (line {0}).
 import.part_limit	A blueprint file must contain 2–50000 pieces. Nothing is truncated.
 import.interactive_limit	This construction is preserved, but exceeds the current interactive preview budget ({0}). Large-scene rendering is not ready yet.
 import.payload_pending	Custom sockets are preserved in the document. Their persistent world integration is not ready; placement is blocked rather than losing them.
-import.foreign_pending	Foreign object data is preserved, but its contents are not yet displayed or restored in the world. Placement is blocked until the native adapter is ready; geometry editing/save/export remain available.
+import.foreign_pending	Foreign object data is preserved. Known item-stand contents can be previewed, but full native restoration in the world is not ready. Placement is blocked; geometry editing/save/export remain available.
 blueprint.sign_unsupported	Sign text is unsupported or exceeds this piece's native text limit: {0}
 blueprint.sign_capture_failed	Sign text is unavailable or invalid: {0}. Nothing was saved.
 blueprint.sign_apply_failed	The piece was placed, but its sign text was refused or failed. Check access and the sign; subsequent placement is paused if there are more pieces.
@@ -803,3 +803,7 @@ exchange.invalid_name	Enter a file name without path separators or <>:"/\\|?*. T
 exchange.imported	A separate source copy is saved at: {0}
 import.format	Unsupported blueprint file format.
 editor.support.add_short	+ Support
+editor.item_preview_warning	{0}: contents preview unavailable — {1}
+editor.item_preview_invalid	unrecognized or invalid item-stand data; the original is preserved
+editor.item_preview_missing	the required item prefab is not installed; the original is preserved
+editor.item_preview_unsupported	attachment, quality, variant, orientation or scripted visuals are unsupported; the original is preserved

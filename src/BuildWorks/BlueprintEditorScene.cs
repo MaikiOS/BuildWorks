@@ -124,6 +124,8 @@ namespace OstrixMods.BuildWorks
         private sealed class VisualNode
         {
             public string PrefabName;
+            public BlueprintForeignPartData ForeignData;
+            public string ContentWarning;
             public bool Placeholder;
             public bool Locked;
             public GameObject Root;
@@ -492,7 +494,8 @@ namespace OstrixMods.BuildWorks
                     GameObject source = sources[part.StableId];
                     bool placeholder = !source;
                     if (!visuals.TryGetValue(part.StableId, out VisualNode visual) ||
-                        visual.PrefabName != part.PrefabName || visual.Placeholder != placeholder)
+                        visual.PrefabName != part.PrefabName || visual.Placeholder != placeholder ||
+                        !ReferenceEquals(visual.ForeignData, part.ForeignData))
                     {
                         visual = CreateVisual(part, source, cacheMaterials: true);
                         visual.Root.SetActive(false);
@@ -538,6 +541,9 @@ namespace OstrixMods.BuildWorks
             warning = missingPrefabs.Count == 0
                 ? null
                 : "Missing prefab placeholder: " + string.Join(", ", missingPrefabs);
+            foreach (VisualNode visual in visuals.Values)
+                if (visual.ContentWarning != null) warning = string.IsNullOrEmpty(warning)
+                    ? visual.ContentWarning : warning + "\n" + visual.ContentWarning;
             return true;
         }
 
@@ -1003,7 +1009,8 @@ namespace OstrixMods.BuildWorks
                 {
                     BlueprintEditorPart part = preview[index];
                     VisualNode visual = index < target.Count ? target[index] : null;
-                    if (visual == null || visual.PrefabName != part.PrefabName)
+                    if (visual == null || visual.PrefabName != part.PrefabName ||
+                        !ReferenceEquals(visual.ForeignData, part.ForeignData))
                     {
                         GameObject source = resolveVisualSource(part.PrefabName);
                         if (!source)
@@ -2041,6 +2048,7 @@ namespace OstrixMods.BuildWorks
             var result = new VisualNode
             {
                 PrefabName = part.PrefabName,
+                ForeignData = part.ForeignData,
                 Placeholder = !source
             };
             try
@@ -2051,6 +2059,8 @@ namespace OstrixMods.BuildWorks
                     : CreatePlaceholder(part.StableId, result.OwnedAssets);
                 result.Root.transform.SetParent(root.transform, false);
                 if (source) result.Root.transform.localScale = source.transform.lossyScale;
+                if (source) BlueprintItemStandPreview.TryAdd(source, result.Root,
+                    part.ForeignData, out result.ContentWarning);
                 result.BaseScale = result.Root.transform.localScale;
                 if (source) result.NativeSnapCount = CaptureSnapPoints(
                     source.transform, result.SnapLocal,
@@ -2065,7 +2075,8 @@ namespace OstrixMods.BuildWorks
                     {
                         // Only document visuals share immutable base materials. Temporary
                         // previews mutate their tint and retain per-visual ownership.
-                        bool share = cacheMaterials && source && sourceMaterials[index];
+                        bool share = cacheMaterials && source && sourceMaterials[index] &&
+                            sourceMaterials[index].hideFlags != HideFlags.HideAndDontSave;
                         if (!share || !sharedPreviewMaterials.TryGetValue(sourceMaterials[index], out Material preview))
                         {
                             preview = CreatePreviewMaterial(sourceMaterials[index], !source,

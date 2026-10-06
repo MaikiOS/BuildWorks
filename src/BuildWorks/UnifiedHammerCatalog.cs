@@ -2934,10 +2934,10 @@ namespace OstrixMods.BuildWorks
             CompositeBlueprintStore.Blueprint blueprint)
         {
             ClosePreview();
-            previewSession = blueprintRegistry.BeginPreview(blueprint);
+            previewSession = blueprintRegistry.BeginPreview(blueprint, out string error);
             if (previewSession == null)
             {
-                ShowStatus(BuildWorksLocalization.Text("catalog.preview.open_failed"));
+                ShowStatus(error ?? BuildWorksLocalization.Text("catalog.preview.open_failed"));
                 return;
             }
             previewBlueprint = blueprint;
@@ -3081,8 +3081,8 @@ namespace OstrixMods.BuildWorks
                 return;
             }
             ClosePreview();
-            if (!blueprintRegistry.RefreshThumbnail(blueprint))
-                ShowStatus(BuildWorksLocalization.Text("catalog.preview.save_failed"));
+            if (!blueprintRegistry.RefreshThumbnail(blueprint, out error))
+                ShowStatus(error ?? BuildWorksLocalization.Text("catalog.preview.save_failed"));
             Invalidate();
         }
 

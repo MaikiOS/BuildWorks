@@ -2,7 +2,20 @@
 
 **English** | [Русский](blueprint-format_RU.md)
 
-Current source **0.19.69**: Store v13 / portable v4 retain inert per-part foreign info/ZDO/chance;
+Current source **0.19.70**: renderer-only ItemStand preview is implemented in Scene/thumbnail/rotatable preview.
+The verified PlanBuild four-field info schema is decoded for installed items only. Native read-only helpers select
+the target/attach subtree/orientation offsets and quality scale; native ItemStyle changes owned materials only.
+Invalid/missing/unsupported state reports a reason in the editor and retains raw data. Particle effects,
+unknown equipment scripts and unsupported renderer types fail explicitly; manual previews surface the reason,
+and failed thumbnail refresh invalidates generated disk cache. No gameplay prefab, inventory, ZDO, RPC
+or native SetVisualItem is created/executed.
+Preview caches rebuild when immutable foreign payload changes; thumbnail cache names version the content renderer.
+Build/host contract and isolated Unity fixtures pass; these prove supported static preview rules, not native gameplay parity.
+ArmorStand requires an inert skeleton/bone-binding/pose fixture: current VisEquipment/SetPose paths require network data
+and scripted cloth/effects. Full catalogue/attachment authoring, typed native item state and world restoration remain pending.
+Store v13 / portable v4 and the shared foreign-state world-placement guard remain unchanged.
+
+Previous source **0.19.69**: Store v13 / portable v4 retain inert per-part foreign info/ZDO/chance;
 unknown root sections remain exact source text. Editor transforms/copy/history/save/exchange preserve them.
 Source-only v12/v3 migrate. Native execution/display adapters are not implemented: editor warning and shared
 world guard prevent silently placing empty holders or dropping object behavior. Geometry editing is available.
@@ -79,7 +92,7 @@ permission and networking rules: a blueprint is a recipe, not an item duplicatio
 Proof: editor selection/attachment/removal and Undo; exact disk/portable roundtrip; imported display
 state; actual holder placement, contents after save/reload, removal without duplication and remote client.
 Modded items/holders require capability checks; installing arbitrary foreign code is not authorized.
-This extension is recorded, not implemented. The existing goal remains active.
+The full extension remains unfinished; .70 implements read-only ItemStand preview only. The existing goal remains active.
 
 | Stage | Owner | Required proof |
 | --- | --- | --- |

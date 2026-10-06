@@ -2,6 +2,27 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.70 — read-only ItemStand contents preview; not deployed
+
+PlanBuild four-field item info is decoded for installed items on renderer-only copies in the editor,
+thumbnails and rotatable preview. Verified native read-only attachment/offset/quality rules and
+owned ItemStyle materials preserve horizontal/wall layout, nested anchors and holder XYZ transforms.
+Selection/movement/Undo/copies and foreign-payload cache replacement include the contents.
+Missing/invalid/scripted particle or unsupported renderer contents report a reason; thumbnails/preview
+fail explicitly rather than silently showing empty holders. Failed refresh invalidates generated disk cache.
+Raw info/ZDO/chance remain unchanged. No gameplay prefab, inventory, ZDO/RPC or SetVisualItem executes.
+
+Release zero warnings/errors; 108 Geometry, Store, eight Bridge, 12 WorldLayout, 808 Localization keys,
+HostContract, guarded deployment checks and format PASS. Isolated Unity: 180 fresh states PASS,
+including attachment math, quality/variant/source-material isolation, unsupported-state errors and
+thumbnail cache invalidation across reopening; gameHostTested=false. Independent correctness findings
+(particle omission, renderer omission, hidden preview failures and stale thumbnail cache) were fixed;
+Ponytail PASS. The verify helper is absent; direct checks and independent review were used.
+Installed TerrainRamp-1.0-Test remains .67. No deployment, Valheim launch, save edits, push or publication.
+Goal extension is recorded in the roadmap/spec: ordinary item catalogue and free/attached placement,
+holder/slot relationships, authoring/copy/history/exchange, ArmorStand rig/pose and native world restoration
+remain unfinished. Heavy scenes above 512 and durable custom world sockets/reload/client also remain; goal active.
+
 ## Checkpoint 0.19.69 — inert foreign object state; not deployed
 
 Store v13 / portable v4 retain part-bound foreign info/ZDO/chance and exact unknown source sections.

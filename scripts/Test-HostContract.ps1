@@ -819,7 +819,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.69.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.70.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -2823,4 +2823,34 @@ Assert-Contract ($resolveCalls -match 'CompositeBlueprintStore::HasForeignData' 
     $sessionSource -match 'if \(!forEditor && CompositeBlueprintStore\.HasForeignData\(blueprint\)\)\s*\{ missingPrefab = BuildWorksLocalization\.Text\("import.foreign_pending"\); return false; \}') `
     'Foreign payload must block native world placement without blocking geometry editing.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.69 and Valheim Steam build 25185596.'
+$standType = $hostAssembly.MainModule.Types | Where-Object Name -eq 'ItemStand'
+foreach ($name in 'GetAttach', 'GetAttachPrefab', 'GetAttachGameObject', 'GetOrientationSettings', 'IsUnsupported', 'IsSupported') {
+    $nativeHelper = @($standType.Methods | Where-Object { $_.Name -eq $name -and $_.IsPublic })
+    Assert-Contract ($nativeHelper.Count -eq 1) "ItemStand read-only helper changed: $name"
+    $operands = ($nativeHelper[0].Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+    Assert-Contract ($operands -notmatch 'ZDO::|ZNetView::|Inventory::|Object::Instantiate|::Setup\(') "ItemStand helper gained side effects: $name"
+}
+$nativeStandVisual = $standType.Methods | Where-Object { $_.Name -eq 'SetVisualItem' -and $_.Parameters.Count -eq 4 }
+$standVisualCalls = ($nativeStandVisual.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($standVisualCalls -match 'ItemStand::GetOrientationSettings' -and $standVisualCalls -match 'ItemDrop/ItemData::GetScale' -and
+    $standVisualCalls -match 'ZDO::Set' -and $standVisualCalls -match 'IEquipmentVisual::Setup' -and
+    $standVisualCalls -match 'ParticleIntensityScaler::SetQuality') 'Native attachment schema changed; preview parity must be reviewed.'
+$standPreviewMethods = @($pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintItemStandPreview' })
+$nativeStyle = ($hostAssembly.MainModule.Types | Where-Object Name -eq 'ItemStyle').Methods | Where-Object Name -eq 'Setup'
+$styleCalls = ($nativeStyle.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($styleCalls -match 'ShaderProps::_Style' -and $styleCalls -match 'MaterialMan::SetValue<System.Int32>' -and
+    $styleCalls -notmatch 'ZDO::|ZNetView::|Inventory::|Object::Instantiate') 'Native ItemStyle material-only contract changed.'
+$standPreviewCalls = ($standPreviewMethods | ForEach-Object { $_.Body.Instructions | ForEach-Object { [string]$_.Operand } }) -join "`n"
+Assert-Contract ($standPreviewCalls -match 'PlacementGhostPreviewView::CreateVisualClone' -and
+    $standPreviewCalls -match 'ItemStand::GetOrientationSettings' -and $standPreviewCalls -match 'ItemDrop/ItemData::GetScale' -and
+    $standPreviewCalls -match 'GetComponentInChildren<ParticleIntensityScaler>' -and
+    $standPreviewCalls -notmatch 'ZDO::|ZNetView::|Inventory::|ItemStand::SetVisualItem|Object::Instantiate|ItemStyle::Setup|ParticleIntensityScaler::SetQuality') `
+    'Editor item contents execute native inventory/network/equipment scripts or omit native attachment rules.'
+$sceneCalls = ($pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintEditorScene' -and $_.Name -eq 'CreateVisual' } |
+    ForEach-Object { $_.Body.Instructions | ForEach-Object { [string]$_.Operand } }) -join "`n"
+Assert-Contract ($sceneCalls -match 'BlueprintItemStandPreview::TryAdd') 'Editor geometry omits item-stand preview.'
+$thumbnailCalls = ($pluginMethods | Where-Object { $_.DeclaringType.Name -in @('BlueprintThumbnailRenderer', 'PreviewSession') } |
+    ForEach-Object { $_.Body.Instructions | ForEach-Object { [string]$_.Operand } }) -join "`n"
+Assert-Contract ([regex]::Matches($thumbnailCalls, 'BlueprintItemStandPreview::TryAdd').Count -eq 2) 'Thumbnail and rotating preview must use the same content adapter.'
+
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.70 and Valheim Steam build 25185596.'

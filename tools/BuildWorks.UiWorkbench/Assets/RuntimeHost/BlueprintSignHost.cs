@@ -12,19 +12,21 @@ public sealed class ZNetView : MonoBehaviour
 public sealed class ZDO
 {
     public int Writes;
+    public uint DataRevision => (uint)Writes;
     private readonly Dictionary<int, string> strings = new Dictionary<int, string>();
     private readonly Dictionary<int, int> integers = new Dictionary<int, int>();
     private readonly Dictionary<int, byte[]> bytes = new Dictionary<int, byte[]>();
     public string GetString(int key, string fallback) => strings.TryGetValue(key, out string value) ? value : fallback;
     public void Set(int key, string value) { ++Writes; strings[key] = value; }
     public int GetInt(int key, int fallback) => integers.TryGetValue(key, out int value) ? value : fallback;
+    public bool GetBool(int key, bool fallback) => integers.TryGetValue(key, out int value) ? value != 0 : fallback;
     public byte[] GetByteArray(int key, byte[] fallback) => bytes.TryGetValue(key, out byte[] value) ? value : fallback;
     public void Set(int key, int value) { ++Writes; integers[key] = value; }
     public void Set(int key, byte[] value) { ++Writes; bytes[key] = value; }
 }
 public static class ZDOVars
 {
-    public const int s_text = 1, s_item = 2, s_variant = 3, s_quality = 4, s_type = 5, s_itemData = 6;
+    public const int s_text = 1, s_item = 2, s_variant = 3, s_quality = 4, s_type = 5, s_itemData = 6, s_items = 7, s_addedDefaultItems = 8;
 }
 public sealed class Sign : MonoBehaviour
 {

@@ -78,6 +78,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Run("Blueprint document deep copies source", BlueprintDocumentDeepCopiesSource);
             Run("Blueprint payload survives insertion and cached history", BlueprintPayloadSurvivesHistory);
             Run("ItemStand authoring preserves contents in history and rejects opaque/locked edits", ItemStandContentsHistory);
+            Run("Native Container payload preserves history and rejects invalid manifests/packages", NativeContainerState);
             Run("Free supports have independent pose, scope and history", BlueprintSupportHistory);
             Run("Free supports insert with remapped root pose and validate atomically", BlueprintSupportInsertion);
             Run("Blueprint selection does not dirty document", BlueprintSelectionDoesNotDirtyDocument);
@@ -1991,6 +1992,33 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Throws<InvalidOperationException>(() => full.InsertBlueprint(source, new Point3(), identity));
             Equal(0, full.Parts.Count);
             Equal(false, full.IsDirty);
+        }
+
+        private static void NativeContainerState()
+        {
+            string Package(int count, int size = 0)
+            {
+                var bytes = new byte[Math.Max(6 + count * 13, size)];
+                bytes[0] = 109; bytes[4] = (byte)count; bytes[5] = (byte)(count >> 8);
+                return Convert.ToBase64String(bytes);
+            }
+            var payload = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat,
+                "5:2:2:12|AxeIron|Wood", Package(2), null);
+            var document = EditorDocument(new BlueprintEditorPart("chest", "piece_chest", "Chest", new Point3(), IdentityRotation(), foreignData: payload));
+            document.MarkClean();
+            document.InsertBlueprint(document, new Point3(1, 0, 0), IdentityRotation());
+            Equal(payload, document.Parts[1].ForeignData);
+            Equal(true, document.Undo()); Equal(payload, document.Parts[0].ForeignData);
+            Equal(true, document.Redo()); Equal(payload, document.Parts[1].ForeignData);
+            new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, "5:2:0:0", Package(0), null);
+            foreach (string info in new[] { "0:2:0:0", "257:2:0:0", "5:2:0:1", "5:2:1:0|Wood", "1:1:2:2|Wood",
+                "5:2:2:12|Wood|AxeIron", "5:2:2:12|Wood|Wood", "5:2:2:12", "5:2:2:12|../Wood", "5:2:0:0|Wood" })
+                Throws<ArgumentException>(() => new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, info, Package(2), null));
+            foreach (string package in new[] { "not-base64", "AAAA", Package(2) + " ", Package(1), Package(2).Replace("bQ", "bg"),
+                Package(0, 7), Package(2, BlueprintForeignPartData.MaximumContainerBytes + 1) })
+                Throws<ArgumentException>(() => new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, "5:2:2:12|Wood", package, null));
+            Throws<ArgumentException>(() => new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, "5:2:0:0", null, null));
+            Throws<ArgumentException>(() => new BlueprintForeignPartData("blueprint", "opaque", Package(2, 30000), null));
         }
 
         private static void ItemStandContentsHistory()

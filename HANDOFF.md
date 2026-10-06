@@ -2,6 +2,31 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.73 — read-only native storage capture; not deployed
+
+World selection captures an ordinary root-owned native Container after access/ward/busy checks.
+The cached native view respects overrides. Exact s_items bytes are compared with Inventory.Save into a new
+private package; live inventory/ZDO is never written or loaded. New empty chests without bytes require
+s_addedDefaultItems, an empty live inventory and stable revision; unknown absence is not empty.
+Nested/multiple/derived/special storage, invalid cells, unavailable items, ambiguous names/hash resolution,
+changed data or unsupported packets reject the entire save. Bounds: version 109, 4096 occupied slots,
+1 MiB per packet; 16 MiB aggregate captured state reserves overhead within the 32 MiB portable limit.
+Nothing is truncated. Existing foreignData stores valheim-container-v1, capacity/count/units/sorted item
+dependencies and canonical Base64. Metadata is declarative, not a verified decoder/restoration recipe.
+Store v13/portable v4/copy/history preserve exact packages, including payloads above 32K characters.
+
+Release zero warnings/errors; 110 Geometry, Store, eight Bridge, 12 WorldLayout, 823 Localization,
+HostContract, format and deployment WhatIf PASS. Format retains existing workspace-load warnings.
+Final isolated Unity: 180 existing layout states plus actual capture on inert API fixtures PASS at
+2026-10-06T18:09:29.1201329Z; not native game capture/save/reload proof. verify is absent; direct checks/review used.
+Independent review fixed uninitialized-vs-empty, nested/derived containers and ambiguous dependencies.
+Final independent correctness and Ponytail review PASS.
+
+Installed TerrainRamp-1.0-Test remains .67. No deployment, game launch, save changes or publication.
+Independent retain/clear UI, foreign-container conversion/decoding, armour/free items, native cost-aware
+restoration/reload/client, heavy interactive scenes above 512 and durable world sockets remain unfinished.
+The foreign-state world guard stays closed; full goal remains active.
+
 ## Checkpoint 0.19.72 — ItemStand attachment authoring; not deployed
 
 Select one editable native ItemStand, then Tools -> attach/remove item. The attachment catalogue

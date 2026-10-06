@@ -34,6 +34,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 ForeignSourcesRoundTrip(Path.Combine(directory, "sources.json"));
                 ForeignObjectRoundTrip(Path.Combine(directory, "foreign-objects.json"));
                 NativeItemStandRoundTrip(Path.Combine(directory, "native-holder.json"));
+                NativeContainerRoundTrip(Path.Combine(directory, "native-container.json"));
                 ExchangeRoundTrip(Path.Combine(directory, "exchange-library.json"));
                 SupportRoundTrip(Path.Combine(directory, "supports.json"));
                 if (args.Length > 0) InspectActualLibrary(args[0]);
@@ -131,6 +132,47 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(nativeV12.All().Count == 1 && nativeV12.All()[0].sourceDocuments[0].text == text,
                 "Source-only native v12 stopped migrating");
             Console.WriteLine("PASS source v13/v4 exact UTF-8/BOM/CRLF/header retention; stable rows; detached/save/update/exchange; strict old-version/hash/reference/duplicate rejection");
+        }
+
+        private static void NativeContainerRoundTrip(string path)
+        {
+            // Inert structural fixture, not a claim that synthetic item records are native-loadable.
+            var bytes = new byte[40000]; bytes[0] = 109; bytes[4] = 2;
+            string package = Convert.ToBase64String(bytes);
+            var parts = new List<CompositeBlueprintStore.Part> {
+                Part("a", "piece_chest", "Chest", null, true, false, 0), Part("b", "woodwall", "Wall", null, true, false, 2) };
+            parts[0].foreignData = new CompositeBlueprintStore.ForeignPartData {
+                format = Geometry.BlueprintForeignPartData.NativeContainerFormat, info = "5:2:2:12|AxeIron|Wood", zdo = package };
+            var store = new CompositeBlueprintStore(path);
+            Require(store.TrySave("Native storage", parts, new List<CompositeBlueprintStore.VectorData>(), out var saved, out string error), error);
+            parts[0].foreignData.zdo = "changed caller";
+            var reopened = new CompositeBlueprintStore(path).All().Single();
+            string json = System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(reopened));
+            const string dependencies = "\"requiredPrefabIds\":[\"AxeIron\",\"Wood\",\"piece_chest\",\"woodwall\"]";
+            Require(json.Contains(dependencies), "Container item dependencies absent");
+            var decoded = BlueprintExchangeFormat.Decode(json);
+            Require(saved.parts[0].foreignData.zdo == package && decoded.parts[0].foreignData.zdo == package &&
+                decoded.parts[0].foreignData.info == "5:2:2:12|AxeIron|Wood" && CompositeBlueprintStore.HasForeignData(decoded),
+                "Container package lost/aliased or allowed into native world placement");
+            var changed = CompositeBlueprintStore.CloneParts(saved.parts); changed[0].foreignData.info = "5:2:2:13|AxeIron|Wood";
+            string original = File.ReadAllText(path);
+            using (var locked = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                Require(!store.TryUpdateDocument(saved, changed, saved.groups, saved.anchors, out error), "Locked container update succeeded");
+            Require(File.ReadAllText(path) == original && saved.parts[0].foreignData.info == "5:2:2:12|AxeIron|Wood", "Failed update changed inventory state");
+            foreach (string malformed in new[] { json.Replace(dependencies, "\"requiredPrefabIds\":[\"piece_chest\",\"woodwall\"]"),
+                json.Replace("valheim-container-v1", "blueprint"), json.Replace("5:2:2:12|AxeIron|Wood", "5:2:1:12|Wood"),
+                json.Replace("\"version\":4", "\"version\":3") })
+            {
+                bool rejected = false;
+                try { BlueprintExchangeFormat.Decode(malformed); } catch (InvalidDataException) { rejected = true; }
+                Require(rejected, "Mismatched container manifest/dependencies or old version accepted");
+            }
+            var empty = new byte[] { 109, 0, 0, 0, 0, 0 };
+            changed[0].foreignData.info = "5:2:0:0"; changed[0].foreignData.zdo = Convert.ToBase64String(empty);
+            Require(store.TryUpdateDocument(saved, changed, saved.groups, saved.anchors, out error), error);
+            Require(BlueprintExchangeFormat.Decode(System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(saved)))
+                .parts[0].foreignData.zdo == Convert.ToBase64String(empty), "Verified empty package lost");
+            Console.WriteLine("PASS native Container exact >32K package store/portable roundtrip, dependencies, immutable copy, atomic failure and known empty state; no native decode");
         }
 
         private static void NativeItemStandRoundTrip(string path)

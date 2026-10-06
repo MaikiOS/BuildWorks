@@ -183,6 +183,7 @@ public static class RuntimeEditorAcceptance
             checks.Add(PlacementContactAcceptance.Run());
             TestSignPayload();
             TestPlacementSupportFrame();
+            checks.Add(StorageCaptureAcceptance.Run());
             foreach (object step in ItemStandPreviewAcceptance.Run(template, output)) yield return step;
             checks.Add("Actual ItemStand tools -> compatible item catalogue -> one click -> replacement Cancel/confirm -> full-package Undo -> detach -> immediate empty-stand attach -> native save/reopen; stale locked stand rejected. No inventory/world creation.");
             checks.Add("Actual read-only ItemStand capture: native view override, negative item hash, exact opaque item package and immutable snapshot; legacy/empty/invalid/missing/oversized/armour denial; captured contents visible in renderer-only scene. No native item-package decode, inventory or world reconstruction executed.");

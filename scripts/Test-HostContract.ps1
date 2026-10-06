@@ -819,7 +819,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.72.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.73.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -2904,4 +2904,55 @@ $continuationCalls = ($itemProvider.Body.Instructions | Where-Object {
 } | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($continuationCalls -match '::MoveNext\(') 'Invalid-item handler must continue the item enumeration.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.72 and Valheim Steam build 25185596.'
+$containerType = $hostAssembly.MainModule.Types | Where-Object Name -eq 'Container'
+$inventoryType = $hostAssembly.MainModule.Types | Where-Object Name -eq 'Inventory'
+$containerView = $containerType.Fields | Where-Object Name -eq 'm_nview'
+Assert-Contract ($containerView.IsPrivate -and $containerView.FieldType.FullName -eq 'ZNetView') 'Container view contract changed.'
+$containerAwake = $containerType.Methods | Where-Object Name -eq 'Awake'
+$containerAwakeCalls = ($containerAwake.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($containerAwakeCalls -match 'Container::m_rootObjectOverride' -and $containerAwakeCalls -match 'Container::m_nview') 'Container capture must use the native cached override-aware view.'
+foreach ($entry in @(@($containerType, 'GetInventory'), @($containerType, 'IsInUse'), @($containerType, 'CheckAccess'),
+        @($inventoryType, 'GetWidth'), @($inventoryType, 'GetHeight'), @($inventoryType, 'GetAllItems'))) {
+    $method = @($entry[0].Methods | Where-Object { $_.Name -eq $entry[1] -and
+        $_.Parameters.Count -eq $(if ($entry[1] -eq 'CheckAccess') { 1 } else { 0 }) })
+    Assert-Contract ($method.Count -eq 1 -and $method[0].HasBody) "Storage read helper changed: $($entry[1])"
+    $calls = ($method[0].Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+    Assert-Contract ($calls -notmatch 'ZDO::Set|RPC|Object::Instantiate|Inventory::Load|Inventory::Changed' -and
+        @($method[0].Body.Instructions | Where-Object { $_.OpCode.Name -in @('stfld', 'stsfld') }).Count -eq 0) "Storage read helper gained mutations: $($entry[1])"
+}
+$containerAccess = $containerType.Methods | Where-Object Name -eq 'CheckAccess'
+Assert-Contract ($containerAccess.IsPrivate -and $containerAccess.Parameters.Count -eq 1 -and
+    $containerAccess.Parameters[0].ParameterType.FullName -eq 'System.Int64' -and
+    (($containerAccess.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n") -match 'Piece::GetCreator') 'Container private access/creator gate changed.'
+$inventorySave = $inventoryType.Methods | Where-Object Name -eq 'Save'
+$inventorySaveCalls = ($inventorySave.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($inventorySave.IsPublic -and $inventorySave.Parameters.Count -eq 1 -and
+    @($inventorySave.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'ldc.i4.s' -and [int]$_.Operand -eq 109 }).Count -eq 1 -and
+    $inventorySaveCalls -match 'ZPackage::Write\(System.Int32\)' -and $inventorySaveCalls -match 'ZPackage::Write\(System.UInt16\)' -and
+    $inventorySaveCalls -match 'ItemDrop/ItemData::Save\(ZPackage\)' -and
+    $inventorySaveCalls -notmatch 'ZDO::|RPC|Object::Instantiate|Inventory::Changed|Inventory::Load' -and
+    @($inventorySave.Body.Instructions | Where-Object { $_.OpCode.Name -in @('stfld', 'stsfld') }).Count -eq 0) 'Native private Inventory.Save packet/version/count or side effects changed.'
+$itemDataType = ($hostAssembly.MainModule.Types | Where-Object Name -eq 'ItemDrop').NestedTypes | Where-Object Name -eq 'ItemData'
+$itemSave = $itemDataType.Methods | Where-Object { $_.Name -eq 'Save' -and $_.Parameters.Count -eq 1 }
+$itemSaveCalls = ($itemSave.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+foreach ($field in 'm_durability', 'm_gridPos', 'm_worldLevel', 'm_quality', 'm_stack', 'm_variant', 'm_crafterID', 'm_crafterName', 'm_dropPrefab', 'm_customData') {
+    Assert-Contract ($itemSaveCalls -match "ItemDrop/ItemData::$field") "Inventory serializer field changed: $field"
+}
+Assert-Contract ($itemSaveCalls -notmatch 'ZDO::|RPC|Object::Instantiate|Inventory::Load|Inventory::Changed' -and
+    @($itemSave.Body.Instructions | Where-Object { $_.OpCode.Name -in @('stfld', 'stsfld') }).Count -eq 0) 'Native ItemData.Save gained live-state side effects.'
+$nativeContainerSave = $containerType.Methods | Where-Object Name -eq 'Save'
+$nativeContainerSaveCalls = ($nativeContainerSave.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($nativeContainerSaveCalls -match 'ZDOVars::s_items' -and $nativeContainerSaveCalls -match 'ZDO::Set\(System.Int32,System.Byte\[\]\)') 'Native Container no longer persists its exact byte package.'
+$storageCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintStorageCapture' -and $_.Name -eq 'TryCapture' }
+$storageCalls = ($storageCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+foreach ($pattern in 'Player::GetPlayerID', 'PrivateArea::CheckAccess', 'Container::IsInUse', 'Container::GetInventory',
+    'Inventory::GetAllItems', 'Inventory::GetWidth', 'Inventory::GetHeight', 'Inventory::Save', 'ZDO::GetByteArray', 'ZDO::get_DataRevision',
+    'ZDOVars::s_items', 'ZDOVars::s_addedDefaultItems', 'ZDO::GetBool', 'GetComponentsInChildren<Container>') {
+    Assert-Contract ($storageCalls -match $pattern) "Container snapshot omits required gate: $pattern"
+}
+Assert-Contract ($storageCalls -notmatch 'Container::Save|Container::Load|Inventory::Load|ZDO::Set|RPC|Object::Instantiate|ItemDrop/ItemData::Load') 'Container snapshot mutates, restores or executes live state.'
+$worldCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'PrecisionPlacementSession' -and $_.Name -eq 'TrySaveWorldSelection' }
+$worldCaptureCalls = ($worldCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($worldCaptureCalls -match 'BlueprintStorageCapture::TryCapture' -and $worldCaptureCalls -match 'CompositeBlueprintStore/ForeignPartData::FromGeometry') 'World selection does not preserve container snapshots.'
+
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.73 and Valheim Steam build 25185596.'

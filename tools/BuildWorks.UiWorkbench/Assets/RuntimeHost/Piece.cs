@@ -19,6 +19,12 @@ public class ItemDrop : MonoBehaviour
     public class ItemData
     {
         public readonly SharedData m_shared = new SharedData();
+        public GameObject m_dropPrefab;
+        public readonly Dictionary<string, string> m_customData = new Dictionary<string, string>();
+        public int m_stack = 1, m_quality = 1, m_worldLevel;
+        public Vector2Int m_gridPos;
+        public long m_crafterID;
+        public string m_crafterName = "";
         public enum ItemType { None, OneHandedWeapon }
         public Vector3 GetScale(float quality) => Vector3.one * (1f + (quality - 1f) * m_shared.m_scaleByQuality);
         public Sprite Icon;

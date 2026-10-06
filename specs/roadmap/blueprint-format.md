@@ -2,7 +2,18 @@
 
 **English** | [Русский](blueprint-format_RU.md)
 
-Current source **0.19.72**: editable native ItemStand has an attachment catalogue of compatible installed player-known items.
+Current source **0.19.73**: world selection preserves an ordinary root-owned native Container's exact inventory bytes
+without writing live state. Access/ward/busy/revision and native prefab-name resolution are checked; derived/nested/special
+storage refuses explicitly. Initialized fresh empty chests have a verified canonical empty packet; unknown absence is not empty.
+Existing foreignData tag valheim-container-v1 contains width:height:occupiedSlots:units, sorted unique prefab names separated
+by |, and exact canonical Base64 bytes. Source names containing | refuse capture; no escaping or silent dependency splitting.
+Current packet version109/4096-slot/1-MiB bounds and a 16-MiB aggregate capture budget reject, never truncate. This manifest
+is declarative only: raw records are not decoded, executed or restored. Future restore must validate every item against them.
+Native v13/portable v4/copy/history preserve >32K packages and include item dependencies. Existing envelope fields are unchanged;
+old readers reject the unknown tag instead of silently losing it. Release/required checks and 180 isolated Unity cases plus
+read-only capture API fixtures PASS, not native Valheim save/reload. Retain/clear UI and foreign decoding/world restore remain pending.
+
+Previous source **0.19.72**: editable native ItemStand has an attachment catalogue of compatible installed player-known items.
 Tools attach/remove; empty-holder click commits a default recipe (quality 1, variant/orientation 0), populated-holder replacement/removal
 requires confirmation. Renderer-only preflight, effective locks/visibility and stale-reference checks prevent partial edits.
 Undo restores the full previous package; holder movement/copies/native/portable/history use the existing part payload.
@@ -135,7 +146,8 @@ Retaining contents is a recipe/state requirement, not permission to spawn free i
 inventory ownership, access, server authority or duplication protection.
 Required proof: independent choices, native/modded storage, filled/empty/unknown, import/export/cancel/error,
 exact original-state roundtrip, intentionally empty copy, stand/armour independence, save/reload and remote client.
-This requirement is recorded in the active goal; storage detection, policy UI and world restoration are not implemented yet.
+This requirement is recorded in the active goal; .73 captures supported native storage only. Exchange-wide inspection,
+policy UI, foreign-storage decoding and world restoration are not implemented yet.
 
 | Stage | Owner | Required proof |
 | --- | --- | --- |

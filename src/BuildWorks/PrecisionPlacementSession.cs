@@ -4634,6 +4634,7 @@ namespace OstrixMods.BuildWorks
             Vector3 origin = blueprintSelection[0].transform.position;
             var parts = new List<CompositeBlueprintStore.Part>(blueprintSelection.Count);
             var snapSets = new List<IReadOnlyList<Point3>>(blueprintSelection.Count);
+            long capturedStateBytes = 0;
             foreach (Piece piece in blueprintSelection)
             {
                 if (!IsBlueprintPieceSelectable(piece) || !TryResolveBuildPiece(
@@ -4670,6 +4671,19 @@ namespace OstrixMods.BuildWorks
                     error = BuildWorksLocalization.Text("blueprint.holder_capture_failed", PrefabName(piece));
                     return false;
                 }
+                if (!BlueprintStorageCapture.TryCapture(piece, Player.m_localPlayer, out var storedItems))
+                {
+                    error = BuildWorksLocalization.Text("blueprint.storage_capture_failed", PrefabName(piece));
+                    return false;
+                }
+                capturedStateBytes += System.Text.Encoding.UTF8.GetByteCount(signText ?? "") +
+                    ((storedItems ?? contents)?.Info?.Length ?? 0) * 3L + ((storedItems ?? contents)?.Zdo?.Length ?? 0);
+                // Reserve document/escaping overhead within the existing portable file limit.
+                if (capturedStateBytes > BlueprintExchangeFormat.MaximumBytes / 2)
+                {
+                    error = BuildWorksLocalization.Text("import.file_limit");
+                    return false;
+                }
                 parts.Add(new CompositeBlueprintStore.Part
                 {
                     prefabName = PrefabName(piece),
@@ -4677,7 +4691,7 @@ namespace OstrixMods.BuildWorks
                     rotation = new CompositeBlueprintStore.QuaternionData(inverse * piece.transform.rotation),
                     scale = scale,
                     signText = signText,
-                    foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(contents)
+                    foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(storedItems ?? contents)
                 });
                 var points = new List<Transform>();
                 piece.GetSnapPoints(points);

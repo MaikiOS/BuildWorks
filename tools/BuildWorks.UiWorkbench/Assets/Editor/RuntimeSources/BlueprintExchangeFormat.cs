@@ -131,6 +131,8 @@ namespace OstrixMods.BuildWorks
             .Select(part => part.prefabName)
             .Concat(blueprint.parts.Where(part => part.foreignData?.format == Geometry.BlueprintForeignPartData.NativeItemStandFormat)
                 .Select(part => part.foreignData.info.Split(':')[0]))
+            .Concat(blueprint.parts.Where(part => part.foreignData?.format == Geometry.BlueprintForeignPartData.NativeContainerFormat)
+                .SelectMany(part => part.foreignData.info.Split('|').Skip(1)))
             .Distinct(StringComparer.Ordinal).OrderBy(name => name, StringComparer.Ordinal).ToList();
 
         private static void ValidateBlueprint(CompositeBlueprintStore.Blueprint blueprint)
@@ -150,7 +152,7 @@ namespace OstrixMods.BuildWorks
 
         // Reject unknown and duplicate fields rather than silently converting a newer document with data loss.
         private static void ValidateNode(XmlReader reader, Type expected, bool requireFields, bool allowSupportFields,
-            bool allowSourceFields, bool allowForeignFields, bool sourceText = false)
+            bool allowSourceFields, bool allowForeignFields, bool sourceText = false, bool inventoryPackage = false)
         {
             string kind = reader.GetAttribute("type");
             if (kind == "null")
@@ -180,7 +182,8 @@ namespace OstrixMods.BuildWorks
                 string scalarKind = expected == typeof(string) ? "string" : expected == typeof(bool) ? "boolean" : "number";
                 if (kind != scalarKind) throw new InvalidDataException("$buildworks_import.fields");
                 string value = reader.ReadElementContentAsString();
-                if (value.Length > (sourceText ? Geometry.BlueprintSourceDocument.MaximumBytes : 32768))
+                if (value.Length > (sourceText ? Geometry.BlueprintSourceDocument.MaximumBytes :
+                    inventoryPackage ? Geometry.BlueprintForeignPartData.MaximumContainerBase64 : 32768))
                     throw new InvalidDataException("$buildworks_import.fields");
                 return;
             }
@@ -202,7 +205,8 @@ namespace OstrixMods.BuildWorks
                     !allowForeignFields && expected == typeof(CompositeBlueprintStore.Part) && reader.LocalName == "foreignData")
                     throw new InvalidDataException("$buildworks_import.fields");
                 bool textField = expected == typeof(CompositeBlueprintStore.SourceDocument) && reader.LocalName == "text";
-                ValidateNode(reader, field, requireFields, allowSupportFields, allowSourceFields, allowForeignFields, textField);
+                bool packageField = expected == typeof(CompositeBlueprintStore.ForeignPartData) && reader.LocalName == "zdo";
+                ValidateNode(reader, field, requireFields, allowSupportFields, allowSourceFields, allowForeignFields, textField, packageField);
             }
             if (requireFields && RequiredFields[expected].Any(name => !seen.Contains(name)))
                 throw new InvalidDataException("$buildworks_import.fields");

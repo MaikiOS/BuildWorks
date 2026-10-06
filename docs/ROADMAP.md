@@ -9,7 +9,14 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.72**: compatible player-known ItemStand items are authored from Tools through the existing catalogue.
+Active source checkpoint **0.19.73**: native Container world capture is read-only, permission-gated and revision-checked.
+Exact packages/capacity/item dependencies survive Store v13/portable v4/copy/history; known initialized empty
+chests are distinct from unavailable data. Nested/derived/special/multiple storage and unsupported state reject atomically.
+Release/110 Geometry/required checks and 180 isolated Unity states plus capture API fixtures PASS; no native game proof.
+Installed test remains .67. Retain/clear UI, foreign-container decoding, armour/free items and native restoration,
+heavy interactive scenes above 512 and durable world sockets remain unfinished. Capture limits are in HANDOFF.
+
+Previous source checkpoint **0.19.72**: compatible player-known ItemStand items are authored from Tools through the existing catalogue.
 One click attaches to an empty holder; populated replacement/removal requires confirmation. Undo restores the full original package;
 the tree shows contents under the holder. Invalid mod-item records skip individually; missing native attach nodes are filtered.
 Release/109 Geometry/required checks and 180 existing Unity layout states plus authoring interaction checks PASS; correctness/Ponytail PASS.

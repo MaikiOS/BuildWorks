@@ -80,6 +80,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Run("ItemStand authoring preserves contents in history and rejects opaque/locked edits", ItemStandContentsHistory);
             Run("Native Container payload preserves history and rejects invalid manifests/packages", NativeContainerState);
             Run("Native Container inspection reads all fields and refuses corrupt records without mutation", ContainerInventoryTests.Run);
+            Run("Intentional empty contents retain evidence and editor history without treating unknown as empty", ClearedContentsHistory);
             Run("Free supports have independent pose, scope and history", BlueprintSupportHistory);
             Run("Free supports insert with remapped root pose and validate atomically", BlueprintSupportInsertion);
             Run("Blueprint selection does not dirty document", BlueprintSelectionDoesNotDirtyDocument);
@@ -1993,6 +1994,36 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Throws<InvalidOperationException>(() => full.InsertBlueprint(source, new Point3(), identity));
             Equal(0, full.Parts.Count);
             Equal(false, full.IsDirty);
+        }
+
+        private static void ClearedContentsHistory()
+        {
+            var original = new BlueprintForeignPartData(BlueprintForeignPartData.NativeItemStandFormat,
+                "SwordIron:2:3:0", Convert.ToBase64String(new byte[] { 109, 2, 0 }), null);
+            var cleared = original.WithoutContents(null);
+            Equal(false, original.ContentsCleared); Equal(true, cleared.ContentsCleared);
+            Equal(original.Info, cleared.Info); Equal(original.Zdo, cleared.Zdo);
+            Equal(cleared, cleared.WithoutContents(null));
+            var document = EditorDocument(new BlueprintEditorPart("stand", "itemstand", "Stand",
+                new Point3(), IdentityRotation(), foreignData: original));
+            document.MarkClean();
+            Equal(true, document.SetItemStandContents("stand", cleared));
+            Equal(true, document.Undo()); Equal(original, document.Parts[0].ForeignData);
+            Equal(true, document.Redo()); Equal(cleared, document.Parts[0].ForeignData);
+            var copy = EditorDocument(document.Parts[0]);
+            Equal(true, copy.Parts[0].ForeignData.ContentsCleared);
+            var unknown = new BlueprintForeignPartData("blueprint", "opaque", null, null);
+            Throws<ArgumentException>(() => unknown.WithoutContents(null));
+            Throws<ArgumentException>(() => new BlueprintForeignPartData("vbuild", "opaque", null, null, true));
+            var empty = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat,
+                "5:2:0:0", Convert.ToBase64String(new byte[] { 109, 0, 0, 0, 0, 0 }), null);
+            Equal(true, empty.WithoutContents(_ => 1).ContentsCleared);
+            Throws<ArgumentException>(() => empty.WithoutContents(null));
+            var bytes = new byte[19]; bytes[0] = 109; bytes[4] = 1;
+            var unreadable = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat,
+                "5:2:1:1|Wood", Convert.ToBase64String(bytes), null);
+            Throws<ArgumentException>(() => unreadable.WithoutContents(_ => 1));
+            Equal(false, unreadable.ContentsCleared);
         }
 
         private static void NativeContainerState()

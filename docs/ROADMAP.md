@@ -9,7 +9,13 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.74**: bounded read-only native v109 inventory inspection validates full records/dependencies
+Active source checkpoint **0.19.75**: Store v14 / portable v5 preserve independent storage/mount clear intent
+without changing original packages or sources. Effective dependencies, editor visuals/tree/tools and Undo follow that intent.
+Four export combinations, migration/rejection/atomicity, Release/112 Geometry/required checks and independent reviews PASS.
+Choice/count/preflight UI and direct import policy remain pending; native world-state placement is still gated.
+Installed .67 unchanged, not deployed. Details are in HANDOFF and the format contract.
+
+Previous source checkpoint **0.19.74**: bounded read-only native v109 inventory inspection validates full records/dependencies
 before capture. Immutable item fields retain exact custom strings; canonical encoding, zero/colliding hashes, cells/counts
 and full consumption are checked without Inventory.Load, normalization or world writes. Native custom-map overflow rejects early.
 Release/111 Geometry/Store/required checks and final isolated Unity180 plus capture fixtures PASS; independent reviews PASS.

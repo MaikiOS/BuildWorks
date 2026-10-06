@@ -35,6 +35,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 ForeignObjectRoundTrip(Path.Combine(directory, "foreign-objects.json"));
                 NativeItemStandRoundTrip(Path.Combine(directory, "native-holder.json"));
                 NativeContainerRoundTrip(Path.Combine(directory, "native-container.json"));
+                ContentsPolicyRoundTrip(Path.Combine(directory, "contents-policy"));
                 ExchangeRoundTrip(Path.Combine(directory, "exchange-library.json"));
                 SupportRoundTrip(Path.Combine(directory, "supports.json"));
                 if (args.Length > 0) InspectActualLibrary(args[0]);
@@ -85,7 +86,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(saved.parts[0].sourceDocumentId == id && saved.parts[0].sourceLine == 7,
                 "Legacy parts-only update discarded source row binding");
             string json = System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(saved));
-            foreach (string invalid in new[] { json.Replace("\"version\":4", "\"version\":2"),
+            foreach (string invalid in new[] { json.Replace("\"version\":5", "\"version\":2"),
                 json.Replace("\"sourceLine\":7", "\"sourceLine\":6"), json.Replace("\"sourceLine\":7", "\"sourceLine\":0"),
                 json.Replace("Original.blueprint", "../Original.blueprint"), json.Replace("Автор", "Other author"),
                 json.Replace("\"sourceDocuments\":[", "\"sourceDocuments\":[null,"),
@@ -121,17 +122,128 @@ namespace OstrixMods.BuildWorks.StoreTests
             string legacy = System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(new CompositeBlueprintStore.Blueprint {
                 id = Guid.NewGuid().ToString("N"), name = "Legacy", category = "OTHER", prefabName = "wall",
                 parts = new List<CompositeBlueprintStore.Part> { Part("a", "wall", "A", null, true, false, 0),
-                    Part("b", "wall", "B", null, true, false, 1) } })).Replace("\"version\":4", "\"version\":2");
+                    Part("b", "wall", "B", null, true, false, 1) } })).Replace("\"version\":5", "\"version\":2");
             Require(BlueprintExchangeFormat.Decode(legacy).sourceDocuments == null, "Clean v2 document stopped migrating");
-            var sourceOnlyV3 = BlueprintExchangeFormat.Decode(json.Replace("\"version\":4", "\"version\":3"));
+            var sourceOnlyV3 = BlueprintExchangeFormat.Decode(json.Replace("\"version\":5", "\"version\":3"));
             Require(sourceOnlyV3.sourceDocuments[0].text == text && sourceOnlyV3.parts[0].foreignData == null,
                 "Source-only portable v3 stopped migrating");
             string currentNative = File.ReadAllText(path);
-            File.WriteAllText(path, currentNative.Replace("\"version\":13", "\"version\":12"));
+            File.WriteAllText(path, currentNative.Replace("\"version\":14", "\"version\":12"));
             var nativeV12 = new CompositeBlueprintStore(path);
             Require(nativeV12.All().Count == 1 && nativeV12.All()[0].sourceDocuments[0].text == text,
                 "Source-only native v12 stopped migrating");
-            Console.WriteLine("PASS source v13/v4 exact UTF-8/BOM/CRLF/header retention; stable rows; detached/save/update/exchange; strict old-version/hash/reference/duplicate rejection");
+            Console.WriteLine("PASS source v14/v5 exact UTF-8/BOM/CRLF/header retention; stable rows; detached/save/update/exchange; strict old-version/hash/reference/duplicate rejection");
+        }
+
+        private static void ContentsPolicyRoundTrip(string directory)
+        {
+            Directory.CreateDirectory(directory);
+            string path = Path.Combine(directory, "library.json");
+            string package;
+            using (var stream = new MemoryStream())
+            using (var writer = new BinaryWriter(stream))
+            {
+                writer.Write(109); writer.Write((ushort)1);
+                writer.Write(0); writer.Write((byte)0); writer.Write((byte)0); writer.Write((byte)0);
+                writer.Write((byte)64); writer.Write(100); writer.Write((byte)0);
+                writer.Flush(); package = Convert.ToBase64String(stream.ToArray());
+            }
+            var parts = new[] { Part("chest", "piece_chest", "Chest", null, true, false, 0),
+                Part("stand", "itemstand", "Stand", null, true, false, 1) };
+            parts[0].foreignData = new CompositeBlueprintStore.ForeignPartData {
+                format = Geometry.BlueprintForeignPartData.NativeContainerFormat, info = "5:2:1:1|Wood", zdo = package };
+            parts[1].foreignData = new CompositeBlueprintStore.ForeignPartData {
+                format = Geometry.BlueprintForeignPartData.NativeItemStandFormat, info = "SwordIron:2:3:0", zdo = "bQIA" };
+            var store = new CompositeBlueprintStore(path);
+            Require(store.TrySave("Contents", parts, Array.Empty<CompositeBlueprintStore.VectorData>(), out var saved, out string error), error);
+            string original = File.ReadAllText(path);
+            foreach (bool storage in new[] { false, true })
+            foreach (bool mounts in new[] { false, true })
+            {
+                string name = "contents-" + storage + "-" + mounts;
+                Require(store.TryExportFile(saved, directory, name, mounts, out string exported, out error,
+                    clearStorage: storage, clearMounts: mounts, prefabHash: _ => 100), error);
+                var output = ExternalBlueprintLibrary.LoadFile(exported).Single();
+                Require(output.importError == null && output.parts[0].foreignData.contentsCleared == storage &&
+                    output.parts[1].foreignData.contentsCleared == mounts, "Storage/mount choices were coupled or lost");
+                var retained = CompositeBlueprintStore.CopyWithContentsPolicy(output, false, false, null);
+                string portableOutput = System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(retained));
+                var dependencies = new List<string> { "itemstand", "piece_chest" };
+                if (!storage) dependencies.Add("Wood");
+                if (!mounts) dependencies.Add("SwordIron");
+                string manifest = "\"requiredPrefabIds\":[" + string.Join(",", dependencies.OrderBy(value => value, StringComparer.Ordinal)
+                    .Select(value => "\"" + value + "\"")) + "]";
+                Require(portableOutput.Contains(manifest), "Cleared archival contents remained a required prefab dependency");
+                Require(output.parts[0].foreignData.zdo == package && output.parts[0].foreignData.info == "5:2:1:1|Wood" &&
+                    output.parts[1].foreignData.zdo == "bQIA" && output.parts[1].foreignData.info == "SwordIron:2:3:0",
+                    "Intentional clear destroyed original contents evidence");
+                Require(retained.parts[0].foreignData.contentsCleared == storage && retained.parts[1].foreignData.contentsCleared == mounts &&
+                    !saved.parts[0].foreignData.contentsCleared && !saved.parts[1].foreignData.contentsCleared &&
+                    File.ReadAllText(path) == original, "Retain resurrected contents or export changed source");
+                if (storage && mounts)
+                {
+                    Require(store.TryImportFile(exported, out error), error); WaitForImport(store);
+                    Require(store.ImportError == null && store.CatalogAll().Any(item => item.IsExternal &&
+                        item.parts.Count == 2 && item.parts.All(part => part.foreignData.contentsCleared)), "File import lost empty intent");
+                    Require(store.TryUpdateDocument(saved, retained.parts, retained.groups, retained.anchors, out error), error);
+                    var reopened = new CompositeBlueprintStore(path).All().Single();
+                    Require(reopened.parts.All(part => part.foreignData.contentsCleared) && reopened.parts[0].foreignData.zdo == package &&
+                        CompositeBlueprintStore.HasForeignData(reopened), "Save/reopen lost clear intent or bypassed world-state guard");
+                    string portable = System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(reopened));
+                    foreach (string invalid in new[] { portable.Replace("\"version\":5", "\"version\":4"),
+                        portable.Replace("\"contentsCleared\":true", "\"contentsCleared\":\"true\""),
+                        portable.Replace("\"contentsCleared\":true", "\"contentsCleared\":true,\"contentsCleared\":true"),
+                        portable.Replace("valheim-itemstand-v1", "blueprint") })
+                    {
+                        Require(invalid != portable, "Clear-state test did not mutate input");
+                        bool rejected = false;
+                        try { BlueprintExchangeFormat.Decode(invalid); } catch (InvalidDataException) { rejected = true; }
+                        Require(rejected, "Old schema, mistyped/duplicate or unknown clear state accepted");
+                    }
+                    string currentNative = File.ReadAllText(path);
+                    File.WriteAllText(path, currentNative.Replace("\"version\":14", "\"version\":13"));
+                    var blocked = new CompositeBlueprintStore(path);
+                    Require(blocked.All().Count == 0 && !blocked.TrySave(parts, Array.Empty<CompositeBlueprintStore.VectorData>(), out _, out _),
+                        "Old native schema silently accepted new clear semantics");
+                    File.WriteAllText(path, currentNative);
+                    using (var locked = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                        Require(!store.TryUpdateDocument(saved, parts, saved.groups, saved.anchors, out error), "Locked clear update succeeded");
+                    Require(File.ReadAllText(path) == currentNative && saved.parts.All(part => part.foreignData.contentsCleared),
+                        "Failed update discarded prior clear state");
+                }
+            }
+            // Migration keeps pre-policy contents populated and does not rewrite the source on read.
+            foreach (int version in new[] { 13, 14 })
+            {
+                string old = original.Replace("\"version\":14", "\"version\":" + version);
+                File.WriteAllText(path, old);
+                var previous = new CompositeBlueprintStore(path).All().Single();
+                Require(previous.parts.All(part => !part.foreignData.contentsCleared) && File.ReadAllText(path) == old, "Native migration cleared old contents");
+                string portable = System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(previous)).Replace("\"version\":5", "\"version\":4");
+                Require(BlueprintExchangeFormat.Decode(portable).parts.All(part => !part.foreignData.contentsCleared), "Portable v4 migration changed contents");
+            }
+            var unreadable = saved.ImportCopy();
+            unreadable.parts[0].foreignData.zdo = Convert.ToBase64String(new byte[19] { 109, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 });
+            unreadable.parts[0].foreignData.contentsCleared = false;
+            Require(!store.TryExportFile(unreadable, directory, "unreadable", false, out _, out error,
+                clearStorage: true, prefabHash: _ => 100) && !File.Exists(Path.Combine(directory, "unreadable.buildworks.json")),
+                "Unreadable container treated as empty or created a partial output");
+            foreach (Func<string, int> hash in new Func<string, int>[] { null, _ => 0, _ => -101 })
+                Require(!store.TryExportFile(saved, directory, "bad-hash", false, out _, out error, clearStorage: true, prefabHash: hash) &&
+                    !File.Exists(Path.Combine(directory, "bad-hash.buildworks.json")), "Missing/incorrect hash resolver cleared inventory");
+            var opaque = saved.ImportCopy();
+            opaque.parts[1].foreignData = new CompositeBlueprintStore.ForeignPartData { format = "blueprint", info = "opaque" };
+            Require(!store.TryExportFile(opaque, directory, "unknown", false, out _, out error, clearStorage: true, prefabHash: _ => 100) &&
+                !File.Exists(Path.Combine(directory, "unknown.buildworks.json")), "Unknown object silently emptied");
+            var sections = saved.ImportCopy();
+            sections.sourceDocuments = new List<CompositeBlueprintStore.SourceDocument> {
+                CompositeBlueprintStore.SourceDocument.FromGeometry(new Geometry.BlueprintSourceDocument("blueprint", "Original.blueprint",
+                    "#Pieces\n#FutureStorage\nopaque\n")) };
+            Require(!store.TryExportFile(sections, directory, "unknown-sections", false, out _, out error,
+                clearMounts: true) && !File.Exists(Path.Combine(directory, "unknown-sections.buildworks.json")),
+                "Unknown source section silently excluded from clear policy");
+            Require(!Directory.EnumerateFiles(directory).Any(file => file.EndsWith(".tmp")), "Failed policy export left temporary data");
+            Console.WriteLine("PASS independent contents choices, original evidence, native14/portable5/ZIP/import/reopen, v13/v4 migration, no resurrection, unknown rejection and atomic failure");
         }
 
         private static void NativeContainerRoundTrip(string path)
@@ -161,7 +273,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(File.ReadAllText(path) == original && saved.parts[0].foreignData.info == "5:2:2:12|AxeIron|Wood", "Failed update changed inventory state");
             foreach (string malformed in new[] { json.Replace(dependencies, "\"requiredPrefabIds\":[\"piece_chest\",\"woodwall\"]"),
                 json.Replace("valheim-container-v1", "blueprint"), json.Replace("5:2:2:12|AxeIron|Wood", "5:2:1:12|Wood"),
-                json.Replace("\"version\":4", "\"version\":3") })
+                json.Replace("\"version\":5", "\"version\":3") })
             {
                 bool rejected = false;
                 try { BlueprintExchangeFormat.Decode(malformed); } catch (InvalidDataException) { rejected = true; }
@@ -232,7 +344,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 json.Replace(serializedPackage, serializedPackage + " "), json.Replace("SwordIron:2:3:0", "SwordIron:2:0:0"),
                 json.Replace("SwordIron:2:3:0", "../SwordIron:2:3:0"),
                 json.Replace(dependencies, "\"requiredPrefabIds\":[\"itemstand\",\"woodwall\"]"),
-                json.Replace("\"version\":4", "\"version\":3") })
+                json.Replace("\"version\":5", "\"version\":3") })
             {
                 bool rejected = false;
                 Require(malformed != json, "Malformed native fixture did not change serialized input");
@@ -274,7 +386,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                     null, null, out error), "Locked update succeeded");
             Require(File.ReadAllText(path) == before && saved.parts[0].foreignData.zdo == "opaque-zdo", "Failed write corrupted foreign state");
             string json = System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(saved));
-            foreach (string invalid in new[] { json.Replace("\"version\":4", "\"version\":3"),
+            foreach (string invalid in new[] { json.Replace("\"version\":5", "\"version\":3"),
                 json.Replace("\"format\":\"blueprint\",\"info\"", "\"format\":\"lua\",\"info\""),
                 json.Replace("opaque-zdo", new string('x', 32769)), json.Replace("\"chance\":\"0.5\"", "\"chance\":\"0.5\",\"chance\":\"0.5\"") })
             {
@@ -282,7 +394,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 try { BlueprintExchangeFormat.Decode(invalid); } catch (InvalidDataException) { rejected = true; }
                 Require(rejected, "Old schema/invalid format/oversized/duplicate foreign data accepted");
             }
-            File.WriteAllText(path, before.Replace("\"version\":13", "\"version\":12"));
+            File.WriteAllText(path, before.Replace("\"version\":14", "\"version\":12"));
             Require(new CompositeBlueprintStore(path).All().Count == 0 && File.ReadAllText(path).Contains("\"version\":12"),
                 "Mislabeled native foreign data was accepted or overwritten");
             var empty = ExternalBlueprintLibrary.Parse("#Pieces\nwall;;0;0;0;0;0;0;1;\"\"\nwall;;1;0;0;0;0;0;1;\"\"", "empty.blueprint");
@@ -292,7 +404,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             var vbuild = ExternalBlueprintLibrary.Parse("wall;0;0;0;1;0;0;0;opaque;.25\nwall;0;0;0;1;1;0;0", "extra.vbuild");
             Require(vbuild.parts.Count == 2 && vbuild.parts[0].foreignData.format == "vbuild" && vbuild.parts[0].foreignData.chance == ".25",
                 "vbuild extension was lost");
-            Console.WriteLine("PASS inert holder/object/ZDO/chance/unknown-section preservation; native13/portable4; clone/legacy update/rollback; pending execution gate");
+            Console.WriteLine("PASS inert holder/object/ZDO/chance/unknown-section preservation; native14/portable5; clone/legacy update/rollback; pending execution gate");
         }
 
         private static void ForeignSignText()
@@ -377,7 +489,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(loaded.All().Count == 1 && loaded.All()[0].parts[0].scale.y == 2 && loaded.CatalogAll().Count == 3,
                 "Native copy cannot be reopened with original sources");
             Require(File.ReadAllText(original) == source, "Import/save rewrote original file");
-            Console.WriteLine("PASS read-only .blueprint/.vbuild -> separate native v13 copy, exact poses/scales, inert terrain retention, rejection without partial pieces, inert archive");
+            Console.WriteLine("PASS read-only .blueprint/.vbuild -> separate native v14 copy, exact poses/scales, inert terrain retention, rejection without partial pieces, inert archive");
         }
 
         private static CompositeBlueprintStore.VectorData UnitScale => new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 };
@@ -576,9 +688,9 @@ namespace OstrixMods.BuildWorks.StoreTests
                 copy.groups[0].pivotPartId == copy.parts[0].stableId && copy.primaryPartId == copy.parts[0].stableId &&
                 copy.primaryGroupId == copy.groups[0].stableId && copy.parts[0].signText == parts[0].signText &&
                 copy.customSnapPoints[0].x == 2 && !copy.parts[0].editorVisible && copy.parts[0].editorLocked, "Detached copy lost hierarchy/data");
-            foreach (string invalid in new[] { json.Replace("\"version\":4", "\"version\":999"),
+            foreach (string invalid in new[] { json.Replace("\"version\":5", "\"version\":999"),
                 json.Replace("\"format\":", "\"future\":42,\"format\":"),
-                json.Replace("\"version\":4", "\"version\":4,\"version\":4"),
+                json.Replace("\"version\":5", "\"version\":5,\"version\":5"),
                 json.Replace("\"x\":2", "\"x\":null"), json.Replace("\"x\":2", "\"extra\":2,\"x\":2"),
                 json.Replace("\"previewZoom\":1,", ""), json.Replace("\"name\":\"Group\"", "\"name\":\" Group \""),
                 json.Replace("\"previewZoom\":1", "\"previewZoom\":0") })
@@ -591,11 +703,11 @@ namespace OstrixMods.BuildWorks.StoreTests
                 saved.primaryPartId, saved.primaryGroupId, out error), error);
             Require(new CompositeBlueprintStore(path).All()[0].customSnapPoints.Count == 1, "Legacy save path cleared custom points");
             string original = File.ReadAllText(path);
-            File.WriteAllText(path, original.Replace("\"version\":13", "\"future\":123,\"version\":13"));
+            File.WriteAllText(path, original.Replace("\"version\":14", "\"future\":123,\"version\":14"));
             var unknown = new CompositeBlueprintStore(path);
             Require(!unknown.TrySave(parts, Array.Empty<CompositeBlueprintStore.VectorData>(), out _, out _) &&
                 File.ReadAllText(path).Contains("\"future\":123"), "Unknown native fields silently discarded");
-            Console.WriteLine("PASS v13/public v4 roundtrip, sign UTF-8, custom sockets, strict unknown fields, detached hierarchy");
+            Console.WriteLine("PASS v14/public v5 roundtrip, sign UTF-8, custom sockets, strict unknown fields, detached hierarchy");
         }
 
         private static void SupportRoundTrip(string path)
@@ -618,7 +730,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 reopened.parts[0].position.x == 0 && reopened.primaryPartId == "a" && reopened.primaryGroupId == "group",
                 "Support native roundtrip changed pose, roots or fallback frame");
             string json = System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(reopened));
-            Require(json.Contains("\"version\":4"), "Portable version was not bumped");
+            Require(json.Contains("\"version\":5"), "Portable version was not bumped");
             var decoded = BlueprintExchangeFormat.Decode(json);
             Require(decoded.supports[0].name == "Вход" && decoded.placementSupportId == "support" &&
                 decoded.supports[0].rotation.w == .7071068f, "Portable support pose/default lost");
@@ -656,7 +768,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             // Legacy files have no support fields; reading them must not rewrite the original.
             decoded.supports = null; decoded.placementSupportId = null;
             string legacyPortable = System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(decoded))
-                .Replace("\"version\":4", "\"version\":1");
+                .Replace("\"version\":5", "\"version\":1");
             Require(BlueprintExchangeFormat.Decode(legacyPortable).supports.Count == 0, "Portable v1 not migrated");
             string legacyNative = Json(new CompositeBlueprintStore.LibraryData { version = 10,
                 blueprints = new List<CompositeBlueprintStore.Blueprint> { decoded } });
@@ -665,9 +777,9 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(legacy.All().Count == 1 && legacy.All()[0].supports.Count == 0 && File.ReadAllText(path) == legacyNative,
                 "Native v10 not migrated without overwriting source");
             Require(legacy.TryRename(legacy.All()[0], "Migrated", out error) &&
-                File.ReadAllText(path).Contains("\"version\":13"), "Legacy migration not saved as v13");
+                File.ReadAllText(path).Contains("\"version\":14"), "Legacy migration not saved as v14");
 
-            foreach (string invalid in new[] { json.Replace("\"version\":4", "\"version\":1"),
+            foreach (string invalid in new[] { json.Replace("\"version\":5", "\"version\":1"),
                 json.Replace("\"stableId\":\"support\"", "\"stableId\":\"a\""),
                 json.Replace("\"stableId\":\"support\"", "\"stableId\":\"group\""),
                 json.Replace("\"placementSupportId\":\"support\"", "\"placementSupportId\":\"missing\""),
@@ -704,7 +816,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(ExternalBlueprintLibrary.Parse(maximumJson.Replace("\"supports\":[", "\"supports\":[" + Json(many[64]) + ","),
                 "overflow.buildworks.json").importError != null, "Decoder accepted 65 supports");
 
-            foreach (string invalidNative in new[] { original.Replace("\"version\":13", "\"version\":10"),
+            foreach (string invalidNative in new[] { original.Replace("\"version\":14", "\"version\":10"),
                 original.Replace("\"name\":\"Вход\"", "\"future\":true,\"name\":\"Вход\""),
                 original.Replace("\"placementSupportId\":\"support\"", "\"placementSupportId\":\"missing\"") })
             {
@@ -713,7 +825,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 Require(!blocked.TrySave(parts, Array.Empty<CompositeBlueprintStore.VectorData>(), out _, out _) &&
                     File.ReadAllText(path) == invalidNative, "Invalid native support file was rewritten");
             }
-            Console.WriteLine("PASS support v13/v4 disk/exchange/copy; v10/v1 migration; explicit clear; legacy retain; atomic rollback; strict IDs/pose/labels/version/count");
+            Console.WriteLine("PASS support v14/v5 disk/exchange/copy; v10/v1 migration; explicit clear; legacy retain; atomic rollback; strict IDs/pose/labels/version/count");
         }
 
         private static string Json<T>(T value)
@@ -760,7 +872,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(store.TrySaveDocument(
                 parts, groups, anchors, out CompositeBlueprintStore.Blueprint saved,
                 out string error), error);
-            Require(File.ReadAllText(path).Contains("\"version\":13"), "v13 was not written");
+            Require(File.ReadAllText(path).Contains("\"version\":14"), "v14 was not written");
 
             var reopened = new CompositeBlueprintStore(path);
             Equal(1, reopened.All().Count, "blueprint count");
@@ -791,7 +903,7 @@ namespace OstrixMods.BuildWorks.StoreTests
         {
             RoundTripV9(path);
             string original = System.Text.RegularExpressions.Regex.Replace(
-                File.ReadAllText(path).Replace("\"version\":13", "\"version\":5").Replace(",\"supports\":[]", ""),
+                File.ReadAllText(path).Replace("\"version\":14", "\"version\":5").Replace(",\"supports\":[]", ""),
                 ",\"scale\":\\{[^}]+\\}", string.Empty);
             File.WriteAllText(path, original);
             var migrated = new CompositeBlueprintStore(path);
@@ -935,8 +1047,8 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(migrated.TryUpdateDocument(
                 blueprint, blueprint.parts, blueprint.groups, blueprint.anchors,
                 out string error), error);
-            Require(File.ReadAllText(path).Contains("\"version\":13"),
-                "migration was not persisted as v13");
+            Require(File.ReadAllText(path).Contains("\"version\":14"),
+                "migration was not persisted as v14");
             Equal(id + "_part_000",
                 new CompositeBlueprintStore(path).All()[0].parts[0].stableId,
                 "migrated id after reopen");

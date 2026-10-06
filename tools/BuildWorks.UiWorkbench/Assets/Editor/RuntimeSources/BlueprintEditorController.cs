@@ -2700,7 +2700,7 @@ namespace OstrixMods.BuildWorks
             { view.SetStatus(BuildWorksLocalization.Text("editor.item.select_stand"), error: true); return; }
             if (detach)
             {
-                if (part.ForeignData != null) ConfirmItemContents(part, null);
+                if (part.ForeignData != null && !part.ForeignData.ContentsCleared) ConfirmItemContents(part, null);
                 return;
             }
             try
@@ -2765,7 +2765,7 @@ namespace OstrixMods.BuildWorks
                 if (ApplyDocumentEdit(() => document.SetItemStandContents(id, contents)))
                     view.SetStatus(BuildWorksLocalization.Text("editor.item.saved"));
             }
-            if (previous == null) Apply();
+            if (previous == null || previous.ContentsCleared) Apply();
             else view.ShowConfirmation(BuildWorksLocalization.Text("editor.item.replace_title"),
                 BuildWorksLocalization.Text(contents == null ? "editor.item.remove_confirm" : "editor.item.replace_confirm"), Apply);
         }
@@ -3774,7 +3774,7 @@ namespace OstrixMods.BuildWorks
             view.SupportCentreId = transformSupportPivotId;
             BlueprintEditorPart standPart = EditableItemStand(document.ActiveNodeId, out _);
             view.ItemStandEditable = standPart != null && document.Selection.Count == 1;
-            view.ItemStandHasContents = standPart?.ForeignData != null;
+            view.ItemStandHasContents = standPart?.ForeignData != null && !standPart.ForeignData.ContentsCleared;
             view.Bind(document, true, missing, boundsSize);
             UpdateOperationMetrics();
             if (!string.IsNullOrEmpty(status))

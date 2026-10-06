@@ -2,7 +2,16 @@
 
 **English** | [Русский](blueprint-format_RU.md)
 
-Current source **0.19.74**: read-only native v109 record inspection returns detached immutable item fields, including exact
+Current source **0.19.75**: Store v14 / portable v5 add optional contentsCleared for native Container/ItemStand only.
+Independent storage/mount export choices act on a validated private copy. Exact raw Info/ZDO stay archival;
+requiredPrefabIds reflects effective contents. Retain never resurrects a prior cleared copy.
+Old v13/v4 inputs default to retained contents; old-schema new fields and invalid/duplicate/unknown flags reject.
+Clearing storage requires full native v109 inspection with verified hashes; unknown/unreadable/opaque data
+rejects clearing atomically with no output and no original mutation. Preview/tree/tools and Undo preserve the distinction.
+Release/112 Geometry/Store/required checks and independent reviews PASS; no world reconstruction or game acceptance.
+Choice/count/preflight UI and direct import policy remain pending. Installed .67 unchanged; no deployment.
+
+Previous source **0.19.74**: read-only native v109 record inspection returns detached immutable item fields, including exact
 custom strings and crafter data, while original bytes remain authoritative. Strings/counts are bounded before allocation.
 Cells, occupied count, total units and every dependency are verified; zero/colliding/undeclared hashes, invalid UTF-8,
 noncanonical optional/default fields, string/custom-map encodings and incomplete/trailing records refuse with no partial output.

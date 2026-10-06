@@ -2741,7 +2741,7 @@ namespace OstrixMods.BuildWorks
             if (lockIcon) lockIcon.color = locked ? AccentColor : MutedColor;
             if (!part) name.color = AccentColor;
             if (!visible) name.color = MutedColor;
-            if (contents?.Format == BlueprintForeignPartData.NativeItemStandFormat)
+            if (contents?.Format == BlueprintForeignPartData.NativeItemStandFormat && !contents.ContentsCleared)
             {
                 string itemId = contents.Info.Split(':')[0];
                 GameObject item = ObjectDB.instance ? ObjectDB.instance.GetItemPrefab(itemId) : null;

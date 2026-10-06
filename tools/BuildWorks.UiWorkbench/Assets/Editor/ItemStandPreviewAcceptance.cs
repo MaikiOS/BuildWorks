@@ -48,6 +48,17 @@ internal static class ItemStandPreviewAcceptance
             Call(editor, "SelectNode", id, false, false);
             var view = Field<BlueprintEditorView>(editor, "view");
             Require(view.ItemStandEditable && view.ItemStandHasContents, "selected stand tools unavailable");
+            Require((bool)Call(editor, "ApplyDocumentEdit", new Func<bool>(() =>
+                editor.Document.SetItemStandContents(id, captured.WithoutContents(null))), false), "empty policy could not bind");
+            Require(view.ItemStandEditable && !view.ItemStandHasContents &&
+                !Field<RectTransform>(view, "outlinerRows").Cast<Transform>().Any(row =>
+                    row.name == "Contents_" + id && row.gameObject.activeSelf), "empty policy leaked into tree or tools");
+            Call(editor, "RequestItemContents", true);
+            Require(!view.HasModal && editor.Document.Parts[0].ForeignData.ContentsCleared, "empty policy offered detach");
+            Call(editor, "ApplyHistory", new Func<bool>(editor.Document.Undo), new Func<bool>(editor.Document.Redo));
+            Require(view.ItemStandHasContents && Field<RectTransform>(view, "outlinerRows").Cast<Transform>().Any(row =>
+                row.name == "Contents_" + id && row.gameObject.activeSelf),
+                "policy Undo did not restore tree/tools");
             view.ShowToolsMenu(Vector2.zero, false);
             var tools = Field<List<UnityEngine.UI.Button>>(view, "toolsEntries");
             tools.Single(button => button.name == "ToolsItem0").onClick.Invoke();
@@ -207,6 +218,15 @@ internal static class ItemStandPreviewAcceptance
                 Require(scene.TrySync(doc, out string warning) && warning == null &&
                     Content(Field<GameObject>(scene, "root")) && doc.Parts[0].ForeignData.Zdo == captured.Zdo,
                     "native-captured contents were not previewed or raw package changed");
+                doc.SelectOnly("holder");
+                Require(doc.SetItemStandContents("holder", captured.WithoutContents(null)) &&
+                    scene.TrySync(doc, out warning) && warning == null, "intentional empty contents could not sync");
+                yield return null;
+                Require(!Content(Field<GameObject>(scene, "root")) && doc.Parts[0].ForeignData.Zdo == captured.Zdo,
+                    "cleared evidence was rendered as contents or original package was removed");
+                Require(doc.Undo() && scene.TrySync(doc, out warning) && warning == null, "clear Undo failed");
+                yield return null;
+                Require(Content(Field<GameObject>(scene, "root")), "clear Undo did not restore the rendered contents");
             }
             yield return null;
             foreach (ItemStand.Orientation orientation in new[] { ItemStand.Orientation.Horizontal, ItemStand.Orientation.Vertical })

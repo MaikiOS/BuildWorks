@@ -185,7 +185,7 @@ public static class RuntimeEditorAcceptance
             TestPlacementSupportFrame();
             checks.Add(StorageCaptureAcceptance.Run());
             foreach (object step in ItemStandPreviewAcceptance.Run(template, output)) yield return step;
-            checks.Add("Actual ItemStand tools -> compatible item catalogue -> one click -> replacement Cancel/confirm -> full-package Undo -> detach -> immediate empty-stand attach -> native save/reopen; stale locked stand rejected. No inventory/world creation.");
+            checks.Add("Actual ItemStand tools -> compatible item catalogue -> one click -> replacement Cancel/confirm -> full-package Undo -> detach -> immediate empty-stand attach -> native save/reopen; cleared contents hide tree/tools/visuals, preserve raw evidence and Undo restores; stale locked stand rejected. No inventory/world creation.");
             checks.Add("Actual read-only ItemStand capture: native view override, negative item hash, exact opaque item package and immutable snapshot; legacy/empty/invalid/missing/oversized/armour denial; captured contents visible in renderer-only scene. No native item-package decode, inventory or world reconstruction executed.");
             checks.Add("Actual ItemStand renderer-only adapter: horizontal/wall offsets, quality/variant, nested/duplicate anchors, holder XYZ scale/rotation, selection/move/Undo, temporary copies and content cache replacement; invalid/missing contents explain failure without data loss; thumbnail/rotatable preview, source/material/script isolation. Native inventory/world/armour remain unverified.");
             checks.Add(UICatalogAcceptance.Run(fontTemplate.font));
@@ -675,8 +675,8 @@ public static class RuntimeEditorAcceptance
         Require(reloaded.All().Count == 1, "Actual disk library roundtrip");
         Require(Mathf.Abs(reloaded.All()[0].parts[0].scale.x - expected) < 0.0001f, "Store discarded scale");
         CheckReopenedCopy(controller, reloaded, expected);
-        Require(File.ReadAllText(path).Contains("\"version\":13"), "Controller did not write format13");
-        checks.Add("Controller save -> disk format13 -> new store -> OpenExisting retains scale, rotated root-owned support and placement reference; transient support focus absent");
+        Require(File.ReadAllText(path).Contains("\"version\":14"), "Controller did not write format14");
+        checks.Add("Controller save -> disk format14 -> new store -> OpenExisting retains scale, rotated root-owned support and placement reference; transient support focus absent");
     }
 
     private static void TestExternalImportEditor(Camera camera, TMP_Text font,

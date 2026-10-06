@@ -20,7 +20,7 @@ namespace OstrixMods.BuildWorks
             BlueprintForeignPartData data, out string warning)
         {
             warning = null;
-            if (data == null || !source || !visual) return false;
+            if (data == null || data.ContentsCleared || !source || !visual) return false;
             ItemStand stand = source.GetComponent<ItemStand>();
             if (!stand) return false;
             string reason = "editor.item_preview_invalid";

@@ -2,6 +2,28 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.75 — independent contents policy persistence; not deployed
+
+Store v14 / portable v5 add optional contentsCleared to known native Container/ItemStand payloads.
+Export applies separate storage and mount choices to a validated private copy; original Info/ZDO
+remain exact archival evidence, not effective contents. Retain never resurrects an already cleared
+copy. Required prefab dependencies exclude cleared archival items. Old v13/v4 inputs retain contents;
+new fields in old schemas, unknown payloads and malformed booleans reject rather than silently lose data.
+Container clearing requires full bounded inventory inspection and verified prefab hashes; unreadable
+inventories, opaque foreign objects/source sections reject the entire clear operation without output.
+Editor tree/tools/renderer respect cleared state; Undo restores exact original contents.
+The shared foreign-state world guard remains closed; no inventory execution/world reconstruction.
+
+Release zero warnings/errors; 112 Geometry, Store (all four independent choices, JSON/ZIP, disk/reopen,
+old-version gates and failure atomicity), eight Bridge, 12 WorldLayout, 823 Localization, HostContract,
+format and deployment WhatIf PASS. verify unavailable; direct checks and independent correctness/
+Ponytail review PASS. Fresh isolated Unity: 180 screenshots / 38 checks PASS at
+2026-10-06T19:08:47.1390967Z, gameHostTested=false; not Valheim acceptance.
+Installed test .67 unchanged; no deployment/game/save changes/publication.
+Choice/count/preflight UI and direct import policy are still pending, as are foreign storage decoding,
+world restoration, armour/free items, heavy scenes above 512 and durable world sockets.
+Overall goal stays active.
+
 ## Checkpoint 0.19.74 — bounded native inventory inspection; not deployed
 
 Read-only v109 inspection exposes every stored field (identity, cell, stack, quality, variant,

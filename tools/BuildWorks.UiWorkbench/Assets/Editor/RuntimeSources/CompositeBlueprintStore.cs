@@ -26,7 +26,7 @@ namespace OstrixMods.BuildWorks
         internal const string DefaultCategory = "OTHER";
         private const string LegacyDefaultCategory = "ПРОЧЕЕ";
         private const string LocalizationPrefix = "$buildworks_";
-        private const int FormatVersion = 13;
+        private const int FormatVersion = 14;
         private const int MaximumBlueprints = 32;
         private const int MaximumCategories = 12;
         private const int MaximumAnchors = 512;
@@ -187,15 +187,18 @@ namespace OstrixMods.BuildWorks
             TryExportFile(blueprint, ExportDirectory, "blueprint_" + Guid.NewGuid().ToString("N"), false, out exportedPath, out error);
 
         internal bool TryExportFile(Blueprint blueprint, string directory, string fileName, bool archive,
-            out string exportedPath, out string error)
+            out string exportedPath, out string error, bool clearStorage = false, bool clearMounts = false,
+            Func<string, int> prefabHash = null)
         {
             exportedPath = null; error = null; string temporary = null;
             try
             {
                 if (blueprint == null || !string.IsNullOrEmpty(blueprint.importError))
                     throw new InvalidDataException(blueprint?.importError ?? "$buildworks_import.format");
-                byte[] bytes = BlueprintExchangeFormat.Encode(blueprint.IsExternal
-                    ? ExternalBlueprintLibrary.DetachedCopy(blueprint) : blueprint);
+                Blueprint prepared = clearStorage || clearMounts
+                    ? CopyWithContentsPolicy(blueprint, clearStorage, clearMounts, prefabHash)
+                    : blueprint.IsExternal ? ExternalBlueprintLibrary.DetachedCopy(blueprint) : blueprint;
+                byte[] bytes = BlueprintExchangeFormat.Encode(prepared);
                 BlueprintExchangeFormat.Decode(new UTF8Encoding(false, true).GetString(bytes));
                 directory = ValidateExchangeDirectory(directory);
                 if (string.IsNullOrWhiteSpace(fileName) || fileName.Length > 120 || fileName != fileName.Trim() ||
@@ -226,6 +229,30 @@ namespace OstrixMods.BuildWorks
         }
 
         public IReadOnlyList<string> Categories() => data.categories;
+
+        // Always a private recipe. Retaining never resurrects previously cleared contents.
+        internal static Blueprint CopyWithContentsPolicy(Blueprint source, bool clearStorage, bool clearMounts,
+            Func<string, int> prefabHash)
+        {
+            if (source == null || !string.IsNullOrEmpty(source.importError))
+                throw new InvalidDataException(source?.importError ?? "$buildworks_import.format");
+            Blueprint copy = BlueprintExchangeFormat.Decode(Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(
+                source.IsExternal ? ExternalBlueprintLibrary.DetachedCopy(source) : source)));
+            if (!clearStorage && !clearMounts) return copy;
+            if (copy.sourceDocuments?.Any(document => document.ToGeometry().HasOpaqueSections) == true)
+                throw new InvalidDataException("$buildworks_import.object_data");
+            foreach (Part part in copy.parts)
+            {
+                var contents = part.foreignData?.ToGeometry();
+                if (contents == null) continue;
+                if (contents.Format != Geometry.BlueprintForeignPartData.NativeContainerFormat &&
+                    contents.Format != Geometry.BlueprintForeignPartData.NativeItemStandFormat)
+                    throw new InvalidDataException("$buildworks_import.object_data");
+                if (contents.Format == Geometry.BlueprintForeignPartData.NativeContainerFormat ? clearStorage : clearMounts)
+                    part.foreignData = ForeignPartData.FromGeometry(contents.WithoutContents(prefabHash));
+            }
+            return copy;
+        }
 
         public bool TrySave(
             IReadOnlyList<Part> parts,
@@ -828,7 +855,7 @@ namespace OstrixMods.BuildWorks
                 }
                 BlueprintExchangeFormat.ValidateLibraryJson(json, requireFields: loaded.version >= 6,
                     allowSupportFields: loaded.version >= 11, allowSourceFields: loaded.version >= 12,
-                    allowForeignFields: loaded.version >= 13);
+                    allowForeignFields: loaded.version >= 13, allowContentsFields: loaded.version >= 14);
                 loaded.blueprints = loaded.blueprints ?? new List<Blueprint>();
                 loaded.categories = loaded.categories ?? new List<string>();
                 if (loaded.version == 1)
@@ -1088,7 +1115,8 @@ namespace OstrixMods.BuildWorks
             blueprint?.sourceDocuments?.Any(source => source.ToGeometry().HasOpaqueSections) == true;
 
         private static ForeignPartData CloneForeignData(ForeignPartData value) => value == null ? null :
-            new ForeignPartData { format = value.format, info = value.info, zdo = value.zdo, chance = value.chance };
+            new ForeignPartData { format = value.format, info = value.info, zdo = value.zdo, chance = value.chance,
+                contentsCleared = value.contentsCleared };
 
         private static bool ValidForeignData(ForeignPartData value)
         {
@@ -1453,9 +1481,11 @@ namespace OstrixMods.BuildWorks
             [DataMember(Order = 1)] public string info;
             [DataMember(Order = 2)] public string zdo;
             [DataMember(Order = 3)] public string chance;
-            internal Geometry.BlueprintForeignPartData ToGeometry() => new Geometry.BlueprintForeignPartData(format, info, zdo, chance);
+            [DataMember(Order = 4, EmitDefaultValue = false)] public bool contentsCleared;
+            internal Geometry.BlueprintForeignPartData ToGeometry() => new Geometry.BlueprintForeignPartData(format, info, zdo, chance, contentsCleared);
             internal static ForeignPartData FromGeometry(Geometry.BlueprintForeignPartData value) => value == null ? null :
-                new ForeignPartData { format = value.Format, info = value.Info, zdo = value.Zdo, chance = value.Chance };
+                new ForeignPartData { format = value.Format, info = value.Info, zdo = value.Zdo, chance = value.Chance,
+                    contentsCleared = value.ContentsCleared };
         }
 
         [DataContract]

@@ -11,10 +11,12 @@ namespace OstrixMods.BuildWorks.Geometry
         public const string NativeContainerFormat = "valheim-container-v1";
         public const int MaximumContainerBytes = 1024 * 1024;
         public const int MaximumContainerBase64 = ((MaximumContainerBytes + 2) / 3) * 4;
-        public BlueprintForeignPartData(string format, string info, string zdo, string chance)
+        public BlueprintForeignPartData(string format, string info, string zdo, string chance, bool contentsCleared = false)
         {
             if (format != "blueprint" && format != "vbuild" && format != NativeItemStandFormat && format != NativeContainerFormat)
                 throw new ArgumentException("Unknown part-state format.");
+            if (contentsCleared && format != NativeItemStandFormat && format != NativeContainerFormat)
+                throw new ArgumentException("Cannot clear unknown object contents.");
             foreach (string value in new[] { info, chance })
                 if (value != null && value.Length > 32768) throw new ArgumentException("Foreign data is too large.");
             if (zdo != null && zdo.Length > (format == NativeContainerFormat ? MaximumContainerBase64 : 32768))
@@ -74,12 +76,22 @@ namespace OstrixMods.BuildWorks.Geometry
                     Convert.ToBase64String(bytes) != zdo)
                     throw new ArgumentException("Unknown, incomplete or mismatched native inventory package.");
             }
-            Format = format; Info = info; Zdo = zdo; Chance = chance;
+            Format = format; Info = info; Zdo = zdo; Chance = chance; ContentsCleared = contentsCleared;
         }
 
         public string Format { get; }
         public string Info { get; }
         public string Zdo { get; }
         public string Chance { get; }
+        // Empty effective contents; Info/Zdo remain exact original evidence, never a restoration recipe.
+        public bool ContentsCleared { get; }
+
+        public BlueprintForeignPartData WithoutContents(Func<string, int> prefabHash)
+        {
+            if (Format != NativeItemStandFormat && Format != NativeContainerFormat ||
+                Format == NativeContainerFormat && !BlueprintContainerInventory.TryRead(this, prefabHash, out _))
+                throw new ArgumentException("Cannot clear unreadable object contents.");
+            return ContentsCleared ? this : new BlueprintForeignPartData(Format, Info, Zdo, Chance, true);
+        }
     }
 }

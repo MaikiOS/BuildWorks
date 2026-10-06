@@ -77,6 +77,8 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Run("Invalid anchor values are rejected", InvalidAnchorValuesAreRejected);
             Run("Blueprint document deep copies source", BlueprintDocumentDeepCopiesSource);
             Run("Blueprint payload survives insertion and cached history", BlueprintPayloadSurvivesHistory);
+            Run("Free supports have independent pose, scope and history", BlueprintSupportHistory);
+            Run("Free supports insert with remapped root pose and validate atomically", BlueprintSupportInsertion);
             Run("Blueprint selection does not dirty document", BlueprintSelectionDoesNotDirtyDocument);
             Run("Blueprint range selection follows tree order", BlueprintRangeSelectionFollowsTreeOrder);
             Run("Blueprint range selection stays inside parent", BlueprintRangeSelectionStaysInsideParent);
@@ -1870,6 +1872,116 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Equal("g0", document.Selection[0]);
             Equal(false, document.IsDirty);
             Equal(false, document.CanUndo);
+        }
+
+        private static void BlueprintSupportHistory()
+        {
+            var identity = new Rotation3(0, 0, 0, 1);
+            var turn = new Rotation3(0, Math.Sqrt(.5), 0, Math.Sqrt(.5));
+            var document = EditorDocument(EditorPart("wall", 1, 0, 0));
+            document.SelectOnly("wall");
+            document.MarkClean();
+            Equal(true, document.AddSupport(new BlueprintEditorSupport("support", "Вход", new Point3(2, 3, 4), identity)));
+            Equal("support", document.ActiveSupportId);
+            Equal("wall", document.Selection[0]);
+            Equal(null, document.PlacementSupportId); // selecting is not assigning
+            Equal(true, document.Undo());
+            Equal(0, document.Supports.Count);
+            Equal(false, document.IsDirty);
+            Equal(true, document.Redo());
+            Equal("support", document.ActiveSupportId);
+            document.MarkClean();
+            Equal(true, document.SelectSupport(null));
+            Equal(false, document.IsDirty);
+            Equal(false, document.SelectSupport("missing"));
+            Equal(true, document.SelectSupport("support"));
+            Equal(true, document.SetSupportPose("support", new Point3(5, 6, 7), turn));
+            Near(new Point3(1, 0, 0), document.Parts[0].Position);
+            Near(new Point3(1, 1, 1), document.Parts[0].Scale);
+            Equal(true, document.RollbackLastEdit());
+            Near(new Point3(2, 3, 4), document.Supports[0].Position);
+            Equal(false, document.IsDirty);
+            Equal(true, document.SetSupportPose("support", new Point3(5, 6, 7), turn));
+            Equal(true, document.Undo());
+            Equal(true, document.Redo());
+            Near(new Point3(5, 6, 7), document.FindSupport("support").Position);
+            Near(new Point3(0, 0, -1), document.FindSupport("support").Rotation.Rotate(new Point3(1, 0, 0)));
+            Equal(true, document.SetPlacementSupport("support"));
+            Equal(true, document.RenameSupport("support", "Новая опора"));
+            Equal(true, document.SelectOnly("wall"));
+            Equal(null, document.ActiveSupportId);
+            Equal(true, document.DuplicateSelection(new Point3(1, 0, 0)));
+            Equal(1, document.Supports.Count); // group/part copies cannot steal root supports
+            Equal(true, document.SelectOnly("wall"));
+            Equal(true, document.DeleteSelection(deleteGroupChildren: true));
+            Equal(1, document.Supports.Count);
+            Equal("support", document.PlacementSupportId);
+            Equal(true, document.SelectSupport("support"));
+            Equal(true, document.DeleteSupport("support"));
+            Equal(null, document.ActiveSupportId);
+            Equal(null, document.PlacementSupportId);
+            Equal(true, document.Undo());
+            Equal("support", document.ActiveSupportId);
+            Equal("support", document.PlacementSupportId);
+            Equal("Новая опора", document.Supports[0].Name);
+            Equal(true, document.SetPlacementSupport(null));
+            Equal(null, document.PlacementSupportId);
+            Equal(true, document.Undo());
+            Equal("support", document.PlacementSupportId);
+            Equal(true, document.RenameSupport("support", "Ещё имя"));
+            Equal(true, document.Undo());
+            Equal("Новая опора", document.Supports[0].Name);
+            document.MarkClean();
+            Equal(false, document.SetPlacementSupport("missing"));
+            Equal(false, document.SetSupportPose("missing", new Point3(), identity));
+            Equal(false, document.SetSupportPose("support", new Point3(5, 6, 7), turn));
+            Equal(false, document.IsDirty);
+        }
+
+        private static void BlueprintSupportInsertion()
+        {
+            var identity = new Rotation3(0, 0, 0, 1);
+            var turn = new Rotation3(0, Math.Sqrt(.5), 0, Math.Sqrt(.5));
+            var source = new BlueprintEditorDocument(null, "Source", "OTHER",
+                new[] { EditorPart("wall", 0, 0, 0) },
+                sourceSupports: new[] { new BlueprintEditorSupport("source-support", "Вход", new Point3(2, 3, 4), turn) },
+                placementSupportId: "source-support");
+            var destination = EditorDocument(EditorPart("existing", 0, 0, 0));
+            destination.AddSupport(new BlueprintEditorSupport("existing-support", "Главная", new Point3(), identity));
+            destination.SetPlacementSupport("existing-support");
+            destination.MarkClean();
+            Equal(true, destination.InsertBlueprint(source, new Point3(10, 0, 0), turn));
+            Equal(2, destination.Supports.Count);
+            Equal(false, destination.Supports[1].StableId == "source-support");
+            Near(new Point3(14, 3, -2), destination.Supports[1].Position);
+            Near(new Point3(-1, 0, 0), destination.Supports[1].Rotation.Rotate(new Point3(1, 0, 0)));
+            Equal("existing-support", destination.PlacementSupportId);
+            Equal(true, destination.Undo());
+            Equal(1, destination.Supports.Count);
+            Equal(false, destination.IsDirty);
+            Equal(true, destination.Redo());
+            Equal(2, destination.Supports.Count);
+            Throws<ArgumentException>(() => destination.AddSupport(new BlueprintEditorSupport("existing", "Collision", new Point3(), identity)));
+            Equal(2, destination.Supports.Count);
+            Throws<ArgumentOutOfRangeException>(() => new BlueprintEditorSupport("bad", "Position", new Point3(513, 0, 0), identity));
+            Throws<ArgumentException>(() => destination.AddPart(EditorPart("existing-support", 0, 0, 0)));
+            int oldParts = destination.Parts.Count;
+            Throws<ArgumentOutOfRangeException>(() => destination.InsertBlueprint(source, new Point3(511, 0, 0), turn));
+            Equal(oldParts, destination.Parts.Count);
+            Equal(2, destination.Supports.Count);
+            Equal("existing-support", destination.PlacementSupportId);
+            Throws<ArgumentOutOfRangeException>(() => new BlueprintEditorSupport("bad", "Rotation", new Point3(), new Rotation3()));
+            Throws<ArgumentException>(() => new BlueprintEditorSupport("bad", "<b>label</b>", new Point3(), identity));
+            Throws<ArgumentOutOfRangeException>(() => new BlueprintEditorSupport("bad", new string('x', 49), new Point3(), identity));
+            Throws<ArgumentException>(() => new BlueprintEditorDocument(null, "Bad", "OTHER", sourceSupports: source.Supports, placementSupportId: "missing"));
+            Throws<ArgumentException>(() => new BlueprintEditorDocument(null, "Bad", "OTHER", sourceSupports: new[] { source.Supports[0], source.Supports[0] }));
+            var full = new BlueprintEditorDocument(null, "Full", "OTHER", sourceSupports: Enumerable.Range(0, BlueprintEditorDocument.MaximumSupports)
+                .Select(index => new BlueprintEditorSupport("s" + index, "Support", new Point3(), identity)));
+            full.MarkClean();
+            Throws<InvalidOperationException>(() => full.AddSupport(new BlueprintEditorSupport("overflow", "Overflow", new Point3(), identity)));
+            Throws<InvalidOperationException>(() => full.InsertBlueprint(source, new Point3(), identity));
+            Equal(0, full.Parts.Count);
+            Equal(false, full.IsDirty);
         }
 
         private static void BlueprintPayloadSurvivesHistory()

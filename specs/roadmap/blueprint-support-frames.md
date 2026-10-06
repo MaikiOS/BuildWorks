@@ -1,11 +1,37 @@
-# Free blueprint supports — researched proposal, not implemented
+# Free blueprint supports — approved, document foundation implemented
 
 **English** | [Русский](blueprint-support-frames_RU.md)
+
+## Checkpoint 0.19.61 — foundation only
+
+Ostrix approved the workflow on 2026-10-06. BlueprintEditorDocument now holds
+independent root-owned Supports (maximum 64), separate ActiveSupportId and optional
+PlacementSupportId. Add/name/pose/default/delete share validated atomic Undo/Redo
+and rollback. Object selection is retained when selecting a support; object clicks
+leave support scope. Geometry duplicate/delete/reparent do not own these supports.
+Insertion remaps IDs and composes root pose without replacing destination default.
+Controller.CopyDocument now deep-copies supports and custom snap points.
+
+Release has zero warnings/errors. 108 Geometry checks, five actual EditorBridge
+checks, Store/Localization/HostContract/WorldLayout/DeploymentChecks pass.
+144 exact-source Unity UI states pass at 2026-10-06T09:35:25Z, gameHostTested=false.
+Independent correctness and Ponytail review pass; verify skill is absent.
+
+This does NOT implement the Supports branch, G/R UI routing, disk schema or world
+persistence yet. Store remains v10 and portable remains v1; no support payload is
+accepted or written there. The new model is not exposed to players. Next complete
+slice must connect v11/v2, tree/inspector/gizmo and all copy/save paths together.
+Free frame math must stay separate from HasExplicitFrame/IsFramePart, whose
+existing role also filters geometry/native sockets. Rotated placement/default and
+history require the same pose resolver before world use. No limit increase,
+deployment, game launch or save mutation.
+
 
 2026-10-06. Ostrix clarified that the desired feature is a freely authored blueprint
 support with its own transform, not another snap point owned by a nearby piece.
 Main source inspection plus two read-only agents examined UX and coordinate/storage
-contracts. This proposal needs approval before new entity/UI/world persistence work.
+contracts. The first workflow is now approved; world persistence still needs its
+server-authoritative contract and in-game acceptance.
 
 ## Keep the meanings distinct
 

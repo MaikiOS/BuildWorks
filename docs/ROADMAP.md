@@ -9,7 +9,11 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.60**: [shared pick geometry](../specs/roadmap/blueprint-render-performance.md).
+Active source checkpoint **0.19.61**: [independent support data foundation](../specs/roadmap/blueprint-support-frames.md).
+108 Geometry + five EditorBridge + Release/targeted checks and 144 Unity states PASS.
+Not exposed/persisted yet: Store v10/portable v1 unchanged; tree/G/R and v11/v2 next.
+
+Previous source checkpoint **0.19.60**: [shared pick geometry](../specs/roadmap/blueprint-render-performance.md).
 512 walls: pick-array payload 50071344 → 107808 bytes, sync 550 → 223 ms; renderers unchanged.
 144 real-size Unity states PASS; no game proof/deployment, budget 512 unchanged.
 Free root support workflow approved; implementation and world durability remain.

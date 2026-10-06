@@ -54,6 +54,25 @@ internal static class Program
         Console.WriteLine("PASS actual Controller.BuildStoreParts -> Store.TrySaveDocument preserves XYZ scale");
         Console.WriteLine("PASS actual Controller/store/reopen preserves sign text");
 
+        document.AddSupport(new BlueprintEditorSupport("support", "Вход", new Point3(2,3,4), new Rotation3(0,0,0,1)));
+        document.SetPlacementSupport("support");
+        document.SelectOnly("a");
+        document.SelectSupport("support");
+        var payload = new BlueprintEditorDocument(null, "Copy", "OTHER", document.Parts,
+            sourceCustomSnapPoints: new[] { new Point3(7,8,9) }, sourceSupports: document.Supports,
+            placementSupportId: document.PlacementSupportId);
+        payload.SelectOnly("a"); payload.SelectSupport("support");
+        var copied = (BlueprintEditorDocument)controllerType.GetMethod("CopyDocument", BindingFlags.NonPublic | BindingFlags.Static)
+            .Invoke(null, new object[] { payload });
+        Require(copied.CustomSnapPoints.Count == 1 && copied.CustomSnapPoints[0].Y == 8 &&
+            copied.Supports.Count == 1 && copied.Supports[0].Position.Z == 4 &&
+            copied.PlacementSupportId == "support" && copied.ActiveSupportId == "support" &&
+            copied.Selection.SequenceEqual(payload.Selection) && !ReferenceEquals(copied.Supports[0], payload.Supports[0]),
+            "Controller copy dropped root payload or conflated support/object selection");
+        copied.SetSupportPose("support", new Point3(9,9,9), new Rotation3(0,0,0,1));
+        Require(payload.Supports[0].Position.X == 2, "Controller copy aliases support poses");
+        Console.WriteLine("PASS actual Controller.CopyDocument retains detached root payload and support scope");
+
         var grouped = new BlueprintEditorDocument(null, "Group", "OTHER", new[] { Part("a",0), Part("b",2) });
         grouped.SelectOnly("a"); grouped.ToggleSelection("b"); grouped.CreateGroup("g", "Group");
         grouped.DuplicateSelection(new Point3(10,0,0));

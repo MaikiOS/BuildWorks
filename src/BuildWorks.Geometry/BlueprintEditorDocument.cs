@@ -144,11 +144,45 @@ namespace OstrixMods.BuildWorks.Geometry
             new BlueprintEditorGroup(StableId, Name, Visible, Locked, ParentGroupId, PivotPartId);
     }
 
+    // Root-owned frame, not a part, snap socket or scaled object.
+    public sealed class BlueprintEditorSupport
+    {
+        public BlueprintEditorSupport(string stableId, string name, Point3 position, Rotation3 rotation)
+        {
+            StableId = Label(stableId, 128, nameof(stableId));
+            Name = Label(name, 48, nameof(name));
+            ValidatePosition(position);
+            Position = position;
+            Rotation = rotation.Normalized();
+        }
+
+        public string StableId { get; }
+        public string Name { get; internal set; }
+        public Point3 Position { get; internal set; }
+        public Rotation3 Rotation { get; internal set; }
+        internal BlueprintEditorSupport Clone() => new BlueprintEditorSupport(StableId, Name, Position, Rotation);
+        internal static string Label(string value, int limit, string name)
+        {
+            string text = BlueprintEditorPart.Required(value, name);
+            if (text.Length > limit) throw new ArgumentOutOfRangeException(name);
+            foreach (char c in text)
+                if (char.IsControl(c) || c == '<' || c == '>') throw new ArgumentException("Invalid label.", name);
+            return text;
+        }
+        internal static void ValidatePosition(Point3 value)
+        {
+            BlueprintEditorPart.Validate(value, nameof(value));
+            if (Math.Abs(value.X) > 512 || Math.Abs(value.Y) > 512 || Math.Abs(value.Z) > 512)
+                throw new ArgumentOutOfRangeException(nameof(value));
+        }
+    }
+
     public sealed class BlueprintEditorDocument
     {
         // Storage safety ceiling, not a verified Unity/game rendering budget.
         public const int MaximumParts = 50000;
         public const int MaximumGroups = 64;
+        public const int MaximumSupports = 64;
         public const int MaximumHistory = 32;
         public const double MinimumScale = 0.01;
         public const double MaximumScale = 4.0;
@@ -161,6 +195,9 @@ namespace OstrixMods.BuildWorks.Geometry
             public List<BlueprintEditorPart> Parts;
             public List<BlueprintEditorGroup> Groups;
             public List<Point3> CustomSnapPoints;
+            public List<BlueprintEditorSupport> Supports;
+            public string PlacementSupportId;
+            public string ActiveSupportId;
             public List<string> Selection;
             public string ActiveNodeId;
             public string PrimaryPartId;
@@ -171,6 +208,8 @@ namespace OstrixMods.BuildWorks.Geometry
         private readonly List<BlueprintEditorGroup> groups = new List<BlueprintEditorGroup>();
         private readonly List<string> selection = new List<string>();
         private readonly List<Point3> customSnapPoints = new List<Point3>();
+        private readonly List<BlueprintEditorSupport> supports = new List<BlueprintEditorSupport>();
+        private readonly ReadOnlyCollection<BlueprintEditorSupport> supportsView;
         private readonly ReadOnlyCollection<Point3> customSnapPointsView;
         private readonly Dictionary<string, BlueprintEditorPart> partIndex = new Dictionary<string, BlueprintEditorPart>(StringComparer.Ordinal);
         private readonly Dictionary<string, BlueprintEditorGroup> groupIndex = new Dictionary<string, BlueprintEditorGroup>(StringComparer.Ordinal);
@@ -195,12 +234,22 @@ namespace OstrixMods.BuildWorks.Geometry
             IEnumerable<BlueprintEditorGroup> sourceGroups = null,
             string primaryPartId = null,
             string primaryGroupId = null,
-            IEnumerable<Point3> sourceCustomSnapPoints = null)
+            IEnumerable<Point3> sourceCustomSnapPoints = null,
+            IEnumerable<BlueprintEditorSupport> sourceSupports = null,
+            string placementSupportId = null)
         {
             partsView = parts.AsReadOnly();
             groupsView = groups.AsReadOnly();
             selectionView = selection.AsReadOnly();
             customSnapPointsView = customSnapPoints.AsReadOnly();
+            supportsView = supports.AsReadOnly();
+            if (sourceSupports != null)
+                foreach (BlueprintEditorSupport support in sourceSupports)
+                {
+                    if (support == null) throw new ArgumentException("Support is null.", nameof(sourceSupports));
+                    supports.Add(support.Clone());
+                }
+            PlacementSupportId = placementSupportId;
             if (sourceCustomSnapPoints != null) customSnapPoints.AddRange(sourceCustomSnapPoints);
             SourceBlueprintId = string.IsNullOrWhiteSpace(sourceBlueprintId)
                 ? null
@@ -239,6 +288,10 @@ namespace OstrixMods.BuildWorks.Geometry
         public IReadOnlyList<BlueprintEditorGroup> Groups => groupsView;
         public IReadOnlyList<string> Selection => selectionView;
         public IReadOnlyList<Point3> CustomSnapPoints => customSnapPointsView;
+        public IReadOnlyList<BlueprintEditorSupport> Supports => supportsView;
+        public string PlacementSupportId { get; private set; }
+        // Support-edit scope is separate from retained geometry selection.
+        public string ActiveSupportId { get; private set; }
         public string ActiveNodeId { get; private set; }
         public string PrimaryPartId { get; private set; }
         public string PrimaryGroupId { get; private set; }
@@ -265,6 +318,7 @@ namespace OstrixMods.BuildWorks.Geometry
         public bool SelectOnly(string stableId)
         {
             if (!ContainsNode(stableId)) return false;
+            ActiveSupportId = null;
             selection.Clear();
             selection.Add(stableId);
             ActiveNodeId = stableId;
@@ -274,6 +328,7 @@ namespace OstrixMods.BuildWorks.Geometry
         public bool ToggleSelection(string stableId)
         {
             if (!ContainsNode(stableId)) return false;
+            ActiveSupportId = null;
             int index = selection.IndexOf(stableId);
             if (index >= 0)
             {
@@ -292,6 +347,7 @@ namespace OstrixMods.BuildWorks.Geometry
         public bool SelectRange(string stableId)
         {
             if (!ContainsNode(stableId)) return false;
+            ActiveSupportId = null;
             if (string.IsNullOrEmpty(ActiveNodeId) || !ContainsNode(ActiveNodeId))
                 return SelectOnly(stableId);
             List<string> order = SiblingOrder(stableId);
@@ -312,8 +368,70 @@ namespace OstrixMods.BuildWorks.Geometry
 
         public void ClearSelection()
         {
+            ActiveSupportId = null;
             selection.Clear();
             ActiveNodeId = null;
+        }
+
+        public BlueprintEditorSupport FindSupport(string stableId) =>
+            stableId == null ? null : supports.Find(support => support.StableId == stableId);
+
+        public bool SelectSupport(string stableId)
+        {
+            if (stableId != null && FindSupport(stableId) == null) return false;
+            ActiveSupportId = stableId;
+            return true;
+        }
+
+        public bool AddSupport(BlueprintEditorSupport support)
+        {
+            if (support == null) throw new ArgumentNullException(nameof(support));
+            if (supports.Count >= MaximumSupports) throw new InvalidOperationException("Maximum supports reached.");
+            return Commit(() =>
+            {
+                supports.Add(support.Clone());
+                ActiveSupportId = support.StableId;
+            });
+        }
+
+        public bool RenameSupport(string stableId, string name)
+        {
+            string normalized = BlueprintEditorSupport.Label(name, 48, nameof(name));
+            BlueprintEditorSupport support = FindSupport(stableId);
+            return support != null && Commit(() => support.Name = normalized);
+        }
+
+        public bool SetSupportPose(string stableId, Point3 position, Rotation3 rotation)
+        {
+            BlueprintEditorSupport.ValidatePosition(position);
+            Rotation3 normalized = rotation.Normalized();
+            BlueprintEditorSupport support = FindSupport(stableId);
+            return support != null && Commit(() => { support.Position = position; support.Rotation = normalized; });
+        }
+
+        public bool SetPlacementSupport(string stableId)
+        {
+            if (stableId != null && FindSupport(stableId) == null) return false;
+            return Commit(() => PlacementSupportId = stableId);
+        }
+
+        public bool DeleteSupport(string stableId)
+        {
+            BlueprintEditorSupport support = FindSupport(stableId);
+            if (support == null) return false;
+            return Commit(() =>
+            {
+                supports.Remove(support);
+                if (PlacementSupportId == stableId) PlacementSupportId = null;
+                if (ActiveSupportId == stableId) ActiveSupportId = null;
+            });
+        }
+
+        public List<BlueprintEditorSupport> CopySupports()
+        {
+            var copy = new List<BlueprintEditorSupport>(supports.Count);
+            foreach (BlueprintEditorSupport support in supports) copy.Add(support.Clone());
+            return copy;
         }
 
         public bool AddPart(BlueprintEditorPart part)
@@ -328,6 +446,7 @@ namespace OstrixMods.BuildWorks.Geometry
             return Commit(() =>
             {
                 parts.Add(part.Clone());
+                ActiveSupportId = null;
                 selection.Clear();
                 selection.Add(part.StableId);
                 ActiveNodeId = part.StableId;
@@ -756,7 +875,8 @@ namespace OstrixMods.BuildWorks.Geometry
             if (source.parts.Count == 0) return false;
             if (parts.Count + source.parts.Count > MaximumParts ||
                 groups.Count + source.groups.Count + 1 > MaximumGroups ||
-                customSnapPoints.Count + source.customSnapPoints.Count > 512)
+                customSnapPoints.Count + source.customSnapPoints.Count > 512 ||
+                supports.Count + source.supports.Count > MaximumSupports)
                 throw new InvalidOperationException("Maximum blueprint size reached.");
             string rootId = Guid.NewGuid().ToString("N");
             var groupIds = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -786,6 +906,9 @@ namespace OstrixMods.BuildWorks.Geometry
                 parts.AddRange(newParts);
                 foreach (Point3 point in source.customSnapPoints)
                     customSnapPoints.Add(position + orientation.Rotate(point));
+                foreach (BlueprintEditorSupport support in source.supports)
+                    supports.Add(new BlueprintEditorSupport(Guid.NewGuid().ToString("N"), support.Name,
+                        position + orientation.Rotate(support.Position), Multiply(orientation, support.Rotation)));
                 SelectOnly(rootId);
             });
         }
@@ -1173,6 +1296,19 @@ namespace OstrixMods.BuildWorks.Geometry
             if (parts.Count > MaximumParts || groups.Count > MaximumGroups)
                 throw new ArgumentOutOfRangeException("Document limits exceeded.");
             var ids = new HashSet<string>(StringComparer.Ordinal);
+            if (supports.Count > MaximumSupports) throw new ArgumentOutOfRangeException(nameof(Supports));
+            foreach (BlueprintEditorSupport support in supports)
+            {
+                if (!ids.Add(support.StableId)) throw new ArgumentException("Duplicate stable ID: " + support.StableId);
+                BlueprintEditorSupport.Label(support.StableId, 128, nameof(support.StableId));
+                BlueprintEditorSupport.Label(support.Name, 48, nameof(support.Name));
+                BlueprintEditorSupport.ValidatePosition(support.Position);
+                support.Rotation = support.Rotation.Normalized();
+            }
+            if (PlacementSupportId != null && FindSupport(PlacementSupportId) == null)
+                throw new ArgumentException("Missing placement support: " + PlacementSupportId);
+            if (ActiveSupportId != null && FindSupport(ActiveSupportId) == null)
+                throw new ArgumentException("Missing active support: " + ActiveSupportId);
             foreach (BlueprintEditorGroup group in groups)
                 if (!ids.Add(group.StableId))
                     throw new ArgumentException("Duplicate stable ID: " + group.StableId);
@@ -1332,6 +1468,9 @@ namespace OstrixMods.BuildWorks.Geometry
             Parts = CopyParts(),
             Groups = CopyGroups(),
             CustomSnapPoints = new List<Point3>(customSnapPoints),
+            Supports = CopySupports(),
+            PlacementSupportId = PlacementSupportId,
+            ActiveSupportId = ActiveSupportId,
             Selection = new List<string>(selection),
             ActiveNodeId = ActiveNodeId,
             PrimaryPartId = PrimaryPartId,
@@ -1348,6 +1487,10 @@ namespace OstrixMods.BuildWorks.Geometry
             selection.Clear();
             customSnapPoints.Clear();
             customSnapPoints.AddRange(state.CustomSnapPoints);
+            supports.Clear();
+            foreach (BlueprintEditorSupport support in state.Supports) supports.Add(support.Clone());
+            PlacementSupportId = state.PlacementSupportId;
+            ActiveSupportId = state.ActiveSupportId;
             foreach (BlueprintEditorPart part in state.Parts) parts.Add(part.Clone());
             foreach (BlueprintEditorGroup group in state.Groups) groups.Add(group.Clone());
             selection.AddRange(state.Selection);
@@ -1363,7 +1506,9 @@ namespace OstrixMods.BuildWorks.Geometry
                 state.Parts.Count != parts.Count || state.Groups.Count != groups.Count ||
                 state.Selection.Count != selection.Count || state.ActiveNodeId != ActiveNodeId ||
                 state.PrimaryPartId != PrimaryPartId || state.PrimaryGroupId != PrimaryGroupId ||
-                state.CustomSnapPoints.Count != customSnapPoints.Count)
+                state.CustomSnapPoints.Count != customSnapPoints.Count ||
+                state.Supports.Count != supports.Count || state.PlacementSupportId != PlacementSupportId ||
+                state.ActiveSupportId != ActiveSupportId)
                 return false;
             for (int index = 0; index < parts.Count; ++index)
             {
@@ -1390,6 +1535,12 @@ namespace OstrixMods.BuildWorks.Geometry
                 if (state.Selection[index] != selection[index]) return false;
             for (int index = 0; index < customSnapPoints.Count; ++index)
                 if (!Same(state.CustomSnapPoints[index], customSnapPoints[index])) return false;
+            for (int index = 0; index < supports.Count; ++index)
+            {
+                BlueprintEditorSupport left = state.Supports[index], right = supports[index];
+                if (left.StableId != right.StableId || left.Name != right.Name ||
+                    !Same(left.Position, right.Position) || !Same(left.Rotation, right.Rotation)) return false;
+            }
             return true;
         }
 

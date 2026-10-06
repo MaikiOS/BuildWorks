@@ -2005,8 +2005,10 @@ namespace OstrixMods.BuildWorks
         {
             var copy = new BlueprintEditorDocument(source.SourceBlueprintId, source.Name,
                 source.Category, source.Parts, source.Groups, source.PrimaryPartId,
-                source.PrimaryGroupId);
+                source.PrimaryGroupId, source.CustomSnapPoints, source.Supports,
+                source.PlacementSupportId);
             foreach (string id in source.Selection) copy.ToggleSelection(id);
+            copy.SelectSupport(source.ActiveSupportId);
             return copy;
         }
 

@@ -2,6 +2,16 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Source checkpoint 0.19.61 — support data foundation; not deployed
+
+Independent root-owned supports, pose/default and separate selection scope now
+live in the document; validated atomic history and root-space insertion pass.
+Controller copy preserves custom points/supports without aliasing. Store v10 and
+portable v1 unchanged: no UI or durable support authoring is exposed yet.
+Release/targeted tests, read-only correctness/Ponytail and 144 Unity states PASS
+(2026-10-06T09:35:25Z, gameHostTested=false). Next: v11/v2 + tree/G/R + placement pose;
+world persistence and heavy rendering/export remain. Installed .56/saves unchanged.
+
 ## Source checkpoint 0.19.60 — not deployed; development remains active
 
 2026-10-06: [shared pick geometry](specs/roadmap/blueprint-render-performance.md).

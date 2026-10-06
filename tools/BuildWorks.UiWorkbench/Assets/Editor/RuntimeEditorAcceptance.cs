@@ -309,7 +309,7 @@ public static class RuntimeEditorAcceptance
                     yield return null;
                     Canvas.ForceUpdateCanvases();
                     Require(Screen.width == width && Screen.height == height,
-                        "Offscreen capture changed actual GameView size: " + Screen.width + "x" + Screen.height);
+                        "Size/layout step changed actual GameView size: " + Screen.width + "x" + Screen.height);
                     try { view.Tick(); }
                     catch (ArgumentOutOfRangeException ex)
                     {

@@ -33,6 +33,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 ForeignSignText();
                 ForeignSourcesRoundTrip(Path.Combine(directory, "sources.json"));
                 ForeignObjectRoundTrip(Path.Combine(directory, "foreign-objects.json"));
+                NativeItemStandRoundTrip(Path.Combine(directory, "native-holder.json"));
                 ExchangeRoundTrip(Path.Combine(directory, "exchange-library.json"));
                 SupportRoundTrip(Path.Combine(directory, "supports.json"));
                 if (args.Length > 0) InspectActualLibrary(args[0]);
@@ -130,6 +131,51 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(nativeV12.All().Count == 1 && nativeV12.All()[0].sourceDocuments[0].text == text,
                 "Source-only native v12 stopped migrating");
             Console.WriteLine("PASS source v13/v4 exact UTF-8/BOM/CRLF/header retention; stable rows; detached/save/update/exchange; strict old-version/hash/reference/duplicate rejection");
+        }
+
+        private static void NativeItemStandRoundTrip(string path)
+        {
+            const string nativeFormat = OstrixMods.BuildWorks.Geometry.BlueprintForeignPartData.NativeItemStandFormat;
+            string package = Convert.ToBase64String(new byte[] { 109, 2, 0, 255, 67 });
+            var parts = new List<CompositeBlueprintStore.Part> {
+                Part("a", "itemstand", "Stand", null, true, false, 0),
+                Part("b", "woodwall", "Wall", null, true, false, 2) };
+            parts[0].foreignData = new CompositeBlueprintStore.ForeignPartData {
+                format = nativeFormat, info = "SwordIron:2:3:0", zdo = package };
+            var store = new CompositeBlueprintStore(path);
+            Require(store.TrySave("Native holder", parts, new List<CompositeBlueprintStore.VectorData>(),
+                out var saved, out string error), error);
+            parts[0].foreignData.zdo = "changed";
+            var reopened = new CompositeBlueprintStore(path).All()[0];
+            string json = System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(reopened));
+            string serializedPackage = package.Replace("/", "\\/");
+            Require(json.Contains(serializedPackage), "Native package fixture not found in actual serializer output");
+            const string dependencies = "\"requiredPrefabIds\":[\"SwordIron\",\"itemstand\",\"woodwall\"]";
+            Require(json.Contains(dependencies), "Native attachment prefab omitted from sorted exact dependencies");
+            var portable = BlueprintExchangeFormat.Decode(json);
+            Require(saved.parts[0].foreignData.zdo == package && portable.parts[0].foreignData.zdo == package &&
+                portable.parts[0].foreignData.format == nativeFormat && portable.parts[0].foreignData.info == "SwordIron:2:3:0" &&
+                CompositeBlueprintStore.HasForeignData(portable), "Native item state lost, aliased or allowed into world placement");
+            var changed = CompositeBlueprintStore.CloneParts(saved.parts);
+            changed[0].foreignData.info = "SwordIron:1:2:1";
+            string before = File.ReadAllText(path);
+            using (var locked = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                Require(!store.TryUpdateParts(saved, changed, saved.anchors, out error), "Locked native state update succeeded");
+            Require(File.ReadAllText(path) == before && saved.parts[0].foreignData.info == "SwordIron:2:3:0",
+                "Failed write changed native attachment state");
+            foreach (string malformed in new[] {
+                json.Replace(serializedPackage, "not-base64"), json.Replace(serializedPackage, "AAAA"),
+                json.Replace(serializedPackage, serializedPackage + " "), json.Replace("SwordIron:2:3:0", "SwordIron:2:0:0"),
+                json.Replace("SwordIron:2:3:0", "../SwordIron:2:3:0"),
+                json.Replace(dependencies, "\"requiredPrefabIds\":[\"itemstand\",\"woodwall\"]"),
+                json.Replace("\"version\":4", "\"version\":3") })
+            {
+                bool rejected = false;
+                Require(malformed != json, "Malformed native fixture did not change serialized input");
+                try { BlueprintExchangeFormat.Decode(malformed); } catch (InvalidDataException) { rejected = true; }
+                Require(rejected, "Malformed native state or old envelope accepted");
+            }
+            Console.WriteLine("PASS native ItemStand snapshot -> store/reopen/portable, exact dependencies, immutable copy, failed write and malformed package rejection");
         }
 
         private static void ForeignObjectRoundTrip(string path)

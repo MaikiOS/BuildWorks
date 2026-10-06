@@ -128,7 +128,10 @@ namespace OstrixMods.BuildWorks
         }
 
         private static List<string> Prefabs(CompositeBlueprintStore.Blueprint blueprint) => blueprint.parts
-            .Select(part => part.prefabName).Distinct(StringComparer.Ordinal).OrderBy(name => name, StringComparer.Ordinal).ToList();
+            .Select(part => part.prefabName)
+            .Concat(blueprint.parts.Where(part => part.foreignData?.format == Geometry.BlueprintForeignPartData.NativeItemStandFormat)
+                .Select(part => part.foreignData.info.Split(':')[0]))
+            .Distinct(StringComparer.Ordinal).OrderBy(name => name, StringComparer.Ordinal).ToList();
 
         private static void ValidateBlueprint(CompositeBlueprintStore.Blueprint blueprint)
         {

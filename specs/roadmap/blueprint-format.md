@@ -2,7 +2,21 @@
 
 **English** | [Русский](blueprint-format_RU.md)
 
-Current source **0.19.70**: renderer-only ItemStand preview is implemented in Scene/thumbnail/rotatable preview.
+Current source **0.19.71**: read-only native ItemStand capture is integrated into world selection before any blueprint write.
+The actual private native view respects `m_netViewOverride`; signed prefab hashes resolve through ObjectDB.
+The existing part payload accepts `valheim-itemstand-v1`: plain `prefab:variant:quality:orientation` in info,
+canonical Base64 of the exact full native `s_itemData` bytes in zdo, no chance. Visual metadata is validated;
+the package is size/header/encoding checked but never decoded, executed or claimed behaviorally valid.
+Legacy absent item packages remain absent; empty stands have no contents payload. Missing items, invalid data,
+oversized packages and ArmorStand slot/pose state reject the whole save instead of silently losing data.
+Native v13, portable v4, controller copies/history and save/reopen preserve exact immutable state.
+The portable dependency list also includes native captured item prefabs; altered omissions reject.
+This new tag needs no envelope-shape migration; older readers reject it rather than silently dropping it.
+Only visual metadata is used by the existing renderer-only preview. The world foreign-state guard stays closed:
+no inventory consumption, arbitrary ZDO writes, ItemData.Load, item creation or native restoration occurs.
+Build/host contracts, Store/Bridge checks and 180 fresh isolated Unity states PASS, not Valheim capture/reload proof.
+
+Previous source **0.19.70**: renderer-only ItemStand preview is implemented in Scene/thumbnail/rotatable preview.
 The verified PlanBuild four-field info schema is decoded for installed items only. Native read-only helpers select
 the target/attach subtree/orientation offsets and quality scale; native ItemStyle changes owned materials only.
 Invalid/missing/unsupported state reports a reason in the editor and retains raw data. Particle effects,
@@ -92,7 +106,7 @@ permission and networking rules: a blueprint is a recipe, not an item duplicatio
 Proof: editor selection/attachment/removal and Undo; exact disk/portable roundtrip; imported display
 state; actual holder placement, contents after save/reload, removal without duplication and remote client.
 Modded items/holders require capability checks; installing arbitrary foreign code is not authorized.
-The full extension remains unfinished; .70 implements read-only ItemStand preview only. The existing goal remains active.
+The full extension remains unfinished; .71 implements read-only ItemStand preview and native capture/preservation, not authoring/world restoration. The existing goal remains active.
 
 | Stage | Owner | Required proof |
 | --- | --- | --- |

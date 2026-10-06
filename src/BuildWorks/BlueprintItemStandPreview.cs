@@ -23,10 +23,11 @@ namespace OstrixMods.BuildWorks
             GameObject content = null;
             try
             {
-                // Only the verified PlanBuild info schema is decoded. Raw ZDO and
-                // chance remain inert and survive round-trip unchanged.
-                if (data.Format != "blueprint" || data.Info == null) throw new InvalidDataException();
-                string info = BlueprintExchangeFormat.DecodeSignText(data.Info);
+                // Only known PlanBuild/native visual metadata is decoded. Raw
+                // item packages, foreign ZDO and chance remain inert.
+                if (data.Format != "blueprint" && data.Format != BlueprintForeignPartData.NativeItemStandFormat ||
+                    data.Info == null) throw new InvalidDataException();
+                string info = data.Format == "blueprint" ? BlueprintExchangeFormat.DecodeSignText(data.Info) : data.Info;
                 string[] fields = info?.Split(':');
                 if (fields == null || fields.Length != 4 || string.IsNullOrWhiteSpace(fields[0]) ||
                     fields[0].Length > 128 || Path.GetFileName(fields[0]) != fields[0] ||

@@ -819,7 +819,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.70.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.71.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -2853,4 +2853,28 @@ $thumbnailCalls = ($pluginMethods | Where-Object { $_.DeclaringType.Name -in @('
     ForEach-Object { $_.Body.Instructions | ForEach-Object { [string]$_.Operand } }) -join "`n"
 Assert-Contract ([regex]::Matches($thumbnailCalls, 'BlueprintItemStandPreview::TryAdd').Count -eq 2) 'Thumbnail and rotating preview must use the same content adapter.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.70 and Valheim Steam build 25185596.'
+$nativeCapture = ($pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintItemStandCapture' -and $_.Name -eq 'TryCapture' })
+$captureCalls = ($nativeCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($captureCalls -match 'ItemStand::GetAttachedItem' -and $captureCalls -match 'ObjectDB::GetItemPrefab' -and
+    $captureCalls -match 'ZDOVars::s_itemData' -and $captureCalls -match 'ZDO::GetByteArray' -and
+    $captureCalls -notmatch 'ZDO::Set|ZNetView::InvokeRPC|Inventory::|Object::Instantiate|ItemData::Load|ItemDrop::LoadFromZDO') `
+    'Native ItemStand capture must preserve the raw package without executing or mutating it.'
+$standView = $standType.Fields | Where-Object Name -eq 'm_nview'
+Assert-Contract ($standView.IsPrivate -and $standView.FieldType.FullName -eq 'ZNetView') 'ItemStand native view field changed.'
+$nativeStandDrop = $standType.Methods | Where-Object Name -eq 'DropItem'
+$standDropCalls = ($nativeStandDrop.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($standDropCalls -match 'ItemDrop::LoadFromExternalZDO') 'Native stand item restoration path changed.'
+$itemDropType = $hostAssembly.MainModule.Types | Where-Object Name -eq 'ItemDrop'
+$externalItemLoad = $itemDropType.Methods | Where-Object Name -eq 'LoadFromExternalZDO'
+$externalLoadCalls = ($externalItemLoad.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($externalLoadCalls -match 'ItemDrop::LoadFromZDO') 'Native external item load no longer reads the item package.'
+$nativeItemLoad = $itemDropType.Methods | Where-Object Name -eq 'LoadFromZDO'
+$loadItemCalls = ($nativeItemLoad.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($nativeItemLoad.IsPublic -and $loadItemCalls -match 'ZDOVars::s_itemData' -and
+    $loadItemCalls -match 'ZDO::GetByteArray') 'Native item package storage changed.'
+$worldSelection = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'PrecisionPlacementSession' -and $_.Name -eq 'TrySaveWorldSelection' }
+$worldCaptureCalls = ($worldSelection.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($worldCaptureCalls -match 'BlueprintItemStandCapture::TryCapture' -and
+    $worldCaptureCalls -match 'ForeignPartData::FromGeometry') 'World selection discards native holder state.'
+
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.71 and Valheim Steam build 25185596.'

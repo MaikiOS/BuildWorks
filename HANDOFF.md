@@ -2,6 +2,33 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.71 — native ItemStand capture and exact state preservation; not deployed
+
+World selection reads the actual native ItemStand view (including override), signed item hash,
+variant/quality/orientation and full s_itemData bytes. The existing part-bound foreignData stores
+validated valheim-itemstand-v1 metadata and canonical Base64 without executing the item package.
+Immutable snapshots, controller/history, native v13 and portable v4 preserve it; the dependency
+manifest includes the attached item. Legacy absent packages stay absent. Invalid/missing/oversized
+state and ArmorStand slots/pose refuse the whole save. Captured contents use the renderer-only preview.
+No inventory/ZDO/RPC writes, native item decoding, item creation or world restoration are introduced;
+the existing world foreign-state guard remains closed.
+
+Release zero warnings/errors; 108 Geometry, Store, eight Bridge, 12 WorldLayout, 809 Localization keys,
+HostContract, deployment guard and format PASS (format retains workspace-load warnings).
+Final isolated Unity: 180 fresh states PASS at 2026-10-06T16:49:33.8183020Z; all 23 runtime source hashes
+match. Fixtures verify native-view override, negative hash, exact raw package/immutable snapshot,
+legacy/empty/invalid/missing/oversized/armour cases and captured-content preview; gameHostTested=false.
+Independent correctness found the omitted item dependency; native-only manifest/regression fixed it,
+final PASS. Ponytail PASS. verify is absent; direct checks and independent review were used.
+Native Awake override handling was additionally confirmed by direct installed-DLL inspection.
+Initial checks exposed a missing type import, a no-op escaped-JSON test mutation and a mistaken native
+load-chain assertion; all were corrected and rerun without weakening safety checks.
+
+Installed TerrainRamp-1.0-Test remains .67. No deployment, Valheim launch, save edits, push or publication.
+Item catalogue/free placement/attachment authoring/tree relations, ArmorStand slots/poses and native
+cost-aware/no-duplication world reconstruction/reload/client remain unfinished. Heavy interactive scenes
+above 512 and durable authored world sockets also remain; full goal active.
+
 ## Checkpoint 0.19.70 — read-only ItemStand contents preview; not deployed
 
 PlanBuild four-field item info is decoded for installed items on renderer-only copies in the editor,

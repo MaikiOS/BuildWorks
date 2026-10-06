@@ -2,9 +2,11 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // Only the read-only host contract, checked against current Valheim IL.
-// No ZDO, RPC, inventory or scripted attachment path exists in this fixture.
+// Inert ZDO reads only; no RPC, inventory or scripted attachment path.
 public class ItemStand : MonoBehaviour
 {
+    private ZNetView m_nview = null;
+    public int GetAttachedItem() => m_nview && m_nview.IsValid() ? m_nview.GetZDO().GetInt(ZDOVars.s_item, 0) : 0;
     public enum Orientation { None = 0, Vertical = 1, Horizontal = 2, All = 3 }
     public class OrientationSettings
     {
@@ -49,6 +51,9 @@ public class ObjectDB
 {
     public static ObjectDB instance;
     public readonly Dictionary<string, GameObject> Items = new Dictionary<string, GameObject>();
+    public readonly Dictionary<int, GameObject> ItemHashes = new Dictionary<int, GameObject>();
     public GameObject GetItemPrefab(string name) => Items.TryGetValue(name, out GameObject item) ? item : null;
+    public GameObject GetItemPrefab(int hash) => ItemHashes.TryGetValue(hash, out GameObject item) ? item : null;
     public static implicit operator bool(ObjectDB value) => value != null;
 }
+public class ArmorStand : MonoBehaviour { }

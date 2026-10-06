@@ -4640,13 +4640,19 @@ namespace OstrixMods.BuildWorks
                     error = BuildWorksLocalization.Text("blueprint.sign_capture_failed", PrefabName(piece));
                     return false;
                 }
+                if (!BlueprintItemStandCapture.TryCapture(piece, out var contents))
+                {
+                    error = BuildWorksLocalization.Text("blueprint.holder_capture_failed", PrefabName(piece));
+                    return false;
+                }
                 parts.Add(new CompositeBlueprintStore.Part
                 {
                     prefabName = PrefabName(piece),
                     position = new CompositeBlueprintStore.VectorData(inverse * (piece.transform.position - origin)),
                     rotation = new CompositeBlueprintStore.QuaternionData(inverse * piece.transform.rotation),
                     scale = scale,
-                    signText = signText
+                    signText = signText,
+                    foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(contents)
                 });
                 var points = new List<Transform>();
                 piece.GetSnapPoints(points);

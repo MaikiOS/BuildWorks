@@ -9,7 +9,15 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.70**: read-only ItemStand contents preview in the editor, thumbnails and rotatable preview.
+Active source checkpoint **0.19.71**: world selection captures native ItemStand contents without modifying the stand or inventory.
+The actual native view (including override), signed item hash and visual metadata are read; the full item-data package is retained
+in the existing part payload with the validated `valheim-itemstand-v1` tag. Native/portable/copy/history preserve it unchanged;
+portable dependencies include the attached item prefab. Missing/invalid/oversized state and armour stands reject saving explicitly.
+Release/required checks and 180 fresh Unity states PASS; no native item package is executed or restored.
+Store v13 / portable v4 and the shared world-placement guard remain unchanged. Not deployed; installed test remains .67.
+Item authoring/catalogue/tree relations, armour slots/poses, world restoration, heavy scenes and world-socket durability remain unfinished.
+
+Previous source checkpoint **0.19.70**: read-only ItemStand contents preview in the editor, thumbnails and rotatable preview.
 Known PlanBuild item identity/variant/quality/orientation use verified native attachment rules on renderer-only clones;
 horizontal/wall offsets, holder XYZ transforms, selection/Undo/copies, cache changes and missing/invalid-state reasons are Unity-tested.
 Store v13 / portable v4 and the world foreign-state guard remain unchanged; no inventory/network/scripts are executed.
@@ -35,7 +43,7 @@ The [lossless conversion requirement](../specs/roadmap/blueprint-format.md) is p
 source absolute scale is prepared atomically without shrinking; opaque foreign object/header preservation remains pending.
 Heavy interactive budget 512 and world-support durability remain separate unfinished work.
 Ostrix's 2026-10-06 goal extension: ordinary items and horizontal/wall/armour stand contents,
-including editor attachments, preserved state/exchange and native world reconstruction; only the read-only ItemStand preview slice is implemented.
+including editor attachments, preserved state/exchange and native world reconstruction; read-only ItemStand preview and native capture/preservation are implemented.
 Select ordinary items from an item catalogue, place them freely or attach to a compatible holder/armour slot;
 show the relationship in the tree/inspector and preserve it through holder movement, copy, Undo and exchange.
 

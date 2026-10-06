@@ -806,4 +806,5 @@ editor.support.add_short	+ Support
 editor.item_preview_warning	{0}: contents preview unavailable — {1}
 editor.item_preview_invalid	unrecognized or invalid item-stand data; the original is preserved
 editor.item_preview_missing	the required item prefab is not installed; the original is preserved
+blueprint.holder_capture_failed	{0}: holder contents could not be preserved. Missing or invalid item data, unsupported armour slots, or an oversized native package. The blueprint was not saved.
 editor.item_preview_unsupported	attachment, quality, variant, orientation or scripted visuals are unsupported; the original is preserved

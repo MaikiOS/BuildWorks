@@ -22,6 +22,57 @@ internal static class ItemStandPreviewAcceptance
         "holder", "fixture-stand", "Stand", new Point3(2, 1, 3), new Rotation3(0, .70710678118, 0, .70710678118),
         scale: new Point3(1.5, 2, .5), foreignData: data);
 
+    private static BlueprintForeignPartData CaptureChecks(GameObject source, GameObject item)
+    {
+        Piece piece = source.AddComponent<Piece>();
+        var stand = source.GetComponent<ItemStand>();
+        var overrideObject = new GameObject("InertStandNetworkOverride");
+        var view = overrideObject.AddComponent<ZNetView>();
+        typeof(ItemStand).GetField("m_nview", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(stand, view);
+        ZDO zdo = view.GetZDO();
+        const int hash = -1729;
+        ObjectDB.instance.ItemHashes.Add(hash, item);
+        byte[] package = { 109, 2, 0, 255, 67 };
+        string encoded = Convert.ToBase64String(package);
+        zdo.Set(ZDOVars.s_item, hash); zdo.Set(ZDOVars.s_variant, 2);
+        zdo.Set(ZDOVars.s_quality, 3); zdo.Set(ZDOVars.s_type, 0);
+        zdo.Set(ZDOVars.s_itemData, package);
+        int writes = zdo.Writes;
+        Require(BlueprintItemStandCapture.TryCapture(piece, out var captured) &&
+            captured.Format == BlueprintForeignPartData.NativeItemStandFormat &&
+            captured.Info == "SwordFixture:2:3:0" && captured.Zdo == encoded && captured.Chance == null,
+            "native capture lost identity/variant/quality/orientation/package");
+        Require(zdo.Writes == writes && zdo.GetByteArray(ZDOVars.s_itemData, null) == package,
+            "capture mutated network data");
+        package[1] = 77;
+        Require(captured.Zdo == encoded, "snapshot aliases live native bytes");
+        foreach (byte[] invalid in new[] { new byte[2], new byte[24577], new byte[] { 0, 1, 2 } })
+        {
+            zdo.Set(ZDOVars.s_itemData, invalid);
+            Require(!BlueprintItemStandCapture.TryCapture(piece, out var rejected) && rejected == null,
+                "invalid/oversized package accepted");
+        }
+        zdo.Set(ZDOVars.s_itemData, (byte[])null);
+        Require(BlueprintItemStandCapture.TryCapture(piece, out var legacy) && legacy.Zdo == null &&
+            legacy.Info == captured.Info, "legacy stand without item package discarded");
+        zdo.Set(ZDOVars.s_quality, 0);
+        Require(!BlueprintItemStandCapture.TryCapture(piece, out _), "invalid native quality accepted");
+        zdo.Set(ZDOVars.s_quality, 3);
+        ObjectDB.instance.ItemHashes.Remove(hash);
+        Require(!BlueprintItemStandCapture.TryCapture(piece, out _), "missing item silently erased");
+        ObjectDB.instance.ItemHashes.Add(hash, item);
+        view.Valid = false;
+        Require(!BlueprintItemStandCapture.TryCapture(piece, out _), "invalid view accepted");
+        view.Valid = true;
+        zdo.Set(ZDOVars.s_item, 0);
+        Require(BlueprintItemStandCapture.TryCapture(piece, out var empty) && empty == null, "empty stand changed");
+        var armour = source.AddComponent<ArmorStand>();
+        Require(!BlueprintItemStandCapture.TryCapture(piece, out _), "armour pose/slots silently discarded");
+        Object.Destroy(armour);
+        Object.Destroy(overrideObject);
+        return captured;
+    }
+
     internal static IEnumerable<object> Run(Camera template, string output)
     {
         var source = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -72,6 +123,17 @@ internal static class ItemStandPreviewAcceptance
         var data = new BlueprintForeignPartData("blueprint", "\"SwordFixture:2:3:0\"", "raw-zdo", ".5");
         try
         {
+            BlueprintForeignPartData captured = CaptureChecks(source, item);
+            yield return null;
+            stand.m_orientationType = ItemStand.Orientation.Horizontal;
+            using (var scene = new BlueprintEditorScene(template, _ => source))
+            {
+                var doc = new BlueprintEditorDocument(null, "Captured", "Test", new[] { Part(captured) });
+                Require(scene.TrySync(doc, out string warning) && warning == null &&
+                    Content(Field<GameObject>(scene, "root")) && doc.Parts[0].ForeignData.Zdo == captured.Zdo,
+                    "native-captured contents were not previewed or raw package changed");
+            }
+            yield return null;
             foreach (ItemStand.Orientation orientation in new[] { ItemStand.Orientation.Horizontal, ItemStand.Orientation.Vertical })
             {
                 stand.m_orientationType = orientation;
@@ -139,7 +201,7 @@ internal static class ItemStandPreviewAcceptance
                 new CompositeBlueprintStore.Part { prefabName = source.name, position = new CompositeBlueprintStore.VectorData(Vector3.zero),
                     rotation = new CompositeBlueprintStore.QuaternionData(Quaternion.identity), scale = new CompositeBlueprintStore.VectorData(Vector3.one),
                     foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(data) } } };
-            var pieces = new[] { source.AddComponent<Piece>() };
+            var pieces = new[] { source.GetComponent<Piece>() };
             using (var renderer = new BlueprintThumbnailRenderer())
             using (var preview = renderer.BeginPreview(blueprint, pieces, out string previewError))
             {

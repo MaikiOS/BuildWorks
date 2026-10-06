@@ -61,7 +61,7 @@ internal static class Program
         var evidence = new BlueprintSourceDocument("blueprint", "Original.blueprint", "\uFEFF#Pieces\r\nwoodwall;;0;0;0;0;0;0;1;\"\"\r\nwoodwall;;2;0;0;0;0;0;1;\"\"\r\n");
         var payloadParts = document.Parts.Select((part, index) => new BlueprintEditorPart(part.StableId, part.PrefabName,
             part.DisplayName, part.Position, part.Rotation, part.ParentGroupId, part.Visible, part.Locked, part.Scale,
-            part.SignText, evidence.Id, index + 2));
+            part.SignText, evidence.Id, index + 2, new BlueprintForeignPartData("blueprint", "\"SwordIron:0:1:3\"", "opaque", ".5")));
         var payload = new BlueprintEditorDocument(null, "Copy", "OTHER", payloadParts,
             sourceCustomSnapPoints: new[] { new Point3(7,8,9) }, sourceSupports: document.Supports,
             placementSupportId: document.PlacementSupportId, sourceDocuments: new[] { evidence });
@@ -77,6 +77,7 @@ internal static class Program
         Require(payload.Supports[0].Position.X == 2, "Controller copy aliases support poses");
         Require(copied.Sources[0].Text == evidence.Text && copied.Parts[0].SourceDocumentId == evidence.Id,
             "Controller copy discarded source provenance");
+        Require(copied.Parts[0].ForeignData.Info == payload.Parts[0].ForeignData.Info, "Controller copy dropped foreign object data");
         Console.WriteLine("PASS actual Controller.CopyDocument retains detached root payload and support scope");
 
         controllerType.GetField("document", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(controller, payload);
@@ -102,6 +103,10 @@ internal static class Program
         Require(reloaded.Sources[0].Text == evidence.Text && reloaded.Sources[0].Id == evidence.Id &&
             reloaded.Parts[0].SourceDocumentId == evidence.Id && reloaded.Parts[0].SourceLine == 2,
             "Actual Controller source/part bridge discarded original bytes or row binding");
+        Require(reloaded.Parts[0].ForeignData.Info == payload.Parts[0].ForeignData.Info &&
+            reloaded.Parts[1].ForeignData.Zdo == "opaque" && reloaded.Parts[0].ForeignData.Chance == ".5",
+            "Actual controller/store/reopen dropped part-bound foreign state");
+        Console.WriteLine("PASS actual Controller copy/build/save/reopen retains part-bound opaque holder/object state");
             Console.WriteLine("PASS actual Controller sources/row references -> store -> disk -> reopen retains content evidence");
 
         var grouped = new BlueprintEditorDocument(null, "Group", "OTHER", new[] { Part("a",0), Part("b",2) });

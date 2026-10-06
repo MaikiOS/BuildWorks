@@ -15,7 +15,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const int MaximumBytes = 32 * 1024 * 1024;
         private const string FormatName = "buildworks-blueprint";
-        private const int Version = 3;
+        private const int Version = 4;
 
         [DataContract]
         private sealed class Envelope
@@ -29,7 +29,7 @@ namespace OstrixMods.BuildWorks
         private static readonly Dictionary<Type, Dictionary<string, Type>> Fields =
             new[] { typeof(Envelope), typeof(CompositeBlueprintStore.Blueprint), typeof(CompositeBlueprintStore.Part),
                 typeof(CompositeBlueprintStore.Group), typeof(CompositeBlueprintStore.Support),
-                typeof(CompositeBlueprintStore.SourceDocument),
+                typeof(CompositeBlueprintStore.SourceDocument), typeof(CompositeBlueprintStore.ForeignPartData),
                 typeof(CompositeBlueprintStore.VectorData), typeof(CompositeBlueprintStore.QuaternionData),
                 typeof(CompositeBlueprintStore.LibraryData) }
                 .ToDictionary(type => type, type => type.GetFields(BindingFlags.Instance | BindingFlags.Public)
@@ -42,8 +42,9 @@ namespace OstrixMods.BuildWorks
                     (member.EmitDefaultValue || member.IsRequired))
                 .Select(field => field.GetCustomAttribute<DataMemberAttribute>().Name ?? field.Name).ToArray());
 
-        internal static void ValidateLibraryJson(string text, bool requireFields, bool allowSupportFields, bool allowSourceFields) => ValidateStructure(
-            Encoding.UTF8.GetBytes(text), typeof(CompositeBlueprintStore.LibraryData), requireFields, allowSupportFields, allowSourceFields);
+        internal static void ValidateLibraryJson(string text, bool requireFields, bool allowSupportFields, bool allowSourceFields,
+            bool allowForeignFields) => ValidateStructure(
+            Encoding.UTF8.GetBytes(text), typeof(CompositeBlueprintStore.LibraryData), requireFields, allowSupportFields, allowSourceFields, allowForeignFields);
 
         internal static string DecodeSignText(string token)
         {
@@ -67,7 +68,7 @@ namespace OstrixMods.BuildWorks
         }
 
         private static void ValidateStructure(byte[] bytes, Type expected, bool requireFields = true, bool allowSupportFields = true,
-            bool allowSourceFields = true)
+            bool allowSourceFields = true, bool allowForeignFields = true)
         {
             using (XmlDictionaryReader reader = JsonReaderWriterFactory.CreateJsonReader(bytes,
                 new XmlDictionaryReaderQuotas
@@ -80,7 +81,7 @@ namespace OstrixMods.BuildWorks
                 }))
             {
                 reader.MoveToContent();
-                ValidateNode(reader, expected, requireFields, allowSupportFields, allowSourceFields);
+                ValidateNode(reader, expected, requireFields, allowSupportFields, allowSourceFields, allowForeignFields);
                 if (reader.MoveToContent() != XmlNodeType.None) throw new InvalidDataException("$buildworks_import.fields");
             }
         }
@@ -111,7 +112,8 @@ namespace OstrixMods.BuildWorks
                 if (envelope == null || envelope.format != FormatName || envelope.version < 1 || envelope.version > Version)
                     throw new InvalidDataException("$buildworks_store.unknown_version");
                 if (envelope.version < Version)
-                    ValidateStructure(bytes, typeof(Envelope), allowSupportFields: envelope.version >= 2, allowSourceFields: false);
+                    ValidateStructure(bytes, typeof(Envelope), allowSupportFields: envelope.version >= 2,
+                        allowSourceFields: envelope.version >= 3, allowForeignFields: false);
                 if (envelope.blueprint != null)
                     envelope.blueprint.supports = envelope.blueprint.supports ?? new List<CompositeBlueprintStore.Support>();
                 ValidateBlueprint(envelope.blueprint);
@@ -145,7 +147,7 @@ namespace OstrixMods.BuildWorks
 
         // Reject unknown and duplicate fields rather than silently converting a newer document with data loss.
         private static void ValidateNode(XmlReader reader, Type expected, bool requireFields, bool allowSupportFields,
-            bool allowSourceFields, bool sourceText = false)
+            bool allowSourceFields, bool allowForeignFields, bool sourceText = false)
         {
             string kind = reader.GetAttribute("type");
             if (kind == "null")
@@ -165,7 +167,7 @@ namespace OstrixMods.BuildWorks
                 while (reader.MoveToContent() == XmlNodeType.Element)
                 {
                     if (reader.LocalName != "item" || ++count > limit) throw new InvalidDataException("$buildworks_import.fields");
-                    ValidateNode(reader, item, requireFields, allowSupportFields, allowSourceFields);
+                    ValidateNode(reader, item, requireFields, allowSupportFields, allowSourceFields, allowForeignFields);
                 }
                 reader.ReadEndElement();
                 return;
@@ -193,10 +195,11 @@ namespace OstrixMods.BuildWorks
                     !allowSupportFields && expected == typeof(CompositeBlueprintStore.Blueprint) &&
                         (reader.LocalName == "supports" || reader.LocalName == "placementSupportId") ||
                     !allowSourceFields && (expected == typeof(CompositeBlueprintStore.Blueprint) && reader.LocalName == "sourceDocuments" ||
-                        expected == typeof(CompositeBlueprintStore.Part) && (reader.LocalName == "sourceDocumentId" || reader.LocalName == "sourceLine")))
+                        expected == typeof(CompositeBlueprintStore.Part) && (reader.LocalName == "sourceDocumentId" || reader.LocalName == "sourceLine")) ||
+                    !allowForeignFields && expected == typeof(CompositeBlueprintStore.Part) && reader.LocalName == "foreignData")
                     throw new InvalidDataException("$buildworks_import.fields");
                 bool textField = expected == typeof(CompositeBlueprintStore.SourceDocument) && reader.LocalName == "text";
-                ValidateNode(reader, field, requireFields, allowSupportFields, allowSourceFields, textField);
+                ValidateNode(reader, field, requireFields, allowSupportFields, allowSourceFields, allowForeignFields, textField);
             }
             if (requireFields && RequiredFields[expected].Any(name => !seen.Contains(name)))
                 throw new InvalidDataException("$buildworks_import.fields");

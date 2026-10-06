@@ -2,7 +2,15 @@
 
 **English** | [Русский](blueprint-format_RU.md)
 
-Current source **0.19.68**: Store v12 / portable v3 add optional immutable source content evidence and piece-row references.
+Current source **0.19.69**: Store v13 / portable v4 retain inert per-part foreign info/ZDO/chance;
+unknown root sections remain exact source text. Editor transforms/copy/history/save/exchange preserve them.
+Source-only v12/v3 migrate. Native execution/display adapters are not implemented: editor warning and shared
+world guard prevent silently placing empty holders or dropping object behavior. Geometry editing is available.
+This is preservation, not full behavioral compatibility or ordinary item support.
+The source hash/row binding does not prove foreignData token equality; future native adapters must
+validate/decode supported state before applying it, not trust mutable DTOs as provenance.
+
+Previous source **0.19.68**: Store v12 / portable v3 add optional immutable source content evidence and piece-row references.
 For compatible `.blueprint`/`.vbuild` imports, format + basename + exact valid UTF-8 text (BOM/newlines included)
 are retained through native save/reopen, portable exchange, insertion, duplication and Undo/Redo.
 Archive entry/path origin is not persisted and is not claimed; identical format/name/text deliberately deduplicate.

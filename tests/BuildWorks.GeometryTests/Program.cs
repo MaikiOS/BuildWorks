@@ -1995,14 +1995,16 @@ namespace OstrixMods.BuildWorks.GeometryTests
         private static void BlueprintPayloadSurvivesHistory()
         {
             var evidence = new BlueprintSourceDocument("blueprint", "source.blueprint", "\uFEFF#Pieces\r\nsign;;1;0;0;0;0;0;1;\"text\"\r\n");
+            var foreign = new BlueprintForeignPartData("blueprint", null, "opaque", "0.5");
             var source = new BlueprintEditorDocument(null, "Source", "OTHER", new[] {
                 new BlueprintEditorPart("sign", "sign", "Sign", new Point3(1, 0, 0), new Rotation3(0, 0, 0, 1), signText: "Надпись\nДом",
-                    sourceDocumentId: evidence.Id, sourceLine: 2) },
+                    sourceDocumentId: evidence.Id, sourceLine: 2, foreignData: foreign) },
                 sourceCustomSnapPoints: new[] { new Point3(2, 3, 4) }, sourceDocuments: new[] { evidence });
             var document = EditorDocument(EditorPart("wall", 0, 0, 0));
             document.InsertBlueprint(source, new Point3(10, 0, 0), new Rotation3(0, 0, 0, 1));
             Near(new Point3(12, 3, 4), document.CustomSnapPoints[0]);
             Equal("Надпись\nДом", document.Parts[1].SignText);
+            Equal(foreign, document.Parts[1].ForeignData);
             Equal(true, document.Undo());
             Equal(0, document.CustomSnapPoints.Count);
             Equal(0, document.Sources.Count);
@@ -2020,6 +2022,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Equal("Надпись\nДом", document.Parts[2].SignText);
             Equal(evidence.Id, document.Parts[2].SourceDocumentId);
             Equal(2, document.Parts[2].SourceLine);
+            Equal(foreign, document.Parts[2].ForeignData);
             document.Undo();
             Equal(2, document.Parts.Count);
             document.InsertBlueprint(source, new Point3(), new Rotation3(0, 0, 0, 1));
@@ -2032,6 +2035,22 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Equal(2, document.Sources.Count);
             document.Undo(); Equal(1, document.Sources.Count);
             document.Redo(); Equal(2, document.Sources.Count);
+            Equal(foreign, document.Parts[1].ForeignData);
+            Throws<ArgumentException>(() => new BlueprintForeignPartData("lua", "data", null, null));
+            source.SelectOnly("sign");
+            Equal(true, source.ApplyArray(2, 1, new Point3(1, 0, 0), new Point3(0, 0, 1), new Point3(0, 1, 0), 0, 0, false, 0,
+                new Point3(-.5, 0, 0), new Point3(.5, 0, 0)));
+            Equal(foreign, source.Parts[1].ForeignData);
+            source.Undo();
+            source.AddPart(new BlueprintEditorPart("left", "support", "Left", new Point3(-2, 0, 0), IdentityRotation()));
+            source.AddPart(new BlueprintEditorPart("right", "support", "Right", new Point3(2, 0, 0), IdentityRotation()));
+            source.SelectOnly("sign");
+            Equal(true, source.ApplyContour(new[] { "left", "right" }, false, 0));
+            Equal(foreign, source.Parts[3].ForeignData);
+            source.Undo();
+            Equal(foreign, source.Parts[0].ForeignData);
+            Throws<ArgumentException>(() => new BlueprintForeignPartData("blueprint", null, null, null));
+            Throws<ArgumentException>(() => new BlueprintForeignPartData("blueprint", new string('x', 32769), null, null));
             Throws<ArgumentException>(() => new BlueprintEditorDocument(null, "Bad", "OTHER", source.Parts));
             Throws<ArgumentException>(() => new BlueprintSourceDocument("blueprint", "../bad.blueprint", ""));
             Throws<ArgumentException>(() => new BlueprintSourceDocument("blueprint", "large.blueprint", new string('x', BlueprintSourceDocument.MaximumBytes + 1)));
@@ -2044,6 +2063,8 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Equal(true, sections.HasPartAt(3, "wall"));
             Equal(false, sections.HasPartAt(5, "wall"));
             Equal(false, sections.HasPartAt(7, "wall"));
+            Equal(false, sections.HasOpaqueSections);
+            Equal(true, new BlueprintSourceDocument("blueprint", "future.blueprint", "#Future\nwall;opaque\n#Pieces\nwall;piece").HasOpaqueSections);
             Equal(true, new BlueprintSourceDocument("blueprint", "bom.blueprint", "\uFEFF\uFEFF#Pieces\nwall;piece").HasPartAt(2, "wall"));
             var longRow = new BlueprintSourceDocument("blueprint", "long.blueprint", "#Pieces\nwall;" + new string('x', 7 * 1024 * 1024));
             long before = GC.GetAllocatedBytesForCurrentThread();

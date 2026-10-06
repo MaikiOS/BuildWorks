@@ -2790,7 +2790,7 @@ namespace OstrixMods.BuildWorks
                 parts.Add(new BlueprintEditorPart(part.stableId, part.prefabName, part.displayName,
                     ToPoint(part.position.ToVector3()), ToRotation(part.rotation.ToQuaternion()), part.parentGroupId,
                     part.editorVisible, part.editorLocked, ToPoint(part.scale.ToVector3()), part.signText,
-                    part.sourceDocumentId, part.sourceLine));
+                    part.sourceDocumentId, part.sourceLine, part.foreignData?.ToGeometry()));
             return new BlueprintEditorDocument(source.id, source.name,
                 source.category ?? CompositeBlueprintStore.DefaultCategory, parts, groups,
                 source.primaryPartId, source.primaryGroupId,
@@ -3574,7 +3574,8 @@ namespace OstrixMods.BuildWorks
                     editorLocked = part.Locked,
                     signText = part.SignText,
                     sourceDocumentId = part.SourceDocumentId,
-                    sourceLine = part.SourceLine
+                    sourceLine = part.SourceLine,
+                    foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(part.ForeignData)
                 });
             }
             return result;
@@ -3665,6 +3666,8 @@ namespace OstrixMods.BuildWorks
 
         private void Bind(string status)
         {
+            if (string.IsNullOrEmpty(status) && (document.Parts.Any(part => part.ForeignData != null) ||
+                document.Sources.Any(source => source.HasOpaqueSections))) status = BuildWorksLocalization.Text("import.foreign_pending");
             var missing = new HashSet<string>(StringComparer.Ordinal);
             foreach (BlueprintEditorPart part in document.Parts)
                 if (!ResolveVisualSource(part.PrefabName)) missing.Add(part.StableId);

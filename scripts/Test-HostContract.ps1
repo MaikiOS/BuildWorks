@@ -819,7 +819,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.68.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.69.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -1813,7 +1813,7 @@ Assert-Contract ($updateDocumentMethods.Count -eq 5 -and
         @($_.Parameters | Where-Object Name -eq 'placementSupportId').Count -eq 1
     }).Count -eq 1) `
     'Blueprint frame update overload or a compatibility overload is missing.'
-Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion = 12' -and
+Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion = 13' -and
     $blueprintStoreSource -match 'loaded\.version < 6' -and
     $blueprintStoreSource -match 'ValidScale\(part\.scale\)' -and
     $blueprintStoreSource -match 'if \(loaded\.version < 4\)' -and
@@ -2817,4 +2817,10 @@ $signInstruction = @($nativeFinished.Body.Instructions | Where-Object { [string]
 $indexWrite = @($nativeFinished.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'stfld' -and [string]$_.Operand -match '::placementPlanIndex$' })
 Assert-Contract ($signInstruction.Count -eq 1 -and $indexWrite.Count -gt 0 -and $signInstruction[0].Offset -lt $indexWrite[0].Offset) 'Sign payload must apply before advancing the native queue.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.68 and Valheim Steam build 25185596.'
+$resolveBlueprint = $pluginMethods | Where-Object { $_.Name -eq 'TryResolveBlueprintPieces' -and $_.DeclaringType.Name -eq 'PrecisionPlacementSession' }
+$resolveCalls = ($resolveBlueprint.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($resolveCalls -match 'CompositeBlueprintStore::HasForeignData' -and
+    $sessionSource -match 'if \(!forEditor && CompositeBlueprintStore\.HasForeignData\(blueprint\)\)\s*\{ missingPrefab = BuildWorksLocalization\.Text\("import.foreign_pending"\); return false; \}') `
+    'Foreign payload must block native world placement without blocking geometry editing.'
+
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.69 and Valheim Steam build 25185596.'

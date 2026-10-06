@@ -2,6 +2,27 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.69 — inert foreign object state; not deployed
+
+Store v13 / portable v4 retain part-bound foreign info/ZDO/chance and exact unknown source sections.
+Geometry edits, copy/insertion/array/contour, Undo, legacy updates and native/portable save retain the payload;
+mutable DTO copies do not alias, failed writes restore state, cached sources revalidate changed contents.
+Old source-only v12/v3 migrate; new payload under old versions, duplicate/oversized fields and invalid formats reject.
+The editor warns that contents are not displayed/restored. The shared world resolver blocks unsupported data;
+no foreign source is executed and no arbitrary ZDO writes are introduced. Geometry editing is available.
+
+Release zero warnings/errors; 108 Geometry, Store, eight Bridge, 12 WorldLayout, 804 Localization keys,
+HostContract, deployment guards and format checks PASS. Unity 6000.0.61f1: 180 fresh states PASS,
+including actual opaque import/edit/save/reopen/update/insert-cancel; gameHostTested=false.
+The first Unity run failed an obsolete blocked-info fixture; its replacement uses invalid coordinates,
+with an explicit importError assertion. The geometry contour fixture was corrected to use matching prefab IDs.
+Independent correctness found no blocker; Ponytail found no unnecessary infrastructure. The verify helper is absent; direct checks are used.
+Source hash/row/prefab validation does not prove that foreignData tokens equal the original row;
+a future native adapter must validate/decode source state and never treat mutable DTOs as provenance.
+Installed test remains .67; no deployment, Valheim launch, save edits, push or publication.
+Native item/holder decoding, preview/catalogue/attachment tools and world reconstruction are not implemented.
+Heavy scenes above 512 and durable custom world sockets/reload/client remain unfinished; goal active.
+
 ## Checkpoint 0.19.68 — original content evidence; not deployed
 
 Store v12 / portable v3 retain format, basename, exact valid UTF-8 text and per-piece source row references.

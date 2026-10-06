@@ -99,6 +99,7 @@ namespace OstrixMods.BuildWorks
             public GameObject Visual;
             public Vector3 Scale = Vector3.one;
             public string SignText;
+            public CompositeBlueprintStore.Part SourceData;
             public readonly List<Vector3> SnapLocal = new List<Vector3>();
         }
 
@@ -1292,7 +1293,7 @@ namespace OstrixMods.BuildWorks
                         pieces[index],
                         EditorWorkspaceOrigin + part.position.ToVector3(),
                         part.rotation.ToQuaternion(),
-                        part.scale.ToVector3(), part.signText))
+                        part.scale.ToVector3(), part.signText, part))
                     {
                         Finish();
                         ShowStatus(player, BuildWorksLocalization.Text(
@@ -1316,7 +1317,8 @@ namespace OstrixMods.BuildWorks
             Vector3 position,
             Quaternion rotation,
             Vector3? scale = null,
-            string signText = null)
+            string signText = null,
+            CompositeBlueprintStore.Part sourceData = null)
         {
             if (!source || blueprintWorkspaceParts.Count >= CompositeBlueprintStore.InteractivePartBudget)
                 return false;
@@ -1355,7 +1357,8 @@ namespace OstrixMods.BuildWorks
                 Source = source,
                 Visual = visual,
                 Scale = partScale,
-                SignText = signText
+                SignText = signText,
+                SourceData = sourceData == null ? null : CompositeBlueprintStore.CloneParts(new[] { sourceData })[0]
             };
             var sourceSnaps = new List<Transform>();
             source.GetSnapPoints(sourceSnaps);
@@ -4991,6 +4994,8 @@ namespace OstrixMods.BuildWorks
             if (!player || blueprint?.parts == null) return false;
             if (!string.IsNullOrEmpty(blueprint.importError))
             { missingPrefab = BuildWorksLocalization.ResolveUserText(blueprint.importError); return false; }
+            if (!forEditor && CompositeBlueprintStore.HasForeignData(blueprint))
+            { missingPrefab = BuildWorksLocalization.Text("import.foreign_pending"); return false; }
             if (CompositeBlueprintStore.InteractiveError(blueprint.parts.Count) is string budgetError)
             { missingPrefab = BuildWorksLocalization.ResolveUserText(budgetError); return false; }
             if (!forEditor && blueprint.customSnapPoints?.Count > 0)
@@ -5898,7 +5903,10 @@ namespace OstrixMods.BuildWorks
                         visual.position - rootPosition),
                     rotation = new CompositeBlueprintStore.QuaternionData(visual.rotation),
                     scale = new CompositeBlueprintStore.VectorData(workspacePart.Scale),
-                    signText = workspacePart.SignText
+                    signText = workspacePart.SignText,
+                    sourceDocumentId = workspacePart.SourceData?.sourceDocumentId,
+                    sourceLine = workspacePart.SourceData?.sourceLine ?? 0,
+                    foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(workspacePart.SourceData?.foreignData?.ToGeometry())
                 });
                 var snaps = new List<Point3>(workspacePart.SnapLocal.Count);
                 foreach (Vector3 snapLocal in workspacePart.SnapLocal)

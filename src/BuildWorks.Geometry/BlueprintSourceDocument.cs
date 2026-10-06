@@ -42,7 +42,12 @@ namespace OstrixMods.BuildWorks.Geometry
                 {
                     if (last - first == 7 && string.CompareOrdinal(text, first, "#Pieces", 0, 7) == 0) pieces = true;
                     else if (!HeaderAt(text, first, last, "#Name:") && !HeaderAt(text, first, last, "#Category:") &&
-                        !HeaderAt(text, first, last, "#Creator:") && !HeaderAt(text, first, last, "#Description:")) pieces = false;
+                        !HeaderAt(text, first, last, "#Creator:") && !HeaderAt(text, first, last, "#Description:"))
+                    {
+                        pieces = false;
+                        if (!(last - first == 8 && string.CompareOrdinal(text, first, "#Terrain", 0, 8) == 0) &&
+                            !(last - first == 11 && string.CompareOrdinal(text, first, "#SnapPoints", 0, 11) == 0)) HasOpaqueSections = true;
+                    }
                 }
                 else if (pieces && first < last)
                 {
@@ -71,6 +76,7 @@ namespace OstrixMods.BuildWorks.Geometry
         public string Name { get; }
         public string Text { get; }
         public int ByteCount { get; }
+        public bool HasOpaqueSections { get; }
 
         public bool HasPartAt(int line, string prefab)
         {

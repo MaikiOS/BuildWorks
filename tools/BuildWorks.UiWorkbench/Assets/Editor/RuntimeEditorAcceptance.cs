@@ -670,8 +670,8 @@ public static class RuntimeEditorAcceptance
         Require(reloaded.All().Count == 1, "Actual disk library roundtrip");
         Require(Mathf.Abs(reloaded.All()[0].parts[0].scale.x - expected) < 0.0001f, "Store discarded scale");
         CheckReopenedCopy(controller, reloaded, expected);
-        Require(File.ReadAllText(path).Contains("\"version\":12"), "Controller did not write format12");
-        checks.Add("Controller save -> disk format12 -> new store -> OpenExisting retains scale, rotated root-owned support and placement reference; transient support focus absent");
+        Require(File.ReadAllText(path).Contains("\"version\":13"), "Controller did not write format13");
+        checks.Add("Controller save -> disk format13 -> new store -> OpenExisting retains scale, rotated root-owned support and placement reference; transient support focus absent");
     }
 
     private static void TestExternalImportEditor(Camera camera, TMP_Text font,
@@ -680,7 +680,7 @@ public static class RuntimeEditorAcceptance
         string path = Path.Combine(output, "external-copy-" + Guid.NewGuid().ToString("N") + ".json");
         var store = new CompositeBlueprintStore(path);
         var raw = ExternalBlueprintLibrary.Parse("#Name:Import fixture\n#Category:OTHER\n#Pieces\n" +
-            "woodwall;0;1;2;3;0;0;0;1;\"\";1;1;1\nwood_pole;0;4;5;6;0;0;0;1;\"\";1;1;1", "fixture.blueprint");
+            "woodwall;0;1;2;3;0;0;0;1;\"opaque-object-state\";1;1;1;opaque-zdo;.5\nwood_pole;0;4;5;6;0;0;0;1;\"\";1;1;1\n#FutureData\nignored", "fixture.blueprint");
         var original = ExternalBlueprintLibrary.PrepareForHost(raw, name => sources.TryGetValue(name, out GameObject prefab)
             ? new CompositeBlueprintStore.VectorData(prefab.transform.localScale) : (CompositeBlueprintStore.VectorData?)null);
         using (var editor = new BlueprintEditorController(store, camera, font,
@@ -706,7 +706,9 @@ public static class RuntimeEditorAcceptance
                 original.parts[0].position.x == 1 && !reopened.All()[0].IsExternal, "Save mutated source or lost edit");
             Require(reopened.All()[0].sourceDocuments[0].text == raw.sourceDocuments[0].text &&
                 reopened.All()[0].parts[0].sourceDocumentId == raw.sourceDocuments[0].id &&
-                reopened.All()[0].parts[0].sourceLine == 4, "Actual import/edit/save discarded original source or row binding");
+                reopened.All()[0].parts[0].sourceLine == 4 && reopened.All()[0].parts[0].foreignData.info == "\"opaque-object-state\"" &&
+                reopened.All()[0].parts[0].foreignData.zdo == "opaque-zdo" && reopened.All()[0].parts[0].foreignData.chance == ".5" &&
+                CompositeBlueprintStore.HasForeignData(reopened.All()[0]), "Actual import/edit/save discarded original source, row binding or opaque object state");
             editor.Close(true);
             Require(editor.OpenExisting(store.All()[0], out error), "Saved import cannot reopen: " + error);
             Require(editor.Document.Sources[0].Text == raw.sourceDocuments[0].text &&
@@ -721,7 +723,7 @@ public static class RuntimeEditorAcceptance
                 "Cancel insert changed saved document or leaked ghost state");
             editor.Close(true);
         }
-        checks.Add("External .blueprint -> detached draft -> metadata Cancel no disk -> transform/save native v12 -> reopen/update -> whole-source insert preview/Cancel; exact original source and row binding retained");
+        checks.Add("External .blueprint -> detached draft -> metadata Cancel no disk -> transform/save native v13 -> reopen/update -> whole-source insert preview/Cancel; exact source/rows, inert object/ZDO/chance/unknown sections retained; native contents not rendered or executed");
     }
 
     private static void TestScaleBoundaries(BlueprintEditorController controller, string path)

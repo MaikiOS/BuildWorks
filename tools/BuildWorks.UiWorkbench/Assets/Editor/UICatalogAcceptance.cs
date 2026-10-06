@@ -381,7 +381,8 @@ internal static class UICatalogAcceptance
                 Scroll(treeScroll.gameObject, -1f); Canvas.ForceUpdateCanvases();
                 Require(treeScroll.verticalNormalizedPosition < 1f && crowded.IsPartSelected("scroll0"),
                     "Tree scrolling changed selection or did not scroll");
-                var blockedSource = ExternalBlueprintLibrary.Parse("#Name:Blocked source\n#Pieces\nwall;0;0;0;0;0;0;0;1;\"contents\"\nwall;0;0;0;0;0;0;0;1;\"\"", "fixtures/blocked.blueprint");
+                var blockedSource = ExternalBlueprintLibrary.Parse("#Name:Blocked source\n#Pieces\nwall;0;NaN;0;0;0;0;0;1;\"contents\"\nwall;0;0;0;0;0;0;0;1;\"\"", "fixtures/blocked.blueprint");
+                Require(blockedSource.importError != null, "Invalid coordinates did not block source import");
                 string blockedReason = BuildWorksLocalization.ResolveUserText(blockedSource.importError);
                 view.ShowCatalog(new[] { new BlueprintEditorCatalogItem("external-card", blockedSource.name,
                     null, "OTHER", "blueprints", "external_blueprints", 0, blockedSource, unavailableReason: blockedReason) });

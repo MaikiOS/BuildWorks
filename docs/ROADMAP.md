@@ -9,7 +9,12 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.68**: compatible foreign imports retain exact valid UTF-8 source text and piece-row bindings in Store v12 / portable v3.
+Active source checkpoint **0.19.69**: part-bound foreign info/ZDO/chance and unknown source sections survive editor/history/native v13/portable v4 exchange.
+Release/required checks and 180 isolated Unity states PASS; eight EditorBridge checks include real save/reopen.
+Contents are inert and not displayed/restored; geometry editing is available, unsupported world placement blocked.
+Independent correctness/Ponytail PASS. Not deployed, installed test remains .67. Full item/holder behavior is unfinished.
+
+Previous source checkpoint **0.19.68**: compatible foreign imports retain exact valid UTF-8 source text and piece-row bindings in Store v12 / portable v3.
 Release/required checks and 180 isolated native Unity states PASS; seven EditorBridge checks include actual controller save/reopen.
 Content evidence is format + basename + text, not original archive/path identity; source text never executes.
 Unsupported foreign object state/unknown sections, ordinary items/holder contents, heavy interactive scenes and world durability remain pending.

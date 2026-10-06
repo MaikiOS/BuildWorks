@@ -26,7 +26,7 @@ namespace OstrixMods.BuildWorks
         internal const string DefaultCategory = "OTHER";
         private const string LegacyDefaultCategory = "ПРОЧЕЕ";
         private const string LocalizationPrefix = "$buildworks_";
-        private const int FormatVersion = 12;
+        private const int FormatVersion = 13;
         private const int MaximumBlueprints = 32;
         private const int MaximumCategories = 12;
         private const int MaximumAnchors = 512;
@@ -565,6 +565,7 @@ namespace OstrixMods.BuildWorks
                     prepared[index].editorLocked = blueprint.parts[index].editorLocked;
                     prepared[index].sourceDocumentId = blueprint.parts[index].sourceDocumentId;
                     prepared[index].sourceLine = blueprint.parts[index].sourceLine;
+                    prepared[index].foreignData = CloneForeignData(blueprint.parts[index].foreignData);
                 }
             }
             return TryUpdateDocument(
@@ -765,7 +766,8 @@ namespace OstrixMods.BuildWorks
                     editorLocked = part.editorLocked,
                     signText = part.signText,
                     sourceDocumentId = part.sourceDocumentId,
-                    sourceLine = part.sourceLine
+                    sourceLine = part.sourceLine,
+                    foreignData = CloneForeignData(part.foreignData)
                 });
             }
             return clone;
@@ -825,7 +827,8 @@ namespace OstrixMods.BuildWorks
                     return;
                 }
                 BlueprintExchangeFormat.ValidateLibraryJson(json, requireFields: loaded.version >= 6,
-                    allowSupportFields: loaded.version >= 11, allowSourceFields: loaded.version >= 12);
+                    allowSupportFields: loaded.version >= 11, allowSourceFields: loaded.version >= 12,
+                    allowForeignFields: loaded.version >= 13);
                 loaded.blueprints = loaded.blueprints ?? new List<Blueprint>();
                 loaded.categories = loaded.categories ?? new List<string>();
                 if (loaded.version == 1)
@@ -1081,13 +1084,24 @@ namespace OstrixMods.BuildWorks
             catch (ArgumentException) { return false; }
         }
 
+        internal static bool HasForeignData(Blueprint blueprint) => blueprint?.parts?.Any(part => part?.foreignData != null) == true ||
+            blueprint?.sourceDocuments?.Any(source => source.ToGeometry().HasOpaqueSections) == true;
+
+        private static ForeignPartData CloneForeignData(ForeignPartData value) => value == null ? null :
+            new ForeignPartData { format = value.format, info = value.info, zdo = value.zdo, chance = value.chance };
+
+        private static bool ValidForeignData(ForeignPartData value)
+        {
+            try { value?.ToGeometry(); return true; } catch (ArgumentException) { return false; }
+        }
+
         private static bool Valid(Part part)
         {
             if (part == null || string.IsNullOrWhiteSpace(part.prefabName) ||
                 string.IsNullOrWhiteSpace(part.stableId) ||
                 string.IsNullOrWhiteSpace(part.displayName) ||
                 !Valid(part.position) || !Valid(part.rotation) || !ValidScale(part.scale) ||
-                !Geometry.BlueprintEditorPart.IsValidSignText(part.signText)) return false;
+                !Geometry.BlueprintEditorPart.IsValidSignText(part.signText) || !ValidForeignData(part.foreignData)) return false;
             float length = part.rotation.x * part.rotation.x +
                 part.rotation.y * part.rotation.y +
                 part.rotation.z * part.rotation.z +
@@ -1405,6 +1419,7 @@ namespace OstrixMods.BuildWorks
         [DataContract]
         internal sealed class SourceDocument
         {
+            private Geometry.BlueprintSourceDocument cached;
             [DataMember(Order = 0)] public string id;
             [DataMember(Order = 1)] public string format;
             [DataMember(Order = 2)] public string name;
@@ -1412,9 +1427,10 @@ namespace OstrixMods.BuildWorks
 
             internal Geometry.BlueprintSourceDocument ToGeometry()
             {
+                if (cached != null && cached.Id == id && cached.Format == format && cached.Name == name && cached.Text == text) return cached;
                 var source = new Geometry.BlueprintSourceDocument(format, name, text);
                 if (source.Id != id) throw new ArgumentException("Source identity does not match its contents.");
-                return source;
+                return cached = source;
             }
 
             internal static SourceDocument FromGeometry(Geometry.BlueprintSourceDocument source) => new SourceDocument
@@ -1428,6 +1444,18 @@ namespace OstrixMods.BuildWorks
             [DataMember(Order = 1)] public string name;
             [DataMember(Order = 2)] public VectorData position;
             [DataMember(Order = 3)] public QuaternionData rotation;
+        }
+
+        [DataContract]
+        internal sealed class ForeignPartData
+        {
+            [DataMember(Order = 0)] public string format;
+            [DataMember(Order = 1)] public string info;
+            [DataMember(Order = 2)] public string zdo;
+            [DataMember(Order = 3)] public string chance;
+            internal Geometry.BlueprintForeignPartData ToGeometry() => new Geometry.BlueprintForeignPartData(format, info, zdo, chance);
+            internal static ForeignPartData FromGeometry(Geometry.BlueprintForeignPartData value) => value == null ? null :
+                new ForeignPartData { format = value.Format, info = value.Info, zdo = value.Zdo, chance = value.Chance };
         }
 
         [DataContract]
@@ -1457,6 +1485,8 @@ namespace OstrixMods.BuildWorks
             public string sourceDocumentId;
             [DataMember(Order = 11, EmitDefaultValue = false)]
             public int sourceLine;
+            [DataMember(Order = 12, EmitDefaultValue = false)]
+            public ForeignPartData foreignData;
         }
 
         [DataContract]

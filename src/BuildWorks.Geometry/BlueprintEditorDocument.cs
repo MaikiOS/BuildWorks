@@ -18,7 +18,8 @@ namespace OstrixMods.BuildWorks.Geometry
             Point3? scale = null,
             string signText = null,
             string sourceDocumentId = null,
-            int sourceLine = 0)
+            int sourceLine = 0,
+            BlueprintForeignPartData foreignData = null)
         {
             StableId = Required(stableId, nameof(stableId));
             PrefabName = Required(prefabName, nameof(prefabName));
@@ -37,6 +38,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 throw new ArgumentException("Invalid source reference.");
             SourceDocumentId = sourceDocumentId;
             SourceLine = sourceLine;
+            ForeignData = foreignData;
         }
 
         public string StableId { get; }
@@ -51,6 +53,7 @@ namespace OstrixMods.BuildWorks.Geometry
         public string SignText { get; }
         public string SourceDocumentId { get; }
         public int SourceLine { get; }
+        public BlueprintForeignPartData ForeignData { get; }
         public static bool IsValidSignText(string value)
         {
             if (value == null) return true;
@@ -70,7 +73,7 @@ namespace OstrixMods.BuildWorks.Geometry
             Visible,
             Locked,
             Scale,
-            SignText, SourceDocumentId, SourceLine);
+            SignText, SourceDocumentId, SourceLine, ForeignData);
 
         internal static string Required(string value, string name)
         {
@@ -883,7 +886,7 @@ namespace OstrixMods.BuildWorks.Geometry
                     parentId,
                     part.Visible,
                     part.Locked,
-                    part.Scale, part.SignText, part.SourceDocumentId, part.SourceLine));
+                    part.Scale, part.SignText, part.SourceDocumentId, part.SourceLine, part.ForeignData));
                 if (rootIds.Contains(part.StableId)) copiedRoots.Add(copyId);
             }
             return Commit(() =>
@@ -928,7 +931,7 @@ namespace OstrixMods.BuildWorks.Geometry
                     part.PrefabName, part.DisplayName, position + orientation.Rotate(part.Position),
                     Multiply(orientation, part.Rotation).Normalized(),
                     part.ParentGroupId == null ? rootId : groupIds[part.ParentGroupId],
-                    part.Visible, part.Locked, part.Scale, part.SignText, part.SourceDocumentId, part.SourceLine));
+                    part.Visible, part.Locked, part.Scale, part.SignText, part.SourceDocumentId, part.SourceLine, part.ForeignData));
             return Commit(() =>
             {
                 groups.AddRange(newGroups);
@@ -1226,7 +1229,7 @@ namespace OstrixMods.BuildWorks.Geometry
                             sample.Position + stepY * logicalY +
                                 turn.Rotate((source.Position - pivot) * sample.UniformScale),
                             Multiply(turn, source.Rotation).Normalized(), source.ParentGroupId,
-                            source.Visible, source.Locked, copyScale, source.SignText, source.SourceDocumentId, source.SourceLine));
+                            source.Visible, source.Locked, copyScale, source.SignText, source.SourceDocumentId, source.SourceLine, source.ForeignData));
                     }
                 }
             }
@@ -1314,7 +1317,7 @@ namespace OstrixMods.BuildWorks.Geometry
                         source.ParentGroupId,
                         source.Visible,
                         source.Locked,
-                        copyScale, source.SignText, source.SourceDocumentId, source.SourceLine));
+                        copyScale, source.SignText, source.SourceDocumentId, source.SourceLine, source.ForeignData));
                 }
             }
             return copies;
@@ -1557,7 +1560,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 if (left.StableId != right.StableId || left.PrefabName != right.PrefabName ||
                     left.DisplayName != right.DisplayName || left.ParentGroupId != right.ParentGroupId ||
                     left.Visible != right.Visible || left.Locked != right.Locked || left.SignText != right.SignText ||
-                    left.SourceDocumentId != right.SourceDocumentId || left.SourceLine != right.SourceLine ||
+                    left.SourceDocumentId != right.SourceDocumentId || left.SourceLine != right.SourceLine || left.ForeignData != right.ForeignData ||
                     !Same(left.Position, right.Position) || !Same(left.Rotation, right.Rotation) ||
                     !Same(left.Scale, right.Scale))
                     return false;

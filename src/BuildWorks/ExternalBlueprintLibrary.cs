@@ -215,7 +215,7 @@ namespace OstrixMods.BuildWorks
                         else if (line == "#Terrain") { pieces = false; snapPoints = false; }
                         else if (!line.StartsWith("#Creator:", StringComparison.Ordinal) &&
                             !line.StartsWith("#Description:", StringComparison.Ordinal))
-                            blueprint.importError = "$buildworks_import.section\t" + line;
+                        { pieces = false; snapPoints = false; } // Unknown sections are retained, never executed or parsed as pieces.
                         continue;
                     }
                     if (snapPoints)
@@ -251,15 +251,16 @@ namespace OstrixMods.BuildWorks
                             (!vbuild && (fields.Length == 11 || fields.Length == 12)))
                             throw new InvalidDataException("$buildworks_import.fields");
                         string prefab = fields[0].Trim();
-                        // PlanBuild reuses info for doors, inventory and signs. Only its exact native sign is unambiguous.
-                        if (!vbuild && prefab != "sign" && fields[9] != "" && fields[9] != "\"\"" && fields[9] != "null")
-                            throw new InvalidDataException("$buildworks_import.object_data");
+                        // Decode only the known sign adapter; every other object payload remains inert and part-bound.
                         string signText = !vbuild && prefab == "sign" ? BlueprintExchangeFormat.DecodeSignText(fields[9]) : null;
                         int dataIndex = vbuild ? 8 : 13;
-                        if (fields.Length > dataIndex && fields[dataIndex] != "" && fields[dataIndex] != "\"\"")
-                            throw new InvalidDataException("$buildworks_import.object_data");
-                        if (fields.Length > dataIndex + 1 && fields[dataIndex + 1] != "" && Number(fields[dataIndex + 1]) != 1f)
-                            throw new InvalidDataException("$buildworks_import.chance");
+                        string info = !vbuild && prefab != "sign" && HasData(fields[9]) ? fields[9] : null;
+                        string zdo = fields.Length > dataIndex && HasData(fields[dataIndex]) ? fields[dataIndex] : null;
+                        string chance = fields.Length > dataIndex + 1 && fields[dataIndex + 1] != "" &&
+                            fields[dataIndex + 1] != "1" ? fields[dataIndex + 1] : null;
+                        CompositeBlueprintStore.ForeignPartData foreign = info == null && zdo == null && chance == null ? null :
+                            CompositeBlueprintStore.ForeignPartData.FromGeometry(new Geometry.BlueprintForeignPartData(
+                                vbuild ? "vbuild" : "blueprint", info, zdo, chance));
                         if (prefab.Length == 0 || prefab.Length > 128 || prefab.Any(c => char.IsControl(c) || c == '/' || c == '\\'))
                             throw new InvalidDataException("$buildworks_import.fields");
                         int p = vbuild ? 5 : 2, q = vbuild ? 1 : 5;
@@ -273,7 +274,8 @@ namespace OstrixMods.BuildWorks
                             scale = new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 },
                             signText = signText,
                             sourceDocumentId = evidence.Id,
-                            sourceLine = lineNumber
+                            sourceLine = lineNumber,
+                            foreignData = foreign
                         };
                         if (Math.Abs(part.position.x) > 512 || Math.Abs(part.position.y) > 512 || Math.Abs(part.position.z) > 512)
                             throw new InvalidDataException("$buildworks_import.transform");
@@ -289,7 +291,7 @@ namespace OstrixMods.BuildWorks
                         part.rotation.w = (float)(part.rotation.w / norm);
                         blueprint.parts.Add(part);
                     }
-                    catch (Exception exception) when (exception is InvalidDataException || exception is FormatException || exception is OverflowException)
+                    catch (Exception exception) when (exception is InvalidDataException || exception is FormatException || exception is OverflowException || exception is ArgumentException)
                     { if (blueprint.importError == null) blueprint.importError = exception.Message + "\t" + lineNumber; }
                 }
             }
@@ -389,11 +391,14 @@ namespace OstrixMods.BuildWorks
                     editorLocked = part.editorLocked,
                     signText = part.signText,
                     sourceDocumentId = part.sourceDocumentId,
-                    sourceLine = part.sourceLine
+                    sourceLine = part.sourceLine,
+                    foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(part.foreignData?.ToGeometry())
                 });
             if (!CompositeBlueprintStore.Valid(result)) throw new InvalidDataException("$buildworks_import.fields");
             return result;
         }
+
+        private static bool HasData(string value) => value != "" && value != "\"\"" && value != "null";
 
         private static float Number(string value)
         {

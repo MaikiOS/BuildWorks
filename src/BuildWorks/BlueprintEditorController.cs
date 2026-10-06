@@ -2097,7 +2097,7 @@ namespace OstrixMods.BuildWorks
             var copy = new BlueprintEditorDocument(source.SourceBlueprintId, source.Name,
                 source.Category, source.Parts, source.Groups, source.PrimaryPartId,
                 source.PrimaryGroupId, source.CustomSnapPoints, source.Supports,
-                source.PlacementSupportId);
+                source.PlacementSupportId, source.Sources);
             foreach (string id in source.Selection) copy.ToggleSelection(id);
             copy.SelectSupport(source.ActiveSupportId);
             return copy;
@@ -2789,14 +2789,15 @@ namespace OstrixMods.BuildWorks
             foreach (CompositeBlueprintStore.Part part in source.parts ?? new List<CompositeBlueprintStore.Part>())
                 parts.Add(new BlueprintEditorPart(part.stableId, part.prefabName, part.displayName,
                     ToPoint(part.position.ToVector3()), ToRotation(part.rotation.ToQuaternion()), part.parentGroupId,
-                    part.editorVisible, part.editorLocked, ToPoint(part.scale.ToVector3()), part.signText));
+                    part.editorVisible, part.editorLocked, ToPoint(part.scale.ToVector3()), part.signText,
+                    part.sourceDocumentId, part.sourceLine));
             return new BlueprintEditorDocument(source.id, source.name,
                 source.category ?? CompositeBlueprintStore.DefaultCategory, parts, groups,
                 source.primaryPartId, source.primaryGroupId,
                 source.customSnapPoints?.Select(point => ToPoint(point.ToVector3())),
                 source.supports?.Select(support => new BlueprintEditorSupport(support.stableId, support.name,
                     ToPoint(support.position.ToVector3()), ToRotation(support.rotation.ToQuaternion()))),
-                source.placementSupportId);
+                source.placementSupportId, source.sourceDocuments?.Select(evidence => evidence.ToGeometry()));
         }
 
         private void ApplyInspector(
@@ -3505,7 +3506,7 @@ namespace OstrixMods.BuildWorks
                         supports,
                         document.PlacementSupportId,
                         out sourceBlueprint,
-                        out error, customPoints, previewTemplate);
+                        out error, customPoints, previewTemplate, BuildStoreSources());
                 else
                     success = store.TryUpdateDocument(
                         sourceBlueprint,
@@ -3518,7 +3519,7 @@ namespace OstrixMods.BuildWorks
                         document.PrimaryGroupId,
                         supports,
                         document.PlacementSupportId,
-                        out error, customPoints);
+                        out error, customPoints, BuildStoreSources());
                 if (!success)
                 {
                     state = EditorState.Editing;
@@ -3571,11 +3572,16 @@ namespace OstrixMods.BuildWorks
                     parentGroupId = part.ParentGroupId,
                     editorVisible = part.Visible,
                     editorLocked = part.Locked,
-                    signText = part.SignText
+                    signText = part.SignText,
+                    sourceDocumentId = part.SourceDocumentId,
+                    sourceLine = part.SourceLine
                 });
             }
             return result;
         }
+
+        private List<CompositeBlueprintStore.SourceDocument> BuildStoreSources() => document.Sources
+            .Select(CompositeBlueprintStore.SourceDocument.FromGeometry).ToList();
 
         private List<CompositeBlueprintStore.Support> BuildStoreSupports() => document.Supports
             .Select(support => new CompositeBlueprintStore.Support

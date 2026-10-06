@@ -1994,17 +1994,22 @@ namespace OstrixMods.BuildWorks.GeometryTests
 
         private static void BlueprintPayloadSurvivesHistory()
         {
+            var evidence = new BlueprintSourceDocument("blueprint", "source.blueprint", "\uFEFF#Pieces\r\nsign;;1;0;0;0;0;0;1;\"text\"\r\n");
             var source = new BlueprintEditorDocument(null, "Source", "OTHER", new[] {
-                new BlueprintEditorPart("sign", "sign", "Sign", new Point3(1, 0, 0), new Rotation3(0, 0, 0, 1), signText: "Надпись\nДом") },
-                sourceCustomSnapPoints: new[] { new Point3(2, 3, 4) });
+                new BlueprintEditorPart("sign", "sign", "Sign", new Point3(1, 0, 0), new Rotation3(0, 0, 0, 1), signText: "Надпись\nДом",
+                    sourceDocumentId: evidence.Id, sourceLine: 2) },
+                sourceCustomSnapPoints: new[] { new Point3(2, 3, 4) }, sourceDocuments: new[] { evidence });
             var document = EditorDocument(EditorPart("wall", 0, 0, 0));
             document.InsertBlueprint(source, new Point3(10, 0, 0), new Rotation3(0, 0, 0, 1));
             Near(new Point3(12, 3, 4), document.CustomSnapPoints[0]);
             Equal("Надпись\nДом", document.Parts[1].SignText);
             Equal(true, document.Undo());
             Equal(0, document.CustomSnapPoints.Count);
+            Equal(0, document.Sources.Count);
             Equal(true, document.Redo());
             Equal(1, document.CustomSnapPoints.Count);
+            Equal(evidence.Id, document.Sources[0].Id);
+            Equal(evidence.Text, document.Sources[0].Text);
             document.SelectOnly(document.Parts[1].StableId);
             document.ApplyTransformDelta(new Point3(1, 0, 0), new Rotation3(0, 0, 0, 1), new Point3());
             document.Undo(); // same item count: the cached part must be rebuilt
@@ -2013,8 +2018,37 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Equal("Надпись\nДом", document.Parts[1].SignText);
             document.DuplicateSelection(new Point3(1, 0, 0));
             Equal("Надпись\nДом", document.Parts[2].SignText);
+            Equal(evidence.Id, document.Parts[2].SourceDocumentId);
+            Equal(2, document.Parts[2].SourceLine);
             document.Undo();
             Equal(2, document.Parts.Count);
+            document.InsertBlueprint(source, new Point3(), new Rotation3(0, 0, 0, 1));
+            Equal(1, document.Sources.Count); // Same source is shared by independent instances.
+            var other = new BlueprintSourceDocument("vbuild", "other.vbuild", "wall 0 0 0 1 1 2 3\n");
+            var second = new BlueprintEditorDocument(null, "Second", "OTHER", new[] {
+                new BlueprintEditorPart("other", "wall", "Wall", new Point3(), new Rotation3(0, 0, 0, 1),
+                    sourceDocumentId: other.Id, sourceLine: 1) }, sourceDocuments: new[] { other });
+            document.InsertBlueprint(second, new Point3(), new Rotation3(0, 0, 0, 1));
+            Equal(2, document.Sources.Count);
+            document.Undo(); Equal(1, document.Sources.Count);
+            document.Redo(); Equal(2, document.Sources.Count);
+            Throws<ArgumentException>(() => new BlueprintEditorDocument(null, "Bad", "OTHER", source.Parts));
+            Throws<ArgumentException>(() => new BlueprintSourceDocument("blueprint", "../bad.blueprint", ""));
+            Throws<ArgumentException>(() => new BlueprintSourceDocument("blueprint", "large.blueprint", new string('x', BlueprintSourceDocument.MaximumBytes + 1)));
+            Equal(false, evidence.HasPartAt(1, "sign"));
+            Equal(false, evidence.HasPartAt(2, "wall"));
+            Equal(true, other.HasPartAt(1, "wall"));
+            var sections = new BlueprintSourceDocument("blueprint", "sections.blueprint",
+                "wall;before\r#Pieces\nwall;piece\r\n#Terrain\r\nwall;terrain\n#SnapPoints\nwall;snap");
+            Equal(false, sections.HasPartAt(1, "wall"));
+            Equal(true, sections.HasPartAt(3, "wall"));
+            Equal(false, sections.HasPartAt(5, "wall"));
+            Equal(false, sections.HasPartAt(7, "wall"));
+            Equal(true, new BlueprintSourceDocument("blueprint", "bom.blueprint", "\uFEFF\uFEFF#Pieces\nwall;piece").HasPartAt(2, "wall"));
+            var longRow = new BlueprintSourceDocument("blueprint", "long.blueprint", "#Pieces\nwall;" + new string('x', 7 * 1024 * 1024));
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            for (int i = 0; i < 50000; ++i) Equal(true, longRow.HasPartAt(2, "wall"));
+            Equal(true, GC.GetAllocatedBytesForCurrentThread() - before < 1024 * 1024);
         }
 
         private static void BlueprintArrayPreviewMatchesApply()

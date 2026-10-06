@@ -2,6 +2,25 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.68 — original content evidence; not deployed
+
+Store v12 / portable v3 retain format, basename, exact valid UTF-8 text and per-piece source row references.
+Compatible foreign imports keep BOM/newlines/creator/description/inert terrain through actual editor transform,
+save/reopen, portable exchange, copy/insertion/duplicate/Undo. Original archive/path identity is deliberately
+not persisted: this is content evidence, not complete provenance or executable foreign state.
+Piece-row lookup is indexed once and capped; terrain/header rows cannot masquerade as pieces.
+Legacy parts-only updates retain references; failed writes restore sources and parts atomically.
+Old v11/v2 migrate; forged hashes, duplicate fields, invalid references and new fields under old versions reject.
+
+Release zero warnings/errors; 108 Geometry, Store, seven Bridge, 12 WorldLayout, 803 Localization keys,
+HostContract, deployment guards and format checks PASS. Isolated Unity: 180 fresh states and actual
+import/edit/save/reopen/update/content evidence PASS; gameHostTested=false. Independent correctness
+found and closed the row-allocation/terrain-spoof and legacy-update reference issues; Ponytail PASS.
+The verify helper is absent; direct checks and independent review were used.
+Installed TerrainRamp-1.0-Test remains .67; no deployment, Valheim launch, save edits, push or publication.
+Opaque info/ZDO/chance/unknown-section conversion, ordinary items and stand/armour contents, heavy
+interactive scenes above 512 and world-support reload/network acceptance remain unfinished; goal active.
+
 ## Checkpoint 0.19.67 — usable file exchange and exact foreign scale; test deployment
 
 Editor and Hammer share a folder/file browser, output filename/location and native JSON/ZIP choice.

@@ -31,6 +31,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 ForeignScaleSemantics(Path.Combine(directory, "foreign-scale.json"));
                 ExchangeFileWorkflow(Path.Combine(directory, "file-flow"));
                 ForeignSignText();
+                ForeignSourcesRoundTrip(Path.Combine(directory, "sources.json"));
                 ExchangeRoundTrip(Path.Combine(directory, "exchange-library.json"));
                 SupportRoundTrip(Path.Combine(directory, "supports.json"));
                 if (args.Length > 0) InspectActualLibrary(args[0]);
@@ -46,6 +47,74 @@ namespace OstrixMods.BuildWorks.StoreTests
             {
                 Directory.Delete(directory, recursive: true);
             }
+        }
+
+        private static void ForeignSourcesRoundTrip(string path)
+        {
+            string text = "\uFEFF#Name:Sources\r\n#Creator:Автор\r\n#Description:" + new string('x', 40000) +
+                "\r\n#Terrain\r\nsquare;ignored\r\n#Pieces\r\nwall;;0;0;0;0;0;0;1;\"\"\r\nbeam;;1;0;0;0;0;0;1;\"\"\r\n";
+            var external = ExternalBlueprintLibrary.Parse(text, "archive/Original.blueprint");
+            Require(external.importError == null, external.importError);
+            var converted = ExternalBlueprintLibrary.DetachedCopy(ExternalBlueprintLibrary.PrepareForHost(external, _ => UnitScale));
+            var store = new CompositeBlueprintStore(path);
+            Require(store.TrySaveDocument(converted.name, converted.category, converted.parts, converted.groups, converted.anchors,
+                null, null, converted.supports, null, out var saved, out string error, sourceDocuments: converted.sourceDocuments), error);
+            string id = saved.sourceDocuments[0].id;
+            converted.sourceDocuments[0].text = "changed caller";
+            Require(saved.sourceDocuments[0].text == text, "Save retained caller-owned mutable source object");
+            var reopened = new CompositeBlueprintStore(path).All()[0];
+            var decoded = BlueprintExchangeFormat.Decode(System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(reopened)));
+            Require(decoded.sourceDocuments[0].text == text && decoded.sourceDocuments[0].name == "Original.blueprint" &&
+                decoded.sourceDocuments[0].id == id && decoded.parts[0].sourceDocumentId == id && decoded.parts[0].sourceLine == 7,
+                "Original source, BOM, line endings or row binding was lost");
+            Require(store.TryUpdateDocument(saved, saved.name, saved.category, saved.parts, saved.groups, saved.anchors,
+                null, null, out error), error);
+            Require(new CompositeBlueprintStore(path).All()[0].sourceDocuments[0].text == text, "Legacy update discarded source evidence");
+            var reconstructed = CompositeBlueprintStore.CloneParts(saved.parts);
+            foreach (var part in reconstructed) { part.sourceDocumentId = null; part.sourceLine = 0; }
+            Require(store.TryUpdateParts(saved, reconstructed, saved.anchors, out error), error);
+            Require(saved.parts[0].sourceDocumentId == id && saved.parts[0].sourceLine == 7,
+                "Legacy parts-only update discarded source row binding");
+            string json = System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(saved));
+            foreach (string invalid in new[] { json.Replace("\"version\":3", "\"version\":2"),
+                json.Replace("\"sourceLine\":7", "\"sourceLine\":6"), json.Replace("\"sourceLine\":7", "\"sourceLine\":0"),
+                json.Replace("Original.blueprint", "../Original.blueprint"), json.Replace("Автор", "Other author"),
+                json.Replace("\"sourceDocuments\":[", "\"sourceDocuments\":[null,"),
+                json.Replace("\"sourceLine\":7", "\"sourceLine\":7,\"sourceLine\":7") })
+            {
+                bool rejected = false;
+                try { BlueprintExchangeFormat.Decode(invalid); } catch (InvalidDataException) { rejected = true; }
+                Require(rejected, "Invalid source identity, row, path, duplicate or old schema was accepted");
+            }
+            var duplicate = CompositeBlueprintStore.CloneSources(saved.sourceDocuments);
+            duplicate.Add(duplicate[0]);
+            string original = File.ReadAllText(path);
+            Require(!store.TryUpdateDocument(saved, saved.name, saved.category, saved.parts, saved.groups, saved.anchors,
+                null, null, saved.supports, null, out error, sourceDocuments: duplicate) && File.ReadAllText(path) == original,
+                "Duplicate source update was not atomic");
+            var invalidParts = CompositeBlueprintStore.CloneParts(saved.parts);
+            invalidParts[0].sourceDocumentId = "missing";
+            Require(!store.TryUpdateDocument(saved, saved.name, saved.category, invalidParts, saved.groups, saved.anchors,
+                null, null, out error) && saved.parts[0].sourceDocumentId == id && File.ReadAllText(path) == original,
+                "Missing row source changed the saved document");
+            var updatedSources = CompositeBlueprintStore.CloneSources(saved.sourceDocuments);
+            updatedSources.Add(CompositeBlueprintStore.SourceDocument.FromGeometry(new Geometry.BlueprintSourceDocument(
+                "vbuild", "Extra.vbuild", "wall 0 0 0 1 0 0 0\r\n")));
+            using (var locked = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                Require(!store.TryUpdateDocument(saved, saved.name, saved.category, saved.parts, saved.groups, saved.anchors,
+                    null, null, saved.supports, null, out error, sourceDocuments: updatedSources) && saved.sourceDocuments.Count == 1,
+                    "Failed write did not restore source documents");
+            Require(File.ReadAllText(path) == original, "Failed source update replaced original file");
+            string oversizedScalar = json.Replace("\"name\":\"Sources\"", "\"name\":\"" + new string('x', 32769) + "\"");
+            bool quotaRejected = false;
+            try { BlueprintExchangeFormat.Decode(oversizedScalar); } catch (InvalidDataException) { quotaRejected = true; }
+            Require(quotaRejected, "Source text quota also enlarged ordinary scalar fields");
+            string legacy = System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(new CompositeBlueprintStore.Blueprint {
+                id = Guid.NewGuid().ToString("N"), name = "Legacy", category = "OTHER", prefabName = "wall",
+                parts = new List<CompositeBlueprintStore.Part> { Part("a", "wall", "A", null, true, false, 0),
+                    Part("b", "wall", "B", null, true, false, 1) } })).Replace("\"version\":3", "\"version\":2");
+            Require(BlueprintExchangeFormat.Decode(legacy).sourceDocuments == null, "Clean v2 document stopped migrating");
+            Console.WriteLine("PASS source v12/v3 exact UTF-8/BOM/CRLF/header retention; stable rows; detached/save/update/exchange; strict old-version/hash/reference/duplicate rejection");
         }
 
         private static void ForeignSignText()
@@ -120,13 +189,14 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(store.All().Count == 0 && store.CatalogAll().Count == 2 && !File.Exists(Path.Combine(directory, "import-copy.json")), "Browsing sources mutated native store");
             Require(!store.TryDelete(parsed, out _) && File.ReadAllText(original) == source, "Source library is writable");
             Require(store.TrySaveDocument(copyA.name, copyA.category, copyA.parts, copyA.groups, copyA.anchors,
-                out CompositeBlueprintStore.Blueprint saved, out string error), error);
+                null, null, copyA.supports, null, out CompositeBlueprintStore.Blueprint saved, out string error,
+                sourceDocuments: copyA.sourceDocuments), error);
             Require(saved.id != parsed.id && !saved.IsExternal, "Imported copy shares source identity");
             var loaded = new CompositeBlueprintStore(Path.Combine(directory, "import-copy.json"));
             Require(loaded.All().Count == 1 && loaded.All()[0].parts[0].scale.y == 2 && loaded.CatalogAll().Count == 3,
                 "Native copy cannot be reopened with original sources");
             Require(File.ReadAllText(original) == source, "Import/save rewrote original file");
-            Console.WriteLine("PASS read-only .blueprint/.vbuild -> separate native v11 copy, exact poses/scales, terrain exclusion, rejection without partial pieces, inert archive");
+            Console.WriteLine("PASS read-only .blueprint/.vbuild -> separate native v12 copy, exact poses/scales, inert terrain retention, rejection without partial pieces, inert archive");
         }
 
         private static CompositeBlueprintStore.VectorData UnitScale => new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 };
@@ -156,7 +226,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(!store.TryExportFile(raw, out _, out string error) && error.Contains("scale_pending"), "Raw absolute scale exported as native multiplier");
             var copy = ExternalBlueprintLibrary.DetachedCopy(prepared);
             Require(store.TrySaveDocument(copy.name, copy.category, copy.parts, copy.groups, copy.anchors,
-                out var saved, out error), error);
+                null, null, copy.supports, null, out var saved, out error, sourceDocuments: copy.sourceDocuments), error);
             var reopened = new CompositeBlueprintStore(path).All()[0];
             var decoded = BlueprintExchangeFormat.Decode(System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(reopened)));
             Require(decoded.parts[0].scale.x * 2 == 1 && decoded.parts[0].scale.y * .5f == 1 &&
@@ -206,6 +276,10 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(ReferenceEquals(snapshot, store.CatalogAll()), "Catalog allocates a new snapshot on every call");
             Require(store.TryRename(saved, "Renamed", out error) && !ReferenceEquals(snapshot, store.CatalogAll()), "Metadata did not invalidate snapshot");
             saved.parts[0].prefabName = "missing_prefab";
+            var evidence = saved.sourceDocuments[0];
+            saved.sourceDocuments[0] = CompositeBlueprintStore.SourceDocument.FromGeometry(new Geometry.BlueprintSourceDocument(
+                evidence.format, evidence.name, evidence.text.Replace("wall;", "missing_prefab;")));
+            foreach (var part in saved.parts) part.sourceDocumentId = saved.sourceDocuments[0].id;
             Require(store.TryExportFile(saved, out string exported, out error), error);
             var decoded = BlueprintExchangeFormat.Decode(File.ReadAllText(exported));
             Require(decoded.parts[0].prefabName == "missing_prefab" && decoded.previewPitch == -18 &&
@@ -321,9 +395,9 @@ namespace OstrixMods.BuildWorks.StoreTests
                 copy.groups[0].pivotPartId == copy.parts[0].stableId && copy.primaryPartId == copy.parts[0].stableId &&
                 copy.primaryGroupId == copy.groups[0].stableId && copy.parts[0].signText == parts[0].signText &&
                 copy.customSnapPoints[0].x == 2 && !copy.parts[0].editorVisible && copy.parts[0].editorLocked, "Detached copy lost hierarchy/data");
-            foreach (string invalid in new[] { json.Replace("\"version\":2", "\"version\":999"),
+            foreach (string invalid in new[] { json.Replace("\"version\":3", "\"version\":999"),
                 json.Replace("\"format\":", "\"future\":42,\"format\":"),
-                json.Replace("\"version\":2", "\"version\":2,\"version\":2"),
+                json.Replace("\"version\":3", "\"version\":3,\"version\":3"),
                 json.Replace("\"x\":2", "\"x\":null"), json.Replace("\"x\":2", "\"extra\":2,\"x\":2"),
                 json.Replace("\"previewZoom\":1,", ""), json.Replace("\"name\":\"Group\"", "\"name\":\" Group \""),
                 json.Replace("\"previewZoom\":1", "\"previewZoom\":0") })
@@ -336,11 +410,11 @@ namespace OstrixMods.BuildWorks.StoreTests
                 saved.primaryPartId, saved.primaryGroupId, out error), error);
             Require(new CompositeBlueprintStore(path).All()[0].customSnapPoints.Count == 1, "Legacy save path cleared custom points");
             string original = File.ReadAllText(path);
-            File.WriteAllText(path, original.Replace("\"version\":11", "\"future\":123,\"version\":11"));
+            File.WriteAllText(path, original.Replace("\"version\":12", "\"future\":123,\"version\":12"));
             var unknown = new CompositeBlueprintStore(path);
             Require(!unknown.TrySave(parts, Array.Empty<CompositeBlueprintStore.VectorData>(), out _, out _) &&
                 File.ReadAllText(path).Contains("\"future\":123"), "Unknown native fields silently discarded");
-            Console.WriteLine("PASS v11/public v2 roundtrip, sign UTF-8, custom sockets, strict unknown fields, detached hierarchy");
+            Console.WriteLine("PASS v12/public v3 roundtrip, sign UTF-8, custom sockets, strict unknown fields, detached hierarchy");
         }
 
         private static void SupportRoundTrip(string path)
@@ -363,7 +437,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 reopened.parts[0].position.x == 0 && reopened.primaryPartId == "a" && reopened.primaryGroupId == "group",
                 "Support native roundtrip changed pose, roots or fallback frame");
             string json = System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(reopened));
-            Require(json.Contains("\"version\":2"), "Portable version was not bumped");
+            Require(json.Contains("\"version\":3"), "Portable version was not bumped");
             var decoded = BlueprintExchangeFormat.Decode(json);
             Require(decoded.supports[0].name == "Вход" && decoded.placementSupportId == "support" &&
                 decoded.supports[0].rotation.w == .7071068f, "Portable support pose/default lost");
@@ -401,7 +475,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             // Legacy files have no support fields; reading them must not rewrite the original.
             decoded.supports = null; decoded.placementSupportId = null;
             string legacyPortable = System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(decoded))
-                .Replace("\"version\":2", "\"version\":1");
+                .Replace("\"version\":3", "\"version\":1");
             Require(BlueprintExchangeFormat.Decode(legacyPortable).supports.Count == 0, "Portable v1 not migrated");
             string legacyNative = Json(new CompositeBlueprintStore.LibraryData { version = 10,
                 blueprints = new List<CompositeBlueprintStore.Blueprint> { decoded } });
@@ -410,9 +484,9 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(legacy.All().Count == 1 && legacy.All()[0].supports.Count == 0 && File.ReadAllText(path) == legacyNative,
                 "Native v10 not migrated without overwriting source");
             Require(legacy.TryRename(legacy.All()[0], "Migrated", out error) &&
-                File.ReadAllText(path).Contains("\"version\":11"), "Legacy migration not saved as v11");
+                File.ReadAllText(path).Contains("\"version\":12"), "Legacy migration not saved as v12");
 
-            foreach (string invalid in new[] { json.Replace("\"version\":2", "\"version\":1"),
+            foreach (string invalid in new[] { json.Replace("\"version\":3", "\"version\":1"),
                 json.Replace("\"stableId\":\"support\"", "\"stableId\":\"a\""),
                 json.Replace("\"stableId\":\"support\"", "\"stableId\":\"group\""),
                 json.Replace("\"placementSupportId\":\"support\"", "\"placementSupportId\":\"missing\""),
@@ -449,7 +523,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(ExternalBlueprintLibrary.Parse(maximumJson.Replace("\"supports\":[", "\"supports\":[" + Json(many[64]) + ","),
                 "overflow.buildworks.json").importError != null, "Decoder accepted 65 supports");
 
-            foreach (string invalidNative in new[] { original.Replace("\"version\":11", "\"version\":10"),
+            foreach (string invalidNative in new[] { original.Replace("\"version\":12", "\"version\":10"),
                 original.Replace("\"name\":\"Вход\"", "\"future\":true,\"name\":\"Вход\""),
                 original.Replace("\"placementSupportId\":\"support\"", "\"placementSupportId\":\"missing\"") })
             {
@@ -458,7 +532,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 Require(!blocked.TrySave(parts, Array.Empty<CompositeBlueprintStore.VectorData>(), out _, out _) &&
                     File.ReadAllText(path) == invalidNative, "Invalid native support file was rewritten");
             }
-            Console.WriteLine("PASS support v11/v2 disk/exchange/copy; v10/v1 migration; explicit clear; legacy retain; atomic rollback; strict IDs/pose/labels/version/count");
+            Console.WriteLine("PASS support v12/v3 disk/exchange/copy; v10/v1 migration; explicit clear; legacy retain; atomic rollback; strict IDs/pose/labels/version/count");
         }
 
         private static string Json<T>(T value)
@@ -505,7 +579,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(store.TrySaveDocument(
                 parts, groups, anchors, out CompositeBlueprintStore.Blueprint saved,
                 out string error), error);
-            Require(File.ReadAllText(path).Contains("\"version\":11"), "v11 was not written");
+            Require(File.ReadAllText(path).Contains("\"version\":12"), "v12 was not written");
 
             var reopened = new CompositeBlueprintStore(path);
             Equal(1, reopened.All().Count, "blueprint count");
@@ -536,7 +610,7 @@ namespace OstrixMods.BuildWorks.StoreTests
         {
             RoundTripV9(path);
             string original = System.Text.RegularExpressions.Regex.Replace(
-                File.ReadAllText(path).Replace("\"version\":11", "\"version\":5").Replace(",\"supports\":[]", ""),
+                File.ReadAllText(path).Replace("\"version\":12", "\"version\":5").Replace(",\"supports\":[]", ""),
                 ",\"scale\":\\{[^}]+\\}", string.Empty);
             File.WriteAllText(path, original);
             var migrated = new CompositeBlueprintStore(path);
@@ -680,8 +754,8 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(migrated.TryUpdateDocument(
                 blueprint, blueprint.parts, blueprint.groups, blueprint.anchors,
                 out string error), error);
-            Require(File.ReadAllText(path).Contains("\"version\":11"),
-                "migration was not persisted as v11");
+            Require(File.ReadAllText(path).Contains("\"version\":12"),
+                "migration was not persisted as v12");
             Equal(id + "_part_000",
                 new CompositeBlueprintStore(path).All()[0].parts[0].stableId,
                 "migrated id after reopen");

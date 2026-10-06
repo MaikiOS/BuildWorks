@@ -9,7 +9,13 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.67**: shared file browser/output settings, persistent result and exact foreign prefab scale.
+Active source checkpoint **0.19.68**: compatible foreign imports retain exact valid UTF-8 source text and piece-row bindings in Store v12 / portable v3.
+Release/required checks and 180 isolated native Unity states PASS; seven EditorBridge checks include actual controller save/reopen.
+Content evidence is format + basename + text, not original archive/path identity; source text never executes.
+Unsupported foreign object state/unknown sections, ordinary items/holder contents, heavy interactive scenes and world durability remain pending.
+Not deployed; installed test version remains .67. Independent reviews are recorded in the current handoff.
+
+Previous source checkpoint **0.19.67**: shared file browser/output settings, persistent result and exact foreign prefab scale.
 Release/required checks, correctness/Ponytail and 180 isolated native Unity states PASS.
 Installed in TerrainRamp-1.0-Test through the guarded script, DLL hashes verified; no Valheim launch.
 [Player checks](testing/catalog-exchange-0.19.67.md). Faster scrolling/object-only support tree retained from .66.

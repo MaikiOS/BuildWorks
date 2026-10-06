@@ -670,8 +670,8 @@ public static class RuntimeEditorAcceptance
         Require(reloaded.All().Count == 1, "Actual disk library roundtrip");
         Require(Mathf.Abs(reloaded.All()[0].parts[0].scale.x - expected) < 0.0001f, "Store discarded scale");
         CheckReopenedCopy(controller, reloaded, expected);
-        Require(File.ReadAllText(path).Contains("\"version\":11"), "Controller did not write format11");
-        checks.Add("Controller save -> disk format11 -> new store -> OpenExisting retains scale, rotated root-owned support and placement reference; transient support focus absent");
+        Require(File.ReadAllText(path).Contains("\"version\":12"), "Controller did not write format12");
+        checks.Add("Controller save -> disk format12 -> new store -> OpenExisting retains scale, rotated root-owned support and placement reference; transient support focus absent");
     }
 
     private static void TestExternalImportEditor(Camera camera, TMP_Text font,
@@ -704,8 +704,13 @@ public static class RuntimeEditorAcceptance
             var reopened = new CompositeBlueprintStore(path);
             Require(reopened.All().Count == 1 && reopened.All()[0].parts[0].position.x == 2 &&
                 original.parts[0].position.x == 1 && !reopened.All()[0].IsExternal, "Save mutated source or lost edit");
+            Require(reopened.All()[0].sourceDocuments[0].text == raw.sourceDocuments[0].text &&
+                reopened.All()[0].parts[0].sourceDocumentId == raw.sourceDocuments[0].id &&
+                reopened.All()[0].parts[0].sourceLine == 4, "Actual import/edit/save discarded original source or row binding");
             editor.Close(true);
-            Require(editor.OpenExisting(reopened.All()[0], out error), "Saved import cannot reopen: " + error);
+            Require(editor.OpenExisting(store.All()[0], out error), "Saved import cannot reopen: " + error);
+            Require(editor.Document.Sources[0].Text == raw.sourceDocuments[0].text &&
+                (bool)Call(editor, "TrySave", false, true), "Actual native reopen/update discarded source");
             Call(editor, "RequestCatalog");
             Call(editor, "BeginPartPlacement", new BlueprintEditorCatalogItem("external-fixture", original.name, null,
                 "OTHER", "blueprints", "external_blueprints", 0, original), true);
@@ -716,7 +721,7 @@ public static class RuntimeEditorAcceptance
                 "Cancel insert changed saved document or leaked ghost state");
             editor.Close(true);
         }
-        checks.Add("External .blueprint -> detached editable draft -> metadata Cancel no disk -> transform/save native v11 -> reopen -> whole-source insert preview/Cancel; original unchanged");
+        checks.Add("External .blueprint -> detached draft -> metadata Cancel no disk -> transform/save native v12 -> reopen/update -> whole-source insert preview/Cancel; exact original source and row binding retained");
     }
 
     private static void TestScaleBoundaries(BlueprintEditorController controller, string path)

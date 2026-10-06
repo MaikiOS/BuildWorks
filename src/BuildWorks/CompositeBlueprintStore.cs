@@ -26,7 +26,7 @@ namespace OstrixMods.BuildWorks
         internal const string DefaultCategory = "OTHER";
         private const string LegacyDefaultCategory = "ПРОЧЕЕ";
         private const string LocalizationPrefix = "$buildworks_";
-        private const int FormatVersion = 11;
+        private const int FormatVersion = 12;
         private const int MaximumBlueprints = 32;
         private const int MaximumCategories = 12;
         private const int MaximumAnchors = 512;
@@ -306,7 +306,7 @@ namespace OstrixMods.BuildWorks
             IReadOnlyList<VectorData> anchors, string primaryPartId, string primaryGroupId,
             IReadOnlyList<Support> supports, string placementSupportId,
             out Blueprint blueprint, out string error, IReadOnlyList<VectorData> customSnapPoints = null,
-            Blueprint previewTemplate = null)
+            Blueprint previewTemplate = null, IReadOnlyList<SourceDocument> sourceDocuments = null)
         {
             blueprint = null;
             error = null;
@@ -398,7 +398,8 @@ namespace OstrixMods.BuildWorks
                 primaryGroupId = primaryGroupId,
                 previewYaw = previewTemplate?.previewYaw ?? 45f,
                 previewPitch = previewTemplate?.previewPitch ?? 30f,
-                previewZoom = previewTemplate?.previewZoom ?? 1f
+                previewZoom = previewTemplate?.previewZoom ?? 1f,
+                sourceDocuments = CloneSources(sourceDocuments ?? previewTemplate?.sourceDocuments)
             };
             if (!Valid(blueprint)) { blueprint = null; error = UserError("store.verify_data_failed"); return false; }
             if (addCategory) data.categories.Add(category);
@@ -562,6 +563,8 @@ namespace OstrixMods.BuildWorks
                     prepared[index].parentGroupId = blueprint.parts[index].parentGroupId;
                     prepared[index].editorVisible = blueprint.parts[index].editorVisible;
                     prepared[index].editorLocked = blueprint.parts[index].editorLocked;
+                    prepared[index].sourceDocumentId = blueprint.parts[index].sourceDocumentId;
+                    prepared[index].sourceLine = blueprint.parts[index].sourceLine;
                 }
             }
             return TryUpdateDocument(
@@ -627,7 +630,8 @@ namespace OstrixMods.BuildWorks
             Blueprint blueprint, string name, string category, IReadOnlyList<Part> parts,
             IReadOnlyList<Group> groups, IReadOnlyList<VectorData> anchors, string primaryPartId,
             string primaryGroupId, IReadOnlyList<Support> supports, string placementSupportId,
-            out string error, IReadOnlyList<VectorData> customSnapPoints = null)
+            out string error, IReadOnlyList<VectorData> customSnapPoints = null,
+            IReadOnlyList<SourceDocument> sourceDocuments = null)
         {
             error = null;
             name = (name ?? string.Empty).Trim();
@@ -635,6 +639,9 @@ namespace OstrixMods.BuildWorks
             primaryPartId = string.IsNullOrWhiteSpace(primaryPartId) ? null : primaryPartId.Trim();
             primaryGroupId = string.IsNullOrWhiteSpace(primaryGroupId) ? null : primaryGroupId.Trim();
             customSnapPoints = customSnapPoints ?? blueprint?.customSnapPoints;
+            sourceDocuments = sourceDocuments ?? blueprint?.sourceDocuments;
+            if (!ValidSources(parts, sourceDocuments))
+            { error = UserError("store.invalid_composition"); return false; }
             if (!CanWrite(blueprint, out error) || parts == null || groups == null ||
                 anchors == null ||
                 parts.Count < 2 || parts.Count > MaximumParts ||
@@ -696,6 +703,7 @@ namespace OstrixMods.BuildWorks
             List<VectorData> previousAnchors = blueprint.anchors;
             List<VectorData> previousCustomSnapPoints = blueprint.customSnapPoints;
             List<Support> previousSupports = blueprint.supports;
+            List<SourceDocument> previousSources = blueprint.sourceDocuments;
             string previousPlacementSupportId = blueprint.placementSupportId;
             string previousName = blueprint.name;
             string previousCategory = blueprint.category;
@@ -710,6 +718,7 @@ namespace OstrixMods.BuildWorks
             blueprint.anchors = new List<VectorData>(anchors);
             blueprint.customSnapPoints = customSnapPoints == null ? null : new List<VectorData>(customSnapPoints);
             blueprint.supports = CloneSupports(supports);
+            blueprint.sourceDocuments = CloneSources(sourceDocuments);
             blueprint.placementSupportId = placementSupportId;
             blueprint.primaryPartId = primaryPartId;
             blueprint.primaryGroupId = primaryGroupId;
@@ -721,6 +730,7 @@ namespace OstrixMods.BuildWorks
                 blueprint.anchors = previousAnchors;
                 blueprint.customSnapPoints = previousCustomSnapPoints;
                 blueprint.supports = previousSupports;
+                blueprint.sourceDocuments = previousSources;
                 blueprint.placementSupportId = previousPlacementSupportId;
                 blueprint.name = previousName;
                 blueprint.category = previousCategory;
@@ -753,7 +763,9 @@ namespace OstrixMods.BuildWorks
                     parentGroupId = part.parentGroupId,
                     editorVisible = part.editorVisible,
                     editorLocked = part.editorLocked,
-                    signText = part.signText
+                    signText = part.signText,
+                    sourceDocumentId = part.sourceDocumentId,
+                    sourceLine = part.sourceLine
                 });
             }
             return clone;
@@ -813,7 +825,7 @@ namespace OstrixMods.BuildWorks
                     return;
                 }
                 BlueprintExchangeFormat.ValidateLibraryJson(json, requireFields: loaded.version >= 6,
-                    allowSupportFields: loaded.version >= 11);
+                    allowSupportFields: loaded.version >= 11, allowSourceFields: loaded.version >= 12);
                 loaded.blueprints = loaded.blueprints ?? new List<Blueprint>();
                 loaded.categories = loaded.categories ?? new List<string>();
                 if (loaded.version == 1)
@@ -1026,6 +1038,7 @@ namespace OstrixMods.BuildWorks
                 blueprint.anchors.Count > MaximumAnchors || blueprint.groups == null ||
                 blueprint.groups.Count > MaximumGroups ||
                 !ValidDocument(blueprint.parts, blueprint.groups, blueprint.supports) ||
+                !ValidSources(blueprint.parts, blueprint.sourceDocuments) ||
                 !ValidPlacementSupport(blueprint.supports, blueprint.placementSupportId) ||
                 !ValidCustomSnapPoints(blueprint.customSnapPoints) ||
                 !ValidPrimaryPart(blueprint.parts, blueprint.primaryPartId) ||
@@ -1044,6 +1057,28 @@ namespace OstrixMods.BuildWorks
             if (points.Count > MaximumAnchors) return false;
             foreach (VectorData point in points) if (!Valid(point)) return false;
             return true;
+        }
+
+        internal static List<SourceDocument> CloneSources(IReadOnlyList<SourceDocument> sources) => sources?.Select(source =>
+            source == null ? null : new SourceDocument { id = source.id, format = source.format, name = source.name, text = source.text }).ToList();
+
+        internal static bool ValidSources(IReadOnlyList<Part> parts, IReadOnlyList<SourceDocument> sources)
+        {
+            try
+            {
+                if (parts == null) return false;
+                var index = Geometry.BlueprintSourceDocument.Index(sources?.Select(source => source?.ToGeometry()));
+                foreach (Part part in parts)
+                {
+                    if (part == null) return false;
+                    if (part.sourceDocumentId == null)
+                    { if (part.sourceLine != 0) return false; }
+                    else if (!index.TryGetValue(part.sourceDocumentId, out var evidence) ||
+                        !evidence.HasPartAt(part.sourceLine, part.prefabName)) return false;
+                }
+                return true;
+            }
+            catch (ArgumentException) { return false; }
         }
 
         private static bool Valid(Part part)
@@ -1326,6 +1361,7 @@ namespace OstrixMods.BuildWorks
             {
                 var copy = (Blueprint)MemberwiseClone();
                 copy.parts = CloneParts(parts);
+                copy.sourceDocuments = CloneSources(sourceDocuments);
                 return copy;
             }
             public string importSource;
@@ -1362,6 +1398,27 @@ namespace OstrixMods.BuildWorks
             public List<Support> supports;
             [DataMember(Order = 14, EmitDefaultValue = false)]
             public string placementSupportId;
+            [DataMember(Order = 15, EmitDefaultValue = false)]
+            public List<SourceDocument> sourceDocuments;
+        }
+
+        [DataContract]
+        internal sealed class SourceDocument
+        {
+            [DataMember(Order = 0)] public string id;
+            [DataMember(Order = 1)] public string format;
+            [DataMember(Order = 2)] public string name;
+            [DataMember(Order = 3)] public string text;
+
+            internal Geometry.BlueprintSourceDocument ToGeometry()
+            {
+                var source = new Geometry.BlueprintSourceDocument(format, name, text);
+                if (source.Id != id) throw new ArgumentException("Source identity does not match its contents.");
+                return source;
+            }
+
+            internal static SourceDocument FromGeometry(Geometry.BlueprintSourceDocument source) => new SourceDocument
+            { id = source.Id, format = source.Format, name = source.Name, text = source.Text };
         }
 
         [DataContract]
@@ -1396,6 +1453,10 @@ namespace OstrixMods.BuildWorks
             public VectorData scale = new VectorData { x = 1f, y = 1f, z = 1f };
             [DataMember(Order = 9, EmitDefaultValue = false)]
             public string signText;
+            [DataMember(Order = 10, EmitDefaultValue = false)]
+            public string sourceDocumentId;
+            [DataMember(Order = 11, EmitDefaultValue = false)]
+            public int sourceLine;
         }
 
         [DataContract]

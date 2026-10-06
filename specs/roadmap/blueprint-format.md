@@ -2,7 +2,15 @@
 
 **English** | [Русский](blueprint-format_RU.md)
 
-Current source **0.19.67**: file browser/output settings and persistent results are implemented in editor/Hammer;
+Current source **0.19.68**: Store v12 / portable v3 add optional immutable source content evidence and piece-row references.
+For compatible `.blueprint`/`.vbuild` imports, format + basename + exact valid UTF-8 text (BOM/newlines included)
+are retained through native save/reopen, portable exchange, insertion, duplication and Undo/Redo.
+Archive entry/path origin is not persisted and is not claimed; identical format/name/text deliberately deduplicate.
+Sources are inert, capped at 8 MiB each / 64 documents / 24 MiB total, with bounded piece-row indexing.
+Old v11/v2 migrate; new fields under old versions, modified hashes and invalid row references reject atomically.
+Unsupported object info/ZDO/chance and unknown sections still block whole imports: this is not full compatibility.
+
+Previous source **0.19.67**: file browser/output settings and persistent results are implemented in editor/Hammer;
 foreign absolute scale is prepared from actual prefab bases once, without guessed shrinking or partial conversion.
 Support actions live in Tools, not object rows. World reload/network durability remains unverified.
 Full foreign header/object-data preservation and heavy interactive scenes below remain pending.
@@ -34,7 +42,7 @@ Required exchange UX: visible file selection (not compulsory memorized paths), f
 format capability information and a persistent result. Native export is authoritative; foreign output
 cannot promise supports/groups/XYZ/text that its target format does not encode. Regression gates:
 exact unedited conversion and native round-trip, edited property preservation, missing dependencies,
-cancel/errors/collision/no overwrite, source identity and real measured geometry in Unity/Valheim.
+cancel/errors/collision/no overwrite, source content evidence and real measured geometry in Unity/Valheim.
 
 2026-10-05. Approved by Ostrix: preserve prefab-built constructions, large documents,
 sign text, authored snap points and conversion from other building mods. This does

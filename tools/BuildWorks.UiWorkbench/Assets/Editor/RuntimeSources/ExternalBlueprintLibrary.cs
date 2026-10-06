@@ -190,6 +190,11 @@ namespace OstrixMods.BuildWorks
             blueprint.importAbsoluteScale = true;
             blueprint.id = Identity(source + "\n" + text);
             bool vbuild = source.EndsWith(".vbuild", StringComparison.OrdinalIgnoreCase);
+            Geometry.BlueprintSourceDocument evidence;
+            try { evidence = new Geometry.BlueprintSourceDocument(vbuild ? "vbuild" : "blueprint", Path.GetFileName(source), text); }
+            catch (ArgumentException) { return Blocked(source, "$buildworks_import.file_limit"); }
+            blueprint.sourceDocuments = new List<CompositeBlueprintStore.SourceDocument>
+            { CompositeBlueprintStore.SourceDocument.FromGeometry(evidence) };
             bool pieces = vbuild, seenPieces = vbuild, snapPoints = false;
             int lineNumber = 0;
             using (var reader = new StringReader(text.TrimStart('\uFEFF')))
@@ -266,7 +271,9 @@ namespace OstrixMods.BuildWorks
                             position = new CompositeBlueprintStore.VectorData { x = Number(fields[p]), y = Number(fields[p + 1]), z = Number(fields[p + 2]) },
                             rotation = new CompositeBlueprintStore.QuaternionData { x = Number(fields[q]), y = Number(fields[q + 1]), z = Number(fields[q + 2]), w = Number(fields[q + 3]) },
                             scale = new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 },
-                            signText = signText
+                            signText = signText,
+                            sourceDocumentId = evidence.Id,
+                            sourceLine = lineNumber
                         };
                         if (Math.Abs(part.position.x) > 512 || Math.Abs(part.position.y) > 512 || Math.Abs(part.position.z) > 512)
                             throw new InvalidDataException("$buildworks_import.transform");
@@ -346,7 +353,8 @@ namespace OstrixMods.BuildWorks
                 supports = new List<CompositeBlueprintStore.Support>(),
                 previewYaw = source.previewYaw,
                 previewPitch = source.previewPitch,
-                previewZoom = source.previewZoom
+                previewZoom = source.previewZoom,
+                sourceDocuments = CompositeBlueprintStore.CloneSources(source.sourceDocuments)
             };
             var ids = source.parts.Select(part => part.stableId).Concat(source.groups.Select(group => group.stableId))
                 .Concat((source.supports ?? new List<CompositeBlueprintStore.Support>()).Select(support => support.stableId))
@@ -379,7 +387,9 @@ namespace OstrixMods.BuildWorks
                     parentGroupId = part.parentGroupId == null ? null : ids[part.parentGroupId],
                     editorVisible = part.editorVisible,
                     editorLocked = part.editorLocked,
-                    signText = part.signText
+                    signText = part.signText,
+                    sourceDocumentId = part.sourceDocumentId,
+                    sourceLine = part.sourceLine
                 });
             if (!CompositeBlueprintStore.Valid(result)) throw new InvalidDataException("$buildworks_import.fields");
             return result;

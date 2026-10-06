@@ -58,9 +58,13 @@ internal static class Program
         document.SetPlacementSupport("support");
         document.SelectOnly("a");
         document.SelectSupport("support");
-        var payload = new BlueprintEditorDocument(null, "Copy", "OTHER", document.Parts,
+        var evidence = new BlueprintSourceDocument("blueprint", "Original.blueprint", "\uFEFF#Pieces\r\nwoodwall;;0;0;0;0;0;0;1;\"\"\r\nwoodwall;;2;0;0;0;0;0;1;\"\"\r\n");
+        var payloadParts = document.Parts.Select((part, index) => new BlueprintEditorPart(part.StableId, part.PrefabName,
+            part.DisplayName, part.Position, part.Rotation, part.ParentGroupId, part.Visible, part.Locked, part.Scale,
+            part.SignText, evidence.Id, index + 2));
+        var payload = new BlueprintEditorDocument(null, "Copy", "OTHER", payloadParts,
             sourceCustomSnapPoints: new[] { new Point3(7,8,9) }, sourceSupports: document.Supports,
-            placementSupportId: document.PlacementSupportId);
+            placementSupportId: document.PlacementSupportId, sourceDocuments: new[] { evidence });
         payload.SelectOnly("a"); payload.SelectSupport("support");
         var copied = (BlueprintEditorDocument)controllerType.GetMethod("CopyDocument", BindingFlags.NonPublic | BindingFlags.Static)
             .Invoke(null, new object[] { payload });
@@ -71,14 +75,17 @@ internal static class Program
             "Controller copy dropped root payload or conflated support/object selection");
         copied.SetSupportPose("support", new Point3(9,9,9), new Rotation3(0,0,0,1));
         Require(payload.Supports[0].Position.X == 2, "Controller copy aliases support poses");
+        Require(copied.Sources[0].Text == evidence.Text && copied.Parts[0].SourceDocumentId == evidence.Id,
+            "Controller copy discarded source provenance");
         Console.WriteLine("PASS actual Controller.CopyDocument retains detached root payload and support scope");
 
         controllerType.GetField("document", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(controller, payload);
         object supportData = controllerType.GetMethod("BuildStoreSupports", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(controller, null);
         parts = controllerType.GetMethod("BuildStoreParts", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(controller, null);
-        MethodInfo supportSave = storeType.GetMethods().Single(m => m.Name == "TrySaveDocument" && m.GetParameters().Length == 13);
+        object sourceData = controllerType.GetMethod("BuildStoreSources", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(controller, null);
+        MethodInfo supportSave = storeType.GetMethods().Single(m => m.Name == "TrySaveDocument" && m.GetParameters().Length == 14);
         object[] supportCall = { "Support bridge", "OTHER", parts, call[3], call[4], null, null,
-            supportData, payload.PlacementSupportId, null, null, null, null };
+            supportData, payload.PlacementSupportId, null, null, null, null, sourceData };
         Require((bool)supportSave.Invoke(store, supportCall), "Store rejected support bridge: " + supportCall[10]);
         object reloadedStore = Activator.CreateInstance(storeType, BindingFlags.NonPublic | BindingFlags.Instance,
             null, new object[] { pathOut }, null);
@@ -92,6 +99,10 @@ internal static class Program
             reloaded.Parts[0].Position.X == 0 && reloaded.Parts[0].SignText == "Дом\nOstrix",
             "Controller support disk roundtrip lost pose/default, moved geometry or persisted transient focus");
         Console.WriteLine("PASS actual Controller.BuildStoreSupports -> disk -> DocumentFromBlueprint preserves root pose/default without transient focus");
+        Require(reloaded.Sources[0].Text == evidence.Text && reloaded.Sources[0].Id == evidence.Id &&
+            reloaded.Parts[0].SourceDocumentId == evidence.Id && reloaded.Parts[0].SourceLine == 2,
+            "Actual Controller source/part bridge discarded original bytes or row binding");
+            Console.WriteLine("PASS actual Controller sources/row references -> store -> disk -> reopen retains content evidence");
 
         var grouped = new BlueprintEditorDocument(null, "Group", "OTHER", new[] { Part("a",0), Part("b",2) });
         grouped.SelectOnly("a"); grouped.ToggleSelection("b"); grouped.CreateGroup("g", "Group");

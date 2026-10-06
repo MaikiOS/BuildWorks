@@ -625,7 +625,7 @@ editor.view.family_move	Move
 editor.view.family_rotate	Rotate
 editor.view.family_scale	Scale
 editor.view.focus_view	Focus viewport / restore panels
-editor.hint.tools_menu	1–4 — choose tool · ↑/↓ — navigate · Enter — choose · Esc — close
+editor.hint.tools_menu	1–7 — tool or support action · ↑/↓ — navigate · Enter — choose · Esc — close
 editor.hint.next_selected	Select a point for the pivot · G — move · R — rotate · S — scale · Amber clasp — native · Ivory knot — ours
 editor.hint.next_empty	LMB — select a part · Tab — add · Space — tools
 editor.view.surface	Surface

@@ -646,16 +646,12 @@ namespace OstrixMods.BuildWorks
                     "snap", "⌁", T("editor.view.tool_contour"));
 
                 RectTransform rootDrop = CreatePanel("OutlinerRootDrop", outliner, Color.clear, null);
-                SetTopAnchored(rootDrop, 8f, 4f, 158f, 32f);
+                SetTopAnchored(rootDrop, 8f, 4f, 56f, 32f);
                 outlinerTitle = CreateText("OutlinerTitle", rootDrop, T("editor.view.outliner"), 16f,
                     FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
                 SetInsets(outlinerTitle.rectTransform, 4f, 0f, 4f, 0f);
                 AddOutlinerDrop(rootDrop, null, true);
                 AddTooltip(rootDrop, T("editor.view.root_drop_tooltip"));
-                Button createSupportToolbar = CreateButton("CreateSupportToolbar", outliner,
-                    T("editor.support.add_short"), 96f, () => SupportCreated?.Invoke());
-                AddTooltip((RectTransform)createSupportToolbar.transform, T("editor.support.create"));
-                SetTopRight((RectTransform)createSupportToolbar.transform, 56f, 4f, 96f, 32f);
                 RectTransform outlinerCommands = CreateRect("OutlinerCommands", outliner);
                 SetTopAnchored(outlinerCommands, 8f, 40f, 8f, 32f);
                 var commandsLayout = outlinerCommands.gameObject.AddComponent<HorizontalLayoutGroup>();
@@ -982,13 +978,10 @@ namespace OstrixMods.BuildWorks
                     T("editor.support.placement"), 228f, () => SupportPlacementRequested?.Invoke(
                         boundDocument.PlacementSupportId == supportNodeId ? null : supportNodeId));
                 SetInspectorButton((RectTransform)supportPlacementButton.transform, 0f, 276f, 228f);
-                Button deleteSupport = CreateButton("DeleteSupport", supportEditPanel.transform,
-                    T("editor.support.delete"), 228f, () => SupportDeleted?.Invoke(supportNodeId));
-                SetInspectorButton((RectTransform)deleteSupport.transform, 0f, 320f, 228f);
                 supportHint = CreateText("SupportHint", supportEditPanel.transform,
                     T("editor.support.edit_hint"), 12f, FontStyles.Normal, TextAlignmentOptions.TopLeft);
                 supportHint.textWrappingMode = TextWrappingModes.Normal;
-                SetTopAnchored(supportHint.rectTransform, 0f, 366f, 0f, 110f);
+                SetTopAnchored(supportHint.rectTransform, 0f, 322f, 0f, 110f);
                 supportEditPanel.SetActive(false);
 
                 groupEditPanel = CreateRect("GroupEdit", inspectorBody).gameObject;
@@ -1407,7 +1400,7 @@ namespace OstrixMods.BuildWorks
                 toolsPanel = CreatePanel("ToolsMenu", toolsMenu.transform, PanelRaised);
                 toolsPanel.anchorMin = toolsPanel.anchorMax = new Vector2(.5f, .5f);
                 toolsPanel.pivot = new Vector2(0f, 1f);
-                toolsPanel.sizeDelta = new Vector2(310f, 236f);
+                toolsPanel.sizeDelta = new Vector2(310f, 344f);
                 TMP_Text toolsTitle = CreateText("ToolsTitle", toolsPanel, T("editor.view.tools"), 15f,
                     FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
                 SetTopLeft(toolsTitle.rectTransform, 12f, 8f, 286f, 28f);
@@ -1436,6 +1429,18 @@ namespace OstrixMods.BuildWorks
                         T(toolNames[index]).Split('\n')[0], 286f, () =>
                         { HideToolsMenu(); ToolSelected?.Invoke(tool); });
                     SetTopLeft((RectTransform)entry.transform, 12f, 82f + index * 36f, 286f, 32f);
+                    toolsEntries.Add(entry);
+                }
+                string[] supportActions = { "editor.support.create", "editor.support.delete", "editor.support.reset_centre" };
+                Action[] supportCommands = { () => SupportCreated?.Invoke(),
+                    () => SupportDeleted?.Invoke(boundDocument?.ActiveSupportId),
+                    () => SupportCentreRequested?.Invoke(null) };
+                for (int index = 0; index < supportActions.Length; ++index)
+                {
+                    Action command = supportCommands[index];
+                    Button entry = CreateButton("ToolsEntry" + (index + tools.Length), toolsPanel,
+                        T(supportActions[index]), 286f, () => { HideToolsMenu(); command(); });
+                    SetTopLeft((RectTransform)entry.transform, 12f, 82f + (index + tools.Length) * 36f, 286f, 32f);
                     toolsEntries.Add(entry);
                 }
                 toolsMenu.SetActive(false);
@@ -2002,7 +2007,15 @@ namespace OstrixMods.BuildWorks
                 string label = entry.GetComponentInChildren<TMP_Text>().text;
                 bool match = label.IndexOf(toolsSearch.text, StringComparison.OrdinalIgnoreCase) >= 0;
                 entry.gameObject.SetActive(match);
-                entry.interactable = entry.name == "ToolsEntry0" || boundDocument?.EditablePartSelectionCount > 0;
+                entry.interactable = entry.name switch
+                {
+                    "ToolsEntry0" => true,
+                    "ToolsEntry1" => boundDocument?.EditablePartSelectionCount > 0 || boundDocument?.ActiveSupportId != null,
+                    "ToolsEntry4" => boundDocument != null && boundDocument.Supports.Count < BlueprintEditorDocument.MaximumSupports,
+                    "ToolsEntry5" => boundDocument?.FindSupport(boundDocument.ActiveSupportId) != null,
+                    "ToolsEntry6" => SupportCentreId != null,
+                    _ => boundDocument?.EditablePartSelectionCount > 0
+                };
                 if (match) SetTopLeft((RectTransform)entry.transform, 12f, 82f + row++ * 36f, 286f, 32f);
             }
             toolsMenuIndex = 0;
@@ -2028,7 +2041,7 @@ namespace OstrixMods.BuildWorks
                 available[Mathf.Clamp(toolsMenuIndex, 0, available.Count - 1)].onClick.Invoke();
             else if (!toolsSearch.isFocused)
                 for (int index = 0; index < toolsEntries.Count; ++index)
-                    if (input.GetKeyDown(KeyCode.Alpha1 + index) && toolsEntries[index].interactable)
+                    if (input.GetKeyDown(KeyCode.Alpha1 + index) && toolsEntries[index].gameObject.activeSelf && toolsEntries[index].interactable)
                     { toolsEntries[index].onClick.Invoke(); return; }
         }
 
@@ -2526,16 +2539,11 @@ namespace OstrixMods.BuildWorks
                 AddOutlinerRow(document, part.StableId, part.DisplayName,
                     part.Visible, part.Locked, true, false, 0);
             }
+            if (document.Supports.Count == 0) return;
             AddSupportRow("Supports", (supportsCollapsed ? "+ " : "- ") +
                 T("editor.support.branch", document.Supports.Count), () =>
                 { supportsCollapsed = !supportsCollapsed; RebuildOutliner(document); });
             if (supportsCollapsed) return;
-            Button create = AddSupportRow("CreateSupport", T("editor.support.create"),
-                () => SupportCreated?.Invoke());
-            SetAvailability(create, document.Supports.Count < BlueprintEditorDocument.MaximumSupports,
-                T("editor.support.limit", BlueprintEditorDocument.MaximumSupports));
-            AddSupportRow("ClearSupportCentre", T("editor.support.reset_centre"),
-                () => SupportCentreRequested?.Invoke(null));
             foreach (BlueprintEditorSupport support in document.Supports)
             {
                 bool active = document.ActiveSupportId == support.StableId;

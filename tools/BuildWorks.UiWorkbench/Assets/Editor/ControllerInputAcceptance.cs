@@ -642,7 +642,12 @@ internal static class ControllerInputAcceptance
             var scene = Field<BlueprintEditorScene>(controller, "scene");
             yield return null;
             Set(controller, "selectedAnchorWorld", new Vector3(0, 1, 0));
-            NativeClick(view, null, "CreateSupportToolbar"); yield return null;
+            Require(!view.RootCanvas.GetComponentsInChildren<Transform>(true).Any(t =>
+                t.name == "CreateSupportToolbar" || t.name == "CreateSupport" || t.name == "ClearSupportCentre" || t.name == "DeleteSupport"),
+                "Support actions must live in Tools, not the object tree/inspector");
+            view.ShowToolsMenu(view.ViewportScreenRect().center, false);
+            yield return null;
+            NativeClick(view, null, "ToolsEntry4"); yield return null;
             string id = doc.ActiveSupportId;
             Require(id != null && doc.Selection.Count == 2 && doc.PlacementSupportId == null,
                 "Creating/selecting support must retain parts without assigning placement");
@@ -728,10 +733,14 @@ internal static class ControllerInputAcceptance
             Require(Vector3.Distance(V(doc.FindSupport(id).Position), before) < .001f &&
                 Vector3.Distance(V(doc.Parts[0].Position), parts[0]) > .1f, "Centre transform moved support or failed to move parts");
             yield return null;
-            NativeClick(view, null, "ClearSupportCentre"); yield return null;
+            view.ShowToolsMenu(view.ViewportScreenRect().center, false);
+            yield return null;
+            NativeClick(view, null, "ToolsEntry6"); yield return null;
             Require(Field<string>(controller, "transformSupportPivotId") == null, "Normal centre reset is disconnected");
             NativeClick(view, null, "Support_" + id); Frame(controller, input, mouse); yield return null;
-            Frame(controller, input, mouse, 0, KeyCode.Delete); Frame(controller, input, mouse);
+            view.ShowToolsMenu(view.ViewportScreenRect().center, false);
+            yield return null;
+            NativeClick(view, null, "ToolsEntry5"); yield return null;
             Require(doc.Supports.Count == 0 && doc.Parts.Count == 2 && doc.PlacementSupportId == null,
                 "Support Delete removed retained parts or left placement ID");
             Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Z); Frame(controller, input, mouse);

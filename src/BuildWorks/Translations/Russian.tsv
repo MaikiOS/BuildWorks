@@ -625,7 +625,7 @@ editor.view.family_move	Перемещение
 editor.view.family_rotate	Вращение
 editor.view.family_scale	Масштаб
 editor.view.focus_view	Весь вид / вернуть панели
-editor.hint.tools_menu	1–4 — инструмент · ↑/↓ — выбор · Enter — включить · Esc — закрыть
+editor.hint.tools_menu	1–7 — инструмент или действие с опорой · ↑/↓ — выбор · Enter — выполнить · Esc — закрыть
 editor.hint.next_selected	Выбери точку опоры · G — перенос · R — вращать · S — масштаб · Янтарный обод — ваниль · Светлый узел — наши
 editor.hint.next_empty	ЛКМ — выбрать деталь · Tab — добавить · Space — инструменты
 editor.view.surface	Поверхность

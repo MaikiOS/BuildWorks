@@ -2185,7 +2185,7 @@ namespace OstrixMods.BuildWorks
             GameObject content = AddPanel(viewport.transform, "BlueprintCategoriesContent", Vector2.zero,
                 new Vector2(width + 14, 0), Color.clear);
             scroll.viewport = blueprintCategoryViewport; scroll.content = (RectTransform)content.transform;
-            scroll.horizontal = false; scroll.vertical = true; scroll.scrollSensitivity = 52f;
+            scroll.horizontal = false; scroll.vertical = true; scroll.scrollSensitivity = 132f;
             scroll.movementType = ScrollRect.MovementType.Clamped;
             rail = content.transform; y = 0;
             var categories = new List<string> { AllBlueprintCategories };
@@ -2617,7 +2617,7 @@ namespace OstrixMods.BuildWorks
             GameObject content = AddPanel(viewport.transform, "BlueprintActionsContent", Vector2.zero,
                 new Vector2(width, actionCount * actionHeight), Color.clear);
             scroll.viewport = (RectTransform)viewport.transform; scroll.content = (RectTransform)content.transform;
-            scroll.horizontal = false; scroll.vertical = true; scroll.scrollSensitivity = 56;
+            scroll.horizontal = false; scroll.vertical = true; scroll.scrollSensitivity = 132f;
             scroll.movementType = ScrollRect.MovementType.Clamped;
             parent = content.transform;
             float y = 0;
@@ -2873,7 +2873,7 @@ namespace OstrixMods.BuildWorks
             scroll.horizontal = false;
             scroll.vertical = true;
             scroll.movementType = ScrollRect.MovementType.Clamped;
-            scroll.scrollSensitivity = 28f;
+            scroll.scrollSensitivity = 132f;
 
             float y = 0f;
             foreach (HammerBlueprintPieceRegistry.ResourceInfo resource in resources)

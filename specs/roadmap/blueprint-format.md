@@ -2,12 +2,37 @@
 
 **English** | [Русский](blueprint-format_RU.md)
 
-Current source **0.19.62**: [support storage/exchange and remaining workflow](blueprint-support-frames.md).
+Current source **0.19.66**: independent support editing and placement-frame composition are implemented;
+support actions now live in Tools, not object rows. World reload/network durability remains unverified.
+The full file-exchange workflow and lossless foreign conversion below are still pending.
+Checkpoint **0.19.62**: [support storage/exchange and remaining workflow](blueprint-support-frames.md).
 Store v11 adds optional supports (stableId/name/position/rotation) and placementSupportId;
 portable v2 carries the same payload. Old v10/v1 migrate without support data or source writes;
 mislabeled versions with new support fields are rejected. Native sign integration is preserved.
-Tree/gizmo and placement-frame math/world durability are not yet implemented.
+The storage checkpoint did not yet implement tree/gizmo and placement-frame math/world durability.
 The .57 measurements and pending list below are that checkpoint's historical record.
+
+## Owner requirement: lossless foreign construction conversion (2026-10-06)
+
+Convert foreign prefab constructions into the native format without silently dropping source data.
+Preserve headers/creator/description, exact transforms, text, custom sockets and foreign object data;
+keep source-only fields inert until a verified native adapter can apply their behavior. Retaining the
+source bytes alone is archival preservation, not proof that an edited building behaves identically.
+Terrain data may be retained as inert source metadata; terrain execution remains outside scope.
+Original files remain untouched. Never call an incomplete adapter fully compatible.
+
+PlanBuild captures `piece.transform.localScale` and assigns that exact value on ghost clones:
+[primary Blueprint.cs](https://raw.githubusercontent.com/sirskunkalot/PlanBuild/master/PlanBuild/Blueprints/Blueprint.cs).
+BuildWorks currently stores relative prefab multipliers. The next adapter must distinguish these
+semantics, resolve actual prefab root scale and test non-unit, nested and mirrored fixtures before
+conversion. Do not apply a guessed global shrink/clamp to large pieces. Missing prefab dependencies
+must remain identifiable, not be substituted. Unsupported transforms/data stay blocked, not discarded.
+
+Required exchange UX: visible file selection (not compulsory memorized paths), filename/output location,
+format capability information and a persistent result. Native export is authoritative; foreign output
+cannot promise supports/groups/XYZ/text that its target format does not encode. Regression gates:
+exact unedited conversion and native round-trip, edited property preservation, missing dependencies,
+cancel/errors/collision/no overwrite, source identity and real measured geometry in Unity/Valheim.
 
 2026-10-05. Approved by Ostrix: preserve prefab-built constructions, large documents,
 sign text, authored snap points and conversion from other building mods. This does

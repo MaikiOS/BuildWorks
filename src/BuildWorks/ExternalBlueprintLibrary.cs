@@ -51,50 +51,50 @@ namespace OstrixMods.BuildWorks
 
         private static void AppendFile(string path, List<CompositeBlueprintStore.Blueprint> result, ref long budget)
         {
-                string extension = Path.GetExtension(path).ToLowerInvariant();
-                if (extension != ".zip" && !Supported(path)) return;
-                try
+            string extension = Path.GetExtension(path).ToLowerInvariant();
+            if (extension != ".zip" && !Supported(path)) return;
+            try
+            {
+                if (new FileInfo(path).Length > 64L * 1024 * 1024)
+                    throw new InvalidDataException("$buildworks_import.file_limit");
+                if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+                    throw new InvalidDataException("$buildworks_import.path");
+                if (extension == ".zip")
                 {
-                    if (new FileInfo(path).Length > 64L * 1024 * 1024)
-                        throw new InvalidDataException("$buildworks_import.file_limit");
-                    if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
-                        throw new InvalidDataException("$buildworks_import.path");
-                    if (extension == ".zip")
+                    using (var stream = File.OpenRead(path))
+                    using (var zip = new ZipArchive(stream, ZipArchiveMode.Read))
                     {
-                        using (var stream = File.OpenRead(path))
-                        using (var zip = new ZipArchive(stream, ZipArchiveMode.Read))
+                        if (zip.Entries.Count > MaximumFiles)
+                            throw new InvalidDataException("$buildworks_import.library_limit");
+                        foreach (ZipArchiveEntry entry in zip.Entries)
                         {
-                            if (zip.Entries.Count > MaximumFiles)
-                                throw new InvalidDataException("$buildworks_import.library_limit");
-                            foreach (ZipArchiveEntry entry in zip.Entries)
+                            if (!Supported(entry.FullName)) continue;
+                            if (result.Count >= MaximumFiles) throw new InvalidDataException("$buildworks_import.library_limit");
+                            string source = Path.GetFileName(path) + "/" + entry.FullName;
+                            using (Stream data = entry.Open())
+                                result.Add(Read(data, entry.Length, source, ref budget));
+                            ZipArchiveEntry preview = zip.GetEntry(Path.ChangeExtension(entry.FullName, ".png"));
+                            if (preview != null && preview.Length <= MaximumPreviewBytes && preview.Length <= budget)
                             {
-                                if (!Supported(entry.FullName)) continue;
-                                if (result.Count >= MaximumFiles) throw new InvalidDataException("$buildworks_import.library_limit");
-                                string source = Path.GetFileName(path) + "/" + entry.FullName;
-                                using (Stream data = entry.Open())
-                                    result.Add(Read(data, entry.Length, source, ref budget));
-                                ZipArchiveEntry preview = zip.GetEntry(Path.ChangeExtension(entry.FullName, ".png"));
-                                if (preview != null && preview.Length <= MaximumPreviewBytes && preview.Length <= budget)
+                                budget -= preview.Length;
+                                try
                                 {
-                                    budget -= preview.Length;
-                                    try
-                                    {
-                                        using (Stream image = preview.Open())
-                                            result[result.Count - 1].importPreview = ReadPreview(image, preview.Length);
-                                    }
-                                    catch (Exception exception) when (exception is IOException || exception is InvalidDataException)
-                                    { /* An optional damaged picture must not hide the remaining documents. */ }
+                                    using (Stream image = preview.Open())
+                                        result[result.Count - 1].importPreview = ReadPreview(image, preview.Length);
                                 }
+                                catch (Exception exception) when (exception is IOException || exception is InvalidDataException)
+                                { /* An optional damaged picture must not hide the remaining documents. */ }
                             }
                         }
                     }
-                    else using (Stream stream = File.OpenRead(path))
-                        result.Add(Read(stream, stream.Length, Path.GetFileName(path), ref budget));
                 }
-                catch (Exception exception) when (exception is IOException || exception is InvalidDataException || exception is UnauthorizedAccessException || exception is ArgumentException)
-                {
-                    result.Add(Blocked(Path.GetFileName(path), exception.Message));
-                }
+                else using (Stream stream = File.OpenRead(path))
+                    result.Add(Read(stream, stream.Length, Path.GetFileName(path), ref budget));
+            }
+            catch (Exception exception) when (exception is IOException || exception is InvalidDataException || exception is UnauthorizedAccessException || exception is ArgumentException)
+            {
+                result.Add(Blocked(Path.GetFileName(path), exception.Message));
+            }
         }
 
         internal static bool ValidPreview(byte[] png)

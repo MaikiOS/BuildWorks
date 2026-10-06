@@ -2,6 +2,29 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Source checkpoint 0.19.66 — support tools / scroll; not deployed
+
+Hammer category/actions/resource scroll sensitivity is 132. Support Create/Delete/Reset centre
+reuse the existing Space/F3 Tools menu; tree rows represent existing supports only. Delete uses
+the currently selected support and preserves retained part selection. Search-hidden commands
+cannot execute through number keys. The inspector keeps pose/name and centre/placement properties.
+
+Release: zero warnings/errors; HostContract, 784 Localization keys, Store, 108 Geometry,
+six Bridge, 12 WorldLayout, deployment guard and whole-project format checks PASS.
+Independent correctness/Ponytail PASS. Final isolated Unity: 156 states, 2026-10-06T13:08:30Z,
+native support Tools clicks/Undo PASS; gameHostTested=false. `verify` helper unavailable;
+direct tests/diff/review used. ExternalBlueprintLibrary changes are whitespace only (`diff -w` empty).
+First sandbox Unity attempt failed license198; unsandboxed run used the existing license.
+Immediate same-frame popup test was corrected to wait one UI frame, without disabling raycast checks.
+
+Owner .65 feedback: target XYZ snapping works, previews appear; category scrolling slow,
+manual file paths / transient export feedback inadequate, tree action rows unwanted.
+[Updated conversion contract](specs/roadmap/blueprint-format.md): foreign-to-native without lost
+data, exact prefab scale semantics, no guessed shrink/clamp. This is pending implementation;
+current v11/v2 still cannot preserve/apply every foreign object/header field. Source file archive
+alone is not behavioral compatibility. Arbitrary mesh imports/terrain execution remain out of scope.
+Installed .65, world/save files unchanged. No source push (await current explicit authorization).
+
 ## Checkpoint 0.19.65 — library UI, exchange and editor snapping
 
 Installed in TerrainRamp-1.0-Test via the guarded script on 2026-10-06.

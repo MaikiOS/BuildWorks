@@ -9,10 +9,11 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.65**: library UI, import/export and target-frame editor snapping.
-Clipped categories/actions, background archive parsing, paired PNG previews and pinned support creation.
-Build/targeted checks, correctness/Ponytail and final 156 native Unity states PASS.
-[Player checks](testing/catalog-exchange-0.19.65_RU.md); native game acceptance pending.
+Active source checkpoint **0.19.66**: faster Hammer scrolling; support actions in Tools, object-only support tree.
+Release/required checks, correctness/Ponytail and final 156 isolated native Unity states PASS.
+Not deployed; .65 remains installed. Owner .65 feedback confirms snapping/support edit behavior, but rejects
+the path-only exchange UX and action rows. [Lossless conversion requirement](../specs/roadmap/blueprint-format.md)
+is recorded, not implemented; file browser/output settings and source scale semantics remain pending.
 Heavy interactive budget 512 and world-support durability remain separate unfinished work.
 
 Previous source checkpoint **0.19.64**: [independent support editor](../specs/roadmap/blueprint-support-frames.md).

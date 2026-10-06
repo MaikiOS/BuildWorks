@@ -168,11 +168,33 @@ namespace OstrixMods.BuildWorks.StoreTests
                 Require(rejected, "Mismatched container manifest/dependencies or old version accepted");
             }
             var empty = new byte[] { 109, 0, 0, 0, 0, 0 };
+            using (var nativeStream = new MemoryStream())
+            using (var writer = new BinaryWriter(nativeStream))
+            {
+                writer.Write(109); writer.Write((ushort)2);
+                writer.Write(12505); writer.Write((byte)4); writer.Write((byte)1); writer.Write((byte)3); writer.Write((byte)204);
+                writer.Write((ushort)3); writer.Write((ushort)12); writer.Write(-101);
+                writer.Write((byte)1); writer.Write("mod:opaque"); writer.Write(new string('x', 40000) + "\0🪵"); writer.Write((byte)0);
+                writer.Write(0); writer.Write((byte)0); writer.Write((byte)0); writer.Write((byte)0); writer.Write((byte)64);
+                writer.Write(100); writer.Write((byte)0); writer.Flush();
+                string nativePackage = Convert.ToBase64String(nativeStream.ToArray());
+                changed[0].foreignData.info = "5:2:2:13|AxeIron|Wood"; changed[0].foreignData.zdo = nativePackage;
+                Require(store.TryUpdateDocument(saved, changed, saved.groups, saved.anchors, out error), error);
+                var nativeReload = new CompositeBlueprintStore(path).All().Single();
+                var portable = BlueprintExchangeFormat.Decode(System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(nativeReload)));
+                Require(portable.parts[0].foreignData.zdo == nativePackage &&
+                    Geometry.BlueprintContainerInventory.TryRead(portable.parts[0].foreignData.ToGeometry(),
+                        name => name == "AxeIron" ? -101 : 100, out var inventory) && inventory.Count == 2 &&
+                    inventory[0].Stack == 12 && inventory[0].Quality == 3 && inventory[0].WorldLevel == 3 &&
+                    inventory[0].CustomData["mod:opaque"] == new string('x', 40000) + "\0🪵",
+                    "Verified native records lost during save/reopen/portable inspection");
+                Require(CompositeBlueprintStore.HasForeignData(portable), "Read-only inspection accidentally enabled restoration");
+            }
             changed[0].foreignData.info = "5:2:0:0"; changed[0].foreignData.zdo = Convert.ToBase64String(empty);
             Require(store.TryUpdateDocument(saved, changed, saved.groups, saved.anchors, out error), error);
             Require(BlueprintExchangeFormat.Decode(System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(saved)))
                 .parts[0].foreignData.zdo == Convert.ToBase64String(empty), "Verified empty package lost");
-            Console.WriteLine("PASS native Container exact >32K package store/portable roundtrip, dependencies, immutable copy, atomic failure and known empty state; no native decode");
+            Console.WriteLine("PASS native Container exact >32K package store/portable roundtrip, full record inspection, dependencies, immutable copy, atomic failure and known empty state; no native restore");
         }
 
         private static void NativeItemStandRoundTrip(string path)

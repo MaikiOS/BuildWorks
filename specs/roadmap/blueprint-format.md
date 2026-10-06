@@ -2,7 +2,18 @@
 
 **English** | [Русский](blueprint-format_RU.md)
 
-Current source **0.19.73**: world selection preserves an ordinary root-owned native Container's exact inventory bytes
+Current source **0.19.74**: read-only native v109 record inspection returns detached immutable item fields, including exact
+custom strings and crafter data, while original bytes remain authoritative. Strings/counts are bounded before allocation.
+Cells, occupied count, total units and every dependency are verified; zero/colliding/undeclared hashes, invalid UTF-8,
+noncanonical optional/default fields, string/custom-map encodings and incomplete/trailing records refuse with no partial output.
+Capture gates on this inspection after exact raw/private Save equality and rejects native custom maps above 32767 entries.
+Installed native serializer/loader/hash/count and BinaryWriter primitive IL are pinned by HostContract. Native v13/portable v4 unchanged.
+Existing inert packages are preserved without execution even if inspection fails; future exchange policy/world restore must inspect
+again rather than treating descriptive metadata as proven contents. No Inventory.Load or reconstruction was introduced.
+Release/111 Geometry/Store/required checks and final Unity180/capture fixtures plus independent reviews PASS; not game evidence.
+Retain/clear UI, foreign-container decoding and world restoration remain pending.
+
+Previous source **0.19.73**: world selection preserves an ordinary root-owned native Container's exact inventory bytes
 without writing live state. Access/ward/busy/revision and native prefab-name resolution are checked; derived/nested/special
 storage refuses explicitly. Initialized fresh empty chests have a verified canonical empty packet; unknown absence is not empty.
 Existing foreignData tag valheim-container-v1 contains width:height:occupiedSlots:units, sorted unique prefab names separated

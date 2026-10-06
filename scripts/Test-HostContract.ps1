@@ -819,7 +819,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.73.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.74.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -2951,8 +2951,31 @@ foreach ($pattern in 'Player::GetPlayerID', 'PrivateArea::CheckAccess', 'Contain
     Assert-Contract ($storageCalls -match $pattern) "Container snapshot omits required gate: $pattern"
 }
 Assert-Contract ($storageCalls -notmatch 'Container::Save|Container::Load|Inventory::Load|ZDO::Set|RPC|Object::Instantiate|ItemDrop/ItemData::Load') 'Container snapshot mutates, restores or executes live state.'
+Assert-Contract ($storageCalls -match 'BlueprintContainerInventory::TryRead') 'Container snapshot skips full inert record/dependency validation.'
+# The read-only v109 decoder relies on exact native field/flag order and custom-map count encoding.
+# A host update must fail this gate until the new serializer is reviewed, not silently misread bytes.
+$packageType = $hostAssembly.MainModule.Types | Where-Object Name -eq 'ZPackage'
+$numItemsSave = $packageType.Methods | Where-Object Name -eq 'WriteNumItems'
+$inventoryLoadLayout = $inventoryType.Methods | Where-Object { $_.Name -eq 'Load' -and $_.Parameters.Count -eq 1 }
+$hashType = @($hostAssembly.MainModule.Types) + @($utilsAssembly.MainModule.Types) | Where-Object Name -eq 'StringExtensionMethods'
+$prefabHashLayout = $hashType.Methods | Where-Object Name -eq 'GetStableHashCode'
+foreach ($entry in @(@($itemSave, 'DAA9052430B2B766A8F15E221AB0D24C63FD55A6723EEBDCC65405E48F8D5494'),
+        @($numItemsSave, 'EFCB67745DEF1986C47B3526000AC07C0114FDA19AF57F0DABCDE653A6DC456E'),
+        @($inventoryLoadLayout, 'E0E6FF90F203C6FFE961DE66768CDEDF609B896945E637A8166B121911BEF935'),
+        @($prefabHashLayout, '8D6089461A9226DC1BDF23B87784C88F378A57F95C1FF6FFB6CCB85E731BF821'))) {
+    $layoutText = ($entry[0].Body.Instructions | ForEach-Object ToString) -join "`n"
+    $layoutSha = [Security.Cryptography.SHA256]::Create()
+    try { $layoutHash = [BitConverter]::ToString($layoutSha.ComputeHash([Text.Encoding]::UTF8.GetBytes($layoutText))).Replace('-', '') }
+    finally { $layoutSha.Dispose() }
+    Assert-Contract ($layoutHash -eq $entry[1]) "Native v109 serializer layout changed: $($entry[0].FullName)"
+}
+foreach ($primitive in 'System.Byte', 'System.Int32', 'System.UInt16', 'System.Int64', 'System.String') {
+    $writer = $packageType.Methods | Where-Object { $_.Name -eq 'Write' -and $_.Parameters.Count -eq 1 -and $_.Parameters[0].ParameterType.FullName -eq $primitive }
+    $writerCalls = @($writer.Body.Instructions | Where-Object { $_.OpCode.Name -in @('call', 'callvirt') } | ForEach-Object { [string]$_.Operand })
+    Assert-Contract ($writerCalls.Count -eq 1 -and $writerCalls[0] -eq "System.Void System.IO.BinaryWriter::Write($primitive)") "Native ZPackage byte codec changed: $primitive"
+}
 $worldCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'PrecisionPlacementSession' -and $_.Name -eq 'TrySaveWorldSelection' }
 $worldCaptureCalls = ($worldCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($worldCaptureCalls -match 'BlueprintStorageCapture::TryCapture' -and $worldCaptureCalls -match 'CompositeBlueprintStore/ForeignPartData::FromGeometry') 'World selection does not preserve container snapshots.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.73 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.74 and Valheim Steam build 25185596.'

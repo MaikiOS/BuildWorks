@@ -2,6 +2,30 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.74 — bounded native inventory inspection; not deployed
+
+Read-only v109 inspection exposes every stored field (identity, cell, stack, quality, variant,
+durability, world level, flags, crafter and exact custom strings) as immutable detached data.
+Native signed hashes resolve against the declared prefab manifest; zero/colliding/undeclared hashes,
+cell/count/unit/name mismatches, incomplete/trailing records, invalid UTF-8, noncanonical optional fields,
+string lengths and custom-map counts refuse inspection without partial output. Strings are bounded
+against remaining packet bytes before allocation. Native capture uses this gate after exact raw/private-Save
+comparison and rejects more than 32767 custom entries before native serialization can truncate its count.
+No Inventory.Load, item creation, world writes, byte normalization or schema migration was introduced.
+Inert saved/imported packages remain intact even when unreadable: future policy/restore must re-inspect,
+not infer an empty chest or trust the descriptive manifest alone. Store v13 / portable v4 unchanged.
+
+Release: no warnings/errors. 111 Geometry, Store (including real-layout >32K record save/reopen/portable
+inspection), eight EditorBridge, 12 WorldLayout, 823 Localization, HostContract, format and deployment
+WhatIf PASS; existing workspace-load warnings remain. verify is unavailable; direct checks/review used.
+Installed Valheim serializer/loader/hash/custom-count IL and primitive BinaryWriter codec are pinned.
+Final isolated Unity: 180 states plus actual capture on inert API fixtures PASS at
+2026-10-06T18:35:14.5953723Z; gameHostTested=false, not native inventory reconstruction proof.
+Independent correctness review fixed optional/default normalization and native hash-zero loss; final PASS.
+Ponytail review PASS. TerrainRamp-1.0-Test remains .67; no installation/game/save mutation/publication.
+Retain/clear UI, foreign storage decoding, world restoration/resources/server/save/reconnect, armour/free
+items, heavy scenes above 512 and durable world sockets remain unfinished. Overall goal remains active.
+
 ## Checkpoint 0.19.73 — read-only native storage capture; not deployed
 
 World selection captures an ordinary root-owned native Container after access/ward/busy checks.

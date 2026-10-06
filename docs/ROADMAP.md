@@ -9,7 +9,14 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.73**: native Container world capture is read-only, permission-gated and revision-checked.
+Active source checkpoint **0.19.74**: bounded read-only native v109 inventory inspection validates full records/dependencies
+before capture. Immutable item fields retain exact custom strings; canonical encoding, zero/colliding hashes, cells/counts
+and full consumption are checked without Inventory.Load, normalization or world writes. Native custom-map overflow rejects early.
+Release/111 Geometry/Store/required checks and final isolated Unity180 plus capture fixtures PASS; independent reviews PASS.
+Installed test .67 unchanged; policy UI, foreign storage conversion/restore and other remaining goal scopes are not complete.
+See HANDOFF and the [format contract](../specs/roadmap/blueprint-format.md) for exact boundaries.
+
+Previous source checkpoint **0.19.73**: native Container world capture is read-only, permission-gated and revision-checked.
 Exact packages/capacity/item dependencies survive Store v13/portable v4/copy/history; known initialized empty
 chests are distinct from unavailable data. Nested/derived/special/multiple storage and unsupported state reject atomically.
 Release/110 Geometry/required checks and 180 isolated Unity states plus capture API fixtures PASS; no native game proof.

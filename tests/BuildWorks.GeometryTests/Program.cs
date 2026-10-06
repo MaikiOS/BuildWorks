@@ -79,6 +79,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Run("Blueprint payload survives insertion and cached history", BlueprintPayloadSurvivesHistory);
             Run("ItemStand authoring preserves contents in history and rejects opaque/locked edits", ItemStandContentsHistory);
             Run("Native Container payload preserves history and rejects invalid manifests/packages", NativeContainerState);
+            Run("Native Container inspection reads all fields and refuses corrupt records without mutation", ContainerInventoryTests.Run);
             Run("Free supports have independent pose, scope and history", BlueprintSupportHistory);
             Run("Free supports insert with remapped root pose and validate atomically", BlueprintSupportInsertion);
             Run("Blueprint selection does not dirty document", BlueprintSelectionDoesNotDirtyDocument);

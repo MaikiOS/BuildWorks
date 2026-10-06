@@ -53,7 +53,7 @@ namespace OstrixMods.BuildWorks
                 long units = 0, serializationBudget = 6;
                 foreach (ItemDrop.ItemData item in items)
                 {
-                    if (item?.m_shared == null || !item.m_dropPrefab || item.m_customData == null ||
+                    if (item?.m_shared == null || !item.m_dropPrefab || item.m_customData == null || item.m_customData.Count > 32767 ||
                         item.m_stack < 1 || item.m_stack > ushort.MaxValue || item.m_quality < 1 || item.m_quality > ushort.MaxValue ||
                         item.m_gridPos.x < 0 || item.m_gridPos.x >= width || item.m_gridPos.y < 0 || item.m_gridPos.y >= height ||
                         item.m_worldLevel < 0 || item.m_worldLevel > byte.MaxValue ||
@@ -87,7 +87,9 @@ namespace OstrixMods.BuildWorks
                 byte[] canonical = package.GetArray();
                 if (raw != null && !canonical.SequenceEqual(raw) || zdo.DataRevision != revision || container.IsInUse()) return false;
                 raw = raw ?? canonical;
-                data = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, info, Convert.ToBase64String(raw), null);
+                var snapshot = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, info, Convert.ToBase64String(raw), null);
+                if (!BlueprintContainerInventory.TryRead(snapshot, name => name.GetStableHashCode(), out _)) return false;
+                data = snapshot;
                 return true;
             }
             catch (Exception error) when (error is ArgumentException || error is OverflowException || error is TargetInvocationException)

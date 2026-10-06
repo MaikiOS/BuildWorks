@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using OstrixMods.BuildWorks;
@@ -32,10 +33,9 @@ internal static class StorageCaptureAcceptance
             ObjectDB.instance = new ObjectDB(); ObjectDB.instance.Items.Add(itemRoot.name, itemRoot);
             var item = itemRoot.AddComponent<ItemDrop>().m_itemData;
             item.m_dropPrefab = itemRoot; item.m_stack = 12; item.m_quality = 3;
-            item.m_customData.Add("mod:payload", "exact fixture metadata");
+            item.m_customData.Add("mod:payload", new string('x', 40000));
             container.Inventory.Items.Add(item);
-            byte[] bytes = Enumerable.Range(0, 40000).Select(index => (byte)index).ToArray();
-            bytes[0] = 109; bytes[1] = bytes[2] = bytes[3] = 0; bytes[4] = 1; bytes[5] = 0;
+            byte[] bytes = FixturePackage(itemRoot.name, item.m_customData["mod:payload"]);
             container.Inventory.Snapshot = (byte[])bytes.Clone();
             var zdo = view.GetZDO(); zdo.Set(ZDOVars.s_items, bytes);
             int writes = zdo.Writes;
@@ -44,6 +44,12 @@ internal static class StorageCaptureAcceptance
                 state.Format == BlueprintForeignPartData.NativeContainerFormat && state.Info == "5:2:1:12|StorageFixtureWood" &&
                 state.Zdo == original && zdo.Writes == writes && ReferenceEquals(zdo.GetByteArray(ZDOVars.s_items, null), bytes),
                 "capture lost data or wrote live ZDO");
+            Require(BlueprintContainerInventory.TryRead(state, name => name.GetStableHashCode(), out var inspection) &&
+                inspection.Count == 1 && inspection[0].Quality == 3 && inspection[0].Stack == 12 &&
+                inspection[0].CustomData["mod:payload"].Length == 40000, "native field inspection lost contents");
+            bytes[bytes.Length - 1] = 2; container.Inventory.Snapshot = (byte[])bytes.Clone();
+            Require(!BlueprintStorageCapture.TryCapture(piece, player, out _), "invalid native records captured as verified state");
+            bytes[bytes.Length - 1] = 0; container.Inventory.Snapshot = (byte[])bytes.Clone();
             bytes[20] ^= 1;
             Require(state.Zdo == original, "snapshot aliases source bytes");
             Require(!BlueprintStorageCapture.TryCapture(piece, player, out _), "live/package mismatch accepted");
@@ -73,6 +79,8 @@ internal static class StorageCaptureAcceptance
             Require(!BlueprintStorageCapture.TryCapture(piece, player, out _), "became busy during read"); container.Inventory.OnSave = null; container.Busy = false;
             item.m_customData["mod:payload"] = new string('x', BlueprintForeignPartData.MaximumContainerBytes);
             Require(!BlueprintStorageCapture.TryCapture(piece, player, out _), "unbounded serialization accepted"); item.m_customData.Clear();
+            for (int index = 0; index < 32768; ++index) item.m_customData.Add("k" + index, "v");
+            Require(!BlueprintStorageCapture.TryCapture(piece, player, out _), "native 15-bit custom map count would overflow"); item.m_customData.Clear();
             item.m_gridPos = new Vector2Int(5, 0); Require(!BlueprintStorageCapture.TryCapture(piece, player, out _), "invalid grid cell accepted"); item.m_gridPos = Vector2Int.zero;
             container.Inventory.Items.Add(item); Require(!BlueprintStorageCapture.TryCapture(piece, player, out _), "duplicate cell accepted"); container.Inventory.Items.Clear();
             foreach (byte[] invalid in new[] { null, new byte[2], new byte[BlueprintForeignPartData.MaximumContainerBytes + 1] })
@@ -92,12 +100,25 @@ internal static class StorageCaptureAcceptance
             typeof(Container).GetField("m_nview", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(derived, view);
             derived.Inventory.Snapshot = empty;
             Require(!BlueprintStorageCapture.TryCapture(derivedPiece, player, out _), "derived storage treated as fully native state");
-            return "Actual read-only Container capture on inert API fixture: full private package comparison, immutable >32K snapshot, known empty, access/ward/busy/revision/special/missing/grid/size rejection; no inventory restore or world writes. Native byte codec verified separately by HostContract.";
+            return "Actual read-only Container capture on inert API fixture: verified v109 records/dependencies, full private package comparison, immutable >32K snapshot, custom map boundary, known empty, access/ward/busy/revision/special/missing/grid/size rejection; no inventory restore or world writes. Native serializer layout pinned separately by HostContract.";
         }
         finally
         {
             ObjectDB.instance = previous; PrivateArea.Allowed = true;
             Object.DestroyImmediate(root); Object.DestroyImmediate(network); Object.DestroyImmediate(playerRoot); Object.DestroyImmediate(itemRoot);
+        }
+    }
+
+    private static byte[] FixturePackage(string prefab, string customValue)
+    {
+        using (var stream = new MemoryStream())
+        using (var writer = new BinaryWriter(stream))
+        {
+            writer.Write(109); writer.Write((ushort)1); writer.Write(12500);
+            writer.Write((byte)0); writer.Write((byte)0); writer.Write((byte)0); writer.Write((byte)204);
+            writer.Write((ushort)3); writer.Write((ushort)12); writer.Write(prefab.GetStableHashCode());
+            writer.Write((byte)1); writer.Write("mod:payload"); writer.Write(customValue); writer.Write((byte)0);
+            writer.Flush(); return stream.ToArray();
         }
     }
 }

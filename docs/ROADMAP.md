@@ -11,7 +11,8 @@ not just a button or a mathematical helper.
 
 Active source checkpoint **0.19.67**: shared file browser/output settings, persistent result and exact foreign prefab scale.
 Release/required checks, correctness/Ponytail and 180 isolated native Unity states PASS.
-Not deployed; .65 remains installed. Faster scrolling and object-only support tree are retained from .66.
+Installed in TerrainRamp-1.0-Test through the guarded script, DLL hashes verified; no Valheim launch.
+[Player checks](testing/catalog-exchange-0.19.67.md). Faster scrolling/object-only support tree retained from .66.
 The [lossless conversion requirement](../specs/roadmap/blueprint-format.md) is partially implemented:
 source absolute scale is prepared atomically without shrinking; opaque foreign object/header preservation remains pending.
 Heavy interactive budget 512 and world-support durability remain separate unfinished work.

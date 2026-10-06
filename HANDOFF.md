@@ -2,7 +2,7 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
-## Source checkpoint 0.19.67 — usable file exchange and exact foreign scale; not deployed
+## Checkpoint 0.19.67 — usable file exchange and exact foreign scale; test deployment
 
 Editor and Hammer share a folder/file browser, output filename/location and native JSON/ZIP choice.
 Import retains a separate original copy; export is atomic and never overwrites existing files.
@@ -17,8 +17,12 @@ Release zero warnings/errors; 803 Localization keys, Store, 108 Geometry, six Br
 Isolated Unity: 180 states plus actual file selection, locked-file error/retry, named ZIP/collision,
 non-unit prefab visual size and modal close raycasts. gameHostTested=false; no game/save changes.
 The verify helper is absent; direct checks and independent review were used.
-Current installed .65 is unchanged. Full opaque foreign-data preservation, heavy interactive scenes
+Installed only in TerrainRamp-1.0-Test through the guarded script, SHA-256 verified for both DLLs.
+[Player checks](docs/testing/catalog-exchange-0.19.67.md). No Valheim launch or save changes.
+Full opaque foreign-data preservation, heavy interactive scenes
 above 512 parts and world-support reload/network acceptance remain unfinished; the goal is active.
+Ostrix extended the goal with ordinary items and horizontal/wall/armour stand contents;
+the editor/format/world requirement is recorded in blueprint-format.md, not implemented.
 
 ## Source checkpoint 0.19.66 — support tools / scroll; not deployed
 

@@ -9,7 +9,12 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.61**: [independent support data foundation](../specs/roadmap/blueprint-support-frames.md).
+Active source checkpoint **0.19.62**: [support storage/exchange](../specs/roadmap/blueprint-support-frames.md).
+Store v11 / portable v2, legacy migration/clear/rollback and real rotated support disk roundtrip pass.
+108 Geometry + six EditorBridge + required checks/review and fresh 144 Unity states PASS.
+Not exposed as a player workflow: placement-frame math/tree/G/R/world durability remain; .56 unchanged.
+
+Previous source checkpoint **0.19.61**: [independent support data foundation](../specs/roadmap/blueprint-support-frames.md).
 108 Geometry + five EditorBridge + Release/targeted checks and 144 Unity states PASS.
 Not exposed/persisted yet: Store v10/portable v1 unchanged; tree/G/R and v11/v2 next.
 

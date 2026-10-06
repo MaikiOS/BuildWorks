@@ -2638,7 +2638,10 @@ namespace OstrixMods.BuildWorks
             return new BlueprintEditorDocument(source.id, source.name,
                 source.category ?? CompositeBlueprintStore.DefaultCategory, parts, groups,
                 source.primaryPartId, source.primaryGroupId,
-                source.customSnapPoints?.Select(point => ToPoint(point.ToVector3())));
+                source.customSnapPoints?.Select(point => ToPoint(point.ToVector3())),
+                source.supports?.Select(support => new BlueprintEditorSupport(support.stableId, support.name,
+                    ToPoint(support.position.ToVector3()), ToRotation(support.rotation.ToQuaternion()))),
+                source.placementSupportId);
         }
 
         private void ApplyInspector(
@@ -3336,6 +3339,7 @@ namespace OstrixMods.BuildWorks
                 bool success;
                 string error;
                 List<CompositeBlueprintStore.Group> groups = BuildStoreGroups();
+                List<CompositeBlueprintStore.Support> supports = BuildStoreSupports();
                 if (sourceBlueprint == null)
                     success = store.TrySaveDocument(
                         document.Name,
@@ -3345,6 +3349,8 @@ namespace OstrixMods.BuildWorks
                         anchors,
                         document.PrimaryPartId,
                         document.PrimaryGroupId,
+                        supports,
+                        document.PlacementSupportId,
                         out sourceBlueprint,
                         out error, customPoints);
                 else
@@ -3357,6 +3363,8 @@ namespace OstrixMods.BuildWorks
                         anchors,
                         document.PrimaryPartId,
                         document.PrimaryGroupId,
+                        supports,
+                        document.PlacementSupportId,
                         out error, customPoints);
                 if (!success)
                 {
@@ -3415,6 +3423,15 @@ namespace OstrixMods.BuildWorks
             }
             return result;
         }
+
+        private List<CompositeBlueprintStore.Support> BuildStoreSupports() => document.Supports
+            .Select(support => new CompositeBlueprintStore.Support
+            {
+                stableId = support.StableId,
+                name = support.Name,
+                position = new CompositeBlueprintStore.VectorData(ToVector(support.Position)),
+                rotation = new CompositeBlueprintStore.QuaternionData(ToQuaternion(support.Rotation))
+            }).ToList();
 
         private List<CompositeBlueprintStore.Group> BuildStoreGroups()
         {

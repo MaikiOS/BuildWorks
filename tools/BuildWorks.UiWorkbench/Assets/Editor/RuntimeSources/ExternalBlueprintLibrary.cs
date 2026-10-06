@@ -241,21 +241,40 @@ namespace OstrixMods.BuildWorks
 
         internal static CompositeBlueprintStore.Blueprint DetachedCopy(CompositeBlueprintStore.Blueprint source)
         {
-            if (!source.IsExternal || source.importError != null) throw new InvalidDataException("$buildworks_import.fields");
+            if (source == null || !source.IsExternal || source.importError != null)
+                throw new InvalidDataException("$buildworks_import.fields");
             var result = new CompositeBlueprintStore.Blueprint
-            { id = Guid.NewGuid().ToString("N"), name = source.name, category = source.category, prefabName = source.prefabName,
+            {
+                id = Guid.NewGuid().ToString("N"),
+                name = source.name,
+                category = source.category,
+                prefabName = source.prefabName,
                 anchors = new List<CompositeBlueprintStore.VectorData>(source.anchors),
                 customSnapPoints = source.customSnapPoints == null ? null : new List<CompositeBlueprintStore.VectorData>(source.customSnapPoints),
-                previewYaw = source.previewYaw, previewPitch = source.previewPitch, previewZoom = source.previewZoom };
+                supports = new List<CompositeBlueprintStore.Support>(),
+                previewYaw = source.previewYaw,
+                previewPitch = source.previewPitch,
+                previewZoom = source.previewZoom
+            };
             var ids = source.parts.Select(part => part.stableId).Concat(source.groups.Select(group => group.stableId))
+                .Concat((source.supports ?? new List<CompositeBlueprintStore.Support>()).Select(support => support.stableId))
                 .ToDictionary(id => id, id => Guid.NewGuid().ToString("N"), StringComparer.Ordinal);
             result.primaryPartId = source.primaryPartId == null ? null : ids[source.primaryPartId];
             result.primaryGroupId = source.primaryGroupId == null ? null : ids[source.primaryGroupId];
+            result.placementSupportId = source.placementSupportId == null ? null : ids[source.placementSupportId];
+            foreach (CompositeBlueprintStore.Support support in source.supports ?? new List<CompositeBlueprintStore.Support>())
+                result.supports.Add(new CompositeBlueprintStore.Support
+                { stableId = ids[support.stableId], name = support.name, position = support.position, rotation = support.rotation });
             foreach (CompositeBlueprintStore.Group group in source.groups)
                 result.groups.Add(new CompositeBlueprintStore.Group
-                { stableId = ids[group.stableId], name = group.name, editorVisible = group.editorVisible, editorLocked = group.editorLocked,
+                {
+                    stableId = ids[group.stableId],
+                    name = group.name,
+                    editorVisible = group.editorVisible,
+                    editorLocked = group.editorLocked,
                     parentGroupId = group.parentGroupId == null ? null : ids[group.parentGroupId],
-                    pivotPartId = group.pivotPartId == null ? null : ids[group.pivotPartId] });
+                    pivotPartId = group.pivotPartId == null ? null : ids[group.pivotPartId]
+                });
             foreach (CompositeBlueprintStore.Part part in source.parts)
                 result.parts.Add(new CompositeBlueprintStore.Part
                 {
@@ -270,6 +289,7 @@ namespace OstrixMods.BuildWorks
                     editorLocked = part.editorLocked,
                     signText = part.signText
                 });
+            if (!CompositeBlueprintStore.Valid(result)) throw new InvalidDataException("$buildworks_import.fields");
             return result;
         }
 

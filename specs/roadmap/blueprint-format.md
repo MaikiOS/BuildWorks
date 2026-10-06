@@ -2,8 +2,11 @@
 
 **English** | [Русский](blueprint-format_RU.md)
 
-Current source **0.19.58**: [native sign integration and evidence](blueprint-signs.md).
-Free support-frame clarification: [researched proposal, not implemented](blueprint-support-frames.md).
+Current source **0.19.62**: [support storage/exchange and remaining workflow](blueprint-support-frames.md).
+Store v11 adds optional supports (stableId/name/position/rotation) and placementSupportId;
+portable v2 carries the same payload. Old v10/v1 migrate without support data or source writes;
+mislabeled versions with new support fields are rejected. Native sign integration is preserved.
+Tree/gizmo and placement-frame math/world durability are not yet implemented.
 The .57 measurements and pending list below are that checkpoint's historical record.
 
 2026-10-05. Approved by Ostrix: preserve prefab-built constructions, large documents,

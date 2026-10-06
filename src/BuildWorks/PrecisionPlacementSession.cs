@@ -1021,7 +1021,8 @@ namespace OstrixMods.BuildWorks
                     CompositeBlueprintStore.Blueprint copy = ExternalBlueprintLibrary.DetachedCopy(blueprint);
                     if (!blueprintStore.TrySaveDocument(copy.name, copy.category,
                         copy.parts, copy.groups, copy.anchors, copy.primaryPartId,
-                        copy.primaryGroupId, out CompositeBlueprintStore.Blueprint imported, out string error, copy.customSnapPoints))
+                        copy.primaryGroupId, copy.supports, copy.placementSupportId,
+                        out CompositeBlueprintStore.Blueprint imported, out string error, copy.customSnapPoints))
                     { ShowStatus(player, error); return; }
                     blueprint = imported;
                     RefreshBlueprintEditorLibrary();

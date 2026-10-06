@@ -539,6 +539,10 @@ public static class RuntimeEditorAcceptance
 
     private static void TestSaveRoundtrip(BlueprintEditorController controller, string path)
     {
+        controller.Document.AddSupport(new BlueprintEditorSupport("saved-support", "Вход",
+            new Point3(2, 3, 4), new Rotation3(0, 1, 0, 1)));
+        controller.Document.SetPlacementSupport("saved-support");
+        controller.Document.SelectSupport(null);
         float expected = (float)controller.Document.Parts[0].Scale.X;
         Require((bool)Call(controller, "TrySave", false, true), "Product controller save failed");
         Require(!controller.Document.IsDirty, "Saved document stays dirty");
@@ -546,7 +550,8 @@ public static class RuntimeEditorAcceptance
         Require(reloaded.All().Count == 1, "Actual disk library roundtrip");
         Require(Mathf.Abs(reloaded.All()[0].parts[0].scale.x - expected) < 0.0001f, "Store discarded scale");
         CheckReopenedCopy(controller, reloaded, expected);
-        checks.Add("Controller save -> disk format10 -> new store -> OpenExisting retains scale and optional blueprint anchor");
+        Require(File.ReadAllText(path).Contains("\"version\":11"), "Controller did not write format11");
+        checks.Add("Controller save -> disk format11 -> new store -> OpenExisting retains scale, rotated root-owned support and placement reference; transient support focus absent");
     }
 
     private static void TestExternalImportEditor(Camera camera, TMP_Text font,
@@ -589,7 +594,7 @@ public static class RuntimeEditorAcceptance
                 "Cancel insert changed saved document or leaked ghost state");
             editor.Close(true);
         }
-        checks.Add("External .blueprint -> detached editable draft -> metadata Cancel no disk -> transform/save native v10 -> reopen -> whole-source insert preview/Cancel; original unchanged");
+        checks.Add("External .blueprint -> detached editable draft -> metadata Cancel no disk -> transform/save native v11 -> reopen -> whole-source insert preview/Cancel; original unchanged");
     }
 
     private static void TestScaleBoundaries(BlueprintEditorController controller, string path)
@@ -625,6 +630,20 @@ public static class RuntimeEditorAcceptance
             Require(opened.OpenExisting(reloaded.All()[0], out string error), "New controller reopen: " + error);
             Require(Math.Abs(opened.Document.Parts[0].Scale.X - expected) < 0.00001,
                 "New controller discarded persisted scale " + expected);
+            Require(opened.Document.Supports.Count == original.Document.Supports.Count &&
+                opened.Document.PlacementSupportId == original.Document.PlacementSupportId && opened.Document.ActiveSupportId == null,
+                "Controller dropped support data/default or persisted temporary focus");
+            for (int i = 0; i < original.Document.Supports.Count; ++i)
+            {
+                BlueprintEditorSupport source = original.Document.Supports[i], restored = opened.Document.Supports[i];
+                Require(source.StableId == restored.StableId && source.Name == restored.Name &&
+                    Math.Abs(source.Position.X - restored.Position.X) < .000001 &&
+                    Math.Abs(source.Position.Y - restored.Position.Y) < .000001 &&
+                    Math.Abs(source.Position.Z - restored.Position.Z) < .000001 &&
+                    Math.Abs(source.Rotation.Y - restored.Rotation.Y) < .000001 &&
+                    Math.Abs(source.Rotation.W - restored.Rotation.W) < .000001,
+                    "Controller changed support pose/name on reopen");
+            }
             opened.Close(true);
         }
     }

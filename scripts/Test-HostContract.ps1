@@ -816,7 +816,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.61.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.62.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -1769,7 +1769,7 @@ foreach ($fieldName in @('stableId', 'name', 'editorVisible', 'editorLocked', 'p
 $blueprintType = $pluginTypes | Where-Object {
     $_.Name -eq 'Blueprint' -and $_.DeclaringType -eq $blueprintStore
 }
-foreach ($fieldName in @('category', 'previewYaw', 'previewPitch', 'previewZoom', 'groups', 'primaryPartId', 'primaryGroupId')) {
+foreach ($fieldName in @('category', 'previewYaw', 'previewPitch', 'previewZoom', 'groups', 'primaryPartId', 'primaryGroupId', 'supports', 'placementSupportId')) {
     Assert-Contract (@($blueprintType.Fields | Where-Object Name -eq $fieldName).Count -eq 1) `
         "Blueprint library field is missing: $fieldName"
 }
@@ -1780,28 +1780,36 @@ foreach ($methodName in @('TryRename', 'TryDelete', 'TrySetCategory',
 }
 $saveDocumentMethods = @($blueprintStore.Methods | Where-Object Name -eq 'TrySaveDocument')
 $updateDocumentMethods = @($blueprintStore.Methods | Where-Object Name -eq 'TryUpdateDocument')
-Assert-Contract ($saveDocumentMethods.Count -eq 4 -and
+Assert-Contract ($saveDocumentMethods.Count -eq 5 -and
     @($saveDocumentMethods | Where-Object {
         @($_.Parameters | Where-Object Name -eq 'primaryPartId').Count -eq 1
-    }).Count -eq 2 -and
+    }).Count -eq 3 -and
     @($saveDocumentMethods | Where-Object {
         @($_.Parameters | Where-Object Name -eq 'primaryGroupId').Count -eq 1
+    }).Count -eq 2 -and
+    @($saveDocumentMethods | Where-Object {
+        @($_.Parameters | Where-Object Name -eq 'supports').Count -eq 1 -and
+        @($_.Parameters | Where-Object Name -eq 'placementSupportId').Count -eq 1
     }).Count -eq 1) `
     'Blueprint frame save overload or a compatibility overload is missing.'
-Assert-Contract ($updateDocumentMethods.Count -eq 4 -and
+Assert-Contract ($updateDocumentMethods.Count -eq 5 -and
     @($updateDocumentMethods | Where-Object {
         @($_.Parameters | Where-Object Name -eq 'primaryPartId').Count -eq 1
-    }).Count -eq 2 -and
+    }).Count -eq 3 -and
     @($updateDocumentMethods | Where-Object {
         @($_.Parameters | Where-Object Name -eq 'primaryGroupId').Count -eq 1
+    }).Count -eq 2 -and
+    @($updateDocumentMethods | Where-Object {
+        @($_.Parameters | Where-Object Name -eq 'supports').Count -eq 1 -and
+        @($_.Parameters | Where-Object Name -eq 'placementSupportId').Count -eq 1
     }).Count -eq 1) `
     'Blueprint frame update overload or a compatibility overload is missing.'
-Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion = 10' -and
+Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion = 11' -and
     $blueprintStoreSource -match 'loaded\.version < 6' -and
     $blueprintStoreSource -match 'ValidScale\(part\.scale\)' -and
     $blueprintStoreSource -match 'if \(loaded\.version < 4\)' -and
     $blueprintStoreSource -match 'part\.stableId = blueprint\.id' -and
-    $blueprintStoreSource -match 'ValidDocument\(blueprint\.parts, blueprint\.groups\)' -and
+    $blueprintStoreSource -match 'ValidDocument\(blueprint\.parts, blueprint\.groups, blueprint\.supports\)' -and
     $blueprintStoreSource -match 'ValidPrimaryPart\(blueprint\.parts, blueprint\.primaryPartId\)' -and
     $blueprintStoreSource -match 'ValidPrimaryGroup\(blueprint\.parts, blueprint\.groups, blueprint\.primaryGroupId\)' -and
     $blueprintStoreSource -match
@@ -2797,4 +2805,4 @@ $signInstruction = @($nativeFinished.Body.Instructions | Where-Object { [string]
 $indexWrite = @($nativeFinished.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'stfld' -and [string]$_.Operand -match '::placementPlanIndex$' })
 Assert-Contract ($signInstruction.Count -eq 1 -and $indexWrite.Count -gt 0 -and $signInstruction[0].Offset -lt $indexWrite[0].Offset) 'Sign payload must apply before advancing the native queue.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.61 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.62 and Valheim Steam build 25185596.'

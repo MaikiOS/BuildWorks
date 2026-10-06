@@ -2,6 +2,28 @@
 
 **English** | [Русский](blueprint-support-frames_RU.md)
 
+## Checkpoint 0.19.62 — storage and exchange
+
+Store v11 and portable v2 preserve support ID/name/root-local position/unit rotation
+and nullable placementSupportId. Old v10/v1 documents migrate to empty supports without
+rewriting the source on read. Version-mislabeled/unknown/duplicate fields block writes;
+support IDs share the part/group namespace, maximum 64. Legacy update overloads retain
+payload; explicit support-aware updates can clear the default/list. Atomic write failure
+restores support refs, geometry, points and metadata. Detached external copies remap all
+support IDs/defaults without moving parts; editor save/open bridges preserve poses.
+
+Automated Store tests include actual 353-file archive (109 format-compatible, 244 blocked),
+v10/v1 migration, malformed payloads, max/overflow, clone and rollback. Actual EditorBridge
+adds support disk roundtrip; Unity's real Controller.TrySave/OpenExisting also checks a
+rotated support/default. Release, required target checks and independent correctness/
+Ponytail pass; verify helper absent. Fresh 144-state Unity proof is recorded under
+artifacts/support-storage-0.19.62 (gameHostTested=false).
+
+Storage is complete for this slice, not the player workflow: tree/G/R/transform-centre,
+placement-frame composition, world reload/network durability are still pending. New data
+must not be advertised as a working world placement frame before the pose resolver is
+integrated. Interactive budget 512 and installed .56 remain unchanged; no game/save writes.
+
 ## Checkpoint 0.19.61 — foundation only
 
 Ostrix approved the workflow on 2026-10-06. BlueprintEditorDocument now holds

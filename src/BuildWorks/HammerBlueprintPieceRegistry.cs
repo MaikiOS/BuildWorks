@@ -640,6 +640,7 @@ namespace OstrixMods.BuildWorks
                 AppendText(signature, blueprint?.category);
                 AppendText(signature, blueprint?.primaryPartId);
                 AppendText(signature, blueprint?.primaryGroupId);
+                AppendText(signature, blueprint?.placementSupportId);
                 if (blueprint != null)
                 {
                     AppendFloat(signature, blueprint.previewYaw);
@@ -668,6 +669,17 @@ namespace OstrixMods.BuildWorks
                 signature.Append(customCount).Append(':');
                 for (int pointIndex = 0; pointIndex < customCount; ++pointIndex)
                     AppendVector(signature, blueprint.customSnapPoints[pointIndex]);
+                int supportCount = blueprint?.supports?.Count ?? 0;
+                signature.Append(supportCount).Append(':');
+                for (int supportIndex = 0; supportIndex < supportCount; ++supportIndex)
+                {
+                    CompositeBlueprintStore.Support support = blueprint.supports[supportIndex];
+                    AppendText(signature, support?.stableId);
+                    if (support == null) continue;
+                    AppendText(signature, support.name);
+                    AppendVector(signature, support.position);
+                    AppendQuaternion(signature, support.rotation);
+                }
             }
 
             int catalogCount = 0;

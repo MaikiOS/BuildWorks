@@ -23,7 +23,7 @@ namespace OstrixMods.BuildWorks
         internal const string DefaultCategory = "OTHER";
         private const string LegacyDefaultCategory = "ПРОЧЕЕ";
         private const string LocalizationPrefix = "$buildworks_";
-        private const int FormatVersion = 10;
+        private const int FormatVersion = 11;
         private const int MaximumBlueprints = 32;
         private const int MaximumCategories = 12;
         private const int MaximumAnchors = 512;
@@ -131,6 +131,14 @@ namespace OstrixMods.BuildWorks
             out Blueprint blueprint,
             out string error,
             IReadOnlyList<VectorData> customSnapPoints = null)
+            => TrySaveDocument(name, category, parts, groups, anchors, primaryPartId,
+                primaryGroupId, null, null, out blueprint, out error, customSnapPoints);
+
+        public bool TrySaveDocument(
+            string name, string category, IReadOnlyList<Part> parts, IReadOnlyList<Group> groups,
+            IReadOnlyList<VectorData> anchors, string primaryPartId, string primaryGroupId,
+            IReadOnlyList<Support> supports, string placementSupportId,
+            out Blueprint blueprint, out string error, IReadOnlyList<VectorData> customSnapPoints = null)
         {
             blueprint = null;
             error = null;
@@ -181,7 +189,8 @@ namespace OstrixMods.BuildWorks
             }
             List<Part> preparedParts = PrepareParts(parts);
             List<Group> preparedGroups = CloneGroups(groups);
-            if (!ValidDocument(preparedParts, preparedGroups))
+            if (!ValidDocument(preparedParts, preparedGroups, supports) ||
+                !ValidPlacementSupport(supports, placementSupportId))
             {
                 error = UserError("store.invalid_parts_or_groups");
                 return false;
@@ -215,6 +224,8 @@ namespace OstrixMods.BuildWorks
                 groups = preparedGroups,
                 anchors = new List<VectorData>(anchors),
                 customSnapPoints = customSnapPoints == null ? null : new List<VectorData>(customSnapPoints),
+                supports = CloneSupports(supports),
+                placementSupportId = placementSupportId,
                 primaryPartId = primaryPartId,
                 primaryGroupId = primaryGroupId
             };
@@ -437,6 +448,14 @@ namespace OstrixMods.BuildWorks
             string primaryGroupId,
             out string error,
             IReadOnlyList<VectorData> customSnapPoints = null)
+            => TryUpdateDocument(blueprint, name, category, parts, groups, anchors, primaryPartId,
+                primaryGroupId, blueprint?.supports, blueprint?.placementSupportId, out error, customSnapPoints);
+
+        public bool TryUpdateDocument(
+            Blueprint blueprint, string name, string category, IReadOnlyList<Part> parts,
+            IReadOnlyList<Group> groups, IReadOnlyList<VectorData> anchors, string primaryPartId,
+            string primaryGroupId, IReadOnlyList<Support> supports, string placementSupportId,
+            out string error, IReadOnlyList<VectorData> customSnapPoints = null)
         {
             error = null;
             name = (name ?? string.Empty).Trim();
@@ -475,7 +494,8 @@ namespace OstrixMods.BuildWorks
             }
             List<Part> preparedParts = PrepareParts(parts);
             List<Group> preparedGroups = CloneGroups(groups);
-            if (!ValidDocument(preparedParts, preparedGroups))
+            if (!ValidDocument(preparedParts, preparedGroups, supports) ||
+                !ValidPlacementSupport(supports, placementSupportId))
             {
                 error = UserError("store.invalid_parts_or_groups");
                 return false;
@@ -503,6 +523,8 @@ namespace OstrixMods.BuildWorks
             List<Group> previousGroups = blueprint.groups;
             List<VectorData> previousAnchors = blueprint.anchors;
             List<VectorData> previousCustomSnapPoints = blueprint.customSnapPoints;
+            List<Support> previousSupports = blueprint.supports;
+            string previousPlacementSupportId = blueprint.placementSupportId;
             string previousName = blueprint.name;
             string previousCategory = blueprint.category;
             string previousPrimaryPartId = blueprint.primaryPartId;
@@ -515,6 +537,8 @@ namespace OstrixMods.BuildWorks
             blueprint.groups = preparedGroups;
             blueprint.anchors = new List<VectorData>(anchors);
             blueprint.customSnapPoints = customSnapPoints == null ? null : new List<VectorData>(customSnapPoints);
+            blueprint.supports = CloneSupports(supports);
+            blueprint.placementSupportId = placementSupportId;
             blueprint.primaryPartId = primaryPartId;
             blueprint.primaryGroupId = primaryGroupId;
             blueprint.prefabName = PrimaryPrefabName(preparedParts, primaryPartId);
@@ -524,6 +548,8 @@ namespace OstrixMods.BuildWorks
                 blueprint.groups = previousGroups;
                 blueprint.anchors = previousAnchors;
                 blueprint.customSnapPoints = previousCustomSnapPoints;
+                blueprint.supports = previousSupports;
+                blueprint.placementSupportId = previousPlacementSupportId;
                 blueprint.name = previousName;
                 blueprint.category = previousCategory;
                 blueprint.primaryPartId = previousPrimaryPartId;
@@ -585,6 +611,21 @@ namespace OstrixMods.BuildWorks
             return clone;
         }
 
+        internal static List<Support> CloneSupports(IReadOnlyList<Support> supports)
+        {
+            var result = new List<Support>(supports?.Count ?? 0);
+            if (supports != null)
+                foreach (Support support in supports)
+                    result.Add(support == null ? null : new Support
+                    {
+                        stableId = support.stableId,
+                        name = support.name,
+                        position = support.position,
+                        rotation = support.rotation
+                    });
+            return result;
+        }
+
         private void Load()
         {
             if (!File.Exists(path)) return;
@@ -599,7 +640,8 @@ namespace OstrixMods.BuildWorks
                     writeBlockReason = UserError("store.unknown_version");
                     return;
                 }
-                BlueprintExchangeFormat.ValidateLibraryJson(json, requireFields: loaded.version >= 6);
+                BlueprintExchangeFormat.ValidateLibraryJson(json, requireFields: loaded.version >= 6,
+                    allowSupportFields: loaded.version >= 11);
                 loaded.blueprints = loaded.blueprints ?? new List<Blueprint>();
                 loaded.categories = loaded.categories ?? new List<string>();
                 if (loaded.version == 1)
@@ -654,6 +696,8 @@ namespace OstrixMods.BuildWorks
                             foreach (Part part in blueprint.parts)
                                 if (part != null) part.scale = new VectorData { x = 1f, y = 1f, z = 1f };
                 NormalizeCategories(loaded);
+                foreach (Blueprint blueprint in loaded.blueprints)
+                    if (blueprint != null) blueprint.supports = blueprint.supports ?? new List<Support>();
                 loaded.version = FormatVersion;
                 List<Blueprint> valid = new List<Blueprint>();
                 var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -807,7 +851,9 @@ namespace OstrixMods.BuildWorks
                 blueprint.parts.Count > MaximumParts || blueprint.anchors == null ||
                 blueprint.anchors.Count > MaximumAnchors || blueprint.groups == null ||
                 blueprint.groups.Count > MaximumGroups ||
-                !ValidDocument(blueprint.parts, blueprint.groups) || !ValidCustomSnapPoints(blueprint.customSnapPoints) ||
+                !ValidDocument(blueprint.parts, blueprint.groups, blueprint.supports) ||
+                !ValidPlacementSupport(blueprint.supports, blueprint.placementSupportId) ||
+                !ValidCustomSnapPoints(blueprint.customSnapPoints) ||
                 !ValidPrimaryPart(blueprint.parts, blueprint.primaryPartId) ||
                 !ValidPrimaryGroup(blueprint.parts, blueprint.groups, blueprint.primaryGroupId))
                 return false;
@@ -842,11 +888,18 @@ namespace OstrixMods.BuildWorks
 
         private static bool ValidDocument(
             IReadOnlyList<Part> parts,
-            IReadOnlyList<Group> groups)
+            IReadOnlyList<Group> groups,
+            IReadOnlyList<Support> supports = null)
         {
             if (parts == null || groups == null || parts.Count > MaximumParts ||
                 groups.Count > MaximumGroups) return false;
             var ids = new HashSet<string>(StringComparer.Ordinal);
+            if (supports != null)
+            {
+                if (supports.Count > Geometry.BlueprintEditorDocument.MaximumSupports) return false;
+                foreach (Support support in supports)
+                    if (!Valid(support) || !ids.Add(support.stableId)) return false;
+            }
             var groupIds = new HashSet<string>(StringComparer.Ordinal);
             foreach (Group group in groups)
             {
@@ -1002,6 +1055,33 @@ namespace OstrixMods.BuildWorks
             return result;
         }
 
+        private static bool Valid(Support support)
+        {
+            if (support == null || !ValidSupportLabel(support.stableId, 128) ||
+                !ValidSupportLabel(support.name, 48) || !Valid(support.position) || !Valid(support.rotation))
+                return false;
+            double length = (double)support.rotation.x * support.rotation.x +
+                (double)support.rotation.y * support.rotation.y +
+                (double)support.rotation.z * support.rotation.z + (double)support.rotation.w * support.rotation.w;
+            return Math.Abs(length - 1) <= 0.0001;
+        }
+
+        private static bool ValidSupportLabel(string text, int limit)
+        {
+            if (string.IsNullOrWhiteSpace(text) || text.Length > limit || text != text.Trim()) return false;
+            foreach (char c in text) if (char.IsControl(c) || c == '<' || c == '>') return false;
+            return true;
+        }
+
+        private static bool ValidPlacementSupport(IReadOnlyList<Support> supports, string id)
+        {
+            if (id == null) return true;
+            if (supports != null)
+                foreach (Support support in supports)
+                    if (support != null && support.stableId == id) return true;
+            return false;
+        }
+
         private static bool Valid(VectorData value) =>
             IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z) &&
             Mathf.Abs(value.x) <= 512f && Mathf.Abs(value.y) <= 512f &&
@@ -1084,6 +1164,19 @@ namespace OstrixMods.BuildWorks
             public string primaryGroupId;
             [DataMember(Order = 12, EmitDefaultValue = false)]
             public List<VectorData> customSnapPoints;
+            [DataMember(Order = 13, EmitDefaultValue = false)]
+            public List<Support> supports;
+            [DataMember(Order = 14, EmitDefaultValue = false)]
+            public string placementSupportId;
+        }
+
+        [DataContract]
+        internal sealed class Support
+        {
+            [DataMember(Order = 0)] public string stableId;
+            [DataMember(Order = 1)] public string name;
+            [DataMember(Order = 2)] public VectorData position;
+            [DataMember(Order = 3)] public QuaternionData rotation;
         }
 
         [DataContract]

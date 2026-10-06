@@ -54,7 +54,7 @@ internal static class Program
         Console.WriteLine("PASS actual Controller.BuildStoreParts -> Store.TrySaveDocument preserves XYZ scale");
         Console.WriteLine("PASS actual Controller/store/reopen preserves sign text");
 
-        document.AddSupport(new BlueprintEditorSupport("support", "Вход", new Point3(2,3,4), new Rotation3(0,0,0,1)));
+        document.AddSupport(new BlueprintEditorSupport("support", "Вход", new Point3(2,3,4), new Rotation3(0,1,0,1)));
         document.SetPlacementSupport("support");
         document.SelectOnly("a");
         document.SelectSupport("support");
@@ -72,6 +72,26 @@ internal static class Program
         copied.SetSupportPose("support", new Point3(9,9,9), new Rotation3(0,0,0,1));
         Require(payload.Supports[0].Position.X == 2, "Controller copy aliases support poses");
         Console.WriteLine("PASS actual Controller.CopyDocument retains detached root payload and support scope");
+
+        controllerType.GetField("document", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(controller, payload);
+        object supportData = controllerType.GetMethod("BuildStoreSupports", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(controller, null);
+        parts = controllerType.GetMethod("BuildStoreParts", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(controller, null);
+        MethodInfo supportSave = storeType.GetMethods().Single(m => m.Name == "TrySaveDocument" && m.GetParameters().Length == 12);
+        object[] supportCall = { "Support bridge", "OTHER", parts, call[3], call[4], null, null,
+            supportData, payload.PlacementSupportId, null, null, null };
+        Require((bool)supportSave.Invoke(store, supportCall), "Store rejected support bridge: " + supportCall[10]);
+        object reloadedStore = Activator.CreateInstance(storeType, BindingFlags.NonPublic | BindingFlags.Instance,
+            null, new object[] { pathOut }, null);
+        object reloadedBlueprint = ((IList)storeType.GetMethod("All").Invoke(reloadedStore, null))[1];
+        var reloaded = (BlueprintEditorDocument)controllerType.GetMethod("DocumentFromBlueprint", BindingFlags.NonPublic | BindingFlags.Static)
+            .Invoke(null, new[] { reloadedBlueprint });
+        Require(reloaded.Supports.Count == 1 && reloaded.Supports[0].StableId == "support" &&
+            reloaded.Supports[0].Name == "Вход" && reloaded.Supports[0].Position.Z == 4 &&
+            Math.Abs(reloaded.Supports[0].Rotation.Y - Math.Sqrt(.5)) < .000001 &&
+            reloaded.PlacementSupportId == "support" && reloaded.ActiveSupportId == null && reloaded.Selection.Count == 0 &&
+            reloaded.Parts[0].Position.X == 0 && reloaded.Parts[0].SignText == "Дом\nOstrix",
+            "Controller support disk roundtrip lost pose/default, moved geometry or persisted transient focus");
+        Console.WriteLine("PASS actual Controller.BuildStoreSupports -> disk -> DocumentFromBlueprint preserves root pose/default without transient focus");
 
         var grouped = new BlueprintEditorDocument(null, "Group", "OTHER", new[] { Part("a",0), Part("b",2) });
         grouped.SelectOnly("a"); grouped.ToggleSelection("b"); grouped.CreateGroup("g", "Group");

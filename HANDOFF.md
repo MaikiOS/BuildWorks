@@ -2,6 +2,18 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Source checkpoint 0.19.62 — support storage/exchange; not deployed
+
+Store v11 / portable v2 preserve root support pose/name/ID and placement default,
+with v10/v1 migration, strict version/field validation, shared IDs, bounded poses,
+legacy-preserve vs explicit-clear and atomic rollback. Detached import copies remap
+supports/default; real Controller save/open roundtrip passes, including rotation.
+108 Geometry, six actual EditorBridge, Store(+353 archive), Localization, HostContract,
+WorldLayout, DeploymentChecks, dotnet format and read-only correctness/Ponytail PASS.
+Fresh 144-state Unity PASS (2026-10-06T10:00:04Z, gameHostTested=false).
+Next: placement-frame composition + tree/G/R/explicit transform centre. World sockets,
+reload/network, heavy-scene rendering and export UI remain. Installed .56/saves unchanged.
+
 ## Source checkpoint 0.19.61 — support data foundation; not deployed
 
 Independent root-owned supports, pose/default and separate selection scope now

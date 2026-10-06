@@ -182,6 +182,7 @@ public static class RuntimeEditorAcceptance
             checks.Add(WorldSelectionHighlightAcceptance.Run());
             checks.Add(PlacementContactAcceptance.Run());
             TestSignPayload();
+            TestPlacementSupportFrame();
             checks.Add(UICatalogAcceptance.Run(fontTemplate.font));
             foreach (object step in ControllerInputAcceptance.Run(template, fontTemplate, output)) yield return step;
             foreach (object step in ControllerInputAcceptance.RunContourLifecycle(template, fontTemplate, output)) yield return step;
@@ -535,6 +536,78 @@ public static class RuntimeEditorAcceptance
             checks.Add("Actual sign adapter on Unity objects: raw UTF-8/default capture, hidden/invalid denial, native limits, platform denial, setter result mismatch and explicit blank. Host Sign permissions/reload/network remain game acceptance.");
         }
         finally { provider.Granted = true; UnityEngine.Object.DestroyImmediate(root); }
+    }
+
+    private static void TestPlacementSupportFrame()
+    {
+        var blueprint = new CompositeBlueprintStore.Blueprint();
+        Require(!BlueprintPlacementFrame.TryResolve(blueprint, out Vector3 origin, out Quaternion orientation) &&
+            origin == Vector3.zero && orientation == Quaternion.identity, "Legacy placement frame changed");
+        blueprint.supports = new List<CompositeBlueprintStore.Support>
+        {
+            new CompositeBlueprintStore.Support
+            {
+                stableId = "entrance", name = "Вход",
+                position = new CompositeBlueprintStore.VectorData(new Vector3(1, 2, 3)),
+                rotation = new CompositeBlueprintStore.QuaternionData(Quaternion.Euler(23, 61, -17))
+            }
+        };
+        blueprint.placementSupportId = "entrance";
+        Require(BlueprintPlacementFrame.TryResolve(blueprint, out origin, out orientation), "Saved support frame unresolved");
+        foreach (float factor in new[] { 0.5f, 1f, 2f })
+        {
+            BlueprintPlacementFrame.ToRootPose(new Vector3(10, 20, 30), Quaternion.Euler(0, 0, 90),
+                new Vector3(1, 2, 3), Quaternion.Euler(0, 90, 0), factor,
+                out Vector3 position, out Quaternion rotation);
+            Require(Vector3.Distance(position, new Vector3(10 + 2 * factor, 20 + 3 * factor, 30 - factor)) < 0.0001f &&
+                Quaternion.Angle(rotation, new Quaternion(0.5f, -0.5f, 0.5f, 0.5f)) < 0.05f,
+                "Support pose inverse/order/uniform-scale compensation is wrong");
+        }
+        GameObject root = new GameObject("Placement support proof");
+        try
+        {
+            Transform child = new GameObject("Part").transform;
+            child.SetParent(root.transform, false);
+            child.localPosition = new Vector3(4, -2, 6);
+            child.localRotation = Quaternion.Euler(37, -11, 29);
+            child.localScale = new Vector3(-2, 0.5f, 1.25f);
+            Transform nested = new GameObject("Nested visual").transform;
+            nested.SetParent(child, false);
+            nested.localPosition = new Vector3(-1, 2, 0.3f);
+            nested.localRotation = Quaternion.Euler(12, 43, 9);
+            nested.localScale = new Vector3(0.75f, 2, 1);
+            Vector3 meshCorner = new Vector3(0.3f, -0.7f, 1.1f);
+            Vector3 rootPoint = nested.TransformPoint(meshCorner);
+            Vector3 childPosition = child.localPosition;
+            Quaternion childRotation = child.localRotation;
+            Vector3 childScale = child.localScale;
+            Bounds bounds = new Bounds(new Vector3(2, -3, 5), new Vector3(3, 7, 11));
+            Bounds rebased = BlueprintPlacementFrame.RebaseVisuals(root.transform, bounds, origin, orientation);
+            Require(child.localScale == childScale, "Frame rebase changed source scale");
+            Vector3 target = new Vector3(17, 29, -13);
+            Quaternion targetRotation = Quaternion.Euler(-19, 47, 32);
+            BlueprintPlacementFrame.ToRootPose(target, targetRotation, origin, orientation, 1,
+                out Vector3 rootPosition, out Quaternion rootRotation);
+            root.transform.SetPositionAndRotation(target, targetRotation);
+            Require(Vector3.Distance(child.position, rootPosition + rootRotation * childPosition) < 0.0001f &&
+                Quaternion.Angle(child.rotation, rootRotation * childRotation) < 0.05f,
+                "Hammer visual and root plan poses disagree");
+            Require(Vector3.Distance(nested.TransformPoint(meshCorner), rootPosition + rootRotation * rootPoint) < 0.0001f,
+                "Rotated support moved nested/mirrored mesh corner away from the plan");
+            Vector3 socketLocal = BlueprintPlacementFrame.ToLocal(rootPoint, origin, orientation);
+            Require(Vector3.Distance(root.transform.TransformPoint(socketLocal), nested.TransformPoint(meshCorner)) < 0.0001f,
+                "Hammer snap and visual disagree");
+            for (int corner = 0; corner < 8; ++corner)
+            {
+                Vector3 point = new Vector3((corner & 1) == 0 ? bounds.min.x : bounds.max.x,
+                    (corner & 2) == 0 ? bounds.min.y : bounds.max.y,
+                    (corner & 4) == 0 ? bounds.min.z : bounds.max.z);
+                Require(rebased.Contains(BlueprintPlacementFrame.ToLocal(point, origin, orientation)),
+                    "Support collider lost a rotated bound corner");
+            }
+        }
+        finally { Object.DestroyImmediate(root); }
+        checks.Add("Actual placement-frame adapter on Unity transforms: saved rotated support, Hammer visual/root-plan agreement, nested mirrored XYZ scale, native socket coincidence and all eight collider bounds corners; no native Valheim placement executed");
     }
 
     private static void TestSaveRoundtrip(BlueprintEditorController controller, string path)

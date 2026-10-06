@@ -9,7 +9,12 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.62**: [support storage/exchange](../specs/roadmap/blueprint-support-frames.md).
+Active source checkpoint **0.19.63**: [Hammer support-frame composition](../specs/roadmap/blueprint-support-frames.md).
+Shared inverse pose for ghost visuals/collider/native snaps and geometric root; F9 bounds pivot remains separate.
+Release/target checks and actual nested/mirrored Unity proof plus 144 states PASS; correctness/Ponytail PASS.
+Not a complete player workflow: tree/G/R/transform centre/world durability pending, installed .56 unchanged.
+
+Previous source checkpoint **0.19.62**: [support storage/exchange](../specs/roadmap/blueprint-support-frames.md).
 Store v11 / portable v2, legacy migration/clear/rollback and real rotated support disk roundtrip pass.
 108 Geometry + six EditorBridge + required checks/review and fresh 144 Unity states PASS.
 Not exposed as a player workflow: placement-frame math/tree/G/R/world durability remain; .56 unchanged.

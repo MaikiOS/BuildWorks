@@ -374,7 +374,8 @@ namespace OstrixMods.BuildWorks
             IReadOnlyList<Piece> pieces,
             out Vector3 placementOrigin)
         {
-            placementOrigin = Vector3.zero;
+            bool supportFrame = BlueprintPlacementFrame.TryResolve(blueprint,
+                out placementOrigin, out Quaternion placementRotation);
             GameObject prefab = new GameObject(PrefabPrefix + blueprint.id)
             {
                 hideFlags = HideFlags.HideAndDontSave,
@@ -425,12 +426,13 @@ namespace OstrixMods.BuildWorks
                         else frameBounds.Encapsulate(transformed);
                     }
                 }
-                placementOrigin = new Vector3(
-                    frameBounds.center.x,
-                    frameBounds.min.y,
-                    frameBounds.center.z);
-                foreach (Transform child in prefab.transform)
-                    child.localPosition -= placementOrigin;
+                if (!supportFrame)
+                    placementOrigin = new Vector3(
+                        frameBounds.center.x,
+                        frameBounds.min.y,
+                        frameBounds.center.z);
+                Bounds localBounds = BlueprintPlacementFrame.RebaseVisuals(
+                    prefab.transform, frameBounds, placementOrigin, placementRotation);
 
                 var placementBounds = new GameObject(
                     "BuildWorks_PlacementBounds",
@@ -443,11 +445,11 @@ namespace OstrixMods.BuildWorks
                 };
                 placementBounds.transform.SetParent(prefab.transform, false);
                 BoxCollider collider = placementBounds.GetComponent<BoxCollider>();
-                collider.center = frameBounds.center - placementOrigin;
+                collider.center = localBounds.center;
                 collider.size = new Vector3(
-                    Mathf.Max(frameBounds.size.x, 0.05f),
-                    Mathf.Max(frameBounds.size.y, 0.05f),
-                    Mathf.Max(frameBounds.size.z, 0.05f));
+                    Mathf.Max(localBounds.size.x, 0.05f),
+                    Mathf.Max(localBounds.size.y, 0.05f),
+                    Mathf.Max(localBounds.size.z, 0.05f));
 
                 int snapIndex = 0;
                 IReadOnlyList<Vector3> nativeSnapPoints = BlueprintNativeSnapPoints(blueprint, pieces);
@@ -464,13 +466,18 @@ namespace OstrixMods.BuildWorks
                     for (int index = 0; index < AnchorAdjustment.AnchorCount; ++index)
                     {
                         Point3 point = bounds.Anchor(index);
-                        AddSnapPoint(prefab.transform, snapIndex++, new Vector3(
-                            (float)point.X, (float)point.Y, (float)point.Z) - placementOrigin);
+                        AddSnapPoint(prefab.transform, snapIndex++, BlueprintPlacementFrame.ToLocal(
+                            new Vector3((float)point.X, (float)point.Y, (float)point.Z),
+                            placementOrigin, placementRotation));
                     }
                 }
                 foreach (Vector3 point in nativeSnapPoints)
-                    AddSnapPoint(prefab.transform, snapIndex++, point - placementOrigin);
+                    AddSnapPoint(prefab.transform, snapIndex++, BlueprintPlacementFrame.ToLocal(
+                        point, placementOrigin, placementRotation));
             }
+            else if (supportFrame)
+                BlueprintPlacementFrame.RebaseVisuals(prefab.transform, default,
+                    placementOrigin, placementRotation);
 
             return prefab;
         }

@@ -1781,19 +1781,27 @@ namespace OstrixMods.BuildWorks
             // A normal hammer click places one blueprint, regardless of the last F9 tool.
             if (!editBeforePlacement) gizmoMode = GizmoMode.Move;
             blueprintPivotLocal = placementOrigin;
-            basePosition = currentPosition = ghost.transform.position;
-            baseRotation = currentRotation = ghost.transform.rotation;
-            baseSnapshot = CaptureHistorySnapshot();
-            history.Reset(baseSnapshot);
+            Quaternion placementRotation = Quaternion.identity;
+            if (BlueprintPlacementFrame.TryResolve(blueprint,
+                out Vector3 supportPosition, out Quaternion supportRotation))
+            {
+                blueprintPivotLocal = supportPosition;
+                placementRotation = supportRotation;
+            }
             activeBlueprint = blueprint;
             blueprintCompositeFrame = !CompositeBlueprintStore.HasExplicitFrame(blueprint);
             activeBlueprintPieces.Clear();
             activeBlueprintPieces.AddRange(pieces);
-            blueprintRootPosition = currentPosition - currentRotation * blueprintPivotLocal;
-            blueprintRootRotation = currentRotation;
+            BlueprintPlacementFrame.ToRootPose(ghost.transform.position, ghost.transform.rotation,
+                blueprintPivotLocal, placementRotation, 1f,
+                out blueprintRootPosition, out blueprintRootRotation);
+            basePosition = currentPosition = ghost.transform.position;
+            baseRotation = currentRotation = blueprintRootRotation;
             Debug.Log("BuildWorks blueprint placement root " + blueprintRootPosition +
                 ", ghost " + ghost.transform.position + ", origin " + placementOrigin + ".");
             blueprintEditPartIndex = -1;
+            baseSnapshot = CaptureHistorySnapshot();
+            history.Reset(baseSnapshot);
             blueprintPartsDirty = false;
             state = PlacementState.Editing;
             ClearLayout();

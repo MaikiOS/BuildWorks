@@ -41,6 +41,7 @@ internal static class Program
             TestGridComposition();
             TestSignPayloadLifecycle();
             TestPivotLayoutComposition();
+            TestPlacementSupportRootComposition();
             TestHistorySurvivesPivotFrameSwitch();
             TestRotatedRoots();
             TestLimit();
@@ -97,6 +98,46 @@ internal static class Program
         CheckVector(Get(session, "blueprintRootPosition"), new Point3(10, 18, 30));
         CheckVector(Get(session, "currentPosition"), new Point3(10, 18, 30));
         Console.WriteLine("PASS actual Session: whole-blueprint history restores root across a composite-frame key switch");
+    }
+
+    private static void TestPlacementSupportRootComposition()
+    {
+        float s = (float)Math.Sqrt(0.5);
+        object supportPosition = Activator.CreateInstance(vectorType, 1f, 2f, 3f);
+        object framePosition = Activator.CreateInstance(vectorType, 10f, 20f, 30f);
+        foreach (float factor in new[] { 0.5f, 1f, 2f })
+        {
+            // Known root from support p=(1,2,3), q=Ry(90), target=(10,20,30)/Rz(90).
+            // Quaternion.Inverse is native: the shared pose resolver is tested in Unity.
+            object rootPosition = Activator.CreateInstance(vectorType,
+                10 + 2 * factor, 20 + 3 * factor, 30 - factor);
+            object rootRotation = Rotation(0.5f, -0.5f, 0.5f, 0.5f);
+            object session = Session(2);
+            IList parts = (IList)Get(Get(session, "activeBlueprint"), "parts");
+            foreach (object part in parts) Set(part, "scale", StoredVector(1, 1, 1));
+            Require((bool)append.Invoke(session, new[] { rootPosition, rootRotation, (object)factor }),
+                "Rotated support root append failed");
+            IList plan = (IList)Get(session, "placementPlan");
+            CheckVector(Property(plan[0], "Position"), new Point3(10 + 2 * factor, 20 + 3 * factor, 30));
+            CheckVector(Property(plan[1], "Position"), new Point3(10, 20 + 3 * factor, 30 - factor));
+            CheckRotation(Property(plan[1], "Rotation"), s, 0, s, 0);
+            foreach (object part in parts) CheckVector(Get(part, "scale"), new Point3(1, 1, 1));
+            if (factor != 1f) continue;
+            Set(session, "blueprintEditPartIndex", -1);
+            Set(session, "blueprintPivotLocal", supportPosition);
+            Set(session, "currentPosition", framePosition);
+            Set(session, "currentRotation", rootRotation);
+            sessionType.GetMethod("CommitBlueprintEditTarget", Instance).Invoke(session, null);
+            CheckVector(Get(session, "blueprintRootPosition"), new Point3(12, 23, 29));
+            CheckRotation(Get(session, "blueprintRootRotation"), 0.5f, -0.5f, 0.5f, 0.5f);
+            object snapshot = sessionType.GetMethod("CaptureHistorySnapshot", Instance).Invoke(session, null);
+            CheckVector(Property(snapshot, "Position"), new Point3(12, 23, 29));
+            Set(session, "blueprintPivotLocal", Activator.CreateInstance(vectorType, 0f, 2f, 0f));
+            sessionType.GetMethod("ApplyHistorySnapshot", Instance).Invoke(session, new[] { snapshot });
+            CheckVector(Get(session, "currentPosition"), new Point3(10, 23, 29));
+            CheckRotation(Get(session, "currentRotation"), 0.5f, -0.5f, 0.5f, 0.5f);
+        }
+        Console.WriteLine("PASS actual Session: known rotated support roots at 50/100/200% scale, source poses unchanged, commit/history preserve geometry root across pivot change; native pose resolver checked separately in Unity");
     }
 
     private static void TestGridComposition()

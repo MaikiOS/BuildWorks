@@ -816,7 +816,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.62.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.63.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -1356,10 +1356,17 @@ Assert-Contract ($blueprintRegistrySource -match
     $blueprintRegistrySource -match 'AnchorAdjustment\.AnchorCount' -and
     $blueprintRegistrySource -match 'bounds\.Anchor\(index\)' -and
     $blueprintRegistrySource -match 'BlueprintNativeSnapPoints\(blueprint, pieces\)' -and
-    $blueprintRegistrySource -match 'collider\.center = frameBounds\.center - placementOrigin' -and
-    $blueprintRegistrySource -match 'Mathf\.Max\(frameBounds\.size\.x, 0\.05f\)' -and
+    $blueprintRegistrySource -match 'collider\.center = localBounds\.center' -and
+    $blueprintRegistrySource -match 'Mathf\.Max\(localBounds\.size\.x, 0\.05f\)' -and
     $blueprintRegistrySource -match 'AnchorAdjustment\.ExternalCompositeSnapPoints') `
     'Blueprint placement no longer uses the selected part/group frame or composite fallback.'
+Assert-Contract ($createBlueprintPrefabOperands -match 'BlueprintPlacementFrame::TryResolve' -and
+    $createBlueprintPrefabOperands -match 'BlueprintPlacementFrame::RebaseVisuals' -and
+    $createBlueprintPrefabOperands -match 'BlueprintPlacementFrame::ToLocal' -and
+    $sessionSource -match 'BlueprintPlacementFrame\.ToRootPose\(ghost\.transform\.position, ghost\.transform\.rotation' -and
+    $sessionSource -match 'baseRotation = currentRotation = blueprintRootRotation' -and
+    $sessionSource -match 'blueprintEditPartIndex = -1;\s*baseSnapshot = CaptureHistorySnapshot\(\);\s*history\.Reset\(baseSnapshot\)') `
+    'Hammer visuals/snaps/collider and placement root do not share the independent support frame or coherent initial history.'
 Assert-Contract ($blueprintRegistrySource -match
     'if \(!CompositeBlueprintStore\.HasExplicitFrame\(blueprint\) \|\| nativeSnapPoints\.Count == 0\)' -and
     $blueprintRegistrySource -match
@@ -2805,4 +2812,4 @@ $signInstruction = @($nativeFinished.Body.Instructions | Where-Object { [string]
 $indexWrite = @($nativeFinished.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'stfld' -and [string]$_.Operand -match '::placementPlanIndex$' })
 Assert-Contract ($signInstruction.Count -eq 1 -and $indexWrite.Count -gt 0 -and $signInstruction[0].Offset -lt $indexWrite[0].Offset) 'Sign payload must apply before advancing the native queue.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.62 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.63 and Valheim Steam build 25185596.'

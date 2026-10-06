@@ -2,6 +2,19 @@
 
 **English** | [Русский](blueprint-support-frames_RU.md)
 
+## Checkpoint 0.19.63 — placement frame, not UI
+
+Saved placement support now rebases Hammer visuals, collider bounds and native sockets
+with the same inverse pose used to recover the geometric root before placement plans.
+Nested/mirrored XYZ-scale Unity visuals agree with root math; 50/100/200% support-offset
+compensation, actual Session composition/commit/history and legacy fallback pass.
+Placement origin remains separate from world-F9 bounds pivot and geometry/socket filters.
+Release, 108 Geometry, six Bridge, 12 WorldLayout, Store/Localization/HostContract/
+Deployment/format checks and fresh 144-state Unity PASS (2026-10-06T10:17:52Z).
+Native Quaternion.Inverse is checked inside Unity, not simulated outside the engine.
+Independent correctness and Ponytail reviews PASS. Tree/G/R/explicit transform-centre and world durability
+remain; installed .56 and saves unchanged. No Valheim placement/reload/network proof.
+
 ## Checkpoint 0.19.62 — storage and exchange
 
 Store v11 and portable v2 preserve support ID/name/root-local position/unit rotation

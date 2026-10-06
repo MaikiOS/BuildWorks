@@ -2,7 +2,20 @@
 
 **English** | [Русский](blueprint-format_RU.md)
 
-Current source **0.19.75**: Store v14 / portable v5 add optional contentsCleared for native Container/ItemStand only.
+Current source **0.19.76**: shared export preflight reads effective counts in a background task and asks independent storage/mount
+choices before confirmation. Back/cancel never write; destination/format remain fixed during review.
+Unreadable native storage disables storage clearing, not valid mount clearing; opaque unknown state disables both.
+Already-cleared raw storage is re-inspected; no archival contents are reported as effective.
+Store14/portable5 unchanged. Required checks/reviews and 204 isolated Unity EN/RU layout states PASS; not game proof.
+
+| Scenario | Implementation | Evidence |
+| --- | --- | --- |
+| Export counts/independent keep-clear/Back/cancel/error | CompositeBlueprintStore.InspectContents; BlueprintExchangeView | Store + ControllerInputAcceptance.RunExchangeLifecycle; Unity 2026-10-06T19:23:45.645088Z |
+| English/Russian review layout | Existing shared exchange window; catalogue test adapter | 1280–3440 px, UI100–140%, 24 new review captures |
+| Direct import policy and multi-document conversion | Pending; current import retains original data | Not achieved; do not infer from export tests |
+| Native world restoration and remote/save-load behavior | Pending; foreign-state guard unchanged | Not achieved |
+
+Previous source **0.19.75**: Store v14 / portable v5 add optional contentsCleared for native Container/ItemStand only.
 Independent storage/mount export choices act on a validated private copy. Exact raw Info/ZDO stay archival;
 requiredPrefabIds reflects effective contents. Retain never resurrects a prior cleared copy.
 Old v13/v4 inputs default to retained contents; old-schema new fields and invalid/duplicate/unknown flags reject.

@@ -7,20 +7,22 @@ using UnityEngine;
 namespace OstrixMods.BuildWorks
 {
     /// <summary>
-    /// English-only test adapter for the isolated Unity Workbench. Production
+    /// Catalogue test adapter for the isolated Unity Workbench. Production
     /// uses BuildWorksLocalization.cs and Valheim's selected language.
     /// </summary>
     internal static class BuildWorksLocalization
     {
         private const string TokenPrefix = "buildworks_";
-        private static readonly Dictionary<string, string> English = LoadEnglish();
+        private static readonly Dictionary<string, string> English = LoadCatalog("English");
+        private static readonly Dictionary<string, string> Russian = LoadCatalog("Russian");
+        internal static bool RussianLanguage;
 
         internal static string Token(string key) =>
             "$" + TokenPrefix + key.Replace('.', '_');
 
         internal static string Text(string key, params object[] arguments)
         {
-            string text = English.TryGetValue(key, out string value) ? value : key;
+            string text = (RussianLanguage ? Russian : English).TryGetValue(key, out string value) ? value : key;
             return arguments == null || arguments.Length == 0
                 ? text
                 : string.Format(CultureInfo.InvariantCulture, text, arguments);
@@ -50,10 +52,10 @@ namespace OstrixMods.BuildWorks
                 : Text(payload.Substring(0, separator), payload.Substring(separator + 1));
         }
 
-        private static Dictionary<string, string> LoadEnglish()
+        private static Dictionary<string, string> LoadCatalog(string language)
         {
             string path = Path.Combine(
-                Application.dataPath, "Editor", "RuntimeSources", "English.tsv");
+                Application.dataPath, "Editor", "RuntimeSources", language + ".tsv");
             var catalog = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (string line in File.ReadAllLines(path))
             {

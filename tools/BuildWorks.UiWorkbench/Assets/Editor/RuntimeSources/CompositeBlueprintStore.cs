@@ -230,6 +230,45 @@ namespace OstrixMods.BuildWorks
 
         public IReadOnlyList<string> Categories() => data.categories;
 
+        internal sealed class ContentsSummary
+        {
+            internal int Storages, Mounts, Unknown, UnreadableStorages, AlreadyCleared;
+            internal long StoredItems;
+            internal bool CanClearStorage => Unknown == 0;
+            internal bool CanClearMounts => Unknown == UnreadableStorages;
+        }
+
+        // Read effective contents only. Unknown data is never reported as an empty inventory.
+        internal static ContentsSummary InspectContents(Blueprint source, Func<string, int> prefabHash)
+        {
+            var result = new ContentsSummary();
+            if (source == null || !string.IsNullOrEmpty(source.importError))
+                throw new InvalidDataException(source?.importError ?? "$buildworks_import.format");
+            result.Unknown = source.sourceDocuments?.Count(document => document.ToGeometry().HasOpaqueSections) ?? 0;
+            foreach (Part part in source.parts)
+            {
+                var contents = part.foreignData?.ToGeometry();
+                if (contents == null) continue;
+                if (contents.ContentsCleared)
+                {
+                    ++result.AlreadyCleared;
+                    if (contents.Format == Geometry.BlueprintForeignPartData.NativeContainerFormat &&
+                        !Geometry.BlueprintContainerInventory.TryRead(contents, prefabHash, out _))
+                    { ++result.Unknown; ++result.UnreadableStorages; }
+                    continue;
+                }
+                if (contents.Format == Geometry.BlueprintForeignPartData.NativeItemStandFormat) ++result.Mounts;
+                else if (contents.Format == Geometry.BlueprintForeignPartData.NativeContainerFormat)
+                {
+                    if (Geometry.BlueprintContainerInventory.TryRead(contents, prefabHash, out var items))
+                    { ++result.Storages; result.StoredItems += items.Sum(item => (long)item.Stack); }
+                    else { ++result.Unknown; ++result.UnreadableStorages; }
+                }
+                else ++result.Unknown;
+            }
+            return result;
+        }
+
         // Always a private recipe. Retaining never resurrects previously cleared contents.
         internal static Blueprint CopyWithContentsPolicy(Blueprint source, bool clearStorage, bool clearMounts,
             Func<string, int> prefabHash)

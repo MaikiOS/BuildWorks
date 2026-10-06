@@ -2,6 +2,30 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.76 — export contents review UI; not deployed
+
+The existing shared editor/Hammer exchange window now reviews effective contents before export:
+verified storage/item counts, mount count, unknown records and already-cleared objects.
+Storage and mount keep/clear rows are independent; destination/format stay fixed until Back.
+No file exists before explicit confirmation. Back/cancel preserve source/document; errors retain choices.
+Unreadable native storage blocks storage clearing only; valid mounts can still be cleared while exact
+storage bytes remain. Opaque foreign/source state blocks both destructive choices, never pretends empty.
+Previously cleared raw inventories are re-inspected; archival items are not counted as effective.
+Store v14 / portable v5 and the world-state guard are unchanged.
+
+Release zero warnings/errors; 112 Geometry, Store, eight Bridge, 12 WorldLayout, 833 Localization,
+HostContract, format and deployment WhatIf PASS (existing format workspace-load warnings).
+verify unavailable; direct checks and independent correctness/Ponytail reviews PASS.
+Fresh isolated Unity: 204 screenshots / 38 checks PASS at 2026-10-06T19:23:45.645088Z,
+including actual clicks for four choices, Back/cancel, no pre-confirm output, duplicate/error recovery,
+opaque state blocking and mount-only export alongside unreadable storage with exact raw/source retention.
+12 new English and 12 Russian review-window layout captures cover 1280/1920/2560/3440 and UI100/120/140%.
+Russian captures use a catalogue test adapter, not host Localization proof; gameHostTested=false.
+Installed test remains .67; no deployment, Valheim launch, save mutation, publication or push.
+Direct import policy/count UI and multi-document atomic conversion remain pending; native world
+restoration, foreign storage decoding, armour/free items, heavy scenes above 512 and durable world sockets
+are still unfinished. Full goal stays active.
+
 ## Checkpoint 0.19.75 — independent contents policy persistence; not deployed
 
 Store v14 / portable v5 add optional contentsCleared to known native Container/ItemStand payloads.

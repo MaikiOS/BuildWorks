@@ -794,6 +794,16 @@ exchange.downloads	Downloads
 exchange.documents	Documents
 exchange.desktop	Desktop
 exchange.filename	File name
+exchange.contents_title	Contents of the exported copy
+exchange.contents_counts	Verified storages: {0}; items: {1}\nMounted items: {2}\nUnknown records: {3}; previously cleared objects: {4}
+exchange.storage_keep	Storage inventories: KEEP
+exchange.storage_clear	Storage inventories: CLEAR IN COPY
+exchange.mounts_keep	Mounted items: KEEP
+exchange.mounts_clear	Mounted items: CLEAR IN COPY
+exchange.contents_copy	Click either row to change its choice. Only the exported copy changes. Original data is retained; previously cleared contents stay empty.
+exchange.contents_unknown	Unknown/unreadable state: unavailable clear choices are disabled. Other choices remain independent. Exact original data is retained; the world is unchanged.
+exchange.confirm_export	Confirm export
+exchange.back	Back to file settings
 exchange.format_json	BuildWorks JSON
 exchange.format_zip	ZIP + BuildWorks
 exchange.copy_path	Copy full path

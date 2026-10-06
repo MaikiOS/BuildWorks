@@ -683,6 +683,17 @@ internal static class ControllerInputAcceptance
                 Field<TMP_InputField>(exchange, "fileName").SetTextWithoutNotify(name);
                 NativeClick(view, null, "ExchangeFormat"); yield return null;
                 NativeClick(view, null, "ExchangeSubmit"); yield return null;
+                for (int i = 0; i < 300 && Field<Task<CompositeBlueprintStore.ContentsSummary>>(exchange, "contentsInspection") != null; ++i)
+                { Frame(controller, input, Vector2.zero); yield return null; }
+                Require(Field<bool>(exchange, "reviewingContents") && !Field<bool>(exchange, "completed") &&
+                    !File.Exists(Path.Combine(store.ExportDirectory, name + ".zip")), "Export wrote before contents confirmation");
+                NativeClick(view, null, "ExchangeContentsBack"); yield return null;
+                Require(Field<TMP_InputField>(exchange, "fileName").gameObject.activeInHierarchy &&
+                    Field<TMP_InputField>(exchange, "directory").interactable, "Back did not restore file settings");
+                NativeClick(view, null, "ExchangeSubmit"); yield return null;
+                for (int i = 0; i < 300 && Field<Task<CompositeBlueprintStore.ContentsSummary>>(exchange, "contentsInspection") != null; ++i)
+                { Frame(controller, input, Vector2.zero); yield return null; }
+                NativeClick(view, null, "ExchangeSubmit"); yield return null;
                 Require(view.HasModal && Field<bool>(exchange, "completed") && Field<string>(exchange, "resultPath").EndsWith(name + ".zip"),
                     "Named ZIP export did not retain a usable result");
                 string exported = Field<string>(exchange, "resultPath");
@@ -697,11 +708,85 @@ internal static class ControllerInputAcceptance
                 NativeClick(view, null, "ExchangeFormat"); yield return null;
                 byte[] before = File.ReadAllBytes(exported);
                 NativeClick(view, null, "ExchangeSubmit"); yield return null;
+                for (int i = 0; i < 300 && Field<Task<CompositeBlueprintStore.ContentsSummary>>(exchange, "contentsInspection") != null; ++i)
+                { Frame(controller, input, Vector2.zero); yield return null; }
+                NativeClick(view, null, "ExchangeSubmit"); yield return null;
                 Require(!Field<bool>(exchange, "completed") && File.ReadAllBytes(exported).SequenceEqual(before) &&
                     Field<TMP_InputField>(exchange, "fileName").text == name && Field<TMP_Text>(exchange, "message").text.Length > 0,
                     "Duplicate export overwrote file or hid recoverable error");
                 NativeClick(view, null, "ExchangeClose"); yield return null;
+                var policy = CompositeBlueprintStore.CopyWithContentsPolicy(prepared, false, false, null);
+                // New native test objects, not the original foreign wall rows.
+                foreach (var part in policy.parts) { part.sourceDocumentId = null; part.sourceLine = 0; }
+                policy.parts[0].prefabName = "piece_chest";
+                policy.parts[0].foreignData = new CompositeBlueprintStore.ForeignPartData {
+                    format = BlueprintForeignPartData.NativeContainerFormat, info = "5:2:0:0", zdo = "bQAAAAAA" };
+                policy.parts[1].prefabName = "itemstand";
+                policy.parts[1].foreignData = new CompositeBlueprintStore.ForeignPartData {
+                    format = BlueprintForeignPartData.NativeItemStandFormat, info = "SwordIron:0:1:0", zdo = "bQIA" };
+                foreach (bool emptyStorage in new[] { false, true })
+                foreach (bool emptyMounts in new[] { false, true })
+                {
+                    view.ShowExchange((parent, textFont, closed) => new BlueprintExchangeView(parent, textFont, store, policy, closed)); yield return null;
+                    exchange = Field<BlueprintExchangeView>(view, "exchangeView");
+                    for (int i = 0; i < 300 && Field<Task<string[]>>(exchange, "listing") != null; ++i)
+                    { Frame(controller, input, Vector2.zero); yield return null; }
+                    Field<TMP_InputField>(exchange, "fileName").SetTextWithoutNotify("policy_" + Guid.NewGuid().ToString("N"));
+                    NativeClick(view, null, "ExchangeSubmit"); yield return null;
+                    for (int i = 0; i < 300 && Field<Task<CompositeBlueprintStore.ContentsSummary>>(exchange, "contentsInspection") != null; ++i)
+                    { Frame(controller, input, Vector2.zero); yield return null; }
+                    var summary = Field<CompositeBlueprintStore.ContentsSummary>(exchange, "contentsSummary");
+                    Require(summary != null && summary.CanClearStorage && summary.CanClearMounts && summary.Storages == 1 && summary.Mounts == 1,
+                        "UI contents counts missing: " + Field<TMP_Text>(exchange, "message").text);
+                    if (emptyStorage) NativeClick(view, null, "ExchangeStorageChoice");
+                    if (emptyMounts) NativeClick(view, null, "ExchangeMountChoice");
+                    NativeClick(view, null, "ExchangeSubmit"); yield return null;
+                    Require(Field<bool>(exchange, "completed"),
+                        "Contents export did not complete: " + Field<TMP_Text>(exchange, "message").text);
+                    var copy = ExternalBlueprintLibrary.LoadFile(Field<string>(exchange, "resultPath")).Single();
+                    Require(copy.parts[0].foreignData.contentsCleared == emptyStorage && copy.parts[1].foreignData.contentsCleared == emptyMounts &&
+                        !policy.parts[0].foreignData.contentsCleared && !policy.parts[1].foreignData.contentsCleared,
+                        "Actual UI coupled storage/mount choices or mutated source");
+                    NativeClick(view, null, "ExchangeClose"); yield return null;
+                }
                 string lockedPath = Path.Combine(folder, "locked.blueprint"); File.WriteAllText(lockedPath, text);
+                policy.parts[0].foreignData = new CompositeBlueprintStore.ForeignPartData { format = "vbuild", zdo = "opaque" };
+                view.ShowExchange((parent, textFont, closed) => new BlueprintExchangeView(parent, textFont, store, policy, closed)); yield return null;
+                exchange = Field<BlueprintExchangeView>(view, "exchangeView");
+                for (int i = 0; i < 300 && Field<Task<string[]>>(exchange, "listing") != null; ++i)
+                { Frame(controller, input, Vector2.zero); yield return null; }
+                string cancelledName = "cancel_" + Guid.NewGuid().ToString("N");
+                Field<TMP_InputField>(exchange, "fileName").SetTextWithoutNotify(cancelledName);
+                NativeClick(view, null, "ExchangeSubmit"); yield return null;
+                for (int i = 0; i < 300 && Field<Task<CompositeBlueprintStore.ContentsSummary>>(exchange, "contentsInspection") != null; ++i)
+                { Frame(controller, input, Vector2.zero); yield return null; }
+                Require(Field<CompositeBlueprintStore.ContentsSummary>(exchange, "contentsSummary").Unknown == 1 &&
+                    !Field<Button>(exchange, "storageChoice").interactable && !Field<Button>(exchange, "mountChoice").interactable &&
+                    Field<Button>(exchange, "primary").interactable, "Unknown state did not block only destructive choices");
+                NativeClick(view, null, "ExchangeClose"); yield return null;
+                Require(!File.Exists(Path.Combine(store.ExportDirectory, cancelledName + ".buildworks.json")) &&
+                    policy.parts[0].foreignData.zdo == "opaque", "Cancel changed source or wrote an export");
+                string unreadablePackage = Convert.ToBase64String(new byte[] { 109, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 64, 1, 0, 0, 0, 0 });
+                policy.parts[0].foreignData = new CompositeBlueprintStore.ForeignPartData {
+                    format = BlueprintForeignPartData.NativeContainerFormat, info = "5:2:1:1|Wood", zdo = unreadablePackage };
+                view.ShowExchange((parent, textFont, closed) => new BlueprintExchangeView(parent, textFont, store, policy, closed)); yield return null;
+                exchange = Field<BlueprintExchangeView>(view, "exchangeView");
+                for (int i = 0; i < 300 && Field<Task<string[]>>(exchange, "listing") != null; ++i)
+                { Frame(controller, input, Vector2.zero); yield return null; }
+                Field<TMP_InputField>(exchange, "fileName").SetTextWithoutNotify("mount_only_" + Guid.NewGuid().ToString("N"));
+                NativeClick(view, null, "ExchangeSubmit"); yield return null;
+                for (int i = 0; i < 300 && Field<Task<CompositeBlueprintStore.ContentsSummary>>(exchange, "contentsInspection") != null; ++i)
+                { Frame(controller, input, Vector2.zero); yield return null; }
+                Require(!Field<Button>(exchange, "storageChoice").interactable && Field<Button>(exchange, "mountChoice").interactable,
+                    "Unreadable storage blocked an independent valid mount choice");
+                NativeClick(view, null, "ExchangeMountChoice");
+                NativeClick(view, null, "ExchangeSubmit"); yield return null;
+                Require(Field<bool>(exchange, "completed"), "Independent mount-only export failed");
+                var mountOnly = ExternalBlueprintLibrary.LoadFile(Field<string>(exchange, "resultPath")).Single();
+                Require(!mountOnly.parts[0].foreignData.contentsCleared && mountOnly.parts[0].foreignData.zdo == unreadablePackage &&
+                    mountOnly.parts[1].foreignData.contentsCleared && !policy.parts[1].foreignData.contentsCleared,
+                    "Mount-only export changed unreadable storage or source");
+                NativeClick(view, null, "ExchangeClose"); yield return null;
                 view.ShowExchange((parent, textFont, closed) => new BlueprintExchangeView(parent, textFont, store, null, closed)); yield return null;
                 exchange = Field<BlueprintExchangeView>(view, "exchangeView");
                 for (int i = 0; i < 300 && Field<Task<string[]>>(exchange, "listing") != null; ++i)
@@ -732,7 +817,7 @@ internal static class ControllerInputAcceptance
                 { Frame(controller, input, Vector2.zero); yield return null; }
                 Require(Field<bool>(exchange, "completed"), "Recovered browser cannot retry import");
                 File.WriteAllText(Path.Combine(output, "exchange-input-check.txt"),
-                    "PASS actual catalogue/browser clicks, original-safe import, persistent path and Escape, nonunit prefab visual scale, named native ZIP, duplicate rejection and retained inputs, no stale files while loading, worker error recovery and retry. No Valheim host proof.");
+                    "PASS actual catalogue/browser clicks, original-safe import, persistent path and Escape, nonunit prefab visual scale, named native ZIP, duplicate rejection and retained inputs, export contents counts/four independent choices/back/confirmation/unknown-state guard/cancel, no stale files while loading, worker error recovery and retry. No Valheim host proof.");
             }
         }
         finally { Object.Destroy(source); }

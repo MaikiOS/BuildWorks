@@ -157,6 +157,19 @@ namespace OstrixMods.BuildWorks.StoreTests
             var store = new CompositeBlueprintStore(path);
             Require(store.TrySave("Contents", parts, Array.Empty<CompositeBlueprintStore.VectorData>(), out var saved, out string error), error);
             string original = File.ReadAllText(path);
+            var inspected = CompositeBlueprintStore.InspectContents(saved, _ => 100);
+            Require(inspected.CanClearStorage && inspected.CanClearMounts && inspected.Storages == 1 && inspected.StoredItems == 1 &&
+                inspected.Mounts == 1 && inspected.Unknown == 0 && inspected.AlreadyCleared == 0,
+                "Contents preflight did not report independent effective counts");
+            var unavailable = CompositeBlueprintStore.InspectContents(saved, _ => 0);
+            Require(!unavailable.CanClearStorage && unavailable.CanClearMounts && unavailable.Storages == 0 && unavailable.Unknown == 1 && unavailable.Mounts == 1,
+                "Unreadable contents were reported as an empty known storage");
+            var clearedUnreadable = CompositeBlueprintStore.CopyWithContentsPolicy(saved, true, false, _ => 100);
+            var invalidPacket = Convert.FromBase64String(package); invalidPacket[14] = 0;
+            clearedUnreadable.parts[0].foreignData.zdo = Convert.ToBase64String(invalidPacket);
+            var archived = CompositeBlueprintStore.InspectContents(clearedUnreadable, _ => 100);
+            Require(!archived.CanClearStorage && archived.CanClearMounts && archived.AlreadyCleared == 1 && archived.Unknown == 1,
+                "Previously cleared unreadable evidence bypassed preflight");
             foreach (bool storage in new[] { false, true })
             foreach (bool mounts in new[] { false, true })
             {
@@ -167,6 +180,10 @@ namespace OstrixMods.BuildWorks.StoreTests
                 Require(output.importError == null && output.parts[0].foreignData.contentsCleared == storage &&
                     output.parts[1].foreignData.contentsCleared == mounts, "Storage/mount choices were coupled or lost");
                 var retained = CompositeBlueprintStore.CopyWithContentsPolicy(output, false, false, null);
+                var summary = CompositeBlueprintStore.InspectContents(retained, _ => 100);
+                Require(summary.CanClearStorage && summary.CanClearMounts && summary.Storages == (storage ? 0 : 1) && summary.StoredItems == (storage ? 0 : 1) &&
+                    summary.Mounts == (mounts ? 0 : 1) && summary.AlreadyCleared == (storage ? 1 : 0) + (mounts ? 1 : 0),
+                    "Contents review counted archival items as effective contents");
                 string portableOutput = System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(retained));
                 var dependencies = new List<string> { "itemstand", "piece_chest" };
                 if (!storage) dependencies.Add("Wood");

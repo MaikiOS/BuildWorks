@@ -17,6 +17,11 @@ namespace OstrixMods.BuildWorks
         private readonly TMP_Text font, message, pageLabel;
         private readonly TMP_InputField directory, fileName;
         private readonly Button primary, copyPath, format;
+        private RectTransform contentsPanel;
+        private Button contentsBack, storageChoice, mountChoice;
+        private Task<CompositeBlueprintStore.ContentsSummary> contentsInspection;
+        private CompositeBlueprintStore.ContentsSummary contentsSummary;
+        private bool reviewingContents, clearStorage, clearMounts;
         private readonly BlueprintEditorSkin skin = new BlueprintEditorSkin();
         private readonly CompositeBlueprintStore store;
         private readonly CompositeBlueprintStore.Blueprint blueprint;
@@ -125,7 +130,14 @@ namespace OstrixMods.BuildWorks
                     }
                 }
             }
-            primary.interactable = !completed && !importing && listing == null && (blueprint != null || selected != null);
+            if (contentsInspection != null && contentsInspection.IsCompleted)
+            {
+                try { contentsSummary = contentsInspection.GetAwaiter().GetResult(); if (reviewingContents) RenderContents(); }
+                catch (Exception error) { if (reviewingContents) SetError(error); }
+                contentsInspection = null;
+            }
+            primary.interactable = !completed && !importing && listing == null &&
+                (blueprint != null || selected != null) && (!reviewingContents || contentsSummary != null);
             copyPath.interactable = !importing;
             if (completed || importing)
                 foreach (Selectable control in root.GetComponentsInChildren<Selectable>())
@@ -176,7 +188,10 @@ namespace OstrixMods.BuildWorks
             }
             else
             {
-                if (!store.TryExportFile(blueprint, directory.text, fileName.text, archive, out resultPath, out string error))
+                if (!reviewingContents) { ReviewContents(); return; }
+                if (contentsSummary == null) return;
+                if (!store.TryExportFile(blueprint, directory.text, fileName.text, archive, out resultPath, out string error,
+                    clearStorage, clearMounts, name => name.GetStableHashCode()))
                 { message.text = BuildWorksLocalization.ResolveUserText(error); return; }
                 completed = true; ShowResult(T("exchange.exported", resultPath));
             }
@@ -184,12 +199,67 @@ namespace OstrixMods.BuildWorks
         }
 
         private void SetError(Exception error) => message.text = BuildWorksLocalization.ResolveUserText(error.Message);
-        private void ShowResult(string value)
+
+        private void ReviewContents()
+        {
+            reviewingContents = true; contentsSummary = null; clearStorage = clearMounts = false;
+            SetFileControls(false); copyPath.gameObject.SetActive(false);
+            if (!contentsPanel)
+            {
+                contentsPanel = Rect("ExchangeContents", panel, 20, 174, 740, 260);
+                contentsPanel.gameObject.AddComponent<Image>().color = new Color(.05f, .055f, .055f, 1);
+                Label("ExchangeContentsTitle", T("exchange.contents_title"), 12, 8, 716, 30, 20, contentsPanel);
+                Label("ExchangeContentsSummary", "", 12, 48, 716, 92, 16, contentsPanel);
+                storageChoice = Button("ExchangeStorageChoice", "", 12, 152, 716, () =>
+                { clearStorage = !clearStorage; RenderContents(); }, contentsPanel);
+                mountChoice = Button("ExchangeMountChoice", "", 12, 194, 716, () =>
+                { clearMounts = !clearMounts; RenderContents(); }, contentsPanel);
+                contentsBack = Button("ExchangeContentsBack", T("exchange.back"), 256, 530, 276, () =>
+                {
+                    reviewingContents = false; contentsPanel.gameObject.SetActive(false);
+                    contentsBack.gameObject.SetActive(false); copyPath.gameObject.SetActive(true);
+                    SetFileControls(true); message.text = "";
+                    primary.GetComponentInChildren<TMP_Text>().text = T("exchange.export");
+                });
+            }
+            contentsPanel.gameObject.SetActive(true); contentsBack.gameObject.SetActive(true);
+            storageChoice.interactable = mountChoice.interactable = primary.interactable = false;
+            primary.GetComponentInChildren<TMP_Text>().text = T("exchange.confirm_export");
+            message.text = T("exchange.loading");
+            contentsInspection = Task.Run(() => CompositeBlueprintStore.InspectContents(blueprint, name => name.GetStableHashCode()));
+        }
+
+        private void RenderContents()
+        {
+            var summary = contentsPanel.Find("ExchangeContentsSummary").GetComponent<TMP_Text>();
+            summary.text = T("exchange.contents_counts", contentsSummary.Storages, contentsSummary.StoredItems,
+                contentsSummary.Mounts, contentsSummary.Unknown, contentsSummary.AlreadyCleared);
+            storageChoice.GetComponentInChildren<TMP_Text>().text = T(clearStorage ? "exchange.storage_clear" : "exchange.storage_keep");
+            mountChoice.GetComponentInChildren<TMP_Text>().text = T(clearMounts ? "exchange.mounts_clear" : "exchange.mounts_keep");
+            storageChoice.interactable = contentsSummary.CanClearStorage && contentsSummary.Storages > 0;
+            mountChoice.interactable = contentsSummary.CanClearMounts && contentsSummary.Mounts > 0;
+            skin.Apply(storageChoice, active: clearStorage); skin.Apply(mountChoice, active: clearMounts);
+            message.text = T(contentsSummary.Unknown == 0 ? "exchange.contents_copy" : "exchange.contents_unknown");
+        }
+
+        private void SetFileControls(bool visible)
         {
             foreach (Transform child in panel)
                 if (child.name == "ExchangeEntries" || child.name == "ExchangePrevious" || child.name == "ExchangeNext" ||
                     child.name == "ExchangePage" || child.name == "ExchangeNameLabel" || child.name == "ExchangeFileName" || child.name == "ExchangeFormat")
-                    child.gameObject.SetActive(false);
+                    child.gameObject.SetActive(visible);
+            // The reviewed destination and format stay fixed until Back.
+            foreach (string name in new[] { "ExchangeDirectory", "ExchangeUp", "ExchangeGo", "ExchangeHome",
+                "ExchangeDownloads", "ExchangeDocuments", "ExchangeDesktop" })
+                panel.Find(name).GetComponent<Selectable>().interactable = visible;
+        }
+
+        private void ShowResult(string value)
+        {
+            SetFileControls(false);
+            if (contentsPanel) contentsPanel.gameObject.SetActive(false);
+            if (contentsBack) contentsBack.gameObject.SetActive(false);
+            copyPath.gameObject.SetActive(true);
             var viewport = Rect("ExchangeResult", panel, 20, 174, 740, 342);
             viewport.gameObject.AddComponent<Image>().color = new Color(.05f, .055f, .055f, 1);
             viewport.gameObject.AddComponent<RectMask2D>();

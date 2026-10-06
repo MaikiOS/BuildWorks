@@ -9,7 +9,13 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.75**: Store v14 / portable v5 preserve independent storage/mount clear intent
+Active source checkpoint **0.19.76**: shared editor/Hammer export contents review shows counts/unknown/previous clears
+and independent storage/mount choices before explicit confirmation. Back/cancel/source retention and partial unreadable-storage
+eligibility are verified by real UI interactions. 204 isolated Unity layouts, including Russian review screens, and required checks PASS.
+Store14/portable5 unchanged; installed .67 unchanged, not deployed. Direct import policy/multi-document conversion and world restoration
+remain pending. Details and exact proof are in HANDOFF.
+
+Previous source checkpoint **0.19.75**: Store v14 / portable v5 preserve independent storage/mount clear intent
 without changing original packages or sources. Effective dependencies, editor visuals/tree/tools and Undo follow that intent.
 Four export combinations, migration/rejection/atomicity, Release/112 Geometry/required checks and independent reviews PASS.
 Choice/count/preflight UI and direct import policy remain pending; native world-state placement is still gated.

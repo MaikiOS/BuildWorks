@@ -331,7 +331,7 @@ public static class RuntimeEditorAcceptance
                     scene.SetViewport(view.ViewportScreenRect());
                     Call(controller, "FrameAll");
                     foreach (string state in new[] { "select", "transform", "array", "contour", "catalog",
-                        "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "save-metadata", "supports", "exchange-import", "exchange-export" })
+                        "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "save-metadata", "supports", "exchange-import", "exchange-export", "exchange-contents", "exchange-contents-ru" })
                     {
                         Require(Screen.width == width && Screen.height == height,
                             "GameView changed before " + state + ": " + Screen.width + "x" + Screen.height);
@@ -385,11 +385,22 @@ public static class RuntimeEditorAcceptance
                             var layoutStore = new CompositeBlueprintStore(Path.Combine(folder, "library.json"));
                             var blueprint = store.All()[0];
                             File.WriteAllBytes(Path.Combine(folder, "Дом.buildworks.json"), BlueprintExchangeFormat.Encode(blueprint));
+                            BuildWorksLocalization.RussianLanguage = state.EndsWith("-ru", StringComparison.Ordinal);
                             view.ShowExchange((parent, textFont, closed) => new BlueprintExchangeView(parent, textFont, layoutStore,
-                                state == "exchange-export" ? blueprint : null, closed));
+                                state != "exchange-import" ? blueprint : null, closed));
                             for (int i = 0; i < 300 && Field<System.Threading.Tasks.Task<string[]>>(
                                 Field<BlueprintExchangeView>(view, "exchangeView"), "listing") != null; ++i)
                             { view.Tick(); yield return null; }
+                            if (state.StartsWith("exchange-contents", StringComparison.Ordinal))
+                            {
+                                ControllerInputAcceptance.NativeClick(view, uiCamera, "ExchangeSubmit");
+                                var exchange = Field<BlueprintExchangeView>(view, "exchangeView");
+                                for (int i = 0; i < 300 && Field<System.Threading.Tasks.Task<CompositeBlueprintStore.ContentsSummary>>(
+                                    exchange, "contentsInspection") != null; ++i)
+                                { view.Tick(); yield return null; }
+                                Require(Field<CompositeBlueprintStore.ContentsSummary>(exchange, "contentsSummary") != null,
+                                    "Contents screenshot missed completed inspection");
+                            }
                         }
                         else Call(controller, "UpdateGizmo");
                         // Product Destroy() and TMP rebuilds must see a real frame.
@@ -428,6 +439,7 @@ public static class RuntimeEditorAcceptance
                         scene.Camera.targetTexture = null;
                         view.RootCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
                         if (state.StartsWith("exchange")) ControllerInputAcceptance.NativeClick(view, uiCamera, "ExchangeClose");
+                        BuildWorksLocalization.RussianLanguage = false;
                         yield return null;
                     }
                     Object.DestroyImmediate(target);

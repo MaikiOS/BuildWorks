@@ -54,6 +54,7 @@ $sourceProof = foreach ($name in $runtimeFiles) {
 }
 $englishCatalog = Join-Path $repositoryRoot 'src\BuildWorks\Translations\English.tsv'
 Copy-Item -LiteralPath $englishCatalog -Destination (Join-Path $runtimeSources 'English.tsv') -Force
+Copy-Item -LiteralPath (Join-Path $repositoryRoot 'src\BuildWorks\Translations\Russian.tsv') -Destination (Join-Path $runtimeSources 'Russian.tsv') -Force
 $iconDestination = Join-Path $projectPath 'Assets\Resources\BuildWorks\Icons'
 New-Item -ItemType Directory -Path $iconDestination -Force | Out-Null
 Get-ChildItem -LiteralPath (Join-Path $repositoryRoot 'src\BuildWorks\Assets\BlueprintEditorIcons') -Filter '*.png' |
@@ -85,7 +86,7 @@ if ($process.ExitCode -ne 0) {
 }
 
 $outputPath = Join-Path $repositoryRoot 'artifacts\ui-runtime'
-$expected = foreach ($state in 'select', 'transform', 'array', 'contour', 'catalog', 'outliner', 'settings', 'catalog-blueprints', 'catalog-materials', 'catalog-quick', 'catalog-crafting', 'save-metadata', 'supports', 'exchange-import', 'exchange-export') {
+$expected = foreach ($state in 'select', 'transform', 'array', 'contour', 'catalog', 'outliner', 'settings', 'catalog-blueprints', 'catalog-materials', 'catalog-quick', 'catalog-crafting', 'save-metadata', 'supports', 'exchange-import', 'exchange-export', 'exchange-contents', 'exchange-contents-ru') {
     foreach ($size in '1280x720', '1920x1080', '2560x1440', '3440x1440') {
         foreach ($scale in 100,120,140) { "$state-$size-$scale.png" }
     }

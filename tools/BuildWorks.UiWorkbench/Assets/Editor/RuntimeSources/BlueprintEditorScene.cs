@@ -188,6 +188,8 @@ namespace OstrixMods.BuildWorks
             new List<UnityEngine.Object>();
         private readonly Dictionary<Mesh, MeshSnapshot> meshSnapshots =
             new Dictionary<Mesh, MeshSnapshot>();
+        private readonly Dictionary<(Mesh, Matrix4x4), PickSurface> rootMeshGeometry =
+            new Dictionary<(Mesh, Matrix4x4), PickSurface>();
         private readonly Dictionary<Material, Material> sharedPreviewMaterials =
             new Dictionary<Material, Material>();
         private readonly int editorLayer;
@@ -1849,6 +1851,7 @@ namespace OstrixMods.BuildWorks
             foreach (VisualNode visual in visuals.Values) DestroyVisual(visual);
             visuals.Clear();
             meshSnapshots.Clear();
+            rootMeshGeometry.Clear();
             sharedPreviewMaterials.Clear();
             if (root) UnityEngine.Object.Destroy(root);
             foreach (UnityEngine.Object asset in ownedAssets)
@@ -2046,7 +2049,7 @@ namespace OstrixMods.BuildWorks
                     renderer.sharedMaterials = previewMaterials;
                     result.OriginalRenderingOff.Add(renderer.forceRenderingOff);
                 }
-                if (selectable || captureSurfaces) CapturePickSurfaces(result);
+                if (selectable || captureSurfaces) CapturePickSurfaces(result, cacheMaterials);
                 if (result.PlacementLocal.Count == 0) AddBoundsPlacementPoints(result);
                 if (selectable) ApplyAppearance(result);
                 return result;
@@ -2394,12 +2397,12 @@ namespace OstrixMods.BuildWorks
             return found;
         }
 
-        private void CapturePickSurfaces(VisualNode visual)
+        private void CapturePickSurfaces(VisualNode visual, bool cacheGeometry)
         {
             foreach (MeshFilter filter in visual.Root.GetComponentsInChildren<MeshFilter>(true))
             {
                 Renderer renderer = filter.GetComponent<Renderer>();
-                AddPickSurface(visual, renderer, filter.sharedMesh, filter.transform);
+                AddPickSurface(visual, renderer, filter.sharedMesh, filter.transform, cacheGeometry);
             }
         }
 
@@ -2407,9 +2410,12 @@ namespace OstrixMods.BuildWorks
             VisualNode visual,
             Renderer renderer,
             Mesh mesh,
-            Transform meshTransform)
+            Transform meshTransform,
+            bool cacheGeometry)
         {
             if (!renderer || !mesh || !meshTransform) return;
+            bool persistent = (mesh.hideFlags & HideFlags.DontSave) == 0 &&
+                !visual.OwnedAssets.Contains(mesh);
             if (!meshSnapshots.TryGetValue(mesh, out MeshSnapshot snapshot))
             {
                 if (!BlueprintEditorMeshData.TryRead(
@@ -2429,30 +2435,38 @@ namespace OstrixMods.BuildWorks
                 };
                 // Baked clones and placeholders belong to one visual; retaining their
                 // unique mesh keys would keep dead geometry until the editor closes.
-                if ((mesh.hideFlags & HideFlags.DontSave) == 0 &&
-                    !visual.OwnedAssets.Contains(mesh))
+                if (persistent)
                     meshSnapshots.Add(mesh, snapshot);
             }
-            var vertices = new Vector3[snapshot.Vertices.Length];
-            for (int index = 0; index < vertices.Length; ++index)
-                vertices[index] = visual.Root.transform.InverseTransformPoint(
-                    meshTransform.TransformPoint(snapshot.Vertices[index]));
-            var edges = new Edge3[snapshot.Edges.Count];
-            for (int index = 0; index < edges.Length; ++index)
+            // Part poses are applied after capture. This key retains nested local TRS,
+            // not the part's world pose; renderer state stays on each surface instance.
+            Matrix4x4 relative = visual.Root.transform.worldToLocalMatrix * meshTransform.localToWorldMatrix;
+            float determinant = visual.Root.transform.localToWorldMatrix.determinant;
+            bool shared = persistent && IsFinite(determinant) && determinant != 0f;
+            for (int index = 0; shared && index < 16; ++index) shared = IsFinite(relative[index]);
+            if (!shared || !rootMeshGeometry.TryGetValue((mesh, relative), out PickSurface geometry))
             {
-                Edge3 edge = snapshot.Edges[index];
-                edges[index] = new Edge3(
-                    ToGeometry(visual.Root.transform.InverseTransformPoint(
-                        meshTransform.TransformPoint(ToUnity(edge.Start)))),
-                    ToGeometry(visual.Root.transform.InverseTransformPoint(
-                        meshTransform.TransformPoint(ToUnity(edge.End)))));
+                Vector3 InRoot(Vector3 vertex) => shared ? relative.MultiplyPoint3x4(vertex)
+                    : visual.Root.transform.InverseTransformPoint(meshTransform.TransformPoint(vertex));
+                var vertices = new Vector3[snapshot.Vertices.Length];
+                for (int index = 0; index < vertices.Length; ++index) vertices[index] = InRoot(snapshot.Vertices[index]);
+                var edges = new Edge3[snapshot.Edges.Count];
+                for (int index = 0; index < edges.Length; ++index)
+                {
+                    Edge3 edge = snapshot.Edges[index];
+                    edges[index] = new Edge3(ToGeometry(InRoot(ToUnity(edge.Start))), ToGeometry(InRoot(ToUnity(edge.End))));
+                }
+                geometry = new PickSurface { Vertices = vertices, Triangles = snapshot.Triangles, Edges = edges };
+                // Catalog placement previews may reuse document geometry, but must not
+                // retain every newly browsed prefab until the document closes.
+                if (shared && cacheGeometry) rootMeshGeometry.Add((mesh, relative), geometry);
             }
             var surface = new PickSurface
             {
                 Renderer = renderer,
-                Vertices = vertices,
-                Triangles = snapshot.Triangles,
-                Edges = edges
+                Vertices = geometry.Vertices,
+                Triangles = geometry.Triangles,
+                Edges = geometry.Edges
             };
             visual.PickSurfaces.Add(surface);
         }

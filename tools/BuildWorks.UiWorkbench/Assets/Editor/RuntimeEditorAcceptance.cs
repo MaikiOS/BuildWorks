@@ -21,6 +21,7 @@ public static class RuntimeEditorAcceptance
     private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
     private const string PendingRun = "BuildWorks.RuntimeAcceptance.Pending";
     private static IEnumerator run;
+    private static Action repaintGameView;
     private static int lastFrame = -1;
     private static readonly List<string> checks = new List<string>();
     private static readonly List<string> runtimeErrors = new List<string>();
@@ -56,6 +57,7 @@ public static class RuntimeEditorAcceptance
         {
             if (Time.frameCount == lastFrame) return;
             lastFrame = Time.frameCount;
+            repaintGameView?.Invoke();
             if (run.MoveNext()) return;
             EditorApplication.update -= Advance;
             EditorApplication.Exit(0);
@@ -93,8 +95,20 @@ public static class RuntimeEditorAcceptance
         var window = EditorWindow.GetWindow(asm.GetType("UnityEditor.GameView"), false, "BuildWorks Acceptance", false);
         var selection = window.GetType().GetMethod("SizeSelectionCallback");
         int original = (int)window.GetType().GetProperty("selectedSizeIndex", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).GetValue(window);
-        selection.Invoke(window, new object[] { index, null }); window.Repaint();
-        return () => { selection.Invoke(window, new object[] { original, null }); groupType.GetMethod("RemoveCustomSize").Invoke(group, new object[] { index }); };
+        selection.Invoke(window, new object[] { index, null }); window.Focus(); window.Repaint();
+        // Editor updates are not GameView repaints in batch mode. Render the real
+        // fixed-size view before each fixture step instead of fabricating Screen values.
+        MethodInfo repaint = typeof(EditorWindow).GetMethod("RepaintImmediately", Private);
+        repaintGameView = () => repaint.Invoke(window, null);
+        Type playModeType = asm.GetType("UnityEditor.PlayModeView");
+        object main = playModeType.GetMethod("GetMainPlayModeView", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, null);
+        Debug.Log("BUILDWORKS_MAINVIEW " + ((EditorWindow)main).GetInstanceID() + " " + main.GetType().Name +
+            " target=" + playModeType.GetProperty("targetSize", Private).GetValue(main));
+        foreach (EditorWindow other in Resources.FindObjectsOfTypeAll(asm.GetType("UnityEditor.GameView")))
+            Debug.Log("BUILDWORKS_GAMEVIEW " + other.GetInstanceID() + " selected=" +
+                other.GetType().GetProperty("selectedSizeIndex").GetValue(other) + " target=" +
+                other.GetType().GetProperty("targetRenderSize", Private).GetValue(other) + " window=" + other.position);
+        return () => { repaintGameView = null; selection.Invoke(window, new object[] { original, null }); groupType.GetMethod("RemoveCustomSize").Invoke(group, new object[] { index }); };
     }
 
     public static void CaptureAll()
@@ -289,20 +303,29 @@ public static class RuntimeEditorAcceptance
                     Require(Screen.width == width && Screen.height == height,
                         "GameView size mismatch: " + Screen.width + "x" + Screen.height + " instead of " + width + "x" + height);
                     var target = new RenderTexture(width, height, 24);
-                    uiCamera.targetTexture = target;
                     uiCamera.pixelRect = new Rect(0, 0, width, height);
                     uiCamera.ResetAspect(); uiCamera.ResetProjectionMatrix();
-                    scene.Camera.targetTexture = target;
                     view.SetUiScale(uiScale);
                     yield return null;
                     Canvas.ForceUpdateCanvases();
-                    view.Tick();
+                    Require(Screen.width == width && Screen.height == height,
+                        "Offscreen capture changed actual GameView size: " + Screen.width + "x" + Screen.height);
+                    try { view.Tick(); }
+                    catch (ArgumentOutOfRangeException ex)
+                    {
+                        throw new InvalidOperationException("Layout fixture not ready: requested=" + width + "x" + height +
+                            " scale=" + uiScale + " screen=" + Screen.width + "x" + Screen.height +
+                            " safe=" + Screen.safeArea + " display=" + view.RootCanvas.renderingDisplaySize +
+                            " root=" + Field<RectTransform>(view, "safeRoot").rect, ex);
+                    }
                     Canvas.ForceUpdateCanvases();
                     scene.SetViewport(view.ViewportScreenRect());
                     Call(controller, "FrameAll");
                     foreach (string state in new[] { "select", "transform", "array", "contour", "catalog",
                         "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "save-metadata" })
                     {
+                        Require(Screen.width == width && Screen.height == height,
+                            "GameView changed before " + state + ": " + Screen.width + "x" + Screen.height);
                         view.HideCatalog();
                         view.HideOutlinerMenu();
                         view.HideViewportSettings();
@@ -346,20 +369,22 @@ public static class RuntimeEditorAcceptance
                         Call(controller, "RefreshContextHints");
                         Canvas.ForceUpdateCanvases();
                         ValidateControls(view, state);
-                        // Test input in the product's overlay mode; the off-screen camera is only a capture adapter.
+                        // Do not leave offscreen targets attached across a real GameView
+                        // frame: batch-mode Screen can fall back to the editor window size.
+                        uiCamera.targetTexture = target;
+                        scene.Camera.targetTexture = target;
                         view.RootCanvas.renderMode = RenderMode.ScreenSpaceCamera;
-                        yield return null;
                         Canvas.ForceUpdateCanvases();
                         scene.Camera.Render();
                         uiCamera.Render();
                         string name = state + "-" + width + "x" + height + "-" + Mathf.RoundToInt(uiScale * 100);
                         SavePixels(target, Path.Combine(output, name + ".png"));
                         ++count;
+                        uiCamera.targetTexture = null;
+                        scene.Camera.targetTexture = null;
                         view.RootCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
                         yield return null;
                     }
-                    uiCamera.targetTexture = null;
-                    scene.Camera.targetTexture = null;
                     Object.DestroyImmediate(target);
                     restoreScreen();
                 }

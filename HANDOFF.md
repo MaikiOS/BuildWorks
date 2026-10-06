@@ -2,6 +2,17 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Source checkpoint 0.19.60 — not deployed; development remains active
+
+2026-10-06: [shared pick geometry](specs/roadmap/blueprint-render-performance.md).
+512 walls: unique pick-array payload 50071344 → 107808 bytes, sync 550 → 223 ms
+in single-machine samples; renderer count unchanged. Persistent exact mesh/matrix
+cache preserves nested transforms; transient previews cannot grow it.
+Release/targeted tests, independent review and 144 real-size Unity states PASS
+(2026-10-06T09:15:01Z, gameHostTested=false). Budget 512 and installed .56 unchanged.
+Owner approved free root-owned support frames; implementation/world persistence,
+heavy batching and export remain. No game/world/save changes.
+
 ## Source checkpoint 0.19.59 — not deployed; development remains active
 
 2026-10-06: [bounded rendering measurements](specs/roadmap/blueprint-render-performance.md)

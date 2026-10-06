@@ -816,7 +816,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.59.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.60.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -2797,4 +2797,4 @@ $signInstruction = @($nativeFinished.Body.Instructions | Where-Object { [string]
 $indexWrite = @($nativeFinished.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'stfld' -and [string]$_.Operand -match '::placementPlanIndex$' })
 Assert-Contract ($signInstruction.Count -eq 1 -and $indexWrite.Count -gt 0 -and $signInstruction[0].Offset -lt $indexWrite[0].Offset) 'Sign payload must apply before advancing the native queue.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.59 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.60 and Valheim Steam build 25185596.'

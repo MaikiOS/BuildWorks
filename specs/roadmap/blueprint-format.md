@@ -55,6 +55,11 @@ not authorize arbitrary mesh extraction, terrain editing or world/save changes.
 Ostrix added item support to the same active goal. The editor must represent ordinary game items,
 especially items attached to horizontal/wall item stands and equipment on armour stands.
 Preview-only loose items and holder-bound items are distinct from native building parts.
+Required editor journey: item catalogue → choose item → place freely or select a compatible holder/slot →
+preview → confirm/cancel. Show attached items under their holder in the object tree and identify the
+holder/slot in the inspector; attachment actions belong to tools, not fake object rows.
+Moving a holder moves its contents; duplicate remaps owner IDs/slots, while detach/removal and Undo
+restore a valid relationship. Test horizontal and wall stands separately, plus a multi-slot armour stand.
 Holder attachments retain an explicit owning part/slot relationship, follow holder transforms,
 and survive duplicate/insertion/Undo, native save and portable import/export.
 Preserve item identity and supported state (quantity, quality, variant, durability and mod metadata);

@@ -24,6 +24,8 @@ source absolute scale is prepared atomically without shrinking; opaque foreign o
 Heavy interactive budget 512 and world-support durability remain separate unfinished work.
 Ostrix's 2026-10-06 goal extension: ordinary items and horizontal/wall/armour stand contents,
 including editor attachments, preserved state/exchange and native world reconstruction; not implemented.
+Select ordinary items from an item catalogue, place them freely or attach to a compatible holder/armour slot;
+show the relationship in the tree/inspector and preserve it through holder movement, copy, Undo and exchange.
 
 Previous source checkpoint **0.19.64**: [independent support editor](../specs/roadmap/blueprint-support-frames.md).
 Tree/inspector, G/R without moving parts, transient centre and persisted placement default.

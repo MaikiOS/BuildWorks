@@ -36,6 +36,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 NativeItemStandRoundTrip(Path.Combine(directory, "native-holder.json"));
                 NativeContainerRoundTrip(Path.Combine(directory, "native-container.json"));
                 ContentsPolicyRoundTrip(Path.Combine(directory, "contents-policy"));
+                ReviewedImportWorkflow(Path.Combine(directory, "reviewed-import"));
                 ExchangeRoundTrip(Path.Combine(directory, "exchange-library.json"));
                 SupportRoundTrip(Path.Combine(directory, "supports.json"));
                 if (args.Length > 0) InspectActualLibrary(args[0]);
@@ -133,6 +134,130 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(nativeV12.All().Count == 1 && nativeV12.All()[0].sourceDocuments[0].text == text,
                 "Source-only native v12 stopped migrating");
             Console.WriteLine("PASS source v14/v5 exact UTF-8/BOM/CRLF/header retention; stable rows; detached/save/update/exchange; strict old-version/hash/reference/duplicate rejection");
+        }
+
+        private static void ReviewedImportWorkflow(string directory)
+        {
+            Directory.CreateDirectory(directory);
+            var store = new CompositeBlueprintStore(Path.Combine(directory, "library.json"));
+            store.ConfigureImportScale(_ => new CompositeBlueprintStore.VectorData { x = 2, y = .5f, z = 3 });
+            var parts = new[] { Part("chest", "piece_chest", "Chest", null, true, false, 0),
+                Part("stand", "itemstand", "Stand", null, true, false, 1) };
+            parts[0].foreignData = new CompositeBlueprintStore.ForeignPartData {
+                format = Geometry.BlueprintForeignPartData.NativeContainerFormat, info = "5:2:0:0", zdo = "bQAAAAAA" };
+            parts[1].foreignData = new CompositeBlueprintStore.ForeignPartData {
+                format = Geometry.BlueprintForeignPartData.NativeItemStandFormat, info = "SwordIron:0:1:0", zdo = "bQIA" };
+            Require(store.TrySave("Contents", parts, Array.Empty<CompositeBlueprintStore.VectorData>(), out var saved, out string error), error);
+            byte[] bytes = BlueprintExchangeFormat.Encode(saved);
+            string source = Path.Combine(directory, "source.zip");
+            using (var zip = ZipFile.Open(source, ZipArchiveMode.Create))
+            {
+                using (var entry = zip.CreateEntry("one.buildworks.json").Open()) entry.Write(bytes, 0, bytes.Length);
+                using (var entry = zip.CreateEntry("two.buildworks.json").Open()) entry.Write(bytes, 0, bytes.Length);
+            }
+            byte[] original = File.ReadAllBytes(source);
+            var review = CompositeBlueprintStore.ReviewImportFile(source, _ => 100);
+            Require(review.Documents.Count == 2 && review.Contents.Storages == 2 && review.Contents.Mounts == 2 &&
+                !Directory.Exists(store.ImportDirectory), "Review wrote to library or did not inspect entire archive");
+            foreach (bool storage in new[] { false, true })
+            foreach (bool mounts in new[] { false, true })
+            {
+                Require(store.TryImportReviewed(review, storage, mounts, _ => 100, out error), error); WaitForImport(store);
+                Require(store.ImportError == null && File.Exists(store.ImportResultPath), store.ImportError);
+                var copies = ExternalBlueprintLibrary.LoadFile(store.ImportResultPath);
+                Require(copies.Count == 2 && copies.All(copy => copy.importError == null &&
+                    copy.parts[0].foreignData.contentsCleared == storage && copy.parts[1].foreignData.contentsCleared == mounts &&
+                    copy.parts[0].scale.x == 1), "Reviewed ZIP changed native scale or coupled choices");
+                Require(store.CatalogAll().Where(copy => (copy.importSource ?? "").StartsWith(Path.GetFileName(store.ImportResultPath) + "/", StringComparison.Ordinal))
+                    .Select(copy => copy.id).SequenceEqual(copies.Select(copy => copy.id)), "Committed import changed cache identity after reload");
+                using (var zip = ZipFile.OpenRead(store.ImportResultPath))
+                using (var input = zip.GetEntry("original/source.bin").Open())
+                using (var retained = new MemoryStream())
+                { input.CopyTo(retained); Require(retained.ToArray().SequenceEqual(original), "Exact original ZIP was lost"); }
+                Require(File.ReadAllBytes(source).SequenceEqual(original) && !saved.parts[0].foreignData.contentsCleared &&
+                    !saved.parts[1].foreignData.contentsCleared, "Import changed original or current document");
+            }
+            int before = Directory.GetFiles(store.ImportDirectory).Length;
+            File.AppendAllText(source, "changed");
+            Require(store.TryImportReviewed(review, false, false, null, out error), error); WaitForImport(store);
+            Require(store.ImportError.Contains("source_changed") && store.ImportResultPath == null &&
+                Directory.GetFiles(store.ImportDirectory).Length == before && Directory.GetDirectories(store.ImportDirectory).Length == 0,
+                "Changed source committed or left staging files");
+            string bad = Path.Combine(directory, "mixed.zip");
+            using (var zip = ZipFile.Open(bad, ZipArchiveMode.Create))
+            {
+                using (var entry = zip.CreateEntry("good.buildworks.json").Open()) entry.Write(bytes, 0, bytes.Length);
+                using (var writer = new StreamWriter(zip.CreateEntry("bad.buildworks.json").Open())) writer.Write("invalid");
+            }
+            try { CompositeBlueprintStore.ReviewImportFile(bad, _ => 100); throw new Exception("Mixed archive accepted"); }
+            catch (InvalidDataException) { }
+            Require(!store.TryImportFile(bad, out error) && Directory.GetFiles(store.ImportDirectory).Length == before,
+                "Legacy caller bypassed whole-archive rejection");
+            saved.parts[0].foreignData = new CompositeBlueprintStore.ForeignPartData { format = "vbuild", zdo = "opaque" };
+            string unknown = Path.Combine(directory, "unknown.buildworks.json");
+            File.WriteAllBytes(unknown, BlueprintExchangeFormat.Encode(saved));
+            var unknownReview = CompositeBlueprintStore.ReviewImportFile(unknown, _ => 100);
+            Require(!unknownReview.Contents.CanClearStorage && !unknownReview.Contents.CanClearMounts && unknownReview.Contents.Unknown == 1,
+                "Unknown import contents were treated as empty");
+            Require(store.TryImportReviewed(unknownReview, false, true, _ => 100, out error), error); WaitForImport(store);
+            Require(store.ImportError != null && store.ImportResultPath == null && Directory.GetFiles(store.ImportDirectory).Length == before &&
+                Directory.GetDirectories(store.ImportDirectory).Length == 0, "Failed contents conversion committed partial data or leaked staging files");
+            string foreign = Path.Combine(directory, "scale.blueprint");
+            File.WriteAllText(foreign, "#Name:Scale\n#Pieces\nwall;;0;0;0;0;0;0;1;\"\";1;1;1\nwall;;2;0;0;0;0;0;1;\"\";1;1;1");
+            Require(store.TryImportFile(foreign, out error), error); WaitForImport(store);
+            var normalized = ExternalBlueprintLibrary.LoadFile(store.ImportResultPath).Single();
+            Require(normalized.parts[0].scale.x == .5f && normalized.parts[0].scale.y == 2 &&
+                !normalized.importAbsoluteScale, "Foreign conversion did not normalize once against host prefab base");
+            ReviewedImportLimits(Path.Combine(directory, "limits"), bytes);
+            Console.WriteLine("PASS reviewed atomic archive import, four independent choices, exact original bytes, cancel/no writes, stale source and mixed-member rejection, normalized native copy");
+        }
+
+        private static void ReviewedImportLimits(string directory, byte[] document)
+        {
+            Directory.CreateDirectory(directory);
+            var store = new CompositeBlueprintStore(Path.Combine(directory, "library.json"));
+            Directory.CreateDirectory(store.ImportDirectory);
+            var large = BlueprintExchangeFormat.Decode(System.Text.Encoding.UTF8.GetString(document));
+            large.sourceDocuments = new List<CompositeBlueprintStore.SourceDocument> {
+                CompositeBlueprintStore.SourceDocument.FromGeometry(new Geometry.BlueprintSourceDocument("blueprint", "large.blueprint",
+                    "#Description:" + new string('x', 7 * 1024 * 1024) + "\n#Pieces\nwall;;0;0;0;0;0;0;1;\"\"\nwall;;1;0;0;0;0;0;1;\"\"")) };
+            byte[] largeDocument = BlueprintExchangeFormat.Encode(large);
+            void Archive(string path, int count)
+            {
+                using (var zip = ZipFile.Open(path, ZipArchiveMode.Create))
+                for (int i = 0; i < count; ++i)
+                {
+                    string name = (count == 17 && i >= 15 ? "duplicate" : "piece" + i) + ".buildworks.json";
+                    using (var entry = zip.CreateEntry(name).Open()) entry.Write(largeDocument, 0, largeDocument.Length);
+                }
+            }
+            string baseline = Path.Combine(store.ImportDirectory, "zzz-existing.zip"); Archive(baseline, 17);
+            Require(store.CatalogAll().Count == 17 && store.CatalogAll().All(copy => copy.importError == null), "Budget baseline invalid");
+            string source = Path.Combine(directory, "crosses-budget.zip"); Archive(source, 2);
+            var review = CompositeBlueprintStore.ReviewImportFile(source, _ => 100);
+            Require(review.Documents.Count == 2, "Budget candidate did not load independently");
+            Require(store.TryImportReviewed(review, false, false, null, out string error), error);
+            WaitForImport(store);
+            Require(store.ImportError != null && store.ImportResultPath == null && Directory.GetFiles(store.ImportDirectory).Length == 1 &&
+                ExternalBlueprintLibrary.Load(store.ImportDirectory).All(copy => copy.importError == null),
+                "Aggregate-budget import broke existing library on reload or left a candidate");
+            File.Delete(baseline); // This test owns only this generated file.
+            for (int i = 0; i < 1999; ++i) File.WriteAllText(Path.Combine(store.ImportDirectory, i + ".txt"), "ignored");
+            string small = Path.Combine(directory, "small.buildworks.json"); File.WriteAllBytes(small, document);
+            review = CompositeBlueprintStore.ReviewImportFile(small, _ => 100);
+            Require(store.TryImportReviewed(review, false, false, null, out error), error); WaitForImport(store);
+            Require(store.ImportError == null && Directory.GetFiles(store.ImportDirectory).Length == 2000,
+                "Exactly 2000 library files rejected because staging counted twice: " + store.ImportError);
+            Require(store.TryImportReviewed(review, false, false, null, out error), error); WaitForImport(store);
+            Require(store.ImportError != null && Directory.GetFiles(store.ImportDirectory).Length == 2000 &&
+                Directory.GetDirectories(store.ImportDirectory).Length == 0, "2001st file committed or failed import leaked staging");
+            string crowded = Path.Combine(directory, "crowded.zip");
+            using (var zip = ZipFile.Open(crowded, ZipArchiveMode.Create))
+                for (int i = 0; i < 1999; ++i)
+                    using (var entry = zip.CreateEntry("piece" + i + ".buildworks.json").Open()) entry.Write(document, 0, document.Length);
+            try { CompositeBlueprintStore.ReviewImportFile(crowded, _ => 100); throw new Exception("Projected ZIP overflow passed preflight"); }
+            catch (InvalidDataException) { }
+            Console.WriteLine("PASS atomic import shared 128MiB library budget, exact future ordering and 2000/2001 file boundary");
         }
 
         private static void ContentsPolicyRoundTrip(string directory)
@@ -559,9 +684,11 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(store.CatalogAll().Count == 0 && store.TryImportFile(source, out string error), "Import start");
             WaitForImport(store);
             Require(store.ImportError == null && store.CatalogAll().Count == 1, "Import after first browsing failed: " + store.ImportError);
-            Require(File.ReadAllText(source) == text && File.ReadAllText(Path.Combine(directory, "imports", "selected.blueprint")) == text,
+            Require(File.ReadAllText(source) == text && File.Exists(store.ImportResultPath),
                 "Import must leave original unchanged and retain separate copy");
-            Require(!store.TryImportFile(source, out error) && error.Contains("exchange.exists"), "Duplicate overwrote source");
+            using (var zip = ZipFile.OpenRead(store.ImportResultPath))
+            using (var reader = new StreamReader(zip.GetEntry("original/source.bin").Open()))
+                Require(reader.ReadToEnd() == text, "Converted import lost exact original");
             var imported = store.CatalogAll()[0];
             string externalId = imported.id;
             Require(store.TryExportFile(imported, out string externalExport, out error), error);
@@ -570,7 +697,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 "Foreign export changed source or XYZ");
             Require(store.TryImportFile(externalExport, out error), error);
             WaitForImport(store);
-            var portable = store.CatalogAll().First(x => x.importSource.EndsWith(".buildworks.json", StringComparison.OrdinalIgnoreCase));
+            var portable = store.CatalogAll().Last(x => x.importSource.EndsWith(".buildworks.json", StringComparison.OrdinalIgnoreCase));
             Require(store.TryExportFile(portable, out string portableExport, out error) &&
                 BlueprintExchangeFormat.Decode(File.ReadAllText(portableExport)).parts.Count == 2,
                 "Imported native portable file cannot be re-exported: " + error);

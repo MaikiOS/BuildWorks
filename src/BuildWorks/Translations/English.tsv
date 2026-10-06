@@ -803,6 +803,10 @@ exchange.mounts_clear	Mounted items: CLEAR IN COPY
 exchange.contents_copy	Click either row to change its choice. Only the exported copy changes. Original data is retained; previously cleared contents stay empty.
 exchange.contents_unknown	Unknown/unreadable state: unavailable clear choices are disabled. Other choices remain independent. Exact original data is retained; the world is unchanged.
 exchange.confirm_export	Confirm export
+exchange.confirm_import	Confirm import
+exchange.import_review	Import contents: {0} blueprints
+exchange.import_copy	Choose each family separately. A new native ZIP copy retains the exact original file. Nothing is placed in the world.
+exchange.source_changed	The source file changed after inspection. Go back and inspect it again; nothing was imported.
 exchange.back	Back to file settings
 exchange.format_json	BuildWorks JSON
 exchange.format_zip	ZIP + BuildWorks

@@ -2,7 +2,18 @@
 
 **English** | [Русский](blueprint-format_RU.md)
 
-Current source **0.19.76**: shared export preflight reads effective counts in a background task and asks independent storage/mount
+Current source **0.19.77**: shared import preflight snapshots and validates every file/archive member before library writes.
+Counts and storage/mount keep-clear choices cover all documents. Confirmation normalizes foreign absolute scales once on the Unity
+thread, converts private recipes to native14/portable5 and atomically publishes one ZIP. original/source.bin and original/name.txt
+retain exact input bytes/name inertly; archive paths are never extracted. Original files/current documents/world remain unchanged.
+Changed source files, any blocked member and conversion failure reject without partial library output. Keep never resurrects cleared state.
+Short sibling staging paths avoid the Unity Windows path-length failure reproduced by actual UI acceptance.
+The full candidate library is loaded in exact final filename order under the shared 128MiB budget before Move;
+every previously valid and incoming stable ID is retained with multiplicity, including identical duplicate ZIP names.
+Exactly 2000 files fit; 2001 reject. Review also reserves two inert entries and paired previews under the ZIP-entry cap.
+Store/required checks and 228 isolated Unity EN/RU layouts/input scenarios PASS; native world restoration remains gated, not game proof.
+
+Previous source **0.19.76**: shared export preflight reads effective counts in a background task and asks independent storage/mount
 choices before confirmation. Back/cancel never write; destination/format remain fixed during review.
 Unreadable native storage disables storage clearing, not valid mount clearing; opaque unknown state disables both.
 Already-cleared raw storage is re-inspected; no archival contents are reported as effective.
@@ -12,7 +23,7 @@ Store14/portable5 unchanged. Required checks/reviews and 204 isolated Unity EN/R
 | --- | --- | --- |
 | Export counts/independent keep-clear/Back/cancel/error | CompositeBlueprintStore.InspectContents; BlueprintExchangeView | Store + ControllerInputAcceptance.RunExchangeLifecycle; Unity 2026-10-06T19:23:45.645088Z |
 | English/Russian review layout | Existing shared exchange window; catalogue test adapter | 1280–3440 px, UI100–140%, 24 new review captures |
-| Direct import policy and multi-document conversion | Pending; current import retains original data | Not achieved; do not infer from export tests |
+| Import policy and atomic multi-document conversion | ReviewImportFile; TryImportReviewed; shared exchange window | Store: four choices, mixed/stale/unknown/budget/duplicate-ID rejection, exact source and cache IDs; actual UI import choices/Back/retry; Unity 2026-10-06T19:49:59.0236127Z |
 | Native world restoration and remote/save-load behavior | Pending; foreign-state guard unchanged | Not achieved |
 
 Previous source **0.19.75**: Store v14 / portable v5 add optional contentsCleared for native Container/ItemStand only.

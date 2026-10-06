@@ -331,7 +331,7 @@ public static class RuntimeEditorAcceptance
                     scene.SetViewport(view.ViewportScreenRect());
                     Call(controller, "FrameAll");
                     foreach (string state in new[] { "select", "transform", "array", "contour", "catalog",
-                        "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "save-metadata", "supports", "exchange-import", "exchange-export", "exchange-contents", "exchange-contents-ru" })
+                        "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "save-metadata", "supports", "exchange-import", "exchange-export", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru" })
                     {
                         Require(Screen.width == width && Screen.height == height,
                             "GameView changed before " + state + ": " + Screen.width + "x" + Screen.height);
@@ -387,7 +387,7 @@ public static class RuntimeEditorAcceptance
                             File.WriteAllBytes(Path.Combine(folder, "Дом.buildworks.json"), BlueprintExchangeFormat.Encode(blueprint));
                             BuildWorksLocalization.RussianLanguage = state.EndsWith("-ru", StringComparison.Ordinal);
                             view.ShowExchange((parent, textFont, closed) => new BlueprintExchangeView(parent, textFont, layoutStore,
-                                state != "exchange-import" ? blueprint : null, closed));
+                                !state.StartsWith("exchange-import", StringComparison.Ordinal) ? blueprint : null, closed));
                             for (int i = 0; i < 300 && Field<System.Threading.Tasks.Task<string[]>>(
                                 Field<BlueprintExchangeView>(view, "exchangeView"), "listing") != null; ++i)
                             { view.Tick(); yield return null; }
@@ -400,6 +400,19 @@ public static class RuntimeEditorAcceptance
                                 { view.Tick(); yield return null; }
                                 Require(Field<CompositeBlueprintStore.ContentsSummary>(exchange, "contentsSummary") != null,
                                     "Contents screenshot missed completed inspection");
+                            }
+                            else if (state.StartsWith("exchange-import-review", StringComparison.Ordinal))
+                            {
+                                var exchange = Field<BlueprintExchangeView>(view, "exchangeView");
+                                int index = Array.IndexOf(Field<string[]>(exchange, "entries"), Path.Combine(folder, "Дом.buildworks.json"));
+                                Require(index >= 0 && index < 7, "Import review layout source unavailable");
+                                ControllerInputAcceptance.NativeClick(view, uiCamera, "ExchangeEntry" + index); view.Tick();
+                                ControllerInputAcceptance.NativeClick(view, uiCamera, "ExchangeSubmit");
+                                for (int i = 0; i < 300 && Field<System.Threading.Tasks.Task<CompositeBlueprintStore.ImportReview>>(
+                                    exchange, "importInspection") != null; ++i)
+                                { view.Tick(); yield return null; }
+                                Require(Field<CompositeBlueprintStore.ContentsSummary>(exchange, "contentsSummary") != null,
+                                    "Import screenshot missed completed inspection");
                             }
                         }
                         else Call(controller, "UpdateGizmo");

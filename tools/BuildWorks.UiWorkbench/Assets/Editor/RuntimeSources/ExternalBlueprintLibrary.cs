@@ -14,19 +14,19 @@ namespace OstrixMods.BuildWorks
     internal static class ExternalBlueprintLibrary
     {
         internal const int MaximumFileBytes = 8 * 1024 * 1024;
-        private const int MaximumFiles = 2000;
+        internal const int MaximumFiles = 2000;
         private const long MaximumTotalBytes = 128L * 1024 * 1024;
         internal const int MaximumPreviewBytes = 4 * 1024 * 1024;
 
-        internal static List<CompositeBlueprintStore.Blueprint> LoadFile(string path)
+        internal static List<CompositeBlueprintStore.Blueprint> LoadFile(string path, string sourceName = null)
         {
             var result = new List<CompositeBlueprintStore.Blueprint>();
             long budget = MaximumTotalBytes;
-            AppendFile(Path.GetFullPath(path), result, ref budget);
+            AppendFile(Path.GetFullPath(path), result, ref budget, sourceName);
             return result;
         }
 
-        internal static List<CompositeBlueprintStore.Blueprint> Load(string directory)
+        internal static List<CompositeBlueprintStore.Blueprint> Load(string directory, string stagedPath = null, string stagedName = null)
         {
             var result = new List<CompositeBlueprintStore.Blueprint>();
             if (!Directory.Exists(directory)) return result;
@@ -36,7 +36,9 @@ namespace OstrixMods.BuildWorks
             {
                 if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
                     throw new InvalidDataException("$buildworks_import.path");
-                paths = Directory.EnumerateFiles(directory).OrderBy(x => x, StringComparer.Ordinal).Take(MaximumFiles + 1).ToArray();
+                paths = Directory.EnumerateFiles(directory)
+                    .OrderBy(x => x == stagedPath ? Path.Combine(directory, stagedName) : x, StringComparer.Ordinal)
+                    .Take(MaximumFiles + 1).ToArray();
                 if (paths.Length > MaximumFiles) throw new InvalidDataException("$buildworks_import.library_limit");
             }
             catch (Exception exception) when (exception is IOException || exception is InvalidDataException || exception is UnauthorizedAccessException)
@@ -44,12 +46,12 @@ namespace OstrixMods.BuildWorks
             foreach (string path in paths)
             {
                 if (result.Count >= MaximumFiles) break;
-                AppendFile(path, result, ref budget);
+                AppendFile(path, result, ref budget, path == stagedPath ? stagedName : null);
             }
             return result;
         }
 
-        private static void AppendFile(string path, List<CompositeBlueprintStore.Blueprint> result, ref long budget)
+        private static void AppendFile(string path, List<CompositeBlueprintStore.Blueprint> result, ref long budget, string sourceName = null)
         {
             string extension = Path.GetExtension(path).ToLowerInvariant();
             if (extension != ".zip" && !Supported(path)) return;
@@ -70,7 +72,7 @@ namespace OstrixMods.BuildWorks
                         {
                             if (!Supported(entry.FullName)) continue;
                             if (result.Count >= MaximumFiles) throw new InvalidDataException("$buildworks_import.library_limit");
-                            string source = Path.GetFileName(path) + "/" + entry.FullName;
+                            string source = (sourceName ?? Path.GetFileName(path)) + "/" + entry.FullName;
                             using (Stream data = entry.Open())
                                 result.Add(Read(data, entry.Length, source, ref budget));
                             ZipArchiveEntry preview = zip.GetEntry(Path.ChangeExtension(entry.FullName, ".png"));
@@ -89,11 +91,11 @@ namespace OstrixMods.BuildWorks
                     }
                 }
                 else using (Stream stream = File.OpenRead(path))
-                    result.Add(Read(stream, stream.Length, Path.GetFileName(path), ref budget));
+                    result.Add(Read(stream, stream.Length, sourceName ?? Path.GetFileName(path), ref budget));
             }
             catch (Exception exception) when (exception is IOException || exception is InvalidDataException || exception is UnauthorizedAccessException || exception is ArgumentException)
             {
-                result.Add(Blocked(Path.GetFileName(path), exception.Message));
+                result.Add(Blocked(sourceName ?? Path.GetFileName(path), exception.Message));
             }
         }
 

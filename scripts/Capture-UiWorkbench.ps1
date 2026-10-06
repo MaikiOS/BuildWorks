@@ -86,7 +86,7 @@ if ($process.ExitCode -ne 0) {
 }
 
 $outputPath = Join-Path $repositoryRoot 'artifacts\ui-runtime'
-$expected = foreach ($state in 'select', 'transform', 'array', 'contour', 'catalog', 'outliner', 'settings', 'catalog-blueprints', 'catalog-materials', 'catalog-quick', 'catalog-crafting', 'save-metadata', 'supports', 'exchange-import', 'exchange-export', 'exchange-contents', 'exchange-contents-ru') {
+$expected = foreach ($state in 'select', 'transform', 'array', 'contour', 'catalog', 'outliner', 'settings', 'catalog-blueprints', 'catalog-materials', 'catalog-quick', 'catalog-crafting', 'save-metadata', 'supports', 'exchange-import', 'exchange-export', 'exchange-contents', 'exchange-contents-ru', 'exchange-import-review', 'exchange-import-review-ru') {
     foreach ($size in '1280x720', '1920x1080', '2560x1440', '3440x1440') {
         foreach ($scale in 100,120,140) { "$state-$size-$scale.png" }
     }

@@ -657,15 +657,28 @@ internal static class ControllerInputAcceptance
                 Require(chosen >= 0 && chosen < 7, "Supported source file unavailable in browser");
                 NativeClick(view, null, "ExchangeEntry" + chosen); Frame(controller, input, Vector2.zero); yield return null;
                 NativeClick(view, null, "ExchangeSubmit"); yield return null;
+                for (int i = 0; i < 300 && Field<Task<CompositeBlueprintStore.ImportReview>>(exchange, "importInspection") != null; ++i)
+                { Frame(controller, input, Vector2.zero); yield return null; }
+                Require(Field<bool>(exchange, "reviewingContents") && !Directory.Exists(store.ImportDirectory),
+                    "Import wrote before contents confirmation");
+                NativeClick(view, null, "ExchangeContentsBack"); yield return null;
+                Require(Field<TMP_InputField>(exchange, "directory").interactable && !Directory.Exists(store.ImportDirectory),
+                    "Import Back changed library or did not restore browser");
+                NativeClick(view, null, "ExchangeSubmit"); yield return null;
+                for (int i = 0; i < 300 && Field<Task<CompositeBlueprintStore.ImportReview>>(exchange, "importInspection") != null; ++i)
+                { Frame(controller, input, Vector2.zero); yield return null; }
+                NativeClick(view, null, "ExchangeSubmit"); yield return null;
                 for (int i = 0; i < 300 && Field<bool>(exchange, "importing"); ++i)
                 { Frame(controller, input, Vector2.zero); yield return null; }
                 Require(Field<bool>(exchange, "completed") && view.HasModal && controller.Document.Parts.Count == 0 &&
-                    File.ReadAllText(sourcePath) == text, "Import result disappeared, modified document or original");
+                    File.ReadAllText(sourcePath) == text, "Import result disappeared, modified document or original: " +
+                    Field<TMP_Text>(exchange, "message").text + "; review=" + Field<bool>(exchange, "reviewingContents") +
+                    "; importing=" + Field<bool>(exchange, "importing"));
                 string importedPath = Field<string>(exchange, "resultPath");
                 Require(File.Exists(importedPath), "Persistent result path is not the copied file");
                 Frame(controller, input, Vector2.zero, 0, KeyCode.Escape); Frame(controller, input, Vector2.zero); yield return null;
                 Require(!view.HasModal && view.HasCatalog, "Escape closed catalogue instead of exchange dialog");
-                var prepared = store.CatalogAll().First(item => item.importSource == "atlas.blueprint");
+                var prepared = store.CatalogAll().First(item => item.importSource.StartsWith(Path.GetFileName(importedPath) + "/", StringComparison.Ordinal));
                 Require(prepared.parts[0].scale.x == .5f && prepared.parts[0].scale.y == 2, "Host scale not prepared for editor");
                 view.CancelCatalog();
                 controller.Close(discardChanges: true);
@@ -748,6 +761,34 @@ internal static class ControllerInputAcceptance
                         !policy.parts[0].foreignData.contentsCleared && !policy.parts[1].foreignData.contentsCleared,
                         "Actual UI coupled storage/mount choices or mutated source");
                     NativeClick(view, null, "ExchangeClose"); yield return null;
+                    string importFolder = Path.Combine(folder, "contents-" + emptyStorage + "-" + emptyMounts);
+                    Directory.CreateDirectory(importFolder);
+                    File.WriteAllBytes(Path.Combine(importFolder, "contents.buildworks.json"), BlueprintExchangeFormat.Encode(policy));
+                    view.ShowExchange((parent, textFont, closed) => new BlueprintExchangeView(parent, textFont, store, null, closed)); yield return null;
+                    exchange = Field<BlueprintExchangeView>(view, "exchangeView");
+                    for (int i = 0; i < 300 && Field<Task<string[]>>(exchange, "listing") != null; ++i)
+                    { Frame(controller, input, Vector2.zero); yield return null; }
+                    Field<TMP_InputField>(exchange, "directory").SetTextWithoutNotify(importFolder);
+                    NativeClick(view, null, "ExchangeGo");
+                    for (int i = 0; i < 300 && Field<Task<string[]>>(exchange, "listing") != null; ++i)
+                    { Frame(controller, input, Vector2.zero); yield return null; }
+                    NativeClick(view, null, "ExchangeEntry0"); Frame(controller, input, Vector2.zero);
+                    NativeClick(view, null, "ExchangeSubmit");
+                    for (int i = 0; i < 300 && Field<Task<CompositeBlueprintStore.ImportReview>>(exchange, "importInspection") != null; ++i)
+                    { Frame(controller, input, Vector2.zero); yield return null; }
+                    Require(Field<CompositeBlueprintStore.ContentsSummary>(exchange, "contentsSummary").Storages == 1 &&
+                        Field<Button>(exchange, "storageChoice").interactable && Field<Button>(exchange, "mountChoice").interactable,
+                        "Import review missed native contents");
+                    if (emptyStorage) NativeClick(view, null, "ExchangeStorageChoice");
+                    if (emptyMounts) NativeClick(view, null, "ExchangeMountChoice");
+                    NativeClick(view, null, "ExchangeSubmit");
+                    for (int i = 0; i < 300 && Field<bool>(exchange, "importing"); ++i)
+                    { Frame(controller, input, Vector2.zero); yield return null; }
+                    Require(Field<bool>(exchange, "completed"), "Confirmed contents import failed: " + Field<TMP_Text>(exchange, "message").text);
+                    copy = ExternalBlueprintLibrary.LoadFile(Field<string>(exchange, "resultPath")).Single();
+                    Require(copy.parts[0].foreignData.contentsCleared == emptyStorage && copy.parts[1].foreignData.contentsCleared == emptyMounts,
+                        "Actual import UI coupled choices");
+                    NativeClick(view, null, "ExchangeClose"); yield return null;
                 }
                 string lockedPath = Path.Combine(folder, "locked.blueprint"); File.WriteAllText(lockedPath, text);
                 policy.parts[0].foreignData = new CompositeBlueprintStore.ForeignPartData { format = "vbuild", zdo = "opaque" };
@@ -799,25 +840,29 @@ internal static class ControllerInputAcceptance
                 for (int i = 0; i < 300 && Field<Task<string[]>>(exchange, "listing") != null; ++i)
                 { Frame(controller, input, Vector2.zero); yield return null; }
                 chosen = Array.IndexOf(Field<string[]>(exchange, "entries"), lockedPath);
-                Require(chosen >= 0 && chosen < 7, "Locked-file fixture missing");
+                Require(chosen >= 0, "Locked-file fixture missing");
+                for (int i = 0; i < chosen / 7; ++i) { NativeClick(view, null, "ExchangeNext"); yield return null; }
                 NativeClick(view, null, "ExchangeEntry" + chosen); Frame(controller, input, Vector2.zero); yield return null;
                 using (var fileLock = new FileStream(lockedPath, FileMode.Open, FileAccess.Read, FileShare.None))
                 {
                     NativeClick(view, null, "ExchangeSubmit");
-                    for (int i = 0; i < 300 && Field<bool>(exchange, "importing"); ++i)
+                    for (int i = 0; i < 300 && Field<Task<CompositeBlueprintStore.ImportReview>>(exchange, "importInspection") != null; ++i)
                     { Frame(controller, input, Vector2.zero); yield return null; }
-                    Require(store.ImportError != null && !Field<bool>(exchange, "completed") &&
-                        Field<TMP_InputField>(exchange, "directory").interactable &&
-                        Field<RectTransform>(exchange, "rows").GetComponentsInChildren<Button>().All(button => button.interactable),
-                        "Worker error leaves browser controls disabled");
+                    Require(Field<TMP_Text>(exchange, "message").text.Length > 0 && !Field<bool>(exchange, "completed") &&
+                        !Field<Button>(exchange, "primary").interactable && Field<Button>(exchange, "contentsBack").interactable,
+                        "Inspection error enabled confirmation or blocked Back");
                 }
+                NativeClick(view, null, "ExchangeContentsBack"); yield return null;
                 NativeClick(view, null, "ExchangeEntry" + chosen); Frame(controller, input, Vector2.zero); yield return null;
+                NativeClick(view, null, "ExchangeSubmit");
+                for (int i = 0; i < 300 && Field<Task<CompositeBlueprintStore.ImportReview>>(exchange, "importInspection") != null; ++i)
+                { Frame(controller, input, Vector2.zero); yield return null; }
                 NativeClick(view, null, "ExchangeSubmit");
                 for (int i = 0; i < 300 && Field<bool>(exchange, "importing"); ++i)
                 { Frame(controller, input, Vector2.zero); yield return null; }
                 Require(Field<bool>(exchange, "completed"), "Recovered browser cannot retry import");
                 File.WriteAllText(Path.Combine(output, "exchange-input-check.txt"),
-                    "PASS actual catalogue/browser clicks, original-safe import, persistent path and Escape, nonunit prefab visual scale, named native ZIP, duplicate rejection and retained inputs, export contents counts/four independent choices/back/confirmation/unknown-state guard/cancel, no stale files while loading, worker error recovery and retry. No Valheim host proof.");
+                    "PASS actual catalogue/browser clicks, original-safe reviewed import, persistent path and Escape, nonunit prefab visual scale, named native ZIP, duplicate export rejection and retained inputs, import/export four independent contents choices, back/confirmation/unknown-state guard/cancel, no stale files while loading, inspection error recovery and retry. No Valheim host proof.");
             }
         }
         finally { Object.Destroy(source); }

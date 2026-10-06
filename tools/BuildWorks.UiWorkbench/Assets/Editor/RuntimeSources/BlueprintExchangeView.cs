@@ -20,6 +20,8 @@ namespace OstrixMods.BuildWorks
         private RectTransform contentsPanel;
         private Button contentsBack, storageChoice, mountChoice;
         private Task<CompositeBlueprintStore.ContentsSummary> contentsInspection;
+        private Task<CompositeBlueprintStore.ImportReview> importInspection;
+        private CompositeBlueprintStore.ImportReview importReview;
         private CompositeBlueprintStore.ContentsSummary contentsSummary;
         private bool reviewingContents, clearStorage, clearMounts;
         private readonly BlueprintEditorSkin skin = new BlueprintEditorSkin();
@@ -114,14 +116,14 @@ namespace OstrixMods.BuildWorks
                     importing = false;
                     if (store.ImportError != null)
                     {
+                        contentsBack.interactable = true;
+                        RenderContents();
                         message.text = BuildWorksLocalization.ResolveUserText(store.ImportError);
-                        foreach (Selectable control in panel.GetComponentsInChildren<Selectable>()) control.interactable = true;
-                        RenderRows();
                     }
                     else
                     {
-                        completed = true; resultPath = Path.Combine(store.ImportDirectory, Path.GetFileName(selected));
-                        string name = Path.GetFileName(selected);
+                        completed = true; resultPath = store.ImportResultPath;
+                        string name = Path.GetFileName(resultPath);
                         var imported = store.CatalogAll().Where(item => item.importSource == name ||
                             (item.importSource ?? "").StartsWith(name + "/", StringComparison.Ordinal)).ToArray();
                         string[] errors = imported.Where(item => item.importError != null)
@@ -136,6 +138,16 @@ namespace OstrixMods.BuildWorks
                 catch (Exception error) { if (reviewingContents) SetError(error); }
                 contentsInspection = null;
             }
+            if (importInspection != null && importInspection.IsCompleted)
+            {
+                try
+                {
+                    var review = importInspection.GetAwaiter().GetResult();
+                    if (reviewingContents) { importReview = review; contentsSummary = review.Contents; RenderContents(); }
+                }
+                catch (Exception error) { if (reviewingContents) SetError(error); }
+                importInspection = null;
+            }
             primary.interactable = !completed && !importing && listing == null &&
                 (blueprint != null || selected != null) && (!reviewingContents || contentsSummary != null);
             copyPath.interactable = !importing;
@@ -146,7 +158,7 @@ namespace OstrixMods.BuildWorks
 
         private void Browse(string path)
         {
-            if (listing != null || importing || completed) return;
+            if (listing != null || importing || completed || reviewingContents) return;
             try
             {
                 string full = CompositeBlueprintStore.ValidateExchangeDirectory(path);
@@ -180,16 +192,17 @@ namespace OstrixMods.BuildWorks
         private void Submit()
         {
             if (completed || importing || listing != null) return;
+            if (!reviewingContents) { if (blueprint != null || selected != null) ReviewContents(); return; }
+            if (contentsSummary == null) return;
             if (blueprint == null)
             {
                 if (selected == null) return;
-                if (!store.TryImportFile(selected, out string error)) { message.text = BuildWorksLocalization.ResolveUserText(error); return; }
+                if (!store.TryImportReviewed(importReview, clearStorage, clearMounts, name => name.GetStableHashCode(), out string error))
+                { message.text = BuildWorksLocalization.ResolveUserText(error); return; }
                 importing = true; message.text = T("exchange.loading");
             }
             else
             {
-                if (!reviewingContents) { ReviewContents(); return; }
-                if (contentsSummary == null) return;
                 if (!store.TryExportFile(blueprint, directory.text, fileName.text, archive, out resultPath, out string error,
                     clearStorage, clearMounts, name => name.GetStableHashCode()))
                 { message.text = BuildWorksLocalization.ResolveUserText(error); return; }
@@ -202,7 +215,7 @@ namespace OstrixMods.BuildWorks
 
         private void ReviewContents()
         {
-            reviewingContents = true; contentsSummary = null; clearStorage = clearMounts = false;
+            reviewingContents = true; contentsSummary = null; importReview = null; clearStorage = clearMounts = false;
             SetFileControls(false); copyPath.gameObject.SetActive(false);
             if (!contentsPanel)
             {
@@ -219,14 +232,20 @@ namespace OstrixMods.BuildWorks
                     reviewingContents = false; contentsPanel.gameObject.SetActive(false);
                     contentsBack.gameObject.SetActive(false); copyPath.gameObject.SetActive(true);
                     SetFileControls(true); message.text = "";
-                    primary.GetComponentInChildren<TMP_Text>().text = T("exchange.export");
+                    primary.GetComponentInChildren<TMP_Text>().text = T(blueprint == null ? "exchange.import" : "exchange.export");
                 });
             }
             contentsPanel.gameObject.SetActive(true); contentsBack.gameObject.SetActive(true);
             storageChoice.interactable = mountChoice.interactable = primary.interactable = false;
-            primary.GetComponentInChildren<TMP_Text>().text = T("exchange.confirm_export");
+            primary.GetComponentInChildren<TMP_Text>().text = T(blueprint == null ? "exchange.confirm_import" : "exchange.confirm_export");
             message.text = T("exchange.loading");
-            contentsInspection = Task.Run(() => CompositeBlueprintStore.InspectContents(blueprint, name => name.GetStableHashCode()));
+            if (blueprint != null)
+                contentsInspection = Task.Run(() => CompositeBlueprintStore.InspectContents(blueprint, name => name.GetStableHashCode()));
+            else
+            {
+                string source = selected;
+                importInspection = Task.Run(() => CompositeBlueprintStore.ReviewImportFile(source, name => name.GetStableHashCode()));
+            }
         }
 
         private void RenderContents()
@@ -234,12 +253,15 @@ namespace OstrixMods.BuildWorks
             var summary = contentsPanel.Find("ExchangeContentsSummary").GetComponent<TMP_Text>();
             summary.text = T("exchange.contents_counts", contentsSummary.Storages, contentsSummary.StoredItems,
                 contentsSummary.Mounts, contentsSummary.Unknown, contentsSummary.AlreadyCleared);
+            contentsPanel.Find("ExchangeContentsTitle").GetComponent<TMP_Text>().text = blueprint == null
+                ? T("exchange.import_review", importReview.Documents.Count) : T("exchange.contents_title");
             storageChoice.GetComponentInChildren<TMP_Text>().text = T(clearStorage ? "exchange.storage_clear" : "exchange.storage_keep");
             mountChoice.GetComponentInChildren<TMP_Text>().text = T(clearMounts ? "exchange.mounts_clear" : "exchange.mounts_keep");
             storageChoice.interactable = contentsSummary.CanClearStorage && contentsSummary.Storages > 0;
             mountChoice.interactable = contentsSummary.CanClearMounts && contentsSummary.Mounts > 0;
             skin.Apply(storageChoice, active: clearStorage); skin.Apply(mountChoice, active: clearMounts);
-            message.text = T(contentsSummary.Unknown == 0 ? "exchange.contents_copy" : "exchange.contents_unknown");
+            message.text = T(contentsSummary.Unknown != 0 ? "exchange.contents_unknown" :
+                blueprint == null ? "exchange.import_copy" : "exchange.contents_copy");
         }
 
         private void SetFileControls(bool visible)

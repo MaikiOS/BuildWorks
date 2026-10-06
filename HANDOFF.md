@@ -2,6 +2,28 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.77 — reviewed atomic import; not deployed
+
+The shared editor/Hammer import flow now snapshots the complete file/archive and reviews counts and
+independent storage/mount keep-clear choices before any library write. Back/Close do not import.
+Confirmation produces one private native ZIP, with exact original bytes/name in inert original/source.bin
+and original/name.txt. No archive paths are extracted. Foreign absolute scales normalize once against
+host prefab bases on the Unity thread; native relative scales stay unchanged. Changed source, any blocked
+member or failed conversion rejects without partial output. Short sibling staging paths fix the actual
+Unity Windows 269-character temporary-path failure; final source/cache identities survive reload.
+Before Move, shared 128MiB library budget and final sort order preserve every valid document ID with
+multiplicity (including duplicate ZIP names). Exactly 2000 files fit; 2001 and projected ZIP-entry overflow reject.
+
+Release zero warnings/errors; Store (all four choices, whole-archive rejection, stale input, unknown-state
+rollback, exact original and stable IDs), 112 Geometry, Bridge8, WorldLayout12, Localization837,
+HostContract, format and deployment WhatIf PASS. verify unavailable; direct checks used.
+Isolated Unity: 228 layouts / 38 checks PASS at 2026-10-06T19:49:59.0236127Z, including actual import/export choices, Back, error/retry,
+nonunit prefab scale, EN/RU 1280–3440 px and UI100–140%; gameHostTested=false.
+Independent correctness and Ponytail reviews PASS after fixes; one dead error-text assignment removed.
+Installed test remains .67; no deploy, Valheim, save edits, publication or push.
+Native world restoration, foreign state decoding, armour/free items, heavy scenes above 512 and durable
+world sockets remain pending. The full goal is active.
+
 ## Checkpoint 0.19.76 — export contents review UI; not deployed
 
 The existing shared editor/Hammer exchange window now reviews effective contents before export:

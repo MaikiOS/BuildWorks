@@ -42,6 +42,7 @@ namespace OstrixMods.BuildWorks
         internal int Revision { get; private set; }
         internal bool CatalogLoading => importTask != null && !importTask.IsCompleted;
         internal string ImportError { get; private set; }
+        internal string ImportResultPath { get; private set; }
         private string writeBlockReason;
 
         public CompositeBlueprintStore()
@@ -130,47 +131,128 @@ namespace OstrixMods.BuildWorks
 
         internal bool TryImportFile(string source, out string error)
         {
+            try { return TryImportReviewed(ReviewImportFile(source, null), false, false, null, out error); }
+            catch (Exception exception) { error = exception.Message; return false; }
+        }
+
+        internal sealed class ImportReview
+        {
+            internal string Source;
+            internal byte[] Bytes;
+            internal List<Blueprint> Documents;
+            internal ContentsSummary Contents;
+        }
+
+        private static byte[] ReadImportBytes(string source)
+        {
+            ValidateExchangeDirectory(Path.GetDirectoryName(source));
+            if ((File.GetAttributes(source) & FileAttributes.ReparsePoint) != 0)
+                throw new InvalidDataException("$buildworks_import.path");
+            using (var input = File.OpenRead(source))
+            using (var output = new MemoryStream())
+            {
+                var buffer = new byte[8192]; int read;
+                while ((read = input.Read(buffer, 0, buffer.Length)) != 0)
+                {
+                    if (output.Length + read > 64L * 1024 * 1024)
+                        throw new InvalidDataException("$buildworks_import.file_limit");
+                    output.Write(buffer, 0, read);
+                }
+                return output.ToArray();
+            }
+        }
+
+        // Pure file inspection: no library writes and no Unity prefab access.
+        internal static ImportReview ReviewImportFile(string source, Func<string, int> prefabHash)
+        {
+            source = Path.GetFullPath((source ?? "").Trim().Trim('"'));
+            byte[] bytes = ReadImportBytes(source);
+            string folder = Path.Combine(Path.GetTempPath(), "BuildWorks-review-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(folder);
+            string temporary = Path.Combine(folder, Path.GetFileName(source));
+            try
+            {
+                File.WriteAllBytes(temporary, bytes);
+                var documents = ExternalBlueprintLibrary.LoadFile(temporary);
+                if (documents.Count == 0) throw new InvalidDataException("$buildworks_import.format");
+                if (2 + documents.Count + documents.Count(document => ExternalBlueprintLibrary.ValidPreview(document.importPreview)) >
+                    ExternalBlueprintLibrary.MaximumFiles)
+                    throw new InvalidDataException("$buildworks_import.library_limit");
+                var summary = new ContentsSummary();
+                foreach (Blueprint document in documents)
+                {
+                    var contents = InspectContents(document, prefabHash); // Reject every blocked member, not just empty archives.
+                    summary.Storages += contents.Storages; summary.StoredItems += contents.StoredItems;
+                    summary.Mounts += contents.Mounts; summary.Unknown += contents.Unknown;
+                    summary.UnreadableStorages += contents.UnreadableStorages; summary.AlreadyCleared += contents.AlreadyCleared;
+                }
+                return new ImportReview { Source = source, Bytes = bytes, Documents = documents, Contents = summary };
+            }
+            finally
+            {
+                if (File.Exists(temporary)) File.Delete(temporary);
+                Directory.Delete(folder);
+            }
+        }
+
+        // Called on the Unity thread: normalize against installed prefab bases before the file worker.
+        internal bool TryImportReviewed(ImportReview review, bool clearStorage, bool clearMounts,
+            Func<string, int> prefabHash, out string error)
+        {
             error = null;
             if (CatalogLoading) { error = UserError("exchange.loading"); return false; }
             CatalogAll();
             try
             {
-                source = Path.GetFullPath((source ?? "").Trim().Trim('"'));
-                if (!File.Exists(source)) throw new FileNotFoundException(source);
-                string target = Path.Combine(ImportDirectory, Path.GetFileName(source));
-                if (File.Exists(target)) throw new IOException(UserError("exchange.exists", target));
-                string input = source;
+                if (review == null) throw new InvalidDataException("$buildworks_import.format");
+                var prepared = review.Documents.Select(document => ExternalBlueprintLibrary.PrepareForHost(document, importPrefabScale)).ToArray();
+                if (prepared.Any(document => document.importError != null))
+                    throw new InvalidDataException(prepared.First(document => document.importError != null).importError);
+                string target = Path.Combine(ImportDirectory, "import_" + Guid.NewGuid().ToString("N") + ".zip");
                 ImportError = null;
+                ImportResultPath = null;
                 importTask = Task.Run(() =>
                 {
+                    if (!ReadImportBytes(review.Source).SequenceEqual(review.Bytes))
+                        throw new InvalidDataException("$buildworks_exchange.source_changed");
+                    ValidateExchangeDirectory(ImportDirectory);
                     Directory.CreateDirectory(ImportDirectory);
-                    if ((File.GetAttributes(ImportDirectory) & FileAttributes.ReparsePoint) != 0 ||
-                        (File.GetAttributes(input) & FileAttributes.ReparsePoint) != 0)
-                        throw new InvalidDataException("$buildworks_import.path");
-                    string temporary = Path.Combine(ImportDirectory, Guid.NewGuid().ToString("N") + ".tmp" + Path.GetExtension(target));
+                    var catalog = ExternalBlueprintLibrary.Load(ImportDirectory);
+                    string temporary = Path.Combine(ImportDirectory, Guid.NewGuid().ToString("N") + ".tmp.zip");
                     try
                     {
-                        using (Stream from = File.OpenRead(input))
-                        using (Stream to = File.Create(temporary))
+                        using (var output = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                        using (var zip = new ZipArchive(output, ZipArchiveMode.Create))
                         {
-                            var buffer = new byte[8192]; int read; long total = 0;
-                            while ((read = from.Read(buffer, 0, buffer.Length)) != 0)
+                            WriteEntry("original/source.bin", review.Bytes); // Inert exact original, never parsed as a second blueprint.
+                            WriteEntry("original/name.txt", Encoding.UTF8.GetBytes(Path.GetFileName(review.Source)));
+                            for (int i = 0; i < prepared.Length; ++i)
                             {
-                                total += read;
-                                if (total > 64L * 1024 * 1024) throw new InvalidDataException("$buildworks_import.file_limit");
-                                to.Write(buffer, 0, read);
+                                var copy = CopyWithContentsPolicy(prepared[i], clearStorage, clearMounts, prefabHash);
+                                string name = "document_" + i + ".buildworks.json";
+                                WriteEntry(name, BlueprintExchangeFormat.Encode(copy));
+                                if (ExternalBlueprintLibrary.ValidPreview(prepared[i].importPreview))
+                                    WriteEntry(Path.ChangeExtension(name, ".png"), prepared[i].importPreview);
                             }
+                            void WriteEntry(string name, byte[] data)
+                            { using (var entry = zip.CreateEntry(name).Open()) entry.Write(data, 0, data.Length); }
                         }
-                        // Native names must retain the complete suffix during validation.
-                        string validation = temporary;
-                        if (target.EndsWith(".buildworks.json", StringComparison.OrdinalIgnoreCase))
-                        { validation = temporary + ".buildworks.json"; File.Move(temporary, validation); temporary = validation; }
-                        if (ExternalBlueprintLibrary.LoadFile(validation).Count == 0)
+                        var validated = ExternalBlueprintLibrary.LoadFile(temporary, Path.GetFileName(target));
+                        if (validated.Count != prepared.Length || validated.Any(document => document.importError != null))
                             throw new InvalidDataException("$buildworks_import.format");
-                        if (Directory.EnumerateFiles(ImportDirectory).Take(2001).Count() >= 2001)
+                        if (catalog.Count + validated.Count > ExternalBlueprintLibrary.MaximumFiles)
                             throw new InvalidDataException("$buildworks_import.library_limit");
-                        File.Move(temporary, target); // Never overwrite either source or an existing library file.
-                        return ExternalBlueprintLibrary.Load(ImportDirectory);
+                        // Validate the exact future sort order and shared read budget, not just this ZIP in isolation.
+                        var candidate = ExternalBlueprintLibrary.Load(ImportDirectory, temporary, Path.GetFileName(target));
+                        var validCopies = candidate.Where(document => document.importError == null)
+                            .GroupBy(document => document.id).ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+                        if (candidate.Count != catalog.Count + validated.Count ||
+                            catalog.Where(document => document.importError == null).Concat(validated).GroupBy(document => document.id)
+                                .Any(group => !validCopies.TryGetValue(group.Key, out int count) || count < group.Count()))
+                            throw new InvalidDataException("$buildworks_import.library_limit");
+                        File.Move(temporary, target); // The whole reviewed archive becomes visible at once; never overwrite.
+                        ImportResultPath = target;
+                        return candidate;
                     }
                     finally
                     {

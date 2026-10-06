@@ -9,7 +9,14 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.76**: shared editor/Hammer export contents review shows counts/unknown/previous clears
+Active source checkpoint **0.19.77**: import also reviews the whole file/archive and independent storage/mount choices before writing.
+One atomic native ZIP retains exact original bytes as inert evidence. Changed sources, blocked archive members and failed conversion
+write no partial copy; prefab-base scale normalization runs on the host thread. Whole-library budget/order/duplicate-ID multiplicity,
+2000/2001 files and projected ZIP-entry caps are verified before publishing. Store tests and 228 isolated Unity layouts/input checks PASS.
+Store14/portable5 unchanged; installed .67 unchanged, not deployed. Native world restoration, foreign state decoding, armour/free items,
+heavy scenes above 512 and durable world sockets remain pending; the full goal stays active. Details are in HANDOFF.
+
+Previous source checkpoint **0.19.76**: shared editor/Hammer export contents review shows counts/unknown/previous clears
 and independent storage/mount choices before explicit confirmation. Back/cancel/source retention and partial unreadable-storage
 eligibility are verified by real UI interactions. 204 isolated Unity layouts, including Russian review screens, and required checks PASS.
 Store14/portable5 unchanged; installed .67 unchanged, not deployed. Direct import policy/multi-document conversion and world restoration

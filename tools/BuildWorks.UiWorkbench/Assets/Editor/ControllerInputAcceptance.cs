@@ -558,6 +558,131 @@ internal static class ControllerInputAcceptance
         }
     }
 
+    internal static IEnumerable RunSupportLifecycle(Camera template, TMP_Text font, string output)
+    {
+        GameObject source = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        source.SetActive(false);
+        var input = new InputFrames();
+        var errors = new List<string>();
+        using (var controller = new BlueprintEditorController(new CompositeBlueprintStore(
+            Path.Combine(output, "support-input-fixture.json")), template, font, _ => source,
+            name => name, () => Array.Empty<BlueprintEditorCatalogItem>(), errors.Add, editorInput: input))
+        try
+        {
+            Require(controller.OpenNew(out string error), error);
+            BlueprintEditorDocument doc = controller.Document;
+            doc.AddPart(new BlueprintEditorPart("left", "fixture", "Left", new Point3(-1, 0, 0), new Rotation3(0, 0, 0, 1)));
+            doc.AddPart(new BlueprintEditorPart("right", "fixture", "Right", new Point3(1, 0, 0), new Rotation3(0, 0, 0, 1)));
+            doc.SelectOnly("left"); doc.ToggleSelection("right");
+            Call(controller, "RefreshSelection");
+            var view = Field<BlueprintEditorView>(controller, "view");
+            var scene = Field<BlueprintEditorScene>(controller, "scene");
+            yield return null;
+            Set(controller, "selectedAnchorWorld", new Vector3(0, 1, 0));
+            NativeClick(view, null, "CreateSupport"); yield return null;
+            string id = doc.ActiveSupportId;
+            Require(id != null && doc.Selection.Count == 2 && doc.PlacementSupportId == null,
+                "Creating/selecting support must retain parts without assigning placement");
+            var gizmo = Field<TransformGizmoView>(scene, "gizmo");
+            Require(!gizmo.ScaleEnabled, "Support exposes scale handles");
+            Vector3 original = V(doc.FindSupport(id).Position);
+            Require(Vector3.Distance(original, new Vector3(0, 1, 0)) < .001f,
+                "Create lost explicit A while ApplyDocumentEdit cleared transient anchors");
+            Require(scene.ModelSpaceGizmo && gizmo.ModelSize >= .4f,
+                "Default model-space support gizmo collapses without part bounds");
+            Frame(controller, input, Vector2.zero, 0, KeyCode.F); Frame(controller, input, Vector2.zero);
+            Require(Vector3.Distance(Field<Vector3>(controller, "cameraFocus"), original) < .001f,
+                "F frames retained parts instead of selected support");
+            Vector3[] parts = doc.Parts.Select(p => V(p.Position)).ToArray();
+            var visuals = Field<IDictionary>(scene, "visuals");
+            Vector3[] visualPositions = doc.Parts.Select(p => Field<GameObject>(visuals[p.StableId], "Root").transform.position).ToArray();
+            Vector2 mouse = scene.Camera.WorldToScreenPoint(original);
+            Vector2 arrow = scene.Camera.WorldToScreenPoint(original + Vector3.right * gizmo.Scale * .7f);
+            Frame(controller, input, arrow, 1);
+            Require(Field<GizmoHandleKind>(controller, "dragHandle") == GizmoHandleKind.Move,
+                "Support move arrow does not start native pointer drag");
+            Frame(controller, input, arrow + Vector2.right * 60, 1);
+            Vector3 pointerDelta = Field<Vector3>(controller, "dragTranslation");
+            Frame(controller, input, arrow + Vector2.right * 60); yield return null;
+            Require(pointerDelta.magnitude > .01f &&
+                Vector3.Distance(V(doc.FindSupport(id).Position), original + pointerDelta) < .001f,
+                "Support pointer release did not commit displayed pose");
+            Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Z); Frame(controller, input, mouse);
+            Frame(controller, input, mouse, 0, KeyCode.G); Frame(controller, input, mouse);
+            Frame(controller, input, mouse, 0, KeyCode.X); Frame(controller, input, mouse + Vector2.right * 50);
+            Frame(controller, input, mouse, 0, KeyCode.Escape); Frame(controller, input, mouse);
+            Require(!Field<bool>(controller, "keyboardPreview") &&
+                Vector3.Distance(V(doc.FindSupport(id).Position), original) < .001f, "Support Esc committed the preview");
+            Frame(controller, input, mouse, 0, KeyCode.G); Frame(controller, input, mouse);
+            Frame(controller, input, mouse, 0, KeyCode.X); Frame(controller, input, mouse + Vector2.right * 60);
+            input.Next(mouse); input.InputString = "3"; controller.Update(); controller.LateUpdate(); yield return null;
+            Require(Vector3.Distance(Field<Vector3>(controller, "dragTranslation"), Vector3.right * 3) < .001f,
+                "Support G number must replace mouse displacement from operation start");
+            for (int i = 0; i < parts.Length; ++i)
+                Require(Vector3.Distance(parts[i], V(doc.Parts[i].Position)) < .001f &&
+                    Vector3.Distance(visualPositions[i], Field<GameObject>(visuals[doc.Parts[i].StableId], "Root").transform.position) < .001f,
+                    "Support preview moved retained part geometry");
+            Frame(controller, input, mouse, 0, KeyCode.Return); Frame(controller, input, mouse); yield return null;
+            Require(Vector3.Distance(V(doc.FindSupport(id).Position), original + Vector3.right * 3) < .001f,
+                "Support G commit did not move only the support");
+            Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Z); Frame(controller, input, mouse);
+            Require(Vector3.Distance(V(doc.FindSupport(id).Position), original) < .001f, "Support move needs more than one Undo");
+            Frame(controller, input, mouse, 0, KeyCode.R); Frame(controller, input, mouse);
+            Frame(controller, input, mouse, 0, KeyCode.Y); Frame(controller, input, mouse + Vector2.up * 40);
+            input.Next(mouse); input.InputString = "90"; controller.Update(); controller.LateUpdate();
+            Quaternion preview = Field<Quaternion>(controller, "dragRotation");
+            Frame(controller, input, mouse, 0, KeyCode.S); Frame(controller, input, mouse); yield return null;
+            Require(Field<bool>(controller, "keyboardPreview") && Quaternion.Angle(preview,
+                Field<Quaternion>(controller, "dragRotation")) < .01f, "S interrupted support R preview");
+            Frame(controller, input, mouse, 0, KeyCode.Return); Frame(controller, input, mouse);
+            Require(Quaternion.Angle(new Quaternion((float)doc.FindSupport(id).Rotation.X,
+                (float)doc.FindSupport(id).Rotation.Y, (float)doc.FindSupport(id).Rotation.Z,
+                (float)doc.FindSupport(id).Rotation.W), Quaternion.Euler(0, 90, 0)) < .01f,
+                "Support R numeric angle is wrong");
+            NativeClick(view, null, "SupportPlacement"); yield return null;
+            Require(doc.PlacementSupportId == id && doc.ActiveSupportId == id,
+                "Placement assignment changed edit scope");
+            Field<TMP_InputField[]>(view, "supportPosition")[0].SetTextWithoutNotify("513");
+            NativeClick(view, null, "ApplySupport"); yield return null;
+            Require(Vector3.Distance(V(doc.FindSupport(id).Position), original) < .001f,
+                "Out-of-range inspector support position committed");
+            Field<TMP_InputField[]>(view, "supportPosition")[0].SetTextWithoutNotify(original.x.ToString());
+            Field<TMP_InputField>(view, "supportName").SetTextWithoutNotify("Вход · свободная опора");
+            Field<TMP_InputField[]>(view, "supportPosition")[1].SetTextWithoutNotify("2");
+            NativeClick(view, null, "ApplySupport"); yield return null;
+            Require(doc.FindSupport(id).Name == "Вход · свободная опора" && Mathf.Abs(V(doc.FindSupport(id).Position).y - 2) < .001f,
+                "Support inspector name/pose apply disconnected");
+            Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Z); Frame(controller, input, mouse);
+            Require(doc.FindSupport(id).Name != "Вход · свободная опора" &&
+                Vector3.Distance(V(doc.FindSupport(id).Position), original) < .001f,
+                "Support name and pose require two Undos");
+            NativeClick(view, null, "SupportCentre"); Frame(controller, input, mouse); yield return null;
+            Require(doc.ActiveSupportId == null && doc.PlacementSupportId == id && gizmo.ScaleEnabled &&
+                Field<string>(controller, "transformSupportPivotId") == id, "Centre assignment did not switch back to part scope");
+            Vector3 before = V(doc.FindSupport(id).Position);
+            Require(controller.ApplyTransformDelta(Vector3.zero, Quaternion.Euler(0, 90, 0), before),
+                "Part transform from support centre failed");
+            Require(Vector3.Distance(V(doc.FindSupport(id).Position), before) < .001f &&
+                Vector3.Distance(V(doc.Parts[0].Position), parts[0]) > .1f, "Centre transform moved support or failed to move parts");
+            yield return null;
+            NativeClick(view, null, "ClearSupportCentre"); yield return null;
+            Require(Field<string>(controller, "transformSupportPivotId") == null, "Normal centre reset is disconnected");
+            NativeClick(view, null, "Support_" + id); Frame(controller, input, mouse); yield return null;
+            Frame(controller, input, mouse, 0, KeyCode.Delete); Frame(controller, input, mouse);
+            Require(doc.Supports.Count == 0 && doc.Parts.Count == 2 && doc.PlacementSupportId == null,
+                "Support Delete removed retained parts or left placement ID");
+            Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Z); Frame(controller, input, mouse);
+            Require(doc.FindSupport(id) != null && doc.PlacementSupportId == id, "Undo support deletion loses placement role");
+            controller.Close(true); Require(controller.OpenNew(out error), error);
+            Require(controller.Document.ActiveSupportId == null && Field<string>(controller, "transformSupportPivotId") == null,
+                "Reopen leaked support focus/centre");
+            Require(errors.Count == 0, "Support controller errors: " + string.Join("; ", errors));
+            File.WriteAllText(Path.Combine(output, "support-input-check.txt"),
+                "PASS: native support tree/inspector clicks, retained parts, G/R numeric replacement, S non-interruption, atomic Apply/Undo, placement vs centre, Delete/Undo and reopen isolation. No Valheim host test.");
+        }
+        finally { Object.Destroy(source); }
+    }
+
     internal static IEnumerable RunContourLifecycle(Camera template, TMP_Text font, string output)
     {
         GameObject wall = GameObject.CreatePrimitive(PrimitiveType.Cube);

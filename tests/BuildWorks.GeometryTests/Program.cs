@@ -1895,6 +1895,14 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Equal(false, document.IsDirty);
             Equal(false, document.SelectSupport("missing"));
             Equal(true, document.SelectSupport("support"));
+            Equal(true, document.SetSupportProperties("support", "Переименованная", new Point3(7, 8, 9), turn));
+            Near(new Point3(1, 0, 0), document.Parts[0].Position);
+            Equal(true, document.Undo());
+            Equal("Вход", document.Supports[0].Name);
+            Near(new Point3(2, 3, 4), document.Supports[0].Position);
+            Throws<ArgumentOutOfRangeException>(() => document.SetSupportProperties("support", "Bad", new Point3(513, 0, 0), turn));
+            Equal("Вход", document.Supports[0].Name);
+            Equal(false, document.IsDirty);
             Equal(true, document.SetSupportPose("support", new Point3(5, 6, 7), turn));
             Near(new Point3(1, 0, 0), document.Parts[0].Position);
             Near(new Point3(1, 1, 1), document.Parts[0].Scale);

@@ -409,6 +409,20 @@ namespace OstrixMods.BuildWorks.Geometry
             return support != null && Commit(() => { support.Position = position; support.Rotation = normalized; });
         }
 
+        public bool SetSupportProperties(string stableId, string name, Point3 position, Rotation3 rotation)
+        {
+            string normalizedName = BlueprintEditorSupport.Label(name, 48, nameof(name));
+            BlueprintEditorSupport.ValidatePosition(position);
+            Rotation3 normalizedRotation = rotation.Normalized();
+            BlueprintEditorSupport support = FindSupport(stableId);
+            return support != null && Commit(() =>
+            {
+                support.Name = normalizedName;
+                support.Position = position;
+                support.Rotation = normalizedRotation;
+            });
+        }
+
         public bool SetPlacementSupport(string stableId)
         {
             if (stableId != null && FindSupport(stableId) == null) return false;

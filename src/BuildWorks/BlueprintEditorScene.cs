@@ -203,6 +203,7 @@ namespace OstrixMods.BuildWorks
         private readonly Light rimLight;
         private readonly TransformGizmoView gizmo;
         internal GizmoFamily GizmoFamily { get => gizmo.Family; set => gizmo.Family = value; }
+        internal bool GizmoScaleEnabled { set => gizmo.ScaleEnabled = value; }
         internal Vector2 GizmoMouse { set => gizmo.EditorMouse = value; }
         private readonly List<VisualNode> contourPreviews = new List<VisualNode>();
         private readonly List<VisualNode> duplicatePreviews = new List<VisualNode>();
@@ -299,7 +300,7 @@ namespace OstrixMods.BuildWorks
             set { if (experimentalGeometryPoints == value) return; experimentalGeometryPoints = value; InvalidateGizmoAnchors(); }
         }
 
-        internal void SetGizmoModelSize(IReadOnlyList<string> ids)
+        internal void SetGizmoModelSize(IReadOnlyList<string> ids, float minimum = .0001f)
         {
             // Local dimensions transformed as vectors: rotation and camera cannot inflate the reference.
             float diagonal = 0f;
@@ -317,7 +318,7 @@ namespace OstrixMods.BuildWorks
                     diagonal = Mathf.Max(diagonal, Mathf.Sqrt(squared));
                 }
             }
-            gizmo.ModelSize = Mathf.Max(.0001f, diagonal * .4f);
+            gizmo.ModelSize = Mathf.Max(minimum, diagonal * .4f);
         }
         internal float GroundHeight => groundHeight;
 

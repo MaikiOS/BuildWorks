@@ -753,3 +753,24 @@ blueprint.sign_unsupported	Текст не поддерживается дета
 blueprint.sign_capture_failed	Текст таблички недоступен или некорректен: {0}. Ничего не сохранено.
 blueprint.sign_apply_failed	Деталь поставлена, но текст таблички не применён. Проверь доступ и табличку; если остались детали, дальнейшее размещение приостановлено.
 catalog.group.external_blueprints	ИСХОДНЫЕ БИБЛИОТЕКИ
+editor.support.name	Опора {0}
+editor.support.branch	Опоры ({0})
+editor.support.create	+ Создать опору
+editor.support.limit	Лимит опор: {0}
+editor.support.title	Опора · {0}
+editor.support.centre	Центр трансформации
+editor.support.placement	Опора размещения
+editor.support.clear_placement	Снять опору размещения
+editor.support.placement_role	Размещение
+editor.support.delete	Удалить опору
+editor.support.reset_centre	Вернуть обычный центр
+editor.support.select_parts	Сначала выбери доступные детали, затем эту опору.
+editor.support.edit_hint	Редактируется только опора. G — перемещение; R — поворот; Enter — применить; Esc — отменить. Детали не меняются. Масштаб у опор отсутствует.
+editor.support.no_scale	У опор нет масштаба. Используй G или R; текущая правка остаётся активной.
+editor.support.centre_clear	Обычный центр восстановлен. Редактируются выбранные детали.
+editor.support.centre_hint	Опора — центр трансформации выбранных деталей. Сама опора не меняется.
+editor.support.preview	Предпросмотр опоры: XYZ {0} / {1} / {2} м; поворот {3} / {4} / {5}°. Enter — применить; Esc — отменить. Детали не меняются.
+editor.support.scope	Опора: {0} · G — перемещение · R — поворот · Enter — применить · Esc — отменить
+editor.support.actions	Delete — удалить опору · щелчок по детали — редактировать детали
+editor.support.centre_role	Центр трансформации
+editor.support.modes	Ctrl+1 — выбор · Ctrl+2 — гизма · Space/F3 — инструменты · Tab — каталог

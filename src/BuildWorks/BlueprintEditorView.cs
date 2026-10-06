@@ -386,6 +386,17 @@ namespace OstrixMods.BuildWorks
         private readonly Button inspectorActivePivotButton;
         private readonly Button[] inspectorBoundsButtons = new Button[9];
         private readonly GameObject groupEditPanel;
+        private readonly GameObject supportEditPanel;
+        private readonly TMP_InputField supportName;
+        private readonly TMP_InputField[] supportPosition = new TMP_InputField[3];
+        private readonly TMP_InputField[] supportRotation = new TMP_InputField[3];
+        private readonly Button supportPlacementButton;
+        private readonly Button supportCentreButton;
+        private readonly TMP_Text supportHint;
+        private string supportNodeId;
+        private bool supportsCollapsed;
+        private string lastSupportFocus;
+        internal string SupportCentreId { get; set; }
         private readonly TMP_InputField groupName;
         private readonly TMP_Text detailInfo;
         private readonly Button detailVisibilityButton;
@@ -786,6 +797,7 @@ namespace OstrixMods.BuildWorks
 
                 inspectorTitle = CreateText("InspectorTitle", inspector, T("editor.view.object_properties"), 16f,
                     FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+                inspectorTitle.overflowMode = TextOverflowModes.Ellipsis;
                 SetTopAnchored((RectTransform)inspectorTitle.transform, 8f, 4f, 8f, 32f);
                 inspectorTabs = CreateRect("InspectorTabs", inspector);
                 SetTopAnchored(inspectorTabs, 8f, 38f, 8f, 28f);
@@ -818,6 +830,12 @@ namespace OstrixMods.BuildWorks
                 inspectorBody.pivot = new Vector2(0.5f, 1f);
                 inspectorBody.anchoredPosition = Vector2.zero;
                 inspectorBody.sizeDelta = new Vector2(0f, 500f);
+                ScrollRect inspectorScroll = inspectorViewport.gameObject.AddComponent<ScrollRect>();
+                inspectorScroll.viewport = inspectorViewport;
+                inspectorScroll.content = inspectorBody;
+                inspectorScroll.horizontal = false;
+                inspectorScroll.movementType = ScrollRect.MovementType.Clamped;
+                inspectorScroll.scrollSensitivity = 24f;
                 inspectorContent = CreateText("InspectorContent", inspectorBody,
                     T("editor.view.nothing_selected"), 14f, FontStyles.Normal, TextAlignmentOptions.TopLeft);
                 inspectorContent.textWrappingMode = TextWrappingModes.Normal;
@@ -934,6 +952,37 @@ namespace OstrixMods.BuildWorks
                     button.gameObject.SetActive(false);
                 CreateAnchorControls(inspectorEditPanel.transform, 320f);
                 inspectorEditPanel.SetActive(false);
+
+                supportEditPanel = CreateRect("SupportEdit", inspectorBody).gameObject;
+                SetInsets((RectTransform)supportEditPanel.transform, 0f, 0f, 0f, 0f);
+                CreateInspectorLabel(supportEditPanel.transform, T("editor.view.name"), 0f);
+                supportName = CreateInput("SupportName", supportEditPanel.transform, new Vector2(0f, -24f), 228f);
+                supportName.characterLimit = 48;
+                CreateInspectorLabel(supportEditPanel.transform, T("editor.view.position_m"), 62f);
+                CreateAxisInputs(supportEditPanel.transform, supportPosition, 86f, .01f);
+                CreateInspectorLabel(supportEditPanel.transform, T("editor.view.rotation_deg"), 124f);
+                CreateAxisInputs(supportEditPanel.transform, supportRotation, 148f, .25f);
+                supportName.onSubmit.AddListener(_ => SubmitSupport());
+                foreach (TMP_InputField field in supportPosition) field.onSubmit.AddListener(_ => SubmitSupport());
+                foreach (TMP_InputField field in supportRotation) field.onSubmit.AddListener(_ => SubmitSupport());
+                Button applySupport = CreateButton("ApplySupport", supportEditPanel.transform,
+                    T("editor.view.apply"), 228f, SubmitSupport, primary: true);
+                SetInspectorButton((RectTransform)applySupport.transform, 0f, 188f, 228f);
+                supportCentreButton = CreateButton("SupportCentre", supportEditPanel.transform,
+                    T("editor.support.centre"), 228f, () => SupportCentreRequested?.Invoke(supportNodeId));
+                SetInspectorButton((RectTransform)supportCentreButton.transform, 0f, 232f, 228f);
+                supportPlacementButton = CreateButton("SupportPlacement", supportEditPanel.transform,
+                    T("editor.support.placement"), 228f, () => SupportPlacementRequested?.Invoke(
+                        boundDocument.PlacementSupportId == supportNodeId ? null : supportNodeId));
+                SetInspectorButton((RectTransform)supportPlacementButton.transform, 0f, 276f, 228f);
+                Button deleteSupport = CreateButton("DeleteSupport", supportEditPanel.transform,
+                    T("editor.support.delete"), 228f, () => SupportDeleted?.Invoke(supportNodeId));
+                SetInspectorButton((RectTransform)deleteSupport.transform, 0f, 320f, 228f);
+                supportHint = CreateText("SupportHint", supportEditPanel.transform,
+                    T("editor.support.edit_hint"), 12f, FontStyles.Normal, TextAlignmentOptions.TopLeft);
+                supportHint.textWrappingMode = TextWrappingModes.Normal;
+                SetTopAnchored(supportHint.rectTransform, 0f, 366f, 0f, 110f);
+                supportEditPanel.SetActive(false);
 
                 groupEditPanel = CreateRect("GroupEdit", inspectorBody).gameObject;
                 SetInsets((RectTransform)groupEditPanel.transform, 0f, 0f, 0f, 0f);
@@ -1445,6 +1494,12 @@ namespace OstrixMods.BuildWorks
         internal event Action<string> MoveSelectionToGroupRequested;
         internal event Action DuplicateSelectionRequested;
         internal event Action DeleteSelectionRequested;
+        internal event Action SupportCreated;
+        internal event Action<string> SupportSelected;
+        internal event Action<string, string, Vector3, Vector3> SupportSubmitted;
+        internal event Action<string> SupportDeleted;
+        internal event Action<string> SupportPlacementRequested;
+        internal event Action<string> SupportCentreRequested;
         internal event Action<string> PrimaryPartRequested;
         internal event Action<string> PrimaryGroupRequested;
         internal event Action<string, string> GroupPivotRequested;
@@ -1657,29 +1712,36 @@ namespace OstrixMods.BuildWorks
             SetButtonInteractable(undoButton, document.CanUndo);
             SetButtonInteractable(redoButton, document.CanRedo);
             saveButton.interactable = canSave && document.IsDirty && document.Parts.Count >= 2;
-            bool hasSelection = document.Selection.Count > 0;
+            bool editingSupport = document.FindSupport(document.ActiveSupportId) != null;
+            bool hasSelection = !editingSupport && document.Selection.Count > 0;
             int editableCount = document.EditablePartSelectionCount;
-            bool hasEditableSelection = editableCount > 0;
+            bool hasEditableSelection = !editingSupport && editableCount > 0;
             foreach (KeyValuePair<BlueprintEditorTool, Button> entry in toolButtons)
                 if (entry.Key != BlueprintEditorTool.Select)
                     SetAvailability(entry.Value,
-                        hasEditableSelection,
+                        hasEditableSelection || editingSupport && entry.Key == BlueprintEditorTool.Transform,
                         hasSelection ? T("editor.view.selection_unavailable") :
                             T("editor.view.select_first"));
-            SetAvailability(outlinerNewGroupButton, document.MovableNodeSelectionCount >= 2,
+            SetAvailability(outlinerNewGroupButton, !editingSupport && document.MovableNodeSelectionCount >= 2,
                 T("editor.view.group_two_objects"));
             foreach (Button button in outlinerSelectionButtons)
-                SetAvailability(button, button.name == "RenameSelection" ? document.Selection.Count == 1 : hasSelection,
+                SetAvailability(button, button.name == "RenameSelection" ? hasSelection && document.Selection.Count == 1 : hasSelection,
                     button.name == "RenameSelection"
                         ? T("editor.view.rename_one_object")
                         : T("editor.view.select_object_or_group"));
-            if (!hasEditableSelection && selectedTool != BlueprintEditorTool.Select)
+            if (!hasEditableSelection && !editingSupport && selectedTool != BlueprintEditorTool.Select)
             {
                 SetTool(BlueprintEditorTool.Select);
                 ToolSelected?.Invoke(BlueprintEditorTool.Select);
             }
             RebuildOutliner(document);
             BindInspector(document);
+            if (editingSupport && document.ActiveSupportId != lastSupportFocus)
+            {
+                Canvas.ForceUpdateCanvases();
+                outliner.GetComponent<ScrollRect>().verticalNormalizedPosition = 0f;
+            }
+            lastSupportFocus = document.ActiveSupportId;
         }
 
         internal void SetTransformContext(
@@ -2427,6 +2489,42 @@ namespace OstrixMods.BuildWorks
                 AddOutlinerRow(document, part.StableId, part.DisplayName,
                     part.Visible, part.Locked, true, false, 0);
             }
+            AddSupportRow("Supports", (supportsCollapsed ? "+ " : "- ") +
+                T("editor.support.branch", document.Supports.Count), () =>
+                { supportsCollapsed = !supportsCollapsed; RebuildOutliner(document); });
+            if (supportsCollapsed) return;
+            Button create = AddSupportRow("CreateSupport", T("editor.support.create"),
+                () => SupportCreated?.Invoke());
+            SetAvailability(create, document.Supports.Count < BlueprintEditorDocument.MaximumSupports,
+                T("editor.support.limit", BlueprintEditorDocument.MaximumSupports));
+            AddSupportRow("ClearSupportCentre", T("editor.support.reset_centre"),
+                () => SupportCentreRequested?.Invoke(null));
+            foreach (BlueprintEditorSupport support in document.Supports)
+            {
+                bool active = document.ActiveSupportId == support.StableId;
+                if (!Matches(support.Name, filter) || !PassesOutlinerFilter(active, true, false, false)) continue;
+                string id = support.StableId;
+                string label = support.Name + (document.PlacementSupportId == id
+                    ? " · " + T("editor.support.placement_role") : string.Empty);
+                if (SupportCentreId == id) label += " · " + T("editor.support.centre_role");
+                AddSupportRow("Support_" + id, label, () => SupportSelected?.Invoke(id), active);
+            }
+        }
+
+        private Button AddSupportRow(string name, string label, Action clicked, bool selected = false)
+        {
+            RectTransform row = CreatePanel(name, outlinerRows,
+                selected ? SelectedColor : PanelRaised, null);
+            LayoutElement layout = row.gameObject.AddComponent<LayoutElement>();
+            layout.preferredHeight = layout.minHeight = (float)BlueprintEditorLayout.OutlinerRowHeight;
+            Button button = row.gameObject.AddComponent<Button>();
+            button.onClick.AddListener(() => clicked());
+            TMP_Text text = CreateText("Name", row, label, 12f, FontStyles.Normal,
+                TextAlignmentOptions.MidlineLeft);
+            text.overflowMode = TextOverflowModes.Ellipsis;
+            SetInsets(text.rectTransform, 12f, 0f, 8f, 0f);
+            AddTooltip(row, label);
+            return button;
         }
 
         private bool BranchMatches(
@@ -2886,6 +2984,7 @@ namespace OstrixMods.BuildWorks
         private void BindInspector(BlueprintEditorDocument document)
         {
             inspectorEditPanel.SetActive(false);
+            supportEditPanel.SetActive(false);
             groupEditPanel.SetActive(false);
             blueprintEditPanel.SetActive(false);
             arrayEditPanel.SetActive(false);
@@ -2898,6 +2997,29 @@ namespace OstrixMods.BuildWorks
                 selectedTool == BlueprintEditorTool.Contour;
             inspectorTitle.text = T("editor.view.tool_parameters");
             inspectorTabs.gameObject.SetActive(false);
+            BlueprintEditorSupport support = document.FindSupport(document.ActiveSupportId);
+            if (support != null)
+            {
+                inspectorContent.gameObject.SetActive(false);
+                supportEditPanel.SetActive(true);
+                supportNodeId = support.StableId;
+                inspectorTitle.text = T("editor.support.title", support.Name);
+                supportName.SetTextWithoutNotify(support.Name);
+                SetInputValid(supportName, true);
+                SetAxisValues(supportPosition, new Vector3((float)support.Position.X,
+                    (float)support.Position.Y, (float)support.Position.Z));
+                Vector3 euler = new Quaternion((float)support.Rotation.X, (float)support.Rotation.Y,
+                    (float)support.Rotation.Z, (float)support.Rotation.W).eulerAngles;
+                SetAxisValues(supportRotation, new Vector3(SignedAngle(euler.x),
+                    SignedAngle(euler.y), SignedAngle(euler.z)));
+                foreach (TMP_InputField field in supportPosition) SetInputValid(field, true);
+                foreach (TMP_InputField field in supportRotation) SetInputValid(field, true);
+                SetAvailability(supportCentreButton, document.EditablePartSelectionCount > 0,
+                    T("editor.support.select_parts"));
+                SetButtonLabel(supportPlacementButton, T(document.PlacementSupportId == support.StableId
+                    ? "editor.support.clear_placement" : "editor.support.placement"));
+                return;
+            }
             if (selectedTool == BlueprintEditorTool.Select && inspectorTab == 0 &&
                 document.Selection.Count == 0)
             {
@@ -3120,6 +3242,35 @@ namespace OstrixMods.BuildWorks
         {
             if (!string.IsNullOrEmpty(groupNodeId))
                 RenameSubmitted?.Invoke(groupNodeId, groupName.text);
+        }
+
+        internal void SetSupportPreview(Vector3 position, Quaternion rotation, bool preview)
+        {
+            if (!supportEditPanel.activeSelf) return;
+            Vector3 euler = rotation.eulerAngles;
+            supportHint.text = preview ? T("editor.support.preview",
+                position.x.ToString("0.##"), position.y.ToString("0.##"), position.z.ToString("0.##"),
+                SignedAngle(euler.x).ToString("0.#"), SignedAngle(euler.y).ToString("0.#"), SignedAngle(euler.z).ToString("0.#"))
+                : T("editor.support.edit_hint");
+        }
+
+        private void SubmitSupport()
+        {
+            if (!supportEditPanel.activeSelf) return;
+            var values = new float[6];
+            bool valid = !string.IsNullOrWhiteSpace(supportName.text);
+            SetInputValid(supportName, valid);
+            for (int index = 0; index < values.Length; ++index)
+            {
+                TMP_InputField field = index < 3 ? supportPosition[index] : supportRotation[index - 3];
+                bool fieldValid = TryRead(field, out values[index]) &&
+                    (index >= 3 || Mathf.Abs(values[index]) <= 512f);
+                SetInputValid(field, fieldValid);
+                valid &= fieldValid;
+            }
+            if (!valid) { SetStatus(T("editor.view.invalid_red_field"), error: true); return; }
+            SupportSubmitted?.Invoke(supportNodeId, supportName.text,
+                new Vector3(values[0], values[1], values[2]), new Vector3(values[3], values[4], values[5]));
         }
 
         private void SubmitInspector()

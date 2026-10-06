@@ -54,6 +54,7 @@ namespace OstrixMods.BuildWorks
 
         private readonly GameObject root;
         internal GizmoFamily Family { get; set; } = GizmoFamily.Combined;
+        internal bool ScaleEnabled { get; set; } = true;
         internal Vector2? EditorMouse { get; set; }
         internal bool ModelSpaceSizing { get; set; }
         internal float ModelSize { get; set; } = 1f;
@@ -358,7 +359,7 @@ namespace OstrixMods.BuildWorks
                     if (screenSpaceSizing) DrawDepthContinuation(layoutAxisLines[i], layoutColor);
                 }
             }
-            bool showScale = allowExtended && (mode == GizmoMode.Move || combined && mode == GizmoMode.Repeat) &&
+            bool showScale = ScaleEnabled && allowExtended && (mode == GizmoMode.Move || combined && mode == GizmoMode.Repeat) &&
                 (combined || Family == GizmoFamily.Scale);
             scaleHandle.gameObject.SetActive(showScale);
             if (showScale)
@@ -638,7 +639,7 @@ namespace OstrixMods.BuildWorks
 
         internal bool HitTestScale(Camera camera, Vector2 mouse)
         {
-            if (!camera || !scaleHandle.gameObject.activeInHierarchy) return false;
+            if (!ScaleEnabled || !camera || !scaleHandle.gameObject.activeInHierarchy) return false;
             Vector3 first = camera.WorldToScreenPoint(scaleHandle.GetPosition(0));
             Vector3 opposite = camera.WorldToScreenPoint(scaleHandle.GetPosition(2));
             if (first.z <= 0f || opposite.z <= 0f) return false;

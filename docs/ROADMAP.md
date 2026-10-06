@@ -9,7 +9,13 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.63**: [Hammer support-frame composition](../specs/roadmap/blueprint-support-frames.md).
+Active source checkpoint **0.19.64**: [independent support editor](../specs/roadmap/blueprint-support-frames.md).
+Tree/inspector, G/R without moving parts, transient centre and persisted placement default.
+Release/target checks, correctness/Ponytail and 156 Unity states PASS.
+[Six player cases](testing/free-supports-0.19.64.md); not deployed for native game acceptance.
+Quiet unselected markers and world persistence/reload/network remain. Installed .56 unchanged.
+
+Previous source checkpoint **0.19.63**: [Hammer support-frame composition](../specs/roadmap/blueprint-support-frames.md).
 Shared inverse pose for ghost visuals/collider/native snaps and geometric root; F9 bounds pivot remains separate.
 Release/target checks and actual nested/mirrored Unity proof plus 144 states PASS; correctness/Ponytail PASS.
 Not a complete player workflow: tree/G/R/transform centre/world durability pending, installed .56 unchanged.

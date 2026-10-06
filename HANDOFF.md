@@ -2,6 +2,22 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Source checkpoint 0.19.64 — independent support editor; not deployed
+
+Independent supports now have their own tree branch and inspector. G/R and pointer
+drag edit only the selected support; S does not interrupt rotation. Name/pose apply
+as one Undo operation. Transform centre is transient; placement default is separately
+persisted. F frames the support; model-space handles have a 0.4 m minimum and the
+inspector uses native scrolling at small resolutions.
+Release has zero warnings/errors; 108 Geometry, Store/Localization, six Bridge,
+12 WorldLayout, HostContract/Deployment/format PASS. Independent correctness/Ponytail
+PASS. 156 Unity states PASS (2026-10-06T10:57:09Z, gameHostTested=false), including
+native clicks, pointer drag, numeric G/R, unchanged parts and Undo.
+[Six player acceptance cases](docs/testing/free-supports-0.19.64.md).
+Quiet unselected viewport markers and world support persistence/reload/network remain
+pending. Installed .56, worlds and saves unchanged. This is source/isolated Unity
+proof, not native game acceptance.
+
 ## Source checkpoint 0.19.63 — Hammer support frame; not deployed
 
 Saved placement support now rebases Hammer visuals, collider bounds and native sockets

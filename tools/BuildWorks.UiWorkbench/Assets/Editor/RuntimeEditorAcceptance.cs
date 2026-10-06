@@ -185,6 +185,7 @@ public static class RuntimeEditorAcceptance
             TestPlacementSupportFrame();
             checks.Add(UICatalogAcceptance.Run(fontTemplate.font));
             foreach (object step in ControllerInputAcceptance.Run(template, fontTemplate, output)) yield return step;
+            foreach (object step in ControllerInputAcceptance.RunSupportLifecycle(template, fontTemplate, output)) yield return step;
             foreach (object step in ControllerInputAcceptance.RunContourLifecycle(template, fontTemplate, output)) yield return step;
             checks.Add("Actual contour input: hover guide without copies, leave clears, click previews, cancel/tool switch/delete clear guide permanently");
             checks.Add("Actual Controller.Update/LateUpdate frame chords and native EventSystem raycasts: Ctrl+A, Shift rows/viewport, pin, shared gizmo, Alt move preview/commit/cancel/Undo, scale, placement RMB catalog reopen/camera and compound import; single Outliner context subscriptions; Array arrows/wheel/Ctrl zoom/Fit/spacing/shared step presets/live scrub before release/all TMP profile/atomic apply");
@@ -323,7 +324,7 @@ public static class RuntimeEditorAcceptance
                     scene.SetViewport(view.ViewportScreenRect());
                     Call(controller, "FrameAll");
                     foreach (string state in new[] { "select", "transform", "array", "contour", "catalog",
-                        "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "save-metadata" })
+                        "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "save-metadata", "supports" })
                     {
                         Require(Screen.width == width && Screen.height == height,
                             "GameView changed before " + state + ": " + Screen.width + "x" + Screen.height);
@@ -331,6 +332,13 @@ public static class RuntimeEditorAcceptance
                         view.HideOutlinerMenu();
                         view.HideViewportSettings();
                         view.HideDialog();
+                        document.SelectSupport(null);
+                        scene.ModelSpaceGizmo = state == "supports";
+                        if (state == "supports")
+                        {
+                            Call(controller, "SelectSupport", "saved-support");
+                            Call(controller, "FrameSelectionOrAll");
+                        }
                         BlueprintEditorTool tool = state == "array" ? BlueprintEditorTool.Array :
                             state == "contour" ? BlueprintEditorTool.Contour :
                             state == "select" ? BlueprintEditorTool.Select : BlueprintEditorTool.Transform;
@@ -370,6 +378,22 @@ public static class RuntimeEditorAcceptance
                         Call(controller, "RefreshContextHints");
                         Canvas.ForceUpdateCanvases();
                         ValidateControls(view, state);
+                        if (state == "supports")
+                        {
+                            GameObject panel = Field<GameObject>(view, "supportEditPanel");
+                            Require(panel.activeInHierarchy, "Support inspector absent");
+                            foreach (TMP_Text text in panel.GetComponentsInChildren<TMP_Text>())
+                            {
+                                text.ForceMeshUpdate();
+                                if (!text.GetComponentInParent<TMP_InputField>())
+                                    Require(!text.isTextOverflowing, "Support text overflows: " + text.name);
+                            }
+                            ScrollRect scroll = panel.GetComponentInParent<ScrollRect>();
+                            Require(scroll && scroll.vertical && !scroll.horizontal, "Small-screen support fields are unreachable");
+                            scroll.verticalNormalizedPosition = 1;
+                            Canvas.ForceUpdateCanvases();
+                            ControllerInputAcceptance.NativeClick(view, uiCamera, "ApplySupport");
+                        }
                         // Do not leave offscreen targets attached across a real GameView
                         // frame: batch-mode Screen can fall back to the editor window size.
                         uiCamera.targetTexture = target;

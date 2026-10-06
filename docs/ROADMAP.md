@@ -9,7 +9,15 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.71**: world selection captures native ItemStand contents without modifying the stand or inventory.
+Active source checkpoint **0.19.72**: compatible player-known ItemStand items are authored from Tools through the existing catalogue.
+One click attaches to an empty holder; populated replacement/removal requires confirmation. Undo restores the full original package;
+the tree shows contents under the holder. Invalid mod-item records skip individually; missing native attach nodes are filtered.
+Release/109 Geometry/required checks and 180 existing Unity layout states plus authoring interaction checks PASS; correctness/Ponytail PASS.
+These images do not establish attachment-mode visual or Valheim acceptance. Store v13/portable v4 and the world-state guard remain unchanged.
+Not deployed; test .67 unchanged. Ordinary free items, armour slots/poses, storage retain/clear prompts, native world restoration,
+heavy interactive scenes above 512 and durable world sockets remain unfinished.
+
+Previous source checkpoint **0.19.71**: world selection captures native ItemStand contents without modifying the stand or inventory.
 The actual native view (including override), signed item hash and visual metadata are read; the full item-data package is retained
 in the existing part payload with the validated `valheim-itemstand-v1` tag. Native/portable/copy/history preserve it unchanged;
 portable dependencies include the attached item prefab. Missing/invalid/oversized state and armour stands reject saving explicitly.
@@ -46,6 +54,10 @@ Ostrix's 2026-10-06 goal extension: ordinary items and horizontal/wall/armour st
 including editor attachments, preserved state/exchange and native world reconstruction; read-only ItemStand preview and native capture/preservation are implemented.
 Select ordinary items from an item catalogue, place them freely or attach to a compatible holder/armour slot;
 show the relationship in the tree/inspector and preserve it through holder movement, copy, Undo and exchange.
+Ostrix's additional 2026-10-06 requirement: import/export must inspect storage inventories and ask retain/clear
+for the resulting copy, with an independent retain/clear choice for stands, item mounts and armour displays.
+Originals/world objects stay untouched; unknown storage is not silently emptied. Policy UI/restore remain pending.
+See the storage policy in the [format contract](../specs/roadmap/blueprint-format.md).
 
 Previous source checkpoint **0.19.64**: [independent support editor](../specs/roadmap/blueprint-support-frames.md).
 Tree/inspector, G/R without moving parts, transient centre and persisted placement default.

@@ -819,7 +819,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.71.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.72.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -2877,4 +2877,31 @@ $worldCaptureCalls = ($worldSelection.Body.Instructions | ForEach-Object { [stri
 Assert-Contract ($worldCaptureCalls -match 'BlueprintItemStandCapture::TryCapture' -and
     $worldCaptureCalls -match 'ForeignPartData::FromGeometry') 'World selection discards native holder state.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.71 and Valheim Steam build 25185596.'
+$knownMaterial = ($hostAssembly.MainModule.Types | Where-Object Name -eq 'Player').Methods | Where-Object Name -eq 'IsMaterialKnown'
+$knownCalls = ($knownMaterial.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($knownMaterial.IsPublic -and $knownCalls -match '::m_knownMaterial' -and $knownCalls -match '::Contains' -and
+    $knownCalls -notmatch 'Inventory::|ZDO::Set|RPC') 'Known-item catalogue filter no longer reads native player progression.'
+$itemList = ($hostAssembly.MainModule.Types | Where-Object Name -eq 'ObjectDB').Fields | Where-Object Name -eq 'm_items'
+Assert-Contract ($itemList.IsPublic -and $itemList.FieldType.FullName -eq 'System.Collections.Generic.List`1<UnityEngine.GameObject>') 'Native item catalogue list changed.'
+$itemProvider = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'PrecisionPlacementSession' -and $_.Name -eq 'BlueprintEditorItemCatalogItems' }
+$providerCalls = ($itemProvider.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($providerCalls -match 'Player::IsMaterialKnown' -and $providerCalls -match 'ObjectDB::m_items' -and
+    $providerCalls -notmatch 'Inventory::|ZDO::|Object::Instantiate|ItemDrop/ItemData::Load') 'Item catalogue lost native progression or creates/loads runtime objects.'
+$invalidItemHandlers = @($itemProvider.Body.ExceptionHandlers | Where-Object { $_.CatchType -and $_.CatchType.FullName -eq 'System.ArgumentException' })
+Assert-Contract ($invalidItemHandlers.Count -eq 1) 'Invalid mod-items must have a narrow ArgumentException handler.'
+$invalidItemHandler = $invalidItemHandlers[0]
+$invalidItemInstructions = @($itemProvider.Body.Instructions | Where-Object { $_.Offset -ge $invalidItemHandler.HandlerStart.Offset -and $_.Offset -lt $invalidItemHandler.HandlerEnd.Offset })
+$invalidItemCalls = ($invalidItemInstructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+$catalogueSort = $itemProvider.Body.Instructions | Where-Object { [string]$_.Operand -match '::OrderBy<' } | Select-Object -First 1
+$invalidItemLeave = @($invalidItemInstructions | Where-Object { $_.OpCode.Name -like 'leave*' })
+Assert-Contract ($invalidItemCalls -match 'Debug::LogWarning' -and
+    @($invalidItemInstructions | Where-Object { $_.OpCode.Name -in @('throw', 'rethrow') }).Count -eq 0 -and
+    $invalidItemLeave.Count -eq 1 -and $catalogueSort -and
+    $invalidItemLeave[0].Operand.Offset -ge $invalidItemHandler.HandlerEnd.Offset -and
+    $invalidItemLeave[0].Operand.Offset -lt $catalogueSort.Offset) 'An invalid mod-item must be reported and skipped without aborting the catalogue.'
+$continuationCalls = ($itemProvider.Body.Instructions | Where-Object {
+    $_.Offset -ge $invalidItemLeave[0].Operand.Offset -and $_.Offset -lt $catalogueSort.Offset
+} | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($continuationCalls -match '::MoveNext\(') 'Invalid-item handler must continue the item enumeration.'
+
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.72 and Valheim Steam build 25185596.'

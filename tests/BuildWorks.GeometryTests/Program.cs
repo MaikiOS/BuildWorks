@@ -77,6 +77,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Run("Invalid anchor values are rejected", InvalidAnchorValuesAreRejected);
             Run("Blueprint document deep copies source", BlueprintDocumentDeepCopiesSource);
             Run("Blueprint payload survives insertion and cached history", BlueprintPayloadSurvivesHistory);
+            Run("ItemStand authoring preserves contents in history and rejects opaque/locked edits", ItemStandContentsHistory);
             Run("Free supports have independent pose, scope and history", BlueprintSupportHistory);
             Run("Free supports insert with remapped root pose and validate atomically", BlueprintSupportInsertion);
             Run("Blueprint selection does not dirty document", BlueprintSelectionDoesNotDirtyDocument);
@@ -1990,6 +1991,31 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Throws<InvalidOperationException>(() => full.InsertBlueprint(source, new Point3(), identity));
             Equal(0, full.Parts.Count);
             Equal(false, full.IsDirty);
+        }
+
+        private static void ItemStandContentsHistory()
+        {
+            var original = new BlueprintForeignPartData(BlueprintForeignPartData.NativeItemStandFormat,
+                "SwordIron:2:3:0", Convert.ToBase64String(new byte[] { 109, 2, 0, 255, 67 }), null);
+            var replacement = new BlueprintForeignPartData(BlueprintForeignPartData.NativeItemStandFormat,
+                "AxeIron:0:1:0", null, null);
+            var document = EditorDocument(new BlueprintEditorPart("stand", "itemstand", "Stand", new Point3(), IdentityRotation(), foreignData: original));
+            document.MarkClean();
+            Equal(true, document.SetItemStandContents("stand", replacement));
+            Equal(replacement, document.Parts[0].ForeignData);
+            Equal(true, document.Undo()); Equal(original, document.Parts[0].ForeignData); Equal(false, document.IsDirty);
+            Equal(true, document.Redo()); Equal(replacement, document.Parts[0].ForeignData);
+            Equal(true, document.SetItemStandContents("stand", null));
+            Equal(null, document.Parts[0].ForeignData);
+            Equal(true, document.Undo()); Equal(replacement, document.Parts[0].ForeignData);
+            Equal(false, document.SetItemStandContents("missing", replacement));
+            document.SetLocked("stand", true); Equal(false, document.SetItemStandContents("stand", null));
+            document.SetLocked("stand", false); document.SetVisibility("stand", false);
+            Equal(false, document.SetItemStandContents("stand", null));
+            var opaque = new BlueprintForeignPartData("blueprint", "unknown", null, null);
+            var unknown = EditorDocument(new BlueprintEditorPart("stand", "itemstand", "Stand", new Point3(), IdentityRotation(), foreignData: opaque));
+            Equal(false, unknown.SetItemStandContents("stand", replacement)); Equal(opaque, unknown.Parts[0].ForeignData);
+            Throws<ArgumentException>(() => document.SetItemStandContents("stand", opaque));
         }
 
         private static void BlueprintPayloadSurvivesHistory()

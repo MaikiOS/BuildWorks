@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.71";
+        internal const string PluginVersion = "0.19.72";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -310,7 +310,8 @@ namespace OstrixMods.BuildWorks
                         message => Logger.LogError(message),
                         changed => current.RefreshBlueprintEditorLibrary(changed),
                         initialPlacementSnapPointProvider:
-                            PrecisionPlacementSession.CurrentManualSnapPoint);
+                            PrecisionPlacementSession.CurrentManualSnapPoint,
+                        itemCatalogItemProvider: current.BlueprintEditorItemCatalogItems);
                     blueprintEditor.InterfaceScaleChanged += scale =>
                         InterfaceScalePercent.Value = Mathf.Clamp(
                             Mathf.RoundToInt(scale * 100f), 60, 140);

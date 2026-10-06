@@ -22,6 +22,75 @@ internal static class ItemStandPreviewAcceptance
         "holder", "fixture-stand", "Stand", new Point3(2, 1, 3), new Rotation3(0, .70710678118, 0, .70710678118),
         scale: new Point3(1.5, 2, .5), foreignData: data);
 
+    private static object Call(object value, string name, params object[] args) => value.GetType()
+        .GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic).Invoke(value, args);
+
+    private static void AuthoringChecks(Camera template, GameObject source, BlueprintForeignPartData captured, string output)
+    {
+        string path = Path.Combine(output, "stand-authoring-" + Guid.NewGuid().ToString("N") + ".json");
+        var store = new CompositeBlueprintStore(path);
+        var saved = new CompositeBlueprintStore.Blueprint { id = "stand-authoring", name = "Stand authoring", parts = new List<CompositeBlueprintStore.Part> {
+            new CompositeBlueprintStore.Part { stableId = "holder", prefabName = source.name, displayName = "Stand",
+                foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(captured) } } };
+        var recipe = new BlueprintForeignPartData(BlueprintForeignPartData.NativeItemStandFormat, "SwordFixture:0:1:0", null, null);
+        var card = new BlueprintEditorCatalogItem("SwordFixture", "Sword fixture", null, "OTHER", "OTHER", "ITEMS", 0, itemContents: recipe);
+        var noAttach = new BlueprintEditorCatalogItem("NoAttachFixture", "No attach fixture", null, "OTHER", "OTHER", "ITEMS", 1,
+            itemContents: new BlueprintForeignPartData(BlueprintForeignPartData.NativeItemStandFormat, "NoAttachFixture:0:1:0", null, null));
+        using (var editor = new BlueprintEditorController(store, template, null, _ => source, name => name,
+            () => Array.Empty<BlueprintEditorCatalogItem>(), message => { throw new InvalidOperationException(message); },
+            itemCatalogItemProvider: () => new[] { noAttach, card }))
+        {
+            Require(editor.OpenNew(out string error), error);
+            Require((bool)Call(editor, "ApplyDocumentEdit", new Func<bool>(() => editor.Document.AddPart(
+                new BlueprintEditorPart("holder", source.name, "Stand", new Point3(), new Rotation3(0, 0, 0, 1), foreignData: captured))), false), "cannot create holder draft");
+            Require(editor.AddPart(source.name, "Second stand"), "cannot create second part");
+            string id = editor.Document.Parts[0].StableId;
+            Call(editor, "SelectNode", id, false, false);
+            var view = Field<BlueprintEditorView>(editor, "view");
+            Require(view.ItemStandEditable && view.ItemStandHasContents, "selected stand tools unavailable");
+            view.ShowToolsMenu(Vector2.zero, false);
+            var tools = Field<List<UnityEngine.UI.Button>>(view, "toolsEntries");
+            tools.Single(button => button.name == "ToolsItem0").onClick.Invoke();
+            Require(view.HasCatalog && !Field<bool>(view, "catalogBlueprintMode") && Field<bool>(view, "catalogAttachmentMode"), "attachment catalogue not opened");
+            Require(Field<RectTransform>(view, "catalogNavigation").GetComponentsInChildren<UnityEngine.UI.Button>()
+                .All(button => !button.name.Contains("building")), "building navigation leaked into item catalogue");
+            Require(!Field<RectTransform>(view, "catalogGrid").GetComponentsInChildren<UnityEngine.UI.Button>()
+                .Any(value => value.name == "Catalog_NoAttachFixture"), "item without native attach appeared in catalogue");
+            var button = Field<RectTransform>(view, "catalogGrid").GetComponentsInChildren<UnityEngine.UI.Button>()
+                .Single(value => value.name == "Catalog_SwordFixture");
+            BlueprintForeignPartData original = editor.Document.Parts[0].ForeignData;
+            button.onClick.Invoke();
+            Require(!view.HasCatalog && view.HasModal && editor.Document.Parts[0].ForeignData == original &&
+                Field<BlueprintEditorCatalogItem>(editor, "placementItem") == null, "one click mutated before confirmation or spawned a Piece");
+            Field<UnityEngine.UI.Button>(view, "dialogCancelButton").onClick.Invoke();
+            Require(!view.HasModal && editor.Document.Parts[0].ForeignData == original, "cancel lost old state");
+            Call(editor, "RequestItemContents", false);
+            Call(editor, "BeginPartPlacement", card, true);
+            Field<UnityEngine.UI.Button>(view, "dialogPrimaryButton").onClick.Invoke();
+            Require(editor.Document.Parts[0].ForeignData == recipe && !view.HasModal &&
+                Field<RectTransform>(view, "outlinerRows").Find("Contents_" + id), "confirmed recipe or holder tree relationship absent");
+            Call(editor, "ApplyHistory", new Func<bool>(editor.Document.Undo), new Func<bool>(editor.Document.Redo));
+            Require(editor.Document.Parts[0].ForeignData.Info == captured.Info &&
+                editor.Document.Parts[0].ForeignData.Zdo == captured.Zdo, "Undo did not restore the full package");
+            Call(editor, "RequestItemContents", true);
+            Field<UnityEngine.UI.Button>(view, "dialogPrimaryButton").onClick.Invoke();
+            Require(editor.Document.Parts[0].ForeignData == null, "explicit detach did not clear draft");
+            Call(editor, "RequestItemContents", false);
+            Call(editor, "BeginPartPlacement", card, true);
+            Require(!view.HasModal && editor.Document.Parts[0].ForeignData == recipe, "empty stand required a second click");
+            Require((bool)Call(editor, "TrySave", false, true), "authored recipe could not save");
+            var reopened = new CompositeBlueprintStore(path).All().Single();
+            Require(reopened.parts[0].foreignData.info == recipe.Info && reopened.parts[0].foreignData.zdo == null &&
+                saved.parts[0].foreignData.info == captured.Info && saved.parts[0].foreignData.zdo == captured.Zdo,
+                "save changed source or reused the old item package");
+            Call(editor, "RequestItemContents", true);
+            editor.Document.SetLocked(id, true);
+            Field<UnityEngine.UI.Button>(view, "dialogPrimaryButton").onClick.Invoke();
+            Require(editor.Document.Parts[0].ForeignData == recipe, "stale locked stand accepted contents change");
+            editor.Close(true);
+        }
+    }
+
     private static BlueprintForeignPartData CaptureChecks(GameObject source, GameObject item)
     {
         Piece piece = source.AddComponent<Piece>();
@@ -119,11 +188,17 @@ internal static class ItemStandPreviewAcceptance
         ObjectDB previousDb = ObjectDB.instance;
         ObjectDB.instance = new ObjectDB();
         ObjectDB.instance.Items.Add(item.name, item);
+        var noAttach = new GameObject("NoAttachFixture");
+        noAttach.SetActive(false);
+        noAttach.AddComponent<ItemDrop>();
+        ObjectDB.instance.Items.Add(noAttach.name, noAttach);
         int sourceChildren = source.transform.childCount;
         var data = new BlueprintForeignPartData("blueprint", "\"SwordFixture:2:3:0\"", "raw-zdo", ".5");
         try
         {
             BlueprintForeignPartData captured = CaptureChecks(source, item);
+            yield return null;
+            AuthoringChecks(template, source, captured, output);
             yield return null;
             stand.m_orientationType = ItemStand.Orientation.Horizontal;
             using (var scene = new BlueprintEditorScene(template, _ => source))
@@ -258,7 +333,7 @@ internal static class ItemStandPreviewAcceptance
         finally
         {
             ObjectDB.instance = previousDb;
-            Object.Destroy(source); Object.Destroy(item); Object.Destroy(material);
+            Object.Destroy(source); Object.Destroy(item); Object.Destroy(noAttach); Object.Destroy(material);
         }
         yield return null;
     }

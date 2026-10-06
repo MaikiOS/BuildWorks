@@ -36,6 +36,8 @@ namespace OstrixMods.BuildWorks
         private readonly Func<string, GameObject> resolveVisualSource;
         private readonly Func<string, string> resolveDisplayName;
         private readonly Func<IReadOnlyList<BlueprintEditorCatalogItem>> catalogItems;
+        private readonly Func<IReadOnlyList<BlueprintEditorCatalogItem>> itemCatalogItems;
+        private string itemStandCatalogOwnerId;
         private readonly Func<int> initialPlacementSnapPoint;
         private readonly Action<string> logError;
         private readonly Action<CompositeBlueprintStore.Blueprint> saved;
@@ -205,7 +207,8 @@ namespace OstrixMods.BuildWorks
             Action<string> errorLogger,
             Action<CompositeBlueprintStore.Blueprint> onSaved = null,
             IBlueprintEditorInput editorInput = null,
-            Func<int> initialPlacementSnapPointProvider = null)
+            Func<int> initialPlacementSnapPointProvider = null,
+            Func<IReadOnlyList<BlueprintEditorCatalogItem>> itemCatalogItemProvider = null)
         {
             store = blueprintStore ?? throw new ArgumentNullException(nameof(blueprintStore));
             cameraTemplate = editorCameraTemplate
@@ -218,6 +221,7 @@ namespace OstrixMods.BuildWorks
             catalogItems = catalogItemProvider ??
                 (() => Array.Empty<BlueprintEditorCatalogItem>());
             initialPlacementSnapPoint = initialPlacementSnapPointProvider ?? (() => -1);
+            itemCatalogItems = itemCatalogItemProvider ?? (() => Array.Empty<BlueprintEditorCatalogItem>());
             logError = errorLogger ?? (_ => { });
             saved = onSaved;
             input = editorInput ?? UnityBlueprintEditorInput.Instance;
@@ -610,6 +614,7 @@ namespace OstrixMods.BuildWorks
                 document.SetLocked(id, locked));
             view.DialogDecided += HandleDialog;
             view.CatalogPartSelected += BeginPartPlacement;
+            view.ItemContentsRequested += RequestItemContents;
             view.CatalogImportRequested += () => view.ShowExchange((parent, font, closed) => new BlueprintExchangeView(parent, font, store, null, closed), () =>
             {
                 catalogImportPending = true;
@@ -2676,9 +2681,99 @@ namespace OstrixMods.BuildWorks
             Bind(warning);
         }
 
+        private BlueprintEditorPart EditableItemStand(string id, out GameObject source)
+        {
+            source = null;
+            BlueprintEditorPart part = document?.Parts.FirstOrDefault(value => value.StableId == id);
+            if (part == null || !document.IsEffectivelyVisible(id) || document.IsEffectivelyLocked(id) ||
+                part.ForeignData != null && part.ForeignData.Format != BlueprintForeignPartData.NativeItemStandFormat)
+                return null;
+            source = ResolveVisualSource(part.PrefabName);
+            return source && source.GetComponent<ItemStand>() && !source.GetComponent<ArmorStand>() ? part : null;
+        }
+
+        private void RequestItemContents(bool detach)
+        {
+            if (!IsEditing || keyboardPreview || placementItem != null || IsGizmoDragging) return;
+            BlueprintEditorPart part = EditableItemStand(document.ActiveNodeId, out GameObject source);
+            if (part == null || document.Selection.Count != 1)
+            { view.SetStatus(BuildWorksLocalization.Text("editor.item.select_stand"), error: true); return; }
+            if (detach)
+            {
+                if (part.ForeignData != null) ConfirmItemContents(part, null);
+                return;
+            }
+            try
+            {
+                ItemStand stand = source.GetComponent<ItemStand>();
+                var items = (itemCatalogItems() ?? Array.Empty<BlueprintEditorCatalogItem>()).Where(item =>
+                {
+                    GameObject prefab = ObjectDB.instance ? ObjectDB.instance.GetItemPrefab(item.PrefabName) : null;
+                    return item.ItemContents?.Format == BlueprintForeignPartData.NativeItemStandFormat &&
+                        prefab && ItemStand.GetAttachPrefab(prefab) &&
+                        BlueprintItemStandPreview.Supports(stand, prefab.GetComponent<ItemDrop>()?.m_itemData);
+                }).ToList();
+                if (items.Count == 0)
+                { view.SetStatus(BuildWorksLocalization.Text("editor.item.catalog_empty"), error: true); return; }
+                itemStandCatalogOwnerId = part.StableId;
+                catalogImportPending = false;
+                scene.HideGizmo();
+                view.ShowItemStandCatalog(items);
+            }
+            catch (Exception exception)
+            {
+                logError("BuildWorks item catalogue failed: " + exception);
+                view.SetStatus(BuildWorksLocalization.Text("editor.catalog_open_failed"), error: true);
+            }
+        }
+
+        private void AttachItemContents(BlueprintEditorCatalogItem item)
+        {
+            BlueprintEditorPart part = EditableItemStand(itemStandCatalogOwnerId, out GameObject source);
+            if (part == null || !string.IsNullOrEmpty(item.UnavailableReason))
+            { view.SetStatus(item.UnavailableReason ?? BuildWorksLocalization.Text("editor.item.select_stand"), error: true); return; }
+            GameObject preview = null;
+            try
+            {
+                preview = PlacementGhostPreviewView.CreateVisualClone(source, "BuildWorks_ItemAttachmentCheck", source.layer);
+                if (!BlueprintItemStandPreview.TryAdd(source, preview, item.ItemContents, out string warning))
+                { view.SetStatus(warning, error: true); return; }
+                view.HideCatalog();
+                itemStandCatalogOwnerId = null;
+                ConfirmItemContents(part, item.ItemContents);
+            }
+            catch (Exception exception)
+            {
+                logError("BuildWorks item attachment failed: " + exception);
+                view.SetStatus(BuildWorksLocalization.Text("editor.catalog_open_failed"), error: true);
+            }
+            finally
+            {
+                if (preview) { preview.SetActive(false); UnityEngine.Object.Destroy(preview); }
+            }
+        }
+
+        private void ConfirmItemContents(BlueprintEditorPart part, BlueprintForeignPartData contents)
+        {
+            string id = part.StableId;
+            BlueprintForeignPartData previous = part.ForeignData;
+            void Apply()
+            {
+                BlueprintEditorPart current = EditableItemStand(id, out _);
+                if (current == null || !ReferenceEquals(current.ForeignData, previous))
+                { view.SetStatus(BuildWorksLocalization.Text("editor.item.changed"), error: true); return; }
+                if (ApplyDocumentEdit(() => document.SetItemStandContents(id, contents)))
+                    view.SetStatus(BuildWorksLocalization.Text("editor.item.saved"));
+            }
+            if (previous == null) Apply();
+            else view.ShowConfirmation(BuildWorksLocalization.Text("editor.item.replace_title"),
+                BuildWorksLocalization.Text(contents == null ? "editor.item.remove_confirm" : "editor.item.replace_confirm"), Apply);
+        }
+
         private void RequestCatalog()
         {
             if (!IsEditing || keyboardPreview) return;
+            itemStandCatalogOwnerId = null;
             try
             {
                 scene.HideGizmo();
@@ -2704,6 +2799,7 @@ namespace OstrixMods.BuildWorks
         private void BeginPartPlacement(BlueprintEditorCatalogItem item, bool snap)
         {
             if (!IsEditing || item == null || keyboardPreview) return;
+            if (item.ItemContents != null) { AttachItemContents(item); return; }
             if (!string.IsNullOrEmpty(item.UnavailableReason))
             { view.SetStatus(item.UnavailableReason, error: true); return; }
             if (item.IsBlueprint && CompositeBlueprintStore.InteractiveError(item.Blueprint.parts.Count) is string budgetError)
@@ -3676,6 +3772,9 @@ namespace OstrixMods.BuildWorks
                 ? bounds.size
                 : (Vector3?)null;
             view.SupportCentreId = transformSupportPivotId;
+            BlueprintEditorPart standPart = EditableItemStand(document.ActiveNodeId, out _);
+            view.ItemStandEditable = standPart != null && document.Selection.Count == 1;
+            view.ItemStandHasContents = standPart?.ForeignData != null;
             view.Bind(document, true, missing, boundsSize);
             UpdateOperationMetrics();
             if (!string.IsNullOrEmpty(status))
@@ -3737,6 +3836,7 @@ namespace OstrixMods.BuildWorks
             middleDeleteTarget = null;
             rightCameraTracking = cameraFlying = false;
             placementItem = null;
+            itemStandCatalogOwnerId = null;
             contourSupportIds.Clear();
             contourGuidePoints.Clear();
             ResetGizmoDrag();

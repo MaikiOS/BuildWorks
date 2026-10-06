@@ -59,7 +59,7 @@ namespace OstrixMods.BuildWorks
             IReadOnlyList<BlueprintEditorCatalogResource> resources = null,
             string requiredStation = null, Sprite requiredStationIcon = null,
             IReadOnlyList<string> materials = null, int materialOrder = 0,
-            string unavailableReason = null)
+            string unavailableReason = null, BlueprintForeignPartData itemContents = null)
         {
             PrefabName = prefabName;
             DisplayName = displayName;
@@ -88,6 +88,7 @@ namespace OstrixMods.BuildWorks
             Materials = materials ?? new[] { Material };
             MaterialOrder = materialOrder;
             UnavailableReason = unavailableReason;
+            ItemContents = itemContents;
         }
 
         internal string PrefabName { get; }
@@ -104,6 +105,7 @@ namespace OstrixMods.BuildWorks
         internal int Index { get; }
         internal CompositeBlueprintStore.Blueprint Blueprint { get; }
         internal bool IsBlueprint => Blueprint != null;
+        internal BlueprintForeignPartData ItemContents { get; }
         internal string UnavailableReason { get; }
         internal string Section { get; }
         internal string Family { get; }
@@ -435,6 +437,9 @@ namespace OstrixMods.BuildWorks
         private RectTransform saveMetadataFields;
         private TMP_InputField saveMetadataName, saveMetadataCategory;
         private Action<string, string> saveMetadataAccepted;
+        private Action confirmationAccepted;
+        internal bool ItemStandEditable { get; set; }
+        internal bool ItemStandHasContents { get; set; }
         private BlueprintExchangeView exchangeView;
         private float inspectorOriginalScale;
         private string inspectorOriginalScaleText;
@@ -1443,6 +1448,15 @@ namespace OstrixMods.BuildWorks
                     SetTopLeft((RectTransform)entry.transform, 12f, 82f + (index + tools.Length) * 36f, 286f, 32f);
                     toolsEntries.Add(entry);
                 }
+                string[] itemActions = { "editor.item.attach", "editor.item.detach" };
+                for (int index = 0; index < itemActions.Length; ++index)
+                {
+                    bool detach = index == 1;
+                    Button entry = CreateButton("ToolsItem" + index, toolsPanel, T(itemActions[index]), 286f,
+                        () => { HideToolsMenu(); ItemContentsRequested?.Invoke(detach); });
+                    AddTooltip((RectTransform)entry.transform, T("editor.item.select_stand"));
+                    toolsEntries.Add(entry);
+                }
                 toolsMenu.SetActive(false);
 
                 InitializeCatalog();
@@ -1463,7 +1477,9 @@ namespace OstrixMods.BuildWorks
                     dialog, "SaveExit", T("editor.view.save_exit"), 20f,
                     () =>
                     {
-                        if (saveMetadataAccepted != null) SubmitSaveMetadata();
+                        if (confirmationAccepted != null)
+                        { Action accepted = confirmationAccepted; HideDialog(); accepted(); }
+                        else if (saveMetadataAccepted != null) SubmitSaveMetadata();
                         else DialogDecided?.Invoke(errorDialog ? BlueprintEditorDialogDecision.Retry : BlueprintEditorDialogDecision.SaveAndExit);
                     }, true);
                 dialogDiscardButton = CreateDialogButton(
@@ -1507,6 +1523,7 @@ namespace OstrixMods.BuildWorks
         internal event Action DuplicateSelectionRequested;
         internal event Action DeleteSelectionRequested;
         internal event Action SupportCreated;
+        internal event Action<bool> ItemContentsRequested;
         internal event Action<string> SupportSelected;
         internal event Action<string, string, Vector3, Vector3> SupportSubmitted;
         internal event Action<string> SupportDeleted;
@@ -1982,12 +1999,12 @@ namespace OstrixMods.BuildWorks
             EndTooltip();
             toolsSearch.SetTextWithoutNotify("");
             toolsMenu.SetActive(true);
+            FilterTools();
             Camera uiCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
             RectTransformUtility.ScreenPointToLocalPointInRectangle(safeRoot, mouse, uiCamera, out Vector2 point);
             Rect safe = safeRoot.rect;
             toolsPanel.anchoredPosition = new Vector2(Mathf.Clamp(point.x, safe.xMin, safe.xMax - toolsPanel.rect.width),
                 Mathf.Clamp(point.y, safe.yMin + toolsPanel.rect.height, safe.yMax));
-            FilterTools();
             if (searchFocused) toolsSearch.ActivateInputField();
         }
 
@@ -2014,10 +2031,13 @@ namespace OstrixMods.BuildWorks
                     "ToolsEntry4" => boundDocument != null && boundDocument.Supports.Count < BlueprintEditorDocument.MaximumSupports,
                     "ToolsEntry5" => boundDocument?.FindSupport(boundDocument.ActiveSupportId) != null,
                     "ToolsEntry6" => SupportCentreId != null,
+                    "ToolsItem0" => ItemStandEditable,
+                    "ToolsItem1" => ItemStandEditable && ItemStandHasContents,
                     _ => boundDocument?.EditablePartSelectionCount > 0
                 };
                 if (match) SetTopLeft((RectTransform)entry.transform, 12f, 82f + row++ * 36f, 286f, 32f);
             }
+            toolsPanel.sizeDelta = new Vector2(310f, 88f + row * 36f);
             toolsMenuIndex = 0;
             RefreshToolsHighlight();
         }
@@ -2115,6 +2135,20 @@ namespace OstrixMods.BuildWorks
             ShowDialog();
         }
 
+        internal void ShowConfirmation(string title, string message, Action accepted)
+        {
+            ResetSaveMetadata();
+            errorDialog = false;
+            confirmationAccepted = accepted;
+            modalTitle.text = title;
+            modalMessage.text = message;
+            SetButtonLabel(dialogPrimaryButton, T("editor.view.apply"));
+            SetButtonLabel(dialogCancelButton, T("editor.view.cancel"));
+            dialogPrimaryButton.gameObject.SetActive(true);
+            dialogDiscardButton.gameObject.SetActive(false);
+            ShowDialog();
+        }
+
         internal void ShowError(string titleText, string message, bool canRetry = true)
         {
             ResetSaveMetadata();
@@ -2142,6 +2176,7 @@ namespace OstrixMods.BuildWorks
         private void ResetSaveMetadata()
         {
             saveMetadataAccepted = null;
+            confirmationAccepted = null;
             if (saveMetadataFields) saveMetadataFields.gameObject.SetActive(false);
             ((RectTransform)modalTitle.transform.parent).sizeDelta = new Vector2(520, 260);
             SetInsets(modalMessage.rectTransform, 20, 64, 20, 90);
@@ -2518,7 +2553,7 @@ namespace OstrixMods.BuildWorks
                     document.IsEffectivelyLocked(part.StableId),
                     missingPrefabNodes.Contains(part.StableId))) continue;
                 AddOutlinerRow(document, part.StableId, part.DisplayName,
-                    part.Visible, part.Locked, true, false, 0);
+                    part.Visible, part.Locked, true, false, 0, part.ForeignData);
             }
             if (document.Supports.Count == 0) return;
             AddSupportRow("Supports", (supportsCollapsed ? "+ " : "- ") +
@@ -2602,7 +2637,7 @@ namespace OstrixMods.BuildWorks
                         document.IsEffectivelyLocked(part.StableId),
                         missingPrefabNodes.Contains(part.StableId))) continue;
                 AddOutlinerRow(document, part.StableId, part.DisplayName,
-                    part.Visible, part.Locked, true, false, depth + 1);
+                    part.Visible, part.Locked, true, false, depth + 1, part.ForeignData);
             }
         }
 
@@ -2614,7 +2649,8 @@ namespace OstrixMods.BuildWorks
             bool locked,
             bool part,
             bool collapsed,
-            int depth)
+            int depth,
+            BlueprintForeignPartData contents = null)
         {
             RectTransform row = CreatePanel("Row_" + stableId, outlinerRows,
                 Contains(document.Selection, stableId) ? SelectedColor :
@@ -2705,6 +2741,19 @@ namespace OstrixMods.BuildWorks
             if (lockIcon) lockIcon.color = locked ? AccentColor : MutedColor;
             if (!part) name.color = AccentColor;
             if (!visible) name.color = MutedColor;
+            if (contents?.Format == BlueprintForeignPartData.NativeItemStandFormat)
+            {
+                string itemId = contents.Info.Split(':')[0];
+                GameObject item = ObjectDB.instance ? ObjectDB.instance.GetItemPrefab(itemId) : null;
+                string itemName = item ? item.GetComponent<ItemDrop>()?.m_itemData?.m_shared?.m_name : null;
+                Button contentRow = AddSupportRow("Contents_" + stableId,
+                    "↳ " + (string.IsNullOrEmpty(itemName) ? itemId : Localization.instance?.Localize(itemName) ?? itemName),
+                    () => NodeClicked?.Invoke(stableId, false, false));
+                TMP_Text contentLabel = contentRow.GetComponentInChildren<TMP_Text>();
+                SetInsets(contentLabel.rectTransform, 40f + (depth + 1) * 15f, 0, 8, 0);
+                contentRow.GetComponent<BlueprintEditorHoverTarget>().Initialize(
+                    contentLabel.text + "\n" + T("editor.item.tree_hint"), BeginTooltip, EndTooltip);
+            }
         }
 
         private static void StyleTreeControl(Button button)

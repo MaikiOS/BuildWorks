@@ -12,6 +12,10 @@ namespace OstrixMods.BuildWorks
     internal static class BlueprintItemStandPreview
     {
         private static readonly Type EquipmentVisualType = typeof(ItemStand).Assembly.GetType("IEquipmentVisual", false);
+        internal static bool Supports(ItemStand stand, ItemDrop.ItemData item) =>
+            stand && item?.m_shared != null && stand.m_supportedTypes != null &&
+            stand.m_supportedItems != null && stand.m_unsupportedItems != null && !stand.IsUnsupported(item) &&
+            (stand.IsSupported(item) || stand.m_supportedTypes.Contains(item.m_shared.m_itemType));
         internal static bool TryAdd(GameObject source, GameObject visual,
             BlueprintForeignPartData data, out string warning)
         {
@@ -44,9 +48,7 @@ namespace OstrixMods.BuildWorks
                 GameObject attach = ItemStand.GetAttachPrefab(item);
                 if (itemData?.m_shared == null || !attach || quality < 1 || quality > itemData.m_shared.m_maxQuality ||
                     variant >= Math.Max(1, itemData.m_shared.m_variants) || itemData.m_shared.m_itemStandOffsets == null ||
-                    stand.m_supportedTypes == null || stand.m_supportedItems == null || stand.m_unsupportedItems == null ||
-                    stand.IsUnsupported(itemData) ||
-                    !stand.IsSupported(itemData) && !stand.m_supportedTypes.Contains(itemData.m_shared.m_itemType))
+                    !Supports(stand, itemData))
                     throw new InvalidDataException();
                 Transform target = MapTransform(source.transform, visual.transform, stand.GetAttach(itemData));
                 GameObject attachObject = ItemStand.GetAttachGameObject(attach);

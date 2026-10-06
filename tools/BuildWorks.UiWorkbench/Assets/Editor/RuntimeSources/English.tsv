@@ -808,3 +808,16 @@ editor.item_preview_invalid	unrecognized or invalid item-stand data; the origina
 editor.item_preview_missing	the required item prefab is not installed; the original is preserved
 blueprint.holder_capture_failed	{0}: holder contents could not be preserved. Missing or invalid item data, unsupported armour slots, or an oversized native package. The blueprint was not saved.
 editor.item_preview_unsupported	attachment, quality, variant, orientation or scripted visuals are unsupported; the original is preserved
+editor.item.attach	Item on stand…
+editor.item.detach	Remove item from stand…
+editor.item.select_stand	Select one visible, unlocked ItemStand with no unknown foreign state. Armour slots are not supported yet.
+editor.item.catalog_empty	No known player items are compatible with this stand.
+editor.item.catalog_title	Items for this stand
+editor.item.click_help	Click — attach · star — favorite · hover — inspect
+editor.item.defaults	New blueprint item: quality 1, variant 0, default orientation. No inventory or world objects are changed. World restoration is not implemented yet.
+editor.item.replace_title	Change stand contents?
+editor.item.replace_confirm	Replace the saved item with a new default item? Its previous properties are retained in Undo; the source file and world stay unchanged.
+editor.item.remove_confirm	Remove the saved item from this draft? Undo restores its full saved state. The source file and world stay unchanged.
+editor.item.changed	The stand changed while confirmation was open. Select it again and retry.
+editor.item.saved	Stand contents updated in the draft. Undo is available; world restoration remains pending.
+editor.item.tree_hint	Attached item belongs to this stand and follows its transforms. Click to select the stand; edit contents through Tools.

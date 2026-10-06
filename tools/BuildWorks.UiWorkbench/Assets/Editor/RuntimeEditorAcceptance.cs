@@ -184,6 +184,7 @@ public static class RuntimeEditorAcceptance
             TestSignPayload();
             TestPlacementSupportFrame();
             foreach (object step in ItemStandPreviewAcceptance.Run(template, output)) yield return step;
+            checks.Add("Actual ItemStand tools -> compatible item catalogue -> one click -> replacement Cancel/confirm -> full-package Undo -> detach -> immediate empty-stand attach -> native save/reopen; stale locked stand rejected. No inventory/world creation.");
             checks.Add("Actual read-only ItemStand capture: native view override, negative item hash, exact opaque item package and immutable snapshot; legacy/empty/invalid/missing/oversized/armour denial; captured contents visible in renderer-only scene. No native item-package decode, inventory or world reconstruction executed.");
             checks.Add("Actual ItemStand renderer-only adapter: horizontal/wall offsets, quality/variant, nested/duplicate anchors, holder XYZ scale/rotation, selection/move/Undo, temporary copies and content cache replacement; invalid/missing contents explain failure without data loss; thumbnail/rotatable preview, source/material/script isolation. Native inventory/world/armour remain unverified.");
             checks.Add(UICatalogAcceptance.Run(fontTemplate.font));

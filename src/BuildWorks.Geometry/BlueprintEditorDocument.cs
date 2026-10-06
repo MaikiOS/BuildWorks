@@ -53,7 +53,7 @@ namespace OstrixMods.BuildWorks.Geometry
         public string SignText { get; }
         public string SourceDocumentId { get; }
         public int SourceLine { get; }
-        public BlueprintForeignPartData ForeignData { get; }
+        public BlueprintForeignPartData ForeignData { get; internal set; }
         public static bool IsValidSignText(string value)
         {
             if (value == null) return true;
@@ -567,6 +567,17 @@ namespace OstrixMods.BuildWorks.Geometry
                 part.Rotation = normalizedRotation;
                 part.Scale = normalizedScale;
             });
+        }
+
+        public bool SetItemStandContents(string stableId, BlueprintForeignPartData contents)
+        {
+            if (contents != null && contents.Format != BlueprintForeignPartData.NativeItemStandFormat)
+                throw new ArgumentException("Only native item-stand contents can be authored.", nameof(contents));
+            BlueprintEditorPart part = FindPart(stableId);
+            if (part == null || !IsEffectivelyVisible(stableId) || IsEffectivelyLocked(stableId) ||
+                part.ForeignData != null && part.ForeignData.Format != BlueprintForeignPartData.NativeItemStandFormat)
+                return false;
+            return Commit(() => part.ForeignData = contents);
         }
 
         public bool CreateEmptyGroup(string stableId, string name, string parentGroupId = null)

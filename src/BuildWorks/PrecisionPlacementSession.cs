@@ -6,6 +6,7 @@ using UnityEngine;
 using AnchorAdjustment = OstrixMods.BuildWorks.Geometry.AnchorAdjustment;
 using AnchorBounds = OstrixMods.BuildWorks.Geometry.AnchorBounds;
 using BlueprintEditorPart = OstrixMods.BuildWorks.Geometry.BlueprintEditorPart;
+using BlueprintForeignPartData = OstrixMods.BuildWorks.Geometry.BlueprintForeignPartData;
 using BoundedUndoHistory = OstrixMods.BuildWorks.Geometry.BoundedUndoHistory<OstrixMods.BuildWorks.PrecisionPlacementSession.TransformSnapshot>;
 using ConstructionLayout = OstrixMods.BuildWorks.Geometry.ConstructionLayout;
 using Edge3 = OstrixMods.BuildWorks.Geometry.Edge3;
@@ -582,6 +583,30 @@ namespace OstrixMods.BuildWorks
             return Localization.instance != null && !string.IsNullOrWhiteSpace(name)
                 ? Localization.instance.Localize(name)
                 : string.IsNullOrWhiteSpace(name) ? prefabName : name;
+        }
+
+        internal IReadOnlyList<BlueprintEditorCatalogItem> BlueprintEditorItemCatalogItems()
+        {
+            var result = new List<BlueprintEditorCatalogItem>();
+            Player player = Player.m_localPlayer;
+            if (!player || !ObjectDB.instance || ObjectDB.instance.m_items == null) return result;
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            foreach (GameObject prefab in ObjectDB.instance.m_items)
+            {
+                ItemDrop drop = prefab ? prefab.GetComponent<ItemDrop>() : null;
+                string name = drop?.m_itemData?.m_shared?.m_name;
+                if (string.IsNullOrWhiteSpace(name) || !player.IsMaterialKnown(name) || !names.Add(prefab.name)) continue;
+                try
+                {
+                    var contents = new BlueprintForeignPartData(BlueprintForeignPartData.NativeItemStandFormat,
+                        prefab.name + ":0:1:0", null, null);
+                    result.Add(new BlueprintEditorCatalogItem(prefab.name, Localization.instance?.Localize(name) ?? name,
+                        drop.m_itemData.GetIcon(), "OTHER", "OTHER", "ITEMS", result.Count, itemContents: contents));
+                }
+                catch (ArgumentException exception)
+                { Debug.LogWarning("BuildWorks skipped invalid item catalogue entry " + prefab.name + ": " + exception.Message); }
+            }
+            return result.OrderBy(item => item.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToList();
         }
 
         internal IReadOnlyList<BlueprintEditorCatalogItem> BlueprintEditorCatalogItems()

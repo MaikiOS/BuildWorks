@@ -2,6 +2,31 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.72 — ItemStand attachment authoring; not deployed
+
+Select one editable native ItemStand, then Tools -> attach/remove item. The attachment catalogue
+uses installed, player-known items and native holder/type/attach-node compatibility. Empty holders
+accept one click; populated holders require explicit replacement/removal confirmation. Renderer-only
+preflight refuses unsupported visuals without mutating the draft. New items use quality 1, variant 0
+and default orientation; old raw packages are never reused for another item. Undo restores the complete
+original payload. A child contents row selects its holder; it is not a standalone build piece.
+Invalid mod-item names warn and skip only that record. Opaque/locked/hidden/stale holders refuse edits.
+
+Release zero warnings/errors; 109 Geometry, Store, eight Bridge, 12 WorldLayout, 822 Localization keys,
+HostContract, deployment guard and format PASS (format retains workspace-load warnings).
+Final isolated Unity: 180 fresh existing layout states PASS at 2026-10-06T17:30:14.7819802Z, plus actual
+attachment tools/catalogue/card/confirmation/cancel/history/save/reopen/locked-state and no-attach-filter
+interaction checks. These 180 images do not claim attachment-mode visual or native game acceptance.
+Independent correctness and Ponytail review: PASS. verify is absent; direct checks/review were used.
+Review fixed missing native attach-node filtering and whole-list failure from one malformed mod-item;
+HostContract verifies that its exception handler warns and continues enumeration.
+
+Store v13 / portable v4 unchanged. No world inventory/ZDO/RPC writes, item creation or restoration;
+the shared foreign-state world guard stays closed. Installed TerrainRamp-1.0-Test remains .67.
+No deployment, Valheim launch, save edits or publication. Ordinary free items, ArmorStand slots/poses,
+storage inspection and separate retain/clear prompts, native cost-aware restoration/reload/client,
+heavy interactive scenes above 512 and durable world sockets remain unfinished; full goal active.
+
 ## Checkpoint 0.19.71 — native ItemStand capture and exact state preservation; not deployed
 
 World selection reads the actual native ItemStand view (including override), signed item hash,

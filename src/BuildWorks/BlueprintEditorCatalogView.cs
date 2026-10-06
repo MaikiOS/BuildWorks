@@ -22,12 +22,13 @@ namespace OstrixMods.BuildWorks
         private Button catalogPartsModeButton, catalogBlueprintsModeButton, catalogAtlasButton, catalogQuickButton,
             catalogDetailsButton, catalogMaterialButton, catalogSourceButton, catalogPreviousPage, catalogNextPage;
         private BlueprintCatalogLayout catalogLayout;
-        private bool catalogBlueprintMode, catalogQuick, catalogDetails = true, catalogStateInitialized;
+        private bool catalogBlueprintMode, catalogQuick, catalogDetails = true, catalogStateInitialized, catalogAttachmentMode;
         private int catalogPage, catalogPageCount = 1;
         private readonly HashSet<string> catalogFavorites = new HashSet<string>(StringComparer.Ordinal);
         private readonly List<string> catalogRecent = new List<string>();
         private readonly CatalogFilters catalogPartFilters = new CatalogFilters(), catalogBlueprintFilters = new CatalogFilters();
-        private CatalogFilters CatalogFilter => catalogBlueprintMode ? catalogBlueprintFilters : catalogPartFilters;
+        private readonly CatalogFilters catalogItemFilters = new CatalogFilters();
+        private CatalogFilters CatalogFilter => catalogAttachmentMode ? catalogItemFilters : catalogBlueprintMode ? catalogBlueprintFilters : catalogPartFilters;
         private sealed class CatalogFilters
         {
             internal string Query = "", Section, Family, Material, Source, Station, Kind;
@@ -115,7 +116,10 @@ namespace OstrixMods.BuildWorks
             catalogPanel.sizeDelta = new Vector2((float)catalogLayout.Width, (float)catalogLayout.Height);
             catalogPanel.localScale = Vector3.one * scale;
             catalogPanel.anchoredPosition = new Vector2(0, (bottom - (float)BlueprintEditorLayout.TopHeight) * .5f);
-            SetTopLeft((RectTransform)catalogPartsModeButton.transform, 12, 12, 102, 36);
+            SetTopLeft((RectTransform)catalogPartsModeButton.transform, 12, 12, catalogAttachmentMode ? 218 : 102, 36);
+            SetButtonLabel(catalogPartsModeButton, catalogAttachmentMode ? T("editor.item.catalog_title") : CatalogText("parts"));
+            catalogBlueprintsModeButton.gameObject.SetActive(!catalogAttachmentMode);
+            catalogPartsModeButton.interactable = !catalogAttachmentMode;
             SetTopLeft((RectTransform)catalogBlueprintsModeButton.transform, 120, 12, 112, 36);
             SetTopRight((RectTransform)catalogAtlasButton.transform, 280, 12, 88, 36);
             SetTopRight((RectTransform)catalogQuickButton.transform, 186, 12, 88, 36);
@@ -143,6 +147,19 @@ namespace OstrixMods.BuildWorks
 
         internal void ShowCatalog(IReadOnlyList<BlueprintEditorCatalogItem> items)
         {
+            catalogAttachmentMode = false;
+            OpenCatalog(items);
+        }
+
+        internal void ShowItemStandCatalog(IReadOnlyList<BlueprintEditorCatalogItem> items)
+        {
+            catalogAttachmentMode = true;
+            catalogBlueprintMode = false;
+            OpenCatalog(items);
+        }
+
+        private void OpenCatalog(IReadOnlyList<BlueprintEditorCatalogItem> items)
+        {
             shownCatalogItems.Clear(); if (items != null) shownCatalogItems.AddRange(items);
             catalogStateInitialized = true; catalog.SetActive(true); catalog.transform.SetAsLastSibling();
             SetPanelsInteractable(false); catalogSearch.SetTextWithoutNotify(CatalogFilter.Query);
@@ -151,6 +168,7 @@ namespace OstrixMods.BuildWorks
         }
         private void SetCatalogMode(bool blueprint)
         {
+            if (catalogAttachmentMode) return;
             catalogBlueprintMode = blueprint; CloseCatalogPicker();
             catalogSearch.SetTextWithoutNotify(CatalogFilter.Query); RebuildCatalog();
         }
@@ -185,7 +203,7 @@ namespace OstrixMods.BuildWorks
                 (f.Material == null ? "" : " · " + BuildWorksLocalization.CatalogLabel(f.Material)) +
                 (f.Source == null ? "" : " · " + BuildWorksLocalization.CatalogLabel(f.Source)) +
                 (f.Station == null ? "" : " · " + shownCatalogItems.FirstOrDefault(x => x.StationId == f.Station)?.StationName) +
-                " · " + CatalogText("click_help");
+                " · " + (catalogAttachmentMode ? T("editor.item.click_help") : CatalogText("click_help"));
             SetSelected(catalogPartsModeButton, !catalogBlueprintMode); SetSelected(catalogBlueprintsModeButton, catalogBlueprintMode);
             SetSelected(catalogAtlasButton, !catalogQuick); SetSelected(catalogQuickButton, catalogQuick);
             SetSelected(catalogDetailsButton, catalogDetails && catalogLayout.Details.Width > 0);
@@ -237,7 +255,7 @@ namespace OstrixMods.BuildWorks
             ClearCatalogChildren(catalogNavigation);
             var values = new List<string> { "all", "favorites", "recent" };
             if (catalogBlueprintMode) values.AddRange(shownCatalogItems.Where(x => x.IsBlueprint).Select(x => "category:" + x.Category).Distinct());
-            else values.AddRange(new[] { "building", "decor", "lighting", "furniture", "resources", "crafting" });
+            else if (!catalogAttachmentMode) values.AddRange(new[] { "building", "decor", "lighting", "furniture", "resources", "crafting" });
             // ponytail: blueprint user categories scroll in Atlas; Quick has a compact category picker.
             if (catalogBlueprintMode && catalogQuick && values.Count > 8) values = new List<string> { "all", "favorites", "recent", "categories" };
             int columns = catalogQuick ? Math.Max(1, (int)Math.Floor(catalogNavigation.rect.width / 116)) : 1;
@@ -309,6 +327,7 @@ namespace OstrixMods.BuildWorks
             if (item.IsBlueprint && item.Blueprint.IsExternal)
                 description = BuildWorksLocalization.Text("import.read_only") + "\n" + item.Blueprint.importSource +
                     "\n" + BuildWorksLocalization.Text("catalog.card.parts", item.Blueprint.importPartCount);
+            if (item.ItemContents != null) description = T("editor.item.defaults") + "\n\n" + item.PrefabName;
             if (!string.IsNullOrEmpty(item.UnavailableReason)) description += "\n\n" + item.UnavailableReason;
             RectTransform viewport = CreatePanel("PreviewBody", catalogPreview, Color.clear, null);
             SetTopAnchored(viewport, 8, 224, 8, Mathf.Max(32, catalogPreview.rect.height - 286));
@@ -322,7 +341,7 @@ namespace OstrixMods.BuildWorks
             float metadataHeight = body.GetPreferredValues(description, 204, Mathf.Infinity).y + 8;
             SetTopLeft((RectTransform)body.transform, 4, 0, 204, metadataHeight);
             float y = metadataHeight;
-            if (!string.IsNullOrEmpty(item.UnavailableReason))
+            if (!string.IsNullOrEmpty(item.UnavailableReason) || item.ItemContents != null)
             { SetTopLeft(content, 0, 0, 212, metadataHeight); return; }
             TMP_Text costTitle = CreateText("PreviewCostTitle", content, CatalogText("build_cost"), 14, FontStyles.Bold, TextAlignmentOptions.TopLeft);
             SetTopLeft(costTitle.rectTransform, 4, y, 204, 24); y += 26;

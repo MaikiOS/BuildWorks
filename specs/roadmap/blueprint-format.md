@@ -2,7 +2,16 @@
 
 **English** | [Русский](blueprint-format_RU.md)
 
-Current source **0.19.71**: read-only native ItemStand capture is integrated into world selection before any blueprint write.
+Current source **0.19.72**: editable native ItemStand has an attachment catalogue of compatible installed player-known items.
+Tools attach/remove; empty-holder click commits a default recipe (quality 1, variant/orientation 0), populated-holder replacement/removal
+requires confirmation. Renderer-only preflight, effective locks/visibility and stale-reference checks prevent partial edits.
+Undo restores the full previous package; holder movement/copies/native/portable/history use the existing part payload.
+Contents appear as a holder-selecting child row, not an independent piece. Invalid mod-item names skip individually with warning;
+items without native attach nodes are filtered. No new schema, item inventory, world restoration or foreign execution.
+Release/required checks and existing 180 isolated layout images plus authoring interaction tests PASS, not new-mode/game visual acceptance.
+Ordinary free items, armour slots/poses, storage policy UI and world reconstruction remain unfinished.
+
+Previous source **0.19.71**: read-only native ItemStand capture is integrated into world selection before any blueprint write.
 The actual private native view respects `m_netViewOverride`; signed prefab hashes resolve through ObjectDB.
 The existing part payload accepts `valheim-itemstand-v1`: plain `prefab:variant:quality:orientation` in info,
 canonical Base64 of the exact full native `s_itemData` bytes in zdo, no chance. Visual metadata is validated;
@@ -106,7 +115,27 @@ permission and networking rules: a blueprint is a recipe, not an item duplicatio
 Proof: editor selection/attachment/removal and Undo; exact disk/portable roundtrip; imported display
 state; actual holder placement, contents after save/reload, removal without duplication and remote client.
 Modded items/holders require capability checks; installing arbitrary foreign code is not authorized.
-The full extension remains unfinished; .71 implements read-only ItemStand preview and native capture/preservation, not authoring/world restoration. The existing goal remains active.
+The full extension remains unfinished; .72 implements ItemStand attachment authoring, preview and native capture/preservation, not free items/armour/world restoration. The existing goal remains active.
+
+### Goal extension: storage and display contents policy (2026-10-06)
+
+At both import and export, inspect supported storage objects and ask independently:
+1. Storage inventory (chests and other storage types): retain full contents or clear them in the resulting copy.
+2. Display attachments (horizontal/wall ItemStand, armour stands and other item mounts): retain or clear separately.
+
+Do not merge these choices: clearing chest inventories must not silently empty equipment displays.
+Show the affected object/item counts and any unknown/unsupported contents before confirmation.
+An unreadable/unsupported storage type is not an empty container: preserve its inert original data and explain
+the limitation; do not claim an editable/restorable conversion or silently substitute a different holder.
+Apply the policy to the new draft/export copy only, never the source file, current document or world objects.
+Keep the retained source evidence intact even when the editable copy is intentionally emptied.
+Cancel/error leaves the source and document unchanged. Copy/history/native and portable roundtrip must
+preserve the chosen state; re-export prompts again rather than hiding a previous choice.
+Retaining contents is a recipe/state requirement, not permission to spawn free items or bypass native costs,
+inventory ownership, access, server authority or duplication protection.
+Required proof: independent choices, native/modded storage, filled/empty/unknown, import/export/cancel/error,
+exact original-state roundtrip, intentionally empty copy, stand/armour independence, save/reload and remote client.
+This requirement is recorded in the active goal; storage detection, policy UI and world restoration are not implemented yet.
 
 | Stage | Owner | Required proof |
 | --- | --- | --- |

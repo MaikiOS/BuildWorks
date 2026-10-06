@@ -2,6 +2,24 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Source checkpoint 0.19.67 — usable file exchange and exact foreign scale; not deployed
+
+Editor and Hammer share a folder/file browser, output filename/location and native JSON/ZIP choice.
+Import retains a separate original copy; export is atomic and never overwrites existing files.
+Results remain open with the full path and Copy path. Errors retain inputs and allow retry;
+loading a folder removes stale selectable rows. Modals block world input and stay above hints.
+Foreign PlanBuild/vbuild scale is absolute prefab-root localScale, converted once to the native
+relative multiplier on the Unity thread. Missing/invalid prefab bases reject the whole preparation;
+raw source bytes/scales stay untouched. Derived thumbnail identities include actual prefab scales.
+
+Release zero warnings/errors; 803 Localization keys, Store, 108 Geometry, six Bridge,
+12 WorldLayout, HostContract, deployment guard and format PASS. Independent correctness/Ponytail PASS.
+Isolated Unity: 180 states plus actual file selection, locked-file error/retry, named ZIP/collision,
+non-unit prefab visual size and modal close raycasts. gameHostTested=false; no game/save changes.
+The verify helper is absent; direct checks and independent review were used.
+Current installed .65 is unchanged. Full opaque foreign-data preservation, heavy interactive scenes
+above 512 parts and world-support reload/network acceptance remain unfinished; the goal is active.
+
 ## Source checkpoint 0.19.66 — support tools / scroll; not deployed
 
 Hammer category/actions/resource scroll sensitivity is 132. Support Create/Delete/Reset centre

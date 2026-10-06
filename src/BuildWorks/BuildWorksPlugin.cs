@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.66";
+        internal const string PluginVersion = "0.19.67";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -514,30 +514,35 @@ namespace OstrixMods.BuildWorks
 
         private static bool ShouldRunNativeGhostUpdate(Player player)
         {
+            if (HammerCatalogView.BlocksExchangeInput) return false;
             if (instance?.blueprintEditor?.BlocksWorldInput == true) return false;
             return instance?.session?.AllowsNativeGhostUpdate(player) != false;
         }
 
         private static bool ShouldBlockNativePlacement(Player player, Piece piece)
         {
+            if (HammerCatalogView.BlocksExchangeInput) return true;
             if (instance?.blueprintEditor?.BlocksWorldInput == true) return true;
             return instance?.session?.ShouldBlockNativePlacement(player, piece) == true;
         }
 
         private static bool ShouldBlockPlayerInput(Player player)
         {
+            if (HammerCatalogView.BlocksExchangeInput) return true;
             if (instance?.blueprintEditor?.BlocksWorldInput == true) return true;
             return instance?.session?.ShouldBlockPlayerInput(player) == true;
         }
 
         private static bool ShouldBlockGameCamera()
         {
+            if (HammerCatalogView.BlocksExchangeInput) return true;
             if (instance?.blueprintEditor?.BlocksWorldInput == true) return true;
             return instance?.session?.ShouldBlockGameCamera() == true;
         }
 
         private static bool ShouldBlockCharacterControls()
         {
+            if (HammerCatalogView.BlocksExchangeInput) return true;
             if (instance?.blueprintEditor?.BlocksWorldInput == true) return true;
             return instance?.session?.ShouldBlockCharacterControls() == true;
         }
@@ -837,10 +842,17 @@ namespace OstrixMods.BuildWorks
         [HarmonyPatch(typeof(BuildUi), nameof(BuildUi.Close))]
         private static class HammerCatalogDefaultOpenResetPatch
         {
+            private static bool Prefix() => !HammerCatalogView.BlocksExchangeInput;
             private static void Postfix()
             {
-                HammerCatalogView.MarkNativeBuildUiClosed();
+                if (!HammerCatalogView.BlocksExchangeInput) HammerCatalogView.MarkNativeBuildUiClosed();
             }
+        }
+
+        [HarmonyPatch(typeof(Hud), nameof(Hud.CloseBuildUi))]
+        private static class HammerExchangeClosePatch
+        {
+            private static bool Prefix() => !HammerCatalogView.BlocksExchangeInput;
         }
 
         [HarmonyPatch(typeof(BuildUi), "OnFavoritePieceAdded")]
@@ -867,7 +879,7 @@ namespace OstrixMods.BuildWorks
         private static class HammerCatalogBlueprintContextInputPatch
         {
             private static bool Prefix() =>
-                !HammerCatalogView.ShouldCaptureBlueprintContext();
+                !HammerCatalogView.BlocksExchangeInput && !HammerCatalogView.ShouldCaptureBlueprintContext();
         }
 
         [HarmonyPatch(typeof(Hud), "OnLeftClickPiece")]

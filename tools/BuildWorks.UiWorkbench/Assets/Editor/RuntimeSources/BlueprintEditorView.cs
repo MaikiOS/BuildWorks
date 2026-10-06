@@ -435,7 +435,7 @@ namespace OstrixMods.BuildWorks
         private RectTransform saveMetadataFields;
         private TMP_InputField saveMetadataName, saveMetadataCategory;
         private Action<string, string> saveMetadataAccepted;
-        private Action<string> importPathAccepted;
+        private BlueprintExchangeView exchangeView;
         private float inspectorOriginalScale;
         private string inspectorOriginalScaleText;
         private TMP_InputField fieldOfViewInput;
@@ -1463,8 +1463,7 @@ namespace OstrixMods.BuildWorks
                     dialog, "SaveExit", T("editor.view.save_exit"), 20f,
                     () =>
                     {
-                        if (importPathAccepted != null) SubmitImportPath();
-                        else if (saveMetadataAccepted != null) SubmitSaveMetadata();
+                        if (saveMetadataAccepted != null) SubmitSaveMetadata();
                         else DialogDecided?.Invoke(errorDialog ? BlueprintEditorDialogDecision.Retry : BlueprintEditorDialogDecision.SaveAndExit);
                     }, true);
                 dialogDiscardButton = CreateDialogButton(
@@ -1474,7 +1473,7 @@ namespace OstrixMods.BuildWorks
                     dialog, "Cancel", T("editor.view.cancel"), 380f,
                     () =>
                     {
-                        if (importPathAccepted != null || saveMetadataAccepted != null) HideDialog();
+                        if (saveMetadataAccepted != null) HideDialog();
                         else DialogDecided?.Invoke(errorDialog
                             ? BlueprintEditorDialogDecision.Acknowledge : BlueprintEditorDialogDecision.Cancel);
                     }, false);
@@ -1591,7 +1590,7 @@ namespace OstrixMods.BuildWorks
 
         internal RectTransform Viewport => viewport;
         internal Canvas RootCanvas => canvas;
-        internal bool HasModal => modal.activeSelf;
+        internal bool HasModal => modal.activeSelf || exchangeView?.IsOpen == true;
         internal bool HasCatalog => catalog.activeSelf;
         internal bool HasOutlinerMenu => outlinerMenu.activeSelf || outlinerContextMenu.gameObject.activeSelf;
         internal bool HasOutlinerContextMenu => outlinerContextMenu.gameObject.activeSelf;
@@ -1670,6 +1669,7 @@ namespace OstrixMods.BuildWorks
         internal void Tick()
         {
             if (disposed) return;
+            exchangeView?.Tick();
             if (statusMessageUntil > 0f && Time.unscaledTime >= statusMessageUntil)
             {
                 statusMessageUntil = 0f;
@@ -1704,7 +1704,7 @@ namespace OstrixMods.BuildWorks
             if (pendingTooltipAnchor && !tooltip.gameObject.activeSelf &&
                 Time.unscaledTime >= tooltipAt)
                 ShowTooltipNow();
-            status.SetAsLastSibling();
+            if (!HasModal) status.SetAsLastSibling();
         }
 
         internal void Bind(
@@ -2132,6 +2132,8 @@ namespace OstrixMods.BuildWorks
 
         internal void HideDialog()
         {
+            exchangeView?.Dispose();
+            exchangeView = null;
             ResetSaveMetadata();
             modal.SetActive(false);
             foreach (CanvasGroup group in modalBlockedGroups) group.interactable = true;
@@ -2140,38 +2142,16 @@ namespace OstrixMods.BuildWorks
         private void ResetSaveMetadata()
         {
             saveMetadataAccepted = null;
-            importPathAccepted = null;
             if (saveMetadataFields) saveMetadataFields.gameObject.SetActive(false);
             ((RectTransform)modalTitle.transform.parent).sizeDelta = new Vector2(520, 260);
             SetInsets(modalMessage.rectTransform, 20, 64, 20, 90);
         }
 
-        internal void ShowImportPath(Action<string> accepted)
+        internal void ShowExchange(Func<Transform, TMP_Text, Action, BlueprintExchangeView> create, Action closed = null)
         {
-            ResetSaveMetadata();
-            RectTransform dialog = (RectTransform)modalTitle.transform.parent;
-            dialog.sizeDelta = new Vector2(520, 350);
-            if (saveMetadataFields) UnityEngine.Object.Destroy(saveMetadataFields.gameObject);
-            saveMetadataFields = CreateRect("ImportPath", dialog);
-            SetInsets(saveMetadataFields, 20, 140, 20, 90);
-            saveMetadataName = CreateInput("ImportFilePath", saveMetadataFields, Vector2.zero, 460);
-            saveMetadataName.characterLimit = 1024;
-            saveMetadataName.onSubmit.AddListener(_ => SubmitImportPath());
-            modalTitle.text = T("exchange.import"); modalMessage.text = T("exchange.path_help");
-            SetTopAnchored(modalMessage.rectTransform, 20, 64, 20, 70);
-            SetButtonLabel(dialogPrimaryButton, T("exchange.import"));
-            dialogPrimaryButton.gameObject.SetActive(true); dialogDiscardButton.gameObject.SetActive(false);
-            SetButtonLabel(dialogCancelButton, T("editor.view.cancel"));
-            errorDialog = false; importPathAccepted = accepted; ShowDialog();
-            saveMetadataName.ActivateInputField();
-        }
-
-        private void SubmitImportPath()
-        {
-            string value = (saveMetadataName.text ?? "").Trim();
-            if (value.Length == 0) return;
-            Action<string> accepted = importPathAccepted;
-            HideDialog(); accepted?.Invoke(value);
+            HideDialog(); EndTooltip(); SetPanelsInteractable(false);
+            exchangeView = create(safeRoot, fontTemplate, () =>
+            { exchangeView = null; SetPanelsInteractable(true); closed?.Invoke(); });
         }
 
         internal void ShowSaveMetadata(string name, string category, IEnumerable<string> categories, Action<string, string> accepted)
@@ -2363,6 +2343,7 @@ namespace OstrixMods.BuildWorks
         {
             if (disposed) return;
             disposed = true;
+            exchangeView?.Dispose(); exchangeView = null;
             EndOutlinerDrag();
             boundDocument = null;
             if (canvasObject)

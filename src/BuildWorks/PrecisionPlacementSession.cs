@@ -503,6 +503,12 @@ namespace OstrixMods.BuildWorks
             Action<CompositeBlueprintStore.Blueprint> openBlueprintEditor = null,
             Action createBlueprint = null)
         {
+            blueprintStore.ConfigureImportScale(name =>
+            {
+                GameObject prefab = ZNetScene.instance ? ZNetScene.instance.GetPrefab(name) : null;
+                return prefab ? new CompositeBlueprintStore.VectorData(prefab.transform.localScale)
+                    : (CompositeBlueprintStore.VectorData?)null;
+            }, () => ZNetScene.instance);
             blueprintPieceRegistry = new HammerBlueprintPieceRegistry(blueprintStore);
             hud = new PrecisionPlacementHudView(
                 SelectGizmoMode,
@@ -4662,9 +4668,8 @@ namespace OstrixMods.BuildWorks
         }
 
         internal static Vector3 RelativeBlueprintScale(Vector3 worldScale, Vector3 sourceScale) =>
-            ToUnity(BlueprintEditorPart.NormalizeScale(new Point3(
-                worldScale.x / sourceScale.x, worldScale.y / sourceScale.y, worldScale.z / sourceScale.z),
-                nameof(worldScale)));
+            CompositeBlueprintStore.RelativeScale(new CompositeBlueprintStore.VectorData(worldScale),
+                new CompositeBlueprintStore.VectorData(sourceScale)).ToVector3();
 
         private void BeginBlueprintSelection()
         {

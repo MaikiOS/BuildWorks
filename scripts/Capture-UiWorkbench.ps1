@@ -41,7 +41,7 @@ New-Item -ItemType Directory -Path $runtimeSources -Force | Out-Null
 $runtimeFiles = @('BlueprintEditorView.cs', 'BlueprintEditorCatalogView.cs', 'BlueprintEditorSkin.cs', 'BlueprintEditorInput.cs', 'BlueprintEditorController.cs',
     'BlueprintEditorScene.cs', 'BlueprintEditorMeshData.cs', 'BlueprintEditorIconLibrary.cs',
     'TransformGizmoView.cs', 'PlacementGhostPreviewView.cs', 'BlueprintPlacementFrame.cs', 'CompositeBlueprintStore.cs', 'ExternalBlueprintLibrary.cs', 'BlueprintExchangeFormat.cs',
-    'PrecisionPlacementHudView.cs', 'BlueprintResourceHudView.cs', 'WorldSelectionHighlight.cs', 'BuildWorksPlacementValidation.cs', 'BlueprintSignText.cs')
+    'PrecisionPlacementHudView.cs', 'BlueprintResourceHudView.cs', 'WorldSelectionHighlight.cs', 'BuildWorksPlacementValidation.cs', 'BlueprintSignText.cs', 'BlueprintExchangeView.cs')
 $sourceProof = foreach ($name in $runtimeFiles) {
     $source = Join-Path $repositoryRoot ('src\BuildWorks\' + $name)
     $destination = Join-Path $runtimeSources $name
@@ -85,7 +85,7 @@ if ($process.ExitCode -ne 0) {
 }
 
 $outputPath = Join-Path $repositoryRoot 'artifacts\ui-runtime'
-$expected = foreach ($state in 'select', 'transform', 'array', 'contour', 'catalog', 'outliner', 'settings', 'catalog-blueprints', 'catalog-materials', 'catalog-quick', 'catalog-crafting', 'save-metadata', 'supports') {
+$expected = foreach ($state in 'select', 'transform', 'array', 'contour', 'catalog', 'outliner', 'settings', 'catalog-blueprints', 'catalog-materials', 'catalog-quick', 'catalog-crafting', 'save-metadata', 'supports', 'exchange-import', 'exchange-export') {
     foreach ($size in '1280x720', '1920x1080', '2560x1440', '3440x1440') {
         foreach ($scale in 100,120,140) { "$state-$size-$scale.png" }
     }

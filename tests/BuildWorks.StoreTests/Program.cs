@@ -28,6 +28,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 RejectGroupCycle(Path.Combine(directory, "cycle.json"));
                 FailedWritePreservesOriginal(Path.Combine(directory, "failure.json"));
                 ExternalImports(directory);
+                ForeignScaleSemantics(Path.Combine(directory, "foreign-scale.json"));
                 ExchangeFileWorkflow(Path.Combine(directory, "file-flow"));
                 ForeignSignText();
                 ExchangeRoundTrip(Path.Combine(directory, "exchange-library.json"));
@@ -87,14 +88,15 @@ namespace OstrixMods.BuildWorks.StoreTests
             var whitespace = ExternalBlueprintLibrary.Parse("wall 0 0 0 1 1 2 3\nbeam\t0 0 0 1 -4 5 6", "buildshare.vbuild");
             Require(whitespace.importError == null && whitespace.parts[0].position.y == 2, "BuildShare whitespace dialect");
             Require(ExternalBlueprintLibrary.Parse("#Pieces\n" + rows, "no-headers.blueprint").importError == null, "Header-light source");
-            var copyA = ExternalBlueprintLibrary.DetachedCopy(parsed);
-            var copyB = ExternalBlueprintLibrary.DetachedCopy(parsed);
+            var prepared = ExternalBlueprintLibrary.PrepareForHost(parsed, _ => UnitScale);
+            var copyA = ExternalBlueprintLibrary.DetachedCopy(prepared);
+            var copyB = ExternalBlueprintLibrary.DetachedCopy(prepared);
             Require(copyA.id != copyB.id && copyA.parts[0].stableId != copyB.parts[0].stableId &&
                 copyA.parts[0].stableId != parsed.parts[0].stableId, "Duplicate conversion identities collide");
             foreach (string invalid in new[] {
                 source.Replace("1;2;3", "NaN;2;3"), source.Replace("1;2;3", "513;2;3"),
                 source.Replace("0;0;0;1;", "0;0;0;0;"), source.Replace("\"\"", "\"inventory\""),
-                source.Replace(";1;2;1", ";1;5;1"), source.Replace(";1;2;1", ";1;2;1;zdo"),
+                source.Replace(";1;2;1", ";1;0;1"), source.Replace(";1;2;1", ";1;2;1;zdo"),
                 source.Replace(";1;2;1", ";1;2;1;;0.5"), source + "#FutureData\nnew data",
                 source.Replace("#Terrain", "#TerrainFuture"),
                 "#Pieces\n" + string.Concat(Enumerable.Repeat(rows, CompositeBlueprintStore.MaximumParts / 2 + 1)), "#Pieces\n" + rows.Split('\n')[0]
@@ -127,6 +129,44 @@ namespace OstrixMods.BuildWorks.StoreTests
             Console.WriteLine("PASS read-only .blueprint/.vbuild -> separate native v11 copy, exact poses/scales, terrain exclusion, rejection without partial pieces, inert archive");
         }
 
+        private static CompositeBlueprintStore.VectorData UnitScale => new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 };
+
+        private static void ForeignScaleSemantics(string path)
+        {
+            const string text = "#Pieces\nwall;;0;0;0;0;0;0;1;\"\";1;1;1\nsmall;;1;0;0;0;0;0;1;\"\";.001;.001;.001";
+            var raw = ExternalBlueprintLibrary.Parse(text, "scaled.blueprint");
+            Require(raw.importError == null && raw.importAbsoluteScale, "Absolute scale provenance missing");
+            CompositeBlueprintStore.VectorData? Base(string name) => name == "wall"
+                ? new CompositeBlueprintStore.VectorData { x = 2, y = .5f, z = 3 }
+                : new CompositeBlueprintStore.VectorData { x = .001f, y = .001f, z = .001f };
+            var prepared = ExternalBlueprintLibrary.PrepareForHost(raw, Base);
+            Require(prepared.importError == null && !prepared.importAbsoluteScale &&
+                prepared.parts[0].scale.x == .5f && prepared.parts[0].scale.y == 2 &&
+                Math.Abs(prepared.parts[0].scale.z - 1f / 3) < 1e-7 && prepared.parts[1].scale.x == 1,
+                "Absolute localScale was multiplied by the prefab base instead of normalized");
+            Require(raw.parts[0].scale.x == 1 && raw.parts[1].scale.x == .001f && raw.importAbsoluteScale &&
+                ReferenceEquals(prepared, ExternalBlueprintLibrary.PrepareForHost(prepared, Base)), "Source mutated or divided twice");
+            Require(prepared.id != raw.id && prepared.id == ExternalBlueprintLibrary.PrepareForHost(raw, Base).id &&
+                prepared.id != ExternalBlueprintLibrary.PrepareForHost(raw, name => name == "wall" ? UnitScale : Base(name)).id,
+                "Derived thumbnail identity reuses old absolute scale or varies without changed prefab scale");
+            var missing = ExternalBlueprintLibrary.PrepareForHost(raw, name => name == "wall" ? Base(name) : null);
+            Require(missing.parts.Count == 0 && missing.importError.Contains("scale_missing") && raw.parts.Count == 2,
+                "Missing prefab published partial/mixed scales");
+            var store = new CompositeBlueprintStore(path);
+            Require(!store.TryExportFile(raw, out _, out string error) && error.Contains("scale_pending"), "Raw absolute scale exported as native multiplier");
+            var copy = ExternalBlueprintLibrary.DetachedCopy(prepared);
+            Require(store.TrySaveDocument(copy.name, copy.category, copy.parts, copy.groups, copy.anchors,
+                out var saved, out error), error);
+            var reopened = new CompositeBlueprintStore(path).All()[0];
+            var decoded = BlueprintExchangeFormat.Decode(System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(reopened)));
+            Require(decoded.parts[0].scale.x * 2 == 1 && decoded.parts[0].scale.y * .5f == 1 &&
+                Math.Abs(decoded.parts[0].scale.z * 3 - 1) < 1e-7 && decoded.parts[1].scale.x == 1 &&
+                !decoded.importAbsoluteScale, "Native round-trip changed absolute size or provenance");
+            var invalid = ExternalBlueprintLibrary.PrepareForHost(raw, _ => new CompositeBlueprintStore.VectorData { x = 0, y = 1, z = 1 });
+            Require(invalid.parts.Count == 0 && invalid.importError != null, "Zero prefab base accepted");
+            Console.WriteLine("PASS foreign absolute localScale, nonunit/small prefab bases, atomic missing rejection, native round-trip, no double normalization");
+        }
+
         private static void ExchangeFileWorkflow(string directory)
         {
             Directory.CreateDirectory(directory);
@@ -134,6 +174,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             const string text = "#Name:Selected\n#Pieces\nwall;Workbench;1;2;3;0;0;0;1;\"\";1.234567;2;.01001\nbeam;Workbench;0;0;0;0;0;0;1;\"\";1;1;1\n";
             File.WriteAllText(source, text);
             var store = new CompositeBlueprintStore(Path.Combine(directory, "library.json"), backgroundImports: true);
+            store.ConfigureImportScale(_ => UnitScale);
             WaitForImport(store);
             Require(store.CatalogAll().Count == 0 && store.TryImportFile(source, out string error), "Import start");
             WaitForImport(store);
@@ -172,6 +213,19 @@ namespace OstrixMods.BuildWorks.StoreTests
             byte[] firstExport = File.ReadAllBytes(exported);
             Require(store.TryExportFile(saved, out string exportedAgain, out error) && exportedAgain != exported &&
                 File.ReadAllBytes(exported).SequenceEqual(firstExport), "Export overwrote existing file");
+            Require(store.TryExportFile(saved, directory, "Chosen name", true, out string zipExport, out error), error);
+            var zipped = ExternalBlueprintLibrary.LoadFile(zipExport);
+            Require(Path.GetFileName(zipExport) == "Chosen name.zip" && zipped.Count == 1 && zipped[0].importError == null &&
+                zipped[0].parts[0].scale.z == saved.parts[0].scale.z, "Chosen filename/ZIP lost native document");
+            byte[] zipBytes = File.ReadAllBytes(zipExport);
+            Require(!store.TryExportFile(saved, directory, "Chosen name", true, out _, out error) &&
+                File.ReadAllBytes(zipExport).SequenceEqual(zipBytes), "Named export overwrote an existing document");
+            Require(!store.TryExportFile(saved, directory, "../escape", false, out _, out error) &&
+                !File.Exists(Path.Combine(directory, "..", "escape.buildworks.json")), "Export filename escaped folder");
+            Require(!store.TryExportFile(saved, directory, "unsafe.", false, out _, out error), "Trailing-dot filename accepted");
+            Require(CompositeBlueprintStore.BrowseExchangeDirectory(directory).Contains(zipExport) &&
+                !CompositeBlueprintStore.BrowseExchangeDirectory(directory).Contains(Path.Combine(directory, "library.json")),
+                "Browser omitted supported files or exposed native internal store");
             Require(!store.TryExportFile(new CompositeBlueprintStore.Blueprint { importError = "$buildworks_import.format" }, out _, out error),
                 "Blocked document exported as valid");
             byte[] png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==");
@@ -276,7 +330,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 Require(ExternalBlueprintLibrary.Parse(invalid, "bad.buildworks.json").importError != null, "Unknown/invalid portable data accepted");
             var snapSource = ExternalBlueprintLibrary.Parse("#Name:Snap\n#Pieces\nwall;;0;0;0;0;0;0;1;\"\"\nwall;;1;0;0;0;0;0;1;\"\"\n#SnapPoints\n2;3;4", "snap.blueprint");
             Require(snapSource.importError == null && snapSource.customSnapPoints.Count == 1 &&
-                ExternalBlueprintLibrary.DetachedCopy(snapSource).customSnapPoints[0].z == 4, "Foreign explicit snap point lost");
+                ExternalBlueprintLibrary.DetachedCopy(ExternalBlueprintLibrary.PrepareForHost(snapSource, _ => UnitScale)).customSnapPoints[0].z == 4, "Foreign explicit snap point lost");
             Require(ExternalBlueprintLibrary.Parse("#Pieces\nwall;;0;0;0;0;0;0;1;\"\"\nwall;;1;0;0;0;0;0;0;1;\"\"\n#SnapPoints\nNaN;0;0", "bad.blueprint").importError != null, "Nonfinite snap accepted");
             Require(store.TryUpdateDocument(saved, saved.name, saved.category, saved.parts, saved.groups, saved.anchors,
                 saved.primaryPartId, saved.primaryGroupId, out error), error);

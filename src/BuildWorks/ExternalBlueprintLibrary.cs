@@ -126,7 +126,7 @@ namespace OstrixMods.BuildWorks
             }
         }
 
-        private static bool Supported(string name) =>
+        internal static bool Supported(string name) =>
             name.EndsWith(".blueprint", StringComparison.OrdinalIgnoreCase) ||
             name.EndsWith(".vbuild", StringComparison.OrdinalIgnoreCase) ||
             name.EndsWith(".buildworks.json", StringComparison.OrdinalIgnoreCase);
@@ -187,6 +187,7 @@ namespace OstrixMods.BuildWorks
                 catch (InvalidDataException exception) { return Blocked(source, exception.Message); }
             }
             var blueprint = Blocked(source, null);
+            blueprint.importAbsoluteScale = true;
             blueprint.id = Identity(source + "\n" + text);
             bool vbuild = source.EndsWith(".vbuild", StringComparison.OrdinalIgnoreCase);
             bool pieces = vbuild, seenPieces = vbuild, snapPoints = false;
@@ -273,7 +274,7 @@ namespace OstrixMods.BuildWorks
                             part.scale = new CompositeBlueprintStore.VectorData { x = Number(fields[10]), y = Number(fields[11]), z = Number(fields[12]) };
                         double norm = Math.Sqrt((double)part.rotation.x * part.rotation.x + (double)part.rotation.y * part.rotation.y +
                             (double)part.rotation.z * part.rotation.z + (double)part.rotation.w * part.rotation.w);
-                        if (norm < .999 || norm > 1.001 || !CompositeBlueprintStore.ValidScale(part.scale))
+                        if (norm < .999 || norm > 1.001 || !CompositeBlueprintStore.PositiveScale(part.scale))
                             throw new InvalidDataException("$buildworks_import.transform");
                         part.rotation.x = (float)(part.rotation.x / norm);
                         part.rotation.y = (float)(part.rotation.y / norm);
@@ -294,10 +295,46 @@ namespace OstrixMods.BuildWorks
             return blueprint;
         }
 
+        internal static CompositeBlueprintStore.Blueprint PrepareForHost(CompositeBlueprintStore.Blueprint source,
+            Func<string, CompositeBlueprintStore.VectorData?> resolvePrefabScale)
+        {
+            if (source == null || !source.importAbsoluteScale || source.importError != null) return source;
+            var copy = source.ImportCopy();
+            string currentPrefab = null;
+            try
+            {
+                if (resolvePrefabScale == null) throw new InvalidDataException("$buildworks_import.scale_pending");
+                var scales = new Dictionary<string, CompositeBlueprintStore.VectorData>(StringComparer.Ordinal);
+                foreach (CompositeBlueprintStore.Part part in copy.parts)
+                {
+                    currentPrefab = part.prefabName;
+                    if (!scales.TryGetValue(part.prefabName, out var prefabScale))
+                    {
+                        var resolved = resolvePrefabScale(part.prefabName);
+                        if (!resolved.HasValue) throw new InvalidDataException("$buildworks_import.scale_missing\t" + part.prefabName);
+                        scales.Add(part.prefabName, prefabScale = resolved.Value);
+                    }
+                    part.scale = CompositeBlueprintStore.RelativeScale(part.scale, prefabScale);
+                }
+                copy.importAbsoluteScale = false;
+                // Derived cache identity must not reuse pre-normalization thumbnails or another prefab revision.
+                copy.id = Identity(source.id + "\nrelative-scale-v1\n" + string.Join("\n", scales.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                    .Select(pair => pair.Key + "\t" + pair.Value.x.ToString("R", CultureInfo.InvariantCulture) + "\t" +
+                        pair.Value.y.ToString("R", CultureInfo.InvariantCulture) + "\t" + pair.Value.z.ToString("R", CultureInfo.InvariantCulture))));
+            }
+            catch (Exception error) when (error is InvalidDataException || error is ArgumentException)
+            {
+                copy.importError = error is ArgumentException ? "$buildworks_import.scale_range\t" + currentPrefab : error.Message;
+                copy.parts.Clear(); // Atomic conversion: never publish mixed absolute/relative scales.
+            }
+            return copy;
+        }
+
         internal static CompositeBlueprintStore.Blueprint DetachedCopy(CompositeBlueprintStore.Blueprint source)
         {
             if (source == null || !source.IsExternal || source.importError != null)
                 throw new InvalidDataException("$buildworks_import.fields");
+            if (source.importAbsoluteScale) throw new InvalidDataException("$buildworks_import.scale_pending");
             var result = new CompositeBlueprintStore.Blueprint
             {
                 id = Guid.NewGuid().ToString("N"),

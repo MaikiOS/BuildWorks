@@ -9,12 +9,14 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.66**: faster Hammer scrolling; support actions in Tools, object-only support tree.
-Release/required checks, correctness/Ponytail and final 156 isolated native Unity states PASS.
-Not deployed; .65 remains installed. Owner .65 feedback confirms snapping/support edit behavior, but rejects
-the path-only exchange UX and action rows. [Lossless conversion requirement](../specs/roadmap/blueprint-format.md)
-is recorded, not implemented; file browser/output settings and source scale semantics remain pending.
+Active source checkpoint **0.19.67**: shared file browser/output settings, persistent result and exact foreign prefab scale.
+Release/required checks, correctness/Ponytail and 180 isolated native Unity states PASS.
+Not deployed; .65 remains installed. Faster scrolling and object-only support tree are retained from .66.
+The [lossless conversion requirement](../specs/roadmap/blueprint-format.md) is partially implemented:
+source absolute scale is prepared atomically without shrinking; opaque foreign object/header preservation remains pending.
 Heavy interactive budget 512 and world-support durability remain separate unfinished work.
+Ostrix's 2026-10-06 goal extension: ordinary items and horizontal/wall/armour stand contents,
+including editor attachments, preserved state/exchange and native world reconstruction; not implemented.
 
 Previous source checkpoint **0.19.64**: [independent support editor](../specs/roadmap/blueprint-support-frames.md).
 Tree/inspector, G/R without moving parts, transient centre and persisted placement default.

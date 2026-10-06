@@ -2,9 +2,10 @@
 
 **English** | [Русский](blueprint-format_RU.md)
 
-Current source **0.19.66**: independent support editing and placement-frame composition are implemented;
-support actions now live in Tools, not object rows. World reload/network durability remains unverified.
-The full file-exchange workflow and lossless foreign conversion below are still pending.
+Current source **0.19.67**: file browser/output settings and persistent results are implemented in editor/Hammer;
+foreign absolute scale is prepared from actual prefab bases once, without guessed shrinking or partial conversion.
+Support actions live in Tools, not object rows. World reload/network durability remains unverified.
+Full foreign header/object-data preservation and heavy interactive scenes below remain pending.
 Checkpoint **0.19.62**: [support storage/exchange and remaining workflow](blueprint-support-frames.md).
 Store v11 adds optional supports (stableId/name/position/rotation) and placementSupportId;
 portable v2 carries the same payload. Old v10/v1 migrate without support data or source writes;
@@ -23,9 +24,10 @@ Original files remain untouched. Never call an incomplete adapter fully compatib
 
 PlanBuild captures `piece.transform.localScale` and assigns that exact value on ghost clones:
 [primary Blueprint.cs](https://raw.githubusercontent.com/sirskunkalot/PlanBuild/master/PlanBuild/Blueprints/Blueprint.cs).
-BuildWorks currently stores relative prefab multipliers. The next adapter must distinguish these
-semantics, resolve actual prefab root scale and test non-unit, nested and mirrored fixtures before
-conversion. Do not apply a guessed global shrink/clamp to large pieces. Missing prefab dependencies
+BuildWorks stores relative prefab multipliers. The .67 adapter distinguishes these semantics,
+resolves actual positive prefab root scales on the Unity thread and prepares an atomic cached copy.
+Non-unit/small bases and native roundtrip pass; mirrored/unsupported bases remain blocked.
+Do not apply a guessed global shrink/clamp to large pieces. Missing prefab dependencies
 must remain identifiable, not be substituted. Unsupported transforms/data stay blocked, not discarded.
 
 Required exchange UX: visible file selection (not compulsory memorized paths), filename/output location,
@@ -40,12 +42,31 @@ not authorize arbitrary mesh extraction, terrain editing or world/save changes.
 
 ## Work and evidence gates
 
+### Goal extension: ordinary items and equipment displays (2026-10-06)
+
+Ostrix added item support to the same active goal. The editor must represent ordinary game items,
+especially items attached to horizontal/wall item stands and equipment on armour stands.
+Preview-only loose items and holder-bound items are distinct from native building parts.
+Holder attachments retain an explicit owning part/slot relationship, follow holder transforms,
+and survive duplicate/insertion/Undo, native save and portable import/export.
+Preserve item identity and supported state (quantity, quality, variant, durability and mod metadata);
+do not claim unverified metadata has identical gameplay behavior. Unsupported holder/item combinations
+must remain recognizable with a reason, without substitution or silent deletion.
+
+World reconstruction must use verified native item/holder APIs and respect resource, ownership,
+permission and networking rules: a blueprint is a recipe, not an item duplication mechanism.
+Proof: editor selection/attachment/removal and Undo; exact disk/portable roundtrip; imported display
+state; actual holder placement, contents after save/reload, removal without duplication and remote client.
+Modded items/holders require capability checks; installing arbitrary foreign code is not authorized.
+This extension is recorded, not implemented. The existing goal remains active.
+
 | Stage | Owner | Required proof |
 | --- | --- | --- |
 | Document/portable format and converters | Main integration; blueprint_format_contract57 independent review | Exact roundtrip, old-file migration, rejection without partial data, originals unchanged |
 | Large editor scenes | Main implementation; blueprint_render_audit57 measurements/review | Real Unity open/pick/Undo/thumbnail times, memory, cancel/teardown, stable part selection |
 | Signs | Main host integration; render agent verified current Sign API | Payload follows each placement step; native SetText; capture, place, save/reload, remote client |
 | Authored sockets | Main editor/world integration; format agent contract review | Create/delete/Undo, exact frames, persistent native-piece sockets, reload and host/client |
+| Ordinary items / holder contents | Main integration; format/native API review | Holder-slot relations, exact item state, editor Undo/exchange, costs/no duplication, save/reload and host/client |
 
 Agent creation hit the current thread limit; two existing agents were reused for
 read-only research/review. Shared, coupled source edits remain with the main agent.

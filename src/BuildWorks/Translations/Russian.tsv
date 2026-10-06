@@ -781,5 +781,24 @@ exchange.loading	Библиотека чертежей загружается в
 exchange.ready	Библиотека обновлена. ⋯ — редактировать/экспортировать; щелчок по карточке — разместить.
 exchange.exported	Экспорт сохранён: {0}
 exchange.exists	В библиотеке уже есть этот файл: {0}
+import.scale_pending	Сначала открой чертёж в игровом каталоге для пересчёта масштаба префабов. Исходник не изменён.
+import.scale_range	Масштаб детали {0} выходит за поддерживаемый множитель 1–400%. Детали не уменьшались, частичная конвертация не выполнена.
+import.scale_missing	Не найден исходный масштаб детали {0}. Установи её мод и открой каталог заново; частичная конвертация не выполнена.
+exchange.browse_help	Выбери папку и файл, затем «Импорт». Исходные файлы не меняются.
+exchange.export_help	Полный документ BuildWorks: XYZ-масштаб, надписи, группы и опоры. Существующие файлы не перезаписываются.
+exchange.up	Выше
+exchange.go	Открыть
+exchange.library	Папка BuildWorks
+exchange.downloads	Загрузки
+exchange.documents	Документы
+exchange.desktop	Рабочий стол
+exchange.filename	Имя файла
+exchange.format_json	BuildWorks JSON
+exchange.format_zip	ZIP + BuildWorks
+exchange.copy_path	Скопировать путь
+exchange.empty	Здесь нет поддерживаемых файлов. Открой «Загрузки», другую папку или вставь путь к папке сверху.
+exchange.folder	Папка:
+exchange.invalid_name	Введи имя файла без пути и символов <>:"/\\|?*. Расширение формата добавляется автоматически.
+exchange.imported	Отдельная копия исходника сохранена: {0}
 import.format	Неподдерживаемый формат файла чертежа.
 editor.support.add_short	+ Опора

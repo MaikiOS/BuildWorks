@@ -1163,6 +1163,9 @@ namespace OstrixMods.BuildWorks
         private static float previewZoom;
         private static Vector2 previewMouse;
         private static bool previewDragging;
+        private static BlueprintExchangeView exchangeView;
+        private static int exchangeClosedFrame = -1;
+        internal static bool BlocksExchangeInput => exchangeView?.IsOpen == true || Time.frameCount <= exchangeClosedFrame;
         private static bool indexGridActive;
         private static bool nativeIndexMode;
         private static bool nativeBuildUiWasVisible;
@@ -1205,6 +1208,7 @@ namespace OstrixMods.BuildWorks
         public static void Unconfigure(CompositeBlueprintStore store)
         {
             if (blueprintStore != store) return;
+            exchangeView?.Dispose(); exchangeView = null;
             ExitNativeIndex(Hud.instance, Player.m_localPlayer);
             ClosePreview();
             Clear();
@@ -1223,6 +1227,16 @@ namespace OstrixMods.BuildWorks
 
         public static void Tick(Hud hud, Player player)
         {
+            if (exchangeView != null)
+            {
+                if (!hud || !player || !Hud.IsPieceSelectionVisible()) { exchangeView.Dispose(); exchangeView = null; }
+                else
+                {
+                    exchangeView.Tick();
+                    if (Input.GetKeyDown(KeyCode.Escape)) { exchangeView.Dispose(); exchangeView = null; }
+                    return;
+                }
+            }
             if (HammerCatalogOrganizer.NativeBuildUiActive)
             {
                 if (!hud || !player || !HammerCatalogOrganizer.NativeBuildUiVisible ||
@@ -2272,18 +2286,26 @@ namespace OstrixMods.BuildWorks
             scroll.content.sizeDelta = new Vector2(width + 14, -y);
         }
 
-        private static void ImportBlueprintFile() => TextInput.instance?.RequestText(new PromptReceiver(
-            () => string.Empty, value =>
-            {
-                if (!blueprintStore.TryImportFile(value, out string error)) ShowStatus(error);
-                else { blueprintImportPending = true; ShowStatus(BuildWorksLocalization.Text("exchange.loading")); }
-                Invalidate();
-            }), BuildWorksLocalization.Text("exchange.path_help"), 1024);
+        private static void ImportBlueprintFile() => ShowExchange(null);
 
         private static void ExportBlueprintFile(CompositeBlueprintStore.Blueprint blueprint)
         {
-            ShowStatus(blueprintStore.TryExportFile(blueprint, out string path, out string error)
-                ? BuildWorksLocalization.Text("exchange.exported", path) : error);
+            ShowExchange(blueprint);
+        }
+
+        private static void ShowExchange(CompositeBlueprintStore.Blueprint blueprint)
+        {
+            Hud hud = Hud.instance;
+            Canvas canvas = hud && hud.m_pieceSelectionWindow ? hud.m_pieceSelectionWindow.GetComponentInParent<Canvas>() : null;
+            if (!canvas || blueprintStore == null) return;
+            exchangeView?.Dispose();
+            exchangeView = new BlueprintExchangeView(canvas.transform,
+                hud.m_pieceDescription ? hud.m_pieceDescription : hud.m_buildSelection, blueprintStore, blueprint, () =>
+                {
+                    exchangeView = null; exchangeClosedFrame = Time.frameCount;
+                    if (blueprint == null) blueprintImportPending = true;
+                    Invalidate();
+                }, frontCanvas: true);
         }
 
         private static void AddBlueprintLibrary(Hud hud, Player player)
@@ -2703,7 +2725,7 @@ namespace OstrixMods.BuildWorks
             HammerCatalogOrganizer.IndexEnabled && Hud.instance &&
             Hud.IsPieceSelectionVisible();
 
-        public static bool BlocksCatalogPaging => previewSession != null || showResources ||
+        public static bool BlocksCatalogPaging => BlocksExchangeInput || previewSession != null || showResources ||
             (blueprintCategoryViewport && RectTransformUtility.RectangleContainsScreenPoint(
                 blueprintCategoryViewport, Input.mousePosition)) ||
             (blueprintActionsViewport && RectTransformUtility.RectangleContainsScreenPoint(

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
@@ -35,6 +36,9 @@ namespace OstrixMods.BuildWorks
         private List<Blueprint> externalBlueprints;
         private IReadOnlyList<Blueprint> catalogSnapshot;
         private Task<List<Blueprint>> importTask;
+        private Func<string, VectorData?> importPrefabScale;
+        private Func<object> importHostContext;
+        private object preparedHostContext;
         internal int Revision { get; private set; }
         internal bool CatalogLoading => importTask != null && !importTask.IsCompleted;
         internal string ImportError { get; private set; }
@@ -59,8 +63,19 @@ namespace OstrixMods.BuildWorks
 
         public IReadOnlyList<Blueprint> All() => data.blueprints;
 
+        // Called on the Unity thread only. File workers never inspect host prefabs.
+        internal void ConfigureImportScale(Func<string, VectorData?> resolve, Func<object> context = null)
+        {
+            importPrefabScale = resolve;
+            importHostContext = context;
+            catalogSnapshot = null;
+        }
+
         internal IReadOnlyList<Blueprint> CatalogAll()
         {
+            object hostContext = importHostContext?.Invoke();
+            if (!ReferenceEquals(hostContext, preparedHostContext))
+            { preparedHostContext = hostContext; catalogSnapshot = null; }
             if (importTask != null && importTask.IsCompleted)
             {
                 try { externalBlueprints = importTask.GetAwaiter().GetResult(); ImportError = null; }
@@ -76,11 +91,42 @@ namespace OstrixMods.BuildWorks
             }
             if (catalogSnapshot != null) return catalogSnapshot;
             var result = new List<Blueprint>(data.blueprints);
-            result.AddRange(externalBlueprints);
+            result.AddRange(externalBlueprints.Select(source => ExternalBlueprintLibrary.PrepareForHost(source, importPrefabScale)));
             return catalogSnapshot = result;
         }
 
-        private string ImportDirectory => Path.Combine(Path.GetDirectoryName(path), "imports");
+        internal string ExchangeDirectory => Path.GetDirectoryName(path);
+        internal string ImportDirectory => Path.Combine(ExchangeDirectory, "imports");
+        internal string ExportDirectory => Path.Combine(ExchangeDirectory, "exports");
+
+        internal static string ValidateExchangeDirectory(string directory)
+        {
+            string full = Path.GetFullPath(directory ?? "");
+            for (var current = new DirectoryInfo(full); current != null; current = current.Parent)
+                if (current.Exists && (current.Attributes & FileAttributes.ReparsePoint) != 0)
+                    throw new InvalidDataException("$buildworks_import.path");
+            return full;
+        }
+
+        internal static string[] BrowseExchangeDirectory(string directory)
+        {
+            string full = ValidateExchangeDirectory(directory);
+            var entries = Directory.EnumerateFileSystemEntries(full)
+                .Take(2001).ToArray();
+            if (entries.Length > 2000) throw new InvalidDataException("$buildworks_import.library_limit");
+            return entries.Where(entry => (File.GetAttributes(entry) & FileAttributes.ReparsePoint) == 0 &&
+                (Directory.Exists(entry) || ExternalBlueprintLibrary.Supported(entry) ||
+                    entry.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)))
+                .OrderBy(entry => Directory.Exists(entry) ? 0 : 1)
+                .ThenBy(entry => Path.GetFileName(entry), StringComparer.CurrentCultureIgnoreCase).ToArray();
+        }
+
+        internal static string ExportName(string name)
+        {
+            string safe = new string((name ?? "blueprint").Select(c => char.IsControl(c) || "<>:\"/\\|?*".Contains(c) ? '_' : c).ToArray());
+            safe = safe.Trim().TrimEnd('.');
+            return "blueprint_" + (safe.Length > 96 ? safe.Substring(0, 96) : safe);
+        }
 
         internal bool TryImportFile(string source, out string error)
         {
@@ -137,7 +183,11 @@ namespace OstrixMods.BuildWorks
             catch (Exception exception) { error = exception.Message; return false; }
         }
 
-        internal bool TryExportFile(Blueprint blueprint, out string exportedPath, out string error)
+        internal bool TryExportFile(Blueprint blueprint, out string exportedPath, out string error) =>
+            TryExportFile(blueprint, ExportDirectory, "blueprint_" + Guid.NewGuid().ToString("N"), false, out exportedPath, out error);
+
+        internal bool TryExportFile(Blueprint blueprint, string directory, string fileName, bool archive,
+            out string exportedPath, out string error)
         {
             exportedPath = null; error = null; string temporary = null;
             try
@@ -147,13 +197,22 @@ namespace OstrixMods.BuildWorks
                 byte[] bytes = BlueprintExchangeFormat.Encode(blueprint.IsExternal
                     ? ExternalBlueprintLibrary.DetachedCopy(blueprint) : blueprint);
                 BlueprintExchangeFormat.Decode(new UTF8Encoding(false, true).GetString(bytes));
-                string directory = Path.Combine(Path.GetDirectoryName(path), "exports");
+                directory = ValidateExchangeDirectory(directory);
+                if (string.IsNullOrWhiteSpace(fileName) || fileName.Length > 120 || fileName != fileName.Trim() ||
+                    fileName.EndsWith(".", StringComparison.Ordinal) || fileName.Any(c => char.IsControl(c) || "<>:\"/\\|?*".Contains(c)) ||
+                    fileName == "." || fileName == "..")
+                    throw new InvalidDataException("$buildworks_exchange.invalid_name");
+                string target = Path.Combine(directory, fileName + (archive ? ".zip" : ".buildworks.json"));
+                if (File.Exists(target)) throw new IOException(UserError("exchange.exists", target));
                 Directory.CreateDirectory(directory);
-                if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
-                    throw new InvalidDataException("$buildworks_import.path");
-                string target = Path.Combine(directory, "blueprint_" + Guid.NewGuid().ToString("N") + ".buildworks.json");
-                temporary = target + ".tmp";
-                File.WriteAllBytes(temporary, bytes);
+                temporary = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".tmp");
+                using (var output = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                {
+                    if (!archive) output.Write(bytes, 0, bytes.Length);
+                    else using (var zip = new ZipArchive(output, ZipArchiveMode.Create, true))
+                        using (var entry = zip.CreateEntry(fileName + ".buildworks.json").Open())
+                            entry.Write(bytes, 0, bytes.Length);
+                }
                 File.Move(temporary, target);
                 exportedPath = target;
                 return true;
@@ -1210,6 +1269,18 @@ namespace OstrixMods.BuildWorks
             value.x >= 0.01f && value.y >= 0.01f && value.z >= 0.01f &&
             value.x <= 4f && value.y <= 4f && value.z <= 4f;
 
+        internal static VectorData RelativeScale(VectorData absolute, VectorData prefab)
+        {
+            if (!PositiveScale(absolute) || !PositiveScale(prefab))
+                throw new ArgumentOutOfRangeException(nameof(absolute), "$buildworks_import.transform");
+            var relative = Geometry.BlueprintEditorPart.NormalizeScale(new Geometry.Point3(
+                absolute.x / prefab.x, absolute.y / prefab.y, absolute.z / prefab.z), nameof(absolute));
+            return new VectorData { x = (float)relative.X, y = (float)relative.Y, z = (float)relative.Z };
+        }
+
+        internal static bool PositiveScale(VectorData value) =>
+            IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z) && value.x > 0 && value.y > 0 && value.z > 0;
+
         private static bool IsFinite(float value) =>
             !float.IsNaN(value) && !float.IsInfinity(value);
 
@@ -1250,6 +1321,13 @@ namespace OstrixMods.BuildWorks
         {
             // Transient read-only import diagnostics; not persisted library fields.
             internal byte[] importPreview;
+            internal bool importAbsoluteScale;
+            internal Blueprint ImportCopy()
+            {
+                var copy = (Blueprint)MemberwiseClone();
+                copy.parts = CloneParts(parts);
+                return copy;
+            }
             public string importSource;
             public string importError;
             public int importPartCount;

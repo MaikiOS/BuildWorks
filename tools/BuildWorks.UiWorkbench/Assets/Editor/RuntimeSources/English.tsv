@@ -781,5 +781,24 @@ exchange.loading	Loading blueprint library in the background…
 exchange.ready	Blueprint library updated. Use ⋯ to edit/export; click a card to place.
 exchange.exported	Export saved: {0}
 exchange.exists	The library already contains this file: {0}
+import.scale_pending	Load the blueprint in the game catalogue first to resolve prefab scales. The source has not been changed.
+import.scale_range	The scale of prefab {0} cannot be represented within the supported 1–400% multiplier range. No parts were resized or partially converted.
+import.scale_missing	Cannot resolve the original scale of prefab {0}. Install its mod and reopen the catalogue; no partial conversion was made.
+exchange.browse_help	Choose a folder and file, then Import. Original files remain unchanged.
+exchange.export_help	Full BuildWorks document: XYZ scales, signs, groups and supports. Existing files are never overwritten.
+exchange.up	Up
+exchange.go	Open
+exchange.library	BuildWorks folder
+exchange.downloads	Downloads
+exchange.documents	Documents
+exchange.desktop	Desktop
+exchange.filename	File name
+exchange.format_json	BuildWorks JSON
+exchange.format_zip	ZIP + BuildWorks
+exchange.copy_path	Copy full path
+exchange.empty	No supported files here. Try Downloads, another folder, or paste a folder path above.
+exchange.folder	Folder:
+exchange.invalid_name	Enter a file name without path separators or <>:"/\\|?*. The format extension is added automatically.
+exchange.imported	A separate source copy is saved at: {0}
 import.format	Unsupported blueprint file format.
 editor.support.add_short	+ Support

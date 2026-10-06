@@ -610,17 +610,14 @@ namespace OstrixMods.BuildWorks
                 document.SetLocked(id, locked));
             view.DialogDecided += HandleDialog;
             view.CatalogPartSelected += BeginPartPlacement;
-            view.CatalogImportRequested += () => view.ShowImportPath(path =>
+            view.CatalogImportRequested += () => view.ShowExchange((parent, font, closed) => new BlueprintExchangeView(parent, font, store, null, closed), () =>
             {
-                if (!store.TryImportFile(path, out string error)) { view.SetStatus(error); return; }
                 catalogImportPending = true;
-                view.SetStatus(BuildWorksLocalization.Text("exchange.loading"));
             });
             view.CatalogExportRequested += blueprint =>
             {
                 if (blueprint == null) { view.SetStatus(BuildWorksLocalization.Text("catalog.choose_blueprint")); return; }
-                view.SetStatus(store.TryExportFile(blueprint, out string path, out string error)
-                    ? BuildWorksLocalization.Text("exchange.exported", path) : error);
+                view.ShowExchange((parent, font, closed) => new BlueprintExchangeView(parent, font, store, blueprint, closed));
             };
             view.InspectorSubmitted += ApplyInspector;
             view.RenameSubmitted += (id, name) => ApplyDocumentEdit(() =>

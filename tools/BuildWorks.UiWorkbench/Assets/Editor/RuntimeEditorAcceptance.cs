@@ -186,6 +186,7 @@ public static class RuntimeEditorAcceptance
             checks.Add(UICatalogAcceptance.Run(fontTemplate.font));
             foreach (object step in ControllerInputAcceptance.Run(template, fontTemplate, output)) yield return step;
             foreach (object step in ControllerInputAcceptance.RunSupportLifecycle(template, fontTemplate, output)) yield return step;
+            foreach (object step in ControllerInputAcceptance.RunExchangeLifecycle(template, fontTemplate, output)) yield return step;
             foreach (object step in ControllerInputAcceptance.RunContourLifecycle(template, fontTemplate, output)) yield return step;
             checks.Add("Actual contour input: hover guide without copies, leave clears, click previews, cancel/tool switch/delete clear guide permanently");
             checks.Add("Actual Controller.Update/LateUpdate frame chords and native EventSystem raycasts: Ctrl+A, Shift rows/viewport, pin, shared gizmo, Alt move preview/commit/cancel/Undo, scale, placement RMB catalog reopen/camera and compound import; single Outliner context subscriptions; Array arrows/wheel/Ctrl zoom/Fit/spacing/shared step presets/live scrub before release/all TMP profile/atomic apply");
@@ -325,7 +326,7 @@ public static class RuntimeEditorAcceptance
                     scene.SetViewport(view.ViewportScreenRect());
                     Call(controller, "FrameAll");
                     foreach (string state in new[] { "select", "transform", "array", "contour", "catalog",
-                        "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "save-metadata", "supports" })
+                        "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "save-metadata", "supports", "exchange-import", "exchange-export" })
                     {
                         Require(Screen.width == width && Screen.height == height,
                             "GameView changed before " + state + ": " + Screen.width + "x" + Screen.height);
@@ -373,6 +374,18 @@ public static class RuntimeEditorAcceptance
                         else if (state == "settings") ControllerInputAcceptance.NativeClick(view, uiCamera, "View");
                         else if (state == "save-metadata") view.ShowSaveMetadata("Новый чертёж", "Дома",
                             new[] { "Дома", "Мебель" }, (_, __) => { });
+                        else if (state.StartsWith("exchange"))
+                        {
+                            string folder = Path.Combine(output, "exchange-layout"); Directory.CreateDirectory(folder);
+                            var layoutStore = new CompositeBlueprintStore(Path.Combine(folder, "library.json"));
+                            var blueprint = store.All()[0];
+                            File.WriteAllBytes(Path.Combine(folder, "Дом.buildworks.json"), BlueprintExchangeFormat.Encode(blueprint));
+                            view.ShowExchange((parent, textFont, closed) => new BlueprintExchangeView(parent, textFont, layoutStore,
+                                state == "exchange-export" ? blueprint : null, closed));
+                            for (int i = 0; i < 300 && Field<System.Threading.Tasks.Task<string[]>>(
+                                Field<BlueprintExchangeView>(view, "exchangeView"), "listing") != null; ++i)
+                            { view.Tick(); yield return null; }
+                        }
                         else Call(controller, "UpdateGizmo");
                         // Product Destroy() and TMP rebuilds must see a real frame.
                         yield return null;
@@ -409,6 +422,7 @@ public static class RuntimeEditorAcceptance
                         uiCamera.targetTexture = null;
                         scene.Camera.targetTexture = null;
                         view.RootCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                        if (state.StartsWith("exchange")) ControllerInputAcceptance.NativeClick(view, uiCamera, "ExchangeClose");
                         yield return null;
                     }
                     Object.DestroyImmediate(target);
@@ -523,6 +537,14 @@ public static class RuntimeEditorAcceptance
         }
         if (state == "save-metadata") EnsureInside(Field<RectTransform>(view, "safeRoot"),
             (RectTransform)Field<TMP_Text>(view, "modalTitle").transform.parent);
+        if (state.StartsWith("exchange"))
+        {
+            var exchange = Field<BlueprintExchangeView>(view, "exchangeView");
+            var panel = Field<RectTransform>(exchange, "panel");
+            EnsureInside(Field<RectTransform>(view, "safeRoot"), panel);
+            foreach (Button button in panel.GetComponentsInChildren<Button>()) EnsureInside(panel, (RectTransform)button.transform);
+            foreach (TMP_InputField field in panel.GetComponentsInChildren<TMP_InputField>()) EnsureInside(panel, (RectTransform)field.transform);
+        }
     }
 
     private static void TestSignPayload()
@@ -657,8 +679,10 @@ public static class RuntimeEditorAcceptance
     {
         string path = Path.Combine(output, "external-copy-" + Guid.NewGuid().ToString("N") + ".json");
         var store = new CompositeBlueprintStore(path);
-        var original = ExternalBlueprintLibrary.Parse("#Name:Import fixture\n#Category:OTHER\n#Pieces\n" +
+        var raw = ExternalBlueprintLibrary.Parse("#Name:Import fixture\n#Category:OTHER\n#Pieces\n" +
             "woodwall;0;1;2;3;0;0;0;1;\"\";1;1;1\nwood_pole;0;4;5;6;0;0;0;1;\"\";1;1;1", "fixture.blueprint");
+        var original = ExternalBlueprintLibrary.PrepareForHost(raw, name => sources.TryGetValue(name, out GameObject prefab)
+            ? new CompositeBlueprintStore.VectorData(prefab.transform.localScale) : (CompositeBlueprintStore.VectorData?)null);
         using (var editor = new BlueprintEditorController(store, camera, font,
             name => sources.TryGetValue(name, out GameObject prefab) ? prefab : null, name => name,
             () => new[] { new BlueprintEditorCatalogItem("external-fixture", original.name, null,

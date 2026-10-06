@@ -54,6 +54,24 @@ internal static class ControllerInputAcceptance
         controller.Update(); controller.LateUpdate(); Canvas.ForceUpdateCanvases();
     }
 
+    private static void TestExactInspectorScale(BlueprintEditorController controller, BlueprintEditorView view, BlueprintEditorDocument doc)
+    {
+        var part = doc.Parts.First(x => x.StableId == "left");
+        var scale = new Point3(1.234567f, 2f, .01001f);
+        doc.SetPartProperties("left", part.DisplayName, part.Position, part.Rotation, scale);
+        doc.SelectOnly("left"); Call(controller, "Bind", new object[] { null });
+        Call(view, "SubmitInspector");
+        Require(doc.Parts.First(x => x.StableId == "left").Scale.Equals(scale),
+            "Unchanged rounded scale field changed exact XYZ");
+        Field<TMP_InputField>(view, "inspectorScale").SetTextWithoutNotify("154.320875");
+        Call(view, "SubmitInspector");
+        var resized = doc.Parts.First(x => x.StableId == "left").Scale;
+        Require(resized.X > scale.X && Math.Abs(resized.Y / resized.X - scale.Y / scale.X) < .00001 &&
+            Math.Abs(resized.Z / resized.X - scale.Z / scale.X) < .00001, "Resize lost XYZ proportions");
+        doc.SetPartProperties("left", part.DisplayName, part.Position, part.Rotation, new Point3(1,1,1));
+        Call(controller, "Bind", new object[] { null });
+    }
+
     private static void TestPointHoverHints(BlueprintEditorController controller, InputFrames input,
         BlueprintEditorScene scene, BlueprintEditorView view, BlueprintEditorDocument doc)
     {
@@ -85,6 +103,49 @@ internal static class ControllerInputAcceptance
         Frame(controller, input, Vector2.zero);
         Require(Field<TMP_Text>(view, "nextActionText").text != pointCaption,
             "Leaving the viewport retains a stale point caption");
+    }
+
+    private static void TestRotatedG(BlueprintEditorController controller, InputFrames input,
+        BlueprintEditorScene scene, BlueprintEditorDocument doc)
+    {
+        BlueprintEditorPart right = doc.Parts.First(x => x.StableId == "right");
+        Rotation3 originalRightRotation = right.Rotation;
+        Quaternion targetRotation = Quaternion.Euler(23,41,-17);
+        doc.SetPartProperties("right", right.DisplayName, right.Position,
+            new Rotation3(targetRotation.x,targetRotation.y,targetRotation.z,targetRotation.w), right.Scale);
+        doc.SelectOnly("left"); scene.TrySync(doc, out _); Call(controller, "Bind", new object[] { null });
+        Frame(controller, input, Vector2.zero);
+        int source = Field<int>(controller, "gizmoNativeAnchorStart");
+        Set(controller, "selectedAnchorPoint", source);
+        Set(controller, "selectedAnchorWorld", (Vector3?)Field<Vector3[]>(controller, "gizmoAnchors")[source]);
+        Vector3 point = V(right.Position) + targetRotation * new Vector3(.5f,0,-.5f);
+        Vector2 mouse = scene.Camera.WorldToScreenPoint(point);
+        Frame(controller, input, mouse, 0, KeyCode.G);
+        mouse += Vector2.right * 2;
+        Frame(controller, input, mouse); Frame(controller, input, mouse); Frame(controller, input, mouse);
+        Require(Field<bool>(controller, "snapTargetVisible"), "Rotated G fixture never captured target");
+        Vector3 grip = Field<Vector3>(controller, "snapTargetWorld");
+        for (int i = 0; i < 2; ++i)
+        {
+            input.Next(mouse); input.MouseScrollDelta = Vector2.up;
+            controller.Update(); controller.LateUpdate(); Canvas.ForceUpdateCanvases();
+        }
+        Quaternion rotation = Field<Quaternion>(controller, "dragRotation");
+        Require(Quaternion.Angle(rotation, targetRotation * Quaternion.Euler(0,45,0)) < .02f,
+            "Stationary G wheel lost target XYZ frame");
+        int selected = Field<int>(controller, "keyboardAutoSource");
+        Vector3 pivot = Field<Vector3>(controller, "dragPivot"), translation = Field<Vector3>(controller, "dragTranslation");
+        Vector3[] anchors = Field<Vector3[]>(controller, "dragSourceAnchors");
+        Require(selected >= 0 && Vector3.Distance(pivot + rotation * (anchors[selected] - pivot) + translation,
+            Field<Vector3>(controller, "snapTargetWorld")) < .001f, "G wheel moved grip away from target");
+        Frame(controller, input, mouse, 0, KeyCode.Escape); Frame(controller, input, mouse);
+        Require(Quaternion.Angle(new Quaternion((float)doc.Parts[0].Rotation.X, (float)doc.Parts[0].Rotation.Y,
+            (float)doc.Parts[0].Rotation.Z, (float)doc.Parts[0].Rotation.W), Quaternion.identity) < .01f,
+            "G cancel leaked rotation into document");
+        doc.SetPartProperties("right", right.DisplayName, right.Position, originalRightRotation, right.Scale);
+        Require(right.Rotation.Equals(originalRightRotation), "Rotated G fixture did not restore target pose");
+        Set(controller, "selectedAnchorPoint", -1); Set(controller, "selectedAnchorWorld", null);
+        Call(controller, "Bind", new object[] { null }); Frame(controller, input, Vector2.zero);
     }
 
     internal static IEnumerable Run(Camera template, TMP_Text font, string output)
@@ -148,8 +209,10 @@ internal static class ControllerInputAcceptance
             scene.Camera.targetTexture = target;
             Set(controller, "cameraFocus", new Vector3(0,.5f,0)); Set(controller, "cameraDistance", 8f);
             Set(controller, "cameraYaw", 20f); Set(controller, "cameraPitch", 20f);
+            TestExactInspectorScale(controller, view, doc);
             yield return null;
             Frame(controller, input, Vector2.zero); yield return null;
+            TestRotatedG(controller, input, scene, doc);
             NativeClick(view, uiCamera, "View");
             Frame(controller, input, Vector2.zero); yield return null;
             Require(Field<TMP_Text>(view, "statusHintText").text ==
@@ -579,7 +642,7 @@ internal static class ControllerInputAcceptance
             var scene = Field<BlueprintEditorScene>(controller, "scene");
             yield return null;
             Set(controller, "selectedAnchorWorld", new Vector3(0, 1, 0));
-            NativeClick(view, null, "CreateSupport"); yield return null;
+            NativeClick(view, null, "CreateSupportToolbar"); yield return null;
             string id = doc.ActiveSupportId;
             Require(id != null && doc.Selection.Count == 2 && doc.PlacementSupportId == null,
                 "Creating/selecting support must retain parts without assigning placement");
@@ -1349,7 +1412,12 @@ internal static class ControllerInputAcceptance
             Require(Field<bool>(controller, "keyboardPreview") &&
                 Vector3.Distance(Field<Vector3>(controller, "dragPivot"), pin) < .0001f &&
                 Vector3.Dot(Field<Vector3>(controller, "dragAxisWorld"), axisWorld) > .999f,
-                "R + axis did not rotate around the selected native pivot " + axis);
+                "R + axis did not rotate around the selected native pivot " + axis +
+                "; preview=" + Field<bool>(controller, "keyboardPreview") +
+                "; pivot=" + Field<Vector3>(controller, "dragPivot") + "; pin=" + pin +
+                "; axis=" + Field<Vector3>(controller, "dragAxisWorld") +
+                "; frame=" + Field<object>(controller, "transformFrame") +
+                "; local=" + Field<bool>(controller, "localSpace"));
             Quaternion expected = Quaternion.AngleAxis(30f, axisWorld);
             input.Next(pinMouse); input.InputString = "30";
             controller.Update(); controller.LateUpdate(); yield return null;

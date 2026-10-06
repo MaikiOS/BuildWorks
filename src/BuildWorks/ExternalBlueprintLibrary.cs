@@ -16,6 +16,15 @@ namespace OstrixMods.BuildWorks
         internal const int MaximumFileBytes = 8 * 1024 * 1024;
         private const int MaximumFiles = 2000;
         private const long MaximumTotalBytes = 128L * 1024 * 1024;
+        internal const int MaximumPreviewBytes = 4 * 1024 * 1024;
+
+        internal static List<CompositeBlueprintStore.Blueprint> LoadFile(string path)
+        {
+            var result = new List<CompositeBlueprintStore.Blueprint>();
+            long budget = MaximumTotalBytes;
+            AppendFile(Path.GetFullPath(path), result, ref budget);
+            return result;
+        }
 
         internal static List<CompositeBlueprintStore.Blueprint> Load(string directory)
         {
@@ -35,8 +44,15 @@ namespace OstrixMods.BuildWorks
             foreach (string path in paths)
             {
                 if (result.Count >= MaximumFiles) break;
+                AppendFile(path, result, ref budget);
+            }
+            return result;
+        }
+
+        private static void AppendFile(string path, List<CompositeBlueprintStore.Blueprint> result, ref long budget)
+        {
                 string extension = Path.GetExtension(path).ToLowerInvariant();
-                if (extension != ".zip" && !Supported(path)) continue;
+                if (extension != ".zip" && !Supported(path)) return;
                 try
                 {
                     if (new FileInfo(path).Length > 64L * 1024 * 1024)
@@ -57,6 +73,18 @@ namespace OstrixMods.BuildWorks
                                 string source = Path.GetFileName(path) + "/" + entry.FullName;
                                 using (Stream data = entry.Open())
                                     result.Add(Read(data, entry.Length, source, ref budget));
+                                ZipArchiveEntry preview = zip.GetEntry(Path.ChangeExtension(entry.FullName, ".png"));
+                                if (preview != null && preview.Length <= MaximumPreviewBytes && preview.Length <= budget)
+                                {
+                                    budget -= preview.Length;
+                                    try
+                                    {
+                                        using (Stream image = preview.Open())
+                                            result[result.Count - 1].importPreview = ReadPreview(image, preview.Length);
+                                    }
+                                    catch (Exception exception) when (exception is IOException || exception is InvalidDataException)
+                                    { /* An optional damaged picture must not hide the remaining documents. */ }
+                                }
                             }
                         }
                     }
@@ -67,8 +95,35 @@ namespace OstrixMods.BuildWorks
                 {
                     result.Add(Blocked(Path.GetFileName(path), exception.Message));
                 }
+        }
+
+        internal static bool ValidPreview(byte[] png)
+        {
+            if (png == null || png.Length < 33 || png.Length > MaximumPreviewBytes) return false;
+            byte[] signature = { 137, 80, 78, 71, 13, 10, 26, 10 };
+            for (int i = 0; i < signature.Length; ++i) if (png[i] != signature[i]) return false;
+            if (png[8] != 0 || png[9] != 0 || png[10] != 0 || png[11] != 13 ||
+                png[12] != 73 || png[13] != 72 || png[14] != 68 || png[15] != 82) return false;
+            uint width = ReadBigEndian(16), height = ReadBigEndian(20);
+            return width > 0 && height > 0 && width <= 2048 && height <= 2048;
+            uint ReadBigEndian(int offset) => (uint)png[offset] << 24 | (uint)png[offset + 1] << 16 |
+                (uint)png[offset + 2] << 8 | png[offset + 3];
+        }
+
+        private static byte[] ReadPreview(Stream stream, long length)
+        {
+            if (length < 33 || length > MaximumPreviewBytes) return null;
+            using (var bytes = new MemoryStream())
+            {
+                var buffer = new byte[8192]; int read;
+                while ((read = stream.Read(buffer, 0, buffer.Length)) != 0)
+                {
+                    if (bytes.Length + read > length) return null;
+                    bytes.Write(buffer, 0, read);
+                }
+                byte[] png = bytes.ToArray();
+                return ValidPreview(png) ? png : null;
             }
-            return result;
         }
 
         private static bool Supported(string name) =>
@@ -85,7 +140,7 @@ namespace OstrixMods.BuildWorks
             budget -= length;
             try
             {
-                // Never extract archive paths or load DLLs/images from the package.
+                // Never extract archive paths or execute package contents.
                 using (var bytes = new MemoryStream())
                 {
                     var buffer = new byte[8192]; int read;

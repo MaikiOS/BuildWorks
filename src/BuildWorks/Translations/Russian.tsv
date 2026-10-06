@@ -774,3 +774,12 @@ editor.support.scope	Опора: {0} · G — перемещение · R — п
 editor.support.actions	Delete — удалить опору · щелчок по детали — редактировать детали
 editor.support.centre_role	Центр трансформации
 editor.support.modes	Ctrl+1 — выбор · Ctrl+2 — гизма · Space/F3 — инструменты · Tab — каталог
+exchange.import	Импорт файла
+exchange.export	Экспорт файла
+exchange.path_help	Полный путь к .buildworks.json, .blueprint, .vbuild или .zip. В BuildWorks/imports попадёт отдельная копия; оригинал не меняется.
+exchange.loading	Библиотека чертежей загружается в фоне…
+exchange.ready	Библиотека обновлена. ⋯ — редактировать/экспортировать; щелчок по карточке — разместить.
+exchange.exported	Экспорт сохранён: {0}
+exchange.exists	В библиотеке уже есть этот файл: {0}
+import.format	Неподдерживаемый формат файла чертежа.
+editor.support.add_short	+ Опора

@@ -233,6 +233,17 @@ internal static class UICatalogAcceptance
                 Click(Button(view, "CatalogAtlas"));
                 Click(Button(view, "CatalogBlueprintsMode"));
                 Require(Field<RectTransform>(view, "catalogGrid").childCount == 2, "Part filters leaked into blueprint tab");
+                int imports = 0; CompositeBlueprintStore.Blueprint exported = null;
+                view.CatalogImportRequested += () => ++imports;
+                view.CatalogExportRequested += value => exported = value;
+                Click(Button(view, "CatalogImport"));
+                Click(Button(view, "CatalogExport"));
+                Require(imports == 1 && exported != null, "Visible exchange buttons do not dispatch");
+                string importPath = null;
+                view.ShowImportPath(value => importPath = value);
+                Field<TMP_InputField>(view, "saveMetadataName").SetTextWithoutNotify("C:/fixture.buildworks.json");
+                Click(Field<Button>(view, "dialogPrimaryButton"));
+                Require(importPath == "C:/fixture.buildworks.json" && !view.HasModal, "Import dialog did not submit path");
                 Click(Button(view, "Category_favorites"));
                 Require(Field<RectTransform>(view, "catalogGrid").childCount == 0,
                     "User category collides with the built-in favorites section");

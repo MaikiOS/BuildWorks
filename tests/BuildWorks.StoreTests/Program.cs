@@ -28,6 +28,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 RejectGroupCycle(Path.Combine(directory, "cycle.json"));
                 FailedWritePreservesOriginal(Path.Combine(directory, "failure.json"));
                 ExternalImports(directory);
+                ExchangeFileWorkflow(Path.Combine(directory, "file-flow"));
                 ForeignSignText();
                 ExchangeRoundTrip(Path.Combine(directory, "exchange-library.json"));
                 SupportRoundTrip(Path.Combine(directory, "supports.json"));
@@ -124,6 +125,78 @@ namespace OstrixMods.BuildWorks.StoreTests
                 "Native copy cannot be reopened with original sources");
             Require(File.ReadAllText(original) == source, "Import/save rewrote original file");
             Console.WriteLine("PASS read-only .blueprint/.vbuild -> separate native v11 copy, exact poses/scales, terrain exclusion, rejection without partial pieces, inert archive");
+        }
+
+        private static void ExchangeFileWorkflow(string directory)
+        {
+            Directory.CreateDirectory(directory);
+            string source = Path.Combine(directory, "selected.blueprint");
+            const string text = "#Name:Selected\n#Pieces\nwall;Workbench;1;2;3;0;0;0;1;\"\";1.234567;2;.01001\nbeam;Workbench;0;0;0;0;0;0;1;\"\";1;1;1\n";
+            File.WriteAllText(source, text);
+            var store = new CompositeBlueprintStore(Path.Combine(directory, "library.json"), backgroundImports: true);
+            WaitForImport(store);
+            Require(store.CatalogAll().Count == 0 && store.TryImportFile(source, out string error), "Import start");
+            WaitForImport(store);
+            Require(store.ImportError == null && store.CatalogAll().Count == 1, "Import after first browsing failed: " + store.ImportError);
+            Require(File.ReadAllText(source) == text && File.ReadAllText(Path.Combine(directory, "imports", "selected.blueprint")) == text,
+                "Import must leave original unchanged and retain separate copy");
+            Require(!store.TryImportFile(source, out error) && error.Contains("exchange.exists"), "Duplicate overwrote source");
+            var imported = store.CatalogAll()[0];
+            string externalId = imported.id;
+            Require(store.TryExportFile(imported, out string externalExport, out error), error);
+            var externalDecoded = BlueprintExchangeFormat.Decode(File.ReadAllText(externalExport));
+            Require(externalDecoded.parts[0].scale.x == 1.234567f && imported.id == externalId,
+                "Foreign export changed source or XYZ");
+            Require(store.TryImportFile(externalExport, out error), error);
+            WaitForImport(store);
+            var portable = store.CatalogAll().First(x => x.importSource.EndsWith(".buildworks.json", StringComparison.OrdinalIgnoreCase));
+            Require(store.TryExportFile(portable, out string portableExport, out error) &&
+                BlueprintExchangeFormat.Decode(File.ReadAllText(portableExport)).parts.Count == 2,
+                "Imported native portable file cannot be re-exported: " + error);
+            imported.previewYaw = 27; imported.previewPitch = -18; imported.previewZoom = 1.4f;
+            var copy = ExternalBlueprintLibrary.DetachedCopy(imported);
+            Require(store.TrySaveDocument(copy.name, copy.category, copy.parts, copy.groups, copy.anchors,
+                copy.primaryPartId, copy.primaryGroupId, copy.supports, copy.placementSupportId,
+                out var saved, out error, copy.customSnapPoints, copy), error);
+            Require(saved.previewYaw == 27 && saved.previewPitch == -18 && saved.previewZoom == 1.4f &&
+                saved.parts[0].scale.x == 1.234567f && saved.parts[0].scale.y == 2f && saved.parts[0].scale.z == .01001f,
+                "Import/save changed preview or XYZ");
+            var snapshot = store.CatalogAll();
+            Require(ReferenceEquals(snapshot, store.CatalogAll()), "Catalog allocates a new snapshot on every call");
+            Require(store.TryRename(saved, "Renamed", out error) && !ReferenceEquals(snapshot, store.CatalogAll()), "Metadata did not invalidate snapshot");
+            saved.parts[0].prefabName = "missing_prefab";
+            Require(store.TryExportFile(saved, out string exported, out error), error);
+            var decoded = BlueprintExchangeFormat.Decode(File.ReadAllText(exported));
+            Require(decoded.parts[0].prefabName == "missing_prefab" && decoded.previewPitch == -18 &&
+                decoded.parts[0].scale.z == .01001f, "Export consulted host or lost payload");
+            byte[] firstExport = File.ReadAllBytes(exported);
+            Require(store.TryExportFile(saved, out string exportedAgain, out error) && exportedAgain != exported &&
+                File.ReadAllBytes(exported).SequenceEqual(firstExport), "Export overwrote existing file");
+            Require(!store.TryExportFile(new CompositeBlueprintStore.Blueprint { importError = "$buildworks_import.format" }, out _, out error),
+                "Blocked document exported as valid");
+            byte[] png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==");
+            string archive = Path.Combine(directory, "paired.zip");
+            using (var file = File.Create(archive))
+            using (var zip = new ZipArchive(file, ZipArchiveMode.Create))
+            {
+                using (var writer = new StreamWriter(zip.CreateEntry("nested/model.blueprint").Open())) writer.Write(text);
+                using (var image = zip.CreateEntry("nested/model.png").Open()) image.Write(png, 0, png.Length);
+                using (var image = zip.CreateEntry("unpaired.png").Open()) image.Write(png, 0, png.Length);
+            }
+            byte[] zipBefore = File.ReadAllBytes(archive);
+            var sources = ExternalBlueprintLibrary.LoadFile(archive);
+            Require(sources.Count == 1 && sources[0].importPreview.SequenceEqual(png) &&
+                File.ReadAllBytes(archive).SequenceEqual(zipBefore) && !Directory.Exists(Path.Combine(directory, "nested")),
+                "Paired preview absent, extra image exposed, source rewritten or package extracted");
+            png[16] = 127;
+            Require(!ExternalBlueprintLibrary.ValidPreview(png) && !ExternalBlueprintLibrary.ValidPreview(new byte[30]),
+                "Oversized/corrupt PNG passed decoder boundary");
+            Console.WriteLine("PASS background import, separate disk copy, cached snapshot, native save exact XYZ/preview, host-independent atomic export, bounded paired PNG");
+        }
+
+        private static void WaitForImport(CompositeBlueprintStore store)
+        {
+            Require(System.Threading.SpinWait.SpinUntil(() => { store.CatalogAll(); return !store.CatalogLoading; }, 10000), "Import worker timeout");
         }
 
         private static int BenchmarkExchange(int count)

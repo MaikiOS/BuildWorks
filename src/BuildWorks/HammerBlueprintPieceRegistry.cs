@@ -39,6 +39,8 @@ namespace OstrixMods.BuildWorks
         private GameObject categoryMarker;
         private PieceTable registeredTable;
         private string registeredSignature = string.Empty;
+        private int registeredRevision = -1, registeredPieceCount = -1;
+        private string registeredAvailability;
 
         public HammerBlueprintPieceRegistry(CompositeBlueprintStore store)
         {
@@ -58,8 +60,17 @@ namespace OstrixMods.BuildWorks
             }
             ProcessThumbnail(out _, out _);
             PieceTable table = PrecisionPlacementSession.GetBuildPieceTable(player);
+            string availability = HammerCatalogOrganizer.AvailabilitySignature(table);
+            if (table == registeredTable && store.Revision == registeredRevision &&
+                (table ? table.m_pieces.Count : 0) == registeredPieceCount && availability == registeredAvailability) return;
             string signature = BuildSignature(store.All(), table);
-            if (table == registeredTable && signature == registeredSignature) return;
+            if (table == registeredTable && signature == registeredSignature)
+            {
+                registeredRevision = store.Revision;
+                registeredPieceCount = table ? table.m_pieces.Count : 0;
+                registeredAvailability = availability;
+                return;
+            }
 
             string selectedBlueprintId = null;
             Piece selectedPiece = player ? player.GetSelectedPiece() : null;
@@ -71,7 +82,6 @@ namespace OstrixMods.BuildWorks
             }
 
             Detach();
-            thumbnailRenderer.Dispose();
             if (!table || !PrecisionPlacementSession.UsesHammerPieceTable(player)) return;
 
             holder = new GameObject("BuildWorks_BlueprintPieces")
@@ -129,6 +139,9 @@ namespace OstrixMods.BuildWorks
 
             registeredTable = table;
             registeredSignature = signature;
+            registeredRevision = store.Revision;
+            registeredPieceCount = table.m_pieces.Count;
+            registeredAvailability = availability;
             if (player && UpdateAvailablePiecesMethod != null)
             {
                 UpdateAvailablePiecesMethod.Invoke(player, null);
@@ -267,7 +280,7 @@ namespace OstrixMods.BuildWorks
         {
             if (!thumbnailRenderer.ProcessOne(out id, out thumbnail) || !thumbnail) return false;
             if (piecesByBlueprintId.TryGetValue(id, out Piece iconPiece)) iconPiece.m_icon = thumbnail;
-            HammerCatalogView.Invalidate();
+            HammerCatalogView.UpdateThumbnail(id, thumbnail);
             return true;
         }
 
@@ -277,7 +290,7 @@ namespace OstrixMods.BuildWorks
             if (blueprint == null) return false;
             if (sourcePiecesByBlueprintId.TryGetValue(blueprint.id, out pieces)) return true;
             if (!blueprint.IsExternal || !PrecisionPlacementSession.TryResolveBlueprintPieces(
-                Player.m_localPlayer, blueprint, out List<Piece> resolved, out _)) return false;
+                Player.m_localPlayer, blueprint, out List<Piece> resolved, out _, forEditor: true)) return false;
             pieces = resolved;
             sourcePiecesByBlueprintId[blueprint.id] = pieces;
             return true;
@@ -285,6 +298,8 @@ namespace OstrixMods.BuildWorks
 
         internal Sprite Icon(CompositeBlueprintStore.Blueprint blueprint)
         {
+            Sprite cached = thumbnailRenderer.GetCached(blueprint);
+            if (cached) return cached;
             if (TryGetPiece(blueprint, out Piece piece)) return piece.m_icon;
             return TrySources(blueprint, out IReadOnlyList<Piece> pieces)
                 ? thumbnailRenderer.GetOrQueue(blueprint, pieces) : null;

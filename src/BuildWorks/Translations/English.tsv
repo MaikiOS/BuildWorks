@@ -774,3 +774,12 @@ editor.support.scope	Support: {0} · G — move · R — rotate · Enter — app
 editor.support.actions	Delete — remove support · click a piece — edit pieces
 editor.support.centre_role	Transform centre
 editor.support.modes	Ctrl+1 — select · Ctrl+2 — gizmo · Space/F3 — tools · Tab — catalog
+exchange.import	Import file
+exchange.export	Export file
+exchange.path_help	Full path to .buildworks.json, .blueprint, .vbuild or .zip. A separate copy goes to BuildWorks/imports; the original stays unchanged.
+exchange.loading	Loading blueprint library in the background…
+exchange.ready	Blueprint library updated. Use ⋯ to edit/export; click a card to place.
+exchange.exported	Export saved: {0}
+exchange.exists	The library already contains this file: {0}
+import.format	Unsupported blueprint file format.
+editor.support.add_short	+ Support

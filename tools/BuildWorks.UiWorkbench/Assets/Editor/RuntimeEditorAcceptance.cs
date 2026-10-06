@@ -193,6 +193,7 @@ public static class RuntimeEditorAcceptance
             foreach (object step in BlueprintScenePerformanceAcceptance.Run(template, output)) yield return step;
             checks.Add("Bounded actual woodwall scenes: 128/512 parts, sync/resync/mesh-pick timings, material counts and disposal; not large-scene/FPS proof.");
             TestNativeSocketTargets(template);
+            TestRotatedPlacementFrames(template);
             yield return null;
             string storePath = Path.Combine(output, "acceptance-" + Guid.NewGuid().ToString("N") + ".json");
             var store = new CompositeBlueprintStore(storePath);
@@ -1496,6 +1497,60 @@ public static class RuntimeEditorAcceptance
         }
         Object.Destroy(source);
         checks.Add("Game snapping accepts native sockets inside their own mesh, not generated midpoints");
+    }
+
+    private static void TestRotatedPlacementFrames(Camera template)
+    {
+        GameObject source = GameObject.CreatePrimitive(PrimitiveType.Cube); source.SetActive(false);
+        var socket = new GameObject("RotatedSocket"); socket.tag = "snappoint"; socket.transform.SetParent(source.transform, false);
+        Quaternion targetFrame = Quaternion.Euler(23, 41, -17), yaw = Quaternion.Euler(0, 37, 0);
+        Vector3 target = new Vector3(0, 1, 0);
+        var doc = new BlueprintEditorDocument(null, "Rotated target", "Test", new[] {
+            new BlueprintEditorPart("target", "fixture", "Target", new Point3(0,1,0),
+                new Rotation3(targetFrame.x, targetFrame.y, targetFrame.z, targetFrame.w)) });
+        try
+        {
+            using (var scene = new BlueprintEditorScene(template, _ => source))
+            {
+                scene.SetViewport(new Rect(0,0,1920,1080));
+                scene.SetCameraPose(new Vector3(0,2,-5), Quaternion.Euler(10,0,0));
+                Require(scene.TrySync(doc, out string error), error);
+                Require(scene.ShowPlacementPreview("fixture", target - Vector3.up * .4f, Vector3.up, yaw, true,
+                    out Vector3 final, out error, 0), error);
+                Require(scene.PlacementSnapTarget.HasValue && Vector3.Distance(final, target) < .001f &&
+                    Quaternion.Angle(scene.PlacementFinalRotation, targetFrame * yaw) < .01f,
+                    "Single ghost did not inherit target XYZ and preserve grip");
+                var ghost = Field<object>(scene, "placementPreview");
+                Require(Quaternion.Angle(Field<GameObject>(ghost, "Root").transform.rotation, scene.PlacementFinalRotation) < .01f,
+                    "Single ghost final frame differs from commit frame");
+                Require(scene.ShowPlacementPreview("fixture", target - Vector3.up * .4f, Vector3.up, yaw, false,
+                    out _, out error, 0) && Quaternion.Angle(scene.PlacementFinalRotation, yaw) < .01f,
+                    "Unsnapped ghost retained old target XYZ");
+                var second = new BlueprintEditorPart("second", "fixture", "Second", new Point3(0,1,0),
+                    new Rotation3(yaw.x,yaw.y,yaw.z,yaw.w));
+                var first = new BlueprintEditorPart("first", "fixture", "First", new Point3(10,1,0),
+                    new Rotation3(yaw.x,yaw.y,yaw.z,yaw.w));
+                scene.ShowBlueprintPlacementPreview(new[] { first, second }, target - Vector3.up * .4f,
+                    out Vector3 offset, snap:true, inputRotation:yaw);
+                Require(scene.PlacementSnapTarget.HasValue && Quaternion.Angle(scene.PlacementFinalRotation, targetFrame * yaw) < .01f,
+                    "Second part native socket in blueprint ghost was skipped");
+                var previews = Field<IList>(scene, "duplicatePreviews");
+                Transform near = Field<GameObject>(previews[1], "Root").transform;
+                Require(Vector3.Distance(near.position, target) < .001f &&
+                    Quaternion.Angle(near.rotation, targetFrame * yaw) < .01f, "Blueprint ghost grip/frame mismatch");
+                Transform far = Field<GameObject>(previews[0], "Root").transform;
+                Require(Vector3.Distance(far.position - near.position, targetFrame * Vector3.right * 10) < .001f,
+                    "Blueprint alignment changed relative geometry");
+                var targets = new List<Vector3>(); var flags = new List<bool>();
+                Require(scene.TryCursorSnap(Array.Empty<string>(), new[] { target + Vector3.right * .1f }, new[] { 0 },
+                    0, 1, targets, flags, out int selected, out Vector3 point, out bool native,
+                    cursor:scene.Camera.WorldToScreenPoint(target)) && selected == 0 && native &&
+                    Quaternion.Angle(scene.SnapTargetRotation, targetFrame) < .01f && Vector3.Distance(point, target) < .001f,
+                    "G target provenance did not return owner XYZ");
+            }
+        }
+        finally { Object.Destroy(source); }
+        checks.Add("XYZ rotated native target: single/second-part blueprint ghosts preserve grip, relative geometry and final commit frame; no stale free frame");
     }
 
     private static void TestHoverAppearance(Camera template)

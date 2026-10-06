@@ -61,6 +61,8 @@ namespace OstrixMods.BuildWorks
             CompositeBlueprintStore.Blueprint blueprint,
             IReadOnlyList<Piece> pieces)
         {
+            Sprite available = GetCached(blueprint);
+            if (available) return available;
             if (blueprint == null || string.IsNullOrWhiteSpace(blueprint.id) ||
                 blueprint.parts == null || pieces == null ||
                 blueprint.parts.Count != pieces.Count || CompositeBlueprintStore.InteractiveError(blueprint.parts.Count) != null)
@@ -68,15 +70,20 @@ namespace OstrixMods.BuildWorks
             if (sprites.TryGetValue(blueprint.id, out Sprite cached)) return cached;
             if (failures.Contains(blueprint.id)) return null;
 
-            Sprite loaded = Load(blueprint.id);
-            if (loaded)
-            {
-                sprites.Add(blueprint.id, loaded);
-                return loaded;
-            }
             if (queued.Add(blueprint.id))
                 pending.Enqueue(new PendingThumbnail(blueprint, pieces));
             return null;
+        }
+
+        internal Sprite GetCached(CompositeBlueprintStore.Blueprint blueprint)
+        {
+            if (blueprint == null || string.IsNullOrWhiteSpace(blueprint.id)) return null;
+            if (sprites.TryGetValue(blueprint.id, out Sprite cached)) return cached;
+            if (failures.Contains(blueprint.id)) return null;
+            Sprite loaded = Load(blueprint.id, blueprint.importPreview);
+            if (loaded) sprites[blueprint.id] = loaded;
+            else if (blueprint.importPreview != null) failures.Add(blueprint.id);
+            return loaded;
         }
 
         public bool ProcessOne(out string blueprintId, out Sprite sprite)
@@ -104,6 +111,7 @@ namespace OstrixMods.BuildWorks
             RemoveCached(blueprint.id);
             failures.Remove(blueprint.id);
             queued.Remove(blueprint.id);
+            RemovePending(blueprint.id);
             return RenderAndStore(blueprint, pieces);
         }
 
@@ -113,6 +121,7 @@ namespace OstrixMods.BuildWorks
             RemoveCached(blueprintId);
             failures.Remove(blueprintId);
             queued.Remove(blueprintId);
+            RemovePending(blueprintId);
             string path = ThumbnailPath(blueprintId);
             try
             {
@@ -214,13 +223,16 @@ namespace OstrixMods.BuildWorks
             queued.Clear();
         }
 
-        private Sprite Load(string blueprintId)
+        private Sprite Load(string blueprintId, byte[] importedPng = null)
         {
             string path = ThumbnailPath(blueprintId);
-            if (!File.Exists(path)) return null;
+            Texture2D texture = null;
             try
             {
-                var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false)
+                if (importedPng == null && (!File.Exists(path) || new FileInfo(path).Length > ExternalBlueprintLibrary.MaximumPreviewBytes)) return null;
+                byte[] png = importedPng ?? File.ReadAllBytes(path);
+                if (!ExternalBlueprintLibrary.ValidPreview(png)) return null;
+                texture = new Texture2D(2, 2, TextureFormat.RGBA32, false)
                 {
                     hideFlags = HideFlags.HideAndDontSave,
                     filterMode = FilterMode.Bilinear,
@@ -230,15 +242,13 @@ namespace OstrixMods.BuildWorks
                 bool loaded = LoadImageMethod != null &&
                     (bool)LoadImageMethod.Invoke(
                         null,
-                        new object[] { texture, File.ReadAllBytes(path), false });
+                        new object[] { texture, png, false });
                 if (!loaded)
                 {
-                    UnityEngine.Object.Destroy(texture);
                     return null;
                 }
-                if (HasLegacyOpaqueBackground(texture))
+                if (importedPng == null && HasLegacyOpaqueBackground(texture))
                 {
-                    UnityEngine.Object.Destroy(texture);
                     return null;
                 }
                 Sprite sprite = Sprite.Create(
@@ -248,6 +258,7 @@ namespace OstrixMods.BuildWorks
                     100f);
                 sprite.name = "BuildWorks_BlueprintIcon_" + blueprintId;
                 sprite.hideFlags = HideFlags.HideAndDontSave;
+                texture = null; // Sprite now owns the decoded texture.
                 return sprite;
             }
             catch (Exception exception)
@@ -255,6 +266,7 @@ namespace OstrixMods.BuildWorks
                 Debug.LogWarning("BuildWorks could not load blueprint thumbnail: " + exception);
                 return null;
             }
+            finally { if (texture) UnityEngine.Object.Destroy(texture); }
         }
 
         private void RemoveCached(string blueprintId)
@@ -265,6 +277,16 @@ namespace OstrixMods.BuildWorks
             Texture2D texture = sprite.texture;
             UnityEngine.Object.Destroy(sprite);
             if (texture) UnityEngine.Object.Destroy(texture);
+        }
+
+        private void RemovePending(string blueprintId)
+        {
+            int count = pending.Count;
+            while (count-- > 0)
+            {
+                PendingThumbnail item = pending.Dequeue();
+                if (item.Blueprint?.id != blueprintId) pending.Enqueue(item);
+            }
         }
 
         private string ThumbnailPath(string blueprintId) => Path.Combine(

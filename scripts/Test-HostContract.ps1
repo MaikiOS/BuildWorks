@@ -819,7 +819,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.64.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.65.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -1578,9 +1578,8 @@ Assert-Contract ($null -ne $catalogRail -and $null -ne $sourceTabs -and
 Assert-Contract ($blueprintCardSource -match 'HammerCatalogPointerClick' -and
     $blueprintCardSource -match 'RightPressed[\s\S]{0,180}contextBlueprint = blueprint' -and
     $blueprintCardSource -match 'RightReleased = ReleaseBlueprintContextMenu' -and
-    $blueprintCardSource -match 'bool doubleClick' -and
-    $blueprintCardSource -match 'if \(doubleClick\) blueprintAction\?\.Invoke\(blueprint, false\)' -and
-    $blueprintCardSource -match 'else Invalidate\(\)' -and
+    $blueprintCardSource -notmatch 'bool doubleClick' -and
+    $blueprintCardSource -match 'blueprintAction\?\.Invoke\(blueprint, false\)' -and
     $blueprintCardSource -match 'AddBlueprintContextMenu' -and
     $blueprintCardSource -match 'catalog\.action\.place' -and
     $blueprintCardSource -match 'catalog\.action\.edit' -and
@@ -1594,7 +1593,7 @@ Assert-Contract ($blueprintCardSource -match 'HammerCatalogPointerClick' -and
         '\[HarmonyPatch\(typeof\(BuildUi\), "NavigationUpdate"\)\][\s\S]{0,260}?ShouldCaptureBlueprintContext' -and
     $blueprintCardSource -match 'catalog\.action\.resources' -and
     $blueprintCardSource -match 'catalog\.action\.delete') `
-    'Blueprint cards lost single-click selection, double-click placement, or the RMB action menu.'
+    'Blueprint cards lost single-click placement or the RMB action menu.'
 Assert-Contract ($catalogSource -match 'ApplyLayout\(hud, table\)' -and
     $catalogSource -match 'Screen\.safeArea' -and
     $catalogSource -match 'layoutCanvas\.scaleFactor' -and
@@ -2191,7 +2190,10 @@ Assert-Contract ($catalogSource -match
     $catalogSource -match 'new Vector2\(16f, y\)') `
     'Blueprint inspector no longer keeps a responsive width and safe inner padding.'
 Assert-Contract ($catalogSource -match 'const float actionHeight = 28f' -and
-    $catalogSource -match 'const int actionCount = 7' -and
+    $catalogSource -match 'const int actionCount = 8' -and
+    $catalogSource -match 'BlueprintActionsViewport' -and
+    $catalogSource -match 'viewport.AddComponent<RectMask2D>' -and
+    $catalogSource -match 'viewport.AddComponent<ScrollRect>' -and
     $catalogSource -match
         'height - actionCount \* actionHeight - 8f') `
     'Blueprint inspector actions can escape below their panel.'
@@ -2200,8 +2202,8 @@ foreach ($inspectorHeight in 358, 477) {
     $actionTop = [Math]::Min(184, 86 + $inspectorHeight * 0.20)
     $actionTop = [Math]::Min(
         $actionTop,
-        [Math]::Max(86, $inspectorHeight - 7 * $actionHeight - 8))
-    Assert-Contract (($actionTop + 7 * $actionHeight) -le ($inspectorHeight - 8)) `
+        [Math]::Max(86, $inspectorHeight - 8 * $actionHeight - 8))
+    Assert-Contract (($inspectorHeight - $actionTop - 8) -gt 0) `
         "Blueprint inspector actions exceed a $inspectorHeight px panel."
 }
 Assert-Contract ($thumbnailSource -match
@@ -2815,4 +2817,4 @@ $signInstruction = @($nativeFinished.Body.Instructions | Where-Object { [string]
 $indexWrite = @($nativeFinished.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'stfld' -and [string]$_.Operand -match '::placementPlanIndex$' })
 Assert-Contract ($signInstruction.Count -eq 1 -and $indexWrite.Count -gt 0 -and $signInstruction[0].Offset -lt $indexWrite[0].Offset) 'Sign payload must apply before advancing the native queue.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.64 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.65 and Valheim Steam build 25185596.'

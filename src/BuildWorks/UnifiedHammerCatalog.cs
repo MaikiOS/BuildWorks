@@ -1142,8 +1142,6 @@ namespace OstrixMods.BuildWorks
         private static CompositeBlueprintStore.Blueprint contextBlueprint;
         private static GameObject contextMenu;
         private static readonly List<Button> ContextButtons = new List<Button>();
-        private static string lastBlueprintClickId;
-        private static float lastBlueprintClickAt = float.NegativeInfinity;
         private const string AllBlueprintCategories = "all";
         private static string blueprintCategory = AllBlueprintCategories;
         private static int blueprintPage;
@@ -1155,6 +1153,9 @@ namespace OstrixMods.BuildWorks
         private static float layoutWindowHeight;
         private static int layoutSourceRows = 1;
         private static float layoutCategoryBottom = 42f;
+        private static RectTransform blueprintCategoryViewport;
+        private static RectTransform blueprintActionsViewport;
+        private static bool blueprintImportPending;
         private static BlueprintThumbnailRenderer.PreviewSession previewSession;
         private static CompositeBlueprintStore.Blueprint previewBlueprint;
         private static float previewYaw;
@@ -1337,6 +1338,12 @@ namespace OstrixMods.BuildWorks
                     table.GetSelectedCategory()).GetHashCode();
                 if (blueprintStore != null)
                 {
+                    blueprintStore.CatalogAll();
+                    if (blueprintImportPending && !blueprintStore.CatalogLoading)
+                    {
+                        blueprintImportPending = false;
+                        ShowStatus(blueprintStore.ImportError ?? BuildWorksLocalization.Text("exchange.ready"));
+                    }
                     foreach (CompositeBlueprintStore.Blueprint blueprint in blueprintStore.CatalogAll())
                     {
                         signature = signature * 31 + blueprint.id.GetHashCode();
@@ -1535,6 +1542,8 @@ namespace OstrixMods.BuildWorks
 
         public static void Clear()
         {
+            blueprintCategoryViewport = null;
+            blueprintActionsViewport = null;
             maskState?.Restore();
             listRootState?.Restore();
             if (listRootState != null && listRootState.Rect)
@@ -2165,6 +2174,20 @@ namespace OstrixMods.BuildWorks
                     () => blueprintWorldSelectionAction?.Invoke(), width: width);
                 y -= 32f;
             }
+            AddRailButton(hud, rail, BuildWorksLocalization.Text("exchange.import"), y, 27f,
+                Accent(HammerCatalogOrganizer.BlueprintsGroup), false, ImportBlueprintFile, width: width);
+            y -= 32f;
+            GameObject viewport = AddPanel(rail, "BlueprintCategoriesViewport", new Vector2(0, y),
+                new Vector2(width + 14, Mathf.Max(24, layoutWindowHeight - 82 + y - 8)), Color.clear);
+            blueprintCategoryViewport = (RectTransform)viewport.transform;
+            viewport.AddComponent<RectMask2D>();
+            ScrollRect scroll = viewport.AddComponent<ScrollRect>();
+            GameObject content = AddPanel(viewport.transform, "BlueprintCategoriesContent", Vector2.zero,
+                new Vector2(width + 14, 0), Color.clear);
+            scroll.viewport = blueprintCategoryViewport; scroll.content = (RectTransform)content.transform;
+            scroll.horizontal = false; scroll.vertical = true; scroll.scrollSensitivity = 52f;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            rail = content.transform; y = 0;
             var categories = new List<string> { AllBlueprintCategories };
             categories.AddRange(blueprintStore.Categories().Concat(
                 blueprintStore.CatalogAll().Select(x => x.category)).Distinct());
@@ -2244,7 +2267,23 @@ namespace OstrixMods.BuildWorks
                         Invalidate();
                     },
                     width: width);
+                y -= 26f;
             }
+            scroll.content.sizeDelta = new Vector2(width + 14, -y);
+        }
+
+        private static void ImportBlueprintFile() => TextInput.instance?.RequestText(new PromptReceiver(
+            () => string.Empty, value =>
+            {
+                if (!blueprintStore.TryImportFile(value, out string error)) ShowStatus(error);
+                else { blueprintImportPending = true; ShowStatus(BuildWorksLocalization.Text("exchange.loading")); }
+                Invalidate();
+            }), BuildWorksLocalization.Text("exchange.path_help"), 1024);
+
+        private static void ExportBlueprintFile(CompositeBlueprintStore.Blueprint blueprint)
+        {
+            ShowStatus(blueprintStore.TryExportFile(blueprint, out string path, out string error)
+                ? BuildWorksLocalization.Text("exchange.exported", path) : error);
         }
 
         private static void AddBlueprintLibrary(Hud hud, Player player)
@@ -2384,14 +2423,8 @@ namespace OstrixMods.BuildWorks
             pointer.Clicked = button =>
             {
                 if (button != PointerEventData.InputButton.Left) return;
-                float now = Time.unscaledTime;
-                bool doubleClick = string.Equals(lastBlueprintClickId, blueprint.id,
-                    StringComparison.Ordinal) && now - lastBlueprintClickAt <= 0.35f;
-                lastBlueprintClickId = blueprint.id;
-                lastBlueprintClickAt = now;
                 SelectBlueprint(blueprint);
-                if (doubleClick) blueprintAction?.Invoke(blueprint, false);
-                else Invalidate();
+                blueprintAction?.Invoke(blueprint, false);
             };
             pointer.RightPressed = position =>
             {
@@ -2401,9 +2434,8 @@ namespace OstrixMods.BuildWorks
             };
             pointer.RightReleased = ReleaseBlueprintContextMenu;
             Sprite icon = blueprintRegistry.Icon(blueprint);
-            if (icon)
-                AddIcon(card.transform, icon, new Vector2(8f, -8f),
-                    new Vector2(size.x - 16f, size.y - 42f));
+            AddIcon(card.transform, icon, new Vector2(8f, -8f),
+                new Vector2(size.x - 16f, size.y - 42f), blueprint.id);
             AddRailText(
                 hud,
                 card.transform,
@@ -2447,7 +2479,7 @@ namespace OstrixMods.BuildWorks
             ContextButtons.Clear();
             GameObject menu = AddPanel(parent, "BlueprintContextMenu",
                 Vector2.zero,
-                new Vector2(244f, 260f), new Color(0.08f, 0.04f, 0.02f, 0.98f));
+                new Vector2(244f, 290f), new Color(0.08f, 0.04f, 0.02f, 0.98f));
             contextMenu = menu;
             RectTransform parentRect = parent as RectTransform;
             RectTransformUtility.ScreenPointToLocalPointInRectangle(parentRect, screenPosition,
@@ -2456,7 +2488,7 @@ namespace OstrixMods.BuildWorks
             RectTransform menuRect = (RectTransform)menu.transform;
             menuRect.pivot = new Vector2(
                 local.x + 244f <= bounds.xMax ? 0f : 1f,
-                local.y - 260f >= bounds.yMin ? 1f : 0f);
+                local.y - 290f >= bounds.yMin ? 1f : 0f);
             menuRect.anchoredPosition = new Vector2(
                 Mathf.Clamp(local.x, bounds.xMin, bounds.xMax),
                 Mathf.Clamp(local.y, bounds.yMin, bounds.yMax));
@@ -2472,10 +2504,13 @@ namespace OstrixMods.BuildWorks
             AddContextAction(hud, menu.transform,
                 BuildWorksLocalization.Text("catalog.action.edit"), y, width,
                 () => { contextBlueprint = null; blueprintAction?.Invoke(blueprint, true); });
+            y -= 30f;
+            AddContextAction(hud, menu.transform, BuildWorksLocalization.Text("exchange.export"), y, width,
+                () => { contextBlueprint = null; ExportBlueprintFile(blueprint); });
             if (blueprint.IsExternal)
             {
                 AddRailText(hud, menu.transform, BuildWorksLocalization.Text("import.read_only"),
-                    new Vector2(10f, -105f), 14f, Color.white, FontStyles.Normal, width: width);
+                    new Vector2(10f, -140f), 14f, Color.white, FontStyles.Normal, width: width);
                 return;
             }
             y -= 30f;
@@ -2563,17 +2598,29 @@ namespace OstrixMods.BuildWorks
                 new Color(0.88f, 0.80f, 0.66f, 1f), FontStyles.Normal,
                 width: width - 32f);
             Sprite icon = blueprintRegistry.Icon(blueprint);
-            if (icon)
-                AddIcon(parent, icon, new Vector2(16f, -74f),
-                    new Vector2(width - 32f, Mathf.Min(104f, height * 0.20f)));
+            AddIcon(parent, icon, new Vector2(16f, -74f),
+                new Vector2(width - 32f, Mathf.Min(104f, height * 0.20f)), blueprint.id);
 
             const float actionHeight = 28f;
-            const int actionCount = 7;
+            const int actionCount = 8;
             float actionTop = Mathf.Min(184f, 86f + height * 0.20f);
             actionTop = Mathf.Min(
                 actionTop,
                 Mathf.Max(86f, height - actionCount * actionHeight - 8f));
-            float y = -actionTop;
+            actionTop = Mathf.Min(actionTop, Mathf.Max(0, height - 28));
+            Transform inspectorParent = parent;
+            GameObject viewport = AddPanel(parent, "BlueprintActionsViewport", new Vector2(0, -actionTop),
+                new Vector2(width, height - actionTop - 8), Color.clear);
+            blueprintActionsViewport = (RectTransform)viewport.transform;
+            viewport.AddComponent<RectMask2D>();
+            ScrollRect scroll = viewport.AddComponent<ScrollRect>();
+            GameObject content = AddPanel(viewport.transform, "BlueprintActionsContent", Vector2.zero,
+                new Vector2(width, actionCount * actionHeight), Color.clear);
+            scroll.viewport = (RectTransform)viewport.transform; scroll.content = (RectTransform)content.transform;
+            scroll.horizontal = false; scroll.vertical = true; scroll.scrollSensitivity = 56;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            parent = content.transform;
+            float y = 0;
             float buttonWidth = width - 32f;
             AddActionButton(hud, parent,
                 BuildWorksLocalization.Text(blueprint.IsExternal ? "import.place_copy" : "catalog.action.place"), y, buttonWidth,
@@ -2583,8 +2630,12 @@ namespace OstrixMods.BuildWorks
                 BuildWorksLocalization.Text("catalog.action.edit"), y, buttonWidth,
                 () => blueprintAction?.Invoke(blueprint, true));
             y -= actionHeight;
+            AddActionButton(hud, parent, BuildWorksLocalization.Text("exchange.export"), y, buttonWidth,
+                () => ExportBlueprintFile(blueprint));
+            y -= actionHeight;
             if (blueprint.IsExternal)
             {
+                scroll.content.sizeDelta = new Vector2(width, 260);
                 string reason = BuildWorksLocalization.ResolveUserText(blueprint.importError);
                 if (string.IsNullOrEmpty(reason) && !PrecisionPlacementSession.TryResolveBlueprintPieces(
                     player, blueprint, out _, out string missing))
@@ -2635,7 +2686,7 @@ namespace OstrixMods.BuildWorks
                 () => DeleteBlueprint(player, blueprint),
                 danger: true);
 
-            if (showResources) AddResourcesPopup(hud, parent, blueprint, width, height);
+            if (showResources) AddResourcesPopup(hud, inspectorParent, blueprint, width, height);
         }
 
         public static bool HandleBlueprintPaging(PieceTable table, int direction)
@@ -2652,7 +2703,11 @@ namespace OstrixMods.BuildWorks
             HammerCatalogOrganizer.IndexEnabled && Hud.instance &&
             Hud.IsPieceSelectionVisible();
 
-        public static bool BlocksCatalogPaging => previewSession != null || showResources;
+        public static bool BlocksCatalogPaging => previewSession != null || showResources ||
+            (blueprintCategoryViewport && RectTransformUtility.RectangleContainsScreenPoint(
+                blueprintCategoryViewport, Input.mousePosition)) ||
+            (blueprintActionsViewport && RectTransformUtility.RectangleContainsScreenPoint(
+                blueprintActionsViewport, Input.mousePosition));
 
         private static GameObject AddPanel(
             Transform parent,
@@ -2737,10 +2792,10 @@ namespace OstrixMods.BuildWorks
             Transform parent,
             Sprite sprite,
             Vector2 position,
-            Vector2 size)
+            Vector2 size, string blueprintId = null)
         {
-            if (!sprite) return;
             var root = new GameObject(Prefix + "Icon", typeof(RectTransform), typeof(Image));
+            if (blueprintId != null) root.name += "_" + blueprintId;
             root.transform.SetParent(parent, false);
             var rect = (RectTransform)root.transform;
             rect.anchorMin = rect.anchorMax = new Vector2(0f, 1f);
@@ -2749,9 +2804,20 @@ namespace OstrixMods.BuildWorks
             rect.sizeDelta = size;
             Image image = root.GetComponent<Image>();
             image.sprite = sprite;
+            image.color = sprite ? Color.white : Color.clear;
             image.preserveAspect = true;
             image.raycastTarget = false;
             Decorations.Add(root);
+        }
+
+        internal static void UpdateThumbnail(string id, Sprite sprite)
+        {
+            foreach (GameObject decoration in Decorations)
+                if (decoration && decoration.name == Prefix + "Icon_" + id)
+                {
+                    Image image = decoration.GetComponent<Image>();
+                    image.sprite = sprite; image.color = Color.white;
+                }
         }
 
         private static void AddResourcesPopup(

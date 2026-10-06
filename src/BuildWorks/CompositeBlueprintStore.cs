@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Text;
+using System.Threading.Tasks;
 using BepInEx;
 using UnityEngine;
 
@@ -31,31 +33,137 @@ namespace OstrixMods.BuildWorks
         private readonly string path;
         private LibraryData data = new LibraryData();
         private List<Blueprint> externalBlueprints;
+        private IReadOnlyList<Blueprint> catalogSnapshot;
+        private Task<List<Blueprint>> importTask;
+        internal int Revision { get; private set; }
+        internal bool CatalogLoading => importTask != null && !importTask.IsCompleted;
+        internal string ImportError { get; private set; }
         private string writeBlockReason;
 
         public CompositeBlueprintStore()
-            : this(Path.Combine(Paths.ConfigPath, "BuildWorks", "blueprints.json"))
+            : this(Path.Combine(Paths.ConfigPath, "BuildWorks", "blueprints.json"), true)
         {
         }
 
-        internal CompositeBlueprintStore(string storagePath)
+        internal CompositeBlueprintStore(string storagePath) : this(storagePath, false) { }
+
+        internal CompositeBlueprintStore(string storagePath, bool backgroundImports)
         {
             if (string.IsNullOrWhiteSpace(storagePath))
                 throw new ArgumentException("Storage path is required.", nameof(storagePath));
             path = Path.GetFullPath(storagePath);
             Load();
+            if (backgroundImports)
+                importTask = Task.Run(() => ExternalBlueprintLibrary.Load(ImportDirectory));
         }
 
         public IReadOnlyList<Blueprint> All() => data.blueprints;
 
         internal IReadOnlyList<Blueprint> CatalogAll()
         {
+            if (importTask != null && importTask.IsCompleted)
+            {
+                try { externalBlueprints = importTask.GetAwaiter().GetResult(); ImportError = null; }
+                catch (Exception exception) { ImportError = exception.Message; }
+                importTask = null;
+                externalBlueprints = externalBlueprints ?? new List<Blueprint>();
+                catalogSnapshot = null;
+            }
             if (externalBlueprints == null)
-                externalBlueprints = ExternalBlueprintLibrary.Load(
-                    Path.Combine(Path.GetDirectoryName(path), "imports"));
+            {
+                if (importTask != null) return data.blueprints;
+                externalBlueprints = ExternalBlueprintLibrary.Load(ImportDirectory);
+            }
+            if (catalogSnapshot != null) return catalogSnapshot;
             var result = new List<Blueprint>(data.blueprints);
             result.AddRange(externalBlueprints);
-            return result;
+            return catalogSnapshot = result;
+        }
+
+        private string ImportDirectory => Path.Combine(Path.GetDirectoryName(path), "imports");
+
+        internal bool TryImportFile(string source, out string error)
+        {
+            error = null;
+            if (CatalogLoading) { error = UserError("exchange.loading"); return false; }
+            CatalogAll();
+            try
+            {
+                source = Path.GetFullPath((source ?? "").Trim().Trim('"'));
+                if (!File.Exists(source)) throw new FileNotFoundException(source);
+                string target = Path.Combine(ImportDirectory, Path.GetFileName(source));
+                if (File.Exists(target)) throw new IOException(UserError("exchange.exists", target));
+                string input = source;
+                ImportError = null;
+                importTask = Task.Run(() =>
+                {
+                    Directory.CreateDirectory(ImportDirectory);
+                    if ((File.GetAttributes(ImportDirectory) & FileAttributes.ReparsePoint) != 0 ||
+                        (File.GetAttributes(input) & FileAttributes.ReparsePoint) != 0)
+                        throw new InvalidDataException("$buildworks_import.path");
+                    string temporary = Path.Combine(ImportDirectory, Guid.NewGuid().ToString("N") + ".tmp" + Path.GetExtension(target));
+                    try
+                    {
+                        using (Stream from = File.OpenRead(input))
+                        using (Stream to = File.Create(temporary))
+                        {
+                            var buffer = new byte[8192]; int read; long total = 0;
+                            while ((read = from.Read(buffer, 0, buffer.Length)) != 0)
+                            {
+                                total += read;
+                                if (total > 64L * 1024 * 1024) throw new InvalidDataException("$buildworks_import.file_limit");
+                                to.Write(buffer, 0, read);
+                            }
+                        }
+                        // Native names must retain the complete suffix during validation.
+                        string validation = temporary;
+                        if (target.EndsWith(".buildworks.json", StringComparison.OrdinalIgnoreCase))
+                        { validation = temporary + ".buildworks.json"; File.Move(temporary, validation); temporary = validation; }
+                        if (ExternalBlueprintLibrary.LoadFile(validation).Count == 0)
+                            throw new InvalidDataException("$buildworks_import.format");
+                        if (Directory.EnumerateFiles(ImportDirectory).Take(2001).Count() >= 2001)
+                            throw new InvalidDataException("$buildworks_import.library_limit");
+                        File.Move(temporary, target); // Never overwrite either source or an existing library file.
+                        return ExternalBlueprintLibrary.Load(ImportDirectory);
+                    }
+                    finally
+                    {
+                        try { if (File.Exists(temporary)) File.Delete(temporary); }
+                        catch (Exception exception) { Debug.LogWarning("BuildWorks import cleanup: " + exception.Message); }
+                    }
+                });
+                return true;
+            }
+            catch (Exception exception) { error = exception.Message; return false; }
+        }
+
+        internal bool TryExportFile(Blueprint blueprint, out string exportedPath, out string error)
+        {
+            exportedPath = null; error = null; string temporary = null;
+            try
+            {
+                if (blueprint == null || !string.IsNullOrEmpty(blueprint.importError))
+                    throw new InvalidDataException(blueprint?.importError ?? "$buildworks_import.format");
+                byte[] bytes = BlueprintExchangeFormat.Encode(blueprint.IsExternal
+                    ? ExternalBlueprintLibrary.DetachedCopy(blueprint) : blueprint);
+                BlueprintExchangeFormat.Decode(new UTF8Encoding(false, true).GetString(bytes));
+                string directory = Path.Combine(Path.GetDirectoryName(path), "exports");
+                Directory.CreateDirectory(directory);
+                if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
+                    throw new InvalidDataException("$buildworks_import.path");
+                string target = Path.Combine(directory, "blueprint_" + Guid.NewGuid().ToString("N") + ".buildworks.json");
+                temporary = target + ".tmp";
+                File.WriteAllBytes(temporary, bytes);
+                File.Move(temporary, target);
+                exportedPath = target;
+                return true;
+            }
+            catch (Exception exception) { error = exception.Message; return false; }
+            finally
+            {
+                try { if (temporary != null && File.Exists(temporary)) File.Delete(temporary); }
+                catch (Exception exception) { Debug.LogWarning("BuildWorks export cleanup: " + exception.Message); }
+            }
         }
 
         public IReadOnlyList<string> Categories() => data.categories;
@@ -138,7 +246,8 @@ namespace OstrixMods.BuildWorks
             string name, string category, IReadOnlyList<Part> parts, IReadOnlyList<Group> groups,
             IReadOnlyList<VectorData> anchors, string primaryPartId, string primaryGroupId,
             IReadOnlyList<Support> supports, string placementSupportId,
-            out Blueprint blueprint, out string error, IReadOnlyList<VectorData> customSnapPoints = null)
+            out Blueprint blueprint, out string error, IReadOnlyList<VectorData> customSnapPoints = null,
+            Blueprint previewTemplate = null)
         {
             blueprint = null;
             error = null;
@@ -227,8 +336,12 @@ namespace OstrixMods.BuildWorks
                 supports = CloneSupports(supports),
                 placementSupportId = placementSupportId,
                 primaryPartId = primaryPartId,
-                primaryGroupId = primaryGroupId
+                primaryGroupId = primaryGroupId,
+                previewYaw = previewTemplate?.previewYaw ?? 45f,
+                previewPitch = previewTemplate?.previewPitch ?? 30f,
+                previewZoom = previewTemplate?.previewZoom ?? 1f
             };
+            if (!Valid(blueprint)) { blueprint = null; error = UserError("store.verify_data_failed"); return false; }
             if (addCategory) data.categories.Add(category);
             data.blueprints.Add(blueprint);
             try
@@ -760,6 +873,8 @@ namespace OstrixMods.BuildWorks
                 {
                     File.Move(temporary, path);
                 }
+                ++Revision;
+                catalogSnapshot = null;
             }
             catch
             {
@@ -1134,6 +1249,7 @@ namespace OstrixMods.BuildWorks
         internal sealed class Blueprint
         {
             // Transient read-only import diagnostics; not persisted library fields.
+            internal byte[] importPreview;
             public string importSource;
             public string importError;
             public int importPartCount;

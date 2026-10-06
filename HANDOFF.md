@@ -2,6 +2,34 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.65 — library UI, exchange and editor snapping
+
+Installed in TerrainRamp-1.0-Test via the guarded script on 2026-10-06.
+Both DLL SHA-256 values verified; Default has no installed BuildWorks DLLs.
+Final Unity evidence: 2026-10-06T12:10:16Z; game was not launched.
+
+Hammer categories/actions now use clipped native scroll views. External parsing runs
+off the main thread; snapshots and thumbnail images are reused. Paired bounded PNG
+previews in ZIP libraries are read without extracting packages. Cards place on one
+click; the menu exposes Import file and Export file. The editor has the same exchange
+buttons and a pinned + Support action above the object tree.
+
+File import keeps a separate copy in BuildWorks/imports. Export writes a new portable
+.buildworks.json in BuildWorks/exports without overwriting inputs. Accepted external
+documents export through detached identities; missing game prefabs do not block data
+export. XYZ scale, signs, supports and preview framing remain intact. Unchanged rounded
+inspector fields preserve exact scale; explicit resizing preserves XYZ proportions.
+Ghost placement and G reuse the target's full XYZ frame and retain the chosen grip
+through wheel turns and confirmation.
+
+Release: zero warnings/errors. HostContract, Localization (784 keys), Store,
+108 Geometry, six EditorBridge, 12 WorldLayout and deployment guard checks PASS.
+Independent correctness/Ponytail reviews PASS. Final isolated Unity: 156 states,
+native exchange/support button dispatch, XYZ snap and exact-scale input PASS.
+No Valheim/save/reload/network proof. Interactive budget remains 512; larger valid
+documents can be exported but are not yet interactive. Unknown foreign data is still
+rejected, never silently discarded. [Player checks](docs/testing/catalog-exchange-0.19.65_RU.md).
+
 ## Source checkpoint 0.19.64 — independent support editor; not deployed
 
 Independent supports now have their own tree branch and inspector. G/R and pointer

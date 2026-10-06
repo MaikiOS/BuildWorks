@@ -435,6 +435,9 @@ namespace OstrixMods.BuildWorks
         private RectTransform saveMetadataFields;
         private TMP_InputField saveMetadataName, saveMetadataCategory;
         private Action<string, string> saveMetadataAccepted;
+        private Action<string> importPathAccepted;
+        private float inspectorOriginalScale;
+        private string inspectorOriginalScaleText;
         private TMP_InputField fieldOfViewInput;
         private Slider fieldOfViewSlider;
         private Button fieldOfViewReset;
@@ -643,12 +646,16 @@ namespace OstrixMods.BuildWorks
                     "snap", "⌁", T("editor.view.tool_contour"));
 
                 RectTransform rootDrop = CreatePanel("OutlinerRootDrop", outliner, Color.clear, null);
-                SetTopAnchored(rootDrop, 8f, 4f, 56f, 32f);
+                SetTopAnchored(rootDrop, 8f, 4f, 158f, 32f);
                 outlinerTitle = CreateText("OutlinerTitle", rootDrop, T("editor.view.outliner"), 16f,
                     FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
                 SetInsets(outlinerTitle.rectTransform, 4f, 0f, 4f, 0f);
                 AddOutlinerDrop(rootDrop, null, true);
                 AddTooltip(rootDrop, T("editor.view.root_drop_tooltip"));
+                Button createSupportToolbar = CreateButton("CreateSupportToolbar", outliner,
+                    T("editor.support.add_short"), 96f, () => SupportCreated?.Invoke());
+                AddTooltip((RectTransform)createSupportToolbar.transform, T("editor.support.create"));
+                SetTopRight((RectTransform)createSupportToolbar.transform, 56f, 4f, 96f, 32f);
                 RectTransform outlinerCommands = CreateRect("OutlinerCommands", outliner);
                 SetTopAnchored(outlinerCommands, 8f, 40f, 8f, 32f);
                 var commandsLayout = outlinerCommands.gameObject.AddComponent<HorizontalLayoutGroup>();
@@ -1451,7 +1458,8 @@ namespace OstrixMods.BuildWorks
                     dialog, "SaveExit", T("editor.view.save_exit"), 20f,
                     () =>
                     {
-                        if (saveMetadataAccepted != null) SubmitSaveMetadata();
+                        if (importPathAccepted != null) SubmitImportPath();
+                        else if (saveMetadataAccepted != null) SubmitSaveMetadata();
                         else DialogDecided?.Invoke(errorDialog ? BlueprintEditorDialogDecision.Retry : BlueprintEditorDialogDecision.SaveAndExit);
                     }, true);
                 dialogDiscardButton = CreateDialogButton(
@@ -1461,7 +1469,7 @@ namespace OstrixMods.BuildWorks
                     dialog, "Cancel", T("editor.view.cancel"), 380f,
                     () =>
                     {
-                        if (saveMetadataAccepted != null) HideDialog();
+                        if (importPathAccepted != null || saveMetadataAccepted != null) HideDialog();
                         else DialogDecided?.Invoke(errorDialog
                             ? BlueprintEditorDialogDecision.Acknowledge : BlueprintEditorDialogDecision.Cancel);
                     }, false);
@@ -2119,9 +2127,38 @@ namespace OstrixMods.BuildWorks
         private void ResetSaveMetadata()
         {
             saveMetadataAccepted = null;
+            importPathAccepted = null;
             if (saveMetadataFields) saveMetadataFields.gameObject.SetActive(false);
             ((RectTransform)modalTitle.transform.parent).sizeDelta = new Vector2(520, 260);
             SetInsets(modalMessage.rectTransform, 20, 64, 20, 90);
+        }
+
+        internal void ShowImportPath(Action<string> accepted)
+        {
+            ResetSaveMetadata();
+            RectTransform dialog = (RectTransform)modalTitle.transform.parent;
+            dialog.sizeDelta = new Vector2(520, 350);
+            if (saveMetadataFields) UnityEngine.Object.Destroy(saveMetadataFields.gameObject);
+            saveMetadataFields = CreateRect("ImportPath", dialog);
+            SetInsets(saveMetadataFields, 20, 140, 20, 90);
+            saveMetadataName = CreateInput("ImportFilePath", saveMetadataFields, Vector2.zero, 460);
+            saveMetadataName.characterLimit = 1024;
+            saveMetadataName.onSubmit.AddListener(_ => SubmitImportPath());
+            modalTitle.text = T("exchange.import"); modalMessage.text = T("exchange.path_help");
+            SetTopAnchored(modalMessage.rectTransform, 20, 64, 20, 70);
+            SetButtonLabel(dialogPrimaryButton, T("exchange.import"));
+            dialogPrimaryButton.gameObject.SetActive(true); dialogDiscardButton.gameObject.SetActive(false);
+            SetButtonLabel(dialogCancelButton, T("editor.view.cancel"));
+            errorDialog = false; importPathAccepted = accepted; ShowDialog();
+            saveMetadataName.ActivateInputField();
+        }
+
+        private void SubmitImportPath()
+        {
+            string value = (saveMetadataName.text ?? "").Trim();
+            if (value.Length == 0) return;
+            Action<string> accepted = importPathAccepted;
+            HideDialog(); accepted?.Invoke(value);
         }
 
         internal void ShowSaveMetadata(string name, string category, IEnumerable<string> categories, Action<string, string> accepted)
@@ -3124,8 +3161,9 @@ namespace OstrixMods.BuildWorks
                 Vector3 euler = quaternion.eulerAngles;
                 SetAxisValues(inspectorRotation, new Vector3(
                     SignedAngle(euler.x), SignedAngle(euler.y), SignedAngle(euler.z)));
-                inspectorScale.SetTextWithoutNotify(
-                    ((float)singlePart.Scale.X * 100f).ToString("0.##"));
+                inspectorOriginalScale = (float)singlePart.Scale.X;
+                inspectorOriginalScaleText = (inspectorOriginalScale * 100f).ToString("0.##");
+                inspectorScale.SetTextWithoutNotify(inspectorOriginalScaleText);
             }
             UpdateTransformControls();
         }
@@ -3304,7 +3342,8 @@ namespace OstrixMods.BuildWorks
                 inspectorName.text,
                 new Vector3(px, py, pz),
                 new Vector3(rx, ry, rz),
-                scale / 100f,
+                !inspectorDelta && inspectorScale.text == inspectorOriginalScaleText
+                    ? inspectorOriginalScale : scale / 100f,
                 inspectorDelta);
         }
 

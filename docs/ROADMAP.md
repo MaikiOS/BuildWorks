@@ -2,14 +2,20 @@
 
 **English** | [Русский](ROADMAP_RU.md)
 
-Updated 2026-10-05. Ostrix approved this order after the development review.
+Updated 2026-10-06. Ostrix approved this order after the development review.
 The goal is predictable building with real Valheim pieces, then useful group
 operations and editable generators. Each stage delivers a complete workflow,
 not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.64**: [independent support editor](../specs/roadmap/blueprint-support-frames.md).
+Active source checkpoint **0.19.65**: library UI, import/export and target-frame editor snapping.
+Clipped categories/actions, background archive parsing, paired PNG previews and pinned support creation.
+Build/targeted checks, correctness/Ponytail and final 156 native Unity states PASS.
+[Player checks](testing/catalog-exchange-0.19.65_RU.md); native game acceptance pending.
+Heavy interactive budget 512 and world-support durability remain separate unfinished work.
+
+Previous source checkpoint **0.19.64**: [independent support editor](../specs/roadmap/blueprint-support-frames.md).
 Tree/inspector, G/R without moving parts, transient centre and persisted placement default.
 Release/target checks, correctness/Ponytail and 156 Unity states PASS.
 [Six player cases](testing/free-supports-0.19.64.md); not deployed for native game acceptance.

@@ -9,7 +9,15 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.85**, not deployed: bounded typed foreign-state conversion,
+Active source checkpoint **0.19.86**, not deployed: survival ItemStand accepts the supplied same-prefab
+item's own properties; exact-one native spending and exact supplied-package confirmation remain.
+Archive untouched; no admin restoration. New regression reproduced on .85 and passed with28 adapter
+cases/Unity252; required checks and both reviews PASS. Installed remains .82; no game/network proof or push.
+[Audited matrix and dependencies](continuation-audit-2026-10-07.md),
+[additional209-source corpus/format boundaries](../specs/roadmap/external-corpus-2026-10-07.md).
+Supplied-item preview, full imported build/reload and prepared survival world remain open. Goal incomplete.
+
+Previous source checkpoint **0.19.85**, not deployed: bounded typed foreign-state conversion,
 full legacy mount snapshots and ZDO sign text, exact source binding and ordinary survival policy.
 Original admin/ownership/damage settings stay archived, never executed. Release/required checks,
 actual 353-file/133,738-packet audit, WorldLayout14 and Unity252 PASS; both reviews passed.

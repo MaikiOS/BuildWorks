@@ -1,5 +1,10 @@
 # Blueprint format and large-construction work
 
+Current .86 policy/evidence: [continuation audit](../../docs/continuation-audit-2026-10-07.md).
+Survival mounts use the supplied same-prefab item's own properties for archived snapshots and recipes.
+Source-exact matching/future reservation below is historical .80 behavior. Native validation,
+exact-one spending and supplied-package confirmation remain; preview/reload parity remains open.
+
 **English** | [Русский](blueprint-format_RU.md)
 
 Current source **0.19.80**: native ItemStand contents are restored through a real player's inventory item on the newly

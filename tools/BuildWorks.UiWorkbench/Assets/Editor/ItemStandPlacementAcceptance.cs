@@ -24,7 +24,7 @@ internal static class ItemStandPlacementAcceptance
         PrivateArea.Allowed = true;
         try
         {
-            foreach (string scenario in new[] { "recipe-stack", "full-stack1", "orientation", "missing", "mismatch",
+            foreach (string scenario in new[] { "own-properties", "own-properties-recipe", "recipe-stack", "full-stack1", "orientation", "missing", "mismatch",
                 "ward", "owner", "false-ack", "owner-loss", "stale-item", "throw-write", "throw-consume",
                 "unspent", "delayed-clear", "lost-after-consume", "double-consume", "foreign-queue",
                 "rebound-write", "ward-write", "foreign-queue-write", "orientation-owner-loss",
@@ -45,9 +45,19 @@ internal static class ItemStandPlacementAcceptance
                 player.Inventory.Items.Clear(); player.Inventory.Items.Add(item);
                 var data = new BlueprintForeignPartData(BlueprintForeignPartData.NativeItemStandFormat,
                     prefab.name + ":2:3:" + (scenario == "orientation" || scenario == "orientation-owner-loss" ? "1" : "0"),
-                    scenario == "recipe-stack" || scenario == "orientation" || scenario == "changed-recipe" ||
+                    scenario == "own-properties-recipe" || scenario == "recipe-stack" || scenario == "orientation" || scenario == "changed-recipe" ||
                     scenario == "oversized-recipe" || scenario == "hash-collision" ? null :
                         Convert.ToBase64String(ItemStandPreviewAcceptance.ItemPackage(prefab.name, 3, 2)), null);
+                string archivedInfo = data.Info, archivedPackage = data.Zdo;
+                if (scenario == "own-properties" || scenario == "own-properties-recipe")
+                {
+                    item.m_quality = 1; item.m_variant = 0; item.m_durability = 7.53f;
+                    item.m_gridPos = new Vector2Int(0, 2); item.m_worldLevel = 0; item.m_cheated = false;
+                    item.m_customData.Clear(); item.m_customData.Add("mod:owner", "my supplied item");
+                }
+                var supplied = item.Clone(); supplied.m_stack = 1;
+                var suppliedPacket = new ZPackage(); suppliedPacket.Write((byte)109); supplied.Save(suppliedPacket);
+                string suppliedPackage = Convert.ToBase64String(suppliedPacket.GetArray());
                 Require(BlueprintItemStandPlacement.CanRestore(placed.GetComponent<Piece>(), data), "native allowlist " + scenario);
                 Require(BlueprintItemStandPlacement.CanSupply(player, new[] { data, data }) == (item.m_stack > 1), "same stack allocation " + scenario);
                 Require(!BlueprintItemStandPlacement.CanSupply(player, new[] { data, data, data, data }), "mount shortage accepted " + scenario);
@@ -57,7 +67,7 @@ internal static class ItemStandPlacementAcceptance
                 switch (scenario)
                 {
                     case "missing": player.Inventory.Items.Clear(); break;
-                    case "mismatch": item.m_customData["mod:fixture"] = "different"; break;
+                    case "mismatch": item.m_dropPrefab = placed; break;
                     case "ward": PrivateArea.Allowed = false; break;
                     case "owner": view.Owner = false; break;
                     case "false-ack": stand.RejectUse = true; break;
@@ -98,7 +108,8 @@ internal static class ItemStandPlacementAcceptance
                 bool applied = BlueprintItemStandPlacement.TryApply(player, placed, data, out bool attempted, out bool safe);
                 ObjectDB.instance.ItemHashes[prefab.name.GetStableHashCode()] = prefab;
                 PrivateArea.Allowed = beforeAccess;
-                bool expected = scenario == "recipe-stack" || scenario == "full-stack1" || scenario == "orientation" || scenario == "throw-consume";
+                bool expected = scenario == "own-properties" || scenario == "own-properties-recipe" ||
+                    scenario == "recipe-stack" || scenario == "full-stack1" || scenario == "orientation" || scenario == "throw-consume";
                 Require(applied == expected, "confirmation " + scenario);
                 bool started = scenario != "missing" && scenario != "mismatch" && scenario != "ward" && scenario != "owner" &&
                     scenario != "oversized-recipe" && scenario != "hash-collision";
@@ -122,7 +133,9 @@ internal static class ItemStandPlacementAcceptance
                         !BlueprintItemStandPlacement.CanRollback(placed, true), "occupied holder force destruction " + scenario);
                     Require((player.Inventory.ContainsItem(item) ? item.m_stack : 0) == (scenario == "full-stack1" ? 0 : 2), "native exact-one consumption " + scenario);
                     Require(BlueprintItemStandCapture.TryCapture(placed.GetComponent<Piece>(), out var captured) &&
-                        captured.Info == data.Info && (data.Zdo == null || captured.Zdo == data.Zdo), "saved contents " + scenario);
+                        captured.Info == prefab.name + ":" + supplied.m_variant + ":" + supplied.m_quality + ":" + data.Info.Split(':')[3] &&
+                        captured.Zdo == suppliedPackage, "supplied item's complete properties were not retained " + scenario);
+                    Require(data.Info == archivedInfo && data.Zdo == archivedPackage, "source blueprint changed " + scenario);
                 }
                 if (scenario == "throw-write" || scenario == "unspent")
                     Require(stand.Destroys == 1 && !stand.HaveAttachment() && item.m_stack == 3 &&
@@ -158,13 +171,14 @@ internal static class ItemStandPlacementAcceptance
                 var recipe = new BlueprintForeignPartData(BlueprintForeignPartData.NativeItemStandFormat, exact.Info, null, null);
                 player.Inventory.Items.Clear(); player.Inventory.Items.Add(exactItem);
                 Require(!BlueprintItemStandPlacement.CanSupply(player, new[] { recipe, exact }) &&
-                    BlueprintItemStandPlacement.FindPlacementItem(player, recipe, new[] { exact }) == null,
-                    "recipe spent the only later exact item");
+                    BlueprintItemStandPlacement.FindItem(player, recipe) == exactItem,
+                    "survival preflight lost item-count allocation");
                 player.Inventory.Items.Add(flexibleItem);
                 Require(BlueprintItemStandPlacement.CanSupply(player, new[] { recipe, exact }) &&
-                    BlueprintItemStandPlacement.TryApply(player, reservedHolder, recipe, out bool attempted, out bool safe, new[] { exact }) &&
-                    attempted && safe && player.Inventory.ContainsItem(exactItem) && exactItem.m_stack == 1 &&
-                    !player.Inventory.ContainsItem(flexibleItem), "recipe ignored the future exact-item reservation");
+                    BlueprintItemStandPlacement.TryApply(player, reservedHolder, recipe, out bool attempted, out bool safe) &&
+                    attempted && safe && !player.Inventory.ContainsItem(exactItem) &&
+                    player.Inventory.ContainsItem(flexibleItem) && flexibleItem.m_stack == 1,
+                    "survival placement consumed more than its selected item");
             }
             finally { Object.DestroyImmediate(reservedHolder); }
         }

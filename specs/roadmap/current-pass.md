@@ -1,5 +1,9 @@
 # BuildWorks catalog game checks
 
+Historical .56 catalogue series. Current continuation status/dependencies:
+[2026-10-07 audit](../../docs/continuation-audit-2026-10-07.md).
+Do not use this as full imported construction acceptance or repeat accepted cases wholesale.
+
 **English** | [Русский](current-pass_RU.md)
 
 Import .56 passes 144 Unity UI states and is deployed with the external source ZIP

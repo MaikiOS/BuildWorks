@@ -405,11 +405,17 @@ namespace OstrixMods.BuildWorks
             // Construction creates NEW ordinary native pieces: no inherited ownership, stale support,
             // damage, invulnerability, AI overrides or network lifetime flags. All originals remain in
             // the exact source document. This is NOT an administrator-state restoration adapter.
-            var ordinary = new Dictionary<int, Type> {
-                [hash("health")] = typeof(float), [hash("support")] = typeof(float), [hash("creator")] = typeof(long),
-                [hash("scale")] = typeof(Geometry.Point3), [hash("scaleScalar")] = typeof(float),
-                [hash("HasFields")] = typeof(int), [hash("HasFieldsWearNTear")] = typeof(int),
-                [hash("WearNTear.m_health")] = typeof(float), [hash("HasFieldsStaticTarget")] = typeof(int),
+            var ordinary = new Dictionary<int, Type>
+            {
+                [hash("health")] = typeof(float),
+                [hash("support")] = typeof(float),
+                [hash("creator")] = typeof(long),
+                [hash("scale")] = typeof(Geometry.Point3),
+                [hash("scaleScalar")] = typeof(float),
+                [hash("HasFields")] = typeof(int),
+                [hash("HasFieldsWearNTear")] = typeof(int),
+                [hash("WearNTear.m_health")] = typeof(float),
+                [hash("HasFieldsStaticTarget")] = typeof(int),
                 [hash("StaticTarget.m_randomTarget")] = typeof(int)
             };
             foreach (var key in state.Keys)

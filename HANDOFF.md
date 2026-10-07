@@ -2,6 +2,26 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.86 — survival supplies the player's own mounted item; source verified
+
+[Verified continuation audit and dependencies](docs/continuation-audit-2026-10-07.md).
+Existing full-cycle goal remains active; no goal-text update/completion claimed.
+ItemStand accepts the same prefab with the supplied item's own durability/quality/variant/custom data
+for both archived snapshots and recipes. Native validation, exact-one spending, exact supplied-package
+capture, ownership/ward/queue/rollback protections remain. Source state stays untouched; no admin restore.
+Removed exact-future-item reservation; preflight still counts stack units.
+New own-properties regression failed on .85, now passes;28 inert adapter cases and Unity252 PASS.
+Release/Geometry/Store353/Localization848/EditorBridge/WorldLayout14/HostContract/deploy guards/format PASS.
+Independent correctness and ponytail reviews passed; verify absent. Sandbox atomic-write/NuGet/pipe
+failures were retried with the same checks outside sandbox. Old converter whitespace fixed without logic changes.
+[Additional corpus/research](specs/roadmap/external-corpus-2026-10-07.md):209 new local sources,
+156 parsed/53 refused, NOT host/game compatibility; attribution/conditions/hash retained, no redistribution.
+Dvergr Library download blocked by Cloudflare; conflicting header dialects stay blocked.
+Not deployed: installed TerrainRamp-1.0-Test remains .82; no game/save/network/FPS proof or push.
+OPEN: preview still shows archived item variant/quality. Next reconcile supplied-item preview and the
+small external full cycle. Missing/heavy editor, inventories/armour/free items, placement choices,
+server admin authority and prepared survival world remain incomplete. No wholesale old-series retest.
+
 ## Checkpoint 0.19.85 — typed foreign-state conversion under native survival rules; source verified
 
 Foreign DataEntry packages now have a bounded, read-only typed decoder, including network-tail

@@ -2,6 +2,26 @@
 
 [English](HANDOFF.md) | **Русский**
 
+## Этап 0.19.86 — свой предмет на креплении по правилам выживания; исходники проверены
+
+[Аудит фактов и зависимости](docs/continuation-audit-2026-10-07_RU.md).
+Существующая полная цель остаётся active; изменение её текста/завершение не заявляется.
+ItemStand принимает предмет того же prefab с его собственными durability/quality/variant/custom data
+для полного архива и рецепта. Native-проверки, расход одной штуки, точный пакет своего предмета,
+ownership/ward/queue/rollback остаются. Исходник неизменен; admin restore не добавлен.
+Удалён резерв будущих точных снимков; общий подсчёт единиц stack сохранён.
+Новая own-properties регрессия отказала на .85, теперь проходит;28 inert adapter cases и Unity252 PASS.
+Release/Geometry/Store353/Localization848/EditorBridge/WorldLayout14/HostContract/deploy guards/format PASS.
+Независимые correctness и ponytail reviews пройдены; verify отсутствует. Отказы sandbox atomic-write/NuGet/pipe
+преодолены повтором тех же проверок вне sandbox. Старое форматирование конвертера исправлено без изменения логики.
+[Дополнительный корпус/исследование](specs/roadmap/external-corpus-2026-10-07_RU.md):209 новых локальных источников,
+156 разобраны/53 отклонены — НЕ совместимость с хостом/игрой; авторство/условия/хеш сохранены, без redistribution.
+Dvergr Library заблокирован Cloudflare; неоднозначные диалекты заголовков остаются заблокированными.
+Не установлено: TerrainRamp-1.0-Test остаётся .82; нет game/save/network/FPS proof или push.
+ОТКРЫТО: preview показывает старые variant/quality предмета. Далее — preview своего предмета и
+малый внешний полный цикл. Missing/heavy editor, inventories/armour/free items, placement choices,
+server admin и готовый survival world не закончены. Массовая проверка старых серий не нужна.
+
 ## Этап 0.19.85 — типизированный импорт по правилам выживания; исходники проверены
 
 Добавлен ограниченный разбор чужого DataEntry без исполнения ZDO. Один hash допустим в разных

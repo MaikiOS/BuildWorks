@@ -2614,8 +2614,7 @@ namespace OstrixMods.BuildWorks
                 if (!pendingItemStandAttempted)
                 {
                     applied = BlueprintItemStandPlacement.TryApply(player, pendingItemStandPiece,
-                        pendingItemStandContents, out pendingItemStandAttempted, out safe,
-                        placementPlan.Skip(placementPlanIndex + 1).Select(pose => pose.ItemStandContents));
+                        pendingItemStandContents, out pendingItemStandAttempted, out safe);
                     if (!safe)
                     {
                         applied = false;
@@ -2702,8 +2701,7 @@ namespace OstrixMods.BuildWorks
             }
             BlueprintForeignPartData nextContents = placementPlan[placementPlanIndex].ItemStandContents;
             if (nextContents != null && !nextContents.ContentsCleared &&
-                BlueprintItemStandPlacement.FindPlacementItem(player, nextContents,
-                    placementPlan.Skip(placementPlanIndex + 1).Select(pose => pose.ItemStandContents)) == null)
+                BlueprintItemStandPlacement.FindItem(player, nextContents) == null)
             {
                 PauseAutomaticPlacement(player, BuildWorksLocalization.Text("placement.mount_unavailable"));
                 return;

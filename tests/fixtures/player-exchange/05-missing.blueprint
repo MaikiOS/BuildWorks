@@ -1,0 +1,5 @@
+#Name: TEST 05 Missing
+#Category: BW TEST
+#Pieces
+woodwall;;0;0;0;0;0;0;1;"";1;1;1;
+buildworks_test_missing_prefab;;2;0;0;0;0;0;1;"";1;1;1;

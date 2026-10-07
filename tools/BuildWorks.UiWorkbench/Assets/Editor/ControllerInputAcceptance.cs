@@ -648,6 +648,19 @@ internal static class ControllerInputAcceptance
                 { Frame(controller, input, Vector2.zero); yield return null; }
                 var exchange = Field<BlueprintExchangeView>(view, "exchangeView");
                 var directory = Field<TMP_InputField>(exchange, "directory");
+                string longPath = "C:\\Users\\Ostrix\\AppData\\Roaming\\Thunderstore Mod Manager\\DataFolder\\Valheim\\profiles\\TerrainRamp-1.0-Test\\BepInEx\\config\\BuildWorks\\imports";
+                directory.SetTextWithoutNotify(longPath);
+                directory.ActivateInputField(); yield return null;
+                directory.caretPosition = longPath.Length; directory.ForceLabelUpdate();
+                Canvas.ForceUpdateCanvases(); directory.textComponent.ForceMeshUpdate();
+                Require(directory.lineType == TMP_InputField.LineType.SingleLine &&
+                    directory.textComponent.textWrappingMode == TextWrappingModes.NoWrap &&
+                    directory.textComponent.textInfo.lineCount == 1 &&
+                    directory.textComponent.overflowMode == TextOverflowModes.Overflow &&
+                    directory.text == longPath, "Long exchange path wrapped, truncated or lost");
+                var close = ((RectTransform)Field<RectTransform>(exchange, "panel").Find("ExchangeClose"));
+                Require(close.anchoredPosition.x > 600 && close.anchoredPosition.y > -50,
+                    "Exchange Close is not in the upper-right header");
                 directory.SetTextWithoutNotify(folder);
                 NativeClick(view, null, "ExchangeGo"); yield return null;
                 for (int i = 0; i < 300 && Field<Task<string[]>>(exchange, "listing") != null; ++i)
@@ -713,6 +726,16 @@ internal static class ControllerInputAcceptance
                 Require(ExternalBlueprintLibrary.LoadFile(exported)[0].parts[0].scale.x == .5f, "ZIP export changed multiplier");
                 NativeClick(view, null, "ExchangeClose"); yield return null;
                 Require(!view.HasModal, "Close button cannot dismiss result");
+                string report = "Editor: OK\nWorld: unsupported state\nPrefab scale: (0.25, 0.25, 0.25)";
+                var reportStore = new CompositeBlueprintStore(Path.Combine(folder, "report-only", "blueprints.json"));
+                view.ShowExchange((parent, textFont, closed) => new BlueprintExchangeView(parent, textFont, reportStore, prepared, closed, report: report)); yield return null;
+                exchange = Field<BlueprintExchangeView>(view, "exchangeView");
+                Require(Field<bool>(exchange, "completed") && Field<TMP_Text>(exchange, "message").text == report &&
+                    !Directory.Exists(reportStore.ExportDirectory), "Read-only report wrote exports or lost text");
+                NativeClick(view, null, "ExchangeCopyPath"); yield return null;
+                Require(GUIUtility.systemCopyBuffer == report && !Field<Button>(exchange, "primary").interactable,
+                    "Diagnostics cannot copy the full report or allow an unintended export");
+                NativeClick(view, null, "ExchangeClose"); yield return null;
                 view.ShowExchange((parent, textFont, closed) => new BlueprintExchangeView(parent, textFont, store, prepared, closed)); yield return null;
                 exchange = Field<BlueprintExchangeView>(view, "exchangeView");
                 for (int i = 0; i < 300 && Field<Task<string[]>>(exchange, "listing") != null; ++i)

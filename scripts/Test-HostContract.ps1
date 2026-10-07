@@ -819,7 +819,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.80.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.81.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -2190,7 +2190,7 @@ Assert-Contract ($catalogSource -match
     $catalogSource -match 'new Vector2\(16f, y\)') `
     'Blueprint inspector no longer keeps a responsive width and safe inner padding.'
 Assert-Contract ($catalogSource -match 'const float actionHeight = 28f' -and
-    $catalogSource -match 'const int actionCount = 8' -and
+    $catalogSource -match 'const int actionCount = 9' -and
     $catalogSource -match 'BlueprintActionsViewport' -and
     $catalogSource -match 'viewport.AddComponent<RectMask2D>' -and
     $catalogSource -match 'viewport.AddComponent<ScrollRect>' -and
@@ -2202,7 +2202,7 @@ foreach ($inspectorHeight in 358, 477) {
     $actionTop = [Math]::Min(184, 86 + $inspectorHeight * 0.20)
     $actionTop = [Math]::Min(
         $actionTop,
-        [Math]::Max(86, $inspectorHeight - 8 * $actionHeight - 8))
+        [Math]::Max(86, $inspectorHeight - 9 * $actionHeight - 8))
     Assert-Contract (($inspectorHeight - $actionTop - 8) -gt 0) `
         "Blueprint inspector actions exceed a $inspectorHeight px panel."
 }
@@ -2825,6 +2825,10 @@ Assert-Contract (@($nativeFinished.Body.Instructions | Where-Object { [string]$_
     $sessionSource -match 'if \(!BlueprintItemStandPlacement.CanRollback\(item.Placed, forceDestroy: true\)\) return false;') 'Mount work must be deferred out of TryPlacePiece postfix and content-bearing rollback must not force-destroy.'
 
 $resolveBlueprint = $pluginMethods | Where-Object { $_.Name -eq 'TryResolveBlueprintPieces' -and $_.DeclaringType.Name -eq 'PrecisionPlacementSession' }
+$openBlueprintEditor = $pluginMethods | Where-Object { $_.Name -eq 'BeginBlueprintEditor' -and $_.DeclaringType.Name -eq 'PrecisionPlacementSession' }
+$editorResolveCall = @($openBlueprintEditor.Body.Instructions | Where-Object { [string]$_.Operand -match 'PrecisionPlacementSession::TryResolveBlueprintPieces' })
+Assert-Contract ($editorResolveCall.Count -eq 1 -and $editorResolveCall[0].Previous.OpCode.Name -eq 'ldc.i4.1') `
+    'Opening the isolated editor must use forEditor=true, not world placement gates.'
 $resolveCalls = ($resolveBlueprint.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($resolveCalls -match 'BlueprintItemStandPlacement::CanRestore' -and
     $sessionSource -match 'sourceDocuments\?\.Any\(source => source.ToGeometry\(\).HasOpaqueSections\)' -and
@@ -3017,4 +3021,4 @@ $worldCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'Preci
 $worldCaptureCalls = ($worldCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($worldCaptureCalls -match 'BlueprintStorageCapture::TryCapture' -and $worldCaptureCalls -match 'CompositeBlueprintStore/ForeignPartData::FromGeometry') 'World selection does not preserve container snapshots.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.80 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.81 and Valheim Steam build 25185596.'

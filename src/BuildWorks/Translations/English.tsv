@@ -839,3 +839,6 @@ editor.item.remove_confirm	Remove the saved item from this draft? Undo restores 
 editor.item.changed	The stand changed while confirmation was open. Select it again and retry.
 editor.item.saved	Stand contents updated in the draft. Undo is available; world restoration remains pending.
 editor.item.tree_hint	Attached item belongs to this stand and follows its transforms. Click to select the stand; edit contents through Tools.
+exchange.diagnostics	Check blueprint
+exchange.diagnostics_help	Read-only check: copy this report for diagnosis. No world changes or item costs.
+exchange.copy_report	Copy report

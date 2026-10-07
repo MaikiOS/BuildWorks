@@ -2,6 +2,47 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.81 — editor gate correction, exchange path, ready test files; test-deployed
+
+The isolated editor now calls TryResolveBlueprintPieces(forEditor:true); its opening path previously
+applied world-only opaque-state/socket gates. World placement gates remain unchanged. This is not
+complete foreign-state execution or a raised interactive part budget.
+
+The shared Hammer/editor exchange field explicitly disables wrapping after assigning its TMP text
+component, uses native single-line caret scrolling and keeps the full path. Close is in the upper-right.
+The Hammer inspector has a ninth scroll-contained action, Check blueprint. Its read-only report
+separates editor/world reasons and prints canonical/Hammer local and lossy prefab scales plus document
+multipliers. Failed normalization can inspect inert original source rows. The report modal returns before
+directory browsing/creation, disables export and copies the full report text.
+
+Six authored files are installed through guarded Deploy-TestBuild -PlayerTestFixtures into the test
+profile's BuildWorks/test-fixtures, never auto-imported or placed. Existing differing files are refused.
+Each fixture passed parser/native exchange/source retention checks; the missing-prefab fixture rejects
+atomically. Exact file-picker navigation and per-file actions: docs/testing/player-exchange-0.19.81_RU.md.
+
+Evidence: Release 0 warnings/errors; HostContract pins forEditor=true at the compiled editor call;
+Localization843, Geometry, Store plus six fixtures, EditorBridge, WorldLayout and deployment guards PASS.
+Unity228 including long path, upper-right Close and read-only full-report clipboard scenarios PASS.
+Independent correctness and ponytail reviews found no blockers. The verify helper is not available;
+direct checks and review were used. NuGet restore/temp-file sandbox access failures were reported;
+no-restore build and approved isolated test reruns passed. Old version/action-count test expectations
+were updated; no failed required check remains.
+
+Installed only TerrainRamp-1.0-Test on 2026-10-07; independently checked version 0.19.81.0, both DLL hashes
+and all six file hashes. Main A62B39C8C893D00F996709EE13923031AB2A2ABF082DCAED5B9E24C593D5A05B;
+Geometry DD9F2A795396853D0FFE8DFE1BD227E759AA395F21C58D79A3BA1A66212591EA.
+Default remains uninstalled. No Valheim launch, save/world mutation or push.
+
+Open work: the huge lantern root cause is NOT confirmed or fixed. The imported library has 353
+blueprints; 188 exceed512,121 have custom snaps,89 have opaque headers/state (overlap240).
+Offline candidates are not runtime guarantees. House contains eight unit-absolute-scale lanterns;
+do not guess vbuild omitted-scale semantics or silently clamp original scales. Use the in-game report
+to compare registered and Hammer prefab scales. Full foreign decoders, >512 editor/render performance,
+world sockets, storage restoration, armour/free items, editable external thumbnails and placement-time
+independent storage/mount choices remain unfinished. A prepared dedicated survival test world/character
+is not created; do not ask the owner to grind or construct fixtures. Native game UI control is unavailable
+in the currently exposed computer-use tool, so isolated Unity proof is not game proof.
+
 ## Checkpoint 0.19.80 — native ItemStand placement adapter; test-deployed
 
 Filled native horizontal/wall ItemStand parts now carry immutable contents through the ordered world plan.

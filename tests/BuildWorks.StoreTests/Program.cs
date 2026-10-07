@@ -39,7 +39,8 @@ namespace OstrixMods.BuildWorks.StoreTests
                 ReviewedImportWorkflow(Path.Combine(directory, "reviewed-import"));
                 ExchangeRoundTrip(Path.Combine(directory, "exchange-library.json"));
                 SupportRoundTrip(Path.Combine(directory, "supports.json"));
-                if (args.Length > 0) InspectActualLibrary(args[0]);
+                if (args.Length == 2 && args[0] == "--player-fixtures") PlayerFixtures(args[1]);
+                else if (args.Length > 0) InspectActualLibrary(args[0]);
                 Console.WriteLine("All BuildWorks store tests passed.");
                 return 0;
             }
@@ -52,6 +53,26 @@ namespace OstrixMods.BuildWorks.StoreTests
             {
                 Directory.Delete(directory, recursive: true);
             }
+        }
+
+        private static void PlayerFixtures(string directory)
+        {
+            var fixtures = ExternalBlueprintLibrary.Load(directory);
+            Require(fixtures.Count == 6 && fixtures.All(item => item.importError == null && item.parts.Count == 2), "Player fixture parse failed");
+            foreach (var source in fixtures)
+            {
+                var prepared = ExternalBlueprintLibrary.PrepareForHost(source, _ => UnitScale);
+                var copy = ExternalBlueprintLibrary.DetachedCopy(prepared);
+                var decoded = BlueprintExchangeFormat.Decode(System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(copy)));
+                Require(decoded.parts.Count == 2 && decoded.sourceDocuments[0].text == source.sourceDocuments[0].text, "Player fixture conversion lost source");
+            }
+            Require(fixtures.Single(item => item.name == "TEST 02 Sign").parts[1].signText == "BuildWorks: Привет, Ostrix!", "Player sign fixture changed");
+            Require(fixtures.Single(item => item.name == "TEST 03 Opaque").sourceDocuments[0].ToGeometry().HasOpaqueSections, "Opaque fixture not detected");
+            Require(fixtures.Single(item => item.name == "TEST 04 Snap").customSnapPoints.Count == 1, "Player snap fixture lost");
+            var missing = fixtures.Single(item => item.name == "TEST 05 Missing");
+            Require(ExternalBlueprintLibrary.PrepareForHost(missing, name => name == "woodwall" ? UnitScale : (CompositeBlueprintStore.VectorData?)null).parts.Count == 0,
+                "Missing-prefab fixture published partial construction");
+            Console.WriteLine("PASS six named player fixtures: conversion/source/sign/snap/opaque/missing atomic rejection; no game proof");
         }
 
         private static void ForeignSourcesRoundTrip(string path)

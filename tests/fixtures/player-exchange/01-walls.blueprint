@@ -1,0 +1,5 @@
+#Name: TEST 01 Walls
+#Category: BW TEST
+#Pieces
+woodwall;;0;0;0;0;0;0;1;"";1;1;1;
+woodwall;;2;0;0;0;0;0;1;"";1;1;1;

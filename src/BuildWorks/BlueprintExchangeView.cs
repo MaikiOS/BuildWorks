@@ -37,7 +37,7 @@ namespace OstrixMods.BuildWorks
         internal bool IsOpen => root && root.activeInHierarchy && !disposed;
 
         internal BlueprintExchangeView(Transform parent, TMP_Text template, CompositeBlueprintStore library,
-            CompositeBlueprintStore.Blueprint source, Action closed, bool frontCanvas = false)
+            CompositeBlueprintStore.Blueprint source, Action closed, bool frontCanvas = false, string report = null)
         {
             store = library; blueprint = source; font = template; finished = closed;
             previousFocus = EventSystem.current ? EventSystem.current.currentSelectedGameObject : null;
@@ -55,7 +55,8 @@ namespace OstrixMods.BuildWorks
             panel = Rect("ExchangeDialog", rect, 0, 0, 780, 580);
             panel.anchorMin = panel.anchorMax = panel.pivot = new Vector2(.5f, .5f);
             skin.Apply(panel.gameObject.AddComponent<Image>(), BlueprintEditorSkin.Surface.Panel);
-            Label("ExchangeTitle", T(source == null ? "exchange.import" : "exchange.export"), 20, 18, 740, 30, 22);
+            Label("ExchangeTitle", T(source == null ? "exchange.import" : "exchange.export"), 20, 18, 620, 30, 22);
+            Button("ExchangeClose", T("editor.view.close"), 650, 18, 110, Dispose);
             Label("ExchangeHelp", T(source == null ? "exchange.browse_help" : "exchange.export_help"), 20, 56, 740, 26, 14);
             directory = Input("ExchangeDirectory", 20, 86, 562, 1024);
             directory.onSubmit.AddListener(_ => Browse(directory.text));
@@ -87,7 +88,7 @@ namespace OstrixMods.BuildWorks
             primary = Button("ExchangeSubmit", T(source == null ? "exchange.import" : "exchange.export"), 548, 530, 212, Submit);
             copyPath = Button("ExchangeCopyPath", T("exchange.copy_path"), 256, 530, 276,
                 () => GUIUtility.systemCopyBuffer = resultPath ?? selected ?? directory.text);
-            Button("ExchangeClose", T("editor.view.close"), 20, 530, 220, Dispose);
+            if (report != null) { ShowReport(report); return; }
             string initial = Directory.Exists(store.ExchangeDirectory) ? store.ExchangeDirectory : Directory.GetParent(store.ExchangeDirectory).FullName;
             if (source != null)
                 try { initial = CompositeBlueprintStore.ValidateExchangeDirectory(store.ExportDirectory); Directory.CreateDirectory(initial); }
@@ -162,7 +163,8 @@ namespace OstrixMods.BuildWorks
             try
             {
                 string full = CompositeBlueprintStore.ValidateExchangeDirectory(path);
-                directory.SetTextWithoutNotify(full); selected = null; page = 0;
+                directory.SetTextWithoutNotify(full); directory.caretPosition = full.Length;
+                directory.ForceLabelUpdate(); selected = null; page = 0;
                 entries = Array.Empty<string>(); RenderRows();
                 message.text = T("exchange.loading");
                 listing = Task.Run(() => CompositeBlueprintStore.BrowseExchangeDirectory(full));
@@ -212,6 +214,15 @@ namespace OstrixMods.BuildWorks
         }
 
         private void SetError(Exception error) => message.text = BuildWorksLocalization.ResolveUserText(error.Message);
+
+        internal void ShowReport(string value)
+        {
+            completed = true; listing = null; resultPath = value;
+            panel.Find("ExchangeTitle").GetComponent<TMP_Text>().text = T("exchange.diagnostics");
+            panel.Find("ExchangeHelp").GetComponent<TMP_Text>().text = T("exchange.diagnostics_help");
+            copyPath.GetComponentInChildren<TMP_Text>().text = T("exchange.copy_report");
+            ShowResult(value); Tick();
+        }
 
         private void ReviewContents()
         {
@@ -327,9 +338,12 @@ namespace OstrixMods.BuildWorks
             var input = rect.gameObject.AddComponent<TMP_InputField>(); skin.Apply(input, input: true);
             var viewport = Rect(name + "Viewport", rect, 8, 2, width - 16, 26); viewport.gameObject.AddComponent<RectMask2D>();
             var text = Label(name + "Text", "", 0, 0, width - 16, 26, 14, viewport);
-            text.textWrappingMode = TextWrappingModes.NoWrap;
             input.textViewport = viewport; input.textComponent = text; input.characterLimit = limit;
-            input.lineType = TMP_InputField.LineType.SingleLine; return input;
+            input.lineType = TMP_InputField.LineType.SingleLine;
+            // Assigning the text component can reset wrapping; native caret scrolling owns clipping.
+            text.textWrappingMode = TextWrappingModes.NoWrap;
+            text.overflowMode = TextOverflowModes.Overflow;
+            return input;
         }
         public void Dispose()
         {

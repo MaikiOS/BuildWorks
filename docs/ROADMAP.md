@@ -9,7 +9,15 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.80**: native ItemStand world placement consumes a real matching inventory item only after
+Active source checkpoint **0.19.81**, installed only in TerrainRamp-1.0-Test: editor opening no longer applies
+world-only payload/socket gates; shared exchange path stays single-line with native scrolling and Close at upper-right.
+The Hammer read-only blueprint report exposes editor/world reasons and actual prefab scales. Six named test files
+are installed with SHA256 checks. Release/HostContract/Localization843/Geometry/Store/bridge/layout/deployment guards
+and Unity228 PASS; independent correctness/pony review found no blockers. No game/save/push.
+[Exact prepared player actions](testing/player-exchange-0.19.81_RU.md). Huge lamp cause, >512 scenes, foreign decoding,
+world contents/sockets and placement-time contents choices remain unfinished. See HANDOFF for verified hashes.
+
+Previous source checkpoint **0.19.80**: native ItemStand world placement consumes a real matching inventory item only after
 native construction costs, confirms exact saved contents and preserves later exact-item reservations. Owner/access,
 queue/orientation and uncertain rollback guards are implemented. Release/required checks, Unity228 and 26 adapter cases PASS;
 native world/drop/save/client acceptance remains required. Native14/portable5 unchanged. On 2026-10-07, .80 was installed

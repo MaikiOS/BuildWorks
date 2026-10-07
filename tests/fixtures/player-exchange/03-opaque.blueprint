@@ -1,0 +1,7 @@
+#Name: TEST 03 Opaque
+#Category: BW TEST
+#Center
+0;0;0
+#Pieces
+woodwall;;0;0;0;0;0;0;1;"";1;1;1;
+woodwall;;2;0;0;0;0;0;1;"";1;1;1;

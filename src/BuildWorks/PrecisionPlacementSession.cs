@@ -1237,7 +1237,7 @@ namespace OstrixMods.BuildWorks
 
             List<Piece> pieces = new List<Piece>();
             if (blueprint != null && !TryResolveBlueprintPieces(
-                player, blueprint, out pieces, out string missingPrefab))
+                player, blueprint, out pieces, out string missingPrefab, forEditor: true))
             {
                 ShowStatus(player, BuildWorksLocalization.Text(
                     "placement.hammer_piece_missing", missingPrefab));

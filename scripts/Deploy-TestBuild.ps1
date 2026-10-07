@@ -6,7 +6,9 @@ param(
 
     [switch] $ArmSkyCleanup,
 
-    [string] $BlueprintLibraryArchive
+    [string] $BlueprintLibraryArchive,
+
+    [switch] $PlayerTestFixtures
 )
 
 Set-StrictMode -Version Latest
@@ -282,6 +284,36 @@ if ($ArmSkyCleanup) {
     $cleanupMarker = Join-Path $cleanupDirectory 'cleanup-sky-TerrainRamp_Lab.once'
     Set-Content -LiteralPath $cleanupMarker -Value 'TerrainRamp_Lab' -Encoding Ascii
     Write-Output "Armed one-shot BuildWorks sky cleanup: $cleanupMarker"
+}
+
+if ($PlayerTestFixtures) {
+    $fixtureSource = Join-Path $projectRoot 'tests\fixtures\player-exchange'
+    $fixtureTarget = Join-Path $targetBepInEx 'config\BuildWorks\test-fixtures'
+    foreach ($directory in @((Join-Path $targetBepInEx 'config'),
+        (Join-Path $targetBepInEx 'config\BuildWorks'), $fixtureTarget, $fixtureSource)) {
+        Assert-NotReparsePoint $directory
+    }
+    foreach ($name in '01-walls.blueprint', '02-sign.blueprint', '03-opaque.blueprint',
+        '04-snap.blueprint', '05-missing.blueprint', '06-lamp.blueprint') {
+        $fixture = Join-Path $fixtureSource $name
+        $destination = Join-Path $fixtureTarget $name
+        Assert-NotReparsePoint $fixture
+        Assert-NotReparsePoint $destination
+        $hash = (Get-FileHash -LiteralPath $fixture -Algorithm SHA256).Hash
+        if (Test-Path -LiteralPath $destination) {
+            if ((Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash -ne $hash) {
+                throw "Test fixture already exists with different contents; refusing overwrite: $destination"
+            }
+        }
+        elseif ($PSCmdlet.ShouldProcess($destination, 'Add a ready blueprint test file; no world/save changes')) {
+            New-Item -ItemType Directory -Path $fixtureTarget -Force -Confirm:$false | Out-Null
+            Copy-Item -LiteralPath $fixture -Destination $destination -Confirm:$false
+            if ((Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash -ne $hash) {
+                throw "Test fixture SHA256 mismatch: $destination"
+            }
+        }
+    }
+    Write-Output "Player test fixture directory: $fixtureTarget"
 }
 
 Write-Output "Verified BuildWorks test deployment: $targetInstall"

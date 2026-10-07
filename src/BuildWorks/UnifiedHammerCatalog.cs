@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using BepInEx.Logging;
 using TMPro;
 using UnityEngine;
@@ -2293,7 +2294,7 @@ namespace OstrixMods.BuildWorks
             ShowExchange(blueprint);
         }
 
-        private static void ShowExchange(CompositeBlueprintStore.Blueprint blueprint)
+        private static void ShowExchange(CompositeBlueprintStore.Blueprint blueprint, string report = null)
         {
             Hud hud = Hud.instance;
             Canvas canvas = hud && hud.m_pieceSelectionWindow ? hud.m_pieceSelectionWindow.GetComponentInParent<Canvas>() : null;
@@ -2305,7 +2306,38 @@ namespace OstrixMods.BuildWorks
                     exchangeView = null; exchangeClosedFrame = Time.frameCount;
                     if (blueprint == null) blueprintImportPending = true;
                     Invalidate();
-                }, frontCanvas: true);
+                }, frontCanvas: true, report: report);
+        }
+
+        private static void ShowBlueprintDiagnostics(Player player, CompositeBlueprintStore.Blueprint blueprint)
+        {
+            var report = new StringBuilder();
+            report.AppendLine("BuildWorks " + typeof(BuildWorksPlugin).Assembly.GetName().Version);
+            report.AppendLine(blueprint.name + " | " + blueprint.importSource);
+            report.AppendLine("Parts: " + blueprint.parts.Count + " | Source parts: " + blueprint.importPartCount);
+            foreach (bool editor in new[] { true, false })
+            {
+                bool available = PrecisionPlacementSession.TryResolveBlueprintPieces(player, blueprint, out _, out string reason, editor);
+                report.AppendLine((editor ? "Editor: " : "World: ") + (available ? "OK" : reason));
+            }
+            report.AppendLine("Custom snap points: " + (blueprint.customSnapPoints?.Count ?? 0));
+            report.AppendLine("Opaque source sections: " + (blueprint.sourceDocuments?.Count(source => source.ToGeometry().HasOpaqueSections) ?? 0));
+            report.AppendLine("Prefab | count | ZNetScene local/lossy | Hammer local/lossy | " +
+                (blueprint.parts.Count == 0 ? "original absolute scale (conversion rejected)" : "document multiplier"));
+            // Failed atomic normalization clears usable parts, not the inert source evidence.
+            IEnumerable<CompositeBlueprintStore.Part> reportParts = blueprint.parts.Count != 0 ? blueprint.parts :
+                (blueprint.sourceDocuments ?? new List<CompositeBlueprintStore.SourceDocument>())
+                .SelectMany(source => ExternalBlueprintLibrary.Parse(source.text, source.name).parts);
+            foreach (var parts in reportParts.GroupBy(part => part.prefabName).OrderBy(group => group.Key, StringComparer.Ordinal))
+            {
+                GameObject registered = ZNetScene.instance ? ZNetScene.instance.GetPrefab(parts.Key) : null;
+                PrecisionPlacementSession.TryResolveBuildPiece(player, parts.Key, out Piece piece);
+                string Scale(Transform transform) => transform ? transform.localScale.ToString("R") + "/" + transform.lossyScale.ToString("R") : "unavailable";
+                report.AppendLine(parts.Key + " | " + parts.Count() + " | " + Scale(registered ? registered.transform : null) +
+                    " | " + Scale(piece ? piece.transform : null) + " | " +
+                    string.Join(", ", parts.Select(part => part.scale.ToVector3().ToString("R")).Distinct().Take(8)));
+            }
+            ShowExchange(blueprint, report.ToString());
         }
 
         private static void AddBlueprintLibrary(Hud hud, Player player)
@@ -2624,7 +2656,7 @@ namespace OstrixMods.BuildWorks
                 new Vector2(width - 32f, Mathf.Min(104f, height * 0.20f)), blueprint.id);
 
             const float actionHeight = 28f;
-            const int actionCount = 8;
+            const int actionCount = 9;
             float actionTop = Mathf.Min(184f, 86f + height * 0.20f);
             actionTop = Mathf.Min(
                 actionTop,
@@ -2654,6 +2686,9 @@ namespace OstrixMods.BuildWorks
             y -= actionHeight;
             AddActionButton(hud, parent, BuildWorksLocalization.Text("exchange.export"), y, buttonWidth,
                 () => ExportBlueprintFile(blueprint));
+            y -= actionHeight;
+            AddActionButton(hud, parent, BuildWorksLocalization.Text("exchange.diagnostics"), y, buttonWidth,
+                () => ShowBlueprintDiagnostics(player, blueprint));
             y -= actionHeight;
             if (blueprint.IsExternal)
             {

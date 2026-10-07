@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
 using OstrixMods.BuildWorks;
@@ -107,6 +108,7 @@ public static class ActualDividerAcceptance
             cameraObject = new GameObject("ExactDividerCameraTemplate", typeof(Camera));
             Camera template = cameraObject.GetComponent<Camera>();
             template.enabled = false;
+            RunRealExternalBlueprints(template, LoadPrefab, outputDirectory, evidence);
             RunPlacementAcceptance(template, placementPrefabs, evidence);
             DiagnoseChairCorners(template, LoadPrefab("piece_chair02"), outputDirectory, evidence);
             var document = new BlueprintEditorDocument(null, "Группа 1 — installed asset proof", "Test", new[]
@@ -236,6 +238,198 @@ public static class ActualDividerAcceptance
                     "; enabled=" + renderer.enabled + "; bounds=" + renderer.bounds);
         }
         finally { Object.DestroyImmediate(clone); }
+    }
+
+    private static void RunRealExternalBlueprints(Camera template, Func<string, GameObject> load,
+        string output, ICollection<string> evidence)
+    {
+        string repository = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", ".."));
+        string corpus = Path.Combine(repository, "artifacts", "external-blueprints", "BiomeBlueprints-1.0.3");
+        string archivePath = Path.Combine(corpus, "package.zip");
+        string Hash(byte[] bytes)
+        {
+            using (var hash = System.Security.Cryptography.SHA256.Create())
+                return BitConverter.ToString(hash.ComputeHash(bytes)).Replace("-", "");
+        }
+        const string archiveHash = "36C5A04DF80294C6B49B21C916D808FCE60698B17479BFAB7C95F850BE12C707";
+        Require(Hash(File.ReadAllBytes(archivePath)) == archiveHash, "External corpus differs from reviewed archive");
+        using (var archive = ZipFile.OpenRead(archivePath))
+        foreach (var fixture in new[] {
+            ("hs_ashlands_madzobuild_coffeetable.blueprint", "0DE7C847036390D74CEA27242FB47B9375668B1775BA9A7228EADDF7ECC4DD53", 4),
+            ("hs_blackforest_hut.blueprint", "492E78E16FEEFCCF3B58C1503342732AEFC68A9F9B891401EB3B9BC06E588F49", 28) })
+        {
+            byte[] bytes;
+            using (var input = archive.GetEntry("blueprints/" + fixture.Item1).Open())
+            using (var buffer = new MemoryStream()) { input.CopyTo(buffer); bytes = buffer.ToArray(); }
+            Require(Hash(bytes) == fixture.Item2, "External fixture bytes changed: " + fixture.Item1);
+            string original = new System.Text.UTF8Encoding(false, true).GetString(bytes);
+            string fixtureDirectory = Path.Combine(corpus, "smoke");
+            Directory.CreateDirectory(fixtureDirectory);
+            string fixturePath = Path.Combine(fixtureDirectory, fixture.Item1);
+            if (!File.Exists(fixturePath)) File.WriteAllBytes(fixturePath, bytes);
+            Require(File.ReadAllBytes(fixturePath).SequenceEqual(bytes), "Existing external fixture changed; refusing overwrite");
+            var raw = ExternalBlueprintLibrary.Parse(original, fixturePath);
+            Require(raw.importError == null && raw.parts.Count == fixture.Item3 &&
+                !raw.sourceDocuments[0].ToGeometry().HasOpaqueSections, "External fixture cannot enter known pipeline");
+            var prefabs = raw.parts.Select(part => part.prefabName).Distinct().ToDictionary(name => name, load);
+            string runDirectory = Path.Combine(output, "external-real-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(runDirectory);
+            string storePath = Path.Combine(runDirectory, "library.json");
+            var store = new CompositeBlueprintStore(storePath);
+            store.ConfigureImportScale(name => new CompositeBlueprintStore.VectorData(prefabs[name].transform.localScale),
+                () => prefabs, name => name.GetStableHashCode(), () => 0);
+            var review = CompositeBlueprintStore.ReviewImportFile(fixturePath, name => name.GetStableHashCode(), 0);
+            Require(store.TryImportReviewed(review, false, false, name => name.GetStableHashCode(), out string importError), importError);
+            var wait = System.Diagnostics.Stopwatch.StartNew();
+            while (store.CatalogLoading && wait.ElapsedMilliseconds < 10000)
+            { store.CatalogAll(); System.Threading.Thread.Sleep(10); }
+            Require(!store.CatalogLoading && store.ImportError == null, "Real reviewed import failed: " + store.ImportError);
+            var imported = store.CatalogAll().Single();
+            Require(imported.importError == null && !imported.importAbsoluteScale &&
+                !CompositeBlueprintStore.HasForeignData(imported), "Actual reviewed import normalization failed");
+            using (var editor = new BlueprintEditorController(store, template, null,
+                name => prefabs.TryGetValue(name, out var prefab) ? prefab : null, name => name,
+                () => Array.Empty<BlueprintEditorCatalogItem>(), message => { throw new InvalidOperationException(message); }))
+            {
+                Require(editor.OpenExisting(imported, out string error), "Real external editor open: " + error);
+                editor.Document.SelectOnly(editor.Document.Parts[0].StableId);
+                Require(editor.ApplyTransformDelta(Vector3.right * .25f, Quaternion.identity, Vector3.zero), "Real external edit failed");
+                Quaternion supportRotation = Quaternion.Euler(0, 37, 0);
+                Require(editor.Document.AddSupport(new BlueprintEditorSupport("smoke-support", "Опора испытания",
+                    new Point3(1.25, -.25, .5), new Rotation3(supportRotation.x, supportRotation.y, supportRotation.z, supportRotation.w))) &&
+                    editor.Document.SetPlacementSupport("smoke-support"), "Real external placement support failed");
+                Require((bool)typeof(BlueprintEditorController).GetMethod("TrySave", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(editor, new object[] { false, true }), "Real external native copy save failed");
+                editor.Close(true);
+                var reopenedStore = new CompositeBlueprintStore(storePath);
+                var saved = reopenedStore.All().Single();
+                Require(editor.OpenExisting(saved, out error), "Real external saved editor reopen: " + error);
+                Require(Math.Abs(saved.parts[0].position.x - raw.parts[0].position.x - .25f) < .0001 &&
+                    saved.sourceDocuments[0].text == original && saved.placementSupportId == "smoke-support" &&
+                    editor.Document.Parts.Count == fixture.Item3 && editor.Document.Supports.Count == 1,
+                    "Real external disk/editor roundtrip lost source/edit/support");
+                for (int index = 0; index < raw.parts.Count; ++index)
+                {
+                    var before = raw.parts[index]; var after = saved.parts[index];
+                    Vector3 expectedPosition = before.position.ToVector3() + (index == 0 ? Vector3.right * .25f : Vector3.zero);
+                    Vector3 expectedScale = before.scale.ToVector3();
+                    Vector3 intrinsic = prefabs[before.prefabName].transform.localScale;
+                    expectedScale = new Vector3(expectedScale.x / intrinsic.x, expectedScale.y / intrinsic.y, expectedScale.z / intrinsic.z);
+                    Require((after.position.ToVector3() - expectedPosition).sqrMagnitude < .00000001f &&
+                        Quaternion.Angle(after.rotation.ToQuaternion(), before.rotation.ToQuaternion()) < .001f &&
+                        (after.scale.ToVector3() - expectedScale).sqrMagnitude < .00000001f &&
+                        after.sourceLine == before.sourceLine && after.sourceDocumentId == before.sourceDocumentId,
+                        "Real external import/edit/save changed another pose, scale or source row");
+                    var openedPart = editor.Document.Parts[index];
+                    Require((openedPart.Position - new Point3(expectedPosition.x, expectedPosition.y, expectedPosition.z)).LengthSquared < .00000001 &&
+                        (openedPart.Scale - new Point3(expectedScale.x, expectedScale.y, expectedScale.z)).LengthSquared < .00000001 &&
+                        Quaternion.Angle(new Quaternion((float)openedPart.Rotation.X, (float)openedPart.Rotation.Y,
+                            (float)openedPart.Rotation.Z, (float)openedPart.Rotation.W), before.rotation.ToQuaternion()) < .001f,
+                        "Real external reopened editor changed part pose/scale");
+                }
+                Require(reopenedStore.TryExportFile(saved, runDirectory, "edited", false, out string exported, out error), error);
+                var reimported = ExternalBlueprintLibrary.LoadFile(exported).Single();
+                Require(reimported.importError == null && reimported.parts.Count == fixture.Item3 &&
+                    reimported.sourceDocuments[0].text == original && reimported.placementSupportId == saved.placementSupportId,
+                    "Real external export/reimport failed");
+                foreach (var roundtrip in new[] { saved, reimported })
+                {
+                    Require(roundtrip.supports.Count == 1 &&
+                        BlueprintPlacementFrame.TryResolve(roundtrip, out Vector3 supportPosition, out Quaternion restoredRotation) &&
+                        (supportPosition - new Vector3(1.25f, -.25f, .5f)).sqrMagnitude < .00000001f &&
+                        Quaternion.Angle(restoredRotation, supportRotation) < .001f,
+                        "Real external roundtrip changed authored support pose");
+                    for (int index = 0; index < saved.parts.Count; ++index)
+                    {
+                        var expected = saved.parts[index]; var actual = roundtrip.parts[index];
+                        Require(actual.prefabName == expected.prefabName && actual.stableId == expected.stableId &&
+                            (actual.position.ToVector3() - expected.position.ToVector3()).sqrMagnitude < .00000001f &&
+                            Quaternion.Angle(actual.rotation.ToQuaternion(), expected.rotation.ToQuaternion()) < .001f &&
+                            (actual.scale.ToVector3() - expected.scale.ToVector3()).sqrMagnitude < .00000001f &&
+                            actual.sourceDocumentId == expected.sourceDocumentId && actual.sourceLine == expected.sourceLine,
+                            "Real external export/reimport changed part identity, pose, scale or source row");
+                    }
+                }
+                var editorSupport = editor.Document.Supports.Single();
+                Require(editorSupport.StableId == "smoke-support" && editorSupport.Name == "Опора испытания" &&
+                    (editorSupport.Position - new Point3(1.25, -.25, .5)).LengthSquared < .00000001 &&
+                    Quaternion.Angle(new Quaternion((float)editorSupport.Rotation.X, (float)editorSupport.Rotation.Y,
+                        (float)editorSupport.Rotation.Z, (float)editorSupport.Rotation.W), supportRotation) < .001f,
+                    "Real external reopened editor changed authored support pose/name");
+                editor.Close(true);
+                Bounds bounds = VerifyRealWorldPreview(saved, raw, prefabs, template,
+                    Path.Combine(output, "real-" + Path.GetFileNameWithoutExtension(fixture.Item1) + "-world-preview.png"));
+                evidence.Add("PASS real external " + raw.name + "; parts=" + fixture.Item3 + "; source=" + fixturePath +
+                    "; sourceSHA256=" + fixture.Item2 + "; native/export=" + runDirectory);
+                evidence.Add("EXTERNAL world renderer bounds size=" + bounds.size.ToString("R"));
+                foreach (var pair in prefabs) evidence.Add("EXTERNAL prefab=" + pair.Key +
+                    "; actual intrinsic scale=" + pair.Value.transform.localScale.ToString("R"));
+            }
+            Require(Hash(File.ReadAllBytes(fixturePath)) == fixture.Item2, "External workflow modified source");
+        }
+        Require(Hash(File.ReadAllBytes(archivePath)) == archiveHash, "External workflow modified archive");
+        evidence.Add("PASS actual external pipeline; real assets, edit, free support, disk/editor reopen, export/reimport, renderer-only world preview. Native construction/world reload/network NOT executed.");
+    }
+
+    private static Bounds VerifyRealWorldPreview(CompositeBlueprintStore.Blueprint saved,
+        CompositeBlueprintStore.Blueprint raw, IReadOnlyDictionary<string, GameObject> prefabs, Camera camera, string image)
+    {
+        var sources = new List<GameObject>();
+        var ghost = new GameObject("RealExternalGhostFrame");
+        var lightObject = new GameObject("RealExternalProofLight", typeof(Light));
+        var light = lightObject.GetComponent<Light>();
+        light.type = LightType.Directional; light.intensity = 1.2f; light.shadows = LightShadows.None;
+        lightObject.transform.rotation = Quaternion.Euler(50, -30, 0);
+        using (var preview = new PlacementGhostPreviewView())
+        try
+        {
+            var pieces = new List<Piece>();
+            var plan = new List<PrecisionPlacementSession.TransformSnapshot>();
+            Require(BlueprintPlacementFrame.TryResolve(saved, out Vector3 support, out Quaternion orientation), "Saved external support missing");
+            BlueprintPlacementFrame.ToRootPose(new Vector3(25, 4, -15), Quaternion.Euler(0, 73, 0),
+                support, orientation, 1f, out Vector3 position, out Quaternion rotation);
+            foreach (var part in saved.parts)
+            {
+                GameObject prefab = prefabs[part.prefabName];
+                var source = PlacementGhostPreviewView.CreateVisualClone(prefab, "RealExternalInertSource", 0);
+                source.transform.localScale = prefab.transform.localScale;
+                source.SetActive(false); sources.Add(source); pieces.Add(source.AddComponent<Piece>());
+                plan.Add(new PrecisionPlacementSession.TransformSnapshot(position + rotation * part.position.ToVector3(),
+                    rotation * part.rotation.ToQuaternion(), part.scale.ToVector3()));
+            }
+            preview.Show(ghost, plan, pieces, -1);
+            var instances = (List<GameObject>)typeof(PlacementGhostPreviewView).GetField("instances", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(preview);
+            Require(instances.Count == saved.parts.Count, "Real external world ghost omitted pieces");
+            Bounds bounds = default; bool found = false;
+            for (int index = 0; index < instances.Count; ++index)
+            {
+                Matrix4x4 expected = Matrix4x4.TRS(plan[index].Position, plan[index].Rotation, raw.parts[index].scale.ToVector3());
+                Matrix4x4 actual = instances[index].transform.localToWorldMatrix;
+                for (int element = 0; element < 16; ++element)
+                    Require(Mathf.Abs(expected[element] - actual[element]) < .0001f, "Real external ghost has wrong scale/pose");
+                bool visiblePart = false;
+                foreach (Renderer renderer in instances[index].GetComponentsInChildren<Renderer>(true))
+                    if (renderer.enabled && renderer.gameObject.activeInHierarchy &&
+                        renderer.GetComponent<MeshFilter>()?.sharedMesh?.vertexCount > 0)
+                    {
+                        visiblePart = true;
+                        if (found) bounds.Encapsulate(renderer.bounds); else { bounds = renderer.bounds; found = true; }
+                    }
+                Require(visiblePart, "Real external ghost omitted native meshes for part " + index);
+            }
+            Require(found, "Real external ghost has no visible native meshes");
+            camera.orthographic = true; camera.orthographicSize = bounds.extents.magnitude * 1.25f;
+            camera.clearFlags = CameraClearFlags.SolidColor; camera.backgroundColor = new Color(.14f, .16f, .18f);
+            camera.transform.SetPositionAndRotation(bounds.center + new Vector3(1, .65f, -1).normalized * bounds.size.magnitude * 2,
+                Quaternion.LookRotation(new Vector3(-1, -.65f, 1)));
+            Capture(camera, image);
+            return bounds;
+        }
+        finally
+        {
+            foreach (var source in sources) Object.DestroyImmediate(source);
+            Object.DestroyImmediate(ghost); Object.DestroyImmediate(lightObject);
+        }
     }
 
     private static Dictionary<string, List<string>> Dependencies()

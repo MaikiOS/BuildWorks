@@ -2,6 +2,28 @@
 
 [English](external-corpus-2026-10-07.md) | **Русский**
 
+## Два настоящих файла и закреплённые диалекты
+
+[Проверенный участок пути](../../docs/testing/external-path-2026-10-07_RU.md): CoffeeTable4/Forest Hut28
+из BiomeBlueprints1.0.3 прошли reviewed import, editor/edit/free support, disk reopen,
+наш export/reimport и renderer-only мировой план с настоящими prefab. Стройка/reload/сеть не проверены.
+Оригиналы/авторы/хеши закреплены локально; лицензия на перераспространение не найдена.
+
+Заголовки дополнительно сверены с конкретными revisions:
+[InfinityHammer ce2737f](https://github.com/JereKuusela/valheim-infinity_hammer/blob/ce2737f0156df44aa7d193b5e1aed6167f3d794b/InfinityHammer/Blueprint.cs#L31),
+[Expand World Data b036810](https://github.com/JereKuusela/valheim-expand_world_data/blob/b036810d4708949b9b1886291aa08c61ca269729/ExpandWorldData/data/Blueprints.cs#L205).
+Пустой Center в IH включает origin в min/max X/Z, но Y берёт от минимальной детали;
+EWD добавляет к minY0.05. Непустой marker в IH остаётся деталью, EWD исключает только первое
+совпадение через Chance0. Отсутствующий Center и пустой Center различаются настройкой default.
+[IH writer](https://github.com/JereKuusela/valheim-infinity_hammer/blob/ce2737f0156df44aa7d193b5e1aed6167f3d794b/InfinityHammer/commands/blueprint/HammerSave.cs#L127)
+пишет Euler YXZ, а
+[reader](https://github.com/JereKuusela/valheim-infinity_hammer/blob/ce2737f0156df44aa7d193b5e1aed6167f3d794b/InfinityHammer/commands/blueprint/HammerBlueprint.cs#L143)
+читает VectorXZY. Ненулевой Rotation нельзя трактовать по предположению.
+Coordinates XZY относятся к восстановлению исходного места, не обычному переносу.
+Одинаковый синтаксис не определяет потребителя. Даже74 файла с пустым Center/нулевым Rotation
+не разрешены общим whitelist: нужен явный диалект/происхождение и согласованный row binding.
+Production reader в этом этапе не менялся.
+
 Скачан один дополнительный публичный архив [DarkTrooper/2v2t5.0.0](https://thunderstore.io/c/valheim/p/DarkTrooper/2v2t/v/5.0.0/)
 с официального download endpoint. Локальный файл artifacts/external-blueprints/2v2t-5.0.0/package.zip:
 12847060 байт, SHA256 `4A6E6A53F246B5CF4C7EA9472F726D9F35687BCE978F28AB47A020AEE759DD88`.

@@ -2,6 +2,20 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## .87 addition — two real external files; tests only
+
+[Protocol and limits](docs/testing/external-path-2026-10-07.md).
+CoffeeTable4/Forest Hut28 pass reviewed import/background catalogue, editor edit+free support,
+disk/editor reopen, our JSON export/reimport and world renderer with installed native prefabs.
+All poses/scales/source rows/authored support and visible geometry per part are checked.
+252 UI screenshots +2 real-building images; correctness/ponytail reviews PASS. Product/DLL stay .87.
+Evidence: artifacts/external-path-2026-10-07/verification.json. Originals/attribution/hashes stay local;
+external files/models excluded from Git/releases. IH/EWD header semantics conflict; production reader unchanged.
+Installed .82; no deployment/native construction/world reload/network/save mutation/push.
+Next priority: prepared isolated survival stand without manual material gathering.
+Native CUA unavailable; AGENTS requires explicit game launch/save-creation authorization.
+
+
 ## Checkpoint 0.19.87 — supplied world appearance and bound item; source
 
 Ordinary previews previously omitted mounted contents; heavy previews used archived appearance.

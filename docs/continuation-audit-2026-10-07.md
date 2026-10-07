@@ -6,6 +6,11 @@ Audit: 2026-10-07; current source checkpoint .87. This is not full product accep
 Read AGENTS, PROJECT_CONTRACT, current HANDOFF and docs/ROADMAP. CONTINUE_PROMPT.txt targets
 .13; current-pass targets the historical .56 catalogue, not imported construction acceptance.
 
+Same-day addition: [two real external files](testing/external-path-2026-10-07.md) pass reviewed import/
+catalogue → editor/edit/support → disk reopen → JSON export/reimport → world renderer with installed prefabs.
+252 UI screenshots +2 real-building images and independent reviews PASS. Product DLL stays .87, installed .82.
+Native construction/world reload/network remain untested.
+
 ## Verified baseline
 
 Source/artifacts initially .85. Installed DLL is **.82**, only TerrainRamp-1.0-Test:
@@ -27,7 +32,7 @@ Its text was not updated. A document edit is not a goal update.
 | Block | Implemented | Automated evidence | Owner/game evidence | Unfinished | Design only |
 |---|---|---|---|---|---|
 | Editor | Transform/group/Array/Contour/Undo/save | Geometry/bridge/Unity252 | Older .41/.44 and later scoped series recorded as accepted; do not repeat wholesale | Scenes above512 | New guide tools |
-| Exchange | Store14/portable5, .blueprint/.vbuild/ZIP, exact archives, separate contents options | Store353 plus separate209-source parser report | Imported construction through reload unproven | Headers, RandMatSeed, some ZDO/inventory, export only our JSON/ZIP | Unspecified third-party formats |
+| Exchange | Store14/portable5, .blueprint/.vbuild/ZIP, exact archives, separate contents options | Store353;209 parser-only;2 real files reviewed import/edit/support/disk/export/world renderer | Imported construction through reload unproven | Header dialects, RandMatSeed, some ZDO/inventory, export only our JSON/ZIP | Unspecified third-party formats |
 | Scale/preview | Intrinsic prefab scale, nested XYZ, world50000; .87 supplied-item world appearance | Unity transforms; ordinary/native-holder/passive/heavy attachments | Particular giant lamp remains unproven | Native place/reload/FPS; unknown item effects | Further measured optimization |
 | Supports/snaps | Independent supports, distinct pivot/placement, durable world points | Store/controller/Unity/layout | Older group pivots accepted; new world snaps unaccepted | Reload/reconnect/remote client | Quiet unselected markers |
 | Missing prefabs | Scene records/placeholder | Rejection tested | None | Editor entry blocked; no source/type/local bbox or replacement1→N | Explicit multi-object substitution |

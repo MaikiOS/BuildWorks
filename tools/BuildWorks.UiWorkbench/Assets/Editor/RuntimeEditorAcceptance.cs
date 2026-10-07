@@ -495,9 +495,11 @@ public static class RuntimeEditorAcceptance
                 Require(runtimeErrors.Count == 0, "Runtime logged errors: " + string.Join("; ", runtimeErrors));
                 yield return null;
                 ActualDividerAcceptance.Run(output);
-                File.WriteAllLines(Path.Combine(output, "acceptance-checks.txt"), checks);
                 string nativeProof = File.ReadAllText(Path.Combine(output, "native-interaction-check.txt"));
                 string assetProof = File.ReadAllText(Path.Combine(output, "actual-divider-check.txt"));
+                Require(assetProof.Contains("PASS actual external pipeline;"), "Real external/native-asset pipeline failed; see actual-divider-check.txt");
+                checks.Add("Real BiomeBlueprints CoffeeTable/Forest Hut bytes: installed native prefab scales/meshes, actual editor edit/free support/save/reopen/export/reimport and renderer-only world preview. Two extra asset images; native construction/world reload/network unverified.");
+                File.WriteAllLines(Path.Combine(output, "acceptance-checks.txt"), checks);
                 var result = new Result { screenshots = count, uiCases = count, checks = checks.ToArray(),
                     controllerInputPassed = File.ReadAllText(Path.Combine(output, "controller-input-check.txt")).StartsWith("PASS:"),
                     nativeInteractionPassed = nativeProof.Contains("PASS installed prefab hierarchy unchanged") && !nativeProof.Contains("\nFAIL"),

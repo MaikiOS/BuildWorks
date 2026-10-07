@@ -2,6 +2,20 @@
 
 [English](HANDOFF.md) | **Русский**
 
+## Дополнение .87 — два настоящих внешних файла; только испытания
+
+[Протокол и границы](docs/testing/external-path-2026-10-07_RU.md).
+CoffeeTable4/Forest Hut28: reviewed import/background catalog, editor edit+free support,
+disk/editor reopen, наш JSON export/reimport и world renderer с настоящими prefab PASS.
+Все позы/масштабы/исходные строки/опора сравниваются; каждая деталь имеет видимую геометрию.
+252 UI-снимка +2 изображения; correctness/ponytail review PASS. Продукт и DLL остаются .87.
+Доказательства: artifacts/external-path-2026-10-07/verification.json. Оригиналы/авторство/хеши
+локально; внешние файлы и модели не попали в Git/релиз. IH/EWD headers неоднозначны, reader не менялся.
+Установлена .82; нет deployment/native construction/world reload/network/save mutation/push.
+Следующий приоритет — готовый изолированный survival-стенд без ручного сбора материалов.
+Native CUA недоступен; AGENTS требует явное разрешение для игры/создания сохранений.
+
+
 ## Этап 0.19.87 — мировой вид и закрепление своего предмета; исходники
 
 Обычный призрак ранее вообще не добавлял содержимое креплений; heavy использовал архивный вид.

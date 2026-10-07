@@ -2,6 +2,26 @@
 
 **English** | [Русский](external-corpus-2026-10-07_RU.md)
 
+## Real-file pipeline and pinned dialect evidence
+
+[Verified segment](../../docs/testing/external-path-2026-10-07.md): BiomeBlueprints1.0.3 CoffeeTable4/
+Forest Hut28 pass actual reviewed import, editor/edit/free support, disk reopen, our export/reimport and
+renderer-only world planning with installed native prefabs. Construction/world reload/network untested.
+Original attribution/hash provenance is local; no redistribution license established.
+
+Pinned [InfinityHammer ce2737f](https://github.com/JereKuusela/valheim-infinity_hammer/blob/ce2737f0156df44aa7d193b5e1aed6167f3d794b/InfinityHammer/Blueprint.cs#L31)
+and [EWD b036810](https://github.com/JereKuusela/valheim-expand_world_data/blob/b036810d4708949b9b1886291aa08c61ca269729/ExpandWorldData/data/Blueprints.cs#L205)
+disagree: IH empty Center includes origin in X/Z extrema, but uses minimum piece Y; EWD adds0.05Y.
+IH retains a nonempty marker row; EWD excludes only the first matching row through Chance0.
+Absent versus empty Center differ through configured defaults. IH
+[writer](https://github.com/JereKuusela/valheim-infinity_hammer/blob/ce2737f0156df44aa7d193b5e1aed6167f3d794b/InfinityHammer/commands/blueprint/HammerSave.cs#L127)
+uses YXZ Euler, while the pinned
+[reader](https://github.com/JereKuusela/valheim-infinity_hammer/blob/ce2737f0156df44aa7d193b5e1aed6167f3d794b/InfinityHammer/commands/blueprint/HammerBlueprint.cs#L143)
+uses VectorXZY. Nonzero Rotation needs explicit dialect evidence. Coordinates XZY restore original world
+location, not ordinary relocation. Syntax alone does not identify consumer; even74 zero-rotation/empty-center
+files cannot safely receive a shared whitelist. Explicit dialect/provenance and coordinated source-row binding
+are required. No production reader change in this test-only checkpoint.
+
 ## Local test data, never installed or redistributed
 
 [DarkTrooper/2v2t5.0.0](https://thunderstore.io/c/valheim/p/DarkTrooper/2v2t/v/5.0.0/):

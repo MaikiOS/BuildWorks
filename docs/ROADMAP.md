@@ -9,7 +9,12 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.89**, not deployed: [incomplete catalogue insertion](testing/missing-catalogue-0.19.89.md)
+Active source checkpoint **0.19.90**, not deployed: [QA save isolation](testing/qa-save-isolation-0.19.90.md),
+separate opt-in DLL, normal build excludes QA. Cold-storage/root/cloud guards and fresh Local identities with receipt;
+source/path/compiled proof only, not native runtime. Owner-authorized QA bootstrap save creation disabled; preflight PASS.
+Resources/stations/ready survival stand remain open; full goal incomplete. Installed .82.
+
+Previous source checkpoint **0.19.89**, not deployed: [incomplete catalogue insertion](testing/missing-catalogue-0.19.89.md)
 warns about missing models while retaining every record; unknown costs/stations never appear free.
 Actual import/card/click/controller/Undo/Redo/Cancel/save/disk and required checks PASS. Native Session producer
 is pinned by HostContract, not a game run. Installed .82; full import/build/reload and safe survival stand open.

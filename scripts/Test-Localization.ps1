@@ -85,6 +85,9 @@ $sourceFiles = @(Get-ChildItem $allSourceRoot -Recurse -Filter '*.cs' -File |
 $sourceText = ($sourceFiles | ForEach-Object { [IO.File]::ReadAllText($_.FullName) }) -join "`n"
 $nonLocalizationDottedLiterals = @(
     'blueprints.json',
+    'buildworks-qa-root.txt',
+    'qa-identities.txt',
+    'qa-isolation.token',
     'catalog.group.',
     'editor.catalog.',
     'com.jotunn.jotunn',

@@ -2,7 +2,7 @@
 
 [English](continuation-audit-2026-10-07.md) | **Русский**
 
-Аудит 2026-10-07; текущий исходный checkpoint — 0.19.89. Это не приёмка полного продукта.
+Аудит 2026-10-07; текущий исходный checkpoint — 0.19.90. Это не приёмка полного продукта.
 Действующие инструкции: AGENTS.md, PROJECT_CONTRACT.md, docs/ROADMAP.md и текущий запрос владельца.
 CONTINUE_PROMPT.txt описывает .13 и устарел. specs/roadmap/current-pass.md описывает каталог .56,
 а не полный импорт. Исторические проверки не заменяют проверку установленной версии.
@@ -20,6 +20,10 @@ CONTINUE_PROMPT.txt описывает .13 и устарел. specs/roadmap/curr
 предупреждение вместо блокировки, неизвестная цена не выглядит нулевой. Actual UI/controller/Undo/save
 проверены; native Session producer только compiled wiring. Early native save boundary исследована,
 но безопасная изоляция от остальных plugin Awake ещё не доказана; стенд не внедрён.
+
+[Этап .90](testing/qa-save-isolation-0.19.90_RU.md): QA-only root/cloud isolation и fresh Local identities
+подготовлены в исходниках; BCL пути/compiled wiring PASS, native save не исполнялся. Known bootstrap writer
+отключён отдельным разрешением владельца, preflight PASS. Ресурсы/станции/готовый survival-стенд открыты.
 
 ## Проверенные исходные данные
 

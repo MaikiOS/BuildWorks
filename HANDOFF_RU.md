@@ -2,6 +2,21 @@
 
 [English](HANDOFF.md) | **Русский**
 
+## Этап 0.19.90 — изоляция QA saves; только исходная подготовка
+
+[Контракт и проверки](docs/testing/qa-save-isolation-0.19.90_RU.md). Обычная DLL не содержит QA type;
+opt-in BuildWorksTestStand=true пишет отдельный test-stand-bin. GUID-owned root, cold-storage refusal,
+both cloud gates, Set/Reset pin и prefix registration; host DLL fingerprints. После native storage
+готовятся новые Local metadata/profile с started-before-save receipt; незавершённое не повторяется.
+Это НЕ готовый survival-стенд: grants/рецепты/станции/готовые объекты отсутствуют, runtime не проверен.
+Пути/owner/traversal/junction, normal/QA separation, compiled wiring, обе Release0/0, API,
+Localization853, guards и format PASS. Read-only correctness/ponytail PASS.
+С отдельного разрешения Ostrix только QA TerrainRamp bootstrap CreateMissingSaves true→false;
+known-writer preflight после изменения PASS. Иначе его coroutine писала бы saves при отказе BuildWorks.
+artifacts/checkpoint-0.19.90/verification.json. Установлена .82; deployment/game/saves/reload/network/push нет.
+Следующий шаг: loaded UID/playerID/server guards → одноразовые ресурсы/предметы/знания/физические станции →
+готовая серия полного импорта/стройки/reload. Новая массовая проверка старых инструментов не нужна.
+
 ## Этап 0.19.89 — вставка неполного чертежа из каталога; исходники
 
 [Протокол и границы](docs/testing/missing-catalogue-0.19.89_RU.md).

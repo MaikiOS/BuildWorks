@@ -2,7 +2,7 @@
 
 **English** | [Русский](continuation-audit-2026-10-07_RU.md)
 
-Audit: 2026-10-07; current source checkpoint .89. This is not full product acceptance.
+Audit: 2026-10-07; current source checkpoint .90. This is not full product acceptance.
 Read AGENTS, PROJECT_CONTRACT, current HANDOFF and docs/ROADMAP. CONTINUE_PROMPT.txt targets
 .13; current-pass targets the historical .56 catalogue, not imported construction acceptance.
 
@@ -19,6 +19,10 @@ no invented geometry. World planning refuses pending basis; full restoration rem
 unknown costs explicit. Actual UI/controller/Undo/save pass; native Session producer has compiled wiring
 proof only. Early native save boundary is researched; isolation from other plugin Awake remains unproven.
 No safe-stand preparation is implemented.
+
+[Checkpoint .90](testing/qa-save-isolation-0.19.90.md): QA-only root/cloud isolation and fresh Local identities
+are source-prepared. BCL paths/compiled wiring PASS; native save unexecuted. Known bootstrap writer disabled
+with explicit owner authorization; preflight PASS. Resources/stations/ready survival stand remain open.
 
 ## Verified baseline
 

@@ -9,7 +9,12 @@
 
 ## База и доказательства
 
-Активные исходники **0.19.89**, не установлены: [вставка неполного чертежа из каталога](testing/missing-catalogue-0.19.89_RU.md)
+Активные исходники **0.19.90**, не установлены: [QA save isolation](testing/qa-save-isolation-0.19.90_RU.md),
+отдельная opt-in DLL; normal build без QA. Cold-storage/root/cloud guards и fresh Local identities с receipt;
+пока source/path/compiled proof, не native runtime. С разрешения владельца QA bootstrap автосоздание saves отключено,
+preflight PASS. Ресурсы/станции и готовый survival-стенд открыты; полная цель не завершена. Установлена .82.
+
+Предыдущие исходники **0.19.89**, не установлены: [вставка неполного чертежа из каталога](testing/missing-catalogue-0.19.89_RU.md)
 предупреждает об отсутствующих моделях, сохраняет все записи; неизвестная цена/станции не показываются
 как бесплатные. Actual import/card/click/controller/Undo/Redo/Cancel/save/disk и обязательные проверки PASS.
 Native Session producer проверен HostContract, не игровым запуском. Установлена .82; full import/build/reload

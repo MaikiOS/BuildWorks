@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.89";
+        internal const string PluginVersion = "0.19.90";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -47,6 +47,23 @@ namespace OstrixMods.BuildWorks
 
         private void Awake()
         {
+#if BUILDWORKS_TEST_STAND
+            bool qaActive;
+            try
+            {
+                qaActive = BuildWorksTestIsolation.Activate(Paths.ConfigPath);
+                if (qaActive)
+                {
+                    Logger.LogInfo("BuildWorks QA save isolation active; restart to leave this mode.");
+                }
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError("BuildWorks QA isolation refused; no test preparation will run: " + exception);
+                enabled = false;
+                return;
+            }
+#endif
             instance = this;
             TogglePrecisionKey = Config.Bind(
                 "Controls",
@@ -107,7 +124,27 @@ namespace OstrixMods.BuildWorks
             }
 
             Logger.LogInfo("BuildWorks " + PluginVersion + " loaded.");
+#if BUILDWORKS_TEST_STAND
+            if (qaActive) StartCoroutine(PrepareQaSaves());
+#endif
         }
+
+#if BUILDWORKS_TEST_STAND
+        private System.Collections.IEnumerator PrepareQaSaves()
+        {
+            float deadline = Time.realtimeSinceStartup + 60f;
+            while (!PlatformInitializer.SaveDataInitialized && Time.realtimeSinceStartup < deadline) yield return null;
+            try
+            {
+                string name = BuildWorksTestIsolation.PrepareFreshSaves();
+                Logger.LogInfo("BuildWorks QA Local world/character: " + name + ". Resources/stations are not prepared yet.");
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError("BuildWorks QA save preparation refused; no automatic retry: " + exception);
+            }
+        }
+#endif
 
         private static bool HasRegisteredPlacementTranspiler()
         {

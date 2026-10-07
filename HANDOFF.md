@@ -2,6 +2,21 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.90 — QA save isolation; source preparation only
+
+[Contract and checks](docs/testing/qa-save-isolation-0.19.90.md). Normal DLL excludes QA type;
+opt-in BuildWorksTestStand=true targets separate test-stand-bin. GUID-owned root, cold-storage refusal,
+both cloud capabilities, Set/Reset pin, registered prefixes and host fingerprints. After native storage,
+fresh Local metadata/profile use started-before-save receipt; incomplete attempts never retry.
+NOT a ready survival stand: no grants/recipes/stations/placed fixtures; native execution unverified.
+Paths/owner/traversal/junction, binary separation, compiled wiring, both Release0/0, API,
+Localization853, deployment guards and format PASS. Independent correctness/ponytail PASS.
+With explicit owner permission only QA TerrainRamp bootstrap CreateMissingSaves true→false changed;
+known-writer preflight now PASS. Otherwise its coroutine could write saves after BuildWorks refusal.
+Evidence: artifacts/checkpoint-0.19.90/verification.json. Installed .82; no deployment/game/saves/reload/network/push.
+Next: loaded UID/playerID/server guards → one-shot materials/items/knowledge/physical stations →
+ready full import/build/reload series. Do not repeat older accepted tools wholesale.
+
 ## Checkpoint 0.19.89 — incomplete catalogue insertion; source only
 
 [Protocol and limits](docs/testing/missing-catalogue-0.19.89.md).

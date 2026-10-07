@@ -9,7 +9,13 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.88**, not deployed: [incomplete foreign blueprints](testing/missing-model-0.19.88.md)
+Active source checkpoint **0.19.89**, not deployed: [incomplete catalogue insertion](testing/missing-catalogue-0.19.89.md)
+warns about missing models while retaining every record; unknown costs/stations never appear free.
+Actual import/card/click/controller/Undo/Redo/Cancel/save/disk and required checks PASS. Native Session producer
+is pinned by HostContract, not a game run. Installed .82; full import/build/reload and safe survival stand open.
+Early native save boundary researched; overall isolation remains unproven.
+
+Previous source checkpoint **0.19.88**, not deployed: [incomplete foreign blueprints](testing/missing-model-0.19.88.md)
 retain missing records/absolute scale basis; actual editor open/edit/save preserves them without invented
 dimensions. Late model resolution divides once on reopen. Store15/JSON6; world pending-basis rejection is atomic.
 Release/required checks/Unity252 and independent reviews passed. Missing-mod cards/metadata/1→N, heavy editor

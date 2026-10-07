@@ -2,6 +2,21 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.89 — incomplete catalogue insertion; source only
+
+[Protocol and limits](docs/testing/missing-catalogue-0.19.89.md).
+Missing-model cards warn `[!]` and insert every record; file/limit errors remain blocks. Controller
+normalizes an editor copy, never the source. Unknown costs/stations are hidden with an explanation;
+complete costs use resolved Pieces, independently of world registration. Strict world gates remain.
+Reviewed import → actual card/click/controller → insert/Undo/Redo/Cancel/save/fresh disk PASS.
+Workbench does not execute native Session catalogue production; HostContract pins its wiring.
+Adaptive panel inspection includes inactive content, not all-resolution visibility acceptance.
+Release/Localization853/Store/bridge/WorldLayout15/API/guards/format/Unity252/source hashes and both
+reviews PASS; verify absent. Geometry/corpus353 unchanged, .88 evidence reused.
+Evidence: artifacts/checkpoint-0.19.89/verification.json. Early native save boundary researched;
+other plugin Awake still prevents claiming overall safe-stand isolation. Bootstrap absent.
+Installed .82; no deployment/game/saves/reload/network/push. Full goal active; import/build/reload first.
+
 ## Checkpoint 0.19.88 — incomplete foreign blueprints and honest scale; source only
 
 [Protocol and limits](docs/testing/missing-model-0.19.88.md).

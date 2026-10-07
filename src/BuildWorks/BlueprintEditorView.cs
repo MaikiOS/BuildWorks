@@ -59,7 +59,8 @@ namespace OstrixMods.BuildWorks
             IReadOnlyList<BlueprintEditorCatalogResource> resources = null,
             string requiredStation = null, Sprite requiredStationIcon = null,
             IReadOnlyList<string> materials = null, int materialOrder = 0,
-            string unavailableReason = null, BlueprintForeignPartData itemContents = null)
+            string unavailableReason = null, BlueprintForeignPartData itemContents = null,
+            string warningReason = null, bool resourcesKnown = true)
         {
             PrefabName = prefabName;
             DisplayName = displayName;
@@ -88,6 +89,8 @@ namespace OstrixMods.BuildWorks
             Materials = materials ?? new[] { Material };
             MaterialOrder = materialOrder;
             UnavailableReason = unavailableReason;
+            WarningReason = warningReason;
+            ResourcesKnown = resourcesKnown;
             ItemContents = itemContents;
         }
 
@@ -107,6 +110,8 @@ namespace OstrixMods.BuildWorks
         internal bool IsBlueprint => Blueprint != null;
         internal BlueprintForeignPartData ItemContents { get; }
         internal string UnavailableReason { get; }
+        internal string WarningReason { get; }
+        internal bool ResourcesKnown { get; }
         internal string Section { get; }
         internal string Family { get; }
         internal string StationId { get; }

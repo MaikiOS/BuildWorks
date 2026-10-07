@@ -23,6 +23,69 @@ internal static class ControllerInputAcceptance
     private static void Require(bool value, string reason) { if (!value) throw new InvalidOperationException("Input frames: " + reason); }
     private static Vector3 V(Point3 value) => new Vector3((float)value.X, (float)value.Y, (float)value.Z);
 
+    internal static IEnumerable<object> RunMissingCatalogue(Camera template, TMP_Text font, GameObject wall, string output)
+    {
+        string directory = Path.Combine(output, "c89-" + Guid.NewGuid().ToString("N").Substring(0, 8));
+        Directory.CreateDirectory(directory);
+        string original = "#Name:Incomplete catalog\n#Pieces\nwoodwall;;0;0;0;0;0;0;1;\"\";1;1;1\nmissing_catalog_model;;2;3;4;0;0;0;1;\"\";.001;.002;.003";
+        string sourcePath = Path.Combine(directory, "missing.blueprint");
+        File.WriteAllText(sourcePath, original);
+        string storePath = Path.Combine(directory, "library.json");
+        var store = new CompositeBlueprintStore(storePath);
+        GameObject Resolve(string name) => name == "woodwall" ? wall : null;
+        store.ConfigureImportScale(name => Resolve(name) ? new CompositeBlueprintStore.VectorData(wall.transform.localScale) : (CompositeBlueprintStore.VectorData?)null);
+        Require(store.TryImportReviewed(CompositeBlueprintStore.ReviewImportFile(sourcePath, null), false, false, null, out string error), error);
+        for (int frame = 0; frame < 300 && store.CatalogLoading; ++frame)
+        { store.CatalogAll(); yield return null; }
+        Require(!store.CatalogLoading, "Reviewed import catalogue task did not finish");
+        var imported = store.CatalogAll().Single();
+        BlueprintEditorController.EditorCatalogStatus(imported, name => Resolve(name), out string blocked, out string warning);
+        Require(string.IsNullOrEmpty(blocked) && warning.Contains("missing_catalog_model"), "Production catalogue status blocks missing records");
+        var overBudget = new CompositeBlueprintStore.Blueprint { importError = string.Empty };
+        for (int i = 0; i < 513; ++i) overBudget.parts.Add(new CompositeBlueprintStore.Part());
+        BlueprintEditorController.EditorCatalogStatus(overBudget, name => true, out string limitError, out string limitWarning);
+        Require(!string.IsNullOrEmpty(limitError) && limitWarning == null, "Empty import error bypasses catalogue limit status");
+        var card = new BlueprintEditorCatalogItem("blueprint_" + imported.id, imported.name, null, imported.category,
+            "blueprints", "external_blueprints", 0, imported, unavailableReason: blocked, warningReason: warning, resourcesKnown: false);
+        var input = new InputFrames();
+        var errors = new List<string>();
+        using (var controller = new BlueprintEditorController(store, template, font, Resolve, name => name, () => new[] { card }, errors.Add, editorInput: input))
+        {
+            Require(controller.OpenNew(out error), error);
+            var view = Field<BlueprintEditorView>(controller, "view");
+            yield return null;
+            Call(controller, "RequestCatalog"); yield return null;
+            NativeClick(view, null, "CatalogBlueprintsMode"); yield return null;
+            var button = view.RootCanvas.GetComponentsInChildren<Button>().Single(value => value.name == "Catalog_" + card.PrefabName);
+            Require(button.GetComponentInChildren<TMP_Text>().text.StartsWith("[!]"), "Missing-model warning is absent on card");
+            Call(view, "PreviewCatalogItem", card);
+            var preview = Field<RectTransform>(view, "catalogPreview");
+            Require(preview.GetComponentsInChildren<TMP_Text>(true).Any(value => value.name == "PreviewMetadata" &&
+                value.text.Contains(BuildWorksLocalization.Text("editor.catalog_cost_unknown"))) &&
+                !preview.GetComponentsInChildren<TMP_Text>(true).Any(value => value.name == "PreviewCostTitle"),
+                "Unresolved construction cost/stations shown as zero/free");
+            NativeClick(view, null, button); yield return null;
+            Require(Field<BlueprintEditorDocument>(controller, "placementBlueprint")?.Parts.Count == 2 &&
+                Field<BlueprintEditorDocument>(controller, "placementBlueprint").Parts[1].ScaleIsAbsolute,
+                "Actual catalogue card did not start intact missing-model insertion");
+            Vector2 mouse = view.ViewportScreenRect().center;
+            Frame(controller, input, mouse); yield return null;
+            Frame(controller, input, mouse, 1); yield return null;
+            Frame(controller, input, mouse); yield return null;
+            Require(controller.Document.Parts.Count == 2 && controller.Document.Parts[1].ScaleIsAbsolute &&
+                Math.Abs(controller.Document.Parts[1].Scale.X - .001f) < .00000001 &&
+                controller.Document.Sources.Single().Text == original && controller.Document.Undo() &&
+                controller.Document.Parts.Count == 0 && controller.Document.Redo() && controller.Document.Parts.Count == 2,
+                "Actual insertion/Undo/Redo lost records, basis or provenance");
+            Call(controller, "CancelPartPlacement");
+            Require((bool)Call(controller, "TrySave", false, true), "Inserted incomplete blueprint save failed");
+            controller.Close(true);
+            var saved = new CompositeBlueprintStore(storePath).All().Single();
+            Require(saved.parts.Count == 2 && saved.parts[1].scaleIsAbsolute && saved.sourceDocuments.Single().text == original &&
+                File.ReadAllText(sourcePath) == original && errors.Count == 0, "Inserted incomplete native copy lost data or changed source");
+        }
+    }
+
     private sealed class InputFrames : IBlueprintEditorInput
     {
         private HashSet<KeyCode> keys = new HashSet<KeyCode>(), previousKeys = new HashSet<KeyCode>();

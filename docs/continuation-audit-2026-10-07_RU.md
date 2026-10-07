@@ -2,7 +2,7 @@
 
 [English](continuation-audit-2026-10-07.md) | **Русский**
 
-Аудит 2026-10-07; текущий исходный checkpoint — 0.19.88. Это не приёмка полного продукта.
+Аудит 2026-10-07; текущий исходный checkpoint — 0.19.89. Это не приёмка полного продукта.
 Действующие инструкции: AGENTS.md, PROJECT_CONTRACT.md, docs/ROADMAP.md и текущий запрос владельца.
 CONTINUE_PROMPT.txt описывает .13 и устарел. specs/roadmap/current-pass.md описывает каталог .56,
 а не полный импорт. Исторические проверки не заменяют проверку установленной версии.
@@ -15,6 +15,11 @@ CONTINUE_PROMPT.txt описывает .13 и устарел. specs/roadmap/curr
 [Этап .88](testing/missing-model-0.19.88_RU.md) сохраняет отсутствующие чужие детали и их неизвестную
 основу масштаба в Store15/JSON6; настоящий редактор редактирует и сохраняет неполный чертёж.
 Маркер не подменяет геометрию. World план отказывает pending basis; полное восстановление не заявляется.
+
+[Этап .89](testing/missing-catalogue-0.19.89_RU.md) закрывает запрет вставки missing-карточки:
+предупреждение вместо блокировки, неизвестная цена не выглядит нулевой. Actual UI/controller/Undo/save
+проверены; native Session producer только compiled wiring. Early native save boundary исследована,
+но безопасная изоляция от остальных plugin Awake ещё не доказана; стенд не внедрён.
 
 ## Проверенные исходные данные
 
@@ -42,10 +47,10 @@ CONTINUE_PROMPT.txt описывает .13 и устарел. specs/roadmap/curr
 | Блок | Реализовано | Автоматическое доказательство | Пользователь в игре | Не закончено | Только дизайн |
 |---|---|---|---|---|---|
 | Редактор | Трансформации, группы, Array/Contour, Undo, сохранение | Geometry, EditorBridge, Unity252 | Старые .41/.44 и отдельные более поздние серии записаны в testing-history/ROADMAP; не повторять целиком | Сцены >512 деталей | Новые инструменты направляющих |
-| Импорт/экспорт | Store14, portable5, .blueprint/.vbuild, ZIP, точный архив, отдельные копии и настройки содержимого при обмене | Store353;209 parser-only;2 реальных файла через reviewed import/edit/support/disk/export/world renderer | Внешний импорт → стройка → reload не подтверждён | Диалекты заголовков, RandMatSeed, часть ZDO/инвентарей; экспорт только нашего JSON/ZIP | Сторонние форматы без проверенной спецификации |
+| Импорт/экспорт | Store15, portable6, .blueprint/.vbuild, ZIP, точный архив, отдельные копии и настройки содержимого при обмене | Store353;209 parser-only;2 реальных файла через reviewed import/edit/support/disk/export/world renderer | Внешний импорт → стройка → reload не подтверждён | Диалекты заголовков, RandMatSeed, часть ZDO/инвентарей; экспорт только нашего JSON/ZIP | Сторонние форматы без проверенной спецификации |
 | Масштаб/призрак | Intrinsic prefab scale; вложенные матрицы; world ghost до50000; .87 мировой вид своего предмета | Unity: родительские/XYZ/повёрнутые transforms; обычный/опорный/passive/heavy предмет | Конкретная огромная лампа не закрыта в живом хосте | Native place/reload и FPS; нестандартные эффекты предметов | Дальнейшие оптимизации после замеров |
 | Опоры/точки | Независимые supports, отдельные назначения центра/placement, сохранённые world snaps | Document/store/controller/Unity/WorldLayout | Старые group pivots приняты; новые durable snaps не приняты | Save/reload/reconnect/remote client новых точек | Тихие маркеры невыбранных опор |
-| Недостающие prefab | .88 сохраняет чужие записи/absolute basis; editor open/save/reopen/export; условный маркер | Store/actual Unity жесты/поздняя нормализация/atomic world refusal | Нет | Нет source/type/local bbox, перечня модов и замены1→N; остальные входы требуют приёмки | Явная пользовательская замена несколькими деталями |
+| Недостающие prefab | .88 сохраняет записи/absolute basis; editor open/save/reopen/export; .89 warning-card insertion и unknown cost | Store/actual Unity жесты/каталог/Undo/disk; поздняя нормализация; atomic world refusal; Session producer только HostContract | Нет | Source/type/local bbox, названия модов, замена1→N и native приёмка входов | Явная пользовательская замена несколькими деталями |
 | Предметы/права | ItemStand capture/preview/authoring; native spending; retain/clear при обмене; .87 закрепляет выбранный свой предмет | .86: 28 inert adapter cases; .87 дополнительно отказывает подмене изменённого/потраченного предмета | Native placement/drop/reload/network не приняты | Containers restore, ArmorStand, свободные предметы, галочки перед стройкой, серверная авторизация admin | Отдельное полное admin restoration |
 | Выделение/нагрузка | Экранное прямоугольное выделение, ручная корректировка; world50000 | Geometry, layout, shared-template Unity | Старое выделение принято частично; тяжёлая внешняя стройка не принята | Площадь + верх/низ; editor/capture512; FPS и безопасный готовый стенд | Плановая стройка и связь с землёй |
 

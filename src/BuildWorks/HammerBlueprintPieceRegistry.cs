@@ -242,9 +242,12 @@ namespace OstrixMods.BuildWorks
 
         public IReadOnlyList<ResourceInfo> Resources(
             CompositeBlueprintStore.Blueprint blueprint)
+            => TrySources(blueprint, out IReadOnlyList<Piece> pieces)
+                ? ResourceCosts(pieces) : Array.Empty<ResourceInfo>();
+
+        internal static IReadOnlyList<ResourceInfo> ResourceCosts(IReadOnlyList<Piece> pieces)
         {
             var result = new List<ResourceInfo>();
-            if (!TrySources(blueprint, out IReadOnlyList<Piece> pieces)) return result;
             var amounts = new Dictionary<string, ResourceInfo>(StringComparer.Ordinal);
             foreach (Piece piece in pieces)
             {

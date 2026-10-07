@@ -687,14 +687,13 @@ namespace OstrixMods.BuildWorks
             });
             foreach (CompositeBlueprintStore.Blueprint blueprint in blueprintStore.CatalogAll())
             {
-                string unavailable = BuildWorksLocalization.ResolveUserText(blueprint.importError);
+                BlueprintEditorController.EditorCatalogStatus(blueprint, name => ResolveBlueprintEditorVisual(name),
+                    out string unavailable, out string warning);
                 string missing = null;
                 List<Piece> blueprintParts = null;
                 bool resolved = string.IsNullOrEmpty(unavailable) && TryResolveBlueprintPieces(
                     player, blueprint, out blueprintParts, out missing, forEditor: true);
-                if (string.IsNullOrEmpty(unavailable) && !resolved)
-                    unavailable = BuildWorksLocalization.Text("placement.hammer_piece_missing", missing);
-                var costs = blueprintPieceRegistry.Resources(blueprint)
+                var costs = (resolved ? HammerBlueprintPieceRegistry.ResourceCosts(blueprintParts) : Array.Empty<HammerBlueprintPieceRegistry.ResourceInfo>())
                     .Select(x => new BlueprintEditorCatalogResource(x.Name, x.Icon, x.Amount)).ToList();
                 string requiredStations = null; Sprite requiredIcon = null;
                 if (resolved)
@@ -711,7 +710,8 @@ namespace OstrixMods.BuildWorks
                     blueprintPieceRegistry.Icon(blueprint), blueprint.category, HammerCatalogOrganizer.BlueprintsGroup,
                     blueprint.IsExternal ? "external_blueprints" : "my_blueprints",
                     result.Count, blueprint, resources: costs, requiredStation: requiredStations,
-                    requiredStationIcon: requiredIcon, unavailableReason: unavailable));
+                    requiredStationIcon: requiredIcon, unavailableReason: unavailable,
+                    warningReason: warning, resourcesKnown: resolved));
             }
             return result;
         }

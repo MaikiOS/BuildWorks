@@ -2,7 +2,7 @@
 
 **English** | [Русский](continuation-audit-2026-10-07_RU.md)
 
-Audit: 2026-10-07; current source checkpoint .88. This is not full product acceptance.
+Audit: 2026-10-07; current source checkpoint .89. This is not full product acceptance.
 Read AGENTS, PROJECT_CONTRACT, current HANDOFF and docs/ROADMAP. CONTINUE_PROMPT.txt targets
 .13; current-pass targets the historical .56 catalogue, not imported construction acceptance.
 
@@ -14,6 +14,11 @@ Native construction/world reload/network remain untested.
 [Checkpoint .88](testing/missing-model-0.19.88.md) preserves missing foreign records and unknown absolute
 scale basis in Store15/JSON6; the actual editor edits/saves/reopens incomplete blueprints. Markers supply
 no invented geometry. World planning refuses pending basis; full restoration remains unproven.
+
+[Checkpoint .89](testing/missing-catalogue-0.19.89.md) removes missing-card insertion blocks and makes
+unknown costs explicit. Actual UI/controller/Undo/save pass; native Session producer has compiled wiring
+proof only. Early native save boundary is researched; isolation from other plugin Awake remains unproven.
+No safe-stand preparation is implemented.
 
 ## Verified baseline
 
@@ -39,7 +44,7 @@ Its text was not updated. A document edit is not a goal update.
 | Exchange | Store15/portable6, .blueprint/.vbuild/ZIP, exact archives, separate contents options | Store353;209 parser-only;2 real files reviewed import/edit/support/disk/export/world renderer | Imported construction through reload unproven | Header dialects, RandMatSeed, some ZDO/inventory, export only our JSON/ZIP | Unspecified third-party formats |
 | Scale/preview | Intrinsic prefab scale, nested XYZ, world50000; .87 supplied-item world appearance | Unity transforms; ordinary/native-holder/passive/heavy attachments | Particular giant lamp remains unproven | Native place/reload/FPS; unknown item effects | Further measured optimization |
 | Supports/snaps | Independent supports, distinct pivot/placement, durable world points | Store/controller/Unity/layout | Older group pivots accepted; new world snaps unaccepted | Reload/reconnect/remote client | Quiet unselected markers |
-| Missing prefabs | .88 foreign records/absolute basis; editor open/save/reopen/export; uncertainty marker | Store/actual Unity gestures/late normalization/atomic world refusal | None | Source/type/local bounds, missing-mod names, replacement1→N and other entry paths remain | Explicit multi-object substitution |
+| Missing prefabs | .88 records/absolute basis; editor open/save/reopen/export; .89 warning-card insertion and unknown costs | Store/actual Unity gestures/catalogue/Undo/disk; late normalization; atomic world refusal; Session producer HostContract only | None | Source/type/local bounds, mod names, replacement1→N and native entry-path acceptance | Explicit multi-object substitution |
 | Items/authority | ItemStand capture/authoring/native spending; exchange retain/clear; .87 bound supplied item | .86 28 inert cases; .87 refuses changed/construction-spent bindings without fallback | Native placement/drop/reload/network unaccepted | Containers/armour/free items, placement choices, server admin authorization | Full admin restore |
 | Capture/heavy | Screen rectangle/manual edits, world50000 | Geometry/layout/shared-template Unity | Older capture partially accepted; no heavy imported construction | Area+height bounds, editor/capture512, FPS/prepared test world | Planned building/terrain integration |
 

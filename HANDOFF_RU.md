@@ -2,6 +2,21 @@
 
 [English](HANDOFF.md) | **Русский**
 
+## Этап 0.19.89 — вставка неполного чертежа из каталога; исходники
+
+[Протокол и границы](docs/testing/missing-catalogue-0.19.89_RU.md).
+Missing-карточка предупреждает `[!]`, допускает вставку всех записей; ошибки файла/лимита блокируют.
+Controller нормализует editor copy, не источник. Unknown cost/stations скрыты с объяснением;
+полная цена считается по resolved Pieces, без world registry. Строгие world gates сохранены.
+Reviewed import → actual card/click/controller → insert/Undo/Redo/Cancel/save/fresh disk PASS.
+Session producer в Workbench не исполняется, его wiring проверяет HostContract. Панель проверяется
+также inactive: это не приёмка видимости на всех разрешениях. Release/Localization853/Store/bridge/
+WorldLayout15/API/guards/format/Unity252/source hashes и correctness/ponytail PASS; verify отсутствует.
+Geometry/corpus353 без изменений, доказательство .88. artifacts/checkpoint-0.19.89/verification.json.
+Early native save boundary исследована; другие plugin Awake ещё мешают доказать общую изоляцию
+готового survival-стенда. Bootstrap не внедрён. Установлена .82; deployment/game/saves/reload/network/push нет.
+Полная цель active; импорт → стройка → reload остаётся первым.
+
 ## Этап 0.19.88 — неполный внешний чертёж и честный масштаб; исходники
 
 [Протокол и границы](docs/testing/missing-model-0.19.88_RU.md).

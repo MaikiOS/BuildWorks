@@ -253,11 +253,7 @@ namespace OstrixMods.BuildWorks
                 { error = BuildWorksLocalization.ResolveUserText(source.importError); return false; }
                 string budgetError = CompositeBlueprintStore.InteractiveError(source.parts.Count);
                 if (budgetError != null) { error = BuildWorksLocalization.ResolveUserText(budgetError); return false; }
-                var prepared = ExternalBlueprintLibrary.PrepareForHost(source, name =>
-                {
-                    GameObject prefab = ResolveVisualSource(name);
-                    return prefab ? new CompositeBlueprintStore.VectorData(prefab.transform.localScale) : (CompositeBlueprintStore.VectorData?)null;
-                });
+                var prepared = PrepareEditorBlueprint(source);
                 if (!string.IsNullOrEmpty(prepared.importError))
                 { error = BuildWorksLocalization.ResolveUserText(prepared.importError); return false; }
                 bool opened = Open(DocumentFromBlueprint(prepared.IsExternal ? ExternalBlueprintLibrary.DetachedCopy(prepared) : prepared),
@@ -2811,16 +2807,15 @@ namespace OstrixMods.BuildWorks
             { view.SetStatus(item.UnavailableReason, error: true); return; }
             if (item.IsBlueprint && CompositeBlueprintStore.InteractiveError(item.Blueprint.parts.Count) is string budgetError)
             { view.SetStatus(BuildWorksLocalization.ResolveUserText(budgetError), error: true); return; }
-            if (item.IsBlueprint)
-                foreach (CompositeBlueprintStore.Part part in item.Blueprint.parts)
-                    if (!ResolveVisualSource(part.prefabName))
-                    { view.SetStatus(BuildWorksLocalization.Text("editor.part_not_found", part.prefabName), error: true); return; }
+            var prepared = item.IsBlueprint ? PrepareEditorBlueprint(item.Blueprint) : null;
+            if (prepared != null && !string.IsNullOrEmpty(prepared.importError))
+            { view.SetStatus(BuildWorksLocalization.ResolveUserText(prepared.importError), error: true); return; }
             if (IsGizmoDragging) CancelGizmoDrag();
             ClearArrayState();
             ClearContourState();
             scene.HidePlacementPreview();
             scene.ClearBlueprintPlacementPreview();
-            placementBlueprint = item.IsBlueprint ? DocumentFromBlueprint(item.Blueprint) : null;
+            placementBlueprint = prepared != null ? DocumentFromBlueprint(prepared) : null;
             view.HideCatalog();
             placementItem = item;
             placementYaw = 0f;
@@ -2845,6 +2840,25 @@ namespace OstrixMods.BuildWorks
                 Vector3.zero,
                 false);
             SetPlacementStatus();
+        }
+
+        private CompositeBlueprintStore.Blueprint PrepareEditorBlueprint(CompositeBlueprintStore.Blueprint source)
+            => ExternalBlueprintLibrary.PrepareForHost(source, name =>
+            {
+                GameObject prefab = ResolveVisualSource(name);
+                return prefab ? new CompositeBlueprintStore.VectorData(prefab.transform.localScale) : (CompositeBlueprintStore.VectorData?)null;
+            });
+
+        internal static void EditorCatalogStatus(CompositeBlueprintStore.Blueprint source,
+            Func<string, bool> prefabAvailable, out string unavailable, out string warning)
+        {
+            string error = string.IsNullOrEmpty(source.importError) ? CompositeBlueprintStore.InteractiveError(source.parts.Count) : source.importError;
+            unavailable = BuildWorksLocalization.ResolveUserText(error);
+            warning = null;
+            if (!string.IsNullOrEmpty(unavailable)) return;
+            var missing = source.parts.Where(part => part.scaleIsAbsolute || !prefabAvailable(part.prefabName))
+                .Select(part => part.prefabName).Distinct().OrderBy(name => name, StringComparer.Ordinal).ToArray();
+            if (missing.Length > 0) warning = BuildWorksLocalization.Text("editor.missing_dimensions", string.Join(", ", missing));
         }
 
         private void CyclePlacementSnapPoint(int direction)

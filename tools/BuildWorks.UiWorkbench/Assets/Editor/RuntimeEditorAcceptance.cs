@@ -494,6 +494,8 @@ public static class RuntimeEditorAcceptance
                 checks.Add("Reopening clears active operation");
                 TestExternalImportEditor(template, fontTemplate, source, output);
                 TestIncompleteExternalEditor(template, fontTemplate, source["woodwall"], output);
+                foreach (object step in ControllerInputAcceptance.RunMissingCatalogue(template, fontTemplate, source["woodwall"], output)) yield return step;
+                checks.Add("Reviewed missing-prefab import -> production catalogue status -> actual warning card/native click -> editor insertion/Undo/Redo/save/disk reopen preserves both records, pending basis and source; unknown costs/stations not shown as free. Native Session producer wiring verified separately by HostContract; no world construction proof.");
                 checks.Add("Incomplete foreign blueprint: known nonunit prefab plus missing absolute-scale part, constant uncertainty marker without surface/snap geometry; edit/copy/Undo/native save/reopen/export/reimport preserve source and basis; late nonunit prefab resolves exactly once using original native identity. Not world placement proof.");
                 Require(runtimeErrors.Count == 0, "Runtime logged errors: " + string.Join("; ", runtimeErrors));
                 yield return null;

@@ -819,7 +819,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.88.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.89.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -1911,6 +1911,12 @@ foreach ($workspaceGateName in @('BlueprintEditorCatalogItems', 'EnableNativePie
 }
 $catalogItemsMethod = $pluginMethods | Where-Object { $_.Name -eq 'BlueprintEditorCatalogItems' -and $_.DeclaringType.Name -eq 'PrecisionPlacementSession' }
 $catalogItemsOperands = @($catalogItemsMethod.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($catalogItemsOperands -match 'BlueprintEditorController::EditorCatalogStatus' -and
+    $catalogItemsOperands -match 'HammerBlueprintPieceRegistry::ResourceCosts' -and
+    $catalogItemsOperands -notmatch 'HammerBlueprintPieceRegistry::Resources\(' -and
+    $sessionSource -match 'warningReason: warning, resourcesKnown: resolved' -and
+    $sessionSource -notmatch 'unavailable = BuildWorksLocalization.Text\("placement.hammer_piece_missing", missing\)') `
+    'Editor catalogue must separate missing-model warnings from file/limit blocks and unknown construction costs.'
 Assert-Contract ($catalogItemsOperands -match 'StationExtension::m_craftingStation' -and
     $catalogItemsOperands -match 'CraftingStation::m_name' -and
     $catalogItemsOperands -match 'CraftingStation::m_icon' -and
@@ -3052,4 +3058,4 @@ $worldCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'Preci
 $worldCaptureCalls = ($worldCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($worldCaptureCalls -match 'BlueprintStorageCapture::TryCapture' -and $worldCaptureCalls -match 'CompositeBlueprintStore/ForeignPartData::FromGeometry') 'World selection does not preserve container snapshots.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.88 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.89 and Valheim Steam build 25185596.'

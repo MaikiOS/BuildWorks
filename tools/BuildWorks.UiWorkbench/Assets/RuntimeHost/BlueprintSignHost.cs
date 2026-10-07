@@ -12,15 +12,24 @@ public sealed class ZNetView : MonoBehaviour
 public sealed class ZDO
 {
     public int Writes;
+    public System.Action<int> AfterRead;
     public uint DataRevision => (uint)Writes;
     private readonly Dictionary<int, string> strings = new Dictionary<int, string>();
     private readonly Dictionary<int, int> integers = new Dictionary<int, int>();
     private readonly Dictionary<int, byte[]> bytes = new Dictionary<int, byte[]>();
     public string GetString(int key, string fallback) => strings.TryGetValue(key, out string value) ? value : fallback;
     public void Set(int key, string value) { ++Writes; strings[key] = value; }
-    public int GetInt(int key, int fallback) => integers.TryGetValue(key, out int value) ? value : fallback;
+    public int GetInt(int key, int fallback)
+    {
+        int result = integers.TryGetValue(key, out int value) ? value : fallback;
+        AfterRead?.Invoke(key); return result;
+    }
     public bool GetBool(int key, bool fallback) => integers.TryGetValue(key, out int value) ? value != 0 : fallback;
-    public byte[] GetByteArray(int key, byte[] fallback) => bytes.TryGetValue(key, out byte[] value) ? value : fallback;
+    public byte[] GetByteArray(int key, byte[] fallback)
+    {
+        byte[] result = bytes.TryGetValue(key, out byte[] value) ? value : fallback;
+        AfterRead?.Invoke(key); return result;
+    }
     public void Set(int key, int value) { ++Writes; integers[key] = value; }
     public void Set(int key, byte[] value) { ++Writes; bytes[key] = value; }
 }

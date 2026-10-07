@@ -2,7 +2,13 @@
 
 **English** | [Русский](blueprint-format_RU.md)
 
-Current source **0.19.78**: complete inert native ItemStand v109 inspection shares the container ItemData reader.
+Current source **0.19.79**: ItemStand capture requires an unchanged ZDO revision and the same valid native view
+for full/legacy/empty snapshots; bounded packet bytes are privately copied. Changed state rejects with no partial payload.
+Actual injected-read regressions, required checks and isolated Unity228 PASS; no world writes or native reconstruction.
+Native14/portable5 unchanged. Queue/consumption/confirmation and cancellation boundaries for the next native restoration
+slice are researched in HANDOFF, not implemented; the complete goal remains active and installed .67 is unchanged.
+
+Previous source **0.19.78**: complete inert native ItemStand v109 inspection shares the container ItemData reader.
 Checks cover byte-version envelope, every field, exact EOF, one-item stack and prefab/quality/variant agreement.
 Capture rejects corrupt/mismatched snapshots; inspection/clear refuse unreadable mounted evidence, including previously
 cleared archives. Old opaque bytes remain retainable, and a null package remains a metadata-only legacy/authoring recipe.

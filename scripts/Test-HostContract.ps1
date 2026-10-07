@@ -819,7 +819,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.78.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.79.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -2857,7 +2857,8 @@ $nativeCapture = ($pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'Blu
 $captureCalls = ($nativeCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($captureCalls -match 'ItemStand::GetAttachedItem' -and $captureCalls -match 'ObjectDB::GetItemPrefab' -and
     $captureCalls -match 'ZDOVars::s_itemData' -and $captureCalls -match 'ZDO::GetByteArray' -and
-    $captureCalls -match 'BlueprintItemStandContents::TryRead' -and
+    $captureCalls -match 'BlueprintItemStandContents::TryRead' -and $captureCalls -match 'ZDO::get_DataRevision' -and
+    $captureCalls -match 'System.Array::Clone' -and
     $captureCalls -notmatch 'ZDO::Set|ZNetView::InvokeRPC|Inventory::|Object::Instantiate|ItemData::Load|ItemDrop::LoadFromZDO') `
     'Native ItemStand capture must preserve the raw package without executing or mutating it.'
 $standView = $standType.Fields | Where-Object Name -eq 'm_nview'
@@ -2986,4 +2987,4 @@ $worldCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'Preci
 $worldCaptureCalls = ($worldCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($worldCaptureCalls -match 'BlueprintStorageCapture::TryCapture' -and $worldCaptureCalls -match 'CompositeBlueprintStore/ForeignPartData::FromGeometry') 'World selection does not preserve container snapshots.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.78 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.79 and Valheim Steam build 25185596.'

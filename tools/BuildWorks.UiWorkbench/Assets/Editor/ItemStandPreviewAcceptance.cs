@@ -143,6 +143,31 @@ internal static class ItemStandPreviewAcceptance
         Require(BlueprintItemStandContents.TryRead(captured, name => name.GetStableHashCode(), out var inspected) &&
             inspected.Quality == 3 && inspected.Variant == 2 && inspected.DurabilityHundredths == 12505 &&
             inspected.CustomData["mod:fixture"] == "exact\0value\r\n🪵", "full native properties were not inspected");
+        // A valid packet is not a current snapshot if a native/mod read changes the holder.
+        foreach (int key in new[] { ZDOVars.s_item, ZDOVars.s_variant, ZDOVars.s_itemData })
+        {
+            zdo.Set(ZDOVars.s_type, 0);
+            zdo.AfterRead = read =>
+            {
+                if (read != key) return;
+                zdo.AfterRead = null; zdo.Set(ZDOVars.s_type, 1);
+            };
+            writes = zdo.Writes;
+            Require(!BlueprintItemStandCapture.TryCapture(piece, out var stale) && stale == null &&
+                zdo.Writes == writes + 1, "changed revision accepted or capture wrote network data");
+        }
+        zdo.Set(ZDOVars.s_type, 0);
+        zdo.AfterRead = read => { if (read == ZDOVars.s_itemData) { zdo.AfterRead = null; view.Valid = false; } };
+        Require(!BlueprintItemStandCapture.TryCapture(piece, out _), "view invalidated during capture accepted");
+        view.Valid = true;
+        zdo.AfterRead = read =>
+        {
+            if (read != ZDOVars.s_itemData) return;
+            zdo.AfterRead = null;
+            typeof(ItemStand).GetField("m_nview", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(stand, null);
+        };
+        Require(!BlueprintItemStandCapture.TryCapture(piece, out _), "rebound native view accepted");
+        typeof(ItemStand).GetField("m_nview", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(stand, view);
         package[1] = 77;
         Require(captured.Zdo == encoded, "snapshot aliases live native bytes");
         package[0] = 110; // Unknown version, not merely another valid durability value.
@@ -156,6 +181,14 @@ internal static class ItemStandPreviewAcceptance
         zdo.Set(ZDOVars.s_itemData, (byte[])null);
         Require(BlueprintItemStandCapture.TryCapture(piece, out var legacy) && legacy.Zdo == null &&
             legacy.Info == captured.Info, "legacy stand without item package discarded");
+        zdo.AfterRead = read =>
+        {
+            if (read != ZDOVars.s_itemData) return;
+            zdo.AfterRead = null; zdo.Set(ZDOVars.s_item, 0);
+        };
+        Require(!BlueprintItemStandCapture.TryCapture(piece, out var staleLegacy) && staleLegacy == null,
+            "changed legacy holder accepted");
+        zdo.Set(ZDOVars.s_item, hash);
         zdo.Set(ZDOVars.s_quality, 0);
         Require(!BlueprintItemStandCapture.TryCapture(piece, out _), "invalid native quality accepted");
         zdo.Set(ZDOVars.s_quality, 3);
@@ -167,6 +200,13 @@ internal static class ItemStandPreviewAcceptance
         view.Valid = true;
         zdo.Set(ZDOVars.s_item, 0);
         Require(BlueprintItemStandCapture.TryCapture(piece, out var empty) && empty == null, "empty stand changed");
+        zdo.AfterRead = read =>
+        {
+            if (read != ZDOVars.s_item) return;
+            zdo.AfterRead = null; zdo.Set(ZDOVars.s_item, hash);
+        };
+        Require(!BlueprintItemStandCapture.TryCapture(piece, out var staleEmpty) && staleEmpty == null,
+            "newly populated stand silently captured as empty");
         var armour = source.AddComponent<ArmorStand>();
         Require(!BlueprintItemStandCapture.TryCapture(piece, out _), "armour pose/slots silently discarded");
         Object.Destroy(armour);

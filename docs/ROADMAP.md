@@ -9,7 +9,12 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.78**: native ItemStand v109 is fully inspected by the shared immutable item reader.
+Active source checkpoint **0.19.79**: ItemStand capture rejects mid-read ZDO revision changes and invalid/rebound views,
+including legacy and empty-to-populated transitions; bounded raw bytes are privately copied. Release/required checks and
+228 isolated Unity scenarios PASS. World restoration is not implemented; native queue/cost/confirmation boundaries are
+recorded in HANDOFF. Native14/portable5 and installed .67 unchanged; no deploy or game/save changes.
+
+Previous source checkpoint **0.19.78**: native ItemStand v109 is fully inspected by the shared immutable item reader.
 Capture/clear validate the complete packet and prefab/quality/variant/one-item metadata; malformed archival bytes remain
 retainable, not clearable/executable. Storage/mount preflight stays independent, including unreadable mounted evidence.
 Geometry113, Store, Release/API and 228 isolated Unity layouts/input checks PASS. Native world restoration, foreign-state

@@ -24,8 +24,10 @@ namespace OstrixMods.BuildWorks
             if (!view || !view.IsValid()) return false;
             ZDO zdo = view.GetZDO();
             if (zdo == null) return false;
+            uint revision = zdo.DataRevision;
             int hash = stand.GetAttachedItem();
-            if (hash == 0) return true;
+            if (hash == 0) return stand && view && view.IsValid() &&
+                ReferenceEquals(StandView.GetValue(stand), view) && zdo.DataRevision == revision;
             GameObject item = ObjectDB.instance ? ObjectDB.instance.GetItemPrefab(hash) : null;
             if (!item || !item.GetComponent<ItemDrop>()) return false;
             int variant = zdo.GetInt(ZDOVars.s_variant, 0);
@@ -34,6 +36,7 @@ namespace OstrixMods.BuildWorks
             byte[] package = zdo.GetByteArray(ZDOVars.s_itemData, null);
             // Bound before Base64 allocation; the immutable-state limit is 32768 chars.
             if (package != null && package.Length > 24576) return false;
+            package = package == null ? null : (byte[])package.Clone();
             try
             {
                 string info = item.name + ":" + variant.ToString(CultureInfo.InvariantCulture) + ":" +
@@ -42,6 +45,8 @@ namespace OstrixMods.BuildWorks
                     package == null ? null : Convert.ToBase64String(package), null);
                 if (package != null && !BlueprintItemStandContents.TryRead(snapshot, name => name.GetStableHashCode(), out _))
                     return false;
+                if (!stand || !view || !view.IsValid() ||
+                    !ReferenceEquals(StandView.GetValue(stand), view) || zdo.DataRevision != revision) return false;
                 data = snapshot;
                 return true;
             }

@@ -2,6 +2,29 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.79 — revision-consistent ItemStand capture; not deployed
+
+Read-only ItemStand capture now brackets populated, legacy and empty reads with the native ZDO revision
+and checks that the same valid native view is still bound. Bounded package bytes are privately copied.
+A changed holder returns failure with no partial payload instead of a stale full snapshot or false emptiness.
+Actual capture regression fixtures inject changes after item/variant/package reads, late view invalidation/
+rebinding, legacy detachment and empty-to-populated transitions. Capture performs no network writes.
+
+Release (0 warnings/errors), Geometry113, Store, Bridge8, WorldLayout12, Localization837/runtime,
+HostContract, format, forbidden-profile checks and deployment WhatIf PASS; verify is unavailable.
+Isolated Unity: 228 layouts/input checks PASS, 2026-10-07T09:33:56.8269056Z; gameHostTested=false.
+Independent correctness review PASSED; Ponytail complexity review: Lean already. Ship. Native14/portable5 unchanged; installed .67 unchanged.
+Previous .78 committed locally as 0199571. No deploy, Valheim, save edits, publication or push.
+
+Next native restoration boundary (research, not implemented):
+Use a real inventory item through ItemStand.UseItem only after UpdatePlacement returns and construction
+resources are consumed. Queue acceptance is not completion: wait for attached state and verify it by capture.
+Full snapshots require a matching owned item; metadata-only recipes use that item's actual properties.
+Recheck access before queueing; never requeue an uncertain transaction. Native Interact can change orientation.
+Cancel/refund must account for native OnDestroyed/DropItem returning contents to the world, not necessarily
+inventory. Direct raw ZDO seeding or detached ItemData creation would bypass native consumption and is forbidden.
+World restoration, foreign-state decoding, armour/free items, heavy scenes and durable sockets remain unfinished.
+
 ## Checkpoint 0.19.78 — full inert ItemStand inspection; not deployed
 
 Native ItemStand v109 packages now use the same bounded immutable ItemData record reader as containers.

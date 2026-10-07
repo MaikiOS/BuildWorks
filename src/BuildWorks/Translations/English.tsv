@@ -789,6 +789,9 @@ import.scale_pending	Load the blueprint in the game catalogue first to resolve p
 import.scale_range	The scale of prefab {0} cannot be represented within the supported 1–400% multiplier range. No parts were resized or partially converted.
 import.scale_missing	Cannot resolve the original scale of prefab {0}. Install its mod and reopen the catalogue; no partial conversion was made.
 exchange.browse_help	Choose a folder and file, then Import. Original files remain unchanged.
+exchange.current_folder	Folder: {0}
+exchange.edit_path	Edit path
+exchange.cancel_path	Cancel editing
 exchange.export_help	Full BuildWorks document: XYZ scales, signs, groups and supports. Existing files are never overwritten.
 exchange.up	Up
 exchange.go	Open

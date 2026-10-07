@@ -648,16 +648,33 @@ internal static class ControllerInputAcceptance
                 { Frame(controller, input, Vector2.zero); yield return null; }
                 var exchange = Field<BlueprintExchangeView>(view, "exchangeView");
                 var directory = Field<TMP_InputField>(exchange, "directory");
-                string longPath = "C:\\Users\\Ostrix\\AppData\\Roaming\\Thunderstore Mod Manager\\DataFolder\\Valheim\\profiles\\TerrainRamp-1.0-Test\\BepInEx\\config\\BuildWorks\\imports";
+                string originalDirectory = directory.text;
+                var folderLabel = Field<TMP_Text>(exchange, "folderLabel");
+                Require(!directory.gameObject.activeSelf && folderLabel.gameObject.activeSelf &&
+                    folderLabel.text.EndsWith(Path.GetFileName(originalDirectory)), "Default folder display is not compact");
+                NativeClick(view, null, "ExchangeCopyPath"); yield return null;
+                Require(GUIUtility.systemCopyBuffer == originalDirectory, "Compact folder lost the full copyable path");
+                NativeClick(view, null, "ExchangeEditPath"); yield return null;
+                string longPath = "C:\\Users\\nfspr\\AppData\\Roaming\\Thunderstore Mod Manager\\DataFolder\\Valheim\\profiles\\TerrainRamp-1.0-Test\\BepInEx\\config\\BuildWorks\\test-fixtures";
                 directory.SetTextWithoutNotify(longPath);
                 directory.ActivateInputField(); yield return null;
                 directory.caretPosition = longPath.Length; directory.ForceLabelUpdate();
                 Canvas.ForceUpdateCanvases(); directory.textComponent.ForceMeshUpdate();
-                Require(directory.lineType == TMP_InputField.LineType.SingleLine &&
-                    directory.textComponent.textWrappingMode == TextWrappingModes.NoWrap &&
-                    directory.textComponent.textInfo.lineCount == 1 &&
+                Require(directory.lineType == TMP_InputField.LineType.MultiLineSubmit &&
+                    directory.textComponent.textWrappingMode == TextWrappingModes.Normal &&
+                    !directory.textComponent.parseCtrlCharacters &&
+                    !directory.textComponent.textInfo.characterInfo.Take(directory.textComponent.textInfo.characterCount)
+                        .Any(character => character.character == '\n' || character.character == '\r' || character.character == '\t') &&
+                    directory.textComponent.textInfo.lineCount > 1 &&
+                    directory.textComponent.GetPreferredValues(longPath, directory.textViewport.rect.width, 0).y <= directory.textViewport.rect.height &&
                     directory.textComponent.overflowMode == TextOverflowModes.Overflow &&
-                    directory.text == longPath, "Long exchange path wrapped, truncated or lost");
+                    directory.text == longPath && !Field<Button>(exchange, "primary").interactable,
+                    "Expanded exchange path clipped, lost or allowed an unconfirmed destination");
+                NativeClick(view, null, "ExchangeCancelPath"); yield return null;
+                Require(!directory.gameObject.activeSelf && directory.text == originalDirectory && folderLabel.gameObject.activeSelf,
+                    "Cancel path edit lost the browsed folder");
+                NativeClick(view, null, "ExchangeEditPath"); yield return null;
+                Require(directory.gameObject.activeSelf && directory.text == originalDirectory, "Path edit cannot reopen");
                 var close = ((RectTransform)Field<RectTransform>(exchange, "panel").Find("ExchangeClose"));
                 Require(close.anchoredPosition.x > 600 && close.anchoredPosition.y > -50,
                     "Exchange Close is not in the upper-right header");
@@ -666,6 +683,8 @@ internal static class ControllerInputAcceptance
                 for (int i = 0; i < 300 && Field<Task<string[]>>(exchange, "listing") != null; ++i)
                 { Frame(controller, input, Vector2.zero); yield return null; }
                 string[] entries = Field<string[]>(exchange, "entries");
+                Require(!directory.gameObject.activeSelf && folderLabel.text.EndsWith(Path.GetFileName(folder)),
+                    "Open directory did not restore its compact label");
                 int chosen = Array.IndexOf(entries, sourcePath);
                 Require(chosen >= 0 && chosen < 7, "Supported source file unavailable in browser");
                 NativeClick(view, null, "ExchangeEntry" + chosen); Frame(controller, input, Vector2.zero); yield return null;

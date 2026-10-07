@@ -2,6 +2,29 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.82 — literal Windows paths and compact folder display; test-deployed
+
+The owner's .81 screenshot disproved its path-rendering claim. TMP interpreted the literal
+\\n in \\nfspr and \\t in \\test-fixtures as layout controls; NoWrap could not prevent explicit
+control characters. The old regression used C:\\Users\\Ostrix and missed the actual case.
+The shared Label helper now disables control-escape parsing (actual newline characters still work).
+Default exchange UI shows the current folder; Edit path reveals a 64px multiline field.
+Open validates the destination, Cancel restores it, and pending edits disable import/export.
+Copy path still returns the full path. The six existing fixture files are unchanged.
+
+Release (0 warnings/errors), HostContract, Localization846, world-layout and deployment guards PASS.
+Unity252 PASS includes actual nfspr-path character checks and Russian collapsed/expanded layouts
+at four resolutions and three UI scales; 1280x720/140% screenshots visually inspected.
+Independent correctness review PASSED; ponytail review found no unnecessary abstraction.
+The verify helper is unavailable; direct build/checks, diff review and executable regression were used.
+Installed only into TerrainRamp-1.0-Test by the guarded script; no game launch, save changes or push.
+BuildWorks.dll SHA256: 40ADA20A5492855B79956E1EC712C1104B999AFFBDDB584B795532D4A6923DEC.
+Geometry SHA256: DD9F2A795396853D0FFE8DFE1BD227E759AA395F21C58D79A3BA1A66212591EA.
+[Russian owner steps](docs/testing/player-exchange-0.19.82_RU.md) explain literal test file names.
+This is a path-only checkpoint, not completion of the overall import/export/world goal.
+Real Valheim acceptance remains pending. TMP Unicode escapes \\uNNNN/\\UNNNNNNNN remain a known
+rare display limitation, not present in this owner's path; file operation strings are unchanged.
+
 ## Checkpoint 0.19.81 — editor gate correction, exchange path, ready test files; test-deployed
 
 The isolated editor now calls TryResolveBlueprintPieces(forEditor:true); its opening path previously

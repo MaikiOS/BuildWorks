@@ -332,7 +332,7 @@ public static class RuntimeEditorAcceptance
                     scene.SetViewport(view.ViewportScreenRect());
                     Call(controller, "FrameAll");
                     foreach (string state in new[] { "select", "transform", "array", "contour", "catalog",
-                        "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "save-metadata", "supports", "exchange-import", "exchange-export", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru" })
+                        "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "save-metadata", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru" })
                     {
                         Require(Screen.width == width && Screen.height == height,
                             "GameView changed before " + state + ": " + Screen.width + "x" + Screen.height);
@@ -392,7 +392,19 @@ public static class RuntimeEditorAcceptance
                             for (int i = 0; i < 300 && Field<System.Threading.Tasks.Task<string[]>>(
                                 Field<BlueprintExchangeView>(view, "exchangeView"), "listing") != null; ++i)
                             { view.Tick(); yield return null; }
-                            if (state.StartsWith("exchange-contents", StringComparison.Ordinal))
+                            if (state == "exchange-import-path-ru")
+                            {
+                                ControllerInputAcceptance.NativeClick(view, uiCamera, "ExchangeEditPath"); yield return null;
+                                var exchange = Field<BlueprintExchangeView>(view, "exchangeView");
+                                var pathInput = Field<TMP_InputField>(exchange, "directory");
+                                string fullPath = "C:\\Users\\nfspr\\AppData\\Roaming\\Thunderstore Mod Manager\\DataFolder\\Valheim\\profiles\\TerrainRamp-1.0-Test\\BepInEx\\config\\BuildWorks\\test-fixtures";
+                                pathInput.SetTextWithoutNotify(fullPath);
+                                pathInput.DeactivateInputField(); yield return null;
+                                pathInput.textComponent.ForceMeshUpdate();
+                                Require(pathInput.textComponent.GetPreferredValues(fullPath, pathInput.textViewport.rect.width, 0).y <= pathInput.textViewport.rect.height,
+                                    "Expanded Russian path does not fit at " + width + "x" + height + " scale=" + uiScale);
+                            }
+                            else if (state.StartsWith("exchange-contents", StringComparison.Ordinal))
                             {
                                 ControllerInputAcceptance.NativeClick(view, uiCamera, "ExchangeSubmit");
                                 var exchange = Field<BlueprintExchangeView>(view, "exchangeView");

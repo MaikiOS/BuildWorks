@@ -9,8 +9,16 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.81**, installed only in TerrainRamp-1.0-Test: editor opening no longer applies
-world-only payload/socket gates; shared exchange path stays single-line with native scrolling and Close at upper-right.
+Active source checkpoint **0.19.82**, installed only in TerrainRamp-1.0-Test: TMP control-escape parsing
+disabled for literal Windows paths; compact folder display and expanded Edit path field replace clipping.
+The owner's .81 screenshot exposed a missed regression: \\nfspr and \\test-fixtures became LF/TAB.
+Release/HostContract/Localization846/world-layout/deployment guards and Unity252 PASS; Russian collapsed/
+expanded screenshots inspected; independent correctness and ponytail reviews passed. No game/save/push.
+[Short Russian acceptance steps and file explanations](testing/player-exchange-0.19.82_RU.md).
+Remaining import/export/world goals below are unchanged; real Valheim acceptance is pending.
+
+Previous source checkpoint **0.19.81**, installed only in TerrainRamp-1.0-Test: editor opening no longer applies
+world-only payload/socket gates; its single-line path claim was disproved in game and corrected in .82. Close is at upper-right.
 The Hammer read-only blueprint report exposes editor/world reasons and actual prefab scales. Six named test files
 are installed with SHA256 checks. Release/HostContract/Localization843/Geometry/Store/bridge/layout/deployment guards
 and Unity228 PASS; independent correctness/pony review found no blockers. No game/save/push.

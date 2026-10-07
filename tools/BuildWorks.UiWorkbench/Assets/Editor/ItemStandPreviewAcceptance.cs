@@ -49,7 +49,7 @@ internal static class ItemStandPreviewAcceptance
             var view = Field<BlueprintEditorView>(editor, "view");
             Require(view.ItemStandEditable && view.ItemStandHasContents, "selected stand tools unavailable");
             Require((bool)Call(editor, "ApplyDocumentEdit", new Func<bool>(() =>
-                editor.Document.SetItemStandContents(id, captured.WithoutContents(null))), false), "empty policy could not bind");
+                editor.Document.SetItemStandContents(id, captured.WithoutContents(name => name.GetStableHashCode()))), false), "empty policy could not bind");
             Require(view.ItemStandEditable && !view.ItemStandHasContents &&
                 !Field<RectTransform>(view, "outlinerRows").Cast<Transform>().Any(row =>
                     row.name == "Contents_" + id && row.gameObject.activeSelf), "empty policy leaked into tree or tools");
@@ -102,6 +102,22 @@ internal static class ItemStandPreviewAcceptance
         }
     }
 
+    internal static byte[] ItemPackage(string prefab, ushort quality = 1, int variant = 0)
+    {
+        using (var stream = new MemoryStream())
+        using (var writer = new BinaryWriter(stream))
+        {
+            writer.Write((byte)109); writer.Write(12505);
+            writer.Write((byte)4); writer.Write((byte)1); writer.Write((byte)3);
+            writer.Write((byte)(64 | 128 | (quality != 1 ? 4 : 0) | (variant != 0 ? 16 : 0)));
+            if (quality != 1) writer.Write(quality);
+            if (variant != 0) writer.Write(variant);
+            writer.Write(prefab.GetStableHashCode()); writer.Write((byte)1);
+            writer.Write("mod:fixture"); writer.Write("exact\0value\r\n🪵");
+            writer.Write((byte)1); writer.Flush(); return stream.ToArray();
+        }
+    }
+
     private static BlueprintForeignPartData CaptureChecks(GameObject source, GameObject item)
     {
         Piece piece = source.AddComponent<Piece>();
@@ -110,9 +126,9 @@ internal static class ItemStandPreviewAcceptance
         var view = overrideObject.AddComponent<ZNetView>();
         typeof(ItemStand).GetField("m_nview", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(stand, view);
         ZDO zdo = view.GetZDO();
-        const int hash = -1729;
+        int hash = item.name.GetStableHashCode();
         ObjectDB.instance.ItemHashes.Add(hash, item);
-        byte[] package = { 109, 2, 0, 255, 67 };
+        byte[] package = ItemPackage(item.name, 3, 2);
         string encoded = Convert.ToBase64String(package);
         zdo.Set(ZDOVars.s_item, hash); zdo.Set(ZDOVars.s_variant, 2);
         zdo.Set(ZDOVars.s_quality, 3); zdo.Set(ZDOVars.s_type, 0);
@@ -124,9 +140,14 @@ internal static class ItemStandPreviewAcceptance
             "native capture lost identity/variant/quality/orientation/package");
         Require(zdo.Writes == writes && zdo.GetByteArray(ZDOVars.s_itemData, null) == package,
             "capture mutated network data");
+        Require(BlueprintItemStandContents.TryRead(captured, name => name.GetStableHashCode(), out var inspected) &&
+            inspected.Quality == 3 && inspected.Variant == 2 && inspected.DurabilityHundredths == 12505 &&
+            inspected.CustomData["mod:fixture"] == "exact\0value\r\n🪵", "full native properties were not inspected");
         package[1] = 77;
         Require(captured.Zdo == encoded, "snapshot aliases live native bytes");
-        foreach (byte[] invalid in new[] { new byte[2], new byte[24577], new byte[] { 0, 1, 2 } })
+        package[0] = 110; // Unknown version, not merely another valid durability value.
+        foreach (byte[] invalid in new[] { new byte[2], new byte[24577], new byte[] { 0, 1, 2 },
+            ItemPackage(item.name, 2, 2), ItemPackage("OtherFixture", 3, 2), package })
         {
             zdo.Set(ZDOVars.s_itemData, invalid);
             Require(!BlueprintItemStandCapture.TryCapture(piece, out var rejected) && rejected == null,
@@ -219,7 +240,7 @@ internal static class ItemStandPreviewAcceptance
                     Content(Field<GameObject>(scene, "root")) && doc.Parts[0].ForeignData.Zdo == captured.Zdo,
                     "native-captured contents were not previewed or raw package changed");
                 doc.SelectOnly("holder");
-                Require(doc.SetItemStandContents("holder", captured.WithoutContents(null)) &&
+                Require(doc.SetItemStandContents("holder", captured.WithoutContents(name => name.GetStableHashCode())) &&
                     scene.TrySync(doc, out warning) && warning == null, "intentional empty contents could not sync");
                 yield return null;
                 Require(!Content(Field<GameObject>(scene, "root")) && doc.Parts[0].ForeignData.Zdo == captured.Zdo,

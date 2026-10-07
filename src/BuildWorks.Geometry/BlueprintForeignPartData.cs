@@ -89,7 +89,8 @@ namespace OstrixMods.BuildWorks.Geometry
         public BlueprintForeignPartData WithoutContents(Func<string, int> prefabHash)
         {
             if (Format != NativeItemStandFormat && Format != NativeContainerFormat ||
-                Format == NativeContainerFormat && !BlueprintContainerInventory.TryRead(this, prefabHash, out _))
+                Format == NativeContainerFormat && !BlueprintContainerInventory.TryRead(this, prefabHash, out _) ||
+                Format == NativeItemStandFormat && Zdo != null && !BlueprintItemStandContents.TryRead(this, prefabHash, out _))
                 throw new ArgumentException("Cannot clear unreadable object contents.");
             return ContentsCleared ? this : new BlueprintForeignPartData(Format, Info, Zdo, Chance, true);
         }

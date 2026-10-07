@@ -146,7 +146,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             parts[0].foreignData = new CompositeBlueprintStore.ForeignPartData {
                 format = Geometry.BlueprintForeignPartData.NativeContainerFormat, info = "5:2:0:0", zdo = "bQAAAAAA" };
             parts[1].foreignData = new CompositeBlueprintStore.ForeignPartData {
-                format = Geometry.BlueprintForeignPartData.NativeItemStandFormat, info = "SwordIron:0:1:0", zdo = "bQIA" };
+                format = Geometry.BlueprintForeignPartData.NativeItemStandFormat, info = "SwordIron:0:1:0", zdo = StandPackage() };
             Require(store.TrySave("Contents", parts, Array.Empty<CompositeBlueprintStore.VectorData>(), out var saved, out string error), error);
             byte[] bytes = BlueprintExchangeFormat.Encode(saved);
             string source = Path.Combine(directory, "source.zip");
@@ -177,6 +177,19 @@ namespace OstrixMods.BuildWorks.StoreTests
                 Require(File.ReadAllBytes(source).SequenceEqual(original) && !saved.parts[0].foreignData.contentsCleared &&
                     !saved.parts[1].foreignData.contentsCleared, "Import changed original or current document");
             }
+            var damaged = CompositeBlueprintStore.CopyWithContentsPolicy(saved, false, false, null);
+            damaged.parts[1].foreignData.zdo = "bQIA";
+            string damagedSource = Path.Combine(directory, "damaged-mount.buildworks.json");
+            File.WriteAllBytes(damagedSource, BlueprintExchangeFormat.Encode(damaged));
+            var damagedReview = CompositeBlueprintStore.ReviewImportFile(damagedSource, _ => 100);
+            Require(damagedReview.Contents.Unknown == 1 && damagedReview.Contents.UnreadableMounts == 1 &&
+                damagedReview.Contents.CanClearStorage && !damagedReview.Contents.CanClearMounts,
+                "Import aggregation lost independent unreadable mount policy");
+            Require(store.TryImportReviewed(damagedReview, true, false, _ => 100, out error), error); WaitForImport(store);
+            var damagedCopy = ExternalBlueprintLibrary.LoadFile(store.ImportResultPath).Single();
+            Require(store.ImportError == null && damagedCopy.parts[0].foreignData.contentsCleared &&
+                damagedCopy.parts[1].foreignData.zdo == "bQIA" && !damagedCopy.parts[1].foreignData.contentsCleared,
+                "Import discarded unreadable mount evidence or coupled choices");
             int before = Directory.GetFiles(store.ImportDirectory).Length;
             File.AppendAllText(source, "changed");
             Require(store.TryImportReviewed(review, false, false, null, out error), error); WaitForImport(store);
@@ -260,6 +273,21 @@ namespace OstrixMods.BuildWorks.StoreTests
             Console.WriteLine("PASS atomic import shared 128MiB library budget, exact future ordering and 2000/2001 file boundary");
         }
 
+        private static string StandPackage(int variant = 0, ushort quality = 1)
+        {
+            using (var stream = new MemoryStream())
+            using (var writer = new BinaryWriter(stream))
+            {
+                writer.Write((byte)109); writer.Write(12345);
+                writer.Write((byte)0); writer.Write((byte)0); writer.Write((byte)0);
+                writer.Write((byte)(64 | (quality != 1 ? 4 : 0) | (variant != 0 ? 16 : 0)));
+                if (quality != 1) writer.Write(quality);
+                if (variant != 0) writer.Write(variant);
+                writer.Write(100); writer.Write((byte)0);
+                writer.Flush(); return Convert.ToBase64String(stream.ToArray());
+            }
+        }
+
         private static void ContentsPolicyRoundTrip(string directory)
         {
             Directory.CreateDirectory(directory);
@@ -278,7 +306,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             parts[0].foreignData = new CompositeBlueprintStore.ForeignPartData {
                 format = Geometry.BlueprintForeignPartData.NativeContainerFormat, info = "5:2:1:1|Wood", zdo = package };
             parts[1].foreignData = new CompositeBlueprintStore.ForeignPartData {
-                format = Geometry.BlueprintForeignPartData.NativeItemStandFormat, info = "SwordIron:2:3:0", zdo = "bQIA" };
+                format = Geometry.BlueprintForeignPartData.NativeItemStandFormat, info = "SwordIron:2:3:0", zdo = StandPackage(2, 3) };
             var store = new CompositeBlueprintStore(path);
             Require(store.TrySave("Contents", parts, Array.Empty<CompositeBlueprintStore.VectorData>(), out var saved, out string error), error);
             string original = File.ReadAllText(path);
@@ -286,7 +314,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(inspected.CanClearStorage && inspected.CanClearMounts && inspected.Storages == 1 && inspected.StoredItems == 1 &&
                 inspected.Mounts == 1 && inspected.Unknown == 0 && inspected.AlreadyCleared == 0,
                 "Contents preflight did not report independent effective counts");
-            var unavailable = CompositeBlueprintStore.InspectContents(saved, _ => 0);
+            var unavailable = CompositeBlueprintStore.InspectContents(saved, name => name == "Wood" ? 0 : 100);
             Require(!unavailable.CanClearStorage && unavailable.CanClearMounts && unavailable.Storages == 0 && unavailable.Unknown == 1 && unavailable.Mounts == 1,
                 "Unreadable contents were reported as an empty known storage");
             var clearedUnreadable = CompositeBlueprintStore.CopyWithContentsPolicy(saved, true, false, _ => 100);
@@ -295,6 +323,25 @@ namespace OstrixMods.BuildWorks.StoreTests
             var archived = CompositeBlueprintStore.InspectContents(clearedUnreadable, _ => 100);
             Require(!archived.CanClearStorage && archived.CanClearMounts && archived.AlreadyCleared == 1 && archived.Unknown == 1,
                 "Previously cleared unreadable evidence bypassed preflight");
+            var unreadableMount = CompositeBlueprintStore.CopyWithContentsPolicy(saved, false, false, null);
+            unreadableMount.parts[1].foreignData.zdo = "bQIA";
+            var mountSummary = CompositeBlueprintStore.InspectContents(unreadableMount, _ => 100);
+            Require(mountSummary.CanClearStorage && !mountSummary.CanClearMounts && mountSummary.Unknown == 1 &&
+                mountSummary.UnreadableMounts == 1 && mountSummary.Mounts == 0 && mountSummary.Storages == 1,
+                "Unreadable mount was counted as known or blocked independent storage clearing");
+            var storageOnly = CompositeBlueprintStore.CopyWithContentsPolicy(unreadableMount, true, false, _ => 100);
+            Require(storageOnly.parts[0].foreignData.contentsCleared && storageOnly.parts[1].foreignData.zdo == "bQIA",
+                "Independent storage clear discarded unreadable mounted evidence");
+            unreadableMount.parts[1].foreignData.contentsCleared = true;
+            Require(!CompositeBlueprintStore.InspectContents(unreadableMount, _ => 100).CanClearMounts,
+                "Already-cleared mounted evidence bypassed validation");
+            foreach (bool wasCleared in new[] { false, true })
+            {
+                unreadableMount.parts[1].foreignData.contentsCleared = wasCleared;
+                Require(!store.TryExportFile(unreadableMount, directory, "bad-mount", false, out _, out error,
+                    clearMounts: true, prefabHash: _ => 100) && !File.Exists(Path.Combine(directory, "bad-mount.buildworks.json")),
+                    "Unreadable mount clear produced partial output");
+            }
             foreach (bool storage in new[] { false, true })
             foreach (bool mounts in new[] { false, true })
             {
@@ -317,7 +364,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                     .Select(value => "\"" + value + "\"")) + "]";
                 Require(portableOutput.Contains(manifest), "Cleared archival contents remained a required prefab dependency");
                 Require(output.parts[0].foreignData.zdo == package && output.parts[0].foreignData.info == "5:2:1:1|Wood" &&
-                    output.parts[1].foreignData.zdo == "bQIA" && output.parts[1].foreignData.info == "SwordIron:2:3:0",
+                    output.parts[1].foreignData.zdo == StandPackage(2, 3) && output.parts[1].foreignData.info == "SwordIron:2:3:0",
                     "Intentional clear destroyed original contents evidence");
                 Require(retained.parts[0].foreignData.contentsCleared == storage && retained.parts[1].foreignData.contentsCleared == mounts &&
                     !saved.parts[0].foreignData.contentsCleared && !saved.parts[1].foreignData.contentsCleared &&

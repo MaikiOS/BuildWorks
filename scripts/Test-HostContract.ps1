@@ -819,7 +819,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.77.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.78.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -2857,6 +2857,7 @@ $nativeCapture = ($pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'Blu
 $captureCalls = ($nativeCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($captureCalls -match 'ItemStand::GetAttachedItem' -and $captureCalls -match 'ObjectDB::GetItemPrefab' -and
     $captureCalls -match 'ZDOVars::s_itemData' -and $captureCalls -match 'ZDO::GetByteArray' -and
+    $captureCalls -match 'BlueprintItemStandContents::TryRead' -and
     $captureCalls -notmatch 'ZDO::Set|ZNetView::InvokeRPC|Inventory::|Object::Instantiate|ItemData::Load|ItemDrop::LoadFromZDO') `
     'Native ItemStand capture must preserve the raw package without executing or mutating it.'
 $standView = $standType.Fields | Where-Object Name -eq 'm_nview'
@@ -2959,7 +2960,14 @@ $numItemsSave = $packageType.Methods | Where-Object Name -eq 'WriteNumItems'
 $inventoryLoadLayout = $inventoryType.Methods | Where-Object { $_.Name -eq 'Load' -and $_.Parameters.Count -eq 1 }
 $hashType = @($hostAssembly.MainModule.Types) + @($utilsAssembly.MainModule.Types) | Where-Object Name -eq 'StringExtensionMethods'
 $prefabHashLayout = $hashType.Methods | Where-Object Name -eq 'GetStableHashCode'
+$standItemSaveLayout = $itemDropType.Methods | Where-Object Name -eq 'SaveToZDO'
+$standItemLoadLayout = $itemDataType.Methods | Where-Object { $_.Name -eq 'Load' -and $_.Parameters.Count -eq 3 }
+$standAttachLayout = $standType.Methods | Where-Object Name -eq 'UpdateAttach'
 foreach ($entry in @(@($itemSave, 'DAA9052430B2B766A8F15E221AB0D24C63FD55A6723EEBDCC65405E48F8D5494'),
+        @($standItemSaveLayout, 'C56B9EAD97EB6B2C53595D38E6CA97E1EDF7507921DF86D2F88A09F74977BB79'),
+        @($nativeItemLoad, '63E24A305F38DB26E0D0AEEA4922D5421799DA1AB162641999F1541BF85C9475'),
+        @($standItemLoadLayout, '2E5AEE4DF444FCAA4463BA7D37B58A567C4BD38F4EFAFD05DAD596BD6839FD89'),
+        @($standAttachLayout, '0E107474A83CB6A695BCC5FEBD2792760CB85264CFFA0F2172EA9F1A62CCCAE2'),
         @($numItemsSave, 'EFCB67745DEF1986C47B3526000AC07C0114FDA19AF57F0DABCDE653A6DC456E'),
         @($inventoryLoadLayout, 'E0E6FF90F203C6FFE961DE66768CDEDF609B896945E637A8166B121911BEF935'),
         @($prefabHashLayout, '8D6089461A9226DC1BDF23B87784C88F378A57F95C1FF6FFB6CCB85E731BF821'))) {
@@ -2978,4 +2986,4 @@ $worldCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'Preci
 $worldCaptureCalls = ($worldCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($worldCaptureCalls -match 'BlueprintStorageCapture::TryCapture' -and $worldCaptureCalls -match 'CompositeBlueprintStore/ForeignPartData::FromGeometry') 'World selection does not preserve container snapshots.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.77 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.78 and Valheim Steam build 25185596.'

@@ -2,7 +2,15 @@
 
 **English** | [Русский](blueprint-format_RU.md)
 
-Current source **0.19.77**: shared import preflight snapshots and validates every file/archive member before library writes.
+Current source **0.19.78**: complete inert native ItemStand v109 inspection shares the container ItemData reader.
+Checks cover byte-version envelope, every field, exact EOF, one-item stack and prefab/quality/variant agreement.
+Capture rejects corrupt/mismatched snapshots; inspection/clear refuse unreadable mounted evidence, including previously
+cleared archives. Old opaque bytes remain retainable, and a null package remains a metadata-only legacy/authoring recipe.
+Storage/mount choices and import aggregation are independent; invalid mounts do not prevent clearing valid chests.
+Native14/portable5 unchanged. Geometry113, Store, Release/API and 228 isolated Unity layouts/input checks PASS; no game/deploy.
+World restoration, foreign-state decoding, armour/free items, heavy scenes above 512 and durable sockets remain pending.
+
+Previous source **0.19.77**: shared import preflight snapshots and validates every file/archive member before library writes.
 Counts and storage/mount keep-clear choices cover all documents. Confirmation normalizes foreign absolute scales once on the Unity
 thread, converts private recipes to native14/portable5 and atomically publishes one ZIP. original/source.bin and original/name.txt
 retain exact input bytes/name inertly; archive paths are never extracted. Original files/current documents/world remain unchanged.
@@ -190,8 +198,9 @@ Retaining contents is a recipe/state requirement, not permission to spawn free i
 inventory ownership, access, server authority or duplication protection.
 Required proof: independent choices, native/modded storage, filled/empty/unknown, import/export/cancel/error,
 exact original-state roundtrip, intentionally empty copy, stand/armour independence, save/reload and remote client.
-This requirement is recorded in the active goal; .73 captures supported native storage only. Exchange-wide inspection,
-policy UI, foreign-storage decoding and world restoration are not implemented yet.
+This requirement remains in the active goal. .77 implements exchange-wide inspection and independent policy UI.
+.78 also inspects full native ItemStand snapshots. Foreign-storage decoding and world restoration remain incomplete;
+ordinary/modded storage coverage, armour and save/reload/remote-client acceptance are not yet established.
 
 | Stage | Owner | Required proof |
 | --- | --- | --- |

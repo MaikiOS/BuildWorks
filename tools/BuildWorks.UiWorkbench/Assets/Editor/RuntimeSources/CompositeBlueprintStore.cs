@@ -184,7 +184,8 @@ namespace OstrixMods.BuildWorks
                     var contents = InspectContents(document, prefabHash); // Reject every blocked member, not just empty archives.
                     summary.Storages += contents.Storages; summary.StoredItems += contents.StoredItems;
                     summary.Mounts += contents.Mounts; summary.Unknown += contents.Unknown;
-                    summary.UnreadableStorages += contents.UnreadableStorages; summary.AlreadyCleared += contents.AlreadyCleared;
+                    summary.UnreadableStorages += contents.UnreadableStorages; summary.UnreadableMounts += contents.UnreadableMounts;
+                    summary.AlreadyCleared += contents.AlreadyCleared;
                 }
                 return new ImportReview { Source = source, Bytes = bytes, Documents = documents, Contents = summary };
             }
@@ -295,8 +296,8 @@ namespace OstrixMods.BuildWorks
                 {
                     if (!archive) output.Write(bytes, 0, bytes.Length);
                     else using (var zip = new ZipArchive(output, ZipArchiveMode.Create, true))
-                        using (var entry = zip.CreateEntry(fileName + ".buildworks.json").Open())
-                            entry.Write(bytes, 0, bytes.Length);
+                    using (var entry = zip.CreateEntry(fileName + ".buildworks.json").Open())
+                        entry.Write(bytes, 0, bytes.Length);
                 }
                 File.Move(temporary, target);
                 exportedPath = target;
@@ -314,9 +315,9 @@ namespace OstrixMods.BuildWorks
 
         internal sealed class ContentsSummary
         {
-            internal int Storages, Mounts, Unknown, UnreadableStorages, AlreadyCleared;
+            internal int Storages, Mounts, Unknown, UnreadableStorages, UnreadableMounts, AlreadyCleared;
             internal long StoredItems;
-            internal bool CanClearStorage => Unknown == 0;
+            internal bool CanClearStorage => Unknown == UnreadableMounts;
             internal bool CanClearMounts => Unknown == UnreadableStorages;
         }
 
@@ -331,6 +332,13 @@ namespace OstrixMods.BuildWorks
             {
                 var contents = part.foreignData?.ToGeometry();
                 if (contents == null) continue;
+                if (contents.Format == Geometry.BlueprintForeignPartData.NativeItemStandFormat && contents.Zdo != null &&
+                    !Geometry.BlueprintItemStandContents.TryRead(contents, prefabHash, out _))
+                {
+                    ++result.Unknown; ++result.UnreadableMounts;
+                    if (contents.ContentsCleared) ++result.AlreadyCleared;
+                    continue;
+                }
                 if (contents.ContentsCleared)
                 {
                     ++result.AlreadyCleared;
@@ -1236,8 +1244,14 @@ namespace OstrixMods.BuildWorks
             blueprint?.sourceDocuments?.Any(source => source.ToGeometry().HasOpaqueSections) == true;
 
         private static ForeignPartData CloneForeignData(ForeignPartData value) => value == null ? null :
-            new ForeignPartData { format = value.format, info = value.info, zdo = value.zdo, chance = value.chance,
-                contentsCleared = value.contentsCleared };
+            new ForeignPartData
+            {
+                format = value.format,
+                info = value.info,
+                zdo = value.zdo,
+                chance = value.chance,
+                contentsCleared = value.contentsCleared
+            };
 
         private static bool ValidForeignData(ForeignPartData value)
         {
@@ -1605,8 +1619,14 @@ namespace OstrixMods.BuildWorks
             [DataMember(Order = 4, EmitDefaultValue = false)] public bool contentsCleared;
             internal Geometry.BlueprintForeignPartData ToGeometry() => new Geometry.BlueprintForeignPartData(format, info, zdo, chance, contentsCleared);
             internal static ForeignPartData FromGeometry(Geometry.BlueprintForeignPartData value) => value == null ? null :
-                new ForeignPartData { format = value.Format, info = value.Info, zdo = value.Zdo, chance = value.Chance,
-                    contentsCleared = value.ContentsCleared };
+                new ForeignPartData
+                {
+                    format = value.Format,
+                    info = value.Info,
+                    zdo = value.Zdo,
+                    chance = value.Chance,
+                    contentsCleared = value.ContentsCleared
+                };
         }
 
         [DataContract]

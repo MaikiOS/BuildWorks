@@ -80,6 +80,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Run("ItemStand authoring preserves contents in history and rejects opaque/locked edits", ItemStandContentsHistory);
             Run("Native Container payload preserves history and rejects invalid manifests/packages", NativeContainerState);
             Run("Native Container inspection reads all fields and refuses corrupt records without mutation", ContainerInventoryTests.Run);
+            Run("Native ItemStand inspection validates every property and holder metadata without executing it", ItemStandContentsTests.Run);
             Run("Intentional empty contents retain evidence and editor history without treating unknown as empty", ClearedContentsHistory);
             Run("Free supports have independent pose, scope and history", BlueprintSupportHistory);
             Run("Free supports insert with remapped root pose and validate atomically", BlueprintSupportInsertion);
@@ -1999,11 +2000,11 @@ namespace OstrixMods.BuildWorks.GeometryTests
         private static void ClearedContentsHistory()
         {
             var original = new BlueprintForeignPartData(BlueprintForeignPartData.NativeItemStandFormat,
-                "SwordIron:2:3:0", Convert.ToBase64String(new byte[] { 109, 2, 0 }), null);
-            var cleared = original.WithoutContents(null);
+                "SwordIron:2:3:0", Convert.ToBase64String(ItemStandContentsTests.Packet()), null);
+            var cleared = original.WithoutContents(_ => -101);
             Equal(false, original.ContentsCleared); Equal(true, cleared.ContentsCleared);
             Equal(original.Info, cleared.Info); Equal(original.Zdo, cleared.Zdo);
-            Equal(cleared, cleared.WithoutContents(null));
+            Equal(cleared, cleared.WithoutContents(_ => -101));
             var document = EditorDocument(new BlueprintEditorPart("stand", "itemstand", "Stand",
                 new Point3(), IdentityRotation(), foreignData: original));
             document.MarkClean();

@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace OstrixMods.BuildWorks
 {
-    // Capture only: no inventory consumption, native package decoding or ZDO writes.
+    // Capture and inert inspection only: no native Load, inventory consumption or ZDO writes.
     internal static class BlueprintItemStandCapture
     {
         private static readonly FieldInfo StandView = typeof(ItemStand).GetField(
@@ -38,8 +38,11 @@ namespace OstrixMods.BuildWorks
             {
                 string info = item.name + ":" + variant.ToString(CultureInfo.InvariantCulture) + ":" +
                     quality.ToString(CultureInfo.InvariantCulture) + ":" + orientation.ToString(CultureInfo.InvariantCulture);
-                data = new BlueprintForeignPartData(BlueprintForeignPartData.NativeItemStandFormat, info,
+                var snapshot = new BlueprintForeignPartData(BlueprintForeignPartData.NativeItemStandFormat, info,
                     package == null ? null : Convert.ToBase64String(package), null);
+                if (package != null && !BlueprintItemStandContents.TryRead(snapshot, name => name.GetStableHashCode(), out _))
+                    return false;
+                data = snapshot;
                 return true;
             }
             catch (ArgumentException) { return false; }

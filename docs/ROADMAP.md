@@ -2,14 +2,21 @@
 
 **English** | [Русский](ROADMAP_RU.md)
 
-Updated 2026-10-06. Ostrix approved this order after the development review.
+Updated 2026-10-07. Ostrix approved this order after the development review.
 The goal is predictable building with real Valheim pieces, then useful group
 operations and editable generators. Each stage delivers a complete workflow,
 not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.77**: import also reviews the whole file/archive and independent storage/mount choices before writing.
+Active source checkpoint **0.19.78**: native ItemStand v109 is fully inspected by the shared immutable item reader.
+Capture/clear validate the complete packet and prefab/quality/variant/one-item metadata; malformed archival bytes remain
+retainable, not clearable/executable. Storage/mount preflight stays independent, including unreadable mounted evidence.
+Geometry113, Store, Release/API and 228 isolated Unity layouts/input checks PASS. Native world restoration, foreign-state
+decoding, armour/free items, heavy scenes above 512 and durable sockets remain pending. No deploy; installed .67 unchanged.
+Exact evidence: HANDOFF.
+
+Previous source checkpoint **0.19.77**: import also reviews the whole file/archive and independent storage/mount choices before writing.
 One atomic native ZIP retains exact original bytes as inert evidence. Changed sources, blocked archive members and failed conversion
 write no partial copy; prefab-base scale normalization runs on the host thread. Whole-library budget/order/duplicate-ID multiplicity,
 2000/2001 files and projected ZIP-entry caps are verified before publishing. Store tests and 228 isolated Unity layouts/input checks PASS.

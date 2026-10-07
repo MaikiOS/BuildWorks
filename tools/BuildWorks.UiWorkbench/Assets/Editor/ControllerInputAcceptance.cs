@@ -736,7 +736,8 @@ internal static class ControllerInputAcceptance
                     format = BlueprintForeignPartData.NativeContainerFormat, info = "5:2:0:0", zdo = "bQAAAAAA" };
                 policy.parts[1].prefabName = "itemstand";
                 policy.parts[1].foreignData = new CompositeBlueprintStore.ForeignPartData {
-                    format = BlueprintForeignPartData.NativeItemStandFormat, info = "SwordIron:0:1:0", zdo = "bQIA" };
+                    format = BlueprintForeignPartData.NativeItemStandFormat, info = "SwordIron:0:1:0",
+                    zdo = Convert.ToBase64String(ItemStandPreviewAcceptance.ItemPackage("SwordIron")) };
                 foreach (bool emptyStorage in new[] { false, true })
                 foreach (bool emptyMounts in new[] { false, true })
                 {
@@ -790,6 +791,27 @@ internal static class ControllerInputAcceptance
                         "Actual import UI coupled choices");
                     NativeClick(view, null, "ExchangeClose"); yield return null;
                 }
+                string goodMountPackage = policy.parts[1].foreignData.zdo;
+                policy.parts[1].foreignData.zdo = "bQIA";
+                view.ShowExchange((parent, textFont, closed) => new BlueprintExchangeView(parent, textFont, store, policy, closed)); yield return null;
+                exchange = Field<BlueprintExchangeView>(view, "exchangeView");
+                for (int i = 0; i < 300 && Field<Task<string[]>>(exchange, "listing") != null; ++i)
+                { Frame(controller, input, Vector2.zero); yield return null; }
+                Field<TMP_InputField>(exchange, "fileName").SetTextWithoutNotify("storage_only_" + Guid.NewGuid().ToString("N"));
+                NativeClick(view, null, "ExchangeSubmit"); yield return null;
+                for (int i = 0; i < 300 && Field<Task<CompositeBlueprintStore.ContentsSummary>>(exchange, "contentsInspection") != null; ++i)
+                { Frame(controller, input, Vector2.zero); yield return null; }
+                Require(Field<Button>(exchange, "storageChoice").interactable && !Field<Button>(exchange, "mountChoice").interactable &&
+                    Field<CompositeBlueprintStore.ContentsSummary>(exchange, "contentsSummary").UnreadableMounts == 1,
+                    "Unreadable mount blocked an independent valid storage choice");
+                NativeClick(view, null, "ExchangeStorageChoice"); NativeClick(view, null, "ExchangeSubmit"); yield return null;
+                Require(Field<bool>(exchange, "completed"), "Independent storage-only export failed");
+                var storageOnly = ExternalBlueprintLibrary.LoadFile(Field<string>(exchange, "resultPath")).Single();
+                Require(storageOnly.parts[0].foreignData.contentsCleared && !storageOnly.parts[1].foreignData.contentsCleared &&
+                    storageOnly.parts[1].foreignData.zdo == "bQIA" && !policy.parts[0].foreignData.contentsCleared,
+                    "Storage-only export changed unreadable mount evidence or source");
+                NativeClick(view, null, "ExchangeClose"); yield return null;
+                policy.parts[1].foreignData.zdo = goodMountPackage;
                 string lockedPath = Path.Combine(folder, "locked.blueprint"); File.WriteAllText(lockedPath, text);
                 policy.parts[0].foreignData = new CompositeBlueprintStore.ForeignPartData { format = "vbuild", zdo = "opaque" };
                 view.ShowExchange((parent, textFont, closed) => new BlueprintExchangeView(parent, textFont, store, policy, closed)); yield return null;

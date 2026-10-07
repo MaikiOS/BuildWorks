@@ -2,6 +2,31 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.78 — full inert ItemStand inspection; not deployed
+
+Native ItemStand v109 packages now use the same bounded immutable ItemData record reader as containers.
+The one-byte stand envelope, one-item stack and prefab/quality/variant metadata are checked against the
+complete record and exact end of stream. Durability, grid/world level, flags, crafter and mod strings remain
+exact data; no ItemData.Load, prefab scripts, inventory or ZDO restoration executes.
+World capture refuses malformed/mismatched snapshots before returning data. Older inert bytes remain
+loadable/retainable as evidence, but unreadable mounted state cannot be cleared, even if already marked cleared.
+A null legacy/authoring package remains a metadata-only recipe, not proof of a full snapshot.
+Import/export inspection and aggregation keep storage/mount eligibility independent: an unreadable mount
+does not prevent clearing a readable chest, and the retained mounted bytes stay unchanged.
+No schema change: native14/portable5. Installed .67 is unchanged; no deploy, game/save edits or push.
+
+Release, Geometry113, Store, Bridge8, WorldLayout12, Localization837 and HostContract PASS.
+Current native ItemData/ItemStand Save/Load/UpdateAttach IL is pinned; changes require explicit review.
+verify is unavailable; direct build/tests/diff checks are used.
+Unity Workbench: 228 PASS, 2026-10-07T09:03:20.5734429Z; not an in-game check.
+Independent correctness review: PASSED, no blocking findings.
+
+Resumed at Ostrix's request, 2026-10-07. Independent Ponytail review: Lean already. Ship.
+Release/Geometry113/localization runtime/HostContract and forbidden-profile checks passed again after resuming.
+Source-only mirror reconciled for the local .78 checkpoint; no deployment or push.
+The full goal remains incomplete: world item restoration, armour/free items, foreign state decoding,
+heavy scenes and durable snap points, followed by save/reload and client verification.
+
 ## Checkpoint 0.19.77 — reviewed atomic import; not deployed
 
 The shared editor/Hammer import flow now snapshots the complete file/archive and reviews counts and

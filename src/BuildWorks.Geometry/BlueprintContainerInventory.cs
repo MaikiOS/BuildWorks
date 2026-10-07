@@ -65,40 +65,10 @@ namespace OstrixMods.BuildWorks.Geometry
                     long total = 0;
                     for (int index = 0; index < count; ++index)
                     {
-                        int durability = reader.ReadInt32(), x = reader.ReadByte(), y = reader.ReadByte();
-                        int worldLevel = reader.ReadByte(), flags = reader.ReadByte();
-                        int quality = (flags & 4) != 0 ? reader.ReadUInt16() : 1;
-                        int stack = (flags & 8) != 0 ? reader.ReadUInt16() : 1;
-                        int variant = (flags & 16) != 0 ? reader.ReadInt32() : 0;
-                        long crafterId = (flags & 32) != 0 ? reader.ReadInt64() : 0;
-                        string crafterName = (flags & 32) != 0 ? ReadString(reader) : "";
-                        if ((flags & 4) != 0 && quality == 1 || (flags & 8) != 0 && stack == 1 ||
-                            (flags & 16) != 0 && variant == 0 || (flags & 32) != 0 && crafterId == 0) return false;
-                        if ((flags & 64) == 0 || !names.TryGetValue(reader.ReadInt32(), out string prefab) ||
-                            x >= width || y >= height || quality < 1 || stack < 1 || !cells.Add(y * width + x)) return false;
-                        var customData = new Dictionary<string, string>(StringComparer.Ordinal);
-                        int customCount = 0;
-                        if ((flags & 128) != 0)
-                        {
-                            customCount = reader.ReadByte();
-                            if ((customCount & 128) != 0)
-                            {
-                                customCount = (customCount & 127) << 8 | reader.ReadByte();
-                                if (customCount < 128) return false;
-                            }
-                            if (customCount == 0 || customCount * 2L > stream.Length - stream.Position) return false;
-                        }
-                        for (int entry = 0; entry < customCount; ++entry)
-                        {
-                            string key = ReadString(reader), value = ReadString(reader);
-                            if (customData.ContainsKey(key)) return false;
-                            customData.Add(key, value);
-                        }
-                        int extraFlags = reader.ReadByte();
-                        if ((extraFlags & ~1) != 0) return false;
-                        total += stack; usedNames.Add(prefab);
-                        result.Add(new Item(prefab, durability, x, y, worldLevel, flags, quality, stack, variant,
-                            crafterId, crafterName, customData, (extraFlags & 1) != 0));
+                        Item item = ReadItem(reader, names);
+                        if (item.X >= width || item.Y >= height || !cells.Add(item.Y * width + item.X)) return false;
+                        total += item.Stack; usedNames.Add(item.Prefab);
+                        result.Add(item);
                     }
                     if (stream.Position != stream.Length || total != units || usedNames.Count != names.Count) return false;
                     items = result.AsReadOnly(); return true;
@@ -106,6 +76,46 @@ namespace OstrixMods.BuildWorks.Geometry
             }
             catch (Exception error) when (error is IOException || error is InvalidDataException || error is FormatException || error is DecoderFallbackException)
             { return false; }
+        }
+
+        // ItemStand and Inventory use the same native ItemData.Save record, with different envelopes.
+        internal static Item ReadItem(BinaryReader reader, Dictionary<int, string> names)
+        {
+            int durability = reader.ReadInt32(), x = reader.ReadByte(), y = reader.ReadByte();
+            int worldLevel = reader.ReadByte(), flags = reader.ReadByte();
+            int quality = (flags & 4) != 0 ? reader.ReadUInt16() : 1;
+            int stack = (flags & 8) != 0 ? reader.ReadUInt16() : 1;
+            int variant = (flags & 16) != 0 ? reader.ReadInt32() : 0;
+            long crafterId = (flags & 32) != 0 ? reader.ReadInt64() : 0;
+            string crafterName = (flags & 32) != 0 ? ReadString(reader) : "";
+            if ((flags & 4) != 0 && quality == 1 || (flags & 8) != 0 && stack == 1 ||
+                (flags & 16) != 0 && variant == 0 || (flags & 32) != 0 && crafterId == 0 || quality < 1 || stack < 1)
+                throw new InvalidDataException("Invalid native item defaults.");
+            if ((flags & 64) == 0 || !names.TryGetValue(reader.ReadInt32(), out string prefab))
+                throw new InvalidDataException("Unknown native item prefab.");
+            var customData = new Dictionary<string, string>(StringComparer.Ordinal);
+            int customCount = 0;
+            if ((flags & 128) != 0)
+            {
+                customCount = reader.ReadByte();
+                if ((customCount & 128) != 0)
+                {
+                    customCount = (customCount & 127) << 8 | reader.ReadByte();
+                    if (customCount < 128) throw new InvalidDataException("Invalid native item map count.");
+                }
+                if (customCount == 0 || customCount * 2L > reader.BaseStream.Length - reader.BaseStream.Position)
+                    throw new InvalidDataException("Invalid native item map size.");
+            }
+            for (int entry = 0; entry < customCount; ++entry)
+            {
+                string key = ReadString(reader), value = ReadString(reader);
+                if (customData.ContainsKey(key)) throw new InvalidDataException("Duplicate native item key.");
+                customData.Add(key, value);
+            }
+            int extraFlags = reader.ReadByte();
+            if ((extraFlags & ~1) != 0) throw new InvalidDataException("Unknown native item flags.");
+            return new Item(prefab, durability, x, y, worldLevel, flags, quality, stack, variant,
+                crafterId, crafterName, customData, (extraFlags & 1) != 0);
         }
 
         // BinaryWriter strings use a canonical 7-bit UTF-8 byte length. Bound it before allocating.

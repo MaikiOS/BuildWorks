@@ -59,3 +59,33 @@ Admin restoration ещё не реализован, отдельная успе�
 для обоих файлов, отмены и повторного входа; host/remote client проверяются отдельно.
 Запуск Valheim и создание сохранений требуют явного разрешения по AGENTS.md.
 Native управление CUA в этой сессии недоступно; Workbench не подменяет наблюдение в игре.
+
+### Проверенные зависимости автоматической подготовки
+
+Read-only исследование установленного host подтвердило public `Inventory.AddItem(GameObject,int)`,
+`Player.AddKnownItem(ItemData)` и `Player.AddKnownStation(CraftingStation)`.
+AddKnownItem обновляет native рецепты; прямую запись в `m_knownRecipes` делать не нужно.
+AddItem ограничивает одну выдачу `m_maxStackSize`: выдавать порциями с проверкой реального count,
+не считать bool доказательством полного количества. Станцию нужно физически подготовить:
+одной записи о знании недостаточно для `CraftingStation.HaveBuildStationInRange`.
+
+`HammerBlueprintPieceRegistry.Resources` использует native `Piece.m_resources/GetAmount(1)`,
+но сначала требует открытых деталей через `TryResolveBlueprintPieces/TryResolveBuildPiece`.
+Для нового персонажа это bootstrap-блокер: подготовка читает prefab напрямую по закреплённым
+исходникам, затем открывает знания native API и перепроверяет обычный путь. NoCost/debug не включать.
+
+До любой выдачи нужны: закрытый local server без connected peers, точные world name/UID и
+character filename/player ID, оба `FileSource.Local`, разрешённый фактический save root,
+отсутствие debug/NoCost/NoBuildCost/NoCraftCost/NoWorkbench, хеши исходников и одноразовый receipt.
+Нельзя повторить выдачу после частичного сбоя; сначала сохраняется факт начала попытки.
+Старый `TryRunArmedSkyCleanup` для этого не используется.
+
+`Utils.GetSaveDataPath(FileHelpers.FileSource.Local)` и `Utils.SetSaveDataPath(string)` существуют.
+Однако `-savedir` найден только в `FejdStartup.ParseServerArguments`, без найденных вызовов parser
+в клиентском assembly_valheim, assembly_guiutils и Assembly-CSharp. Это не доказательство работы CLI.
+Будущий стенд должен проверить фактический канонический root до мутаций и отказать при несовпадении.
+Менять root после загрузки мира/персонажа нельзя. Автоматическая подготовка пока не внедрена.
+
+Проверенные DLL: assembly_valheim SHA256
+`25A0A107DCE4D834C44C2B72D0EAFD5CB7793933BDA81816ACCFA1EA9543DACE`,
+assembly_utils `6BE2AFEB97B5B26FD3176E1B8584C07E57AD48DDCD6E8E5E79E32BEE943827C1`.

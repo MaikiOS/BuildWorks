@@ -35,3 +35,17 @@ Before manual instructions, prepare isolated world/character, native-recipe reso
 ordinary mode without debug/no-cost bypass. Then supply exact Russian button sequence, starting state,
 expected result and errors for each named fixture, cancellation and reload; host/remote client separately.
 AGENTS.md requires explicit permission for game launch/save creation; native CUA control is unavailable.
+
+Read-only native setup research: public Inventory.AddItem(GameObject,int), Player.AddKnownItem(ItemData),
+Player.AddKnownStation(CraftingStation) are available. AddItem caps each grant at m_maxStackSize:
+split and verify actual counts. AddKnownItem updates native recipes, no direct knownRecipes mutation.
+Physical station still required. Registry.Resources uses native requirements but depends on unlocked pieces;
+bootstrap must read pinned fixture prefabs directly, grant/unlock through native APIs, then verify ordinary resolution.
+Require closed local server/no connected peers, exact world UID/character ID, both Local file sources,
+actual canonical isolated save root, no debug/no-cost/global cost bypass, pinned hashes and one-shot receipt
+before mutation. A partial failure must never automatically repeat grants. Old sky cleanup is unrelated.
+Utils.GetSaveDataPath(Local)/SetSaveDataPath exist, but -savedir only appears in FejdStartup.ParseServerArguments
+with no found callers in client assembly_valheim/guiutils/Assembly-CSharp: desktop CLI support remains unproven.
+Fail before mutations if actual root differs; never change save root after loading world/character. Setup unimplemented.
+Pinned host SHA256:25A0A107DCE4D834C44C2B72D0EAFD5CB7793933BDA81816ACCFA1EA9543DACE;
+utils:6BE2AFEB97B5B26FD3176E1B8584C07E57AD48DDCD6E8E5E79E32BEE943827C1.

@@ -40,6 +40,15 @@ states, placement-time independent contents choices, editor >512 and the live la
 Next: preserve material variation in preview/place/reload, resolve #Center/#Coordinates/#Rotation,
 then inventory/armour adapters. Never label partial conversion as complete.
 
+Read-only legacy-inventory audit: all 2,806 packages match installed Inventory.LoadOld to exact EOF:
+Info 162/v103 + 110/v104 + 1,531/v106; ZDO.items 8/v104 + 995/v106 (not deduplicated).
+The current OldSave writer appends cheated under header106, but LoadOld and these real v106 packets do not.
+Do not add a speculative alternate parser. There are 16 zero-crafter-ID/nonempty-name records
+and 34 float-durability precision changes that native v109 cannot exactly represent; retain exact
+original fields separately, never invent an ID. Container dimensions/item capacities require the host;
+Inventory.AddItem is not a lossless file converter. This is research, not an implemented migration.
+Installed assembly_valheim SHA256: 25A0A107DCE4D834C44C2B72D0EAFD5CB7793933BDA81816ACCFA1EA9543DACE.
+
 ## Checkpoint 0.19.84 — heavy world ghosts and intrinsic prefab scale; source verified
 
 World plans now allow the native-format maximum of 50,000 parts; the editor remains at 512.

@@ -47,6 +47,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Run("Screen edge selection is perspective correct", ScreenEdgeSelectionIsPerspectiveCorrect);
             Run("Composite snap points exclude internal joins", CompositeSnapPointsExcludeInternalJoins);
             Run("Composite snap points keep same-part neighbors", CompositeSnapPointsKeepSamePartNeighbors);
+            Run("Spatial snap clustering preserves original first-match semantics and large sets", CompositeSnapSpatialParity);
             Run("World snap-point packages are bounded, exact and reject corrupt coordinates", WorldSnapPointPackages);
             Run("Straight repeat uses exact step", StraightRepeatUsesExactStep);
             Run("Connected ring starts at selected support", ConnectedRingStartsAtSelectedSupport);
@@ -1218,6 +1219,44 @@ namespace OstrixMods.BuildWorks.GeometryTests
                 AnchorAdjustment.ExternalCompositeSnapPoints(
                     new IReadOnlyList<Point3>[] { new[] { new Point3(0.0, 0.0, 0.0) } },
                     0.0));
+        }
+
+        private static void CompositeSnapSpatialParity()
+        {
+            var random = new Random(8317);
+            foreach (double tolerance in new[] { 0.0001, 0.12, 1.0, double.Epsilon, 1e200 })
+            for (int trial = 0; trial < 20; ++trial)
+            {
+                var sets = new List<IReadOnlyList<Point3>>();
+                for (int part = 0; part < 12; ++part)
+                {
+                    var points = new List<Point3>();
+                    for (int index = 0; index < 15; ++index)
+                        points.Add(new Point3(random.Next(-4, 5) + random.NextDouble() * 0.2,
+                            random.Next(-2, 3) * 0.1, random.Next(-2, 3) * 0.1));
+                    sets.Add(points);
+                }
+                var old = new List<(Point3 point, int owner, bool shared)>();
+                for (int part = 0; part < sets.Count; ++part)
+                foreach (Point3 point in sets[part])
+                {
+                    int found = old.FindIndex(value => (value.point - point).LengthSquared <= tolerance * tolerance);
+                    if (found < 0) old.Add((point, part, false));
+                    else if (old[found].owner != part) old[found] = (old[found].point, old[found].owner, true);
+                }
+                Point3[] expected = old.Where(value => !value.shared).Select(value => value.point).ToArray();
+                var actual = AnchorAdjustment.ExternalCompositeSnapPoints(sets, tolerance);
+                Equal(expected.Length, actual.Count);
+                for (int index = 0; index < expected.Length; ++index) Near(expected[index], actual[index]);
+            }
+            var large = Enumerable.Range(0, 50000).Select(index =>
+                (IReadOnlyList<Point3>)new[] { new Point3(index, 0, 0), new Point3(index + 1, 0, 0) }).ToArray();
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            var endpoints = AnchorAdjustment.ExternalCompositeSnapPoints(large, 0.0001);
+            Equal(2, endpoints.Count);
+            Near(new Point3(0, 0, 0), endpoints[0]);
+            Near(new Point3(50000, 0, 0), endpoints[1]);
+            Console.WriteLine("  100000 sockets clustered in " + watch.ElapsedMilliseconds + " ms");
         }
 
         private static void BlueprintDocumentDeepCopiesSource()

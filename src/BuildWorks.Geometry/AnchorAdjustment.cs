@@ -303,6 +303,8 @@ namespace OstrixMods.BuildWorks.Geometry
 
             double toleranceSquared = tolerance * tolerance;
             List<SnapCluster> clusters = new List<SnapCluster>();
+            var cells = new Dictionary<(long, long, long), List<int>>();
+            var unindexed = new List<int>();
             for (int part = 0; part < parts.Count; ++part)
             {
                 IReadOnlyList<Point3> points = parts[part] ??
@@ -310,19 +312,51 @@ namespace OstrixMods.BuildWorks.Geometry
                 foreach (Point3 point in points)
                 {
                     if (!IsFinite(point)) throw new ArgumentOutOfRangeException(nameof(parts));
-                    SnapCluster cluster = null;
-                    foreach (SnapCluster candidate in clusters)
+                    double x = Math.Floor(point.X / (2 * tolerance));
+                    double y = Math.Floor(point.Y / (2 * tolerance));
+                    double z = Math.Floor(point.Z / (2 * tolerance));
+                    bool indexed = toleranceSquared > 0 && GeometryMath.IsFinite(toleranceSquared) &&
+                        Math.Abs(x) < 1e12 && Math.Abs(y) < 1e12 && Math.Abs(z) < 1e12;
+                    int best = int.MaxValue;
+                    if (indexed)
                     {
-                        if ((candidate.Point - point).LengthSquared <= toleranceSquared)
+                        for (int dx = -1; dx <= 1; ++dx)
+                        for (int dy = -1; dy <= 1; ++dy)
+                        for (int dz = -1; dz <= 1; ++dz)
+                            if (cells.TryGetValue(((long)x + dx, (long)y + dy, (long)z + dz),
+                                out List<int> candidates))
+                                foreach (int candidate in candidates)
+                                    if (candidate < best &&
+                                        (clusters[candidate].Point - point).LengthSquared <= toleranceSquared)
+                                        best = candidate;
+                        foreach (int candidate in unindexed)
+                            if (candidate < best &&
+                                (clusters[candidate].Point - point).LengthSquared <= toleranceSquared)
+                                best = candidate;
+                    }
+                    else
+                    {
+                        // ponytail: extreme floating ranges retain the exact old scan semantics.
+                        for (int candidate = 0; candidate < clusters.Count; ++candidate)
                         {
-                            cluster = candidate;
-                            break;
+                            if ((clusters[candidate].Point - point).LengthSquared <= toleranceSquared)
+                            { best = candidate; break; }
                         }
                     }
+                    SnapCluster cluster = best == int.MaxValue ? null : clusters[best];
                     if (cluster == null)
                     {
                         cluster = new SnapCluster(point, part);
+                        int index = clusters.Count;
                         clusters.Add(cluster);
+                        if (indexed)
+                        {
+                            var cell = ((long)x, (long)y, (long)z);
+                            if (!cells.TryGetValue(cell, out List<int> bucket))
+                                cells.Add(cell, bucket = new List<int>());
+                            bucket.Add(index);
+                        }
+                        else unindexed.Add(index);
                     }
                     else if (cluster.Owner != part)
                     {

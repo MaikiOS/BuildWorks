@@ -25,6 +25,46 @@ internal static class ItemStandPreviewAcceptance
     private static object Call(object value, string name, params object[] args) => value.GetType()
         .GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic).Invoke(value, args);
 
+    private static void HeavyContentsChecks(GameObject source, BlueprintForeignPartData captured)
+    {
+        var plan = new List<PrecisionPlacementSession.TransformSnapshot>();
+        var pieces = new List<Piece>();
+        for (int index = 0; index < 513; ++index)
+        {
+            byte[] package = Convert.FromBase64String(captured.Zdo);
+            package[1] = (byte)index; // Different durability, same visible item.
+            var data = new BlueprintForeignPartData(captured.Format, captured.Info, Convert.ToBase64String(package), null);
+            plan.Add(new PrecisionPlacementSession.TransformSnapshot(new Vector3(index * 1000, 0, 0),
+                Quaternion.identity, Vector3.one, itemStandContents: data));
+            pieces.Add(source.GetComponent<Piece>());
+        }
+        using (var preview = new BlueprintBatchedPreview())
+        {
+            preview.Prepare(plan, pieces, 0);
+            Require(preview.Ready && preview.TemplateCount == 1, "identical visible items allocate per-package templates");
+            Array parts = Field<Array>(preview, "parts");
+            GameObject visual = Field<GameObject>(parts.GetValue(0), "Visual");
+            Transform content = Content(visual);
+            Require(content, "heavy template omits mounted contents");
+            Matrix4x4 expected = Matrix4x4.Scale(source.transform.localScale) *
+                visual.transform.worldToLocalMatrix * content.localToWorldMatrix;
+            preview.Draw(plan, new MaterialPropertyBlock(), 0, 0, Matrix4x4.identity);
+            bool found = false;
+            foreach (System.Collections.DictionaryEntry entry in Field<System.Collections.IDictionary>(preview, "batches"))
+            {
+                var key = ((Mesh, Material, int))entry.Key;
+                if (key.Item2 != content.GetComponent<Renderer>().sharedMaterial) continue;
+                Matrix4x4 first = Field<Matrix4x4[]>(entry.Value, "Matrices")[0];
+                for (int element = 0; element < 16; ++element)
+                    Require(Mathf.Abs(first[element] - expected[element]) < .0001f,
+                        "hidden native holder also hides its mounted item");
+                found = true;
+            }
+            Require(found && plan[0].ItemStandContents.Zdo != plan[1].ItemStandContents.Zdo,
+                "heavy contents draw absent or placement metadata collapsed");
+        }
+    }
+
     private static void AuthoringChecks(Camera template, GameObject source, BlueprintForeignPartData captured, string output)
     {
         string path = Path.Combine(output, "stand-authoring-" + Guid.NewGuid().ToString("N") + ".json");
@@ -274,6 +314,7 @@ internal static class ItemStandPreviewAcceptance
             yield return null;
             ItemStandPlacementAcceptance.Run(item);
             stand.m_orientationType = ItemStand.Orientation.Horizontal;
+            HeavyContentsChecks(source, captured);
             using (var scene = new BlueprintEditorScene(template, _ => source))
             {
                 var doc = new BlueprintEditorDocument(null, "Captured", "Test", new[] { Part(captured) });

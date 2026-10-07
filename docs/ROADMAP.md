@@ -9,7 +9,13 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.83**, not deployed: native world custom-point persistence and known
+Active source checkpoint **0.19.84**, not deployed: full shared-template world ghosts up to 50,000 parts,
+intrinsic prefab-scale parity and faster composite socket clustering. Editor remains limited to 512.
+Release/required checks, WorldLayout14 and Unity252 PASS; independent correctness and ponytail reviews passed.
+No native world/FPS proof. Unsupported item effects fail closed; foreign ZDO/containers/armour/contents choices
+and the live-host lamp remain open. TerrainRamp-1.0-Test remains .82. Details: HANDOFF; goal not complete.
+
+Previous source checkpoint **0.19.83**, not deployed: native world custom-point persistence and known
 foreign ItemStand recipe conversion. Release/required checks and Unity252 PASS; WorldLayout14
 includes repeated custom-point ownership. Independent reviews passed. Real Valheim persistence
 and the remaining heavy/foreign-state/contents/lamp goals are not claimed complete. See HANDOFF.

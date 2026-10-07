@@ -36,6 +36,7 @@ namespace OstrixMods.BuildWorks
         private readonly Dictionary<string, IReadOnlyList<Piece>> sourcePiecesByBlueprintId =
             new Dictionary<string, IReadOnlyList<Piece>>(StringComparer.Ordinal);
         private readonly List<GameObject> prefabs = new List<GameObject>();
+        private readonly Dictionary<Piece, Bounds> sourceBounds = new Dictionary<Piece, Bounds>();
         private GameObject holder;
         private GameObject categoryMarker;
         private PieceTable registeredTable;
@@ -414,8 +415,11 @@ namespace OstrixMods.BuildWorks
             piece.m_icon = thumbnailRenderer.GetOrQueue(blueprint, pieces) ??
                 FirstPieceIcon(pieces);
 
+            bool heavy = pieces.Count > CompositeBlueprintStore.InteractivePartBudget;
+            int frameIndex = CompositeBlueprintStore.FramePartIndex(blueprint);
             for (int index = 0; index < pieces.Count; ++index)
             {
+                if (heavy && index != frameIndex) continue;
                 GameObject visual = PlacementGhostPreviewView.CreateVisualClone(
                     pieces[index].gameObject,
                     "Part_" + index,
@@ -423,15 +427,17 @@ namespace OstrixMods.BuildWorks
                 visual.transform.SetParent(prefab.transform, false);
                 visual.transform.localPosition = blueprint.parts[index].position.ToVector3();
                 visual.transform.localRotation = blueprint.parts[index].rotation.ToQuaternion();
-                visual.transform.localScale = Vector3.Scale(pieces[index].transform.lossyScale,
+                visual.transform.localScale = Vector3.Scale(pieces[index].transform.localScale,
                     blueprint.parts[index].scale.ToVector3());
                 visual.SetActive(true);
             }
 
-            if (TryGetLocalVisualBounds(prefab, out Bounds visualBounds))
+            Bounds visualBounds;
+            if (heavy ? TryGetBlueprintFrameBounds(blueprint, pieces, out visualBounds) :
+                TryGetLocalVisualBounds(prefab, out visualBounds))
             {
                 Bounds frameBounds = visualBounds;
-                if (CompositeBlueprintStore.HasExplicitFrame(blueprint))
+                if (!heavy && CompositeBlueprintStore.HasExplicitFrame(blueprint))
                 {
                     bool initialized = false;
                     for (int index = 0; index < blueprint.parts.Count; ++index)
@@ -519,11 +525,11 @@ namespace OstrixMods.BuildWorks
                 var native = new List<Transform>();
                 piece.GetSnapPoints(native);
                 var local = new List<Point3>(native.Count);
-                Quaternion inverse = Quaternion.Inverse(piece.transform.rotation);
                 foreach (Transform snap in native)
                 {
                     if (!snap) continue;
-                    Vector3 pieceLocal = inverse * (snap.position - piece.transform.position);
+                    Vector3 pieceLocal = Vector3.Scale(piece.transform.localScale,
+                        piece.transform.InverseTransformPoint(snap.position));
                     Vector3 point = part.position.ToVector3() + part.rotation.ToQuaternion() *
                         Vector3.Scale(pieceLocal, part.scale.ToVector3());
                     if (float.IsNaN(point.x) || float.IsInfinity(point.x) ||
@@ -538,8 +544,48 @@ namespace OstrixMods.BuildWorks
                 : AnchorAdjustment.ExternalCompositeSnapPoints(sets, tolerance: 0.0001);
             var result = new List<Vector3>(selected.Count);
             foreach (Point3 point in selected)
+            {
+                if (result.Count == 512) break;
                 result.Add(new Vector3((float)point.X, (float)point.Y, (float)point.Z));
+            }
             return result;
+        }
+
+        private bool TryGetBlueprintFrameBounds(CompositeBlueprintStore.Blueprint blueprint,
+            IReadOnlyList<Piece> pieces, out Bounds bounds)
+        {
+            bounds = default;
+            bool found = false;
+            for (int index = 0; index < pieces.Count; ++index)
+            {
+                if (CompositeBlueprintStore.HasExplicitFrame(blueprint) &&
+                    !CompositeBlueprintStore.IsFramePart(blueprint, index)) continue;
+                Piece piece = pieces[index];
+                if (!sourceBounds.TryGetValue(piece, out Bounds local))
+                {
+                    GameObject template = PlacementGhostPreviewView.CreateVisualClone(piece.gameObject,
+                        "BuildWorks_BoundsProbe", piece.gameObject.layer);
+                    try
+                    {
+                        if (!TryGetLocalVisualBounds(template, out local)) return false;
+                        sourceBounds.Add(piece, local);
+                    }
+                    finally { template.SetActive(false); UnityEngine.Object.Destroy(template); }
+                }
+                var part = blueprint.parts[index];
+                Matrix4x4 matrix = Matrix4x4.TRS(part.position.ToVector3(), part.rotation.ToQuaternion(),
+                    Vector3.Scale(piece.transform.localScale, part.scale.ToVector3()));
+                for (int corner = 0; corner < 8; ++corner)
+                {
+                    Vector3 point = matrix.MultiplyPoint3x4(new Vector3(
+                        (corner & 1) == 0 ? local.min.x : local.max.x,
+                        (corner & 2) == 0 ? local.min.y : local.max.y,
+                        (corner & 4) == 0 ? local.min.z : local.max.z));
+                    if (!found) { bounds = new Bounds(point, Vector3.zero); found = true; }
+                    else bounds.Encapsulate(point);
+                }
+            }
+            return found;
         }
 
         private static void AddSnapPoint(Transform parent, int index, Vector3 localPosition)
@@ -605,6 +651,7 @@ namespace OstrixMods.BuildWorks
             placementOriginsByPiece.Clear();
             piecesByBlueprintId.Clear();
             sourcePiecesByBlueprintId.Clear();
+            sourceBounds.Clear();
             if (holder) UnityEngine.Object.Destroy(holder);
             holder = null;
             categoryMarker = null;
@@ -678,8 +725,6 @@ namespace OstrixMods.BuildWorks
                 }
                 int partCount = blueprint?.parts?.Count ?? 0;
                 signature.Append(partCount).Append(':');
-                if (CompositeBlueprintStore.InteractiveError(partCount) != null)
-                { signature.Append("over-budget;"); continue; }
                 for (int partIndex = 0; partIndex < partCount; ++partIndex)
                 {
                     CompositeBlueprintStore.Part part = blueprint.parts[partIndex];

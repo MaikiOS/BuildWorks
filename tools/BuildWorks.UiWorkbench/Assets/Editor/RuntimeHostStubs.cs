@@ -19,11 +19,13 @@ namespace OstrixMods.BuildWorks
     {
         internal readonly struct TransformSnapshot
         {
-            public TransformSnapshot(Vector3 position, Quaternion rotation, Vector3? scale = null)
-            { Position = position; Rotation = rotation; Scale = scale ?? Vector3.one; }
+            public TransformSnapshot(Vector3 position, Quaternion rotation, Vector3? scale = null,
+                string signText = null, OstrixMods.BuildWorks.Geometry.BlueprintForeignPartData itemStandContents = null)
+            { Position = position; Rotation = rotation; Scale = scale ?? Vector3.one; ItemStandContents = itemStandContents; }
             public Vector3 Position { get; }
             public Quaternion Rotation { get; }
             public Vector3 Scale { get; }
+            public OstrixMods.BuildWorks.Geometry.BlueprintForeignPartData ItemStandContents { get; }
         }
     }
 }

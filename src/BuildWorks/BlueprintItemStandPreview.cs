@@ -18,13 +18,17 @@ namespace OstrixMods.BuildWorks
             (stand.IsSupported(item) || stand.m_supportedTypes.Contains(item.m_shared.m_itemType));
         internal static bool TryAdd(GameObject source, GameObject visual,
             BlueprintForeignPartData data, out string warning)
+            => TryAdd(source, visual, data, out warning, out _);
+
+        internal static bool TryAdd(GameObject source, GameObject visual,
+            BlueprintForeignPartData data, out string warning, out GameObject content)
         {
             warning = null;
+            content = null;
             if (data == null || data.ContentsCleared || !source || !visual) return false;
             ItemStand stand = source.GetComponent<ItemStand>();
             if (!stand) return false;
             string reason = "editor.item_preview_invalid";
-            GameObject content = null;
             try
             {
                 // Only known PlanBuild/native visual metadata is decoded. Raw

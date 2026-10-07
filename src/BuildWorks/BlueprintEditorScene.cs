@@ -2058,7 +2058,7 @@ namespace OstrixMods.BuildWorks
                         source, "Part_" + part.StableId, editorLayer)
                     : CreatePlaceholder(part.StableId, result.OwnedAssets);
                 result.Root.transform.SetParent(root.transform, false);
-                if (source) result.Root.transform.localScale = source.transform.lossyScale;
+                if (source) result.Root.transform.localScale = source.transform.localScale;
                 if (source) BlueprintItemStandPreview.TryAdd(source, result.Root,
                     part.ForeignData, out result.ContentWarning);
                 result.BaseScale = result.Root.transform.localScale;

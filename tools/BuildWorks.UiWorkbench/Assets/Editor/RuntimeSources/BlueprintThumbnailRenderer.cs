@@ -326,7 +326,7 @@ namespace OstrixMods.BuildWorks
                     visual.transform.localPosition = blueprint.parts[index].position.ToVector3();
                     visual.transform.localRotation = blueprint.parts[index].rotation.ToQuaternion();
                     visual.transform.localScale = Vector3.Scale(
-                        piece.transform.lossyScale, blueprint.parts[index].scale.ToVector3());
+                        piece.transform.localScale, blueprint.parts[index].scale.ToVector3());
                     visual.SetActive(true);
                 }
 
@@ -575,7 +575,7 @@ namespace OstrixMods.BuildWorks
                         visual.transform.localPosition = blueprint.parts[index].position.ToVector3();
                         visual.transform.localRotation = blueprint.parts[index].rotation.ToQuaternion();
                         visual.transform.localScale = Vector3.Scale(
-                            piece.transform.lossyScale, blueprint.parts[index].scale.ToVector3());
+                            piece.transform.localScale, blueprint.parts[index].scale.ToVector3());
                         visual.SetActive(true);
                     }
                     if (!TryGetBounds(root, out Bounds sceneBounds))

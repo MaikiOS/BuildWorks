@@ -2,6 +2,32 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.84 — heavy world ghosts and intrinsic prefab scale; source verified
+
+World plans now allow the native-format maximum of 50,000 parts; the editor remains at 512.
+Heavy Hammer markers keep one frame visual and cached transformed bounds. Full ghosts use shared
+renderer-only templates, at most two new templates prepared per update, with exact nested/root/XYZ
+matrices. Native per-piece placement, resources, access checks and item spending remain in force.
+Incomplete or unsupported previews refuse arming rather than silently dropping parts. A hidden native
+holder still draws its saved item; distinct inventory packages share only visual templates.
+Particle/equipment item visuals not understood by the renderer-only adapter remain blocked.
+
+Visual and socket/bounds paths now use the prefab's intrinsic localScale, matching parentless
+Player.PlacePiece instantiation; ancestor transform scale is excluded. A scaled/rotated-parent Unity
+fixture verifies native Instantiate, ordinary world ghosts, editor copies and heavy matrices.
+This is a confirmed scale-path defect, not a reproduction of the owner's particular lamp.
+Composite socket clustering uses a spatial index with original first-match semantics and exact
+fallback for extreme numeric inputs; 100,000 sockets and randomized linear-oracle parity pass.
+
+Release (0 warnings/errors), Geometry, Store plus six player fixtures, HostContract, Localization848,
+EditorBridge, WorldLayout14, deployment guards and Unity252 PASS. Heavy preparation covers
+513/5,000/39,487/50,000 parts with three templates. Camera-isolated instanced/fallback render images
+pass independently; a 513-filled-stand test retains the hidden frame item and independent packages.
+Correctness review passed; ponytail review removed an unused Draw argument. verify is unavailable.
+No Valheim/FPS/native heavy construction proof, deployment, game/save changes or push.
+TerrainRamp-1.0-Test remains .82. Foreign ZDO, containers/armour, placement-time contents choices,
+editor scenes above 512 and live-host lamp acceptance remain open. The full goal is NOT complete.
+
 ## Checkpoint 0.19.83 — world custom snaps and foreign mount recipes; source verified
 
 Custom snaps now follow native placement in piece-local coordinates, persist in an owned piece ZDO

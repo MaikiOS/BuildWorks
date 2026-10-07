@@ -29,16 +29,37 @@ namespace OstrixMods.BuildWorks
         private readonly List<GameObject> instanceSources = new List<GameObject>();
         private readonly MaterialPropertyBlock ghostProperties = new MaterialPropertyBlock();
         private GameObject source;
+        private readonly BlueprintBatchedPreview batched = new BlueprintBatchedPreview();
+        internal bool HeavyReady => batched.Ready;
+        internal int HeavyPreparedCount => batched.PreparedCount;
+        internal string HeavyError { get; private set; }
 
         public void Show(
             GameObject placementGhost,
             IReadOnlyList<PrecisionPlacementSession.TransformSnapshot> plan,
             IReadOnlyList<Piece> pieces,
-            int hiddenIndex = 0)
+            int hiddenIndex = 0, Matrix4x4? root = null)
         {
             if (!placementGhost || plan == null || plan.Count < 2)
             {
                 Hide();
+                return;
+            }
+            if (plan.Count > CompositeBlueprintStore.InteractivePartBudget)
+            {
+                Hide();
+                ghostProperties.Clear();
+                Renderer renderer = placementGhost.GetComponentInChildren<Renderer>(true);
+                if (renderer) renderer.GetPropertyBlock(ghostProperties);
+                try
+                {
+                    HeavyError = null;
+                    batched.Prepare(plan, pieces, placementGhost.layer);
+                    batched.Draw(plan, ghostProperties, placementGhost.layer,
+                        hiddenIndex, root ?? Matrix4x4.identity);
+                }
+                catch (Exception error) when (error is ArgumentException || error is UnityException)
+                { HeavyError = error.Message; }
                 return;
             }
             if (source != placementGhost)
@@ -90,7 +111,7 @@ namespace OstrixMods.BuildWorks
                 PrecisionPlacementSession.TransformSnapshot sample = plan[planIndex];
                 preview.transform.SetPositionAndRotation(sample.Position, sample.Rotation);
                 preview.transform.localScale = Vector3.Scale(
-                    visualSource.transform.lossyScale, sample.Scale);
+                    visualSource.transform.localScale, sample.Scale);
             }
         }
 
@@ -114,6 +135,8 @@ namespace OstrixMods.BuildWorks
             }
             instances.Clear();
             instanceSources.Clear();
+            batched.Dispose();
+            HeavyError = null;
             source = null;
         }
 

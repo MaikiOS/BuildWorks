@@ -270,17 +270,17 @@ internal static class Program
 
     private static void TestLimit()
     {
-        object session = Session(128);
-        for (int index = 0; index < 4; ++index)
-            Require(Add(session, new Point3(index,0,0), Rotation(0,0,0,1)), "Valid 512-part plan failed");
+        object session = Session(5000);
+        for (int index = 0; index < 10; ++index)
+            Require(Add(session, new Point3(index,0,0), Rotation(0,0,0,1)), "Valid 50000-part world plan failed");
         IList plan = (IList)Get(session, "placementPlan");
-        object last = plan[511];
-        Require(!Add(session, new Point3(4,0,0), Rotation(0,0,0,1)), "Oversized plan accepted");
-        Require(plan.Count == 512 && ((IList)Get(session, "placementPlanPieces")).Count == 512 &&
-            last.Equals(plan[511]), "Rejected group was partially appended or changed earlier entries");
+        object last = plan[49999];
+        Require(!Add(session, new Point3(10,0,0), Rotation(0,0,0,1)), "Oversized plan accepted");
+        Require(plan.Count == 50000 && ((IList)Get(session, "placementPlanPieces")).Count == 50000 &&
+            last.Equals(plan[49999]), "Rejected group was partially appended or changed earlier entries");
         Require((bool)Get(session, "expandedPlanLimited"), "Oversized plan did not block arming");
         Require((int)Get(session, "placementPlanIndex") == 0, "Limit check advanced native placement index");
-        Console.WriteLine("PASS actual Session: 512 actual parts allowed; next whole group rejected atomically and arming guard set");
+        Console.WriteLine("PASS actual Session: 50000 actual world parts allowed; next whole group rejected atomically and arming guard set");
     }
 
     private static object Session(int partCount)

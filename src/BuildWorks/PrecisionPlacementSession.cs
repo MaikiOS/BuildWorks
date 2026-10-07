@@ -227,7 +227,7 @@ namespace OstrixMods.BuildWorks
         private const int NativeAnchorStart = AnchorAdjustment.SelectableAnchorCount;
         private const int MaximumSourceNativeSnapPoints = 32;
         private const int MaximumBlueprintSourceNativeSnapPoints = 512;
-        private const int MaximumExpandedPlacements = 512;
+        private const int MaximumExpandedPlacements = CompositeBlueprintStore.MaximumParts;
         private const int EditorLayer = 30;
         private const float EditorFloorSize = 2000f;
         private const float BlueprintWorkspaceRotationStep = 22.5f;
@@ -238,6 +238,9 @@ namespace OstrixMods.BuildWorks
 
         private readonly TransformGizmoView gizmo = new TransformGizmoView();
         private readonly PlacementGhostPreviewView previews = new PlacementGhostPreviewView();
+        private CompositeBlueprintStore.Blueprint passivePreviewBlueprint;
+        private int passivePreviewRevision = -1;
+        private readonly List<TransformSnapshot> passivePreviewPlan = new List<TransformSnapshot>();
         private readonly BoundedUndoHistory history = new BoundedUndoHistory(20);
         private readonly PrecisionPlacementHudView hud;
         private readonly CompositeBlueprintStore blueprintStore = new CompositeBlueprintStore();
@@ -1046,6 +1049,8 @@ namespace OstrixMods.BuildWorks
             {
                 sessionMode = SessionMode.None;
                 previews.Clear();
+                passivePreviewBlueprint = null;
+                passivePreviewPlan.Clear();
             }
         }
 
@@ -1366,7 +1371,7 @@ namespace OstrixMods.BuildWorks
             if (!visual) return false;
             visual.transform.SetPositionAndRotation(position, rotation);
             Vector3 partScale = scale ?? Vector3.one;
-            visual.transform.localScale = Vector3.Scale(source.transform.lossyScale, partScale);
+            visual.transform.localScale = Vector3.Scale(source.transform.localScale, partScale);
             visual.SetActive(true);
             if (!TryCaptureAnchorBounds(visual, position, rotation, out AnchorBounds bounds))
             {
@@ -1806,6 +1811,14 @@ namespace OstrixMods.BuildWorks
                 : null;
             string missingPrefab = string.Empty;
             List<Piece> pieces = null;
+            if (blueprint?.parts?.Count > CompositeBlueprintStore.InteractivePartBudget &&
+                (passivePreviewBlueprint != blueprint || !previews.HeavyReady || previews.HeavyError != null))
+            {
+                ShowStatus(player, previews.HeavyError == null
+                    ? BuildWorksLocalization.Text("placement.preview_loading", previews.HeavyPreparedCount, blueprint.parts.Count)
+                    : BuildWorksLocalization.Text("placement.preview_failed", previews.HeavyError));
+                return false;
+            }
             if (!palettePiece || !ghost || !ghost.activeInHierarchy ||
                 !TryResolveBlueprintPieces(player, blueprint, out pieces, out missingPrefab))
             {
@@ -2140,12 +2153,44 @@ namespace OstrixMods.BuildWorks
                 !ghost || !ghost.activeInHierarchy ||
                 !blueprintPieceRegistry.TryGetBlueprint(
                     palettePiece,
-                    out _))
+                    out CompositeBlueprintStore.Blueprint blueprint))
             {
                 return false;
             }
 
-            previews.Hide();
+            if (blueprint.parts.Count > CompositeBlueprintStore.InteractivePartBudget &&
+                blueprintPieceRegistry.TryGetSourcePieces(blueprint, out IReadOnlyList<Piece> pieces))
+            {
+                if (passivePreviewBlueprint != blueprint || passivePreviewRevision != blueprintStore.Revision)
+                {
+                    previews.Clear();
+                    passivePreviewBlueprint = blueprint;
+                    passivePreviewRevision = blueprintStore.Revision;
+                    passivePreviewPlan.Clear();
+                    foreach (var part in blueprint.parts)
+                        passivePreviewPlan.Add(new TransformSnapshot(part.position.ToVector3(),
+                            part.rotation.ToQuaternion(), part.scale.ToVector3(), part.signText,
+                            part.foreignData?.ToGeometry()));
+                }
+                blueprintPieceRegistry.TryGetPlacementOrigin(palettePiece, out Vector3 origin);
+                Quaternion orientation = Quaternion.identity;
+                if (BlueprintPlacementFrame.TryResolve(blueprint, out Vector3 support, out Quaternion supportRotation))
+                { origin = support; orientation = supportRotation; }
+                BlueprintPlacementFrame.ToRootPose(ghost.transform.position, ghost.transform.rotation,
+                    origin, orientation, 1f, out Vector3 position, out Quaternion rotation);
+                previews.Show(ghost, passivePreviewPlan, pieces, CompositeBlueprintStore.FramePartIndex(blueprint),
+                    Matrix4x4.TRS(position, rotation, Vector3.one));
+            }
+            else
+            {
+                if (passivePreviewBlueprint != null)
+                {
+                    previews.Clear();
+                    passivePreviewBlueprint = null;
+                    passivePreviewPlan.Clear();
+                }
+                previews.Hide();
+            }
             return true;
         }
 
@@ -5074,7 +5119,7 @@ namespace OstrixMods.BuildWorks
             {
                 Piece piece = activeBlueprintPieces[index];
                 if (!piece || !TryCaptureAnchorBounds(piece.gameObject,
-                    piece.transform.position, piece.transform.rotation, out AnchorBounds bounds))
+                    piece.transform.position, piece.transform.rotation, out AnchorBounds bounds, prefabLocal: true))
                     continue;
                 CompositeBlueprintStore.Part part = activeBlueprint.parts[index];
                 Vector3 partPosition = part.position.ToVector3();
@@ -5119,7 +5164,7 @@ namespace OstrixMods.BuildWorks
             { missingPrefab = BuildWorksLocalization.ResolveUserText(blueprint.importError); return false; }
             if (!forEditor && blueprint.sourceDocuments?.Any(source => source.ToGeometry().HasOpaqueSections) == true)
             { missingPrefab = BuildWorksLocalization.Text("import.foreign_pending"); return false; }
-            if (CompositeBlueprintStore.InteractiveError(blueprint.parts.Count) is string budgetError)
+            if (forEditor && CompositeBlueprintStore.InteractiveError(blueprint.parts.Count) is string budgetError)
             { missingPrefab = BuildWorksLocalization.ResolveUserText(budgetError); return false; }
             var unavailable = new HashSet<string>(StringComparer.Ordinal);
             var resolved = new Dictionary<string, Piece>(StringComparer.Ordinal);
@@ -5191,7 +5236,7 @@ namespace OstrixMods.BuildWorks
                     piece.gameObject,
                     piece.transform.position,
                     piece.transform.rotation,
-                    out AnchorBounds partBounds))
+                    out AnchorBounds partBounds, prefabLocal: true))
                     return false;
                 CompositeBlueprintStore.Part part = activeBlueprint.parts[index];
                 Vector3 partPosition = part.position.ToVector3();
@@ -5204,11 +5249,11 @@ namespace OstrixMods.BuildWorks
                 partSnaps.Clear();
                 piece.GetSnapPoints(partSnaps);
                 var nativePoints = new List<Point3>();
-                Quaternion sourceInverse = Quaternion.Inverse(piece.transform.rotation);
                 foreach (Transform snap in partSnaps)
                 {
                     if (!snap) continue;
-                    Vector3 local = sourceInverse * (snap.position - piece.transform.position);
+                    Vector3 local = Vector3.Scale(piece.transform.localScale,
+                        piece.transform.InverseTransformPoint(snap.position));
                     Vector3 point = partPosition + partRotation *
                         Vector3.Scale(local, part.scale.ToVector3());
                     if (!IsFinite(point)) continue;
@@ -6133,6 +6178,18 @@ namespace OstrixMods.BuildWorks
                 ShowStatus(player, BuildWorksLocalization.Text("placement.plan_corrupt"));
                 return false;
             }
+            if (placementPlan.Count > CompositeBlueprintStore.InteractivePartBudget)
+            {
+                previews.Show(placementGhost, placementPlan, placementPlanPieces,
+                    CompositeBlueprintStore.FramePartIndex(activeBlueprint));
+                if (!previews.HeavyReady || previews.HeavyError != null)
+                {
+                    ShowStatus(player, previews.HeavyError == null
+                        ? BuildWorksLocalization.Text("placement.preview_loading", previews.HeavyPreparedCount, placementPlan.Count)
+                        : BuildWorksLocalization.Text("placement.preview_failed", previews.HeavyError));
+                    return false;
+                }
+            }
             if (!BlueprintItemStandPlacement.CanSupply(player, placementPlan.Select(pose => pose.ItemStandContents)))
             {
                 ShowStatus(player, BuildWorksLocalization.Text("placement.mount_unavailable"));
@@ -6533,6 +6590,8 @@ namespace OstrixMods.BuildWorks
             selectedPiece = null;
             activeBlueprint = null;
             blueprintSnapLocalSets = null;
+            passivePreviewBlueprint = null;
+            passivePreviewPlan.Clear();
             activeBlueprintPieces.Clear();
             currentBlueprintPlacements.Clear();
             pendingItemStandPiece = null;
@@ -7207,7 +7266,7 @@ namespace OstrixMods.BuildWorks
             GameObject target,
             Vector3 origin,
             Quaternion rotation,
-            out AnchorBounds result)
+            out AnchorBounds result, bool prefabLocal = false)
         {
             result = default;
             MeshRenderer[] renderers = target.GetComponentsInChildren<MeshRenderer>(true);
@@ -7233,7 +7292,9 @@ namespace OstrixMods.BuildWorks
                         (corner & 2) == 0 ? bounds.min.y : bounds.max.y,
                         (corner & 4) == 0 ? bounds.min.z : bounds.max.z);
                     Vector3 world = filter.transform.TransformPoint(meshPoint);
-                    Vector3 local = inverseRotation * (world - origin);
+                    Vector3 local = prefabLocal
+                        ? Vector3.Scale(target.transform.localScale, target.transform.InverseTransformPoint(world))
+                        : inverseRotation * (world - origin);
                     anchorBoundsPoints.Add(ToGeometry(local));
                 }
             }

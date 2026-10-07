@@ -481,6 +481,8 @@ public static class RuntimeEditorAcceptance
                 TestModelSpaceGizmo(template);
                 TestExperimentalGeometry(template, fontTemplate);
                 WorldSnapPointAcceptance.Run(output);
+                HeavyBlueprintAcceptance.Run(output);
+                checks.Add("Heavy world preview: 513/5000/39487/50000 parts, bounded shared renderer templates; exact nested/root/XYZ matrices; independently camera-isolated instanced/fallback images; hidden holder retains mounted item and differing inventory packages share only visuals. Native world placement/FPS remain unverified.");
                 TestFurnitureCornersAndCursorIntent(template, output);
                 controller.Close(true);
                 Require(controller.OpenNew(out error), "Reopen: " + error);
@@ -1165,7 +1167,7 @@ public static class RuntimeEditorAcceptance
                 new PrecisionPlacementSession.TransformSnapshot(Vector3.right, Quaternion.identity, new Vector3(1.2f,0.5f,2f)) }, null);
             var instances = Field<List<GameObject>>(ghost, "instances");
             Require(Vector3.Distance(instances[0].transform.localScale,
-                Vector3.Scale(source.transform.lossyScale, new Vector3(1.2f,0.5f,2f))) < 0.001f, "World preview discarded per-part scale");
+                Vector3.Scale(source.transform.localScale, new Vector3(1.2f,0.5f,2f))) < 0.001f, "World preview discarded per-part scale");
         }
         checks.Add("Nested descendants have matching bounds and original selection materials; selecting a leaf stays local");
         checks.Add("World ghost preview consumes non-unit XYZ scale");

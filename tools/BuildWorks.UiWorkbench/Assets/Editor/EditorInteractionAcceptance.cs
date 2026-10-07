@@ -197,7 +197,7 @@ public static class EditorInteractionAcceptance
                 Require(duplicateRoot.GetInstanceID() == Field<GameObject>(duplicates[0], "Root").GetInstanceID() &&
                     Vector3.Distance(duplicateRoot.transform.position, new Vector3(2,3,4)) < 0.0001f &&
                     Quaternion.Angle(duplicateRoot.transform.rotation, previewRotation) < 0.001f &&
-                    Vector3.Distance(duplicateRoot.transform.localScale, wall.transform.lossyScale * 2f) < 0.0001f,
+                    Vector3.Distance(duplicateRoot.transform.localScale, wall.transform.localScale * 2f) < 0.0001f,
                     "Reused preview kept stale pose or scale");
                 scene.ShowDuplicatePreview(new[] { Part("replacement", "ashwood_decowall_divider", pivot),
                     Part("tail", "woodwall", pivot + Vector3.up) });

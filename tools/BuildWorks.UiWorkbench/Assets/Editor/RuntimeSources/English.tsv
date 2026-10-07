@@ -749,7 +749,10 @@ import.transform	Invalid/out-of-range transform or scale (line {0}).
 import.part_limit	A blueprint file must contain 2–50000 pieces. Nothing is truncated.
 import.interactive_limit	This construction is preserved, but exceeds the current interactive preview budget ({0}). Large-scene rendering is not ready yet.
 import.payload_pending	Custom sockets are preserved in the document. Their persistent world integration is not ready; placement is blocked rather than losing them.
-import.foreign_pending	Foreign object data is preserved. Known item-stand contents can be previewed, but full native restoration in the world is not ready. Placement is blocked; geometry editing/save/export remain available.
+import.foreign_pending	This object state or opaque source section has no supported world adapter. The original is preserved; editing/save/export remain available. Native item stands have a separate checked placement path.
+placement.mount_unavailable	Attachment paused: supply the matching inventory item, check ward access and ownership, then Enter. Full snapshots require exact native item data, including inventory position; recipes require prefab, quality and variant. Esc cancels.
+placement.mount_uncertain	Native attachment did not confirm the expected item and consumption. It will not be retried. Esc cancels safe parts; any uncertain holder stays for manual inspection.
+placement.rollback_mount_uncertain	Safe blueprint parts were cancelled. A holder with uncertain item state was left in the world; inspect it manually. No item refund was invented.
 blueprint.sign_unsupported	Sign text is unsupported or exceeds this piece's native text limit: {0}
 blueprint.sign_capture_failed	Sign text is unavailable or invalid: {0}. Nothing was saved.
 blueprint.sign_apply_failed	The piece was placed, but its sign text was refused or failed. Check access and the sign; subsequent placement is paused if there are more pieces.
@@ -794,6 +797,20 @@ exchange.downloads	Downloads
 exchange.documents	Documents
 exchange.desktop	Desktop
 exchange.filename	File name
+exchange.contents_title	Contents of the exported copy
+exchange.contents_counts	Verified storages: {0}; items: {1}\nMounted items: {2}\nUnknown records: {3}; previously cleared objects: {4}
+exchange.storage_keep	Storage inventories: KEEP
+exchange.storage_clear	Storage inventories: CLEAR IN COPY
+exchange.mounts_keep	Mounted items: KEEP
+exchange.mounts_clear	Mounted items: CLEAR IN COPY
+exchange.contents_copy	Click either row to change its choice. Only the exported copy changes. Original data is retained; previously cleared contents stay empty.
+exchange.contents_unknown	Unknown/unreadable state: unavailable clear choices are disabled. Other choices remain independent. Exact original data is retained; the world is unchanged.
+exchange.confirm_export	Confirm export
+exchange.confirm_import	Confirm import
+exchange.import_review	Import contents: {0} blueprints
+exchange.import_copy	Choose each family separately. A new native ZIP copy retains the exact original file. Nothing is placed in the world.
+exchange.source_changed	The source file changed after inspection. Go back and inspect it again; nothing was imported.
+exchange.back	Back to file settings
 exchange.format_json	BuildWorks JSON
 exchange.format_zip	ZIP + BuildWorks
 exchange.copy_path	Copy full path

@@ -9,7 +9,13 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.79**: ItemStand capture rejects mid-read ZDO revision changes and invalid/rebound views,
+Active source checkpoint **0.19.80**: native ItemStand world placement consumes a real matching inventory item only after
+native construction costs, confirms exact saved contents and preserves later exact-item reservations. Owner/access,
+queue/orientation and uncertain rollback guards are implemented. Release/required checks, Unity228 and 26 adapter cases PASS;
+native world/drop/save/client acceptance remains required. Native14/portable5 and installed .67 unchanged; no deploy/game/save/push.
+Foreign state, containers, armour/free items, editor scenes above 512 and durable world sockets remain unfinished.
+
+Previous source checkpoint **0.19.79**: ItemStand capture rejects mid-read ZDO revision changes and invalid/rebound views,
 including legacy and empty-to-populated transitions; bounded raw bytes are privately copied. Release/required checks and
 228 isolated Unity scenarios PASS. World restoration is not implemented; native queue/cost/confirmation boundaries are
 recorded in HANDOFF. Native14/portable5 and installed .67 unchanged; no deploy or game/save changes.
@@ -261,7 +267,7 @@ dependent changes wait for its gate, unrelated preparation may continue.
 | BW-02 | Group layout operations without resizing pieces | BW-01 | Planned; focused operation UI approval required |
 | BW-03 | Persistent Array and minimal recipe persistence | BW-02 | Planned; safe Store migration and editing/Bake gate |
 | BW-04 | Guides and curves in accepted slices | BW-03 + renewed owner discussion | Tool-semantics discussion required before coding |
-| BW-05 | Safe exchange and dependency recovery | Stable Store; BW-03/04 before exchanging recipes/guides | Planned; minimal readiness checks start in BW-00 |
+| BW-05 | Safe exchange and dependency recovery | Stable Store; BW-03/04 before exchanging recipes/guides | Native14/portable5 exchange and .80 native mount adapter automatically verified; foreign-state decoding and world/save/client acceptance pending |
 | BW-06 | Linked instances, original adaptive pieces, explicit terrain compatibility | Proven generators, persistence and relevant network gates | Deferred; separate contracts |
 
 No promised dates or release numbers before scope and evidence are known.

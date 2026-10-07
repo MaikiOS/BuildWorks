@@ -819,7 +819,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.79.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.80.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -2814,14 +2814,22 @@ $signCalls = ($signApply.Body.Instructions | ForEach-Object { [string]$_.Operand
 Assert-Contract ($signCalls -match 'Sign::SetText' -and $signCalls -match 'CheckPrivilege' -and $signCalls -match 'ZDO::GetString' -and $signCalls -notmatch 'ZDO::Set\(') 'Blueprint sign writes bypass native setters or do not verify stored text.'
 $nativeFinished = $pluginMethods | Where-Object { $_.Name -eq 'OnNativePlacementFinished' -and $_.DeclaringType.Name -eq 'PrecisionPlacementSession' }
 $signInstruction = @($nativeFinished.Body.Instructions | Where-Object { [string]$_.Operand -match 'BlueprintSignText::TryApply' })
-$indexWrite = @($nativeFinished.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'stfld' -and [string]$_.Operand -match '::placementPlanIndex$' })
-Assert-Contract ($signInstruction.Count -eq 1 -and $indexWrite.Count -gt 0 -and $signInstruction[0].Offset -lt $indexWrite[0].Offset) 'Sign payload must apply before advancing the native queue.'
+$completePlacement = $pluginMethods | Where-Object { $_.Name -eq 'CompleteNativePlacement' -and $_.DeclaringType.Name -eq 'PrecisionPlacementSession' }
+$indexWrite = @($completePlacement.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'stfld' -and [string]$_.Operand -match '::placementPlanIndex$' })
+$completionCall = @($nativeFinished.Body.Instructions | Where-Object { [string]$_.Operand -match '::CompleteNativePlacement' })
+Assert-Contract ($signInstruction.Count -eq 1 -and $indexWrite.Count -gt 0 -and $completionCall.Count -eq 1 -and
+    $signInstruction[0].Offset -lt $completionCall[0].Offset) 'Sign payload must apply before advancing the native queue.'
+Assert-Contract (@($nativeFinished.Body.Instructions | Where-Object { [string]$_.Operand -match 'BlueprintItemStandPlacement::TryApply' }).Count -eq 0 -and
+    $automaticDriverOperands -match 'BlueprintItemStandPlacement::TryApply' -and
+    $sessionSource -match 'pendingItemStandContents != null' -and
+    $sessionSource -match 'if \(!BlueprintItemStandPlacement.CanRollback\(item.Placed, forceDestroy: true\)\) return false;') 'Mount work must be deferred out of TryPlacePiece postfix and content-bearing rollback must not force-destroy.'
 
 $resolveBlueprint = $pluginMethods | Where-Object { $_.Name -eq 'TryResolveBlueprintPieces' -and $_.DeclaringType.Name -eq 'PrecisionPlacementSession' }
 $resolveCalls = ($resolveBlueprint.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
-Assert-Contract ($resolveCalls -match 'CompositeBlueprintStore::HasForeignData' -and
-    $sessionSource -match 'if \(!forEditor && CompositeBlueprintStore\.HasForeignData\(blueprint\)\)\s*\{ missingPrefab = BuildWorksLocalization\.Text\("import.foreign_pending"\); return false; \}') `
-    'Foreign payload must block native world placement without blocking geometry editing.'
+Assert-Contract ($resolveCalls -match 'BlueprintItemStandPlacement::CanRestore' -and
+    $sessionSource -match 'sourceDocuments\?\.Any\(source => source.ToGeometry\(\).HasOpaqueSections\)' -and
+    $sessionSource -match '!forEditor && !BlueprintItemStandPlacement.CanRestore') `
+    'Only allowlisted native ItemStand state may pass world placement; opaque sections remain blocked.'
 
 $standType = $hostAssembly.MainModule.Types | Where-Object Name -eq 'ItemStand'
 foreach ($name in 'GetAttach', 'GetAttachPrefab', 'GetAttachGameObject', 'GetOrientationSettings', 'IsUnsupported', 'IsSupported') {
@@ -2863,6 +2871,24 @@ Assert-Contract ($captureCalls -match 'ItemStand::GetAttachedItem' -and $capture
     'Native ItemStand capture must preserve the raw package without executing or mutating it.'
 $standView = $standType.Fields | Where-Object Name -eq 'm_nview'
 Assert-Contract ($standView.IsPrivate -and $standView.FieldType.FullName -eq 'ZNetView') 'ItemStand native view field changed.'
+$standQueue = $standType.Fields | Where-Object Name -eq 'm_queuedItem'
+Assert-Contract ($standQueue.IsPrivate -and $standQueue.FieldType.FullName -eq 'ItemDrop/ItemData') 'Native stand queue reference changed.'
+$mountMethods = @($pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintItemStandPlacement' -and $_.HasBody })
+$mountCalls = ($mountMethods | ForEach-Object { $_.Body.Instructions | ForEach-Object { [string]$_.Operand } }) -join "`n"
+foreach ($pattern in 'ZNetView::IsOwner', 'PrivateArea::CheckAccess', 'ItemStand::UseItem', 'Inventory::ContainsItem',
+    'ItemDrop/ItemData::Clone', 'ItemDrop/ItemData::Save', 'BlueprintItemStandCapture::TryCapture',
+    'ItemStand::DestroyAttachment', 'ItemStand::Interact', 'MonoBehaviour::CancelInvoke') {
+    Assert-Contract ($mountCalls -match $pattern) "Native mount adapter omits gate: $pattern"
+}
+Assert-Contract ($mountCalls -notmatch 'ZDO::Set|Inventory::RemoveOneItem|Inventory::AddItem|ItemData::Load|ItemDrop::LoadFromZDO|ZNetView::InvokeRPC|Object::Instantiate|ClaimOwnership') 'Mount adapter bypasses native inventory/ownership or executes archive bytes.'
+$mountSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src/BuildWorks/BlueprintItemStandPlacement.cs') -Raw
+# C# lowers ReferenceEquals to reference branches/ceq, not a System.Object call.
+Assert-Contract ([regex]::Matches($mountSource, 'ReferenceEquals\(QueuedItem.GetValue\(stand\), item\)').Count -eq 2 -and
+    [regex]::Matches($mountSource, 'ReferenceEquals\(StandView.GetValue\(stand\), view\)').Count -ge 4) 'Mount queue/view identity checks changed.'
+$nativePlacementOrder = ($player.Methods | Where-Object Name -eq 'UpdatePlacement').Body.Instructions
+$nativePlaceCall = @($nativePlacementOrder | Where-Object { [string]$_.Operand -match 'Player::TryPlacePiece' })
+$nativeSpendCall = @($nativePlacementOrder | Where-Object { [string]$_.Operand -match 'Player::ConsumeResources' })
+Assert-Contract ($nativePlaceCall.Count -eq 1 -and $nativeSpendCall.Count -eq 1 -and $nativePlaceCall[0].Offset -lt $nativeSpendCall[0].Offset) 'Native construction spending order changed; review deferred attachment.'
 $nativeStandDrop = $standType.Methods | Where-Object Name -eq 'DropItem'
 $standDropCalls = ($nativeStandDrop.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($standDropCalls -match 'ItemDrop::LoadFromExternalZDO') 'Native stand item restoration path changed.'
@@ -2965,6 +2991,10 @@ $standItemSaveLayout = $itemDropType.Methods | Where-Object Name -eq 'SaveToZDO'
 $standItemLoadLayout = $itemDataType.Methods | Where-Object { $_.Name -eq 'Load' -and $_.Parameters.Count -eq 3 }
 $standAttachLayout = $standType.Methods | Where-Object Name -eq 'UpdateAttach'
 foreach ($entry in @(@($itemSave, 'DAA9052430B2B766A8F15E221AB0D24C63FD55A6723EEBDCC65405E48F8D5494'),
+        @(($standType.Methods | Where-Object Name -eq 'UseItem'), '3EF78FC042D7E631C130758E846162014078DC92A495001E984AC8017DF4BC6A'),
+        @(($standType.Methods | Where-Object Name -eq 'Interact'), 'CFC7C1C57E2591E62CC01FE461664BB8E2DC9AAD9B5F822990279EF25D8BFD52'),
+        @(($standType.Methods | Where-Object Name -eq 'DestroyAttachment'), '61403E7D10E8BA39FFAC1A5934BA9D6E33B97245D908CC17F3BB9B3C8372991B'),
+        @(($standType.Methods | Where-Object Name -eq 'RPC_DestroyAttachment'), '6F7557FD696A8DEF565913F3967AB29152274BD0E563A31BFD1F6817D9930645'),
         @($standItemSaveLayout, 'C56B9EAD97EB6B2C53595D38E6CA97E1EDF7507921DF86D2F88A09F74977BB79'),
         @($nativeItemLoad, '63E24A305F38DB26E0D0AEEA4922D5421799DA1AB162641999F1541BF85C9475'),
         @($standItemLoadLayout, '2E5AEE4DF444FCAA4463BA7D37B58A567C4BD38F4EFAFD05DAD596BD6839FD89'),
@@ -2987,4 +3017,4 @@ $worldCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'Preci
 $worldCaptureCalls = ($worldCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($worldCaptureCalls -match 'BlueprintStorageCapture::TryCapture' -and $worldCaptureCalls -match 'CompositeBlueprintStore/ForeignPartData::FromGeometry') 'World selection does not preserve container snapshots.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.79 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.80 and Valheim Steam build 25185596.'

@@ -5,8 +5,10 @@ using UnityEngine;
 public sealed class ZNetView : MonoBehaviour
 {
     public bool Valid = true;
+    public bool Owner = true;
     private readonly ZDO data = new ZDO();
     public bool IsValid() => Valid;
+    public bool IsOwner() => Owner;
     public ZDO GetZDO() => data;
 }
 public sealed class ZDO

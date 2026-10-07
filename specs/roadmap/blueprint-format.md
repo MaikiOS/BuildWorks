@@ -2,7 +2,16 @@
 
 **English** | [Русский](blueprint-format_RU.md)
 
-Current source **0.19.79**: ItemStand capture requires an unchanged ZDO revision and the same valid native view
+Current source **0.19.80**: native ItemStand contents are restored through a real player's inventory item on the newly
+placed owner-held stand after native construction costs. Full snapshots require exact native bytes (including grid/flags),
+recipes preserve the selected item's actual properties. Nonzero canonical prefab identity, bounded full decoding, reservation
+of future exact snapshots and one-item/exact-package postconditions are required. Denied/rebound/foreign-queue state cannot
+be destructively cleared; uncertain attempts never requeue. Occupied mounts use native removal/drop, not force destruction.
+Release/required checks, Unity228 and 26 adapter cases PASS; world drop/save/reload/client acceptance is still pending.
+Native14/portable5 unchanged; installed .67 unchanged, no deploy/game/save/push. Containers/foreign/armour state still block
+world placement. The full goal, including free items, heavy scenes and durable sockets, remains active.
+
+Previous source **0.19.79**: ItemStand capture requires an unchanged ZDO revision and the same valid native view
 for full/legacy/empty snapshots; bounded packet bytes are privately copied. Changed state rejects with no partial payload.
 Actual injected-read regressions, required checks and isolated Unity228 PASS; no world writes or native reconstruction.
 Native14/portable5 unchanged. Queue/consumption/confirmation and cancellation boundaries for the next native restoration

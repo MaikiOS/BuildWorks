@@ -1,11 +1,69 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// Only the read-only host contract, checked against current Valheim IL.
-// Inert ZDO reads only; no RPC, inventory or scripted attachment path.
+// Inert host fixtures checked against current Valheim IL; no real RPC/world execution.
 public class ItemStand : MonoBehaviour
 {
     private ZNetView m_nview = null;
+    private ItemDrop.ItemData m_queuedItem;
+    private ItemDrop m_visualItemDrop;
+    private List<OrientationSettings> m_orientationSettings = new List<OrientationSettings>();
+    public System.Action OnUse, AfterWrite, AfterConsume, OnInteract;
+    public bool RejectUse, SkipConsume, DelayDestroy;
+    public int Uses, Attaches, Destroys;
+    public bool HaveAttachment() => GetAttachedItem() != 0;
+    public int GetOrientation() => m_nview.GetZDO().GetInt(ZDOVars.s_type, 0);
+    public bool UseItem(Humanoid player, ItemDrop.ItemData item)
+    {
+        ++Uses;
+        if (HaveAttachment()) return false;
+        if (RejectUse) return true;
+        m_queuedItem = item;
+        InvokeRepeating("UpdateAttach", 0, .1f);
+        OnUse?.Invoke();
+        return true;
+    }
+    private void UpdateAttach()
+    {
+        if (!m_nview.IsOwner()) return;
+        CancelInvoke("UpdateAttach");
+        if (m_queuedItem != null && Player.m_localPlayer && Player.m_localPlayer.GetInventory().ContainsItem(m_queuedItem) && !HaveAttachment())
+        {
+            ++Attaches;
+            ItemDrop.ItemData copy = m_queuedItem.Clone(); copy.m_stack = 1;
+            ZDO data = m_nview.GetZDO();
+            data.Set(ZDOVars.s_item, copy.m_dropPrefab.name.GetStableHashCode());
+            AfterWrite?.Invoke();
+            var package = new ZPackage(); package.Write((byte)109); copy.Save(package);
+            data.Set(ZDOVars.s_itemData, package.GetArray());
+            data.Set(ZDOVars.s_variant, copy.m_variant); data.Set(ZDOVars.s_quality, copy.m_quality);
+            if (!SkipConsume) Player.m_localPlayer.GetInventory().RemoveOneItem(m_queuedItem);
+            AfterConsume?.Invoke();
+            m_visualItemDrop = copy.m_dropPrefab.GetComponent<ItemDrop>();
+            GetOrientationSettings(copy, ref m_orientationSettings);
+        }
+        m_queuedItem = null;
+    }
+    public bool Interact(Humanoid player, bool hold, bool alt)
+    {
+        if (!PrivateArea.CheckAccess(transform.position, 0, false, false)) return true;
+        if (!alt || hold || !m_visualItemDrop || m_orientationSettings.Count < 2)
+            throw new System.InvalidOperationException("Fixture refuses unrelated native interaction branches");
+        OnInteract?.Invoke();
+        if (!m_nview.IsOwner())
+        {
+            InvokeRepeating("UpdateOrientation", 0, .1f);
+            return true;
+        }
+        m_nview.GetZDO().Set(ZDOVars.s_type, (GetOrientation() + 1) % m_orientationSettings.Count);
+        return false;
+    }
+    private void UpdateOrientation() { if (m_nview.IsOwner()) CancelInvoke("UpdateOrientation"); }
+    public void DestroyAttachment()
+    {
+        ++Destroys;
+        if (!DelayDestroy) m_nview.GetZDO().Set(ZDOVars.s_item, 0);
+    }
     public int GetAttachedItem() => m_nview && m_nview.IsValid() ? m_nview.GetZDO().GetInt(ZDOVars.s_item, 0) : 0;
     public enum Orientation { None = 0, Vertical = 1, Horizontal = 2, All = 3 }
     public class OrientationSettings

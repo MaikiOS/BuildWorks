@@ -2,6 +2,39 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.80 — native ItemStand placement adapter; not deployed
+
+Filled native horizontal/wall ItemStand parts now carry immutable contents through the ordered world plan.
+After native UpdatePlacement returns and construction costs have run, a newly placed locally owned holder
+uses one real inventory item through native UseItem/UpdateAttach. No archive Load, raw ZDO seeding, direct
+inventory removal, item creation or ownership claim is added. Unsupported foreign/container/armour state and
+opaque source sections still block world placement; cleared native mounts stay empty.
+
+Full snapshots require the exact native one-item packet, including inventory position/flags/custom data;
+metadata-only recipes use the selected actual item's properties. Exact future snapshots reserve inventory
+units before flexible recipes. Nonzero canonical prefab hashes, the 24KiB limit and full inert decoding are
+checked before consumption. Native bool/queue acceptance is not success: exactly one consumed item and its
+exact saved package must be confirmed. Orientation uses guarded native Interact; delayed invocations from
+this operation are cancelled. A denied/missing-item preflight may retry; an attempted uncertain operation
+never requeues automatically. Native construction recipes can consume a shared mount item between checks:
+the sequence then pauses on the empty paid holder instead of inventing a replacement.
+
+Cancel checks native view ownership/access, uses native removal/drop for occupied mounts and forbids force
+destroy of occupied/queued holders. Unspent cleanup requires the same view/access/intended hash and no foreign
+queue. Uncertain consumption/rebound/replacement state is left intact for manual recovery, not refunded twice.
+Native drop delivery, save/reload, logout with pending rollback and host/remote-client parity require game acceptance.
+
+Release (0 warnings/errors), Geometry113, Store, Bridge8, WorldLayout13, Localization840/runtime, HostContract,
+format, four forbidden-profile checks and deployment WhatIf PASS; verify is unavailable. Sandbox ACL/named-pipe
+failures and Unity sandbox crash were rerun outside the sandbox successfully; format retains existing workspace warnings.
+Isolated Unity: 228 layouts/input states and 26 native-adapter fixture cases PASS, 2026-10-07T10:23:31.8503534Z;
+gameHostTested=false. Independent correctness PASSED; Ponytail review: Lean already. Ship.
+Native14/portable5 unchanged; installed test .67 unchanged. Previous local checkpoint b82b980 (.79).
+No deploy, Valheim, save edits, publication or push. Full goal stays active: foreign-state decoding, containers,
+armour/free items, editor scenes above 512 and durable world sockets remain unfinished.
+
+[Required native acceptance](docs/testing/itemstand-placement-0.19.80.md) — six cases after authorized test deployment.
+
 ## Checkpoint 0.19.79 — revision-consistent ItemStand capture; not deployed
 
 Read-only ItemStand capture now brackets populated, legacy and empty reads with the native ZDO revision

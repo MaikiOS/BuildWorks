@@ -272,6 +272,7 @@ internal static class ItemStandPreviewAcceptance
             yield return null;
             AuthoringChecks(template, source, captured, output);
             yield return null;
+            ItemStandPlacementAcceptance.Run(item);
             stand.m_orientationType = ItemStand.Orientation.Horizontal;
             using (var scene = new BlueprintEditorScene(template, _ => source))
             {

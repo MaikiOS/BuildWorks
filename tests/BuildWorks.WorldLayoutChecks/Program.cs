@@ -40,6 +40,7 @@ internal static class Program
             pieceType = sessionType.GetField("selectedPiece", Instance).FieldType;
             TestGridComposition();
             TestSignPayloadLifecycle();
+            TestItemStandPayloadLifecycle();
             TestPivotLayoutComposition();
             TestPlacementSupportRootComposition();
             TestHistorySurvivesPivotFrameSwitch();
@@ -206,6 +207,35 @@ internal static class Program
         object[] empty = { true, null, null };
         Require((bool)take.Invoke(session, empty) && (string)empty[2] == "", "Explicit blank sign lost its payload");
         Console.WriteLine("PASS actual Session: sign text follows repeated steps; native rejection/stale steps consume without apply; success/blank text are one-shot");
+    }
+
+    private static void TestItemStandPayloadLifecycle()
+    {
+        object session = Session(2);
+        IList parts = (IList)Get(Get(session, "activeBlueprint"), "parts");
+        Type dataType = partType.GetField("foreignData", Instance).FieldType;
+        object data = Activator.CreateInstance(dataType, true);
+        Set(data, "format", BlueprintForeignPartData.NativeItemStandFormat);
+        Set(data, "info", "SwordFixture:2:3:1");
+        Set(parts[1], "foreignData", data);
+        Require(Add(session, new Point3(0,0,0), Rotation(0,0,0,1)) &&
+            Add(session, new Point3(4,0,0), Rotation(0,0,0,1)), "Mount repeated root append failed");
+        IList plan = (IList)Get(session, "placementPlan");
+        for (int index = 0; index < plan.Count; ++index)
+        {
+            var contents = Property(plan[index], "ItemStandContents") as BlueprintForeignPartData;
+            Require(index % 2 == 0 ? contents == null : contents?.Info == "SwordFixture:2:3:1",
+                "Mount payload attached to the wrong repeated part");
+        }
+        Set(data, "info", "Changed:0:1:0");
+        Require(((BlueprintForeignPartData)Property(plan[1], "ItemStandContents")).Info == "SwordFixture:2:3:1",
+            "Armed plan aliases mutable source holder metadata");
+        Set(session, "pendingItemStandContents", Property(plan[1], "ItemStandContents"));
+        Set(session, "allowNativeGhostUpdate", true);
+        sessionType.GetMethod("OnNativePlacementFinished", Instance).Invoke(session, new object[] { null, null, false });
+        Require((bool)Get(session, "allowNativeGhostUpdate") && (int)Get(session, "placementPlanIndex") == 0,
+            "Blocked repeat changed the pending mount stage");
+        Console.WriteLine("PASS actual Session: repeated mounts retain immutable per-part payload; blocked native repeat leaves pending mount unchanged");
     }
 
     private static void TestRotatedRoots()

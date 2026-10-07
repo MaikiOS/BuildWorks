@@ -106,18 +106,21 @@ namespace OstrixMods.BuildWorks
 
         internal readonly struct TransformSnapshot
         {
-            public TransformSnapshot(Vector3 position, Quaternion rotation, Vector3? scale = null, string signText = null)
+            public TransformSnapshot(Vector3 position, Quaternion rotation, Vector3? scale = null, string signText = null,
+                BlueprintForeignPartData itemStandContents = null)
             {
                 Position = position;
                 Rotation = rotation;
                 Scale = scale ?? Vector3.one;
                 SignText = signText;
+                ItemStandContents = itemStandContents;
             }
 
             public Vector3 Position { get; }
             public Quaternion Rotation { get; }
             public Vector3 Scale { get; }
             public string SignText { get; }
+            public BlueprintForeignPartData ItemStandContents { get; }
         }
 
         private readonly struct SnapEdge
@@ -409,6 +412,9 @@ namespace OstrixMods.BuildWorks
         private readonly List<Piece> placementPlanPieces = new List<Piece>();
         private GameObject pendingNativePiece;
         private int pendingNativePlanIndex = -1;
+        private GameObject pendingItemStandPiece;
+        private BlueprintForeignPartData pendingItemStandContents;
+        private bool pendingItemStandAttempted, pendingItemStandSignFailed, pendingItemStandRollbackUnsafe;
         private readonly List<GameObject> currentBlueprintPlacements = new List<GameObject>();
         private readonly List<BlueprintRollbackItem> pendingBlueprintRollbacks = new List<BlueprintRollbackItem>();
         private float nextBlueprintRollbackRetry;
@@ -1889,8 +1895,7 @@ namespace OstrixMods.BuildWorks
             if (!armed && state != PlacementState.Armed &&
                 sessionMode == SessionMode.BlueprintWorldPlacement)
             {
-                ShowStatus(player, BuildWorksLocalization.Text(
-                    "placement.blueprint_prepare_failed"));
+                // ArmPlacement already reports the specific failure (including missing mounted items).
                 Finish();
             }
             return armed || state == PlacementState.Armed;
@@ -2303,6 +2308,7 @@ namespace OstrixMods.BuildWorks
                 return false;
             }
             if (sessionMode == SessionMode.BlueprintEditor) return true;
+            if (pendingItemStandContents != null) return true;
             if (automaticPlacementPaused) return true;
 
             bool approvedContext = piece && piece == selectedPiece &&
@@ -2549,6 +2555,35 @@ namespace OstrixMods.BuildWorks
                 automaticPauseReason = null;
                 RestoreCursor();
             }
+            if (pendingItemStandContents != null)
+            {
+                if (!GameplayInputAvailable(player)) return;
+                bool applied = false;
+                bool safe = true;
+                if (!pendingItemStandAttempted)
+                {
+                    applied = BlueprintItemStandPlacement.TryApply(player, pendingItemStandPiece,
+                        pendingItemStandContents, out pendingItemStandAttempted, out safe,
+                        placementPlan.Skip(placementPlanIndex + 1).Select(pose => pose.ItemStandContents));
+                    if (!safe)
+                    {
+                        applied = false;
+                        pendingItemStandRollbackUnsafe = true;
+                        currentBlueprintPlacements.Remove(pendingItemStandPiece);
+                    }
+                }
+                if (!applied)
+                {
+                    PauseAutomaticPlacement(player, BuildWorksLocalization.Text(pendingItemStandAttempted
+                        ? "placement.mount_uncertain" : "placement.mount_unavailable"));
+                    return;
+                }
+                pendingItemStandPiece = null;
+                pendingItemStandContents = null;
+                pendingItemStandAttempted = false;
+                CompleteNativePlacement(player, pendingItemStandSignFailed);
+                return;
+            }
             if (!HasUsableBuildTool(player))
             {
                 if (!automaticWaitingForTool)
@@ -2612,6 +2647,14 @@ namespace OstrixMods.BuildWorks
                     ShowStatus(player, BuildWorksLocalization.Text(
                         "placement.progress.stamina", placementPlanIndex + 1, placementPlan.Count));
                 }
+                return;
+            }
+            BlueprintForeignPartData nextContents = placementPlan[placementPlanIndex].ItemStandContents;
+            if (nextContents != null && !nextContents.ContentsCleared &&
+                BlueprintItemStandPlacement.FindPlacementItem(player, nextContents,
+                    placementPlan.Skip(placementPlanIndex + 1).Select(pose => pose.ItemStandContents)) == null)
+            {
+                PauseAutomaticPlacement(player, BuildWorksLocalization.Text("placement.mount_unavailable"));
                 return;
             }
             if (automaticWaitingForStamina)
@@ -2723,6 +2766,8 @@ namespace OstrixMods.BuildWorks
 
         public void OnNativePlacementFinished(Player player, Piece piece, bool placed)
         {
+            // A blocked repeat of TryPlacePiece must not disturb the deferred native attachment.
+            if (pendingItemStandContents != null) return;
             allowNativeGhostUpdate = false;
             if (state == PlacementState.Inactive && player == Player.m_localPlayer && placed)
             {
@@ -2748,37 +2793,18 @@ namespace OstrixMods.BuildWorks
             }
             if (placed)
             {
-                automaticCooldownOverridden = false;
-                ++placementPlanIndex;
-                Debug.Log("BuildWorks series placed " + placementPlanIndex + "/" +
-                    placementPlan.Count + ".");
-                if (placementPlanIndex < placementPlan.Count)
+                BlueprintForeignPartData contents = placementPlan[placementPlanIndex].ItemStandContents;
+                if (contents != null && !contents.ContentsCleared)
                 {
-                    TransformSnapshot next = placementPlan[placementPlanIndex];
-                    currentPosition = next.Position;
-                    currentRotation = next.Rotation;
-                    if (signFailed)
-                    {
-                        PauseAutomaticPlacement(player, BuildWorksLocalization.Text("blueprint.sign_apply_failed"));
-                        return;
-                    }
+                    // TryPlacePiece's postfix precedes native construction-resource consumption.
+                    // ContinueAutomaticPlacement runs the payload only after UpdatePlacement has returned.
+                    pendingItemStandPiece = created;
+                    pendingItemStandContents = contents;
+                    pendingItemStandSignFailed = signFailed;
                     requestAutomaticPlacement = true;
                     return;
                 }
-                if (automaticSkippedPlacements > 0)
-                {
-                    ShowStatus(player, BuildWorksLocalization.Text(
-                        "placement.complete.skipped", automaticSkippedPlacements));
-                }
-                else if (activeBlueprint != null)
-                {
-                    ShowStatus(player, BuildWorksLocalization.Text(
-                        "placement.complete.blueprint", placementPlan.Count));
-                }
-                CaptureContinuation();
-                currentBlueprintPlacements.Clear();
-                Finish(preserveContinuation: true);
-                if (signFailed) ShowStatus(player, BuildWorksLocalization.Text("blueprint.sign_apply_failed"));
+                CompleteNativePlacement(player, signFailed);
                 return;
             }
 
@@ -2792,6 +2818,34 @@ namespace OstrixMods.BuildWorks
             }
             PauseAutomaticPlacement(player, BuildWorksLocalization.Text(
                 "placement.pause.native_rejected"));
+        }
+
+        private void CompleteNativePlacement(Player player, bool signFailed)
+        {
+            automaticCooldownOverridden = false;
+            ++placementPlanIndex;
+            Debug.Log("BuildWorks series placed " + placementPlanIndex + "/" + placementPlan.Count + ".");
+            if (placementPlanIndex < placementPlan.Count)
+            {
+                TransformSnapshot next = placementPlan[placementPlanIndex];
+                currentPosition = next.Position;
+                currentRotation = next.Rotation;
+                if (signFailed)
+                {
+                    PauseAutomaticPlacement(player, BuildWorksLocalization.Text("blueprint.sign_apply_failed"));
+                    return;
+                }
+                requestAutomaticPlacement = true;
+                return;
+            }
+            if (automaticSkippedPlacements > 0)
+                ShowStatus(player, BuildWorksLocalization.Text("placement.complete.skipped", automaticSkippedPlacements));
+            else if (activeBlueprint != null)
+                ShowStatus(player, BuildWorksLocalization.Text("placement.complete.blueprint", placementPlan.Count));
+            CaptureContinuation();
+            currentBlueprintPlacements.Clear();
+            Finish(preserveContinuation: true);
+            if (signFailed) ShowStatus(player, BuildWorksLocalization.Text("blueprint.sign_apply_failed"));
         }
 
         private void PauseAutomaticPlacement(Player player, string reason)
@@ -4539,7 +4593,8 @@ namespace OstrixMods.BuildWorks
                     position + rotation * (localPosition * uniformScale),
                     rotation * localRotation,
                     ToUnity(BlueprintEditorPart.NormalizeScale(
-                        ToGeometry(part.scale.ToVector3()) * uniformScale, nameof(uniformScale))), part.signText));
+                        ToGeometry(part.scale.ToVector3()) * uniformScale, nameof(uniformScale))), part.signText,
+                    part.foreignData?.ToGeometry()));
                 placementPlanPieces.Add(activeBlueprintPieces[index]);
             }
             return true;
@@ -5039,7 +5094,7 @@ namespace OstrixMods.BuildWorks
             if (!player || blueprint?.parts == null) return false;
             if (!string.IsNullOrEmpty(blueprint.importError))
             { missingPrefab = BuildWorksLocalization.ResolveUserText(blueprint.importError); return false; }
-            if (!forEditor && CompositeBlueprintStore.HasForeignData(blueprint))
+            if (!forEditor && blueprint.sourceDocuments?.Any(source => source.ToGeometry().HasOpaqueSections) == true)
             { missingPrefab = BuildWorksLocalization.Text("import.foreign_pending"); return false; }
             if (CompositeBlueprintStore.InteractiveError(blueprint.parts.Count) is string budgetError)
             { missingPrefab = BuildWorksLocalization.ResolveUserText(budgetError); return false; }
@@ -5055,6 +5110,11 @@ namespace OstrixMods.BuildWorks
                     continue;
                 }
                 ZNetView view = piece.GetComponent<ZNetView>();
+                if (!forEditor && !BlueprintItemStandPlacement.CanRestore(piece, part.foreignData?.ToGeometry()))
+                {
+                    unavailable.Add(BuildWorksLocalization.Text("import.foreign_pending"));
+                    continue;
+                }
                 if (!forEditor && !BlueprintSignText.CanApply(piece, part.signText))
                 {
                     unavailable.Add(BuildWorksLocalization.Text("blueprint.sign_unsupported", part.prefabName));
@@ -6030,6 +6090,11 @@ namespace OstrixMods.BuildWorks
                 ShowStatus(player, BuildWorksLocalization.Text("placement.plan_corrupt"));
                 return false;
             }
+            if (!BlueprintItemStandPlacement.CanSupply(player, placementPlan.Select(pose => pose.ItemStandContents)))
+            {
+                ShowStatus(player, BuildWorksLocalization.Text("placement.mount_unavailable"));
+                return false;
+            }
             editorRootBeforePlacement = new TransformSnapshot(currentPosition, currentRotation);
             placementPlanIndex = 0;
             automaticSkippedPlacements = 0;
@@ -6297,6 +6362,7 @@ namespace OstrixMods.BuildWorks
 
         private void CancelBlueprintPlacement(Player player)
         {
+            bool unsafeMount = pendingItemStandRollbackUnsafe;
             int requested = currentBlueprintPlacements.Count;
             for (int index = currentBlueprintPlacements.Count - 1; index >= 0; --index)
             {
@@ -6307,7 +6373,7 @@ namespace OstrixMods.BuildWorks
             int failed = RetryPendingBlueprintRollbacks(force: true);
             precisionEnabled = false;
             Finish();
-            ShowStatus(player, BuildWorksLocalization.Text(failed == 0
+            ShowStatus(player, BuildWorksLocalization.Text(unsafeMount ? "placement.rollback_mount_uncertain" : failed == 0
                 ? "placement.rollback_complete"
                 : "placement.rollback_pending", failed == 0 ? requested : failed));
         }
@@ -6330,6 +6396,7 @@ namespace OstrixMods.BuildWorks
         private static bool TryRollbackBlueprintPiece(BlueprintRollbackItem item)
         {
             if (!item.Placed) return true;
+            if (!BlueprintItemStandPlacement.CanRollback(item.Placed)) return false;
             if (!item.RemovalNotified)
             {
                 item.RemovalNotified = true;
@@ -6375,6 +6442,8 @@ namespace OstrixMods.BuildWorks
             if (!item.Placed) return true;
             if (item.WaitForNativeRemoval && Time.unscaledTime < item.ForceDestroyAt)
                 return false;
+            // Native WearNTear removal drops mounted contents; a direct fallback destroy does not.
+            if (!BlueprintItemStandPlacement.CanRollback(item.Placed, forceDestroy: true)) return false;
             try
             {
                 ZNetView view = item.Placed.GetComponent<ZNetView>();
@@ -6422,6 +6491,9 @@ namespace OstrixMods.BuildWorks
             activeBlueprint = null;
             activeBlueprintPieces.Clear();
             currentBlueprintPlacements.Clear();
+            pendingItemStandPiece = null;
+            pendingItemStandContents = null;
+            pendingItemStandAttempted = pendingItemStandSignFailed = pendingItemStandRollbackUnsafe = false;
             blueprintRootPosition = Vector3.zero;
             blueprintRootRotation = Quaternion.identity;
             blueprintPivotLocal = Vector3.zero;

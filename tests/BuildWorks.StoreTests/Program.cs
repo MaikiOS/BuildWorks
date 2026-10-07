@@ -34,6 +34,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 ForeignSourcesRoundTrip(Path.Combine(directory, "sources.json"));
                 ForeignObjectRoundTrip(Path.Combine(directory, "foreign-objects.json"));
                 ForeignItemStandRecipes();
+                ForeignZdoChecks.Run();
                 NativeItemStandRoundTrip(Path.Combine(directory, "native-holder.json"));
                 NativeContainerRoundTrip(Path.Combine(directory, "native-container.json"));
                 ContentsPolicyRoundTrip(Path.Combine(directory, "contents-policy"));
@@ -886,14 +887,39 @@ namespace OstrixMods.BuildWorks.StoreTests
 
         private static void InspectActualLibrary(string path)
         {
-            int total = 0, supported = 0, blocked = 0;
+            int total = 0, supported = 0, blocked = 0, packets = 0, convertedStates = 0, remainingStates = 0, scaleBlocked = 0;
             using (Stream input = File.OpenRead(path))
             using (var zip = new ZipArchive(input, ZipArchiveMode.Read))
                 foreach (ZipArchiveEntry entry in zip.Entries.Where(x => x.FullName.EndsWith(".blueprint", StringComparison.OrdinalIgnoreCase)))
                 {
                     using (var reader = new StreamReader(entry.Open()))
                     {
-                        var parsed = ExternalBlueprintLibrary.Parse(reader.ReadToEnd(), entry.FullName);
+                        string text = reader.ReadToEnd();
+                        foreach (string line in text.Split('\n'))
+                        {
+                            string[] fields = line.TrimEnd('\r').Split(';');
+                            if (fields.Length < 14 || fields[13] == "" || fields[13] == "null" || fields[13] == "\"\"") continue;
+                            Require(Geometry.BlueprintForeignZdo.TryRead(fields[13], out _), "Actual ZDO reader rejected " + entry.FullName);
+                            ++packets;
+                        }
+                        var parsed = ExternalBlueprintLibrary.Parse(text, entry.FullName);
+                        if (parsed.importError == null)
+                        {
+                            var converted = ExternalBlueprintLibrary.PrepareForHost(parsed, _ => UnitScale, ForeignZdoChecks.Hash, 0);
+                            if (converted.importError != null)
+                            {
+                                Require(converted.importError.StartsWith("$buildworks_import.scale_range\t", StringComparison.Ordinal),
+                                    "Actual native-rules conversion failed: " + entry.FullName + " " + converted.importError);
+                                ++scaleBlocked; // Unit prefab bases are a file-only probe, not actual host scale availability.
+                            }
+                            else for (int index = 0; index < parsed.parts.Count; ++index)
+                                if (parsed.parts[index].foreignData != null)
+                                {
+                                    if (converted.parts[index].foreignData == null || converted.parts[index].foreignData.format == Geometry.BlueprintForeignPartData.NativeItemStandFormat)
+                                        ++convertedStates;
+                                    else ++remainingStates;
+                                }
+                        }
                         ++total; if (parsed.importError == null) ++supported; else ++blocked;
                         if (parsed.name == "CoffeeTable") Require(parsed.importError == null && parsed.parts.Count == 4, "Actual CoffeeTable cannot be converted");
                         if (parsed.name == "WoodCouch1") Require(parsed.importError == null &&
@@ -903,6 +929,8 @@ namespace OstrixMods.BuildWorks.StoreTests
                 }
             Require(total == 353 && supported > 0 && total == supported + blocked, "Downloaded library coverage");
             Console.WriteLine("PASS actual BiomeBlueprints: " + total + " visible source entries; " + supported + " format-compatible; " + blocked + " explicitly blocked (host prefab availability is separate)");
+            Require(packets == 133738, "Actual packet coverage changed");
+            Console.WriteLine("PASS actual typed ZDO: " + packets + " exact EOF; " + convertedStates + " known states converted under native construction rules; " + remainingStates + " retain explicit blockers; " + scaleBlocked + " plans correctly refused by unit-base scale probe");
         }
 
         private static void ExchangeRoundTrip(string path)

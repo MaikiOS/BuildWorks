@@ -811,7 +811,7 @@ exchange.contents_unknown	Unknown/unreadable state: unavailable clear choices ar
 exchange.confirm_export	Confirm export
 exchange.confirm_import	Confirm import
 exchange.import_review	Import contents: {0} blueprints
-exchange.import_copy	Choose each family separately. A new native ZIP copy retains the exact original file. Nothing is placed in the world.
+exchange.import_copy	Choose each family separately. The native copy retains the exact source. Construction uses normal Valheim rules; original invulnerability, AI overrides, damage and ownership are archived, not applied.
 exchange.source_changed	The source file changed after inspection. Go back and inspect it again; nothing was imported.
 exchange.back	Back to file settings
 exchange.format_json	BuildWorks JSON

@@ -11,7 +11,8 @@ namespace OstrixMods.BuildWorks.Geometry
         public const int MaximumBytes = 8 * 1024 * 1024;
         public const int MaximumSources = 64;
         public const int MaximumTotalBytes = 24 * 1024 * 1024;
-        private readonly Dictionary<int, string> partRows = new Dictionary<int, string>();
+        private readonly Dictionary<int, (string Prefab, int Start, int Length)> partRows =
+            new Dictionary<int, (string, int, int)>();
 
         public BlueprintSourceDocument(string format, string name, string text)
         {
@@ -60,7 +61,7 @@ namespace OstrixMods.BuildWorks.Geometry
                         while (separator > first && char.IsWhiteSpace(text[separator - 1])) --separator;
                         if (partRows.Count >= BlueprintEditorDocument.MaximumParts)
                             throw new ArgumentException("Too many source parts.", nameof(text));
-                        partRows.Add(line, text.Substring(first, separator - first));
+                        partRows.Add(line, (text.Substring(first, separator - first), first, last - first));
                     }
                 }
                 start = end;
@@ -80,8 +81,10 @@ namespace OstrixMods.BuildWorks.Geometry
 
         public bool HasPartAt(int line, string prefab)
         {
-            return partRows.TryGetValue(line, out string sourcePrefab) && sourcePrefab == prefab;
+            return partRows.TryGetValue(line, out var row) && row.Prefab == prefab;
         }
+
+        public string PartRow(int line) => partRows.TryGetValue(line, out var row) ? Text.Substring(row.Start, row.Length) : null;
 
         public static Dictionary<string, BlueprintSourceDocument> Index(IEnumerable<BlueprintSourceDocument> sources)
         {

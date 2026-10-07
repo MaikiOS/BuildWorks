@@ -119,7 +119,7 @@ namespace OstrixMods.BuildWorks.Geometry
         }
 
         // BinaryWriter strings use a canonical 7-bit UTF-8 byte length. Bound it before allocating.
-        private static string ReadString(BinaryReader reader)
+        internal static string ReadString(BinaryReader reader)
         {
             uint length = 0;
             for (int shift = 0; shift < 35; shift += 7)

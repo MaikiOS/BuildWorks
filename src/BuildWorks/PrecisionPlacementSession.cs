@@ -525,7 +525,7 @@ namespace OstrixMods.BuildWorks
                 GameObject prefab = ZNetScene.instance ? ZNetScene.instance.GetPrefab(name) : null;
                 return prefab ? new CompositeBlueprintStore.VectorData(prefab.transform.localScale)
                     : (CompositeBlueprintStore.VectorData?)null;
-            }, () => ZNetScene.instance);
+            }, () => ZNetScene.instance, name => name.GetStableHashCode(), () => Game.m_worldLevel);
             blueprintPieceRegistry = new HammerBlueprintPieceRegistry(blueprintStore);
             hud = new PrecisionPlacementHudView(
                 SelectGizmoMode,

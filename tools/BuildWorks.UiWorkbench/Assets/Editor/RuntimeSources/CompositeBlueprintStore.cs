@@ -37,6 +37,9 @@ namespace OstrixMods.BuildWorks
         private IReadOnlyList<Blueprint> catalogSnapshot;
         private Task<List<Blueprint>> importTask;
         private Func<string, VectorData?> importPrefabScale;
+        private Func<string, int> importPrefabHash;
+        private Func<int> importWorldLevel;
+        private int? preparedWorldLevel;
         private Func<object> importHostContext;
         private object preparedHostContext;
         internal int Revision { get; private set; }
@@ -65,18 +68,22 @@ namespace OstrixMods.BuildWorks
         public IReadOnlyList<Blueprint> All() => data.blueprints;
 
         // Called on the Unity thread only. File workers never inspect host prefabs.
-        internal void ConfigureImportScale(Func<string, VectorData?> resolve, Func<object> context = null)
+        internal void ConfigureImportScale(Func<string, VectorData?> resolve, Func<object> context = null,
+            Func<string, int> prefabHash = null, Func<int> worldLevel = null)
         {
             importPrefabScale = resolve;
             importHostContext = context;
+            importPrefabHash = prefabHash;
+            importWorldLevel = worldLevel;
             catalogSnapshot = null;
         }
 
         internal IReadOnlyList<Blueprint> CatalogAll()
         {
             object hostContext = importHostContext?.Invoke();
-            if (!ReferenceEquals(hostContext, preparedHostContext))
-            { preparedHostContext = hostContext; catalogSnapshot = null; }
+            int? worldLevel = importWorldLevel?.Invoke();
+            if (!ReferenceEquals(hostContext, preparedHostContext) || preparedWorldLevel != worldLevel)
+            { preparedHostContext = hostContext; preparedWorldLevel = worldLevel; catalogSnapshot = null; }
             if (importTask != null && importTask.IsCompleted)
             {
                 try { externalBlueprints = importTask.GetAwaiter().GetResult(); ImportError = null; }
@@ -92,7 +99,7 @@ namespace OstrixMods.BuildWorks
             }
             if (catalogSnapshot != null) return catalogSnapshot;
             var result = new List<Blueprint>(data.blueprints);
-            result.AddRange(externalBlueprints.Select(source => ExternalBlueprintLibrary.PrepareForHost(source, importPrefabScale)));
+            result.AddRange(externalBlueprints.Select(source => ExternalBlueprintLibrary.PrepareForHost(source, importPrefabScale, importPrefabHash, worldLevel)));
             return catalogSnapshot = result;
         }
 
@@ -163,7 +170,7 @@ namespace OstrixMods.BuildWorks
         }
 
         // Pure file inspection: no library writes and no Unity prefab access.
-        internal static ImportReview ReviewImportFile(string source, Func<string, int> prefabHash)
+        internal static ImportReview ReviewImportFile(string source, Func<string, int> prefabHash, int? worldLevel = null)
         {
             source = Path.GetFullPath((source ?? "").Trim().Trim('"'));
             byte[] bytes = ReadImportBytes(source);
@@ -181,6 +188,13 @@ namespace OstrixMods.BuildWorks
                 var summary = new ContentsSummary();
                 foreach (Blueprint document in documents)
                 {
+                    if (prefabHash != null && document.importError == null)
+                    {
+                        var evidenceIndex = Geometry.BlueprintSourceDocument.Index(document.sourceDocuments?.Select(evidence => evidence.ToGeometry()));
+                        foreach (Part part in document.parts)
+                            if (part.sourceDocumentId != null && evidenceIndex.TryGetValue(part.sourceDocumentId, out var evidence))
+                                ExternalBlueprintLibrary.ConvertKnownState(part, evidence, prefabHash, worldLevel);
+                    }
                     var contents = InspectContents(document, prefabHash); // Reject every blocked member, not just empty archives.
                     summary.Storages += contents.Storages; summary.StoredItems += contents.StoredItems;
                     summary.Mounts += contents.Mounts; summary.Unknown += contents.Unknown;
@@ -206,7 +220,7 @@ namespace OstrixMods.BuildWorks
             try
             {
                 if (review == null) throw new InvalidDataException("$buildworks_import.format");
-                var prepared = review.Documents.Select(document => ExternalBlueprintLibrary.PrepareForHost(document, importPrefabScale)).ToArray();
+                var prepared = review.Documents.Select(document => ExternalBlueprintLibrary.PrepareForHost(document, importPrefabScale, importPrefabHash, importWorldLevel?.Invoke())).ToArray();
                 if (prepared.Any(document => document.importError != null))
                     throw new InvalidDataException(prepared.First(document => document.importError != null).importError);
                 string target = Path.Combine(ImportDirectory, "import_" + Guid.NewGuid().ToString("N") + ".zip");

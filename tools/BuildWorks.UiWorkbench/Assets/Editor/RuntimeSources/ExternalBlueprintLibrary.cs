@@ -318,29 +318,36 @@ namespace OstrixMods.BuildWorks
         }
 
         internal static CompositeBlueprintStore.Blueprint PrepareForHost(CompositeBlueprintStore.Blueprint source,
-            Func<string, CompositeBlueprintStore.VectorData?> resolvePrefabScale)
+            Func<string, CompositeBlueprintStore.VectorData?> resolvePrefabScale, Func<string, int> hash = null, int? worldLevel = null)
         {
-            if (source == null || !source.importAbsoluteScale || source.importError != null) return source;
+            if (source == null || source.importError != null || !source.importAbsoluteScale &&
+                (hash == null || !source.parts.Any(part => part.foreignData?.format == "blueprint" || part.foreignData?.format == "vbuild"))) return source;
             var copy = source.ImportCopy();
             string currentPrefab = null;
             try
             {
-                if (resolvePrefabScale == null) throw new InvalidDataException("$buildworks_import.scale_pending");
+                if (source.importAbsoluteScale && resolvePrefabScale == null) throw new InvalidDataException("$buildworks_import.scale_pending");
                 var scales = new Dictionary<string, CompositeBlueprintStore.VectorData>(StringComparer.Ordinal);
+                var evidenceIndex = hash == null ? null : Geometry.BlueprintSourceDocument.Index(copy.sourceDocuments?.Select(evidence => evidence.ToGeometry()));
                 foreach (CompositeBlueprintStore.Part part in copy.parts)
                 {
                     currentPrefab = part.prefabName;
-                    if (!scales.TryGetValue(part.prefabName, out var prefabScale))
+                    if (source.importAbsoluteScale)
                     {
-                        var resolved = resolvePrefabScale(part.prefabName);
-                        if (!resolved.HasValue) throw new InvalidDataException("$buildworks_import.scale_missing\t" + part.prefabName);
-                        scales.Add(part.prefabName, prefabScale = resolved.Value);
+                        if (!scales.TryGetValue(part.prefabName, out var prefabScale))
+                        {
+                            var resolved = resolvePrefabScale(part.prefabName);
+                            if (!resolved.HasValue) throw new InvalidDataException("$buildworks_import.scale_missing\t" + part.prefabName);
+                            scales.Add(part.prefabName, prefabScale = resolved.Value);
+                        }
+                        part.scale = CompositeBlueprintStore.RelativeScale(part.scale, prefabScale);
                     }
-                    part.scale = CompositeBlueprintStore.RelativeScale(part.scale, prefabScale);
+                    if (hash != null && part.sourceDocumentId != null && evidenceIndex.TryGetValue(part.sourceDocumentId, out var evidence))
+                        ConvertKnownState(part, evidence, hash, worldLevel);
                 }
                 copy.importAbsoluteScale = false;
                 // Derived cache identity must not reuse pre-normalization thumbnails or another prefab revision.
-                copy.id = Identity(source.id + "\nrelative-scale-v1\n" + string.Join("\n", scales.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                copy.id = Identity(source.id + "\nrelative-scale-v2-native-rules\n" + (hash == null ? "inert" : worldLevel?.ToString(CultureInfo.InvariantCulture) ?? "pending-world") + "\n" + string.Join("\n", scales.OrderBy(pair => pair.Key, StringComparer.Ordinal)
                     .Select(pair => pair.Key + "\t" + pair.Value.x.ToString("R", CultureInfo.InvariantCulture) + "\t" +
                         pair.Value.y.ToString("R", CultureInfo.InvariantCulture) + "\t" + pair.Value.z.ToString("R", CultureInfo.InvariantCulture))));
             }
@@ -350,6 +357,69 @@ namespace OstrixMods.BuildWorks
                 copy.parts.Clear(); // Atomic conversion: never publish mixed absolute/relative scales.
             }
             return copy;
+        }
+
+        internal static void ConvertKnownState(CompositeBlueprintStore.Part part, Geometry.BlueprintSourceDocument evidence,
+            Func<string, int> hash, int? worldLevel)
+        {
+            var original = part.foreignData;
+            if (original == null || original.format != "blueprint" && original.format != "vbuild" || original.chance != null ||
+                evidence == null || evidence.Id != part.sourceDocumentId || evidence.Format != original.format ||
+                !Geometry.BlueprintForeignZdo.TryRead(original.zdo, out var state) || state.ConnectionType.HasValue) return;
+            string row = evidence.PartRow(part.sourceLine);
+            if (row == null || !evidence.HasPartAt(part.sourceLine, part.prefabName)) return;
+            bool vbuild = original.format == "vbuild";
+            if ((vbuild || part.prefabName == "sign") && original.info != null) return;
+            // vbuild has no row-scale columns; dropping a ZDO scale would change its geometry.
+            // Keep this dialect blocked until its absolute-scale adapter is verified.
+            if (vbuild && (state.HasHash(hash("scale")) || state.HasHash(hash("scaleScalar")))) return;
+            string[] fields = vbuild && !row.Contains(";") ? row.Split((char[])null, StringSplitOptions.RemoveEmptyEntries) : row.Split(';');
+            int dataIndex = vbuild ? 8 : 13;
+            if (fields.Length <= dataIndex || fields[dataIndex] != original.zdo ||
+                fields.Length > dataIndex + 1 && HasData(fields[dataIndex + 1]) && fields[dataIndex + 1] != "1" ||
+                (!vbuild && part.prefabName != "sign" && (HasData(fields[9]) ? fields[9] : null) != original.info) ||
+                (!vbuild && part.prefabName == "sign" && BlueprintExchangeFormat.DecodeSignText(fields[9]) != part.signText)) return;
+            var consumed = new HashSet<KeyValuePair<int, Type>>();
+            Geometry.BlueprintForeignPartData contents = null;
+            string text = part.signText;
+            if (part.prefabName == "itemstand" || part.prefabName == "itemstandh")
+            {
+                if (!Geometry.BlueprintItemStandContents.TryConvertLegacy(state, hash, worldLevel, out contents, out consumed)) return;
+            }
+            else if (part.prefabName == "sign")
+            {
+                // With ZDO present, legacy Info is not a text fallback.
+                if (!state.HasHash(hash("text")) && text != null) return;
+                if (state.HasHash(hash("text")))
+                {
+                    if (!state.TryGet<string>(hash("text"), out text) || !Geometry.BlueprintEditorPart.IsValidSignText(text)) return;
+                    consumed.Add(new KeyValuePair<int, Type>(hash("text"), typeof(string)));
+                }
+                if (state.HasHash(hash("author")))
+                {
+                    if (!state.TryGet<string>(hash("author"), out _)) return;
+                    consumed.Add(new KeyValuePair<int, Type>(hash("author"), typeof(string))); // Native Sign.SetText assigns the new author.
+                }
+            }
+            else if (original.info != null) return;
+            // Construction creates NEW ordinary native pieces: no inherited ownership, stale support,
+            // damage, invulnerability, AI overrides or network lifetime flags. All originals remain in
+            // the exact source document. This is NOT an administrator-state restoration adapter.
+            var ordinary = new Dictionary<int, Type> {
+                [hash("health")] = typeof(float), [hash("support")] = typeof(float), [hash("creator")] = typeof(long),
+                [hash("scale")] = typeof(Geometry.Point3), [hash("scaleScalar")] = typeof(float),
+                [hash("HasFields")] = typeof(int), [hash("HasFieldsWearNTear")] = typeof(int),
+                [hash("WearNTear.m_health")] = typeof(float), [hash("HasFieldsStaticTarget")] = typeof(int),
+                [hash("StaticTarget.m_randomTarget")] = typeof(int)
+            };
+            foreach (var key in state.Keys)
+            {
+                if (consumed.Contains(key)) continue;
+                if (!ordinary.TryGetValue(key.Key, out Type expected) || key.Value != expected) return;
+                if (expected == typeof(int) && (!state.TryGet<int>(key.Key, out int flag) || flag < 0 || flag > 1)) return;
+            }
+            part.signText = text;
+            part.foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(contents);
         }
 
         internal static CompositeBlueprintStore.Blueprint DetachedCopy(CompositeBlueprintStore.Blueprint source)

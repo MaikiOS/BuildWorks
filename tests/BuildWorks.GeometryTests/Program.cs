@@ -49,6 +49,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Run("Composite snap points keep same-part neighbors", CompositeSnapPointsKeepSamePartNeighbors);
             Run("Spatial snap clustering preserves original first-match semantics and large sets", CompositeSnapSpatialParity);
             Run("World snap-point packages are bounded, exact and reject corrupt coordinates", WorldSnapPointPackages);
+            Run("Foreign ZDO reader is typed, immutable, bounded and rejects malformed packages", ForeignZdoChecks.Run);
             Run("Straight repeat uses exact step", StraightRepeatUsesExactStep);
             Run("Connected ring starts at selected support", ConnectedRingStartsAtSelectedSupport);
             Run("Concave ring follows graph neighbors", ConcaveRingFollowsGraphNeighbors);

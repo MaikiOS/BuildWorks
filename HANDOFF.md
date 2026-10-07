@@ -2,6 +2,44 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.85 — typed foreign-state conversion under native survival rules; source verified
+
+Foreign DataEntry packages now have a bounded, read-only typed decoder, including network-tail
+flags. Equal hashes in different typed sections are legal (cooking slot name/time); same-type
+duplicates, malformed lengths, nonfinite values and trailing bytes refuse conversion. Typed
+residual tracking prevents a known field from swallowing an unknown sibling.
+
+Known structural metadata converts to NEW ordinary native construction: original damage,
+invulnerability, AI overrides, creator and network flags stay in the exact archived source,
+not in the newly placed object's state. No admin powers are granted; admin restoration is
+not implemented. Row absolute scale is normalized once against intrinsic prefab scale,
+never multiplied by a second ZDO scale. Ambiguous vbuild scale remains blocked.
+
+Known legacy ItemStand state becomes a full native v109 snapshot, preserving durability,
+quality, variant, crafter, world level, custom data/order and existing native base state.
+Missing world level comes from the host, captured before file workers. Sign ZDO text is
+preserved; Info is not used as a fallback when ZDO is present. Import review now inspects
+these conversions before independent contents choices. No raw ZDO is executed.
+
+Conversion requires a matching archived row (format/prefab/ZDO/Info/chance); modified
+unarchived payloads stay raw. Source row offsets avoid repeated scans or duplicate full rows.
+Native/public schema versions remain v14/v5, with all source evidence retained.
+
+Release (0 warnings/errors), Geometry, Store with the actual 353-file archive, HostContract,
+Localization848, EditorBridge, WorldLayout14, deployment guards and fresh Unity252 PASS.
+Correctness and ponytail reviews passed after source-binding and custom-order fixes.
+The real reader consumes all 133,738 packages to EOF. Unit-base probe: 114,619 known states
+converted, 24,373 still blocked, one plan refused for scale. A separate no-host-scale audit
+finds 113 plans free of foreign-state blockers, NOT 113 proven world-placeable plans.
+The verify helper is unavailable; these direct checks/reviews are the verification evidence.
+
+Not deployed; TerrainRamp-1.0-Test remains .82. No Valheim launch/save/world/client/FPS proof,
+no push. Goal remains incomplete: appearance RandMatSeed, known placement headers, legacy
+container v103/v106 conversion and native restoration, armour/free items, cooking/fuel/other
+states, placement-time independent contents choices, editor >512 and the live lamp.
+Next: preserve material variation in preview/place/reload, resolve #Center/#Coordinates/#Rotation,
+then inventory/armour adapters. Never label partial conversion as complete.
+
 ## Checkpoint 0.19.84 — heavy world ghosts and intrinsic prefab scale; source verified
 
 World plans now allow the native-format maximum of 50,000 parts; the editor remains at 512.

@@ -282,7 +282,8 @@ namespace OstrixMods.BuildWorks
             else
             {
                 string source = selected;
-                importInspection = Task.Run(() => CompositeBlueprintStore.ReviewImportFile(source, name => name.GetStableHashCode()));
+                int worldLevel = Game.m_worldLevel; // Capture on host thread; file worker never reads Unity/game state.
+                importInspection = Task.Run(() => CompositeBlueprintStore.ReviewImportFile(source, name => name.GetStableHashCode(), worldLevel));
             }
         }
 

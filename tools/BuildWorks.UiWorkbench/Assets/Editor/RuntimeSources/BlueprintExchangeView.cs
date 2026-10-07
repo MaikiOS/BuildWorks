@@ -14,9 +14,9 @@ namespace OstrixMods.BuildWorks
     {
         private readonly GameObject root;
         private readonly RectTransform panel, rows;
-        private readonly TMP_Text font, message, pageLabel;
+        private readonly TMP_Text font, message, pageLabel, folderLabel;
         private readonly TMP_InputField directory, fileName;
-        private readonly Button primary, copyPath, format;
+        private readonly Button primary, copyPath, format, editPath, cancelPath;
         private RectTransform contentsPanel;
         private Button contentsBack, storageChoice, mountChoice;
         private Task<CompositeBlueprintStore.ContentsSummary> contentsInspection;
@@ -31,13 +31,13 @@ namespace OstrixMods.BuildWorks
         private readonly GameObject previousFocus;
         private Task<string[]> listing;
         private string[] entries = Array.Empty<string>();
-        private string selected, resultPath;
+        private string selected, resultPath, currentDirectory;
         private int page;
         private bool importing, archive, completed, disposed;
         internal bool IsOpen => root && root.activeInHierarchy && !disposed;
 
         internal BlueprintExchangeView(Transform parent, TMP_Text template, CompositeBlueprintStore library,
-            CompositeBlueprintStore.Blueprint source, Action closed, bool frontCanvas = false)
+            CompositeBlueprintStore.Blueprint source, Action closed, bool frontCanvas = false, string report = null)
         {
             store = library; blueprint = source; font = template; finished = closed;
             previousFocus = EventSystem.current ? EventSystem.current.currentSelectedGameObject : null;
@@ -55,13 +55,22 @@ namespace OstrixMods.BuildWorks
             panel = Rect("ExchangeDialog", rect, 0, 0, 780, 580);
             panel.anchorMin = panel.anchorMax = panel.pivot = new Vector2(.5f, .5f);
             skin.Apply(panel.gameObject.AddComponent<Image>(), BlueprintEditorSkin.Surface.Panel);
-            Label("ExchangeTitle", T(source == null ? "exchange.import" : "exchange.export"), 20, 18, 740, 30, 22);
+            Label("ExchangeTitle", T(source == null ? "exchange.import" : "exchange.export"), 20, 18, 620, 30, 22);
+            Button("ExchangeClose", T("editor.view.close"), 650, 18, 110, Dispose);
             Label("ExchangeHelp", T(source == null ? "exchange.browse_help" : "exchange.export_help"), 20, 56, 740, 26, 14);
-            directory = Input("ExchangeDirectory", 20, 86, 562, 1024);
+            folderLabel = Label("ExchangeFolder", "", 20, 86, 410, 30, 14);
+            folderLabel.textWrappingMode = TextWrappingModes.NoWrap;
+            folderLabel.overflowMode = TextOverflowModes.Ellipsis;
+            editPath = Button("ExchangeEditPath", T("exchange.edit_path"), 438, 86, 144, () => SetDirectoryEditing(true));
+            directory = Input("ExchangeDirectory", 20, 86, 562, 1024, 64);
+            directory.lineType = TMP_InputField.LineType.MultiLineSubmit;
+            directory.textComponent.textWrappingMode = TextWrappingModes.Normal;
+            directory.textComponent.alignment = TextAlignmentOptions.TopLeft;
             directory.onSubmit.AddListener(_ => Browse(directory.text));
+            cancelPath = Button("ExchangeCancelPath", T("exchange.cancel_path"), 590, 122, 170, () => SetDirectoryEditing(false));
             Button("ExchangeUp", T("exchange.up"), 590, 86, 80, () =>
             {
-                try { Browse(Directory.GetParent(directory.text)?.FullName ?? directory.text); }
+                try { Browse(Directory.GetParent(currentDirectory)?.FullName ?? currentDirectory); }
                 catch (Exception error) { SetError(error); }
             });
             Button("ExchangeGo", T("exchange.go"), 678, 86, 82, () => Browse(directory.text));
@@ -69,6 +78,7 @@ namespace OstrixMods.BuildWorks
             Location("ExchangeDownloads", T("exchange.downloads"), Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"), 208);
             Location("ExchangeDocuments", T("exchange.documents"), Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), 396);
             Location("ExchangeDesktop", T("exchange.desktop"), Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), 584);
+            SetDirectoryEditing(false);
             rows = Rect("ExchangeEntries", panel, 20, 174, 740, 224);
             rows.gameObject.AddComponent<Image>().color = new Color(.05f, .055f, .055f, 1);
             Button("ExchangePrevious", "<", 20, 404, 38, () => { if (page > 0) { --page; RenderRows(); } });
@@ -87,13 +97,12 @@ namespace OstrixMods.BuildWorks
             primary = Button("ExchangeSubmit", T(source == null ? "exchange.import" : "exchange.export"), 548, 530, 212, Submit);
             copyPath = Button("ExchangeCopyPath", T("exchange.copy_path"), 256, 530, 276,
                 () => GUIUtility.systemCopyBuffer = resultPath ?? selected ?? directory.text);
-            Button("ExchangeClose", T("editor.view.close"), 20, 530, 220, Dispose);
+            if (report != null) { ShowReport(report); return; }
             string initial = Directory.Exists(store.ExchangeDirectory) ? store.ExchangeDirectory : Directory.GetParent(store.ExchangeDirectory).FullName;
             if (source != null)
                 try { initial = CompositeBlueprintStore.ValidateExchangeDirectory(store.ExportDirectory); Directory.CreateDirectory(initial); }
                 catch (Exception error) { SetError(error); }
             Browse(initial);
-            if (EventSystem.current) EventSystem.current.SetSelectedGameObject(directory.gameObject);
             Tick();
         }
 
@@ -148,7 +157,7 @@ namespace OstrixMods.BuildWorks
                 catch (Exception error) { if (reviewingContents) SetError(error); }
                 importInspection = null;
             }
-            primary.interactable = !completed && !importing && listing == null &&
+            primary.interactable = !completed && !importing && listing == null && !directory.gameObject.activeSelf &&
                 (blueprint != null || selected != null) && (!reviewingContents || contentsSummary != null);
             copyPath.interactable = !importing;
             if (completed || importing)
@@ -162,12 +171,32 @@ namespace OstrixMods.BuildWorks
             try
             {
                 string full = CompositeBlueprintStore.ValidateExchangeDirectory(path);
-                directory.SetTextWithoutNotify(full); selected = null; page = 0;
+                currentDirectory = full;
+                string leaf = Path.GetFileName(full.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                folderLabel.text = T("exchange.current_folder", leaf.Length > 0 ? leaf : full);
+                SetDirectoryEditing(false); selected = null; page = 0;
                 entries = Array.Empty<string>(); RenderRows();
                 message.text = T("exchange.loading");
                 listing = Task.Run(() => CompositeBlueprintStore.BrowseExchangeDirectory(full));
             }
             catch (Exception error) { SetError(error); }
+        }
+
+        private void SetDirectoryEditing(bool editing)
+        {
+            directory.SetTextWithoutNotify(currentDirectory ?? "");
+            directory.gameObject.SetActive(editing);
+            folderLabel.gameObject.SetActive(!editing); editPath.gameObject.SetActive(!editing);
+            cancelPath.gameObject.SetActive(editing);
+            foreach (string name in new[] { "ExchangeHome", "ExchangeDownloads", "ExchangeDocuments", "ExchangeDesktop" })
+                panel.Find(name).gameObject.SetActive(!editing);
+            if (editing)
+            {
+                if (EventSystem.current) EventSystem.current.SetSelectedGameObject(directory.gameObject);
+                directory.ActivateInputField();
+            }
+            else if (EventSystem.current && EventSystem.current.currentSelectedGameObject == directory.gameObject)
+                EventSystem.current.SetSelectedGameObject(null);
         }
 
         private void RenderRows()
@@ -213,6 +242,15 @@ namespace OstrixMods.BuildWorks
 
         private void SetError(Exception error) => message.text = BuildWorksLocalization.ResolveUserText(error.Message);
 
+        internal void ShowReport(string value)
+        {
+            completed = true; listing = null; resultPath = value;
+            panel.Find("ExchangeTitle").GetComponent<TMP_Text>().text = T("exchange.diagnostics");
+            panel.Find("ExchangeHelp").GetComponent<TMP_Text>().text = T("exchange.diagnostics_help");
+            copyPath.GetComponentInChildren<TMP_Text>().text = T("exchange.copy_report");
+            ShowResult(value); Tick();
+        }
+
         private void ReviewContents()
         {
             reviewingContents = true; contentsSummary = null; importReview = null; clearStorage = clearMounts = false;
@@ -244,7 +282,8 @@ namespace OstrixMods.BuildWorks
             else
             {
                 string source = selected;
-                importInspection = Task.Run(() => CompositeBlueprintStore.ReviewImportFile(source, name => name.GetStableHashCode()));
+                int worldLevel = Game.m_worldLevel; // Capture on host thread; file worker never reads Unity/game state.
+                importInspection = Task.Run(() => CompositeBlueprintStore.ReviewImportFile(source, name => name.GetStableHashCode(), worldLevel));
             }
         }
 
@@ -271,7 +310,7 @@ namespace OstrixMods.BuildWorks
                     child.name == "ExchangePage" || child.name == "ExchangeNameLabel" || child.name == "ExchangeFileName" || child.name == "ExchangeFormat")
                     child.gameObject.SetActive(visible);
             // The reviewed destination and format stay fixed until Back.
-            foreach (string name in new[] { "ExchangeDirectory", "ExchangeUp", "ExchangeGo", "ExchangeHome",
+            foreach (string name in new[] { "ExchangeDirectory", "ExchangeEditPath", "ExchangeCancelPath", "ExchangeUp", "ExchangeGo", "ExchangeHome",
                 "ExchangeDownloads", "ExchangeDocuments", "ExchangeDesktop" })
                 panel.Find(name).GetComponent<Selectable>().interactable = visible;
         }
@@ -310,7 +349,9 @@ namespace OstrixMods.BuildWorks
             var label = Rect(name, parent ?? panel, x, y, width, height).gameObject.AddComponent<TextMeshProUGUI>();
             if (font) { label.font = font.font; label.fontSharedMaterial = font.fontSharedMaterial; }
             label.text = text; label.fontSize = size; label.color = new Color(.94f, .90f, .80f, 1);
-            label.richText = false; label.raycastTarget = false; label.alignment = TextAlignmentOptions.MidlineLeft;
+            // Windows paths contain literal \n, \r and \t; never interpret them as layout controls.
+            label.richText = false; label.parseCtrlCharacters = false;
+            label.raycastTarget = false; label.alignment = TextAlignmentOptions.MidlineLeft;
             return label;
         }
         private Button Button(string name, string text, float x, float y, float width, Action action, Transform parent = null)
@@ -321,15 +362,18 @@ namespace OstrixMods.BuildWorks
             label.overflowMode = TextOverflowModes.Ellipsis;
             return button;
         }
-        private TMP_InputField Input(string name, float x, float y, float width, int limit)
+        private TMP_InputField Input(string name, float x, float y, float width, int limit, float height = 30)
         {
-            var rect = Rect(name, panel, x, y, width, 30); rect.gameObject.AddComponent<Image>();
+            var rect = Rect(name, panel, x, y, width, height); rect.gameObject.AddComponent<Image>();
             var input = rect.gameObject.AddComponent<TMP_InputField>(); skin.Apply(input, input: true);
-            var viewport = Rect(name + "Viewport", rect, 8, 2, width - 16, 26); viewport.gameObject.AddComponent<RectMask2D>();
-            var text = Label(name + "Text", "", 0, 0, width - 16, 26, 14, viewport);
-            text.textWrappingMode = TextWrappingModes.NoWrap;
+            var viewport = Rect(name + "Viewport", rect, 8, 2, width - 16, height - 4); viewport.gameObject.AddComponent<RectMask2D>();
+            var text = Label(name + "Text", "", 0, 0, width - 16, height - 4, 14, viewport);
             input.textViewport = viewport; input.textComponent = text; input.characterLimit = limit;
-            input.lineType = TMP_InputField.LineType.SingleLine; return input;
+            input.lineType = TMP_InputField.LineType.SingleLine;
+            // Assigning the text component can reset wrapping; native caret scrolling owns clipping.
+            text.textWrappingMode = TextWrappingModes.NoWrap;
+            text.overflowMode = TextOverflowModes.Overflow;
+            return input;
         }
         public void Dispose()
         {

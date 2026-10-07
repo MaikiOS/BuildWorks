@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+public static class Game { public static int m_worldLevel; }
+
 namespace BepInEx
 {
     public static class Paths { public static string ConfigPath => Application.temporaryCachePath; }

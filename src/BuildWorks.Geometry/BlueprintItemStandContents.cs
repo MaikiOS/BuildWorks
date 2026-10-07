@@ -9,6 +9,102 @@ namespace OstrixMods.BuildWorks.Geometry
     // Full read-only native v109 item package. A null package is a legacy/authoring recipe, not a snapshot.
     public static class BlueprintItemStandContents
     {
+        // EWD legacy loose fields -> verified native record, never ZDO.Deserialize.
+        // Caller must classify EVERY unconsumed outer field before enabling placement.
+        public static bool TryConvertLegacy(BlueprintForeignZdo source, Func<string, int> hash, int? defaultWorldLevel,
+            out BlueprintForeignPartData converted, out HashSet<KeyValuePair<int, Type>> consumed)
+        {
+            converted = null; consumed = new HashSet<KeyValuePair<int, Type>>();
+            if (source == null || hash == null) return false;
+            var used = new HashSet<KeyValuePair<int, Type>>();
+            try
+            {
+                if (!source.TryGet<string>(hash("item"), out string prefab) || string.IsNullOrEmpty(prefab)) return false;
+                used.Add(new KeyValuePair<int, Type>(hash("item"), typeof(string)));
+                int prefabId = hash(prefab);
+                if (prefabId == 0) return false;
+                BlueprintContainerInventory.Item original = null;
+                if (source.HasHash(hash("itemData")))
+                {
+                    if (!source.TryGet<byte[]>(hash("itemData"), out var packet)) return false;
+                    using (var input = new MemoryStream(packet, false))
+                    using (var reader = new BinaryReader(input, new UTF8Encoding(false, true)))
+                    {
+                        if (reader.ReadByte() != 109) return false;
+                        original = BlueprintContainerInventory.ReadItem(reader, new Dictionary<int, string> { [prefabId] = prefab });
+                        if (input.Position != input.Length) return false;
+                    }
+                    used.Add(new KeyValuePair<int, Type>(hash("itemData"), typeof(byte[])));
+                }
+                int quality = Get("quality", original?.Quality ?? 1), stack = Get("stack", original?.Stack ?? 1);
+                int variant = Get("variant", original?.Variant ?? 0), orientation = Get("type", 0);
+                int world = Get("worldLevel", original?.WorldLevel ?? defaultWorldLevel ?? -1);
+                long crafter = Get("crafterID", original?.CrafterId ?? 0);
+                string crafterName = Get("crafterName", original?.CrafterName ?? "");
+                bool pickedUp = Get("pickedUp", original?.PickedUp == true ? 1 : 0) != 0;
+                bool cheated = Get("cheated", original?.Cheated == true ? 1 : 0) != 0;
+                int durability = original?.DurabilityHundredths ?? 10000;
+                if (source.HasHash(hash("durability")))
+                {
+                    float saved = Get("durability", 100f) * 100f; // Native float multiply then conv.i4, NOT Round.
+                    if (saved < 0 || saved >= 2147483648f) return false;
+                    durability = (int)saved;
+                }
+                if (quality < 1 || quality > ushort.MaxValue || stack != 1 || variant < 0 || orientation < 0 ||
+                    world < 0 || world > byte.MaxValue || crafter == 0 && crafterName != "") return false;
+                var custom = new Dictionary<string, string>(StringComparer.Ordinal);
+                if (original != null) foreach (var pair in original.CustomData) custom.Add(pair.Key, pair.Value);
+                int count = Get("dataCount", 0);
+                if (count < 0 || count > 4096) return false;
+                var looseKeys = new HashSet<string>(StringComparer.Ordinal);
+                for (int index = 0; index < count; ++index)
+                {
+                    string suffix = index.ToString(CultureInfo.InvariantCulture);
+                    string key = Get("data_" + suffix, ""), value = Get("data__" + suffix, "");
+                    if (key == "") { if (value != "") return false; continue; }
+                    if (!looseKeys.Add(key)) return false;
+                    custom[key] = value;
+                }
+                if (custom.Count > 32767) return false;
+                using (var output = new MemoryStream())
+                using (var writer = new BinaryWriter(output, new UTF8Encoding(false, true)))
+                {
+                    writer.Write((byte)109); writer.Write(durability);
+                    writer.Write((byte)(original?.X ?? 0)); writer.Write((byte)(original?.Y ?? 0)); writer.Write((byte)world);
+                    int flags = 64 | (pickedUp ? 1 : 0) | (original?.Equipped == true ? 2 : 0) |
+                        (quality != 1 ? 4 : 0) | (variant != 0 ? 16 : 0) | (crafter != 0 ? 32 : 0) | (custom.Count != 0 ? 128 : 0);
+                    writer.Write((byte)flags);
+                    if (quality != 1) writer.Write((ushort)quality);
+                    if (variant != 0) writer.Write(variant);
+                    if (crafter != 0) { writer.Write(crafter); writer.Write(crafterName); }
+                    writer.Write(prefabId);
+                    if (custom.Count != 0)
+                    {
+                        if (custom.Count < 128) writer.Write((byte)custom.Count);
+                        else { writer.Write((byte)(128 | custom.Count >> 8)); writer.Write((byte)(custom.Count & 255)); }
+                        // Native ItemData.Save enumerates this map; preserve source order for exact inventory matching.
+                        foreach (var pair in custom)
+                        { writer.Write(pair.Key); writer.Write(pair.Value); }
+                    }
+                    writer.Write((byte)(cheated ? 1 : 0)); writer.Flush();
+                    var result = new BlueprintForeignPartData(BlueprintForeignPartData.NativeItemStandFormat,
+                        prefab + ":" + variant.ToString(CultureInfo.InvariantCulture) + ":" + quality.ToString(CultureInfo.InvariantCulture) +
+                        ":" + orientation.ToString(CultureInfo.InvariantCulture), Convert.ToBase64String(output.ToArray()), null);
+                    if (!TryRead(result, hash, out _)) return false;
+                    converted = result; consumed = used; return true;
+                }
+                T Get<T>(string name, T fallback)
+                {
+                    int key = hash(name);
+                    if (!source.HasHash(key)) return fallback;
+                    if (!source.TryGet<T>(key, out T value)) throw new InvalidDataException("Wrong legacy item field type.");
+                    used.Add(new KeyValuePair<int, Type>(key, typeof(T))); return value;
+                }
+            }
+            catch (Exception error) when (error is IOException || error is InvalidDataException || error is ArgumentException || error is FormatException)
+            { return false; }
+        }
+
         public static bool TryRead(BlueprintForeignPartData data, Func<string, int> prefabHash,
             out BlueprintContainerInventory.Item item)
         {

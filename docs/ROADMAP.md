@@ -9,7 +9,15 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.84**, not deployed: full shared-template world ghosts up to 50,000 parts,
+Active source checkpoint **0.19.85**, not deployed: bounded typed foreign-state conversion,
+full legacy mount snapshots and ZDO sign text, exact source binding and ordinary survival policy.
+Original admin/ownership/damage settings stay archived, never executed. Release/required checks,
+actual 353-file/133,738-packet audit, WorldLayout14 and Unity252 PASS; both reviews passed.
+113 plans have no foreign-state blockers before host dependencies/scale; this is not world proof.
+Appearance, headers, legacy inventories, armour/free items and placement choices remain open.
+TerrainRamp-1.0-Test stays .82; see HANDOFF. Full goal is not complete.
+
+Previous source checkpoint **0.19.84**, not deployed: full shared-template world ghosts up to 50,000 parts,
 intrinsic prefab-scale parity and faster composite socket clustering. Editor remains limited to 512.
 Release/required checks, WorldLayout14 and Unity252 PASS; independent correctness and ponytail reviews passed.
 No native world/FPS proof. Unsupported item effects fail closed; foreign ZDO/containers/armour/contents choices

@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using OstrixMods.BuildWorks.Geometry;
 using UnityEngine;
 
 namespace OstrixMods.BuildWorks
@@ -7,6 +10,35 @@ namespace OstrixMods.BuildWorks
     // changing the separate bounds pivot used by the world precision editor.
     internal static class BlueprintPlacementFrame
     {
+        internal static Point3[][] SnapLocalSets(CompositeBlueprintStore.Blueprint blueprint, IReadOnlyList<Piece> pieces)
+        {
+            var sets = new List<Point3>[blueprint.parts.Count];
+            foreach (CompositeBlueprintStore.VectorData point in blueprint.customSnapPoints ??
+                Enumerable.Empty<CompositeBlueprintStore.VectorData>())
+            {
+                Vector3 position = point.ToVector3();
+                int nearest = 0;
+                float distance = float.PositiveInfinity;
+                for (int index = 0; index < blueprint.parts.Count; ++index)
+                {
+                    float candidate = (position - blueprint.parts[index].position.ToVector3()).sqrMagnitude;
+                    if (candidate < distance) { nearest = index; distance = candidate; }
+                }
+                var part = blueprint.parts[nearest];
+                Vector3 unscaled = Quaternion.Inverse(part.rotation.ToQuaternion()) * (position - part.position.ToVector3());
+                Vector3 scale = Vector3.Scale(pieces[nearest].transform.localScale, part.scale.ToVector3());
+                if (!(scale.x > 0) || !(scale.y > 0) || !(scale.z > 0) ||
+                    float.IsInfinity(scale.x) || float.IsInfinity(scale.y) || float.IsInfinity(scale.z))
+                    throw new ArgumentException("Invalid native prefab scale for snap points.");
+                var local = new Point3(unscaled.x / scale.x, unscaled.y / scale.y, unscaled.z / scale.z);
+                (sets[nearest] ?? (sets[nearest] = new List<Point3>())).Add(local);
+            }
+            Point3[][] result = sets.Select(set => set?.ToArray()).ToArray();
+            foreach (Point3[] set in result)
+                if (set != null) BlueprintSnapPointCodec.Encode(set);
+            return result;
+        }
+
         internal static bool TryResolve(CompositeBlueprintStore.Blueprint blueprint,
             out Vector3 position, out Quaternion rotation)
         {

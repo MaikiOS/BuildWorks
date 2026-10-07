@@ -41,6 +41,7 @@ internal static class Program
             TestGridComposition();
             TestSignPayloadLifecycle();
             TestItemStandPayloadLifecycle();
+            TestCustomPointPayloadLifecycle();
             TestPivotLayoutComposition();
             TestPlacementSupportRootComposition();
             TestHistorySurvivesPivotFrameSwitch();
@@ -236,6 +237,22 @@ internal static class Program
         Require((bool)Get(session, "allowNativeGhostUpdate") && (int)Get(session, "placementPlanIndex") == 0,
             "Blocked repeat changed the pending mount stage");
         Console.WriteLine("PASS actual Session: repeated mounts retain immutable per-part payload; blocked native repeat leaves pending mount unchanged");
+    }
+
+    private static void TestCustomPointPayloadLifecycle()
+    {
+        object session = Session(2);
+        var points = new[] { new Point3(0.25, -0.5, 2) };
+        Set(session, "blueprintSnapLocalSets", new[] { points, null });
+        Require(Add(session, new Point3(0,0,0), Rotation(0,0,0,1)) &&
+            Add(session, new Point3(4,2,0), Rotation(0,0,1,0)), "Custom-point repeated root append failed");
+        IList plan = (IList)Get(session, "placementPlan");
+        for (int index = 0; index < plan.Count; ++index)
+            Require(index % 2 == 0
+                ? ReferenceEquals(Property(plan[index], "CustomSnapPoints"), points)
+                : Property(plan[index], "CustomSnapPoints") == null,
+                "Custom piece-local points were lost or assigned to another repeated part");
+        Console.WriteLine("PASS actual Session: custom piece-local snap payload follows the owning part across differently rotated repeated roots");
     }
 
     private static void TestRotatedRoots()

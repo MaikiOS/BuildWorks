@@ -9,7 +9,12 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.82**, installed only in TerrainRamp-1.0-Test: TMP control-escape parsing
+Active source checkpoint **0.19.83**, not deployed: native world custom-point persistence and known
+foreign ItemStand recipe conversion. Release/required checks and Unity252 PASS; WorldLayout14
+includes repeated custom-point ownership. Independent reviews passed. Real Valheim persistence
+and the remaining heavy/foreign-state/contents/lamp goals are not claimed complete. See HANDOFF.
+
+Previous checkpoint **0.19.82**, installed only in TerrainRamp-1.0-Test: TMP control-escape parsing
 disabled for literal Windows paths; compact folder display and expanded Edit path field replace clipping.
 The owner's .81 screenshot exposed a missed regression: \\nfspr and \\test-fixtures became LF/TAB.
 Release/HostContract/Localization846/world-layout/deployment guards and Unity252 PASS; Russian collapsed/

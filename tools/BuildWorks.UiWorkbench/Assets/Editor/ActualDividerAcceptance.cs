@@ -69,6 +69,7 @@ public static class ActualDividerAcceptance
                 placementPrefabs[prefabName] = prefab;
                 RecordPlacementMetadata(prefab, evidence);
             }
+            DiagnoseLantern(LoadPrefab("piece_dvergr_lantern"), evidence);
             EditorInteractionAcceptance.Run(outputDirectory, divider, wall);
             probe = PlacementGhostPreviewView.CreateVisualClone(divider, "ExactDividerVisualProbe", 0);
             probe.transform.localScale = divider.transform.lossyScale;
@@ -215,6 +216,26 @@ public static class ActualDividerAcceptance
             foreach (AssetBundle bundle in loaded) if (bundle) bundle.Unload(true);
             File.WriteAllLines(Path.Combine(outputDirectory, "actual-divider-check.txt"), evidence);
         }
+    }
+
+    private static void DiagnoseLantern(GameObject prefab, ICollection<string> evidence)
+    {
+        GameObject clone = PlacementGhostPreviewView.CreateVisualClone(prefab, "LanternScaleProbe", 0);
+        try
+        {
+            clone.transform.localScale = prefab.transform.localScale;
+            evidence.Add("LANTERN root local=" + prefab.transform.localScale.ToString("R") +
+                "; lossy=" + prefab.transform.lossyScale.ToString("R"));
+            foreach (MeshFilter filter in prefab.GetComponentsInChildren<MeshFilter>(true))
+                if (filter.sharedMesh)
+                    evidence.Add("LANTERN native " + filter.name + "; active=" + filter.gameObject.activeInHierarchy +
+                        "; matrix=" + (prefab.transform.worldToLocalMatrix * filter.transform.localToWorldMatrix).ToString("R") +
+                        "; bounds=" + filter.sharedMesh.bounds);
+            foreach (Renderer renderer in clone.GetComponentsInChildren<Renderer>(true))
+                evidence.Add("LANTERN clone " + renderer.name + "; active=" + renderer.gameObject.activeInHierarchy +
+                    "; enabled=" + renderer.enabled + "; bounds=" + renderer.bounds);
+        }
+        finally { Object.DestroyImmediate(clone); }
     }
 
     private static Dictionary<string, List<string>> Dependencies()

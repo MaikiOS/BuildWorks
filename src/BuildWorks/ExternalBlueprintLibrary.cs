@@ -263,6 +263,17 @@ namespace OstrixMods.BuildWorks
                         CompositeBlueprintStore.ForeignPartData foreign = info == null && zdo == null && chance == null ? null :
                             CompositeBlueprintStore.ForeignPartData.FromGeometry(new Geometry.BlueprintForeignPartData(
                                 vbuild ? "vbuild" : "blueprint", info, zdo, chance));
+                        if (!vbuild && (prefab == "itemstand" || prefab == "itemstandh") && info != null && zdo == null && chance == null)
+                        {
+                            try
+                            {
+                                foreign = CompositeBlueprintStore.ForeignPartData.FromGeometry(new Geometry.BlueprintForeignPartData(
+                                    Geometry.BlueprintForeignPartData.NativeItemStandFormat,
+                                    BlueprintExchangeFormat.DecodeSignText(info), null, null));
+                            }
+                            catch (Exception error) when (error is ArgumentException || error is InvalidDataException)
+                            { /* Unknown holder dialect remains inert, with its exact original row retained. */ }
+                        }
                         if (prefab.Length == 0 || prefab.Length > 128 || prefab.Any(c => char.IsControl(c) || c == '/' || c == '\\'))
                             throw new InvalidDataException("$buildworks_import.fields");
                         int p = vbuild ? 5 : 2, q = vbuild ? 1 : 5;

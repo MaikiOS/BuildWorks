@@ -47,6 +47,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Run("Screen edge selection is perspective correct", ScreenEdgeSelectionIsPerspectiveCorrect);
             Run("Composite snap points exclude internal joins", CompositeSnapPointsExcludeInternalJoins);
             Run("Composite snap points keep same-part neighbors", CompositeSnapPointsKeepSamePartNeighbors);
+            Run("World snap-point packages are bounded, exact and reject corrupt coordinates", WorldSnapPointPackages);
             Run("Straight repeat uses exact step", StraightRepeatUsesExactStep);
             Run("Connected ring starts at selected support", ConnectedRingStartsAtSelectedSupport);
             Run("Concave ring follows graph neighbors", ConcaveRingFollowsGraphNeighbors);
@@ -2749,6 +2750,25 @@ namespace OstrixMods.BuildWorks.GeometryTests
             {
                 throw new InvalidOperationException($"Expected {expected}, got {actual}.");
             }
+        }
+
+        private static void WorldSnapPointPackages()
+        {
+            var expected = new[] { new Point3(-2, 0, 3.5), new Point3(0.125, -100, 512) };
+            byte[] bytes = BlueprintSnapPointCodec.Encode(expected);
+            Point3[] actual = BlueprintSnapPointCodec.Decode(bytes);
+            Equal(expected.Length, actual.Length);
+            for (int index = 0; index < actual.Length; ++index) Near(expected[index], actual[index]);
+            Equal(0, BlueprintSnapPointCodec.Decode(BlueprintSnapPointCodec.Encode(Array.Empty<Point3>())).Length);
+            Throws<ArgumentException>(() => BlueprintSnapPointCodec.Decode(bytes.Take(bytes.Length - 1).ToArray()));
+            Throws<ArgumentException>(() => BlueprintSnapPointCodec.Decode(bytes.Concat(new byte[] { 0 }).ToArray()));
+            byte[] invalid = (byte[])bytes.Clone(); invalid[0] = 0;
+            Throws<ArgumentException>(() => BlueprintSnapPointCodec.Decode(invalid));
+            Throws<ArgumentException>(() => BlueprintSnapPointCodec.Encode(new Point3[513]));
+            Throws<ArgumentException>(() => BlueprintSnapPointCodec.Encode(new[] { new Point3(double.NaN, 0, 0) }));
+            invalid = (byte[])bytes.Clone();
+            Array.Copy(BitConverter.GetBytes(float.PositiveInfinity), 0, invalid, 8, 4);
+            Throws<ArgumentException>(() => BlueprintSnapPointCodec.Decode(invalid));
         }
 
         private static void Throws<T>(Action action) where T : Exception

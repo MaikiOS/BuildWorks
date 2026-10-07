@@ -40,11 +40,16 @@ $runtimeSources = Join-Path $projectPath 'Assets\Editor\RuntimeSources'
 New-Item -ItemType Directory -Path $runtimeSources -Force | Out-Null
 $runtimeFiles = @('BlueprintEditorView.cs', 'BlueprintEditorCatalogView.cs', 'BlueprintEditorSkin.cs', 'BlueprintEditorInput.cs', 'BlueprintEditorController.cs',
     'BlueprintEditorScene.cs', 'BlueprintEditorMeshData.cs', 'BlueprintEditorIconLibrary.cs',
-    'TransformGizmoView.cs', 'PlacementGhostPreviewView.cs', 'BlueprintItemStandPreview.cs', 'BlueprintItemStandCapture.cs', 'BlueprintItemStandPlacement.cs', 'BlueprintStorageCapture.cs', 'BlueprintThumbnailRenderer.cs', 'BlueprintPlacementFrame.cs', 'CompositeBlueprintStore.cs', 'ExternalBlueprintLibrary.cs', 'BlueprintExchangeFormat.cs',
+    'TransformGizmoView.cs', 'PlacementGhostPreviewView.cs', 'BlueprintWorldSnapPoints.cs', 'BlueprintItemStandPreview.cs', 'BlueprintItemStandCapture.cs', 'BlueprintItemStandPlacement.cs', 'BlueprintStorageCapture.cs', 'BlueprintThumbnailRenderer.cs', 'BlueprintPlacementFrame.cs', 'CompositeBlueprintStore.cs', 'ExternalBlueprintLibrary.cs', 'BlueprintExchangeFormat.cs',
     'PrecisionPlacementHudView.cs', 'BlueprintResourceHudView.cs', 'WorldSelectionHighlight.cs', 'BuildWorksPlacementValidation.cs', 'BlueprintSignText.cs', 'BlueprintExchangeView.cs')
 $sourceProof = foreach ($name in $runtimeFiles) {
     $source = Join-Path $repositoryRoot ('src\BuildWorks\' + $name)
     $destination = Join-Path $runtimeSources $name
+    if ($name -eq 'BlueprintWorldSnapPoints.cs') {
+        # MonoBehaviour belongs to the runtime assembly, not Assembly-CSharp-Editor.
+        if (Test-Path -LiteralPath $destination -PathType Leaf) { Remove-Item -LiteralPath $destination }
+        $destination = Join-Path $projectPath 'Assets\RuntimeHost\BlueprintWorldSnapPoints.cs'
+    }
     Copy-Item -LiteralPath $source -Destination $destination -Force
     $hash = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash
     if ($hash -ne (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash) {

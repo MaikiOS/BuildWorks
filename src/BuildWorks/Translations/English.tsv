@@ -748,7 +748,7 @@ import.chance	Random piece placement is unsupported (line {0}).
 import.transform	Invalid/out-of-range transform or scale (line {0}).
 import.part_limit	A blueprint file must contain 2–50000 pieces. Nothing is truncated.
 import.interactive_limit	This construction is preserved, but exceeds the current interactive preview budget ({0}). Large-scene rendering is not ready yet.
-import.payload_pending	Custom sockets are preserved in the document. Their persistent world integration is not ready; placement is blocked rather than losing them.
+import.payload_pending	Custom points cannot be persisted safely on the native pieces. Check piece scale, point count and network components. Placement stopped before construction; the document and original source are preserved.
 import.foreign_pending	This object state or opaque source section has no supported world adapter. The original is preserved; editing/save/export remain available. Native item stands have a separate checked placement path.
 placement.mount_unavailable	Attachment paused: supply the matching inventory item, check ward access and ownership, then Enter. Full snapshots require exact native item data, including inventory position; recipes require prefab, quality and variant. Esc cancels.
 placement.mount_uncertain	Native attachment did not confirm the expected item and consumption. It will not be retried. Esc cancels safe parts; any uncertain holder stays for manual inspection.

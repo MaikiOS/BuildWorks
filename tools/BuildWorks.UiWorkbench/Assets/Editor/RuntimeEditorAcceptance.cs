@@ -480,6 +480,7 @@ public static class RuntimeEditorAcceptance
                 TestGizmoHits(template);
                 TestModelSpaceGizmo(template);
                 TestExperimentalGeometry(template, fontTemplate);
+                WorldSnapPointAcceptance.Run(output);
                 TestFurnitureCornersAndCursorIntent(template, output);
                 controller.Close(true);
                 Require(controller.OpenNew(out error), "Reopen: " + error);

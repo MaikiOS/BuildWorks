@@ -2,6 +2,23 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.83 — world custom snaps and foreign mount recipes; source verified
+
+Custom snaps now follow native placement in piece-local coordinates, persist in an owned piece ZDO
+under a bounded BuildWorks-only key, and reconstruct for readers. Scale, packet limits and
+network-bearing source pieces are validated before construction. Capture preserves these snaps
+and refuses corrupted packages rather than silently discarding them. Info-only itemstand/itemstandh
+recipes convert to the existing native inventory-spending adapter; unknown ZDO/chance/armour state
+remains inert. The exact foreign source is retained.
+
+Release, Geometry, Store, HostContract, Localization846, EditorBridge, WorldLayout14, deployment
+guards and Unity252 PASS. Isolated snap tests cover rotation, XYZ scale, byte reload/replica,
+duplicates, invalid packets and owner refusal. Independent correctness and ponytail reviews passed.
+The verify helper is unavailable. This is NOT completion: >512 scenes, foreign ZDO, containers/armour,
+placement-time contents choices and the giant-lamp live-host discrepancy remain open.
+The native unit-scale lantern asset has normal bounds; this does not reproduce the owner's host.
+Not deployed: TerrainRamp-1.0-Test remains .82. No Valheim launch, save changes or push.
+
 ## Checkpoint 0.19.82 — literal Windows paths and compact folder display; test-deployed
 
 The owner's .81 screenshot disproved its path-rendering claim. TMP interpreted the literal

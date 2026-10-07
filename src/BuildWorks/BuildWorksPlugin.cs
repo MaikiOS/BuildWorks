@@ -210,6 +210,7 @@ namespace OstrixMods.BuildWorks
             HammerCatalogView.Clear();
             HammerCatalogOrganizer.Reset();
             VanillaMidpointSnapPoints.RemoveAll();
+            BlueprintWorldSnapPoints.RemoveAll();
             PrecisionPlacementSession.RestoreNativePieceScale();
             harmony?.UnpatchSelf();
             harmony = null;
@@ -1039,6 +1040,7 @@ namespace OstrixMods.BuildWorks
             private static void Postfix(Piece __instance, List<Transform> points)
             {
                 VanillaMidpointSnapPoints.Append(__instance, points);
+                BlueprintWorldSnapPoints.Append(__instance, points);
             }
         }
 

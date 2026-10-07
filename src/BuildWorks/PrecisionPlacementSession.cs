@@ -61,7 +61,10 @@ namespace OstrixMods.BuildWorks
                 view.SetLocalScale(Vector3.Scale(source.transform.localScale, scale));
             }
             if (sessionMode == SessionMode.BlueprintWorldPlacement)
+            {
+                BlueprintWorldSnapPoints.Apply(placed, placementPlan[placementPlanIndex].CustomSnapPoints);
                 currentBlueprintPlacements.Add(placed);
+            }
             pendingNativePiece = placed;
             pendingNativePlanIndex = placementPlanIndex;
         }
@@ -107,13 +110,14 @@ namespace OstrixMods.BuildWorks
         internal readonly struct TransformSnapshot
         {
             public TransformSnapshot(Vector3 position, Quaternion rotation, Vector3? scale = null, string signText = null,
-                BlueprintForeignPartData itemStandContents = null)
+                BlueprintForeignPartData itemStandContents = null, Point3[] customSnapPoints = null)
             {
                 Position = position;
                 Rotation = rotation;
                 Scale = scale ?? Vector3.one;
                 SignText = signText;
                 ItemStandContents = itemStandContents;
+                CustomSnapPoints = customSnapPoints;
             }
 
             public Vector3 Position { get; }
@@ -121,6 +125,7 @@ namespace OstrixMods.BuildWorks
             public Vector3 Scale { get; }
             public string SignText { get; }
             public BlueprintForeignPartData ItemStandContents { get; }
+            public Point3[] CustomSnapPoints { get; }
         }
 
         private readonly struct SnapEdge
@@ -409,6 +414,7 @@ namespace OstrixMods.BuildWorks
         private float automaticPreviousLastToolUseTime;
         private int suppressPlacementFrame = -1;
         private readonly List<TransformSnapshot> placementPlan = new List<TransformSnapshot>();
+        private Point3[][] blueprintSnapLocalSets;
         private readonly List<Piece> placementPlanPieces = new List<Piece>();
         private GameObject pendingNativePiece;
         private int pendingNativePlanIndex = -1;
@@ -4579,6 +4585,8 @@ namespace OstrixMods.BuildWorks
             }
             if (activeBlueprintPieces.Count != activeBlueprint.parts.Count)
                 return false;
+            if (blueprintSnapLocalSets == null)
+                blueprintSnapLocalSets = BlueprintPlacementFrame.SnapLocalSets(activeBlueprint, activeBlueprintPieces);
             if (placementPlan.Count + activeBlueprint.parts.Count > MaximumExpandedPlacements)
             {
                 expandedPlanLimited = true;
@@ -4594,7 +4602,7 @@ namespace OstrixMods.BuildWorks
                     rotation * localRotation,
                     ToUnity(BlueprintEditorPart.NormalizeScale(
                         ToGeometry(part.scale.ToVector3()) * uniformScale, nameof(uniformScale))), part.signText,
-                    part.foreignData?.ToGeometry()));
+                    part.foreignData?.ToGeometry(), blueprintSnapLocalSets[index]));
                 placementPlanPieces.Add(activeBlueprintPieces[index]);
             }
             return true;
@@ -4689,6 +4697,7 @@ namespace OstrixMods.BuildWorks
             Vector3 origin = blueprintSelection[0].transform.position;
             var parts = new List<CompositeBlueprintStore.Part>(blueprintSelection.Count);
             var snapSets = new List<IReadOnlyList<Point3>>(blueprintSelection.Count);
+            var customPoints = new List<CompositeBlueprintStore.VectorData>();
             long capturedStateBytes = 0;
             foreach (Piece piece in blueprintSelection)
             {
@@ -4748,6 +4757,16 @@ namespace OstrixMods.BuildWorks
                     signText = signText,
                     foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(storedItems ?? contents)
                 });
+                if (!BlueprintWorldSnapPoints.TryRead(piece, out Point3[] customLocal))
+                { error = BuildWorksLocalization.Text("import.payload_pending"); return false; }
+                foreach (Point3 point in customLocal)
+                {
+                    Vector3 local = inverse * (piece.transform.TransformPoint(ToUnity(point)) - origin);
+                    if (customPoints.Any(existing => (existing.ToVector3() - local).sqrMagnitude < 0.00000001f)) continue;
+                    if (customPoints.Count >= OstrixMods.BuildWorks.Geometry.BlueprintSnapPointCodec.MaximumPoints)
+                    { error = BuildWorksLocalization.Text("import.payload_pending"); return false; }
+                    customPoints.Add(new CompositeBlueprintStore.VectorData(local));
+                }
                 var points = new List<Transform>();
                 piece.GetSnapPoints(points);
                 var localPoints = new List<Point3>(points.Count);
@@ -4761,13 +4780,16 @@ namespace OstrixMods.BuildWorks
                 if (anchors.Count >= MaximumBlueprintSourceNativeSnapPoints) break;
                 anchors.Add(new CompositeBlueprintStore.VectorData(ToUnity(point)));
             }
-            return blueprintStore.TrySave(
+            return blueprintStore.TrySaveDocument(
                 BuildWorksLocalization.Text(
                     "blueprint.default_name", blueprintStore.All().Count + 1),
+                CompositeBlueprintStore.DefaultCategory,
                 parts,
+                Array.Empty<CompositeBlueprintStore.Group>(),
                 anchors,
+                null, null,
                 out saved,
-                out error);
+                out error, customPoints);
         }
 
         internal static Vector3 RelativeBlueprintScale(Vector3 worldScale, Vector3 sourceScale) =>
@@ -4964,6 +4986,7 @@ namespace OstrixMods.BuildWorks
                 return;
             part.position = new CompositeBlueprintStore.VectorData(localPosition);
             part.rotation = new CompositeBlueprintStore.QuaternionData(localRotation);
+            blueprintSnapLocalSets = null;
             blueprintPartsDirty = true;
         }
 
@@ -5098,12 +5121,16 @@ namespace OstrixMods.BuildWorks
             { missingPrefab = BuildWorksLocalization.Text("import.foreign_pending"); return false; }
             if (CompositeBlueprintStore.InteractiveError(blueprint.parts.Count) is string budgetError)
             { missingPrefab = BuildWorksLocalization.ResolveUserText(budgetError); return false; }
-            if (!forEditor && blueprint.customSnapPoints?.Count > 0)
-            { missingPrefab = BuildWorksLocalization.Text("import.payload_pending"); return false; }
             var unavailable = new HashSet<string>(StringComparer.Ordinal);
+            var resolved = new Dictionary<string, Piece>(StringComparer.Ordinal);
             foreach (CompositeBlueprintStore.Part part in blueprint.parts)
             {
-                if (!TryResolveBuildPiece(player, part.prefabName, out Piece piece) ||
+                if (!resolved.TryGetValue(part.prefabName, out Piece piece))
+                {
+                    TryResolveBuildPiece(player, part.prefabName, out piece);
+                    resolved[part.prefabName] = piece;
+                }
+                if (!piece ||
                     !SupportsBlueprintWorkspacePiece(piece) || !CompositeBlueprintStore.ValidScale(part.scale))
                 {
                     unavailable.Add(part.prefabName);
@@ -5129,11 +5156,24 @@ namespace OstrixMods.BuildWorks
                 pieces.Add(piece);
             }
             missingPrefab = string.Join(", ", unavailable.OrderBy(x => x, StringComparer.Ordinal));
+            if (!forEditor && unavailable.Count == 0 && blueprint.customSnapPoints?.Count > 0)
+            {
+                try
+                {
+                    Point3[][] sets = BlueprintPlacementFrame.SnapLocalSets(blueprint, pieces);
+                    for (int index = 0; index < sets.Length; ++index)
+                        if (sets[index] != null && !pieces[index].GetComponent<ZNetView>())
+                            throw new ArgumentException("Native piece has no persistent network state.");
+                }
+                catch (ArgumentException)
+                { missingPrefab = BuildWorksLocalization.Text("import.payload_pending"); return false; }
+            }
             return unavailable.Count == 0 && pieces.Count >= 2;
         }
 
         private bool ApplyBlueprintAnchors()
         {
+            blueprintSnapLocalSets = null;
             if (activeBlueprint == null ||
                 activeBlueprintPieces.Count != activeBlueprint.parts.Count)
                 return false;
@@ -5201,6 +5241,9 @@ namespace OstrixMods.BuildWorks
             for (int index = 0; index < externalSnaps.Count &&
                 index < MaximumBlueprintSourceNativeSnapPoints; ++index)
                 points.Add(ToUnity(externalSnaps[index]) - blueprintPivotLocal);
+            foreach (CompositeBlueprintStore.VectorData point in activeBlueprint.customSnapPoints ??
+                Enumerable.Empty<CompositeBlueprintStore.VectorData>())
+                points.Add(point.ToVector3() - blueprintPivotLocal);
             anchorLocalPoints = points.ToArray();
             anchorWorldPoints = new Vector3[anchorLocalPoints.Length];
             anchorBoundsAvailable = true;
@@ -6489,6 +6532,7 @@ namespace OstrixMods.BuildWorks
             placementGhost = null;
             selectedPiece = null;
             activeBlueprint = null;
+            blueprintSnapLocalSets = null;
             activeBlueprintPieces.Clear();
             currentBlueprintPlacements.Clear();
             pendingItemStandPiece = null;

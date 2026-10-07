@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Globalization;
 using System.Reflection;
 using System.Text;
@@ -491,6 +492,10 @@ namespace OstrixMods.BuildWorks
                 foreach (Vector3 point in nativeSnapPoints)
                     AddSnapPoint(prefab.transform, snapIndex++, BlueprintPlacementFrame.ToLocal(
                         point, placementOrigin, placementRotation));
+                foreach (CompositeBlueprintStore.VectorData point in blueprint.customSnapPoints ??
+                    Enumerable.Empty<CompositeBlueprintStore.VectorData>())
+                    AddSnapPoint(prefab.transform, snapIndex++, BlueprintPlacementFrame.ToLocal(
+                        point.ToVector3(), placementOrigin, placementRotation));
             }
             else if (supportFrame)
                 BlueprintPlacementFrame.RebaseVisuals(prefab.transform, default,

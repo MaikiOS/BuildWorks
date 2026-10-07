@@ -819,7 +819,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.82.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.83.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -2431,6 +2431,21 @@ $midpointPatchOperands = @(
 ) -join "`n"
 Assert-Contract ($midpointPatchOperands -match 'VanillaMidpointSnapPoints::Append') `
     'Piece.GetSnapPoints patch no longer appends vanilla midpoint snaps.'
+Assert-Contract ($midpointPatchOperands -match 'BlueprintWorldSnapPoints::Append' -and
+    $pluginOnDestroyOperands -match 'BlueprintWorldSnapPoints::RemoveAll') `
+    'World custom snap-point reconstruction or unload cleanup is missing.'
+$worldSnapType = $pluginTypes | Where-Object Name -eq 'BlueprintWorldSnapPoints'
+$worldSnapApply = $worldSnapType.Methods | Where-Object Name -eq 'Apply'
+$worldSnapApplyOperands = @(
+    $worldSnapApply.Body.Instructions | ForEach-Object { [string]$_.Operand }
+) -join "`n"
+Assert-Contract ($worldSnapApplyOperands -match 'ZNetView::IsOwner' -and
+    $worldSnapApplyOperands -match 'ZDO::Set' -and
+    $worldSnapApplyOperands -notmatch 'ClaimOwnership') `
+    'Custom snap persistence must require ownership without claiming another player piece.'
+$snapNativeApply = $pluginMethods | Where-Object Name -eq 'ApplyNativePlacementScale'
+Assert-Contract ((@($snapNativeApply.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n") -match
+    'BlueprintWorldSnapPoints::Apply') 'Native placement no longer persists the approved custom snap payload.'
 $showSnapCandidates = $pluginMethods | Where-Object {
     $_.Name -eq 'ShowSnapCandidates' -and
     $_.DeclaringType.Name -eq 'TransformGizmoView'
@@ -3021,4 +3036,4 @@ $worldCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'Preci
 $worldCaptureCalls = ($worldCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($worldCaptureCalls -match 'BlueprintStorageCapture::TryCapture' -and $worldCaptureCalls -match 'CompositeBlueprintStore/ForeignPartData::FromGeometry') 'World selection does not preserve container snapshots.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.82 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.83 and Valheim Steam build 25185596.'

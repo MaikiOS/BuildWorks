@@ -2,6 +2,21 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.88 — incomplete foreign blueprints and honest scale; source only
+
+[Protocol and limits](docs/testing/missing-model-0.19.88.md).
+Store15/JSON6 per-part scaleIsAbsolute retains missing records without inventing intrinsic1. Actual
+editor open/edit/save/reopen/export preserves source/basis; late prefab normalization happens once on
+explicit reopen, keeping original native write identity. World rejects pending basis before queue mutation.
+Constant .3 markers are selection/camera aids, never geometry corners/contact/automatic packing bounds.
+Gesture/inspector limits respect absolute basis and reject Infinity. Scene placeholders pre-existed;
+the overbroad audit claim about all missing editor entries is corrected. Mod lists/metadata/1→N remain open.
+Release/Geometry/Store353/Localization852/bridge/WorldLayout15/API/deploy guards/format and Unity252 PASS;
+independent correctness/ponytail review findings addressed. verify absent. Evidence:
+artifacts/checkpoint-0.19.88/verification.json. Installed .82; no deployment/game/save/reload/network/push.
+Prepared safe survival stand still absent: SaveSystem caches/cloud prevent assuming late SetSaveDataPath
+is isolated. Full goal remains active.
+
 ## .87 addition — two real external files; tests only
 
 [Protocol and limits](docs/testing/external-path-2026-10-07.md).

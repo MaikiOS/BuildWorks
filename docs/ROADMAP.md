@@ -9,7 +9,13 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.87**, not deployed: ordinary/native-holder/passive/heavy world mounts show
+Active source checkpoint **0.19.88**, not deployed: [incomplete foreign blueprints](testing/missing-model-0.19.88.md)
+retain missing records/absolute scale basis; actual editor open/edit/save preserves them without invented
+dimensions. Late model resolution divides once on reopen. Store15/JSON6; world pending-basis rejection is atomic.
+Release/required checks/Unity252 and independent reviews passed. Missing-mod cards/metadata/1→N, heavy editor
+and full import/build/reload remain open. Installed .82.
+
+Previous source checkpoint **0.19.87**, not deployed: ordinary/native-holder/passive/heavy world mounts show
 the supplied item's own quality/variant. Confirmation binds own reference/native packet; disappearance or mutation,
 including native recipe consumption, pauses attachment without fallback. Archive/editor/thumbnails unchanged.
 See [current audit](continuation-audit-2026-10-07.md) and HANDOFF for evidence and limitations. Installed remains .82;

@@ -586,16 +586,16 @@ namespace OstrixMods.BuildWorks
 
         internal GameObject ResolveBlueprintEditorVisual(string prefabName)
         {
-            return TryResolveBuildPiece(
-                Player.m_localPlayer, prefabName, out Piece piece)
-                ? piece.gameObject
-                : null;
+            GameObject prefab = ZNetScene.instance ? ZNetScene.instance.GetPrefab(prefabName) : null;
+            Piece piece = prefab ? prefab.GetComponent<Piece>() : null;
+            return piece && SupportsBlueprintWorkspacePiece(piece) ? prefab : null;
         }
 
         internal string ResolveBlueprintEditorName(string prefabName)
         {
-            if (!TryResolveBuildPiece(
-                Player.m_localPlayer, prefabName, out Piece piece)) return prefabName;
+            GameObject prefab = ResolveBlueprintEditorVisual(prefabName);
+            Piece piece = prefab ? prefab.GetComponent<Piece>() : null;
+            if (!piece) return prefabName;
             string name = piece.m_name;
             return Localization.instance != null && !string.IsNullOrWhiteSpace(name)
                 ? Localization.instance.Localize(name)
@@ -4623,7 +4623,14 @@ namespace OstrixMods.BuildWorks
                     BlueprintEditorPart.NormalizeScale(new Point3(uniformScale, uniformScale, uniformScale), nameof(uniformScale));
                 else
                     foreach (CompositeBlueprintStore.Part part in activeBlueprint.parts)
+                    {
+                        if (part.scaleIsAbsolute)
+                        {
+                            repeatPlanError = BuildWorksLocalization.Text("import.scale_missing", part.prefabName);
+                            return false;
+                        }
                         BlueprintEditorPart.NormalizeScale(ToGeometry(part.scale.ToVector3()) * uniformScale, nameof(uniformScale));
+                    }
             }
             catch (ArgumentOutOfRangeException)
             {
@@ -5178,6 +5185,11 @@ namespace OstrixMods.BuildWorks
             var resolved = new Dictionary<string, Piece>(StringComparer.Ordinal);
             foreach (CompositeBlueprintStore.Part part in blueprint.parts)
             {
+                if (part.scaleIsAbsolute)
+                {
+                    unavailable.Add(BuildWorksLocalization.Text("import.scale_missing", part.prefabName));
+                    continue;
+                }
                 if (!resolved.TryGetValue(part.prefabName, out Piece piece))
                 {
                     TryResolveBuildPiece(player, part.prefabName, out piece);

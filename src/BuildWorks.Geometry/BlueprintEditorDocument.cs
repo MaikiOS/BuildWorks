@@ -19,7 +19,8 @@ namespace OstrixMods.BuildWorks.Geometry
             string signText = null,
             string sourceDocumentId = null,
             int sourceLine = 0,
-            BlueprintForeignPartData foreignData = null)
+            BlueprintForeignPartData foreignData = null,
+            bool scaleIsAbsolute = false)
         {
             StableId = Required(stableId, nameof(stableId));
             PrefabName = Required(prefabName, nameof(prefabName));
@@ -27,7 +28,8 @@ namespace OstrixMods.BuildWorks.Geometry
             Validate(position, nameof(position));
             Position = position;
             Rotation = rotation.Normalized();
-            Scale = NormalizeScale(scale ?? new Point3(1.0, 1.0, 1.0), nameof(scale));
+            ScaleIsAbsolute = scaleIsAbsolute;
+            Scale = NormalizeScale(scale ?? new Point3(1.0, 1.0, 1.0), nameof(scale), scaleIsAbsolute);
             ParentGroupId = parentGroupId;
             Visible = visible;
             Locked = locked;
@@ -47,6 +49,7 @@ namespace OstrixMods.BuildWorks.Geometry
         public Point3 Position { get; internal set; }
         public Rotation3 Rotation { get; internal set; }
         public Point3 Scale { get; internal set; }
+        public bool ScaleIsAbsolute { get; }
         public string ParentGroupId { get; internal set; }
         public bool Visible { get; internal set; }
         public bool Locked { get; internal set; }
@@ -73,7 +76,7 @@ namespace OstrixMods.BuildWorks.Geometry
             Visible,
             Locked,
             Scale,
-            SignText, SourceDocumentId, SourceLine, ForeignData);
+            SignText, SourceDocumentId, SourceLine, ForeignData, ScaleIsAbsolute);
 
         internal static string Required(string value, string name)
         {
@@ -101,8 +104,16 @@ namespace OstrixMods.BuildWorks.Geometry
                 throw new ArgumentOutOfRangeException(name);
         }
 
-        public static Point3 NormalizeScale(Point3 value, string name)
+        public static Point3 NormalizeScale(Point3 value, string name, bool absolute = false)
         {
+            if (absolute)
+            {
+                Validate(value, name);
+                if (value.X < float.Epsilon || value.Y < float.Epsilon || value.Z < float.Epsilon ||
+                    value.X > float.MaxValue || value.Y > float.MaxValue || value.Z > float.MaxValue)
+                    throw new ArgumentOutOfRangeException(name);
+                return value;
+            }
             var normalized = new Point3(
                 NormalizeScaleBoundary(value.X),
                 NormalizeScaleBoundary(value.Y),
@@ -559,7 +570,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 displayName, nameof(displayName));
             BlueprintEditorPart.Validate(position, nameof(position));
             Rotation3 normalizedRotation = rotation.Normalized();
-            Point3 normalizedScale = BlueprintEditorPart.NormalizeScale(scale ?? part.Scale, nameof(scale));
+            Point3 normalizedScale = BlueprintEditorPart.NormalizeScale(scale ?? part.Scale, nameof(scale), part.ScaleIsAbsolute);
             return Commit(() =>
             {
                 part.DisplayName = normalizedName;
@@ -836,7 +847,7 @@ namespace OstrixMods.BuildWorks.Geometry
                         delta.Rotate((part.Position - pivot) * uniformScale) + translation;
                     part.Rotation = Multiply(delta, part.Rotation).Normalized();
                     part.Scale = BlueprintEditorPart.NormalizeScale(
-                        part.Scale * uniformScale, nameof(uniformScale));
+                        part.Scale * uniformScale, nameof(uniformScale), part.ScaleIsAbsolute);
                 }
             });
         }
@@ -897,7 +908,7 @@ namespace OstrixMods.BuildWorks.Geometry
                     parentId,
                     part.Visible,
                     part.Locked,
-                    part.Scale, part.SignText, part.SourceDocumentId, part.SourceLine, part.ForeignData));
+                    part.Scale, part.SignText, part.SourceDocumentId, part.SourceLine, part.ForeignData, part.ScaleIsAbsolute));
                 if (rootIds.Contains(part.StableId)) copiedRoots.Add(copyId);
             }
             return Commit(() =>
@@ -942,7 +953,7 @@ namespace OstrixMods.BuildWorks.Geometry
                     part.PrefabName, part.DisplayName, position + orientation.Rotate(part.Position),
                     Multiply(orientation, part.Rotation).Normalized(),
                     part.ParentGroupId == null ? rootId : groupIds[part.ParentGroupId],
-                    part.Visible, part.Locked, part.Scale, part.SignText, part.SourceDocumentId, part.SourceLine, part.ForeignData));
+                    part.Visible, part.Locked, part.Scale, part.SignText, part.SourceDocumentId, part.SourceLine, part.ForeignData, part.ScaleIsAbsolute));
             return Commit(() =>
             {
                 groups.AddRange(newGroups);
@@ -1233,14 +1244,14 @@ namespace OstrixMods.BuildWorks.Geometry
                     foreach (BlueprintEditorPart source in sources)
                     {
                         Point3 copyScale = BlueprintEditorPart.NormalizeScale(
-                            source.Scale * sample.UniformScale, nameof(scaleStep));
+                            source.Scale * sample.UniformScale, nameof(scaleStep), source.ScaleIsAbsolute);
                         copies.Add(new BlueprintEditorPart(
                             Guid.NewGuid().ToString("N"), source.PrefabName,
                             source.DisplayName + " " + copyLabel + " " + (x + 1) + ":" + (y + 1),
                             sample.Position + stepY * logicalY +
                                 turn.Rotate((source.Position - pivot) * sample.UniformScale),
                             Multiply(turn, source.Rotation).Normalized(), source.ParentGroupId,
-                            source.Visible, source.Locked, copyScale, source.SignText, source.SourceDocumentId, source.SourceLine, source.ForeignData));
+                            source.Visible, source.Locked, copyScale, source.SignText, source.SourceDocumentId, source.SourceLine, source.ForeignData, source.ScaleIsAbsolute));
                     }
                 }
             }
@@ -1312,7 +1323,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 foreach (BlueprintEditorPart source in sources)
                 {
                     Point3 copyScale = BlueprintEditorPart.NormalizeScale(
-                        source.Scale * scale, nameof(scaleStep));
+                        source.Scale * scale, nameof(scaleStep), source.ScaleIsAbsolute);
                     if (parts.Count + copies.Count >= MaximumParts)
                         throw new InvalidOperationException("Maximum part count reached.");
                     Point3 localPosition = inverseReference.Rotate(
@@ -1328,7 +1339,7 @@ namespace OstrixMods.BuildWorks.Geometry
                         source.ParentGroupId,
                         source.Visible,
                         source.Locked,
-                        copyScale, source.SignText, source.SourceDocumentId, source.SourceLine, source.ForeignData));
+                        copyScale, source.SignText, source.SourceDocumentId, source.SourceLine, source.ForeignData, source.ScaleIsAbsolute));
                 }
             }
             return copies;
@@ -1379,7 +1390,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 if (part.ParentGroupId != null && FindGroup(part.ParentGroupId) == null)
                     throw new ArgumentException("Missing parent group: " + part.ParentGroupId);
                 BlueprintEditorPart.Validate(part.Position, nameof(part.Position));
-                BlueprintEditorPart.ValidateScale(part.Scale, nameof(part.Scale));
+                BlueprintEditorPart.NormalizeScale(part.Scale, nameof(part.Scale), part.ScaleIsAbsolute);
                 part.Rotation = part.Rotation.Normalized();
             }
             foreach (BlueprintEditorGroup group in groups)
@@ -1573,7 +1584,7 @@ namespace OstrixMods.BuildWorks.Geometry
                     left.Visible != right.Visible || left.Locked != right.Locked || left.SignText != right.SignText ||
                     left.SourceDocumentId != right.SourceDocumentId || left.SourceLine != right.SourceLine || left.ForeignData != right.ForeignData ||
                     !Same(left.Position, right.Position) || !Same(left.Rotation, right.Rotation) ||
-                    !Same(left.Scale, right.Scale))
+                    !Same(left.Scale, right.Scale) || left.ScaleIsAbsolute != right.ScaleIsAbsolute)
                     return false;
             }
             for (int index = 0; index < groups.Count; ++index)

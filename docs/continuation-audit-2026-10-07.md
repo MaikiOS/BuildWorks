@@ -2,14 +2,18 @@
 
 **English** | [Русский](continuation-audit-2026-10-07_RU.md)
 
-Audit: 2026-10-07; current source checkpoint .87. This is not full product acceptance.
+Audit: 2026-10-07; current source checkpoint .88. This is not full product acceptance.
 Read AGENTS, PROJECT_CONTRACT, current HANDOFF and docs/ROADMAP. CONTINUE_PROMPT.txt targets
 .13; current-pass targets the historical .56 catalogue, not imported construction acceptance.
 
 Same-day addition: [two real external files](testing/external-path-2026-10-07.md) pass reviewed import/
 catalogue → editor/edit/support → disk reopen → JSON export/reimport → world renderer with installed prefabs.
-252 UI screenshots +2 real-building images and independent reviews PASS. Product DLL stays .87, installed .82.
+252 UI screenshots +2 real-building images and independent reviews PASS. Product DLL was .87 then, installed .82.
 Native construction/world reload/network remain untested.
+
+[Checkpoint .88](testing/missing-model-0.19.88.md) preserves missing foreign records and unknown absolute
+scale basis in Store15/JSON6; the actual editor edits/saves/reopens incomplete blueprints. Markers supply
+no invented geometry. World planning refuses pending basis; full restoration remains unproven.
 
 ## Verified baseline
 
@@ -32,10 +36,10 @@ Its text was not updated. A document edit is not a goal update.
 | Block | Implemented | Automated evidence | Owner/game evidence | Unfinished | Design only |
 |---|---|---|---|---|---|
 | Editor | Transform/group/Array/Contour/Undo/save | Geometry/bridge/Unity252 | Older .41/.44 and later scoped series recorded as accepted; do not repeat wholesale | Scenes above512 | New guide tools |
-| Exchange | Store14/portable5, .blueprint/.vbuild/ZIP, exact archives, separate contents options | Store353;209 parser-only;2 real files reviewed import/edit/support/disk/export/world renderer | Imported construction through reload unproven | Header dialects, RandMatSeed, some ZDO/inventory, export only our JSON/ZIP | Unspecified third-party formats |
+| Exchange | Store15/portable6, .blueprint/.vbuild/ZIP, exact archives, separate contents options | Store353;209 parser-only;2 real files reviewed import/edit/support/disk/export/world renderer | Imported construction through reload unproven | Header dialects, RandMatSeed, some ZDO/inventory, export only our JSON/ZIP | Unspecified third-party formats |
 | Scale/preview | Intrinsic prefab scale, nested XYZ, world50000; .87 supplied-item world appearance | Unity transforms; ordinary/native-holder/passive/heavy attachments | Particular giant lamp remains unproven | Native place/reload/FPS; unknown item effects | Further measured optimization |
 | Supports/snaps | Independent supports, distinct pivot/placement, durable world points | Store/controller/Unity/layout | Older group pivots accepted; new world snaps unaccepted | Reload/reconnect/remote client | Quiet unselected markers |
-| Missing prefabs | Scene records/placeholder | Rejection tested | None | Editor entry blocked; no source/type/local bbox or replacement1→N | Explicit multi-object substitution |
+| Missing prefabs | .88 foreign records/absolute basis; editor open/save/reopen/export; uncertainty marker | Store/actual Unity gestures/late normalization/atomic world refusal | None | Source/type/local bounds, missing-mod names, replacement1→N and other entry paths remain | Explicit multi-object substitution |
 | Items/authority | ItemStand capture/authoring/native spending; exchange retain/clear; .87 bound supplied item | .86 28 inert cases; .87 refuses changed/construction-spent bindings without fallback | Native placement/drop/reload/network unaccepted | Containers/armour/free items, placement choices, server admin authorization | Full admin restore |
 | Capture/heavy | Screen rectangle/manual edits, world50000 | Geometry/layout/shared-template Unity | Older capture partially accepted; no heavy imported construction | Area+height bounds, editor/capture512, FPS/prepared test world | Planned building/terrain integration |
 
@@ -50,8 +54,9 @@ import/save/reload. Historical assistant readiness statements are not runtime ev
    without selecting a replacement. Remaining visuals do not shift after spending earlier items. Inert fixtures only.
 2. Small external full cycle: typed dialect headers/source binding/material variation → shared placement
    frame → prepared file/resources → edit/place/cancel/reload. Never globally shrink to hide scale errors.
-3. Missing/heavy editor: preserve unknown scale/bounds and exact records; editor allowed, world blocked
-   pending explicit replacement → budgeted/cancellable scenes above512 and measurements.
+3. Missing/heavy editor: .88 retains unknown scale/bounds and exact records; editor allowed, world blocked
+   pending model resolution/replacement → metadata/mod cards/replacement1→N/remaining entries →
+   budgeted/cancellable scenes above512 and measurements.
 4. Independent placement contents choices, legacy inventories/armour/free items; ordinary supplied state
    vs server-authorized admin restoration. Text/design differ from wear/fuel/inventory; new network identities.
 5. Area plus upper/lower capture volume, intersection/loaded-area rules and manual list; review visuals first.

@@ -253,9 +253,16 @@ namespace OstrixMods.BuildWorks
                 { error = BuildWorksLocalization.ResolveUserText(source.importError); return false; }
                 string budgetError = CompositeBlueprintStore.InteractiveError(source.parts.Count);
                 if (budgetError != null) { error = BuildWorksLocalization.ResolveUserText(budgetError); return false; }
-                bool opened = Open(DocumentFromBlueprint(source.IsExternal ? ExternalBlueprintLibrary.DetachedCopy(source) : source),
+                var prepared = ExternalBlueprintLibrary.PrepareForHost(source, name =>
+                {
+                    GameObject prefab = ResolveVisualSource(name);
+                    return prefab ? new CompositeBlueprintStore.VectorData(prefab.transform.localScale) : (CompositeBlueprintStore.VectorData?)null;
+                });
+                if (!string.IsNullOrEmpty(prepared.importError))
+                { error = BuildWorksLocalization.ResolveUserText(prepared.importError); return false; }
+                bool opened = Open(DocumentFromBlueprint(prepared.IsExternal ? ExternalBlueprintLibrary.DetachedCopy(prepared) : prepared),
                     source.IsExternal ? null : source, out error);
-                if (opened) previewTemplate = source;
+                if (opened) previewTemplate = prepared;
                 return opened;
             }
             catch (Exception exception)
@@ -1580,8 +1587,8 @@ namespace OstrixMods.BuildWorks
                 {
                     if (!dragIds.Contains(part.StableId)) continue;
                     Vector3 scale = ToVector(part.Scale);
-                    minimum = Mathf.Max(minimum, .01f / Mathf.Min(scale.x, scale.y, scale.z));
-                    maximum = Mathf.Min(maximum, 4f / Mathf.Max(scale.x, scale.y, scale.z));
+                    minimum = Mathf.Max(minimum, (part.ScaleIsAbsolute ? float.Epsilon : .01f) / Mathf.Min(scale.x, scale.y, scale.z));
+                    maximum = Mathf.Min(maximum, (part.ScaleIsAbsolute ? float.MaxValue : 4f) / Mathf.Max(scale.x, scale.y, scale.z));
                 }
                 dragScale = Mathf.Clamp(keyboardBaseScale * Mathf.Max(.001f, 1f + percent * .01f), minimum, maximum);
             }
@@ -1630,8 +1637,8 @@ namespace OstrixMods.BuildWorks
                 {
                     if (!dragIds.Contains(part.StableId)) continue;
                     Vector3 candidate = ToVector(part.Scale) * scale;
-                    keyboardValid &= Mathf.Min(candidate.x, candidate.y, candidate.z) >= .01f &&
-                        Mathf.Max(candidate.x, candidate.y, candidate.z) <= 4f;
+                    keyboardValid &= Mathf.Min(candidate.x, candidate.y, candidate.z) >= (part.ScaleIsAbsolute ? float.Epsilon : .01f) &&
+                        Mathf.Max(candidate.x, candidate.y, candidate.z) <= (part.ScaleIsAbsolute ? float.MaxValue : 4f);
                 }
             }
             else
@@ -1895,15 +1902,15 @@ namespace OstrixMods.BuildWorks
             }
             else if (dragHandle == GizmoHandleKind.Scale)
             {
-                float minimum = 0f, maximum = float.PositiveInfinity;
+                float minimum = float.Epsilon, maximum = float.MaxValue;
                 float referenceScale = 1f;
                 foreach (BlueprintEditorPart part in document.Parts)
                 {
                     if (!dragIds.Contains(part.StableId)) continue;
                     Vector3 scale = ToVector(part.Scale);
-                    if (dragIds.Count == 1) referenceScale = scale.x;
-                    minimum = Mathf.Max(minimum, 0.01f / Mathf.Min(scale.x, scale.y, scale.z));
-                    maximum = Mathf.Min(maximum, 4f / Mathf.Max(scale.x, scale.y, scale.z));
+                    if (dragIds.Count == 1 && !part.ScaleIsAbsolute) referenceScale = scale.x;
+                    minimum = Mathf.Max(minimum, (part.ScaleIsAbsolute ? float.Epsilon : .01f) / Mathf.Min(scale.x, scale.y, scale.z));
+                    maximum = Mathf.Min(maximum, (part.ScaleIsAbsolute ? float.MaxValue : 4f) / Mathf.Max(scale.x, scale.y, scale.z));
                 }
                 float percent = mouse.y - dragStartMouse.y;
                 if (!ShiftHeld)
@@ -2886,7 +2893,7 @@ namespace OstrixMods.BuildWorks
                 parts.Add(new BlueprintEditorPart(part.stableId, part.prefabName, part.displayName,
                     ToPoint(part.position.ToVector3()), ToRotation(part.rotation.ToQuaternion()), part.parentGroupId,
                     part.editorVisible, part.editorLocked, ToPoint(part.scale.ToVector3()), part.signText,
-                    part.sourceDocumentId, part.sourceLine, part.foreignData?.ToGeometry()));
+                    part.sourceDocumentId, part.sourceLine, part.foreignData?.ToGeometry(), part.scaleIsAbsolute));
             return new BlueprintEditorDocument(source.id, source.name,
                 source.category ?? CompositeBlueprintStore.DefaultCategory, parts, groups,
                 source.primaryPartId, source.primaryGroupId,
@@ -3076,6 +3083,15 @@ namespace OstrixMods.BuildWorks
         private void PreviewArray()
         {
             if (!IsEditing || activeTool != BlueprintEditorTool.Array) return;
+            if (arrayDistribution == RepeatDistributionMode.Pack && document.Parts.Any(part =>
+                document.IsPartSelected(part.StableId) && (part.ScaleIsAbsolute || !ResolveVisualSource(part.PrefabName))))
+            {
+                arrayPreviewCount = 0;
+                scene.ClearArrayPreview();
+                view.SetArrayState(0);
+                view.SetStatus(BuildWorksLocalization.Text("editor.array_missing_dimensions"));
+                return;
+            }
             string stepLabel = arrayDistribution == RepeatDistributionMode.Fit
                 ? BuildWorksLocalization.Text("editor.array_fit")
                 : arrayDistribution == RepeatDistributionMode.Exact
@@ -3581,7 +3597,7 @@ namespace OstrixMods.BuildWorks
             try
             {
                 List<CompositeBlueprintStore.Part> parts = BuildStoreParts();
-                List<CompositeBlueprintStore.VectorData> anchors = document.Parts.Any(part => !ResolveVisualSource(part.PrefabName))
+                List<CompositeBlueprintStore.VectorData> anchors = document.Parts.Any(part => part.ScaleIsAbsolute || !ResolveVisualSource(part.PrefabName))
                     ? new List<CompositeBlueprintStore.VectorData>(previewTemplate?.anchors ?? new List<CompositeBlueprintStore.VectorData>())
                     : BuildBoundsAnchors();
                 CompositeBlueprintStore.VectorData[] customPoints = document.CustomSnapPoints
@@ -3663,6 +3679,7 @@ namespace OstrixMods.BuildWorks
                     position = new CompositeBlueprintStore.VectorData(ToVector(part.Position)),
                     rotation = new CompositeBlueprintStore.QuaternionData(ToQuaternion(part.Rotation)),
                     scale = new CompositeBlueprintStore.VectorData(ToVector(part.Scale)),
+                    scaleIsAbsolute = part.ScaleIsAbsolute,
                     stableId = part.StableId,
                     displayName = part.DisplayName,
                     parentGroupId = part.ParentGroupId,
@@ -3766,9 +3783,12 @@ namespace OstrixMods.BuildWorks
                 document.Sources.Any(source => source.HasOpaqueSections))) status = BuildWorksLocalization.Text("import.foreign_pending");
             var missing = new HashSet<string>(StringComparer.Ordinal);
             foreach (BlueprintEditorPart part in document.Parts)
-                if (!ResolveVisualSource(part.PrefabName)) missing.Add(part.StableId);
+                if (part.ScaleIsAbsolute || !ResolveVisualSource(part.PrefabName)) missing.Add(part.StableId);
+            if (missing.Count > 0 && string.IsNullOrEmpty(status))
+                status = BuildWorksLocalization.Text("editor.missing_dimensions", string.Join(", ", document.Parts
+                    .Where(part => missing.Contains(part.StableId)).Select(part => part.PrefabName).Distinct()));
             UpdateTransformContext();
-            Vector3? boundsSize = scene.TryGetDocumentBounds(out Bounds bounds)
+            Vector3? boundsSize = missing.Count == 0 && scene.TryGetDocumentBounds(out Bounds bounds)
                 ? bounds.size
                 : (Vector3?)null;
             view.SupportCentreId = transformSupportPivotId;

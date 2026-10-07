@@ -51,6 +51,7 @@ internal static class Program
             TestUniformGroupScale();
             TestUniformSingleScale();
             TestInvalidGroupScaleIsAtomic();
+            TestPendingScaleIsAtomic();
             TestPrimaryPartSelection();
             Console.WriteLine("All actual Session root-composition checks passed; no game placement executed.");
             return 0;
@@ -438,6 +439,22 @@ internal static class Program
             Require((int)Get(session, "placementPlanIndex") == 0, "Invalid scale advanced placement queue");
         }
         Console.WriteLine("PASS actual Session: later invalid part scale rejects whole group atomically with repeatPlanError; previous queue untouched");
+    }
+
+    private static void TestPendingScaleIsAtomic()
+    {
+        object session = Session(2);
+        Require(Add(session, new Point3(10,20,30), Rotation(0,0,0,1)), "Baseline group rejected");
+        IList plan = (IList)Get(session, "placementPlan"), sources = (IList)Get(session, "placementPlanPieces");
+        object first = plan[0], last = plan[1];
+        IList parts = (IList)Get(Get(session, "activeBlueprint"), "parts");
+        Set(parts[1], "scale", StoredVector(1, 1, 1)); // Numerically legal but semantically unresolved.
+        Set(parts[1], "scaleIsAbsolute", true);
+        Require(!Add(session, new Point3(40,50,60), Rotation(0,0,0,1)), "Pending absolute basis treated as native multiplier");
+        Require(plan.Count == 2 && sources.Count == 2 && first.Equals(plan[0]) && last.Equals(plan[1]) &&
+            (int)Get(session, "placementPlanIndex") == 0 && !string.IsNullOrEmpty((string)Get(session, "repeatPlanError")),
+            "Pending group changed existing placement queue or failed silently");
+        Console.WriteLine("PASS actual Session: unresolved absolute basis rejects whole group before planning, queue unchanged");
     }
 
     private static object StoredVector(float x, float y, float z)

@@ -1,6 +1,11 @@
 # Blueprint format and large-construction work
 
-Current .87 policy/evidence: [continuation audit](../../docs/continuation-audit-2026-10-07.md).
+Current .88 format: Store15/JSON6 optional `Part.scaleIsAbsolute` preserves an individual record's unknown
+scale basis. Absent flag retains historical relative semantics. Missing records remain editable; intrinsic1
+and model bounding boxes are never invented. World refuses pending basis. Versions14/5 reject the new field.
+[Evidence and limits](../../docs/testing/missing-model-0.19.88.md).
+
+.87 policy/evidence: [continuation audit](../../docs/continuation-audit-2026-10-07.md).
 Survival mounts use the supplied same-prefab item's own properties for archived snapshots and recipes.
 Source-exact matching/future reservation below is historical .80 behavior. Native validation,
 exact-one spending and supplied-package confirmation remain. World previews use own variant/quality;
@@ -9,7 +14,7 @@ Full native place/reload remains unverified.
 
 **English** | [Русский](blueprint-format_RU.md)
 
-Current source **0.19.80**: native ItemStand contents are restored through a real player's inventory item on the newly
+Historical checkpoint **0.19.80**: native ItemStand contents are restored through a real player's inventory item on the newly
 placed owner-held stand after native construction costs. Full snapshots require exact native bytes (including grid/flags),
 recipes preserve the selected item's actual properties. Nonzero canonical prefab identity, bounded full decoding, reservation
 of future exact snapshots and one-item/exact-package postconditions are required. Denied/rebound/foreign-queue state cannot

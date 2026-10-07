@@ -208,11 +208,14 @@ public static class EditorInteractionAcceptance
                 Require(duplicates.Count == 1 && !tailRoot.activeSelf &&
                     replacementRoot.GetInstanceID() == Field<GameObject>(duplicates[0], "Root").GetInstanceID(),
                     "Shrinking preview failed to remove only its trailing visual");
-                bool missingRejected = false;
-                try { scene.ShowDuplicatePreview(new[] { Part("missing", "missing-prefab", pivot) }); }
-                catch (InvalidOperationException) { missingRejected = true; }
-                Require(missingRejected && duplicates.Count == 0 && !replacementRoot.activeSelf,
-                    "Missing prefab failure leaves the old preview active");
+                scene.ShowDuplicatePreview(new[] { Part("missing", "missing-prefab", pivot) });
+                Require(duplicates.Count == 1 && Field<bool>(duplicates[0], "Placeholder") && !replacementRoot.activeSelf &&
+                    Field<GameObject>(duplicates[0], "Root").transform.localScale == Vector3.one * .3f,
+                    "Missing prefab did not replace the old preview with an uncertainty marker");
+                bool invalidRejected = false;
+                try { scene.ShowDuplicatePreview(new BlueprintEditorPart[] { null }); }
+                catch (NullReferenceException) { invalidRejected = true; }
+                Require(invalidRejected && duplicates.Count == 0, "Invalid preview left partial visuals active");
                 scene.ClearDuplicatePreview();
                 Require(!duplicateRoot.activeSelf && Field<IList>(scene, "contourPreviews").Count == 1,
                     "Duplicate preview teardown changed the independent array preview");

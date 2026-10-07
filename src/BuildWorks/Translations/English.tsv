@@ -787,7 +787,7 @@ exchange.exported	Export saved: {0}
 exchange.exists	The library already contains this file: {0}
 import.scale_pending	Load the blueprint in the game catalogue first to resolve prefab scales. The source has not been changed.
 import.scale_range	The scale of prefab {0} cannot be represented within the supported 1–400% multiplier range. No parts were resized or partially converted.
-import.scale_missing	Cannot resolve the original scale of prefab {0}. Install its mod and reopen the catalogue; no partial conversion was made.
+import.scale_missing	Original prefab scale unknown: {0}. Open and save it in the editor after installing its mod; world placement remains blocked.
 exchange.browse_help	Choose a folder and file, then Import. Original files remain unchanged.
 exchange.current_folder	Folder: {0}
 exchange.edit_path	Edit path
@@ -848,3 +848,6 @@ exchange.copy_report	Copy report
 placement.preview_loading	Preparing blueprint preview: {0}/{1}. Wait for the complete preview before placing.
 placement.preview_failed	Blueprint preview could not be prepared: {0}. Construction has not started.
 placement.mount_supply_changed	The item selected for this mount changed or disappeared. A replacement will not be consumed automatically. Esc cancels placement; then select the blueprint again.
+editor.missing_dimensions	Model or original prefab scale unavailable; dimensions unknown: {0}. Conditional markers are not model bounds.
+editor.array_missing_dimensions	Packing is unavailable while selected model dimensions are unknown. Use an explicit spacing or install the missing model.
+editor.view.source_scale	Source scale (%)

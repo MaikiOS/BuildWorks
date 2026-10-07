@@ -26,7 +26,7 @@ namespace OstrixMods.BuildWorks
         internal const string DefaultCategory = "OTHER";
         private const string LegacyDefaultCategory = "ПРОЧЕЕ";
         private const string LocalizationPrefix = "$buildworks_";
-        private const int FormatVersion = 14;
+        private const int FormatVersion = 15;
         private const int MaximumBlueprints = 32;
         private const int MaximumCategories = 12;
         private const int MaximumAnchors = 512;
@@ -735,6 +735,7 @@ namespace OstrixMods.BuildWorks
                     prepared[index].editorLocked = blueprint.parts[index].editorLocked;
                     prepared[index].sourceDocumentId = blueprint.parts[index].sourceDocumentId;
                     prepared[index].sourceLine = blueprint.parts[index].sourceLine;
+                    prepared[index].scaleIsAbsolute = blueprint.parts[index].scaleIsAbsolute;
                     prepared[index].foreignData = CloneForeignData(blueprint.parts[index].foreignData);
                 }
             }
@@ -929,6 +930,7 @@ namespace OstrixMods.BuildWorks
                     position = part.position,
                     rotation = part.rotation,
                     scale = part.scale,
+                    scaleIsAbsolute = part.scaleIsAbsolute,
                     stableId = part.stableId,
                     displayName = part.displayName,
                     parentGroupId = part.parentGroupId,
@@ -998,7 +1000,8 @@ namespace OstrixMods.BuildWorks
                 }
                 BlueprintExchangeFormat.ValidateLibraryJson(json, requireFields: loaded.version >= 6,
                     allowSupportFields: loaded.version >= 11, allowSourceFields: loaded.version >= 12,
-                    allowForeignFields: loaded.version >= 13, allowContentsFields: loaded.version >= 14);
+                    allowForeignFields: loaded.version >= 13, allowContentsFields: loaded.version >= 14,
+                    allowAbsoluteScaleFields: loaded.version >= 15);
                 loaded.blueprints = loaded.blueprints ?? new List<Blueprint>();
                 loaded.categories = loaded.categories ?? new List<string>();
                 if (loaded.version == 1)
@@ -1277,7 +1280,8 @@ namespace OstrixMods.BuildWorks
             if (part == null || string.IsNullOrWhiteSpace(part.prefabName) ||
                 string.IsNullOrWhiteSpace(part.stableId) ||
                 string.IsNullOrWhiteSpace(part.displayName) ||
-                !Valid(part.position) || !Valid(part.rotation) || !ValidScale(part.scale) ||
+                !Valid(part.position) || !Valid(part.rotation) ||
+                !(part.scaleIsAbsolute ? PositiveScale(part.scale) : ValidScale(part.scale)) ||
                 !Geometry.BlueprintEditorPart.IsValidSignText(part.signText) || !ValidForeignData(part.foreignData)) return false;
             float length = part.rotation.x * part.rotation.x +
                 part.rotation.y * part.rotation.y +
@@ -1672,6 +1676,9 @@ namespace OstrixMods.BuildWorks
             public int sourceLine;
             [DataMember(Order = 12, EmitDefaultValue = false)]
             public ForeignPartData foreignData;
+            // True only while source absolute scale awaits a known prefab intrinsic scale.
+            [DataMember(Order = 13, EmitDefaultValue = false)]
+            public bool scaleIsAbsolute;
         }
 
         [DataContract]

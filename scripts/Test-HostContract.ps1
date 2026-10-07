@@ -819,7 +819,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.87.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.88.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -1813,7 +1813,7 @@ Assert-Contract ($updateDocumentMethods.Count -eq 5 -and
         @($_.Parameters | Where-Object Name -eq 'placementSupportId').Count -eq 1
     }).Count -eq 1) `
     'Blueprint frame update overload or a compatibility overload is missing.'
-Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion = 14' -and
+Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion = 15' -and
     $blueprintStoreSource -match 'loaded\.version < 6' -and
     $blueprintStoreSource -match 'ValidScale\(part\.scale\)' -and
     $blueprintStoreSource -match 'if \(loaded\.version < 4\)' -and
@@ -1896,6 +1896,12 @@ Assert-Contract ($resolveBlueprintPiecesOperands -match
     $resolveBlueprintPiecesOperands -match 'ZNetView::m_syncInitialScale' -and
     $resolveBlueprintPiecesOperands -notmatch 'PrecisionPlacementSession::SupportsPrecisionPlacement') `
     'Blueprint resolution must allow available furniture while retaining native scale validation.'
+Assert-Contract ($resolveBlueprintPiecesOperands -match 'CompositeBlueprintStore/Part::scaleIsAbsolute') `
+    'World blueprint resolution must reject unresolved source scale basis.'
+$editorVisual = $pluginMethods | Where-Object { $_.Name -eq 'ResolveBlueprintEditorVisual' -and $_.DeclaringType.Name -eq 'PrecisionPlacementSession' }
+$editorVisualCalls = ($editorVisual.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($editorVisualCalls -match 'ZNetScene::GetPrefab' -and $editorVisualCalls -notmatch 'TryResolveBuildPiece|IsBuildPieceAvailable') `
+    'Editor visuals must not require unlocked survival recipes.'
 foreach ($workspaceGateName in @('BlueprintEditorCatalogItems', 'EnableNativePieceScale', 'IsBlueprintPieceSelectable')) {
     $workspaceGate = $pluginMethods | Where-Object { $_.Name -eq $workspaceGateName -and $_.DeclaringType.Name -eq 'PrecisionPlacementSession' }
     $workspaceGateOperands = @($workspaceGate.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
@@ -3046,4 +3052,4 @@ $worldCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'Preci
 $worldCaptureCalls = ($worldCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($worldCaptureCalls -match 'BlueprintStorageCapture::TryCapture' -and $worldCaptureCalls -match 'CompositeBlueprintStore/ForeignPartData::FromGeometry') 'World selection does not preserve container snapshots.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.87 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.88 and Valheim Steam build 25185596.'

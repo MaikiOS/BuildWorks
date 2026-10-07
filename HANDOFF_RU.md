@@ -2,6 +2,21 @@
 
 [English](HANDOFF.md) | **Русский**
 
+## Этап 0.19.88 — неполный внешний чертёж и честный масштаб; исходники
+
+[Протокол и границы](docs/testing/missing-model-0.19.88_RU.md).
+Store15/JSON6: per-part scaleIsAbsolute сохраняет отсутствующую деталь без выдуманного intrinsic1.
+Редактор открывает/редактирует/сохраняет копию; поздний prefab нормализуется при новом открытии ровно
+один раз. Native identity для записи сохраняется. Мир блокирует pending basis до изменения очереди.
+Маркер .3 — только выбор/камера; preview постоянный, углы/контакт/автоупаковка из него не выводятся.
+Жесты/инспектор сохраняют absolute basis, Infinity отклоняется. Missing в сцене уже поддерживался:
+старое утверждение о блокировке любого входа исправлено в аудите. Мод-лист/metadata/1→N ещё открыты.
+Release/Geometry/Store353/Localization852/bridge/WorldLayout15/API/deploy guards/format и Unity252 PASS;
+correctness/ponytail review закрыли найденные дефекты. verify отсутствует.
+Доказательства: artifacts/checkpoint-0.19.88/verification.json. Установлена .82; deployment/game/save/
+reload/network/push нет. Безопасный готовый survival-стенд пока отсутствует: SaveSystem caches/cloud
+не позволяют считать поздний SetSaveDataPath изоляцией. Полная цель остаётся active.
+
 ## Дополнение .87 — два настоящих внешних файла; только испытания
 
 [Протокол и границы](docs/testing/external-path-2026-10-07_RU.md).

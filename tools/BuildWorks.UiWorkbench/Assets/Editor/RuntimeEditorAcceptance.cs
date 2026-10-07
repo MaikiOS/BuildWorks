@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using OstrixMods.BuildWorks;
 using OstrixMods.BuildWorks.Geometry;
@@ -492,6 +493,8 @@ public static class RuntimeEditorAcceptance
                 controller.Close(true);
                 checks.Add("Reopening clears active operation");
                 TestExternalImportEditor(template, fontTemplate, source, output);
+                TestIncompleteExternalEditor(template, fontTemplate, source["woodwall"], output);
+                checks.Add("Incomplete foreign blueprint: known nonunit prefab plus missing absolute-scale part, constant uncertainty marker without surface/snap geometry; edit/copy/Undo/native save/reopen/export/reimport preserve source and basis; late nonunit prefab resolves exactly once using original native identity. Not world placement proof.");
                 Require(runtimeErrors.Count == 0, "Runtime logged errors: " + string.Join("; ", runtimeErrors));
                 yield return null;
                 ActualDividerAcceptance.Run(output);
@@ -719,8 +722,140 @@ public static class RuntimeEditorAcceptance
         Require(reloaded.All().Count == 1, "Actual disk library roundtrip");
         Require(Mathf.Abs(reloaded.All()[0].parts[0].scale.x - expected) < 0.0001f, "Store discarded scale");
         CheckReopenedCopy(controller, reloaded, expected);
-        Require(File.ReadAllText(path).Contains("\"version\":14"), "Controller did not write format14");
-        checks.Add("Controller save -> disk format14 -> new store -> OpenExisting retains scale, rotated root-owned support and placement reference; transient support focus absent");
+        Require(File.ReadAllText(path).Contains("\"version\":15"), "Controller did not write format15");
+        checks.Add("Controller save -> disk format15 -> new store -> OpenExisting retains scale, rotated root-owned support and placement reference; transient support focus absent");
+    }
+
+    private static void TestIncompleteExternalEditor(Camera camera, TMP_Text font, GameObject wall, string output)
+    {
+        string path = Path.Combine(output, "missing-copy-" + Guid.NewGuid().ToString("N") + ".json");
+        const string text = "#Name:Missing model\n#Pieces\nwoodwall;;0;0;0;0;0;0;1;\"\";1;1;1\n" +
+            "absent_model;;3;4;5;0;0;0;1;\"unknown-info\";.001;.002;.003;unknown-zdo;.5";
+        GameObject known = PlacementGhostPreviewView.CreateVisualClone(wall, "NonunitKnownPrefab", 0);
+        GameObject later = null;
+        known.transform.localScale = new Vector3(2, .5f, 3);
+        var models = new Dictionary<string, GameObject> { ["woodwall"] = known };
+        BlueprintEditorController NewEditor(CompositeBlueprintStore library) => new BlueprintEditorController(library,
+            camera, font, name => models.TryGetValue(name, out var model) ? model : null, name => name,
+            () => Array.Empty<BlueprintEditorCatalogItem>(), message => { throw new InvalidOperationException(message); });
+        try
+        {
+            var raw = ExternalBlueprintLibrary.Parse(text, "missing.blueprint");
+            var store = new CompositeBlueprintStore(path);
+            using (var editor = NewEditor(store))
+            {
+                Require(editor.OpenExisting(raw, out string error), "Incomplete external open: " + error);
+                Require(editor.Document.Parts.Count == 2 && !editor.Document.Parts[0].ScaleIsAbsolute &&
+                    editor.Document.Parts[0].Scale.X == .5 && editor.Document.Parts[1].ScaleIsAbsolute,
+                    "Incomplete editor lost records or guessed intrinsic scale");
+                string missingId = editor.Document.Parts[1].StableId;
+                object visual = Field<IDictionary>(Field<BlueprintEditorScene>(editor, "scene"), "visuals")[missingId];
+                Require(Field<bool>(visual, "Placeholder") && Field<GameObject>(visual, "Root").transform.localScale == Vector3.one * .3f &&
+                    Field<List<Vector3>>(visual, "PlacementLocal").Count == 0 && Field<List<Vector3>>(visual, "SnapLocal").Count == 0,
+                    "Unknown source scale became model size or generated sockets");
+                editor.Document.SelectOnly(missingId);
+                Call(editor, "Bind", "");
+                var scene = Field<BlueprintEditorScene>(editor, "scene");
+                foreach (bool experimental in new[] { false, true })
+                {
+                    scene.ExperimentalGeometryPoints = experimental;
+                    Require(scene.TryGetGizmoAnchors(new[] { missingId }, out Vector3[] points, out _) && points.Length == 1 &&
+                        points[0] == new Vector3(3, 4, 5) && scene.GeometryAnchorCount == 0 &&
+                        !scene.TryGetGizmoAnchors(new[] { missingId }, out _, out _, legacyLayoutAnchors: true),
+                        "Marker geometry became corner or packing anchors");
+                }
+                foreach (bool keyboard in new[] { true, false })
+                {
+                    Call(editor, "BeginKeyboardPreview", GizmoHandleKind.Scale);
+                    Vector2 mouse = Field<Vector2>(editor, "dragStartMouse");
+                    Set(editor, "keyboardMoved", true);
+                    Call(editor, keyboard ? "PreviewKeyboardTransform" : "PreviewGizmoDrag", mouse);
+                    Require(Field<float>(editor, "dragScale") == 1f, "Zero-delta scale gesture damaged pending source scale");
+                    if (keyboard)
+                    {
+                        Set(editor, "keyboardNumber", "2");
+                        Call(editor, "PreviewKeyboardNumber");
+                        Require(Field<bool>(editor, "keyboardValid") && Field<float>(editor, "dragScale") == 2f,
+                            "Numeric gesture rejects valid pending absolute scale");
+                    }
+                    else Call(editor, "PreviewGizmoDrag", mouse + Vector2.up * 100);
+                    Require(Field<float>(editor, "dragScale") == 2f &&
+                        Field<GameObject>(visual, "Root").transform.localScale == Vector3.one * .3f,
+                        "Scale gesture interpreted pending basis or resized uncertainty marker");
+                    Call(editor, "CommitGizmoDrag");
+                    Require(Math.Abs(editor.Document.Parts[1].Scale.X - .002f) < .00000001 && editor.Document.Undo(),
+                        "Pending scale confirm/Undo failed");
+                    Require(scene.TrySync(editor.Document, out error), error);
+                    visual = Field<IDictionary>(scene, "visuals")[missingId];
+                }
+                var view = Field<BlueprintEditorView>(editor, "view");
+                Call(editor, "Bind", "");
+                var positionInputs = Field<TMP_InputField[]>(view, "inspectorPosition");
+                positionInputs[0].text = "3.25";
+                var scaleInput = Field<TMP_InputField>(view, "inspectorScale");
+                scaleInput.text = "Infinity";
+                scaleInput.onEndEdit.Invoke("Infinity");
+                Require(editor.Document.Parts[1].Position.X == 3 && editor.Document.Parts[1].Scale.X == .001f,
+                    "Nonfinite pending scale was accepted by inspector");
+                scaleInput.text = Field<string>(view, "inspectorOriginalScaleText");
+                positionInputs[0].onEndEdit.Invoke("3.25");
+                Require(editor.Document.Parts[1].Position.X == 3.25 && editor.Document.Parts[1].Scale.X == .001f &&
+                    editor.Document.Undo(), "Inspector position edit rejects or changes pending scale");
+                Require(scene.TrySync(editor.Document, out error), error);
+                visual = Field<IDictionary>(scene, "visuals")[missingId];
+                scene.PreviewTransform(editor.Document, new[] { missingId }, Vector3.right, Quaternion.Euler(0, 37, 0), Vector3.zero);
+                Require(Field<GameObject>(visual, "Root").transform.localScale == Vector3.one * .3f,
+                    "Move/rotate preview resized unknown model marker");
+                Require(scene.TrySync(editor.Document, out error), error);
+                scene.ShowBlueprintPlacementPreview(new[] { editor.Document.Parts[0] }, Vector3.up, out Vector3 knownOffset);
+                scene.ShowBlueprintPlacementPreview(new[] { editor.Document.Parts[0], new BlueprintEditorPart(
+                    "missing-low", "absent_model", "missing", new Point3(3, -100, 5), new Rotation3(0, 0, 0, 1),
+                    scale: new Point3(.001, .002, .003), scaleIsAbsolute: true) }, Vector3.up, out Vector3 mixedOffset);
+                Require(knownOffset == mixedOffset, "Missing marker changed surface grounding of known geometry");
+                scene.ClearBlueprintPlacementPreview();
+                Require(editor.ApplyTransformDelta(Vector3.right * .5f, Quaternion.Euler(0, 37, 0), new Vector3(3, 4, 5)), "Missing record cannot move/rotate");
+                Require(editor.Document.DuplicateSelection(new Point3(2, 0, 0)) &&
+                    editor.Document.Parts.Count == 3 && editor.Document.Parts[2].ScaleIsAbsolute &&
+                    editor.Document.Undo() && editor.Document.Parts.Count == 2 && editor.Document.Parts[1].ScaleIsAbsolute,
+                    "Copy/Undo dropped pending basis");
+                Require((bool)Call(editor, "TrySave", false, true), "Incomplete native save failed");
+                editor.Close(true);
+            }
+            var reloaded = new CompositeBlueprintStore(path);
+            var saved = reloaded.All().Single();
+            Require(saved.parts[1].scaleIsAbsolute && saved.parts[1].scale.x == .001f && saved.parts[1].position.x == 3.5f &&
+                Quaternion.Angle(saved.parts[1].rotation.ToQuaternion(), Quaternion.Euler(0, 37, 0)) < .001f &&
+                saved.parts[1].foreignData.zdo == "unknown-zdo" && saved.sourceDocuments[0].text == text && raw.parts[1].position.x == 3,
+                "Incomplete disk save lost pose, foreign evidence, source or basis");
+            Require(reloaded.TryExportFile(saved, output, "missing-exchange-" + Guid.NewGuid().ToString("N"), false,
+                out string exported, out string exportError), exportError);
+            var exchanged = ExternalBlueprintLibrary.LoadFile(exported).Single();
+            Require(exchanged.importError == null && exchanged.parts[1].scaleIsAbsolute && exchanged.parts[1].scale.x == .001f &&
+                exchanged.parts[1].position.x == 3.5f && exchanged.sourceDocuments[0].text == text,
+                "Incomplete portable roundtrip lost pending part");
+            using (var editor = NewEditor(reloaded))
+            {
+                Require(editor.OpenExisting(saved, out string error) && editor.Document.Parts[1].ScaleIsAbsolute,
+                    "Incomplete native editor reopen: " + error);
+                later = PlacementGhostPreviewView.CreateVisualClone(wall, "LateNonunitPrefab", 0);
+                later.transform.localScale = new Vector3(.0005f, .001f, .0015f);
+                models.Add("absent_model", later);
+                var scene = Field<BlueprintEditorScene>(editor, "scene");
+                Require(scene.TrySync(editor.Document, out error), error);
+                object visual = Field<IDictionary>(scene, "visuals")[editor.Document.Parts[1].StableId];
+                Require(Field<bool>(visual, "Placeholder"), "Late prefab rendered before explicit scale normalization");
+                editor.Close(true);
+                Require(editor.OpenExisting(saved, out error) && !editor.Document.Parts[1].ScaleIsAbsolute &&
+                    editor.Document.Parts[1].Scale.X == 2 && editor.Document.Parts[0].Scale.X == .5 &&
+                    ReferenceEquals(Field<CompositeBlueprintStore.Blueprint>(editor, "sourceBlueprint"), saved) &&
+                    (bool)Call(editor, "TrySave", false, true), "Late normalization lost native write identity or divided twice: " + error);
+                editor.Close(true);
+            }
+            Require(!new CompositeBlueprintStore(path).All()[0].parts[1].scaleIsAbsolute &&
+                new CompositeBlueprintStore(path).All()[0].parts[1].scale.x == 2 && raw.sourceDocuments[0].text == text,
+                "Resolved basis did not persist or source was modified");
+        }
+        finally { Object.DestroyImmediate(known); if (later) Object.DestroyImmediate(later); }
     }
 
     private static void TestExternalImportEditor(Camera camera, TMP_Text font,
@@ -772,7 +907,7 @@ public static class RuntimeEditorAcceptance
                 "Cancel insert changed saved document or leaked ghost state");
             editor.Close(true);
         }
-        checks.Add("External .blueprint -> detached draft -> metadata Cancel no disk -> transform/save native v13 -> reopen/update -> whole-source insert preview/Cancel; exact source/rows, inert object/ZDO/chance/unknown sections retained; native contents not rendered or executed");
+        checks.Add("External .blueprint -> detached draft -> metadata Cancel no disk -> transform/save native v15 -> reopen/update -> whole-source insert preview/Cancel; exact source/rows, inert object/ZDO/chance/unknown sections retained; native contents not rendered or executed");
     }
 
     private static void TestScaleBoundaries(BlueprintEditorController controller, string path)

@@ -442,6 +442,7 @@ namespace OstrixMods.BuildWorks
         internal bool ItemStandHasContents { get; set; }
         private BlueprintExchangeView exchangeView;
         private float inspectorOriginalScale;
+        private bool inspectorScaleIsAbsolute;
         private string inspectorOriginalScaleText;
         private TMP_InputField fieldOfViewInput;
         private Slider fieldOfViewSlider;
@@ -3162,6 +3163,7 @@ namespace OstrixMods.BuildWorks
                     if (part.StableId == selected) singlePart = part;
             }
             inspectorDelta = singlePart == null;
+            inspectorScaleIsAbsolute = singlePart?.ScaleIsAbsolute == true;
             inspectorNodeId = singlePart?.StableId;
             inspectorContent.gameObject.SetActive(false);
             inspectorEditPanel.SetActive(true);
@@ -3177,7 +3179,7 @@ namespace OstrixMods.BuildWorks
                 : "editor.view.rotation_deg");
             inspectorScaleLabel.text = T(inspectorDelta
                 ? "editor.view.selection_scale"
-                : "editor.view.uniform_scale");
+                : inspectorScaleIsAbsolute ? "editor.view.source_scale" : "editor.view.uniform_scale");
             SetButtonLabel(inspectorResetButton, T("editor.view.reset"));
             if (singlePart == null)
             {
@@ -3200,7 +3202,7 @@ namespace OstrixMods.BuildWorks
                 SetAxisValues(inspectorRotation, new Vector3(
                     SignedAngle(euler.x), SignedAngle(euler.y), SignedAngle(euler.z)));
                 inspectorOriginalScale = (float)singlePart.Scale.X;
-                inspectorOriginalScaleText = (inspectorOriginalScale * 100f).ToString("0.##");
+                inspectorOriginalScaleText = ((double)inspectorOriginalScale * 100).ToString(inspectorScaleIsAbsolute ? "G9" : "0.##");
                 inspectorScale.SetTextWithoutNotify(inspectorOriginalScaleText);
             }
             UpdateTransformControls();
@@ -3358,8 +3360,10 @@ namespace OstrixMods.BuildWorks
             bool rxValid = TryRead(inspectorRotation[0], out float rx);
             bool ryValid = TryRead(inspectorRotation[1], out float ry);
             bool rzValid = TryRead(inspectorRotation[2], out float rz);
+            bool scaleUnchanged = !inspectorDelta && inspectorScale.text == inspectorOriginalScaleText;
             bool scaleValid = TryRead(inspectorScale, out float scale) &&
-                scale >= 1f && scale <= 400f;
+                (inspectorScaleIsAbsolute ? scale / 100f >= float.Epsilon && scale / 100f <= float.MaxValue : scale >= 1f && scale <= 400f);
+            scaleValid |= scaleUnchanged;
             SetInputValid(inspectorPosition[0], pxValid);
             SetInputValid(inspectorPosition[1], pyValid);
             SetInputValid(inspectorPosition[2], pzValid);
@@ -3380,7 +3384,7 @@ namespace OstrixMods.BuildWorks
                 inspectorName.text,
                 new Vector3(px, py, pz),
                 new Vector3(rx, ry, rz),
-                !inspectorDelta && inspectorScale.text == inspectorOriginalScaleText
+                scaleUnchanged
                     ? inspectorOriginalScale : scale / 100f,
                 inspectorDelta);
         }

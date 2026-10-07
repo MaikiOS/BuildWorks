@@ -9,7 +9,11 @@
 
 ## База и доказательства
 
-Активные исходники **0.19.90**, не установлены: [QA save isolation](testing/qa-save-isolation-0.19.90_RU.md),
+Активные исходники **0.19.91**, не установлены: [QA save isolation и loaded gate](testing/qa-save-isolation-0.19.90_RU.md).
+Повторная проверка Local UID/profile ID/ZDO player ID, closed server/no peers/без cheats перед будущей выдачей;
+25 BCL receipt/identity случаев + compiled guard/coroutine wiring PASS. Runtime не доказан, выдачи ещё нет.
+
+Предыдущие исходники **0.19.90**, не установлены: [QA save isolation](testing/qa-save-isolation-0.19.90_RU.md),
 отдельная opt-in DLL; normal build без QA. Cold-storage/root/cloud guards и fresh Local identities с receipt;
 пока source/path/compiled proof, не native runtime. С разрешения владельца QA bootstrap автосоздание saves отключено,
 preflight PASS. Ресурсы/станции и готовый survival-стенд открыты; полная цель не завершена. Установлена .82.

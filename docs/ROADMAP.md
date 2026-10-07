@@ -9,7 +9,11 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.90**, not deployed: [QA save isolation](testing/qa-save-isolation-0.19.90.md),
+Active source checkpoint **0.19.91**, not deployed: [QA isolation and loaded gate](testing/qa-save-isolation-0.19.90.md).
+Rechecks Local world UID/profile ID/ZDO player ID, closed server/no peers/no cheats before future provisioning;
+25 BCL receipt/identity cases and compiled guard/coroutine wiring PASS. Runtime unproven; no grants yet.
+
+Previous source checkpoint **0.19.90**, not deployed: [QA save isolation](testing/qa-save-isolation-0.19.90.md),
 separate opt-in DLL, normal build excludes QA. Cold-storage/root/cloud guards and fresh Local identities with receipt;
 source/path/compiled proof only, not native runtime. Owner-authorized QA bootstrap save creation disabled; preflight PASS.
 Resources/stations/ready survival stand remain open; full goal incomplete. Installed .82.

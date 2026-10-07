@@ -2,6 +2,21 @@
 
 [English](HANDOFF.md) | **Русский**
 
+## Этап 0.19.91 — проверка загруженного QA-сеанса
+
+[Контракт и проверки](docs/testing/qa-save-isolation-0.19.90_RU.md). RequireLoadedSession повторно проверяет
+root/Local sources/пути/receipt и реальные world UID, profile ID, ZDO player ID/имена. Closed server/no peers,
+living loaded player/no cheats/worldLevel0; native API проверены по установленным DLL. Coroutine вызывает
+guard после появления игрока/teleport; каждый будущий grant должен снова вызвать guard, ранний PASS не capability.
+25 исполняемых BCL receipt/identity случаев + paths/junction + compiled guard/coroutine wiring PASS.
+Обе Release0/0, normal/QA separation, host contract и Localization853/format PASS; native runtime не исполнялся.
+Это не готовый стенд: ресурсы/свои предметы/станции/одноразовая выдача ещё не внедрены. Next: native материал-план,
+Hammer перед AddKnownItem, собственные предметы, физические станции через native PlacePiece, одноразовый receipt,
+проверка actual delta/count и profile.SavePlayerData(player)+Save() после повторного identity guard.
+Отдельно проверить Piece.FreeBuildKey для каждого тестового prefab. Никаких NoCost/debug/world key обходов.
+Установлена .82; не устанавливалось, игра/сохранения не запускались, bootstrap config после .90 не менялся.
+Локальная source-only проверка: artifacts/checkpoint-0.19.91/verification.json. Полная цель остаётся открытой.
+
 ## Этап 0.19.90 — изоляция QA saves; только исходная подготовка
 
 [Контракт и проверки](docs/testing/qa-save-isolation-0.19.90_RU.md). Обычная DLL не содержит QA type;

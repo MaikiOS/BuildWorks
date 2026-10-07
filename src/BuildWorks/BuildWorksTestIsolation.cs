@@ -145,13 +145,8 @@ namespace OstrixMods.BuildWorks
             {
                 ValidateSavePath(receipt);
                 ValidateSavePath(worldPath); ValidateSavePath(profilePath);
-                if (new FileInfo(receipt).Length > 512) throw new InvalidDataException("Invalid QA identity receipt.");
-                string[] lines = File.ReadAllLines(receipt);
-                if (lines.Length != 8 || lines[0] != "BuildWorks-QA-1" || lines[1] != token ||
-                    lines[2] != name || lines[4] != name || lines[6] != "started" || lines[7] != "complete" ||
-                    !long.TryParse(lines[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out long worldId) || worldId == 0 ||
-                    !long.TryParse(lines[5], NumberStyles.Integer, CultureInfo.InvariantCulture, out long playerId) || playerId == 0 ||
-                    !File.Exists(worldPath) || !File.Exists(profilePath))
+                ReadIdentityReceipt();
+                if (!File.Exists(worldPath) || !File.Exists(profilePath))
                     throw new InvalidDataException("Previous QA identity preparation is incomplete; it will not be retried automatically.");
                 return name;
             }
@@ -179,6 +174,66 @@ namespace OstrixMods.BuildWorks
             SaveSystem.InvalidateCache(SaveDataType.World);
             SaveSystem.InvalidateCache(SaveDataType.Character);
             return name;
+        }
+
+        private static string[] ReadIdentityReceipt()
+        {
+            string path = Path.Combine(root, "qa-identities.txt");
+            ValidateSavePath(path);
+            var file = new FileInfo(path);
+            if (!file.Exists || file.Length > 512) throw new InvalidDataException("Invalid QA identity receipt.");
+            string[] lines = File.ReadAllLines(path);
+            ValidateIdentityReceipt(lines, token);
+            return lines;
+        }
+
+        internal static long[] ValidateIdentityReceipt(string[] lines, string sessionToken)
+        {
+            if (!Guid.TryParseExact(sessionToken, "N", out Guid id) || id == Guid.Empty)
+                throw new InvalidDataException("Invalid QA identity token.");
+            string name = "BW_QA_" + id.ToString("N").Substring(0, 8);
+            if (lines == null || lines.Length != 8 || lines[0] != "BuildWorks-QA-1" || lines[1] != id.ToString("N") ||
+                lines[2] != name || lines[4] != name || lines[6] != "started" || lines[7] != "complete" ||
+                !long.TryParse(lines[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out long worldId) || worldId == 0 ||
+                !long.TryParse(lines[5], NumberStyles.Integer, CultureInfo.InvariantCulture, out long playerId) || playerId == 0)
+                throw new InvalidDataException("Previous QA identity preparation is incomplete or changed; it will not be retried automatically.");
+            return new[] { worldId, playerId };
+        }
+
+        internal static void RequireIdentityMatch(string[] receipt, string sessionToken, string worldName, long worldId,
+            string profileFilename, long profileId, long localPlayerId)
+        {
+            long[] ids = ValidateIdentityReceipt(receipt, sessionToken);
+            if (worldName != receipt[2] || worldId != ids[0] || profileFilename != receipt[4] ||
+                profileId != ids[1] || localPlayerId != ids[1])
+                throw new InvalidDataException("Loaded QA world/profile/player does not match its original identity receipt.");
+        }
+
+        // Call immediately before each future provisioning operation; an earlier PASS is not a grant capability.
+        internal static Player RequireLoadedSession()
+        {
+            AssertPinned();
+            ZNet network = ZNet.instance;
+            Game game = Game.instance;
+            Player player = Player.m_localPlayer;
+            if (!network || !game || !player || !ZoneSystem.instance || !PlatformInitializer.SaveDataInitialized ||
+                !network.IsServer() || network.IsDedicated() || ZNet.IsOpenServer() || network.GetPeers().Count != 0 ||
+                game.IsShuttingDown() || player.IsDead() || player.IsTeleporting() || player.GetInventory() == null ||
+                Player.m_debugMode || player.NoCostCheat() || Game.m_worldLevel != 0 ||
+                ZoneSystem.instance.GetGlobalKey(GlobalKeys.NoBuildCost) || ZoneSystem.instance.GetGlobalKey(GlobalKeys.NoCraftCost))
+                throw new InvalidOperationException("QA preparation requires a loaded living player on a closed Local survival server with no peers or cheats.");
+            World world = network.GetWorld();
+            PlayerProfile profile = game.GetPlayerProfile();
+            if (world == null || profile == null || world.m_fileSource != FileHelpers.FileSource.Local ||
+                profile.m_fileSource != FileHelpers.FileSource.Local)
+                throw new InvalidOperationException("QA preparation requires Local world and character saves.");
+            ValidateSavePath(world.GetSaveFWLPath());
+            ValidateSavePath(profile.GetPath());
+            if (!File.Exists(world.GetSaveFWLPath()) || !File.Exists(profile.GetPath()))
+                throw new InvalidDataException("Loaded QA identity save files are missing.");
+            RequireIdentityMatch(ReadIdentityReceipt(), token, world.m_worldName, world.m_uid,
+                profile.GetFilename(), profile.GetPlayerID(), player.GetPlayerID());
+            return player;
         }
 
         internal static void ValidateSavePath(string path)

@@ -1,12 +1,35 @@
-# Изоляция QA saves: этап 0.19.90
+# Изоляция QA saves: этапы 0.19.90–0.19.91
 
 [English](qa-save-isolation-0.19.90.md) | **Русский**
 
 Это проверенный исходный этап подготовки стенда, **не готовый survival-стенд и не игровая приёмка**.
-Установлена .82; .90 не устанавливалась. Valheim не запускался, игровые сохранения не менялись.
+Установлена .82; текущая .91 не устанавливалась. Valheim не запускался, игровые сохранения не менялись.
 С разрешения Ostrix изменён только `[Bootstrap] CreateMissingSaves = true` → `false` в конфиге
 TerrainRamp.TestBootstrap профиля TerrainRamp-1.0-Test. Другие параметры сохранены, BOM/newlines сохранены.
 Локальная копия/хеши: `artifacts/checkpoint-0.19.90/bootstrap-config-change.json` и `bootstrap-config-before.cfg`.
+
+## Проверка загруженного сеанса: .91
+
+После подготовки saves coroutine ждёт появления local player и завершения телепортации, затем вызывает
+RequireLoadedSession. Это одноразовая проверка первого входа, не постоянная блокировка сетевых соединений
+и не разрешение на будущую выдачу. Перед каждой будущей изменяющей операцией guard нужно вызвать снова.
+Отказ только записывается в лог; предметы/станции/ресурсы пока не создаются.
+
+Guard повторно проверяет root/cloud/owner, initialized storage, текущие Local world/profile, существующие
+пути внутри root, полное совпадение имени мира/filename персонажа и 64-битных UID/profile ID/local player ID
+с исходным complete receipt. `Player.GetPlayerID()` возвращает ID из действующего ZDO; до него 0 запрещён.
+Общий validator receipt используется и при повторном открытии ранее подготовленных saves.
+
+Требуются living player, inventory, ZoneSystem, !shutdown, server, !dedicated, !open server и GetPeers().Count=0.
+Native GetPeers содержит также уже принятые подключения до handshake: проверка только ready peers слабее.
+Отказ при debug, NoCostCheat, worldLevel!=0, мировых NoBuildCost/NoCraftCost. Эти проверки не доказывают
+survival-настройки будущих конкретных деталей: при подготовке их плана отдельно проверить Piece.FreeBuildKey().
+
+Test-QASaveIsolation выполняет **25** BCL случаев: валидные большие signed64 ID, каждый повреждённый столбец,
+неполный/расширенный/null receipt, нулевые и overflowing ID, чужой/некорректный token, несовпадение каждого
+загруженного имени/ID и player ID=0. Проверки native guard и его вызова coroutine — только compiled wiring.
+Сами native методы, save creation, loaded lifecycle и сетевые переходы не исполнялись.
+Доказательства .91: `artifacts/checkpoint-0.19.91/verification.json`; старые Unity/corpus проверки не перезапускались.
 
 ## Реализация и граница
 
@@ -70,7 +93,7 @@ Character PreSave пропускает world-only migration; quota возвра�
 Delete недостижим, Local→Local Copy создаёт `<name>_backup_auto-<timestamp>.fch` в той же папке.
 Это native proof именно свежей первой записи, не произвольного существующего архива.
 
-Следующий этап: привязать подготовку к реально загруженным Local UID/player ID и закрытому single-player
-server; подготовить материалы/свои предметы/знания/физические станции с одноразовым receipt и native
+Следующий этап: использовать повторную проверку загруженных Local UID/player ID и закрытого single-player
+server непосредственно перед подготовкой материалов/своих предметов/знаний/физических станций с одноразовым receipt и native
 count проверками. Затем готовая безопасная серия импорт → editor → стройка/cancel → world reload/сеть.
 Не предлагать пользователю добывать материалы или считать этот исходный этап готовым стендом.

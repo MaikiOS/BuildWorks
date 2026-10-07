@@ -2,7 +2,7 @@
 
 [English](continuation-audit-2026-10-07.md) | **Русский**
 
-Аудит 2026-10-07; текущий исходный checkpoint — 0.19.90. Это не приёмка полного продукта.
+Аудит 2026-10-07; текущий исходный checkpoint — 0.19.91. Это не приёмка полного продукта.
 Действующие инструкции: AGENTS.md, PROJECT_CONTRACT.md, docs/ROADMAP.md и текущий запрос владельца.
 CONTINUE_PROMPT.txt описывает .13 и устарел. specs/roadmap/current-pass.md описывает каталог .56,
 а не полный импорт. Исторические проверки не заменяют проверку установленной версии.
@@ -24,6 +24,11 @@ CONTINUE_PROMPT.txt описывает .13 и устарел. specs/roadmap/curr
 [Этап .90](testing/qa-save-isolation-0.19.90_RU.md): QA-only root/cloud isolation и fresh Local identities
 подготовлены в исходниках; BCL пути/compiled wiring PASS, native save не исполнялся. Known bootstrap writer
 отключён отдельным разрешением владельца, preflight PASS. Ресурсы/станции/готовый survival-стенд открыты.
+
+Этап .91 добавляет loaded Local identity/closed survival gate в QA coroutine: те же UID/profile ID/ZDO player ID
+и имена, отсутствие peers/open server/cheats; 25 BCL receipt/identity случаев и compiled wiring PASS.
+Native loaded lifecycle не исполнялся; выдачи ресурсов/предметов и станций пока нет. Исторические игровые
+подтверждения не требуют повтора из-за этой source-only проверки. Установленная .82 не менялась.
 
 ## Проверенные исходные данные
 

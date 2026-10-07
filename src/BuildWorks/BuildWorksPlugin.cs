@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.90";
+        internal const string PluginVersion = "0.19.91";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -142,6 +142,17 @@ namespace OstrixMods.BuildWorks
             catch (Exception exception)
             {
                 Logger.LogError("BuildWorks QA save preparation refused; no automatic retry: " + exception);
+                yield break;
+            }
+            while (!Player.m_localPlayer || Player.m_localPlayer.IsTeleporting()) yield return null;
+            try
+            {
+                BuildWorksTestIsolation.RequireLoadedSession();
+                Logger.LogInfo("BuildWorks QA loaded Local identities and closed survival session verified. Resources/stations are not prepared yet.");
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError("BuildWorks QA loaded session refused; no test items or stations were created: " + exception);
             }
         }
 #endif

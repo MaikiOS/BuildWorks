@@ -2,7 +2,7 @@
 
 **English** | [Русский](continuation-audit-2026-10-07_RU.md)
 
-Audit: 2026-10-07; current source checkpoint .90. This is not full product acceptance.
+Audit: 2026-10-07; current source checkpoint .91. This is not full product acceptance.
 Read AGENTS, PROJECT_CONTRACT, current HANDOFF and docs/ROADMAP. CONTINUE_PROMPT.txt targets
 .13; current-pass targets the historical .56 catalogue, not imported construction acceptance.
 
@@ -23,6 +23,11 @@ No safe-stand preparation is implemented.
 [Checkpoint .90](testing/qa-save-isolation-0.19.90.md): QA-only root/cloud isolation and fresh Local identities
 are source-prepared. BCL paths/compiled wiring PASS; native save unexecuted. Known bootstrap writer disabled
 with explicit owner authorization; preflight PASS. Resources/stations/ready survival stand remain open.
+
+Checkpoint .91 adds a loaded Local identity/closed survival gate to the QA coroutine: exact world UID/profile ID/
+ZDO player ID and names, no peers/open server/cheats. 25 BCL receipt/identity cases and compiled wiring PASS.
+Native loaded lifecycle remains unexecuted; no resource/item grants or stations yet. This source-only check does
+not require repeating accepted historical game checks. Installed .82 remains unchanged.
 
 ## Verified baseline
 

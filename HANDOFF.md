@@ -2,6 +2,21 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.91 — loaded QA session gate
+
+[Contract/checks](docs/testing/qa-save-isolation-0.19.90.md). RequireLoadedSession rechecks root/Local sources/
+paths/receipt and actual world UID/profile ID/ZDO player ID/names. Closed server/no peers, living loaded player,
+no cheats/worldLevel0; native APIs inspected in installed DLLs. Coroutine calls after player/teleport readiness;
+every future grant must call again immediately before mutation, an earlier PASS is not a capability.
+25 executed BCL receipt/identity cases + paths/junction + compiled guard/coroutine wiring PASS.
+Both Release0/0, normal/QA separation, host contract and Localization853/format PASS; native runtime unexecuted.
+Not a ready stand: resources/supplied items/stations/one-shot grants absent. Next: native material plan, Hammer
+before AddKnownItem, supplied items, physical stations via native PlacePiece, one-shot receipt and actual
+delta/count verification; profile.SavePlayerData(player)+Save() after rechecking the identity gate.
+Check Piece.FreeBuildKey for each test prefab separately. No NoCost/debug/world key bypasses.
+Installed .82; no deployment, game/save execution or bootstrap config changes after .90.
+Local source-only proof: artifacts/checkpoint-0.19.91/verification.json. Full objective remains open.
+
 ## Checkpoint 0.19.90 — QA save isolation; source preparation only
 
 [Contract and checks](docs/testing/qa-save-isolation-0.19.90.md). Normal DLL excludes QA type;

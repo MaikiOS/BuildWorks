@@ -53,6 +53,20 @@ foreach ($entry in @(@('assembly_valheim.dll','25A0A107DCE4D834C44C2B72D0EAFD5CB
 }
 $allCalls = ($type.Methods | Where-Object HasBody | ForEach-Object { $_.Body.Instructions | ForEach-Object { [string]$_.Operand } }) -join "`n"
 Require ($allCalls -notmatch 'ResetSaveDataPath\(\)|SaveSystem::ForceRefreshCache|Directory::Delete|File::Delete|File::Move') 'QA isolation gained cache clearing, root reset or destructive filesystem operations.'
+$loaded = $type.Methods | Where-Object Name -eq 'RequireLoadedSession'
+$loadedCalls = @($loaded.Body.Instructions | Where-Object { $_.OpCode.Name -in @('call','callvirt') } | ForEach-Object { [string]$_.Operand })
+foreach ($name in @('AssertPinned','IsServer','IsDedicated','IsOpenServer','GetPeers','IsShuttingDown','IsDead','IsTeleporting',
+    'GetInventory','NoCostCheat','GetGlobalKey','GetWorld','GetPlayerProfile','GetSaveFWLPath','GetPath','GetFilename',
+    'GetPlayerID','ReadIdentityReceipt','RequireIdentityMatch')) {
+    Require ([bool]($loadedCalls -match "::$name\(")) "Loaded QA session omits native identity/survival guard: $name"
+}
+$loadedFields = @($loaded.Body.Instructions | Where-Object { $_.OpCode.Name -in @('ldfld','ldsfld') } | ForEach-Object { [string]$_.Operand })
+foreach ($name in @('m_debugMode','m_worldLevel','m_fileSource','m_worldName','m_uid')) {
+    Require ([bool]($loadedFields -match "::$name$")) "Loaded QA session omits native identity/survival field: $name"
+}
+$pluginType = $qa.MainModule.GetType('OstrixMods.BuildWorks.BuildWorksPlugin')
+$coroutine = $pluginType.NestedTypes | Where-Object Name -Like '<PrepareQaSaves>*'
+Require ([bool](@($coroutine.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -match '::RequireLoadedSession\(')) 'QA loaded gate is not called by the actual plugin coroutine.'
 $qa.Dispose(); $normal.Dispose()
 
 # Only BCL path/ownership functions execute here. No native API/root setter/save is invoked.
@@ -101,6 +115,47 @@ Refuses { Invoke-PathCheck 'ValidateSavePath' @((Join-Path $isolated '../escape.
 $link = Join-Path $isolated 'linked'
 New-Item -ItemType Junction -Path $link -Value $unknown | Out-Null
 Refuses { Invoke-PathCheck 'ValidateSavePath' @((Join-Path $link 'escape.fch')) } 'Junction escaped isolated save destination.'
-@{status='passed_paths_and_compiled_contract_only';qaSha256=(Get-FileHash $qaPath).Hash;normalSha256=(Get-FileHash $normalPath).Hash;gameHostTested=$false;saveFilesModified=$false;fixtures=$output} |
+# Execute the real receipt/matching helpers; native host methods above are compiled-contract proof only.
+$name = 'BW_QA_' + $token.Substring(0,8)
+[string[]]$receipt = @('BuildWorks-QA-1',$token,$name,'9223372036854775806',$name,'-9223372036854775807','started','complete')
+function Invoke-IdentityCheck([string]$method, [object[]]$arguments) {
+    $runtimeType.GetMethod($method,$flags).Invoke($null,$arguments)
+}
+$identityChecks = 0
+[object[]]$identity = @($receipt,$token,$name,[long]9223372036854775806,$name,[long]::Parse('-9223372036854775807'),[long]::Parse('-9223372036854775807'))
+Invoke-IdentityCheck 'RequireIdentityMatch' $identity
+$identityChecks++
+foreach ($index in 0..7) {
+    [string[]]$badReceipt = $receipt.Clone()
+    $badReceipt[$index] = 'invalid'
+    Refuses { Invoke-IdentityCheck 'ValidateIdentityReceipt' @($badReceipt,$token) } "Malformed receipt field $index accepted."
+    $identityChecks++
+}
+foreach ($invalidId in @(@{index=3;value='0'},@{index=5;value='0'},@{index=3;value='9223372036854775808'},@{index=5;value='-9223372036854775809'})) {
+    [string[]]$lines = $receipt.Clone(); $lines[$invalidId.index] = $invalidId.value
+    Refuses { Invoke-IdentityCheck 'ValidateIdentityReceipt' @($lines,$token) } 'Zero or overflowing native ID accepted.'
+    $identityChecks++
+}
+foreach ($length in @(7,9)) {
+    [string[]]$lines = if ($length -eq 7) { $receipt[0..6] } else { @($receipt) + @('extra') }
+    Refuses { Invoke-IdentityCheck 'ValidateIdentityReceipt' @($lines,$token) } 'Partial or extended receipt accepted.'
+    $identityChecks++
+}
+Refuses { Invoke-IdentityCheck 'ValidateIdentityReceipt' @($null,$token) } 'Null receipt accepted.'
+$identityChecks++
+foreach ($badToken in @([guid]::Empty.ToString('N'),[guid]::NewGuid().ToString('N'),'../escape')) {
+    Refuses { Invoke-IdentityCheck 'ValidateIdentityReceipt' @($receipt,$badToken) } 'Foreign or malformed identity token accepted.'
+    $identityChecks++
+}
+foreach ($index in 2..6) {
+    [object[]]$mismatch = $identity.Clone()
+    $mismatch[$index] = if ($index -in @(2,4)) { 'other' } else { [long]17 }
+    Refuses { Invoke-IdentityCheck 'RequireIdentityMatch' $mismatch } "Loaded identity mismatch $index accepted."
+    $identityChecks++
+}
+[object[]]$noZdo = $identity.Clone(); $noZdo[6] = [long]0
+Refuses { Invoke-IdentityCheck 'RequireIdentityMatch' $noZdo } 'Uninitialized local player ZDO ID accepted.'
+$identityChecks++
+@{status='passed_paths_receipts_and_compiled_contract_only';identityCases=$identityChecks;qaSha256=(Get-FileHash $qaPath).Hash;normalSha256=(Get-FileHash $normalPath).Hash;gameHostTested=$false;saveFilesModified=$false;fixtures=$output} |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'verification.json')
-'PASS: QA-only assembly, native guard wiring, root/ownership/traversal/junction refusal; no native saves or game execution.'
+"PASS: QA-only assembly, native loaded guard wiring, $identityChecks receipt/identity cases, root/ownership/traversal/junction refusal; no native saves or game execution."

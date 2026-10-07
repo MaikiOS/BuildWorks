@@ -1,11 +1,34 @@
-# QA save isolation: checkpoint 0.19.90
+# QA save isolation: checkpoints 0.19.90–0.19.91
 
 **English** | [Русский](qa-save-isolation-0.19.90_RU.md)
 
-Verified source preparation, **not a ready survival stand or game acceptance**. Installed .82; .90 is not
+Verified source preparation, **not a ready survival stand or game acceptance**. Installed .82; current .91 is not
 deployed. No Valheim launch or game-save mutation. With explicit owner permission only TerrainRamp-1.0-Test's
 TerrainRamp bootstrap `[Bootstrap] CreateMissingSaves=true` changed to false; all other text/BOM/newlines preserved.
 Local backup/hash proof: `artifacts/checkpoint-0.19.90/bootstrap-config-change.json` and `bootstrap-config-before.cfg`.
+
+## Loaded-session gate: .91
+
+After save preparation the coroutine waits for a local player and teleport completion, then calls
+RequireLoadedSession. This is a one-time first-entry check, not continuous connection blocking or a capability
+to grant later. Every future mutating operation must call the guard again immediately before proceeding.
+Refusal only logs an error; no test items, stations or materials are created yet.
+
+The guard rechecks root/cloud/owner, initialized storage, current Local world/profile, existing save paths inside
+the root, and exact world name/profile filename and signed64 world UID/profile ID/local player ID against the
+original complete receipt. Player.GetPlayerID reads the live ZDO ID; uninitialized zero is rejected.
+Receipt validation is shared with reopening previously prepared saves.
+
+Requires living player, inventory, ZoneSystem, !shutdown, server, !dedicated, !open server and zero GetPeers.
+Native GetPeers includes accepted connections before handshake; counting only ready peers is weaker.
+Debug, NoCostCheat, nonzero world level and global NoBuildCost/NoCraftCost refuse. These do not prove the
+survival settings of future individual pieces: their plan must also check Piece.FreeBuildKey().
+
+Test-QASaveIsolation executes **25** BCL cases: valid large signed64 IDs, each corrupt field, partial/extended/null
+receipt, zero/overflowing IDs, foreign/malformed token, every loaded name/ID mismatch and player ID=0.
+Native guard/coroutine checks prove compiled wiring only. Native methods, save creation, loaded lifecycle and
+network transitions have not executed. Proof: `artifacts/checkpoint-0.19.91/verification.json`.
+Older Unity/corpus checks were not rerun.
 
 ## Implementation boundary
 
@@ -63,6 +86,6 @@ world migration; quota returns false. First .fch.new/.fch/.old writes stay in th
 first autobackup for a new name; absent old backup skips Delete, Local→Local Copy targets the same folder with
 <name>_backup_auto-<timestamp>.fch. This covers fresh first writes, not arbitrary existing saves.
 
-Next: verify loaded Local world UID/player ID and closed single-player server; prepare resources/supplied items/native
+Next: recheck loaded Local world UID/player ID and closed single-player server immediately before preparing resources/supplied items/native
 knowledge/physical stations with one-shot receipt and real count checks. Then provide a ready import/editor/build/
 cancel/reload/network test series. Do not ask the owner to gather materials or treat this source stage as a ready stand.

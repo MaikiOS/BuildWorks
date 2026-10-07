@@ -41,18 +41,20 @@ namespace OstrixMods.BuildWorks
         internal int TemplateCount => templates.Count;
 
         internal void Prepare(IReadOnlyList<PrecisionPlacementSession.TransformSnapshot> plan,
-            IReadOnlyList<Piece> pieces, int layer)
+            IReadOnlyList<Piece> pieces, int layer,
+            IReadOnlyList<BlueprintItemStandPlacement.Supply> supplies = null)
         {
             Ready = false;
             PreparedCount = 0;
-            if (plan == null || pieces == null || plan.Count != pieces.Count) return;
+            if (plan == null || pieces == null || plan.Count != pieces.Count ||
+                supplies != null && supplies.Count != plan.Count) return;
             if (parts.Length != plan.Count) parts = new Template[plan.Count];
             int created = 0;
             for (int index = 0; index < plan.Count; ++index)
             {
                 if (!pieces[index]) return;
                 GameObject source = pieces[index].gameObject;
-                BlueprintForeignPartData data = plan[index].ItemStandContents;
+                BlueprintForeignPartData data = supplies == null ? plan[index].ItemStandContents : supplies[index]?.Contents;
                 var key = (source, data?.Format, data?.Info, data?.ContentsCleared ?? false);
                 if (!templates.TryGetValue(key, out Template template))
                 {
@@ -105,7 +107,7 @@ namespace OstrixMods.BuildWorks
 
         internal void Draw(IReadOnlyList<PrecisionPlacementSession.TransformSnapshot> plan,
             MaterialPropertyBlock properties, int layer,
-            int hiddenIndex, Matrix4x4 root, Camera camera = null)
+            int hiddenIndex, Matrix4x4 root, Camera camera = null, bool attachmentsOnly = false)
         {
             if (!Ready || plan.Count != parts.Length) return;
             foreach (Batch batch in batches.Values) batch.Count = 0;
@@ -117,7 +119,7 @@ namespace OstrixMods.BuildWorks
                 foreach (DrawPart draw in parts[index].Parts)
                 {
                     // The native ghost supplies the holder, not its saved item.
-                    if (index == hiddenIndex && !draw.Attachment) continue;
+                    if ((attachmentsOnly || index == hiddenIndex) && !draw.Attachment) continue;
                     var key = (draw.Mesh, draw.Material, draw.Submesh);
                     if (!batches.TryGetValue(key, out Batch batch))
                     {

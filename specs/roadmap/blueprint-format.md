@@ -1,9 +1,11 @@
 # Blueprint format and large-construction work
 
-Current .86 policy/evidence: [continuation audit](../../docs/continuation-audit-2026-10-07.md).
+Current .87 policy/evidence: [continuation audit](../../docs/continuation-audit-2026-10-07.md).
 Survival mounts use the supplied same-prefab item's own properties for archived snapshots and recipes.
 Source-exact matching/future reservation below is historical .80 behavior. Native validation,
-exact-one spending and supplied-package confirmation remain; preview/reload parity remains open.
+exact-one spending and supplied-package confirmation remain. World previews use own variant/quality;
+confirmation binds own item/packet and refuses silent replacement after native recipe consumption.
+Full native place/reload remains unverified.
 
 **English** | [Русский](blueprint-format_RU.md)
 

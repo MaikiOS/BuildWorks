@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -27,6 +28,8 @@ namespace OstrixMods.BuildWorks
     {
         private readonly List<GameObject> instances = new List<GameObject>();
         private readonly List<GameObject> instanceSources = new List<GameObject>();
+        private readonly List<(string, string, bool, bool)> instanceContents = new List<(string, string, bool, bool)>();
+        private readonly List<BlueprintItemStandPlacement.Supply> liveSupplies = new List<BlueprintItemStandPlacement.Supply>();
         private readonly MaterialPropertyBlock ghostProperties = new MaterialPropertyBlock();
         private GameObject source;
         private readonly BlueprintBatchedPreview batched = new BlueprintBatchedPreview();
@@ -38,14 +41,28 @@ namespace OstrixMods.BuildWorks
             GameObject placementGhost,
             IReadOnlyList<PrecisionPlacementSession.TransformSnapshot> plan,
             IReadOnlyList<Piece> pieces,
-            int hiddenIndex = 0, Matrix4x4? root = null)
+            int hiddenIndex = 0, Matrix4x4? root = null, Player supplier = null,
+            IReadOnlyList<BlueprintItemStandPlacement.Supply> supplies = null, bool attachmentsOnly = false)
         {
+            HeavyError = null;
             if (!placementGhost || plan == null || plan.Count < 2)
             {
                 Hide();
                 return;
             }
-            if (plan.Count > CompositeBlueprintStore.InteractivePartBudget)
+            if (plan.Count <= CompositeBlueprintStore.InteractivePartBudget && !attachmentsOnly && source != placementGhost)
+            {
+                Clear();
+                source = placementGhost;
+            }
+            if (supplier && supplies == null)
+            {
+                BlueprintItemStandPlacement.SelectSupplies(supplier, plan.Select(pose => pose.ItemStandContents), liveSupplies);
+                supplies = liveSupplies;
+            }
+            if (supplies != null && supplies.Count != plan.Count)
+            { Hide(); HeavyError = "Mount supply plan does not match placement plan."; return; }
+            if (plan.Count > CompositeBlueprintStore.InteractivePartBudget || attachmentsOnly)
             {
                 Hide();
                 ghostProperties.Clear();
@@ -54,30 +71,25 @@ namespace OstrixMods.BuildWorks
                 try
                 {
                     HeavyError = null;
-                    batched.Prepare(plan, pieces, placementGhost.layer);
+                    batched.Prepare(plan, pieces, placementGhost.layer, supplies);
                     batched.Draw(plan, ghostProperties, placementGhost.layer,
-                        hiddenIndex, root ?? Matrix4x4.identity);
+                        hiddenIndex, root ?? Matrix4x4.identity, attachmentsOnly: attachmentsOnly);
                 }
                 catch (Exception error) when (error is ArgumentException || error is UnityException)
                 { HeavyError = error.Message; }
                 return;
             }
-            if (source != placementGhost)
-            {
-                Clear();
-                source = placementGhost;
-            }
-
             ghostProperties.Clear();
             Renderer ghostRenderer = placementGhost.GetComponentInChildren<Renderer>(true);
             if (ghostRenderer) ghostRenderer.GetPropertyBlock(ghostProperties);
 
             bool hideOne = hiddenIndex >= 0 && hiddenIndex < plan.Count;
-            int count = plan.Count - (hideOne ? 1 : 0);
+            int count = plan.Count;
             while (instances.Count < count)
             {
                 instances.Add(null);
                 instanceSources.Add(null);
+                instanceContents.Add(default);
             }
 
             for (int index = 0; index < instances.Count; ++index)
@@ -87,12 +99,14 @@ namespace OstrixMods.BuildWorks
                     if (instances[index]) instances[index].SetActive(false);
                     continue;
                 }
-                int planIndex = hideOne && index >= hiddenIndex ? index + 1 : index;
+                int planIndex = index;
+                var data = supplies == null ? plan[planIndex].ItemStandContents : supplies[planIndex]?.Contents;
+                var contentKey = (data?.Format, data?.Info, data?.ContentsCleared ?? false, planIndex == hiddenIndex);
                 GameObject visualSource = pieces != null && pieces.Count == plan.Count &&
                     pieces[planIndex]
                     ? pieces[planIndex].gameObject
                     : placementGhost;
-                if (!instances[index] || instanceSources[index] != visualSource)
+                if (!instances[index] || instanceSources[index] != visualSource || instanceContents[index] != contentKey)
                 {
                     if (instances[index])
                     {
@@ -105,6 +119,16 @@ namespace OstrixMods.BuildWorks
                         hideOne ? ghostProperties : null,
                         placementGhost.layer);
                     instanceSources[index] = visualSource;
+                    instanceContents[index] = contentKey;
+                    if (planIndex == hiddenIndex)
+                        foreach (Renderer renderer in instances[index].GetComponentsInChildren<Renderer>(true))
+                            renderer.enabled = false;
+                    BlueprintItemStandPreview.TryAdd(visualSource, instances[index], data, out string warning, out GameObject content);
+                    if (warning != null)
+                    { HeavyError = warning; instanceSources[index] = null; }
+                    if (content && hideOne)
+                        foreach (Renderer renderer in content.GetComponentsInChildren<Renderer>(true))
+                            renderer.SetPropertyBlock(ghostProperties);
                 }
                 GameObject preview = instances[index];
                 preview.SetActive(true);
@@ -135,6 +159,8 @@ namespace OstrixMods.BuildWorks
             }
             instances.Clear();
             instanceSources.Clear();
+            instanceContents.Clear();
+            liveSupplies.Clear();
             batched.Dispose();
             HeavyError = null;
             source = null;

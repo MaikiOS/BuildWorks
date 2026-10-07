@@ -174,10 +174,25 @@ internal static class ItemStandPlacementAcceptance
                     BlueprintItemStandPlacement.FindItem(player, recipe) == exactItem,
                     "survival preflight lost item-count allocation");
                 player.Inventory.Items.Add(flexibleItem);
+                var supplies = new System.Collections.Generic.List<BlueprintItemStandPlacement.Supply>();
+                Require(BlueprintItemStandPlacement.SelectSupplies(player, new[] { recipe, exact }, supplies) &&
+                    supplies[0].Item == exactItem && supplies[1].Item == flexibleItem, "binding lost inventory order");
+                exactItem.m_durability = 1;
+                Require(!BlueprintItemStandPlacement.IsAvailable(player, supplies[0]) &&
+                    !BlueprintItemStandPlacement.TryApply(player, reservedHolder, recipe, out bool changedAttempt, out bool changedSafe, supplies[0]) &&
+                    !changedAttempt && changedSafe && !stand.HaveAttachment() && flexibleItem.m_stack == 1,
+                    "changed selected item silently replaced or consumed");
+                exactItem.m_durability = 125.05f;
+                player.Inventory.Items.Remove(exactItem);
+                Require(!BlueprintItemStandPlacement.TryApply(player, reservedHolder, recipe, out changedAttempt, out changedSafe, supplies[0]) &&
+                    !changedAttempt && changedSafe && !stand.HaveAttachment() && flexibleItem.m_stack == 1,
+                    "construction-spent selected item silently replaced or consumed");
+                player.Inventory.Items.Insert(0, exactItem);
                 Require(BlueprintItemStandPlacement.CanSupply(player, new[] { recipe, exact }) &&
-                    BlueprintItemStandPlacement.TryApply(player, reservedHolder, recipe, out bool attempted, out bool safe) &&
+                    BlueprintItemStandPlacement.TryApply(player, reservedHolder, recipe, out bool attempted, out bool safe, supplies[0]) &&
                     attempted && safe && !player.Inventory.ContainsItem(exactItem) &&
-                    player.Inventory.ContainsItem(flexibleItem) && flexibleItem.m_stack == 1,
+                    player.Inventory.ContainsItem(flexibleItem) && flexibleItem.m_stack == 1 &&
+                    BlueprintItemStandPlacement.IsAvailable(player, supplies[1]),
                     "survival placement consumed more than its selected item");
             }
             finally { Object.DestroyImmediate(reservedHolder); }

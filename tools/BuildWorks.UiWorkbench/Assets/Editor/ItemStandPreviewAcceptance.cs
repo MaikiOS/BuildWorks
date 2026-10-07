@@ -65,6 +65,79 @@ internal static class ItemStandPreviewAcceptance
         }
     }
 
+    private static void SuppliedWorldChecks(GameObject source, GameObject item, BlueprintForeignPartData captured)
+    {
+        Player previous = Player.m_localPlayer;
+        var playerObject = new GameObject("WorldPreviewSupplier");
+        var player = playerObject.AddComponent<Player>();
+        Player.m_localPlayer = player;
+        try
+        {
+            var own = item.GetComponent<ItemDrop>().m_itemData.Clone();
+            own.m_dropPrefab = item; own.m_stack = 1; own.m_quality = 1; own.m_variant = 0;
+            var second = own.Clone(); second.m_stack = 2; second.m_quality = 2; second.m_variant = 1;
+            player.Inventory.Items.Add(own); player.Inventory.Items.Add(second);
+            var plan = new List<PrecisionPlacementSession.TransformSnapshot>();
+            var pieces = new List<Piece>();
+            for (int index = 0; index < 3; ++index)
+            {
+                plan.Add(new PrecisionPlacementSession.TransformSnapshot(new Vector3(index * 3, 0, 0),
+                    Quaternion.Euler(0, 35, 0), itemStandContents: captured));
+                pieces.Add(source.GetComponent<Piece>());
+            }
+            var bound = new List<BlueprintItemStandPlacement.Supply>();
+            Require(BlueprintItemStandPlacement.SelectSupplies(player, plan.Select(pose => pose.ItemStandContents), bound) &&
+                bound[0].Item == own && bound[1].Item == second && bound[2].Item == second,
+                "world preview does not reserve stack units");
+            using (var small = new PlacementGhostPreviewView())
+            {
+                small.Show(source, plan, pieces, 0, supplier: player);
+                var instances = Field<List<GameObject>>(small, "instances");
+                Require(instances.Count == 3 && instances.All(value => Content(value)),
+                    "small world or hidden native holder omits mounted item");
+                Require(Content(instances[0]).GetComponent<Renderer>().sharedMaterial.GetInt("_Style") == 0 &&
+                    Content(instances[1]).GetComponent<Renderer>().sharedMaterial.GetInt("_Style") == 1 &&
+                    Content(instances[2]).localScale == Content(instances[1]).localScale &&
+                    Content(instances[0]).localScale != Content(instances[1]).localScale,
+                    "world preview uses archived quality/variant instead of supplied item");
+                own.m_quality = 4; own.m_variant = 2;
+                small.Show(source, plan, pieces, 0, supplier: player);
+                Require(Content(instances[0]).GetComponent<Renderer>().sharedMaterial.GetInt("_Style") == 2,
+                    "live world preview ignores inventory changes");
+                small.Show(source, plan, pieces, 0, supplies: bound);
+                Require(Content(instances[0]).GetComponent<Renderer>().sharedMaterial.GetInt("_Style") == 0 &&
+                    !BlueprintItemStandPlacement.IsAvailable(player, bound[0]),
+                    "confirmed world preview silently changes selected item");
+                // Passive palette already includes all holders: draw only attachments in its root frame.
+                Matrix4x4 root = Matrix4x4.TRS(new Vector3(10, 2, 8), Quaternion.Euler(0, 70, 0), Vector3.one);
+                for (int frame = 0; frame < 3; ++frame)
+                    small.Show(source, plan, pieces, 0, root, supplies: bound, attachmentsOnly: true);
+                var batched = Field<BlueprintBatchedPreview>(small, "batched");
+                Require(batched.Ready && small.HeavyError == null, "passive small attachment overlay failed");
+                var batches = Field<System.Collections.IDictionary>(batched, "batches");
+                Require(batches.Count == 2, "passive attachment overlay redraws holders or collapses variants");
+            }
+            for (int index = 3; index < 513; ++index)
+            {
+                plan.Add(new PrecisionPlacementSession.TransformSnapshot(Vector3.zero, Quaternion.identity));
+                pieces.Add(source.GetComponent<Piece>());
+                bound.Add(null);
+            }
+            using (var heavy = new BlueprintBatchedPreview())
+            {
+                for (int frame = 0; frame < 3; ++frame) heavy.Prepare(plan, pieces, 0, bound);
+                Require(heavy.Ready && heavy.TemplateCount == 3, "heavy supplied templates allocate per item/stack");
+                Array parts = Field<Array>(heavy, "parts");
+                Require(Content(Field<GameObject>(parts.GetValue(0), "Visual")).GetComponent<Renderer>()
+                    .sharedMaterial.GetInt("_Style") == 0, "heavy world uses archived variant");
+            }
+            Require(player.Inventory.Items.Count == 2 && own.m_stack == 1 && second.m_stack == 2 &&
+                plan[0].ItemStandContents == captured && captured.Info == "SwordFixture:2:3:0",
+                "world preview consumed inventory or rewrote blueprint");
+        }
+        finally { Player.m_localPlayer = previous; Object.DestroyImmediate(playerObject); }
+    }
+
     private static void AuthoringChecks(Camera template, GameObject source, BlueprintForeignPartData captured, string output)
     {
         string path = Path.Combine(output, "stand-authoring-" + Guid.NewGuid().ToString("N") + ".json");
@@ -315,6 +388,7 @@ internal static class ItemStandPreviewAcceptance
             ItemStandPlacementAcceptance.Run(item);
             stand.m_orientationType = ItemStand.Orientation.Horizontal;
             HeavyContentsChecks(source, captured);
+            SuppliedWorldChecks(source, item, captured);
             using (var scene = new BlueprintEditorScene(template, _ => source))
             {
                 var doc = new BlueprintEditorDocument(null, "Captured", "Test", new[] { Part(captured) });

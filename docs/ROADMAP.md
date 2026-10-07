@@ -9,13 +9,19 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.86**, not deployed: survival ItemStand accepts the supplied same-prefab
+Active source checkpoint **0.19.87**, not deployed: ordinary/native-holder/passive/heavy world mounts show
+the supplied item's own quality/variant. Confirmation binds own reference/native packet; disappearance or mutation,
+including native recipe consumption, pauses attachment without fallback. Archive/editor/thumbnails unchanged.
+See [current audit](continuation-audit-2026-10-07.md) and HANDOFF for evidence and limitations. Installed remains .82;
+full imported build/reload and prepared survival world are still open.
+
+Previous source checkpoint **0.19.86**, not deployed: survival ItemStand accepts the supplied same-prefab
 item's own properties; exact-one native spending and exact supplied-package confirmation remain.
 Archive untouched; no admin restoration. New regression reproduced on .85 and passed with28 adapter
 cases/Unity252; required checks and both reviews PASS. Installed remains .82; no game/network proof or push.
 [Audited matrix and dependencies](continuation-audit-2026-10-07.md),
 [additional209-source corpus/format boundaries](../specs/roadmap/external-corpus-2026-10-07.md).
-Supplied-item preview, full imported build/reload and prepared survival world remain open. Goal incomplete.
+Full imported build/reload and prepared survival world remain open. Goal incomplete.
 
 Previous source checkpoint **0.19.85**, not deployed: bounded typed foreign-state conversion,
 full legacy mount snapshots and ZDO sign text, exact source binding and ordinary survival policy.

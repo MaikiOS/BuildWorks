@@ -819,7 +819,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.86.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.87.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -2139,9 +2139,13 @@ $passiveBlueprintPreviewOperands = @(
     $passiveBlueprintPreview.Body.Instructions |
         ForEach-Object { [string]$_.Operand }
 ) -join "`n"
-Assert-Contract ($previewShow.Parameters.Count -eq 5 -and
+Assert-Contract ($previewShow.Parameters.Count -eq 8 -and
     $previewShow.Parameters[3].Name -eq 'hiddenIndex' -and
+    $previewShow.Parameters[7].Name -eq 'attachmentsOnly' -and
     $previewSource -match 'bool hideOne = hiddenIndex >= 0' -and
+    $previewSource -match 'BlueprintItemStandPreview.TryAdd' -and
+    $previewSource -match 'BlueprintItemStandPlacement.SelectSupplies' -and
+    $sessionSource -match 'attachmentsOnly: blueprint.parts.Count <= CompositeBlueprintStore.InteractivePartBudget' -and
     $sessionSource -match 'ShowPassiveBlueprintPreview' -and
     $sessionSource -notmatch 'passiveBlueprintPieces' -and
     $passiveBlueprintPreviewOperands -notmatch 'Renderer::set_enabled' -and
@@ -2149,6 +2153,10 @@ Assert-Contract ($previewShow.Parameters.Count -eq 5 -and
     $passiveBlueprintPreviewOperands -match 'PlacementGhostPreviewView::Show' -and
     $passiveBlueprintPreviewOperands -match 'BlueprintPlacementFrame::ToRootPose') `
     'Blueprint preview overrides source renderer visibility or duplicates the native ghost.'
+Assert-Contract ($sessionSource -match 'IsAvailable\(player, pendingItemStandSupply\)' -and
+    $sessionSource -match 'out safe, pendingItemStandSupply' -and
+    $sessionSource -match 'supplies: placementSupplies') `
+    'Confirmed mount visuals and deferred native attachment must retain the selected supplied item.'
 $beginFreeView = $pluginMethods | Where-Object Name -eq 'BeginFreeView'
 $beginFreeViewOperands = @(
     $beginFreeView.Body.Instructions | ForEach-Object { [string]$_.Operand }
@@ -3038,4 +3046,4 @@ $worldCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'Preci
 $worldCaptureCalls = ($worldCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($worldCaptureCalls -match 'BlueprintStorageCapture::TryCapture' -and $worldCaptureCalls -match 'CompositeBlueprintStore/ForeignPartData::FromGeometry') 'World selection does not preserve container snapshots.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.86 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.87 and Valheim Steam build 25185596.'

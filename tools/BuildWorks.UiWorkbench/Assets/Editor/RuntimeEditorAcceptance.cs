@@ -185,6 +185,7 @@ public static class RuntimeEditorAcceptance
             TestPlacementSupportFrame();
             checks.Add(StorageCaptureAcceptance.Run());
             foreach (object step in ItemStandPreviewAcceptance.Run(template, output)) yield return step;
+            checks.Add("Supplied world mounts: small/native-holder/passive/heavy renderer paths use own quality/variant and per-stack allocation; live inventory changes refresh preview, confirmation binds exact own item and pause refuses changed/construction-spent items without fallback. Inert API fixtures only; real world/reload/network not tested.");
             checks.Add("Actual ItemStand world adapter on inert API fixture: 28 owner-only synchronous attachment cases; supplied-item properties for both archived snapshots and recipes, stack1/N, count allocation, orientation/late-owner-loss queue cancellation, access/ownership/no-item/wrong-type, false native acknowledgement, mid-use owner/item change, exceptions before/after consumption, exact consumed-package attribution/changed valid payload, oversized recipe/hash collision rejection, unspent clone cleanup/delayed cleanup, missing attachment, abnormal consumption, foreign queue isolation and denied/rebound/foreign-holder cleanup guards. Native world placement, drops, save/reload and multiplayer remain unverified.");
             checks.Add("Actual ItemStand tools -> compatible item catalogue -> one click -> replacement Cancel/confirm -> full-package Undo -> detach -> immediate empty-stand attach -> native save/reopen; cleared contents hide tree/tools/visuals, preserve raw evidence and Undo restores; stale locked stand rejected. No inventory/world creation.");
             checks.Add("Actual read-only ItemStand capture: native view override, stable item hash, exact v109 package and immutable full properties; metadata/hash mismatch, corrupt/oversized payload refused; mid-read revision changes, invalid/rebound views and newly populated empty/changed legacy holders refused; captured contents visible in renderer-only scene. No native ItemData.Load, inventory or world reconstruction executed.");
@@ -1166,7 +1167,9 @@ public static class RuntimeEditorAcceptance
                 new PrecisionPlacementSession.TransformSnapshot(Vector3.zero, Quaternion.identity),
                 new PrecisionPlacementSession.TransformSnapshot(Vector3.right, Quaternion.identity, new Vector3(1.2f,0.5f,2f)) }, null);
             var instances = Field<List<GameObject>>(ghost, "instances");
-            Require(Vector3.Distance(instances[0].transform.localScale,
+            Require(instances.Count == 2 && Array.TrueForAll(instances[0].GetComponentsInChildren<Renderer>(true), renderer => !renderer.enabled),
+                "World preview duplicates the native holder");
+            Require(Vector3.Distance(instances[1].transform.localScale,
                 Vector3.Scale(source.transform.localScale, new Vector3(1.2f,0.5f,2f))) < 0.001f, "World preview discarded per-part scale");
         }
         checks.Add("Nested descendants have matching bounds and original selection materials; selecting a leaf stays local");

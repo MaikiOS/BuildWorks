@@ -847,3 +847,4 @@ exchange.diagnostics_help	Read-only check: copy this report for diagnosis. No wo
 exchange.copy_report	Copy report
 placement.preview_loading	Preparing blueprint preview: {0}/{1}. Wait for the complete preview before placing.
 placement.preview_failed	Blueprint preview could not be prepared: {0}. Construction has not started.
+placement.mount_supply_changed	The item selected for this mount changed or disappeared. A replacement will not be consumed automatically. Esc cancels placement; then select the blueprint again.

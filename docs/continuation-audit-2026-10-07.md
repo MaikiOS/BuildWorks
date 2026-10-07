@@ -2,7 +2,7 @@
 
 **English** | [Русский](continuation-audit-2026-10-07_RU.md)
 
-Audit: 2026-10-07; next source checkpoint .86. This is not full product acceptance.
+Audit: 2026-10-07; current source checkpoint .87. This is not full product acceptance.
 Read AGENTS, PROJECT_CONTRACT, current HANDOFF and docs/ROADMAP. CONTINUE_PROMPT.txt targets
 .13; current-pass targets the historical .56 catalogue, not imported construction acceptance.
 
@@ -28,10 +28,10 @@ Its text was not updated. A document edit is not a goal update.
 |---|---|---|---|---|---|
 | Editor | Transform/group/Array/Contour/Undo/save | Geometry/bridge/Unity252 | Older .41/.44 and later scoped series recorded as accepted; do not repeat wholesale | Scenes above512 | New guide tools |
 | Exchange | Store14/portable5, .blueprint/.vbuild/ZIP, exact archives, separate contents options | Store353 plus separate209-source parser report | Imported construction through reload unproven | Headers, RandMatSeed, some ZDO/inventory, export only our JSON/ZIP | Unspecified third-party formats |
-| Scale/preview | Intrinsic prefab scale, nested XYZ, world50000 | Unity transform/heavy fixtures | Particular giant lamp remains unproven | Supplied-item variant/quality not reflected in ghost | Further measured optimization |
+| Scale/preview | Intrinsic prefab scale, nested XYZ, world50000; .87 supplied-item world appearance | Unity transforms; ordinary/native-holder/passive/heavy attachments | Particular giant lamp remains unproven | Native place/reload/FPS; unknown item effects | Further measured optimization |
 | Supports/snaps | Independent supports, distinct pivot/placement, durable world points | Store/controller/Unity/layout | Older group pivots accepted; new world snaps unaccepted | Reload/reconnect/remote client | Quiet unselected markers |
 | Missing prefabs | Scene records/placeholder | Rejection tested | None | Editor entry blocked; no source/type/local bbox or replacement1→N | Explicit multi-object substitution |
-| Items/authority | ItemStand capture/authoring/native spending; exchange retain/clear | .86 supplied properties/count/source retention;28 inert adapter cases | Native placement/drop/reload/network unaccepted | Containers/armour/free items, placement choices, server admin authorization | Full admin restore |
+| Items/authority | ItemStand capture/authoring/native spending; exchange retain/clear; .87 bound supplied item | .86 28 inert cases; .87 refuses changed/construction-spent bindings without fallback | Native placement/drop/reload/network unaccepted | Containers/armour/free items, placement choices, server admin authorization | Full admin restore |
 | Capture/heavy | Screen rectangle/manual edits, world50000 | Geometry/layout/shared-template Unity | Older capture partially accepted; no heavy imported construction | Area+height bounds, editor/capture512, FPS/prepared test world | Planned building/terrain integration |
 
 Original owner JSONL was read: 2026-10-01 18:55:35Z and 2026-10-03 17:18:33Z/19:06:57Z
@@ -40,7 +40,9 @@ import/save/reload. Historical assistant readiness statements are not runtime ev
 
 ## Ordered dependencies
 
-1. .86 supplied ItemStand properties/counts → reconcile world preview with the selected supply item.
+1. .86 supplied ItemStand properties/counts → .87 ordinary/native-holder/passive/heavy world projection of own
+   variant/quality. Confirmation binds own item reference/native packet; changed/construction-spent items pause
+   without selecting a replacement. Remaining visuals do not shift after spending earlier items. Inert fixtures only.
 2. Small external full cycle: typed dialect headers/source binding/material variation → shared placement
    frame → prepared file/resources → edit/place/cancel/reload. Never globally shrink to hide scale errors.
 3. Missing/heavy editor: preserve unknown scale/bounds and exact records; editor allowed, world blocked

@@ -2,6 +2,23 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.87 — supplied world appearance and bound item; source
+
+Ordinary previews previously omitted mounted contents; heavy previews used archived appearance.
+Ordinary/native-holder/passive Hammer/heavy paths now use separate Supply records: same-prefab inventory order,
+stack-unit allocation, own quality/variant and planned orientation. Editor/thumbnails retain archive appearance.
+Confirmation binds the supplied ItemData reference and native one-unit packet. Guards before construction and
+after native recipe consumption refuse changed/missing bindings without silently choosing another item.
+The Russian message requires Esc cancellation and selecting the blueprint again; Enter does not rebind.
+Exact-one spending/own-package verification remain. Source unchanged; preview never consumes inventory.
+Regressions cover all world renderer paths, allocation/live updates/frozen bindings and changed/spent refusal
+without consuming an alternative. Workbench uses inert API fixtures, not native Valheim.
+Final results: `artifacts/checkpoint-0.19.87/verification.json`. Correctness/ponytail reviews PASS; verify absent.
+Installed remains .82; no deployment/game/reload/network/FPS proof/push or save mutation.
+Next: a small real external blueprint through native construction/reload with a prepared safe fixture;
+header/material dialects, missing/heavy editor, inventory/armour/free items, placement choices/server admin remain.
+Full goal active. Do not request blanket retesting of previously accepted functionality.
+
 ## Checkpoint 0.19.86 — survival supplies the player's own mounted item; source verified
 
 [Verified continuation audit and dependencies](docs/continuation-audit-2026-10-07.md).

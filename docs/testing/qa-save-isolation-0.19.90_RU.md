@@ -1,12 +1,36 @@
-# Изоляция QA saves: этапы 0.19.90–0.19.91
+# Изоляция QA saves: этапы 0.19.90–0.19.92
 
 [English](qa-save-isolation-0.19.90.md) | **Русский**
 
 Это проверенный исходный этап подготовки стенда, **не готовый survival-стенд и не игровая приёмка**.
-Установлена .82; текущая .91 не устанавливалась. Valheim не запускался, игровые сохранения не менялись.
+Установлена .82; текущая .92 не устанавливалась. Valheim не запускался, игровые сохранения не менялись.
 С разрешения Ostrix изменён только `[Bootstrap] CreateMissingSaves = true` → `false` в конфиге
 TerrainRamp.TestBootstrap профиля TerrainRamp-1.0-Test. Другие параметры сохранены, BOM/newlines сохранены.
 Локальная копия/хеши: `artifacts/checkpoint-0.19.90/bootstrap-config-change.json` и `bootstrap-config-before.cfg`.
+
+## Одноразовые материалы: .92
+
+QA-only BuildWorksTestSupplies вызывается actual coroutine после loaded gate. План проверяет хеши своих
+01/02/03/04/06 и внешних CoffeeTable/ForestHut, читает actual reviewed importer. Исходники не меняются;
+внешние файлы остаются локально, [происхождение/ограничения](external-path-2026-10-07_RU.md), в Git только
+имена/хеши. Staging внешних файлов в QA config ещё не внедрён: без них отказ до выдачи.
+Native Piece.m_resources/ResourceCosts дают материалы для одной копии каждого файла; missing/free-key/invalid
+requirements блокируют подготовку. Общий cost<=10000 до accumulator. Canonical ObjectDB prefab IDs;
+Hammer1 перед материалами/AddKnownItem для обновления рецептов. Станции/их знания пока не готовятся.
+Проверяются консервативные empty slots/вес; если не помещается — отказ, нужен ещё не реализованный сундук.
+Разные prefab с одинаковым shared name запрещены; batch<=maxStack, проверяется точный prefab/count delta.
+False/partial не повторяется. Loaded gate повторяется перед каждым batch. Receipt привязан к IDs/source hashes/
+actual plan; CreateNew+Flush(true) перед выдачей, profile.SavePlayerData+Save(bool result) перед complete.
+Complete не выдаёт повторно после расходования; interrupted/foreign/changed требуют разбора без auto retry.
+Исполнены25 identity+11 one-shot+13 stack BCL случаев; native call/order/coroutine — только compiled proof.
+Native выдача/знания/save не исполнялись. Это исходная реализация, **не готовый стенд**.
+Proof: artifacts/checkpoint-0.19.92/verification.json; старые UI/corpus тесты не перезапускались.
+
+Следующее: физические станции без terraform, native world save. Player.PlacePiece не проверяет и не списывает
+cost — только QA fixture preparation, не ordinary construction proof. Проверить loaded ground/footprint/obstacles/
+отсутствие terrain components; после Start новый owner ZDO/creator/range. WorldSaveFinished/SaveDoneTime не
+означают success: после ZNet.Save(false,false,false) дождаться !IsSaving и committed GetSaveNumber()==before+1,
+повторить identity/root gate. EndSave(writeOK:true) фиксирует номер; failure не фиксирует. Reload отдельно.
 
 ## Проверка загруженного сеанса: .91
 

@@ -2,7 +2,7 @@
 
 **English** | [Русский](continuation-audit-2026-10-07_RU.md)
 
-Audit: 2026-10-07; current source checkpoint .91. This is not full product acceptance.
+Audit: 2026-10-07; current source checkpoint .92. This is not full product acceptance.
 Read AGENTS, PROJECT_CONTRACT, current HANDOFF and docs/ROADMAP. CONTINUE_PROMPT.txt targets
 .13; current-pass targets the historical .56 catalogue, not imported construction acceptance.
 
@@ -28,6 +28,11 @@ Checkpoint .91 adds a loaded Local identity/closed survival gate to the QA corou
 ZDO player ID and names, no peers/open server/cheats. 25 BCL receipt/identity cases and compiled wiring PASS.
 Native loaded lifecycle remains unexecuted; no resource/item grants or stations yet. This source-only check does
 not require repeating accepted historical game checks. Installed .82 remains unchanged.
+
+Checkpoint .92 implements QA-only one-shot actual-native materials/knowledge from7 pinned files.
+Started receipt before grants, exact stack/prefab delta, profile save before complete; partial/replay never reissues.
+25identity+11once+13stack BCL PASS; native compiled wiring only, no actual grants/save executed.
+Physical stations/external staging/ready stand remain absent; installed .82 unchanged.
 
 ## Verified baseline
 

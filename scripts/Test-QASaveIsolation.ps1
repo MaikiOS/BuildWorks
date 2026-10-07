@@ -65,8 +65,19 @@ foreach ($name in @('m_debugMode','m_worldLevel','m_fileSource','m_worldName','m
     Require ([bool]($loadedFields -match "::$name$")) "Loaded QA session omits native identity/survival field: $name"
 }
 $pluginType = $qa.MainModule.GetType('OstrixMods.BuildWorks.BuildWorksPlugin')
+$suppliesName = 'OstrixMods.BuildWorks.BuildWorksTestSupplies'
+$suppliesType = $qa.MainModule.GetType($suppliesName)
+Require ($null -ne $suppliesType -and $null -eq $normal.MainModule.GetType($suppliesName)) 'QA supplies leaked into normal build or are missing.'
+$prepare = $suppliesType.Methods | Where-Object Name -eq 'Prepare'
+$prepareCalls = @($prepare.Body.Instructions | Where-Object { $_.OpCode.Name -in @('call','callvirt') })
+foreach ($name in @('RequireLoadedSession','Plan','SupplyStamp','OnceComplete','BeginOnce','Count','AddItem','AddKnownItem','SavePlayerData','Save','CompleteOnce')) {
+    Require ([bool]($prepareCalls | Where-Object { [string]$_.Operand -match "::$name\(" })) "Native supply path omits $name"
+}
+function SupplyOffset([string]$name) { ($prepareCalls | Where-Object { [string]$_.Operand -match "::$name\(" } | Select-Object -First 1).Offset }
+Require ((SupplyOffset 'BeginOnce') -lt (SupplyOffset 'AddItem') -and (SupplyOffset 'Save') -lt (SupplyOffset 'CompleteOnce')) 'Supply receipt ordering lost started-before-grant or saved-before-complete.'
 $coroutine = $pluginType.NestedTypes | Where-Object Name -Like '<PrepareQaSaves>*'
 Require ([bool](@($coroutine.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -match '::RequireLoadedSession\(')) 'QA loaded gate is not called by the actual plugin coroutine.'
+Require ([bool](@($coroutine.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -match 'BuildWorksTestSupplies::Prepare\(')) 'QA supply path is not called by actual plugin coroutine.'
 $qa.Dispose(); $normal.Dispose()
 
 # Only BCL path/ownership functions execute here. No native API/root setter/save is invoked.
@@ -156,6 +167,44 @@ foreach ($index in 2..6) {
 [object[]]$noZdo = $identity.Clone(); $noZdo[6] = [long]0
 Refuses { Invoke-IdentityCheck 'RequireIdentityMatch' $noZdo } 'Uninitialized local player ZDO ID accepted.'
 $identityChecks++
-@{status='passed_paths_receipts_and_compiled_contract_only';identityCases=$identityChecks;qaSha256=(Get-FileHash $qaPath).Hash;normalSha256=(Get-FileHash $normalPath).Hash;gameHostTested=$false;saveFilesModified=$false;fixtures=$output} |
+$onceChecks = 0
+$supplyReceipt = Join-Path $isolated 'qa-supplies.txt'
+$stamp = 'A' * 64
+Require ([bool](Invoke-PathCheck 'BeginOnce' @($supplyReceipt,$stamp))) 'Fresh preparation did not start.'
+$onceChecks++
+$startedHash = (Get-FileHash $supplyReceipt).Hash
+Refuses { Invoke-PathCheck 'BeginOnce' @($supplyReceipt,$stamp) } 'Interrupted preparation retried.'
+Require ((Get-FileHash $supplyReceipt).Hash -eq $startedHash) 'Refusal rewrote started receipt.'
+$onceChecks++
+Refuses { Invoke-PathCheck 'CompleteOnce' @($supplyReceipt,('B'*64)) } 'Foreign stamp completed preparation.'
+$onceChecks++
+Invoke-PathCheck 'CompleteOnce' @($supplyReceipt,$stamp)
+Require ([bool](Invoke-PathCheck 'OnceComplete' @($supplyReceipt,$stamp))) 'Completed receipt not recognized.'
+$onceChecks++
+$completeHash = (Get-FileHash $supplyReceipt).Hash
+Require (-not [bool](Invoke-PathCheck 'BeginOnce' @($supplyReceipt,$stamp))) 'Completed preparation reissued supplies.'
+Require ((Get-FileHash $supplyReceipt).Hash -eq $completeHash) 'Replay changed complete receipt.'
+$onceChecks++
+foreach ($invalidStamp in @('A',('a'*64),('G'*64),'../escape')) {
+    Refuses { Invoke-PathCheck 'BeginOnce' @((Join-Path $isolated 'never-created.txt'),$invalidStamp) } 'Malformed supply stamp accepted.'
+    $onceChecks++
+}
+Refuses { Invoke-PathCheck 'BeginOnce' @($supplyReceipt,('B'*64)) } 'Different plan adopted completed receipt.'
+$onceChecks++
+Refuses { Invoke-PathCheck 'BeginOnce' @((Join-Path $link 'escape.txt'),$stamp) } 'Supply receipt escaped through junction.'
+$onceChecks++
+$batchChecks = 0
+$batchType = $assembly.GetType($suppliesName,$true)
+function Batches([int]$amount,[int]$maximum) { $batchType.GetMethod('StackBatches',$flags).Invoke($null,@($amount,$maximum)) }
+foreach ($case in @(@(1,50),@(50,50),@(51,50),@(123,50),@(10000,1),@(10000,10000))) {
+    [int[]]$batches = Batches $case[0] $case[1]
+    Require (($batches | Measure-Object -Sum).Sum -eq $case[0] -and -not ($batches | Where-Object { $_ -lt 1 -or $_ -gt $case[1] })) 'Stack batching lost/truncated items.'
+    $batchChecks++
+}
+foreach ($case in @(@(0,50),@(-1,50),@(10001,50),@(1,0),@(1,-1),@(1,10001),@([int]::MaxValue,1))) {
+    Refuses { Batches $case[0] $case[1] } 'Invalid/excessive supply stack accepted.'
+    $batchChecks++
+}
+@{status='passed_paths_receipts_stacks_and_compiled_contract_only';identityCases=$identityChecks;onceCases=$onceChecks;batchCases=$batchChecks;qaSha256=(Get-FileHash $qaPath).Hash;normalSha256=(Get-FileHash $normalPath).Hash;gameHostTested=$false;saveFilesModified=$false;fixtures=$output} |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'verification.json')
-"PASS: QA-only assembly, native loaded guard wiring, $identityChecks receipt/identity cases, root/ownership/traversal/junction refusal; no native saves or game execution."
+"PASS: QA-only assemblies; $identityChecks identity, $onceChecks one-shot, $batchChecks stack cases; native supply wiring only. No native grants/saves or game execution."

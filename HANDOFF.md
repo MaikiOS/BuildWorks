@@ -2,6 +2,21 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.92 — one-shot QA supplies and knowledge
+
+[Contract/boundaries](docs/testing/qa-save-isolation-0.19.90.md). New QA-only BuildWorksTestSupplies:
+7 hash-pinned fixtures via actual importer → native cost plan → Hammer1/materials/AddKnownItem →
+profile snapshot+Save() bool → complete receipt. Exact prefab count delta, maxStack batches, slots/weight,
+no ambiguous shared names, bound10000 before existing ResourceCosts. Loaded guard before every batch.
+Started+Flush(true) before grant; partial/incomplete/changed refuse, complete never reissues after consumption.
+25identity+11once+13stack BCL+compiled native order/coroutine PASS, normal/QA0/0, HostContract/Localization853 PASS.
+Native grants/knowledge/save unexecuted. Installed .82, no profile/game/save changes.
+Not a ready stand: external2file staging through existing guarded deploy, physical stations/optional resource chest,
+native world save/reload remain. Only external names/hashes enter source, no third-party blueprint content.
+Next: loaded footprint/terrain/obstacles without terraform, PlacePiece for QA fixtures only (no cost consumption),
+fresh owner ZDO/creator/range after Start. Save(false,false,false), !IsSaving + GetSaveNumber()==before+1;
+WorldSaveFinished is not success. Full goal open. Proof artifacts/checkpoint-0.19.92/verification.json.
+
 ## Checkpoint 0.19.91 — loaded QA session gate
 
 [Contract/checks](docs/testing/qa-save-isolation-0.19.90.md). RequireLoadedSession rechecks root/Local sources/

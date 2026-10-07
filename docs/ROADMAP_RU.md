@@ -9,7 +9,12 @@
 
 ## База и доказательства
 
-Активные исходники **0.19.91**, не установлены: [QA save isolation и loaded gate](testing/qa-save-isolation-0.19.90_RU.md).
+Активные исходники **0.19.92**, не установлены: [одноразовые QA supplies](testing/qa-save-isolation-0.19.90_RU.md).
+Actual native resource plan по7 закреплённым файлам, Hammer/материалы/AddKnownItem, stack/count/weight guards,
+started-before-grant и profile-save-before-complete. 25identity+11once+13stack BCL PASS; native только compiled.
+Выдача в игре не исполнялась; staging внешних файлов, физические станции/сундук/ready stand остаются открыты.
+
+Предыдущие исходники **0.19.91**, не установлены: [QA save isolation и loaded gate](testing/qa-save-isolation-0.19.90_RU.md).
 Повторная проверка Local UID/profile ID/ZDO player ID, closed server/no peers/без cheats перед будущей выдачей;
 25 BCL receipt/identity случаев + compiled guard/coroutine wiring PASS. Runtime не доказан, выдачи ещё нет.
 

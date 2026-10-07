@@ -2,6 +2,21 @@
 
 [English](HANDOFF.md) | **Русский**
 
+## Этап 0.19.92 — одноразовые QA материалы и знания
+
+[Контракт/границы](docs/testing/qa-save-isolation-0.19.90_RU.md). Новая QA-only BuildWorksTestSupplies:
+7 hash-pinned fixtures через actual importer → native cost plan → Hammer1/материалы/AddKnownItem →
+profile snapshot+Save() bool → complete receipt. Exact prefab count delta, maxStack batches, slots/weight,
+no ambiguous shared names, bound10000 перед existing ResourceCosts. Guard перед каждым batch.
+Started+Flush(true) перед grant; partial/incomplete/changed refuse, complete никогда не переиздаёт после расхода.
+25identity+11once+13stack BCL+compiled native order/coroutine PASS, normal/QA0/0, HostContract/Localization853 PASS.
+Native выдача/знания/save не исполнялись. Установлена .82, профиль/игра/сохранения не менялись.
+Не готовый стенд: нужны staging2external files существующим guarded deploy, физические stations/при необходимости
+resource chest, native world save+reload. Source включает только имена/хеши внешних файлов, не чужие данные.
+Следующий шаг: loaded footprint/terrain/obstacles без terraform, PlacePiece только QA fixtures (не списываетcost),
+после Start fresh owner ZDO/creator/range. Save(false,false,false), !IsSaving + GetSaveNumber()==before+1;
+WorldSaveFinished не success. Полная цель открыта. Proof artifacts/checkpoint-0.19.92/verification.json.
+
 ## Этап 0.19.91 — проверка загруженного QA-сеанса
 
 [Контракт и проверки](docs/testing/qa-save-isolation-0.19.90_RU.md). RequireLoadedSession повторно проверяет

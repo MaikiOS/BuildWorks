@@ -9,7 +9,12 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.91**, not deployed: [QA isolation and loaded gate](testing/qa-save-isolation-0.19.90.md).
+Active source checkpoint **0.19.92**, not deployed: [one-shot QA supplies](testing/qa-save-isolation-0.19.90.md).
+Actual native resource plan for7 pinned fixtures, Hammer/materials/AddKnownItem, stack/count/weight guards,
+started-before-grant and profile-save-before-complete. 25identity+11once+13stack BCL PASS; native compiled only.
+No in-game grants executed; external staging/physical stations/chest/ready stand remain open.
+
+Previous source checkpoint **0.19.91**, not deployed: [QA isolation and loaded gate](testing/qa-save-isolation-0.19.90.md).
 Rechecks Local world UID/profile ID/ZDO player ID, closed server/no peers/no cheats before future provisioning;
 25 BCL receipt/identity cases and compiled guard/coroutine wiring PASS. Runtime unproven; no grants yet.
 

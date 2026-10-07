@@ -1,11 +1,35 @@
-# QA save isolation: checkpoints 0.19.90–0.19.91
+# QA save isolation: checkpoints 0.19.90–0.19.92
 
 **English** | [Русский](qa-save-isolation-0.19.90_RU.md)
 
-Verified source preparation, **not a ready survival stand or game acceptance**. Installed .82; current .91 is not
+Verified source preparation, **not a ready survival stand or game acceptance**. Installed .82; current .92 is not
 deployed. No Valheim launch or game-save mutation. With explicit owner permission only TerrainRamp-1.0-Test's
 TerrainRamp bootstrap `[Bootstrap] CreateMissingSaves=true` changed to false; all other text/BOM/newlines preserved.
 Local backup/hash proof: `artifacts/checkpoint-0.19.90/bootstrap-config-change.json` and `bootstrap-config-before.cfg`.
+
+## One-shot supplies: .92
+
+QA-only BuildWorksTestSupplies runs in the actual coroutine after loaded gate. Pins owned01/02/03/04/06 and
+external CoffeeTable/ForestHut hashes, uses actual reviewed importer. Sources unchanged; external files local
+only, [provenance/terms](external-path-2026-10-07.md), only names/hashes enter Git. External QA config staging
+is absent: missing files refuse before grants. Actual native Piece resources/ResourceCosts plan one copy of
+each fixture. Missing/free-key/invalid requirements refuse; total cost<=10000 before existing accumulator.
+Canonical ObjectDB IDs, Hammer1 before materials/AddKnownItem for recipe updates. Station knowledge/physical
+stations remain absent. Conservative empty slots/weight must fit, otherwise refuse pending an unimplemented chest.
+Different prefab IDs sharing a name refuse; batches<=maxStack and actual prefab/count delta must match.
+False/partial never retries. Loaded gate before each batch. IDs/source hashes/actual plan bind receipt;
+CreateNew+Flush(true) precedes grants, profile.SavePlayerData+Save(bool result) precedes complete.
+Complete never reissues after consumption; interrupted/foreign/changed receipts require inspection, no auto retry.
+25 identity+11 one-shot+13 stack BCL cases execute; native call/order/coroutine wiring is compiled proof only.
+Native grants/knowledge/save unexecuted; **not a ready stand**. Proof: artifacts/checkpoint-0.19.92/verification.json.
+Older UI/corpus tests not rerun.
+
+Next: physical stations without terraform and native world save. Player.PlacePiece neither validates nor consumes
+cost: QA fixture preparation only, never ordinary construction proof. Verify loaded terrain/footprint/obstacles/
+absence of terrain components, then fresh owner ZDO/creator/range after Start. WorldSaveFinished/SaveDoneTime
+are not success acknowledgements. After ZNet.Save(false,false,false), wait for !IsSaving and committed
+GetSaveNumber()==before+1, recheck identity/root. EndSave(writeOK:true) commits the number; failure does not.
+Reload remains a separate test.
 
 ## Loaded-session gate: .91
 

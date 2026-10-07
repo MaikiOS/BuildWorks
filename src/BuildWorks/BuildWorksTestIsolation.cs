@@ -236,6 +236,55 @@ namespace OstrixMods.BuildWorks
             return player;
         }
 
+        internal static string FixtureDirectory => Path.Combine(Directory.GetParent(root).Parent.FullName, "test-fixtures");
+        internal static string SupplyReceiptPath => Path.Combine(root, "qa-supplies.txt");
+        internal static string SupplyStamp(string plan)
+        {
+            using (var hash = SHA256.Create())
+                return BitConverter.ToString(hash.ComputeHash(System.Text.Encoding.UTF8.GetBytes(
+                    string.Join("\n", ReadIdentityReceipt()) + "\n" + plan))).Replace("-", "");
+        }
+
+        internal static bool OnceComplete(string path, string stamp)
+        {
+            ValidateSavePath(path);
+            if (stamp == null || stamp.Length != 64 || stamp.Any(c => !((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F'))))
+                throw new InvalidDataException("Invalid QA supply stamp.");
+            if (File.Exists(path))
+            {
+                if (new FileInfo(path).Length > 256) throw new InvalidDataException("Invalid QA supply receipt.");
+                string[] lines = File.ReadAllLines(path);
+                if (lines.Length != 3 || lines[0] != stamp || lines[1] != "started" || lines[2] != "complete")
+                    throw new InvalidDataException("QA supplies are incomplete or changed; refusing automatic reissue.");
+                return true;
+            }
+            return false;
+        }
+
+        internal static bool BeginOnce(string path, string stamp)
+        {
+            if (OnceComplete(path, stamp)) return false;
+            using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            using (var writer = new StreamWriter(stream))
+            {
+                writer.WriteLine(stamp); writer.WriteLine("started"); writer.Flush(); stream.Flush(true);
+            }
+            return true;
+        }
+
+        internal static void CompleteOnce(string path, string stamp)
+        {
+            ValidateSavePath(path);
+            if (!File.Exists(path) || new FileInfo(path).Length > 256)
+                throw new InvalidDataException("Invalid QA supply receipt.");
+            string[] lines = File.ReadAllLines(path);
+            if (lines.Length != 2 || lines[0] != stamp || lines[1] != "started")
+                throw new InvalidDataException("QA supply receipt changed during preparation.");
+            using (var stream = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.None))
+            using (var writer = new StreamWriter(stream))
+            { writer.WriteLine("complete"); writer.Flush(); stream.Flush(true); }
+        }
+
         internal static void ValidateSavePath(string path)
         {
             string full = Path.GetFullPath(path);

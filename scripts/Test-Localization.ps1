@@ -87,6 +87,7 @@ $nonLocalizationDottedLiterals = @(
     'blueprints.json',
     'buildworks-qa-root.txt',
     'qa-identities.txt',
+    'qa-supplies.txt',
     'qa-isolation.token',
     'catalog.group.',
     'editor.catalog.',

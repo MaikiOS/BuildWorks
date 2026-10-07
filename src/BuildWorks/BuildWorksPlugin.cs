@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.91";
+        internal const string PluginVersion = "0.19.92";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -148,11 +148,14 @@ namespace OstrixMods.BuildWorks
             try
             {
                 BuildWorksTestIsolation.RequireLoadedSession();
-                Logger.LogInfo("BuildWorks QA loaded Local identities and closed survival session verified. Resources/stations are not prepared yet.");
+                bool supplied = BuildWorksTestSupplies.Prepare();
+                Logger.LogInfo(supplied
+                    ? "BuildWorks QA supplies saved; physical stations are not prepared yet. This is not a ready stand."
+                    : "BuildWorks QA supplies were already prepared; nothing was reissued. Physical stations remain unprepared.");
             }
             catch (Exception exception)
             {
-                Logger.LogError("BuildWorks QA loaded session refused; no test items or stations were created: " + exception);
+                Logger.LogError("BuildWorks QA preparation refused or stopped; no automatic reissue. An incomplete supply receipt requires inspection: " + exception);
             }
         }
 #endif

@@ -2,7 +2,7 @@
 
 [English](continuation-audit-2026-10-07.md) | **Русский**
 
-Аудит 2026-10-07; текущий исходный checkpoint — 0.19.91. Это не приёмка полного продукта.
+Аудит 2026-10-07; текущий исходный checkpoint — 0.19.92. Это не приёмка полного продукта.
 Действующие инструкции: AGENTS.md, PROJECT_CONTRACT.md, docs/ROADMAP.md и текущий запрос владельца.
 CONTINUE_PROMPT.txt описывает .13 и устарел. specs/roadmap/current-pass.md описывает каталог .56,
 а не полный импорт. Исторические проверки не заменяют проверку установленной версии.
@@ -29,6 +29,11 @@ CONTINUE_PROMPT.txt описывает .13 и устарел. specs/roadmap/curr
 и имена, отсутствие peers/open server/cheats; 25 BCL receipt/identity случаев и compiled wiring PASS.
 Native loaded lifecycle не исполнялся; выдачи ресурсов/предметов и станций пока нет. Исторические игровые
 подтверждения не требуют повтора из-за этой source-only проверки. Установленная .82 не менялась.
+
+Этап .92 реализует QA-only одноразовый actual-native material/knowledge plan по7 закреплённым файлам.
+Started receipt до выдачи, точный stack/prefab delta, profile save до complete; повтор/partial не переиздаёт.
+25identity+11once+13stack BCL PASS; native только compiled wiring, реальной выдачи/сохранения не было.
+Физические станции, staging внешних файлов и готовый стенд отсутствуют; .82 не менялась.
 
 ## Проверенные исходные данные
 

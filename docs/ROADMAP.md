@@ -12,7 +12,9 @@ not just a button or a mathematical helper.
 Active source checkpoint **0.19.80**: native ItemStand world placement consumes a real matching inventory item only after
 native construction costs, confirms exact saved contents and preserves later exact-item reservations. Owner/access,
 queue/orientation and uncertain rollback guards are implemented. Release/required checks, Unity228 and 26 adapter cases PASS;
-native world/drop/save/client acceptance remains required. Native14/portable5 and installed .67 unchanged; no deploy/game/save/push.
+native world/drop/save/client acceptance remains required. Native14/portable5 unchanged. On 2026-10-07, .80 was installed
+only in TerrainRamp-1.0-Test; version 0.19.80.0 and both SHA256 hashes verified. No game/save/push.
+[Combined owner acceptance: 22 cases](testing/full-acceptance-0.19.80.md). Older entries retain historical deployment status.
 Foreign state, containers, armour/free items, editor scenes above 512 and durable world sockets remain unfinished.
 
 Previous source checkpoint **0.19.79**: ItemStand capture rejects mid-read ZDO revision changes and invalid/rebound views,

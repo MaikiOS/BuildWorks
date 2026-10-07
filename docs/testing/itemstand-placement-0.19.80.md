@@ -2,9 +2,9 @@
 
 **English** | [Русский](itemstand-placement-0.19.80_RU.md)
 
-Not deployed. The installed TerrainRamp-1.0-Test version is still .67.
-These checks require an authorized .80 deployment first. Ostrix launches Valheim
-in a disposable test world/character only. Unity228/26 fixture cases are not game proof.
+Installed on 2026-10-07 only in TerrainRamp-1.0-Test; main DLL 0.19.80.0 and both hashes verified.
+Ostrix launches Valheim in a disposable test world/character only.
+Unity228/26 fixture cases are not game proof. [Combined checklist](full-acceptance-0.19.80.md).
 
 1. In the editor, author a small blueprint with a native horizontal or wall mount
    and one compatible ordinary item from Tools. Put the matching item and normal

@@ -2,7 +2,7 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
-## Checkpoint 0.19.80 — native ItemStand placement adapter; not deployed
+## Checkpoint 0.19.80 — native ItemStand placement adapter; test-deployed
 
 Filled native horizontal/wall ItemStand parts now carry immutable contents through the ordered world plan.
 After native UpdatePlacement returns and construction costs have run, a newly placed locally owned holder
@@ -29,11 +29,18 @@ format, four forbidden-profile checks and deployment WhatIf PASS; verify is unav
 failures and Unity sandbox crash were rerun outside the sandbox successfully; format retains existing workspace warnings.
 Isolated Unity: 228 layouts/input states and 26 native-adapter fixture cases PASS, 2026-10-07T10:23:31.8503534Z;
 gameHostTested=false. Independent correctness PASSED; Ponytail review: Lean already. Ship.
-Native14/portable5 unchanged; installed test .67 unchanged. Previous local checkpoint b82b980 (.79).
-No deploy, Valheim, save edits, publication or push. Full goal stays active: foreign-state decoding, containers,
+Native14/portable5 unchanged. Source .80: local checkpoint 23aac7b.
+On 2026-10-07, Ostrix authorized .80 deployment only to TerrainRamp-1.0-Test through Deploy-TestBuild.ps1.
+Main DLL 0.19.80.0; both installed SHA256 hashes independently match artifacts/bin:
+BuildWorks.dll: 5CE8DE1841E18852C1040D14730C0DC482B28ECAF4464F43209FAB296E41E66A;
+BuildWorks.Geometry.dll: DD9F2A795396853D0FFE8DFE1BD227E759AA395F21C58D79A3BA1A66212591EA.
+Default contains no BuildWorks game binaries. No Valheim launch, save edits, publication or push.
+The full goal is not complete: foreign-state decoding, containers,
 armour/free items, editor scenes above 512 and durable world sockets remain unfinished.
 
-[Required native acceptance](docs/testing/itemstand-placement-0.19.80.md) — six cases after authorized test deployment.
+[Combined game acceptance](docs/testing/full-acceptance-0.19.80.md) — 22 cases since .67;
+start with mount consumption/cancellation (15–19). [Six detailed mount cases](docs/testing/itemstand-placement-0.19.80.md).
+Historical sections below retain deployment status at each original checkpoint.
 
 ## Checkpoint 0.19.79 — revision-consistent ItemStand capture; not deployed
 

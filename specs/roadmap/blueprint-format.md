@@ -8,7 +8,8 @@ recipes preserve the selected item's actual properties. Nonzero canonical prefab
 of future exact snapshots and one-item/exact-package postconditions are required. Denied/rebound/foreign-queue state cannot
 be destructively cleared; uncertain attempts never requeue. Occupied mounts use native removal/drop, not force destruction.
 Release/required checks, Unity228 and 26 adapter cases PASS; world drop/save/reload/client acceptance is still pending.
-Native14/portable5 unchanged; installed .67 unchanged, no deploy/game/save/push. Containers/foreign/armour state still block
+Native14/portable5 unchanged. On 2026-10-07, .80 was installed only in TerrainRamp-1.0-Test;
+main DLL 0.19.80.0 and both SHA256 hashes verified. No game/save/push. Containers/foreign/armour state still block
 world placement. The full goal, including free items, heavy scenes and durable sockets, remains active.
 
 Previous source **0.19.79**: ItemStand capture requires an unchanged ZDO revision and the same valid native view

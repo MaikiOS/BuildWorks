@@ -9,7 +9,12 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source and installed QA **0.19.95**: [QA startup and first native series](testing/qa-stand-0.19.93.md).
+Active source **0.19.96**, installed QA **0.19.95**: [QA startup and first native series](testing/qa-stand-0.19.93.md).
+.95 replay falsely expected slot0 after native save rotated to slot1; no grants executed.
+.96 persisted primary/native identity replay and async-save boundary: QA72/builds/API/localization/format PASS.
+Install after exit, same QA saves; native stand/build/reload pending. Details: current HANDOFF.
+
+Previous source and installed QA **0.19.95** at that checkpoint:
 .94 menu/isolated identity creation passed; world entry refused preparation before grants/receipts.
 .95 waits for native respawn/nonzero ID, preserving strict identity matching. Regression/QA64/builds/API/
 localization/format/review PASS; guarded installation passed after exit; QA files unchanged. Native stand/build/reload remain pending.

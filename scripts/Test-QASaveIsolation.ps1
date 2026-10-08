@@ -56,13 +56,25 @@ Require ($allCalls -notmatch 'ResetSaveDataPath\(\)|SaveSystem::ForceRefreshCach
 $loaded = $type.Methods | Where-Object Name -eq 'RequireLoadedSession'
 $loadedCalls = @($loaded.Body.Instructions | Where-Object { $_.OpCode.Name -in @('call','callvirt') } | ForEach-Object { [string]$_.Operand })
 foreach ($name in @('AssertPinned','IsServer','IsDedicated','IsOpenServer','GetPeers','IsShuttingDown','WaitingForRespawn','IsDead','IsTeleporting','InIntro',
-    'GetInventory','NoCostCheat','GetGlobalKey','GetWorld','GetPlayerProfile','GetSaveFWLPath','GetPath','GetFilename',
+    'GetInventory','NoCostCheat','GetGlobalKey','GetWorld','GetPlayerProfile','GetSaveFWLPath','RequirePersistedWorld','RequirePersistedPaths','IsSaving','GetPath','GetFilename',
     'GetPlayerID','ReadIdentityReceipt','RequireIdentityMatch')) {
     Require ([bool]($loadedCalls -match "::$name\(")) "Loaded QA session omits native identity/survival guard: $name"
 }
 $loadedFields = @($loaded.Body.Instructions | Where-Object { $_.OpCode.Name -in @('ldfld','ldsfld') } | ForEach-Object { [string]$_.Operand })
-foreach ($name in @('m_debugMode','m_worldLevel','m_fileSource','m_worldName','m_uid')) {
+foreach ($name in @('m_debugMode','m_worldLevel','m_fileSource','m_worldName','m_uid','m_loadError')) {
     Require ([bool]($loadedFields -match "::$name$")) "Loaded QA session omits native identity/survival field: $name"
+}
+$resume = ($type.Methods | Where-Object Name -eq 'PrepareFreshSaves').Body.Instructions
+foreach ($name in @('TryGetSaveByName','RequirePersistedWorld','LoadWorld','Load','RequireIdentityMatch')) {
+    Require ([bool](@($resume | ForEach-Object { [string]$_.Operand }) -match "::$name\(")) "QA identity replay omits native persisted-save validation: $name"
+}
+Require (-not [bool]($loadedCalls -match 'System.IO.File::Exists\(')) 'Loaded guard directly checks a dynamic write-slot file.'
+$saving = $loaded.Body.Instructions | Where-Object { [string]$_.Operand -match 'ZNet::IsSaving\(' } | Select-Object -First 1
+$disk = $loaded.Body.Instructions | Where-Object { [string]$_.Operand -match '::RequirePersistedWorld\(' } | Select-Object -First 1
+Require ($saving.Next.OpCode.Name -in @('brtrue','brtrue.s') -and $saving.Next.Operand.Offset -gt $disk.Offset) 'Live async-save polling reads the rotating persisted-primary collection.'
+$persisted = ($type.Methods | Where-Object Name -eq 'RequirePersistedWorld').Body.Instructions.Operand -join "`n"
+foreach ($name in @('get_IsDeleted','get_PrimaryFile','m_source','get_AllPaths','RequirePersistedPaths')) {
+    Require ($persisted -match $name) "Persisted native primary validation omits $name"
 }
 $pluginType = $qa.MainModule.GetType('OstrixMods.BuildWorks.BuildWorksPlugin')
 $suppliesName = 'OstrixMods.BuildWorks.BuildWorksTestSupplies'
@@ -182,6 +194,26 @@ $name = 'BW_QA_' + $token.Substring(0,8)
 function Invoke-IdentityCheck([string]$method, [object[]]$arguments) {
     $runtimeType.GetMethod($method,$flags).Invoke($null,$arguments)
 }
+$persistedChecks = 0
+$rotated = Join-Path $isolated ('worlds_local/' + $name)
+[IO.Directory]::CreateDirectory($rotated) | Out-Null
+$slot1 = Join-Path $rotated '_main.1.fwl2'
+$slot0 = Join-Path $rotated '_main.0.fwl2'
+$database = Join-Path $rotated '_main.1.db2'
+[IO.File]::WriteAllText($slot1,'persisted primary slot one')
+Invoke-IdentityCheck 'RequirePersistedPaths' @(,[string[]]@($slot1))
+$persistedChecks++
+Refuses { Invoke-IdentityCheck 'RequirePersistedPaths' @(,[string[]]@($slot0)) } 'Absent global write slot passed as persisted primary.'
+$persistedChecks++
+Refuses { Invoke-IdentityCheck 'RequirePersistedPaths' @(,[string[]]@($slot1,$database)) } 'Missing associated save file accepted.'
+$persistedChecks++
+[IO.File]::WriteAllText($database,'persisted database')
+Invoke-IdentityCheck 'RequirePersistedPaths' @(,[string[]]@($slot1,$database))
+$persistedChecks++
+foreach ($paths in @($null,[string[]]@(),[string[]]@((Join-Path $unknown 'untouched.txt')),[string[]]@((Join-Path $link 'untouched.txt')))) {
+    Refuses { Invoke-IdentityCheck 'RequirePersistedPaths' @(,$paths) } 'Empty or escaping persisted save paths accepted.'
+    $persistedChecks++
+}
 $identityChecks = 0
 [object[]]$identity = @($receipt,$token,$name,[long]9223372036854775806,$name,[long]::Parse('-9223372036854775807'),[long]::Parse('-9223372036854775807'))
 Invoke-IdentityCheck 'RequireIdentityMatch' $identity
@@ -282,6 +314,6 @@ foreach ($numbers in @(@(10,10),@(10,12),@(10,9),@(0,0))) {
     Require $refused 'Uncommitted or ambiguous native world save was acknowledged.'
     $stationCases++
 }
-@{status='passed_paths_receipts_stacks_ground_save_ack_and_compiled_contract_only';identityCases=$identityChecks;onceCases=$onceChecks;batchCases=$batchChecks;stationCases=$stationCases;qaSha256=(Get-FileHash $qaPath).Hash;normalSha256=(Get-FileHash $normalPath).Hash;gameHostTested=$false;saveFilesModified=$false;fixtures=$output} |
+@{status='passed_paths_receipts_stacks_ground_save_ack_and_compiled_contract_only';persistedCases=$persistedChecks;identityCases=$identityChecks;onceCases=$onceChecks;batchCases=$batchChecks;stationCases=$stationCases;qaSha256=(Get-FileHash $qaPath).Hash;normalSha256=(Get-FileHash $normalPath).Hash;gameHostTested=$false;saveFilesModified=$false;fixtures=$output} |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'verification.json')
-"PASS: QA-only assemblies; $identityChecks identity, $onceChecks one-shot, $batchChecks stack, $stationCases ground/save-ack cases; native wiring only. No native grants/saves or game execution."
+"PASS: QA-only assemblies; $persistedChecks persisted-slot, $identityChecks identity, $onceChecks one-shot, $batchChecks stack, $stationCases ground/save-ack cases; native wiring only. No native grants/saves or game execution."

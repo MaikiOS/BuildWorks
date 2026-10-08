@@ -136,21 +136,29 @@ namespace OstrixMods.BuildWorks
                 throw new InvalidOperationException("QA identities require initialized storage and the main menu.");
             string name = "BW_QA_" + token.Substring(0, 8);
             string receipt = Path.Combine(root, "qa-identities.txt");
+            if (File.Exists(receipt))
+            {
+                ValidateSavePath(receipt);
+                string[] identities = ReadIdentityReceipt();
+                World savedWorld = World.LoadWorld(RequirePersistedWorld(name));
+                var savedProfile = new PlayerProfile(name, FileHelpers.FileSource.Local);
+                RequirePersistedPaths(new[] { savedProfile.GetPath() });
+                if (savedWorld == null || savedWorld.m_dataError != World.SaveDataError.None ||
+                    savedWorld.m_fileSource != FileHelpers.FileSource.Local || !savedProfile.Load() ||
+                    savedProfile.m_fileSource != FileHelpers.FileSource.Local)
+                    throw new InvalidDataException("Previous QA identities could not be loaded from Local primary saves.");
+                RequireIdentityMatch(identities, token, savedWorld.m_worldName, savedWorld.m_uid,
+                    savedProfile.GetFilename(), savedProfile.GetPlayerID(), savedProfile.GetPlayerID());
+                return name;
+            }
+            if (SaveSystem.TryGetSaveByName(name, SaveDataType.World, out _))
+                throw new InvalidDataException("Refusing to overwrite an existing QA world without its identity receipt.");
             var world = new World(name, "BuildWorksQA") { m_fileSource = FileHelpers.FileSource.Local };
             var profile = new PlayerProfile(name, FileHelpers.FileSource.Local);
             profile.SetName(name);
             string worldPath = world.GetSaveFWLPath(), profilePath = profile.GetPath();
             if (world.m_uid == 0 || profile.GetPlayerID() == 0)
                 throw new InvalidDataException("Valheim did not assign fresh QA identities.");
-            if (File.Exists(receipt))
-            {
-                ValidateSavePath(receipt);
-                ValidateSavePath(worldPath); ValidateSavePath(profilePath);
-                ReadIdentityReceipt();
-                if (!File.Exists(worldPath) || !File.Exists(profilePath))
-                    throw new InvalidDataException("Previous QA identity preparation is incomplete; it will not be retried automatically.");
-                return name;
-            }
             foreach (string path in new[] { worldPath, profilePath })
                 foreach (string suffix in new[] { "", ".new", ".old" })
                 {
@@ -175,6 +183,25 @@ namespace OstrixMods.BuildWorks
             SaveSystem.InvalidateCache(SaveDataType.World);
             SaveSystem.InvalidateCache(SaveDataType.Character);
             return name;
+        }
+
+        private static SaveWithBackups RequirePersistedWorld(string name)
+        {
+            if (!SaveSystem.TryGetSaveByName(name, SaveDataType.World, out SaveWithBackups save) ||
+                save.IsDeleted || save.PrimaryFile == null || save.PrimaryFile.m_source != FileHelpers.FileSource.Local)
+                throw new InvalidDataException("QA world has no active Local primary save.");
+            RequirePersistedPaths(save.PrimaryFile.AllPaths);
+            return save;
+        }
+
+        internal static void RequirePersistedPaths(string[] paths)
+        {
+            if (paths == null || paths.Length == 0) throw new InvalidDataException("QA primary save has no paths.");
+            foreach (string path in paths)
+            {
+                ValidateSavePath(path);
+                if (!File.Exists(path)) throw new InvalidDataException("QA primary save file is missing: " + path);
+            }
         }
 
         private static string[] ReadIdentityReceipt()
@@ -220,7 +247,7 @@ namespace OstrixMods.BuildWorks
             Game game = Game.instance;
             Player player = Player.m_localPlayer;
             if (!network || !game || !player || !ZoneSystem.instance || !PlatformInitializer.SaveDataInitialized ||
-                !network.IsServer() || network.IsDedicated() || ZNet.IsOpenServer() || network.GetPeers().Count != 0 ||
+                !network.IsServer() || network.IsDedicated() || ZNet.IsOpenServer() || network.GetPeers().Count != 0 || ZNet.m_loadError ||
                 game.IsShuttingDown() || game.WaitingForRespawn() || player.IsDead() || player.IsTeleporting() || player.InIntro() ||
                 player.GetPlayerID() == 0 || player.GetInventory() == null ||
                 Player.m_debugMode || player.NoCostCheat() || Game.m_worldLevel != 0 ||
@@ -232,9 +259,9 @@ namespace OstrixMods.BuildWorks
                 profile.m_fileSource != FileHelpers.FileSource.Local)
                 throw new InvalidOperationException("QA preparation requires Local world and character saves.");
             ValidateSavePath(world.GetSaveFWLPath());
-            ValidateSavePath(profile.GetPath());
-            if (!File.Exists(world.GetSaveFWLPath()) || !File.Exists(profile.GetPath()))
-                throw new InvalidDataException("Loaded QA identity save files are missing.");
+            RequirePersistedPaths(new[] { profile.GetPath() });
+            // The native writer rotates/deletes slots before its thread completes.
+            if (!network.IsSaving()) RequirePersistedWorld(world.m_worldName);
             RequireIdentityMatch(ReadIdentityReceipt(), token, world.m_worldName, world.m_uid,
                 profile.GetFilename(), profile.GetPlayerID(), player.GetPlayerID());
             return player;

@@ -10,7 +10,7 @@ before QA identities/grants/stations. The .94 guard and regression pass; QA .94 
 Retry ONLY manager TerrainRamp-1.0-Test Modded; native construction/reload remain pending.
 
 
-Audit: 2026-10-07, updated 2026-10-08; current source checkpoint .95. This is not full product acceptance.
+Audit: 2026-10-07, updated 2026-10-08; current source checkpoint .96. This is not full product acceptance.
 Read AGENTS, PROJECT_CONTRACT, current HANDOFF and docs/ROADMAP. CONTINUE_PROMPT.txt targets
 .13; current-pass targets the historical .56 catalogue, not imported construction acceptance.
 
@@ -62,7 +62,7 @@ Its text was not updated. A document edit is not a goal update.
 
 | Block | Implemented | Automated evidence | Owner/game evidence | Unfinished | Design only |
 |---|---|---|---|---|---|
-| QA preparation | .95 native respawn/nonzero-ID wait; strict receipt | Before/after regression, QA64 BCL, builds/API/localization/format/review | .94 menu and isolated world entry | .94 refused before grants; .95 installed, native stand/build/reload pending | Chest if bounded backpack plan is exceeded |
+| QA preparation | .96 native persisted primary; async-write boundary; strict IDs | Before/after regression, QA72 BCL, builds/API/localization/format/review | .94/.95 menu and isolated world entry | .95 refused before grants on slot0/1; .96 not installed, stand/build/reload pending | Chest if bounded backpack plan is exceeded |
 | Editor | Transform/group/Array/Contour/Undo/save | Geometry/bridge/Unity252 | Older .41/.44 and later scoped series recorded as accepted; do not repeat wholesale | Scenes above512 | New guide tools |
 | Exchange | Store15/portable6, .blueprint/.vbuild/ZIP, exact archives, separate contents options | Store353;209 parser-only;2 real files reviewed import/edit/support/disk/export/world renderer | Imported construction through reload unproven | Header dialects, RandMatSeed, some ZDO/inventory, export only our JSON/ZIP | Unspecified third-party formats |
 | Scale/preview | Intrinsic prefab scale, nested XYZ, world50000; .87 supplied-item world appearance | Unity transforms; ordinary/native-holder/passive/heavy attachments | Particular giant lamp remains unproven | Native place/reload/FPS; unknown item effects | Further measured optimization |

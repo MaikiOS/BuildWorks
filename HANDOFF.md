@@ -2,6 +2,23 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.96 — persisted primary slots; source checks passed, native retry pending
+
+.95 loaded, but replay refused before grants: complete receipt exists while active world is
+_main.1.fwl2 and World.GetSaveFWLPath computes global write slot0 at startup. Existing saves
+are present. The same write-path existence test could fail during native async slot rotation.
+.96 uses native TryGetSaveByName/PrimaryFile.AllPaths, Local source/path guards, World.LoadWorld
+and PlayerProfile.Load with exact receipt IDs on replay. Missing receipt with an existing
+native world refuses overwrite. Shared loaded guard checks persisted primary only when
+!ZNet.IsSaving; during saving it retains root, Local/identity/offline/survival checks, and
+rechecks disk after thread completion. ZNet.m_loadError refuses preparation. No World.saves
+field dependency, cached primary reuse, cache reset, receipt reset or old-world modification.
+Regression failed .95 missing persisted guard; .96 QA72 BCL (8 rotated-slot cases), both
+Release0/0, HostContract, Localization853 and formats PASS. Independent native/source/compiled review PASS; native .96 retry remains untested.
+Installed .95; .96 deployment waits for game exit. Same QA saves/token must remain.
+Native error: artifacts/checkpoint-0.19.95/loaded-world-refusal.json; source proof .96/verification.json.
+Full imported construction/reload/network acceptance remains unfinished.
+
 ## Deployment follow-up 0.19.95 — installed; native retry pending
 
 After Ostrix closed Valheim, the guarded same-token deployment installed QA .95.

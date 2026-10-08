@@ -1,6 +1,10 @@
-# QA package 0.19.93–0.19.95: startup/respawn corrections, native stand pending
+# QA package 0.19.93–0.19.96: startup/respawn/primary-slot corrections, native stand pending
 
 **English** | [Русский](qa-stand-0.19.93_RU.md)
+
+Current source .96 corrects native persisted-primary replay and async slot rotation; installed .95
+refused replay before grants despite complete identities and existing saved world. Do not reset saves/receipts.
+See current HANDOFF and artifacts/checkpoint-0.19.96/verification.json. .96 game retry remains pending.
 
 QA .94 reached menu and created isolated identities; world entry refused preparation before grants.
 Source .95 waits for native respawn completion/nonzero player ID without relaxing identity matching.

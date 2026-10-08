@@ -2,6 +2,23 @@
 
 [English](HANDOFF.md) | **Русский**
 
+## Этап 0.19.96 — действующий слот сохранения; исходники проверены, native повтор открыт
+
+.95 загрузилась, но повторная подготовка отказала до выдачи: receipt complete, действующий
+мир _main.1.fwl2 есть, а World.GetSaveFWLPath вычисляет глобальный write-slot0 при запуске.
+Та же проверка существования могла ложно отказать во время native фоновой смены слотов.
+.96 использует TryGetSaveByName/PrimaryFile.AllPaths, Local/path guards, World.LoadWorld и
+PlayerProfile.Load со строгим совпадением ID receipt. Без receipt существующий native мир
+запрещает перезапись. Shared loaded guard проверяет persisted primary только при
+!ZNet.IsSaving; во время записи остаются root/Local/identity/offline/survival guards,
+после окончания потока снова проверяется диск. ZNet.m_loadError запрещает подготовку.
+Нет зависимости от неиспользуемого World.saves, cached primary, сброса кэшей/receipts/старых миров.
+Регрессия упала на .95 без persisted guard; .96 QA72 BCL (8 случаев слотов), обе Release0/0,
+HostContract, Localization853 и оба format PASS. Независимый native/source/compiled review PASS; native повтор .96 не проверен.
+Установлена .95; установка .96 после закрытия игры. QA saves/token сохранить.
+Ошибка: artifacts/checkpoint-0.19.95/loaded-world-refusal.json; исходники — .96/verification.json.
+Полный импорт/стройка/reload/сеть остаются открыты.
+
 ## Установка 0.19.95 — выполнена; повтор в игре открыт
 
 После закрытия Valheim владельцем guarded deploy с тем же token установил QA .95.

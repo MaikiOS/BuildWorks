@@ -1,5 +1,7 @@
 # .107 — actual construction payment and cancellation
 
+QA .107 was installed by the guarded script; hashes match,48 QA save/receipt files and the library are unchanged. The game was not launched.
+
 The existing sequential placement now records actual item-stack debits per created
 part instead of refunding the recipe through `Piece.DropResources`. Item properties
 are retained. Native mounted contents remain a separate removal path.

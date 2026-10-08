@@ -1,5 +1,7 @@
 # BuildWorks development roadmap
 
+QA .107 was installed by the guarded script; hashes match,48 QA save/receipt files and the library are unchanged. The game was not launched.
+
 ## .107 — payment/refund: automated checks passed, game acceptance open
 
 Actual paid stacks replace recipe refunds. Native drop suppression, original network ID

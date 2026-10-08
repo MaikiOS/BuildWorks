@@ -46,3 +46,7 @@ its fixture basis instead of dereferencing an absent scene. These pre-existing
 fixture failures were fixed without changing production guards. The first bridge
 rerun was denied artifact writes in the sandbox; the identical artifact-only run
 passed with permission. The verify helper is unavailable; direct checks were used.
+
+Deployment: guarded QA .111 installed in TerrainRamp-1.0-Test; SHA `49B218D232DB24FAC160D227676445D7B27CFAADFD047854871236DBC4ABAFD0`.
+All48 QA files and the blueprint library retain their before-deployment hashes.
+Source checkpoint:8e81cb6. No Valheim launch.

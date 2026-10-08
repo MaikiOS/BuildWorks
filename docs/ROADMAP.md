@@ -1,5 +1,7 @@
 # BuildWorks development roadmap
 
+Approved fog v11 remains planned: see FOG_V11_INTEGRATION.md.
+
 ## .111 — explicit ArmorStand-state omission; verified source
 
 Import/export now offer a separate copy without recognized Info-only ArmorStand
@@ -12,7 +14,8 @@ and independent correctness/ponytail review passed. Updated EditorBridge and act
 Session root-composition checks passed in isolated Unity with real inactive host
 components, including50000-part plans and missing/persistence atomic refusal.
 No Valheim launch, native construction, world reload or multiplayer proof.
-QA deployment remains .110 until the guarded .111 deployment is recorded below.
+QA .111 deployed through the guarded script; SHA 49B218D232DB24FAC160D227676445D7B27CFAADFD047854871236DBC4ABAFD0.
+All48 QA file paths/hashes and the blueprint library are unchanged. Code checkpoint:8e81cb6.
 See checkpoint-0.19.111.md and QA_0.19.111_RU.md.
 
 ## .110 — pinned import scale: verified code and QA deployment

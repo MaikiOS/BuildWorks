@@ -184,6 +184,7 @@ public static class RuntimeEditorAcceptance
             checks.Add(PlacementContactAcceptance.Run());
             TestSignPayload();
             TestPlacementSupportFrame();
+            TestImportedAxes(template, fontTemplate, output);
             TestPinnedScaleBasis(template, fontTemplate, output);
             checks.Add(StorageCaptureAcceptance.Run());
             foreach (object step in ItemStandPreviewAcceptance.Run(template, output)) yield return step;
@@ -712,6 +713,76 @@ public static class RuntimeEditorAcceptance
         }
         finally { Object.DestroyImmediate(root); }
         checks.Add("Actual placement-frame adapter on Unity transforms: saved rotated support, Hammer visual/root-plan agreement, nested mirrored XYZ scale, native socket coincidence and all eight collider bounds corners; no native Valheim placement executed");
+    }
+
+    private static void TestImportedAxes(Camera camera, TMP_Text font, string output)
+    {
+        const string tilted = "tilted;;0;0;0;0.6532815;0.2705981;-0.2705981;0.6532815;\"\";1;1;1";
+        const string straight = "straight;;2;0;0;0;0;0;1;\"\";1;1;1";
+        Quaternion expectedTilt = Quaternion.Euler(90, 45, 0);
+        GameObject source = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        source.SetActive(false);
+        try
+        {
+            foreach (bool reverse in new[] { false, true })
+            {
+                string text = "#Name:Axes\n#Pieces\n" + (reverse ? straight + "\n" + tilted : tilted + "\n" + straight);
+                var raw = ExternalBlueprintLibrary.Parse(text, "axes.blueprint");
+                Require(raw.importError == null && raw.sourceDocuments.Single().text == text, "Axis source parsing changed bytes");
+                using (var editor = new BlueprintEditorController(new CompositeBlueprintStore(
+                    Path.Combine(output, "axes-" + Guid.NewGuid().ToString("N") + ".json")), camera, font,
+                    _ => source, name => name, () => Array.Empty<BlueprintEditorCatalogItem>(),
+                    message => { throw new InvalidOperationException(message); }))
+                {
+                    Require(editor.OpenExisting(raw, out string error), error);
+                    var scene = Field<BlueprintEditorScene>(editor, "scene");
+                    var visuals = Field<IDictionary>(scene, "visuals");
+                    var tiltedPart = editor.Document.Parts.Single(part => part.PrefabName == "tilted");
+                    var straightPart = editor.Document.Parts.Single(part => part.PrefabName == "straight");
+                    Transform first = Field<GameObject>(visuals[tiltedPart.StableId], "Root").transform;
+                    Transform second = Field<GameObject>(visuals[straightPart.StableId], "Root").transform;
+                    Require((second.localPosition - first.localPosition - Vector3.right * 2).sqrMagnitude < .00000001f &&
+                        Quaternion.Angle(first.localRotation, expectedTilt) < .001f &&
+                        Quaternion.Angle(second.localRotation, Quaternion.identity) < .001f,
+                        "First row tilt/order rotated editor geometry or swapped axes");
+                    foreach (bool support in new[] { false, true })
+                    {
+                        var frame = raw.ImportCopy();
+                        if (support)
+                        {
+                            frame.supports = new List<CompositeBlueprintStore.Support> {
+                                new CompositeBlueprintStore.Support { stableId = "axis-support", name = "Оси",
+                                    position = new CompositeBlueprintStore.VectorData(Vector3.zero),
+                                    rotation = new CompositeBlueprintStore.QuaternionData(Quaternion.Euler(0, 30, 0)) } };
+                            frame.placementSupportId = "axis-support";
+                        }
+                        Require(BlueprintPlacementFrame.TryResolve(frame, out Vector3 origin, out Quaternion orientation) == support,
+                            "Part order invented or lost a placement support");
+                        var hammer = new GameObject("AxisFrame");
+                        try
+                        {
+                            Transform a = Object.Instantiate(first.gameObject, hammer.transform).transform;
+                            Transform b = Object.Instantiate(second.gameObject, hammer.transform).transform;
+                            BlueprintPlacementFrame.RebaseVisuals(hammer.transform,
+                                new Bounds(Vector3.right, new Vector3(4, 3, 2)), origin, orientation);
+                            BlueprintPlacementFrame.ToRootPose(Vector3.zero, Quaternion.identity, origin, orientation, 1,
+                                out Vector3 position, out Quaternion rotation);
+                            Vector3 expectedDelta = support ? new Vector3(Mathf.Sqrt(3), 0, 1) : Vector3.right * 2;
+                            Quaternion expectedRoot = support ? Quaternion.Euler(0, -30, 0) : Quaternion.identity;
+                            Require((b.localPosition - a.localPosition - expectedDelta).sqrMagnitude < .00000001f &&
+                                Quaternion.Angle(rotation, expectedRoot) < .001f && position == Vector3.zero &&
+                                Quaternion.Angle(a.localRotation, expectedRoot * expectedTilt) < .001f &&
+                                Quaternion.Angle(b.localRotation, expectedRoot) < .001f,
+                                "Hammer visual/root plan inherited first row rotation or lost explicit support compensation");
+                        }
+                        finally { Object.DestroyImmediate(hammer); }
+                    }
+                    editor.Close(true);
+                }
+            }
+            checks.Add("Imported axes: rotated first row and reversed order preserve actual editor poses; no-support frame stays identity, explicit Ry30 support gives independent inverse30 displacement/rotation in shared Hammer rebase/root plan. No native registry/Session execution or world placement.");
+        }
+        finally { Object.DestroyImmediate(source); }
     }
 
     private static void TestPinnedScaleBasis(Camera camera, TMP_Text font, string output)

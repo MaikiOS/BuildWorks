@@ -8,7 +8,10 @@ geometry is separate from native world range. Parent scale/shear/mirror capture 
 rejected. Normal/QA0/0, Geometry/Store/host/localization857/QA isolation/format,
 Workbench252 and independent correctness/ponytail PASSED. QA .110 installed;
 hashes match,48 QA files/library unchanged. Checkpoint:fa66b1d.
-No Valheim execution; native build/reload/network and axis-offset reproduction open.
+Axis regressions passed actual editor and shared frame/rebase/root-plan checks,
+including reversed source rows and explicit Ry30 support; independent review PASSED.
+Native registry/Session were not executed. No Valheim execution; native build/reload/
+network and the reported axis-offset reproduction remain open.
 Legacy v16 copies remain; one new .110 placement copy may coexist, then deduplicate.
 See checkpoint-0.19.110.md and QA_0.19.110_RU.md.
 

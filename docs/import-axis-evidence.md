@@ -18,11 +18,21 @@ The editor defaults to local axes: its active part can therefore tilt the gizmo.
 World axes intentionally ignore the active part rotation. This is separate from
 blueprint geometry and from the transform centre or placement support.
 
-Next regression, not yet implemented: first part Rx90 with non-axis yaw, second
-identity at(2,0,0), no support. Editor/registry/world root identity and delta(2,0,0)
-must survive exchanging row order. Add explicit support Ry30 and prove inverse30
-compensation without changing stored part poses. Keep an independent CoffeeTable
-raw quaternion oracle. Actual Valheim placement remains a separate observation.
+Implemented regression, passed2026-10-08T16:19:41Z in Unity Workbench252 and
+independent correctness/ponytail review: first part Rx90/Ry45, second identity
+at(2,0,0). Both source row orders preserve actual editor positions and rotations.
+Without saved support the shared placement frame remains identity. With support
+Ry30 the shared Hammer rebase/root plan gives inverse30 and delta(sqrt3,0,1),
+checked against independent constants without changing stored part poses.
+ActualDividerAcceptance additionally pins the original CoffeeTable source SHA
+and checks both floor rotations against yaw-33.75 and their literal displacement.
+
+Boundary: shared frame/rebase/root-plan helpers and actual editor visuals executed;
+native registry/CreatePrefab, FramePartIndex and Session/world placement did not.
+The test keeps cloned child order fixed, so the reversed source rows prove importer/
+editor order independence only. No production change or automatic straightening.
+Evidence: artifacts/ui-runtime/verification-status.json, actual-divider-check.txt
+and artifacts/ui-axes-110-current.log. Actual Valheim placement remains open.
 
 Global header rotations are not executed by the current parser; neither checked
 CoffeeTable nor Forest Hut sample has such a header. Support must follow an actual

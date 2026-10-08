@@ -8,7 +8,10 @@ Editor/thumbnail/ghost/save/reopen и rotated XYZ snaps прошли; точна
 отклоняется. Normal/QA0/0, Geometry/Store/host/локализация857/QA isolation/format,
 Workbench252 и независимый correctness/ponytail PASSED. QA .110 установлена;
 хеши совпали,48 QA файлов/библиотека неизменны. Checkpoint:fa66b1d.
-Valheim не запускался; native стройка/reload/network и смещение осей открыты.
+Регрессии осей прошли actual editor и общий frame/rebase/root plan: оба порядка
+строк и явная опора Ry30, независимый обзор PASSED. Native registry/Session не
+исполнялись. Valheim не запускался; стройка/reload/network и воспроизведение
+сообщённого смещения осей остаются открытыми.
 Legacyv16 копии сохраняются; возможна одна новая .110 копия, затем повторное использование.
 Детали: [checkpoint .110](checkpoint-0.19.110_RU.md), [проверка](QA_0.19.110_RU.md).
 

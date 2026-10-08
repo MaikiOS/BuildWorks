@@ -8,7 +8,9 @@ matrix capture refusal passed builds0/0, Geometry/Store/host/localization857/QA
 isolation/format, Workbench252 and final independent correctness/ponytail review.
 Editor tiny-size gate fixed separately from world admission. QA .110 installed;
 hashes match,48 QA files/library unchanged. Checkpoint:fa66b1d. No game execution.
-Native build/reload/network and axis regression open; see docs/import-axis-evidence.md.
+Axis tests passed actual editor/shared frame/rebase/root-plan checks and independent
+review, including both source row orders and saved Ry30 support. Native registry/
+Session/build/reload/network remain open; see docs/import-axis-evidence.md.
 Legacy v16 copy may coexist with one new .110 copy; no destructive migration.
 See docs/checkpoint-0.19.110.md and docs/QA_0.19.110_RU.md.
 

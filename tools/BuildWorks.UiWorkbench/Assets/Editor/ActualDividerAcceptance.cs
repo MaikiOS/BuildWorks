@@ -296,6 +296,16 @@ public static class ActualDividerAcceptance
             var raw = ExternalBlueprintLibrary.Parse(original, fixturePath);
             Require(raw.importError == null && raw.parts.Count == fixture.Item3 &&
                 !raw.sourceDocuments[0].ToGeometry().HasOpaqueSections, "External fixture cannot enter known pipeline");
+            if (fixture.Item3 == 4)
+            {
+                var floors = raw.parts.Where(part => part.prefabName == "ashwood_floor_1x1").ToArray();
+                Require(floors.Length == 2 && floors.All(part => Quaternion.Angle(part.rotation.ToQuaternion(),
+                    Quaternion.Euler(0, -33.75f, 0)) < .001f) &&
+                    (floors[1].position.ToVector3() - floors[0].position.ToVector3() -
+                        new Vector3(.5555696f, 0, -.83145138f)).sqrMagnitude < .00000001f,
+                    "Actual CoffeeTable source yaw/axes changed or were silently straightened");
+                evidence.Add("PASS original CoffeeTable yaw-33.75 degrees and floor delta(.5555696,0,-.83145138) retained; no automatic axis straightening.");
+            }
             var prefabs = raw.parts.Select(part => part.prefabName).Distinct().ToDictionary(name => name, load);
             string runDirectory = Path.Combine(output, "external-real-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(runDirectory);

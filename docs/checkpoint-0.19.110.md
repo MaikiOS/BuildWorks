@@ -38,3 +38,19 @@ See QA_0.19.110_RU.md. Native build/payment/cancel/reload/network remain unverif
 CoffeeTable source already contains yaw-33.75°; a distinct axis conversion defect
 is not proven. See import-axis-evidence.md and private deployment evidence at
 artifacts/checkpoint-0.19.110/verification.json.
+
+## Follow-up: axes and corpus, tests only
+
+Workbench252 passed2026-10-08T16:19:41Z, followed by independent correctness and
+ponytail review. Actual editor poses retain the literal tilted-first-row rotation
+and displacement with both source row orders. Shared placement helpers match
+independent identity/no-support and inverseRy30/saved-support expectations.
+The original SHA-pinned CoffeeTable retains its source yaw-33.75 and displacement.
+Native registry/FramePartIndex/Session/world execution remain outside this proof;
+cloned child order in the shared helper test is fixed. Production DLLs unchanged.
+
+Full local corpus StoreTests passed:353 visible entries,350 format-compatible,
+3 explicitly blocked,133738 typed ZDO exact EOF,115057 known states converted,
+25951 state records still blocked. Unit-base scale probe refused0 plans; this is
+not host prefab availability, complete import or native build/reload acceptance.
+Logs: artifacts/ui-axes-110-current.log and artifacts/corpus-110-current.log.

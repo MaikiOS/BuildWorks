@@ -11,7 +11,8 @@ retains conversion cache across native edits, reserves the thumbnail layer, prev
 actions overlapping the preview, and adds cached world-unavailable card markers.
 Native v16 reads previous versions; portable v6 is unchanged. Normal/QA builds0/0,
 store regressions, host contract, localization853 and format passed.
-Deployment and game acceptance remain separate evidence.
+QA .106 is installed in TerrainRamp-1.0-Test by the guarded script; hashes match.
+All48 QA save/receipt files and the library stayed unchanged during deployment. Game acceptance is pending.
 
 188/353 external documents still exceed the editor's512-piece cap. Giant lamps,
 staged heavy-editor loading, persistent stake jobs and admin world objects remain open.

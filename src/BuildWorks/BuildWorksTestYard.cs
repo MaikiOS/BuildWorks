@@ -115,11 +115,25 @@ namespace OstrixMods.BuildWorks
                         throw new InvalidOperationException($"QA yard height/protection refused at {point}: height={height:R}, plane={center.y:R}, protected={protectedGround}, flat={requireFlat}.");
                     // The native base includes biome-edge blending absent from WorldGenerator.GetHeight.
                     if (!requireFlat && (!baseHeight(map, point, out float generated) || float.IsNaN(generated) || float.IsInfinity(generated) ||
-                        Mathf.Abs(height - generated) > 0.05f))
-                        throw new InvalidOperationException("QA yard terrain was modified before preparation at " + point);
+                        Mathf.Abs(center.y - generated) > 15.5f))
+                        throw new InvalidOperationException("QA yard exceeds its native base-height bound at " + point);
                     maps.Add(map);
                 }
             if (maps.Count == 0 || maps.Count > 25) throw new InvalidDataException("Unexpected QA yard heightmap count.");
+            if (!requireFlat)
+            {
+                foreach (Heightmap map in maps)
+                {
+                    TerrainComp compiler = TerrainComp.FindTerrainCompiler(map.transform.position);
+                    ZNetView view = compiler ? compiler.GetComponent<ZNetView>() : null;
+                    if (compiler && (!view || !view.IsValid() || view.GetZDO().GetByteArray(ZDOVars.s_TCData)?.Length > 0))
+                        throw new InvalidOperationException("QA yard contains previously saved terrain edits at " + map.transform.position);
+                }
+                if (TerrainModifier.GetAllInstances().Any(m => m && m.enabled && m.gameObject.activeInHierarchy &&
+                    m.m_playerModifiction && (m.m_level || m.m_smooth || m.m_paintCleared) &&
+                    Inside(m.transform.position, center, m.GetRadius())))
+                    throw new InvalidOperationException("QA yard contains a legacy player terrain edit.");
+            }
             return maps;
         }
 

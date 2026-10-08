@@ -188,6 +188,10 @@ Require ($lastPreflight -gt (YardOffset 'BeginOnce') -and
 $overlap = ($yard.Methods | Where-Object Name -eq 'Overlaps').Body.Instructions.Operand -join "`n"
 $groundCalls = ($yard.Methods | Where-Object Name -eq 'CheckGround').Body.Instructions.Operand -join "`n"
 Require ($groundCalls -match 'GetWorldBaseHeight' -and $groundCalls -match 'CreateDelegate' -and $groundCalls -notmatch 'WorldGenerator::GetHeight') 'QA pristine-ground check does not use the native blended base.'
+Require ($groundCalls -match 'FindTerrainCompiler' -and $groundCalls -match 'GetByteArray' -and $groundCalls -match 's_TCData') 'QA yard omits persisted native terrain edit protection.'
+$groundNested = ($yard.NestedTypes.Methods | Where-Object HasBody | ForEach-Object { $_.Body.Instructions.Operand }) -join "`n"
+Require ($groundNested -match 'm_playerModifiction' -and $groundNested -match 'm_level' -and $groundNested -match 'm_smooth' -and
+    $groundNested -match 'm_paintCleared' -and $groundNested -match 'GetRadius' -and $groundCalls -match 'GetAllInstances') 'QA yard omits legacy player terrain edit/paint protection.'
 $baseMethod = ([Mono.Cecil.AssemblyDefinition]::ReadAssembly((Join-Path $managed 'assembly_valheim.dll'))).MainModule.GetType('Heightmap').Methods | Where-Object Name -eq 'GetWorldBaseHeight'
 Require ($baseMethod.ReturnType.FullName -eq 'System.Boolean' -and $baseMethod.Parameters.Count -eq 2 -and
     $baseMethod.Parameters[0].ParameterType.FullName -eq 'UnityEngine.Vector3' -and $baseMethod.Parameters[1].ParameterType.FullName -eq 'System.Single&') 'Native base-height delegate contract changed.'

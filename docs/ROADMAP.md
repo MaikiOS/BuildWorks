@@ -1,5 +1,14 @@
 # BuildWorks development roadmap
 
+## QA .103 — native terrain-edit provenance
+
+.102 verified the native base getter, then refused a height difference beforemutations.
+.103 preserves finite/current/base15.5m bounds and rejects nonempty savedTerrainComp data
+and active legacy player TerrainModifiers. Generated natural flattening is not itself a
+playeredit. Bothbuilds0/0, QA82, newcompiledguards, host, localization853 andformat passed.
+Nativeyard/construction/reload remainopen.
+
+
 ## QA .102 — native blended base-height preflight
 
 .101 teleported successfully, then refused ground preflight beforebackup/mutations.

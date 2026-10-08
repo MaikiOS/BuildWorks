@@ -57,6 +57,19 @@ namespace OstrixMods.BuildWorks
         private static bool Inside(Vector3 point, Vector3 center, float margin = 0)
             => Mathf.Abs(point.x - center.x) <= HalfExtent + margin && Mathf.Abs(point.z - center.z) <= HalfExtent + margin;
 
+        internal static bool NearLocation(float dx, float dz, float radius)
+        {
+            if (new[] { dx, dz, radius }.Any(v => float.IsNaN(v) || float.IsInfinity(v)) || radius < 0)
+                throw new InvalidDataException("Invalid QA location bounds.");
+            double extent = HalfExtent + 4d + radius;
+            return Math.Abs((double)dx) <= extent && Math.Abs((double)dz) <= extent;
+        }
+
+        private static bool HasLocation(Vector3 center)
+            => ZoneSystem.instance.GetLocationList().Any(site => site.m_location == null ||
+                NearLocation(site.m_position.x - center.x, site.m_position.z - center.z,
+                    Math.Max(site.m_location.m_exteriorRadius, site.m_location.m_interiorRadius)));
+
         private static Vector3 FindSite()
         {
             WorldGenerator generator = WorldGenerator.instance;
@@ -85,7 +98,7 @@ namespace OstrixMods.BuildWorks
                     smallestDrySpan = Math.Min(smallestDrySpan, maximum - minimum);
                     if (maximum - minimum > 30f) continue;
                     float score = maximum - minimum + Mathf.Sqrt(x * x + z * z) * 0.001f;
-                    if (score >= best) continue;
+                    if (score >= best || HasLocation(new Vector3(x, 0, z))) continue;
                     best = score;
                     selected = new Vector3(x, Plane(minimum, maximum, ZoneSystem.instance.m_waterLevel), z);
                 }
@@ -209,6 +222,15 @@ namespace OstrixMods.BuildWorks
                 center = FindSite();
                 using (var writer = new StreamWriter(new FileStream(planPath, FileMode.CreateNew, FileAccess.Write, FileShare.None)))
                     foreach (float value in new[] { center.x, center.y, center.z }) writer.WriteLine(value.ToString("R", CultureInfo.InvariantCulture));
+            }
+            // An unused plan may predate location-aware selection; never change a started operation.
+            if (!File.Exists(BuildWorksTestIsolation.YardReceiptPath) && HasLocation(center))
+            {
+                if (Directory.Exists(Path.Combine(Path.GetDirectoryName(planPath), "yard-before")))
+                    throw new IOException("QA yard backup exists; refusing to change its plan.");
+                center = FindSite();
+                File.WriteAllLines(planPath, new[] { center.x, center.y, center.z }
+                    .Select(value => value.ToString("R", CultureInfo.InvariantCulture)));
             }
             string stamp = BuildWorksTestIsolation.SupplyStamp("yard192-v1\n" + File.ReadAllText(planPath));
             string receipt = BuildWorksTestIsolation.YardReceiptPath;

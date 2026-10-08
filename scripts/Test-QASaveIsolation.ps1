@@ -196,6 +196,13 @@ $baseMethod = ([Mono.Cecil.AssemblyDefinition]::ReadAssembly((Join-Path $managed
 Require ($baseMethod.ReturnType.FullName -eq 'System.Boolean' -and $baseMethod.Parameters.Count -eq 2 -and
     $baseMethod.Parameters[0].ParameterType.FullName -eq 'UnityEngine.Vector3' -and $baseMethod.Parameters[1].ParameterType.FullName -eq 'System.Single&') 'Native base-height delegate contract changed.'
 Require ($overlap -match 'Collider' -and $overlap -match 'Renderer') 'QA yard ignores objects crossing its boundary.'
+$siteCalls = ($yard.Methods | Where-Object Name -eq 'FindSite').Body.Instructions.Operand -join "`n"
+$locationCalls = ($yard.Methods | Where-Object Name -eq 'HasLocation').Body.Instructions.Operand -join "`n"
+Require ($siteCalls -match 'HasLocation' -and $locationCalls -match 'GetLocationList' -and
+    $groundNested -match 'm_position' -and $groundNested -match 'm_exteriorRadius' -and
+    $groundNested -match 'm_interiorRadius' -and $groundNested -notmatch 'm_placed') 'QA site selection omits exact placed/unplaced native location footprints.'
+Require ((YardOffset 'WriteAllLines') -lt (YardOffset 'SupplyStamp') -and
+    [bool]($yardIl.Operand -match 'get_YardReceiptPath') -and [bool]($yardIl.Operand -match 'Directory::Exists')) 'QA plan reselection lost receipt/backup guards or stamps an old plan.'
 $destroyOffset = YardOffset 'Destroy'
 Require ($null -ne $destroyOffset -and -not [bool]($yardIl | Where-Object { $_.Offset -gt (YardOffset 'Invoke') -and $_.Offset -lt $destroyOffset -and
     $_.OpCode.Name -eq 'stfld' -and [string]$_.Operand -match '<>2__current' })) 'QA yard yields after terrain preflight but before completing object mutations.'
@@ -386,6 +393,15 @@ foreach ($numbers in @(@(10,10),@(10,12),@(10,9),@(0,0))) {
     $stationCases++
 }
 $yardType = $assembly.GetType($yardName,$true)
+$nearLocation = $yardType.GetMethod('NearLocation',$flags)
+foreach ($case in @(@(0,0,0,$true),@(100,100,0,$true),@(-100,-100,0,$true),@(101,0,0,$false),
+    @(0,-101,0,$false),@(120,120,20,$true),@(121,0,20,$false))) {
+    Require ($nearLocation.Invoke($null,@([single]$case[0],[single]$case[1],[single]$case[2])) -eq $case[3]) 'QA location boundary selection is wrong.'
+}
+foreach ($case in @(@([single]::NaN,0,0),@(0,[single]::PositiveInfinity,0),@(0,0,-1),@(0,0,[single]::NaN))) {
+    Refuses { $nearLocation.Invoke($null,@([single]$case[0],[single]$case[1],[single]$case[2])) } 'Invalid QA location footprint accepted.'
+}
+$locationCases = 11
 $plane = $yardType.GetMethod('Plane',$flags)
 Require ($plane.Invoke($null,@([single]35,[single]45,[single]30)) -eq 40) 'QA plane did not preserve safe midpoint.'
 Require ($plane.Invoke($null,@([single]33,[single]33,[single]30)) -eq 33) 'Dry flat QA terrain rejected.'
@@ -396,6 +412,6 @@ foreach ($values in @(@(32,35,30),@(35,66,30),@(40,35,30),@([single]::NaN,40,30)
     Refuses { $plane.Invoke($null,@([single]$values[0],[single]$values[1],[single]$values[2])) } 'Unsafe QA yard plane accepted.'
     $yardCases++
 }
-@{status='passed_paths_receipts_stacks_ground_yard_save_ack_and_compiled_contract_only';persistedCases=$persistedChecks;identityCases=$identityChecks;onceCases=$onceChecks;batchCases=$batchChecks;stationCases=$stationCases;yardCases=$yardCases;qaSha256=(Get-FileHash $qaPath).Hash;normalSha256=(Get-FileHash $normalPath).Hash;gameHostTested=$false;saveFilesModified=$false;fixtures=$output} |
+@{status='passed_paths_receipts_stacks_ground_yard_save_ack_and_compiled_contract_only';persistedCases=$persistedChecks;identityCases=$identityChecks;onceCases=$onceChecks;batchCases=$batchChecks;stationCases=$stationCases;yardCases=$yardCases;locationCases=$locationCases;qaSha256=(Get-FileHash $qaPath).Hash;normalSha256=(Get-FileHash $normalPath).Hash;gameHostTested=$false;saveFilesModified=$false;fixtures=$output} |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'verification.json')
-"PASS: QA-only assemblies; $persistedChecks persisted-slot, $identityChecks identity, $onceChecks one-shot, $batchChecks stack, $stationCases ground/save-ack, $yardCases yard plane cases; native wiring only. No native grants/saves or game execution."
+"PASS: QA-only assemblies; $persistedChecks persisted-slot, $identityChecks identity, $onceChecks one-shot, $batchChecks stack, $stationCases ground/save-ack, $yardCases yard plane, $locationCases location cases; native wiring only. No native grants/saves or game execution."

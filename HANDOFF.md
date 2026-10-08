@@ -1,5 +1,16 @@
 # BuildWorks current development handoff
 
+## QA .104 — location-aware site selection; native verification pending
+
+In game, .103 passed ground preflight and refused construction/storage before any
+backup, receipt or terrain mutation. .104 excludes exact native location positions,
+including locations not yet spawned, using both native radii plus the existing 4 m
+object margin. Loaded object/terrain checks remain mandatory. An unused old plan is
+reselected only when no yard receipt or backup exists. Supplies are not reissued.
+Construction and save/reload acceptance remain open.
+Both builds 0/0, QA 93 cases, host contract, 853 localization keys and format passed.
+
+
 ## QA .103 — native terrain-edit provenance
 
 .102 verified the native base getter, then refused a height difference beforemutations.

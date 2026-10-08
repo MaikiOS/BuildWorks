@@ -2,9 +2,9 @@
 
 [English](qa-stand-0.19.93.md) | **Русский**
 
-Текущие исходники .96 исправляют native persisted-primary replay и границу async смены слотов.
-Установленная .95 отказала до выдачи при complete identities и существующем мире; saves/receipts не сбрасывать.
-Актуальные данные — HANDOFF и artifacts/checkpoint-0.19.96/verification.json. Native повтор .96 открыт.
+Текущие исходники и установленная QA .96 исправляют native persisted-primary replay и границу async смены слотов.
+Предыдущая .95 отказала до выдачи при complete identities и существующем мире; saves/receipts не сбрасывать.
+Guarded установка сохранила все21 хеша QA-root. Данные — HANDOFF и .96/verification.json; native повтор открыт.
 
 QA .94 дошла до меню и создала отдельные identities; вход в мир остановил подготовку до выдачи.
 Исходники .95 ждут окончания native respawn/ненулевого ID без ослабления строгой проверки.

@@ -2,7 +2,7 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
-## Checkpoint 0.19.96 — persisted primary slots; source checks passed, native retry pending
+## Checkpoint 0.19.96 — persisted primary slots; installed, native retry pending
 
 .95 loaded, but replay refused before grants: complete receipt exists while active world is
 _main.1.fwl2 and World.GetSaveFWLPath computes global write slot0 at startup. Existing saves
@@ -15,8 +15,8 @@ rechecks disk after thread completion. ZNet.m_loadError refuses preparation. No 
 field dependency, cached primary reuse, cache reset, receipt reset or old-world modification.
 Regression failed .95 missing persisted guard; .96 QA72 BCL (8 rotated-slot cases), both
 Release0/0, HostContract, Localization853 and formats PASS. Independent native/source/compiled review PASS; native .96 retry remains untested.
-Installed .95; .96 deployment waits for game exit. Same QA saves/token must remain.
-Native error: artifacts/checkpoint-0.19.95/loaded-world-refusal.json; source proof .96/verification.json.
+After confirmed game exit, guarded .96 deployment passed; all21 QA-root file hashes unchanged. Same saves/token retained.
+Native error: artifacts/checkpoint-0.19.95/loaded-world-refusal.json; source/deployment proof .96/verification.json and .96/deployment.json.
 Full imported construction/reload/network acceptance remains unfinished.
 
 ## Deployment follow-up 0.19.95 — installed; native retry pending

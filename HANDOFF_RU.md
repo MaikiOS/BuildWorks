@@ -2,7 +2,7 @@
 
 [English](HANDOFF.md) | **Русский**
 
-## Этап 0.19.96 — действующий слот сохранения; исходники проверены, native повтор открыт
+## Этап 0.19.96 — действующий слот сохранения; установлено, native повтор открыт
 
 .95 загрузилась, но повторная подготовка отказала до выдачи: receipt complete, действующий
 мир _main.1.fwl2 есть, а World.GetSaveFWLPath вычисляет глобальный write-slot0 при запуске.
@@ -15,8 +15,8 @@ PlayerProfile.Load со строгим совпадением ID receipt. Без
 Нет зависимости от неиспользуемого World.saves, cached primary, сброса кэшей/receipts/старых миров.
 Регрессия упала на .95 без persisted guard; .96 QA72 BCL (8 случаев слотов), обе Release0/0,
 HostContract, Localization853 и оба format PASS. Независимый native/source/compiled review PASS; native повтор .96 не проверен.
-Установлена .95; установка .96 после закрытия игры. QA saves/token сохранить.
-Ошибка: artifacts/checkpoint-0.19.95/loaded-world-refusal.json; исходники — .96/verification.json.
+После подтверждённого выхода guarded установка .96 прошла; все21 хеша QA-root прежние, saves/token сохранены.
+Ошибка: artifacts/checkpoint-0.19.95/loaded-world-refusal.json; исходники/установка — .96/verification.json и .96/deployment.json.
 Полный импорт/стройка/reload/сеть остаются открыты.
 
 ## Установка 0.19.95 — выполнена; повтор в игре открыт

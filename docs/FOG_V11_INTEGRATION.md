@@ -35,8 +35,10 @@ Session preview/pause paths. Neither historical recall nor lab PASS proves game 
 3. Ten96x80x80 ARGBHalf fields use46.875MiB before source textures/meshes/buffers.
    Do not allocate this per part. Measure shared/local-domain budgets, catch-up while
    in Evaluate, blocking GPU readback in reset/disable, time jumps and unload cleanup.
-4. Durable project/part IDs, stake interactions, server-authorized operations and
-   crash-safe escrow/refund are not implemented. Fog observes future confirmed
+4. Blueprint IDs and stable part IDs already exist. Missing are a durable job-instance
+   ID, immutable blueprint snapshot/revision binding, authoritative per-part completion
+   and created-ZDO links, stake interactions, server-authorized operations and
+   crash-safe escrow/refund. Fog observes future confirmed
    project state; it does not own costs, permissions or persistence.
 
 Start with one renderer-only real-prefab clone and owned v11 materials, graphics

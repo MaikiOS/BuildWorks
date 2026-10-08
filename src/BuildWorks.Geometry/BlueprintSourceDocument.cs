@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -30,6 +31,8 @@ namespace OstrixMods.BuildWorks.Geometry
                 Id = "source_" + BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(format + "\n" + name + "\n" + text)))
                     .Replace("-", "").ToLowerInvariant();
             bool pieces = format == "vbuild";
+            bool seenPieces = pieces;
+            int placementHeaders = 0;
             int line = 1;
             for (int start = 0; start < text.Length; ++line)
             {
@@ -41,13 +44,16 @@ namespace OstrixMods.BuildWorks.Geometry
                 while (last > first && char.IsWhiteSpace(text[last - 1])) --last;
                 if (first < last && text[first] == '#')
                 {
-                    if (last - first == 7 && string.CompareOrdinal(text, first, "#Pieces", 0, 7) == 0) pieces = true;
+                    if (last - first == 7 && string.CompareOrdinal(text, first, "#Pieces", 0, 7) == 0)
+                    { pieces = true; seenPieces = true; }
                     else if (!HeaderAt(text, first, last, "#Name:") && !HeaderAt(text, first, last, "#Category:") &&
                         !HeaderAt(text, first, last, "#Creator:") && !HeaderAt(text, first, last, "#Description:"))
                     {
                         pieces = false;
                         if (!(last - first == 8 && string.CompareOrdinal(text, first, "#Terrain", 0, 8) == 0) &&
-                            !(last - first == 11 && string.CompareOrdinal(text, first, "#SnapPoints", 0, 11) == 0)) HasOpaqueSections = true;
+                            !(last - first == 11 && string.CompareOrdinal(text, first, "#SnapPoints", 0, 11) == 0) &&
+                            !(format == "blueprint" && !seenPieces &&
+                                PlacementProvenanceHeader(text, first, last, ref placementHeaders))) HasOpaqueSections = true;
                     }
                 }
                 else if (pieces && first < last)
@@ -71,6 +77,26 @@ namespace OstrixMods.BuildWorks.Geometry
 
         private static bool HeaderAt(string text, int first, int last, string header) =>
             last - first >= header.Length && string.CompareOrdinal(text, first, header, 0, header.Length) == 0;
+
+        private static bool PlacementProvenanceHeader(string text, int first, int last, ref int seen)
+        {
+            int flag, offset;
+            if (HeaderAt(text, first, last, "#Center:")) { flag = 1; offset = 8; }
+            else if (HeaderAt(text, first, last, "#Coordinates:")) { flag = 2; offset = 13; }
+            else if (HeaderAt(text, first, last, "#Rotation:")) { flag = 4; offset = 10; }
+            else return false;
+            if ((seen & flag) != 0) return false;
+            seen |= flag;
+            // Saved world pose is provenance, not another transform of the already-local piece rows.
+            if (flag == 1) return first + offset == last; // Named center selection still needs an anchor adapter.
+            if (last - first - offset > 256) return false;
+            string[] values = text.Substring(first + offset, last - first - offset).Split(',');
+            if (values.Length != 3) return false;
+            foreach (string value in values)
+                if (!float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float number) ||
+                    float.IsNaN(number) || float.IsInfinity(number)) return false;
+            return true;
+        }
 
         public string Id { get; }
         public string Format { get; }

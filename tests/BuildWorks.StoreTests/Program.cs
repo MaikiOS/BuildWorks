@@ -47,6 +47,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 SinglePartChecks.Run(Path.Combine(directory, "single-part"));
                 MissingPartChecks.Run(Path.Combine(directory, "missing-parts"));
                 MetadataChecks.Run(Path.Combine(directory, "metadata"));
+                SourcePlacementHeaderChecks.Run(Path.Combine(directory, "placement-headers"));
                 if (args.Length == 2 && args[0] == "--player-fixtures") PlayerFixtures(args[1]);
                 else if (args.Length > 0) InspectActualLibrary(args[0]);
                 Console.WriteLine("All BuildWorks store tests passed.");
@@ -1113,6 +1114,7 @@ namespace OstrixMods.BuildWorks.StoreTests
         {
             int total = 0, supported = 0, blocked = 0, packets = 0, convertedStates = 0, remainingStates = 0, scaleBlocked = 0;
             int armorStates = 0, armorOnlyDocuments = 0;
+            int placementProvenanceDocuments = 0, placementProvenanceOnlyBlocker = 0;
             using (Stream input = File.OpenRead(path))
             using (var zip = new ZipArchive(input, ZipArchiveMode.Read))
                 foreach (ZipArchiveEntry entry in zip.Entries.Where(x => x.FullName.EndsWith(".blueprint", StringComparison.OrdinalIgnoreCase)))
@@ -1140,6 +1142,11 @@ namespace OstrixMods.BuildWorks.StoreTests
                             else
                             {
                                 var summary = CompositeBlueprintStore.InspectContents(converted, ForeignZdoChecks.Hash);
+                                if (text.Contains("#Coordinates:") && !parsed.sourceDocuments[0].ToGeometry().HasOpaqueSections)
+                                {
+                                    ++placementProvenanceDocuments;
+                                    if (summary.Unknown == 0) ++placementProvenanceOnlyBlocker;
+                                }
                                 armorStates += summary.ArmorStates;
                                 if (summary.ArmorStates > 0 && summary.RemainingUnknown(true) == 0) ++armorOnlyDocuments;
                                 for (int index = 0; index < parsed.parts.Count; ++index)
@@ -1163,6 +1170,9 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(packets == 133738, "Actual packet coverage changed");
             Console.WriteLine("PASS actual typed ZDO: " + packets + " exact EOF; " + convertedStates + " known states converted under native construction rules; " + remainingStates + " retain explicit blockers; " + scaleBlocked + " plans correctly refused by unit-base scale probe");
             Console.WriteLine("PASS actual ArmorStand omission review: " + armorStates + " eligible Info-only records; " + armorOnlyDocuments + " documents have armor as their only unknown state (not host placement acceptance)");
+            Console.WriteLine("PASS actual original-placement headers: " + placementProvenanceDocuments +
+                " parsed documents retain understood provenance; " + placementProvenanceOnlyBlocker +
+                " previously blocked only by these headers now have no unknown state (prefab availability/build/reload not proven)");
         }
 
         private static void ExchangeRoundTrip(string path)

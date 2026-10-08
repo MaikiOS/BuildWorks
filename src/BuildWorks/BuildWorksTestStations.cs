@@ -125,7 +125,7 @@ namespace OstrixMods.BuildWorks
             return station;
         }
 
-        internal static IEnumerator Prepare()
+        internal static IEnumerator Prepare(string receipt = null)
         {
             Player player = BuildWorksTestIsolation.RequireLoadedSession();
             BuildWorksTestSupplies.Plan(out List<Piece> pieces);
@@ -145,7 +145,8 @@ namespace OstrixMods.BuildWorks
                 string.Join("|", new[] { bounds[index].center.x, bounds[index].center.y, bounds[index].center.z,
                     bounds[index].size.x, bounds[index].size.y, bounds[index].size.z,
                     prefabs[name].GetComponent<CraftingStation>().m_rangeBuild }.Select(value => value.ToString("R", CultureInfo.InvariantCulture)))));
-            string stamp = BuildWorksTestIsolation.SupplyStamp(description), receipt = BuildWorksTestIsolation.StationReceiptPath;
+            string stamp = BuildWorksTestIsolation.SupplyStamp(description);
+            receipt = receipt ?? BuildWorksTestIsolation.StationReceiptPath;
             if (BuildWorksTestIsolation.OnceComplete(receipt, stamp)) yield break;
             int terrain = LayerMask.NameToLayer("terrain");
             if (terrain < 0) throw new InvalidOperationException("Native terrain layer is missing.");

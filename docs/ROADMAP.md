@@ -1,5 +1,20 @@
 # BuildWorks development roadmap
 
+## Current evidence 2026-10-08 — QA yard .98 source verified; native creation pending
+
+.97 native QA confirmed stations, no supply reissue, CoffeeTable import/edit/save/reopen
+and cancellation. Construction refused in spawn protection; after moving out, the
+workbench was out of range. No imported construction/reload success is claimed.
+
+.98 adds an explicitly requested 192x192m distant yard and midday only to the isolated
+QA build. Back up native world files before terrain changes, recheck session/ground/
+objects after waits, protect crossing objects, and use separate one-shot yard/station
+receipts. Same world/token/supplies retained. Both builds0/0, QA80 plus compiled guards,
+HostContract, Localization853, formatting and independent/Ponytail review passed.
+verify unavailable. Installed .97 is closed; .98 installation/native acceptance pending.
+Details and exact test sequence: docs/testing/qa-yard-0.19.98.md (Russian duplicate exists).
+Earlier checkpoint/deployment paragraphs below are historical.
+
 **English** | [Русский](ROADMAP_RU.md)
 
 Updated 2026-10-08. Ostrix approved this order after the development review.

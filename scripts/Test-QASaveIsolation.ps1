@@ -148,6 +148,36 @@ foreach ($name in @('TerrainModifier','TerrainOp','TerrainComp','BoxCollider','M
     Require ($footprint -match $name) "Station footprint omits $name"
 }
 Require ($footprint -notmatch 'Object::Instantiate|Collider::get_bounds') 'Station preflight instantiates gameplay objects or trusts inactive collider bounds.'
+$yardName = 'OstrixMods.BuildWorks.BuildWorksTestYard'
+$yard = $qa.MainModule.GetType($yardName)
+Require ($null -ne $yard -and $null -eq $normal.MainModule.GetType($yardName)) 'QA yard leaked into normal assembly or is missing.'
+$yardIterator = $yard.NestedTypes | Where-Object Name -Like '<Prepare>*'
+$yardIl = @($yardIterator.Methods.Body.Instructions)
+foreach ($name in @('RequireLoadedSession','ValidateSavePath','ReadIdentityReceipt','OnceComplete','TeleportTo','CheckGround',
+    'Copy','SaveWorld','BeginOnce','CheckGround','RequireEmpty','Vegetation','ClaimOwnership','IsOwner','Invoke','GetByteArray','CompleteOnce')) {
+    Require ([bool]($yardIl.Operand -match "::$name\(")) "QA yard omits $name"
+}
+function YardOffset([string]$name) { ($yardIl | Where-Object { [string]$_.Operand -match "::$name\(" } | Select-Object -First 1).Offset }
+$compilerCall = @($yard.NestedTypes.Methods.Body.Instructions | Where-Object { [string]$_.Operand -match '::GetAndCreateTerrainCompiler\(' })
+Require ($compilerCall.Count -eq 1) 'QA yard does not initialize its native terrain compiler batch.'
+$ownership = YardOffset 'ClaimOwnership'
+$lastPreflight = ($yardIl | Where-Object { [string]$_.Operand -match '::CheckGround\(' -and $_.Offset -lt $ownership } | Select-Object -Last 1).Offset
+Require ($lastPreflight -gt (YardOffset 'BeginOnce') -and
+    [bool]($yardIl | Where-Object { $_.Offset -gt (YardOffset 'BeginOnce') -and $_.Offset -lt $ownership -and [string]$_.Operand -match '::RequireLoadedSession\(' }) -and
+    [bool]($yardIl | Where-Object { $_.Offset -gt $lastPreflight -and $_.Offset -lt $ownership -and [string]$_.Operand -match '::RequireEmpty\(' })) 'QA yard omits post-yield session/ground/object revalidation.'
+$overlap = ($yard.Methods | Where-Object Name -eq 'Overlaps').Body.Instructions.Operand -join "`n"
+Require ($overlap -match 'Collider' -and $overlap -match 'Renderer') 'QA yard ignores objects crossing its boundary.'
+$destroyOffset = YardOffset 'Destroy'
+Require ($null -ne $destroyOffset -and -not [bool]($yardIl | Where-Object { $_.Offset -gt (YardOffset 'Invoke') -and $_.Offset -lt $destroyOffset -and
+    $_.OpCode.Name -eq 'stfld' -and [string]$_.Operand -match '<>2__current' })) 'QA yard yields after terrain preflight but before completing object mutations.'
+Require ((YardOffset 'CheckGround') -lt (YardOffset 'BeginOnce') -and (YardOffset 'Copy') -lt (YardOffset 'BeginOnce') -and
+    (YardOffset 'BeginOnce') -lt $lastPreflight -and
+    (YardOffset 'SaveWorld') -lt (YardOffset 'Copy') -and
+    ($yardIl | Where-Object { [string]$_.Operand -match '::SaveWorld\(' } | Select-Object -Last 1).Offset -gt (YardOffset 'Invoke') -and
+    ($yardIl | Where-Object { [string]$_.Operand -match '::SaveWorld\(' } | Select-Object -Last 1).Offset -lt (YardOffset 'CompleteOnce')) 'QA yard lost preflight/backup/start/native-save ordering.'
+$daylight = ($yard.Methods | Where-Object Name -eq 'Daylight').Body.Instructions
+Require ([bool]($daylight.Operand -match '::RequireLoadedSession\(') -and [bool]($daylight.Operand -match 'EnvMan::m_debugTimeOfDay')) 'QA daylight lost identity gate.'
+Require (-not [bool]($yardIl.Operand -match '::SetNoCost|::SetGodMode|Player::m_debugMode|::SetGlobalKey|Inventory::AddItem')) 'QA yard grants gameplay cheats/resources.'
 $qa.Dispose(); $normal.Dispose()
 if ($CheckCompiledOnly) {
     'PASS: QA/normal separation, native fingerprints and compiled provisioning guards; no file writes or native execution.'
@@ -326,6 +356,15 @@ foreach ($numbers in @(@(10,10),@(10,12),@(10,9),@(0,0))) {
     Require $refused 'Uncommitted or ambiguous native world save was acknowledged.'
     $stationCases++
 }
-@{status='passed_paths_receipts_stacks_ground_save_ack_and_compiled_contract_only';persistedCases=$persistedChecks;identityCases=$identityChecks;onceCases=$onceChecks;batchCases=$batchChecks;stationCases=$stationCases;qaSha256=(Get-FileHash $qaPath).Hash;normalSha256=(Get-FileHash $normalPath).Hash;gameHostTested=$false;saveFilesModified=$false;fixtures=$output} |
+$yardType = $assembly.GetType($yardName,$true)
+$plane = $yardType.GetMethod('Plane',$flags)
+Require ($plane.Invoke($null,@([single]35,[single]45,[single]30)) -eq 40) 'QA plane did not preserve safe midpoint.'
+Require ($plane.Invoke($null,@([single]33,[single]33,[single]30)) -eq 33) 'Dry flat QA terrain rejected.'
+$yardCases = 2
+foreach ($values in @(@(32,35,30),@(35,46,30),@(40,35,30),@([single]::NaN,40,30),@(35,[single]::PositiveInfinity,30),@(35,40,[single]::NegativeInfinity))) {
+    Refuses { $plane.Invoke($null,@([single]$values[0],[single]$values[1],[single]$values[2])) } 'Unsafe QA yard plane accepted.'
+    $yardCases++
+}
+@{status='passed_paths_receipts_stacks_ground_yard_save_ack_and_compiled_contract_only';persistedCases=$persistedChecks;identityCases=$identityChecks;onceCases=$onceChecks;batchCases=$batchChecks;stationCases=$stationCases;yardCases=$yardCases;qaSha256=(Get-FileHash $qaPath).Hash;normalSha256=(Get-FileHash $normalPath).Hash;gameHostTested=$false;saveFilesModified=$false;fixtures=$output} |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'verification.json')
-"PASS: QA-only assemblies; $persistedChecks persisted-slot, $identityChecks identity, $onceChecks one-shot, $batchChecks stack, $stationCases ground/save-ack cases; native wiring only. No native grants/saves or game execution."
+"PASS: QA-only assemblies; $persistedChecks persisted-slot, $identityChecks identity, $onceChecks one-shot, $batchChecks stack, $stationCases ground/save-ack, $yardCases yard plane cases; native wiring only. No native grants/saves or game execution."

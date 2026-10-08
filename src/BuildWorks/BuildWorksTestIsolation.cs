@@ -204,7 +204,7 @@ namespace OstrixMods.BuildWorks
             }
         }
 
-        private static string[] ReadIdentityReceipt()
+        internal static string[] ReadIdentityReceipt()
         {
             string path = Path.Combine(root, "qa-identities.txt");
             ValidateSavePath(path);
@@ -270,6 +270,10 @@ namespace OstrixMods.BuildWorks
         internal static string FixtureDirectory => Path.Combine(Directory.GetParent(root).Parent.FullName, "test-fixtures");
         internal static string SupplyReceiptPath => Path.Combine(root, "qa-supplies.txt");
         internal static string StationReceiptPath => Path.Combine(root, "qa-stations.txt");
+        internal static string YardRequestPath => Path.Combine(root, "qa-yard.request");
+        internal static string YardPlanPath => Path.Combine(root, "qa-yard-plan.txt");
+        internal static string YardReceiptPath => Path.Combine(root, "qa-yard.txt");
+        internal static string YardStationReceiptPath => Path.Combine(root, "qa-yard-stations.txt");
         internal static string SupplyStamp(string plan)
         {
             using (var hash = SHA256.Create())

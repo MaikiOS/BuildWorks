@@ -1,5 +1,7 @@
 # BuildWorks development roadmap
 
+QA .109 installed; hashes match,48 QA files and library unchanged. Checkpoint:3683382. No game execution.
+
 ## .109 — Lava Lantern visual clone scale
 
 Installed real asset reproduced double child scale20.7203922. Shared BakeMesh fixed;

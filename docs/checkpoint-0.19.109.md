@@ -1,5 +1,7 @@
 # .109 — duplicate skinned preview scale
 
+QA .109 installed; hashes match,48 QA files and library unchanged. Checkpoint:3683382. No game execution.
+
 The shared visual clone now uses BakeMesh(baked, true) with its copied transform
 hierarchy. No source prefab, blueprint bytes or whole-building scale is changed.
 Thumbnail cache contents-v3 bypasses stale v2 images; old cache files may remain.

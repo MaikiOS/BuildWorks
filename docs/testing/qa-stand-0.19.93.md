@@ -4,7 +4,7 @@
 
 QA .94 reached menu and created isolated identities; world entry refused preparation before grants.
 Source .95 waits for native respawn completion/nonzero player ID without relaxing identity matching.
-Installation waits for game exit; keep the same QA saves/token. This is not proof of a working
+After game exit QA .95 was installed and all21 QA-root file hashes preserved; keep the same saves/token. This is not proof of a working
 stand or complete import. See HANDOFF for current hashes/checks and native log evidence.
 
 QA-only preparation waits for the fresh player's intro flight to finish; the loaded

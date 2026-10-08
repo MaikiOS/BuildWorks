@@ -2,7 +2,7 @@
 
 .95 update: .94 created isolated identities and reached world entry; provisioning refused
 identity matching during native respawn. .95 waits for respawn/nonzero ID; source checks PASS,
-installation awaits game exit. Keep QA saves; grants/stations/build/reload remain pending.
+QA .95 installed after exit, QA file hashes unchanged. Keep saves; grants/stations/build/reload pending.
 
 **English** | [Русский](continuation-audit-2026-10-07_RU.md)
 Current .94 update: QA .93 was installed; first launch reproduced an early platform getter NRE
@@ -62,7 +62,7 @@ Its text was not updated. A document edit is not a goal update.
 
 | Block | Implemented | Automated evidence | Owner/game evidence | Unfinished | Design only |
 |---|---|---|---|---|---|
-| QA preparation | .95 native respawn/nonzero-ID wait; strict receipt | Before/after regression, QA64 BCL, builds/API/localization/format/review | .94 menu and isolated world entry | .94 refused before grants; .95 not installed, native stand/build/reload pending | Chest if bounded backpack plan is exceeded |
+| QA preparation | .95 native respawn/nonzero-ID wait; strict receipt | Before/after regression, QA64 BCL, builds/API/localization/format/review | .94 menu and isolated world entry | .94 refused before grants; .95 installed, native stand/build/reload pending | Chest if bounded backpack plan is exceeded |
 | Editor | Transform/group/Array/Contour/Undo/save | Geometry/bridge/Unity252 | Older .41/.44 and later scoped series recorded as accepted; do not repeat wholesale | Scenes above512 | New guide tools |
 | Exchange | Store15/portable6, .blueprint/.vbuild/ZIP, exact archives, separate contents options | Store353;209 parser-only;2 real files reviewed import/edit/support/disk/export/world renderer | Imported construction through reload unproven | Header dialects, RandMatSeed, some ZDO/inventory, export only our JSON/ZIP | Unspecified third-party formats |
 | Scale/preview | Intrinsic prefab scale, nested XYZ, world50000; .87 supplied-item world appearance | Unity transforms; ordinary/native-holder/passive/heavy attachments | Particular giant lamp remains unproven | Native place/reload/FPS; unknown item effects | Further measured optimization |

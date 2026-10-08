@@ -2,6 +2,14 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Deployment follow-up 0.19.95 — installed; native retry pending
+
+After Ostrix closed Valheim, the guarded same-token deployment installed QA .95.
+DLL SHA256 BCF6060E025120DEB4182D2413512DE979EC3563D146C5E42171C26C0E154C85.
+All21 existing QA-root files retained identical hashes; complete identities and saved world/character preserved.
+Supplies/stations receipts remain absent. User resumes the same world through manager Modded only.
+Proof: artifacts/checkpoint-0.19.95/deployment.json. Native grants/stations/build/reload still pending.
+
 ## Checkpoint 0.19.95 — wait for native respawn; source verified, installation pending
 
 .94 manager launch reached menu: QA root/cloud isolation active, Local world/character

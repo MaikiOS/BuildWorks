@@ -3018,7 +3018,7 @@ namespace OstrixMods.BuildWorks
                     ToPoint(part.position.ToVector3()), ToRotation(part.rotation.ToQuaternion()), part.parentGroupId,
                     part.editorVisible, part.editorLocked, ToPoint(part.scale.ToVector3()), part.signText,
                     part.sourceDocumentId, part.sourceLine, part.foreignData?.ToGeometry(), part.scaleIsAbsolute,
-                    part.baseScale.HasValue ? ToPoint(part.baseScale.Value.ToVector3()) : (Point3?)null, part.metadata?.ToGeometry()));
+                    part.baseScale.HasValue ? ToPoint(part.baseScale.Value.ToVector3()) : (Point3?)null, part.metadata?.ToGeometry(), part.materialSeed));
             return new BlueprintEditorDocument(source.id, source.name,
                 source.category ?? CompositeBlueprintStore.DefaultCategory, parts, groups,
                 source.primaryPartId, source.primaryGroupId,
@@ -3818,7 +3818,8 @@ namespace OstrixMods.BuildWorks
                     sourceDocumentId = part.SourceDocumentId,
                     sourceLine = part.SourceLine,
                     foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(part.ForeignData),
-                    metadata = CompositeBlueprintStore.PrefabMetadata.FromGeometry(part.Metadata)
+                    metadata = CompositeBlueprintStore.PrefabMetadata.FromGeometry(part.Metadata),
+                    materialSeed = part.MaterialSeed
                 });
             }
             return result;
@@ -3910,7 +3911,7 @@ namespace OstrixMods.BuildWorks
 
         private void Bind(string status)
         {
-            if (string.IsNullOrEmpty(status) && (document.Parts.Any(part => part.ForeignData != null) ||
+            if (string.IsNullOrEmpty(status) && (document.Parts.Any(part => part.ForeignData != null || part.MaterialSeed.HasValue) ||
                 document.Sources.Any(source => source.HasOpaqueSections))) status = BuildWorksLocalization.Text("import.foreign_pending");
             var missing = new HashSet<string>(StringComparer.Ordinal);
             foreach (BlueprintEditorPart part in document.Parts)

@@ -1872,7 +1872,7 @@ Assert-Contract ($updateDocumentMethods.Count -eq 5 -and
         @($_.Parameters | Where-Object Name -eq 'placementSupportId').Count -eq 1
     }).Count -eq 1) `
     'Blueprint frame update overload or a compatibility overload is missing.'
-Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion = 19' -and
+Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion = 20' -and
     $blueprintStoreSource -match 'loaded\.version < 6' -and
     $blueprintStoreSource -match 'ValidScale\(part\.scale\)' -and
     $blueprintStoreSource -match 'if \(loaded\.version < 4\)' -and
@@ -2977,8 +2977,8 @@ Assert-Contract ($editorResolveCall.Count -eq 1 -and $editorResolveCall[0].Previ
 $resolveCalls = ($resolveBlueprint.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($resolveCalls -match 'BlueprintItemStandPlacement::CanRestore' -and
     $sessionSource -match 'sourceDocuments\?\.Any\(source => source.ToGeometry\(\).HasOpaqueSections\)' -and
-    $sessionSource -match '!forEditor && !BlueprintItemStandPlacement.CanRestore') `
-    'Only allowlisted native ItemStand state may pass world placement; opaque sections remain blocked.'
+    $sessionSource -match '!forEditor && \(part.materialSeed.HasValue \|\| !BlueprintItemStandPlacement.CanRestore') `
+    'Only allowlisted native ItemStand state may pass world placement; opaque sections and pending appearance remain blocked.'
 
 $standType = $hostAssembly.MainModule.Types | Where-Object Name -eq 'ItemStand'
 foreach ($name in 'GetAttach', 'GetAttachPrefab', 'GetAttachGameObject', 'GetOrientationSettings', 'IsUnsupported', 'IsSupported') {

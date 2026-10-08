@@ -33,7 +33,7 @@ namespace OstrixMods.BuildWorks
         internal const string DefaultCategory = "OTHER";
         private const string LegacyDefaultCategory = "ПРОЧЕЕ";
         private const string LocalizationPrefix = "$buildworks_";
-        private const int FormatVersion = 19;
+        private const int FormatVersion = 20;
         private const int MaximumBlueprints = 32;
         private const int MaximumCategories = 12;
         private const int MaximumAnchors = 512;
@@ -526,6 +526,7 @@ namespace OstrixMods.BuildWorks
             result.Unknown = evidenceIndex.Values.Count(document => document.HasOpaqueSections);
             foreach (Part part in source.parts)
             {
+                if (part.materialSeed.HasValue) ++result.Unknown;
                 var contents = part.foreignData?.ToGeometry();
                 if (contents == null) continue;
                 if (contents.Format == Geometry.BlueprintForeignPartData.NativeItemStandFormat && contents.Zdo != null &&
@@ -936,6 +937,7 @@ namespace OstrixMods.BuildWorks
                     prepared[index].sourceLine = blueprint.parts[index].sourceLine;
                     prepared[index].baseScale = prepared[index].baseScale ?? blueprint.parts[index].baseScale;
                     prepared[index].metadata = prepared[index].metadata ?? PrefabMetadata.FromGeometry(blueprint.parts[index].metadata?.ToGeometry());
+                    prepared[index].materialSeed = prepared[index].materialSeed ?? blueprint.parts[index].materialSeed;
                     if (!prepared[index].baseScale.HasValue)
                         prepared[index].scaleIsAbsolute = blueprint.parts[index].scaleIsAbsolute;
                     prepared[index].foreignData = CloneForeignData(blueprint.parts[index].foreignData);
@@ -1138,6 +1140,7 @@ namespace OstrixMods.BuildWorks
                     scale = part.scale,
                     baseScale = part.baseScale,
                     metadata = part.metadata?.Copy(),
+                    materialSeed = part.materialSeed,
                     scaleIsAbsolute = part.scaleIsAbsolute,
                     stableId = part.stableId,
                     displayName = part.displayName,
@@ -1210,7 +1213,8 @@ namespace OstrixMods.BuildWorks
                     allowSupportFields: loaded.version >= 11, allowSourceFields: loaded.version >= 12,
                     allowForeignFields: loaded.version >= 13, allowContentsFields: loaded.version >= 14,
                     allowAbsoluteScaleFields: loaded.version >= 15, allowPlacementImportFields: loaded.version >= 16,
-                    allowBaseScaleFields: loaded.version >= 17, allowMetadataFields: loaded.version >= 19);
+                    allowBaseScaleFields: loaded.version >= 17, allowMetadataFields: loaded.version >= 19,
+                    allowMaterialSeedFields: loaded.version >= 20);
                 loaded.blueprints = loaded.blueprints ?? new List<Blueprint>();
                 loaded.categories = loaded.categories ?? new List<string>();
                 if (loaded.version == 1)
@@ -1467,7 +1471,7 @@ namespace OstrixMods.BuildWorks
             catch (ArgumentException) { return false; }
         }
 
-        internal static bool HasForeignData(Blueprint blueprint) => blueprint?.parts?.Any(part => part?.foreignData != null) == true ||
+        internal static bool HasForeignData(Blueprint blueprint) => blueprint?.parts?.Any(part => part?.foreignData != null || part?.materialSeed != null) == true ||
             blueprint?.sourceDocuments?.Any(source => source.ToGeometry().HasOpaqueSections) == true;
 
         private static ForeignPartData CloneForeignData(ForeignPartData value) => value == null ? null :
@@ -1494,6 +1498,7 @@ namespace OstrixMods.BuildWorks
                 !(part.scaleIsAbsolute ? PositiveScale(part.scale) : ValidScale(part.scale)) ||
                 part.baseScale.HasValue && (part.scaleIsAbsolute || !PositiveScale(part.baseScale.Value) ||
                     !PositiveScale(new VectorData(Vector3.Scale(part.baseScale.Value.ToVector3(), part.scale.ToVector3())))) ||
+                part.materialSeed.HasValue && part.materialSeed.Value < 0 ||
                 !Geometry.BlueprintEditorPart.IsValidSignText(part.signText) || !ValidForeignData(part.foreignData)) return false;
             try
             {
@@ -1943,6 +1948,8 @@ namespace OstrixMods.BuildWorks
             public VectorData? baseScale;
             [DataMember(Order = 15, EmitDefaultValue = false)]
             public PrefabMetadata metadata;
+            [DataMember(Order = 16, EmitDefaultValue = false)]
+            public int? materialSeed;
 
             internal Vector3 RootScale(Vector3 prefabScale)
             {

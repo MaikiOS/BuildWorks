@@ -32,7 +32,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 Array.Empty<CompositeBlueprintStore.VectorData>(), part.stableId, "group", supports, "support",
                 out var saved, out string error, points, sourceDocuments: prepared.sourceDocuments), error);
             string native = File.ReadAllText(path);
-            Require(native.Contains("\"version\":19"), "Single native version missing");
+            Require(native.Contains("\"version\":20"), "Single native version missing");
             var reopened = new CompositeBlueprintStore(path).All().Single();
             Require(reopened.parts.Count == 1 && reopened.parts[0].signText == part.signText &&
                 reopened.parts[0].scale.x == 1 && reopened.parts[0].baseScale.Value.x == 2 &&
@@ -43,7 +43,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 reopened.supports[0].position.z == 4 && reopened.customSnapPoints[0].z == 9 &&
                 reopened.sourceDocuments.Single().text == source, "Single native roundtrip lost construction data");
             string portable = Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(reopened));
-            Require(portable.Contains("\"version\":9") && BlueprintExchangeFormat.Decode(portable).parts.Count == 1,
+            Require(portable.Contains("\"version\":10") && BlueprintExchangeFormat.Decode(portable).parts.Count == 1,
                 "Single portable roundtrip failed");
             foreach (bool archive in new[] { false, true })
             {
@@ -60,9 +60,9 @@ namespace OstrixMods.BuildWorks.StoreTests
                 ExternalBlueprintLibrary.LoadFile(store.ImportResultPath).Single().parts.Count == 1 &&
                 File.ReadAllText(sourcePath) == source, "Reviewed single import lost row or changed source");
 
-            Require(ExternalBlueprintLibrary.Parse(portable.Replace("\"version\":9", "\"version\":7"),
+            Require(ExternalBlueprintLibrary.Parse(portable.Replace("\"version\":10", "\"version\":7"),
                 "old.buildworks.json").importError != null, "Legacy portable schema accepted an invalid single part");
-            string legacy = native.Replace("\"version\":19", "\"version\":17");
+            string legacy = native.Replace("\"version\":20", "\"version\":17");
             File.WriteAllText(path, legacy);
             var blocked = new CompositeBlueprintStore(path);
             Require(blocked.All().Count == 0 && !blocked.TrySave(saved.parts, saved.anchors, out _, out _) &&
@@ -87,15 +87,15 @@ namespace OstrixMods.BuildWorks.StoreTests
             var second = CompositeBlueprintStore.CloneParts(saved.parts).Single();
             second.stableId = "second"; second.parentGroupId = null;
             two.parts.Add(second);
-            string oldPortable = Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(two)).Replace("\"version\":9", "\"version\":7");
+            string oldPortable = Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(two)).Replace("\"version\":10", "\"version\":7");
             Require(BlueprintExchangeFormat.Decode(oldPortable).parts.Count == 2, "Valid portable7 stopped loading");
             Require(store.TryUpdateParts(saved, two.parts, saved.anchors, out error), error);
-            string twoNative = File.ReadAllText(path).Replace("\"version\":19", "\"version\":17");
+            string twoNative = File.ReadAllText(path).Replace("\"version\":20", "\"version\":17");
             File.WriteAllText(path, twoNative);
             store = new CompositeBlueprintStore(path); saved = store.All().Single();
             Require(saved.parts.Count == 2 && File.ReadAllText(path) == twoNative, "Valid native17 changed on read");
             Require(store.TryUpdateParts(saved, saved.parts.Take(1).ToArray(), saved.anchors, out error) &&
-                new CompositeBlueprintStore(path).All().Single().parts.Count == 1 && File.ReadAllText(path).Contains("\"version\":19"),
+                new CompositeBlueprintStore(path).All().Single().parts.Count == 1 && File.ReadAllText(path).Contains("\"version\":20"),
                 error ?? "Two-to-one edit failed to migrate/write one remaining part");
             Console.WriteLine("PASS single-part native18/portable8/import/export/source/scale/sign/group/support/snap; empty and legacy-invalid documents refused atomically; missing prefab retained");
         }

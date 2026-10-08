@@ -1,5 +1,23 @@
 # BuildWorks current development handoff
 
+## After .116 — pending material variation data; not deployed
+
+Native20/portable10 store optional materialSeed independently of mount/container
+payloads. Copy/history/insert/Array/Contour and actual Controller save/reopen
+retain it. Strict version/type/range/duplicate guards and legacy retention versus
+explicit clear passed. External RandMatSeed conversion, every renderer and native
+application are still unimplemented; content review/editor/world preflight remain
+explicitly pending. See docs/MATERIAL_VARIATION_CONTRACT.md (or the same file in
+this docs directory). This preparation is not a finished import feature.
+
+Normal/QA0/0, Geometry, Store353, Controller bridge, localization876+unit, Host,
+isolation, deployment guards, format exit0, Workbench336 and actual Session17
+passed; independent correctness and Ponytail reviews passed. verify helper absent.
+No deployment/game launch: installed QA .116, all48 QA files and library unchanged.
+Next: owned per-renderer material variation in every preview and native ghost,
+exact-component capture/preflight and new owned ZDO write/readback before costs.
+Native construction/reload/network and fog v11 remain open.
+
 ## .116 — understood original-placement provenance
 
 Single empty #Center and finite #Coordinates/#Rotation before #Pieces no longer

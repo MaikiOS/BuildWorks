@@ -1,5 +1,23 @@
 # Дорожная карта развития BuildWorks
 
+## После .116 — данные варианта материала; без установки
+
+Native20/portable10 хранят необязательное materialSeed независимо от содержимого
+креплений/контейнеров. Копии/history/insert/Array/Contour и настоящий Controller
+save/reopen сохраняют поле. Строгие version/type/range/duplicate guards, старое
+удержание и явная очистка прошли. Внешняя конвертация RandMatSeed, отображение и
+native применение ещё не реализованы; обзор/редактор/world preflight явно оставляют
+состояние неподдержанным. См. docs/MATERIAL_VARIATION_CONTRACT_RU.md (либо одноимённый
+файл в этой папке docs). Это подготовка, не законченная поддержка импорта.
+
+Normal/QA0/0, Geometry, Store353, Controller bridge, localization876+unit, Host,
+isolation, deployment guards, format exit0, Workbench336 и actual Session17 прошли;
+независимые correctness и Ponytail обзоры прошли. Помощника verify нет.
+Без установки/запуска игры: QA .116, все48 QA файлов и библиотека неизменны.
+Далее: собственные параметры renderer во всех preview/native ghost, захват и
+проверка точного компонента, запись/проверка ZDO нового объекта до штатного списания.
+Native стройка/reload/сеть и игровой туман v11 остаются открытыми.
+
 ## .116 — распознанные сведения об исходном размещении
 
 Однократный пустой #Center и конечные #Coordinates/#Rotation до #Pieces больше

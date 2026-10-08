@@ -27,7 +27,7 @@ internal static class Program
         var document = new BlueprintEditorDocument(null, "Scale regression", "OTHER",
             new[] { new BlueprintEditorPart("a", "woodwall", "A", new Point3(),
                 new Rotation3(0,0,0,1), scale: new Point3(2,0.5,1.25), signText: "Дом\nOstrix",
-                baseScale: new Point3(1,1,1)), Part("b",2) });
+                baseScale: new Point3(1,1,1), materialSeed: 0), Part("b",2) });
         Type controllerType = asm.GetType("OstrixMods.BuildWorks.BlueprintEditorController", true);
         object controller = FormatterServices.GetUninitializedObject(controllerType);
         controllerType.GetField("document", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(controller, document);
@@ -52,6 +52,8 @@ internal static class Program
         var restored = (BlueprintEditorDocument)controllerType.GetMethod("DocumentFromBlueprint", BindingFlags.NonPublic|BindingFlags.Static)
             .Invoke(null, new[] {call[5]});
         Require(restored.Parts[0].SignText == "Дом\nOstrix", "Controller reopen stripped sign text");
+        Require(restored.Parts[0].MaterialSeed == 0 && restored.Parts[1].MaterialSeed == null,
+            "Controller store/reopen lost zero seed or invented an unspecified seed");
         Require(restored.Parts.All(part => part.BaseScale.HasValue && part.BaseScale.Value.X == 1 &&
             part.BaseScale.Value.Y == 1 && part.BaseScale.Value.Z == 1), "Controller/store/reopen lost pinned prefab scale");
         Console.WriteLine("PASS actual Controller.BuildStoreParts -> Store.TrySaveDocument preserves XYZ scale");
@@ -68,7 +70,7 @@ internal static class Program
                 ? new BlueprintForeignPartData(BlueprintForeignPartData.NativeItemStandFormat, "SwordIron:2:3:0",
                     Convert.ToBase64String(new byte[] { 109, 3, 4, 5 }), null, true)
                 : new BlueprintForeignPartData("blueprint", "\"SwordIron:0:1:3\"", "opaque", ".5"),
-            baseScale: part.BaseScale));
+            baseScale: part.BaseScale, materialSeed: part.MaterialSeed));
         var payload = new BlueprintEditorDocument(null, "Copy", "OTHER", payloadParts,
             sourceCustomSnapPoints: new[] { new Point3(7,8,9) }, sourceSupports: document.Supports,
             placementSupportId: document.PlacementSupportId, sourceDocuments: new[] { evidence });
@@ -85,7 +87,8 @@ internal static class Program
         Require(copied.Sources[0].Text == evidence.Text && copied.Parts[0].SourceDocumentId == evidence.Id,
             "Controller copy discarded source provenance");
         Require(copied.Parts[0].ForeignData.Info == payload.Parts[0].ForeignData.Info &&
-            copied.Parts[0].ForeignData.ContentsCleared, "Controller copy dropped foreign object data or clear intent");
+            copied.Parts[0].ForeignData.ContentsCleared && copied.Parts[0].MaterialSeed == 0,
+            "Controller copy dropped foreign object data, seed or clear intent");
         Console.WriteLine("PASS actual Controller.CopyDocument retains detached root payload and support scope");
 
         controllerType.GetField("document", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(controller, payload);
@@ -112,6 +115,7 @@ internal static class Program
             reloaded.Parts[0].SourceDocumentId == evidence.Id && reloaded.Parts[0].SourceLine == 2,
             "Actual Controller source/part bridge discarded original bytes or row binding");
         Require(reloaded.Parts[0].ForeignData.ContentsCleared &&
+            reloaded.Parts[0].MaterialSeed == 0 && reloaded.Parts[1].MaterialSeed == null &&
             reloaded.Parts[0].ForeignData.Info == payload.Parts[0].ForeignData.Info &&
             reloaded.Parts[1].ForeignData.Zdo == "opaque" &&
             reloaded.Parts[0].ForeignData.Format == BlueprintForeignPartData.NativeItemStandFormat &&

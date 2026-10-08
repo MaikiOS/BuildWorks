@@ -5323,7 +5323,8 @@ namespace OstrixMods.BuildWorks
                     unavailable.Add(BuildWorksLocalization.Text("blueprint.network_identity_required", part.prefabName));
                     continue;
                 }
-                if (!forEditor && !BlueprintItemStandPlacement.CanRestore(piece, part.foreignData?.ToGeometry()))
+                // ponytail: keep appearance recipes pending until every preview and native placement applies the seed.
+                if (!forEditor && (part.materialSeed.HasValue || !BlueprintItemStandPlacement.CanRestore(piece, part.foreignData?.ToGeometry())))
                 {
                     unavailable.Add(BuildWorksLocalization.Text("import.foreign_pending"));
                     continue;

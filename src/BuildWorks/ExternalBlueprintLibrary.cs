@@ -511,6 +511,7 @@ namespace OstrixMods.BuildWorks
                     scale = part.scale,
                     baseScale = part.baseScale,
                     metadata = CompositeBlueprintStore.PrefabMetadata.FromGeometry(part.metadata?.ToGeometry()),
+                    materialSeed = part.materialSeed,
                     scaleIsAbsolute = part.scaleIsAbsolute,
                     parentGroupId = part.parentGroupId == null ? null : ids[part.parentGroupId],
                     editorVisible = part.editorVisible,

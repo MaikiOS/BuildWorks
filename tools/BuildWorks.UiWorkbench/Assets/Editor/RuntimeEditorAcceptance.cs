@@ -549,6 +549,7 @@ public static class RuntimeEditorAcceptance
                 checks.Add("Reopening clears active operation");
                 TestExternalImportEditor(template, fontTemplate, source, output);
                 TestIncompleteExternalEditor(template, fontTemplate, source["woodwall"], output);
+                TestPendingMaterialSeedEditor(template, fontTemplate, source["woodwall"], output);
                 Action restoreSingleScreen = UseGameViewSize(1920, 1080);
                 try
                 {
@@ -1027,8 +1028,35 @@ public static class RuntimeEditorAcceptance
         Require(reloaded.All().Count == 1, "Actual disk library roundtrip");
         Require(Mathf.Abs(reloaded.All()[0].parts[0].scale.x - expected) < 0.0001f, "Store discarded scale");
         CheckReopenedCopy(controller, reloaded, expected);
-        Require(File.ReadAllText(path).Contains("\"version\":19"), "Controller did not write format19");
-        checks.Add("Controller save -> disk format18 -> new store -> OpenExisting retains scale, rotated root-owned support and placement reference; transient support focus absent");
+        Require(File.ReadAllText(path).Contains("\"version\":20"), "Controller did not write format20");
+        checks.Add("Controller save -> disk format20 -> new store -> OpenExisting retains scale, rotated root-owned support and placement reference; transient support focus absent");
+    }
+
+    private static void TestPendingMaterialSeedEditor(Camera camera, TMP_Text font, GameObject wall, string output)
+    {
+        string path = Path.Combine(output, "material-seed-" + Guid.NewGuid().ToString("N") + ".json");
+        var store = new CompositeBlueprintStore(path);
+        var part = new CompositeBlueprintStore.Part { stableId = "seed", prefabName = "woodwall", displayName = "Wall",
+            materialSeed = 0, rotation = new CompositeBlueprintStore.QuaternionData { w = 1 } };
+        Require(store.TrySave("Pending material", new[] { part }, Array.Empty<CompositeBlueprintStore.VectorData>(), out var saved, out string error), error);
+        using (var editor = new BlueprintEditorController(store, camera, font, name => name == "woodwall" ? wall : null,
+            name => name, () => Array.Empty<BlueprintEditorCatalogItem>(), message => { throw new InvalidOperationException(message); }))
+        {
+            Require(editor.OpenExisting(saved, out error), error);
+            Call(editor, "Bind", "");
+            var view = Field<BlueprintEditorView>(editor, "view");
+            Require(Field<TMP_Text>(view, "statusText").text.Contains(BuildWorksLocalization.Text("import.foreign_pending")),
+                "Editor reported an unapplied material recipe ready");
+            Require(editor.Document.Parts.Single().MaterialSeed == 0 && (bool)Call(editor, "TrySave", false, true),
+                "Actual editor save lost zero appearance seed");
+            editor.Close(true);
+            var reopened = new CompositeBlueprintStore(path).All().Single();
+            Require(reopened.parts.Single().materialSeed == 0 && CompositeBlueprintStore.HasForeignData(reopened) &&
+                editor.OpenExisting(reopened, out error) && editor.Document.Parts.Single().MaterialSeed == 0,
+                "Editor/native reopen lost the pending appearance recipe: " + error);
+            editor.Close(true);
+        }
+        checks.Add("Material seed native20/portable10 data contract: actual editor save/reopen preserves zero and keeps an explicit pending-state warning; appearance/conversion/native placement not implemented.");
     }
 
     private static void TestIncompleteExternalEditor(Camera camera, TMP_Text font, GameObject wall, string output)

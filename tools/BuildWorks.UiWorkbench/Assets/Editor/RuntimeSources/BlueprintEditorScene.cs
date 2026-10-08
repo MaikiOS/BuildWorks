@@ -232,6 +232,10 @@ namespace OstrixMods.BuildWorks
         internal bool OccluderFadeEnabled { get; private set; }
         private float groundHeight;
         private bool disposed;
+        private BlueprintEditorDocument initialDocument;
+        private int initialRevision, initialIndex;
+        private readonly HashSet<string> initialMissing = new HashSet<string>(StringComparer.Ordinal);
+        internal int InitialLoadedCount => initialIndex;
         private readonly MaterialPropertyBlock hoverProperties = new MaterialPropertyBlock();
         private string[] cachedAnchorIds;
         private Vector3[] cachedGizmoAnchors;
@@ -451,15 +455,79 @@ namespace OstrixMods.BuildWorks
             }
         }
 
-        internal bool TrySync(BlueprintEditorDocument document, out string warning)
+        internal void BeginInitialLoad(BlueprintEditorDocument document)
         {
             ThrowIfDisposed();
             if (document == null) throw new ArgumentNullException(nameof(document));
-            if (CompositeBlueprintStore.InteractiveError(document.Parts.Count) is string budgetError)
+            if (initialDocument != null || visuals.Count != 0)
+                throw new InvalidOperationException("Initial load requires an empty editor scene.");
+            if (CompositeBlueprintStore.EditorError(document.Parts.Count) is string budgetError)
+                throw new InvalidOperationException(BuildWorksLocalization.ResolveUserText(budgetError));
+            initialDocument = document;
+            initialRevision = document.RevisionToken;
+            initialIndex = 0;
+            initialMissing.Clear();
+            camera.enabled = false;
+        }
+
+        internal bool StepInitialLoad(out string warning, int maximumParts = 16, double milliseconds = 8)
+        {
+            ThrowIfDisposed();
+            if (initialDocument == null) throw new InvalidOperationException("Initial load is not running.");
+            if (maximumParts < 1 || milliseconds <= 0 || double.IsNaN(milliseconds) || double.IsInfinity(milliseconds))
+                throw new ArgumentOutOfRangeException(nameof(maximumParts));
+            BlueprintEditorDocument document = initialDocument;
+            if (document.RevisionToken != initialRevision)
+                throw new InvalidOperationException("The document changed during initial load.");
+            warning = null;
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            int processed = 0;
+            while (initialIndex < document.Parts.Count && processed < maximumParts &&
+                (processed == 0 || watch.Elapsed.TotalMilliseconds < milliseconds))
+            {
+                BlueprintEditorPart part = document.Parts[initialIndex];
+                if (!TryUnityTransform(part, out _, out _))
+                    throw new InvalidOperationException("Part transform is outside Unity range: " + part.StableId);
+                GameObject source = part.ScaleIsAbsolute ? null : resolveVisualSource(part.PrefabName);
+                if (!source) initialMissing.Add(part.PrefabName);
+                VisualNode visual = CreateVisual(part, source, cacheMaterials: true);
+                // Register ownership before applying state so Dispose also cleans failed loads.
+                visuals.Add(part.StableId, visual);
+                ApplyPart(visual, part, document.IsEffectivelyVisible(part.StableId),
+                    document.IsEffectivelyLocked(part.StableId));
+                ++initialIndex;
+                ++processed;
+            }
+            if (initialIndex < document.Parts.Count) return false;
+            UpdateHighlights(document, visuals);
+            UpdateGroundHeight();
+            warning = SceneWarning(initialMissing);
+            initialDocument = null;
+            initialMissing.Clear();
+            camera.enabled = true;
+            return true;
+        }
+
+        private string SceneWarning(IEnumerable<string> missingPrefabs)
+        {
+            string missing = string.Join(", ", missingPrefabs);
+            var warnings = new HashSet<string>(StringComparer.Ordinal);
+            if (missing.Length > 0) warnings.Add(BuildWorksLocalization.Text("editor.missing_dimensions", missing));
+            foreach (VisualNode visual in visuals.Values)
+                if (visual.ContentWarning != null) warnings.Add(visual.ContentWarning);
+            return warnings.Count == 0 ? null : string.Join("\n", warnings);
+        }
+
+        internal bool TrySync(BlueprintEditorDocument document, out string warning)
+        {
+            ThrowIfDisposed();
+            if (initialDocument != null) throw new InvalidOperationException("Initial load has not finished.");
+            if (document == null) throw new ArgumentNullException(nameof(document));
+            if (CompositeBlueprintStore.EditorError(document.Parts.Count) is string budgetError)
             { warning = BuildWorksLocalization.ResolveUserText(budgetError); return false; }
             InvalidateGizmoAnchors();
 
-            var missingPrefabs = new List<string>();
+            var missingPrefabs = new HashSet<string>(StringComparer.Ordinal);
             var staged = new List<VisualNode>();
             var oldStates = new List<VisualState>();
             try
@@ -470,7 +538,7 @@ namespace OstrixMods.BuildWorks
                     if (!TryUnityTransform(part, out _, out _))
                         throw new InvalidOperationException(
                             "Part transform is outside Unity range: " + part.StableId);
-                    GameObject source = resolveVisualSource(part.PrefabName);
+                    GameObject source = part.ScaleIsAbsolute ? null : resolveVisualSource(part.PrefabName);
                     sources.Add(part.StableId, source);
                     if (!source && !missingPrefabs.Contains(part.PrefabName))
                         missingPrefabs.Add(part.PrefabName);
@@ -538,12 +606,7 @@ namespace OstrixMods.BuildWorks
                 return false;
             }
 
-            warning = missingPrefabs.Count == 0
-                ? null
-                : "Missing prefab placeholder: " + string.Join(", ", missingPrefabs);
-            foreach (VisualNode visual in visuals.Values)
-                if (visual.ContentWarning != null) warning = string.IsNullOrEmpty(warning)
-                    ? visual.ContentWarning : warning + "\n" + visual.ContentWarning;
+            warning = SceneWarning(missingPrefabs);
             return true;
         }
 
@@ -577,7 +640,8 @@ namespace OstrixMods.BuildWorks
             out string stableId,
             out Vector3 point,
             out Vector3 normal,
-            IReadOnlyList<string> excludedIds = null)
+            IReadOnlyList<string> excludedIds = null,
+            bool skipPlaceholders = false)
         {
             ThrowIfDisposed();
             Ray ray = camera.ScreenPointToRay(screenPosition);
@@ -589,6 +653,7 @@ namespace OstrixMods.BuildWorks
             {
                 if (excludedIds != null && Contains(excludedIds, entry.Key)) continue;
                 VisualNode visual = entry.Value;
+                if (skipPlaceholders && visual.Placeholder) continue;
                 if (!includeLocked && visual.Locked || visual.SeeThrough || !visual.Root.activeInHierarchy ||
                     !TryBounds(visual, out Bounds bounds) ||
                     !bounds.IntersectRay(ray, out float boundsDistance) || boundsDistance >= nearest ||
@@ -609,7 +674,7 @@ namespace OstrixMods.BuildWorks
         }
 
         internal bool TryMoveSurface(Vector2 screenPosition, IReadOnlyList<string> excludedIds, out Vector3 point) =>
-            TryPickPoint(screenPosition, true, out _, out point, out _, excludedIds);
+            TryPickPoint(screenPosition, true, out _, out point, out _, excludedIds, skipPlaceholders: true);
 
         private static bool Contains(IReadOnlyList<string> ids, string id)
         {
@@ -627,7 +692,7 @@ namespace OstrixMods.BuildWorks
             out Vector3 point, out Vector3 normal)
         {
             if (TryPickPoint(
-                screenPosition, includeLocked: true, out _, out point, out normal, excludedIds)) return true;
+                screenPosition, includeLocked: true, out _, out point, out normal, excludedIds, skipPlaceholders: true)) return true;
             Ray ray = camera.ScreenPointToRay(screenPosition);
             var plane = new Plane(Vector3.up, new Vector3(0f, groundHeight, 0f));
             if (!plane.Raycast(ray, out float distance))
@@ -644,7 +709,7 @@ namespace OstrixMods.BuildWorks
         {
             float contact = float.NegativeInfinity;
             foreach (string id in ids)
-                if (visuals.TryGetValue(id, out VisualNode visual) && visual.Root.activeInHierarchy)
+                if (visuals.TryGetValue(id, out VisualNode visual) && !visual.Placeholder && visual.Root.activeInHierarchy)
                     contact = Mathf.Max(contact, Vector3.Dot(PlacementContactOffset(visual, point, normal), normal));
             return float.IsInfinity(contact) ? Vector3.zero : normal * contact;
         }
@@ -730,6 +795,7 @@ namespace OstrixMods.BuildWorks
 
         private void AddEditorHelperTargets(VisualNode visual, List<Vector3> points)
         {
+            if (visual.Placeholder) return;
             AddOrdinaryHelperTargets(visual, points);
             if (ExperimentalGeometryPoints)
             {
@@ -745,6 +811,7 @@ namespace OstrixMods.BuildWorks
 
         private static void AddOrdinaryHelperTargets(VisualNode visual, List<Vector3> points)
         {
+            if (visual.Placeholder) return;
             var helpers = new List<Vector3>();
             if (TryBounds(visual, out Bounds bounds)) AddBoundsAnchors(bounds, helpers);
             for (int index = visual.NativeSnapCount; index < visual.SnapLocal.Count; ++index)
@@ -952,7 +1019,7 @@ namespace OstrixMods.BuildWorks
             bool found = false;
             Bounds bounds = default;
             foreach (VisualNode visual in duplicatePreviews)
-                if (TryBounds(visual, out Bounds partBounds))
+                if (!visual.Placeholder && TryBounds(visual, out Bounds partBounds))
                 {
                     if (found) bounds.Encapsulate(partBounds);
                     else { bounds = partBounds; found = true; }
@@ -1001,21 +1068,19 @@ namespace OstrixMods.BuildWorks
         {
             ThrowIfDisposed();
             if (preview == null) { ClearTemporaryPreview(target); return; }
-            if (CompositeBlueprintStore.InteractiveError(preview.Count) is string budgetError)
+            if (CompositeBlueprintStore.EditorError(preview.Count) is string budgetError)
                 throw new InvalidOperationException(BuildWorksLocalization.ResolveUserText(budgetError));
             try
             {
                 for (int index = 0; index < preview.Count; ++index)
                 {
                     BlueprintEditorPart part = preview[index];
+                    GameObject source = part.ScaleIsAbsolute ? null : resolveVisualSource(part.PrefabName);
                     VisualNode visual = index < target.Count ? target[index] : null;
                     if (visual == null || visual.PrefabName != part.PrefabName ||
+                        visual.Placeholder != !source ||
                         !ReferenceEquals(visual.ForeignData, part.ForeignData))
                     {
-                        GameObject source = resolveVisualSource(part.PrefabName);
-                        if (!source)
-                            throw new InvalidOperationException(BuildWorksLocalization.Text(
-                                "blueprint.scene.preview_piece_missing", part.PrefabName));
                         VisualNode replacement = CreateVisual(part, source, selectable: false);
                         DestroyVisual(visual);
                         visual = replacement;
@@ -1377,7 +1442,7 @@ namespace OstrixMods.BuildWorks
                 visual.Root.transform.SetLocalPositionAndRotation(
                     pivot + rotation * ((sourcePosition - pivot) * uniformScale) + translation,
                     rotation * sourceRotation);
-                visual.Root.transform.localScale = Vector3.Scale(
+                visual.Root.transform.localScale = visual.Placeholder ? Vector3.one * .3f : Vector3.Scale(
                     visual.BaseScale, ToUnity(part.Scale)) * uniformScale;
             }
             UpdateHighlights(document);
@@ -1604,6 +1669,7 @@ namespace OstrixMods.BuildWorks
             if (stableIds == null) return false;
             foreach (string stableId in stableIds)
             {
+                if (visuals.TryGetValue(stableId, out VisualNode missing) && missing.Placeholder) return false;
                 if (!visuals.TryGetValue(stableId, out VisualNode visual) ||
                     !TryBounds(visual, out Bounds partBounds)) continue;
                 if (found) bounds.Encapsulate(partBounds);
@@ -1636,11 +1702,20 @@ namespace OstrixMods.BuildWorks
                 nativeAnchorStart = cachedNativeAnchorStart;
                 return true;
             }
-            if (!TryGetBounds(stableIds, out Bounds bounds)) return false;
+            bool incomplete = false;
+            foreach (string stableId in stableIds)
+                if (visuals.TryGetValue(stableId, out VisualNode visual) && visual.Placeholder) incomplete = true;
+            if (incomplete && legacyLayoutAnchors) return false;
+            Bounds bounds = default;
+            if (!incomplete && !TryGetBounds(stableIds, out bounds)) return false;
 
             var result = new List<Vector3>(
                 AnchorAdjustment.SelectableAnchorCount + 32);
-            AddBoundsAnchors(bounds, result);
+            if (!incomplete) AddBoundsAnchors(bounds, result);
+            else
+                foreach (string stableId in stableIds)
+                    if (visuals.TryGetValue(stableId, out VisualNode visual) && !visual.Locked && visual.Root.activeInHierarchy)
+                        result.Add(visual.Root.transform.position);
             nativeAnchorStart = result.Count;
             var snapSets = new List<IReadOnlyList<Point3>>();
             var nativePoints = new List<Vector3>();
@@ -1882,6 +1957,8 @@ namespace OstrixMods.BuildWorks
             }
             worldCameraMasks.Clear();
             disposed = true;
+            initialDocument = null;
+            initialMissing.Clear();
             gizmo?.Hide();
             gizmo?.Dispose();
             ClearContourPreview();
@@ -2045,6 +2122,7 @@ namespace OstrixMods.BuildWorks
             bool captureSurfaces = false,
             bool cacheMaterials = false)
         {
+            if (part.ScaleIsAbsolute) source = null;
             var result = new VisualNode
             {
                 PrefabName = part.PrefabName,
@@ -2094,7 +2172,7 @@ namespace OstrixMods.BuildWorks
                     result.OriginalRenderingOff.Add(renderer.forceRenderingOff);
                 }
                 if (selectable || captureSurfaces) CapturePickSurfaces(result, cacheMaterials);
-                if (result.PlacementLocal.Count == 0) AddBoundsPlacementPoints(result);
+                if (!result.Placeholder && result.PlacementLocal.Count == 0) AddBoundsPlacementPoints(result);
                 if (selectable) ApplyAppearance(result);
                 return result;
             }
@@ -2360,7 +2438,7 @@ namespace OstrixMods.BuildWorks
         {
             TryUnityTransform(part, out Vector3 position, out Quaternion rotation);
             visual.Root.transform.SetLocalPositionAndRotation(position, rotation);
-            visual.Root.transform.localScale = Vector3.Scale(
+            visual.Root.transform.localScale = visual.Placeholder ? Vector3.one * .3f : Vector3.Scale(
                 visual.BaseScale,
                 new Vector3((float)part.Scale.X, (float)part.Scale.Y, (float)part.Scale.Z));
             visual.Root.SetActive(effectivelyVisible);
@@ -2517,7 +2595,7 @@ namespace OstrixMods.BuildWorks
 
         private static void CaptureGeometryCorners(VisualNode visual)
         {
-            if (visual.GeometryCaptured) return;
+            if (visual.GeometryCaptured || visual.Placeholder) return;
             visual.GeometryCaptured = true;
             var edges = new List<Edge3>();
             var solids = new List<PickSurface>();
@@ -2831,6 +2909,7 @@ namespace OstrixMods.BuildWorks
         private static int FindUnusedEditorLayer()
         {
             var used = new bool[32];
+            used[BlueprintThumbnailRenderer.ThumbnailLayer] = true;
             foreach (Component component in Resources.FindObjectsOfTypeAll<Component>())
             {
                 if (component && component.gameObject.scene.IsValid() &&

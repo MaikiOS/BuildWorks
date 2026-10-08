@@ -250,6 +250,7 @@ namespace OstrixMods.BuildWorks.Geometry
         private int currentToken;
         private int cleanToken;
         private int nextToken = 1;
+        public int RevisionToken => currentToken;
 
         public BlueprintEditorDocument(
             string sourceBlueprintId,

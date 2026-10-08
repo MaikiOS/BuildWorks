@@ -1,5 +1,15 @@
 # BuildWorks current development handoff
 
+## .108 — heavy editor: automated checks passed
+
+Staged load/progress/cancel and virtual outliner passed1025-record actual-controller
+checks including missing/Undo/Redo/save/reopen. Normal512, QA50000 with loaded-session
+guard; capture512 and heavy finalization remain open. Workbench252 screenshots,
+normal/QA0/0, Geometry/Store/host/localization856/QA isolation/format and independent
+review passed. No Valheim execution; installed build remains .107.
+
+See docs/checkpoint-0.19.108.md and docs/WORK_STATUS_RU.md.
+
 QA .107 was installed by the guarded script; hashes match,48 QA save/receipt files and the library are unchanged. The game was not launched.
 
 ## .107 — payment/refund: automated checks passed, game acceptance open

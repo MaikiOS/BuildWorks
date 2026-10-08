@@ -594,6 +594,7 @@ namespace OstrixMods.BuildWorks
             Action<CompositeBlueprintStore.Blueprint> openBlueprintEditor = null,
             Action createBlueprint = null)
         {
+            requestBlueprintEditor = openBlueprintEditor;
             blueprintStore.ConfigureImportScale(name =>
             {
                 GameObject prefab = ZNetScene.instance ? ZNetScene.instance.GetPrefab(name) : null;
@@ -647,6 +648,7 @@ namespace OstrixMods.BuildWorks
         }
 
         internal CompositeBlueprintStore BlueprintStore => blueprintStore;
+        private readonly Action<CompositeBlueprintStore.Blueprint> requestBlueprintEditor;
 
         internal void SuspendForBlueprintEditor()
         {
@@ -1314,6 +1316,11 @@ namespace OstrixMods.BuildWorks
             if (!player)
             {
                 return false;
+            }
+            if (blueprint != null && requestBlueprintEditor != null)
+            {
+                requestBlueprintEditor(blueprint);
+                return true;
             }
 
             List<Piece> pieces = new List<Piece>();

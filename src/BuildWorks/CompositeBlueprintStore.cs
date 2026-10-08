@@ -20,6 +20,13 @@ namespace OstrixMods.BuildWorks
     {
         internal const int MaximumParts = Geometry.BlueprintEditorDocument.MaximumParts;
         internal const int InteractivePartBudget = 512;
+#if BUILDWORKS_TEST_STAND || UNITY_EDITOR
+        internal const int EditorPartBudget = MaximumParts;
+#else
+        internal const int EditorPartBudget = InteractivePartBudget;
+#endif
+        internal static string EditorError(int count) => count > EditorPartBudget
+            ? UserError("import.interactive_limit", count + "/" + EditorPartBudget) : null;
         internal static string InteractiveError(int count) => count > InteractivePartBudget
             ? UserError("import.interactive_limit", count + "/" + InteractivePartBudget) : null;
         private const int MaximumLibraryParts = 100000;

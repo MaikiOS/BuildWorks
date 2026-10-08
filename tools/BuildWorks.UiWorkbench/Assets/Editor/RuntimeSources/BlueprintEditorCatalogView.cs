@@ -224,7 +224,7 @@ namespace OstrixMods.BuildWorks
             });
             LayoutElement element = button.GetComponent<LayoutElement>(); element.minHeight = element.preferredHeight = 152;
             TMP_Text name = button.GetComponentInChildren<TMP_Text>(); name.enableAutoSizing = false; name.fontSize = 14;
-            if (!string.IsNullOrEmpty(item.UnavailableReason)) name.text = "[!] " + item.DisplayName;
+            if (!string.IsNullOrEmpty(item.UnavailableReason) || !string.IsNullOrEmpty(item.WarningReason)) name.text = "[!] " + item.DisplayName;
             name.textWrappingMode = TextWrappingModes.Normal; name.alignment = TextAlignmentOptions.TopLeft;
             name.margin = Vector4.zero; name.maxVisibleLines = item.IsUpgrade ? 2 : 3;
             SetTopAnchored((RectTransform)name.transform, 8, 94, 8, item.IsUpgrade ? 36 : 52);
@@ -241,7 +241,7 @@ namespace OstrixMods.BuildWorks
                 SetTopAnchored((RectTransform)station.transform, 8, 130, 8, 18);
             }
             BlueprintEditorHoverTarget hover = button.gameObject.AddComponent<BlueprintEditorHoverTarget>();
-            hover.Initialize(item.DisplayName + "\n" + (item.UnavailableReason ?? item.PrefabName + " · #" + (item.Index + 1)),
+            hover.Initialize(item.DisplayName + "\n" + (item.UnavailableReason ?? item.WarningReason ?? item.PrefabName + " · #" + (item.Index + 1)),
                 (rect, text) => { PreviewCatalogItem(captured); BeginTooltip(rect, text); }, EndTooltip);
         }
         private void AddCatalogImage(Transform parent, string name, Sprite sprite, float x, float y, float w, float h)
@@ -329,6 +329,8 @@ namespace OstrixMods.BuildWorks
                     "\n" + BuildWorksLocalization.Text("catalog.card.parts", item.Blueprint.importPartCount);
             if (item.ItemContents != null) description = T("editor.item.defaults") + "\n\n" + item.PrefabName;
             if (!string.IsNullOrEmpty(item.UnavailableReason)) description += "\n\n" + item.UnavailableReason;
+            else if (!string.IsNullOrEmpty(item.WarningReason)) description += "\n\n" + item.WarningReason;
+            if (!item.ResourcesKnown) description += "\n\n" + T("editor.catalog_cost_unknown");
             RectTransform viewport = CreatePanel("PreviewBody", catalogPreview, Color.clear, null);
             SetTopAnchored(viewport, 8, 224, 8, Mathf.Max(32, catalogPreview.rect.height - 286));
             viewport.gameObject.AddComponent<RectMask2D>();
@@ -341,7 +343,7 @@ namespace OstrixMods.BuildWorks
             float metadataHeight = body.GetPreferredValues(description, 204, Mathf.Infinity).y + 8;
             SetTopLeft((RectTransform)body.transform, 4, 0, 204, metadataHeight);
             float y = metadataHeight;
-            if (!string.IsNullOrEmpty(item.UnavailableReason) || item.ItemContents != null)
+            if (!string.IsNullOrEmpty(item.UnavailableReason) || item.ItemContents != null || !item.ResourcesKnown)
             { SetTopLeft(content, 0, 0, 212, metadataHeight); return; }
             TMP_Text costTitle = CreateText("PreviewCostTitle", content, CatalogText("build_cost"), 14, FontStyles.Bold, TextAlignmentOptions.TopLeft);
             SetTopLeft(costTitle.rectTransform, 4, y, 204, 24); y += 26;

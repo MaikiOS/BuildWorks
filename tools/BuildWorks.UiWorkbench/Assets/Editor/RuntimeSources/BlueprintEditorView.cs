@@ -59,7 +59,8 @@ namespace OstrixMods.BuildWorks
             IReadOnlyList<BlueprintEditorCatalogResource> resources = null,
             string requiredStation = null, Sprite requiredStationIcon = null,
             IReadOnlyList<string> materials = null, int materialOrder = 0,
-            string unavailableReason = null, BlueprintForeignPartData itemContents = null)
+            string unavailableReason = null, BlueprintForeignPartData itemContents = null,
+            string warningReason = null, bool resourcesKnown = true)
         {
             PrefabName = prefabName;
             DisplayName = displayName;
@@ -88,6 +89,8 @@ namespace OstrixMods.BuildWorks
             Materials = materials ?? new[] { Material };
             MaterialOrder = materialOrder;
             UnavailableReason = unavailableReason;
+            WarningReason = warningReason;
+            ResourcesKnown = resourcesKnown;
             ItemContents = itemContents;
         }
 
@@ -107,6 +110,8 @@ namespace OstrixMods.BuildWorks
         internal bool IsBlueprint => Blueprint != null;
         internal BlueprintForeignPartData ItemContents { get; }
         internal string UnavailableReason { get; }
+        internal string WarningReason { get; }
+        internal bool ResourcesKnown { get; }
         internal string Section { get; }
         internal string Family { get; }
         internal string StationId { get; }
@@ -348,6 +353,9 @@ namespace OstrixMods.BuildWorks
         private readonly RectTransform inspectorTabs;
         private readonly RectTransform status;
         private readonly RectTransform outlinerRows;
+        private readonly List<Action> outlinerRowBuilders = new List<Action>();
+        private bool collectingOutlinerRows;
+        private int firstOutlinerRow = -1, lastOutlinerRow = -1;
         private readonly TMP_Text outlinerTitle;
         private bool outlinerDragging;
         private Vector2 outlinerDragPosition;
@@ -442,6 +450,7 @@ namespace OstrixMods.BuildWorks
         internal bool ItemStandHasContents { get; set; }
         private BlueprintExchangeView exchangeView;
         private float inspectorOriginalScale;
+        private bool inspectorScaleIsAbsolute;
         private string inspectorOriginalScaleText;
         private TMP_InputField fieldOfViewInput;
         private Slider fieldOfViewSlider;
@@ -1694,6 +1703,7 @@ namespace OstrixMods.BuildWorks
                 RefreshStatusText();
             }
             ApplySafeAreaAndLayout(force: false);
+            RefreshOutlinerWindow();
             Camera uiCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
             if (!HasModal && !HasCatalog && !IsTextInputFocused && paneSplitter.gameObject.activeSelf &&
                 input.GetMouseButtonDown(0) && RectTransformUtility.RectangleContainsScreenPoint(paneSplitter, input.MousePosition, uiCamera))
@@ -2122,6 +2132,21 @@ namespace OstrixMods.BuildWorks
                         row.GetSiblingIndex() % 2 == 0 ? PanelColor : PanelRaised;
         }
 
+        internal void ShowLoading(int total)
+        {
+            ResetSaveMetadata();
+            errorDialog = false;
+            modalTitle.text = T("editor.loading_title");
+            SetLoadingProgress(0, total);
+            SetButtonLabel(dialogCancelButton, T("editor.view.cancel"));
+            dialogPrimaryButton.gameObject.SetActive(false);
+            dialogDiscardButton.gameObject.SetActive(false);
+            ShowDialog();
+        }
+
+        internal void SetLoadingProgress(int loaded, int total) =>
+            modalMessage.text = T("editor.loading_progress", loaded, total);
+
         internal void ShowUnsavedDialog(string blueprintName)
         {
             ResetSaveMetadata();
@@ -2529,13 +2554,49 @@ namespace OstrixMods.BuildWorks
 
         private void RebuildOutliner(BlueprintEditorDocument document)
         {
+            outlinerRowBuilders.Clear();
+            collectingOutlinerRows = true;
+            try { CollectOutlinerRows(document); }
+            finally { collectingOutlinerRows = false; }
+            RefreshOutlinerWindow(force: true);
+        }
+
+        private void RefreshOutlinerWindow(bool force = false)
+        {
+            int count = outlinerRowBuilders.Count;
+            float height = (float)BlueprintEditorLayout.OutlinerRowHeight;
+            int first = count <= 256 ? 0 : Mathf.Clamp(
+                Mathf.FloorToInt(Mathf.Max(0, outlinerRows.anchoredPosition.y) / height) - 2, 0, count);
+            int last = count <= 256 ? count : Math.Min(count, first +
+                Mathf.CeilToInt(Mathf.Max(height, outlinerRowViewport.rect.height) / height) + 4);
+            if (!force && first == firstOutlinerRow && last == lastOutlinerRow) return;
+            firstOutlinerRow = first;
+            lastOutlinerRow = last;
+            if (pendingTooltipAnchor && pendingTooltipAnchor.IsChildOf(outlinerRows)) EndTooltip();
+            ClearOutlinerDropCue();
             for (int index = outlinerRows.childCount - 1; index >= 0; --index)
             {
                 GameObject oldRow = outlinerRows.GetChild(index).gameObject;
                 oldRow.SetActive(false);
+                oldRow.transform.SetParent(null, false);
                 UnityEngine.Object.Destroy(oldRow);
             }
+            AddOutlinerSpacer("Before", first * height);
+            for (int index = first; index < last; ++index) outlinerRowBuilders[index]();
+            AddOutlinerSpacer("After", (count - last) * height);
+            LayoutRebuilder.MarkLayoutForRebuild(outlinerRows);
+        }
 
+        private void AddOutlinerSpacer(string name, float height)
+        {
+            if (height <= 0) return;
+            RectTransform spacer = CreateRect(name, outlinerRows);
+            LayoutElement layout = spacer.gameObject.AddComponent<LayoutElement>();
+            layout.minHeight = layout.preferredHeight = height;
+        }
+
+        private void CollectOutlinerRows(BlueprintEditorDocument document)
+        {
             string filter = (outlinerSearch.text ?? string.Empty).Trim();
             foreach (BlueprintEditorGroup group in document.Groups)
             {
@@ -2574,6 +2635,11 @@ namespace OstrixMods.BuildWorks
 
         private Button AddSupportRow(string name, string label, Action clicked, bool selected = false)
         {
+            if (collectingOutlinerRows)
+            {
+                outlinerRowBuilders.Add(() => AddSupportRow(name, label, clicked, selected));
+                return null;
+            }
             RectTransform row = CreatePanel(name, outlinerRows,
                 selected ? SelectedColor : PanelRaised, null);
             LayoutElement layout = row.gameObject.AddComponent<LayoutElement>();
@@ -2652,6 +2718,14 @@ namespace OstrixMods.BuildWorks
             int depth,
             BlueprintForeignPartData contents = null)
         {
+            if (collectingOutlinerRows)
+            {
+                outlinerRowBuilders.Add(() => AddOutlinerRow(document, stableId, labelText,
+                    visible, locked, part, collapsed, depth));
+                if (contents?.Format == BlueprintForeignPartData.NativeItemStandFormat && !contents.ContentsCleared)
+                    outlinerRowBuilders.Add(() => AddOutlinerContentsRow(stableId, contents, depth));
+                return;
+            }
             RectTransform row = CreatePanel("Row_" + stableId, outlinerRows,
                 Contains(document.Selection, stableId) ? SelectedColor :
                     stableId == hoveredNodeId ? new Color(0.07f, 0.22f, 0.32f, 1f) :
@@ -2741,19 +2815,20 @@ namespace OstrixMods.BuildWorks
             if (lockIcon) lockIcon.color = locked ? AccentColor : MutedColor;
             if (!part) name.color = AccentColor;
             if (!visible) name.color = MutedColor;
-            if (contents?.Format == BlueprintForeignPartData.NativeItemStandFormat && !contents.ContentsCleared)
-            {
-                string itemId = contents.Info.Split(':')[0];
-                GameObject item = ObjectDB.instance ? ObjectDB.instance.GetItemPrefab(itemId) : null;
-                string itemName = item ? item.GetComponent<ItemDrop>()?.m_itemData?.m_shared?.m_name : null;
-                Button contentRow = AddSupportRow("Contents_" + stableId,
-                    "↳ " + (string.IsNullOrEmpty(itemName) ? itemId : Localization.instance?.Localize(itemName) ?? itemName),
-                    () => NodeClicked?.Invoke(stableId, false, false));
-                TMP_Text contentLabel = contentRow.GetComponentInChildren<TMP_Text>();
-                SetInsets(contentLabel.rectTransform, 40f + (depth + 1) * 15f, 0, 8, 0);
-                contentRow.GetComponent<BlueprintEditorHoverTarget>().Initialize(
-                    contentLabel.text + "\n" + T("editor.item.tree_hint"), BeginTooltip, EndTooltip);
-            }
+        }
+
+        private void AddOutlinerContentsRow(string stableId, BlueprintForeignPartData contents, int depth)
+        {
+            string itemId = contents.Info.Split(':')[0];
+            GameObject item = ObjectDB.instance ? ObjectDB.instance.GetItemPrefab(itemId) : null;
+            string itemName = item ? item.GetComponent<ItemDrop>()?.m_itemData?.m_shared?.m_name : null;
+            Button contentRow = AddSupportRow("Contents_" + stableId,
+                "↳ " + (string.IsNullOrEmpty(itemName) ? itemId : Localization.instance?.Localize(itemName) ?? itemName),
+                () => NodeClicked?.Invoke(stableId, false, false));
+            TMP_Text contentLabel = contentRow.GetComponentInChildren<TMP_Text>();
+            SetInsets(contentLabel.rectTransform, 40f + (depth + 1) * 15f, 0, 8, 0);
+            contentRow.GetComponent<BlueprintEditorHoverTarget>().Initialize(
+                contentLabel.text + "\n" + T("editor.item.tree_hint"), BeginTooltip, EndTooltip);
         }
 
         private static void StyleTreeControl(Button button)
@@ -3162,6 +3237,7 @@ namespace OstrixMods.BuildWorks
                     if (part.StableId == selected) singlePart = part;
             }
             inspectorDelta = singlePart == null;
+            inspectorScaleIsAbsolute = singlePart?.ScaleIsAbsolute == true;
             inspectorNodeId = singlePart?.StableId;
             inspectorContent.gameObject.SetActive(false);
             inspectorEditPanel.SetActive(true);
@@ -3177,7 +3253,7 @@ namespace OstrixMods.BuildWorks
                 : "editor.view.rotation_deg");
             inspectorScaleLabel.text = T(inspectorDelta
                 ? "editor.view.selection_scale"
-                : "editor.view.uniform_scale");
+                : inspectorScaleIsAbsolute ? "editor.view.source_scale" : "editor.view.uniform_scale");
             SetButtonLabel(inspectorResetButton, T("editor.view.reset"));
             if (singlePart == null)
             {
@@ -3200,7 +3276,7 @@ namespace OstrixMods.BuildWorks
                 SetAxisValues(inspectorRotation, new Vector3(
                     SignedAngle(euler.x), SignedAngle(euler.y), SignedAngle(euler.z)));
                 inspectorOriginalScale = (float)singlePart.Scale.X;
-                inspectorOriginalScaleText = (inspectorOriginalScale * 100f).ToString("0.##");
+                inspectorOriginalScaleText = ((double)inspectorOriginalScale * 100).ToString(inspectorScaleIsAbsolute ? "G9" : "0.##");
                 inspectorScale.SetTextWithoutNotify(inspectorOriginalScaleText);
             }
             UpdateTransformControls();
@@ -3358,8 +3434,10 @@ namespace OstrixMods.BuildWorks
             bool rxValid = TryRead(inspectorRotation[0], out float rx);
             bool ryValid = TryRead(inspectorRotation[1], out float ry);
             bool rzValid = TryRead(inspectorRotation[2], out float rz);
+            bool scaleUnchanged = !inspectorDelta && inspectorScale.text == inspectorOriginalScaleText;
             bool scaleValid = TryRead(inspectorScale, out float scale) &&
-                scale >= 1f && scale <= 400f;
+                (inspectorScaleIsAbsolute ? scale / 100f >= float.Epsilon && scale / 100f <= float.MaxValue : scale >= 1f && scale <= 400f);
+            scaleValid |= scaleUnchanged;
             SetInputValid(inspectorPosition[0], pxValid);
             SetInputValid(inspectorPosition[1], pyValid);
             SetInputValid(inspectorPosition[2], pzValid);
@@ -3380,7 +3458,7 @@ namespace OstrixMods.BuildWorks
                 inspectorName.text,
                 new Vector3(px, py, pz),
                 new Vector3(rx, ry, rz),
-                !inspectorDelta && inspectorScale.text == inspectorOriginalScaleText
+                scaleUnchanged
                     ? inspectorOriginalScale : scale / 100f,
                 inspectorDelta);
         }

@@ -196,6 +196,7 @@ namespace OstrixMods.BuildWorks
         private bool selectionPending;
         private int blockWorldInputThroughFrame = -1;
         private bool disposed;
+        private bool initialLoadFailed;
 
         internal BlueprintEditorController(
             CompositeBlueprintStore blueprintStore,
@@ -230,7 +231,8 @@ namespace OstrixMods.BuildWorks
         internal event Action CatalogRequested;
         internal event Action<float> InterfaceScaleChanged;
 
-        internal bool IsOpen => state == EditorState.Editing || state == EditorState.Saving;
+        internal bool IsOpen => state == EditorState.Opening || state == EditorState.Editing || state == EditorState.Saving;
+        internal bool IsLoading => state == EditorState.Opening;
         internal bool BlocksWorldInput => IsOpen || Time.frameCount <= blockWorldInputThroughFrame;
         internal BlueprintEditorDocument Document => document;
 
@@ -251,7 +253,7 @@ namespace OstrixMods.BuildWorks
             {
                 if (!string.IsNullOrEmpty(source.importError))
                 { error = BuildWorksLocalization.ResolveUserText(source.importError); return false; }
-                string budgetError = CompositeBlueprintStore.InteractiveError(source.parts.Count);
+                string budgetError = CompositeBlueprintStore.EditorError(source.parts.Count);
                 if (budgetError != null) { error = BuildWorksLocalization.ResolveUserText(budgetError); return false; }
                 var prepared = PrepareEditorBlueprint(source);
                 if (!string.IsNullOrEmpty(prepared.importError))
@@ -329,6 +331,36 @@ namespace OstrixMods.BuildWorks
 
         internal void Update()
         {
+            if (state == EditorState.Opening)
+            {
+                HideGameCanvases(view.RootCanvas);
+                scene.EnsureWorldCamerasExcludeEditorLayer();
+                view.Tick();
+                if (state != EditorState.Opening) return;
+                if (input.HasFocus && input.GetKeyDown(KeyCode.Escape)) { Close(true); return; }
+                if (initialLoadFailed) return;
+                try
+                {
+                    scene.SetViewport(view.ViewportScreenRect());
+                    if (scene.StepInitialLoad(out string warning))
+                    {
+                        FrameAll();
+                        Bind(warning);
+                        SubscribeView();
+                        state = EditorState.Editing;
+                        view.HideDialog();
+                    }
+                    else view.SetLoadingProgress(scene.InitialLoadedCount, document.Parts.Count);
+                }
+                catch (Exception exception)
+                {
+                    initialLoadFailed = true;
+                    logError("BuildWorks initial editor load failed: " + exception);
+                    view.ShowError(BuildWorksLocalization.Text("editor.loading_title"),
+                        BuildWorksLocalization.Text("editor.open_data_failed", exception.Message), canRetry: false);
+                }
+                return;
+            }
             if (!IsEditing) return;
             keyboardConfirmRequested = false;
             HideGameCanvases(view.RootCanvas);
@@ -438,6 +470,7 @@ namespace OstrixMods.BuildWorks
 
         internal void Close(bool discardChanges)
         {
+            if (state == EditorState.Opening) { Cleanup(); return; }
             if (!IsEditing) return;
             if (keyboardPreview) { CancelGizmoDrag(); return; }
             if (!discardChanges && document.IsDirty)
@@ -476,21 +509,35 @@ namespace OstrixMods.BuildWorks
             try
             {
                 document = nextDocument ?? throw new ArgumentNullException(nameof(nextDocument));
+#if BUILDWORKS_TEST_STAND
+                if (document.Parts.Count > CompositeBlueprintStore.InteractivePartBudget)
+                    BuildWorksTestIsolation.RequireLoadedSession();
+#endif
                 sourceBlueprint = source;
                 previewTemplate = source;
                 scene = new BlueprintEditorScene(cameraTemplate, ResolveVisualSource);
-                if (!scene.TrySync(document, out string warning))
+                bool staged = document.Parts.Count > 128;
+                string warning = null;
+                if (staged) scene.BeginInitialLoad(document);
+                else if (!scene.TrySync(document, out warning))
                     throw new InvalidOperationException(warning);
                 view = new BlueprintEditorView(textTemplate, input);
                 view.SetProjection(orthographic);
                 HideGameCanvases(view.RootCanvas);
-                SubscribeView();
+                view.CloseRequested += () => Close(discardChanges: false);
+                view.DialogDecided += _ => { if (state == EditorState.Opening) Close(true); };
                 previousCursorLock = Cursor.lockState;
                 previousCursorVisible = Cursor.visible;
                 restoreCursor = true;
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
+                if (staged)
+                {
+                    view.ShowLoading(document.Parts.Count);
+                    return true;
+                }
                 state = EditorState.Editing;
+                SubscribeView();
                 FrameAll();
                 Bind(warning);
                 return true;
@@ -515,7 +562,6 @@ namespace OstrixMods.BuildWorks
             view.SupportDeleted += id => ApplyDocumentEdit(() => document.DeleteSupport(id));
             view.SupportPlacementRequested += id => ApplyDocumentEdit(() => document.SetPlacementSupport(id));
             view.SupportCentreRequested += SetSupportCentre;
-            view.CloseRequested += () => Close(discardChanges: false);
             view.SaveRequested += () => TrySave(closeAfterSave: false);
             view.UndoRequested += () => ApplyHistory(document.Undo, document.Redo);
             view.RedoRequested += () => ApplyHistory(document.Redo, document.Undo);
@@ -2805,7 +2851,7 @@ namespace OstrixMods.BuildWorks
             if (item.ItemContents != null) { AttachItemContents(item); return; }
             if (!string.IsNullOrEmpty(item.UnavailableReason))
             { view.SetStatus(item.UnavailableReason, error: true); return; }
-            if (item.IsBlueprint && CompositeBlueprintStore.InteractiveError(item.Blueprint.parts.Count) is string budgetError)
+            if (item.IsBlueprint && CompositeBlueprintStore.EditorError(item.Blueprint.parts.Count) is string budgetError)
             { view.SetStatus(BuildWorksLocalization.ResolveUserText(budgetError), error: true); return; }
             var prepared = item.IsBlueprint ? PrepareEditorBlueprint(item.Blueprint) : null;
             if (prepared != null && !string.IsNullOrEmpty(prepared.importError))
@@ -2852,7 +2898,7 @@ namespace OstrixMods.BuildWorks
         internal static void EditorCatalogStatus(CompositeBlueprintStore.Blueprint source,
             Func<string, bool> prefabAvailable, out string unavailable, out string warning)
         {
-            string error = string.IsNullOrEmpty(source.importError) ? CompositeBlueprintStore.InteractiveError(source.parts.Count) : source.importError;
+            string error = string.IsNullOrEmpty(source.importError) ? CompositeBlueprintStore.EditorError(source.parts.Count) : source.importError;
             unavailable = BuildWorksLocalization.ResolveUserText(error);
             warning = null;
             if (!string.IsNullOrEmpty(unavailable)) return;
@@ -3239,7 +3285,7 @@ namespace OstrixMods.BuildWorks
                 RefreshModifierPreview();
                 return;
             }
-            int maximumInstances = 1 + (CompositeBlueprintStore.InteractivePartBudget - document.Parts.Count) /
+            int maximumInstances = 1 + (CompositeBlueprintStore.EditorPartBudget - document.Parts.Count) /
                 Math.Max(1, document.EditablePartSelectionCount);
             int otherCount = dragArraySecond ? arrayCountX : arrayCountY;
             int maximumCount = maximumInstances / Math.Max(1, otherCount);
@@ -3301,7 +3347,7 @@ namespace OstrixMods.BuildWorks
 
         private void AdjustArrayCount(int delta)
         {
-            int budget = 1 + (CompositeBlueprintStore.InteractivePartBudget - document.Parts.Count) /
+            int budget = 1 + (CompositeBlueprintStore.EditorPartBudget - document.Parts.Count) /
                 Math.Max(1, document.EditablePartSelectionCount);
             int other = arrayLastSecond ? arrayCountX : arrayCountY;
             int maximum = Math.Max(1, budget / Math.Max(1, other));
@@ -3770,6 +3816,7 @@ namespace OstrixMods.BuildWorks
 
         private void HandleDialog(BlueprintEditorDialogDecision decision)
         {
+            if (!IsOpen || state == EditorState.Opening) return;
             switch (decision)
             {
                 case BlueprintEditorDialogDecision.SaveAndExit:
@@ -3864,6 +3911,7 @@ namespace OstrixMods.BuildWorks
             blockWorldInputThroughFrame = Math.Max(
                 blockWorldInputThroughFrame, Time.frameCount);
             state = EditorState.Closing;
+            initialLoadFailed = false;
             transformSupportPivotId = null;
             selectionPending = false;
             cameraDragging = false;

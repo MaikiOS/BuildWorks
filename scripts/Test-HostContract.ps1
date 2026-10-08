@@ -844,7 +844,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.107.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.108.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -1068,6 +1068,24 @@ foreach ($method in @('Tick', 'Bind', 'ShowUnsavedDialog', 'Dispose')) {
 $editorController = $pluginTypes | Where-Object Name -eq 'BlueprintEditorController'
 Assert-Contract (@($editorController).Count -eq 1) `
     'Compiled independent blueprint editor controller is missing or ambiguous.'
+$editorOpenOperands = @(
+    ($editorController.Methods | Where-Object Name -eq 'Open').Body.Instructions |
+        ForEach-Object { [string]$_.Operand }
+) -join "`n"
+Assert-Contract ($editorOpenOperands -match 'BlueprintEditorScene::BeginInitialLoad' -and
+    $editorOpenOperands -notmatch 'BuildWorksTestIsolation::RequireLoadedSession') `
+    'Normal editor must retain staged loading without QA isolation code.'
+$storeType = $pluginTypes | Where-Object Name -eq 'CompositeBlueprintStore'
+Assert-Contract (($storeType.Fields | Where-Object Name -eq 'EditorPartBudget').Constant -eq 512) `
+    'Normal editor must retain the 512-part gameplay limit.'
+$legacyEditorOperands = @(
+    ($pluginMethods | Where-Object { $_.Name -eq 'BeginBlueprintEditor' -and
+        $_.DeclaringType.Name -eq 'PrecisionPlacementSession' }).Body.Instructions |
+        ForEach-Object { [string]$_.Operand }
+) -join "`n"
+Assert-Contract ($legacyEditorOperands -match 'requestBlueprintEditor' -and
+    $legacyEditorOperands.IndexOf('requestBlueprintEditor') -lt $legacyEditorOperands.IndexOf('TryResolveBlueprintPieces')) `
+    'Legacy editor entry must route through the modern controller before its synchronous fallback.'
 foreach ($method in @(
     'OpenNew', 'OpenExisting', 'AddPart', 'Update', 'LateUpdate', 'Close', 'Dispose',
     'ToggleAnchorVisibility', 'ToggleMeshSnap')) {
@@ -3086,4 +3104,4 @@ $worldCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'Preci
 $worldCaptureCalls = ($worldCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($worldCaptureCalls -match 'BlueprintStorageCapture::TryCapture' -and $worldCaptureCalls -match 'CompositeBlueprintStore/ForeignPartData::FromGeometry') 'World selection does not preserve container snapshots.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.107 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.108 and Valheim Steam build 25185596.'

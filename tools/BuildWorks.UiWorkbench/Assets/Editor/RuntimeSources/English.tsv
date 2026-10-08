@@ -263,6 +263,9 @@ blueprint.loaded	BuildWorks: {0} loaded — {1} parts; click or Tab cycles parts
 blueprint.edit_switch_failed	BuildWorks: could not switch the edited part.
 blueprint.anchors_recalc_failed	could not recalculate snap points
 blueprint.scale_persistence_suffix	{0} (Valheim has no native scale persistence)
+blueprint.network_identity_required	{0} (no network identity for persistence and safe cancellation)
+editor.loading_title	Loading blueprint
+editor.loading_progress	Preparing parts: {0}/{1}. You can cancel loading; the source blueprint is preserved.
 placement.anchor_geometry_missing	BuildWorks: no support geometry was found for this part.
 common.local_short	Local
 common.world_short	World
@@ -750,7 +753,7 @@ import.part_limit	A blueprint file must contain 2–50000 pieces. Nothing is tru
 import.interactive_limit	This construction is preserved, but exceeds the current interactive preview budget ({0}). Large-scene rendering is not ready yet.
 import.payload_pending	Custom points cannot be persisted safely on the native pieces. Check piece scale, point count and network components. Placement stopped before construction; the document and original source are preserved.
 import.foreign_pending	This object state or opaque source section has no supported world adapter. The original is preserved; editing/save/export remain available. Native item stands have a separate checked placement path.
-placement.mount_unavailable	Attachment paused: supply the matching inventory item, check ward access and ownership, then Enter. Full snapshots require exact native item data, including inventory position; recipes require prefab, quality and variant. Esc cancels.
+placement.mount_unavailable	Attachment paused: supply an inventory item of the required type and check ward access and ownership, then Enter. Your item's durability, quality, variant and other properties are retained; the archived state is not applied. Esc cancels.
 placement.mount_uncertain	Native attachment did not confirm the expected item and consumption. It will not be retried. Esc cancels safe parts; any uncertain holder stays for manual inspection.
 placement.rollback_mount_uncertain	Safe blueprint parts were cancelled. A holder with uncertain item state was left in the world; inspect it manually. No item refund was invented.
 blueprint.sign_unsupported	Sign text is unsupported or exceeds this piece's native text limit: {0}
@@ -787,7 +790,7 @@ exchange.exported	Export saved: {0}
 exchange.exists	The library already contains this file: {0}
 import.scale_pending	Load the blueprint in the game catalogue first to resolve prefab scales. The source has not been changed.
 import.scale_range	The scale of prefab {0} cannot be represented within the supported 1–400% multiplier range. No parts were resized or partially converted.
-import.scale_missing	Cannot resolve the original scale of prefab {0}. Install its mod and reopen the catalogue; no partial conversion was made.
+import.scale_missing	Original prefab scale unknown: {0}. Open and save it in the editor after installing its mod; world placement remains blocked.
 exchange.browse_help	Choose a folder and file, then Import. Original files remain unchanged.
 exchange.current_folder	Folder: {0}
 exchange.edit_path	Edit path
@@ -847,3 +850,8 @@ exchange.diagnostics_help	Read-only check: copy this report for diagnosis. No wo
 exchange.copy_report	Copy report
 placement.preview_loading	Preparing blueprint preview: {0}/{1}. Wait for the complete preview before placing.
 placement.preview_failed	Blueprint preview could not be prepared: {0}. Construction has not started.
+placement.mount_supply_changed	The item selected for this mount changed or disappeared. A replacement will not be consumed automatically. Esc cancels placement; then select the blueprint again.
+editor.missing_dimensions	Model or original prefab scale unavailable; dimensions unknown: {0}. Conditional markers are not model bounds.
+editor.array_missing_dimensions	Packing is unavailable while selected model dimensions are unknown. Use an explicit spacing or install the missing model.
+editor.view.source_scale	Source scale (%)
+editor.catalog_cost_unknown	Full construction cost and required stations are unknown. This blueprint can be edited; world placement is checked separately.

@@ -196,6 +196,7 @@ namespace OstrixMods.BuildWorks
         private bool selectionPending;
         private int blockWorldInputThroughFrame = -1;
         private bool disposed;
+        private bool initialLoadFailed;
 
         internal BlueprintEditorController(
             CompositeBlueprintStore blueprintStore,
@@ -230,7 +231,8 @@ namespace OstrixMods.BuildWorks
         internal event Action CatalogRequested;
         internal event Action<float> InterfaceScaleChanged;
 
-        internal bool IsOpen => state == EditorState.Editing || state == EditorState.Saving;
+        internal bool IsOpen => state == EditorState.Opening || state == EditorState.Editing || state == EditorState.Saving;
+        internal bool IsLoading => state == EditorState.Opening;
         internal bool BlocksWorldInput => IsOpen || Time.frameCount <= blockWorldInputThroughFrame;
         internal BlueprintEditorDocument Document => document;
 
@@ -251,11 +253,14 @@ namespace OstrixMods.BuildWorks
             {
                 if (!string.IsNullOrEmpty(source.importError))
                 { error = BuildWorksLocalization.ResolveUserText(source.importError); return false; }
-                string budgetError = CompositeBlueprintStore.InteractiveError(source.parts.Count);
+                string budgetError = CompositeBlueprintStore.EditorError(source.parts.Count);
                 if (budgetError != null) { error = BuildWorksLocalization.ResolveUserText(budgetError); return false; }
-                bool opened = Open(DocumentFromBlueprint(source.IsExternal ? ExternalBlueprintLibrary.DetachedCopy(source) : source),
+                var prepared = PrepareEditorBlueprint(source);
+                if (!string.IsNullOrEmpty(prepared.importError))
+                { error = BuildWorksLocalization.ResolveUserText(prepared.importError); return false; }
+                bool opened = Open(DocumentFromBlueprint(prepared.IsExternal ? ExternalBlueprintLibrary.DetachedCopy(prepared) : prepared),
                     source.IsExternal ? null : source, out error);
-                if (opened) previewTemplate = source;
+                if (opened) previewTemplate = prepared;
                 return opened;
             }
             catch (Exception exception)
@@ -326,6 +331,36 @@ namespace OstrixMods.BuildWorks
 
         internal void Update()
         {
+            if (state == EditorState.Opening)
+            {
+                HideGameCanvases(view.RootCanvas);
+                scene.EnsureWorldCamerasExcludeEditorLayer();
+                view.Tick();
+                if (state != EditorState.Opening) return;
+                if (input.HasFocus && input.GetKeyDown(KeyCode.Escape)) { Close(true); return; }
+                if (initialLoadFailed) return;
+                try
+                {
+                    scene.SetViewport(view.ViewportScreenRect());
+                    if (scene.StepInitialLoad(out string warning))
+                    {
+                        FrameAll();
+                        Bind(warning);
+                        SubscribeView();
+                        state = EditorState.Editing;
+                        view.HideDialog();
+                    }
+                    else view.SetLoadingProgress(scene.InitialLoadedCount, document.Parts.Count);
+                }
+                catch (Exception exception)
+                {
+                    initialLoadFailed = true;
+                    logError("BuildWorks initial editor load failed: " + exception);
+                    view.ShowError(BuildWorksLocalization.Text("editor.loading_title"),
+                        BuildWorksLocalization.Text("editor.open_data_failed", exception.Message), canRetry: false);
+                }
+                return;
+            }
             if (!IsEditing) return;
             keyboardConfirmRequested = false;
             HideGameCanvases(view.RootCanvas);
@@ -435,6 +470,7 @@ namespace OstrixMods.BuildWorks
 
         internal void Close(bool discardChanges)
         {
+            if (state == EditorState.Opening) { Cleanup(); return; }
             if (!IsEditing) return;
             if (keyboardPreview) { CancelGizmoDrag(); return; }
             if (!discardChanges && document.IsDirty)
@@ -473,21 +509,35 @@ namespace OstrixMods.BuildWorks
             try
             {
                 document = nextDocument ?? throw new ArgumentNullException(nameof(nextDocument));
+#if BUILDWORKS_TEST_STAND
+                if (document.Parts.Count > CompositeBlueprintStore.InteractivePartBudget)
+                    BuildWorksTestIsolation.RequireLoadedSession();
+#endif
                 sourceBlueprint = source;
                 previewTemplate = source;
                 scene = new BlueprintEditorScene(cameraTemplate, ResolveVisualSource);
-                if (!scene.TrySync(document, out string warning))
+                bool staged = document.Parts.Count > 128;
+                string warning = null;
+                if (staged) scene.BeginInitialLoad(document);
+                else if (!scene.TrySync(document, out warning))
                     throw new InvalidOperationException(warning);
                 view = new BlueprintEditorView(textTemplate, input);
                 view.SetProjection(orthographic);
                 HideGameCanvases(view.RootCanvas);
-                SubscribeView();
+                view.CloseRequested += () => Close(discardChanges: false);
+                view.DialogDecided += _ => { if (state == EditorState.Opening) Close(true); };
                 previousCursorLock = Cursor.lockState;
                 previousCursorVisible = Cursor.visible;
                 restoreCursor = true;
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
+                if (staged)
+                {
+                    view.ShowLoading(document.Parts.Count);
+                    return true;
+                }
                 state = EditorState.Editing;
+                SubscribeView();
                 FrameAll();
                 Bind(warning);
                 return true;
@@ -512,7 +562,6 @@ namespace OstrixMods.BuildWorks
             view.SupportDeleted += id => ApplyDocumentEdit(() => document.DeleteSupport(id));
             view.SupportPlacementRequested += id => ApplyDocumentEdit(() => document.SetPlacementSupport(id));
             view.SupportCentreRequested += SetSupportCentre;
-            view.CloseRequested += () => Close(discardChanges: false);
             view.SaveRequested += () => TrySave(closeAfterSave: false);
             view.UndoRequested += () => ApplyHistory(document.Undo, document.Redo);
             view.RedoRequested += () => ApplyHistory(document.Redo, document.Undo);
@@ -1580,8 +1629,8 @@ namespace OstrixMods.BuildWorks
                 {
                     if (!dragIds.Contains(part.StableId)) continue;
                     Vector3 scale = ToVector(part.Scale);
-                    minimum = Mathf.Max(minimum, .01f / Mathf.Min(scale.x, scale.y, scale.z));
-                    maximum = Mathf.Min(maximum, 4f / Mathf.Max(scale.x, scale.y, scale.z));
+                    minimum = Mathf.Max(minimum, (part.ScaleIsAbsolute ? float.Epsilon : .01f) / Mathf.Min(scale.x, scale.y, scale.z));
+                    maximum = Mathf.Min(maximum, (part.ScaleIsAbsolute ? float.MaxValue : 4f) / Mathf.Max(scale.x, scale.y, scale.z));
                 }
                 dragScale = Mathf.Clamp(keyboardBaseScale * Mathf.Max(.001f, 1f + percent * .01f), minimum, maximum);
             }
@@ -1630,8 +1679,8 @@ namespace OstrixMods.BuildWorks
                 {
                     if (!dragIds.Contains(part.StableId)) continue;
                     Vector3 candidate = ToVector(part.Scale) * scale;
-                    keyboardValid &= Mathf.Min(candidate.x, candidate.y, candidate.z) >= .01f &&
-                        Mathf.Max(candidate.x, candidate.y, candidate.z) <= 4f;
+                    keyboardValid &= Mathf.Min(candidate.x, candidate.y, candidate.z) >= (part.ScaleIsAbsolute ? float.Epsilon : .01f) &&
+                        Mathf.Max(candidate.x, candidate.y, candidate.z) <= (part.ScaleIsAbsolute ? float.MaxValue : 4f);
                 }
             }
             else
@@ -1895,15 +1944,15 @@ namespace OstrixMods.BuildWorks
             }
             else if (dragHandle == GizmoHandleKind.Scale)
             {
-                float minimum = 0f, maximum = float.PositiveInfinity;
+                float minimum = float.Epsilon, maximum = float.MaxValue;
                 float referenceScale = 1f;
                 foreach (BlueprintEditorPart part in document.Parts)
                 {
                     if (!dragIds.Contains(part.StableId)) continue;
                     Vector3 scale = ToVector(part.Scale);
-                    if (dragIds.Count == 1) referenceScale = scale.x;
-                    minimum = Mathf.Max(minimum, 0.01f / Mathf.Min(scale.x, scale.y, scale.z));
-                    maximum = Mathf.Min(maximum, 4f / Mathf.Max(scale.x, scale.y, scale.z));
+                    if (dragIds.Count == 1 && !part.ScaleIsAbsolute) referenceScale = scale.x;
+                    minimum = Mathf.Max(minimum, (part.ScaleIsAbsolute ? float.Epsilon : .01f) / Mathf.Min(scale.x, scale.y, scale.z));
+                    maximum = Mathf.Min(maximum, (part.ScaleIsAbsolute ? float.MaxValue : 4f) / Mathf.Max(scale.x, scale.y, scale.z));
                 }
                 float percent = mouse.y - dragStartMouse.y;
                 if (!ShiftHeld)
@@ -2802,18 +2851,17 @@ namespace OstrixMods.BuildWorks
             if (item.ItemContents != null) { AttachItemContents(item); return; }
             if (!string.IsNullOrEmpty(item.UnavailableReason))
             { view.SetStatus(item.UnavailableReason, error: true); return; }
-            if (item.IsBlueprint && CompositeBlueprintStore.InteractiveError(item.Blueprint.parts.Count) is string budgetError)
+            if (item.IsBlueprint && CompositeBlueprintStore.EditorError(item.Blueprint.parts.Count) is string budgetError)
             { view.SetStatus(BuildWorksLocalization.ResolveUserText(budgetError), error: true); return; }
-            if (item.IsBlueprint)
-                foreach (CompositeBlueprintStore.Part part in item.Blueprint.parts)
-                    if (!ResolveVisualSource(part.prefabName))
-                    { view.SetStatus(BuildWorksLocalization.Text("editor.part_not_found", part.prefabName), error: true); return; }
+            var prepared = item.IsBlueprint ? PrepareEditorBlueprint(item.Blueprint) : null;
+            if (prepared != null && !string.IsNullOrEmpty(prepared.importError))
+            { view.SetStatus(BuildWorksLocalization.ResolveUserText(prepared.importError), error: true); return; }
             if (IsGizmoDragging) CancelGizmoDrag();
             ClearArrayState();
             ClearContourState();
             scene.HidePlacementPreview();
             scene.ClearBlueprintPlacementPreview();
-            placementBlueprint = item.IsBlueprint ? DocumentFromBlueprint(item.Blueprint) : null;
+            placementBlueprint = prepared != null ? DocumentFromBlueprint(prepared) : null;
             view.HideCatalog();
             placementItem = item;
             placementYaw = 0f;
@@ -2838,6 +2886,25 @@ namespace OstrixMods.BuildWorks
                 Vector3.zero,
                 false);
             SetPlacementStatus();
+        }
+
+        private CompositeBlueprintStore.Blueprint PrepareEditorBlueprint(CompositeBlueprintStore.Blueprint source)
+            => ExternalBlueprintLibrary.PrepareForHost(source, name =>
+            {
+                GameObject prefab = ResolveVisualSource(name);
+                return prefab ? new CompositeBlueprintStore.VectorData(prefab.transform.localScale) : (CompositeBlueprintStore.VectorData?)null;
+            });
+
+        internal static void EditorCatalogStatus(CompositeBlueprintStore.Blueprint source,
+            Func<string, bool> prefabAvailable, out string unavailable, out string warning)
+        {
+            string error = string.IsNullOrEmpty(source.importError) ? CompositeBlueprintStore.EditorError(source.parts.Count) : source.importError;
+            unavailable = BuildWorksLocalization.ResolveUserText(error);
+            warning = null;
+            if (!string.IsNullOrEmpty(unavailable)) return;
+            var missing = source.parts.Where(part => part.scaleIsAbsolute || !prefabAvailable(part.prefabName))
+                .Select(part => part.prefabName).Distinct().OrderBy(name => name, StringComparer.Ordinal).ToArray();
+            if (missing.Length > 0) warning = BuildWorksLocalization.Text("editor.missing_dimensions", string.Join(", ", missing));
         }
 
         private void CyclePlacementSnapPoint(int direction)
@@ -2886,7 +2953,7 @@ namespace OstrixMods.BuildWorks
                 parts.Add(new BlueprintEditorPart(part.stableId, part.prefabName, part.displayName,
                     ToPoint(part.position.ToVector3()), ToRotation(part.rotation.ToQuaternion()), part.parentGroupId,
                     part.editorVisible, part.editorLocked, ToPoint(part.scale.ToVector3()), part.signText,
-                    part.sourceDocumentId, part.sourceLine, part.foreignData?.ToGeometry()));
+                    part.sourceDocumentId, part.sourceLine, part.foreignData?.ToGeometry(), part.scaleIsAbsolute));
             return new BlueprintEditorDocument(source.id, source.name,
                 source.category ?? CompositeBlueprintStore.DefaultCategory, parts, groups,
                 source.primaryPartId, source.primaryGroupId,
@@ -3076,6 +3143,15 @@ namespace OstrixMods.BuildWorks
         private void PreviewArray()
         {
             if (!IsEditing || activeTool != BlueprintEditorTool.Array) return;
+            if (arrayDistribution == RepeatDistributionMode.Pack && document.Parts.Any(part =>
+                document.IsPartSelected(part.StableId) && (part.ScaleIsAbsolute || !ResolveVisualSource(part.PrefabName))))
+            {
+                arrayPreviewCount = 0;
+                scene.ClearArrayPreview();
+                view.SetArrayState(0);
+                view.SetStatus(BuildWorksLocalization.Text("editor.array_missing_dimensions"));
+                return;
+            }
             string stepLabel = arrayDistribution == RepeatDistributionMode.Fit
                 ? BuildWorksLocalization.Text("editor.array_fit")
                 : arrayDistribution == RepeatDistributionMode.Exact
@@ -3209,7 +3285,7 @@ namespace OstrixMods.BuildWorks
                 RefreshModifierPreview();
                 return;
             }
-            int maximumInstances = 1 + (CompositeBlueprintStore.InteractivePartBudget - document.Parts.Count) /
+            int maximumInstances = 1 + (CompositeBlueprintStore.EditorPartBudget - document.Parts.Count) /
                 Math.Max(1, document.EditablePartSelectionCount);
             int otherCount = dragArraySecond ? arrayCountX : arrayCountY;
             int maximumCount = maximumInstances / Math.Max(1, otherCount);
@@ -3271,7 +3347,7 @@ namespace OstrixMods.BuildWorks
 
         private void AdjustArrayCount(int delta)
         {
-            int budget = 1 + (CompositeBlueprintStore.InteractivePartBudget - document.Parts.Count) /
+            int budget = 1 + (CompositeBlueprintStore.EditorPartBudget - document.Parts.Count) /
                 Math.Max(1, document.EditablePartSelectionCount);
             int other = arrayLastSecond ? arrayCountX : arrayCountY;
             int maximum = Math.Max(1, budget / Math.Max(1, other));
@@ -3581,7 +3657,7 @@ namespace OstrixMods.BuildWorks
             try
             {
                 List<CompositeBlueprintStore.Part> parts = BuildStoreParts();
-                List<CompositeBlueprintStore.VectorData> anchors = document.Parts.Any(part => !ResolveVisualSource(part.PrefabName))
+                List<CompositeBlueprintStore.VectorData> anchors = document.Parts.Any(part => part.ScaleIsAbsolute || !ResolveVisualSource(part.PrefabName))
                     ? new List<CompositeBlueprintStore.VectorData>(previewTemplate?.anchors ?? new List<CompositeBlueprintStore.VectorData>())
                     : BuildBoundsAnchors();
                 CompositeBlueprintStore.VectorData[] customPoints = document.CustomSnapPoints
@@ -3663,6 +3739,7 @@ namespace OstrixMods.BuildWorks
                     position = new CompositeBlueprintStore.VectorData(ToVector(part.Position)),
                     rotation = new CompositeBlueprintStore.QuaternionData(ToQuaternion(part.Rotation)),
                     scale = new CompositeBlueprintStore.VectorData(ToVector(part.Scale)),
+                    scaleIsAbsolute = part.ScaleIsAbsolute,
                     stableId = part.StableId,
                     displayName = part.DisplayName,
                     parentGroupId = part.ParentGroupId,
@@ -3739,6 +3816,7 @@ namespace OstrixMods.BuildWorks
 
         private void HandleDialog(BlueprintEditorDialogDecision decision)
         {
+            if (!IsOpen || state == EditorState.Opening) return;
             switch (decision)
             {
                 case BlueprintEditorDialogDecision.SaveAndExit:
@@ -3766,9 +3844,12 @@ namespace OstrixMods.BuildWorks
                 document.Sources.Any(source => source.HasOpaqueSections))) status = BuildWorksLocalization.Text("import.foreign_pending");
             var missing = new HashSet<string>(StringComparer.Ordinal);
             foreach (BlueprintEditorPart part in document.Parts)
-                if (!ResolveVisualSource(part.PrefabName)) missing.Add(part.StableId);
+                if (part.ScaleIsAbsolute || !ResolveVisualSource(part.PrefabName)) missing.Add(part.StableId);
+            if (missing.Count > 0 && string.IsNullOrEmpty(status))
+                status = BuildWorksLocalization.Text("editor.missing_dimensions", string.Join(", ", document.Parts
+                    .Where(part => missing.Contains(part.StableId)).Select(part => part.PrefabName).Distinct()));
             UpdateTransformContext();
-            Vector3? boundsSize = scene.TryGetDocumentBounds(out Bounds bounds)
+            Vector3? boundsSize = missing.Count == 0 && scene.TryGetDocumentBounds(out Bounds bounds)
                 ? bounds.size
                 : (Vector3?)null;
             view.SupportCentreId = transformSupportPivotId;
@@ -3830,6 +3911,7 @@ namespace OstrixMods.BuildWorks
             blockWorldInputThroughFrame = Math.Max(
                 blockWorldInputThroughFrame, Time.frameCount);
             state = EditorState.Closing;
+            initialLoadFailed = false;
             transformSupportPivotId = null;
             selectionPending = false;
             cameraDragging = false;

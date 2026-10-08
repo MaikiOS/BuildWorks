@@ -36,6 +36,12 @@ $normal = [Mono.Cecil.AssemblyDefinition]::ReadAssembly($normalPath)
 $typeName = 'OstrixMods.BuildWorks.BuildWorksTestIsolation'
 $type = $qa.MainModule.GetType($typeName)
 Require ($null -ne $type -and $null -eq $normal.MainModule.GetType($typeName)) 'QA isolation leaked into normal assembly or is missing from the QA build.'
+$editor = $qa.MainModule.GetType('OstrixMods.BuildWorks.BlueprintEditorController')
+$editorCalls = @(($editor.Methods | Where-Object Name -eq 'Open').Body.Instructions |
+    ForEach-Object { [string]$_.Operand }) -join "`n"
+Require ($editorCalls -match 'BuildWorksTestIsolation::RequireLoadedSession') 'Heavy QA editor lost the loaded-session isolation guard.'
+$store = $qa.MainModule.GetType('OstrixMods.BuildWorks.CompositeBlueprintStore')
+Require (($store.Fields | Where-Object Name -eq 'EditorPartBudget').Constant -eq 50000) 'QA heavy editor budget is missing or differs from the storage ceiling.'
 $activate = $type.Methods | Where-Object Name -eq 'Activate'
 $calls = @($activate.Body.Instructions | Where-Object { $_.OpCode.Name -in @('call','callvirt') } | ForEach-Object { [string]$_.Operand })
 $cold = $activate.Body.Instructions | Where-Object { [string]$_.Operand -match '::RequireColdStorage' } | Select-Object -First 1

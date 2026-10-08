@@ -200,6 +200,8 @@ public static class RuntimeEditorAcceptance
             checks.Add("Actual Controller.Update/LateUpdate frame chords and native EventSystem raycasts: Ctrl+A, Shift rows/viewport, pin, shared gizmo, Alt move preview/commit/cancel/Undo, scale, placement RMB catalog reopen/camera and compound import; single Outliner context subscriptions; Array arrows/wheel/Ctrl zoom/Fit/spacing/shared step presets/live scrub before release/all TMP profile/atomic apply");
             TestEditorGestures(template, fontTemplate);
             foreach (object step in BlueprintScenePerformanceAcceptance.Run(template, output)) yield return step;
+            foreach (object step in StagedEditorAcceptance.Run(template, fontTemplate, output)) yield return step;
+            checks.Add("1025-part actual editor: staged load/progress/cancel/reopen/failure, bounded virtual tree, missing-record move/Undo/Redo/save/reopen and stale-revision rejection. Unity Workbench only.");
             checks.Add("Bounded actual woodwall scenes: 128/512 parts, sync/resync/mesh-pick timings, material counts and disposal; not large-scene/FPS proof.");
             TestNativeSocketTargets(template);
             TestRotatedPlacementFrames(template);
@@ -724,8 +726,8 @@ public static class RuntimeEditorAcceptance
         Require(reloaded.All().Count == 1, "Actual disk library roundtrip");
         Require(Mathf.Abs(reloaded.All()[0].parts[0].scale.x - expected) < 0.0001f, "Store discarded scale");
         CheckReopenedCopy(controller, reloaded, expected);
-        Require(File.ReadAllText(path).Contains("\"version\":15"), "Controller did not write format15");
-        checks.Add("Controller save -> disk format15 -> new store -> OpenExisting retains scale, rotated root-owned support and placement reference; transient support focus absent");
+        Require(File.ReadAllText(path).Contains("\"version\":16"), "Controller did not write format16");
+        checks.Add("Controller save -> disk format16 -> new store -> OpenExisting retains scale, rotated root-owned support and placement reference; transient support focus absent");
     }
 
     private static void TestIncompleteExternalEditor(Camera camera, TMP_Text font, GameObject wall, string output)
@@ -1250,12 +1252,11 @@ public static class RuntimeEditorAcceptance
                 "Generated midpoint helpers must not exhaust the 512 exterior-point budget before native points");
             crowded.Add(new BlueprintEditorPart("over-budget", "fixture", "over-budget", new Point3(), new Rotation3(0,0,0,1)));
             var heavy = new BlueprintEditorDocument(null, "Over budget", "Test", crowded);
-            Require(!scene.TrySync(heavy, out string budgetError) && !string.IsNullOrEmpty(budgetError),
-                "Storage ceiling must not bypass the GPU preview budget");
+            Require(scene.TrySync(heavy, out string budgetError), "Isolated editor extension refused: " + budgetError);
             Require(scene.TryGetGizmoAnchors(crowdedIds, out Vector3[] retained, out _, legacyLayoutAnchors: true) &&
                 retained.Length == points.Length, "Over-budget sync changed the previous scene");
         }
-        checks.Add("Native/midpoint provenance: exterior shared joins excluded, stable cache, 100%/1% scale; 512-part interactive budget reserves 512 native points before generated helpers");
+        checks.Add("Native/midpoint provenance: exterior shared joins excluded, stable cache, 100%/1% scale; 512 exterior native points remain bounded when isolated editor part capacity exceeds 512");
     }
 
     private static void DragArray(BlueprintEditorController controller, GizmoAxis axis, int count, int sign)

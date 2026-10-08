@@ -285,6 +285,7 @@ namespace OstrixMods.BuildWorks
                             position = new CompositeBlueprintStore.VectorData { x = Number(fields[p]), y = Number(fields[p + 1]), z = Number(fields[p + 2]) },
                             rotation = new CompositeBlueprintStore.QuaternionData { x = Number(fields[q]), y = Number(fields[q + 1]), z = Number(fields[q + 2]), w = Number(fields[q + 3]) },
                             scale = new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 },
+                            scaleIsAbsolute = true,
                             signText = signText,
                             sourceDocumentId = evidence.Id,
                             sourceLine = lineNumber,
@@ -320,36 +321,37 @@ namespace OstrixMods.BuildWorks
         internal static CompositeBlueprintStore.Blueprint PrepareForHost(CompositeBlueprintStore.Blueprint source,
             Func<string, CompositeBlueprintStore.VectorData?> resolvePrefabScale, Func<string, int> hash = null, int? worldLevel = null)
         {
-            if (source == null || source.importError != null || !source.importAbsoluteScale &&
+            if (source == null || source.importError != null || !source.importAbsoluteScale && !source.parts.Any(part => part.scaleIsAbsolute) &&
                 (hash == null || !source.parts.Any(part => part.foreignData?.format == "blueprint" || part.foreignData?.format == "vbuild"))) return source;
             var copy = source.ImportCopy();
             string currentPrefab = null;
             try
             {
-                if (source.importAbsoluteScale && resolvePrefabScale == null) throw new InvalidDataException("$buildworks_import.scale_pending");
-                var scales = new Dictionary<string, CompositeBlueprintStore.VectorData>(StringComparer.Ordinal);
+                var scales = new Dictionary<string, CompositeBlueprintStore.VectorData?>(StringComparer.Ordinal);
                 var evidenceIndex = hash == null ? null : Geometry.BlueprintSourceDocument.Index(copy.sourceDocuments?.Select(evidence => evidence.ToGeometry()));
                 foreach (CompositeBlueprintStore.Part part in copy.parts)
                 {
                     currentPrefab = part.prefabName;
-                    if (source.importAbsoluteScale)
+                    if (source.importAbsoluteScale || part.scaleIsAbsolute)
                     {
+                        part.scaleIsAbsolute = true;
                         if (!scales.TryGetValue(part.prefabName, out var prefabScale))
                         {
-                            var resolved = resolvePrefabScale(part.prefabName);
-                            if (!resolved.HasValue) throw new InvalidDataException("$buildworks_import.scale_missing\t" + part.prefabName);
-                            scales.Add(part.prefabName, prefabScale = resolved.Value);
+                            prefabScale = resolvePrefabScale?.Invoke(part.prefabName);
+                            scales.Add(part.prefabName, prefabScale);
                         }
-                        part.scale = CompositeBlueprintStore.RelativeScale(part.scale, prefabScale);
+                        if (!prefabScale.HasValue) continue; // Retain the original basis, never invent intrinsic=1.
+                        part.scale = CompositeBlueprintStore.RelativeScale(part.scale, prefabScale.Value);
+                        part.scaleIsAbsolute = false;
                     }
                     if (hash != null && part.sourceDocumentId != null && evidenceIndex.TryGetValue(part.sourceDocumentId, out var evidence))
                         ConvertKnownState(part, evidence, hash, worldLevel);
                 }
                 copy.importAbsoluteScale = false;
                 // Derived cache identity must not reuse pre-normalization thumbnails or another prefab revision.
-                copy.id = Identity(source.id + "\nrelative-scale-v2-native-rules\n" + (hash == null ? "inert" : worldLevel?.ToString(CultureInfo.InvariantCulture) ?? "pending-world") + "\n" + string.Join("\n", scales.OrderBy(pair => pair.Key, StringComparer.Ordinal)
-                    .Select(pair => pair.Key + "\t" + pair.Value.x.ToString("R", CultureInfo.InvariantCulture) + "\t" +
-                        pair.Value.y.ToString("R", CultureInfo.InvariantCulture) + "\t" + pair.Value.z.ToString("R", CultureInfo.InvariantCulture))));
+                if (source.IsExternal) copy.id = Identity(source.id + "\nrelative-scale-v3-pending-parts\n" + (hash == null ? "inert" : worldLevel?.ToString(CultureInfo.InvariantCulture) ?? "pending-world") + "\n" + string.Join("\n", scales.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                    .Select(pair => pair.Key + "\t" + (pair.Value.HasValue ? pair.Value.Value.x.ToString("R", CultureInfo.InvariantCulture) + "\t" +
+                        pair.Value.Value.y.ToString("R", CultureInfo.InvariantCulture) + "\t" + pair.Value.Value.z.ToString("R", CultureInfo.InvariantCulture) : "unknown"))));
             }
             catch (Exception error) when (error is InvalidDataException || error is ArgumentException)
             {
@@ -405,11 +407,17 @@ namespace OstrixMods.BuildWorks
             // Construction creates NEW ordinary native pieces: no inherited ownership, stale support,
             // damage, invulnerability, AI overrides or network lifetime flags. All originals remain in
             // the exact source document. This is NOT an administrator-state restoration adapter.
-            var ordinary = new Dictionary<int, Type> {
-                [hash("health")] = typeof(float), [hash("support")] = typeof(float), [hash("creator")] = typeof(long),
-                [hash("scale")] = typeof(Geometry.Point3), [hash("scaleScalar")] = typeof(float),
-                [hash("HasFields")] = typeof(int), [hash("HasFieldsWearNTear")] = typeof(int),
-                [hash("WearNTear.m_health")] = typeof(float), [hash("HasFieldsStaticTarget")] = typeof(int),
+            var ordinary = new Dictionary<int, Type>
+            {
+                [hash("health")] = typeof(float),
+                [hash("support")] = typeof(float),
+                [hash("creator")] = typeof(long),
+                [hash("scale")] = typeof(Geometry.Point3),
+                [hash("scaleScalar")] = typeof(float),
+                [hash("HasFields")] = typeof(int),
+                [hash("HasFieldsWearNTear")] = typeof(int),
+                [hash("WearNTear.m_health")] = typeof(float),
+                [hash("HasFieldsStaticTarget")] = typeof(int),
                 [hash("StaticTarget.m_randomTarget")] = typeof(int)
             };
             foreach (var key in state.Keys)
@@ -469,6 +477,7 @@ namespace OstrixMods.BuildWorks
                     position = part.position,
                     rotation = part.rotation,
                     scale = part.scale,
+                    scaleIsAbsolute = part.scaleIsAbsolute,
                     parentGroupId = part.parentGroupId == null ? null : ids[part.parentGroupId],
                     editorVisible = part.editorVisible,
                     editorLocked = part.editorLocked,

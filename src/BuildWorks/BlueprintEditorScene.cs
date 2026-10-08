@@ -232,6 +232,10 @@ namespace OstrixMods.BuildWorks
         internal bool OccluderFadeEnabled { get; private set; }
         private float groundHeight;
         private bool disposed;
+        private BlueprintEditorDocument initialDocument;
+        private int initialRevision, initialIndex;
+        private readonly HashSet<string> initialMissing = new HashSet<string>(StringComparer.Ordinal);
+        internal int InitialLoadedCount => initialIndex;
         private readonly MaterialPropertyBlock hoverProperties = new MaterialPropertyBlock();
         private string[] cachedAnchorIds;
         private Vector3[] cachedGizmoAnchors;
@@ -451,15 +455,79 @@ namespace OstrixMods.BuildWorks
             }
         }
 
-        internal bool TrySync(BlueprintEditorDocument document, out string warning)
+        internal void BeginInitialLoad(BlueprintEditorDocument document)
         {
             ThrowIfDisposed();
             if (document == null) throw new ArgumentNullException(nameof(document));
-            if (CompositeBlueprintStore.InteractiveError(document.Parts.Count) is string budgetError)
+            if (initialDocument != null || visuals.Count != 0)
+                throw new InvalidOperationException("Initial load requires an empty editor scene.");
+            if (CompositeBlueprintStore.EditorError(document.Parts.Count) is string budgetError)
+                throw new InvalidOperationException(BuildWorksLocalization.ResolveUserText(budgetError));
+            initialDocument = document;
+            initialRevision = document.RevisionToken;
+            initialIndex = 0;
+            initialMissing.Clear();
+            camera.enabled = false;
+        }
+
+        internal bool StepInitialLoad(out string warning, int maximumParts = 16, double milliseconds = 8)
+        {
+            ThrowIfDisposed();
+            if (initialDocument == null) throw new InvalidOperationException("Initial load is not running.");
+            if (maximumParts < 1 || milliseconds <= 0 || double.IsNaN(milliseconds) || double.IsInfinity(milliseconds))
+                throw new ArgumentOutOfRangeException(nameof(maximumParts));
+            BlueprintEditorDocument document = initialDocument;
+            if (document.RevisionToken != initialRevision)
+                throw new InvalidOperationException("The document changed during initial load.");
+            warning = null;
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            int processed = 0;
+            while (initialIndex < document.Parts.Count && processed < maximumParts &&
+                (processed == 0 || watch.Elapsed.TotalMilliseconds < milliseconds))
+            {
+                BlueprintEditorPart part = document.Parts[initialIndex];
+                if (!TryUnityTransform(part, out _, out _))
+                    throw new InvalidOperationException("Part transform is outside Unity range: " + part.StableId);
+                GameObject source = part.ScaleIsAbsolute ? null : resolveVisualSource(part.PrefabName);
+                if (!source) initialMissing.Add(part.PrefabName);
+                VisualNode visual = CreateVisual(part, source, cacheMaterials: true);
+                // Register ownership before applying state so Dispose also cleans failed loads.
+                visuals.Add(part.StableId, visual);
+                ApplyPart(visual, part, document.IsEffectivelyVisible(part.StableId),
+                    document.IsEffectivelyLocked(part.StableId));
+                ++initialIndex;
+                ++processed;
+            }
+            if (initialIndex < document.Parts.Count) return false;
+            UpdateHighlights(document, visuals);
+            UpdateGroundHeight();
+            warning = SceneWarning(initialMissing);
+            initialDocument = null;
+            initialMissing.Clear();
+            camera.enabled = true;
+            return true;
+        }
+
+        private string SceneWarning(IEnumerable<string> missingPrefabs)
+        {
+            string missing = string.Join(", ", missingPrefabs);
+            var warnings = new HashSet<string>(StringComparer.Ordinal);
+            if (missing.Length > 0) warnings.Add(BuildWorksLocalization.Text("editor.missing_dimensions", missing));
+            foreach (VisualNode visual in visuals.Values)
+                if (visual.ContentWarning != null) warnings.Add(visual.ContentWarning);
+            return warnings.Count == 0 ? null : string.Join("\n", warnings);
+        }
+
+        internal bool TrySync(BlueprintEditorDocument document, out string warning)
+        {
+            ThrowIfDisposed();
+            if (initialDocument != null) throw new InvalidOperationException("Initial load has not finished.");
+            if (document == null) throw new ArgumentNullException(nameof(document));
+            if (CompositeBlueprintStore.EditorError(document.Parts.Count) is string budgetError)
             { warning = BuildWorksLocalization.ResolveUserText(budgetError); return false; }
             InvalidateGizmoAnchors();
 
-            var missingPrefabs = new List<string>();
+            var missingPrefabs = new HashSet<string>(StringComparer.Ordinal);
             var staged = new List<VisualNode>();
             var oldStates = new List<VisualState>();
             try
@@ -538,12 +606,7 @@ namespace OstrixMods.BuildWorks
                 return false;
             }
 
-            warning = missingPrefabs.Count == 0
-                ? null
-                : BuildWorksLocalization.Text("editor.missing_dimensions", string.Join(", ", missingPrefabs));
-            foreach (VisualNode visual in visuals.Values)
-                if (visual.ContentWarning != null) warning = string.IsNullOrEmpty(warning)
-                    ? visual.ContentWarning : warning + "\n" + visual.ContentWarning;
+            warning = SceneWarning(missingPrefabs);
             return true;
         }
 
@@ -1005,7 +1068,7 @@ namespace OstrixMods.BuildWorks
         {
             ThrowIfDisposed();
             if (preview == null) { ClearTemporaryPreview(target); return; }
-            if (CompositeBlueprintStore.InteractiveError(preview.Count) is string budgetError)
+            if (CompositeBlueprintStore.EditorError(preview.Count) is string budgetError)
                 throw new InvalidOperationException(BuildWorksLocalization.ResolveUserText(budgetError));
             try
             {
@@ -1894,6 +1957,8 @@ namespace OstrixMods.BuildWorks
             }
             worldCameraMasks.Clear();
             disposed = true;
+            initialDocument = null;
+            initialMissing.Clear();
             gizmo?.Hide();
             gizmo?.Dispose();
             ClearContourPreview();

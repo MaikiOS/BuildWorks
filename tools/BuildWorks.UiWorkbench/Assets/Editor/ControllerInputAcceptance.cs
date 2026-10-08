@@ -42,7 +42,7 @@ internal static class ControllerInputAcceptance
         BlueprintEditorController.EditorCatalogStatus(imported, name => Resolve(name), out string blocked, out string warning);
         Require(string.IsNullOrEmpty(blocked) && warning.Contains("missing_catalog_model"), "Production catalogue status blocks missing records");
         var overBudget = new CompositeBlueprintStore.Blueprint { importError = string.Empty };
-        for (int i = 0; i < 513; ++i) overBudget.parts.Add(new CompositeBlueprintStore.Part());
+        for (int i = 0; i <= CompositeBlueprintStore.EditorPartBudget; ++i) overBudget.parts.Add(new CompositeBlueprintStore.Part());
         BlueprintEditorController.EditorCatalogStatus(overBudget, name => true, out string limitError, out string limitWarning);
         Require(!string.IsNullOrEmpty(limitError) && limitWarning == null, "Empty import error bypasses catalogue limit status");
         var card = new BlueprintEditorCatalogItem("blueprint_" + imported.id, imported.name, null, imported.category,

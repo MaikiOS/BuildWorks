@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Reflection;
 using OstrixMods.BuildWorks.Geometry;
 using UnityEngine;
@@ -17,6 +16,57 @@ namespace OstrixMods.BuildWorks
         private static readonly FieldInfo VisualItem = typeof(ItemStand).GetField("m_visualItemDrop", Private);
         private static readonly FieldInfo Orientations = typeof(ItemStand).GetField("m_orientationSettings", Private);
         private static readonly MethodInfo UpdateAttach = typeof(ItemStand).GetMethod("UpdateAttach", Private);
+
+        internal sealed class Supply
+        {
+            internal readonly ItemDrop.ItemData Item;
+            internal readonly BlueprintForeignPartData Contents;
+            internal Supply(ItemDrop.ItemData item, BlueprintForeignPartData contents)
+            { Item = item; Contents = contents; }
+        }
+
+        internal static bool SelectSupplies(Player player, IEnumerable<BlueprintForeignPartData> contents,
+            List<Supply> result)
+        {
+            var reserved = new Dictionary<ItemDrop.ItemData, int>();
+            var snapshots = new Dictionary<ItemDrop.ItemData, string>();
+            bool complete = true;
+            int index = 0;
+            foreach (BlueprintForeignPartData data in contents)
+            {
+                Supply supply = null;
+                if (data != null && !data.ContentsCleared)
+                {
+                    ItemDrop.ItemData item = FindItem(player, data, reserved, snapshots);
+                    if (item == null) complete = false;
+                    else
+                    {
+                        reserved.TryGetValue(item, out int count);
+                        reserved[item] = count + 1;
+                        string info = item.m_dropPrefab.name + ":" + item.m_variant.ToString(CultureInfo.InvariantCulture) + ":" +
+                            item.m_quality.ToString(CultureInfo.InvariantCulture) + ":" + data.Info.Split(':')[3];
+                        Supply previous = index < result.Count ? result[index] : null;
+                        supply = previous != null && ReferenceEquals(previous.Item, item) &&
+                            previous.Contents.Info == info && previous.Contents.Zdo == snapshots[item] ? previous :
+                            new Supply(item, new BlueprintForeignPartData(
+                                BlueprintForeignPartData.NativeItemStandFormat, info, snapshots[item], null));
+                    }
+                }
+                if (index < result.Count) result[index] = supply;
+                else result.Add(supply);
+                ++index;
+            }
+            if (result.Count > index) result.RemoveRange(index, result.Count - index);
+            return complete;
+        }
+
+        internal static bool IsAvailable(Player player, Supply supply)
+        {
+            if (!player || supply == null || !player.GetInventory().ContainsItem(supply.Item)) return false;
+            try { return Matches(supply.Item, supply.Contents) && SnapshotItem(supply.Item) == supply.Contents.Zdo; }
+            catch (Exception error) when (error is ArgumentException || error is InvalidOperationException || error is NullReferenceException)
+            { return false; }
+        }
 
         internal static bool CanRestore(Piece piece, BlueprintForeignPartData data)
         {
@@ -58,63 +108,46 @@ namespace OstrixMods.BuildWorks
 
         internal static bool CanSupply(Player player, IEnumerable<BlueprintForeignPartData> contents)
         {
-            var reserved = new Dictionary<ItemDrop.ItemData, int>();
-            // Exact snapshots first: a flexible recipe must not take their only matching item.
-            foreach (BlueprintForeignPartData data in contents.Where(value => value != null && !value.ContentsCleared)
-                .OrderBy(value => value.Zdo == null))
-            {
-                ItemDrop.ItemData item = FindItem(player, data, reserved);
-                if (item == null) return false;
-                reserved.TryGetValue(item, out int count);
-                reserved[item] = count + 1;
-            }
-            return true;
+            return SelectSupplies(player, contents, new List<Supply>());
         }
 
         internal static ItemDrop.ItemData FindItem(Player player, BlueprintForeignPartData data,
-            Dictionary<ItemDrop.ItemData, int> reserved = null)
+            Dictionary<ItemDrop.ItemData, int> reserved = null, Dictionary<ItemDrop.ItemData, string> snapshots = null)
         {
-            if (!player || data == null || data.ContentsCleared) return null;
+            if (!player || data == null || data.ContentsCleared ||
+                data.Format != BlueprintForeignPartData.NativeItemStandFormat ||
+                data.Zdo != null && !BlueprintItemStandContents.TryRead(data, name => name.GetStableHashCode(), out _)) return null;
             foreach (ItemDrop.ItemData item in player.GetInventory().GetAllItems())
             {
                 if (item == null || reserved != null && reserved.TryGetValue(item, out int count) && count >= item.m_stack) continue;
-                try { if (Matches(item, data)) return item; }
+                try
+                {
+                    if (item?.m_dropPrefab?.name != data.Info.Split(':')[0]) continue;
+                    if (snapshots != null && snapshots.ContainsKey(item)) return item;
+                    if (Matches(item, data))
+                    {
+                        if (snapshots != null) snapshots[item] = SnapshotItem(item);
+                        return item;
+                    }
+                }
                 catch (Exception error) when (error is ArgumentException || error is InvalidOperationException || error is NullReferenceException)
                 { Debug.LogWarning("BuildWorks cannot inspect inventory item: " + error.GetType().Name); }
             }
             return null;
         }
 
-        internal static ItemDrop.ItemData FindPlacementItem(Player player, BlueprintForeignPartData data,
-            IEnumerable<BlueprintForeignPartData> later)
-        {
-            if (data == null || data.ContentsCleared) return null;
-            if (data.Zdo != null || later == null) return FindItem(player, data);
-            var reserved = new Dictionary<ItemDrop.ItemData, int>();
-            foreach (BlueprintForeignPartData exact in later.Where(value => value != null && !value.ContentsCleared && value.Zdo != null))
-            {
-                ItemDrop.ItemData item = FindItem(player, exact, reserved);
-                if (item == null) return null;
-                reserved.TryGetValue(item, out int count);
-                reserved[item] = count + 1;
-            }
-            return FindItem(player, data, reserved);
-        }
-
         private static bool Matches(ItemDrop.ItemData item, BlueprintForeignPartData data)
         {
-            string[] fields = data.Info.Split(':');
             if (item?.m_shared == null || !item.m_dropPrefab || item.m_stack < 1 ||
-                item.m_dropPrefab.name != fields[0] ||
-                item.m_variant != int.Parse(fields[1], CultureInfo.InvariantCulture) ||
-                item.m_quality != int.Parse(fields[2], CultureInfo.InvariantCulture)) return false;
-            string package = SnapshotItem(item);
-            return data.Zdo == null || package == data.Zdo;
+                item.m_dropPrefab.name != data.Info.Split(':')[0]) return false;
+            // Survival supplies the player's own item, never the archived item's properties.
+            SnapshotItem(item);
+            return true;
         }
 
         private static string SnapshotItem(ItemDrop.ItemData item)
         {
-            // Match the complete native record, not just its icon/name. The real inventory object is consumed later.
+            // Validate the complete supplied native record before consuming the real inventory object.
             ItemDrop.ItemData copy = item.Clone();
             copy.m_stack = 1;
             var package = new ZPackage();
@@ -132,7 +165,7 @@ namespace OstrixMods.BuildWorks
         }
 
         internal static bool TryApply(Player player, GameObject placed, BlueprintForeignPartData data,
-            out bool attempted, out bool rollbackSafe, IEnumerable<BlueprintForeignPartData> later = null)
+            out bool attempted, out bool rollbackSafe, Supply supply = null)
         {
             attempted = false;
             rollbackSafe = true;
@@ -140,7 +173,9 @@ namespace OstrixMods.BuildWorks
             if (data == null || data.ContentsCleared) return true;
             ItemStand stand = placed.GetComponent<ItemStand>();
             var view = StandView.GetValue(stand) as ZNetView;
-            ItemDrop.ItemData item = FindPlacementItem(player, data, later);
+            ItemDrop.ItemData item = supply == null ? FindItem(player, data) :
+                IsAvailable(player, supply) ? supply.Item : null;
+            if (supply != null && supply.Contents.Info.Split(':')[0] != data.Info.Split(':')[0]) return false;
             if (player != Player.m_localPlayer || !view || !view.IsValid() || !view.IsOwner() ||
                 !PrivateArea.CheckAccess(placed.transform.position, 0f, false, false) ||
                 stand.HaveAttachment() || QueuedItem.GetValue(stand) != null ||
@@ -150,9 +185,13 @@ namespace OstrixMods.BuildWorks
             int before = item.m_stack;
             bool complete = false;
             string expectedPackage = null;
+            string expectedInfo = null;
             try
             {
                 expectedPackage = SnapshotItem(item);
+                int wanted = int.Parse(data.Info.Split(':')[3], CultureInfo.InvariantCulture);
+                expectedInfo = item.m_dropPrefab.name + ":" + item.m_variant.ToString(CultureInfo.InvariantCulture) + ":" +
+                    item.m_quality.ToString(CultureInfo.InvariantCulture) + ":" + wanted.ToString(CultureInfo.InvariantCulture);
                 attempted = true;
                 rollbackSafe = false;
                 // UseItem's bool is not an acknowledgement. Execute its exact native queue only while owner.
@@ -165,7 +204,6 @@ namespace OstrixMods.BuildWorks
                 int remaining = inventory.ContainsItem(item) ? item.m_stack : 0;
                 if (before - remaining != 1 || !view.IsValid() || !view.IsOwner() ||
                     !ReferenceEquals(StandView.GetValue(stand), view)) return false;
-                int wanted = int.Parse(data.Info.Split(':')[3], CultureInfo.InvariantCulture);
                 if (wanted != 0)
                 {
                     var offsets = Orientations.GetValue(stand) as List<ItemStand.OrientationSettings>;
@@ -185,7 +223,7 @@ namespace OstrixMods.BuildWorks
                     }
                 }
                 complete = BlueprintItemStandCapture.TryCapture(placed.GetComponent<Piece>(), out var captured) &&
-                    captured != null && captured.Info == data.Info &&
+                    captured != null && captured.Info == expectedInfo &&
                     captured.Zdo == expectedPackage;
                 return complete;
             }
@@ -195,7 +233,7 @@ namespace OstrixMods.BuildWorks
                 complete = view && view.IsValid() && view.IsOwner() && ReferenceEquals(StandView.GetValue(stand), view) &&
                     before - (inventory.ContainsItem(item) ? item.m_stack : 0) == 1 &&
                     BlueprintItemStandCapture.TryCapture(placed.GetComponent<Piece>(), out var captured) &&
-                    captured != null && captured.Info == data.Info && captured.Zdo == expectedPackage;
+                    captured != null && captured.Info == expectedInfo && captured.Zdo == expectedPackage;
                 return complete;
             }
             finally

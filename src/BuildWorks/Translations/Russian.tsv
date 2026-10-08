@@ -264,6 +264,8 @@ blueprint.edit_switch_failed	BuildWorks: не удалось переключи�
 blueprint.anchors_recalc_failed	не удалось пересчитать точки привязки
 blueprint.scale_persistence_suffix	{0} (нет штатного сохранения масштаба Valheim)
 blueprint.network_identity_required	{0} (нет сетевой записи для сохранения и безопасной отмены)
+editor.loading_title	Загрузка чертежа
+editor.loading_progress	Подготовка деталей: {0}/{1}. Можно отменить загрузку — исходный чертёж сохранится.
 placement.anchor_geometry_missing	BuildWorks: у детали не найдена геометрия опор.
 common.local_short	Лок.
 common.world_short	Мир.

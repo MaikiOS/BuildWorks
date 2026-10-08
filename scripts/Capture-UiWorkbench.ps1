@@ -1,11 +1,21 @@
 [CmdletBinding()]
 param(
-    [string] $UnityPath = 'C:\Program Files\Unity\Hub\Editor\6000.0.61f1\Editor\Unity.exe'
+    [string] $UnityPath = 'C:\Program Files\Unity\Hub\Editor\6000.0.61f1\Editor\Unity.exe',
+    [string] $ProjectPath = ''
 )
 
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
-$projectPath = Join-Path $repositoryRoot 'tools\BuildWorks.UiWorkbench'
+if (-not $ProjectPath) { $ProjectPath = Join-Path $repositoryRoot 'tools\BuildWorks.UiWorkbench' }
+$ProjectPath = [IO.Path]::GetFullPath($ProjectPath)
+if ((Split-Path -Parent (Split-Path -Parent $ProjectPath)) -ine $repositoryRoot -or
+    (Split-Path -Leaf (Split-Path -Parent $ProjectPath)) -notin @('tools', 'artifacts') -or
+    -not (Test-Path -LiteralPath (Join-Path $ProjectPath 'Assets\Editor\RuntimeEditorAcceptance.cs') -PathType Leaf)) {
+    throw 'Workbench must be a project copy directly under BuildWorks/tools or BuildWorks/artifacts; arbitrary Unity projects are not supported.'
+}
+if (-not (Test-Path -LiteralPath (Join-Path $ProjectPath 'ProjectSettings\ProjectVersion.txt') -PathType Leaf)) {
+    throw "Unity Workbench project is missing: $ProjectPath"
+}
 $geometryProject = Join-Path $repositoryRoot 'src\BuildWorks.Geometry\BuildWorks.Geometry.csproj'
 $geometryDll = Join-Path $repositoryRoot 'src\BuildWorks.Geometry\bin\Release\netstandard2.0\BuildWorks.Geometry.dll'
 $pluginsPath = Join-Path $projectPath 'Assets\Plugins'

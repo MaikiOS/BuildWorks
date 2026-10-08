@@ -10,6 +10,7 @@ Normal/QA0/0, Geometry/Store/host/localization856/QA isolation/format, Workbench
 and independent correctness/ponytail review passed. No Valheim execution.
 Canonical/Hammer import bases and native place/reload remain open.
 See docs/checkpoint-0.19.109.md and docs/QA_0.19.109_RU.md.
+Next: docs/scale-basis-next-step.md (design only; parent-scale capture guard required).
 
 QA .108 installed by the guarded script; DLL hashes match,48 QA files and the library unchanged. No game execution. Checkpoint:e51c840.
 

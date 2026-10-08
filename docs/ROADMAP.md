@@ -1,5 +1,7 @@
 # BuildWorks development roadmap
 
+QA .108 installed by the guarded script; DLL hashes match,48 QA files and the library unchanged. No game execution. Checkpoint:e51c840.
+
 ## .108 — heavy editor: automated checks passed
 
 Staged load/progress/cancel and virtual outliner passed1025-record actual-controller

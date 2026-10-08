@@ -1,8 +1,8 @@
 # BuildWorks — полный список требований и замечаний
 
 Обновлено 2026-10-08. Это перечень работ, а не заявление о готовности всего мода.
-Исходники: `Default/BuildWorks`, проверенный шаг **0.19.108**; установленная QA **0.19.107**,
-только `TerrainRamp-1.0-Test`. Checkpoint .107: `2a6f624`; .106: `8f42efe`. Установка .107: SHA `CFD36E82B5EBFA3F22119769A7817F21D8BBFF638A65D5CC6FBDCA00E37BC939`, 48 QA файлов и библиотека неизменны.
+Исходники: `Default/BuildWorks`, проверенный шаг **0.19.108**; установленная QA **0.19.108**,
+только `TerrainRamp-1.0-Test`. Checkpoint .108: `e51c840`; .107: `2a6f624`; .106: `8f42efe`. Установка .108: SHA `02E3365D42F28112516802A60E94C4890B99DD0935CA2D780060511A03E7EAC1`, 48 QA файлов и библиотека неизменны.
 
 **Принято** — конкретный результат подтвердил Ostrix в игре.
 **Авто** — реализовано и проверено сборкой/тестами/статическим контрактом; новая игровая проверка открыта.
@@ -117,7 +117,7 @@
 
 ## Порядок продолжения
 
-1. Тяжёлый редактор: staged visuals, progress/cancel, сохранность полного документа, QA policy.
+1. Native приёмка .108: staged visuals, progress/cancel, полный документ; тяжёлые операции/финализация.
 2. Native lamp/rotation measurements и исправление доказанной причины; remaining converter dialects/state.
 3. Missing metadata/dependencies и явная замена1→N.
 4. Placement contents choices; контейнеры/стойки/предметы; authenticated server authority.

@@ -1,5 +1,7 @@
 # .108 — staged heavy editor loading and virtual outliner
 
+QA .108 installed; hashes match,48 QA files and library unchanged. Checkpoint:e51c840. No game execution.
+
 Automated checks passed; deployment and Valheim acceptance are separate evidence.
 
 Documents over128 parts load at most16 visuals or8 ms per Update, always advancing

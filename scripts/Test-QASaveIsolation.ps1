@@ -170,6 +170,9 @@ $searchExtent = $yard.Fields | Where-Object Name -eq 'SearchExtent'
 Require ($null -ne $searchExtent -and $searchExtent.Constant -eq 4096) 'QA yard search is not bounded to the expanded four-kilometre square.'
 $yardIterator = $yard.NestedTypes | Where-Object Name -Like '<Prepare>*'
 $yardIl = @($yardIterator.Methods.Body.Instructions)
+$teleportOffset = ($yardIl | Where-Object { [string]$_.Operand -match '::TeleportTo\(' } | Select-Object -First 1).Offset
+Require ([bool]($yardIl | Where-Object { $_.Offset -lt $teleportOffset -and $_.OpCode.Name -eq 'ldc.r4' -and $_.Operand -eq [single]2.1 }) -and
+    [bool]($yardIl | Where-Object { $_.Offset -lt $teleportOffset -and [string]$_.Operand -match 'Time::get_time\(' })) 'QA teleport omits native spawn cooldown wait.'
 foreach ($name in @('RequireLoadedSession','ValidateSavePath','ReadIdentityReceipt','OnceComplete','TeleportTo','CheckGround',
     'Copy','SaveWorld','BeginOnce','CheckGround','RequireEmpty','Vegetation','ClaimOwnership','IsOwner','Invoke','GetByteArray','CompleteOnce')) {
     Require ([bool]($yardIl.Operand -match "::$name\(")) "QA yard omits $name"

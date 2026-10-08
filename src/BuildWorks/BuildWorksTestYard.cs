@@ -189,6 +189,11 @@ namespace OstrixMods.BuildWorks
             string stamp = BuildWorksTestIsolation.SupplyStamp("yard192-v1\n" + File.ReadAllText(planPath));
             string receipt = BuildWorksTestIsolation.YardReceiptPath;
             if (BuildWorksTestIsolation.OnceComplete(receipt, stamp)) { IsPrepared = true; yield break; }
+            // Native Player.TeleportTo refuses during its first two seconds after spawning.
+            float readyAt = Time.time + 2.1f;
+            while (Time.time < readyAt) { BuildWorksTestIsolation.AssertPinned(); yield return null; }
+            if (BuildWorksTestIsolation.RequireLoadedSession() != player)
+                throw new InvalidOperationException("QA player changed before yard teleport.");
             if (!player.TeleportTo(new Vector3(center.x, WorldGenerator.instance.GetHeight(center.x, center.z) + 1, center.z), Quaternion.identity, true))
                 throw new InvalidOperationException("QA yard teleport refused.");
             float deadline = Time.realtimeSinceStartup + 90;

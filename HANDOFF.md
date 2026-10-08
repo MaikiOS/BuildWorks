@@ -1,5 +1,13 @@
 # BuildWorks current development handoff
 
+## QA .101 — native spawn teleport cooldown
+
+.100 selected(-256,43.4301529,-768), then nativeTeleportTo refused beforebackup/terrain.
+.101 waits2.1s and rechecks the original player/session before teleporting.
+Bothbuilds0/0, QA82, cooldowncompiledguard, host, localization853 andformat passed.
+Native .101 yard/construction/reload acceptance remainsopen.
+
+
 ## QA .100 — automated checks passed; native acceptance remains open
 
 Native .99 refused before plan/terrain: bounded4096 search found minimum dry span18.5402069m.

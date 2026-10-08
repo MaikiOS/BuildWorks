@@ -149,6 +149,21 @@ foreach ($name in @('TerrainModifier','TerrainOp','TerrainComp','BoxCollider','M
 }
 Require ($footprint -notmatch 'Object::Instantiate|Collider::get_bounds') 'Station preflight instantiates gameplay objects or trusts inactive collider bounds.'
 $yardName = 'OstrixMods.BuildWorks.BuildWorksTestYard'
+$terrainName = 'OstrixMods.BuildWorks.BuildWorksTestTerrain'
+$terrain = $qa.MainModule.GetType($terrainName)
+Require ($null -ne $terrain -and $null -eq $normal.MainModule.GetType($terrainName)) 'QA terrain clamp leaked into normal assembly or is missing.'
+$terrainTargets = ($terrain.NestedTypes.Methods.Body.Instructions.Operand -join "`n")
+Require ($terrainTargets -match 'LevelTerrain' -and $terrainTargets -match 'ApplyToHeightmap') 'QA clamp omits preparation or reload.'
+$limit = ($terrain.Methods | Where-Object Name -eq 'Limit').Body.Instructions.Operand -join "`n"
+foreach ($guard in @('AssertPinned','ReadIdentityReceipt','GetString','m_fileSource','m_worldName','m_uid','IsServer','IsDedicated','IsOpenServer','GetPeers')) {
+    Require ($limit -match $guard) "QA terrain bound omits $guard"
+}
+$nativeTerrain = [Mono.Cecil.AssemblyDefinition]::ReadAssembly((Join-Path $managed 'assembly_valheim.dll')).MainModule.GetType('TerrainComp')
+foreach ($method in @('LevelTerrain','ApplyToHeightmap')) {
+    $body = ($nativeTerrain.Methods | Where-Object Name -eq $method).Body.Instructions
+    Require (@($body | Where-Object { $_.OpCode.Name -eq 'ldc.r4' -and [Math]::Abs([single]$_.Operand) -eq 8 }).Count -eq 2 -and
+        [bool]($body.Operand -match 'Mathf::Clamp')) "Native $method clamp contract changed."
+}
 $yard = $qa.MainModule.GetType($yardName)
 Require ($null -ne $yard -and $null -eq $normal.MainModule.GetType($yardName)) 'QA yard leaked into normal assembly or is missing.'
 $searchExtent = $yard.Fields | Where-Object Name -eq 'SearchExtent'
@@ -362,8 +377,10 @@ $yardType = $assembly.GetType($yardName,$true)
 $plane = $yardType.GetMethod('Plane',$flags)
 Require ($plane.Invoke($null,@([single]35,[single]45,[single]30)) -eq 40) 'QA plane did not preserve safe midpoint.'
 Require ($plane.Invoke($null,@([single]33,[single]33,[single]30)) -eq 33) 'Dry flat QA terrain rejected.'
-$yardCases = 2
-foreach ($values in @(@(32,35,30),@(35,46,30),@(40,35,30),@([single]::NaN,40,30),@(35,[single]::PositiveInfinity,30),@(35,40,[single]::NegativeInfinity))) {
+Require ([Math]::Abs($plane.Invoke($null,@([single]35,[single]53.5402069,[single]30)) - 44.27010345) -lt 0.00001) 'Observed dry18.54m QA candidate rejected.'
+Require ($plane.Invoke($null,@([single]35,[single]65,[single]30)) -eq 50) 'Maximum QA midpoint rejected.'
+$yardCases = 4
+foreach ($values in @(@(32,35,30),@(35,66,30),@(40,35,30),@([single]::NaN,40,30),@(35,[single]::PositiveInfinity,30),@(35,40,[single]::NegativeInfinity))) {
     Refuses { $plane.Invoke($null,@([single]$values[0],[single]$values[1],[single]$values[2])) } 'Unsafe QA yard plane accepted.'
     $yardCases++
 }

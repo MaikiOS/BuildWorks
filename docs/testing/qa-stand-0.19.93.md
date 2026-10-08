@@ -1,5 +1,17 @@
 # QA package 0.19.93–0.19.97: startup/respawn/primary-slot corrections, native stand pending
 
+## QA .100 — automated checks passed; native acceptance remains open
+
+Native .99 refused before plan/terrain: bounded4096 search found minimum dry span18.5402069m.
+.100 changes both native terrain bounds only for explicitly marked ZDO terrain in the
+original isolated QA world: +/-16m during preparation and reload. Original token,
+world name/UID, Local closed server and no peers are required. Normal build omits the
+patch; unmarked QA terrain retains +/-8m. The requested192x192m footprint is unchanged.
+Both builds0/0, QA82, host and localization853 passed; old99 fails the new regression guard.
+This QA terrain requires the QA binary after reload; it is not a product terrain feature.
+Native backup precedes terrain changes; supplies and previous receipts are never reset.
+CoffeeTable construction and world-reload acceptance remain open.
+
 ## QA .99 search follow-up
 
 Native .98 enabled noon but found no qualifying192m yard within +/-1024m; it refused

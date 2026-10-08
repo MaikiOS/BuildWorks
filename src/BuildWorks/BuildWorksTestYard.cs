@@ -23,8 +23,8 @@ namespace OstrixMods.BuildWorks
         internal static float Plane(float minimum, float maximum, float water)
         {
             if (new[] { minimum, maximum, water }.Any(v => float.IsNaN(v) || float.IsInfinity(v)) ||
-                maximum < minimum || maximum - minimum > 10f || minimum < water + 3f)
-                throw new InvalidDataException("QA yard needs dry terrain within the native eight-metre leveling limit.");
+                maximum < minimum || maximum - minimum > 30f || minimum < water + 3f)
+                throw new InvalidDataException("QA yard needs dry terrain within its isolated sixteen-metre leveling limit.");
             return minimum + (maximum - minimum) * 0.5f;
         }
 
@@ -64,7 +64,7 @@ namespace OstrixMods.BuildWorks
             float best = float.MaxValue;
             float smallestDrySpan = float.MaxValue;
             Vector3 selected = Vector3.zero;
-            Debug.Log("BuildWorks QA yard search: 192x192m; centres within +/-4096m; native leveling limits retained.");
+            Debug.Log("BuildWorks QA yard search: 192x192m; centres within +/-4096m; QA-only marked terrain bound 16m.");
             // ponytail: bounded scan of this QA seed; refuse instead of falling back into spawn or water.
             for (int x = -SearchExtent; x <= SearchExtent; x += 128)
                 for (int z = -SearchExtent; z <= SearchExtent; z += 128)
@@ -83,7 +83,7 @@ namespace OstrixMods.BuildWorks
                         }
                     if (!valid || minimum < ZoneSystem.instance.m_waterLevel + 3f) continue;
                     smallestDrySpan = Math.Min(smallestDrySpan, maximum - minimum);
-                    if (maximum - minimum > 10f) continue;
+                    if (maximum - minimum > 30f) continue;
                     float score = maximum - minimum + Mathf.Sqrt(x * x + z * z) * 0.001f;
                     if (score >= best) continue;
                     best = score;
@@ -104,7 +104,7 @@ namespace OstrixMods.BuildWorks
                     Heightmap map = Heightmap.FindHeightmap(point);
                     if (!map || !ZoneSystem.instance.IsZoneLoaded(point) || !map.GetWorldHeight(point, out float height) ||
                         Location.IsInsideNoBuildLocation(point) || float.IsNaN(height) || float.IsInfinity(height) ||
-                        Mathf.Abs(height - center.y) > (requireFlat ? 0.03f : 6f) ||
+                        Mathf.Abs(height - center.y) > (requireFlat ? 0.03f : 15.5f) ||
                         (!requireFlat && Mathf.Abs(height - WorldGenerator.instance.GetHeight(point.x, point.z)) > 0.05f))
                         throw new InvalidOperationException("QA yard footprint is unloaded, protected, nonflat or beyond native leveling limits.");
                     maps.Add(map);
@@ -251,6 +251,7 @@ namespace OstrixMods.BuildWorks
             foreach (TerrainComp compiler in compilers)
             {
                 ZNetView view = compiler.GetComponent<ZNetView>();
+                view.GetZDO().Set(BuildWorksTestTerrain.Marker, BuildWorksTestIsolation.ReadIdentityReceipt()[1]);
                 operation.Invoke(compiler, new object[] { center, Vector3.zero, settings });
                 if (view.GetZDO().GetByteArray(ZDOVars.s_TCData) == null) throw new IOException("QA terrain was not persisted to its native ZDO.");
             }

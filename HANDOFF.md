@@ -1,5 +1,22 @@
 # BuildWorks current development handoff
 
+## .106 — catalog feedback; verified code step, game verification pending
+
+Ostrix accepted the built CoffeeTable shape. Exact resource delta and world reload
+are not separately accepted; do not repeat the shape check without a relevant change.
+Native .105 prepared the temporary 64x64 m yard and built four parts. The larger yard remains open.
+
+.106 reuses an untouched imported placement copy, prepares the library in a worker,
+retains conversion cache across native edits, reserves the thumbnail layer, prevents
+actions overlapping the preview, and adds cached world-unavailable card markers.
+Native v16 reads previous versions; portable v6 is unchanged. Normal/QA builds0/0,
+store regressions, host contract, localization853 and format passed.
+Deployment and game acceptance remain separate evidence.
+
+188/353 external documents still exceed the editor's512-piece cap. Giant lamps,
+staged heavy-editor loading, persistent stake jobs and admin world objects remain open.
+[Evidence, dependencies and narrow manual checks](docs/feedback-2026-10-08.md).
+
 ## QA .105 — temporary 64 m stand for the import/build/reload test
 
 Native .104 found no free 192x192 m candidate with the required height/location

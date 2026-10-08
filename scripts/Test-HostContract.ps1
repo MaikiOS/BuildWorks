@@ -819,7 +819,7 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.105.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.106.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -1813,7 +1813,7 @@ Assert-Contract ($updateDocumentMethods.Count -eq 5 -and
         @($_.Parameters | Where-Object Name -eq 'placementSupportId').Count -eq 1
     }).Count -eq 1) `
     'Blueprint frame update overload or a compatibility overload is missing.'
-Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion = 15' -and
+Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion = 16' -and
     $blueprintStoreSource -match 'loaded\.version < 6' -and
     $blueprintStoreSource -match 'ValidScale\(part\.scale\)' -and
     $blueprintStoreSource -match 'if \(loaded\.version < 4\)' -and
@@ -1833,7 +1833,9 @@ Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion =
     $thumbnailSource -match 'int alpha = Math\.Max\(pixel\.a, derivedAlpha\)' -and
     $thumbnailSource -match 'HasLegacyOpaqueBackground\(texture\)' -and
     $thumbnailSource -match 'Math\.Abs\(pixel\.r - background\.r\)' -and
-    $thumbnailSource -match 'private const int ThumbnailLayer = 31') `
+    $thumbnailSource -match 'internal const int ThumbnailLayer = 31' -and
+    $editorSceneSource -match 'used\[BlueprintThumbnailRenderer.ThumbnailLayer\] = true' -and
+    $thumbnailSource -match '-contents-v2.png') `
     'Blueprint v3/v4 migration, nested groups, or isolated persistent previews are missing.'
 Assert-Contract ($catalogSource -match 'typeof\(RectMask2D\)' -and
     $catalogSource -match 'popup\.AddComponent<ScrollRect>\(\)' -and
@@ -2216,15 +2218,16 @@ Assert-Contract ($catalogSource -match 'const float actionHeight = 28f' -and
     $catalogSource -match 'BlueprintActionsViewport' -and
     $catalogSource -match 'viewport.AddComponent<RectMask2D>' -and
     $catalogSource -match 'viewport.AddComponent<ScrollRect>' -and
-    $catalogSource -match
+    $catalogSource -notmatch
         'height - actionCount \* actionHeight - 8f') `
     'Blueprint inspector actions can escape below their panel.'
-foreach ($inspectorHeight in 358, 477) {
+foreach ($inspectorHeight in 240, 358, 400, 477, 720) {
     $actionHeight = 28
     $actionTop = [Math]::Min(184, 86 + $inspectorHeight * 0.20)
-    $actionTop = [Math]::Min(
-        $actionTop,
-        [Math]::Max(86, $inspectorHeight - 9 * $actionHeight - 8))
+    $actionTop = [Math]::Min($actionTop, [Math]::Max(0, $inspectorHeight - 28))
+    $previewBottom = 74 + [Math]::Min(104, $inspectorHeight * 0.20)
+    Assert-Contract ($actionTop -ge $previewBottom) `
+        "Blueprint inspector actions overlap the preview in a $inspectorHeight px panel."
     Assert-Contract (($inspectorHeight - $actionTop - 8) -gt 0) `
         "Blueprint inspector actions exceed a $inspectorHeight px panel."
 }
@@ -3058,4 +3061,4 @@ $worldCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'Preci
 $worldCaptureCalls = ($worldCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($worldCaptureCalls -match 'BlueprintStorageCapture::TryCapture' -and $worldCaptureCalls -match 'CompositeBlueprintStore/ForeignPartData::FromGeometry') 'World selection does not preserve container snapshots.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.105 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.106 and Valheim Steam build 25185596.'

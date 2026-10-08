@@ -1069,12 +1069,8 @@ namespace OstrixMods.BuildWorks
                 { ShowStatus(player, BuildWorksLocalization.Text("placement.hammer_piece_missing", missing)); return; }
                 if (!edit)
                 {
-                    // Save a separate native copy only on explicit world-placement action.
-                    CompositeBlueprintStore.Blueprint copy = ExternalBlueprintLibrary.DetachedCopy(blueprint);
-                    if (!blueprintStore.TrySaveDocument(copy.name, copy.category,
-                        copy.parts, copy.groups, copy.anchors, copy.primaryPartId,
-                        copy.primaryGroupId, copy.supports, copy.placementSupportId,
-                        out CompositeBlueprintStore.Blueprint imported, out string error, copy.customSnapPoints, copy))
+                    if (!blueprintStore.TryGetOrCreatePlacementCopy(blueprint,
+                        out CompositeBlueprintStore.Blueprint imported, out string error))
                     { ShowStatus(player, error); return; }
                     blueprint = imported;
                     RefreshBlueprintEditorLibrary();

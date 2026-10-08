@@ -26,7 +26,7 @@ namespace OstrixMods.BuildWorks
         internal const string DefaultCategory = "OTHER";
         private const string LegacyDefaultCategory = "ПРОЧЕЕ";
         private const string LocalizationPrefix = "$buildworks_";
-        private const int FormatVersion = 15;
+        private const int FormatVersion = 16;
         private const int MaximumBlueprints = 32;
         private const int MaximumCategories = 12;
         private const int MaximumAnchors = 512;
@@ -35,7 +35,12 @@ namespace OstrixMods.BuildWorks
         private LibraryData data = new LibraryData();
         private List<Blueprint> externalBlueprints;
         private IReadOnlyList<Blueprint> catalogSnapshot;
+        private IReadOnlyList<Blueprint> preparedExternalBlueprints;
         private Task<List<Blueprint>> importTask;
+        private readonly bool backgroundImports;
+        private Task<List<Blueprint>> preparationTask;
+        private int importGeneration;
+        private int preparationGeneration;
         private Func<string, VectorData?> importPrefabScale;
         private Func<string, int> importPrefabHash;
         private Func<int> importWorldLevel;
@@ -43,7 +48,7 @@ namespace OstrixMods.BuildWorks
         private Func<object> importHostContext;
         private object preparedHostContext;
         internal int Revision { get; private set; }
-        internal bool CatalogLoading => importTask != null && !importTask.IsCompleted;
+        internal bool CatalogLoading => importTask != null || preparationTask != null;
         internal string ImportError { get; private set; }
         internal string ImportResultPath { get; private set; }
         private string writeBlockReason;
@@ -60,6 +65,7 @@ namespace OstrixMods.BuildWorks
             if (string.IsNullOrWhiteSpace(storagePath))
                 throw new ArgumentException("Storage path is required.", nameof(storagePath));
             path = Path.GetFullPath(storagePath);
+            this.backgroundImports = backgroundImports;
             Load();
             if (backgroundImports)
                 importTask = Task.Run(() => ExternalBlueprintLibrary.Load(ImportDirectory));
@@ -67,7 +73,7 @@ namespace OstrixMods.BuildWorks
 
         public IReadOnlyList<Blueprint> All() => data.blueprints;
 
-        // Called on the Unity thread only. File workers never inspect host prefabs.
+        // Called on the Unity thread only; prefabHash must be a pure stable string hash.
         internal void ConfigureImportScale(Func<string, VectorData?> resolve, Func<object> context = null,
             Func<string, int> prefabHash = null, Func<int> worldLevel = null)
         {
@@ -76,6 +82,8 @@ namespace OstrixMods.BuildWorks
             importPrefabHash = prefabHash;
             importWorldLevel = worldLevel;
             catalogSnapshot = null;
+            preparedExternalBlueprints = null;
+            ++importGeneration;
         }
 
         internal IReadOnlyList<Blueprint> CatalogAll()
@@ -83,7 +91,7 @@ namespace OstrixMods.BuildWorks
             object hostContext = importHostContext?.Invoke();
             int? worldLevel = importWorldLevel?.Invoke();
             if (!ReferenceEquals(hostContext, preparedHostContext) || preparedWorldLevel != worldLevel)
-            { preparedHostContext = hostContext; preparedWorldLevel = worldLevel; catalogSnapshot = null; }
+            { preparedHostContext = hostContext; preparedWorldLevel = worldLevel; catalogSnapshot = null; preparedExternalBlueprints = null; ++importGeneration; }
             if (importTask != null && importTask.IsCompleted)
             {
                 try { externalBlueprints = importTask.GetAwaiter().GetResult(); ImportError = null; }
@@ -91,6 +99,8 @@ namespace OstrixMods.BuildWorks
                 importTask = null;
                 externalBlueprints = externalBlueprints ?? new List<Blueprint>();
                 catalogSnapshot = null;
+                preparedExternalBlueprints = null;
+                ++importGeneration;
             }
             if (externalBlueprints == null)
             {
@@ -98,9 +108,61 @@ namespace OstrixMods.BuildWorks
                 externalBlueprints = ExternalBlueprintLibrary.Load(ImportDirectory);
             }
             if (catalogSnapshot != null) return catalogSnapshot;
+            if (preparedExternalBlueprints == null)
+            {
+                if (backgroundImports)
+                {
+                    if (preparationTask != null)
+                    {
+                        if (!preparationTask.IsCompleted) return data.blueprints;
+                        try
+                        {
+                            var prepared = preparationTask.GetAwaiter().GetResult();
+                            if (preparationGeneration == importGeneration)
+                                preparedExternalBlueprints = prepared;
+                        }
+                        catch (Exception exception)
+                        {
+                            if (preparationGeneration == importGeneration)
+                            { ImportError = exception.Message; preparedExternalBlueprints = new List<Blueprint>(); }
+                        }
+                        preparationTask = null;
+                    }
+                    if (preparedExternalBlueprints == null)
+                    {
+                        // Snapshot Unity values once; conversion of the library never touches Unity.
+                        var scales = externalBlueprints.SelectMany(source => source.parts).Select(part => part.prefabName)
+                            .Distinct(StringComparer.Ordinal).ToDictionary(name => name, name => importPrefabScale?.Invoke(name), StringComparer.Ordinal);
+                        var sources = externalBlueprints;
+                        var hash = importPrefabHash;
+                        preparationGeneration = importGeneration;
+                        preparationTask = Task.Run(() => sources.Select(source => ExternalBlueprintLibrary.PrepareForHost(
+                            source, name => scales.TryGetValue(name, out var scale) ? scale : null, hash, worldLevel)).ToList());
+                        return data.blueprints;
+                    }
+                }
+                else preparedExternalBlueprints = externalBlueprints.Select(source => ExternalBlueprintLibrary.PrepareForHost(source, importPrefabScale, importPrefabHash, worldLevel)).ToList();
+            }
             var result = new List<Blueprint>(data.blueprints);
-            result.AddRange(externalBlueprints.Select(source => ExternalBlueprintLibrary.PrepareForHost(source, importPrefabScale, importPrefabHash, worldLevel)));
+            result.AddRange(preparedExternalBlueprints);
             return catalogSnapshot = result;
+        }
+
+        internal bool TryGetOrCreatePlacementCopy(Blueprint source, out Blueprint copy, out string error)
+        {
+            copy = null; error = null;
+            if (source == null || !source.IsExternal || source.importError != null ||
+                string.IsNullOrEmpty(source.id))
+            { error = UserError("import.fields"); return false; }
+            if (source.importAbsoluteScale)
+            { error = UserError("import.scale_pending"); return false; }
+            copy = data.blueprints.FirstOrDefault(candidate => candidate.placementImportId == source.id);
+            if (copy != null) return true;
+            var detached = ExternalBlueprintLibrary.DetachedCopy(source);
+            detached.placementImportId = source.id;
+            return TrySaveDocument(detached.name, detached.category, detached.parts, detached.groups,
+                detached.anchors, detached.primaryPartId, detached.primaryGroupId, detached.supports,
+                detached.placementSupportId, out copy, out error, detached.customSnapPoints, detached);
         }
 
         internal string ExchangeDirectory => Path.GetDirectoryName(path);
@@ -569,7 +631,8 @@ namespace OstrixMods.BuildWorks
                 previewYaw = previewTemplate?.previewYaw ?? 45f,
                 previewPitch = previewTemplate?.previewPitch ?? 30f,
                 previewZoom = previewTemplate?.previewZoom ?? 1f,
-                sourceDocuments = CloneSources(sourceDocuments ?? previewTemplate?.sourceDocuments)
+                sourceDocuments = CloneSources(sourceDocuments ?? previewTemplate?.sourceDocuments),
+                placementImportId = previewTemplate?.placementImportId
             };
             if (!Valid(blueprint)) { blueprint = null; error = UserError("store.verify_data_failed"); return false; }
             if (addCategory) data.categories.Add(category);
@@ -876,6 +939,7 @@ namespace OstrixMods.BuildWorks
             List<VectorData> previousCustomSnapPoints = blueprint.customSnapPoints;
             List<Support> previousSupports = blueprint.supports;
             List<SourceDocument> previousSources = blueprint.sourceDocuments;
+            string previousPlacementImportId = blueprint.placementImportId;
             string previousPlacementSupportId = blueprint.placementSupportId;
             string previousName = blueprint.name;
             string previousCategory = blueprint.category;
@@ -891,6 +955,8 @@ namespace OstrixMods.BuildWorks
             blueprint.customSnapPoints = customSnapPoints == null ? null : new List<VectorData>(customSnapPoints);
             blueprint.supports = CloneSupports(supports);
             blueprint.sourceDocuments = CloneSources(sourceDocuments);
+            // An edited copy must not replace the external original on the next placement.
+            blueprint.placementImportId = null;
             blueprint.placementSupportId = placementSupportId;
             blueprint.primaryPartId = primaryPartId;
             blueprint.primaryGroupId = primaryGroupId;
@@ -903,6 +969,7 @@ namespace OstrixMods.BuildWorks
                 blueprint.customSnapPoints = previousCustomSnapPoints;
                 blueprint.supports = previousSupports;
                 blueprint.sourceDocuments = previousSources;
+                blueprint.placementImportId = previousPlacementImportId;
                 blueprint.placementSupportId = previousPlacementSupportId;
                 blueprint.name = previousName;
                 blueprint.category = previousCategory;
@@ -1001,7 +1068,7 @@ namespace OstrixMods.BuildWorks
                 BlueprintExchangeFormat.ValidateLibraryJson(json, requireFields: loaded.version >= 6,
                     allowSupportFields: loaded.version >= 11, allowSourceFields: loaded.version >= 12,
                     allowForeignFields: loaded.version >= 13, allowContentsFields: loaded.version >= 14,
-                    allowAbsoluteScaleFields: loaded.version >= 15);
+                    allowAbsoluteScaleFields: loaded.version >= 15, allowPlacementImportFields: loaded.version >= 16);
                 loaded.blueprints = loaded.blueprints ?? new List<Blueprint>();
                 loaded.categories = loaded.categories ?? new List<string>();
                 if (loaded.version == 1)
@@ -1595,6 +1662,8 @@ namespace OstrixMods.BuildWorks
             public string placementSupportId;
             [DataMember(Order = 15, EmitDefaultValue = false)]
             public List<SourceDocument> sourceDocuments;
+            [DataMember(Order = 16, EmitDefaultValue = false)]
+            public string placementImportId;
         }
 
         [DataContract]

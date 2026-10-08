@@ -35,6 +35,7 @@ namespace OstrixMods.BuildWorks
             new Dictionary<string, Piece>(StringComparer.Ordinal);
         private readonly Dictionary<string, IReadOnlyList<Piece>> sourcePiecesByBlueprintId =
             new Dictionary<string, IReadOnlyList<Piece>>(StringComparer.Ordinal);
+        private readonly Dictionary<string, bool> placementAvailability = new Dictionary<string, bool>(StringComparer.Ordinal);
         private readonly List<GameObject> prefabs = new List<GameObject>();
         private readonly Dictionary<Piece, Bounds> sourceBounds = new Dictionary<Piece, Bounds>();
         private GameObject holder;
@@ -65,6 +66,7 @@ namespace OstrixMods.BuildWorks
             string availability = HammerCatalogOrganizer.AvailabilitySignature(table);
             if (table == registeredTable && store.Revision == registeredRevision &&
                 (table ? table.m_pieces.Count : 0) == registeredPieceCount && availability == registeredAvailability) return;
+            placementAvailability.Clear();
             string signature = BuildSignature(store.All(), table);
             if (table == registeredTable && signature == registeredSignature)
             {
@@ -189,6 +191,15 @@ namespace OstrixMods.BuildWorks
         {
             piece = null;
             return blueprint != null && piecesByBlueprintId.TryGetValue(blueprint.id, out piece);
+        }
+
+        internal bool CanPlace(CompositeBlueprintStore.Blueprint blueprint)
+        {
+            if (blueprint == null) return false;
+            if (!placementAvailability.TryGetValue(blueprint.id, out bool available))
+                placementAvailability[blueprint.id] = available = PrecisionPlacementSession.TryResolveBlueprintPieces(
+                    Player.m_localPlayer, blueprint, out _, out _);
+            return available;
         }
 
         public bool TryGetSourcePieces(
@@ -654,6 +665,7 @@ namespace OstrixMods.BuildWorks
             placementOriginsByPiece.Clear();
             piecesByBlueprintId.Clear();
             sourcePiecesByBlueprintId.Clear();
+            placementAvailability.Clear();
             sourceBounds.Clear();
             if (holder) UnityEngine.Object.Destroy(holder);
             holder = null;

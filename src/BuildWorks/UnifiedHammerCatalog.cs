@@ -2490,6 +2490,9 @@ namespace OstrixMods.BuildWorks
             Sprite icon = blueprintRegistry.Icon(blueprint);
             AddIcon(card.transform, icon, new Vector2(8f, -8f),
                 new Vector2(size.x - 16f, size.y - 42f), blueprint.id);
+            if (!blueprintRegistry.CanPlace(blueprint))
+                AddRailText(hud, card.transform, "!", new Vector2(8f, -8f), 22f,
+                    new Color(1f, 0.65f, 0.2f, 1f), FontStyles.Bold, width: 24f);
             AddRailText(
                 hud,
                 card.transform,
@@ -2658,9 +2661,6 @@ namespace OstrixMods.BuildWorks
             const float actionHeight = 28f;
             const int actionCount = 9;
             float actionTop = Mathf.Min(184f, 86f + height * 0.20f);
-            actionTop = Mathf.Min(
-                actionTop,
-                Mathf.Max(86f, height - actionCount * actionHeight - 8f));
             actionTop = Mathf.Min(actionTop, Mathf.Max(0, height - 28));
             Transform inspectorParent = parent;
             GameObject viewport = AddPanel(parent, "BlueprintActionsViewport", new Vector2(0, -actionTop),

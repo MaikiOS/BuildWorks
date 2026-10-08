@@ -2844,6 +2844,7 @@ namespace OstrixMods.BuildWorks
         private static int FindUnusedEditorLayer()
         {
             var used = new bool[32];
+            used[BlueprintThumbnailRenderer.ThumbnailLayer] = true;
             foreach (Component component in Resources.FindObjectsOfTypeAll<Component>())
             {
                 if (component && component.gameObject.scene.IsValid() &&

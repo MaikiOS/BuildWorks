@@ -10,7 +10,7 @@ namespace OstrixMods.BuildWorks
     internal sealed class BlueprintThumbnailRenderer : IDisposable
     {
         private const int TextureSize = 256;
-        private const int ThumbnailLayer = 31;
+        internal const int ThumbnailLayer = 31;
         private static readonly Color ThumbnailBackground =
             new Color(0.04f, 0.015f, 0.10f, 0f);
         private static readonly Color PreviewBackground =
@@ -293,7 +293,7 @@ namespace OstrixMods.BuildWorks
 
         private string ThumbnailPath(string blueprintId) => Path.Combine(
             directory,
-            Path.GetFileName(blueprintId) + "-contents-v1.png");
+            Path.GetFileName(blueprintId) + "-contents-v2.png");
 
         private static Sprite Render(
             CompositeBlueprintStore.Blueprint blueprint,

@@ -774,7 +774,10 @@ internal static class ControllerInputAcceptance
                 Frame(controller, input, Vector2.zero, 0, KeyCode.Escape); Frame(controller, input, Vector2.zero); yield return null;
                 Require(!view.HasModal && view.HasCatalog, "Escape closed catalogue instead of exchange dialog");
                 var prepared = store.CatalogAll().First(item => item.importSource.StartsWith(Path.GetFileName(importedPath) + "/", StringComparison.Ordinal));
-                Require(prepared.parts[0].scale.x == .5f && prepared.parts[0].scale.y == 2, "Host scale not prepared for editor");
+                Require(prepared.parts[0].baseScale.HasValue && prepared.parts[0].baseScale.Value.ToVector3() == Vector3.one &&
+                    prepared.parts[0].scale.ToVector3() == Vector3.one && !prepared.parts[0].scaleIsAbsolute &&
+                    prepared.parts[0].RootScale(source.transform.localScale) == Vector3.one,
+                    "Host scale not pinned independently of prefab base");
                 view.CancelCatalog();
                 controller.Close(discardChanges: true);
                 Require(controller.OpenExisting(prepared, out error), error);
@@ -805,7 +808,11 @@ internal static class ControllerInputAcceptance
                 Require(view.HasModal && Field<bool>(exchange, "completed") && Field<string>(exchange, "resultPath").EndsWith(name + ".zip"),
                     "Named ZIP export did not retain a usable result");
                 string exported = Field<string>(exchange, "resultPath");
-                Require(ExternalBlueprintLibrary.LoadFile(exported)[0].parts[0].scale.x == .5f, "ZIP export changed multiplier");
+                var exportedPart = ExternalBlueprintLibrary.LoadFile(exported)[0].parts[0];
+                Require(exportedPart.baseScale.HasValue && exportedPart.baseScale.Value.ToVector3() == Vector3.one &&
+                    exportedPart.scale.ToVector3() == Vector3.one && !exportedPart.scaleIsAbsolute &&
+                    exportedPart.RootScale(new Vector3(.5f, 2, .25f)) == Vector3.one,
+                    "ZIP export changed pinned size or multiplier");
                 NativeClick(view, null, "ExchangeClose"); yield return null;
                 Require(!view.HasModal, "Close button cannot dismiss result");
                 string report = "Editor: OK\nWorld: unsupported state\nPrefab scale: (0.25, 0.25, 0.25)";

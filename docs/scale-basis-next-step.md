@@ -1,10 +1,11 @@
-# Persisted scale basis — next implementation step
+# Persisted scale basis — implementation contract
 
-Design only, not implemented. Installed build0.19.109 fixes a separate duplicate
-SkinnedMeshRenderer child scale through BakeMesh(baked,true). It does not fix the
+Implemented in canonical .110; automated checks and independent review passed,
+deployment pending. Installed .109 remains separate. No native game proof.
+.109 BakeMesh(baked,true) regression is retained; this step addresses the distinct
 canonical ZNetScene versus Hammer PieceTable prefab root-scale mismatch.
 
-Recommended optional Part.baseScale in native17/portable7:
+Optional Part.baseScale in native17/portable7:
 effectiveAbsolute=(baseScale??resolvedPrefab.localScale)×scale component-wise.
 scale remains the editor multiplier0.01..4. baseScale is finite/positive, as is
 the resulting float-scale product. baseScale plus scaleIsAbsolute is invalid.
@@ -27,12 +28,12 @@ thumbnail and direct Hammer visual roots use effectiveAbsolute. Custom snap inve
 uses effectiveAbsolute; native snap and bounds generation use the same relative.
 Registry signature must include baseScale presence and components.
 
-Capture must use placed root localScale, validate its ratio to the Hammer prefab and
-native persistence, then save baseScale=placedLocalScale, scale=one. Current capture's
-lossyScale is a blocker for scaled-parent objects: local ZDO restoration would change
-their size. Before shipping, explicitly reject a parent frame whose scale/shear cannot
-be reproduced by the captured position/world rotation/root scale. Do not claim this
-invariant from build success. Add the refusal and a targeted parent-frame test.
+Capture uses placed root localScale, validates its ratio to the Hammer prefab and
+native persistence, then saves baseScale=placedLocalScale, scale=one. Capture rejects
+a parent matrix whose basis differs from its Unity rotation basis: scale/shear or
+reflections not represented by that rotation would otherwise change restoration.
+Real Unity tests cover rigid rotation, scale, odd/double mirrors and shear with unit
+length basis columns. This is stronger than checking lossyScale or column lengths.
 Foreign row scale and ZDO scale must not apply twice.
 
 Affected manual maps: CompositeBlueprintStore Part/clone/partial update/validation,

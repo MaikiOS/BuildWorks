@@ -1,5 +1,16 @@
 # BuildWorks current development handoff
 
+## .110 — verified pinned scale; deployment pending
+
+Native17/portable7 optional baseScale preserves exact source size across canonical/
+Hammer roots. Shared visual/world conversion, atomic scale preflight and parent
+matrix capture refusal passed builds0/0, Geometry/Store/host/localization857/QA
+isolation/format, Workbench252 and final independent correctness/ponytail review.
+Editor tiny-size gate fixed separately from world admission. Installed QA remains
+.109; no game execution. Native build/reload/network and axis reproduction open.
+Legacy v16 copy may coexist with one new .110 copy; no destructive migration.
+See docs/checkpoint-0.19.110.md and docs/QA_0.19.110_RU.md.
+
 QA .109 installed; hashes match,48 QA files and library unchanged. Checkpoint:3683382. No game execution.
 
 ## .109 — Lava Lantern visual clone scale

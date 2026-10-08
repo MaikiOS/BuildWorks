@@ -236,6 +236,9 @@ namespace OstrixMods.BuildWorks
         private int initialRevision, initialIndex;
         private readonly HashSet<string> initialMissing = new HashSet<string>(StringComparer.Ordinal);
         internal int InitialLoadedCount => initialIndex;
+        internal Vector3? PartPrefabScale(string stableId) =>
+            visuals.TryGetValue(stableId, out VisualNode visual) && !visual.Placeholder
+                ? visual.BaseScale : (Vector3?)null;
         private readonly MaterialPropertyBlock hoverProperties = new MaterialPropertyBlock();
         private string[] cachedAnchorIds;
         private Vector3[] cachedGizmoAnchors;
@@ -1442,8 +1445,8 @@ namespace OstrixMods.BuildWorks
                 visual.Root.transform.SetLocalPositionAndRotation(
                     pivot + rotation * ((sourcePosition - pivot) * uniformScale) + translation,
                     rotation * sourceRotation);
-                visual.Root.transform.localScale = visual.Placeholder ? Vector3.one * .3f : Vector3.Scale(
-                    visual.BaseScale, ToUnity(part.Scale)) * uniformScale;
+                visual.Root.transform.localScale = visual.Placeholder ? Vector3.one * .3f :
+                    ToUnity(part.ResolveScale(ToGeometry(visual.BaseScale))) * uniformScale;
             }
             UpdateHighlights(document);
         }
@@ -2438,9 +2441,8 @@ namespace OstrixMods.BuildWorks
         {
             TryUnityTransform(part, out Vector3 position, out Quaternion rotation);
             visual.Root.transform.SetLocalPositionAndRotation(position, rotation);
-            visual.Root.transform.localScale = visual.Placeholder ? Vector3.one * .3f : Vector3.Scale(
-                visual.BaseScale,
-                new Vector3((float)part.Scale.X, (float)part.Scale.Y, (float)part.Scale.Z));
+            visual.Root.transform.localScale = visual.Placeholder ? Vector3.one * .3f :
+                ToUnity(part.ResolveScale(ToGeometry(visual.BaseScale)));
             visual.Root.SetActive(effectivelyVisible);
             visual.Locked = effectivelyLocked;
         }

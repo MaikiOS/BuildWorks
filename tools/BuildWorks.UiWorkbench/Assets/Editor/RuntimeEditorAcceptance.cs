@@ -184,6 +184,7 @@ public static class RuntimeEditorAcceptance
             checks.Add(PlacementContactAcceptance.Run());
             TestSignPayload();
             TestPlacementSupportFrame();
+            TestPinnedScaleBasis(template, fontTemplate, output);
             checks.Add(StorageCaptureAcceptance.Run());
             foreach (object step in ItemStandPreviewAcceptance.Run(template, output)) yield return step;
             checks.Add("Supplied world mounts: small/native-holder/passive/heavy renderer paths use own quality/variant and per-stack allocation; live inventory changes refresh preview, confirmation binds exact own item and pause refuses changed/construction-spent items without fallback. Inert API fixtures only; real world/reload/network not tested.");
@@ -713,6 +714,148 @@ public static class RuntimeEditorAcceptance
         checks.Add("Actual placement-frame adapter on Unity transforms: saved rotated support, Hammer visual/root-plan agreement, nested mirrored XYZ scale, native socket coincidence and all eight collider bounds corners; no native Valheim placement executed");
     }
 
+    private static void TestPinnedScaleBasis(Camera camera, TMP_Text font, string output)
+    {
+        GameObject canonical = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        GameObject hammer = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        GameObject ghost = new GameObject("PinnedScaleGhost");
+        canonical.name = "wall"; canonical.SetActive(false);
+        hammer.name = "wall"; hammer.SetActive(false);
+        canonical.transform.localScale = new Vector3(2, .5f, 3);
+        hammer.transform.localScale = new Vector3(.5f, 2, .25f);
+        Piece piece = hammer.AddComponent<Piece>();
+        string path = Path.Combine(output, "pinned-scale-" + Guid.NewGuid().ToString("N") + ".json");
+        BlueprintEditorController Editor(CompositeBlueprintStore store) => new BlueprintEditorController(store,
+            camera, font, _ => canonical, name => name, () => Array.Empty<BlueprintEditorCatalogItem>(),
+            message => { throw new InvalidOperationException(message); });
+        try
+        {
+            Require(BlueprintPlacementFrame.HasRigidParent(canonical.transform), "Unparented capture rejected");
+            canonical.transform.SetParent(ghost.transform, false);
+            ghost.transform.rotation = Quaternion.Euler(23, -41, 17);
+            Require(BlueprintPlacementFrame.HasRigidParent(canonical.transform), "Rigid rotated capture rejected");
+            ghost.transform.localScale = new Vector3(2, .5f, 1);
+            Require(!BlueprintPlacementFrame.HasRigidParent(canonical.transform), "Scaled capture parent accepted");
+            ghost.transform.localScale = new Vector3(-1, 1, 1);
+            Require(!BlueprintPlacementFrame.HasRigidParent(canonical.transform), "Mirrored capture parent accepted");
+            ghost.transform.localScale = new Vector3(-1, -1, 1);
+            Require(!BlueprintPlacementFrame.HasRigidParent(canonical.transform), "Double-mirrored parent lost its apparent rotation");
+            var intermediate = new GameObject("ShearedCaptureParent");
+            try
+            {
+                ghost.transform.localScale = new Vector3(2, .5f, 1);
+                intermediate.transform.SetParent(ghost.transform, false);
+                intermediate.transform.localRotation = Quaternion.Euler(0, 0, 45);
+                intermediate.transform.localScale = new Vector3(1 / Mathf.Sqrt(2.125f), 1 / Mathf.Sqrt(2.125f), 1);
+                canonical.transform.SetParent(intermediate.transform, false);
+                Matrix4x4 sheared = intermediate.transform.localToWorldMatrix;
+                Require(Mathf.Abs(((Vector3)sheared.GetColumn(0)).sqrMagnitude - 1) < .00001f &&
+                    Mathf.Abs(((Vector3)sheared.GetColumn(1)).sqrMagnitude - 1) < .00001f,
+                    "Shear fixture axes were not normalized");
+                Require(!BlueprintPlacementFrame.HasRigidParent(canonical.transform), "Parent shear with unit-length axes was accepted");
+                canonical.transform.SetParent(ghost.transform, false);
+            }
+            finally { Object.DestroyImmediate(intermediate); }
+            ghost.transform.localScale = Vector3.one;
+            canonical.transform.SetParent(null, false);
+            ghost.transform.rotation = Quaternion.identity;
+            var raw = ExternalBlueprintLibrary.Parse("#Name:Pinned\n#Pieces\n" +
+                "wall;;0;0;0;0;0;0;1;\"\";1;1;1\nwall;;3;0;0;0;0;0;1;\"\";1;1;1", "pinned.blueprint");
+            using (var editor = Editor(new CompositeBlueprintStore(path)))
+            {
+                Require(editor.OpenExisting(raw, out string error), error);
+                var scene = Field<BlueprintEditorScene>(editor, "scene");
+                object visual = Field<IDictionary>(scene, "visuals")[editor.Document.Parts[0].StableId];
+                Require(editor.Document.Parts[0].BaseScale.Value.Equals(new Point3(1, 1, 1)) &&
+                    Field<GameObject>(visual, "Root").transform.localScale == Vector3.one,
+                    "Canonical prefab base changed imported editor dimensions");
+                Require((bool)Call(editor, "TrySave", false, true), "Pinned controller save failed");
+                editor.Close(true);
+            }
+            var stored = new CompositeBlueprintStore(path).All().Single();
+            var tiny = stored.ImportCopy();
+            foreach (var part in tiny.parts)
+                part.baseScale = new CompositeBlueprintStore.VectorData(Vector3.one * .001f);
+            using (var thumbnail = new BlueprintThumbnailRenderer.PreviewSession(tiny, new[] { piece, piece }))
+                Require(Field<GameObject>(thumbnail, "root").transform.GetChild(0).localScale == Vector3.one * .001f,
+                    "Exact tiny editor/thumbnail geometry was rejected or resized by a world scale limit");
+            bool tinyWorldRejected = false;
+            try { tiny.parts[0].PlacementScale(Vector3.one); }
+            catch (ArgumentException) { tinyWorldRejected = true; }
+            Require(tinyWorldRejected, "Tiny editor scale bypassed world admission");
+            for (int pass = 0; pass < 2; ++pass)
+            {
+                Vector3 expected = pass == 0 ? Vector3.one : Vector3.one * .5f;
+                Require(stored.parts[0].RootScale(hammer.transform.localScale) == expected,
+                    "Persisted root scale depends on Hammer prefab");
+                using (var thumbnail = new BlueprintThumbnailRenderer.PreviewSession(stored, new[] { piece, piece }))
+                    Require(Field<GameObject>(thumbnail, "root").transform.GetChild(0).localScale == expected,
+                        "Thumbnail/preview changed pinned root scale");
+                var plan = stored.parts.Select(part => new PrecisionPlacementSession.TransformSnapshot(
+                    part.position.ToVector3(), part.rotation.ToQuaternion(), part.PlacementScale(hammer.transform.localScale))).ToList();
+                Require(plan[0].Scale == (pass == 0 ? new Vector3(2, .5f, 4) : new Vector3(1, .25f, 2)),
+                    "World plan lost pinned scale or multiplied canonical base twice");
+                using (var preview = new PlacementGhostPreviewView())
+                {
+                    preview.Show(ghost, plan, new[] { piece, piece }, -1);
+                    Require(Field<List<GameObject>>(preview, "instances")[0].transform.localScale == expected,
+                        "World ghost differs from editor/thumbnail size");
+                }
+                var currentLibrary = new CompositeBlueprintStore(path);
+                using (var editor = Editor(currentLibrary))
+                {
+                    Require(editor.OpenExisting(currentLibrary.All().Single(), out string error), error);
+                    var scene = Field<BlueprintEditorScene>(editor, "scene");
+                    object visual = Field<IDictionary>(scene, "visuals")[editor.Document.Parts[0].StableId];
+                    Require(Field<GameObject>(visual, "Root").transform.localScale == expected,
+                        "Native reopen changed editor root scale");
+                    if (pass == 0)
+                    {
+                        editor.Document.SelectOnly(editor.Document.Parts[0].StableId);
+                        Require(editor.ApplyTransformDelta(Vector3.zero, Quaternion.identity, Vector3.zero, .5f),
+                            "Pinned multiplier edit failed");
+                        Require((bool)Call(editor, "TrySave", false, true), "Pinned edit save failed");
+                    }
+                    editor.Close(true);
+                }
+                stored = BlueprintExchangeFormat.Decode(System.Text.Encoding.UTF8.GetString(
+                    BlueprintExchangeFormat.Encode(new CompositeBlueprintStore(path).All().Single())));
+            }
+            var snapBlueprint = stored.ImportCopy();
+            var snapped = snapBlueprint.parts[0];
+            snapped.baseScale = new CompositeBlueprintStore.VectorData(new Vector3(1.5f, .75f, .5f));
+            snapped.scale = new CompositeBlueprintStore.VectorData(new Vector3(.5f, 1, 2));
+            snapped.position = new CompositeBlueprintStore.VectorData(new Vector3(1, 2, 3));
+            snapped.rotation = new CompositeBlueprintStore.QuaternionData(Quaternion.Euler(23, 41, -17));
+            Vector3 localSnap = new Vector3(.2f, .3f, -.4f);
+            Vector3 rootSnap = snapped.position.ToVector3() + snapped.rotation.ToQuaternion() *
+                Vector3.Scale(snapped.RootScale(hammer.transform.localScale), localSnap);
+            snapBlueprint.customSnapPoints = new List<CompositeBlueprintStore.VectorData> { new CompositeBlueprintStore.VectorData(rootSnap) };
+            var snapSets = BlueprintPlacementFrame.SnapLocalSets(snapBlueprint, new[] { piece, piece });
+            var restored = BlueprintSnapPointCodec.Decode(BlueprintSnapPointCodec.Encode(snapSets[0]));
+            Require((restored[0] - new Point3(localSnap.x, localSnap.y, localSnap.z)).LengthSquared < .00000001,
+                "Rotated nonuniform pinned scale changed saved local socket");
+            var legacyLibrary = new CompositeBlueprintStore(path + ".legacy");
+            var legacyParts = CompositeBlueprintStore.CloneParts(stored.parts);
+            foreach (var part in legacyParts) { part.baseScale = null; part.scale = new CompositeBlueprintStore.VectorData(Vector3.one); }
+            Require(legacyLibrary.TrySaveDocument("Legacy", stored.category, legacyParts, stored.groups, stored.anchors,
+                null, null, stored.supports, null, out var legacy, out string legacyError, sourceDocuments: stored.sourceDocuments), legacyError);
+            using (var editor = Editor(legacyLibrary))
+            {
+                Require(editor.OpenExisting(legacy, out string error), error);
+                Vector3 observedBase = canonical.transform.localScale;
+                canonical.transform.localScale = Vector3.one * 4;
+                Require((bool)Call(editor, "TrySave", false, true) && legacy.parts[0].baseScale.Value.ToVector3() == observedBase &&
+                    legacy.parts[0].RootScale(hammer.transform.localScale) == observedBase,
+                    "Explicit legacy save changed observed size or pinned a newly resolved prefab");
+                canonical.transform.localScale = observedBase;
+                editor.Close(true);
+            }
+            checks.Add("Pinned native17/portable7 scale: actual controller import/save/reopen/edit, thumbnail PreviewSession and world ghost agree across canonical(2,.5,3)/Hammer(.5,2,.25); scaled/mirrored capture parents refused. Renderer/format tests, no native construction/reload.");
+        }
+        finally { Object.DestroyImmediate(canonical); Object.DestroyImmediate(hammer); Object.DestroyImmediate(ghost); }
+    }
+
     private static void TestSaveRoundtrip(BlueprintEditorController controller, string path)
     {
         controller.Document.AddSupport(new BlueprintEditorSupport("saved-support", "Вход",
@@ -726,8 +869,8 @@ public static class RuntimeEditorAcceptance
         Require(reloaded.All().Count == 1, "Actual disk library roundtrip");
         Require(Mathf.Abs(reloaded.All()[0].parts[0].scale.x - expected) < 0.0001f, "Store discarded scale");
         CheckReopenedCopy(controller, reloaded, expected);
-        Require(File.ReadAllText(path).Contains("\"version\":16"), "Controller did not write format16");
-        checks.Add("Controller save -> disk format16 -> new store -> OpenExisting retains scale, rotated root-owned support and placement reference; transient support focus absent");
+        Require(File.ReadAllText(path).Contains("\"version\":17"), "Controller did not write format17");
+        checks.Add("Controller save -> disk format17 -> new store -> OpenExisting retains scale, rotated root-owned support and placement reference; transient support focus absent");
     }
 
     private static void TestIncompleteExternalEditor(Camera camera, TMP_Text font, GameObject wall, string output)
@@ -750,7 +893,8 @@ public static class RuntimeEditorAcceptance
             {
                 Require(editor.OpenExisting(raw, out string error), "Incomplete external open: " + error);
                 Require(editor.Document.Parts.Count == 2 && !editor.Document.Parts[0].ScaleIsAbsolute &&
-                    editor.Document.Parts[0].Scale.X == .5 && editor.Document.Parts[1].ScaleIsAbsolute,
+                    editor.Document.Parts[0].Scale.X == 1 && editor.Document.Parts[0].BaseScale.Value.X == 1 &&
+                    editor.Document.Parts[1].ScaleIsAbsolute,
                     "Incomplete editor lost records or guessed intrinsic scale");
                 string missingId = editor.Document.Parts[1].StableId;
                 object visual = Field<IDictionary>(Field<BlueprintEditorScene>(editor, "scene"), "visuals")[missingId];
@@ -850,13 +994,15 @@ public static class RuntimeEditorAcceptance
                 Require(Field<bool>(visual, "Placeholder"), "Late prefab rendered before explicit scale normalization");
                 editor.Close(true);
                 Require(editor.OpenExisting(saved, out error) && !editor.Document.Parts[1].ScaleIsAbsolute &&
-                    editor.Document.Parts[1].Scale.X == 2 && editor.Document.Parts[0].Scale.X == .5 &&
+                    editor.Document.Parts[1].Scale.X == 1 && editor.Document.Parts[1].BaseScale.Value.X == .001f &&
+                    editor.Document.Parts[0].Scale.X == 1 && editor.Document.Parts[0].BaseScale.Value.X == 1 &&
                     ReferenceEquals(Field<CompositeBlueprintStore.Blueprint>(editor, "sourceBlueprint"), saved) &&
                     (bool)Call(editor, "TrySave", false, true), "Late normalization lost native write identity or divided twice: " + error);
                 editor.Close(true);
             }
             Require(!new CompositeBlueprintStore(path).All()[0].parts[1].scaleIsAbsolute &&
-                new CompositeBlueprintStore(path).All()[0].parts[1].scale.x == 2 && raw.sourceDocuments[0].text == text,
+                new CompositeBlueprintStore(path).All()[0].parts[1].baseScale.Value.x == .001f &&
+                new CompositeBlueprintStore(path).All()[0].parts[1].scale.x == 1 && raw.sourceDocuments[0].text == text,
                 "Resolved basis did not persist or source was modified");
         }
         finally { Object.DestroyImmediate(known); if (later) Object.DestroyImmediate(later); }

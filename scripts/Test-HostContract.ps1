@@ -844,7 +844,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.109.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.110.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -1805,6 +1805,18 @@ $blueprintPart = $pluginTypes | Where-Object {
     $_.Name -eq 'Part' -and $_.DeclaringType -eq $blueprintStore
 }
 Assert-Contract ($null -ne $blueprintPart) 'Blueprint part record is missing.'
+$pinnedScaleField = $blueprintPart.Fields | Where-Object Name -eq 'baseScale'
+Assert-Contract ($null -ne $pinnedScaleField -and $pinnedScaleField.FieldType.FullName -match
+    'System.Nullable`1<OstrixMods.BuildWorks.CompositeBlueprintStore/VectorData>') `
+    'Pinned scale must remain an optional vector; legacy documents cannot acquire a guessed base.'
+$rootScaleCalls = @(($blueprintPart.Methods | Where-Object Name -eq 'RootScale').Body.Instructions |
+    ForEach-Object { [string]$_.Operand }) -join "`n"
+$placementScaleCalls = @(($blueprintPart.Methods | Where-Object Name -eq 'PlacementScale').Body.Instructions |
+    ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($rootScaleCalls -match 'Part::baseScale' -and $rootScaleCalls -match 'Vector3::Scale' -and
+    $rootScaleCalls -match 'CompositeBlueprintStore::PositiveScale' -and
+    $placementScaleCalls -match 'Part::RootScale' -and $placementScaleCalls -match 'CompositeBlueprintStore::RelativeScale') `
+    'Visual and world scales must share the pinned root scale and validated native-relative conversion.'
 foreach ($fieldName in @('prefabName', 'stableId', 'displayName', 'parentGroupId',
     'editorVisible', 'editorLocked', 'sourceDocumentId', 'sourceLine')) {
     Assert-Contract (@($blueprintPart.Fields | Where-Object Name -eq $fieldName).Count -eq 1) `
@@ -1856,7 +1868,7 @@ Assert-Contract ($updateDocumentMethods.Count -eq 5 -and
         @($_.Parameters | Where-Object Name -eq 'placementSupportId').Count -eq 1
     }).Count -eq 1) `
     'Blueprint frame update overload or a compatibility overload is missing.'
-Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion = 16' -and
+Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion = 17' -and
     $blueprintStoreSource -match 'loaded\.version < 6' -and
     $blueprintStoreSource -match 'ValidScale\(part\.scale\)' -and
     $blueprintStoreSource -match 'if \(loaded\.version < 4\)' -and
@@ -1937,12 +1949,55 @@ Assert-Contract ($resolveBlueprintPiecesOperands -match
     'PrecisionPlacementSession::TryResolveBuildPiece' -and
     $resolveBlueprintPiecesOperands -match
     'PrecisionPlacementSession::SupportsBlueprintWorkspacePiece' -and
-    $resolveBlueprintPiecesOperands -match 'CompositeBlueprintStore::ValidScale' -and
+    $resolveBlueprintPiecesOperands -match 'CompositeBlueprintStore/Part::PlacementScale' -and
     $resolveBlueprintPiecesOperands -match 'ZNetView::m_syncInitialScale' -and
     $resolveBlueprintPiecesOperands -notmatch 'PrecisionPlacementSession::SupportsPrecisionPlacement') `
     'Blueprint resolution must allow available furniture while retaining native scale validation.'
 Assert-Contract ($resolveBlueprintPiecesOperands -match 'CompositeBlueprintStore/Part::scaleIsAbsolute') `
     'World blueprint resolution must reject unresolved source scale basis.'
+$resolveScaleInstructions = $resolveBlueprintPieces.Body.Instructions
+$editorRootScale = $resolveScaleInstructions | Where-Object { [string]$_.Operand -match 'Part::RootScale' } | Select-Object -First 1
+$worldRelativeScale = $resolveScaleInstructions | Where-Object { [string]$_.Operand -match 'Part::PlacementScale' } | Select-Object -First 1
+$editorScaleArgument = $resolveScaleInstructions | Where-Object {
+    $_.Offset -lt [Math]::Min($editorRootScale.Offset, $worldRelativeScale.Offset) -and
+    $_.OpCode.Code -eq 'Ldarg_S' -and $_.Operand.Name -eq 'forEditor'
+} | Select-Object -Last 1
+$editorScaleBranch = if ($null -ne $editorScaleArgument) {
+    $resolveScaleInstructions[$resolveScaleInstructions.IndexOf($editorScaleArgument) + 1]
+} else { $null }
+$editorSelectsRoot = $null -ne $editorScaleBranch -and (
+    ($editorScaleBranch.OpCode.Code -in @('Brtrue', 'Brtrue_S') -and
+        $editorScaleBranch.Operand.Offset -gt $worldRelativeScale.Offset -and
+        $editorScaleBranch.Operand.Offset -lt $editorRootScale.Offset) -or
+    ($editorScaleBranch.OpCode.Code -in @('Brfalse', 'Brfalse_S') -and
+        $editorScaleBranch.Operand.Offset -gt $editorRootScale.Offset -and
+        $editorScaleBranch.Operand.Offset -lt $worldRelativeScale.Offset))
+$scaleAlternativeSkip = @($resolveScaleInstructions | Where-Object {
+    $_.Offset -gt [Math]::Min($editorRootScale.Offset, $worldRelativeScale.Offset) -and
+    $_.Offset -lt [Math]::Max($editorRootScale.Offset, $worldRelativeScale.Offset) -and
+    $_.OpCode.Code -in @('Br', 'Br_S') -and
+    $_.Operand.Offset -gt [Math]::Max($editorRootScale.Offset, $worldRelativeScale.Offset)
+})
+Assert-Contract ($null -ne $editorRootScale -and $null -ne $worldRelativeScale -and
+    $editorSelectsRoot -and $scaleAlternativeSkip.Count -eq 1) `
+    'Editor resolution must validate exact RootScale while only world resolution applies the native relative range.'
+foreach ($methodName in 'ShowPassiveBlueprintPreview', 'ApplyEditingGhostTransform', 'TryAddPlacementInstance', 'ApplyBlueprintAnchors') {
+    $scaleConsumer = $precisionSessionType.Methods | Where-Object Name -eq $methodName
+    $scaleConsumerCalls = @($scaleConsumer.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+    Assert-Contract ($scaleConsumerCalls -match 'Part::PlacementScale') `
+        "World scale path bypasses the pinned scale basis: $methodName"
+}
+$addInstance = $precisionSessionType.Methods | Where-Object Name -eq 'TryAddPlacementInstance'
+$scalePreflight = $addInstance.Body.Instructions | Where-Object {
+    [string]$_.Operand -match 'ZNetView::m_syncInitialScale'
+} | Select-Object -First 1
+$firstPlanAppend = $addInstance.Body.Instructions | Where-Object {
+    [string]$_.Operand -match 'List`1<OstrixMods.BuildWorks.PrecisionPlacementSession/TransformSnapshot>::Add'
+} | Select-Object -First 1
+Assert-Contract ($null -ne $scalePreflight -and $null -ne $firstPlanAppend -and
+    $scalePreflight.Offset -lt $firstPlanAppend.Offset -and
+    $sessionSource -match '(?s)relativeScales\[index\] = ToUnity\(BlueprintEditorPart.NormalizeScale\(.*?\* uniformScale.*?m_syncInitialScale.*?placementPlan.Add') `
+    'All blueprint scales and native persistence must be preflighted before appending a placement instance.'
 $editorVisual = $pluginMethods | Where-Object { $_.Name -eq 'ResolveBlueprintEditorVisual' -and $_.DeclaringType.Name -eq 'PrecisionPlacementSession' }
 $editorVisualCalls = ($editorVisual.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($editorVisualCalls -match 'ZNetScene::GetPrefab' -and $editorVisualCalls -notmatch 'TryResolveBuildPiece|IsBuildPieceAvailable') `
@@ -2044,7 +2099,7 @@ $applyBlueprintAnchorsOperands = @(
 Assert-Contract ($applyBlueprintAnchorsOperands -match 'AnchorBounds::Anchor' -and
     $applyBlueprintAnchorsOperands -match 'Piece::GetSnapPoints' -and
     $applyBlueprintAnchorsOperands -match 'ExternalCompositeSnapPoints' -and
-    $applyBlueprintAnchorsOperands -match 'Part::scale' -and
+    $applyBlueprintAnchorsOperands -match 'Part::PlacementScale' -and
     $applyBlueprintAnchorsOperands -notmatch 'Blueprint::anchors') `
     'Whole-blueprint precision must combine current scaled prefab native/midpoint snaps after bounds anchors.'
 $armPlacement = $pluginMethods | Where-Object Name -eq 'ArmPlacement'
@@ -2148,6 +2203,9 @@ $beginWorldSelectionCalls = @(
 Assert-Contract ($null -ne $worldCapture -and
     $worldCaptureCalls -match 'CompositeBlueprintStore::TrySave' -and
     $worldCaptureCalls -match 'CompositeBlueprintStore::ValidScale' -and
+    $worldCaptureCalls -match 'BlueprintPlacementFrame::HasRigidParent' -and
+    $worldCaptureCalls -match 'Transform::get_localScale' -and
+    $worldCaptureCalls -notmatch 'Transform::get_lossyScale' -and
     $worldCaptureCalls -match 'IsBlueprintPieceSelectable' -and
     $worldCaptureCalls -notmatch '::Destroy|::ClaimOwnership|::SetPositionAndRotation|::set_position|::set_rotation|::SetLocalScale' -and
     $sessionSource -match 'pendingWorldBlueprintSelection && GameplayInputAvailable' -and
@@ -3104,4 +3162,4 @@ $worldCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'Preci
 $worldCaptureCalls = ($worldCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($worldCaptureCalls -match 'BlueprintStorageCapture::TryCapture' -and $worldCaptureCalls -match 'CompositeBlueprintStore/ForeignPartData::FromGeometry') 'World selection does not preserve container snapshots.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.109 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.110 and Valheim Steam build 25185596.'

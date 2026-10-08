@@ -33,7 +33,7 @@ namespace OstrixMods.BuildWorks
         internal const string DefaultCategory = "OTHER";
         private const string LegacyDefaultCategory = "ПРОЧЕЕ";
         private const string LocalizationPrefix = "$buildworks_";
-        private const int FormatVersion = 16;
+        private const int FormatVersion = 17;
         private const int MaximumBlueprints = 32;
         private const int MaximumCategories = 12;
         private const int MaximumAnchors = 512;
@@ -805,7 +805,9 @@ namespace OstrixMods.BuildWorks
                     prepared[index].editorLocked = blueprint.parts[index].editorLocked;
                     prepared[index].sourceDocumentId = blueprint.parts[index].sourceDocumentId;
                     prepared[index].sourceLine = blueprint.parts[index].sourceLine;
-                    prepared[index].scaleIsAbsolute = blueprint.parts[index].scaleIsAbsolute;
+                    prepared[index].baseScale = prepared[index].baseScale ?? blueprint.parts[index].baseScale;
+                    if (!prepared[index].baseScale.HasValue)
+                        prepared[index].scaleIsAbsolute = blueprint.parts[index].scaleIsAbsolute;
                     prepared[index].foreignData = CloneForeignData(blueprint.parts[index].foreignData);
                 }
             }
@@ -1004,6 +1006,7 @@ namespace OstrixMods.BuildWorks
                     position = part.position,
                     rotation = part.rotation,
                     scale = part.scale,
+                    baseScale = part.baseScale,
                     scaleIsAbsolute = part.scaleIsAbsolute,
                     stableId = part.stableId,
                     displayName = part.displayName,
@@ -1075,7 +1078,8 @@ namespace OstrixMods.BuildWorks
                 BlueprintExchangeFormat.ValidateLibraryJson(json, requireFields: loaded.version >= 6,
                     allowSupportFields: loaded.version >= 11, allowSourceFields: loaded.version >= 12,
                     allowForeignFields: loaded.version >= 13, allowContentsFields: loaded.version >= 14,
-                    allowAbsoluteScaleFields: loaded.version >= 15, allowPlacementImportFields: loaded.version >= 16);
+                    allowAbsoluteScaleFields: loaded.version >= 15, allowPlacementImportFields: loaded.version >= 16,
+                    allowBaseScaleFields: loaded.version >= 17);
                 loaded.blueprints = loaded.blueprints ?? new List<Blueprint>();
                 loaded.categories = loaded.categories ?? new List<string>();
                 if (loaded.version == 1)
@@ -1356,6 +1360,8 @@ namespace OstrixMods.BuildWorks
                 string.IsNullOrWhiteSpace(part.displayName) ||
                 !Valid(part.position) || !Valid(part.rotation) ||
                 !(part.scaleIsAbsolute ? PositiveScale(part.scale) : ValidScale(part.scale)) ||
+                part.baseScale.HasValue && (part.scaleIsAbsolute || !PositiveScale(part.baseScale.Value) ||
+                    !PositiveScale(new VectorData(Vector3.Scale(part.baseScale.Value.ToVector3(), part.scale.ToVector3())))) ||
                 !Geometry.BlueprintEditorPart.IsValidSignText(part.signText) || !ValidForeignData(part.foreignData)) return false;
             float length = part.rotation.x * part.rotation.x +
                 part.rotation.y * part.rotation.y +
@@ -1755,6 +1761,24 @@ namespace OstrixMods.BuildWorks
             // True only while source absolute scale awaits a known prefab intrinsic scale.
             [DataMember(Order = 13, EmitDefaultValue = false)]
             public bool scaleIsAbsolute;
+            [DataMember(Order = 14, EmitDefaultValue = false)]
+            public VectorData? baseScale;
+
+            internal Vector3 RootScale(Vector3 prefabScale)
+            {
+                Vector3 root = scaleIsAbsolute ? scale.ToVector3() :
+                    Vector3.Scale(baseScale?.ToVector3() ?? prefabScale, scale.ToVector3());
+                if (!PositiveScale(new VectorData(root)))
+                    throw new ArgumentOutOfRangeException(nameof(scale), "$buildworks_import.transform");
+                return root;
+            }
+
+            internal Vector3 PlacementScale(Vector3 prefabScale)
+            {
+                if (scaleIsAbsolute)
+                    throw new ArgumentException("Unresolved absolute scale.");
+                return RelativeScale(new VectorData(RootScale(prefabScale)), new VectorData(prefabScale)).ToVector3();
+            }
         }
 
         [DataContract]

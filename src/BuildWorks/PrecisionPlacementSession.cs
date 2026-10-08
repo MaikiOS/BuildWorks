@@ -1412,7 +1412,7 @@ namespace OstrixMods.BuildWorks
                         pieces[index],
                         EditorWorkspaceOrigin + part.position.ToVector3(),
                         part.rotation.ToQuaternion(),
-                        part.scale.ToVector3(), part.signText, part))
+                        part.PlacementScale(pieces[index].transform.localScale), part.signText, part))
                     {
                         Finish();
                         ShowStatus(player, BuildWorksLocalization.Text(
@@ -2243,10 +2243,13 @@ namespace OstrixMods.BuildWorks
                     passivePreviewBlueprint = blueprint;
                     passivePreviewRevision = blueprintStore.Revision;
                     passivePreviewPlan.Clear();
-                    foreach (var part in blueprint.parts)
+                    for (int index = 0; index < blueprint.parts.Count; ++index)
+                    {
+                        var part = blueprint.parts[index];
                         passivePreviewPlan.Add(new TransformSnapshot(part.position.ToVector3(),
-                            part.rotation.ToQuaternion(), part.scale.ToVector3(), part.signText,
+                            part.rotation.ToQuaternion(), part.PlacementScale(pieces[index].transform.localScale), part.signText,
                             part.foreignData?.ToGeometry()));
+                    }
                 }
                 blueprintPieceRegistry.TryGetPlacementOrigin(palettePiece, out Vector3 origin);
                 Quaternion orientation = Quaternion.identity;
@@ -2306,7 +2309,7 @@ namespace OstrixMods.BuildWorks
                 placementPlanIndex < placementPlan.Count
                 ? placementPlan[placementPlanIndex].Scale
                 : activeBlueprint != null && blueprintGhostIndex < activeBlueprint.parts.Count
-                    ? activeBlueprint.parts[blueprintGhostIndex].scale.ToVector3()
+                    ? activeBlueprint.parts[blueprintGhostIndex].PlacementScale(selectedPiece.transform.localScale)
                 : transform.Scale;
             placementGhost.transform.localScale = Vector3.Scale(selectedPiece.transform.localScale, scale);
         }
@@ -4699,20 +4702,39 @@ namespace OstrixMods.BuildWorks
 
         private bool TryAddPlacementInstance(Vector3 position, Quaternion rotation, float uniformScale = 1f)
         {
+            Vector3[] relativeScales = null;
             try
             {
                 if (activeBlueprint == null)
                     BlueprintEditorPart.NormalizeScale(new Point3(uniformScale, uniformScale, uniformScale), nameof(uniformScale));
                 else
-                    foreach (CompositeBlueprintStore.Part part in activeBlueprint.parts)
+                {
+                    if (activeBlueprintPieces.Count != activeBlueprint.parts.Count) return false;
+                    relativeScales = new Vector3[activeBlueprint.parts.Count];
+                    for (int index = 0; index < activeBlueprint.parts.Count; ++index)
                     {
+                        CompositeBlueprintStore.Part part = activeBlueprint.parts[index];
                         if (part.scaleIsAbsolute)
                         {
                             repeatPlanError = BuildWorksLocalization.Text("import.scale_missing", part.prefabName);
                             return false;
                         }
-                        BlueprintEditorPart.NormalizeScale(ToGeometry(part.scale.ToVector3()) * uniformScale, nameof(uniformScale));
+                        Piece piece = activeBlueprintPieces[index];
+                        if (!piece)
+                        {
+                            repeatPlanError = BuildWorksLocalization.Text("blueprint.selected_piece_unavailable");
+                            return false;
+                        }
+                        relativeScales[index] = ToUnity(BlueprintEditorPart.NormalizeScale(
+                            ToGeometry(part.PlacementScale(piece.transform.localScale)) * uniformScale, nameof(uniformScale)));
+                        ZNetView view = piece.GetComponent<ZNetView>();
+                        if (relativeScales[index] != Vector3.one && (!view || !view.m_syncInitialScale))
+                        {
+                            repeatPlanError = BuildWorksLocalization.Text("blueprint.scale_persistence_suffix", part.prefabName);
+                            return false;
+                        }
                     }
+                }
             }
             catch (ArgumentOutOfRangeException)
             {
@@ -4742,8 +4764,7 @@ namespace OstrixMods.BuildWorks
                 placementPlan.Add(new TransformSnapshot(
                     position + rotation * (localPosition * uniformScale),
                     rotation * localRotation,
-                    ToUnity(BlueprintEditorPart.NormalizeScale(
-                        ToGeometry(part.scale.ToVector3()) * uniformScale, nameof(uniformScale))), part.signText,
+                    relativeScales[index], part.signText,
                     part.foreignData?.ToGeometry(), blueprintSnapLocalSets[index]));
                 placementPlanPieces.Add(activeBlueprintPieces[index]);
             }
@@ -4850,7 +4871,12 @@ namespace OstrixMods.BuildWorks
                     return false;
                 }
                 Vector3 baseScale = prefab.transform.localScale;
-                Vector3 worldScale = piece.transform.lossyScale;
+                if (!BlueprintPlacementFrame.HasRigidParent(piece.transform))
+                {
+                    error = BuildWorksLocalization.Text("blueprint.capture_parent_frame", PrefabName(piece));
+                    return false;
+                }
+                Vector3 worldScale = piece.transform.localScale;
                 CompositeBlueprintStore.VectorData scale;
                 try { scale = new CompositeBlueprintStore.VectorData(RelativeBlueprintScale(worldScale, baseScale)); }
                 catch (ArgumentException)
@@ -4895,7 +4921,8 @@ namespace OstrixMods.BuildWorks
                     prefabName = PrefabName(piece),
                     position = new CompositeBlueprintStore.VectorData(inverse * (piece.transform.position - origin)),
                     rotation = new CompositeBlueprintStore.QuaternionData(inverse * piece.transform.rotation),
-                    scale = scale,
+                    scale = new CompositeBlueprintStore.VectorData(Vector3.one),
+                    baseScale = new CompositeBlueprintStore.VectorData(worldScale),
                     signText = signText,
                     foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(storedItems ?? contents)
                 });
@@ -5071,8 +5098,7 @@ namespace OstrixMods.BuildWorks
                     part.position.ToVector3();
                 currentRotation = blueprintRootRotation * part.rotation.ToQuaternion();
                 placementGhost.transform.SetPositionAndRotation(currentPosition, currentRotation);
-                placementGhost.transform.localScale = Vector3.Scale(
-                    selectedPiece.transform.localScale, part.scale.ToVector3());
+                placementGhost.transform.localScale = part.RootScale(selectedPiece.transform.localScale);
                 anchorBoundsAvailable = CaptureAnchorPoints(placementGhost);
                 if (!anchorBoundsAvailable) return false;
                 singlePieceAnchorLocalPoints = (Vector3[])anchorLocalPoints.Clone();
@@ -5277,10 +5303,16 @@ namespace OstrixMods.BuildWorks
                     TryResolveBuildPiece(player, part.prefabName, out piece);
                     resolved[part.prefabName] = piece;
                 }
-                if (!piece ||
-                    !SupportsBlueprintWorkspacePiece(piece) || !CompositeBlueprintStore.ValidScale(part.scale))
+                if (!piece || !SupportsBlueprintWorkspacePiece(piece))
                 {
                     unavailable.Add(part.prefabName);
+                    continue;
+                }
+                Vector3 relativeScale;
+                try { relativeScale = forEditor ? part.RootScale(piece.transform.localScale) : part.PlacementScale(piece.transform.localScale); }
+                catch (ArgumentException)
+                {
+                    unavailable.Add(BuildWorksLocalization.Text("blueprint.piece_scale_range", part.prefabName));
                     continue;
                 }
                 ZNetView view = piece.GetComponent<ZNetView>();
@@ -5299,7 +5331,7 @@ namespace OstrixMods.BuildWorks
                     unavailable.Add(BuildWorksLocalization.Text("blueprint.sign_unsupported", part.prefabName));
                     continue;
                 }
-                if (!forEditor && part.scale.ToVector3() != Vector3.one && (!view || !view.m_syncInitialScale))
+                if (!forEditor && relativeScale != Vector3.one && (!view || !view.m_syncInitialScale))
                 {
                     unavailable.Add(BuildWorksLocalization.Text(
                         "blueprint.scale_persistence_suffix", part.prefabName));
@@ -5348,10 +5380,11 @@ namespace OstrixMods.BuildWorks
                 CompositeBlueprintStore.Part part = activeBlueprint.parts[index];
                 Vector3 partPosition = part.position.ToVector3();
                 Quaternion partRotation = part.rotation.ToQuaternion();
+                Vector3 relativeScale = part.PlacementScale(piece.transform.localScale);
                 for (int corner = 0; corner < 8; ++corner)
                 {
                     corners.Add(ToGeometry(partPosition +
-                        partRotation * Vector3.Scale(ToUnity(partBounds.Corner(corner)), part.scale.ToVector3())));
+                        partRotation * Vector3.Scale(ToUnity(partBounds.Corner(corner)), relativeScale)));
                 }
                 partSnaps.Clear();
                 piece.GetSnapPoints(partSnaps);
@@ -5362,7 +5395,7 @@ namespace OstrixMods.BuildWorks
                     Vector3 local = Vector3.Scale(piece.transform.localScale,
                         piece.transform.InverseTransformPoint(snap.position));
                     Vector3 point = partPosition + partRotation *
-                        Vector3.Scale(local, part.scale.ToVector3());
+                        Vector3.Scale(local, relativeScale);
                     if (!IsFinite(point)) continue;
                     nativePoints.Add(ToGeometry(point));
                 }
@@ -6202,7 +6235,8 @@ namespace OstrixMods.BuildWorks
                     position = new CompositeBlueprintStore.VectorData(
                         visual.position - rootPosition),
                     rotation = new CompositeBlueprintStore.QuaternionData(visual.rotation),
-                    scale = new CompositeBlueprintStore.VectorData(workspacePart.Scale),
+                    scale = new CompositeBlueprintStore.VectorData(Vector3.one),
+                    baseScale = new CompositeBlueprintStore.VectorData(visual.localScale),
                     signText = workspacePart.SignText,
                     sourceDocumentId = workspacePart.SourceData?.sourceDocumentId,
                     sourceLine = workspacePart.SourceData?.sourceLine ?? 0,

@@ -341,7 +341,11 @@ namespace OstrixMods.BuildWorks
                             scales.Add(part.prefabName, prefabScale);
                         }
                         if (!prefabScale.HasValue) continue; // Retain the original basis, never invent intrinsic=1.
-                        part.scale = CompositeBlueprintStore.RelativeScale(part.scale, prefabScale.Value);
+                        if (!CompositeBlueprintStore.PositiveScale(prefabScale.Value) ||
+                            !CompositeBlueprintStore.PositiveScale(part.scale))
+                            throw new ArgumentOutOfRangeException(nameof(part.scale));
+                        part.baseScale = part.scale;
+                        part.scale = new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 };
                         part.scaleIsAbsolute = false;
                     }
                     if (hash != null && part.sourceDocumentId != null && evidenceIndex.TryGetValue(part.sourceDocumentId, out var evidence))
@@ -349,7 +353,7 @@ namespace OstrixMods.BuildWorks
                 }
                 copy.importAbsoluteScale = false;
                 // Derived cache identity must not reuse pre-normalization thumbnails or another prefab revision.
-                if (source.IsExternal) copy.id = Identity(source.id + "\nrelative-scale-v3-pending-parts\n" + (hash == null ? "inert" : worldLevel?.ToString(CultureInfo.InvariantCulture) ?? "pending-world") + "\n" + string.Join("\n", scales.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                if (source.IsExternal) copy.id = Identity(source.id + "\npinned-scale-v1-pending-parts\n" + (hash == null ? "inert" : worldLevel?.ToString(CultureInfo.InvariantCulture) ?? "pending-world") + "\n" + string.Join("\n", scales.OrderBy(pair => pair.Key, StringComparer.Ordinal)
                     .Select(pair => pair.Key + "\t" + (pair.Value.HasValue ? pair.Value.Value.x.ToString("R", CultureInfo.InvariantCulture) + "\t" +
                         pair.Value.Value.y.ToString("R", CultureInfo.InvariantCulture) + "\t" + pair.Value.Value.z.ToString("R", CultureInfo.InvariantCulture) : "unknown"))));
             }
@@ -477,6 +481,7 @@ namespace OstrixMods.BuildWorks
                     position = part.position,
                     rotation = part.rotation,
                     scale = part.scale,
+                    baseScale = part.baseScale,
                     scaleIsAbsolute = part.scaleIsAbsolute,
                     parentGroupId = part.parentGroupId == null ? null : ids[part.parentGroupId],
                     editorVisible = part.editorVisible,

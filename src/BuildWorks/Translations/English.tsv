@@ -855,3 +855,4 @@ editor.missing_dimensions	Model or original prefab scale unavailable; dimensions
 editor.array_missing_dimensions	Packing is unavailable while selected model dimensions are unknown. Use an explicit spacing or install the missing model.
 editor.view.source_scale	Source scale (%)
 editor.catalog_cost_unknown	Full construction cost and required stations are unknown. This blueprint can be edited; world placement is checked separately.
+blueprint.capture_parent_frame	Cannot capture {0} exactly: its parent changes scale or shears the object.

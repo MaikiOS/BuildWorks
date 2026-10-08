@@ -2323,7 +2323,7 @@ namespace OstrixMods.BuildWorks
             report.AppendLine("Custom snap points: " + (blueprint.customSnapPoints?.Count ?? 0));
             report.AppendLine("Opaque source sections: " + (blueprint.sourceDocuments?.Count(source => source.ToGeometry().HasOpaqueSections) ?? 0));
             report.AppendLine("Prefab | count | ZNetScene local/lossy | Hammer local/lossy | " +
-                (blueprint.parts.Count == 0 ? "original absolute scale (conversion rejected)" : "document multiplier"));
+                (blueprint.parts.Count == 0 ? "original absolute scale (conversion rejected)" : "document base × multiplier / pending absolute"));
             // Failed atomic normalization clears usable parts, not the inert source evidence.
             IEnumerable<CompositeBlueprintStore.Part> reportParts = blueprint.parts.Count != 0 ? blueprint.parts :
                 (blueprint.sourceDocuments ?? new List<CompositeBlueprintStore.SourceDocument>())
@@ -2335,7 +2335,9 @@ namespace OstrixMods.BuildWorks
                 string Scale(Transform transform) => transform ? transform.localScale.ToString("R") + "/" + transform.lossyScale.ToString("R") : "unavailable";
                 report.AppendLine(parts.Key + " | " + parts.Count() + " | " + Scale(registered ? registered.transform : null) +
                     " | " + Scale(piece ? piece.transform : null) + " | " +
-                    string.Join(", ", parts.Select(part => part.scale.ToVector3().ToString("R")).Distinct().Take(8)));
+                    string.Join(", ", parts.Select(part => part.scaleIsAbsolute ? "absolute " + part.scale.ToVector3().ToString("R") :
+                        (part.baseScale.HasValue ? part.baseScale.Value.ToVector3().ToString("R") : "prefab") + " × " +
+                        part.scale.ToVector3().ToString("R")).Distinct().Take(8)));
             }
             ShowExchange(blueprint, report.ToString());
         }

@@ -441,8 +441,7 @@ namespace OstrixMods.BuildWorks
                 visual.transform.SetParent(prefab.transform, false);
                 visual.transform.localPosition = blueprint.parts[index].position.ToVector3();
                 visual.transform.localRotation = blueprint.parts[index].rotation.ToQuaternion();
-                visual.transform.localScale = Vector3.Scale(pieces[index].transform.localScale,
-                    blueprint.parts[index].scale.ToVector3());
+                visual.transform.localScale = blueprint.parts[index].RootScale(pieces[index].transform.localScale);
                 visual.SetActive(true);
             }
 
@@ -542,10 +541,9 @@ namespace OstrixMods.BuildWorks
                 foreach (Transform snap in native)
                 {
                     if (!snap) continue;
-                    Vector3 pieceLocal = Vector3.Scale(piece.transform.localScale,
-                        piece.transform.InverseTransformPoint(snap.position));
+                    Vector3 pieceLocal = piece.transform.InverseTransformPoint(snap.position);
                     Vector3 point = part.position.ToVector3() + part.rotation.ToQuaternion() *
-                        Vector3.Scale(pieceLocal, part.scale.ToVector3());
+                        Vector3.Scale(pieceLocal, part.RootScale(piece.transform.localScale));
                     if (float.IsNaN(point.x) || float.IsInfinity(point.x) ||
                         float.IsNaN(point.y) || float.IsInfinity(point.y) ||
                         float.IsNaN(point.z) || float.IsInfinity(point.z)) continue;
@@ -588,7 +586,7 @@ namespace OstrixMods.BuildWorks
                 }
                 var part = blueprint.parts[index];
                 Matrix4x4 matrix = Matrix4x4.TRS(part.position.ToVector3(), part.rotation.ToQuaternion(),
-                    Vector3.Scale(piece.transform.localScale, part.scale.ToVector3()));
+                    part.RootScale(piece.transform.localScale));
                 for (int corner = 0; corner < 8; ++corner)
                 {
                     Vector3 point = matrix.MultiplyPoint3x4(new Vector3(
@@ -748,6 +746,9 @@ namespace OstrixMods.BuildWorks
                     AppendVector(signature, part.position);
                     AppendQuaternion(signature, part.rotation);
                     AppendVector(signature, part.scale);
+                    signature.Append(part.baseScale.HasValue ? '1' : '0');
+                    if (part.baseScale.HasValue) AppendVector(signature, part.baseScale.Value);
+                    signature.Append(part.scaleIsAbsolute ? '1' : '0');
                     AppendText(signature, part.signText);
                 }
                 int anchorCount = blueprint?.anchors?.Count ?? 0;

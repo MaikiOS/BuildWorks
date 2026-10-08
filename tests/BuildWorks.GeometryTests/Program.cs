@@ -104,6 +104,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Run("Blueprint empty group is editable and undoable", BlueprintEmptyGroupIsUndoable);
             Run("Blueprint duplicate limit is atomic", BlueprintDuplicateLimitIsAtomic);
             Run("Blueprint scale is atomic and bounded", BlueprintScaleIsAtomicAndBounded);
+            Run("Pinned blueprint scale survives history and copies without prefab dependence", BlueprintPinnedScale);
             Run("Blueprint scale absorbs only boundary roundoff", BlueprintScaleAbsorbsOnlyBoundaryRoundoff);
             Run("Blueprint group reset preserves arrangement and is atomic", BlueprintGroupResetPreservesArrangementAndIsAtomic);
             Run("Blueprint history restores clean revisions", BlueprintHistoryRestoresCleanRevisions);
@@ -1598,6 +1599,38 @@ namespace OstrixMods.BuildWorks.GeometryTests
                 4.01));
             Near(new Point3(2.0, 0.0, 0.0), document.Parts[0].Position);
             Near(new Point3(1.0, 1.0, 1.0), document.Parts[0].Scale);
+        }
+
+        private static void BlueprintPinnedScale()
+        {
+            Point3 one = new Point3(1, 1, 1), basis = new Point3(.001, 2, .5);
+            var part = new BlueprintEditorPart("pinned", "wall", "Wall", new Point3(), IdentityRotation(), baseScale: basis);
+            Near(basis, part.ResolveScale(new Point3(2, .5, 3)));
+            Near(basis, part.ResolveScale(new Point3(.5, 2, .25)));
+            var document = EditorDocument(part);
+            document.SelectOnly(part.StableId);
+            document.MarkClean();
+            Equal(true, document.ApplyTransformDelta(new Point3(), IdentityRotation(), new Point3(), 2));
+            Near(new Point3(.002, 4, 1), document.Parts[0].ResolveScale(one));
+            Equal(true, document.Undo());
+            Near(basis, document.Parts[0].BaseScale.Value);
+            Equal(false, document.IsDirty);
+            Equal(true, document.Redo());
+            Equal(true, document.DuplicateSelection(new Point3(1, 0, 0)));
+            Equal(2, document.Parts.Count);
+            foreach (var copy in document.Parts) Near(basis, copy.BaseScale.Value);
+            var target = EditorDocument(EditorPart("target", 3, 0, 0));
+            Equal(true, target.InsertBlueprint(document, new Point3(), IdentityRotation()));
+            foreach (var copy in target.Parts.Where(value => value.PrefabName == "wall")) Near(basis, copy.BaseScale.Value);
+            Throws<ArgumentException>(() => new BlueprintEditorPart("bad", "wall", "Bad", new Point3(),
+                IdentityRotation(), scaleIsAbsolute: true, baseScale: one));
+            Throws<ArgumentOutOfRangeException>(() => new BlueprintEditorPart("bad", "wall", "Bad", new Point3(),
+                IdentityRotation(), scale: new Point3(4, 1, 1), baseScale: new Point3(float.MaxValue, 1, 1)));
+            var huge = EditorDocument(new BlueprintEditorPart("huge", "wall", "Huge", new Point3(), IdentityRotation(),
+                baseScale: new Point3(float.MaxValue / 2.0, 1, 1)));
+            huge.SelectOnly("huge");
+            Throws<ArgumentOutOfRangeException>(() => huge.ApplyTransformDelta(new Point3(), IdentityRotation(), new Point3(), 4));
+            Near(one, huge.Parts[0].Scale);
         }
 
         private static void BlueprintScaleAbsorbsOnlyBoundaryRoundoff()

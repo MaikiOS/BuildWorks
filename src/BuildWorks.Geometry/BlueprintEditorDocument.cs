@@ -20,7 +20,8 @@ namespace OstrixMods.BuildWorks.Geometry
             string sourceDocumentId = null,
             int sourceLine = 0,
             BlueprintForeignPartData foreignData = null,
-            bool scaleIsAbsolute = false)
+            bool scaleIsAbsolute = false,
+            Point3? baseScale = null)
         {
             StableId = Required(stableId, nameof(stableId));
             PrefabName = Required(prefabName, nameof(prefabName));
@@ -30,6 +31,10 @@ namespace OstrixMods.BuildWorks.Geometry
             Rotation = rotation.Normalized();
             ScaleIsAbsolute = scaleIsAbsolute;
             Scale = NormalizeScale(scale ?? new Point3(1.0, 1.0, 1.0), nameof(scale), scaleIsAbsolute);
+            if (scaleIsAbsolute && baseScale.HasValue)
+                throw new ArgumentException("Pending absolute scale cannot have a pinned base.");
+            BaseScale = baseScale.HasValue ? NormalizeScale(baseScale.Value, nameof(baseScale), true) : (Point3?)null;
+            ResolveScale(new Point3(1, 1, 1));
             ParentGroupId = parentGroupId;
             Visible = visible;
             Locked = locked;
@@ -50,6 +55,7 @@ namespace OstrixMods.BuildWorks.Geometry
         public Rotation3 Rotation { get; internal set; }
         public Point3 Scale { get; internal set; }
         public bool ScaleIsAbsolute { get; }
+        public Point3? BaseScale { get; }
         public string ParentGroupId { get; internal set; }
         public bool Visible { get; internal set; }
         public bool Locked { get; internal set; }
@@ -76,7 +82,14 @@ namespace OstrixMods.BuildWorks.Geometry
             Visible,
             Locked,
             Scale,
-            SignText, SourceDocumentId, SourceLine, ForeignData, ScaleIsAbsolute);
+            SignText, SourceDocumentId, SourceLine, ForeignData, ScaleIsAbsolute, BaseScale);
+
+        public Point3 ResolveScale(Point3 prefabScale)
+        {
+            Point3 basis = BaseScale ?? NormalizeScale(prefabScale, nameof(prefabScale), true);
+            return NormalizeScale(ScaleIsAbsolute ? Scale : new Point3(
+                basis.X * Scale.X, basis.Y * Scale.Y, basis.Z * Scale.Z), nameof(Scale), true);
+        }
 
         internal static string Required(string value, string name)
         {
@@ -909,7 +922,7 @@ namespace OstrixMods.BuildWorks.Geometry
                     parentId,
                     part.Visible,
                     part.Locked,
-                    part.Scale, part.SignText, part.SourceDocumentId, part.SourceLine, part.ForeignData, part.ScaleIsAbsolute));
+                    part.Scale, part.SignText, part.SourceDocumentId, part.SourceLine, part.ForeignData, part.ScaleIsAbsolute, part.BaseScale));
                 if (rootIds.Contains(part.StableId)) copiedRoots.Add(copyId);
             }
             return Commit(() =>
@@ -954,7 +967,7 @@ namespace OstrixMods.BuildWorks.Geometry
                     part.PrefabName, part.DisplayName, position + orientation.Rotate(part.Position),
                     Multiply(orientation, part.Rotation).Normalized(),
                     part.ParentGroupId == null ? rootId : groupIds[part.ParentGroupId],
-                    part.Visible, part.Locked, part.Scale, part.SignText, part.SourceDocumentId, part.SourceLine, part.ForeignData, part.ScaleIsAbsolute));
+                    part.Visible, part.Locked, part.Scale, part.SignText, part.SourceDocumentId, part.SourceLine, part.ForeignData, part.ScaleIsAbsolute, part.BaseScale));
             return Commit(() =>
             {
                 groups.AddRange(newGroups);
@@ -1252,7 +1265,7 @@ namespace OstrixMods.BuildWorks.Geometry
                             sample.Position + stepY * logicalY +
                                 turn.Rotate((source.Position - pivot) * sample.UniformScale),
                             Multiply(turn, source.Rotation).Normalized(), source.ParentGroupId,
-                            source.Visible, source.Locked, copyScale, source.SignText, source.SourceDocumentId, source.SourceLine, source.ForeignData, source.ScaleIsAbsolute));
+                            source.Visible, source.Locked, copyScale, source.SignText, source.SourceDocumentId, source.SourceLine, source.ForeignData, source.ScaleIsAbsolute, source.BaseScale));
                     }
                 }
             }
@@ -1340,7 +1353,7 @@ namespace OstrixMods.BuildWorks.Geometry
                         source.ParentGroupId,
                         source.Visible,
                         source.Locked,
-                        copyScale, source.SignText, source.SourceDocumentId, source.SourceLine, source.ForeignData, source.ScaleIsAbsolute));
+                        copyScale, source.SignText, source.SourceDocumentId, source.SourceLine, source.ForeignData, source.ScaleIsAbsolute, source.BaseScale));
                 }
             }
             return copies;
@@ -1392,6 +1405,7 @@ namespace OstrixMods.BuildWorks.Geometry
                     throw new ArgumentException("Missing parent group: " + part.ParentGroupId);
                 BlueprintEditorPart.Validate(part.Position, nameof(part.Position));
                 BlueprintEditorPart.NormalizeScale(part.Scale, nameof(part.Scale), part.ScaleIsAbsolute);
+                part.ResolveScale(new Point3(1, 1, 1));
                 part.Rotation = part.Rotation.Normalized();
             }
             foreach (BlueprintEditorGroup group in groups)
@@ -1585,7 +1599,9 @@ namespace OstrixMods.BuildWorks.Geometry
                     left.Visible != right.Visible || left.Locked != right.Locked || left.SignText != right.SignText ||
                     left.SourceDocumentId != right.SourceDocumentId || left.SourceLine != right.SourceLine || left.ForeignData != right.ForeignData ||
                     !Same(left.Position, right.Position) || !Same(left.Rotation, right.Rotation) ||
-                    !Same(left.Scale, right.Scale) || left.ScaleIsAbsolute != right.ScaleIsAbsolute)
+                    !Same(left.Scale, right.Scale) || left.ScaleIsAbsolute != right.ScaleIsAbsolute ||
+                    left.BaseScale.HasValue != right.BaseScale.HasValue ||
+                    left.BaseScale.HasValue && !Same(left.BaseScale.Value, right.BaseScale.Value))
                     return false;
             }
             for (int index = 0; index < groups.Count; ++index)

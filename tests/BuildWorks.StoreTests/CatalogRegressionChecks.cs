@@ -24,7 +24,8 @@ namespace OstrixMods.BuildWorks.StoreTests
             });
             Wait(store);
             var source = store.CatalogAll().Single();
-            Require(source.parts[0].scale.x == .5f && scaleReads == 1, "Host snapshot missed distinct-prefab cache");
+            Require(source.parts[0].scale.x == 1 && source.parts[0].baseScale.Value.x == 1 && scaleReads == 1,
+                "Host snapshot missed distinct-prefab cache");
             Require(store.TryGetOrCreatePlacementCopy(source, out var first, out string error), error);
             byte[] before = File.ReadAllBytes(path); int revision = store.Revision;
             Require(store.TryGetOrCreatePlacementCopy(source, out var second, out error) && ReferenceEquals(first, second), error);
@@ -34,7 +35,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(!portable.Contains("placementImportId") && first.placementImportId == source.id &&
                 BlueprintExchangeFormat.Decode(portable).parts.Count == 2, "Portable export leaked local placement cache identity");
             string invalidOld = Path.Combine(directory, "old-with-cache.json");
-            File.WriteAllText(invalidOld, File.ReadAllText(path).Replace("\"version\":16", "\"version\":15"));
+            File.WriteAllText(invalidOld, File.ReadAllText(path).Replace("\"version\":17", "\"version\":15"));
             Require(new CompositeBlueprintStore(invalidOld).All().Count == 0, "Old native schema accepted placement cache field");
             Require(ReferenceEquals(source, store.CatalogAll().Single(x => x.IsExternal)) && scaleReads == 1,
                 "Native save reconverted external library");
@@ -57,7 +58,11 @@ namespace OstrixMods.BuildWorks.StoreTests
             store.CatalogAll();
             store.ConfigureImportScale(_ => new CompositeBlueprintStore.VectorData { x = 8, y = 8, z = 8 });
             Wait(store);
-            Require(store.CatalogAll().Single(x => x.IsExternal).parts[0].scale.x == .125f, "Stale worker result survived host invalidation");
+            var latest = store.CatalogAll().Single(x => x.IsExternal);
+            var expected = ExternalBlueprintLibrary.PrepareForHost(ExternalBlueprintLibrary.Load(imports).Single(),
+                _ => new CompositeBlueprintStore.VectorData { x = 8, y = 8, z = 8 });
+            Require(latest.id == expected.id && latest.id != source.id && latest.parts[0].baseScale.Value.x == 1,
+                "Stale worker result survived host invalidation");
             Console.WriteLine("PASS catalog worker isolation, cached conversion, idempotent placement copy/reload, edited-copy isolation, stale worker rejection");
         }
 

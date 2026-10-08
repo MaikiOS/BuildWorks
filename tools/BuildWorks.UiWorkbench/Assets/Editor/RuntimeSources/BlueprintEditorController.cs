@@ -280,7 +280,7 @@ namespace OstrixMods.BuildWorks
                 prefabName,
                 string.IsNullOrWhiteSpace(displayName) ? DisplayName(prefabName) : displayName,
                 ToPoint(cameraFocus),
-                ToRotation(Quaternion.identity))));
+                ToRotation(Quaternion.identity), baseScale: ResolvePrefabBaseScale(prefabName))));
         }
 
         internal bool ApplyTransformDelta(
@@ -2953,7 +2953,8 @@ namespace OstrixMods.BuildWorks
                 parts.Add(new BlueprintEditorPart(part.stableId, part.prefabName, part.displayName,
                     ToPoint(part.position.ToVector3()), ToRotation(part.rotation.ToQuaternion()), part.parentGroupId,
                     part.editorVisible, part.editorLocked, ToPoint(part.scale.ToVector3()), part.signText,
-                    part.sourceDocumentId, part.sourceLine, part.foreignData?.ToGeometry(), part.scaleIsAbsolute));
+                    part.sourceDocumentId, part.sourceLine, part.foreignData?.ToGeometry(), part.scaleIsAbsolute,
+                    part.baseScale.HasValue ? ToPoint(part.baseScale.Value.ToVector3()) : (Point3?)null));
             return new BlueprintEditorDocument(source.id, source.name,
                 source.category ?? CompositeBlueprintStore.DefaultCategory, parts, groups,
                 source.primaryPartId, source.primaryGroupId,
@@ -3066,7 +3067,7 @@ namespace OstrixMods.BuildWorks
                 item.PrefabName,
                 item.DisplayName,
                 ToPoint(placementPosition),
-                ToRotation(placementRotation))));
+                ToRotation(placementRotation), baseScale: ResolvePrefabBaseScale(item.PrefabName))));
             if (!added) return;
             view.SetStatus(BuildWorksLocalization.Text("editor.part_added"));
         }
@@ -3733,6 +3734,8 @@ namespace OstrixMods.BuildWorks
             var result = new List<CompositeBlueprintStore.Part>(document.Parts.Count);
             foreach (BlueprintEditorPart part in document.Parts)
             {
+                Vector3? basis = part.BaseScale.HasValue ? ToVector(part.BaseScale.Value) :
+                    part.ScaleIsAbsolute ? (Vector3?)null : scene.PartPrefabScale(part.StableId);
                 result.Add(new CompositeBlueprintStore.Part
                 {
                     prefabName = part.PrefabName,
@@ -3740,6 +3743,8 @@ namespace OstrixMods.BuildWorks
                     rotation = new CompositeBlueprintStore.QuaternionData(ToQuaternion(part.Rotation)),
                     scale = new CompositeBlueprintStore.VectorData(ToVector(part.Scale)),
                     scaleIsAbsolute = part.ScaleIsAbsolute,
+                    baseScale = basis.HasValue ? new CompositeBlueprintStore.VectorData(basis.Value) :
+                        (CompositeBlueprintStore.VectorData?)null,
                     stableId = part.StableId,
                     displayName = part.DisplayName,
                     parentGroupId = part.ParentGroupId,
@@ -3985,6 +3990,12 @@ namespace OstrixMods.BuildWorks
             foreach (Canvas candidate in hiddenGameCanvases)
                 if (candidate) candidate.enabled = true;
             hiddenGameCanvases.Clear();
+        }
+
+        private Point3? ResolvePrefabBaseScale(string prefabName)
+        {
+            GameObject source = ResolveVisualSource(prefabName);
+            return source ? ToPoint(source.transform.localScale) : (Point3?)null;
         }
 
         private GameObject ResolveVisualSource(string prefabName)

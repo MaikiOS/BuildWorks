@@ -337,17 +337,19 @@ public static class ActualDividerAcceptance
                 {
                     var before = raw.parts[index]; var after = saved.parts[index];
                     Vector3 expectedPosition = before.position.ToVector3() + (index == 0 ? Vector3.right * .25f : Vector3.zero);
-                    Vector3 expectedScale = before.scale.ToVector3();
+                    Vector3 expectedScale = Vector3.one;
                     Vector3 intrinsic = prefabs[before.prefabName].transform.localScale;
-                    expectedScale = new Vector3(expectedScale.x / intrinsic.x, expectedScale.y / intrinsic.y, expectedScale.z / intrinsic.z);
                     Require((after.position.ToVector3() - expectedPosition).sqrMagnitude < .00000001f &&
                         Quaternion.Angle(after.rotation.ToQuaternion(), before.rotation.ToQuaternion()) < .001f &&
                         (after.scale.ToVector3() - expectedScale).sqrMagnitude < .00000001f &&
+                        after.baseScale.HasValue && after.baseScale.Value.ToVector3() == before.scale.ToVector3() &&
                         after.sourceLine == before.sourceLine && after.sourceDocumentId == before.sourceDocumentId,
                         "Real external import/edit/save changed another pose, scale or source row");
                     var openedPart = editor.Document.Parts[index];
                     Require((openedPart.Position - new Point3(expectedPosition.x, expectedPosition.y, expectedPosition.z)).LengthSquared < .00000001 &&
                         (openedPart.Scale - new Point3(expectedScale.x, expectedScale.y, expectedScale.z)).LengthSquared < .00000001 &&
+                        openedPart.ResolveScale(new Point3(intrinsic.x, intrinsic.y, intrinsic.z)).Equals(
+                            new Point3(before.scale.x, before.scale.y, before.scale.z)) &&
                         Quaternion.Angle(new Quaternion((float)openedPart.Rotation.X, (float)openedPart.Rotation.Y,
                             (float)openedPart.Rotation.Z, (float)openedPart.Rotation.W), before.rotation.ToQuaternion()) < .001f,
                         "Real external reopened editor changed part pose/scale");
@@ -371,6 +373,7 @@ public static class ActualDividerAcceptance
                             (actual.position.ToVector3() - expected.position.ToVector3()).sqrMagnitude < .00000001f &&
                             Quaternion.Angle(actual.rotation.ToQuaternion(), expected.rotation.ToQuaternion()) < .001f &&
                             (actual.scale.ToVector3() - expected.scale.ToVector3()).sqrMagnitude < .00000001f &&
+                            actual.baseScale.Equals(expected.baseScale) && actual.scaleIsAbsolute == expected.scaleIsAbsolute &&
                             actual.sourceDocumentId == expected.sourceDocumentId && actual.sourceLine == expected.sourceLine,
                             "Real external export/reimport changed part identity, pose, scale or source row");
                     }
@@ -420,7 +423,7 @@ public static class ActualDividerAcceptance
                 source.transform.localScale = prefab.transform.localScale;
                 source.SetActive(false); sources.Add(source); pieces.Add(source.AddComponent<Piece>());
                 plan.Add(new PrecisionPlacementSession.TransformSnapshot(position + rotation * part.position.ToVector3(),
-                    rotation * part.rotation.ToQuaternion(), part.scale.ToVector3()));
+                    rotation * part.rotation.ToQuaternion(), part.PlacementScale(source.transform.localScale)));
             }
             preview.Show(ghost, plan, pieces, -1);
             var instances = (List<GameObject>)typeof(PlacementGhostPreviewView).GetField("instances", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(preview);

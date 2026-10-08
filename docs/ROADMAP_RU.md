@@ -1,5 +1,16 @@
 # Дорожная карта развития BuildWorks
 
+## .110 — основа масштаба: код проверен, установка ожидается
+
+Native17/portable7 фиксирует исходный размер независимо от canonical/Hammer bases.
+Editor/thumbnail/ghost/save/reopen и rotated XYZ snaps прошли; точная маленькая
+модель редактора отделена от мирового диапазона. Parent scale/shear/mirror capture
+отклоняется. Normal/QA0/0, Geometry/Store/host/локализация857/QA isolation/format,
+Workbench252 и независимый correctness/ponytail PASSED. Пока установлена QA .109.
+Valheim не запускался; native стройка/reload/network и смещение осей открыты.
+Legacyv16 копии сохраняются; возможна одна новая .110 копия, затем повторное использование.
+Детали: [checkpoint .110](checkpoint-0.19.110_RU.md), [проверка](QA_0.19.110_RU.md).
+
 QA .109 установлена: хеши совпали,48 QA файлов и библиотека неизменны. Checkpoint:3683382. Игра не запускалась.
 
 ## .109 — масштаб визуальной копии Lava Lantern

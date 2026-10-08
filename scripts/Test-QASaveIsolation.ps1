@@ -178,7 +178,7 @@ foreach ($name in @('RequireLoadedSession','ValidateSavePath','ReadIdentityRecei
     Require ([bool]($yardIl.Operand -match "::$name\(")) "QA yard omits $name"
 }
 function YardOffset([string]$name) { ($yardIl | Where-Object { [string]$_.Operand -match "::$name\(" } | Select-Object -First 1).Offset }
-$compilerCall = @($yard.NestedTypes.Methods.Body.Instructions | Where-Object { [string]$_.Operand -match '::GetAndCreateTerrainCompiler\(' })
+$compilerCall = @($yard.NestedTypes.Methods | Where-Object HasBody | ForEach-Object { $_.Body.Instructions } | Where-Object { [string]$_.Operand -match '::GetAndCreateTerrainCompiler\(' })
 Require ($compilerCall.Count -eq 1) 'QA yard does not initialize its native terrain compiler batch.'
 $ownership = YardOffset 'ClaimOwnership'
 $lastPreflight = ($yardIl | Where-Object { [string]$_.Operand -match '::CheckGround\(' -and $_.Offset -lt $ownership } | Select-Object -Last 1).Offset
@@ -186,6 +186,11 @@ Require ($lastPreflight -gt (YardOffset 'BeginOnce') -and
     [bool]($yardIl | Where-Object { $_.Offset -gt (YardOffset 'BeginOnce') -and $_.Offset -lt $ownership -and [string]$_.Operand -match '::RequireLoadedSession\(' }) -and
     [bool]($yardIl | Where-Object { $_.Offset -gt $lastPreflight -and $_.Offset -lt $ownership -and [string]$_.Operand -match '::RequireEmpty\(' })) 'QA yard omits post-yield session/ground/object revalidation.'
 $overlap = ($yard.Methods | Where-Object Name -eq 'Overlaps').Body.Instructions.Operand -join "`n"
+$groundCalls = ($yard.Methods | Where-Object Name -eq 'CheckGround').Body.Instructions.Operand -join "`n"
+Require ($groundCalls -match 'GetWorldBaseHeight' -and $groundCalls -match 'CreateDelegate' -and $groundCalls -notmatch 'WorldGenerator::GetHeight') 'QA pristine-ground check does not use the native blended base.'
+$baseMethod = ([Mono.Cecil.AssemblyDefinition]::ReadAssembly((Join-Path $managed 'assembly_valheim.dll'))).MainModule.GetType('Heightmap').Methods | Where-Object Name -eq 'GetWorldBaseHeight'
+Require ($baseMethod.ReturnType.FullName -eq 'System.Boolean' -and $baseMethod.Parameters.Count -eq 2 -and
+    $baseMethod.Parameters[0].ParameterType.FullName -eq 'UnityEngine.Vector3' -and $baseMethod.Parameters[1].ParameterType.FullName -eq 'System.Single&') 'Native base-height delegate contract changed.'
 Require ($overlap -match 'Collider' -and $overlap -match 'Renderer') 'QA yard ignores objects crossing its boundary.'
 $destroyOffset = YardOffset 'Destroy'
 Require ($null -ne $destroyOffset -and -not [bool]($yardIl | Where-Object { $_.Offset -gt (YardOffset 'Invoke') -and $_.Offset -lt $destroyOffset -and

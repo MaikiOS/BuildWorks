@@ -1,5 +1,13 @@
 # BuildWorks development roadmap
 
+## QA .102 — native blended base-height preflight
+
+.101 teleported successfully, then refused ground preflight beforebackup/mutations.
+.102 compares untouched ground with native Heightmap.GetWorldBaseHeight including biome blending.
+Loaded/protected/height bounds remain enforced; refusal diagnostics identify the point/reason.
+Bothbuilds0/0, QA82, compilednativecontract, host, localization853 andformat passed. Nativeyard/build/reload remainopen.
+
+
 ## QA .101 — native spawn teleport cooldown
 
 .100 selected(-256,43.4301529,-768), then nativeTeleportTo refused beforebackup/terrain.

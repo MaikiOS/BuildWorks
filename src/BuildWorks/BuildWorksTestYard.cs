@@ -94,19 +94,29 @@ namespace OstrixMods.BuildWorks
             return selected;
         }
 
+        private delegate bool BaseHeight(Heightmap map, Vector3 point, out float height);
+
         private static HashSet<Heightmap> CheckGround(Vector3 center, bool requireFlat)
         {
             var maps = new HashSet<Heightmap>();
+            MethodInfo baseMethod = typeof(Heightmap).GetMethod("GetWorldBaseHeight", BindingFlags.NonPublic | BindingFlags.Instance);
+            if (baseMethod == null) throw new MissingMethodException("QA yard native base height contract changed.");
+            var baseHeight = (BaseHeight)Delegate.CreateDelegate(typeof(BaseHeight), baseMethod);
             for (int x = -HalfExtent; x <= HalfExtent; ++x)
                 for (int z = -HalfExtent; z <= HalfExtent; ++z)
                 {
                     var point = new Vector3(center.x + x, 0, center.z + z);
                     Heightmap map = Heightmap.FindHeightmap(point);
-                    if (!map || !ZoneSystem.instance.IsZoneLoaded(point) || !map.GetWorldHeight(point, out float height) ||
-                        Location.IsInsideNoBuildLocation(point) || float.IsNaN(height) || float.IsInfinity(height) ||
-                        Mathf.Abs(height - center.y) > (requireFlat ? 0.03f : 15.5f) ||
-                        (!requireFlat && Mathf.Abs(height - WorldGenerator.instance.GetHeight(point.x, point.z)) > 0.05f))
-                        throw new InvalidOperationException("QA yard footprint is unloaded, protected, nonflat or beyond native leveling limits.");
+                    if (!map || !ZoneSystem.instance.IsZoneLoaded(point) || !map.GetWorldHeight(point, out float height))
+                        throw new InvalidOperationException("QA yard footprint is unloaded at " + point);
+                    bool protectedGround = Location.IsInsideNoBuildLocation(point);
+                    if (protectedGround || float.IsNaN(height) || float.IsInfinity(height) ||
+                        Mathf.Abs(height - center.y) > (requireFlat ? 0.03f : 15.5f))
+                        throw new InvalidOperationException($"QA yard height/protection refused at {point}: height={height:R}, plane={center.y:R}, protected={protectedGround}, flat={requireFlat}.");
+                    // The native base includes biome-edge blending absent from WorldGenerator.GetHeight.
+                    if (!requireFlat && (!baseHeight(map, point, out float generated) || float.IsNaN(generated) || float.IsInfinity(generated) ||
+                        Mathf.Abs(height - generated) > 0.05f))
+                        throw new InvalidOperationException("QA yard terrain was modified before preparation at " + point);
                     maps.Add(map);
                 }
             if (maps.Count == 0 || maps.Count > 25) throw new InvalidDataException("Unexpected QA yard heightmap count.");

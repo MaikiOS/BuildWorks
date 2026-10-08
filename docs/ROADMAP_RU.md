@@ -1,5 +1,15 @@
 # Дорожная карта развития BuildWorks
 
+## .107 — оплата и отмена: автоматические проверки пройдены, игра открыта
+
+Учёт фактически списанных стопок заменил возврат по рецепту. Подавление native drops,
+точный исходный ZDOID и native batch flush проверяются до возврата. Завершение последней
+детали ждёт списания. Normal/QA 0/0, GeometryTests, HostContract, localization854,
+QA separation, format и два независимых обзора прошли. Native отмена/reload/network не приняты.
+
+Полный список: [WORK_STATUS_RU.md](WORK_STATUS_RU.md). Детали: [checkpoint .107](checkpoint-0.19.107_RU.md).
+
+
 ## .106 — замечания каталога; проверенный шаг, игра ещё не проверена
 
 Ostrix подтвердил форму построенного CoffeeTable. Точный расход ресурсов и reload

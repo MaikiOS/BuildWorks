@@ -9,5 +9,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\BuildWorks.Geometry\BuildWorks.Geometry.csproj" />
+    <Compile Include="..\..\src\BuildWorks\BlueprintConstructionRefund.cs" Link="BlueprintConstructionRefund.cs" />
   </ItemGroup>
 </Project>

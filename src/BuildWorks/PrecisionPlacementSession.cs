@@ -64,6 +64,7 @@ namespace OstrixMods.BuildWorks
             {
                 BlueprintWorldSnapPoints.Apply(placed, placementPlan[placementPlanIndex].CustomSnapPoints);
                 currentBlueprintPlacements.Add(placed);
+                constructionPayments[placed] = nativeConstructionPayment;
             }
             pendingNativePiece = placed;
             pendingNativePlanIndex = placementPlanIndex;
@@ -427,7 +428,78 @@ namespace OstrixMods.BuildWorks
         private readonly List<BlueprintItemStandPlacement.Supply> placementSupplies = new List<BlueprintItemStandPlacement.Supply>();
         private bool pendingItemStandAttempted, pendingItemStandSignFailed, pendingItemStandRollbackUnsafe;
         private readonly List<GameObject> currentBlueprintPlacements = new List<GameObject>();
+        private readonly Dictionary<GameObject, BlueprintConstructionRefund> constructionPayments =
+            new Dictionary<GameObject, BlueprintConstructionRefund>();
+        private BlueprintConstructionRefund nativeConstructionPayment;
+        private bool pendingConstructionCompletion, pendingConstructionSignFailed;
+
+        internal BlueprintConstructionRefund BeginConstructionPayment(Player player)
+        {
+            if (player != Player.m_localPlayer || state != PlacementState.Armed ||
+                sessionMode != SessionMode.BlueprintWorldPlacement || !selectedPiece) return null;
+            if (nativeConstructionPayment != null)
+                throw new InvalidOperationException("Recursive blueprint placement is not supported.");
+            return nativeConstructionPayment = new BlueprintConstructionRefund(player.GetInventory(), selectedPiece.m_resources);
+        }
+
+        internal void EndConstructionPayment(Player player, BlueprintConstructionRefund payment, Exception error)
+        {
+            if (payment == null) return;
+            try { payment.Complete(); }
+            finally
+            { if (ReferenceEquals(nativeConstructionPayment, payment)) nativeConstructionPayment = null; }
+            if (error != null || payment.Error != null)
+            {
+                pendingConstructionCompletion = false;
+                OnNativePlacementException(player, selectedPiece);
+                return;
+            }
+            if (pendingConstructionCompletion)
+            {
+                pendingConstructionCompletion = false;
+                CompleteNativePlacement(player, pendingConstructionSignFailed);
+            }
+        }
         private readonly List<BlueprintRollbackItem> pendingBlueprintRollbacks = new List<BlueprintRollbackItem>();
+        private readonly Dictionary<GameObject, BlueprintRollbackItem> pendingRollbackObjects =
+            new Dictionary<GameObject, BlueprintRollbackItem>();
+        private readonly Dictionary<ZDOID, BlueprintRollbackItem> pendingRollbackIds =
+            new Dictionary<ZDOID, BlueprintRollbackItem>();
+        private static readonly MethodInfo SendNativeDestroyed = typeof(ZDOMan).GetMethod(
+            "SendDestroyed", BindingFlags.Instance | BindingFlags.NonPublic);
+        private static readonly FieldInfo NativeDestroyQueue = typeof(ZDOMan).GetField(
+            "m_destroySendList", BindingFlags.Instance | BindingFlags.NonPublic);
+
+        internal static void ConfirmRollbackNetworkRemoval(ZDO zdo, BlueprintConstructionRefund payment, Exception error)
+        {
+            if (payment == null) return;
+            try
+            {
+                var queue = NativeDestroyQueue?.GetValue(ZDOMan.instance) as List<ZDOID>;
+                payment.RecordNetworkRemoval(error == null && zdo != null && queue != null &&
+                    queue.Count > 0 && queue[queue.Count - 1] == zdo.m_uid);
+            }
+            catch (Exception failure)
+            {
+                payment.RecordNetworkRemoval(false);
+                Debug.LogError("BuildWorks native removal queue verification failed: " + failure);
+            }
+        }
+
+        internal BlueprintConstructionRefund CaptureRollbackNetworkRemoval(ZDO zdo)
+        {
+            if (zdo == null || !pendingRollbackIds.TryGetValue(zdo.m_uid, out var item)) return null;
+            if (zdo.IsOwner()) return item.Payment;
+            item.Payment?.RecordNetworkRemoval(succeeded: false);
+            return null;
+        }
+
+        internal BlueprintConstructionRefund CaptureRollbackRemoval(GameObject placed)
+        {
+            if (ReferenceEquals(placed, null) || !pendingRollbackObjects.TryGetValue(placed, out var item)) return null;
+            ZNetView view = placed.GetComponent<ZNetView>();
+            return view && view.IsValid() && !view.IsOwner() ? null : item.Payment;
+        }
         private float nextBlueprintRollbackRetry;
         private readonly List<Vector3> previewContacts = new List<Vector3>();
         private readonly List<Vector3> previewAims = new List<Vector3>();
@@ -2356,6 +2428,8 @@ namespace OstrixMods.BuildWorks
             {
                 return false;
             }
+            if (sessionMode == SessionMode.BlueprintWorldPlacement && state == PlacementState.Armed &&
+                nativeConstructionPayment == null) return true;
             if (sessionMode == SessionMode.BlueprintEditor) return true;
             if (pendingItemStandContents != null) return true;
             if (automaticPlacementPaused) return true;
@@ -2859,7 +2933,12 @@ namespace OstrixMods.BuildWorks
                     requestAutomaticPlacement = true;
                     return;
                 }
-                CompleteNativePlacement(player, signFailed);
+                if (nativeConstructionPayment != null)
+                {
+                    pendingConstructionCompletion = true;
+                    pendingConstructionSignFailed = signFailed;
+                }
+                else CompleteNativePlacement(player, signFailed);
                 return;
             }
 
@@ -5198,6 +5277,11 @@ namespace OstrixMods.BuildWorks
                     continue;
                 }
                 ZNetView view = piece.GetComponent<ZNetView>();
+                if (!forEditor && !view)
+                {
+                    unavailable.Add(BuildWorksLocalization.Text("blueprint.network_identity_required", part.prefabName));
+                    continue;
+                }
                 if (!forEditor && !BlueprintItemStandPlacement.CanRestore(piece, part.foreignData?.ToGeometry()))
                 {
                     unavailable.Add(BuildWorksLocalization.Text("import.foreign_pending"));
@@ -6482,7 +6566,14 @@ namespace OstrixMods.BuildWorks
             for (int index = currentBlueprintPlacements.Count - 1; index >= 0; --index)
             {
                 GameObject placed = currentBlueprintPlacements[index];
-                if (placed) pendingBlueprintRollbacks.Add(new BlueprintRollbackItem(placed));
+                if (placed)
+                {
+                    constructionPayments.TryGetValue(placed, out BlueprintConstructionRefund payment);
+                    var rollback = new BlueprintRollbackItem(placed, payment);
+                    pendingBlueprintRollbacks.Add(rollback);
+                    pendingRollbackObjects[placed] = rollback;
+                    if (!rollback.NetworkId.IsNone()) pendingRollbackIds[rollback.NetworkId] = rollback;
+                }
             }
             currentBlueprintPlacements.Clear();
             int failed = RetryPendingBlueprintRollbacks(force: true);
@@ -6502,16 +6593,48 @@ namespace OstrixMods.BuildWorks
             for (int index = pendingBlueprintRollbacks.Count - 1; index >= 0; --index)
             {
                 BlueprintRollbackItem item = pendingBlueprintRollbacks[index];
-                if (!item.Placed || TryRollbackBlueprintPiece(item))
+                if (TryRollbackBlueprintPiece(item))
+                {
+                    pendingRollbackObjects.Remove(item.Placed);
+                    pendingRollbackIds.Remove(item.NetworkId);
                     pendingBlueprintRollbacks.RemoveAt(index);
+                }
+            }
+            // Flush the native batch now: teardown may run before the next ZDOMan.Update.
+            if (pendingBlueprintRollbacks.Any(item => item.Payment != null && item.Payment.NetworkRemovalQueued &&
+                item.Payment.Error == null && RollbackSessionStillValid(item)))
+            {
+                try
+                {
+                    if (SendNativeDestroyed == null) throw new MissingMethodException("ZDOMan.SendDestroyed");
+                    SendNativeDestroyed.Invoke(ZDOMan.instance, null);
+                    for (int index = pendingBlueprintRollbacks.Count - 1; index >= 0; --index)
+                    {
+                        BlueprintRollbackItem item = pendingBlueprintRollbacks[index];
+                        if (!TryRefundRemovedPiece(item)) continue;
+                        pendingRollbackObjects.Remove(item.Placed);
+                        pendingRollbackIds.Remove(item.NetworkId);
+                        pendingBlueprintRollbacks.RemoveAt(index);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    foreach (BlueprintRollbackItem item in pendingBlueprintRollbacks)
+                        if (item.Payment?.NetworkRemovalQueued == true) item.Payment.RecordNetworkRemoval(false);
+                    Debug.LogError("BuildWorks native removal flush result is uncertain; refund blocked: " + exception);
+                }
             }
             return pendingBlueprintRollbacks.Count;
         }
 
         private static bool TryRollbackBlueprintPiece(BlueprintRollbackItem item)
         {
-            if (!item.Placed) return true;
+            // A part destroyed before our removal may already have dropped its resources.
+            if (!item.Placed) return TryRefundRemovedPiece(item);
+            if (item.Payment == null || !item.Payment.Recorded || item.Payment.Error != null) return false;
             if (!BlueprintItemStandPlacement.CanRollback(item.Placed)) return false;
+            ZNetView ownerView = item.Placed.GetComponent<ZNetView>();
+            if (ownerView && ownerView.IsValid() && !ownerView.IsOwner()) return false;
             if (!item.RemovalNotified)
             {
                 item.RemovalNotified = true;
@@ -6524,18 +6647,8 @@ namespace OstrixMods.BuildWorks
                     Debug.LogError("BuildWorks blueprint removal listener failed: " + exception);
                 }
             }
-            if (!item.ResourcesDropped)
-            {
-                item.ResourcesDropped = true;
-                try
-                {
-                    item.Placed.GetComponent<Piece>()?.DropResources(null);
-                }
-                catch (Exception exception)
-                {
-                    Debug.LogError("BuildWorks blueprint resource refund failed: " + exception);
-                }
-            }
+            if (!item.Placed) return TryRefundRemovedPiece(item);
+            if (ownerView && ownerView.IsValid() && !ownerView.IsOwner()) return false;
             if (!item.NativeRemovalRequested)
             {
                 item.NativeRemovalRequested = true;
@@ -6554,7 +6667,8 @@ namespace OstrixMods.BuildWorks
                     }
                 }
             }
-            if (!item.Placed) return true;
+            if (!item.Placed) return TryRefundRemovedPiece(item);
+            if (TryRefundRemovedPiece(item)) return true;
             if (item.WaitForNativeRemoval && Time.unscaledTime < item.ForceDestroyAt)
                 return false;
             // Native WearNTear removal drops mounted contents; a direct fallback destroy does not.
@@ -6562,28 +6676,52 @@ namespace OstrixMods.BuildWorks
             try
             {
                 ZNetView view = item.Placed.GetComponent<ZNetView>();
-                if (view && view.IsValid() && !view.IsOwner()) view.ClaimOwnership();
+                if (view && view.IsValid() && !view.IsOwner()) return false;
                 if (ZNetScene.instance) ZNetScene.instance.Destroy(item.Placed);
                 else UnityEngine.Object.Destroy(item.Placed);
-                return true;
+                item.Payment.RecordRemoval(blockDrop: true, succeeded: true);
+                return TryRefundRemovedPiece(item);
             }
             catch (Exception exception)
             {
+                item.Payment.RecordRemoval(blockDrop: true, succeeded: false);
                 Debug.LogError("BuildWorks could not roll back blueprint piece; retrying: " + exception);
                 return false;
             }
         }
 
+        private static bool RollbackSessionStillValid(BlueprintRollbackItem item) =>
+            Game.instance && !Game.instance.IsShuttingDown() && ZNet.instance &&
+            ReferenceEquals(ZNet.instance, item.Network) && ReferenceEquals(ZDOMan.instance, item.NetworkObjects) &&
+            ZNet.instance.GetWorld()?.m_uid == item.WorldId;
+
+        private static bool TryRefundRemovedPiece(BlueprintRollbackItem item) => item.Payment != null &&
+            RollbackSessionStillValid(item) && item.Payment.TryRefund(item.RefundPosition,
+                !item.NetworkId.IsNone() && ZDOMan.instance.GetZDO(item.NetworkId) == null);
+
         private sealed class BlueprintRollbackItem
         {
             public readonly GameObject Placed;
+            public readonly BlueprintConstructionRefund Payment;
+            public readonly Vector3 RefundPosition;
+            public readonly ZDOID NetworkId;
+            public readonly ZDOMan NetworkObjects;
+            public readonly ZNet Network;
+            public readonly long WorldId;
             public bool RemovalNotified;
-            public bool ResourcesDropped;
             public bool NativeRemovalRequested;
             public bool WaitForNativeRemoval;
             public float ForceDestroyAt;
 
-            public BlueprintRollbackItem(GameObject placed) => Placed = placed;
+            public BlueprintRollbackItem(GameObject placed, BlueprintConstructionRefund payment)
+            {
+                Placed = placed; Payment = payment; RefundPosition = placed.transform.position;
+                ZNetView view = placed.GetComponent<ZNetView>();
+                NetworkId = view && view.IsValid() ? view.GetZDO().m_uid : ZDOID.None;
+                NetworkObjects = ZDOMan.instance;
+                Network = ZNet.instance;
+                WorldId = Network ? Network.GetWorld()?.m_uid ?? 0 : 0;
+            }
         }
 
         private void Finish(bool restoreCursor = true, bool preserveContinuation = false)
@@ -6610,6 +6748,8 @@ namespace OstrixMods.BuildWorks
             activeBlueprintPieces.Clear();
             currentBlueprintPlacements.Clear();
             pendingItemStandPiece = null;
+            constructionPayments.Clear();
+            pendingConstructionCompletion = false;
             pendingItemStandContents = null;
             pendingItemStandSupply = null;
             placementSupplies.Clear();

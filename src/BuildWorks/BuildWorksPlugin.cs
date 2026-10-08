@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.106";
+        internal const string PluginVersion = "0.19.107";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -1113,11 +1113,47 @@ namespace OstrixMods.BuildWorks
         [HarmonyPatch(typeof(Player), "UpdatePlacement")]
         private static class ContinuousPlacementInputPatch
         {
-            private static void Prefix(Player __instance, ref bool __0)
+            private static void Prefix(Player __instance, ref bool __0, out BlueprintConstructionRefund __state)
             {
                 PrepareNativePlacementUpdate(__instance, ref __0);
+                __state = instance?.session?.BeginConstructionPayment(__instance);
             }
 
+            private static Exception Finalizer(Player __instance, BlueprintConstructionRefund __state, Exception __exception)
+            {
+                if (__state != null)
+                {
+                    __state.Complete();
+                    instance?.session?.EndConstructionPayment(__instance, __state, __exception);
+                }
+                return __exception;
+            }
+        }
+
+        [HarmonyPatch(typeof(WearNTear), "Destroy", new Type[] { typeof(HitData), typeof(bool) })]
+        private static class BlueprintRollbackRemovalPatch
+        {
+            private static void Prefix(WearNTear __instance, out BlueprintConstructionRefund __state) =>
+                __state = instance?.session?.CaptureRollbackRemoval(__instance.gameObject);
+
+            private static Exception Finalizer(bool __1, BlueprintConstructionRefund __state, Exception __exception)
+            {
+                __state?.RecordRemoval(__1, __exception == null);
+                return __exception;
+            }
+        }
+
+        [HarmonyPatch(typeof(ZDOMan), nameof(ZDOMan.DestroyZDO), new Type[] { typeof(ZDO) })]
+        private static class BlueprintRollbackNetworkRemovalPatch
+        {
+            private static void Prefix(ZDO __0, out BlueprintConstructionRefund __state) =>
+                __state = instance?.session?.CaptureRollbackNetworkRemoval(__0);
+
+            private static Exception Finalizer(ZDO __0, BlueprintConstructionRefund __state, Exception __exception)
+            {
+                PrecisionPlacementSession.ConfirmRollbackNetworkRemoval(__0, __state, __exception);
+                return __exception;
+            }
         }
 
         [HarmonyPatch(typeof(Player), "TakeInput")]

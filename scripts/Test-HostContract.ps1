@@ -800,7 +800,8 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
         'System.Collections.Generic.List`1<UnityEngine.GameObject>::Add' -and
     $cancelSessionOperands -match 'PrecisionPlacementSession::CancelBlueprintPlacement' -and
     $tryRollbackBlueprintOperands -match 'WearNTear::Remove' -and
-    $tryRollbackBlueprintOperands -match 'Piece::DropResources' -and
+    $tryRollbackBlueprintOperands -notmatch 'Piece::DropResources' -and
+    $tryRollbackBlueprintOperands -match 'PrecisionPlacementSession::TryRefundRemovedPiece' -and
     $tryRollbackBlueprintOperands -match 'ZNetScene::Destroy' -and
     $cancelBlueprintOperands -match 'currentBlueprintPlacements' -and
     $cancelBlueprintOperands -match 'pendingBlueprintRollbacks' -and
@@ -811,15 +812,39 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $sessionSource -match 'pendingBlueprintRollbacks\.RemoveAt\(index\)' -and
     $sessionSource -match
         'item\.RemovalNotified = true;[\s\S]{0,180}OnRemoved\(\)' -and
-    $sessionSource -match
-        'item\.ResourcesDropped = true;[\s\S]{0,180}DropResources\(null\)' -and
+    $sessionSource -match 'constructionPayments\[placed\] = nativeConstructionPayment' -and
+    $sessionSource -match 'pendingConstructionCompletion = true' -and
+    $sessionSource -match 'payment\.Complete\(\)' -and
     $sessionSource -match 'wear\.Remove\(true\)' -and
     $sessionSource -match
         'item\.WaitForNativeRemoval && Time\.unscaledTime < item\.ForceDestroyAt' -and
-    $tryRollbackBlueprintOperands -match 'ZNetView::ClaimOwnership' -and
+    $tryRollbackBlueprintOperands -notmatch 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
-    'Incomplete blueprint placement is no longer tracked and rolled back atomically.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.106.0') `
+    'Incomplete blueprint placement no longer follows the tracked cancellation path.'
+Assert-Contract ($pluginSource -match 'BlueprintRollbackRemovalPatch' -and
+    $pluginSource -match 'typeof\(HitData\), typeof\(bool\)' -and
+    $pluginSource -match '__state\?\.RecordRemoval\(__1, __exception == null\)' -and
+    $pluginSource -match 'EndConstructionPayment\(__instance, __state, __exception\)') `
+    'Actual debit completion or native drop-suppression receipt is missing.'
+Assert-Contract ($sessionSource -match 'pendingRollbackIds\[rollback.NetworkId\]' -and
+    $sessionSource -match 'GetZDO\(item.NetworkId\) == null' -and
+    $sessionSource -match 'ReferenceEquals\(ZDOMan.instance, item.NetworkObjects\)' -and
+    $sessionSource -match 'SendNativeDestroyed.Invoke\(ZDOMan.instance, null\)' -and
+    $pluginSource -match 'BlueprintRollbackNetworkRemovalPatch') `
+    'Refund is not bound to the original native network identity and live removal batch.'
+$zdoManType = @($hostAssembly.MainModule.Types) + @($utilsAssembly.MainModule.Types) | Where-Object Name -eq 'ZDOMan'
+$destroyQueue = $zdoManType.Fields | Where-Object Name -eq 'm_destroySendList'
+$destroyZdo = $zdoManType.Methods | Where-Object { $_.Name -eq 'DestroyZDO' -and $_.Parameters.Count -eq 1 -and $_.Parameters[0].ParameterType.Name -eq 'ZDO' }
+$destroyZdoCalls = ($destroyZdo.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+$sendDestroyed = $zdoManType.Methods | Where-Object Name -eq 'SendDestroyed'
+$sendDestroyedCalls = ($sendDestroyed.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -eq 'System.Collections.Generic.List`1<ZDOID>' -and
+    $destroyZdo.IsPublic -and $destroyZdoCalls -match 'ZDO::IsOwner' -and
+    $destroyZdoCalls -match 'm_destroySendList' -and $destroyZdoCalls -match 'List`1<ZDOID>::Add' -and
+    $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
+    $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
+    'Native owned network removal queue/flush contract changed; disable construction rollback.'
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.107.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -3061,4 +3086,4 @@ $worldCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'Preci
 $worldCaptureCalls = ($worldCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($worldCaptureCalls -match 'BlueprintStorageCapture::TryCapture' -and $worldCaptureCalls -match 'CompositeBlueprintStore/ForeignPartData::FromGeometry') 'World selection does not preserve container snapshots.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.106 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.107 and Valheim Steam build 25185596.'

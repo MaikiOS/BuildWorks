@@ -263,6 +263,7 @@ blueprint.loaded	BuildWorks: {0} loaded — {1} parts; click or Tab cycles parts
 blueprint.edit_switch_failed	BuildWorks: could not switch the edited part.
 blueprint.anchors_recalc_failed	could not recalculate snap points
 blueprint.scale_persistence_suffix	{0} (Valheim has no native scale persistence)
+blueprint.network_identity_required	{0} (no network identity for persistence and safe cancellation)
 placement.anchor_geometry_missing	BuildWorks: no support geometry was found for this part.
 common.local_short	Local
 common.world_short	World

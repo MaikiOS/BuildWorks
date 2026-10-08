@@ -1,5 +1,15 @@
 # BuildWorks development roadmap
 
+## .107 — payment/refund: automated checks passed, game acceptance open
+
+Actual paid stacks replace recipe refunds. Native drop suppression, original network ID
+and a live native batch flush gate settlement. Last completion waits for resource spending.
+Normal/QA0/0, GeometryTests, HostContract, localization854, QA separation, format and two
+independent read-only reviews passed. Native cancellation/reload/network remain unaccepted.
+
+See [checkpoint .107](checkpoint-0.19.107.md) and [full requirement ledger](WORK_STATUS_RU.md).
+
+
 ## .106 — catalog feedback; verified code step, game verification pending
 
 Ostrix accepted the built CoffeeTable shape. Exact resource delta and world reload

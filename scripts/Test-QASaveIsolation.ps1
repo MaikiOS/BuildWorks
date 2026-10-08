@@ -76,6 +76,24 @@ foreach ($name in @('RequireLoadedSession','Plan','SupplyStamp','OnceComplete','
 function SupplyOffset([string]$name) { ($prepareCalls | Where-Object { [string]$_.Operand -match "::$name\(" } | Select-Object -First 1).Offset }
 Require ((SupplyOffset 'BeginOnce') -lt (SupplyOffset 'AddItem') -and (SupplyOffset 'Save') -lt (SupplyOffset 'CompleteOnce')) 'Supply receipt ordering lost started-before-grant or saved-before-complete.'
 $coroutine = $pluginType.NestedTypes | Where-Object Name -Like '<PrepareQaSaves>*'
+function Require-StorageStartGuard($method) {
+    $instructions = @($method.Body.Instructions)
+    $started = $instructions | Where-Object { [string]$_.Operand -match 'PlatformInitializer::get_StartedSaveDataInitialization\(' } | Select-Object -First 1
+    $ready = $instructions | Where-Object { [string]$_.Operand -match 'PlatformInitializer::get_SaveDataInitialized\(' } | Select-Object -First 1
+    Require ($null -ne $started -and $null -ne $ready) "Missing native storage lifecycle guard in $($method.FullName)"
+    Require ($started.Offset -lt $ready.Offset -and $started.Next.OpCode.Name -in @('brfalse','brfalse.s')) "Early QA startup can dereference an absent platform in $($method.FullName)"
+    $cursor = $started.Next.Operand
+    $stopped = $false
+    for ($step = 0; $step -lt $instructions.Count; $step++) {
+        Require ($null -ne $cursor -and $cursor.Offset -ne $ready.Offset) 'Unstarted storage reaches the unsafe readiness getter.'
+        if ($cursor.OpCode.Name -in @('ret','throw','leave','leave.s')) { $stopped = $true; break }
+        Require ($cursor.OpCode.FlowControl.ToString() -ne 'Cond_Branch') 'Unexpected branch on the unstarted-storage refusal/yield path.'
+        $cursor = if ($cursor.OpCode.Name -in @('br','br.s')) { $cursor.Operand } else { $cursor.Next }
+    }
+    Require $stopped 'Unstarted storage neither yields nor refuses.'
+}
+Require-StorageStartGuard ($coroutine.Methods | Where-Object Name -eq 'MoveNext')
+Require-StorageStartGuard ($type.Methods | Where-Object Name -eq 'PrepareFreshSaves')
 Require ([bool](@($coroutine.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -match '::RequireLoadedSession\(')) 'QA loaded gate is not called by the actual plugin coroutine.'
 Require ([bool](@($coroutine.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -match '(Character|Player)::InIntro\(')) 'QA provisioning does not wait for the fresh-player intro flight.'
 Require ([bool](@($coroutine.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -match 'BuildWorksTestSupplies::Prepare\(')) 'QA supply path is not called by actual plugin coroutine.'

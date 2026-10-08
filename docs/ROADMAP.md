@@ -9,7 +9,12 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.93**, not deployed: [QA stations/package and first native series](testing/qa-stand-0.19.93.md).
+Active source and installed QA **0.19.94**: [QA startup and first native series](testing/qa-stand-0.19.93.md).
+Authorized .93 launch reproduced an early platform getter NRE before identities/grants/stations.
+.94 lifecycle guard, failing-before/passing-after regression, QA64/deployment12, both builds/API/localization/
+format and independent review PASS; installed hash verified. Retry ONLY manager Modded; native build/reload pending.
+
+Previous source checkpoint **0.19.93**, source-only evidence at that checkpoint: [QA stations/package](testing/qa-stand-0.19.93.md).
 Scaled visual/collider sites, no terrain changes, one-shot native stations/knowledge/world-save acknowledgement;
 explicit guarded QA deployment with local pinned files and marker last. QA64 BCL/deploy12 replica/forbidden4 PASS,
 both Release0/0, HostContract/Localization853/format and independent review PASS. Installed .82 unchanged.

@@ -15,6 +15,8 @@ tree under `Default/BuildWorks` is not a mod installation.
 Use the guarded `Deploy-TestBuild.ps1` only from the owner's source tree with
 Valheim closed. It rejects Default and every target other than TerrainRamp-1.0-Test.
 Deployment does not authorize launching Valheim or modifying saves.
+Authorized QA launches use the manager's TerrainRamp-1.0-Test profile and Modded
+button only; do not bypass it with a direct Steam/game launch.
 
 Pause for UI/icon design approval, a prepared game-test series, and renewed guide
 tool discussion before Line A/B or any curves. Historical status/STOP is not the

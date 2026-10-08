@@ -9,7 +9,12 @@
 
 ## База и доказательства
 
-Активные исходники **0.19.93**, не установлены: [QA станции/пакет и первая native серия](testing/qa-stand-0.19.93_RU.md).
+Активные исходники и установленная QA **0.19.94**: [QA запуск и первая native серия](testing/qa-stand-0.19.93_RU.md).
+Разрешённый запуск .93 выявил ранний platform getter NRE до создания персонажа/мира, выдачи и станций.
+.94 lifecycle guard, регрессия до/после, QA64/deployment12, обе сборки/API/локализация/format и review PASS;
+установленный хеш подтверждён. Повтор только через Modded менеджера; native стройка/reload открыты.
+
+Предыдущие исходники **0.19.93**, доказательства до установки: [QA станции/пакет](testing/qa-stand-0.19.93_RU.md).
 Scaled visual/collider площадки без terraform, одноразовые native stations/знания/world-save acknowledgement;
 явный guarded QA deploy с локальными pinned files, маркер последним. QA64 BCL/deploy12 replica/forbidden4 PASS,
 обе Release0/0, HostContract/Localization853/format и independent review PASS. Установленная .82 не менялась.

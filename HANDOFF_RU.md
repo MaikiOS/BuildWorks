@@ -2,6 +2,25 @@
 
 [English](HANDOFF.md) | **Русский**
 
+## Этап 0.19.94 — ранний QA запуск: исправлено и установлено, повтор в игре открыт
+
+Разрешённый запуск .93 загрузил BuildWorks и закрепил отдельную папку saves, затем упал
+в PrepareQaSaves: SaveDataInitialized обратился к DistributionPlatform до запуска платформы.
+В QA папке только маркер владельца; персонаж/мир, материалы и станции не создавались.
+.94 ждёт StartedSaveDataInitialization перед getter готовности; PrepareFreshSaves повторяет
+guard, в том числе после 60 секунд ожидания. Регрессия упала на .93 и прошла на .94.
+Native callback/compiled branches и независимое чтение PASS; обе Release0/0, HostContract,
+Localization853, QA64 BCL, deployment12 replica и оба format PASS. verify отсутствует;
+UI/корпус и native стройка/reload/сеть не повторялись. Guarded deploy установил QA .94
+в TerrainRamp-1.0-Test, SHA256 E91E6448AACF85D7DF68F75D65E1F14E6855613BFB4B6E307D7C63A266D2394C.
+По требованию Ostrix запуск ТОЛЬКО кнопкой Modded в менеджере. Управлять native окном
+здесь невозможно: дальше нажатие пользователя → свежий лог/receipts → BW_QA_43d3719a.
+Разрешение уже есть, повторно спрашивать его не нужно. После первого запуска изменились
+метаданные двух steam_autocloud.vdf; длины/UTC-время самих миров и персонажей прежние,
+это не побайтовое доказательство. Proof: artifacts/checkpoint-0.19.94/verification.json;
+ошибка первого запуска записана в .93/first-launch.json. Goal API остаётся paused,
+выставить resume доступные tools не позволяют; полная цель не завершена.
+
 ## Этап 0.19.93 — физические QA станции и защищённый пакет
 
 [Первый запуск и точная ручная серия](docs/testing/qa-stand-0.19.93_RU.md).

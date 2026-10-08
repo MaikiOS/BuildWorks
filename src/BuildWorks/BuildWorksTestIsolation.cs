@@ -131,7 +131,8 @@ namespace OstrixMods.BuildWorks
         internal static string PrepareFreshSaves()
         {
             AssertPinned();
-            if (!PlatformInitializer.SaveDataInitialized || Game.instance || Player.m_localPlayer || StaticField(typeof(ZNet), "m_world") != null)
+            if (!PlatformInitializer.StartedSaveDataInitialization || !PlatformInitializer.SaveDataInitialized ||
+                Game.instance || Player.m_localPlayer || StaticField(typeof(ZNet), "m_world") != null)
                 throw new InvalidOperationException("QA identities require initialized storage and the main menu.");
             string name = "BW_QA_" + token.Substring(0, 8);
             string receipt = Path.Combine(root, "qa-identities.txt");

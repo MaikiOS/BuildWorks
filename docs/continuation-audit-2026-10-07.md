@@ -1,8 +1,12 @@
 # BuildWorks: verified continuation baseline and dependencies
 
 **English** | [Русский](continuation-audit-2026-10-07_RU.md)
+Current .94 update: QA .93 was installed; first launch reproduced an early platform getter NRE
+before QA identities/grants/stations. The .94 guard and regression pass; QA .94 is installed/hash-verified.
+Retry ONLY manager TerrainRamp-1.0-Test Modded; native construction/reload remain pending.
 
-Audit: 2026-10-07, updated 2026-10-08; current source checkpoint .93. This is not full product acceptance.
+
+Audit: 2026-10-07, updated 2026-10-08; current source checkpoint .94. This is not full product acceptance.
 Read AGENTS, PROJECT_CONTRACT, current HANDOFF and docs/ROADMAP. CONTINUE_PROMPT.txt targets
 .13; current-pass targets the historical .56 catalogue, not imported construction acceptance.
 
@@ -54,7 +58,7 @@ Its text was not updated. A document edit is not a goal update.
 
 | Block | Implemented | Automated evidence | Owner/game evidence | Unfinished | Design only |
 |---|---|---|---|---|---|
-| QA preparation | .93 stations/site guards/native save acknowledgement and explicit QA package | QA64 BCL, deployment12 replica, forbidden4, both builds/API/localization/review | None | Native isolation/grants/stability/build/reload; live .82 unchanged | Resource chest if the bounded backpack plan cannot fit |
+| QA preparation | .94 early-start guard; .93 stations/package | QA64 BCL, deployment12 replica, before/after regression, builds/API/localization/review | No | QA .94 installed; native retry/grants/build/reload pending | Chest if bounded backpack plan is exceeded |
 | Editor | Transform/group/Array/Contour/Undo/save | Geometry/bridge/Unity252 | Older .41/.44 and later scoped series recorded as accepted; do not repeat wholesale | Scenes above512 | New guide tools |
 | Exchange | Store15/portable6, .blueprint/.vbuild/ZIP, exact archives, separate contents options | Store353;209 parser-only;2 real files reviewed import/edit/support/disk/export/world renderer | Imported construction through reload unproven | Header dialects, RandMatSeed, some ZDO/inventory, export only our JSON/ZIP | Unspecified third-party formats |
 | Scale/preview | Intrinsic prefab scale, nested XYZ, world50000; .87 supplied-item world appearance | Unity transforms; ordinary/native-holder/passive/heavy attachments | Particular giant lamp remains unproven | Native place/reload/FPS; unknown item effects | Further measured optimization |

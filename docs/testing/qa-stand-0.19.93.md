@@ -1,9 +1,10 @@
-# QA package 0.19.93: native first launch still pending
+# QA package 0.19.93–0.19.94: startup correction, native retry pending
 
 **English** | [Русский](qa-stand-0.19.93_RU.md)
 
-Source and automated checks are ready for an explicitly authorized first launch,
-not proof of a working game stand or complete import. Installed version remains .82.
+QA .94 is installed after .93's authorized first launch failed on an early platform getter.
+No QA identities/grants/stations were created. The lifecycle guard and regression pass;
+this is not proof of a working stand or complete import. See HANDOFF for current hashes/checks.
 
 QA-only preparation waits for the fresh player's intro flight to finish; the loaded
 guard also refuses InIntro. Stations come from actual requirements of the seven pinned blueprints.
@@ -27,7 +28,8 @@ After owner authorization only, from Default/BuildWorks in PowerShell7:
 ./scripts/Deploy-TestBuild.ps1 -TargetProfile TerrainRamp-1.0-Test -QaStandToken 43d3719a7ee649d184e26ef1daa441a3
 ```
 
-Only WhatIf has run against the live profile. QA deployment validates host/known-bootstrap
+Authorized guarded .93 deployment and the .94 correction have run against the live profile.
+QA deployment validates host/known-bootstrap
 and all files, selects the separate QA DLL pair, stages six owned plus two external local
 files, then writes the isolation marker last. It creates no game saves. Foreign tokens,
 changed files and reparse-point DLL paths refuse; normal deployment over an armed QA identity
@@ -36,8 +38,10 @@ and outside Git/releases; [provenance and conditions](external-path-2026-10-07.m
 
 Planned world/character name: **BW_QA_43d3719a**. Native Valheim assigns fresh actual IDs.
 Save root: `TerrainRamp-1.0-Test/BepInEx/config/BuildWorks/qa-saves/43d3719a7ee649d184e26ef1daa441a3`.
-Game launch/save creation requires separate explicit authorization under AGENTS.md.
-Launch modded TerrainRamp-1.0-Test. Only QA identities should be visible; if regular saves
+Authorization for this isolated QA launch/save creation is already given. Launch ONLY with
+Thunderstore profile TerrainRamp-1.0-Test, button Modded; never direct Steam/game arguments.
+Native UI control is unavailable here; the user clicks, then fresh logs/receipts are inspected.
+Only QA identities should be visible; if regular saves
 appear or QA identities are absent, stop without loading any world. Select the QA identities,
 keep server closed with no clients or cheats. Hammer/resources/stations must be prepared
 without farming/unlocking/building preparation objects. Inspect logs/complete receipts before

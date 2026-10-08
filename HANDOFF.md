@@ -2,6 +2,26 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.94 — early QA startup guard; installed, game retry pending
+
+The authorized .93 launch loaded BuildWorks and pinned the isolated root, then failed in
+PrepareQaSaves: SaveDataInitialized dereferenced DistributionPlatform before platform startup.
+Only the root owner marker exists; no QA identities, supplies or stations were created.
+.94 waits for StartedSaveDataInitialization before the readiness getter; PrepareFreshSaves
+repeats this guard, including after the 60-second wait. Regression failed against .93,
+then passed against .94. Native callback/compiled branch review PASS; both Release builds0/0,
+HostContract, Localization853, QA64 BCL, deployment12 replica and both format checks PASS.
+verify is absent; UI/corpus and native blueprint construction/reload/network were not repeated.
+Guarded deployment installed QA .94 in TerrainRamp-1.0-Test, SHA256
+E91E6448AACF85D7DF68F75D65E1F14E6855613BFB4B6E307D7C63A266D2394C.
+Ostrix requires launching ONLY through the manager's Modded button. No native UI control
+is available here: the next action is the user's click, then inspect fresh logs/receipts
+before loading BW_QA_43d3719a. Existing authorization persists; no repeat permission needed.
+First-launch metadata comparison found two changed steam_autocloud.vdf sidecars; actual
+world/character lengths and UTC timestamps were unchanged, not content-hash proof.
+Proof: artifacts/checkpoint-0.19.94/verification.json; .93/first-launch.json records failure.
+Goal API remains paused and cannot resume through exposed tools; full task is unfinished.
+
 ## Checkpoint 0.19.93 — physical QA stations and guarded package
 
 [First-launch contract and exact manual series](docs/testing/qa-stand-0.19.93.md).

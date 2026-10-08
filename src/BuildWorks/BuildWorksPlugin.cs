@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.93";
+        internal const string PluginVersion = "0.19.94";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -133,7 +133,8 @@ namespace OstrixMods.BuildWorks
         private System.Collections.IEnumerator PrepareQaSaves()
         {
             float deadline = Time.realtimeSinceStartup + 60f;
-            while (!PlatformInitializer.SaveDataInitialized && Time.realtimeSinceStartup < deadline) yield return null;
+            while (Time.realtimeSinceStartup < deadline &&
+                (!PlatformInitializer.StartedSaveDataInitialization || !PlatformInitializer.SaveDataInitialized)) yield return null;
             try
             {
                 string name = BuildWorksTestIsolation.PrepareFreshSaves();

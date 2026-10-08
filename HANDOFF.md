@@ -2,6 +2,16 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Deployment follow-up 0.19.97 — installed; same supplies retained
+
+Valheim process check confirmed it was closed; guarded same-token deployment installed QA .97.
+DLL SHA256 1A61A373037B22CFF245C70177B32A56D3D145DAF03F0F2D909D9DDCCD43E3E4.
+All22 existing QA-root files retained identical hashes, including the complete supplies receipt.
+Same world/character/token retained; station receipt absent. Do not reissue supplies or reset receipts.
+Proof: artifacts/checkpoint-0.19.97/deployment.json. Restart ONLY TerrainRamp-1.0-Test Modded,
+enter BW_QA_43d3719a with the same character, closed Local/no cheats. Station success is not yet proven;
+read the fresh log/receipts before asking for the external construction/reload series.
+
 ## Checkpoint 0.19.97 — canonical QA station resolution; source verified, installation pending
 
 Native .96 loaded the same isolated Local world/character and saved supplies with a complete

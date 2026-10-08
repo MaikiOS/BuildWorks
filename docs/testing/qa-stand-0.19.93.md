@@ -1,5 +1,7 @@
 # QA package 0.19.93–0.19.97: startup/respawn/primary-slot corrections, native stand pending
 
+QA .97 is now installed: all22 QA-root hashes unchanged, including complete supplies receipt. Same world/token; Modded restart pending.
+
 ## Checkpoint 0.19.97 — canonical QA station resolution; source verified, installation pending
 
 Native .96 loaded the same isolated Local world/character and saved supplies with a complete

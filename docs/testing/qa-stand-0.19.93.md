@@ -1,5 +1,13 @@
 # QA package 0.19.93–0.19.97: startup/respawn/primary-slot corrections, native stand pending
 
+## QA .99 search follow-up
+
+Native .98 enabled noon but found no qualifying192m yard within +/-1024m; it refused
+before writing a yard plan/receipt or changing terrain. .99 expands only the bounded
+search/plan extent to +/-4096m (4225 candidate centres); size, dry Meadows and native
+height limits remain. Both builds0/0, QA80, host, localization853 and affected format
+passed. Native .99 and imported construction/reload remain open. Earlier statuses are history.
+
 ## Current evidence 2026-10-08 — QA yard .98 source verified; native creation pending
 
 .97 native QA confirmed stations, no supply reissue, CoffeeTable import/edit/save/reopen

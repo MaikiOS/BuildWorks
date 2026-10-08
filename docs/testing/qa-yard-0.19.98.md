@@ -1,5 +1,13 @@
 # QA yard 0.19.98
 
+## QA .99 search follow-up
+
+Native .98 enabled noon but found no qualifying192m yard within +/-1024m; it refused
+before writing a yard plan/receipt or changing terrain. .99 expands only the bounded
+search/plan extent to +/-4096m (4225 candidate centres); size, dry Meadows and native
+height limits remain. Both builds0/0, QA80, host, localization853 and affected format
+passed. Native .99 and imported construction/reload remain open. Earlier statuses are history.
+
 Source checks passed; .98 installed with matching hashes and all32 existing QA files unchanged. Native yard creation is pending. This is a
 test-only extension of the existing isolated stand, not a terrain feature for players.
 

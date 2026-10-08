@@ -14,6 +14,7 @@ namespace OstrixMods.BuildWorks
     internal static class BuildWorksTestYard
     {
         internal const int HalfExtent = 96;
+        internal const int SearchExtent = 4096;
         internal static bool IsPrepared { get; private set; }
         private static bool previousDaylight;
         private static float previousTime;
@@ -61,10 +62,12 @@ namespace OstrixMods.BuildWorks
             WorldGenerator generator = WorldGenerator.instance;
             if (generator == null) throw new InvalidOperationException("QA yard needs a loaded world generator.");
             float best = float.MaxValue;
+            float smallestDrySpan = float.MaxValue;
             Vector3 selected = Vector3.zero;
+            Debug.Log("BuildWorks QA yard search: 192x192m; centres within +/-4096m; native leveling limits retained.");
             // ponytail: bounded scan of this QA seed; refuse instead of falling back into spawn or water.
-            for (int x = -1024; x <= 1024; x += 128)
-                for (int z = -1024; z <= 1024; z += 128)
+            for (int x = -SearchExtent; x <= SearchExtent; x += 128)
+                for (int z = -SearchExtent; z <= SearchExtent; z += 128)
                 {
                     if (x * x + z * z < 512 * 512) continue;
                     float minimum = float.MaxValue, maximum = float.MinValue;
@@ -78,13 +81,16 @@ namespace OstrixMods.BuildWorks
                             { valid = false; break; }
                             minimum = Math.Min(minimum, height); maximum = Math.Max(maximum, height);
                         }
-                    if (!valid || maximum - minimum > 10f || minimum < ZoneSystem.instance.m_waterLevel + 3f) continue;
+                    if (!valid || minimum < ZoneSystem.instance.m_waterLevel + 3f) continue;
+                    smallestDrySpan = Math.Min(smallestDrySpan, maximum - minimum);
+                    if (maximum - minimum > 10f) continue;
                     float score = maximum - minimum + Mathf.Sqrt(x * x + z * z) * 0.001f;
                     if (score >= best) continue;
                     best = score;
                     selected = new Vector3(x, Plane(minimum, maximum, ZoneSystem.instance.m_waterLevel), z);
                 }
-            if (best == float.MaxValue) throw new InvalidOperationException("No suitable distant 192m QA yard found; no terrain changed.");
+            if (best == float.MaxValue) throw new InvalidOperationException("No suitable distant 192m QA yard found within +/-4096m; smallest dry Meadows span: " +
+                smallestDrySpan.ToString("R", CultureInfo.InvariantCulture) + "; no terrain changed.");
             return selected;
         }
 
@@ -170,7 +176,7 @@ namespace OstrixMods.BuildWorks
                 center = new Vector3(float.Parse(values[0], CultureInfo.InvariantCulture), float.Parse(values[1], CultureInfo.InvariantCulture),
                     float.Parse(values[2], CultureInfo.InvariantCulture));
                 if (new[] { center.x, center.y, center.z }.Any(v => float.IsNaN(v) || float.IsInfinity(v)) ||
-                    Math.Abs(center.x) > 1024 || Math.Abs(center.z) > 1024 || center.x * center.x + center.z * center.z < 512 * 512 ||
+                    Math.Abs(center.x) > SearchExtent || Math.Abs(center.z) > SearchExtent || center.x * center.x + center.z * center.z < 512 * 512 ||
                     center.x % 128 != 0 || center.z % 128 != 0 || center.y < ZoneSystem.instance.m_waterLevel + 3 || center.y > 200)
                     throw new InvalidDataException("QA yard plan is outside the bounded distant dry area.");
             }

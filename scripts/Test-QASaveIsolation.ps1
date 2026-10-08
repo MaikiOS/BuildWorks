@@ -151,6 +151,8 @@ Require ($footprint -notmatch 'Object::Instantiate|Collider::get_bounds') 'Stati
 $yardName = 'OstrixMods.BuildWorks.BuildWorksTestYard'
 $yard = $qa.MainModule.GetType($yardName)
 Require ($null -ne $yard -and $null -eq $normal.MainModule.GetType($yardName)) 'QA yard leaked into normal assembly or is missing.'
+$searchExtent = $yard.Fields | Where-Object Name -eq 'SearchExtent'
+Require ($null -ne $searchExtent -and $searchExtent.Constant -eq 4096) 'QA yard search is not bounded to the expanded four-kilometre square.'
 $yardIterator = $yard.NestedTypes | Where-Object Name -Like '<Prepare>*'
 $yardIl = @($yardIterator.Methods.Body.Instructions)
 foreach ($name in @('RequireLoadedSession','ValidateSavePath','ReadIdentityReceipt','OnceComplete','TeleportTo','CheckGround',

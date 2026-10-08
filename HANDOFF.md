@@ -1,5 +1,17 @@
 # BuildWorks current development handoff
 
+## .113 — explicit missing-part copy, verified QA
+
+Import/native JSON+ZIP export offer a separate copy without missing prefabs.
+Source/ID/count review, default keep, stale-registry recheck, whole-ZIP empty
+refusal and retention of empty groups/supports/snaps passed Store353/UI300.
+Normal/QA0/0 and required checks, actual Session17, independent correctness
+and complexity review passed. QA .113 installed through guarded deployment;
+SHA `B9CCE4B59154E3265BB3D2DAE85099B830DE681E74D4E83CACC5FC3C43F9FECD`. All48 QA files/library unchanged.
+No Valheim launch/native debit/completion/reload/network proof; M02 game
+acceptance remains open. Fog v11 remains planned. See checkpoint-0.19.113.md
+and QA_0.19.113_RU.md.
+
 ## .112 — verified one-part prerequisite
 
 Native18/portable8 admit one part; empty documents and old-schema single entries

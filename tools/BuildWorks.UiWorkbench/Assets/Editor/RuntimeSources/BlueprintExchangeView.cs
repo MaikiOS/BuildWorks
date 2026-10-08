@@ -18,13 +18,14 @@ namespace OstrixMods.BuildWorks
         private readonly TMP_InputField directory, fileName;
         private readonly Button primary, copyPath, format, editPath, cancelPath;
         private RectTransform contentsPanel;
-        private Button contentsBack, storageChoice, mountChoice, armorChoice;
+        private Button contentsBack, storageChoice, mountChoice, armorChoice, missingChoice;
         private TMP_Text contentsDetails;
         private Task<CompositeBlueprintStore.ContentsSummary> contentsInspection;
         private Task<CompositeBlueprintStore.ImportReview> importInspection;
         private CompositeBlueprintStore.ImportReview importReview;
         private CompositeBlueprintStore.ContentsSummary contentsSummary;
-        private bool reviewingContents, clearStorage, clearMounts, omitArmorState;
+        private CompositeBlueprintStore.MissingPartsReview missingReview;
+        private bool reviewingContents, clearStorage, clearMounts, omitArmorState, omitMissingParts;
         private readonly BlueprintEditorSkin skin = new BlueprintEditorSkin();
         private readonly CompositeBlueprintStore store;
         private readonly CompositeBlueprintStore.Blueprint blueprint;
@@ -144,7 +145,7 @@ namespace OstrixMods.BuildWorks
             }
             if (contentsInspection != null && contentsInspection.IsCompleted)
             {
-                try { contentsSummary = contentsInspection.GetAwaiter().GetResult(); if (reviewingContents) RenderContents(); }
+                try { contentsSummary = contentsInspection.GetAwaiter().GetResult(); if (reviewingContents) { RefreshMissing(); RenderContents(); } }
                 catch (Exception error) { if (reviewingContents) SetError(error); }
                 contentsInspection = null;
             }
@@ -153,13 +154,14 @@ namespace OstrixMods.BuildWorks
                 try
                 {
                     var review = importInspection.GetAwaiter().GetResult();
-                    if (reviewingContents) { importReview = review; contentsSummary = review.Contents; RenderContents(); }
+                    if (reviewingContents) { importReview = review; contentsSummary = review.Contents; RefreshMissing(); RenderContents(); }
                 }
                 catch (Exception error) { if (reviewingContents) SetError(error); }
                 importInspection = null;
             }
             primary.interactable = !completed && !importing && listing == null && !directory.gameObject.activeSelf &&
-                (blueprint != null || selected != null) && (!reviewingContents || contentsSummary != null);
+                (blueprint != null || selected != null) && (!reviewingContents ||
+                contentsSummary != null && missingReview != null && (!omitMissingParts || missingReview.CanOmit));
             copyPath.interactable = !importing;
             if (completed || importing)
                 foreach (Selectable control in root.GetComponentsInChildren<Selectable>())
@@ -223,19 +225,20 @@ namespace OstrixMods.BuildWorks
         {
             if (completed || importing || listing != null) return;
             if (!reviewingContents) { if (blueprint != null || selected != null) ReviewContents(); return; }
-            if (contentsSummary == null) return;
+            if (contentsSummary == null || missingReview == null) return;
             if (blueprint == null)
             {
                 if (selected == null) return;
-                if (!store.TryImportReviewed(importReview, clearStorage, clearMounts, name => name.GetStableHashCode(), out string error, omitArmorState))
-                { message.text = BuildWorksLocalization.ResolveUserText(error); return; }
+                if (!store.TryImportReviewed(importReview, clearStorage, clearMounts, name => name.GetStableHashCode(), out string error,
+                    omitArmorState, omitMissingParts ? missingReview : null))
+                { RefreshMissing(); RenderContents(); message.text = BuildWorksLocalization.ResolveUserText(error); return; }
                 importing = true; message.text = T("exchange.loading");
             }
             else
             {
                 if (!store.TryExportFile(blueprint, directory.text, fileName.text, archive, out resultPath, out string error,
-                    clearStorage, clearMounts, name => name.GetStableHashCode(), omitArmorState))
-                { message.text = BuildWorksLocalization.ResolveUserText(error); return; }
+                    clearStorage, clearMounts, name => name.GetStableHashCode(), omitArmorState, omitMissingParts ? missingReview : null))
+                { RefreshMissing(); RenderContents(); message.text = BuildWorksLocalization.ResolveUserText(error); return; }
                 completed = true; ShowResult(T("exchange.exported", resultPath));
             }
             Tick();
@@ -254,7 +257,8 @@ namespace OstrixMods.BuildWorks
 
         private void ReviewContents()
         {
-            reviewingContents = true; contentsSummary = null; importReview = null; clearStorage = clearMounts = omitArmorState = false;
+            reviewingContents = true; contentsSummary = null; importReview = null; missingReview = null;
+            clearStorage = clearMounts = omitArmorState = omitMissingParts = false;
             SetFileControls(false); copyPath.gameObject.SetActive(false);
             if (!contentsPanel)
             {
@@ -275,6 +279,8 @@ namespace OstrixMods.BuildWorks
                 { clearMounts = !clearMounts; RenderContents(); }, contentsPanel);
                 armorChoice = Button("ExchangeArmorChoice", "", 12, 232, 716, () =>
                 { omitArmorState = !omitArmorState; RenderContents(); }, contentsPanel);
+                missingChoice = Button("ExchangeMissingChoice", "", 12, 232, 716, () =>
+                { omitMissingParts = !omitMissingParts; RenderContents(); }, contentsPanel);
                 contentsBack = Button("ExchangeContentsBack", T("exchange.back"), 256, 530, 276, () =>
                 {
                     reviewingContents = false; contentsPanel.gameObject.SetActive(false);
@@ -284,7 +290,7 @@ namespace OstrixMods.BuildWorks
                 });
             }
             contentsPanel.gameObject.SetActive(true); contentsBack.gameObject.SetActive(true);
-            armorChoice.gameObject.SetActive(false);
+            armorChoice.gameObject.SetActive(false); missingChoice.gameObject.SetActive(false);
             storageChoice.interactable = mountChoice.interactable = primary.interactable = false;
             primary.GetComponentInChildren<TMP_Text>().text = T(blueprint == null ? "exchange.confirm_import" : "exchange.confirm_export");
             message.text = T("exchange.loading");
@@ -298,30 +304,60 @@ namespace OstrixMods.BuildWorks
             }
         }
 
+        private void RefreshMissing()
+        {
+            try
+            {
+                missingReview = store.InspectMissing(blueprint == null ? importReview.Documents : new[] { blueprint },
+                    name => name.GetStableHashCode());
+            }
+            catch (Exception error) { missingReview = null; SetError(error); }
+        }
+
         private void RenderContents()
         {
-            contentsDetails.text = T("exchange.contents_counts", contentsSummary.Storages, contentsSummary.StoredItems,
-                contentsSummary.Mounts, contentsSummary.Unknown, contentsSummary.AlreadyCleared);
-            if (contentsSummary.ArmorStates > 0)
-                contentsDetails.text += "\n" + T("exchange.armor_losses", contentsSummary.ArmorStates) + "\n" +
-                    string.Join("\n", contentsSummary.ArmorStateSources.Select(entry => T("exchange.loss_source", entry.Key, entry.Value)));
-            contentsDetails.rectTransform.sizeDelta = new Vector2(700, Mathf.Max(92, contentsDetails.GetPreferredValues(contentsDetails.text, 700, 0).y));
-            int remainingUnknown = contentsSummary.RemainingUnknown(omitArmorState);
-            storageChoice.interactable = remainingUnknown == contentsSummary.UnreadableMounts && contentsSummary.Storages > 0;
-            mountChoice.interactable = remainingUnknown == contentsSummary.UnreadableStorages && contentsSummary.Mounts > 0;
+            if (missingReview == null) return;
+            if (missingReview.Known && missingReview.Parts == 0) omitMissingParts = false;
+            var effective = omitMissingParts && missingReview.CanOmit ? missingReview.RetainedContents : contentsSummary;
+            contentsDetails.text = T("exchange.contents_counts", effective.Storages, effective.StoredItems,
+                effective.Mounts, effective.Unknown, effective.AlreadyCleared);
+            if (effective.ArmorStates > 0)
+                contentsDetails.text += "\n" + T("exchange.armor_losses", effective.ArmorStates) + "\n" +
+                    string.Join("\n", effective.ArmorStateSources.Select(entry => T("exchange.loss_source", entry.Key, entry.Value)));
+            if (!missingReview.Known) contentsDetails.text += "\n" + T("exchange.missing_unavailable");
+            else if (missingReview.Parts > 0)
+                contentsDetails.text += "\n" + T("exchange.missing_losses", missingReview.Parts) + "\n" +
+                    string.Join("\n", missingReview.Sources.Select(entry => T("exchange.loss_source", entry.Key, entry.Value)));
+            int remainingUnknown = effective.RemainingUnknown(omitArmorState);
+            storageChoice.interactable = remainingUnknown == effective.UnreadableMounts && effective.Storages > 0;
+            mountChoice.interactable = remainingUnknown == effective.UnreadableStorages && effective.Mounts > 0;
             if (!storageChoice.interactable) clearStorage = false;
             if (!mountChoice.interactable) clearMounts = false;
             contentsPanel.Find("ExchangeContentsTitle").GetComponent<TMP_Text>().text = blueprint == null
                 ? T("exchange.import_review", importReview.Documents.Count) : T("exchange.contents_title");
             storageChoice.GetComponentInChildren<TMP_Text>().text = T(clearStorage ? "exchange.storage_clear" : "exchange.storage_keep");
             mountChoice.GetComponentInChildren<TMP_Text>().text = T(clearMounts ? "exchange.mounts_clear" : "exchange.mounts_keep");
-            armorChoice.gameObject.SetActive(contentsSummary.ArmorStates > 0);
-            armorChoice.interactable = contentsSummary.ArmorStates > 0;
-            contentsPanel.sizeDelta = new Vector2(740, contentsSummary.ArmorStates > 0 ? 270 : 260);
+            armorChoice.gameObject.SetActive(effective.ArmorStates > 0);
+            armorChoice.interactable = effective.ArmorStates > 0;
+            if (!armorChoice.interactable) omitArmorState = false;
+            missingChoice.gameObject.SetActive(missingReview.Known && missingReview.Parts > 0);
+            missingChoice.interactable = missingReview.CanOmit || omitMissingParts;
+            missingChoice.GetComponentInChildren<TMP_Text>().text = T(omitMissingParts ? "exchange.missing_omit" : "exchange.missing_keep");
+            var choices = new[] { storageChoice, mountChoice, armorChoice, missingChoice }.Where(button => button.gameObject.activeSelf).ToArray();
+            float detailsHeight = 266 - 48 - choices.Length * 34 - 12;
+            var viewport = (RectTransform)contentsDetails.transform.parent;
+            viewport.sizeDelta = new Vector2(716, detailsHeight);
+            contentsDetails.rectTransform.sizeDelta = new Vector2(700, Mathf.Max(detailsHeight, contentsDetails.GetPreferredValues(contentsDetails.text, 700, 0).y));
+            for (int i = 0; i < choices.Length; ++i)
+                ((RectTransform)choices[i].transform).anchoredPosition = new Vector2(12, -(48 + detailsHeight + 6 + i * 34));
+            contentsPanel.sizeDelta = new Vector2(740, 266);
             armorChoice.GetComponentInChildren<TMP_Text>().text = T(omitArmorState ? "exchange.armor_omit" : "exchange.armor_keep");
             skin.Apply(armorChoice, active: omitArmorState);
+            skin.Apply(missingChoice, active: omitMissingParts);
             skin.Apply(storageChoice, active: clearStorage); skin.Apply(mountChoice, active: clearMounts);
-            message.text = omitArmorState ? T("exchange.armor_warning", contentsSummary.ArmorStates, remainingUnknown) :
+            message.text = missingReview.EmptyDocuments > 0 ? T("exchange.missing_empty") :
+                omitMissingParts ? T("exchange.missing_warning", missingReview.Parts, remainingUnknown, omitArmorState ? effective.ArmorStates : 0) :
+                omitArmorState ? T("exchange.armor_warning", effective.ArmorStates, remainingUnknown) :
                 T(contentsSummary.Unknown != 0 ? "exchange.contents_unknown" :
                 blueprint == null ? "exchange.import_copy" : "exchange.contents_copy");
         }

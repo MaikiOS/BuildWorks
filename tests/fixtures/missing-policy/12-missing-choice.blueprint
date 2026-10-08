@@ -1,0 +1,7 @@
+#Name:QA113 Missing Choice
+#Category:OTHER
+#Creator:BuildWorks QA fixture
+#Description:Self-authored one wall plus deliberately nonexistent prefab; test keep versus explicit omission.
+#Pieces
+woodwall;;0;0;0;0;0;0;1;"";1;1;1
+BuildWorks_QA_MissingPrefab;;2;0;0;0;0;0;1;"";1;1;1

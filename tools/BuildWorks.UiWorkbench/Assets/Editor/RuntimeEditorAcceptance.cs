@@ -338,7 +338,7 @@ public static class RuntimeEditorAcceptance
                     scene.SetViewport(view.ViewportScreenRect());
                     Call(controller, "FrameAll");
                     foreach (string state in new[] { "select", "transform", "array", "contour", "catalog",
-                        "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "save-metadata", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru", "exchange-armor", "exchange-armor-ru" })
+                        "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "save-metadata", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru", "exchange-armor", "exchange-armor-ru", "exchange-missing", "exchange-missing-ru" })
                     {
                         Require(Screen.width == width && Screen.height == height,
                             "GameView changed before " + state + ": " + Screen.width + "x" + Screen.height);
@@ -391,6 +391,18 @@ public static class RuntimeEditorAcceptance
                             string folder = Path.Combine(output, "exchange-layout"); Directory.CreateDirectory(folder);
                             var layoutStore = new CompositeBlueprintStore(Path.Combine(folder, "library.json"));
                             var blueprint = store.All()[0];
+                            if (state.StartsWith("exchange-missing", StringComparison.Ordinal))
+                            {
+                                var unit = new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 };
+                                layoutStore.ConfigureImportScale(name => name.StartsWith("qa_missing", StringComparison.Ordinal)
+                                    ? (CompositeBlueprintStore.VectorData?)null : unit);
+                                string missingText = "#Name:Missing policy\n#Pieces\nwoodwall;;0;0;0;0;0;0;1;\"\";1;1;1\nArmorStand;;2;0;0;0;0;0;1;\"2:1:HelmetIron:3:\";1;1;1\n";
+                                for (int index = 0; index < 9; ++index)
+                                    missingText += "qa_missing_" + index + ";;" + (index + 3) + ";0;0;0;0;0;1;\"\";1;1;1\n";
+                                blueprint = ExternalBlueprintLibrary.DetachedCopy(ExternalBlueprintLibrary.PrepareForHost(
+                                    ExternalBlueprintLibrary.Parse(missingText, "missing-policy.blueprint"),
+                                    name => name.StartsWith("qa_missing", StringComparison.Ordinal) ? (CompositeBlueprintStore.VectorData?)null : unit));
+                            }
                             if (state.StartsWith("exchange-armor", StringComparison.Ordinal))
                             {
                                 blueprint = ExternalBlueprintLibrary.DetachedCopy(ExternalBlueprintLibrary.PrepareForHost(ExternalBlueprintLibrary.Parse(
@@ -423,7 +435,8 @@ public static class RuntimeEditorAcceptance
                                 Require(pathInput.textComponent.GetPreferredValues(fullPath, pathInput.textViewport.rect.width, 0).y <= pathInput.textViewport.rect.height,
                                     "Expanded Russian path does not fit at " + width + "x" + height + " scale=" + uiScale);
                             }
-                            else if (state.StartsWith("exchange-contents", StringComparison.Ordinal) || state.StartsWith("exchange-armor", StringComparison.Ordinal))
+                            else if (state.StartsWith("exchange-contents", StringComparison.Ordinal) || state.StartsWith("exchange-armor", StringComparison.Ordinal) ||
+                                state.StartsWith("exchange-missing", StringComparison.Ordinal))
                             {
                                 ControllerInputAcceptance.NativeClick(view, uiCamera, "ExchangeSubmit");
                                 var exchange = Field<BlueprintExchangeView>(view, "exchangeView");
@@ -436,6 +449,13 @@ public static class RuntimeEditorAcceptance
                                 {
                                     ControllerInputAcceptance.NativeClick(view, uiCamera, "ExchangeArmorChoice");
                                     Require(Field<bool>(exchange, "omitArmorState"), "Armor screenshot missed explicit omission");
+                                }
+                                if (state.StartsWith("exchange-missing", StringComparison.Ordinal))
+                                {
+                                    ControllerInputAcceptance.NativeClick(view, uiCamera, "ExchangeMissingChoice"); yield return null;
+                                    ControllerInputAcceptance.NativeClick(view, uiCamera, "ExchangeArmorChoice"); yield return null;
+                                    Require(Field<bool>(exchange, "omitMissingParts") && Field<bool>(exchange, "omitArmorState"),
+                                        "Missing screenshot missed independent explicit omission choices");
                                 }
                             }
                             else if (state.StartsWith("exchange-import-review", StringComparison.Ordinal))
@@ -521,6 +541,8 @@ public static class RuntimeEditorAcceptance
                 {
                     yield return null;
                     foreach (object step in ControllerInputAcceptance.RunSinglePart(template, fontTemplate, source["woodwall"], output)) yield return step;
+                    foreach (object step in ControllerInputAcceptance.RunMissingExchange(template, fontTemplate, source["woodwall"], output)) yield return step;
+                    checks.Add("Explicit missing-part copy: actual default/ID/count/Back reset/native confirmation/stale host refusal/new confirmation -> one-part editor; exact source retained. No game construction proof.");
                     checks.Add("Single-part editor: actual Save/metadata clicks -> disk reopen preserves one row/name/scale; empty editor save refused. Native single-part construction/debit/reload remain unverified.");
                 }
                 finally { restoreSingleScreen(); }
@@ -628,13 +650,15 @@ public static class RuntimeEditorAcceptance
             EnsureInside(Field<RectTransform>(view, "safeRoot"), panel);
             foreach (Button button in panel.GetComponentsInChildren<Button>()) EnsureInside(panel, (RectTransform)button.transform);
             foreach (TMP_InputField field in panel.GetComponentsInChildren<TMP_InputField>()) EnsureInside(panel, (RectTransform)field.transform);
-            if (state.StartsWith("exchange-armor", StringComparison.Ordinal))
+            if (state.StartsWith("exchange-armor", StringComparison.Ordinal) || state.StartsWith("exchange-missing", StringComparison.Ordinal))
             {
                 var contents = Field<RectTransform>(exchange, "contentsPanel");
                 var details = Field<TMP_Text>(exchange, "contentsDetails");
                 var viewport = details.rectTransform.parent.GetComponent<RectTransform>();
                 EnsureInside(contents, viewport);
                 EnsureInside(contents, (RectTransform)Field<Button>(exchange, "armorChoice").transform);
+                if (state.StartsWith("exchange-missing", StringComparison.Ordinal))
+                    EnsureInside(contents, (RectTransform)Field<Button>(exchange, "missingChoice").transform);
                 Require(viewport.GetComponent<RectMask2D>() && viewport.GetComponent<ScrollRect>() &&
                     details.rectTransform.rect.height > viewport.rect.height, "Armor loss list is not scrollable and clipped");
                 var warning = Field<TMP_Text>(exchange, "message");

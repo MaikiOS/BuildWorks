@@ -1,0 +1,157 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.IO.Compression;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using OstrixMods.BuildWorks;
+
+namespace OstrixMods.BuildWorks.StoreTests
+{
+    internal static class MissingPartChecks
+    {
+        private static readonly CompositeBlueprintStore.VectorData Unit = new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 };
+        internal static void Run(string directory)
+        {
+            Directory.CreateDirectory(directory);
+            const string text = "#Name:QA113 Missing Choice\r\n#Pieces\r\nwoodwall;;1;2;3;0;.7071068;0;.7071068;\"\";2;.5;1.25\r\n" +
+                "qa_absent;;8;9;10;0;0;0;1;\"unknown-state\";.01;4;2\r\n";
+            string sourcePath = Path.Combine(directory, "12-missing-choice.blueprint");
+            File.WriteAllText(sourcePath, text);
+            byte[] original = File.ReadAllBytes(sourcePath);
+            var review = CompositeBlueprintStore.ReviewImportFile(sourcePath, ForeignZdoChecks.Hash, 0);
+            var store = new CompositeBlueprintStore(Path.Combine(directory, "library.json"));
+            var unknown = store.InspectMissing(review.Documents, ForeignZdoChecks.Hash);
+            Require(!unknown.Known && !unknown.CanOmit && review.Documents[0].parts.Count == 2, "Absent resolver guessed missing prefabs");
+            object context = null;
+            var installed = new HashSet<string>(StringComparer.Ordinal) { "woodwall", "world_tree" };
+            store.ConfigureImportScale(name => installed.Contains(name) ? Unit : (CompositeBlueprintStore.VectorData?)null, () => context);
+            Require(!store.InspectMissing(review.Documents, ForeignZdoChecks.Hash).Known, "Unloaded host guessed absent prefabs");
+            context = new object();
+            var missing = store.InspectMissing(review.Documents, ForeignZdoChecks.Hash);
+            Require(missing.Known && missing.CanOmit && missing.Parts == 1 && missing.PrefabIds.SetEquals(new[] { "qa_absent" }) &&
+                missing.RetainedContents.Unknown == 0 && review.Contents.Unknown == 1 &&
+                missing.Sources.Single().Key == "12-missing-choice.blueprint · qa_absent", "Missing review count/source/retained state wrong");
+            Require(!Directory.Exists(store.ImportDirectory), "Availability review wrote a copy");
+
+            Require(store.TryImportReviewed(review, false, false, ForeignZdoChecks.Hash, out string error), error); Wait(store);
+            Require(ExternalBlueprintLibrary.LoadFile(store.ImportResultPath).Single().parts.Count == 2,
+                "Default import discarded a missing record");
+            Require(store.TryImportReviewed(review, false, false, ForeignZdoChecks.Hash, out error, omitMissing: missing), error); Wait(store);
+            var imported = ExternalBlueprintLibrary.LoadFile(store.ImportResultPath).Single();
+            Require(imported.parts.Count == 1 && imported.parts[0].prefabName == "woodwall" &&
+                imported.parts[0].position.x == 1 && imported.parts[0].position.z == 3 &&
+                imported.parts[0].baseScale.Value.x == 2 && imported.parts[0].baseScale.Value.y == .5f &&
+                imported.parts[0].rotation.y == review.Documents[0].parts[0].rotation.y &&
+                imported.sourceDocuments.Single().text == text && File.ReadAllBytes(sourcePath).SequenceEqual(original),
+                "Explicit omission changed source, retained pose/basis or synthesized pieces");
+            using (var zip = ZipFile.OpenRead(store.ImportResultPath))
+            using (var entry = zip.GetEntry("original/source.bin").Open())
+            using (var bytes = new MemoryStream())
+            {
+                entry.CopyTo(bytes); Require(bytes.ToArray().SequenceEqual(original), "Original archive bytes changed");
+            }
+            var prepared = ExternalBlueprintLibrary.PrepareForHost(review.Documents[0],
+                name => installed.Contains(name) ? Unit : (CompositeBlueprintStore.VectorData?)null);
+            foreach (bool archive in new[] { false, true })
+            {
+                Require(store.TryExportFile(prepared, directory, archive ? "omitted-zip" : "omitted-json", archive,
+                    out string path, out error, prefabHash: ForeignZdoChecks.Hash, omitMissing: missing), error);
+                Require(ExternalBlueprintLibrary.LoadFile(path).Single().parts.Count == 1 && prepared.parts.Count == 2,
+                    "Export omission mutated source or resurrected removed source rows");
+            }
+            int before = Directory.GetFiles(store.ImportDirectory).Length;
+            installed.Add("qa_absent");
+            Require(!store.TryImportReviewed(review, false, false, ForeignZdoChecks.Hash, out error, omitMissing: missing) &&
+                error.Contains("missing_changed") && Directory.GetFiles(store.ImportDirectory).Length == before, "Changed availability published stale removal");
+            installed.Remove("qa_absent");
+            context = new object();
+            Require(!store.TryImportReviewed(review, false, false, ForeignZdoChecks.Hash, out error, omitMissing: missing) &&
+                error.Contains("missing_changed"), "Changed host context accepted old review");
+            context = null;
+            Require(!store.TryImportReviewed(review, false, false, ForeignZdoChecks.Hash, out error, omitMissing: missing) &&
+                error.Contains("missing_unavailable"), "Unloaded host accepted removal");
+            context = new object();
+
+            string mixedPath = Path.Combine(directory, "mixed.zip");
+            using (var zip = ZipFile.Open(mixedPath, ZipArchiveMode.Create))
+            {
+                using (var writer = new StreamWriter(zip.CreateEntry("mixed.blueprint").Open())) writer.Write(text);
+                using (var writer = new StreamWriter(zip.CreateEntry("all-missing.blueprint").Open()))
+                    writer.Write("#Pieces\nqa_absent;;0;0;0;0;0;0;1;\"\";1;1;1");
+            }
+            var mixed = CompositeBlueprintStore.ReviewImportFile(mixedPath, ForeignZdoChecks.Hash, 0);
+            var emptyReview = store.InspectMissing(mixed.Documents, ForeignZdoChecks.Hash);
+            Require(emptyReview.EmptyDocuments == 1 && !emptyReview.CanOmit &&
+                !store.TryImportReviewed(mixed, false, false, ForeignZdoChecks.Hash, out error, omitMissing: emptyReview) &&
+                error.Contains("missing_empty") && Directory.GetFiles(store.ImportDirectory).Length == before,
+                "All-missing member partially published its ZIP");
+
+            Hierarchy(prepared);
+            var withTree = prepared.ImportCopy();
+            withTree.parts.Add(new CompositeBlueprintStore.Part { stableId = "tree", prefabName = "world_tree",
+                rotation = new CompositeBlueprintStore.QuaternionData { w = 1 } });
+            Require(store.InspectMissing(new[] { withTree }, ForeignZdoChecks.Hash).Parts == 1,
+                "Present world-only prefab was classified missing because it has no recipe");
+            string imagePath = Path.Combine(directory, "preview.zip");
+            using (var zip = ZipFile.Open(imagePath, ZipArchiveMode.Create))
+            {
+                using (var entry = zip.CreateEntry("model.blueprint").Open()) entry.Write(original, 0, original.Length);
+                byte[] png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==");
+                using (var entry = zip.CreateEntry("model.png").Open()) entry.Write(png, 0, png.Length);
+            }
+            var imageReview = CompositeBlueprintStore.ReviewImportFile(imagePath, ForeignZdoChecks.Hash, 0);
+            Require(store.TryImportReviewed(imageReview, false, false, ForeignZdoChecks.Hash, out error,
+                omitMissing: store.InspectMissing(imageReview.Documents, ForeignZdoChecks.Hash)), error); Wait(store);
+            using (var zip = ZipFile.OpenRead(store.ImportResultPath))
+                Require(!zip.Entries.Any(entry => entry.FullName.EndsWith(".png")), "Removed-part copy retained misleading old preview");
+            Console.WriteLine("PASS explicit missing-part copy: unknown host/default keep/fresh context+IDs; source bytes, retained transforms, JSON/ZIP, hierarchy/support/snap, all-missing atomic refusal and stale preview removal");
+        }
+
+        private static void Hierarchy(CompositeBlueprintStore.Blueprint source)
+        {
+            var document = source.ImportCopy();
+            string known = document.parts[0].stableId, absent = document.parts[1].stableId;
+            document.parts[0].parentGroupId = "child"; document.parts[1].parentGroupId = "dead";
+            document.groups = new List<CompositeBlueprintStore.Group> {
+                new CompositeBlueprintStore.Group { stableId = "root", name = "Root", pivotPartId = absent },
+                new CompositeBlueprintStore.Group { stableId = "child", name = "Child", parentGroupId = "root", pivotPartId = known },
+                new CompositeBlueprintStore.Group { stableId = "dead", name = "Dead", parentGroupId = "root", pivotPartId = absent },
+                new CompositeBlueprintStore.Group { stableId = "future", name = "Future roof" },
+                new CompositeBlueprintStore.Group { stableId = "future-child", name = "Future child", parentGroupId = "future" } };
+            document.primaryPartId = absent; document.primaryGroupId = "dead";
+            document.supports = new List<CompositeBlueprintStore.Support> { new CompositeBlueprintStore.Support {
+                stableId = "support", name = "Support", position = new CompositeBlueprintStore.VectorData { x = 7 },
+                rotation = new CompositeBlueprintStore.QuaternionData { w = 1 } } };
+            document.placementSupportId = "support";
+            document.customSnapPoints = new List<CompositeBlueprintStore.VectorData> { new CompositeBlueprintStore.VectorData { y = 8 } };
+            document.anchors = new List<CompositeBlueprintStore.VectorData>(document.anchors);
+            document.anchors.Add(new CompositeBlueprintStore.VectorData { z = 9 });
+            var copy = CompositeBlueprintStore.CopyWithoutMissing(document, new HashSet<string> { "qa_absent" });
+            Require(copy.groups.Count == 5 && copy.groups[0].pivotPartId == null && copy.groups[1].parentGroupId == "root" &&
+                copy.groups[2].pivotPartId == null && copy.groups[2].parentGroupId == "root" &&
+                copy.groups[3].name == "Future roof" && copy.groups[4].parentGroupId == "future" &&
+                copy.groups[1].pivotPartId == known && copy.primaryPartId == null && copy.primaryGroupId == null &&
+                copy.prefabName == "woodwall" && copy.placementSupportId == "support" && copy.supports[0].position.x == 7 &&
+                copy.customSnapPoints[0].y == 8 && copy.anchors.Last().z == 9 &&
+                document.parts.Count == 2 && document.groups.Count == 5 && document.groups[0].pivotPartId == absent &&
+                document.groups[2].pivotPartId == absent && document.primaryPartId == absent,
+                "Omission destroyed empty groups, hierarchy, independent frames or source");
+            var detached = ExternalBlueprintLibrary.DetachedCopy(copy);
+            var roundtrip = BlueprintExchangeFormat.Decode(Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(detached)));
+            Require(roundtrip.parts.Count == 1 && roundtrip.groups.Count == 5 &&
+                roundtrip.groups.Single(group => group.name == "Future child").parentGroupId ==
+                roundtrip.groups.Single(group => group.name == "Future roof").stableId,
+                "Retained empty group graph did not roundtrip");
+        }
+
+        private static void Wait(CompositeBlueprintStore store)
+        {
+            Require(SpinWait.SpinUntil(() => { store.CatalogAll(); return !store.CatalogLoading; }, 10000), "Import timeout");
+            Require(store.ImportError == null, store.ImportError);
+        }
+        private static void Require(bool value, string message)
+        { if (!value) throw new InvalidOperationException(message); }
+    }
+}

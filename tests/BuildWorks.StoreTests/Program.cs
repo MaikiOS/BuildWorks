@@ -45,6 +45,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 ExchangeRoundTrip(Path.Combine(directory, "exchange-library.json"));
                 SupportRoundTrip(Path.Combine(directory, "supports.json"));
                 SinglePartChecks.Run(Path.Combine(directory, "single-part"));
+                MissingPartChecks.Run(Path.Combine(directory, "missing-parts"));
                 if (args.Length == 2 && args[0] == "--player-fixtures") PlayerFixtures(args[1]);
                 else if (args.Length > 0) InspectActualLibrary(args[0]);
                 Console.WriteLine("All BuildWorks store tests passed.");

@@ -56,6 +56,65 @@ internal static class ControllerInputAcceptance
         }
     }
 
+    internal static IEnumerable<object> RunMissingExchange(Camera template, TMP_Text font, GameObject wall, string output)
+    {
+        string folder = Path.Combine(output, "missing-exchange-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        string sourcePath = Path.Combine(folder, "12-missing-choice.blueprint");
+        const string original = "#Name:QA113 Missing Choice\n#Pieces\nwoodwall;;0;0;0;0;0;0;1;\"\";1;1;1\nqa_absent;;2;0;0;0;0;0;1;\"unknown-state\";1;1;1";
+        File.WriteAllText(sourcePath, original);
+        var store = new CompositeBlueprintStore(Path.Combine(folder, "library.json"));
+        object context = new object();
+        store.ConfigureImportScale(name => name == "woodwall" ? new CompositeBlueprintStore.VectorData(wall.transform.localScale)
+            : (CompositeBlueprintStore.VectorData?)null, () => context);
+        using (var controller = new BlueprintEditorController(store, template, font, name => name == "woodwall" ? wall : null,
+            name => name, () => Array.Empty<BlueprintEditorCatalogItem>(), message => { throw new InvalidOperationException(message); }))
+        {
+            Require(controller.OpenNew(out string error), error);
+            var view = Field<BlueprintEditorView>(controller, "view");
+            view.ShowExchange((parent, textFont, closed) => new BlueprintExchangeView(parent, textFont, store, null, closed));
+            var exchange = Field<BlueprintExchangeView>(view, "exchangeView");
+            for (int frame = 0; frame < 300 && Field<Task<string[]>>(exchange, "listing") != null; ++frame)
+            { view.Tick(); yield return null; }
+            Call(exchange, "Browse", folder);
+            for (int frame = 0; frame < 300 && Field<Task<string[]>>(exchange, "listing") != null; ++frame)
+            { view.Tick(); yield return null; }
+            int index = Array.IndexOf(Field<string[]>(exchange, "entries"), sourcePath);
+            Require(index >= 0 && index < 7, "Missing exchange fixture absent");
+            NativeClick(view, null, "ExchangeEntry" + index); view.Tick(); yield return null;
+            for (int iteration = 0; iteration < 2; ++iteration)
+            {
+                NativeClick(view, null, "ExchangeSubmit");
+                for (int frame = 0; frame < 300 && Field<Task<CompositeBlueprintStore.ImportReview>>(exchange, "importInspection") != null; ++frame)
+                { view.Tick(); yield return null; }
+                Require(Field<CompositeBlueprintStore.MissingPartsReview>(exchange, "missingReview").Parts == 1 &&
+                    !Field<bool>(exchange, "omitMissingParts") && Field<Button>(exchange, "missingChoice").interactable &&
+                    Field<TMP_Text>(exchange, "contentsDetails").text.Contains("qa_absent"), "Missing choice default/count/ID wrong");
+                NativeClick(view, null, "ExchangeMissingChoice"); yield return null;
+                Require(Field<bool>(exchange, "omitMissingParts"), "Missing choice did not toggle");
+                if (iteration == 0) { NativeClick(view, null, "ExchangeContentsBack"); yield return null; }
+            }
+            context = new object();
+            NativeClick(view, null, "ExchangeSubmit"); yield return null;
+            Require(!Field<bool>(exchange, "importing") && !Directory.Exists(store.ImportDirectory) &&
+                Field<TMP_Text>(exchange, "message").text == BuildWorksLocalization.Text("exchange.missing_changed"),
+                "Stale-context confirmation published a copy or hid its refusal");
+            NativeClick(view, null, "ExchangeSubmit");
+            for (int frame = 0; frame < 300 && Field<bool>(exchange, "importing"); ++frame)
+            { view.Tick(); yield return null; }
+            Require(Field<bool>(exchange, "completed") && File.ReadAllText(sourcePath) == original, "Fresh confirmation failed or changed source");
+            var imported = store.CatalogAll().Single();
+            Require(imported.parts.Count == 1 && imported.sourceDocuments.Single().text == original,
+                "UI explicit missing copy lost source or retained a removed record");
+            NativeClick(view, null, "ExchangeClose"); yield return null;
+            controller.Close(true);
+            Require(controller.OpenExisting(imported, out error) && controller.Document.Parts.Count == 1, error ?? "One retained part did not open");
+            controller.Close(true);
+        }
+        File.WriteAllText(Path.Combine(output, "missing-exchange-check.txt"),
+            "PASS actual missing choice/ID/count/default/Back reset/native confirmation/stale host refusal/new confirmation/editor one-part open; no Valheim construction proof");
+    }
+
     internal static IEnumerable<object> RunMissingCatalogue(Camera template, TMP_Text font, GameObject wall, string output)
     {
         string directory = Path.Combine(output, "c89-" + Guid.NewGuid().ToString("N").Substring(0, 8));

@@ -265,16 +265,7 @@ namespace OstrixMods.BuildWorks
                                 ExternalBlueprintLibrary.ConvertKnownState(part, evidence, prefabHash, worldLevel);
                     }
                     var contents = InspectContents(document, prefabHash); // Reject every blocked member, not just empty archives.
-                    summary.Storages += contents.Storages; summary.StoredItems += contents.StoredItems;
-                    summary.Mounts += contents.Mounts; summary.Unknown += contents.Unknown;
-                    summary.UnreadableStorages += contents.UnreadableStorages; summary.UnreadableMounts += contents.UnreadableMounts;
-                    summary.AlreadyCleared += contents.AlreadyCleared;
-                    summary.ArmorStates += contents.ArmorStates;
-                    foreach (var entry in contents.ArmorStateSources)
-                    {
-                        summary.ArmorStateSources.TryGetValue(entry.Key, out int count);
-                        summary.ArmorStateSources[entry.Key] = count + entry.Value;
-                    }
+                    summary.Add(contents);
                 }
                 return new ImportReview { Source = source, Bytes = bytes, Documents = documents, Contents = summary };
             }
@@ -287,7 +278,7 @@ namespace OstrixMods.BuildWorks
 
         // Called on the Unity thread: normalize against installed prefab bases before the file worker.
         internal bool TryImportReviewed(ImportReview review, bool clearStorage, bool clearMounts,
-            Func<string, int> prefabHash, out string error, bool omitArmorState = false)
+            Func<string, int> prefabHash, out string error, bool omitArmorState = false, MissingPartsReview omitMissing = null)
         {
             error = null;
             if (CatalogLoading) { error = UserError("exchange.loading"); return false; }
@@ -295,9 +286,12 @@ namespace OstrixMods.BuildWorks
             try
             {
                 if (review == null) throw new InvalidDataException("$buildworks_import.format");
+                if (omitMissing != null) ValidateMissingReview(review.Documents, omitMissing, prefabHash);
                 var prepared = review.Documents.Select(document => ExternalBlueprintLibrary.PrepareForHost(document, importPrefabScale, importPrefabHash, importWorldLevel?.Invoke())).ToArray();
                 if (prepared.Any(document => document.importError != null))
                     throw new InvalidDataException(prepared.First(document => document.importError != null).importError);
+                if (omitMissing != null)
+                    prepared = prepared.Select(document => CopyWithoutMissing(document, omitMissing.PrefabIds)).ToArray();
                 string target = Path.Combine(ImportDirectory, "import_" + Guid.NewGuid().ToString("N") + ".zip");
                 ImportError = null;
                 ImportResultPath = null;
@@ -321,7 +315,7 @@ namespace OstrixMods.BuildWorks
                                 var copy = CopyWithContentsPolicy(prepared[i], clearStorage, clearMounts, prefabHash, omitArmorState);
                                 string name = "document_" + i + ".buildworks.json";
                                 WriteEntry(name, BlueprintExchangeFormat.Encode(copy));
-                                if (!clearStorage && !clearMounts && !omitArmorState && ExternalBlueprintLibrary.ValidPreview(prepared[i].importPreview))
+                                if (!clearStorage && !clearMounts && !omitArmorState && omitMissing == null && ExternalBlueprintLibrary.ValidPreview(prepared[i].importPreview))
                                     WriteEntry(Path.ChangeExtension(name, ".png"), prepared[i].importPreview);
                             }
                             void WriteEntry(string name, byte[] data)
@@ -360,13 +354,19 @@ namespace OstrixMods.BuildWorks
 
         internal bool TryExportFile(Blueprint blueprint, string directory, string fileName, bool archive,
             out string exportedPath, out string error, bool clearStorage = false, bool clearMounts = false,
-            Func<string, int> prefabHash = null, bool omitArmorState = false)
+            Func<string, int> prefabHash = null, bool omitArmorState = false, MissingPartsReview omitMissing = null)
         {
             exportedPath = null; error = null; string temporary = null;
             try
             {
                 if (blueprint == null || !string.IsNullOrEmpty(blueprint.importError))
                     throw new InvalidDataException(blueprint?.importError ?? "$buildworks_import.format");
+                if (omitMissing != null)
+                {
+                    ValidateMissingReview(new[] { blueprint }, omitMissing, prefabHash);
+                    blueprint = CopyWithoutMissing(ExternalBlueprintLibrary.PrepareForHost(blueprint,
+                        importPrefabScale, importPrefabHash, importWorldLevel?.Invoke()), omitMissing.PrefabIds);
+                }
                 Blueprint prepared = clearStorage || clearMounts || omitArmorState
                     ? CopyWithContentsPolicy(blueprint, clearStorage, clearMounts, prefabHash, omitArmorState)
                     : blueprint.IsExternal ? ExternalBlueprintLibrary.DetachedCopy(blueprint) : blueprint;
@@ -411,6 +411,83 @@ namespace OstrixMods.BuildWorks
             internal int RemainingUnknown(bool omitArmorState) => Unknown - (omitArmorState ? ArmorStates : 0);
             internal bool CanClearStorage => Unknown == UnreadableMounts;
             internal bool CanClearMounts => Unknown == UnreadableStorages;
+
+            internal void Add(ContentsSummary other)
+            {
+                Storages += other.Storages; StoredItems += other.StoredItems; Mounts += other.Mounts; Unknown += other.Unknown;
+                UnreadableStorages += other.UnreadableStorages; UnreadableMounts += other.UnreadableMounts;
+                AlreadyCleared += other.AlreadyCleared; ArmorStates += other.ArmorStates;
+                foreach (var entry in other.ArmorStateSources)
+                {
+                    ArmorStateSources.TryGetValue(entry.Key, out int count);
+                    ArmorStateSources[entry.Key] = count + entry.Value;
+                }
+            }
+        }
+
+        internal sealed class MissingPartsReview
+        {
+            internal bool Known;
+            internal object HostContext;
+            internal int Parts, EmptyDocuments;
+            internal readonly HashSet<string> PrefabIds = new HashSet<string>(StringComparer.Ordinal);
+            internal readonly SortedDictionary<string, int> Sources = new SortedDictionary<string, int>(StringComparer.Ordinal);
+            internal readonly ContentsSummary RetainedContents = new ContentsSummary();
+            internal bool CanOmit => Known && Parts > 0 && EmptyDocuments == 0;
+        }
+
+        // Unity thread only. Recipe availability is not prefab presence.
+        internal MissingPartsReview InspectMissing(IReadOnlyList<Blueprint> documents, Func<string, int> prefabHash)
+        {
+            var result = new MissingPartsReview { HostContext = importHostContext?.Invoke() };
+            if (importPrefabScale == null || importHostContext != null && result.HostContext == null) return result;
+            foreach (string prefab in documents.SelectMany(document => document.parts).Select(part => part.prefabName).Distinct(StringComparer.Ordinal))
+                if (!importPrefabScale(prefab).HasValue) result.PrefabIds.Add(prefab);
+            result.Known = true;
+            foreach (Blueprint document in documents)
+            {
+                int removed = 0;
+                var names = (document.sourceDocuments ?? new List<SourceDocument>()).ToDictionary(source => source.id, source => source.name, StringComparer.Ordinal);
+                foreach (Part part in document.parts)
+                {
+                    if (!result.PrefabIds.Contains(part.prefabName)) continue;
+                    ++removed;
+                    string name = part.sourceDocumentId != null && names.TryGetValue(part.sourceDocumentId, out string sourceName) ? sourceName : document.name;
+                    string key = name + " · " + part.prefabName;
+                    result.Sources.TryGetValue(key, out int count); result.Sources[key] = count + 1;
+                }
+                result.Parts += removed;
+                if (removed == document.parts.Count) ++result.EmptyDocuments;
+                else result.RetainedContents.Add(InspectContents(removed == 0 ? document : CopyWithoutMissing(document, result.PrefabIds), prefabHash));
+            }
+            return result;
+        }
+
+        private void ValidateMissingReview(IReadOnlyList<Blueprint> documents, MissingPartsReview expected, Func<string, int> prefabHash)
+        {
+            MissingPartsReview current = InspectMissing(documents, prefabHash);
+            if (!current.Known) throw new InvalidDataException("$buildworks_exchange.missing_unavailable");
+            if (!expected.Known || !ReferenceEquals(current.HostContext, expected.HostContext) ||
+                !current.PrefabIds.SetEquals(expected.PrefabIds) || current.Parts != expected.Parts)
+                throw new InvalidDataException("$buildworks_exchange.missing_changed");
+            if (current.EmptyDocuments > 0) throw new InvalidDataException("$buildworks_exchange.missing_empty");
+            if (!current.CanOmit) throw new InvalidDataException("$buildworks_exchange.missing_changed");
+        }
+
+        internal static Blueprint CopyWithoutMissing(Blueprint source, ISet<string> missing)
+        {
+            Blueprint copy = source.ImportCopy();
+            copy.groups = CloneGroups(source.groups);
+            copy.parts.RemoveAll(part => missing.Contains(part.prefabName));
+            if (copy.parts.Count == 0) throw new InvalidDataException("$buildworks_exchange.missing_empty");
+            if (copy.parts.Count == source.parts.Count) return copy;
+            var ids = new HashSet<string>(copy.parts.Select(part => part.stableId), StringComparer.Ordinal);
+            foreach (Group group in copy.groups)
+                if (group.pivotPartId != null && !ids.Contains(group.pivotPartId)) group.pivotPartId = null;
+            if (copy.primaryPartId != null && !ids.Contains(copy.primaryPartId)) copy.primaryPartId = null;
+            if (!ValidPrimaryGroup(copy.parts, copy.groups, copy.primaryGroupId)) copy.primaryGroupId = null;
+            copy.prefabName = PrimaryPrefabName(copy.parts, copy.primaryPartId);
+            return copy;
         }
 
         // Read effective contents only. Unknown data is never reported as an empty inventory.

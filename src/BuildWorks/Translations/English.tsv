@@ -816,6 +816,13 @@ exchange.armor_omit	Armor stands: COPY WITHOUT EQUIPMENT OR POSE
 exchange.armor_losses	Armor stand equipment and pose eligible for omission: {0}. Affected sources (scroll):
 exchange.loss_source	{0} — records: {1}
 exchange.armor_warning	The copy omits equipment and pose from {0} armor stands listed above. The exact source is retained. Other unknown records: {1}; they may block placement. Prefab availability and construction rules are checked separately.
+exchange.missing_keep	Missing parts: KEEP RECORDS
+exchange.missing_omit	Missing parts: COPY WITHOUT MISSING PARTS
+exchange.missing_losses	Missing parts: {0}. Source and prefab IDs below; supplying mod is undetermined.
+exchange.missing_unavailable	Prefab registry is unavailable. Presence is unknown; records are kept and omission is disabled.
+exchange.missing_changed	Prefab availability changed. Review the updated list and confirm again; no copy was written.
+exchange.missing_empty	Omission would empty at least one blueprint. A copy without missing parts is unavailable until its prefab mod is installed.
+exchange.missing_warning	Copy omits {0} missing parts and equipment/pose from {2} armor stands. Exact source stays unchanged. Other unknown records: {1}; construction rules still apply.
 exchange.confirm_export	Confirm export
 exchange.confirm_import	Confirm import
 exchange.import_review	Import contents: {0} blueprints

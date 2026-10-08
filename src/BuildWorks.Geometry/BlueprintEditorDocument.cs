@@ -940,6 +940,60 @@ namespace OstrixMods.BuildWorks.Geometry
             });
         }
 
+        public bool ReplacePartWithSelection(string targetId, string groupName)
+        {
+            BlueprintEditorPart target = FindPart(targetId);
+            if (target == null || !selection.Contains(targetId) || ActiveSupportId != null ||
+                !IsEffectivelyVisible(targetId) || IsEffectivelyLocked(targetId)) return false;
+            var selectedIds = new HashSet<string>(selection, StringComparer.Ordinal);
+            var selectedParts = new Dictionary<string, BlueprintEditorPart>(StringComparer.Ordinal);
+            foreach (BlueprintEditorPart part in parts)
+                if (selectedIds.Contains(part.StableId)) selectedParts.Add(part.StableId, part);
+            foreach (string id in selection)
+            {
+                BlueprintEditorPart part = selectedParts.TryGetValue(id, out BlueprintEditorPart found) ? found : null;
+                BlueprintEditorGroup group = part == null ? FindGroup(id) : null;
+                string parent = part != null ? part.ParentGroupId : group?.ParentGroupId;
+                if (part == null && group == null || HasSelectedAncestor(parent, selectedIds) ||
+                    part != null && (!part.Visible || part.Locked) || group != null && (!group.Visible || group.Locked) ||
+                    !AncestorsVisible(parent) || AncestorsLocked(parent)) return false;
+            }
+            var replacements = new List<BlueprintEditorPart>();
+            foreach (BlueprintEditorPart part in parts)
+            {
+                if (part.StableId == targetId || !(selectedIds.Contains(part.StableId) ||
+                    HasSelectedAncestor(part.ParentGroupId, selectedIds))) continue;
+                if (!part.Visible || part.Locked || !AncestorsVisible(part.ParentGroupId) || AncestorsLocked(part.ParentGroupId)) return false;
+                replacements.Add(part);
+            }
+            if (replacements.Count == 0) return false;
+            if (groups.Count >= MaximumGroups) throw new InvalidOperationException("Maximum group count reached.");
+            string rootId = Guid.NewGuid().ToString("N");
+            string firstId = replacements[0].StableId;
+            var replacementGroup = new BlueprintEditorGroup(rootId, groupName,
+                parentGroupId: target.ParentGroupId, pivotPartId: firstId);
+            return Commit(() =>
+            {
+                groups.Add(replacementGroup);
+                foreach (BlueprintEditorPart part in selectedParts.Values)
+                    if (part != target) part.ParentGroupId = rootId;
+                foreach (BlueprintEditorGroup group in groups)
+                    if (selectedIds.Contains(group.StableId)) group.ParentGroupId = rootId;
+                parts.Remove(target);
+                if (PrimaryPartId == targetId) PrimaryPartId = firstId;
+                foreach (BlueprintEditorGroup group in groups)
+                    if (group.PivotPartId == targetId) group.PivotPartId = firstId;
+                if (PrimaryGroupId != null)
+                {
+                    var primaryIds = new HashSet<string>(StringComparer.Ordinal) { PrimaryGroupId };
+                    if (!parts.Exists(part => HasSelectedAncestor(part.ParentGroupId, primaryIds)))
+                        PrimaryGroupId = rootId;
+                }
+                ClearInvalidGroupPivots();
+                SelectOnly(rootId);
+            });
+        }
+
         public bool InsertBlueprint(BlueprintEditorDocument source, Point3 position, Rotation3 rotation)
         {
             if (source == null) throw new ArgumentNullException(nameof(source));

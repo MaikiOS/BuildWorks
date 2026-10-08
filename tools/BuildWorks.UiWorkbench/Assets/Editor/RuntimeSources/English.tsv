@@ -868,3 +868,10 @@ editor.array_missing_dimensions	Packing requires the selected models, not record
 editor.view.source_scale	Source scale (%)
 editor.catalog_cost_unknown	Full construction cost and required stations are unknown. This blueprint can be edited; world placement is checked separately.
 blueprint.capture_parent_frame	Cannot capture {0} exactly: its parent changes scale or shears the object.
+editor.replace_title	REPLACE MISSING PART
+editor.replace_hint	Place your replacement first. Select exactly one missing row directly and your available replacement parts or group. Hidden/locked parts and overlapping parent/child selections are not allowed.
+editor.replace_confirm	Remove missing record: {0}\nReplacement: {1} selected parts; their poses and sizes stay unchanged.\nPrimary/pivot links move to: {2}\nIndependent supports and original source stay unchanged. One Undo restores the record.
+editor.replace_changed	Selection, document or available prefabs changed. Review replacement again.
+editor.replace_group	Replacement
+editor.replace_done	Missing record replaced with {0} selected parts. One Undo restores it.
+editor.replace_limit	Replacement needs one group slot. Remove or ungroup an unused group first.

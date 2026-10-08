@@ -82,6 +82,15 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(fixtureRoundtrip.parts[0].position.x == 0 && fixtureRoundtrip.parts[1].position.x == 6 &&
                 fixtureRoundtrip.parts[0].metadata.hostId == "synthetic-fixture",
                 "Ready metadata fixture changed positions or misrepresented provenance");
+            var replacement = ExternalBlueprintLibrary.LoadFile(Path.GetFullPath(Path.Combine(
+                Path.GetDirectoryName(fixture), "../replacement/14-replace-missing.buildworks.json"))).Single();
+            Require(replacement.importError == null, replacement.importError);
+            var replacementCopy = BlueprintExchangeFormat.Decode(Encoding.UTF8.GetString(
+                BlueprintExchangeFormat.Encode(ExternalBlueprintLibrary.DetachedCopy(replacement))));
+            Require(replacementCopy.parts.Count == 3 && replacementCopy.primaryPartId == replacementCopy.parts[0].stableId &&
+                replacementCopy.parts[0].metadata.hostId == "synthetic-fixture" &&
+                replacementCopy.parts.Skip(1).All(part => part.prefabName == "woodwall") &&
+                replacementCopy.parts[2].position.x == 2, "Ready replacement fixture lost its target or own walls");
             Console.WriteLine("PASS metadata native19/portable9: capture/save/update/import/export/reopen, unique snapshots/fresh host, missing retain, immutable copies/Undo, strict versions/IDs/fields/bounds and legacy8");
         }
 

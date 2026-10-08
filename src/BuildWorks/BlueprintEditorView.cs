@@ -1468,6 +1468,11 @@ namespace OstrixMods.BuildWorks
                 }
                 toolsMenu.SetActive(false);
 
+                Button replaceMissing = CreateButton("ToolsReplaceMissing", toolsPanel,
+                    T("editor.replace_title"), 286f, () => { HideToolsMenu(); MissingReplacementRequested?.Invoke(); });
+                AddTooltip((RectTransform)replaceMissing.transform, T("editor.replace_hint"));
+                toolsEntries.Add(replaceMissing);
+
                 InitializeCatalog();
 
                 modal = CreatePanel("Modal", safeRoot, new Color(0f, 0f, 0f, 0.72f), null).gameObject;
@@ -1531,6 +1536,8 @@ namespace OstrixMods.BuildWorks
         internal event Action<string> MoveSelectionToGroupRequested;
         internal event Action DuplicateSelectionRequested;
         internal event Action DeleteSelectionRequested;
+        internal event Action MissingReplacementRequested;
+        internal bool MissingReplacementAvailable { get; set; }
         internal event Action SupportCreated;
         internal event Action<bool> ItemContentsRequested;
         internal event Action<string> SupportSelected;
@@ -2043,6 +2050,7 @@ namespace OstrixMods.BuildWorks
                     "ToolsEntry6" => SupportCentreId != null,
                     "ToolsItem0" => ItemStandEditable,
                     "ToolsItem1" => ItemStandEditable && ItemStandHasContents,
+                    "ToolsReplaceMissing" => MissingReplacementAvailable,
                     _ => boundDocument?.EditablePartSelectionCount > 0
                 };
                 if (match) SetTopLeft((RectTransform)entry.transform, 12f, 82f + row++ * 36f, 286f, 32f);
@@ -2160,9 +2168,10 @@ namespace OstrixMods.BuildWorks
             ShowDialog();
         }
 
-        internal void ShowConfirmation(string title, string message, Action accepted)
+        internal void ShowConfirmation(string title, string message, Action accepted, float height = 260f)
         {
             ResetSaveMetadata();
+            ((RectTransform)modalTitle.transform.parent).sizeDelta = new Vector2(520f, height);
             errorDialog = false;
             confirmationAccepted = accepted;
             modalTitle.text = title;

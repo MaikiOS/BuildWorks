@@ -1,0 +1,118 @@
+{
+  "format": "buildworks-blueprint",
+  "version": 9,
+  "requiredPrefabIds": [
+    "BuildWorks_QA_KnownEnvelope",
+    "woodwall"
+  ],
+  "blueprint": {
+    "id": "b46e65603bed4a4da4184598e73ac115",
+    "name": "QA115 Replace Missing",
+    "prefabName": "BuildWorks_QA_KnownEnvelope",
+    "parts": [
+      {
+        "prefabName": "BuildWorks_QA_KnownEnvelope",
+        "position": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0.25881905,
+          "z": 0,
+          "w": 0.96592583
+        },
+        "stableId": "known",
+        "displayName": "QA missing target",
+        "editorVisible": true,
+        "editorLocked": false,
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "baseScale": {
+          "x": 2,
+          "y": 1,
+          "z": 0.5
+        },
+        "metadata": {
+          "version": 1,
+          "prefabId": "BuildWorks_QA_KnownEnvelope",
+          "name": "QA recorded envelope",
+          "kind": "QA fixture",
+          "hostId": "synthetic-fixture",
+          "prefabScale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "minimum": {
+            "x": -1,
+            "y": 0,
+            "z": -0.5
+          },
+          "maximum": {
+            "x": 1,
+            "y": 2,
+            "z": 0.5
+          }
+        }
+      },
+      {
+        "stableId": "a",
+        "prefabName": "woodwall",
+        "displayName": "QA own wall A",
+        "position": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "editorVisible": true,
+        "editorLocked": false
+      },
+      {
+        "stableId": "b",
+        "prefabName": "woodwall",
+        "displayName": "QA own wall B",
+        "position": {
+          "x": 2,
+          "y": 0,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "editorVisible": true,
+        "editorLocked": false
+      }
+    ],
+    "anchors": [],
+    "category": "OTHER",
+    "previewYaw": 45,
+    "previewPitch": 30,
+    "previewZoom": 1,
+    "groups": [],
+    "primaryPartId": "known"
+  }
+}

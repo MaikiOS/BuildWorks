@@ -56,6 +56,77 @@ internal static class ControllerInputAcceptance
         }
     }
 
+    internal static IEnumerable<object> RunMissingReplacement(Camera template, TMP_Text font, GameObject wall, string output)
+    {
+        string path = Path.Combine(output, "replace-" + Guid.NewGuid().ToString("N") + ".json");
+        var store = new CompositeBlueprintStore(path);
+        var evidence = new BlueprintSourceDocument("blueprint", "replacement.blueprint",
+            "#Pieces\nqa_absent;;0;0;0;0;0;0;1;\"\";1;1;1");
+        var parts = new[] {
+            new CompositeBlueprintStore.Part { stableId = "missing", prefabName = "qa_absent", displayName = "Missing", parentGroupId = "g",
+                rotation = new CompositeBlueprintStore.QuaternionData { w = 1 }, sourceDocumentId = evidence.Id, sourceLine = 2 },
+            new CompositeBlueprintStore.Part { stableId = "a", prefabName = "woodwall", displayName = "Own wall",
+                position = new CompositeBlueprintStore.VectorData { x = 3, y = 2, z = 1 },
+                rotation = new CompositeBlueprintStore.QuaternionData(Quaternion.Euler(0, 45, 0)),
+                scale = new CompositeBlueprintStore.VectorData { x = 2, y = .5f, z = 1 }, baseScale = new CompositeBlueprintStore.VectorData(wall.transform.localScale) },
+            new CompositeBlueprintStore.Part { stableId = "b", prefabName = "woodwall", displayName = "Own second wall",
+                position = new CompositeBlueprintStore.VectorData { x = 5, y = 2, z = 1 }, rotation = new CompositeBlueprintStore.QuaternionData { w = 1 } }
+        };
+        Require(store.TrySaveDocument("Replacement", "OTHER", parts,
+            new[] { new CompositeBlueprintStore.Group { stableId = "g", name = "Original group", pivotPartId = "missing" } },
+            Array.Empty<CompositeBlueprintStore.VectorData>(), "missing", null,
+            new[] { new CompositeBlueprintStore.Support { stableId = "s", name = "Placement",
+                rotation = new CompositeBlueprintStore.QuaternionData { w = 1 } } }, "s", out var saved, out string error,
+            sourceDocuments: new[] { CompositeBlueprintStore.SourceDocument.FromGeometry(evidence) }), error);
+        bool ownAvailable = true;
+        using (var controller = new BlueprintEditorController(store, template, font,
+            name => name == "woodwall" && ownAvailable ? wall : null, name => name,
+            () => Array.Empty<BlueprintEditorCatalogItem>(), message => { throw new InvalidOperationException(message); }))
+        {
+            Require(controller.OpenExisting(saved, out error), error); yield return null;
+            var document = controller.Document;
+            var view = Field<BlueprintEditorView>(controller, "view");
+            document.SelectOnly("missing"); Call(controller, "Bind", (object)null);
+            Require(!view.MissingReplacementAvailable, "Replacement enabled without any chosen own part");
+            document.ToggleSelection("a"); document.ToggleSelection("b"); Call(controller, "Bind", (object)null);
+            Require(view.MissingReplacementAvailable, "Explicit one-to-many selection not available");
+            int revision = document.RevisionToken;
+            view.ShowToolsMenu(new Vector2(Screen.width * .5f, Screen.height * .5f), false); yield return null;
+            NativeClick(view, null, "ToolsReplaceMissing"); yield return null;
+            Require(view.HasModal && document.Parts.Count == 3 && document.RevisionToken == revision,
+                "Tools action removed the missing row before confirmation");
+            NativeClick(view, null, Field<Button>(view, "dialogCancelButton")); yield return null;
+            Require(!view.HasModal && document.Parts.Count == 3 && document.RevisionToken == revision, "Cancel changed document");
+            Call(controller, "RequestMissingReplacement"); yield return null;
+            Require(view.HasModal, "Stale-prefab confirmation did not open"); ownAvailable = false;
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            Require(document.Parts.Count == 3 && document.RevisionToken == revision &&
+                Field<TMP_Text>(view, "statusText").text.Contains(BuildWorksLocalization.Text("editor.replace_changed")),
+                "Changed prefab availability silently committed replacement");
+            ownAvailable = true; Call(controller, "Bind", (object)null);
+            Call(controller, "RequestMissingReplacement"); yield return null;
+            Require(view.HasModal, "Fresh replacement confirmation did not open");
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            Require(document.Parts.Count == 2 && document.PrimaryPartId == "a" && document.PlacementSupportId == "s" &&
+                document.Sources[0].Text == evidence.Text && document.Groups.Single(group => group.StableId == "g").PivotPartId == "a" &&
+                document.Parts[0].Position.X == 3 && document.Parts[0].Scale.X == 2, "Confirmed replacement lost pose/source/support/pivot");
+            NativeClick(view, null, Field<Button>(view, "undoButton")); yield return null;
+            Require(document.Parts.Count == 3 && document.PrimaryPartId == "missing" && document.Groups.Count == 1,
+                "One native Undo did not restore missing row and hierarchy");
+            NativeClick(view, null, Field<Button>(view, "redoButton")); yield return null;
+            Require(document.Parts.Count == 2 && document.Groups.Count == 2, "Native Redo failed");
+            NativeClick(view, null, "Save"); yield return null;
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            Require(!document.IsDirty, "Replacement Save failed"); controller.Close(true);
+        }
+        var reopened = new CompositeBlueprintStore(path).All().Single();
+        Require(reopened.parts.Count == 2 && reopened.parts[0].position.x == 3 && reopened.parts[0].scale.x == 2 &&
+            reopened.groups.Count == 2 && reopened.placementSupportId == "s" && reopened.sourceDocuments[0].text == evidence.Text,
+            "Replacement disk reopen lost structure or original evidence");
+        File.WriteAllText(Path.Combine(output, "replacement-check.txt"),
+            "PASS actual Tools/Cancel/confirmation/stale prefab/one Undo/Redo/Save/reopen; own poses, groups, primary/pivots, independent support and source preserved. No game construction proof.");
+    }
+
     internal static IEnumerable<object> RunPrefabMetadata(Camera template, TMP_Text font, string output)
     {
         var prefab = new GameObject("metadata_piece");

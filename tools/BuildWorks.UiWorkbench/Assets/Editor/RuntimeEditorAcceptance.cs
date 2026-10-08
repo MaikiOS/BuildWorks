@@ -338,7 +338,7 @@ public static class RuntimeEditorAcceptance
                     scene.SetViewport(view.ViewportScreenRect());
                     Call(controller, "FrameAll");
                     foreach (string state in new[] { "select", "transform", "array", "contour", "catalog",
-                        "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "save-metadata", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru", "exchange-armor", "exchange-armor-ru", "exchange-missing", "exchange-missing-ru" })
+                        "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "save-metadata", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru", "exchange-armor", "exchange-armor-ru", "exchange-missing", "exchange-missing-ru", "replace-tools", "replace-confirm", "replace-confirm-ru" })
                     {
                         Require(Screen.width == width && Screen.height == height,
                             "GameView changed before " + state + ": " + Screen.width + "x" + Screen.height);
@@ -346,6 +346,7 @@ public static class RuntimeEditorAcceptance
                         view.HideOutlinerMenu();
                         view.HideViewportSettings();
                         view.HideDialog();
+                        view.HideToolsMenu();
                         document.SelectSupport(null);
                         scene.ModelSpaceGizmo = state == "supports";
                         if (state == "supports")
@@ -472,6 +473,18 @@ public static class RuntimeEditorAcceptance
                                     "Import screenshot missed completed inspection");
                             }
                         }
+                        else if (state == "replace-tools")
+                        {
+                            view.MissingReplacementAvailable = true;
+                            view.ShowToolsMenu(new Vector2(width * .5f, height * .5f), false);
+                        }
+                        else if (state.StartsWith("replace-confirm", StringComparison.Ordinal))
+                        {
+                            BuildWorksLocalization.RussianLanguage = state.EndsWith("-ru", StringComparison.Ordinal);
+                            view.ShowConfirmation(BuildWorksLocalization.Text("editor.replace_title"),
+                                BuildWorksLocalization.Text("editor.replace_confirm", new string('W', 128), 50000, new string('W', 64) + "…"),
+                                () => { }, height: 450f);
+                        }
                         else Call(controller, "UpdateGizmo");
                         // Product Destroy() and TMP rebuilds must see a real frame.
                         yield return null;
@@ -543,6 +556,8 @@ public static class RuntimeEditorAcceptance
                     foreach (object step in ControllerInputAcceptance.RunSinglePart(template, fontTemplate, source["woodwall"], output)) yield return step;
                     foreach (object step in ControllerInputAcceptance.RunMissingExchange(template, fontTemplate, source["woodwall"], output)) yield return step;
                     foreach (object step in ControllerInputAcceptance.RunPrefabMetadata(template, fontTemplate, output)) yield return step;
+                    foreach (object step in ControllerInputAcceptance.RunMissingReplacement(template, fontTemplate, source["woodwall"], output)) yield return step;
+                    checks.Add("Explicit missing replacement: actual Tools button/Cancel/review/commit, one Undo/Redo, stale prefab refusal, exact source/poses and native Save/reopen. No game construction proof.");
                     checks.Add("Prefab metadata: actual nested root-local capture/fresh save, unknown source owner, missing recorded frame pose/scale, no snap/model surfaces, native Save and disk reopen; no game proof.");
                     checks.Add("Explicit missing-part copy: actual default/ID/count/Back reset/native confirmation/stale host refusal/new confirmation -> one-part editor; exact source retained. No game construction proof.");
                     checks.Add("Single-part editor: actual Save/metadata clicks -> disk reopen preserves one row/name/scale; empty editor save refused. Native single-part construction/debit/reload remain unverified.");
@@ -643,7 +658,14 @@ public static class RuntimeEditorAcceptance
             Require(scroll.verticalNormalizedPosition <= .001f, "Material paging did not reach last items");
             EnsureInside(scroll.viewport, (RectTransform)scroll.content.Find("CatalogOption_Материал 35"));
         }
-        if (state == "save-metadata") EnsureInside(Field<RectTransform>(view, "safeRoot"),
+        if (state == "replace-tools") EnsureInside(Field<RectTransform>(view, "safeRoot"), Field<RectTransform>(view, "toolsPanel"));
+        if (state.StartsWith("replace-confirm", StringComparison.Ordinal))
+        {
+            TMP_Text message = Field<TMP_Text>(view, "modalMessage");
+            Require(message.GetPreferredValues(message.text, message.rectTransform.rect.width, 0).y <= message.rectTransform.rect.height,
+                "Replacement confirmation truncates long ID/name");
+        }
+        if (state == "save-metadata" || state.StartsWith("replace-confirm", StringComparison.Ordinal)) EnsureInside(Field<RectTransform>(view, "safeRoot"),
             (RectTransform)Field<TMP_Text>(view, "modalTitle").transform.parent);
         if (state.StartsWith("exchange"))
         {

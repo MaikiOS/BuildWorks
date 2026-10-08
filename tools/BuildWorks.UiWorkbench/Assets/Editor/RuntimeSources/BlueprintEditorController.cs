@@ -583,6 +583,7 @@ namespace OstrixMods.BuildWorks
                 document.DuplicateSelection(new Point3(0.5, 0.0, 0.5),
                     BuildWorksLocalization.Text("editor.generated.copy")));
             view.DeleteSelectionRequested += DeleteActiveSelection;
+            view.MissingReplacementRequested += RequestMissingReplacement;
             view.PrimaryPartRequested += stableId => ApplyDocumentEdit(() =>
                 document.SetPrimaryPart(stableId));
             view.PrimaryGroupRequested += stableId => ApplyDocumentEdit(() =>
@@ -2819,6 +2820,69 @@ namespace OstrixMods.BuildWorks
                 BuildWorksLocalization.Text(contents == null ? "editor.item.remove_confirm" : "editor.item.replace_confirm"), Apply);
         }
 
+        private bool TryMissingReplacement(out BlueprintEditorPart target, out BlueprintEditorPart[] replacements)
+        {
+            target = null;
+            replacements = Array.Empty<BlueprintEditorPart>();
+            if (document == null || document.ActiveSupportId != null || document.Selection.Count < 2) return false;
+            var selectedIds = new HashSet<string>(document.Selection, StringComparer.Ordinal);
+            var groups = document.Groups.ToDictionary(group => group.StableId, StringComparer.Ordinal);
+            bool SelectedAncestor(string parent)
+            {
+                for (string id = parent; id != null; id = groups[id].ParentGroupId)
+                    if (selectedIds.Contains(id)) return true;
+                return false;
+            }
+            bool AvailableAncestors(string parent)
+            {
+                for (string id = parent; id != null; id = groups[id].ParentGroupId)
+                    if (!groups[id].Visible || groups[id].Locked) return false;
+                return true;
+            }
+            bool Selected(BlueprintEditorPart part)
+            {
+                return selectedIds.Contains(part.StableId) || SelectedAncestor(part.ParentGroupId);
+            }
+            var selected = document.Parts.Where(Selected).ToArray();
+            var missing = selected.Where(part => part.ScaleIsAbsolute || !ResolveVisualSource(part.PrefabName)).ToArray();
+            if (missing.Length != 1 || selected.Length < 2 ||
+                !document.Selection.Contains(missing[0].StableId) ||
+                selected.Any(part => !part.Visible || part.Locked || !AvailableAncestors(part.ParentGroupId) ||
+                    selectedIds.Contains(part.StableId) && SelectedAncestor(part.ParentGroupId)) ||
+                groups.Values.Any(group => selectedIds.Contains(group.StableId) &&
+                    (!group.Visible || group.Locked || !AvailableAncestors(group.ParentGroupId) || SelectedAncestor(group.ParentGroupId)))) return false;
+            target = missing[0];
+            replacements = selected.Where(part => part.StableId != missing[0].StableId).ToArray();
+            return true;
+        }
+
+        private void RequestMissingReplacement()
+        {
+            if (!IsEditing || keyboardPreview || IsGizmoDragging || placementItem != null) return;
+            if (document.Groups.Count >= BlueprintEditorDocument.MaximumGroups)
+            { view.SetStatus(BuildWorksLocalization.Text("editor.replace_limit"), error: true); return; }
+            if (!TryMissingReplacement(out BlueprintEditorPart target, out BlueprintEditorPart[] replacements))
+            { view.SetStatus(BuildWorksLocalization.Text("editor.replace_hint"), error: true); return; }
+            var expectedDocument = document;
+            int revision = document.RevisionToken;
+            string[] selection = document.Selection.ToArray();
+            string[] ids = replacements.Select(part => part.StableId).ToArray();
+            string firstName = replacements[0].DisplayName;
+            if (firstName.Length > 64) firstName = firstName.Substring(0, 64) + "…";
+            view.ShowConfirmation(BuildWorksLocalization.Text("editor.replace_title"),
+                BuildWorksLocalization.Text("editor.replace_confirm", target.PrefabName, replacements.Length, firstName), () =>
+                {
+                    if (!ReferenceEquals(document, expectedDocument) || document.RevisionToken != revision ||
+                        !document.Selection.SequenceEqual(selection) ||
+                        !TryMissingReplacement(out BlueprintEditorPart current, out BlueprintEditorPart[] fresh) ||
+                        current.StableId != target.StableId || !fresh.Select(part => part.StableId).SequenceEqual(ids))
+                    { view.SetStatus(BuildWorksLocalization.Text("editor.replace_changed"), error: true); return; }
+                    if (ApplyDocumentEdit(() => document.ReplacePartWithSelection(target.StableId,
+                        BuildWorksLocalization.Text("editor.replace_group"))))
+                        view.SetStatus(BuildWorksLocalization.Text("editor.replace_done", replacements.Length));
+                }, height: 450f);
+        }
+
         private void RequestCatalog()
         {
             if (!IsEditing || keyboardPreview) return;
@@ -3859,6 +3923,7 @@ namespace OstrixMods.BuildWorks
                 ? bounds.size
                 : (Vector3?)null;
             view.SupportCentreId = transformSupportPivotId;
+            view.MissingReplacementAvailable = TryMissingReplacement(out _, out _);
             BlueprintEditorPart standPart = EditableItemStand(document.ActiveNodeId, out _);
             view.ItemStandEditable = standPart != null && document.Selection.Count == 1;
             view.ItemStandHasContents = standPart?.ForeignData != null && !standPart.ForeignData.ContentsCleared;

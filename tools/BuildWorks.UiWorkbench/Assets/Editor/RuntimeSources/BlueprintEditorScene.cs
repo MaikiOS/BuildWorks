@@ -125,6 +125,7 @@ namespace OstrixMods.BuildWorks
         {
             public string PrefabName;
             public BlueprintForeignPartData ForeignData;
+            public BlueprintPrefabMetadata Metadata;
             public string ContentWarning;
             public bool Placeholder;
             public bool Locked;
@@ -566,7 +567,7 @@ namespace OstrixMods.BuildWorks
                     bool placeholder = !source;
                     if (!visuals.TryGetValue(part.StableId, out VisualNode visual) ||
                         visual.PrefabName != part.PrefabName || visual.Placeholder != placeholder ||
-                        !ReferenceEquals(visual.ForeignData, part.ForeignData))
+                        !ReferenceEquals(visual.ForeignData, part.ForeignData) || !ReferenceEquals(visual.Metadata, part.Metadata))
                     {
                         visual = CreateVisual(part, source, cacheMaterials: true);
                         visual.Root.SetActive(false);
@@ -1082,7 +1083,7 @@ namespace OstrixMods.BuildWorks
                     VisualNode visual = index < target.Count ? target[index] : null;
                     if (visual == null || visual.PrefabName != part.PrefabName ||
                         visual.Placeholder != !source ||
-                        !ReferenceEquals(visual.ForeignData, part.ForeignData))
+                        !ReferenceEquals(visual.ForeignData, part.ForeignData) || !ReferenceEquals(visual.Metadata, part.Metadata))
                     {
                         VisualNode replacement = CreateVisual(part, source, selectable: false);
                         DestroyVisual(visual);
@@ -1445,8 +1446,8 @@ namespace OstrixMods.BuildWorks
                 visual.Root.transform.SetLocalPositionAndRotation(
                     pivot + rotation * ((sourcePosition - pivot) * uniformScale) + translation,
                     rotation * sourceRotation);
-                visual.Root.transform.localScale = visual.Placeholder ? Vector3.one * .3f :
-                    ToUnity(part.ResolveScale(ToGeometry(visual.BaseScale))) * uniformScale;
+                visual.Root.transform.localScale = VisualScale(visual, part) *
+                    (visual.Placeholder && part.Metadata?.Minimum == null ? 1f : uniformScale);
             }
             UpdateHighlights(document);
         }
@@ -2130,6 +2131,7 @@ namespace OstrixMods.BuildWorks
             {
                 PrefabName = part.PrefabName,
                 ForeignData = part.ForeignData,
+                Metadata = part.Metadata,
                 Placeholder = !source
             };
             try
@@ -2137,7 +2139,7 @@ namespace OstrixMods.BuildWorks
                 result.Root = source
                     ? PlacementGhostPreviewView.CreateVisualClone(
                         source, "Part_" + part.StableId, editorLayer)
-                    : CreatePlaceholder(part.StableId, result.OwnedAssets);
+                    : CreatePlaceholder(part.StableId, part.Metadata, result.OwnedAssets);
                 result.Root.transform.SetParent(root.transform, false);
                 if (source) result.Root.transform.localScale = source.transform.localScale;
                 if (source) BlueprintItemStandPreview.TryAdd(source, result.Root,
@@ -2330,6 +2332,7 @@ namespace OstrixMods.BuildWorks
 
         private GameObject CreatePlaceholder(
             string stableId,
+            BlueprintPrefabMetadata metadata,
             ICollection<UnityEngine.Object> visualAssets)
         {
             var placeholder = new GameObject("Missing_" + stableId)
@@ -2338,6 +2341,11 @@ namespace OstrixMods.BuildWorks
                 layer = editorLayer
             };
             Mesh mesh = CreateCubeMesh();
+            if (metadata?.Minimum != null)
+            {
+                SetRecordedBounds(mesh, metadata);
+                mesh.SetIndices(new[] { 0, 1, 1, 2, 2, 3, 3, 0, 4, 5, 5, 6, 6, 7, 7, 4, 0, 4, 1, 5, 2, 6, 3, 7 }, MeshTopology.Lines, 0);
+            }
             placeholder.AddComponent<MeshFilter>().sharedMesh = mesh;
             placeholder.AddComponent<MeshRenderer>();
             visualAssets.Add(mesh);
@@ -2441,10 +2449,22 @@ namespace OstrixMods.BuildWorks
         {
             TryUnityTransform(part, out Vector3 position, out Quaternion rotation);
             visual.Root.transform.SetLocalPositionAndRotation(position, rotation);
-            visual.Root.transform.localScale = visual.Placeholder ? Vector3.one * .3f :
-                ToUnity(part.ResolveScale(ToGeometry(visual.BaseScale)));
+            visual.Root.transform.localScale = VisualScale(visual, part);
             visual.Root.SetActive(effectivelyVisible);
             visual.Locked = effectivelyLocked;
+        }
+
+        private static Vector3 VisualScale(VisualNode visual, BlueprintEditorPart part) =>
+            visual.Placeholder && part.Metadata?.Minimum == null ? Vector3.one * .3f :
+                ToUnity(part.ResolveScale(visual.Placeholder ? part.Metadata.PrefabScale : ToGeometry(visual.BaseScale)));
+
+        private static void SetRecordedBounds(Mesh mesh, BlueprintPrefabMetadata metadata)
+        {
+            Vector3 minimum = ToUnity(metadata.Minimum.Value), maximum = ToUnity(metadata.Maximum.Value);
+            Vector3 center = (minimum + maximum) * .5f, size = maximum - minimum;
+            Vector3[] vertices = mesh.vertices;
+            for (int i = 0; i < vertices.Length; ++i) vertices[i] = center + Vector3.Scale(vertices[i], size);
+            mesh.vertices = vertices; mesh.RecalculateBounds();
         }
 
         private static Point3 ToGeometry(Vector3 value) =>
@@ -2523,6 +2543,13 @@ namespace OstrixMods.BuildWorks
 
         private void CapturePickSurfaces(VisualNode visual, bool cacheGeometry)
         {
+            if (visual.Placeholder && visual.Metadata?.Minimum != null)
+            {
+                Mesh proxy = CreateCubeMesh(); SetRecordedBounds(proxy, visual.Metadata);
+                visual.OwnedAssets.Add(proxy);
+                AddPickSurface(visual, visual.Renderers[0], proxy, visual.Root.transform, false);
+                return;
+            }
             foreach (MeshFilter filter in visual.Root.GetComponentsInChildren<MeshFilter>(true))
             {
                 Renderer renderer = filter.GetComponent<Renderer>();

@@ -56,6 +56,76 @@ internal static class ControllerInputAcceptance
         }
     }
 
+    internal static IEnumerable<object> RunPrefabMetadata(Camera template, TMP_Text font, string output)
+    {
+        var prefab = new GameObject("metadata_piece");
+        GameObject child = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        child.transform.SetParent(prefab.transform, false);
+        child.transform.localPosition = new Vector3(3, 5, 7);
+        child.transform.localRotation = Quaternion.Euler(0, 90, 0);
+        child.transform.localScale = new Vector3(2, 4, 6);
+        Object.DestroyImmediate(child.GetComponent<Collider>());
+        prefab.AddComponent<Piece>().m_name = "Metadata fixture";
+        prefab.transform.SetPositionAndRotation(new Vector3(10, 20, 30), Quaternion.Euler(10, 25, 35));
+        prefab.transform.localScale = new Vector3(2, .5f, 3);
+        prefab.SetActive(false);
+        try
+        {
+            var metadata = BlueprintPrefabMetadataCapture.Capture(prefab);
+            Require(metadata != null && metadata.sourceId == null && metadata.kind == "Piece" &&
+                (metadata.minimum.Value.ToVector3() - new Vector3(0, 3, 6)).magnitude < .0001f &&
+                (metadata.maximum.Value.ToVector3() - new Vector3(6, 7, 8)).magnitude < .0001f,
+                "Prefab snapshot did not cancel root TRS or invented ownership");
+            Require(!BlueprintPrefabMetadataCapture.TryGetLocalVisualBounds(prefab, out _), "Shared Hammer helper changed inactive-root behavior");
+            bool available = true;
+            string path = Path.Combine(output, "metadata-" + Guid.NewGuid().ToString("N") + ".json");
+            var store = new CompositeBlueprintStore(path);
+            store.ConfigurePrefabMetadata(_ => available ? BlueprintPrefabMetadataCapture.Capture(prefab) : null);
+            var part = new CompositeBlueprintStore.Part { prefabName = prefab.name, stableId = "recorded", displayName = "Recorded",
+                position = new CompositeBlueprintStore.VectorData { x = 4 }, rotation = new CompositeBlueprintStore.QuaternionData(Quaternion.Euler(0, 30, 0)),
+                baseScale = new CompositeBlueprintStore.VectorData(prefab.transform.localScale), scale = new CompositeBlueprintStore.VectorData { x = 1, y = .75f, z = 2 } };
+            Require(store.TrySave("Metadata", new[] { part }, Array.Empty<CompositeBlueprintStore.VectorData>(), out var saved, out string error), error);
+            child.transform.localPosition += Vector3.right;
+            Require(store.TryUpdateParts(saved, saved.parts, saved.anchors, out error) &&
+                Mathf.Abs(saved.parts[0].metadata.minimum.Value.x - 1) < .0001f, "Prefab mutation reused cached bounds");
+            available = false;
+            using (var controller = new BlueprintEditorController(store, template, font, _ => null, name => name,
+                () => Array.Empty<BlueprintEditorCatalogItem>(), message => { throw new InvalidOperationException(message); }))
+            {
+                Require(controller.OpenExisting(saved, out error), error); yield return null;
+                var scene = Field<BlueprintEditorScene>(controller, "scene");
+                GameObject sceneRoot = Field<GameObject>(scene, "root");
+                MeshFilter frame = sceneRoot.GetComponentsInChildren<MeshFilter>(true).Single(value => value.gameObject.name == "Missing_recorded");
+                Require(frame.sharedMesh.GetTopology(0) == MeshTopology.Lines && frame.sharedMesh.GetIndexCount(0) == 24,
+                    "Saved bounds were shown as a solid fabricated model");
+                Vector3 local = saved.parts[0].metadata.minimum.Value.ToVector3();
+                Vector3 expected = sceneRoot.transform.TransformPoint(new Vector3(4, 0, 0) + Quaternion.Euler(0, 30, 0) * Vector3.Scale(local, new Vector3(2, .375f, 6)));
+                Require((frame.transform.TransformPoint(local) - expected).magnitude < .001f &&
+                    !scene.TryGetBounds(new[] { "recorded" }, out _), "Bounds frame lost pose/scale or became model geometry");
+                var target = new RenderTexture(960, 540, 24);
+                try
+                {
+                    scene.Camera.targetTexture = target; scene.Camera.Render();
+                    RuntimeEditorAcceptance.SavePixels(target, Path.Combine(output, "metadata-bounds-frame.png"));
+                }
+                finally { scene.Camera.targetTexture = null; Object.DestroyImmediate(target); }
+                Require(controller.Document.Rename("recorded", "Retained"), "Could not edit missing record");
+                Call(controller, "Bind", (object)null);
+                var view = Field<BlueprintEditorView>(controller, "view");
+                NativeClick(view, null, "Save"); yield return null;
+                NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+                Require(!controller.Document.IsDirty, "Metadata save failed");
+                controller.Close(true);
+            }
+            var reopened = new CompositeBlueprintStore(path).All().Single();
+            Require(reopened.parts[0].metadata.minimum.Value.x > .999f && reopened.parts[0].displayName == "Retained",
+                "Missing editor save/reopen erased captured metadata");
+            File.WriteAllText(Path.Combine(output, "metadata-check.txt"),
+                "PASS actual capture: nested rotated/nonuniform child, inactive translated/rotated/scaled prefab; fresh save, unknown owner; missing recorded frame exact pose/scale, no model bounds; native Save and disk reopen. No game construction proof.");
+        }
+        finally { Object.DestroyImmediate(prefab); }
+    }
+
     internal static IEnumerable<object> RunMissingExchange(Camera template, TMP_Text font, GameObject wall, string output)
     {
         string folder = Path.Combine(output, "missing-exchange-" + Guid.NewGuid().ToString("N"));

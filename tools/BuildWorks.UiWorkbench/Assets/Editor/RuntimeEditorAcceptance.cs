@@ -542,6 +542,8 @@ public static class RuntimeEditorAcceptance
                     yield return null;
                     foreach (object step in ControllerInputAcceptance.RunSinglePart(template, fontTemplate, source["woodwall"], output)) yield return step;
                     foreach (object step in ControllerInputAcceptance.RunMissingExchange(template, fontTemplate, source["woodwall"], output)) yield return step;
+                    foreach (object step in ControllerInputAcceptance.RunPrefabMetadata(template, fontTemplate, output)) yield return step;
+                    checks.Add("Prefab metadata: actual nested root-local capture/fresh save, unknown source owner, missing recorded frame pose/scale, no snap/model surfaces, native Save and disk reopen; no game proof.");
                     checks.Add("Explicit missing-part copy: actual default/ID/count/Back reset/native confirmation/stale host refusal/new confirmation -> one-part editor; exact source retained. No game construction proof.");
                     checks.Add("Single-part editor: actual Save/metadata clicks -> disk reopen preserves one row/name/scale; empty editor save refused. Native single-part construction/debit/reload remain unverified.");
                 }
@@ -985,7 +987,7 @@ public static class RuntimeEditorAcceptance
                 canonical.transform.localScale = observedBase;
                 editor.Close(true);
             }
-            checks.Add("Pinned native18/portable8 scale: actual controller import/save/reopen/edit, thumbnail PreviewSession and world ghost agree across canonical(2,.5,3)/Hammer(.5,2,.25); scaled/mirrored capture parents refused. Renderer/format tests, no native construction/reload.");
+            checks.Add("Pinned native19/portable9 scale: actual controller import/save/reopen/edit, thumbnail PreviewSession and world ghost agree across canonical(2,.5,3)/Hammer(.5,2,.25); scaled/mirrored capture parents refused. Renderer/format tests, no native construction/reload.");
         }
         finally { Object.DestroyImmediate(canonical); Object.DestroyImmediate(hammer); Object.DestroyImmediate(ghost); }
     }
@@ -1003,7 +1005,7 @@ public static class RuntimeEditorAcceptance
         Require(reloaded.All().Count == 1, "Actual disk library roundtrip");
         Require(Mathf.Abs(reloaded.All()[0].parts[0].scale.x - expected) < 0.0001f, "Store discarded scale");
         CheckReopenedCopy(controller, reloaded, expected);
-        Require(File.ReadAllText(path).Contains("\"version\":18"), "Controller did not write format18");
+        Require(File.ReadAllText(path).Contains("\"version\":19"), "Controller did not write format19");
         checks.Add("Controller save -> disk format18 -> new store -> OpenExisting retains scale, rotated root-owned support and placement reference; transient support focus absent");
     }
 

@@ -1,5 +1,21 @@
 # BuildWorks development roadmap
 
+## .114 — prefab metadata and missing frames, verified source
+
+Native19/portable9 record ID/name/type/host/root scale and optional local bounds.
+Fresh per-operation capture, missing retention, copies/Undo/import/export/reopen
+and a recorded wire frame passed Store353 and Workbench300. Unknown sizes retain
+small markers; source mod ownership and skinned bounds remain unknown. Frames
+are not model/contact/snap geometry. Normal/QA0/0, required checks, actual Session17
+and independent correctness/complexity reviews passed. QA deployment is recorded
+in checkpoint-0.19.114.md; native build/reload/network remain unverified.
+Fog v11 is now in the active goal, still not connected to gameplay.
+See checkpoint-0.19.114.md and QA_0.19.114_RU.md.
+
+QA .114 installed only in TerrainRamp-1.0-Test through the guarded script;
+SHA `CE951EA3E848592BF779CD78A87B2BB88F9FAC7CBAEBFB962B94B94100CD62A7`. Both DLL hashes match; all48 QA files
+and library unchanged. No Valheim launch/native game/reload/network acceptance.
+
 ## .113 — explicit missing-part copy, verified QA
 
 Import/native JSON+ZIP export offer a separate copy without missing prefabs.

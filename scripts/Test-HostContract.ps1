@@ -127,6 +127,7 @@ $pluginSource = Get-Content -LiteralPath $pluginSourcePath -Raw
 $sessionSource = Get-Content -LiteralPath $sessionSourcePath -Raw
 $hudSource = Get-Content -LiteralPath $hudSourcePath -Raw
 $blueprintRegistrySource = Get-Content -LiteralPath $blueprintRegistrySourcePath -Raw
+$prefabMetadataSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src/BuildWorks/BlueprintPrefabMetadataCapture.cs') -Raw
 $catalogSource = Get-Content -LiteralPath $catalogSourcePath -Raw
 $blueprintStoreSource = Get-Content -LiteralPath $blueprintStoreSourcePath -Raw
 $thumbnailSource = Get-Content -LiteralPath $thumbnailSourcePath -Raw
@@ -844,7 +845,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.113.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.114.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -1441,7 +1442,10 @@ Assert-Contract ($previewSource -match
     $previewSource -match 'renderer\.enabled = sourceRenderer\.enabled;' -and
     $previewSource -notmatch
         'renderer\.enabled = sourceRenderer\.enabled \|\|' -and
-    $blueprintRegistrySource -match 'IsActiveWithin\(root\.transform, filter\.transform\)' -and
+    $blueprintRegistrySource -match 'BlueprintPrefabMetadataCapture\.TryGetLocalVisualBounds\(root, out bounds\)' -and
+    $prefabMetadataSource -match 'bool includeInactiveRoot = false' -and
+    $prefabMetadataSource -match 'IsActiveWithin\(root\.transform, filter\.transform, includeInactiveRoot\)' -and
+    $prefabMetadataSource -match 'if \(!current\.gameObject\.activeSelf\) return false;' -and
     $thumbnailSource -match '!renderer\.gameObject\.activeInHierarchy') `
     'Composite preview can still activate hidden wear or damage variants.'
 $catalogLayout = $blueprintRegistry.Methods | Where-Object Name -eq 'ApplyCatalogLayout'
@@ -1868,7 +1872,7 @@ Assert-Contract ($updateDocumentMethods.Count -eq 5 -and
         @($_.Parameters | Where-Object Name -eq 'placementSupportId').Count -eq 1
     }).Count -eq 1) `
     'Blueprint frame update overload or a compatibility overload is missing.'
-Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion = 18' -and
+Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion = 19' -and
     $blueprintStoreSource -match 'loaded\.version < 6' -and
     $blueprintStoreSource -match 'ValidScale\(part\.scale\)' -and
     $blueprintStoreSource -match 'if \(loaded\.version < 4\)' -and
@@ -3162,4 +3166,4 @@ $worldCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'Preci
 $worldCaptureCalls = ($worldCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($worldCaptureCalls -match 'BlueprintStorageCapture::TryCapture' -and $worldCaptureCalls -match 'CompositeBlueprintStore/ForeignPartData::FromGeometry') 'World selection does not preserve container snapshots.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.113 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.114 and Valheim Steam build 25185596.'

@@ -510,6 +510,7 @@ namespace OstrixMods.BuildWorks
                     rotation = part.rotation,
                     scale = part.scale,
                     baseScale = part.baseScale,
+                    metadata = CompositeBlueprintStore.PrefabMetadata.FromGeometry(part.metadata?.ToGeometry()),
                     scaleIsAbsolute = part.scaleIsAbsolute,
                     parentGroupId = part.parentGroupId == null ? null : ids[part.parentGroupId],
                     editorVisible = part.editorVisible,

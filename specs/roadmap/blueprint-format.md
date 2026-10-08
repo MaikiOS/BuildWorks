@@ -1,10 +1,15 @@
 # Blueprint format and large-construction work
 
-Current .112 format: native Store18 / portable JSON8 allow1–50000 parts; empty is invalid.
-Older native<=17 / portable<=7 retain min2. Optional `Part.baseScale` pins the imported root
-scale; `scale` is a relative edit. Older16/6 retain their migration semantics.
-`Part.scaleIsAbsolute` preserves an unresolved basis; no intrinsic1 or bounds are invented.
-World refuses pending basis. [Evidence and limits](../../docs/checkpoint-0.19.112.md).
+Current .114 format: native Store19 / portable JSON9 allow1–50000 parts; empty is invalid.
+Older native<=17 / portable<=7 retain min2;18/8 without metadata remain readable.
+Optional Part.metadata v1 records ID/name/type/host/prefabScale and paired local
+minimum/maximum. Declared sourceId/sourceVersion are provenance, not verified mod
+ownership or authority. Save/import/export refresh available static prefab snapshots;
+missing prefabs retain prior data. Skinned bounds stay unknown. Missing editor frames
+use recorded bounds/pose/root scale, never model/contact/snap geometry. Unknown bounds
+use the small uncertainty marker. Optional Part.baseScale pins imported root scale;
+scale is relative, scaleIsAbsolute retains unresolved basis. Older16/6 keep migration.
+World refuses pending basis. [Evidence and limits](../../docs/checkpoint-0.19.114.md).
 
 .87 policy/evidence: [continuation audit](../../docs/continuation-audit-2026-10-07.md).
 Survival mounts use the supplied same-prefab item's own properties for archived snapshots and recipes.

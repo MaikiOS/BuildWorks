@@ -33,7 +33,7 @@ namespace OstrixMods.BuildWorks
         internal const string DefaultCategory = "OTHER";
         private const string LegacyDefaultCategory = "ПРОЧЕЕ";
         private const string LocalizationPrefix = "$buildworks_";
-        private const int FormatVersion = 18;
+        private const int FormatVersion = 19;
         private const int MaximumBlueprints = 32;
         private const int MaximumCategories = 12;
         private const int MaximumAnchors = 512;
@@ -49,6 +49,7 @@ namespace OstrixMods.BuildWorks
         private int importGeneration;
         private int preparationGeneration;
         private Func<string, VectorData?> importPrefabScale;
+        private Func<string, PrefabMetadata> prefabMetadata;
         private Func<string, int> importPrefabHash;
         private Func<int> importWorldLevel;
         private int? preparedWorldLevel;
@@ -153,6 +154,28 @@ namespace OstrixMods.BuildWorks
             var result = new List<Blueprint>(data.blueprints);
             result.AddRange(preparedExternalBlueprints);
             return catalogSnapshot = result;
+        }
+
+        internal void ConfigurePrefabMetadata(Func<string, PrefabMetadata> resolve) => prefabMetadata = resolve;
+
+        private void CaptureMetadata(IEnumerable<Part> parts)
+        {
+            if (prefabMetadata == null) return;
+            var snapshot = new Dictionary<string, PrefabMetadata>(StringComparer.Ordinal);
+            foreach (Part part in parts)
+            {
+                if (part == null || string.IsNullOrWhiteSpace(part.prefabName)) continue;
+                if (!snapshot.TryGetValue(part.prefabName, out PrefabMetadata metadata))
+                    snapshot.Add(part.prefabName, metadata = prefabMetadata(part.prefabName));
+                if (metadata != null)
+                {
+                    if (metadata.ToGeometry().PrefabId != part.prefabName) throw new ArgumentException("Prefab metadata identity mismatch.");
+                    var fresh = metadata.Copy();
+                    if (fresh.sourceId == null && part.metadata != null)
+                    { fresh.sourceId = part.metadata.sourceId; fresh.sourceVersion = part.metadata.sourceVersion; }
+                    part.metadata = fresh;
+                }
+            }
         }
 
         internal bool TryGetOrCreatePlacementCopy(Blueprint source, out Blueprint copy, out string error)
@@ -292,6 +315,7 @@ namespace OstrixMods.BuildWorks
                     throw new InvalidDataException(prepared.First(document => document.importError != null).importError);
                 if (omitMissing != null)
                     prepared = prepared.Select(document => CopyWithoutMissing(document, omitMissing.PrefabIds)).ToArray();
+                CaptureMetadata(prepared.SelectMany(document => document.parts));
                 string target = Path.Combine(ImportDirectory, "import_" + Guid.NewGuid().ToString("N") + ".zip");
                 ImportError = null;
                 ImportResultPath = null;
@@ -367,6 +391,8 @@ namespace OstrixMods.BuildWorks
                     blueprint = CopyWithoutMissing(ExternalBlueprintLibrary.PrepareForHost(blueprint,
                         importPrefabScale, importPrefabHash, importWorldLevel?.Invoke()), omitMissing.PrefabIds);
                 }
+                blueprint = blueprint.ImportCopy();
+                CaptureMetadata(blueprint.parts);
                 Blueprint prepared = clearStorage || clearMounts || omitArmorState
                     ? CopyWithContentsPolicy(blueprint, clearStorage, clearMounts, prefabHash, omitArmorState)
                     : blueprint.IsExternal ? ExternalBlueprintLibrary.DetachedCopy(blueprint) : blueprint;
@@ -893,7 +919,7 @@ namespace OstrixMods.BuildWorks
             IReadOnlyList<VectorData> anchors,
             out string error)
         {
-            List<Part> prepared = PrepareParts(parts);
+            List<Part> prepared = CloneParts(parts);
             if (blueprint?.parts != null && prepared.Count == blueprint.parts.Count)
             {
                 for (int index = 0; index < prepared.Count; ++index)
@@ -909,6 +935,7 @@ namespace OstrixMods.BuildWorks
                     prepared[index].sourceDocumentId = blueprint.parts[index].sourceDocumentId;
                     prepared[index].sourceLine = blueprint.parts[index].sourceLine;
                     prepared[index].baseScale = prepared[index].baseScale ?? blueprint.parts[index].baseScale;
+                    prepared[index].metadata = prepared[index].metadata ?? PrefabMetadata.FromGeometry(blueprint.parts[index].metadata?.ToGeometry());
                     if (!prepared[index].baseScale.HasValue)
                         prepared[index].scaleIsAbsolute = blueprint.parts[index].scaleIsAbsolute;
                     prepared[index].foreignData = CloneForeignData(blueprint.parts[index].foreignData);
@@ -1110,6 +1137,7 @@ namespace OstrixMods.BuildWorks
                     rotation = part.rotation,
                     scale = part.scale,
                     baseScale = part.baseScale,
+                    metadata = part.metadata?.Copy(),
                     scaleIsAbsolute = part.scaleIsAbsolute,
                     stableId = part.stableId,
                     displayName = part.displayName,
@@ -1182,7 +1210,7 @@ namespace OstrixMods.BuildWorks
                     allowSupportFields: loaded.version >= 11, allowSourceFields: loaded.version >= 12,
                     allowForeignFields: loaded.version >= 13, allowContentsFields: loaded.version >= 14,
                     allowAbsoluteScaleFields: loaded.version >= 15, allowPlacementImportFields: loaded.version >= 16,
-                    allowBaseScaleFields: loaded.version >= 17);
+                    allowBaseScaleFields: loaded.version >= 17, allowMetadataFields: loaded.version >= 19);
                 loaded.blueprints = loaded.blueprints ?? new List<Blueprint>();
                 loaded.categories = loaded.categories ?? new List<string>();
                 if (loaded.version == 1)
@@ -1467,6 +1495,17 @@ namespace OstrixMods.BuildWorks
                 part.baseScale.HasValue && (part.scaleIsAbsolute || !PositiveScale(part.baseScale.Value) ||
                     !PositiveScale(new VectorData(Vector3.Scale(part.baseScale.Value.ToVector3(), part.scale.ToVector3())))) ||
                 !Geometry.BlueprintEditorPart.IsValidSignText(part.signText) || !ValidForeignData(part.foreignData)) return false;
+            try
+            {
+                if (part.metadata != null)
+                {
+                    var metadata = part.metadata.ToGeometry();
+                    if (metadata.PrefabId != part.prefabName) return false;
+                    Vector3 rootScale = part.RootScale(part.metadata.prefabScale.ToVector3());
+                    metadata.ValidateEnvelope(new Geometry.Point3(rootScale.x, rootScale.y, rootScale.z));
+                }
+            }
+            catch (ArgumentException) { return false; }
             float length = part.rotation.x * part.rotation.x +
                 part.rotation.y * part.rotation.y +
                 part.rotation.z * part.rotation.z +
@@ -1629,7 +1668,7 @@ namespace OstrixMods.BuildWorks
             return parts[0].prefabName;
         }
 
-        private static List<Part> PrepareParts(IReadOnlyList<Part> source)
+        private List<Part> PrepareParts(IReadOnlyList<Part> source)
         {
             List<Part> result = CloneParts(source);
             foreach (Part part in result)
@@ -1640,6 +1679,7 @@ namespace OstrixMods.BuildWorks
                 if (string.IsNullOrWhiteSpace(part.displayName))
                     part.displayName = part.prefabName;
             }
+            CaptureMetadata(result);
             return result;
         }
 
@@ -1834,6 +1874,40 @@ namespace OstrixMods.BuildWorks
         }
 
         [DataContract]
+        internal sealed class PrefabMetadata
+        {
+            internal PrefabMetadata Copy() => (PrefabMetadata)MemberwiseClone();
+            [DataMember(Order = 0)] public int version = 1;
+            [DataMember(Order = 1)] public string prefabId;
+            [DataMember(Order = 2)] public string name;
+            [DataMember(Order = 3)] public string kind;
+            [DataMember(Order = 4)] public string hostId;
+            [DataMember(Order = 5)] public VectorData prefabScale;
+            [DataMember(Order = 6, EmitDefaultValue = false)] public VectorData? minimum;
+            [DataMember(Order = 7, EmitDefaultValue = false)] public VectorData? maximum;
+            [DataMember(Order = 8, EmitDefaultValue = false)] public string sourceId;
+            [DataMember(Order = 9, EmitDefaultValue = false)] public string sourceVersion;
+            private static Geometry.Point3 Point(VectorData value) => new Geometry.Point3(value.x, value.y, value.z);
+            private static VectorData Vector(Geometry.Point3 value) => new VectorData { x = (float)value.X, y = (float)value.Y, z = (float)value.Z };
+            internal Geometry.BlueprintPrefabMetadata ToGeometry() => new Geometry.BlueprintPrefabMetadata(version, prefabId, name, kind, hostId,
+                Point(prefabScale), minimum.HasValue ? Point(minimum.Value) : (Geometry.Point3?)null,
+                maximum.HasValue ? Point(maximum.Value) : (Geometry.Point3?)null, sourceId, sourceVersion);
+            internal static PrefabMetadata FromGeometry(Geometry.BlueprintPrefabMetadata value) => value == null ? null : new PrefabMetadata
+            {
+                version = value.Version,
+                prefabId = value.PrefabId,
+                name = value.Name,
+                kind = value.Kind,
+                hostId = value.HostId,
+                prefabScale = Vector(value.PrefabScale),
+                minimum = value.Minimum.HasValue ? Vector(value.Minimum.Value) : (VectorData?)null,
+                maximum = value.Maximum.HasValue ? Vector(value.Maximum.Value) : (VectorData?)null,
+                sourceId = value.SourceId,
+                sourceVersion = value.SourceVersion
+            };
+        }
+
+        [DataContract]
         internal sealed class Part
         {
             [DataMember(Order = 0)]
@@ -1867,6 +1941,8 @@ namespace OstrixMods.BuildWorks
             public bool scaleIsAbsolute;
             [DataMember(Order = 14, EmitDefaultValue = false)]
             public VectorData? baseScale;
+            [DataMember(Order = 15, EmitDefaultValue = false)]
+            public PrefabMetadata metadata;
 
             internal Vector3 RootScale(Vector3 prefabScale)
             {

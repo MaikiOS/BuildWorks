@@ -5,6 +5,7 @@ using UnityEngine;
 // in native snap fixtures; the actual editor implementation remains unchanged.
 public sealed class Piece : MonoBehaviour
 {
+    public string m_name;
     public class Requirement { public ItemDrop m_resItem; public int m_amount; }
     public void GetSnapPoints(List<Transform> points)
     {

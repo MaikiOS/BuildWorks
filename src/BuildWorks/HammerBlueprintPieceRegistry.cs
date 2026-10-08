@@ -672,47 +672,8 @@ namespace OstrixMods.BuildWorks
             registeredSignature = string.Empty;
         }
 
-        internal static bool TryGetLocalVisualBounds(GameObject root, out Bounds bounds)
-        {
-            bounds = default;
-            bool found = false;
-            foreach (MeshFilter filter in root.GetComponentsInChildren<MeshFilter>(true))
-            {
-                Renderer renderer = filter ? filter.GetComponent<Renderer>() : null;
-                if (!filter || !filter.sharedMesh || !renderer || !renderer.enabled ||
-                    !IsActiveWithin(root.transform, filter.transform)) continue;
-                Bounds meshBounds = filter.sharedMesh.bounds;
-                for (int corner = 0; corner < 8; ++corner)
-                {
-                    Vector3 point = new Vector3(
-                        (corner & 1) == 0 ? meshBounds.min.x : meshBounds.max.x,
-                        (corner & 2) == 0 ? meshBounds.min.y : meshBounds.max.y,
-                        (corner & 4) == 0 ? meshBounds.min.z : meshBounds.max.z);
-                    Vector3 local = root.transform.InverseTransformPoint(
-                        filter.transform.TransformPoint(point));
-                    if (!found)
-                    {
-                        bounds = new Bounds(local, Vector3.zero);
-                        found = true;
-                    }
-                    else
-                    {
-                        bounds.Encapsulate(local);
-                    }
-                }
-            }
-            return found;
-        }
-
-        private static bool IsActiveWithin(Transform root, Transform child)
-        {
-            for (Transform current = child; current; current = current.parent)
-            {
-                if (!current.gameObject.activeSelf) return false;
-                if (current == root) return true;
-            }
-            return false;
-        }
+        internal static bool TryGetLocalVisualBounds(GameObject root, out Bounds bounds) =>
+            BlueprintPrefabMetadataCapture.TryGetLocalVisualBounds(root, out bounds);
 
         private static string BuildSignature(
             IReadOnlyList<CompositeBlueprintStore.Blueprint> blueprints,

@@ -21,7 +21,8 @@ namespace OstrixMods.BuildWorks.Geometry
             int sourceLine = 0,
             BlueprintForeignPartData foreignData = null,
             bool scaleIsAbsolute = false,
-            Point3? baseScale = null)
+            Point3? baseScale = null,
+            BlueprintPrefabMetadata metadata = null)
         {
             StableId = Required(stableId, nameof(stableId));
             PrefabName = Required(prefabName, nameof(prefabName));
@@ -46,6 +47,9 @@ namespace OstrixMods.BuildWorks.Geometry
             SourceDocumentId = sourceDocumentId;
             SourceLine = sourceLine;
             ForeignData = foreignData;
+            if (metadata != null && metadata.PrefabId != PrefabName) throw new ArgumentException("Prefab metadata identity mismatch.");
+            Metadata = metadata;
+            metadata?.ValidateEnvelope(ResolveScale(metadata.PrefabScale));
         }
 
         public string StableId { get; }
@@ -56,6 +60,7 @@ namespace OstrixMods.BuildWorks.Geometry
         public Point3 Scale { get; internal set; }
         public bool ScaleIsAbsolute { get; }
         public Point3? BaseScale { get; }
+        public BlueprintPrefabMetadata Metadata { get; }
         public string ParentGroupId { get; internal set; }
         public bool Visible { get; internal set; }
         public bool Locked { get; internal set; }
@@ -82,7 +87,7 @@ namespace OstrixMods.BuildWorks.Geometry
             Visible,
             Locked,
             Scale,
-            SignText, SourceDocumentId, SourceLine, ForeignData, ScaleIsAbsolute, BaseScale);
+            SignText, SourceDocumentId, SourceLine, ForeignData, ScaleIsAbsolute, BaseScale, Metadata);
 
         public Point3 ResolveScale(Point3 prefabScale)
         {
@@ -922,7 +927,7 @@ namespace OstrixMods.BuildWorks.Geometry
                     parentId,
                     part.Visible,
                     part.Locked,
-                    part.Scale, part.SignText, part.SourceDocumentId, part.SourceLine, part.ForeignData, part.ScaleIsAbsolute, part.BaseScale));
+                    part.Scale, part.SignText, part.SourceDocumentId, part.SourceLine, part.ForeignData, part.ScaleIsAbsolute, part.BaseScale, part.Metadata));
                 if (rootIds.Contains(part.StableId)) copiedRoots.Add(copyId);
             }
             return Commit(() =>
@@ -967,7 +972,7 @@ namespace OstrixMods.BuildWorks.Geometry
                     part.PrefabName, part.DisplayName, position + orientation.Rotate(part.Position),
                     Multiply(orientation, part.Rotation).Normalized(),
                     part.ParentGroupId == null ? rootId : groupIds[part.ParentGroupId],
-                    part.Visible, part.Locked, part.Scale, part.SignText, part.SourceDocumentId, part.SourceLine, part.ForeignData, part.ScaleIsAbsolute, part.BaseScale));
+                    part.Visible, part.Locked, part.Scale, part.SignText, part.SourceDocumentId, part.SourceLine, part.ForeignData, part.ScaleIsAbsolute, part.BaseScale, part.Metadata));
             return Commit(() =>
             {
                 groups.AddRange(newGroups);
@@ -1265,7 +1270,7 @@ namespace OstrixMods.BuildWorks.Geometry
                             sample.Position + stepY * logicalY +
                                 turn.Rotate((source.Position - pivot) * sample.UniformScale),
                             Multiply(turn, source.Rotation).Normalized(), source.ParentGroupId,
-                            source.Visible, source.Locked, copyScale, source.SignText, source.SourceDocumentId, source.SourceLine, source.ForeignData, source.ScaleIsAbsolute, source.BaseScale));
+                            source.Visible, source.Locked, copyScale, source.SignText, source.SourceDocumentId, source.SourceLine, source.ForeignData, source.ScaleIsAbsolute, source.BaseScale, source.Metadata));
                     }
                 }
             }
@@ -1353,7 +1358,7 @@ namespace OstrixMods.BuildWorks.Geometry
                         source.ParentGroupId,
                         source.Visible,
                         source.Locked,
-                        copyScale, source.SignText, source.SourceDocumentId, source.SourceLine, source.ForeignData, source.ScaleIsAbsolute, source.BaseScale));
+                        copyScale, source.SignText, source.SourceDocumentId, source.SourceLine, source.ForeignData, source.ScaleIsAbsolute, source.BaseScale, source.Metadata));
                 }
             }
             return copies;
@@ -1600,7 +1605,7 @@ namespace OstrixMods.BuildWorks.Geometry
                     left.SourceDocumentId != right.SourceDocumentId || left.SourceLine != right.SourceLine || left.ForeignData != right.ForeignData ||
                     !Same(left.Position, right.Position) || !Same(left.Rotation, right.Rotation) ||
                     !Same(left.Scale, right.Scale) || left.ScaleIsAbsolute != right.ScaleIsAbsolute ||
-                    left.BaseScale.HasValue != right.BaseScale.HasValue ||
+                    left.Metadata != right.Metadata || left.BaseScale.HasValue != right.BaseScale.HasValue ||
                     left.BaseScale.HasValue && !Same(left.BaseScale.Value, right.BaseScale.Value))
                     return false;
             }

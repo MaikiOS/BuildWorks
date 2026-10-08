@@ -3636,7 +3636,7 @@ namespace OstrixMods.BuildWorks
             if (keyboardPreview) return false;
             if (!IsEditing) return false;
             saveClosesOnSuccess = closeAfterSave;
-            if (document.Parts.Count < 2)
+            if (document.Parts.Count < 1)
             {
                 view.ShowError(
                     BuildWorksLocalization.Text("editor.cannot_save_title"),

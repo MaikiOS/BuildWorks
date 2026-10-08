@@ -1751,7 +1751,7 @@ namespace OstrixMods.BuildWorks
             documentTitle.color = document.IsDirty ? AccentColor : TextColor;
             SetButtonInteractable(undoButton, document.CanUndo);
             SetButtonInteractable(redoButton, document.CanRedo);
-            saveButton.interactable = canSave && document.IsDirty && document.Parts.Count >= 2;
+            saveButton.interactable = canSave && document.IsDirty && document.Parts.Count >= 1;
             bool editingSupport = document.FindSupport(document.ActiveSupportId) != null;
             bool hasSelection = !editingSupport && document.Selection.Count > 0;
             int editableCount = document.EditablePartSelectionCount;

@@ -4853,7 +4853,7 @@ namespace OstrixMods.BuildWorks
             PruneBlueprintSelection();
             error = BuildWorksLocalization.Text(
                 "blueprint.select_part_count", CompositeBlueprintStore.InteractivePartBudget);
-            if (blueprintSelection.Count < 2 ||
+            if (blueprintSelection.Count < 1 ||
                 blueprintSelection.Count > CompositeBlueprintStore.InteractivePartBudget) return false;
             Quaternion rotation = blueprintSelection[0].transform.rotation;
             Quaternion inverse = Quaternion.Inverse(rotation);
@@ -5003,7 +5003,7 @@ namespace OstrixMods.BuildWorks
 
         private bool ActivateBlueprint(CompositeBlueprintStore.Blueprint blueprint)
         {
-            if (blueprint == null || blueprint.parts == null || blueprint.parts.Count < 2)
+            if (blueprint == null || blueprint.parts == null || blueprint.parts.Count < 1)
                 return false;
             Player player = Player.m_localPlayer;
             if (!TryResolveBlueprintPieces(player, blueprint, out List<Piece> pieces,
@@ -5352,7 +5352,7 @@ namespace OstrixMods.BuildWorks
                 catch (ArgumentException)
                 { missingPrefab = BuildWorksLocalization.Text("import.payload_pending"); return false; }
             }
-            return unavailable.Count == 0 && pieces.Count >= 2;
+            return unavailable.Count == 0 && pieces.Count >= 1;
         }
 
         private bool ApplyBlueprintAnchors()
@@ -6185,7 +6185,7 @@ namespace OstrixMods.BuildWorks
         {
             savedBlueprint = activeBlueprint;
             error = null;
-            if (blueprintWorkspaceParts.Count < 2)
+            if (blueprintWorkspaceParts.Count < 1)
             {
                 error = BuildWorksLocalization.Text("editor.minimum_parts");
                 return false;

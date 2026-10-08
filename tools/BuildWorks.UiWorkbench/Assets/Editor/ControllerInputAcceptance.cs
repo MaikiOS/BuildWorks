@@ -23,6 +23,39 @@ internal static class ControllerInputAcceptance
     private static void Require(bool value, string reason) { if (!value) throw new InvalidOperationException("Input frames: " + reason); }
     private static Vector3 V(Point3 value) => new Vector3((float)value.X, (float)value.Y, (float)value.Z);
 
+    internal static IEnumerable<object> RunSinglePart(Camera template, TMP_Text font, GameObject wall, string output)
+    {
+        string path = Path.Combine(output, "single-part-" + Guid.NewGuid().ToString("N") + ".json");
+        var store = new CompositeBlueprintStore(path);
+        var part = new CompositeBlueprintStore.Part { stableId = "single", prefabName = "woodwall", displayName = "Wall",
+            rotation = new CompositeBlueprintStore.QuaternionData { w = 1 },
+            baseScale = new CompositeBlueprintStore.VectorData(wall.transform.localScale),
+            scale = new CompositeBlueprintStore.VectorData { x = 2, y = .5f, z = 1.25f } };
+        Require(store.TrySave(new[] { part }, Array.Empty<CompositeBlueprintStore.VectorData>(), out var saved, out string error), error);
+        using (var controller = new BlueprintEditorController(store, template, font, name => name == "woodwall" ? wall : null,
+            name => name, () => Array.Empty<BlueprintEditorCatalogItem>(), message => { throw new InvalidOperationException(message); }))
+        {
+            Require(controller.OpenExisting(saved, out error), error);
+            Require(controller.Document.Parts.Count == 1 && controller.Document.Rename(controller.Document.Parts[0].StableId, "Changed"),
+                "Single editor did not open/edit one part");
+            yield return null;
+            Call(controller, "Bind", (object)null);
+            var view = Field<BlueprintEditorView>(controller, "view");
+            Require(Field<Button>(view, "saveButton").interactable, "Single editor Save remains disabled");
+            NativeClick(view, null, "Save"); yield return null;
+            Require(view.HasModal, "Single editor Save did not request metadata");
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            Require(!controller.Document.IsDirty && !view.HasModal, "Single editor native Save click failed");
+            controller.Close(true);
+            var reopened = new CompositeBlueprintStore(path).All().Single();
+            Require(reopened.parts.Count == 1 && reopened.parts[0].displayName == "Changed" && reopened.parts[0].scale.x == 2,
+                "Single actual editor save lost row/name/scale");
+            Require(controller.OpenNew(out error), error); yield return null;
+            Require(!Field<Button>(view, "saveButton").interactable && !(bool)Call(controller, "TrySave", false, true) &&
+                new CompositeBlueprintStore(path).All().Count == 1, "Empty editor saved over the single blueprint");
+        }
+    }
+
     internal static IEnumerable<object> RunMissingCatalogue(Camera template, TMP_Text font, GameObject wall, string output)
     {
         string directory = Path.Combine(output, "c89-" + Guid.NewGuid().ToString("N").Substring(0, 8));

@@ -45,7 +45,7 @@ namespace OstrixMods.BuildWorks
             IReadOnlyList<BlueprintItemStandPlacement.Supply> supplies = null, bool attachmentsOnly = false)
         {
             HeavyError = null;
-            if (!placementGhost || plan == null || plan.Count < 2)
+            if (!placementGhost || plan == null || plan.Count < 1)
             {
                 Hide();
                 return;

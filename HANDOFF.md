@@ -1,5 +1,15 @@
 # BuildWorks current development handoff
 
+## .112 — verified one-part prerequisite
+
+Native18/portable8 admit one part; empty documents and old-schema single entries
+remain refused. Import, editor Save, capture/workspace, activation and world preview
+agree. Normal/QA, full corpus, Unity Workbench276, actual Session17 and required
+checks/review passed. See docs/checkpoint-0.19.112.md and QA_0.19.112_RU.md.
+M02 explicit missing-part omission is still open; native debit/completion/reload/
+multiplayer are unverified. No Valheim launch.
+QA .112 installed through Deploy-TestBuild.ps1; SHA BBF449755DC3F156D212B38375EF25B960C524E51C136D95590E4AF2FB84A424. All48 QA files and library unchanged.
+
 ## .111 — explicit ArmorStand-state omission; verified source
 
 Import/export now offer a separate copy without recognized Info-only ArmorStand

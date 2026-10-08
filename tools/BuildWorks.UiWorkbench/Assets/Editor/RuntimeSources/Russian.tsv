@@ -249,7 +249,7 @@ snap.auto_align_enabled	BuildWorks: автостык включён — орие
 snap.auto_align_disabled	BuildWorks: автостык выключен.
 blueprint.save_failed	BuildWorks: {0}
 blueprint.world_saved	BuildWorks: {0} сохранён в ЧЕРТЕЖИ → {1}. Детали мира сохранены на месте.
-blueprint.select_part_count	выбери от 2 до {0} деталей
+blueprint.select_part_count	выбери от 1 до {0} деталей
 blueprint.selected_piece_unavailable	выбранная деталь больше недоступна в молотке
 blueprint.piece_scale_range	масштаб детали {0} вне поддерживаемого диапазона
 blueprint.piece_scale_persistence	масштаб детали {0} нельзя сохранить штатно
@@ -289,7 +289,7 @@ hint.contour_closed_ready	Замкнутый контур готов: {0} дет
 hint.contour_open_ready	Открытый контур готов: {0} деталей сохраняют точное положение исходной; УСТАНОВИТЬ размещает цепь
 editor.save_failed	BuildWorks: не удалось сохранить правки чертежа — {0}.
 editor.saved	BuildWorks: {0} сохранён; редактор закрыт без размещения в мире.
-editor.minimum_parts	нужно построить минимум две детали
+editor.minimum_parts	нужно построить минимум одну деталь
 editor.temp_bounds_failed	не удалось определить границы временной детали
 editor.temp_layout_invalid	временная конструкция не имеет корректных границ
 editor.closed_without_saving	BuildWorks: редактор чертежа закрыт без сохранения.
@@ -331,7 +331,7 @@ editor.hint.empty	Tab — добавить деталь · СКМ — камер
 editor.hint.select	ЛКМ — выбор · Ctrl/Shift+ЛКМ — добавить/убрать · тяни пустоту — рамка · клик СКМ/Delete — удалить · G — открыть гизму
 editor.hint.modes_selected	Ctrl+1 — выбор · Ctrl+2 — гизма · Ctrl+3 — массив · Ctrl+4 — контур · Space/F3 — инструменты · Tab — каталог
 editor.hint.modes_empty	Ctrl+1 — выбор · Space/F3 — инструменты · Tab/Shift+A — каталог
-editor.hint.commands	Ctrl+Z/Y или Ctrl+Shift+Z — отмена/возврат · Ctrl+S — сохранить (от 2 деталей)
+editor.hint.commands	Ctrl+Z/Y или Ctrl+Shift+Z — отмена/возврат · Ctrl+S — сохранить (от 1 детали)
 editor.hint.selection_actions	Ctrl/Shift+ЛКМ — добавить/убрать · тяни пустоту — рамка · A — всё · Ctrl+G — группа · Ctrl+D — копия · Delete — удалить · Esc — назад
 editor.hint.selection_empty	ЛКМ — выбор · тяни пустоту — рамка · Ctrl+A — выбрать всё · Esc — выйти
 editor.hint.visibility_selected	H — скрыть · Shift+H — изолировать · Ctrl+H — всё кроме выбора · Alt+H — показать всё
@@ -407,7 +407,7 @@ editor.pivot_bounds	Pivot: точка границ {0}/9.
 editor.transform_reset	Трансформация выбранного сброшена одной операцией Undo.
 editor.transform_already_reset	Трансформация уже сброшена.
 editor.cannot_save_title	НЕЛЬЗЯ СОХРАНИТЬ
-editor.minimum_two_parts	Для чертежа нужны минимум две детали.
+editor.minimum_two_parts	Для чертежа нужна минимум одна деталь.
 editor.part_not_found	Не найдена деталь: {0}
 editor.save_error_title	ОШИБКА СОХРАНЕНИЯ
 editor.blueprint_saved	Чертёж сохранён.
@@ -749,7 +749,7 @@ import.fields	Неподдерживаемая или повреждённая �
 import.object_data	В файле есть данные или текст предметов, которые пока нельзя сохранить (строка {0}). Ни одна деталь не импортирована.
 import.chance	Случайное размещение деталей не поддерживается (строка {0}).
 import.transform	Недопустимое положение, поворот или масштаб (строка {0}).
-import.part_limit	Файл чертежа должен содержать 2–50000 деталей. Лишние детали не обрезаются.
+import.part_limit	Файл чертежа должен содержать 1–50000 деталей. Лишние детали не обрезаются.
 import.interactive_limit	Постройка сохранена, но превышает текущий бюджет интерактивного предпросмотра ({0}). Отрисовка больших сцен ещё не готова.
 import.payload_pending	Не удалось безопасно сохранить авторские точки на штатных деталях: проверьте масштаб, число точек и сетевой компонент деталей. Размещение остановлено до строительства; документ и оригинал сохранены.
 import.foreign_pending	Для этих данных объекта или неизвестной секции источника нет готового переноса в мир. Оригинал сохранён; редактирование, сохранение и экспорт доступны. Штатные подставки проходят отдельную проверку размещения.

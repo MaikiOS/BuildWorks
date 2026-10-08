@@ -33,7 +33,7 @@ namespace OstrixMods.BuildWorks
         internal const string DefaultCategory = "OTHER";
         private const string LegacyDefaultCategory = "ПРОЧЕЕ";
         private const string LocalizationPrefix = "$buildworks_";
-        private const int FormatVersion = 17;
+        private const int FormatVersion = 18;
         private const int MaximumBlueprints = 32;
         private const int MaximumCategories = 12;
         private const int MaximumAnchors = 512;
@@ -596,7 +596,7 @@ namespace OstrixMods.BuildWorks
                 error = UserError("store.category_limit");
                 return false;
             }
-            if (parts == null || parts.Count < 2 || parts.Count > MaximumParts ||
+            if (parts == null || parts.Count < 1 || parts.Count > MaximumParts ||
                 groups == null || groups.Count > MaximumGroups || anchors == null ||
                 anchors.Count > MaximumAnchors)
             {
@@ -914,7 +914,7 @@ namespace OstrixMods.BuildWorks
             { error = UserError("store.invalid_composition"); return false; }
             if (!CanWrite(blueprint, out error) || parts == null || groups == null ||
                 anchors == null ||
-                parts.Count < 2 || parts.Count > MaximumParts ||
+                parts.Count < 1 || parts.Count > MaximumParts ||
                 groups.Count > MaximumGroups ||
                 anchors.Count > MaximumAnchors)
             {
@@ -1162,12 +1162,13 @@ namespace OstrixMods.BuildWorks
                 NormalizeCategories(loaded);
                 foreach (Blueprint blueprint in loaded.blueprints)
                     if (blueprint != null) blueprint.supports = blueprint.supports ?? new List<Support>();
+                bool allowSinglePart = loaded.version >= 18;
                 loaded.version = FormatVersion;
                 List<Blueprint> valid = new List<Blueprint>();
                 var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (Blueprint blueprint in loaded.blueprints)
                 {
-                    if (Valid(blueprint) && ids.Add(blueprint.id)) valid.Add(blueprint);
+                    if (Valid(blueprint) && (allowSinglePart || blueprint.parts.Count >= 2) && ids.Add(blueprint.id)) valid.Add(blueprint);
                 }
                 if (valid.Count != loaded.blueprints.Count)
                     writeBlockReason = UserError("store.corrupt_entries");
@@ -1313,7 +1314,7 @@ namespace OstrixMods.BuildWorks
                 !Guid.TryParseExact(blueprint.id, "N", out _) ||
                 string.IsNullOrWhiteSpace(blueprint.name) ||
                 string.IsNullOrWhiteSpace(blueprint.prefabName) ||
-                blueprint.parts == null || blueprint.parts.Count < 2 ||
+                blueprint.parts == null || blueprint.parts.Count < 1 ||
                 blueprint.parts.Count > MaximumParts || blueprint.anchors == null ||
                 blueprint.anchors.Count > MaximumAnchors || blueprint.groups == null ||
                 blueprint.groups.Count > MaximumGroups ||

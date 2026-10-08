@@ -117,6 +117,22 @@ internal static class ItemStandPreviewAcceptance
                 var batches = Field<System.Collections.IDictionary>(batched, "batches");
                 Require(batches.Count == 2, "passive attachment overlay redraws holders or collapses variants");
             }
+            using (var single = new PlacementGhostPreviewView())
+            {
+                var one = plan.GetRange(0, 1);
+                var onePiece = pieces.GetRange(0, 1);
+                var oneSupply = bound.GetRange(0, 1);
+                single.Show(source, one, onePiece, 0, supplies: oneSupply);
+                var instances = Field<List<GameObject>>(single, "instances");
+                Require(instances.Count == 1 && Content(instances[0]) && Content(instances[0]).GetComponent<Renderer>().enabled &&
+                    instances[0].GetComponentsInChildren<Renderer>().Where(renderer => renderer.transform != Content(instances[0]))
+                        .All(renderer => !renderer.enabled), "single hidden native frame loses its attachment or redraws body");
+                for (int frame = 0; frame < 3; ++frame)
+                    single.Show(source, one, onePiece, 0, supplies: oneSupply, attachmentsOnly: true);
+                var batched = Field<BlueprintBatchedPreview>(single, "batched");
+                Require(batched.Ready && single.HeavyError == null && Field<System.Collections.IDictionary>(batched, "batches").Count == 1,
+                    "single batched attachment overlay rejected the one-part plan");
+            }
             for (int index = 3; index < 513; ++index)
             {
                 plan.Add(new PrecisionPlacementSession.TransformSnapshot(Vector3.zero, Quaternion.identity));

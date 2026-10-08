@@ -1,0 +1,6 @@
+#Name:QA112 Single Wall
+#Category:OTHER
+#Creator:BuildWorks QA fixture
+#Description:Self-authored one-wall import and editor fixture, no stored items or state.
+#Pieces
+woodwall;;0;0;0;0;0;0;1;"";1;1;1

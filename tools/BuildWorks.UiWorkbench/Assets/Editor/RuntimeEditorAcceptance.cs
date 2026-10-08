@@ -516,6 +516,14 @@ public static class RuntimeEditorAcceptance
                 checks.Add("Reopening clears active operation");
                 TestExternalImportEditor(template, fontTemplate, source, output);
                 TestIncompleteExternalEditor(template, fontTemplate, source["woodwall"], output);
+                Action restoreSingleScreen = UseGameViewSize(1920, 1080);
+                try
+                {
+                    yield return null;
+                    foreach (object step in ControllerInputAcceptance.RunSinglePart(template, fontTemplate, source["woodwall"], output)) yield return step;
+                    checks.Add("Single-part editor: actual Save/metadata clicks -> disk reopen preserves one row/name/scale; empty editor save refused. Native single-part construction/debit/reload remain unverified.");
+                }
+                finally { restoreSingleScreen(); }
                 foreach (object step in ControllerInputAcceptance.RunMissingCatalogue(template, fontTemplate, source["woodwall"], output)) yield return step;
                 checks.Add("Reviewed missing-prefab import -> production catalogue status -> actual warning card/native click -> editor insertion/Undo/Redo/save/disk reopen preserves both records, pending basis and source; unknown costs/stations not shown as free. Native Session producer wiring verified separately by HostContract; no world construction proof.");
                 checks.Add("Incomplete foreign blueprint: known nonunit prefab plus missing absolute-scale part, constant uncertainty marker without surface/snap geometry; edit/copy/Undo/native save/reopen/export/reimport preserve source and basis; late nonunit prefab resolves exactly once using original native identity. Not world placement proof.");
@@ -953,7 +961,7 @@ public static class RuntimeEditorAcceptance
                 canonical.transform.localScale = observedBase;
                 editor.Close(true);
             }
-            checks.Add("Pinned native17/portable7 scale: actual controller import/save/reopen/edit, thumbnail PreviewSession and world ghost agree across canonical(2,.5,3)/Hammer(.5,2,.25); scaled/mirrored capture parents refused. Renderer/format tests, no native construction/reload.");
+            checks.Add("Pinned native18/portable8 scale: actual controller import/save/reopen/edit, thumbnail PreviewSession and world ghost agree across canonical(2,.5,3)/Hammer(.5,2,.25); scaled/mirrored capture parents refused. Renderer/format tests, no native construction/reload.");
         }
         finally { Object.DestroyImmediate(canonical); Object.DestroyImmediate(hammer); Object.DestroyImmediate(ghost); }
     }
@@ -971,8 +979,8 @@ public static class RuntimeEditorAcceptance
         Require(reloaded.All().Count == 1, "Actual disk library roundtrip");
         Require(Mathf.Abs(reloaded.All()[0].parts[0].scale.x - expected) < 0.0001f, "Store discarded scale");
         CheckReopenedCopy(controller, reloaded, expected);
-        Require(File.ReadAllText(path).Contains("\"version\":17"), "Controller did not write format17");
-        checks.Add("Controller save -> disk format17 -> new store -> OpenExisting retains scale, rotated root-owned support and placement reference; transient support focus absent");
+        Require(File.ReadAllText(path).Contains("\"version\":18"), "Controller did not write format18");
+        checks.Add("Controller save -> disk format18 -> new store -> OpenExisting retains scale, rotated root-owned support and placement reference; transient support focus absent");
     }
 
     private static void TestIncompleteExternalEditor(Camera camera, TMP_Text font, GameObject wall, string output)

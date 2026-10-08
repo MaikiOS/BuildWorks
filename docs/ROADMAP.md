@@ -1,5 +1,13 @@
 # BuildWorks development roadmap
 
+## .112 — one-part blueprint prerequisite
+
+Native18/portable8 now admit1 part, empty remains invalid; older17/7 retain min2.
+Import/editor/world-preview paths and legacy safety gates passed automated checks,
+Workbench276 and actual Session17. See checkpoint-0.19.112.md.
+Explicit conversion without missing parts (M02) remains incomplete; no game proof.
+QA .112 installed through guarded deployment;48 QA files/library unchanged; no Valheim launch.
+
 Approved fog v11 remains planned: see FOG_V11_INTEGRATION.md.
 
 ## .111 — explicit ArmorStand-state omission; verified source

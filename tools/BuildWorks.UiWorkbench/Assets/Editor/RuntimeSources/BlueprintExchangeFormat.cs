@@ -15,7 +15,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const int MaximumBytes = 32 * 1024 * 1024;
         private const string FormatName = "buildworks-blueprint";
-        private const int Version = 7;
+        private const int Version = 8;
 
         [DataContract]
         private sealed class Envelope
@@ -124,6 +124,8 @@ namespace OstrixMods.BuildWorks
                         allowBaseScaleFields: envelope.version >= 7);
                 if (envelope.blueprint != null)
                     envelope.blueprint.supports = envelope.blueprint.supports ?? new List<CompositeBlueprintStore.Support>();
+                if (envelope.version < 8 && envelope.blueprint?.parts?.Count == 1)
+                    throw new InvalidDataException("$buildworks_import.part_limit");
                 ValidateBlueprint(envelope.blueprint);
                 if (envelope.requiredPrefabIds == null ||
                     !envelope.requiredPrefabIds.SequenceEqual(Prefabs(envelope.blueprint), StringComparer.Ordinal))

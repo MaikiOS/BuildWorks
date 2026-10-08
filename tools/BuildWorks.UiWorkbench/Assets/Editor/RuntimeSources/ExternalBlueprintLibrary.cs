@@ -309,7 +309,7 @@ namespace OstrixMods.BuildWorks
                     { if (blueprint.importError == null) blueprint.importError = exception.Message + "\t" + lineNumber; }
                 }
             }
-            if (!seenPieces || blueprint.importPartCount < 2) blueprint.importError = "$buildworks_import.part_limit";
+            if (!seenPieces || blueprint.importPartCount < 1) blueprint.importError = "$buildworks_import.part_limit";
             if (blueprint.name.Length == 0 || blueprint.name.Length > 48 || blueprint.category.Length == 0 || blueprint.category.Length > 24 ||
                 (blueprint.name + blueprint.category).Any(c => char.IsControl(c) || c == '<' || c == '>'))
                 blueprint.importError = "$buildworks_store.invalid_metadata";

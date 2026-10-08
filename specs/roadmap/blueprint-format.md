@@ -1,9 +1,10 @@
 # Blueprint format and large-construction work
 
-Current .88 format: Store15/JSON6 optional `Part.scaleIsAbsolute` preserves an individual record's unknown
-scale basis. Absent flag retains historical relative semantics. Missing records remain editable; intrinsic1
-and model bounding boxes are never invented. World refuses pending basis. Versions14/5 reject the new field.
-[Evidence and limits](../../docs/testing/missing-model-0.19.88.md).
+Current .112 format: native Store18 / portable JSON8 allow1–50000 parts; empty is invalid.
+Older native<=17 / portable<=7 retain min2. Optional `Part.baseScale` pins the imported root
+scale; `scale` is a relative edit. Older16/6 retain their migration semantics.
+`Part.scaleIsAbsolute` preserves an unresolved basis; no intrinsic1 or bounds are invented.
+World refuses pending basis. [Evidence and limits](../../docs/checkpoint-0.19.112.md).
 
 .87 policy/evidence: [continuation audit](../../docs/continuation-audit-2026-10-07.md).
 Survival mounts use the supplied same-prefab item's own properties for archived snapshots and recipes.

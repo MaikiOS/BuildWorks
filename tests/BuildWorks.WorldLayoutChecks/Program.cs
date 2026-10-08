@@ -57,6 +57,7 @@ internal static class Program
             TestPendingScaleIsAtomic();
             TestUnavailablePieceIsAtomic();
             TestPrimaryPartSelection();
+            TestSinglePartBlueprint();
             Console.WriteLine("All actual Session root-composition checks passed; no game placement executed.");
             return 0;
         }
@@ -70,6 +71,21 @@ internal static class Program
             foreach (GameObject fixture in fixtureObjects)
                 if (fixture) UnityEngine.Object.DestroyImmediate(fixture);
         }
+    }
+
+    private static void TestSinglePartBlueprint()
+    {
+        object session = Session(1);
+        Set(Get(session, "activeBlueprint"), "primaryPartId", "part-0");
+        float s = (float)Math.Sqrt(.5);
+        Require(Add(session, new Point3(10, 20, 30), Rotation(0, 0, s, s)), "Single blueprint expansion failed");
+        IList plan = (IList)Get(session, "placementPlan");
+        Require(plan.Count == 1 && ((IList)Get(session, "placementPlanPieces")).Count == 1,
+            "Single blueprint synthesized a second placement");
+        CheckVector(Property(plan[0], "Position"), new Point3(10, 21, 30));
+        CheckVector(Property(plan[0], "Scale"), new Point3(2, .5, 1.25));
+        CheckRotation(Property(plan[0], "Rotation"), 0, 0, s, s);
+        Console.WriteLine("PASS actual Session: one source part produces one native placement with composed rotation/scale/position");
     }
 
     private static void TestPivotLayoutComposition()

@@ -662,7 +662,7 @@ namespace OstrixMods.BuildWorks
             registeredSignature = string.Empty;
         }
 
-        private static bool TryGetLocalVisualBounds(GameObject root, out Bounds bounds)
+        internal static bool TryGetLocalVisualBounds(GameObject root, out Bounds bounds)
         {
             bounds = default;
             bool found = false;

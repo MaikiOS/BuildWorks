@@ -1,12 +1,19 @@
-# Изоляция QA saves: этапы 0.19.90–0.19.92
+# Изоляция QA saves: этапы 0.19.90–0.19.93
 
 [English](qa-save-isolation-0.19.90.md) | **Русский**
 
 Это проверенный исходный этап подготовки стенда, **не готовый survival-стенд и не игровая приёмка**.
-Установлена .82; текущая .92 не устанавливалась. Valheim не запускался, игровые сохранения не менялись.
+Установлена .82; текущая .93 не устанавливалась. Valheim не запускался, игровые сохранения не менялись.
 С разрешения Ostrix изменён только `[Bootstrap] CreateMissingSaves = true` → `false` в конфиге
 TerrainRamp.TestBootstrap профиля TerrainRamp-1.0-Test. Другие параметры сохранены, BOM/newlines сохранены.
 Локальная копия/хеши: `artifacts/checkpoint-0.19.90/bootstrap-config-change.json` и `bootstrap-config-before.cfg`.
+
+## Физические станции и защищённый пакет: .93
+
+[Текущий контракт/ручная серия](qa-stand-0.19.93_RU.md): scaled combined bounds, loaded flat sites,
+запрет terrain components, одноразовые native station identity/знания и committed counter world-save.
+Явный QaStandToken deploy копирует QA пару и локальные pinned files, маркер последним.
+QA64BCL/deployment12replica/forbidden4 PASS; native game/reload не исполнялись. Ниже история отдельных этапов.
 
 ## Одноразовые материалы: .92
 

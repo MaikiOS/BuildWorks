@@ -218,7 +218,7 @@ namespace OstrixMods.BuildWorks
             Player player = Player.m_localPlayer;
             if (!network || !game || !player || !ZoneSystem.instance || !PlatformInitializer.SaveDataInitialized ||
                 !network.IsServer() || network.IsDedicated() || ZNet.IsOpenServer() || network.GetPeers().Count != 0 ||
-                game.IsShuttingDown() || player.IsDead() || player.IsTeleporting() || player.GetInventory() == null ||
+                game.IsShuttingDown() || player.IsDead() || player.IsTeleporting() || player.InIntro() || player.GetInventory() == null ||
                 Player.m_debugMode || player.NoCostCheat() || Game.m_worldLevel != 0 ||
                 ZoneSystem.instance.GetGlobalKey(GlobalKeys.NoBuildCost) || ZoneSystem.instance.GetGlobalKey(GlobalKeys.NoCraftCost))
                 throw new InvalidOperationException("QA preparation requires a loaded living player on a closed Local survival server with no peers or cheats.");
@@ -238,6 +238,7 @@ namespace OstrixMods.BuildWorks
 
         internal static string FixtureDirectory => Path.Combine(Directory.GetParent(root).Parent.FullName, "test-fixtures");
         internal static string SupplyReceiptPath => Path.Combine(root, "qa-supplies.txt");
+        internal static string StationReceiptPath => Path.Combine(root, "qa-stations.txt");
         internal static string SupplyStamp(string plan)
         {
             using (var hash = SHA256.Create())

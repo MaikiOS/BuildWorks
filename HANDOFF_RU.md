@@ -2,6 +2,24 @@
 
 [English](HANDOFF.md) | **Русский**
 
+## Этап 0.19.93 — физические QA станции и защищённый пакет
+
+[Первый запуск и точная ручная серия](docs/testing/qa-stand-0.19.93_RU.md).
+QA-only станции берутся из native требований; footprint учитывает визуал/коллайдеры/scale, ровность,
+загруженность и препятствия. Terrain components/чужие behaviours запрещены. Started до PlacePiece;
+после Start проверяются fresh owner/creator/transform/range, затем profile save и committed counter world save,
+только после этого complete. Повтора незавершённых попыток нет. Существующий guarded deploy получил
+явный QaStandToken: отдельная QA DLL-пара,7pinned+missing fixture, маркер последним. DLL reparse запрещены
+перед записью/rollback. QA64 BCL, deployment12 replica, forbidden4, обе Release0/0, HostContract/Localization853/
+format и независимый correctness review PASS. Файловая SymbolicLink недоступна без прав администратора;
+исполнен junction по пути DLL, общий ReparsePoint прочитан reviewer. verify отсутствует; UI252/corpus353 не повторялись.
+Установлена .82, хеш не изменён; настоящая установка/игра/saves/reload/сеть/push не выполнялись.
+Готовность native стенда не подтверждена. Далее: разрешение владельца на пакет/первый запуск → проверка
+изоляции/receipts → два внешних файла через правку/отмену/стройку/reload. Пользователь не добывает материалы
+и не строит подготовительные объекты; старые принятые инструменты целиком не повторяются.
+После команды продолжения goal tool вернул paused; API не умеет resume, изменение статуса не заявляется.
+Proof: artifacts/checkpoint-0.19.93/verification.json. Полная цель открыта.
+
 ## Этап 0.19.92 — одноразовые QA материалы и знания
 
 [Контракт/границы](docs/testing/qa-save-isolation-0.19.90_RU.md). Новая QA-only BuildWorksTestSupplies:

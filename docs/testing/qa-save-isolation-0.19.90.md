@@ -1,11 +1,18 @@
-# QA save isolation: checkpoints 0.19.90–0.19.92
+# QA save isolation: checkpoints 0.19.90–0.19.93
 
 **English** | [Русский](qa-save-isolation-0.19.90_RU.md)
 
-Verified source preparation, **not a ready survival stand or game acceptance**. Installed .82; current .92 is not
+Verified source preparation, **not a ready survival stand or game acceptance**. Installed .82; current .93 is not
 deployed. No Valheim launch or game-save mutation. With explicit owner permission only TerrainRamp-1.0-Test's
 TerrainRamp bootstrap `[Bootstrap] CreateMissingSaves=true` changed to false; all other text/BOM/newlines preserved.
 Local backup/hash proof: `artifacts/checkpoint-0.19.90/bootstrap-config-change.json` and `bootstrap-config-before.cfg`.
+
+## Physical stations and guarded package: .93
+
+[Current source contract/manual cases](qa-stand-0.19.93.md): scaled combined bounds, loaded flat sites,
+terrain-component refusal, one-shot native station identity/knowledge and committed world-save counter.
+Explicit QaStandToken deploy stages QA pair and local pinned files, marker last. QA64BCL/deployment12replica/
+forbidden4 PASS; native game/reload unexecuted. Older sections below describe their individual checkpoints.
 
 ## One-shot supplies: .92
 

@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([switch]$CheckLaunchProfileOnly)
+param([switch]$CheckLaunchProfileOnly, [switch]$CheckCompiledOnly)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -55,7 +55,7 @@ $allCalls = ($type.Methods | Where-Object HasBody | ForEach-Object { $_.Body.Ins
 Require ($allCalls -notmatch 'ResetSaveDataPath\(\)|SaveSystem::ForceRefreshCache|Directory::Delete|File::Delete|File::Move') 'QA isolation gained cache clearing, root reset or destructive filesystem operations.'
 $loaded = $type.Methods | Where-Object Name -eq 'RequireLoadedSession'
 $loadedCalls = @($loaded.Body.Instructions | Where-Object { $_.OpCode.Name -in @('call','callvirt') } | ForEach-Object { [string]$_.Operand })
-foreach ($name in @('AssertPinned','IsServer','IsDedicated','IsOpenServer','GetPeers','IsShuttingDown','IsDead','IsTeleporting',
+foreach ($name in @('AssertPinned','IsServer','IsDedicated','IsOpenServer','GetPeers','IsShuttingDown','IsDead','IsTeleporting','InIntro',
     'GetInventory','NoCostCheat','GetGlobalKey','GetWorld','GetPlayerProfile','GetSaveFWLPath','GetPath','GetFilename',
     'GetPlayerID','ReadIdentityReceipt','RequireIdentityMatch')) {
     Require ([bool]($loadedCalls -match "::$name\(")) "Loaded QA session omits native identity/survival guard: $name"
@@ -77,8 +77,31 @@ function SupplyOffset([string]$name) { ($prepareCalls | Where-Object { [string]$
 Require ((SupplyOffset 'BeginOnce') -lt (SupplyOffset 'AddItem') -and (SupplyOffset 'Save') -lt (SupplyOffset 'CompleteOnce')) 'Supply receipt ordering lost started-before-grant or saved-before-complete.'
 $coroutine = $pluginType.NestedTypes | Where-Object Name -Like '<PrepareQaSaves>*'
 Require ([bool](@($coroutine.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -match '::RequireLoadedSession\(')) 'QA loaded gate is not called by the actual plugin coroutine.'
+Require ([bool](@($coroutine.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -match '(Character|Player)::InIntro\(')) 'QA provisioning does not wait for the fresh-player intro flight.'
 Require ([bool](@($coroutine.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -match 'BuildWorksTestSupplies::Prepare\(')) 'QA supply path is not called by actual plugin coroutine.'
+$stationsName = 'OstrixMods.BuildWorks.BuildWorksTestStations'
+$stations = $qa.MainModule.GetType($stationsName)
+Require ($null -ne $stations -and $null -eq $normal.MainModule.GetType($stationsName)) 'QA stations leaked into the normal build or are missing.'
+Require ([bool](@($coroutine.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -match 'BuildWorksTestStations::Prepare\(')) 'QA station path is not called by the plugin coroutine.'
+$stationIterator = $stations.NestedTypes | Where-Object Name -Like '<Prepare>*'
+$stationCalls = @($stationIterator.Methods.Body.Instructions | Where-Object { $_.OpCode.Name -in @('call','callvirt') })
+foreach ($name in @('RequireLoadedSession','Plan','OnceComplete','FindSite','BeginOnce','PlacePiece','IsValid','IsOwner','GetCreator',
+    'HaveBuildStationInRange','AddKnownStation','SavePlayerData','Save','IsSaving','GetSaveNumber','RequireSaveAcknowledgement','CompleteOnce')) {
+    Require ([bool]($stationCalls | Where-Object { [string]$_.Operand -match "::$name\(" })) "Native QA station path omits $name"
+}
+function StationOffset([string]$name) { ($stationCalls | Where-Object { [string]$_.Operand -match "::$name\(" } | Select-Object -First 1).Offset }
+Require ((StationOffset 'FindSite') -lt (StationOffset 'BeginOnce') -and (StationOffset 'BeginOnce') -lt (StationOffset 'PlacePiece') -and
+    (StationOffset 'RequireSaveAcknowledgement') -lt (StationOffset 'CompleteOnce')) 'QA station receipt ordering lost preflight-before-start, start-before-place or saved-before-complete.'
+$footprint = ($stations.Methods | Where-Object Name -eq 'Footprint').Body.Instructions.Operand -join "`n"
+foreach ($name in @('TerrainModifier','TerrainOp','TerrainComp','BoxCollider','MeshCollider','CreateVisualClone','TryGetLocalVisualBounds')) {
+    Require ($footprint -match $name) "Station footprint omits $name"
+}
+Require ($footprint -notmatch 'Object::Instantiate|Collider::get_bounds') 'Station preflight instantiates gameplay objects or trusts inactive collider bounds.'
 $qa.Dispose(); $normal.Dispose()
+if ($CheckCompiledOnly) {
+    'PASS: QA/normal separation, native fingerprints and compiled provisioning guards; no file writes or native execution.'
+    return
+}
 
 # Only BCL path/ownership functions execute here. No native API/root setter/save is invoked.
 [Reflection.Assembly]::LoadFrom((Join-Path $profile 'BepInEx/core/0Harmony.dll')) | Out-Null
@@ -205,6 +228,33 @@ foreach ($case in @(@(0,50),@(-1,50),@(10001,50),@(1,0),@(1,-1),@(1,10001),@([in
     Refuses { Batches $case[0] $case[1] } 'Invalid/excessive supply stack accepted.'
     $batchChecks++
 }
-@{status='passed_paths_receipts_stacks_and_compiled_contract_only';identityCases=$identityChecks;onceCases=$onceChecks;batchCases=$batchChecks;qaSha256=(Get-FileHash $qaPath).Hash;normalSha256=(Get-FileHash $normalPath).Hash;gameHostTested=$false;saveFilesModified=$false;fixtures=$output} |
+$stationCases = 0
+$stationType = $assembly.GetType($stationsName,$true)
+function Ground([single[]]$heights) { $stationType.GetMethod('FlatGround',$flags).Invoke($null,[object[]]@(,$heights)) }
+Require ((Ground ([single[]]@(1,1,1,1,1,1,1,1,1))) -eq 1) 'Flat ground was rejected.'
+$stationCases++
+Require ((Ground ([single[]]@(0,0,0,0.1,0.1,0.1,0,0,0))) -eq [single]0.1) 'Ground plan did not use highest supported sample.'
+$stationCases++
+foreach ($heights in @(@(),@(0,0,0),@(0,0,0,0,0,0,0,0,0.2),@(0,0,0,0,0,0,0,0,[single]::NaN),
+    @(0,0,0,0,0,0,0,0,[single]::PositiveInfinity),@(0,0,0,0,0,0,0,0,[single]::NegativeInfinity))) {
+    Refuses { Ground ([single[]]$heights) } 'Invalid or nonflat QA ground accepted.'
+    $stationCases++
+}
+Refuses { Ground $null } 'Null QA ground accepted.'
+$stationCases++
+function SaveAck([uint32]$before,[uint32]$after) { $stationType.GetMethod('RequireSaveAcknowledgement',$flags).Invoke($null,@($before,$after)) }
+SaveAck 10 11
+SaveAck ([uint32]::MaxValue) 0
+$stationCases += 2
+foreach ($numbers in @(@(10,10),@(10,12),@(10,9),@(0,0))) {
+    $refused = $false
+    try { SaveAck $numbers[0] $numbers[1] } catch {
+        if ($_.Exception.GetBaseException() -isnot [IO.IOException]) { throw }
+        $refused = $true
+    }
+    Require $refused 'Uncommitted or ambiguous native world save was acknowledged.'
+    $stationCases++
+}
+@{status='passed_paths_receipts_stacks_ground_save_ack_and_compiled_contract_only';identityCases=$identityChecks;onceCases=$onceChecks;batchCases=$batchChecks;stationCases=$stationCases;qaSha256=(Get-FileHash $qaPath).Hash;normalSha256=(Get-FileHash $normalPath).Hash;gameHostTested=$false;saveFilesModified=$false;fixtures=$output} |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'verification.json')
-"PASS: QA-only assemblies; $identityChecks identity, $onceChecks one-shot, $batchChecks stack cases; native supply wiring only. No native grants/saves or game execution."
+"PASS: QA-only assemblies; $identityChecks identity, $onceChecks one-shot, $batchChecks stack, $stationCases ground/save-ack cases; native wiring only. No native grants/saves or game execution."

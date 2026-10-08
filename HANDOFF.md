@@ -2,6 +2,23 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.93 — physical QA stations and guarded package
+
+[First-launch contract and exact manual series](docs/testing/qa-stand-0.19.93.md).
+QA-only stations use native requirements, scaled visual/collider footprints, flat loaded sites and obstacle guards;
+no terrain components or foreign behaviours. Started before PlacePiece, Start/new owner/creator/transform/range
+checks, native profile save, async world save committed counter acknowledgement, then complete. No blind retry.
+Existing guarded deploy accepts explicit QaStandToken, QA DLL pair and 7 pinned+missing fixture, marker last.
+Reparse DLL destinations refuse before write/rollback. QA64 BCL cases, deployment12 replica cases, forbidden4,
+both Release0/0, HostContract/Localization853/format and independent correctness review PASS.
+File symbolic-link execution unavailable without administrator privileges; DLL-path junction executed/common
+ReparsePoint code reviewed. verify unavailable. UI252/corpus353 are previous evidence, not rerun.
+Installed .82/hash unchanged; no live deployment/game/saves/reload/network/push. Native stand readiness unproven.
+Next: owner authorization for actual QA package/first launch, inspect isolation/receipts, then two external files
+through edit/cancel/native construction/reload. No manual farming/preparation or repeat of accepted tools.
+Goal tool returned paused after owner resumed; available API cannot resume, so no status update is claimed.
+Proof: artifacts/checkpoint-0.19.93/verification.json. Full product objective remains open.
+
 ## Checkpoint 0.19.92 — one-shot QA supplies and knowledge
 
 [Contract/boundaries](docs/testing/qa-save-isolation-0.19.90.md). New QA-only BuildWorksTestSupplies:

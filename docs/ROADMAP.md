@@ -2,14 +2,20 @@
 
 **English** | [Русский](ROADMAP_RU.md)
 
-Updated 2026-10-07. Ostrix approved this order after the development review.
+Updated 2026-10-08. Ostrix approved this order after the development review.
 The goal is predictable building with real Valheim pieces, then useful group
 operations and editable generators. Each stage delivers a complete workflow,
 not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source checkpoint **0.19.92**, not deployed: [one-shot QA supplies](testing/qa-save-isolation-0.19.90.md).
+Active source checkpoint **0.19.93**, not deployed: [QA stations/package and first native series](testing/qa-stand-0.19.93.md).
+Scaled visual/collider sites, no terrain changes, one-shot native stations/knowledge/world-save acknowledgement;
+explicit guarded QA deployment with local pinned files and marker last. QA64 BCL/deploy12 replica/forbidden4 PASS,
+both Release0/0, HostContract/Localization853/format and independent review PASS. Installed .82 unchanged.
+Native activation/grants/stations/world save/build/reload/network unexecuted; first launch requires owner authorization.
+
+Previous source checkpoint **0.19.92**, not deployed: [one-shot QA supplies](testing/qa-save-isolation-0.19.90.md).
 Actual native resource plan for7 pinned fixtures, Hammer/materials/AddKnownItem, stack/count/weight guards,
 started-before-grant and profile-save-before-complete. 25identity+11once+13stack BCL PASS; native compiled only.
 No in-game grants executed; external staging/physical stations/chest/ready stand remain open.

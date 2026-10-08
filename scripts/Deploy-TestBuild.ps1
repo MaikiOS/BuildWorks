@@ -8,7 +8,10 @@ param(
 
     [string] $BlueprintLibraryArchive,
 
-    [switch] $PlayerTestFixtures
+    [switch] $PlayerTestFixtures,
+
+    [ValidateNotNullOrEmpty()]
+    [string] $QaStandToken
 )
 
 Set-StrictMode -Version Latest
@@ -57,6 +60,7 @@ function Assert-NotReparsePoint {
 Assert-NotReparsePoint $targetProfileRoot
 
 $artifactRoot = Join-Path $projectRoot 'artifacts\bin'
+if ($QaStandToken) { $artifactRoot = Join-Path $projectRoot 'artifacts\test-stand-bin' }
 $targetInstall = Join-Path $targetProfileRoot 'BepInEx\plugins\Ostrix-BuildWorks'
 $targetBepInEx = Join-Path $targetProfileRoot 'BepInEx'
 $targetPlugins = Join-Path $targetBepInEx 'plugins'
@@ -67,6 +71,29 @@ $dllNames = @('BuildWorks.dll', 'BuildWorks.Geometry.dll')
 Assert-NotReparsePoint $targetBepInEx
 Assert-NotReparsePoint $targetPlugins
 Assert-NotReparsePoint $targetInstall
+
+$qaConfig = Join-Path $targetBepInEx 'config\BuildWorks'
+$qaMarker = Join-Path $qaConfig 'qa-isolation.token'
+foreach ($path in @((Join-Path $targetBepInEx 'config'), $qaConfig, $qaMarker)) { Assert-NotReparsePoint $path }
+if ($QaStandToken) {
+    $sessionId = [guid]::Empty
+    if (-not [guid]::TryParseExact($QaStandToken, 'N', [ref]$sessionId) -or $sessionId -eq [guid]::Empty) {
+        throw 'QA stand token must be a nonzero GUID in N format.'
+    }
+    $QaStandToken = $sessionId.ToString('N')
+    if ($ArmSkyCleanup -or $BlueprintLibraryArchive) { throw 'QA stand deployment cannot arm cleanup or add an unrelated library.' }
+    if (Test-Path -LiteralPath $qaMarker) {
+        if ((Get-Item -LiteralPath $qaMarker).Length -gt 64 -or [IO.File]::ReadAllText($qaMarker).Trim() -cne $QaStandToken) {
+            throw 'A different QA stand token already exists; refusing to replace its identity.'
+        }
+    }
+    & (Join-Path $PSScriptRoot 'Test-QASaveIsolation.ps1') -CheckLaunchProfileOnly
+    & (Join-Path $PSScriptRoot 'Test-QASaveIsolation.ps1') -CheckCompiledOnly
+    $PlayerTestFixtures = $true
+}
+elseif (Test-Path -LiteralPath $qaMarker) {
+    throw 'An armed QA isolation token requires explicit -QaStandToken; normal deployment will not silently replace it.'
+}
 
 function Assert-DefaultClean {
     if (Test-Path -LiteralPath $defaultInstall) {
@@ -86,6 +113,53 @@ function Assert-DefaultClean {
 }
 
 Assert-DefaultClean
+
+# Preflight every source/destination before the first DLL/profile write.
+$fixtureCopies = @()
+if ($PlayerTestFixtures) {
+    $fixtureSource = Join-Path $projectRoot 'tests\fixtures\player-exchange'
+    $fixtureTarget = Join-Path $qaConfig 'test-fixtures'
+    foreach ($path in @($fixtureSource, $fixtureTarget)) { Assert-NotReparsePoint $path }
+    foreach ($name in '01-walls.blueprint', '02-sign.blueprint', '03-opaque.blueprint',
+        '04-snap.blueprint', '05-missing.blueprint', '06-lamp.blueprint') {
+        $fixtureCopies += @{ Source = (Join-Path $fixtureSource $name); Name = $name; Expected = $null }
+    }
+    if ($QaStandToken) {
+        Add-Type -Path (Join-Path $targetBepInEx 'core\Mono.Cecil.dll')
+        $qaAssembly = [Mono.Cecil.AssemblyDefinition]::ReadAssembly((Join-Path $artifactRoot 'BuildWorks.dll'))
+        try {
+            $supplies = $qaAssembly.MainModule.GetType('OstrixMods.BuildWorks.BuildWorksTestSupplies')
+            $manifest = @((($supplies.Methods | Where-Object Name -eq '.cctor').Body.Instructions |
+                Where-Object { $_.OpCode.Name -eq 'ldstr' }).Operand)
+            if ($manifest.Count -ne 7) { throw 'Unexpected QA source fixture manifest.' }
+            foreach ($entry in $manifest) {
+                if ($entry -cnotmatch '^([a-zA-Z0-9_-]+\.blueprint)\|([A-F0-9]{64})$') { throw 'Invalid QA source fixture manifest entry.' }
+                $name = $Matches[1]; $expected = $Matches[2]
+                $owned = @($fixtureCopies | Where-Object Name -CEQ $name)
+                if ($owned.Count -eq 1) { $owned[0].Expected = $expected }
+                elseif ($name -cin @('hs_ashlands_madzobuild_coffeetable.blueprint', 'hs_blackforest_hut.blueprint')) {
+                    $external = Join-Path $projectRoot 'artifacts\external-blueprints\BiomeBlueprints-1.0.3\smoke'
+                    Assert-NotReparsePoint (Split-Path $external)
+                    Assert-NotReparsePoint $external
+                    $fixtureCopies += @{ Source = (Join-Path $external $name); Name = $name; Expected = $expected }
+                }
+                else { throw "Unreviewed QA source fixture: $name" }
+            }
+        }
+        finally { $qaAssembly.Dispose() }
+    }
+    foreach ($copy in $fixtureCopies) {
+        Assert-NotReparsePoint $copy.Source
+        $copy.Destination = Join-Path $fixtureTarget $copy.Name
+        Assert-NotReparsePoint $copy.Destination
+        $copy.Hash = (Get-FileHash -LiteralPath $copy.Source -Algorithm SHA256).Hash
+        if ($copy.Expected -and $copy.Hash -cne $copy.Expected) { throw "QA source fixture hash changed: $($copy.Name)" }
+        if ((Test-Path -LiteralPath $copy.Destination) -and
+            (Get-FileHash -LiteralPath $copy.Destination -Algorithm SHA256).Hash -cne $copy.Hash) {
+            throw "Test fixture already exists with different contents; refusing overwrite: $($copy.Destination)"
+        }
+    }
+}
 
 # Copy only an inert archive into BuildWorks' own config. Runtime reads bounded
 # text entries; no third-party DLL, terrain or code is extracted/installed.
@@ -118,6 +192,8 @@ $needsDeploy = $false
 foreach ($name in $dllNames) {
     $source = Join-Path $artifactRoot $name
     $destination = Join-Path $targetInstall $name
+    Assert-NotReparsePoint $source
+    Assert-NotReparsePoint $destination
 
     if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
         throw "Required build artifact is missing: $source"
@@ -190,6 +266,7 @@ if ($needsDeploy) {
 
         try {
             foreach ($name in $dllNames) {
+                Assert-NotReparsePoint (Join-Path $targetInstall $name)
                 Copy-Item `
                     -LiteralPath (Join-Path $scratchRoot $name) `
                     -Destination (Join-Path $targetInstall $name) `
@@ -212,6 +289,7 @@ if ($needsDeploy) {
             foreach ($name in $dllNames) {
                 try {
                     $destination = Join-Path $targetInstall $name
+                    Assert-NotReparsePoint $destination
                     if ($hadOriginal[$name]) {
                         Copy-Item `
                             -LiteralPath (Join-Path $backupRoot $name) `
@@ -252,6 +330,7 @@ else {
 
 foreach ($name in $dllNames) {
     $destination = Join-Path $targetInstall $name
+    Assert-NotReparsePoint $destination
     if (-not (Test-Path -LiteralPath $destination -PathType Leaf)) {
         throw "Deployment verification failed; missing: $destination"
     }
@@ -287,33 +366,42 @@ if ($ArmSkyCleanup) {
 }
 
 if ($PlayerTestFixtures) {
-    $fixtureSource = Join-Path $projectRoot 'tests\fixtures\player-exchange'
-    $fixtureTarget = Join-Path $targetBepInEx 'config\BuildWorks\test-fixtures'
-    foreach ($directory in @((Join-Path $targetBepInEx 'config'),
-        (Join-Path $targetBepInEx 'config\BuildWorks'), $fixtureTarget, $fixtureSource)) {
-        Assert-NotReparsePoint $directory
-    }
-    foreach ($name in '01-walls.blueprint', '02-sign.blueprint', '03-opaque.blueprint',
-        '04-snap.blueprint', '05-missing.blueprint', '06-lamp.blueprint') {
-        $fixture = Join-Path $fixtureSource $name
-        $destination = Join-Path $fixtureTarget $name
-        Assert-NotReparsePoint $fixture
-        Assert-NotReparsePoint $destination
-        $hash = (Get-FileHash -LiteralPath $fixture -Algorithm SHA256).Hash
-        if (Test-Path -LiteralPath $destination) {
-            if ((Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash -ne $hash) {
-                throw "Test fixture already exists with different contents; refusing overwrite: $destination"
-            }
-        }
-        elseif ($PSCmdlet.ShouldProcess($destination, 'Add a ready blueprint test file; no world/save changes')) {
+    foreach ($copy in $fixtureCopies) {
+        Assert-NotReparsePoint $copy.Destination
+        if (-not (Test-Path -LiteralPath $copy.Destination) -and
+            $PSCmdlet.ShouldProcess($copy.Destination, 'Add a hash-checked blueprint fixture; no world/save changes')) {
             New-Item -ItemType Directory -Path $fixtureTarget -Force -Confirm:$false | Out-Null
-            Copy-Item -LiteralPath $fixture -Destination $destination -Confirm:$false
-            if ((Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash -ne $hash) {
-                throw "Test fixture SHA256 mismatch: $destination"
+            Copy-Item -LiteralPath $copy.Source -Destination $copy.Destination -Confirm:$false
+            if ((Get-FileHash -LiteralPath $copy.Destination -Algorithm SHA256).Hash -cne $copy.Hash) {
+                throw "Test fixture SHA256 mismatch: $($copy.Destination)"
             }
         }
     }
     Write-Output "Player test fixture directory: $fixtureTarget"
+}
+
+# Arm only after the entire DLL pair and every fixture have been verified.
+if ($QaStandToken -and -not $WhatIfPreference) {
+    foreach ($copy in $fixtureCopies) {
+        if (-not (Test-Path -LiteralPath $copy.Destination -PathType Leaf) -or
+            (Get-FileHash -LiteralPath $copy.Destination -Algorithm SHA256).Hash -cne $copy.Hash) {
+            throw "QA fixture is not installed exactly; isolation was not armed: $($copy.Destination)"
+        }
+    }
+    if (Get-Process -Name valheim, valheim_server -ErrorAction SilentlyContinue) {
+        throw 'Valheim started during deployment; QA isolation was not armed.'
+    }
+}
+if ($QaStandToken -and -not (Test-Path -LiteralPath $qaMarker) -and
+    $PSCmdlet.ShouldProcess($qaMarker, 'Arm the explicit isolated QA stand; saves are created only on an authorized game launch')) {
+    New-Item -ItemType Directory -Path $qaConfig -Force -Confirm:$false | Out-Null
+    $stream = [IO.File]::Open($qaMarker, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+    try {
+        $bytes = [Text.Encoding]::ASCII.GetBytes($QaStandToken)
+        $stream.Write($bytes, 0, $bytes.Length); $stream.Flush($true)
+    }
+    finally { $stream.Dispose() }
+    Write-Output "Armed isolated BuildWorks QA identity: $QaStandToken"
 }
 
 Write-Output "Verified BuildWorks test deployment: $targetInstall"

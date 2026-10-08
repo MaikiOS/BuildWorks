@@ -2,14 +2,20 @@
 
 [English](ROADMAP.md) | **Русский**
 
-Обновлено 2026-10-07. Ostrix утвердил порядок после анализа развития.
+Обновлено 2026-10-08. Ostrix утвердил порядок после анализа развития.
 Цель — предсказуемое строительство настоящими деталями Valheim, затем операции
 групп и редактируемые генераторы. Этап заканчивается рабочим сценарием, не кнопкой
 или математическим helper.
 
 ## База и доказательства
 
-Активные исходники **0.19.92**, не установлены: [одноразовые QA supplies](testing/qa-save-isolation-0.19.90_RU.md).
+Активные исходники **0.19.93**, не установлены: [QA станции/пакет и первая native серия](testing/qa-stand-0.19.93_RU.md).
+Scaled visual/collider площадки без terraform, одноразовые native stations/знания/world-save acknowledgement;
+явный guarded QA deploy с локальными pinned files, маркер последним. QA64 BCL/deploy12 replica/forbidden4 PASS,
+обе Release0/0, HostContract/Localization853/format и independent review PASS. Установленная .82 не менялась.
+Native activation/выдача/станции/world save/стройка/reload/сеть не исполнялись; первый запуск требует разрешения владельца.
+
+Предыдущие исходники **0.19.92**, не установлены: [одноразовые QA supplies](testing/qa-save-isolation-0.19.90_RU.md).
 Actual native resource plan по7 закреплённым файлам, Hammer/материалы/AddKnownItem, stack/count/weight guards,
 started-before-grant и profile-save-before-complete. 25identity+11once+13stack BCL PASS; native только compiled.
 Выдача в игре не исполнялась; staging внешних файлов, физические станции/сундук/ready stand остаются открыты.

@@ -38,12 +38,12 @@ namespace OstrixMods.BuildWorks
             using (var hash = SHA256.Create()) return BitConverter.ToString(hash.ComputeHash(bytes)).Replace("-", "");
         }
 
-        private static Dictionary<GameObject, int> Plan()
+        internal static Dictionary<GameObject, int> Plan(out List<Piece> pieces)
         {
             if (!ZNetScene.instance || !ObjectDB.instance || !MessageHud.instance)
                 throw new InvalidOperationException("QA supplies require loaded prefab/item databases and MessageHud.");
             string directory = CompositeBlueprintStore.ValidateExchangeDirectory(BuildWorksTestIsolation.FixtureDirectory);
-            var pieces = new List<Piece>();
+            pieces = new List<Piece>();
             int resourceBudget = 0;
             foreach (string manifest in Fixtures)
             {
@@ -99,7 +99,7 @@ namespace OstrixMods.BuildWorks
         internal static bool Prepare()
         {
             Player player = BuildWorksTestIsolation.RequireLoadedSession();
-            Dictionary<GameObject, int> plan = Plan();
+            Dictionary<GameObject, int> plan = Plan(out _);
             string description = string.Join("\n", Fixtures) + "\n" + string.Join("\n", plan.OrderBy(pair => pair.Key.name, StringComparer.Ordinal)
                 .Select(pair => pair.Key.name + "=" + pair.Value.ToString(CultureInfo.InvariantCulture)));
             string stamp = BuildWorksTestIsolation.SupplyStamp(description);

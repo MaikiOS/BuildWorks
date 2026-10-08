@@ -2,7 +2,7 @@
 
 **English** | [Русский](continuation-audit-2026-10-07_RU.md)
 
-Audit: 2026-10-07; current source checkpoint .92. This is not full product acceptance.
+Audit: 2026-10-07, updated 2026-10-08; current source checkpoint .93. This is not full product acceptance.
 Read AGENTS, PROJECT_CONTRACT, current HANDOFF and docs/ROADMAP. CONTINUE_PROMPT.txt targets
 .13; current-pass targets the historical .56 catalogue, not imported construction acceptance.
 
@@ -54,6 +54,7 @@ Its text was not updated. A document edit is not a goal update.
 
 | Block | Implemented | Automated evidence | Owner/game evidence | Unfinished | Design only |
 |---|---|---|---|---|---|
+| QA preparation | .93 stations/site guards/native save acknowledgement and explicit QA package | QA64 BCL, deployment12 replica, forbidden4, both builds/API/localization/review | None | Native isolation/grants/stability/build/reload; live .82 unchanged | Resource chest if the bounded backpack plan cannot fit |
 | Editor | Transform/group/Array/Contour/Undo/save | Geometry/bridge/Unity252 | Older .41/.44 and later scoped series recorded as accepted; do not repeat wholesale | Scenes above512 | New guide tools |
 | Exchange | Store15/portable6, .blueprint/.vbuild/ZIP, exact archives, separate contents options | Store353;209 parser-only;2 real files reviewed import/edit/support/disk/export/world renderer | Imported construction through reload unproven | Header dialects, RandMatSeed, some ZDO/inventory, export only our JSON/ZIP | Unspecified third-party formats |
 | Scale/preview | Intrinsic prefab scale, nested XYZ, world50000; .87 supplied-item world appearance | Unity transforms; ordinary/native-holder/passive/heavy attachments | Particular giant lamp remains unproven | Native place/reload/FPS; unknown item effects | Further measured optimization |

@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.92";
+        internal const string PluginVersion = "0.19.93";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -144,19 +144,38 @@ namespace OstrixMods.BuildWorks
                 Logger.LogError("BuildWorks QA save preparation refused; no automatic retry: " + exception);
                 yield break;
             }
-            while (!Player.m_localPlayer || Player.m_localPlayer.IsTeleporting()) yield return null;
+            while (!Player.m_localPlayer || Player.m_localPlayer.IsTeleporting() || Player.m_localPlayer.InIntro()) yield return null;
             try
             {
                 BuildWorksTestIsolation.RequireLoadedSession();
                 bool supplied = BuildWorksTestSupplies.Prepare();
                 Logger.LogInfo(supplied
-                    ? "BuildWorks QA supplies saved; physical stations are not prepared yet. This is not a ready stand."
-                    : "BuildWorks QA supplies were already prepared; nothing was reissued. Physical stations remain unprepared.");
+                    ? "BuildWorks QA supplies saved; preparing physical stations."
+                    : "BuildWorks QA supplies were already prepared; nothing was reissued. Checking station preparation.");
             }
             catch (Exception exception)
             {
                 Logger.LogError("BuildWorks QA preparation refused or stopped; no automatic reissue. An incomplete supply receipt requires inspection: " + exception);
+                yield break;
             }
+            var stations = BuildWorksTestStations.Prepare();
+            try
+            {
+                while (true)
+                {
+                    bool more;
+                    try { more = stations.MoveNext(); }
+                    catch (Exception exception)
+                    {
+                        Logger.LogError("BuildWorks QA station preparation stopped; no automatic retry. An incomplete receipt requires inspection: " + exception);
+                        yield break;
+                    }
+                    if (!more) break;
+                    yield return stations.Current;
+                }
+            }
+            finally { (stations as IDisposable)?.Dispose(); }
+            Logger.LogInfo("BuildWorks QA preparation completed or previously recorded. Native blueprint construction and reload still require acceptance.");
         }
 #endif
 

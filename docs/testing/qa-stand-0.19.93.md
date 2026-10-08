@@ -1,0 +1,71 @@
+# QA package 0.19.93: native first launch still pending
+
+**English** | [Русский](qa-stand-0.19.93_RU.md)
+
+Source and automated checks are ready for an explicitly authorized first launch,
+not proof of a working game stand or complete import. Installed version remains .82.
+
+QA-only preparation waits for the fresh player's intro flight to finish; the loaded
+guard also refuses InIntro. Stations come from actual requirements of the seven pinned blueprints.
+All sites are preflighted before objects: loaded terrain, nine height samples with
+at most0.12m variation, obstacles and proposed station overlap. Footprints combine
+visual bounds and Box/Mesh collider geometry, child transforms and native root scale.
+Unknown colliders, foreign MonoBehaviour and TerrainModifier/TerrainOp/TerrainComp
+(including inactive children) refuse preparation. No terrain edits; unsuitable sites refuse.
+Nine height samples do not prove native station stability.
+
+Started receipt precedes free native QA station placement. After Start, new station,
+owner/ZDO/creator, prefab, transform and build range are checked. Native profile Save()
+persists knowledge. World Save(false,false,false) must finish !IsSaving and advance the
+committed save number exactly once, including uint wrap, before complete. Partial attempts
+never retry automatically. Complete prevents duplicate preparation, not proof of reload.
+Blueprint construction still uses the existing survival resource/placement path.
+
+After owner authorization only, from Default/BuildWorks in PowerShell7:
+
+```powershell
+./scripts/Deploy-TestBuild.ps1 -TargetProfile TerrainRamp-1.0-Test -QaStandToken 43d3719a7ee649d184e26ef1daa441a3
+```
+
+Only WhatIf has run against the live profile. QA deployment validates host/known-bootstrap
+and all files, selects the separate QA DLL pair, stages six owned plus two external local
+files, then writes the isolation marker last. It creates no game saves. Foreign tokens,
+changed files and reparse-point DLL paths refuse; normal deployment over an armed QA identity
+also refuses. Cleanup/library additions are forbidden in QA mode. External files remain local
+and outside Git/releases; [provenance and conditions](external-path-2026-10-07.md).
+
+Planned world/character name: **BW_QA_43d3719a**. Native Valheim assigns fresh actual IDs.
+Save root: `TerrainRamp-1.0-Test/BepInEx/config/BuildWorks/qa-saves/43d3719a7ee649d184e26ef1daa441a3`.
+Game launch/save creation requires separate explicit authorization under AGENTS.md.
+Launch modded TerrainRamp-1.0-Test. Only QA identities should be visible; if regular saves
+appear or QA identities are absent, stop without loading any world. Select the QA identities,
+keep server closed with no clients or cheats. Hammer/resources/stations must be prepared
+without farming/unlocking/building preparation objects. Inspect logs/complete receipts before
+calling it prepared. Do not delete failed receipts or blindly reissue supplies.
+
+Manual cases use the current Russian button labels; see the parallel Russian protocol for
+exact file finding, starting state, actions, expected results and failure signs:
+
+1. Hammer → «Чертежи» → «Импорт файла» → «Папка BuildWorks» → «Папка: test-fixtures».
+2. `hs_ashlands_madzobuild_coffeetable.blueprint` → «Импорт файла» → «Подтвердить импорт».
+   CoffeeTable card → ⋯ → «РЕДАКТИРОВАТЬ». Move one part along X; save `QA93 CoffeeTable`
+   through «СОХРАНИТЬ И ВЫЙТИ». Reopen; all4parts and edit must remain, original unchanged.
+3. Record resource counts, select placement, F9 → «ОТМЕНА»: no pieces/costs/items may change.
+4. Select the edited copy; place on suitable clear ground near stations using F9 → «ПРИМЕНИТЬ».
+   Ghost and four placed parts must match; exactly one native cost, no free contents/items.
+5. Repeat import/editor/save as `QA93 Forest Hut` for `hs_blackforest_hut.blueprint`.
+   All28parts, including original projecting beams, must retain native scale and placement.
+6. Normal exit/save then reopen the same QA identities. Compare both buildings/stations and
+   remaining inventory: unchanged transforms, no loss/duplication/reissue/new stations.
+
+Unsuitable terrain/preparation refusal is a failed preparation, not a request that the owner
+terraform or construct a test stand. Admin restoration, containers/mounts, heavy files and
+multiplayer remain separate open work. Native construction/reload have not been executed.
+
+Proof: `artifacts/checkpoint-0.19.93/verification.json`: both Release0/0, HostContract,
+Localization853, QA64BCL cases, replica deployment12cases, forbidden profiles4, independent
+correctness review. Normal DLL excludes all QA modules. File symbolic-link creation required
+Windows administrator privileges; executed a DLL-path junction and reviewed the common
+ReparsePoint guard. verify unavailable; direct review/build/targeted checks used.
+UI252/corpus353 are previous evidence, not rerun. No Valheim window-control tools available;
+Workbench does not establish in-game behavior. Live deployment/game/saves/reload/network/push pending.

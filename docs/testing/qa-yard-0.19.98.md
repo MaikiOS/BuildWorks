@@ -1,6 +1,6 @@
 # QA yard 0.19.98
 
-Source checks passed; installation and native yard creation are pending. This is a
+Source checks passed; .98 installed with matching hashes and all32 existing QA files unchanged. Native yard creation is pending. This is a
 test-only extension of the existing isolated stand, not a terrain feature for players.
 
 The owner requested a distant large construction area and permanent day. In the same

@@ -11,7 +11,7 @@ QA build. Back up native world files before terrain changes, recheck session/gro
 objects after waits, protect crossing objects, and use separate one-shot yard/station
 receipts. Same world/token/supplies retained. Both builds0/0, QA80 plus compiled guards,
 HostContract, Localization853, formatting and independent/Ponytail review passed.
-verify unavailable. Installed .97 is closed; .98 installation/native acceptance pending.
+verify unavailable. .98 installed with matching DLL hashes; all32 existing QA files unchanged. Native yard acceptance pending.
 Details and exact test sequence: docs/testing/qa-yard-0.19.98.md (Russian duplicate exists).
 Earlier checkpoint/deployment paragraphs below are historical.
 

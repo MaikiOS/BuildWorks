@@ -1,12 +1,13 @@
 # BuildWorks development roadmap
 
-## .110 — pinned import scale: verified code, deployment pending
+## .110 — pinned import scale: verified code and QA deployment
 
 Native17/portable7 pins absolute source size independently of canonical/Hammer bases.
 Editor/thumbnail/ghost/save/reopen and rotated nonuniform snaps passed; editor tiny
 geometry is separate from native world range. Parent scale/shear/mirror capture is
 rejected. Normal/QA0/0, Geometry/Store/host/localization857/QA isolation/format,
-Workbench252 and independent correctness/ponytail PASSED. Installed QA remains .109.
+Workbench252 and independent correctness/ponytail PASSED. QA .110 installed;
+hashes match,48 QA files/library unchanged. Checkpoint:fa66b1d.
 No Valheim execution; native build/reload/network and axis-offset reproduction open.
 Legacy v16 copies remain; one new .110 placement copy may coexist, then deduplicate.
 See checkpoint-0.19.110.md and QA_0.19.110_RU.md.

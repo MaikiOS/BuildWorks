@@ -1,7 +1,7 @@
 # Persisted scale basis — implementation contract
 
-Implemented in canonical .110; automated checks and independent review passed,
-deployment pending. Installed .109 remains separate. No native game proof.
+Implemented in canonical .110; automated checks and independent review passed.
+QA .110 installed, hashes match,48 QA files/library unchanged. No native game proof.
 .109 BakeMesh(baked,true) regression is retained; this step addresses the distinct
 canonical ZNetScene versus Hammer PieceTable prefab root-scale mismatch.
 

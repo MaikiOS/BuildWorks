@@ -1,7 +1,8 @@
 # .110 — persisted prefab scale basis
 
 Automated checks and independent correctness/ponytail review passed.
-Deployment is pending; installed QA remains .109. No Valheim execution.
+QA .110 deployed by the guarded script; DLL hashes match,48 QA files and library
+unchanged. Checkpoint:fa66b1d. No Valheim execution.
 
 Native17/portable7 adds optional baseScale. Effective root scale is
 (baseScale ?? resolved prefab base) × user multiplier. External absolute rows
@@ -34,4 +35,6 @@ beside an old v16 copy. Legacy copies are not rewritten or silently reinterprete
 repeated selection within .110 still reuses one placement copy.
 
 See QA_0.19.110_RU.md. Native build/payment/cancel/reload/network remain unverified.
-The reported imported blueprint axis offset remains a separate unresolved symptom.
+CoffeeTable source already contains yaw-33.75°; a distinct axis conversion defect
+is not proven. See import-axis-evidence.md and private deployment evidence at
+artifacts/checkpoint-0.19.110/verification.json.

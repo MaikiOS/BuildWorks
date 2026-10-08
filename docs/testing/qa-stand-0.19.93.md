@@ -1,10 +1,11 @@
-# QA package 0.19.93–0.19.94: startup correction, native retry pending
+# QA package 0.19.93–0.19.95: startup/respawn corrections, native stand pending
 
 **English** | [Русский](qa-stand-0.19.93_RU.md)
 
-QA .94 is installed after .93's authorized first launch failed on an early platform getter.
-No QA identities/grants/stations were created. The lifecycle guard and regression pass;
-this is not proof of a working stand or complete import. See HANDOFF for current hashes/checks.
+QA .94 reached menu and created isolated identities; world entry refused preparation before grants.
+Source .95 waits for native respawn completion/nonzero player ID without relaxing identity matching.
+Installation waits for game exit; keep the same QA saves/token. This is not proof of a working
+stand or complete import. See HANDOFF for current hashes/checks and native log evidence.
 
 QA-only preparation waits for the fresh player's intro flight to finish; the loaded
 guard also refuses InIntro. Stations come from actual requirements of the seven pinned blueprints.

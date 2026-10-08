@@ -2,6 +2,25 @@
 
 [English](HANDOFF.md) | **Русский**
 
+## Этап 0.19.95 — ожидание появления персонажа; исходники проверены, установка открыта
+
+.94 через Modded дошла до меню: QA root/cloud isolation активна, Local персонаж/мир
+BW_QA_43d3719a созданы с complete receipt, ранней ошибки нет. Ostrix вошёл в мир.
+Проверка ID отказала до receipts материалов/станций, между Destroying valkyrie и Local player
+destroyed. Native _RequestRespawn уничтожает ZNetView старого Player до OnDestroy; GetPlayerID
+возвращает0, WaitingForRespawn сбрасывается после SpawnPlayer/LoadPlayerData/SetPlayerID.
+Точное значение ID в момент отказа не записано. .95 ждёт завершения respawn и ненулевого ID;
+shared loaded guard повторяет запрет. Строгое совпадение receipt сохранено, диагностика
+несовпадения теперь показывает ожидаемые/фактические ID. Регрессия упала на .94 без
+WaitingForRespawn и прошла на .95 с проверкой compiled yield branches. QA64 BCL, обе Release0/0,
+HostContract, Localization853, оба format, независимый correctness и Ponytail review PASS.
+verify отсутствует; deployment12/UI/корпус не повторялись для этого исправления.
+.95 НЕ установлена при работающей игре; установлена .94. Ostrix предложено обычным выходом
+закрыть игру, затем guarded deploy с тем же token и перезапуск через Modded. QA saves/receipts
+не сбрасывать. Выдачи/станций не было; native стройка/reload/сеть открыты. Доказательства:
+artifacts/checkpoint-0.19.94/menu-launch.json, loaded-world-refusal.json;
+исходники — artifacts/checkpoint-0.19.95/verification.json. Полная цель не завершена.
+
 ## Этап 0.19.94 — ранний QA запуск: исправлено и установлено, повтор в игре открыт
 
 Разрешённый запуск .93 загрузил BuildWorks и закрепил отдельную папку saves, затем упал

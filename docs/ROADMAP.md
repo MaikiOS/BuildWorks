@@ -9,7 +9,12 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source and installed QA **0.19.94**: [QA startup and first native series](testing/qa-stand-0.19.93.md).
+Active source **0.19.95**, installed QA **0.19.94**: [QA startup and first native series](testing/qa-stand-0.19.93.md).
+.94 menu/isolated identity creation passed; world entry refused preparation before grants/receipts.
+.95 waits for native respawn/nonzero ID, preserving strict identity matching. Regression/QA64/builds/API/
+localization/format/review PASS; install requires game exit. Native stand/build/reload remain pending.
+
+Previous source and installed QA **0.19.94** at that checkpoint:
 Authorized .93 launch reproduced an early platform getter NRE before identities/grants/stations.
 .94 lifecycle guard, failing-before/passing-after regression, QA64/deployment12, both builds/API/localization/
 format and independent review PASS; installed hash verified. Retry ONLY manager Modded; native build/reload pending.

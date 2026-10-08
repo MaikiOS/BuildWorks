@@ -55,7 +55,7 @@ $allCalls = ($type.Methods | Where-Object HasBody | ForEach-Object { $_.Body.Ins
 Require ($allCalls -notmatch 'ResetSaveDataPath\(\)|SaveSystem::ForceRefreshCache|Directory::Delete|File::Delete|File::Move') 'QA isolation gained cache clearing, root reset or destructive filesystem operations.'
 $loaded = $type.Methods | Where-Object Name -eq 'RequireLoadedSession'
 $loadedCalls = @($loaded.Body.Instructions | Where-Object { $_.OpCode.Name -in @('call','callvirt') } | ForEach-Object { [string]$_.Operand })
-foreach ($name in @('AssertPinned','IsServer','IsDedicated','IsOpenServer','GetPeers','IsShuttingDown','IsDead','IsTeleporting','InIntro',
+foreach ($name in @('AssertPinned','IsServer','IsDedicated','IsOpenServer','GetPeers','IsShuttingDown','WaitingForRespawn','IsDead','IsTeleporting','InIntro',
     'GetInventory','NoCostCheat','GetGlobalKey','GetWorld','GetPlayerProfile','GetSaveFWLPath','GetPath','GetFilename',
     'GetPlayerID','ReadIdentityReceipt','RequireIdentityMatch')) {
     Require ([bool]($loadedCalls -match "::$name\(")) "Loaded QA session omits native identity/survival guard: $name"
@@ -94,6 +94,15 @@ function Require-StorageStartGuard($method) {
 }
 Require-StorageStartGuard ($coroutine.Methods | Where-Object Name -eq 'MoveNext')
 Require-StorageStartGuard ($type.Methods | Where-Object Name -eq 'PrepareFreshSaves')
+$iterator = ($coroutine.Methods | Where-Object Name -eq 'MoveNext').Body.Instructions
+$respawnWait = $iterator | Where-Object { [string]$_.Operand -match 'Game::WaitingForRespawn\(' } | Select-Object -First 1
+$playerIdWait = $iterator | Where-Object { [string]$_.Operand -match 'Player::GetPlayerID\(' } | Select-Object -First 1
+Require ($null -ne $respawnWait -and $null -ne $playerIdWait) 'QA preparation does not wait for native respawn and a nonzero player identity.'
+Require ($respawnWait.Next.OpCode.Name -in @('brtrue','brtrue.s') -and
+    $playerIdWait.Next.OpCode.Name -in @('brfalse','brfalse.s') -and
+    $respawnWait.Next.Operand.Offset -eq $playerIdWait.Next.Operand.Offset -and
+    $respawnWait.Next.Operand.Next.Next.OpCode.Name -eq 'stfld' -and
+    [string]$respawnWait.Next.Operand.Next.Next.Operand -match '<>2__current') 'Respawning/zero-ID player does not yield before provisioning.'
 Require ([bool](@($coroutine.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -match '::RequireLoadedSession\(')) 'QA loaded gate is not called by the actual plugin coroutine.'
 Require ([bool](@($coroutine.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -match '(Character|Player)::InIntro\(')) 'QA provisioning does not wait for the fresh-player intro flight.'
 Require ([bool](@($coroutine.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -match 'BuildWorksTestSupplies::Prepare\(')) 'QA supply path is not called by actual plugin coroutine.'

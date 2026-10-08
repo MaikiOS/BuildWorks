@@ -207,7 +207,9 @@ namespace OstrixMods.BuildWorks
             long[] ids = ValidateIdentityReceipt(receipt, sessionToken);
             if (worldName != receipt[2] || worldId != ids[0] || profileFilename != receipt[4] ||
                 profileId != ids[1] || localPlayerId != ids[1])
-                throw new InvalidDataException("Loaded QA world/profile/player does not match its original identity receipt.");
+                throw new InvalidDataException("Loaded QA world/profile/player does not match its original identity receipt. " +
+                    $"Expected world {receipt[2]}/{ids[0]}, profile {receipt[4]}/{ids[1]}; " +
+                    $"loaded world {worldName}/{worldId}, profile {profileFilename}/{profileId}, player {localPlayerId}.");
         }
 
         // Call immediately before each future provisioning operation; an earlier PASS is not a grant capability.
@@ -219,7 +221,8 @@ namespace OstrixMods.BuildWorks
             Player player = Player.m_localPlayer;
             if (!network || !game || !player || !ZoneSystem.instance || !PlatformInitializer.SaveDataInitialized ||
                 !network.IsServer() || network.IsDedicated() || ZNet.IsOpenServer() || network.GetPeers().Count != 0 ||
-                game.IsShuttingDown() || player.IsDead() || player.IsTeleporting() || player.InIntro() || player.GetInventory() == null ||
+                game.IsShuttingDown() || game.WaitingForRespawn() || player.IsDead() || player.IsTeleporting() || player.InIntro() ||
+                player.GetPlayerID() == 0 || player.GetInventory() == null ||
                 Player.m_debugMode || player.NoCostCheat() || Game.m_worldLevel != 0 ||
                 ZoneSystem.instance.GetGlobalKey(GlobalKeys.NoBuildCost) || ZoneSystem.instance.GetGlobalKey(GlobalKeys.NoCraftCost))
                 throw new InvalidOperationException("QA preparation requires a loaded living player on a closed Local survival server with no peers or cheats.");

@@ -2,6 +2,25 @@
 
 **English** | [Русский](HANDOFF_RU.md)
 
+## Checkpoint 0.19.95 — wait for native respawn; source verified, installation pending
+
+.94 manager launch reached menu: QA root/cloud isolation active, Local world/character
+BW_QA_43d3719a created, complete identity receipt, no startup errors. Ostrix entered the
+world. Preparation refused identity matching before supplies/stations receipts; log places
+the refusal between Destroying valkyrie and Local player destroyed. Native _RequestRespawn
+invalidates the old player ZNetView before OnDestroy, so GetPlayerID returns0; WaitingForRespawn
+clears only after SpawnPlayer/LoadPlayerData/SetPlayerID. Exact ID at the refusal was not logged.
+.95 waits for respawn completion and nonzero player ID; shared loaded guard repeats both.
+Strict receipt matching is unchanged; mismatch diagnostics now include expected/actual IDs.
+Regression failed on .94 missing WaitingForRespawn, then passed .95 compiled yield branches.
+QA64 BCL, both Release0/0, HostContract, Localization853, both formats, independent correctness
+and Ponytail review PASS. verify absent; deployment12 and UI/corpus not repeated for this fix.
+.95 is NOT installed while Valheim runs; .94 remains installed. Ostrix was asked to exit
+normally; then guarded same-token deploy and manager Modded restart. Keep existing QA saves
+and receipts. No materials/stations were granted; blueprint construction/reload/network pending.
+Native evidence: artifacts/checkpoint-0.19.94/menu-launch.json and loaded-world-refusal.json;
+source proof: artifacts/checkpoint-0.19.95/verification.json. Full task remains unfinished.
+
 ## Checkpoint 0.19.94 — early QA startup guard; installed, game retry pending
 
 The authorized .93 launch loaded BuildWorks and pinned the isolated root, then failed in

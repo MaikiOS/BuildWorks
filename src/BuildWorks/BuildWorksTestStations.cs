@@ -109,6 +109,22 @@ namespace OstrixMods.BuildWorks
             throw new InvalidOperationException("No clear loaded naturally flat site for QA stations near the player; no terrain was modified.");
         }
 
+        private static Piece ResolveStation(Piece piece)
+        {
+            CraftingStation required = piece.m_craftingStation;
+            Piece parent = required ? required.GetComponentInParent<Piece>(true) : null;
+            string name = parent ? parent.name : required ? required.gameObject.name : null;
+            GameObject prefab = string.IsNullOrEmpty(name) ? null : ZNetScene.instance.GetPrefab(name);
+            Piece station = prefab ? prefab.GetComponent<Piece>() : null;
+            CraftingStation actual = prefab ? prefab.GetComponent<CraftingStation>() : null;
+            ZNetView view = prefab ? prefab.GetComponent<ZNetView>() : null;
+            if (!required || string.IsNullOrEmpty(required.m_name) || !station || !actual || !view ||
+                prefab.name != name || actual.m_name != required.m_name)
+                throw new InvalidDataException($"QA station resolution refused: piece={piece.name}, requirement={required?.name}/{required?.m_name}, " +
+                    $"parent={parent?.name}, canonical={prefab?.name}, Piece={(bool)station}, CraftingStation={(bool)actual}/{actual?.m_name}, ZNetView={(bool)view}.");
+            return station;
+        }
+
         internal static IEnumerator Prepare()
         {
             Player player = BuildWorksTestIsolation.RequireLoadedSession();
@@ -117,10 +133,7 @@ namespace OstrixMods.BuildWorks
             foreach (Piece piece in pieces)
             {
                 if (!piece.m_craftingStation) continue;
-                Piece station = piece.m_craftingStation.GetComponentInParent<Piece>();
-                if (!station || ZNetScene.instance.GetPrefab(station.name) != station.gameObject ||
-                    !station.GetComponent<CraftingStation>() || !station.GetComponent<ZNetView>())
-                    throw new InvalidDataException("QA station is not a registered native root prefab.");
+                Piece station = ResolveStation(piece);
                 prefabs[station.name] = station;
             }
             if (prefabs.Count == 0 || prefabs.Count > 4) throw new InvalidDataException("Unexpected QA station set.");

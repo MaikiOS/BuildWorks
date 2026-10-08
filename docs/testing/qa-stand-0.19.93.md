@@ -1,4 +1,23 @@
-# QA package 0.19.93–0.19.96: startup/respawn/primary-slot corrections, native stand pending
+# QA package 0.19.93–0.19.97: startup/respawn/primary-slot corrections, native stand pending
+
+## Checkpoint 0.19.97 — canonical QA station resolution; source verified, installation pending
+
+Native .96 loaded the same isolated Local world/character and saved supplies with a complete
+receipt. Station preflight refused before its receipt/placement: "QA station is not a registered
+native root prefab." The exact failing field/prefab was not logged; no cause beyond that is proven.
+.97 resolves the exact registered station prefab, includes inactive Piece parents, and validates
+root Piece/CraftingStation/ZNetView plus native CraftingStation.m_name. It removes serialized
+reference equality and adds field diagnostics, without similar-name substitutions. Existing
+supplies receipt stays complete: no reset, reissue, station receipt deletion or terrain changes.
+The compiled resolver regression failed .96 before the fix. .97 QA72 BCL + compiled wiring,
+both Release builds0/0, HostContract, Localization853, both formats and independent correctness
+review PASS. Ponytail review: one focused resolver, existing guards retained; no new dependency.
+verify unavailable; UI/corpus/deployment replica not repeated. Compiled checks do not execute
+real prefab resolution. Installed QA remains .96 while Valheim runs; close normally before the
+guarded same-token .97 deployment. Continue ONLY through manager TerrainRamp-1.0-Test Modded.
+Proof: artifacts/checkpoint-0.19.96/loaded-world-refusal.json and checkpoint-0.19.97/verification.json.
+Native stations, imported construction, world reload and multiplayer remain unverified.
+
 
 **English** | [Русский](qa-stand-0.19.93_RU.md)
 

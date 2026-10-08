@@ -9,7 +9,11 @@ not just a button or a mathematical helper.
 
 ## Baseline and evidence
 
-Active source and installed QA **0.19.96**: [QA startup and first native series](testing/qa-stand-0.19.93.md).
+Active source **0.19.97**, installed QA **0.19.96**. Native supplies saved complete; station preflight refused before placement.
+.97 canonical station resolution: QA72/builds/host/localization/formats/independent review PASS; installation and native retry pending.
+Keep the same QA saves/complete supply receipt; do not reissue. Stations/build/reload remain open.
+
+Previous source and installed QA **0.19.96** at that checkpoint: [QA startup and first native series](testing/qa-stand-0.19.93.md).
 .95 replay falsely expected slot0 after native save rotated to slot1; no grants executed.
 .96 persisted primary/native identity replay and async-save boundary: QA72/builds/API/localization/format PASS.
 Installed after confirmed exit; same QA saves verified unchanged. Native stand/build/reload pending. Details: current HANDOFF.

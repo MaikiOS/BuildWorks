@@ -1,5 +1,24 @@
 # BuildWorks: verified continuation baseline and dependencies
 
+## Checkpoint 0.19.97 — canonical QA station resolution; source verified, installation pending
+
+Native .96 loaded the same isolated Local world/character and saved supplies with a complete
+receipt. Station preflight refused before its receipt/placement: "QA station is not a registered
+native root prefab." The exact failing field/prefab was not logged; no cause beyond that is proven.
+.97 resolves the exact registered station prefab, includes inactive Piece parents, and validates
+root Piece/CraftingStation/ZNetView plus native CraftingStation.m_name. It removes serialized
+reference equality and adds field diagnostics, without similar-name substitutions. Existing
+supplies receipt stays complete: no reset, reissue, station receipt deletion or terrain changes.
+The compiled resolver regression failed .96 before the fix. .97 QA72 BCL + compiled wiring,
+both Release builds0/0, HostContract, Localization853, both formats and independent correctness
+review PASS. Ponytail review: one focused resolver, existing guards retained; no new dependency.
+verify unavailable; UI/corpus/deployment replica not repeated. Compiled checks do not execute
+real prefab resolution. Installed QA remains .96 while Valheim runs; close normally before the
+guarded same-token .97 deployment. Continue ONLY through manager TerrainRamp-1.0-Test Modded.
+Proof: artifacts/checkpoint-0.19.96/loaded-world-refusal.json and checkpoint-0.19.97/verification.json.
+Native stations, imported construction, world reload and multiplayer remain unverified.
+
+
 .95 update: .94 created isolated identities and reached world entry; provisioning refused
 identity matching during native respawn. .95 waits for respawn/nonzero ID; source checks PASS,
 QA .95 installed after exit, QA file hashes unchanged. Keep saves; grants/stations/build/reload pending.
@@ -10,7 +29,7 @@ before QA identities/grants/stations. The .94 guard and regression pass; QA .94 
 Retry ONLY manager TerrainRamp-1.0-Test Modded; native construction/reload remain pending.
 
 
-Audit: 2026-10-07, updated 2026-10-08; current source checkpoint .96. This is not full product acceptance.
+Audit: 2026-10-07, updated 2026-10-08; current source checkpoint .97. This is not full product acceptance.
 Read AGENTS, PROJECT_CONTRACT, current HANDOFF and docs/ROADMAP. CONTINUE_PROMPT.txt targets
 .13; current-pass targets the historical .56 catalogue, not imported construction acceptance.
 

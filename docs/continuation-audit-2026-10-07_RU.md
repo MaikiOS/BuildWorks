@@ -1,5 +1,24 @@
 # BuildWorks: фактическое состояние и порядок продолжения
 
+## Этап 0.19.97 — канонический prefab QA станции; исходники проверены, установка открыта
+
+Native .96 загрузила тот же отдельный Local мир/персонажа и сохранила материалы с complete
+receipt. Проверка станций отказала до своего receipt/размещения: "QA station is not a registered
+native root prefab." Точные поле/prefab не записаны; более конкретная причина не доказана.
+.97 получает станцию по точному имени зарегистрированного prefab, учитывает inactive Piece
+parents и проверяет root Piece/CraftingStation/ZNetView и native CraftingStation.m_name.
+Удалено сравнение serialized ссылок; добавлена диагностика полей без подбора похожих имён.
+Complete receipt материалов сохраняется: нет сброса, повторной выдачи, удаления receipt станций
+или изменения рельефа. Compiled регрессия resolver упала на .96 до исправления. .97 QA72 BCL
++ compiled wiring, обе Release0/0, HostContract, Localization853, оба format и независимый
+correctness review PASS. Ponytail: один узкий resolver, guards сохранены, новых зависимостей нет.
+verify отсутствует; UI/корпус/deployment replica не повторялись. Compiled проверка не исполняет
+разрешение настоящего prefab. Пока Valheim работает, установлена .96; обычный выход перед
+guarded установкой .97 с тем же token. Продолжение ТОЛЬКО Modded менеджера TerrainRamp-1.0-Test.
+Proof: artifacts/checkpoint-0.19.96/loaded-world-refusal.json и checkpoint-0.19.97/verification.json.
+Native станции, импорт/стройка, world reload и сеть остаются непроверенными.
+
+
 Дополнение .95: .94 создала отдельные QA identities и дошла до мира, но выдача остановилась
 на проверке ID при native respawn. .95 ждёт завершения respawn/ненулевого ID; проверки PASS,
 QA .95 установлена после выхода, хеши QA-файлов прежние; материалы/станции/стройка/reload открыты.
@@ -10,7 +29,7 @@ QA .95 установлена после выхода, хеши QA-файлов 
 с проверкой хеша. Повтор только Modded менеджера TerrainRamp-1.0-Test; стройка/reload открыты.
 
 
-Аудит 2026-10-07, дополнен 2026-10-08; текущий исходный checkpoint — 0.19.96. Это не приёмка полного продукта.
+Аудит 2026-10-07, дополнен 2026-10-08; текущий исходный checkpoint — 0.19.97. Это не приёмка полного продукта.
 Действующие инструкции: AGENTS.md, PROJECT_CONTRACT.md, docs/ROADMAP.md и текущий запрос владельца.
 CONTINUE_PROMPT.txt описывает .13 и устарел. specs/roadmap/current-pass.md описывает каталог .56,
 а не полный импорт. Исторические проверки не заменяют проверку установленной версии.

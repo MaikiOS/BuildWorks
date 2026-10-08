@@ -121,10 +121,22 @@ Require ([bool](@($coroutine.Methods.Body.Instructions | ForEach-Object { [strin
 $stationsName = 'OstrixMods.BuildWorks.BuildWorksTestStations'
 $stations = $qa.MainModule.GetType($stationsName)
 Require ($null -ne $stations -and $null -eq $normal.MainModule.GetType($stationsName)) 'QA stations leaked into the normal build or are missing.'
+$resolver = $stations.Methods | Where-Object Name -eq 'ResolveStation'
+Require ($null -ne $resolver) 'QA station requirements are not resolved through the registered prefab.'
+$resolverIl = @($resolver.Body.Instructions)
+$parentLookup = $resolverIl | Where-Object { [string]$_.Operand -match '::GetComponentInParent<Piece>\(System.Boolean\)' } | Select-Object -First 1
+Require ($null -ne $parentLookup -and $parentLookup.Previous.OpCode.Name -eq 'ldc.i4.1') 'QA station resolution skips inactive prefab parents.'
+foreach ($component in @('Piece','CraftingStation','ZNetView')) {
+    Require ([bool]($resolverIl.Operand -match "::GetComponent<$component>\(")) "Canonical QA station omits root $component validation."
+}
+Require ([bool]($resolverIl.Operand -match 'ZNetScene::GetPrefab\(System.String\)') -and
+    [bool]($resolverIl.Operand -match 'CraftingStation::m_name') -and
+    [bool]($resolverIl.Operand -match 'System.String::op_Inequality') -and
+    -not [bool]($resolverIl.Operand -match 'UnityEngine.Object::op_(Equality|Inequality)')) 'QA station resolver requires serialized object-reference equality or omits exact native station type matching.'
 Require ([bool](@($coroutine.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -match 'BuildWorksTestStations::Prepare\(')) 'QA station path is not called by the plugin coroutine.'
 $stationIterator = $stations.NestedTypes | Where-Object Name -Like '<Prepare>*'
 $stationCalls = @($stationIterator.Methods.Body.Instructions | Where-Object { $_.OpCode.Name -in @('call','callvirt') })
-foreach ($name in @('RequireLoadedSession','Plan','OnceComplete','FindSite','BeginOnce','PlacePiece','IsValid','IsOwner','GetCreator',
+foreach ($name in @('RequireLoadedSession','Plan','ResolveStation','OnceComplete','FindSite','BeginOnce','PlacePiece','IsValid','IsOwner','GetCreator',
     'HaveBuildStationInRange','AddKnownStation','SavePlayerData','Save','IsSaving','GetSaveNumber','RequireSaveAcknowledgement','CompleteOnce')) {
     Require ([bool]($stationCalls | Where-Object { [string]$_.Operand -match "::$name\(" })) "Native QA station path omits $name"
 }

@@ -1,0 +1,5 @@
+#Name: QA109 Lava Scale
+#Category: BW TEST
+#Pieces
+piece_Lavalantern;;0;0;0;0;0;0;1;"";1;1;1;
+woodwall;;2;0;0;0;0;0;1;"";1;1;1;

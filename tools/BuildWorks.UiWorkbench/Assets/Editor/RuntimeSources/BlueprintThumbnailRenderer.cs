@@ -293,7 +293,7 @@ namespace OstrixMods.BuildWorks
 
         private string ThumbnailPath(string blueprintId) => Path.Combine(
             directory,
-            Path.GetFileName(blueprintId) + "-contents-v2.png");
+            Path.GetFileName(blueprintId) + "-contents-v3.png");
 
         private static Sprite Render(
             CompositeBlueprintStore.Blueprint blueprint,

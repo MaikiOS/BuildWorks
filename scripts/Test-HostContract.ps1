@@ -395,7 +395,7 @@ Assert-Contract ($editorControllerSource -match 'OpenNew' -and
     $editorControllerSource -match 'Cursor\.lockState') `
     'Blueprint editor controller lifecycle or save path is incomplete.'
 Assert-Contract ($previewSource -match 'SkinnedMeshRenderer' -and
-    $previewSource -match 'BakeMesh' -and
+    $previewSource -match 'sourceSkinned\.BakeMesh\(baked, true\)' -and
     $previewSource -match 'VisualCloneOwnedAssets' -and
     $previewSource -match 'owned\.Track\(baked\)') `
     'Visual clone does not preserve skinned-only prefab geometry safely.'
@@ -844,7 +844,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.108.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.109.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -1878,7 +1878,7 @@ Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion =
     $thumbnailSource -match 'Math\.Abs\(pixel\.r - background\.r\)' -and
     $thumbnailSource -match 'internal const int ThumbnailLayer = 31' -and
     $editorSceneSource -match 'used\[BlueprintThumbnailRenderer.ThumbnailLayer\] = true' -and
-    $thumbnailSource -match '-contents-v2.png') `
+    $thumbnailSource -match '-contents-v3.png') `
     'Blueprint v3/v4 migration, nested groups, or isolated persistent previews are missing.'
 Assert-Contract ($catalogSource -match 'typeof\(RectMask2D\)' -and
     $catalogSource -match 'popup\.AddComponent<ScrollRect>\(\)' -and
@@ -3104,4 +3104,4 @@ $worldCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'Preci
 $worldCaptureCalls = ($worldCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($worldCaptureCalls -match 'BlueprintStorageCapture::TryCapture' -and $worldCaptureCalls -match 'CompositeBlueprintStore/ForeignPartData::FromGeometry') 'World selection does not preserve container snapshots.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.108 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.109 and Valheim Steam build 25185596.'

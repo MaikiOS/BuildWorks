@@ -71,6 +71,7 @@ public static class ActualDividerAcceptance
                 RecordPlacementMetadata(prefab, evidence);
             }
             DiagnoseLantern(LoadPrefab("piece_dvergr_lantern"), evidence);
+            DiagnoseLantern(LoadPrefab("piece_Lavalantern"), evidence);
             EditorInteractionAcceptance.Run(outputDirectory, divider, wall);
             probe = PlacementGhostPreviewView.CreateVisualClone(divider, "ExactDividerVisualProbe", 0);
             probe.transform.localScale = divider.transform.lossyScale;
@@ -226,16 +227,40 @@ public static class ActualDividerAcceptance
         try
         {
             clone.transform.localScale = prefab.transform.localScale;
-            evidence.Add("LANTERN root local=" + prefab.transform.localScale.ToString("R") +
+            evidence.Add("LANTERN " + prefab.name + " root local=" + prefab.transform.localScale.ToString("R") +
                 "; lossy=" + prefab.transform.lossyScale.ToString("R"));
+            foreach (SkinnedMeshRenderer skin in prefab.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                evidence.Add("SKIN " + prefab.name + "/" + skin.name + "; active=" + skin.gameObject.activeInHierarchy +
+                    "; localScale=" + skin.transform.localScale.ToString("R") + "; lossy=" + skin.transform.lossyScale.ToString("R") +
+                    "; localBounds=" + skin.localBounds + "; meshBounds=" + skin.sharedMesh.bounds + "; bones=" + skin.bones.Length);
+                foreach (Transform bone in skin.bones.Take(3))
+                    evidence.Add("SKIN bone=" + (bone ? bone.name + "; matrix=" +
+                        (skin.transform.worldToLocalMatrix * bone.localToWorldMatrix).ToString("R") : "null"));
+                foreach (bool useScale in new[] { false, true })
+                {
+                    var baked = new Mesh();
+                    try { skin.BakeMesh(baked, useScale); baked.RecalculateBounds(); evidence.Add("SKIN baked useScale=" + useScale + "; bounds=" + baked.bounds); }
+                    finally { Object.DestroyImmediate(baked); }
+                }
+            }
             foreach (MeshFilter filter in prefab.GetComponentsInChildren<MeshFilter>(true))
                 if (filter.sharedMesh)
-                    evidence.Add("LANTERN native " + filter.name + "; active=" + filter.gameObject.activeInHierarchy +
+                    evidence.Add("LANTERN " + prefab.name + " native " + filter.name + "; active=" + filter.gameObject.activeInHierarchy +
                         "; matrix=" + (prefab.transform.worldToLocalMatrix * filter.transform.localToWorldMatrix).ToString("R") +
                         "; bounds=" + filter.sharedMesh.bounds);
             foreach (Renderer renderer in clone.GetComponentsInChildren<Renderer>(true))
-                evidence.Add("LANTERN clone " + renderer.name + "; active=" + renderer.gameObject.activeInHierarchy +
+                evidence.Add("LANTERN " + prefab.name + " clone " + renderer.name + "; active=" + renderer.gameObject.activeInHierarchy +
                     "; enabled=" + renderer.enabled + "; bounds=" + renderer.bounds);
+            if (prefab.name == "piece_Lavalantern")
+            {
+                Renderer shell = clone.GetComponentsInChildren<Renderer>(true).Single(renderer => renderer.name == "Sphere.004");
+                Renderer reference = clone.GetComponentsInChildren<Renderer>(true).Single(renderer => renderer.name == "high");
+                Require((shell.bounds.size - reference.bounds.size).magnitude < .05f &&
+                    (shell.bounds.center - reference.bounds.center).magnitude < .05f,
+                    "Lava Lantern skinned clone does not match the independent native static shell dimensions.");
+                evidence.Add("PASS piece_Lavalantern animated shell matches native static high shell within0.05m; root scale unchanged.");
+            }
         }
         finally { Object.DestroyImmediate(clone); }
     }

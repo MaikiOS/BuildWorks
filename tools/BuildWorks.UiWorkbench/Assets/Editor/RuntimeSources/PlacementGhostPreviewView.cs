@@ -267,7 +267,8 @@ namespace OstrixMods.BuildWorks
                 Mesh previewMesh = baked;
                 try
                 {
-                    sourceSkinned.BakeMesh(baked);
+                    // The copied hierarchy applies the renderer transform scale once.
+                    sourceSkinned.BakeMesh(baked, true);
                     owned.Track(baked);
                 }
                 catch (UnityException)

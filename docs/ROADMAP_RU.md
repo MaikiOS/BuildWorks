@@ -1,5 +1,14 @@
 # Дорожная карта развития BuildWorks
 
+## .109 — масштаб визуальной копии Lava Lantern
+
+На настоящем установленном asset воспроизведён двойной дочерний масштаб20.7203922.
+Общий BakeMesh исправлен; bounds лампы0.82м совпали со статической high сеткой
+с допуском0.05м, кеш миниатюрv3. Normal/QA0/0, Geometry/Store/host/localization856/
+QA isolation/format, Workbench252 и независимый correctness/ponytail обзор прошли.
+Valheim не запускался. Импорт canonical/Hammer bases и native place/reload открыты.
+Детали: [checkpoint .109](checkpoint-0.19.109_RU.md), [короткая проверка](QA_0.19.109_RU.md).
+
 QA .108 установлена штатным скриптом; DLL совпали,48 QA файлов и библиотека неизменны. Игра не запускалась. Checkpoint:e51c840.
 
 ## .108 — большой редактор: автоматические проверки пройдены

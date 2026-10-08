@@ -1,5 +1,14 @@
 # BuildWorks current development handoff
 
+## .109 — Lava Lantern visual clone scale
+
+Installed real asset reproduced double child scale20.7203922. Shared BakeMesh fixed;
+0.82m shell bounds match independent static high mesh within0.05m; thumbnail cachev3.
+Normal/QA0/0, Geometry/Store/host/localization856/QA isolation/format, Workbench252
+and independent correctness/ponytail review passed. No Valheim execution.
+Canonical/Hammer import bases and native place/reload remain open.
+See docs/checkpoint-0.19.109.md and docs/QA_0.19.109_RU.md.
+
 QA .108 installed by the guarded script; DLL hashes match,48 QA files and the library unchanged. No game execution. Checkpoint:e51c840.
 
 ## .108 — heavy editor: automated checks passed

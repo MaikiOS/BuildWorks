@@ -18,12 +18,13 @@ namespace OstrixMods.BuildWorks
         private readonly TMP_InputField directory, fileName;
         private readonly Button primary, copyPath, format, editPath, cancelPath;
         private RectTransform contentsPanel;
-        private Button contentsBack, storageChoice, mountChoice;
+        private Button contentsBack, storageChoice, mountChoice, armorChoice;
+        private TMP_Text contentsDetails;
         private Task<CompositeBlueprintStore.ContentsSummary> contentsInspection;
         private Task<CompositeBlueprintStore.ImportReview> importInspection;
         private CompositeBlueprintStore.ImportReview importReview;
         private CompositeBlueprintStore.ContentsSummary contentsSummary;
-        private bool reviewingContents, clearStorage, clearMounts;
+        private bool reviewingContents, clearStorage, clearMounts, omitArmorState;
         private readonly BlueprintEditorSkin skin = new BlueprintEditorSkin();
         private readonly CompositeBlueprintStore store;
         private readonly CompositeBlueprintStore.Blueprint blueprint;
@@ -226,14 +227,14 @@ namespace OstrixMods.BuildWorks
             if (blueprint == null)
             {
                 if (selected == null) return;
-                if (!store.TryImportReviewed(importReview, clearStorage, clearMounts, name => name.GetStableHashCode(), out string error))
+                if (!store.TryImportReviewed(importReview, clearStorage, clearMounts, name => name.GetStableHashCode(), out string error, omitArmorState))
                 { message.text = BuildWorksLocalization.ResolveUserText(error); return; }
                 importing = true; message.text = T("exchange.loading");
             }
             else
             {
                 if (!store.TryExportFile(blueprint, directory.text, fileName.text, archive, out resultPath, out string error,
-                    clearStorage, clearMounts, name => name.GetStableHashCode()))
+                    clearStorage, clearMounts, name => name.GetStableHashCode(), omitArmorState))
                 { message.text = BuildWorksLocalization.ResolveUserText(error); return; }
                 completed = true; ShowResult(T("exchange.exported", resultPath));
             }
@@ -253,18 +254,27 @@ namespace OstrixMods.BuildWorks
 
         private void ReviewContents()
         {
-            reviewingContents = true; contentsSummary = null; importReview = null; clearStorage = clearMounts = false;
+            reviewingContents = true; contentsSummary = null; importReview = null; clearStorage = clearMounts = omitArmorState = false;
             SetFileControls(false); copyPath.gameObject.SetActive(false);
             if (!contentsPanel)
             {
                 contentsPanel = Rect("ExchangeContents", panel, 20, 174, 740, 260);
                 contentsPanel.gameObject.AddComponent<Image>().color = new Color(.05f, .055f, .055f, 1);
                 Label("ExchangeContentsTitle", T("exchange.contents_title"), 12, 8, 716, 30, 20, contentsPanel);
-                Label("ExchangeContentsSummary", "", 12, 48, 716, 92, 16, contentsPanel);
+                var viewport = Rect("ExchangeContentsViewport", contentsPanel, 12, 48, 716, 92);
+                viewport.gameObject.AddComponent<Image>().color = new Color(.05f, .055f, .055f, 1);
+                viewport.gameObject.AddComponent<RectMask2D>();
+                var scroll = viewport.gameObject.AddComponent<ScrollRect>();
+                contentsDetails = Label("ExchangeContentsSummary", "", 0, 0, 700, 92, 16, viewport);
+                contentsDetails.alignment = TextAlignmentOptions.TopLeft;
+                scroll.viewport = viewport; scroll.content = contentsDetails.rectTransform; scroll.horizontal = false;
+                scroll.movementType = ScrollRect.MovementType.Clamped; scroll.scrollSensitivity = 132;
                 storageChoice = Button("ExchangeStorageChoice", "", 12, 152, 716, () =>
                 { clearStorage = !clearStorage; RenderContents(); }, contentsPanel);
                 mountChoice = Button("ExchangeMountChoice", "", 12, 194, 716, () =>
                 { clearMounts = !clearMounts; RenderContents(); }, contentsPanel);
+                armorChoice = Button("ExchangeArmorChoice", "", 12, 232, 716, () =>
+                { omitArmorState = !omitArmorState; RenderContents(); }, contentsPanel);
                 contentsBack = Button("ExchangeContentsBack", T("exchange.back"), 256, 530, 276, () =>
                 {
                     reviewingContents = false; contentsPanel.gameObject.SetActive(false);
@@ -274,6 +284,7 @@ namespace OstrixMods.BuildWorks
                 });
             }
             contentsPanel.gameObject.SetActive(true); contentsBack.gameObject.SetActive(true);
+            armorChoice.gameObject.SetActive(false);
             storageChoice.interactable = mountChoice.interactable = primary.interactable = false;
             primary.GetComponentInChildren<TMP_Text>().text = T(blueprint == null ? "exchange.confirm_import" : "exchange.confirm_export");
             message.text = T("exchange.loading");
@@ -289,17 +300,29 @@ namespace OstrixMods.BuildWorks
 
         private void RenderContents()
         {
-            var summary = contentsPanel.Find("ExchangeContentsSummary").GetComponent<TMP_Text>();
-            summary.text = T("exchange.contents_counts", contentsSummary.Storages, contentsSummary.StoredItems,
+            contentsDetails.text = T("exchange.contents_counts", contentsSummary.Storages, contentsSummary.StoredItems,
                 contentsSummary.Mounts, contentsSummary.Unknown, contentsSummary.AlreadyCleared);
+            if (contentsSummary.ArmorStates > 0)
+                contentsDetails.text += "\n" + T("exchange.armor_losses", contentsSummary.ArmorStates) + "\n" +
+                    string.Join("\n", contentsSummary.ArmorStateSources.Select(entry => T("exchange.loss_source", entry.Key, entry.Value)));
+            contentsDetails.rectTransform.sizeDelta = new Vector2(700, Mathf.Max(92, contentsDetails.GetPreferredValues(contentsDetails.text, 700, 0).y));
+            int remainingUnknown = contentsSummary.RemainingUnknown(omitArmorState);
+            storageChoice.interactable = remainingUnknown == contentsSummary.UnreadableMounts && contentsSummary.Storages > 0;
+            mountChoice.interactable = remainingUnknown == contentsSummary.UnreadableStorages && contentsSummary.Mounts > 0;
+            if (!storageChoice.interactable) clearStorage = false;
+            if (!mountChoice.interactable) clearMounts = false;
             contentsPanel.Find("ExchangeContentsTitle").GetComponent<TMP_Text>().text = blueprint == null
                 ? T("exchange.import_review", importReview.Documents.Count) : T("exchange.contents_title");
             storageChoice.GetComponentInChildren<TMP_Text>().text = T(clearStorage ? "exchange.storage_clear" : "exchange.storage_keep");
             mountChoice.GetComponentInChildren<TMP_Text>().text = T(clearMounts ? "exchange.mounts_clear" : "exchange.mounts_keep");
-            storageChoice.interactable = contentsSummary.CanClearStorage && contentsSummary.Storages > 0;
-            mountChoice.interactable = contentsSummary.CanClearMounts && contentsSummary.Mounts > 0;
+            armorChoice.gameObject.SetActive(contentsSummary.ArmorStates > 0);
+            armorChoice.interactable = contentsSummary.ArmorStates > 0;
+            contentsPanel.sizeDelta = new Vector2(740, contentsSummary.ArmorStates > 0 ? 270 : 260);
+            armorChoice.GetComponentInChildren<TMP_Text>().text = T(omitArmorState ? "exchange.armor_omit" : "exchange.armor_keep");
+            skin.Apply(armorChoice, active: omitArmorState);
             skin.Apply(storageChoice, active: clearStorage); skin.Apply(mountChoice, active: clearMounts);
-            message.text = T(contentsSummary.Unknown != 0 ? "exchange.contents_unknown" :
+            message.text = omitArmorState ? T("exchange.armor_warning", contentsSummary.ArmorStates, remainingUnknown) :
+                T(contentsSummary.Unknown != 0 ? "exchange.contents_unknown" :
                 blueprint == null ? "exchange.import_copy" : "exchange.contents_copy");
         }
 

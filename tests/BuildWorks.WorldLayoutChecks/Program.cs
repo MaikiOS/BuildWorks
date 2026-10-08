@@ -2,7 +2,8 @@ using System;
 using System.Collections;
 using System.IO;
 using System.Reflection;
-using System.Runtime.CompilerServices;
+using System.Runtime.Serialization;
+using UnityEngine;
 using OstrixMods.BuildWorks.Geometry;
 
 internal static class Program
@@ -10,6 +11,7 @@ internal static class Program
     private const BindingFlags Instance = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
     private static Type sessionType, blueprintType, partType, vectorType, rotationType, pieceType;
     private static MethodInfo append, appendAtPivot;
+    private static readonly GameObject[] fixtureObjects = new GameObject[2];
 
     private static int Main(string[] args)
     {
@@ -19,6 +21,7 @@ internal static class Program
             @"C:\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed" };
         AppDomain.CurrentDomain.AssemblyResolve += (_, e) =>
         {
+            if (new AssemblyName(e.Name).Name.StartsWith("Unity", StringComparison.Ordinal)) return null;
             foreach (string folder in folders)
             {
                 string path = Path.Combine(folder, new AssemblyName(e.Name).Name + ".dll");
@@ -52,6 +55,7 @@ internal static class Program
             TestUniformSingleScale();
             TestInvalidGroupScaleIsAtomic();
             TestPendingScaleIsAtomic();
+            TestUnavailablePieceIsAtomic();
             TestPrimaryPartSelection();
             Console.WriteLine("All actual Session root-composition checks passed; no game placement executed.");
             return 0;
@@ -60,6 +64,11 @@ internal static class Program
         {
             Console.Error.WriteLine(error);
             return 1;
+        }
+        finally
+        {
+            foreach (GameObject fixture in fixtureObjects)
+                if (fixture) UnityEngine.Object.DestroyImmediate(fixture);
         }
     }
 
@@ -185,7 +194,8 @@ internal static class Program
             Require((string)Property(plan[index], "SignText") == (index % 2 == 0 ? "Дом\n<b>Ostrix</b>" : ""),
                 "Repeat sign payload follows the wrong part");
         Type objectType = sessionType.GetField("pendingNativePiece", Instance).FieldType;
-        object created = RuntimeHelpers.GetUninitializedObject(objectType);
+        object created = ((Component)NativePiece(0)).gameObject;
+        Require(objectType.IsInstanceOfType(created), "Pending native piece has an unexpected host type");
         MethodInfo take = sessionType.GetMethod("TakePendingPlacementSign", Instance);
         foreach (bool succeeded in new[] { false, true })
         {
@@ -286,7 +296,7 @@ internal static class Program
 
     private static object Session(int partCount)
     {
-        object session = RuntimeHelpers.GetUninitializedObject(sessionType);
+        object session = FormatterServices.GetUninitializedObject(sessionType);
         object blueprint = Activator.CreateInstance(blueprintType);
         IList parts = (IList)Get(blueprint, "parts");
         float s = (float)Math.Sqrt(0.5);
@@ -307,8 +317,25 @@ internal static class Program
             Set(session, field, Activator.CreateInstance(sessionType.GetField(field, Instance).FieldType));
         IList sources = (IList)Get(session, "activeBlueprintPieces");
         for (int index = 0; index < partCount; ++index)
-            sources.Add(RuntimeHelpers.GetUninitializedObject(pieceType));
+            sources.Add(NativePiece(index % 2));
         return session;
+    }
+
+    private static object NativePiece(int index)
+    {
+        if (!fixtureObjects[index])
+        {
+            var fixture = new GameObject("BuildWorks inert layout fixture " + index);
+            fixture.SetActive(false); // Prevent host Awake from initializing networking or world state.
+            fixtureObjects[index] = fixture;
+            Type viewType = pieceType.Assembly.GetType("ZNetView", true);
+            object view = fixture.AddComponent(viewType);
+            Set(view, "m_syncInitialScale", true);
+            fixture.AddComponent(pieceType);
+            Require(fixture.GetComponent(pieceType) && fixture.GetComponent(viewType) && !fixture.activeInHierarchy,
+                "Inert host components were initialized or destroyed");
+        }
+        return fixtureObjects[index].GetComponent(pieceType);
     }
 
     private static void TestPrimaryPartSelection()
@@ -403,7 +430,7 @@ internal static class Program
     {
         object session = Session(0);
         Set(session, "activeBlueprint", null);
-        object piece = RuntimeHelpers.GetUninitializedObject(pieceType);
+        object piece = NativePiece(0);
         Set(session, "selectedPiece", piece);
         Require(Add(session, new Point3(1,2,3), Rotation(0,0,0,1), 0.01f), "Native single 1% rejected");
         Require(Add(session, new Point3(4,5,6), Rotation(0,0,0,1), 4f), "Native single 400% rejected");
@@ -455,6 +482,25 @@ internal static class Program
             (int)Get(session, "placementPlanIndex") == 0 && !string.IsNullOrEmpty((string)Get(session, "repeatPlanError")),
             "Pending group changed existing placement queue or failed silently");
         Console.WriteLine("PASS actual Session: unresolved absolute basis rejects whole group before planning, queue unchanged");
+    }
+
+    private static void TestUnavailablePieceIsAtomic()
+    {
+        object session = Session(2);
+        Require(Add(session, new Point3(), Rotation(0,0,0,1)), "Baseline group rejected");
+        IList plan = (IList)Get(session, "placementPlan");
+        IList sources = (IList)Get(session, "activeBlueprintPieces");
+        sources[1] = null;
+        Require(!Add(session, new Point3(10,0,0), Rotation(0,0,0,1)) && plan.Count == 2,
+            "Unavailable piece partially appended a group");
+        sources[1] = NativePiece(1);
+        Type viewType = pieceType.Assembly.GetType("ZNetView", true);
+        object view = fixtureObjects[1].GetComponent(viewType);
+        Set(view, "m_syncInitialScale", false);
+        Require(!Add(session, new Point3(10,0,0), Rotation(0,0,0,1)) && plan.Count == 2,
+            "Non-persistable scale partially appended a group");
+        Set(view, "m_syncInitialScale", true);
+        Console.WriteLine("PASS actual Session: missing Piece and disabled native scale persistence reject whole group atomically");
     }
 
     private static object StoredVector(float x, float y, float z)

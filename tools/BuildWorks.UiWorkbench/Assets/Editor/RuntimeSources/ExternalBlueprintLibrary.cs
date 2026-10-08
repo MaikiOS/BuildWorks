@@ -365,6 +365,34 @@ namespace OstrixMods.BuildWorks
             return copy;
         }
 
+        internal static bool CanOmitArmorStandState(CompositeBlueprintStore.Part part, Geometry.BlueprintSourceDocument evidence)
+        {
+            var state = part?.foreignData;
+            if (part?.prefabName != "ArmorStand" || state?.format != "blueprint" || state.info == null ||
+                state.zdo != null || state.chance != null || evidence?.Format != "blueprint" || evidence.HasOpaqueSections ||
+                evidence.Id != part.sourceDocumentId || !evidence.HasPartAt(part.sourceLine, part.prefabName)) return false;
+            string[] row = evidence.PartRow(part.sourceLine).Split(';');
+            if (row.Length != 10 && row.Length != 13 && row.Length != 14 && row.Length != 15 || row[9] != state.info ||
+                row.Length > 13 && HasData(row[13]) || row.Length > 14 && HasData(row[14]) && row[14] != "1") return false;
+            try
+            {
+                // PlanBuild stores pose, slot count and item/variant pairs here; root transforms use separate columns.
+                string[] fields = BlueprintExchangeFormat.DecodeSignText(state.info)?.Split(':');
+                if (fields == null || fields.Length < 3 || fields[fields.Length - 1] != "" ||
+                    !int.TryParse(fields[0], NumberStyles.None, CultureInfo.InvariantCulture, out _) ||
+                    !int.TryParse(fields[1], NumberStyles.None, CultureInfo.InvariantCulture, out int slots) ||
+                    slots != (fields.Length - 3) / 2 || fields.Length != 3 + 2 * slots) return false;
+                for (int index = 0; index < slots; ++index)
+                {
+                    string item = fields[2 + index * 2];
+                    if (item.Length > 128 || item.Any(c => char.IsControl(c) || "/\\<>".Contains(c)) ||
+                        !int.TryParse(fields[3 + index * 2], NumberStyles.None, CultureInfo.InvariantCulture, out _)) return false;
+                }
+                return true;
+            }
+            catch (InvalidDataException) { return false; }
+        }
+
         internal static void ConvertKnownState(CompositeBlueprintStore.Part part, Geometry.BlueprintSourceDocument evidence,
             Func<string, int> hash, int? worldLevel)
         {

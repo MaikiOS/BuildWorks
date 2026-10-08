@@ -995,8 +995,47 @@ internal static class ControllerInputAcceptance
                 for (int i = 0; i < 300 && Field<bool>(exchange, "importing"); ++i)
                 { Frame(controller, input, Vector2.zero); yield return null; }
                 Require(Field<bool>(exchange, "completed"), "Recovered browser cannot retry import");
+                NativeClick(view, null, "ExchangeClose"); yield return null;
+                string armorPath = Path.Combine(folder, "armor-policy.blueprint");
+                const string armorText = "#Name:Armor policy\n#Pieces\nwall;;0;0;0;0;0;0;1;\"\";1;1;1\nArmorStand;;2;0;0;0;0;0;1;\"2:1:HelmetIron:3:\";1;1;1";
+                File.WriteAllText(armorPath, armorText);
+                int importsBeforeArmor = Directory.GetFiles(store.ImportDirectory).Length;
+                view.ShowExchange((parent, textFont, closed) => new BlueprintExchangeView(parent, textFont, store, null, closed)); yield return null;
+                exchange = Field<BlueprintExchangeView>(view, "exchangeView");
+                for (int i = 0; i < 300 && Field<Task<string[]>>(exchange, "listing") != null; ++i)
+                { Frame(controller, input, Vector2.zero); yield return null; }
+                Field<TMP_InputField>(exchange, "directory").SetTextWithoutNotify(folder);
+                NativeClick(view, null, "ExchangeGo");
+                for (int i = 0; i < 300 && Field<Task<string[]>>(exchange, "listing") != null; ++i)
+                { Frame(controller, input, Vector2.zero); yield return null; }
+                chosen = Array.IndexOf(Field<string[]>(exchange, "entries"), armorPath);
+                Require(chosen >= 0, "Armor policy fixture missing");
+                for (int i = 0; i < chosen / 7; ++i) { NativeClick(view, null, "ExchangeNext"); yield return null; }
+                NativeClick(view, null, "ExchangeEntry" + chosen); Frame(controller, input, Vector2.zero); yield return null;
+                NativeClick(view, null, "ExchangeSubmit");
+                for (int i = 0; i < 300 && Field<Task<CompositeBlueprintStore.ImportReview>>(exchange, "importInspection") != null; ++i)
+                { Frame(controller, input, Vector2.zero); yield return null; }
+                Require(Field<CompositeBlueprintStore.ContentsSummary>(exchange, "contentsSummary").ArmorStates == 1 &&
+                    Field<Button>(exchange, "armorChoice").gameObject.activeSelf && !Field<bool>(exchange, "omitArmorState") &&
+                    Field<TMP_Text>(exchange, "contentsDetails").text.Contains("armor-policy.blueprint") &&
+                    Field<TMP_Text>(exchange, "contentsDetails").text.Contains("ArmorStand"), "Armor default or loss list missing");
+                NativeClick(view, null, "ExchangeArmorChoice");
+                Require(Field<bool>(exchange, "omitArmorState") && Directory.GetFiles(store.ImportDirectory).Length == importsBeforeArmor,
+                    "Armor review wrote before confirmation");
+                NativeClick(view, null, "ExchangeContentsBack"); Frame(controller, input, Vector2.zero); yield return null;
+                NativeClick(view, null, "ExchangeSubmit");
+                for (int i = 0; i < 300 && Field<Task<CompositeBlueprintStore.ImportReview>>(exchange, "importInspection") != null; ++i)
+                { Frame(controller, input, Vector2.zero); yield return null; }
+                Require(!Field<bool>(exchange, "omitArmorState"), "Back retained a stale destructive choice");
+                NativeClick(view, null, "ExchangeArmorChoice"); NativeClick(view, null, "ExchangeSubmit");
+                for (int i = 0; i < 300 && Field<bool>(exchange, "importing"); ++i)
+                { Frame(controller, input, Vector2.zero); yield return null; }
+                Require(Field<bool>(exchange, "completed") && File.ReadAllText(armorPath) == armorText, "Armor reviewed import failed or changed source");
+                var armorCopy = ExternalBlueprintLibrary.LoadFile(Field<string>(exchange, "resultPath")).Single();
+                Require(armorCopy.parts[1].foreignData == null && armorCopy.sourceDocuments[0].text == armorText,
+                    "Armor UI choice did not reach the copy or lost exact evidence");
                 File.WriteAllText(Path.Combine(output, "exchange-input-check.txt"),
-                    "PASS actual catalogue/browser clicks, original-safe reviewed import, persistent path and Escape, nonunit prefab visual scale, named native ZIP, duplicate export rejection and retained inputs, import/export four independent contents choices, back/confirmation/unknown-state guard/cancel, no stale files while loading, inspection error recovery and retry. No Valheim host proof.");
+                    "PASS actual catalogue/browser clicks, original-safe reviewed import, persistent path and Escape, nonunit prefab visual scale, named native ZIP, duplicate export rejection and retained inputs, import/export four independent contents choices, back/confirmation/unknown-state guard/cancel, no stale files while loading, inspection error recovery and retry; ArmorStand loss/source/count review defaults to keep, no pre-confirm writes, Back resets omission, confirmed copy omits only state and retains source. No Valheim host proof.");
             }
         }
         finally { Object.Destroy(source); }

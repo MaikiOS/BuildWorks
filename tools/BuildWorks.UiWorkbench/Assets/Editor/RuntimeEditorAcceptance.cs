@@ -338,7 +338,7 @@ public static class RuntimeEditorAcceptance
                     scene.SetViewport(view.ViewportScreenRect());
                     Call(controller, "FrameAll");
                     foreach (string state in new[] { "select", "transform", "array", "contour", "catalog",
-                        "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "save-metadata", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru" })
+                        "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "save-metadata", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru", "exchange-armor", "exchange-armor-ru" })
                     {
                         Require(Screen.width == width && Screen.height == height,
                             "GameView changed before " + state + ": " + Screen.width + "x" + Screen.height);
@@ -391,6 +391,19 @@ public static class RuntimeEditorAcceptance
                             string folder = Path.Combine(output, "exchange-layout"); Directory.CreateDirectory(folder);
                             var layoutStore = new CompositeBlueprintStore(Path.Combine(folder, "library.json"));
                             var blueprint = store.All()[0];
+                            if (state.StartsWith("exchange-armor", StringComparison.Ordinal))
+                            {
+                                blueprint = ExternalBlueprintLibrary.DetachedCopy(ExternalBlueprintLibrary.PrepareForHost(ExternalBlueprintLibrary.Parse(
+                                    "#Name:Armor policy\n#Pieces\nwoodwall;;0;0;0;0;0;0;1;\"\";1;1;1\nArmorStand;;2;0;0;0;0;0;1;\"2:1:HelmetIron:3:\";1;1;1",
+                                    "armor-policy.blueprint"), _ => new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 }));
+                                for (int index = 0; index < 8; ++index)
+                                {
+                                    var extra = ExternalBlueprintLibrary.DetachedCopy(ExternalBlueprintLibrary.PrepareForHost(ExternalBlueprintLibrary.Parse(
+                                        blueprint.sourceDocuments[0].text, "armor-extra-" + index + ".blueprint"),
+                                        _ => new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 }));
+                                    blueprint.parts.Add(extra.parts[1]); blueprint.sourceDocuments.AddRange(extra.sourceDocuments);
+                                }
+                            }
                             File.WriteAllBytes(Path.Combine(folder, "Дом.buildworks.json"), BlueprintExchangeFormat.Encode(blueprint));
                             BuildWorksLocalization.RussianLanguage = state.EndsWith("-ru", StringComparison.Ordinal);
                             view.ShowExchange((parent, textFont, closed) => new BlueprintExchangeView(parent, textFont, layoutStore,
@@ -410,7 +423,7 @@ public static class RuntimeEditorAcceptance
                                 Require(pathInput.textComponent.GetPreferredValues(fullPath, pathInput.textViewport.rect.width, 0).y <= pathInput.textViewport.rect.height,
                                     "Expanded Russian path does not fit at " + width + "x" + height + " scale=" + uiScale);
                             }
-                            else if (state.StartsWith("exchange-contents", StringComparison.Ordinal))
+                            else if (state.StartsWith("exchange-contents", StringComparison.Ordinal) || state.StartsWith("exchange-armor", StringComparison.Ordinal))
                             {
                                 ControllerInputAcceptance.NativeClick(view, uiCamera, "ExchangeSubmit");
                                 var exchange = Field<BlueprintExchangeView>(view, "exchangeView");
@@ -419,6 +432,11 @@ public static class RuntimeEditorAcceptance
                                 { view.Tick(); yield return null; }
                                 Require(Field<CompositeBlueprintStore.ContentsSummary>(exchange, "contentsSummary") != null,
                                     "Contents screenshot missed completed inspection");
+                                if (state.StartsWith("exchange-armor", StringComparison.Ordinal))
+                                {
+                                    ControllerInputAcceptance.NativeClick(view, uiCamera, "ExchangeArmorChoice");
+                                    Require(Field<bool>(exchange, "omitArmorState"), "Armor screenshot missed explicit omission");
+                                }
                             }
                             else if (state.StartsWith("exchange-import-review", StringComparison.Ordinal))
                             {
@@ -602,6 +620,19 @@ public static class RuntimeEditorAcceptance
             EnsureInside(Field<RectTransform>(view, "safeRoot"), panel);
             foreach (Button button in panel.GetComponentsInChildren<Button>()) EnsureInside(panel, (RectTransform)button.transform);
             foreach (TMP_InputField field in panel.GetComponentsInChildren<TMP_InputField>()) EnsureInside(panel, (RectTransform)field.transform);
+            if (state.StartsWith("exchange-armor", StringComparison.Ordinal))
+            {
+                var contents = Field<RectTransform>(exchange, "contentsPanel");
+                var details = Field<TMP_Text>(exchange, "contentsDetails");
+                var viewport = details.rectTransform.parent.GetComponent<RectTransform>();
+                EnsureInside(contents, viewport);
+                EnsureInside(contents, (RectTransform)Field<Button>(exchange, "armorChoice").transform);
+                Require(viewport.GetComponent<RectMask2D>() && viewport.GetComponent<ScrollRect>() &&
+                    details.rectTransform.rect.height > viewport.rect.height, "Armor loss list is not scrollable and clipped");
+                var warning = Field<TMP_Text>(exchange, "message");
+                Require(warning.GetPreferredValues(warning.text, warning.rectTransform.rect.width, 0).y <= warning.rectTransform.rect.height,
+                    "Armor loss warning is truncated");
+            }
         }
     }
 

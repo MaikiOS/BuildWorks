@@ -804,13 +804,18 @@ exchange.documents	Documents
 exchange.desktop	Desktop
 exchange.filename	File name
 exchange.contents_title	Contents of the exported copy
-exchange.contents_counts	Verified storages: {0}; items: {1}\nMounted items: {2}\nUnknown records: {3}; previously cleared objects: {4}
+exchange.contents_counts	Verified storages: {0}; items: {1}\nMounted items: {2}\nUnknown or unsupported records: {3}; previously cleared objects: {4}
 exchange.storage_keep	Storage inventories: KEEP
 exchange.storage_clear	Storage inventories: CLEAR IN COPY
 exchange.mounts_keep	Mounted items: KEEP
 exchange.mounts_clear	Mounted items: CLEAR IN COPY
 exchange.contents_copy	Click either row to change its choice. Only the exported copy changes. Original data is retained; previously cleared contents stay empty.
 exchange.contents_unknown	Unknown/unreadable state: unavailable clear choices are disabled. Other choices remain independent. Exact original data is retained; the world is unchanged.
+exchange.armor_keep	Armor stands: KEEP UNSUPPORTED STATE
+exchange.armor_omit	Armor stands: COPY WITHOUT EQUIPMENT OR POSE
+exchange.armor_losses	Armor stand equipment and pose eligible for omission: {0}. Affected sources (scroll):
+exchange.loss_source	{0} — records: {1}
+exchange.armor_warning	The copy omits equipment and pose from {0} armor stands listed above. The exact source is retained. Other unknown records: {1}; they may block placement. Prefab availability and construction rules are checked separately.
 exchange.confirm_export	Confirm export
 exchange.confirm_import	Confirm import
 exchange.import_review	Import contents: {0} blueprints

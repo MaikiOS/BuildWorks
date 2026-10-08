@@ -1,5 +1,20 @@
 # BuildWorks current development handoff
 
+## .111 — explicit ArmorStand-state omission; verified source
+
+Import/export now offer a separate copy without recognized Info-only ArmorStand
+gear/pose. The grouped source/prefab loss list appears before confirmation; default
+keeps state, Back resets omission, original bytes remain separate. Other unknown
+state still blocks; no full ArmorStand restoration claim. Corpus:401 eligible rows,
+3 documents with armor as their only unknown state, not game-build acceptance.
+Normal/QA0/0, Geometry/Store/host/localization862/QA isolation/format, Workbench276
+and independent correctness/ponytail review passed. Updated EditorBridge and actual
+Session root-composition checks passed in isolated Unity with real inactive host
+components, including50000-part plans and missing/persistence atomic refusal.
+No Valheim launch, native construction, world reload or multiplayer proof.
+QA deployment remains .110 until the guarded .111 deployment is recorded below.
+See docs/checkpoint-0.19.111.md and docs/QA_0.19.111_RU.md.
+
 ## .110 — verified pinned scale; QA installed
 
 Native17/portable7 optional baseScale preserves exact source size across canonical/

@@ -26,7 +26,8 @@ internal static class Program
         Assembly asm = Assembly.LoadFrom(Path.Combine(root, "artifacts", "bin", "BuildWorks.dll"));
         var document = new BlueprintEditorDocument(null, "Scale regression", "OTHER",
             new[] { new BlueprintEditorPart("a", "woodwall", "A", new Point3(),
-                new Rotation3(0,0,0,1), scale: new Point3(2,0.5,1.25), signText: "Дом\nOstrix"), Part("b",2) });
+                new Rotation3(0,0,0,1), scale: new Point3(2,0.5,1.25), signText: "Дом\nOstrix",
+                baseScale: new Point3(1,1,1)), Part("b",2) });
         Type controllerType = asm.GetType("OstrixMods.BuildWorks.BlueprintEditorController", true);
         object controller = FormatterServices.GetUninitializedObject(controllerType);
         controllerType.GetField("document", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(controller, document);
@@ -51,6 +52,8 @@ internal static class Program
         var restored = (BlueprintEditorDocument)controllerType.GetMethod("DocumentFromBlueprint", BindingFlags.NonPublic|BindingFlags.Static)
             .Invoke(null, new[] {call[5]});
         Require(restored.Parts[0].SignText == "Дом\nOstrix", "Controller reopen stripped sign text");
+        Require(restored.Parts.All(part => part.BaseScale.HasValue && part.BaseScale.Value.X == 1 &&
+            part.BaseScale.Value.Y == 1 && part.BaseScale.Value.Z == 1), "Controller/store/reopen lost pinned prefab scale");
         Console.WriteLine("PASS actual Controller.BuildStoreParts -> Store.TrySaveDocument preserves XYZ scale");
         Console.WriteLine("PASS actual Controller/store/reopen preserves sign text");
 
@@ -64,7 +67,8 @@ internal static class Program
             part.SignText, evidence.Id, index + 2, index == 0
                 ? new BlueprintForeignPartData(BlueprintForeignPartData.NativeItemStandFormat, "SwordIron:2:3:0",
                     Convert.ToBase64String(new byte[] { 109, 3, 4, 5 }), null, true)
-                : new BlueprintForeignPartData("blueprint", "\"SwordIron:0:1:3\"", "opaque", ".5")));
+                : new BlueprintForeignPartData("blueprint", "\"SwordIron:0:1:3\"", "opaque", ".5"),
+            baseScale: part.BaseScale));
         var payload = new BlueprintEditorDocument(null, "Copy", "OTHER", payloadParts,
             sourceCustomSnapPoints: new[] { new Point3(7,8,9) }, sourceSupports: document.Supports,
             placementSupportId: document.PlacementSupportId, sourceDocuments: new[] { evidence });
@@ -139,6 +143,6 @@ internal static class Program
         return 0;
     }
     private static BlueprintEditorPart Part(string id,double x) =>
-        new BlueprintEditorPart(id,"woodwall",id,new Point3(x,0,0),new Rotation3(0,0,0,1));
+        new BlueprintEditorPart(id,"woodwall",id,new Point3(x,0,0),new Rotation3(0,0,0,1), baseScale: new Point3(1,1,1));
     private static void Require(bool condition, string message) { if (!condition) throw new Exception(message); }
 }

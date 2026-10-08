@@ -1,0 +1,7 @@
+#Name:QA111 Armor State
+#Category:OTHER
+#Creator:BuildWorks QA fixture
+#Description:Self-authored loss-review fixture; equipment and pose are not restored.
+#Pieces
+woodwall;;0;0;0;0;0;0;1;"";1;1;1
+ArmorStand;;2;0;0;0;0;0;1;"2:1:HelmetIron:0:";1;1;1

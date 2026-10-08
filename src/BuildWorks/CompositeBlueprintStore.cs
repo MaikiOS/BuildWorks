@@ -269,6 +269,12 @@ namespace OstrixMods.BuildWorks
                     summary.Mounts += contents.Mounts; summary.Unknown += contents.Unknown;
                     summary.UnreadableStorages += contents.UnreadableStorages; summary.UnreadableMounts += contents.UnreadableMounts;
                     summary.AlreadyCleared += contents.AlreadyCleared;
+                    summary.ArmorStates += contents.ArmorStates;
+                    foreach (var entry in contents.ArmorStateSources)
+                    {
+                        summary.ArmorStateSources.TryGetValue(entry.Key, out int count);
+                        summary.ArmorStateSources[entry.Key] = count + entry.Value;
+                    }
                 }
                 return new ImportReview { Source = source, Bytes = bytes, Documents = documents, Contents = summary };
             }
@@ -281,7 +287,7 @@ namespace OstrixMods.BuildWorks
 
         // Called on the Unity thread: normalize against installed prefab bases before the file worker.
         internal bool TryImportReviewed(ImportReview review, bool clearStorage, bool clearMounts,
-            Func<string, int> prefabHash, out string error)
+            Func<string, int> prefabHash, out string error, bool omitArmorState = false)
         {
             error = null;
             if (CatalogLoading) { error = UserError("exchange.loading"); return false; }
@@ -312,10 +318,10 @@ namespace OstrixMods.BuildWorks
                             WriteEntry("original/name.txt", Encoding.UTF8.GetBytes(Path.GetFileName(review.Source)));
                             for (int i = 0; i < prepared.Length; ++i)
                             {
-                                var copy = CopyWithContentsPolicy(prepared[i], clearStorage, clearMounts, prefabHash);
+                                var copy = CopyWithContentsPolicy(prepared[i], clearStorage, clearMounts, prefabHash, omitArmorState);
                                 string name = "document_" + i + ".buildworks.json";
                                 WriteEntry(name, BlueprintExchangeFormat.Encode(copy));
-                                if (ExternalBlueprintLibrary.ValidPreview(prepared[i].importPreview))
+                                if (!clearStorage && !clearMounts && !omitArmorState && ExternalBlueprintLibrary.ValidPreview(prepared[i].importPreview))
                                     WriteEntry(Path.ChangeExtension(name, ".png"), prepared[i].importPreview);
                             }
                             void WriteEntry(string name, byte[] data)
@@ -354,15 +360,15 @@ namespace OstrixMods.BuildWorks
 
         internal bool TryExportFile(Blueprint blueprint, string directory, string fileName, bool archive,
             out string exportedPath, out string error, bool clearStorage = false, bool clearMounts = false,
-            Func<string, int> prefabHash = null)
+            Func<string, int> prefabHash = null, bool omitArmorState = false)
         {
             exportedPath = null; error = null; string temporary = null;
             try
             {
                 if (blueprint == null || !string.IsNullOrEmpty(blueprint.importError))
                     throw new InvalidDataException(blueprint?.importError ?? "$buildworks_import.format");
-                Blueprint prepared = clearStorage || clearMounts
-                    ? CopyWithContentsPolicy(blueprint, clearStorage, clearMounts, prefabHash)
+                Blueprint prepared = clearStorage || clearMounts || omitArmorState
+                    ? CopyWithContentsPolicy(blueprint, clearStorage, clearMounts, prefabHash, omitArmorState)
                     : blueprint.IsExternal ? ExternalBlueprintLibrary.DetachedCopy(blueprint) : blueprint;
                 byte[] bytes = BlueprintExchangeFormat.Encode(prepared);
                 BlueprintExchangeFormat.Decode(new UTF8Encoding(false, true).GetString(bytes));
@@ -400,6 +406,9 @@ namespace OstrixMods.BuildWorks
         {
             internal int Storages, Mounts, Unknown, UnreadableStorages, UnreadableMounts, AlreadyCleared;
             internal long StoredItems;
+            internal int ArmorStates;
+            internal readonly SortedDictionary<string, int> ArmorStateSources = new SortedDictionary<string, int>(StringComparer.Ordinal);
+            internal int RemainingUnknown(bool omitArmorState) => Unknown - (omitArmorState ? ArmorStates : 0);
             internal bool CanClearStorage => Unknown == UnreadableMounts;
             internal bool CanClearMounts => Unknown == UnreadableStorages;
         }
@@ -410,7 +419,8 @@ namespace OstrixMods.BuildWorks
             var result = new ContentsSummary();
             if (source == null || !string.IsNullOrEmpty(source.importError))
                 throw new InvalidDataException(source?.importError ?? "$buildworks_import.format");
-            result.Unknown = source.sourceDocuments?.Count(document => document.ToGeometry().HasOpaqueSections) ?? 0;
+            var evidenceIndex = Geometry.BlueprintSourceDocument.Index(source.sourceDocuments?.Select(document => document.ToGeometry()));
+            result.Unknown = evidenceIndex.Values.Count(document => document.HasOpaqueSections);
             foreach (Part part in source.parts)
             {
                 var contents = part.foreignData?.ToGeometry();
@@ -437,26 +447,42 @@ namespace OstrixMods.BuildWorks
                     { ++result.Storages; result.StoredItems += items.Sum(item => (long)item.Stack); }
                     else { ++result.Unknown; ++result.UnreadableStorages; }
                 }
-                else ++result.Unknown;
+                else
+                {
+                    ++result.Unknown;
+                    if (part.sourceDocumentId != null && evidenceIndex.TryGetValue(part.sourceDocumentId, out var evidence) &&
+                        ExternalBlueprintLibrary.CanOmitArmorStandState(part, evidence))
+                    {
+                        ++result.ArmorStates;
+                        string key = evidence.Name + " · " + part.prefabName;
+                        result.ArmorStateSources.TryGetValue(key, out int count);
+                        result.ArmorStateSources[key] = count + 1;
+                    }
+                }
             }
             return result;
         }
 
         // Always a private recipe. Retaining never resurrects previously cleared contents.
         internal static Blueprint CopyWithContentsPolicy(Blueprint source, bool clearStorage, bool clearMounts,
-            Func<string, int> prefabHash)
+            Func<string, int> prefabHash, bool omitArmorState = false)
         {
             if (source == null || !string.IsNullOrEmpty(source.importError))
                 throw new InvalidDataException(source?.importError ?? "$buildworks_import.format");
             Blueprint copy = BlueprintExchangeFormat.Decode(Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(
                 source.IsExternal ? ExternalBlueprintLibrary.DetachedCopy(source) : source)));
-            if (!clearStorage && !clearMounts) return copy;
-            if (copy.sourceDocuments?.Any(document => document.ToGeometry().HasOpaqueSections) == true)
+            if (!clearStorage && !clearMounts && !omitArmorState) return copy;
+            var evidenceIndex = Geometry.BlueprintSourceDocument.Index(copy.sourceDocuments?.Select(document => document.ToGeometry()));
+            if ((clearStorage || clearMounts) && evidenceIndex.Values.Any(document => document.HasOpaqueSections))
                 throw new InvalidDataException("$buildworks_import.object_data");
             foreach (Part part in copy.parts)
             {
                 var contents = part.foreignData?.ToGeometry();
                 if (contents == null) continue;
+                if (omitArmorState && part.sourceDocumentId != null && evidenceIndex.TryGetValue(part.sourceDocumentId, out var evidence) &&
+                    ExternalBlueprintLibrary.CanOmitArmorStandState(part, evidence))
+                { part.foreignData = null; continue; }
+                if (!clearStorage && !clearMounts) continue;
                 if (contents.Format != Geometry.BlueprintForeignPartData.NativeContainerFormat &&
                     contents.Format != Geometry.BlueprintForeignPartData.NativeItemStandFormat)
                     throw new InvalidDataException("$buildworks_import.object_data");

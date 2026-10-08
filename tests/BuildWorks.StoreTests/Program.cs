@@ -40,6 +40,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 NativeItemStandRoundTrip(Path.Combine(directory, "native-holder.json"));
                 NativeContainerRoundTrip(Path.Combine(directory, "native-container.json"));
                 ContentsPolicyRoundTrip(Path.Combine(directory, "contents-policy"));
+                ArmorStatePolicy(Path.Combine(directory, "armor-state-policy"));
                 ReviewedImportWorkflow(Path.Combine(directory, "reviewed-import"));
                 ExchangeRoundTrip(Path.Combine(directory, "exchange-library.json"));
                 SupportRoundTrip(Path.Combine(directory, "supports.json"));
@@ -318,6 +319,111 @@ namespace OstrixMods.BuildWorks.StoreTests
                 writer.Write(100); writer.Write((byte)0);
                 writer.Flush(); return Convert.ToBase64String(stream.ToArray());
             }
+        }
+
+        private static void ArmorStatePolicy(string directory)
+        {
+            Directory.CreateDirectory(directory);
+            const string row = "ArmorStand;;2;3;4;0;0;0;1;\"2:1:HelmetIron:3:\";1;1;1";
+            const string text = "#Name:Armor policy\n#Pieces\nwoodwall;;0;0;0;0;0;0;1;\"\";1;1;1\n" + row;
+            var parsed = ExternalBlueprintLibrary.Parse(text, "Armor.blueprint");
+            var prepared = ExternalBlueprintLibrary.PrepareForHost(parsed, _ => UnitScale);
+            var summary = CompositeBlueprintStore.InspectContents(prepared, _ => 100);
+            Require(summary.Unknown == 1 && summary.ArmorStates == 1 && summary.RemainingUnknown(true) == 0 &&
+                summary.ArmorStateSources["Armor.blueprint · ArmorStand"] == 1, "Armor loss review lost source/count");
+            var retained = CompositeBlueprintStore.CopyWithContentsPolicy(prepared, false, false, null);
+            var omitted = CompositeBlueprintStore.CopyWithContentsPolicy(prepared, false, false, null, true);
+            Require(CompositeBlueprintStore.HasForeignData(retained) && !CompositeBlueprintStore.HasForeignData(omitted) &&
+                retained.parts[1].foreignData.info == "\"2:1:HelmetIron:3:\"" && prepared.parts[1].foreignData != null &&
+                parsed.sourceDocuments[0].text == text && omitted.sourceDocuments[0].text == text &&
+                omitted.parts[1].sourceLine == 4 && omitted.parts[1].position.x == 2 && omitted.parts[1].position.y == 3 &&
+                omitted.parts[1].position.z == 4 && omitted.parts[1].rotation.w == 1 && omitted.parts[1].baseScale.Value.x == 1 &&
+                omitted.parts[1].scale.x == 1, "Armor omission changed source, geometry or default policy");
+            var reopened = BlueprintExchangeFormat.Decode(System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(omitted)));
+            Require(ExternalBlueprintLibrary.PrepareForHost(reopened, _ => UnitScale, ForeignZdoChecks.Hash, 0).parts[1].foreignData == null &&
+                reopened.sourceDocuments[0].text == text, "Armor state resurrected from inert source");
+            foreach (string badRow in new[] { row.Replace("ArmorStand", "mod_ArmorStand"),
+                row.Replace("2:1:HelmetIron:3:", "2:2:HelmetIron:3:"), row.Replace("2:1:HelmetIron:3:", "-1:1:HelmetIron:3:"),
+                row.Replace("2:1:HelmetIron:3:", "2:1:HelmetIron:-3:"), row.Replace("2:1:HelmetIron:3:", "2:2147483647:HelmetIron:3:"),
+                row + ";opaque", row + ";;0.5" })
+            {
+                var blocked = ExternalBlueprintLibrary.PrepareForHost(ExternalBlueprintLibrary.Parse(text.Replace(row, badRow), "Armor.blueprint"), _ => UnitScale);
+                Require(blocked.importError == null && CompositeBlueprintStore.InspectContents(blocked, _ => 100).ArmorStates == 0 &&
+                    CompositeBlueprintStore.CopyWithContentsPolicy(blocked, false, false, null, true).parts[1].foreignData != null,
+                    "Armor policy omitted unknown prefab/grammar/ZDO/chance");
+            }
+            var opaque = ExternalBlueprintLibrary.PrepareForHost(ExternalBlueprintLibrary.Parse(text + "\n#Rotation\n0;45;0", "Armor.blueprint"), _ => UnitScale);
+            Require(CompositeBlueprintStore.InspectContents(opaque, _ => 100).ArmorStates == 0 &&
+                CompositeBlueprintStore.HasForeignData(CompositeBlueprintStore.CopyWithContentsPolicy(opaque, false, false, null, true)),
+                "Unknown geometry header was silently omitted");
+            var mismatch = prepared.ImportCopy(); mismatch.parts[1].foreignData.info = "\"0:1:HelmetIron:3:\"";
+            Require(CompositeBlueprintStore.InspectContents(mismatch, _ => 100).ArmorStates == 0, "Unbound armor state accepted");
+            mismatch = prepared.ImportCopy(); mismatch.parts[1].foreignData.format = "vbuild";
+            Require(CompositeBlueprintStore.InspectContents(mismatch, _ => 100).ArmorStates == 0, "Other dialect accepted");
+            var duplicate = ExternalBlueprintLibrary.Parse(text + "\n" + row, "Armor.blueprint");
+            var duplicateSummary = CompositeBlueprintStore.InspectContents(duplicate, _ => 100);
+            Require(duplicateSummary.ArmorStates == 2 && duplicateSummary.ArmorStateSources.Count == 1 &&
+                duplicateSummary.ArmorStateSources.Values.Single() == 2, "Armor losses were not grouped with exact count");
+
+            var mixed = prepared.ImportCopy();
+            var chest = Part("chest", "piece_chest", "Chest", null, true, false, 0);
+            chest.foreignData = new CompositeBlueprintStore.ForeignPartData {
+                format = Geometry.BlueprintForeignPartData.NativeContainerFormat, info = "5:2:0:0", zdo = "bQAAAAAA" };
+            var mount = Part("mount", "itemstand", "Mount", null, true, false, 0);
+            mount.foreignData = new CompositeBlueprintStore.ForeignPartData {
+                format = Geometry.BlueprintForeignPartData.NativeItemStandFormat, info = "SwordIron:0:1:0", zdo = StandPackage() };
+            mixed.parts.Add(chest); mixed.parts.Add(mount);
+            foreach (bool storage in new[] { false, true })
+                foreach (bool mounts in new[] { false, true })
+                {
+                    var copy = CompositeBlueprintStore.CopyWithContentsPolicy(mixed, storage, mounts, _ => 100, true);
+                    Require(copy.parts[1].foreignData == null && copy.parts[2].foreignData.contentsCleared == storage &&
+                        copy.parts[3].foreignData.contentsCleared == mounts && mixed.parts[1].foreignData != null &&
+                        !mixed.parts[2].foreignData.contentsCleared && !mixed.parts[3].foreignData.contentsCleared,
+                        "Armor choice changed independent readable contents or source");
+                }
+            string source = Path.Combine(directory, "Armor.blueprint"); File.WriteAllText(source, text);
+            byte[] original = File.ReadAllBytes(source);
+            var review = CompositeBlueprintStore.ReviewImportFile(source, ForeignZdoChecks.Hash, 0);
+            var store = new CompositeBlueprintStore(Path.Combine(directory, "library.json"));
+            store.ConfigureImportScale(_ => UnitScale);
+            Require(review.Contents.ArmorStates == 1 && !Directory.Exists(store.ImportDirectory), "Armor review wrote a copy");
+            Require(store.TryImportReviewed(review, false, false, null, out string error, true), error); WaitForImport(store);
+            Require(store.ImportError == null && File.ReadAllBytes(source).SequenceEqual(original), "Reviewed armor import changed source");
+            var imported = ExternalBlueprintLibrary.LoadFile(store.ImportResultPath).Single();
+            Require(imported.parts[1].foreignData == null && imported.sourceDocuments[0].text == text, "Reviewed armor policy lost evidence");
+            using (var zip = ZipFile.OpenRead(store.ImportResultPath))
+            using (var entry = zip.GetEntry("original/source.bin").Open())
+            using (var bytes = new MemoryStream())
+            {
+                entry.CopyTo(bytes);
+                Require(bytes.ToArray().SequenceEqual(original), "Armor original archive changed bytes");
+            }
+            Require(store.TryExportFile(prepared, directory, "empty-armor", false, out string exported, out error,
+                omitArmorState: true), error);
+            Require(ExternalBlueprintLibrary.LoadFile(exported).Single().parts[1].foreignData == null && prepared.parts[1].foreignData != null,
+                "Armor export changed source or ignored explicit choice");
+            string imageSource = Path.Combine(directory, "armor-image.zip");
+            byte[] png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==");
+            using (var zip = ZipFile.Open(imageSource, ZipArchiveMode.Create))
+            {
+                using (var entry = zip.CreateEntry("armor.blueprint").Open()) entry.Write(original, 0, original.Length);
+                using (var entry = zip.CreateEntry("armor.png").Open()) entry.Write(png, 0, png.Length);
+            }
+            review = CompositeBlueprintStore.ReviewImportFile(imageSource, ForeignZdoChecks.Hash, 0);
+            foreach (bool omit in new[] { false, true })
+            {
+                Require(store.TryImportReviewed(review, false, false, null, out error, omit), error); WaitForImport(store);
+                Require(store.ImportError == null, store.ImportError);
+                using (var zip = ZipFile.OpenRead(store.ImportResultPath))
+                    Require(zip.Entries.Count(entry => entry.FullName.EndsWith(".png", StringComparison.Ordinal)) == (omit ? 0 : 1),
+                        "Changed armor copy retained misleading source preview or unchanged copy lost it");
+            }
+            var unresolved = ExternalBlueprintLibrary.PrepareForHost(parsed, _ => null);
+            var unresolvedCopy = CompositeBlueprintStore.CopyWithContentsPolicy(unresolved, false, false, null, true);
+            Require(unresolvedCopy.parts[1].scaleIsAbsolute && !unresolvedCopy.parts[1].baseScale.HasValue &&
+                unresolved.parts[1].scaleIsAbsolute && unresolved.parts[1].foreignData != null, "Armor omission fabricated a missing prefab scale");
+            Console.WriteLine("PASS explicit ArmorStand pose/equipment omission: bound grammar-only Info, default keep, exact source, import/export/reopen, independent contents, unknown/ZDO/chance/header rejection, missing prefab remains pending");
         }
 
         private static void ContentsPolicyRoundTrip(string directory)
@@ -1003,6 +1109,7 @@ namespace OstrixMods.BuildWorks.StoreTests
         private static void InspectActualLibrary(string path)
         {
             int total = 0, supported = 0, blocked = 0, packets = 0, convertedStates = 0, remainingStates = 0, scaleBlocked = 0;
+            int armorStates = 0, armorOnlyDocuments = 0;
             using (Stream input = File.OpenRead(path))
             using (var zip = new ZipArchive(input, ZipArchiveMode.Read))
                 foreach (ZipArchiveEntry entry in zip.Entries.Where(x => x.FullName.EndsWith(".blueprint", StringComparison.OrdinalIgnoreCase)))
@@ -1027,13 +1134,19 @@ namespace OstrixMods.BuildWorks.StoreTests
                                     "Actual native-rules conversion failed: " + entry.FullName + " " + converted.importError);
                                 ++scaleBlocked; // Unit prefab bases are a file-only probe, not actual host scale availability.
                             }
-                            else for (int index = 0; index < parsed.parts.Count; ++index)
+                            else
+                            {
+                                var summary = CompositeBlueprintStore.InspectContents(converted, ForeignZdoChecks.Hash);
+                                armorStates += summary.ArmorStates;
+                                if (summary.ArmorStates > 0 && summary.RemainingUnknown(true) == 0) ++armorOnlyDocuments;
+                                for (int index = 0; index < parsed.parts.Count; ++index)
                                 if (parsed.parts[index].foreignData != null)
                                 {
                                     if (converted.parts[index].foreignData == null || converted.parts[index].foreignData.format == Geometry.BlueprintForeignPartData.NativeItemStandFormat)
                                         ++convertedStates;
                                     else ++remainingStates;
                                 }
+                            }
                         }
                         ++total; if (parsed.importError == null) ++supported; else ++blocked;
                         if (parsed.name == "CoffeeTable") Require(parsed.importError == null && parsed.parts.Count == 4, "Actual CoffeeTable cannot be converted");
@@ -1046,6 +1159,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             Console.WriteLine("PASS actual BiomeBlueprints: " + total + " visible source entries; " + supported + " format-compatible; " + blocked + " explicitly blocked (host prefab availability is separate)");
             Require(packets == 133738, "Actual packet coverage changed");
             Console.WriteLine("PASS actual typed ZDO: " + packets + " exact EOF; " + convertedStates + " known states converted under native construction rules; " + remainingStates + " retain explicit blockers; " + scaleBlocked + " plans correctly refused by unit-base scale probe");
+            Console.WriteLine("PASS actual ArmorStand omission review: " + armorStates + " eligible Info-only records; " + armorOnlyDocuments + " documents have armor as their only unknown state (not host placement acceptance)");
         }
 
         private static void ExchangeRoundTrip(string path)

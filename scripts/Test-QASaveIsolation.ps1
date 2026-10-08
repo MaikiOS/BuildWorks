@@ -394,8 +394,8 @@ foreach ($numbers in @(@(10,10),@(10,12),@(10,9),@(0,0))) {
 }
 $yardType = $assembly.GetType($yardName,$true)
 $nearLocation = $yardType.GetMethod('NearLocation',$flags)
-foreach ($case in @(@(0,0,0,$true),@(100,100,0,$true),@(-100,-100,0,$true),@(101,0,0,$false),
-    @(0,-101,0,$false),@(120,120,20,$true),@(121,0,20,$false))) {
+foreach ($case in @(@(0,0,0,$true),@(36,36,0,$true),@(-36,-36,0,$true),@(37,0,0,$false),
+    @(0,-37,0,$false),@(56,56,20,$true),@(57,0,20,$false))) {
     Require ($nearLocation.Invoke($null,@([single]$case[0],[single]$case[1],[single]$case[2])) -eq $case[3]) 'QA location boundary selection is wrong.'
 }
 foreach ($case in @(@([single]::NaN,0,0),@(0,[single]::PositiveInfinity,0),@(0,0,-1),@(0,0,[single]::NaN))) {

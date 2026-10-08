@@ -13,7 +13,7 @@ namespace OstrixMods.BuildWorks
     // Explicitly requested offline QA terrain, never a player construction capability.
     internal static class BuildWorksTestYard
     {
-        internal const int HalfExtent = 96;
+        internal const int HalfExtent = 32;
         internal const int SearchExtent = 4096;
         internal static bool IsPrepared { get; private set; }
         private static bool previousDaylight;
@@ -77,7 +77,7 @@ namespace OstrixMods.BuildWorks
             float best = float.MaxValue;
             float smallestDrySpan = float.MaxValue;
             Vector3 selected = Vector3.zero;
-            Debug.Log("BuildWorks QA yard search: 192x192m; centres within +/-4096m; QA-only marked terrain bound 16m.");
+            Debug.Log("BuildWorks QA yard search: 64x64m; centres within +/-4096m; QA-only marked terrain bound 16m.");
             // ponytail: bounded scan of this QA seed; refuse instead of falling back into spawn or water.
             for (int x = -SearchExtent; x <= SearchExtent; x += 128)
                 for (int z = -SearchExtent; z <= SearchExtent; z += 128)
@@ -102,7 +102,7 @@ namespace OstrixMods.BuildWorks
                     best = score;
                     selected = new Vector3(x, Plane(minimum, maximum, ZoneSystem.instance.m_waterLevel), z);
                 }
-            if (best == float.MaxValue) throw new InvalidOperationException("No suitable distant 192m QA yard found within +/-4096m; smallest dry Meadows span: " +
+            if (best == float.MaxValue) throw new InvalidOperationException("No suitable distant 64m QA yard found within +/-4096m; smallest dry Meadows span: " +
                 smallestDrySpan.ToString("R", CultureInfo.InvariantCulture) + "; no terrain changed.");
             return selected;
         }
@@ -223,8 +223,8 @@ namespace OstrixMods.BuildWorks
                 using (var writer = new StreamWriter(new FileStream(planPath, FileMode.CreateNew, FileAccess.Write, FileShare.None)))
                     foreach (float value in new[] { center.x, center.y, center.z }) writer.WriteLine(value.ToString("R", CultureInfo.InvariantCulture));
             }
-            // An unused plan may predate location-aware selection; never change a started operation.
-            if (!File.Exists(BuildWorksTestIsolation.YardReceiptPath) && HasLocation(center))
+            // Recompute an unused plan for this smaller stand; never change a started operation.
+            if (!File.Exists(BuildWorksTestIsolation.YardReceiptPath))
             {
                 if (Directory.Exists(Path.Combine(Path.GetDirectoryName(planPath), "yard-before")))
                     throw new IOException("QA yard backup exists; refusing to change its plan.");
@@ -232,7 +232,7 @@ namespace OstrixMods.BuildWorks
                 File.WriteAllLines(planPath, new[] { center.x, center.y, center.z }
                     .Select(value => value.ToString("R", CultureInfo.InvariantCulture)));
             }
-            string stamp = BuildWorksTestIsolation.SupplyStamp("yard192-v1\n" + File.ReadAllText(planPath));
+            string stamp = BuildWorksTestIsolation.SupplyStamp("yard64-v1\n" + File.ReadAllText(planPath));
             string receipt = BuildWorksTestIsolation.YardReceiptPath;
             if (BuildWorksTestIsolation.OnceComplete(receipt, stamp)) { IsPrepared = true; yield break; }
             // Native Player.TeleportTo refuses during its first two seconds after spawning.
@@ -247,7 +247,7 @@ namespace OstrixMods.BuildWorks
             while (player && player.IsTeleporting() && Time.realtimeSinceStartup < deadline);
             BuildWorksTestIsolation.RequireLoadedSession();
             if (player != Player.m_localPlayer ||
-                !Inside(player.transform.position, center, -90)) throw new InvalidOperationException("QA yard teleport did not complete.");
+                !Inside(player.transform.position, center, 6 - HalfExtent)) throw new InvalidOperationException("QA yard teleport did not complete.");
             HashSet<Heightmap> maps = CheckGround(center, false);
             RequireEmpty(center);
             Vegetation(center);
@@ -325,7 +325,7 @@ namespace OstrixMods.BuildWorks
             while (saving.MoveNext()) yield return saving.Current;
             BuildWorksTestIsolation.CompleteOnce(receipt, stamp);
             IsPrepared = true;
-            Debug.Log("BuildWorks QA yard prepared: 192x192m at " + center + "; permanent noon; native terrain saved; vegetation cleared: " + vegetation.Length);
+            Debug.Log("BuildWorks QA yard prepared: 64x64m at " + center + "; permanent noon; native terrain saved; vegetation cleared: " + vegetation.Length);
         }
     }
 }

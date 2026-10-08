@@ -1,5 +1,14 @@
 # BuildWorks current development handoff
 
+## QA .105 — temporary 64 m stand for the import/build/reload test
+
+Native .104 found no free 192x192 m candidate with the required height/location
+constraints; nothing was changed. .105 uses a temporary 64x64 m stand and retains
+all safety checks. The larger yard remains open. An unused plan is recomputed only
+without a yard receipt or backup; the operation stamp includes the smaller size.
+Native placement and world reload remain unverified.
+
+
 ## QA .104 — location-aware site selection; native verification pending
 
 In game, .103 passed ground preflight and refused construction/storage before any

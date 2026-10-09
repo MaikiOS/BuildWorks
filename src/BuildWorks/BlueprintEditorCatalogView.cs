@@ -234,6 +234,8 @@ namespace OstrixMods.BuildWorks
             name.margin = Vector4.zero; name.maxVisibleLines = item.IsUpgrade ? 2 : 3;
             SetTopAnchored((RectTransform)name.transform, 8, 94, 8, item.IsUpgrade ? 36 : 52);
             AddCatalogImage(button.transform, "Thumbnail", item.Icon, 8, 6, (float)catalogLayout.CellWidth - 16, 82);
+            if (item.IsBlueprint && !item.Icon)
+                AddEmptyPreview(button.transform.Find("Thumbnail"));
             Button favorite = CreateIconButton("CatalogFavorite", button.transform, "favorite", "*", 28, () =>
             { if (!catalogFavorites.Add(captured.PrefabName)) catalogFavorites.Remove(captured.PrefabName); RebuildCatalog(); }, CatalogText("favorites"));
             SetTopRight((RectTransform)favorite.transform, 4, 4, 28, 28);
@@ -260,6 +262,14 @@ namespace OstrixMods.BuildWorks
             RectTransform rect = CreateRect(name, parent); SetTopLeft(rect, x, y, w, h);
             Image image = rect.gameObject.AddComponent<Image>(); image.sprite = sprite;
             image.preserveAspect = true; image.raycastTarget = false; image.color = sprite ? Color.white : Color.clear;
+        }
+        private void AddEmptyPreview(Transform parent)
+        {
+            TMP_Text text = CreateText("EmptyPreview", parent, T("catalog.thumbnail_pending"), 12f,
+                FontStyles.Normal, TextAlignmentOptions.Center);
+            text.textWrappingMode = TextWrappingModes.Normal;
+            text.raycastTarget = false;
+            SetInsets(text.rectTransform, 8f, 30f, 8f, 4f);
         }
         private void RebuildCatalogNavigation()
         {
@@ -337,6 +347,7 @@ namespace OstrixMods.BuildWorks
             title.maxVisibleLines = 3;
             SetTopAnchored((RectTransform)title.transform, 12, 12, 12, 62);
             AddCatalogImage(catalogPreview, "PreviewIcon", item.Icon, 12, 78, 220, 140);
+            if (item.IsBlueprint && !item.Icon) AddEmptyPreview(catalogPreview.Find("PreviewIcon"));
             string description = BuildWorksLocalization.CatalogLabel(item.Material) + "\n" + BuildWorksLocalization.CatalogLabel(item.Source) +
                 "\n" + item.PrefabName + (item.IsUpgrade ? "\n\n" + CatalogText("upgrade_to") + "\n" + (item.StationName ?? CatalogText("unknown_station")) : "");
             if (item.IsBlueprint && item.Blueprint.IsExternal)
@@ -344,7 +355,8 @@ namespace OstrixMods.BuildWorks
                     "\n" + BuildWorksLocalization.Text("catalog.card.parts", item.Blueprint.importPartCount);
             if (item.ItemContents != null) description = T("editor.item.defaults") + "\n\n" + item.PrefabName;
             if (!string.IsNullOrEmpty(item.UnavailableReason)) description += "\n\n" + item.UnavailableReason;
-            else if (!string.IsNullOrEmpty(item.WarningReason)) description += "\n\n" + item.WarningReason;
+            else if (!string.IsNullOrEmpty(item.WarningReason)) description += "\n\n" + item.WarningReason +
+                (item.IsBlueprint ? "\n" + T("catalog.thumbnail_markers") : "");
             if (!item.ResourcesKnown) description += "\n\n" + T("editor.catalog_cost_unknown");
             RectTransform viewport = CreatePanel("PreviewBody", catalogPreview, Color.clear, null);
             SetTopAnchored(viewport, 8, 224, 8, Mathf.Max(32, catalogPreview.rect.height - 286));
@@ -405,10 +417,12 @@ namespace OstrixMods.BuildWorks
                 if (item.Blueprint?.id != id) continue;
                 item.Icon = icon;
                 Transform image = catalogGrid ? catalogGrid.Find("Catalog_" + item.PrefabName + "/Thumbnail") : null;
+                if (image && image.Find("EmptyPreview")) UnityEngine.Object.Destroy(image.Find("EmptyPreview").gameObject);
                 if (image) { var graphic = image.GetComponent<Image>(); graphic.sprite = icon; graphic.color = Color.white; }
                 if (catalogPreviewItem == item && catalogPreview)
                 {
                     Transform preview = catalogPreview.Find("PreviewIcon");
+                    if (preview && preview.Find("EmptyPreview")) UnityEngine.Object.Destroy(preview.Find("EmptyPreview").gameObject);
                     if (preview) { var graphic = preview.GetComponent<Image>(); graphic.sprite = icon; graphic.color = Color.white; }
                 }
             }

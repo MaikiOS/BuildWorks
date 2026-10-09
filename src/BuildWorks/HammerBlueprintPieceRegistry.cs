@@ -35,6 +35,8 @@ namespace OstrixMods.BuildWorks
             new Dictionary<string, Piece>(StringComparer.Ordinal);
         private readonly Dictionary<string, IReadOnlyList<Piece>> sourcePiecesByBlueprintId =
             new Dictionary<string, IReadOnlyList<Piece>>(StringComparer.Ordinal);
+        private readonly Dictionary<string, IReadOnlyList<Piece>> previewPiecesByBlueprintId =
+            new Dictionary<string, IReadOnlyList<Piece>>(StringComparer.Ordinal);
         private readonly Dictionary<string, bool> placementAvailability = new Dictionary<string, bool>(StringComparer.Ordinal);
         private readonly List<GameObject> prefabs = new List<GameObject>();
         private readonly Dictionary<Piece, Bounds> sourceBounds = new Dictionary<Piece, Bounds>();
@@ -303,22 +305,37 @@ namespace OstrixMods.BuildWorks
         private bool TrySources(CompositeBlueprintStore.Blueprint blueprint, out IReadOnlyList<Piece> pieces)
         {
             pieces = null;
-            if (blueprint == null) return false;
+            if (blueprint?.parts == null || !string.IsNullOrEmpty(blueprint.importError) ||
+                CompositeBlueprintStore.InteractiveError(blueprint.parts.Count) != null) return false;
             if (sourcePiecesByBlueprintId.TryGetValue(blueprint.id, out pieces)) return true;
-            if (!blueprint.IsExternal || !PrecisionPlacementSession.TryResolveBlueprintPieces(
-                Player.m_localPlayer, blueprint, out List<Piece> resolved, out _, forEditor: true)) return false;
+            if (previewPiecesByBlueprintId.TryGetValue(blueprint.id, out pieces)) return true;
+            var resolved = new List<Piece>(blueprint.parts.Count);
+            var sources = new Dictionary<string, Piece>(StringComparer.Ordinal);
+            foreach (CompositeBlueprintStore.Part part in blueprint.parts)
+            {
+                if (part.scaleIsAbsolute) { resolved.Add(null); continue; }
+                if (!sources.TryGetValue(part.prefabName, out Piece piece))
+                {
+                    PrecisionPlacementSession.TryResolveBuildPiece(Player.m_localPlayer, part.prefabName, out piece);
+                    if (!piece && ZNetScene.instance)
+                    {
+                        GameObject registered = ZNetScene.instance.GetPrefab(part.prefabName);
+                        piece = registered ? registered.GetComponent<Piece>() : null;
+                    }
+                    sources.Add(part.prefabName, piece);
+                }
+                resolved.Add(piece);
+            }
             pieces = resolved;
-            sourcePiecesByBlueprintId[blueprint.id] = pieces;
+            previewPiecesByBlueprintId[blueprint.id] = pieces;
             return true;
         }
 
         internal Sprite Icon(CompositeBlueprintStore.Blueprint blueprint)
         {
-            Sprite cached = thumbnailRenderer.GetCached(blueprint);
-            if (cached) return cached;
             if (TryGetPiece(blueprint, out Piece piece)) return piece.m_icon;
             return TrySources(blueprint, out IReadOnlyList<Piece> pieces)
-                ? thumbnailRenderer.GetOrQueue(blueprint, pieces) : null;
+                ? thumbnailRenderer.GetOrQueue(blueprint, pieces) : thumbnailRenderer.GetCached(blueprint);
         }
 
         public Sprite RefreshThumbnail(
@@ -346,8 +363,11 @@ namespace OstrixMods.BuildWorks
                 : null;
         }
 
-        public void DeleteThumbnail(string blueprintId) =>
+        public void DeleteThumbnail(string blueprintId)
+        {
+            previewPiecesByBlueprintId.Remove(blueprintId);
             thumbnailRenderer.Delete(blueprintId);
+        }
 
         public void ApplyCatalogLayout(PieceTable table)
         {
@@ -663,6 +683,7 @@ namespace OstrixMods.BuildWorks
             placementOriginsByPiece.Clear();
             piecesByBlueprintId.Clear();
             sourcePiecesByBlueprintId.Clear();
+            previewPiecesByBlueprintId.Clear();
             placementAvailability.Clear();
             sourceBounds.Clear();
             if (holder) UnityEngine.Object.Destroy(holder);

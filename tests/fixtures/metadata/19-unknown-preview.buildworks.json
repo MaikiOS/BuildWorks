@@ -1,0 +1,96 @@
+{
+  "format": "buildworks-blueprint",
+  "version": 9,
+  "requiredPrefabIds": [
+    "BuildWorks_QA_UnknownEnvelope",
+    "woodwall"
+  ],
+  "blueprint": {
+    "id": "b46e65603bed4a4da4184598e73ac119",
+    "name": "QA U10 Unknown Preview",
+    "prefabName": "BuildWorks_QA_UnknownEnvelope",
+    "parts": [
+      {
+        "prefabName": "BuildWorks_QA_UnknownEnvelope",
+        "position": {
+          "x": 0,
+          "y": 0,
+          "z": 3
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0.25881905,
+          "z": 0,
+          "w": 0.96592583
+        },
+        "stableId": "known",
+        "displayName": "QA unknown-size marker",
+        "editorVisible": true,
+        "editorLocked": false,
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "baseScale": {
+          "x": 2,
+          "y": 1,
+          "z": 0.5
+        }
+      },
+      {
+        "stableId": "a",
+        "prefabName": "woodwall",
+        "displayName": "QA own wall A",
+        "position": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "editorVisible": true,
+        "editorLocked": false
+      },
+      {
+        "stableId": "b",
+        "prefabName": "woodwall",
+        "displayName": "QA own wall B",
+        "position": {
+          "x": 2,
+          "y": 0,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0,
+          "w": 1
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        },
+        "editorVisible": true,
+        "editorLocked": false
+      }
+    ],
+    "anchors": [],
+    "category": "OTHER",
+    "previewYaw": 45,
+    "previewPitch": 30,
+    "previewZoom": 1,
+    "groups": [],
+    "primaryPartId": "known"
+  }
+}

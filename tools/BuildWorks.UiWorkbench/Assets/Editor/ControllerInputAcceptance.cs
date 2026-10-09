@@ -353,6 +353,99 @@ internal static class ControllerInputAcceptance
             "PASS actual persistent Inspector/Tools entry with only missing selected; instructions/Cancel/Open catalogue without mutation; explicit one-to-many confirmation/stale prefab/one Undo/Redo/Save/reopen; own poses, groups, primary/pivots, independent support and source preserved. No game construction proof.");
     }
 
+    internal static IEnumerable<object> RunPartialThumbnails(Camera template, TMP_Text font, GameObject wall, string output)
+    {
+        GameObject model = PlacementGhostPreviewView.CreateVisualClone(wall, "PartialThumbnailSource", BlueprintThumbnailRenderer.ThumbnailLayer);
+        model.SetActive(false);
+        Piece piece = model.AddComponent<Piece>();
+        try
+        {
+        var blueprint = new CompositeBlueprintStore.Blueprint { id = "partial-" + Guid.NewGuid().ToString("N"), name = "Неполный чертёж" };
+        blueprint.parts.Add(new CompositeBlueprintStore.Part { stableId = "available", prefabName = "woodwall",
+            position = new CompositeBlueprintStore.VectorData { x = -2 }, rotation = new CompositeBlueprintStore.QuaternionData { w = 1 },
+            scale = new CompositeBlueprintStore.VectorData { x = .5f, y = 2, z = 1 }, baseScale = new CompositeBlueprintStore.VectorData { x = 2, y = 1, z = .5f } });
+        blueprint.parts.Add(new CompositeBlueprintStore.Part { stableId = "known", prefabName = "qa_absent",
+            position = new CompositeBlueprintStore.VectorData { x = 2, y = 1 }, rotation = new CompositeBlueprintStore.QuaternionData(Quaternion.Euler(0, 90, 0)),
+            scale = new CompositeBlueprintStore.VectorData { x = 2, y = 3, z = .5f },
+            metadata = CompositeBlueprintStore.PrefabMetadata.FromGeometry(new BlueprintPrefabMetadata(1, "qa_absent", "Recorded", "piece", "Valheim",
+                new Point3(2, .5, 3), new Point3(1, 2, 3), new Point3(3, 4, 5))) });
+        blueprint.parts.Add(new CompositeBlueprintStore.Part { stableId = "unknown", prefabName = "woodwall", scaleIsAbsolute = true,
+            position = new CompositeBlueprintStore.VectorData { z = 5 }, rotation = new CompositeBlueprintStore.QuaternionData { w = 1 },
+            scale = new CompositeBlueprintStore.VectorData { x = 100, y = 200, z = 300 } });
+        Piece[] pieces = { piece, null, piece };
+        Mesh markerMesh;
+        using (var preview = new BlueprintThumbnailRenderer.PreviewSession(blueprint, pieces))
+        {
+            var root = Field<GameObject>(preview, "root");
+            Transform available = root.transform.Find("Part_0"), known = root.transform.Find("Missing_known"), unknown = root.transform.Find("Missing_unknown");
+            Require(available && known && unknown, "Partial preview dropped available parts or missing records");
+            Require(available.localScale == new Vector3(1, 2, .5f) && available.localPosition.x == -2,
+                "Partial preview changed available part basis/pose");
+            Require(known.localScale == new Vector3(4, 1.5f, 1.5f) && known.localPosition == new Vector3(2, 1, 0) &&
+                Quaternion.Angle(known.localRotation, Quaternion.Euler(0, 90, 0)) < .001f,
+                "Recorded marker lost prefab basis, multiplier or rotation");
+            markerMesh = known.GetComponent<MeshFilter>().sharedMesh;
+            Require(markerMesh.GetTopology(0) == MeshTopology.Lines && markerMesh.bounds.center == new Vector3(2, 3, 4) &&
+                markerMesh.bounds.size == new Vector3(2, 2, 2), "Recorded marker invented a centered mesh instead of recorded local bounds");
+            Require(unknown.localScale == Vector3.one * .3f && unknown.localPosition == new Vector3(0, 0, 5),
+                "Unknown marker inferred size from an unresolved absolute scale");
+            Require(!root.GetComponentsInChildren<Collider>(true).Any() && blueprint.parts[2].scaleIsAbsolute &&
+                blueprint.parts[2].scale.x == 100, "Partial preview mutated records or acquired collisions");
+            preview.Render(20, 15, 1);
+            Require(preview.Texture, "Partial rotatable preview has no GPU target");
+            RuntimeEditorAcceptance.SavePixels(preview.Texture, Path.Combine(output, "partial-preview.png"));
+        }
+        yield return null; yield return null;
+        Require(!markerMesh, "Missing marker mesh leaked after preview disposal");
+        using (var renderer = new BlueprintThumbnailRenderer())
+        {
+            Sprite partial = renderer.Refresh(blueprint, pieces, out string error);
+            Require(partial && error == null, "Partial thumbnail failed: " + error);
+            Color32[] pixels = partial.texture.GetPixels32();
+            Require(pixels.Any(pixel => pixel.a == 0) && pixels.Any(pixel => pixel.a > 24), "Partial thumbnail lost transparent background or all geometry");
+            File.WriteAllBytes(Path.Combine(output, "partial-thumbnail.png"), partial.texture.EncodeToPNG());
+            string disk = (string)Call(renderer, "ThumbnailPath", blueprint.id);
+            Require(!File.Exists(disk), "Partial placeholder thumbnail persisted across mod changes");
+            var item = new BlueprintEditorCatalogItem("blueprint_" + blueprint.id, blueprint.name, null, "OTHER", "WOOD", "external_blueprints", 0,
+                blueprint: blueprint, warningReason: BuildWorksLocalization.Text("editor.missing_dimensions", "qa_absent"), resourcesKnown: false);
+            var store = new CompositeBlueprintStore(Path.Combine(output, "partial-catalog-" + Guid.NewGuid().ToString("N") + ".json"));
+            using (var controller = new BlueprintEditorController(store, template, font, name => name == "woodwall" ? wall : null, name => name,
+                () => new[] { item }, message => { throw new InvalidOperationException(message); }))
+            {
+                Require(controller.OpenNew(out error), error); yield return null;
+                var view = Field<BlueprintEditorView>(controller, "view");
+                Call(controller, "RequestCatalog"); yield return null;
+                NativeClick(view, null, "CatalogBlueprintsMode"); yield return null;
+                var grid = Field<RectTransform>(view, "catalogGrid");
+                Require(grid.GetComponentsInChildren<TMP_Text>().Any(text => text.name == "EmptyPreview"), "Missing icon still leaves a blank card");
+                view.UpdateCatalogThumbnail(blueprint.id, partial); yield return null;
+                Require(!grid.GetComponentsInChildren<TMP_Text>().Any(text => text.name == "EmptyPreview") &&
+                    !Field<RectTransform>(view, "catalogPreview").GetComponentsInChildren<TMP_Text>().Any(text => text.name == "EmptyPreview"),
+                    "Ready preview is covered by stale empty-image explanation");
+                Require(grid.GetComponentsInChildren<TMP_Text>().Any(text => text.text.StartsWith("[!]")) &&
+                    Field<RectTransform>(view, "catalogPreview").GetComponentsInChildren<TMP_Text>().Any(text => text.text.Contains(BuildWorksLocalization.Text("catalog.thumbnail_markers"))),
+                    "Partial thumbnail hid the warning or marker uncertainty");
+                controller.Close(true);
+            }
+            var cache = new CompositeBlueprintStore.Blueprint { id = "partial-cache-" + Guid.NewGuid().ToString("N"), name = "Cache" };
+            cache.parts.Add(blueprint.parts[0]);
+            Sprite complete = renderer.Refresh(cache, new[] { piece }, out error);
+            Require(complete, "Complete cache fixture failed: " + error);
+            string cachePath = (string)Call(renderer, "ThumbnailPath", cache.id);
+            byte[] originalPng = File.ReadAllBytes(cachePath);
+            Require(!renderer.GetOrQueue(cache, new Piece[] { null }), "Complete disk preview masked newly missing model");
+            Require(renderer.ProcessOne(out string id, out Sprite missing) && id == cache.id && missing,
+                "Partial cache transition did not render a marker");
+            Require(originalPng.SequenceEqual(File.ReadAllBytes(cachePath)), "Partial thumbnail overwrote the complete disk cache");
+            Require(renderer.GetOrQueue(cache, new[] { piece }), "Restored model reused partial preview instead of complete cache");
+            renderer.Delete(cache.id); renderer.Delete(blueprint.id);
+        }
+        File.WriteAllText(Path.Combine(output, "partial-thumbnail-check.txt"),
+            "PASS actual partial PNG and rotatable preview; available root basis/pose, recorded offset/rotated bounds, unknown fixed uncertainty marker, inert absolute record, transparency, disposal, complete/partial/complete cache isolation and actual catalogue fallback/update/warning. No Valheim proof.");
+        }
+        finally { Object.Destroy(model); }
+    }
+
     internal static IEnumerable<object> RunPrefabMetadata(Camera template, TMP_Text font, string output)
     {
         var prefab = new GameObject("metadata_piece");

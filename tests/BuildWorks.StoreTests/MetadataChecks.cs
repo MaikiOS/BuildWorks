@@ -91,6 +91,14 @@ namespace OstrixMods.BuildWorks.StoreTests
                 replacementCopy.parts[0].metadata.hostId == "synthetic-fixture" &&
                 replacementCopy.parts.Skip(1).All(part => part.prefabName == "woodwall") &&
                 replacementCopy.parts[2].position.x == 2, "Ready replacement fixture lost its target or own walls");
+            var unknown = ExternalBlueprintLibrary.LoadFile(Path.Combine(Path.GetDirectoryName(fixture),
+                "19-unknown-preview.buildworks.json")).Single();
+            Require(unknown.importError == null, unknown.importError);
+            var unknownCopy = BlueprintExchangeFormat.Decode(Encoding.UTF8.GetString(
+                BlueprintExchangeFormat.Encode(ExternalBlueprintLibrary.DetachedCopy(unknown))));
+            Require(unknownCopy.parts.Count == 3 && unknownCopy.parts[0].metadata == null &&
+                unknownCopy.parts[0].position.z == 3 && unknownCopy.parts.Skip(1).All(part => part.prefabName == "woodwall"),
+                "Ready unknown-size preview fixture lost available walls or invented metadata");
             Console.WriteLine("PASS metadata native19/portable9: capture/save/update/import/export/reopen, unique snapshots/fresh host, missing retain, immutable copies/Undo, strict versions/IDs/fields/bounds and legacy8");
         }
 

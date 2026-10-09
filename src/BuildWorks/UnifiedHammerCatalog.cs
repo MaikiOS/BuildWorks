@@ -2507,7 +2507,7 @@ namespace OstrixMods.BuildWorks
             pointer.RightReleased = ReleaseBlueprintContextMenu;
             Sprite icon = blueprintRegistry.Icon(blueprint);
             AddIcon(card.transform, icon, new Vector2(8f, -8f),
-                new Vector2(size.x - 16f, size.y - 42f), blueprint.id);
+                new Vector2(size.x - 16f, size.y - 42f), blueprint.id, hud);
             if (!blueprintRegistry.CanPlace(blueprint))
                 AddRailText(hud, card.transform, "!", new Vector2(8f, -8f), 22f,
                     new Color(1f, 0.65f, 0.2f, 1f), FontStyles.Bold, width: 24f);
@@ -2687,7 +2687,7 @@ namespace OstrixMods.BuildWorks
                 width: width - 32f);
             Sprite icon = blueprintRegistry.Icon(blueprint);
             AddIcon(parent, icon, new Vector2(16f, -74f),
-                new Vector2(width - 32f, Mathf.Min(104f, height * 0.20f)), blueprint.id);
+                new Vector2(width - 32f, Mathf.Min(104f, height * 0.20f)), blueprint.id, hud);
 
             const float actionHeight = 28f;
             int actionCount = deleteConfirmationId == blueprint.id ? 10 : 9;
@@ -2893,7 +2893,7 @@ namespace OstrixMods.BuildWorks
             Transform parent,
             Sprite sprite,
             Vector2 position,
-            Vector2 size, string blueprintId = null)
+            Vector2 size, string blueprintId = null, Hud hud = null)
         {
             var root = new GameObject(Prefix + "Icon", typeof(RectTransform), typeof(Image));
             if (blueprintId != null) root.name += "_" + blueprintId;
@@ -2908,6 +2908,21 @@ namespace OstrixMods.BuildWorks
             image.color = sprite ? Color.white : Color.clear;
             image.preserveAspect = true;
             image.raycastTarget = false;
+            if (!sprite && blueprintId != null && hud)
+            {
+                AddRailText(hud, root.transform, BuildWorksLocalization.Text("catalog.thumbnail_pending"),
+                    Vector2.zero, 12f, new Color(.88f, .80f, .66f, 1f), FontStyles.Normal, width: size.x);
+                if (root.transform.childCount > 0)
+                {
+                    TMP_Text label = root.GetComponentInChildren<TMP_Text>();
+                    label.name = "EmptyPreview";
+                    label.alignment = TextAlignmentOptions.Center;
+                    label.textWrappingMode = TextWrappingModes.Normal;
+                    var labelRect = label.rectTransform;
+                    labelRect.anchorMin = Vector2.zero; labelRect.anchorMax = Vector2.one;
+                    labelRect.offsetMin = new Vector2(8f, 4f); labelRect.offsetMax = new Vector2(-8f, -30f);
+                }
+            }
             Decorations.Add(root);
         }
 
@@ -2917,6 +2932,7 @@ namespace OstrixMods.BuildWorks
                 if (decoration && decoration.name == Prefix + "Icon_" + id)
                 {
                     Image image = decoration.GetComponent<Image>();
+                    if (decoration.transform.Find("EmptyPreview")) UnityEngine.Object.Destroy(decoration.transform.Find("EmptyPreview").gameObject);
                     image.sprite = sprite; image.color = Color.white;
                 }
         }

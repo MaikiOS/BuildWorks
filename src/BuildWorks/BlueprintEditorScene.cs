@@ -2146,7 +2146,7 @@ namespace OstrixMods.BuildWorks
                     ? PlacementGhostPreviewView.CreateVisualClone(
                         source, "Part_" + part.StableId, editorLayer,
                         part.MaterialSeed.HasValue && BlueprintMaterialVariation.IsSupported(source) ? part.MaterialSeed : null)
-                    : CreatePlaceholder(part.StableId, part.Metadata, result.OwnedAssets);
+                    : CreatePlaceholder(part.StableId, part.Metadata, result.OwnedAssets, editorLayer);
                 result.Root.transform.SetParent(root.transform, false);
                 if (source) result.Root.transform.localScale = source.transform.localScale;
                 if (source) BlueprintItemStandPreview.TryAdd(source, result.Root,
@@ -2343,15 +2343,15 @@ namespace OstrixMods.BuildWorks
             visual.PlacementLabels.AddRange(labels);
         }
 
-        private GameObject CreatePlaceholder(
+        internal static GameObject CreatePlaceholder(
             string stableId,
             BlueprintPrefabMetadata metadata,
-            ICollection<UnityEngine.Object> visualAssets)
+            ICollection<UnityEngine.Object> visualAssets, int layer)
         {
             var placeholder = new GameObject("Missing_" + stableId)
             {
                 hideFlags = HideFlags.HideAndDontSave,
-                layer = editorLayer
+                layer = layer
             };
             Mesh mesh = CreateCubeMesh();
             if (metadata?.Minimum != null)
@@ -2365,7 +2365,7 @@ namespace OstrixMods.BuildWorks
             return placeholder;
         }
 
-        private Material CreatePreviewMaterial(
+        internal static Material CreatePreviewMaterial(
             Material source,
             bool missing,
             ICollection<UnityEngine.Object> visualAssets)

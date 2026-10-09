@@ -1,3 +1,16 @@
+## 2026-10-09 — incomplete blueprint thumbnails, source only
+
+U10 renders available parts with recorded bbox/unknown-size markers through one
+PNG/rotatable-preview helper. Both catalogues show an absent-image explanation;
+missing warnings stay. Partial images are memory-only and cannot overwrite full
+PNG caches. Nullable preview sources stay separate from strict construction.
+Normal/QA0/0, localization899, Store, HostContract25185596 and Unity444 passed;
+final Unity UTC16:10:31.1990776Z; correctness/Ponytail found no blocker.
+Evidence and ready file14/19 scenario: docs/PARTIAL_THUMBNAIL_CHECKPOINT_2026-10-09.md.
+QA .116 SHA867E5E47…DCF3A unchanged; no installation/game/save mutation.
+Native Hammer pixels and world/runtime remain open. Next: E08 tree filters.
+Full goal active; progress: docs/LIVE_CHECKLIST_RU.md.
+
 ## 2026-10-09 — visible missing-part replacement, source only
 
 Persistent Inspector/Tools entry opens steps and the catalogue for incomplete

@@ -625,6 +625,7 @@ public static class RuntimeEditorAcceptance
                     foreach (object step in ControllerInputAcceptance.RunMissingExchange(template, fontTemplate, source["woodwall"], output)) yield return step;
                     foreach (object step in ControllerInputAcceptance.RunPrefabMetadata(template, fontTemplate, output)) yield return step;
                     foreach (object step in ControllerInputAcceptance.RunMissingReplacement(template, fontTemplate, source["woodwall"], output)) yield return step;
+                    foreach (object step in ControllerInputAcceptance.RunPartialThumbnails(template, fontTemplate, source["woodwall"], output)) yield return step;
                     checks.Add("Explicit missing replacement: actual Tools button/Cancel/review/commit, one Undo/Redo, stale prefab refusal, exact source/poses and native Save/reopen. No game construction proof.");
                     checks.Add("Prefab metadata: actual nested root-local capture/fresh save, unknown source owner, missing recorded frame pose/scale, no snap/model surfaces, native Save and disk reopen; no game proof.");
                     checks.Add("Explicit missing-part copy: actual default/ID/count/Back reset/native confirmation/stale host refusal/new confirmation -> one-part editor; exact source retained. No game construction proof.");
@@ -701,6 +702,8 @@ public static class RuntimeEditorAcceptance
                 "Long preview name lacks bounded ellipsis");
             if (text.name == "PreviewMetadata")
                 Require(!text.isTextOverflowing, "Catalog preview text overflows: " + text.name);
+            if (text.name == "EmptyPreview")
+                Require(!text.isTextOverflowing, "Empty-image explanation overflows");
             if (text.name.StartsWith("StatusHints", StringComparison.Ordinal))
                 Require(!text.isTextTruncated && !text.isTextOverflowing,
                     "Context hotkeys are clipped: " + text.text);

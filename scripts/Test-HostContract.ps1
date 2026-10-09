@@ -3058,7 +3058,16 @@ $sceneCalls = ($pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'Bluepr
 Assert-Contract ($sceneCalls -match 'BlueprintItemStandPreview::TryAdd') 'Editor geometry omits item-stand preview.'
 $thumbnailCalls = ($pluginMethods | Where-Object { $_.DeclaringType.Name -in @('BlueprintThumbnailRenderer', 'PreviewSession') } |
     ForEach-Object { $_.Body.Instructions | ForEach-Object { [string]$_.Operand } }) -join "`n"
-Assert-Contract ([regex]::Matches($thumbnailCalls, 'BlueprintItemStandPreview::TryAdd').Count -eq 2) 'Thumbnail and rotating preview must use the same content adapter.'
+Assert-Contract ([regex]::Matches($thumbnailCalls, 'BlueprintItemStandPreview::TryAdd').Count -eq 1 -and
+    [regex]::Matches($thumbnailCalls, 'BlueprintThumbnailRenderer::CreateVisuals').Count -eq 2) `
+    'Thumbnail and rotating preview must both reach the shared content adapter.'
+$thumbnailVisualCalls = ($thumbnailRenderer.Methods | Where-Object Name -eq 'CreateVisuals' |
+    ForEach-Object { $_.Body.Instructions | ForEach-Object { [string]$_.Operand } }) -join "`n"
+Assert-Contract ($thumbnailVisualCalls -match 'BlueprintEditorScene::CreatePlaceholder' -and
+    $thumbnailVisualCalls -match 'BlueprintItemStandPreview::TryAdd' -and
+    $thumbnailVisualCalls -match 'VisualCloneOwnedAssets::Track' -and
+    $thumbnailVisualCalls -notmatch 'ZDO::|Inventory::|ConsumeResources') `
+    'Partial previews must retain marker ownership and contents without world mutation.'
 
 $nativeCapture = ($pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintItemStandCapture' -and $_.Name -eq 'TryCapture' })
 $captureCalls = ($nativeCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"

@@ -52,7 +52,7 @@ internal static class ItemStandPreviewAcceptance
             bool found = false;
             foreach (System.Collections.DictionaryEntry entry in Field<System.Collections.IDictionary>(preview, "batches"))
             {
-                var key = ((Mesh, Material, int))entry.Key;
+                var key = ((Mesh, Material, int, BlueprintMaterialVariation.Values))entry.Key;
                 if (key.Item2 != content.GetComponent<Renderer>().sharedMaterial) continue;
                 Matrix4x4 first = Field<Matrix4x4[]>(entry.Value, "Matrices")[0];
                 for (int element = 0; element < 16; ++element)
@@ -62,6 +62,38 @@ internal static class ItemStandPreviewAcceptance
             }
             Require(found && plan[0].ItemStandContents.Zdo != plan[1].ItemStandContents.Zdo,
                 "heavy contents draw absent or placement metadata collapsed");
+            var variation = source.AddComponent<RandomMaterialValues>();
+            variation.m_vectorProperties.Add(new RandomMaterialValues.VectorVariationProperty {
+                m_propertyNames = new List<string> { "_HolderOnlyVariation" }, m_minimum = Vector4.one, m_maximum = Vector4.one });
+            try
+            {
+                for (int index = 0; index < plan.Count; ++index)
+                    plan[index] = new PrecisionPlacementSession.TransformSnapshot(plan[index].Position, plan[index].Rotation,
+                        itemStandContents: plan[index].ItemStandContents, materialSeed: 0);
+                preview.Prepare(plan, pieces, 0);
+                preview.Draw(plan, new MaterialPropertyBlock(), 0, -1, Matrix4x4.identity);
+                bool holderSeed = false, contentUnseeded = false;
+                foreach (System.Collections.DictionaryEntry entry in Field<System.Collections.IDictionary>(preview, "batches"))
+                {
+                    var key = ((Mesh, Material, int, BlueprintMaterialVariation.Values))entry.Key;
+                    if (key.Item2 == content.GetComponent<Renderer>().sharedMaterial && key.Item4 == null) contentUnseeded = true;
+                    if (key.Item4 != null) holderSeed = true;
+                }
+                Require(holderSeed && contentUnseeded, "heavy holder seed leaked onto its mounted item");
+                using (var small = new PlacementGhostPreviewView())
+                {
+                    small.Show(source, plan.Take(2).ToArray(), pieces.Take(2).ToArray(), -1);
+                    var blocks = new MaterialPropertyBlock();
+                    foreach (GameObject instance in Field<List<GameObject>>(small, "instances"))
+                    {
+                        Content(instance).GetComponent<Renderer>().GetPropertyBlock(blocks);
+                        Require(!blocks.HasProperty("_HolderOnlyVariation"), "small holder seed leaked onto mounted item");
+                        instance.GetComponentInChildren<Renderer>().GetPropertyBlock(blocks);
+                        Require(blocks.GetVector("_HolderOnlyVariation") == Vector4.one, "small holder lost material seed");
+                    }
+                }
+            }
+            finally { Object.DestroyImmediate(variation); }
         }
     }
 

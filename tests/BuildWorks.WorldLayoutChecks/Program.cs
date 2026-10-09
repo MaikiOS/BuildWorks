@@ -42,6 +42,7 @@ internal static class Program
             rotationType = append.GetParameters()[1].ParameterType;
             pieceType = sessionType.GetField("selectedPiece", Instance).FieldType;
             TestNativeMaterialVariation(asm);
+            TestMaterialSeedPlan();
             TestGridComposition();
             TestSignPayloadLifecycle();
             TestItemStandPayloadLifecycle();
@@ -72,6 +73,28 @@ internal static class Program
             foreach (GameObject fixture in fixtureObjects)
                 if (fixture) UnityEngine.Object.DestroyImmediate(fixture);
         }
+    }
+
+    private static void TestMaterialSeedPlan()
+    {
+        object session = Session(2);
+        IList parts = (IList)Get(Get(session, "activeBlueprint"), "parts");
+        Set(parts[0], "materialSeed", 0);
+        Set(parts[1], "materialSeed", int.MaxValue);
+        Require(Add(session, new Point3(0, 0, 0), Rotation(0, 0, 0, 1)) &&
+            Add(session, new Point3(4, 0, 0), Rotation(0, 0, 0, 1)), "Seed repeat plan append failed");
+        IList plan = (IList)Get(session, "placementPlan");
+        for (int index = 0; index < plan.Count; ++index)
+            Require((int)Property(plan[index], "MaterialSeed") == (index % 2 == 0 ? 0 : int.MaxValue),
+                "Repeated placement plan lost or swapped material seed");
+        Set(parts[0], "materialSeed", 1234);
+        Require((int)Property(plan[0], "MaterialSeed") == 0, "Armed plan aliases mutable source material seed");
+        plan.Clear(); ((IList)Get(session, "placementPlanPieces")).Clear();
+        Set(parts[1], "materialSeed", null);
+        Require(Add(session, new Point3(0, 0, 0), Rotation(0, 0, 0, 1)), "Updated seed plan append failed");
+        Require((int)Property(plan[0], "MaterialSeed") == 1234 && Property(plan[1], "MaterialSeed") == null,
+            "Plan confused unspecified, zero and changed material seed");
+        Console.WriteLine("PASS actual Session: material seed zero/Max/null follows repeated parts without source aliasing; world guard remains separate");
     }
 
     private static void TestNativeMaterialVariation(Assembly plugin)

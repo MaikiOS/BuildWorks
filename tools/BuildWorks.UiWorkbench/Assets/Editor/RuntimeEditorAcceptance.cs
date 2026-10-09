@@ -546,6 +546,8 @@ public static class RuntimeEditorAcceptance
                 TestExperimentalGeometry(template, fontTemplate);
                 WorldSnapPointAcceptance.Run(output);
                 HeavyBlueprintAcceptance.Run(output);
+                MaterialVariationAcceptance.RunPlacement(output);
+                checks.Add("Material placement preview: small cache/error isolation, clones/batched/fallback real GPU equality for uniform and instanced shader parameters, growing/multiple flush batches, native tint/scalar collision and 50000 distinct seeds on one template with bounded buffers/preparation/cache pruning. Native ghost/ZDO/conversion/game shaders/FPS remain open.");
                 checks.Add("Heavy world preview: 513/5000/39487/50000 parts, bounded shared renderer templates; exact nested/root/XYZ matrices; independently camera-isolated instanced/fallback images; hidden holder retains mounted item and differing inventory packages share only visuals. Native world placement/FPS remain unverified.");
                 TestFurnitureCornersAndCursorIntent(template, output);
                 controller.Close(true);
@@ -1065,7 +1067,7 @@ public static class RuntimeEditorAcceptance
                 "Editor/native reopen lost the pending appearance recipe: " + error);
             editor.Close(true);
         }
-        checks.Add("Material seed native20/portable10 data contract: actual editor save/reopen preserves zero and keeps an explicit pending-state warning; appearance/conversion/native placement not implemented.");
+        checks.Add("Material seed native20/portable10 data contract: actual editor save/reopen preserves zero and keeps an explicit pending-state warning; external conversion/native placement remain incomplete.");
     }
 
     private static void TestIncompleteExternalEditor(Camera camera, TMP_Text font, GameObject wall, string output)

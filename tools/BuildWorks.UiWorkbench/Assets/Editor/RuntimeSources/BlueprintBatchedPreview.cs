@@ -16,6 +16,7 @@ namespace OstrixMods.BuildWorks
             internal int Submesh;
             internal Matrix4x4 Local;
             internal bool Attachment;
+            internal Renderer Renderer;
         }
 
         private sealed class Template
@@ -27,15 +28,24 @@ namespace OstrixMods.BuildWorks
 
         private sealed class Batch
         {
-            internal readonly Matrix4x4[] Matrices = new Matrix4x4[1023];
+            internal Matrix4x4[] Matrices = new Matrix4x4[1];
             internal int Count;
+            internal readonly MaterialPropertyBlock Properties = new MaterialPropertyBlock();
+            internal bool PropertiesPrepared;
         }
 
         private readonly Dictionary<(GameObject, string, string, bool), Template> templates =
             new Dictionary<(GameObject, string, string, bool), Template>();
-        private readonly Dictionary<(Mesh, Material, int), Batch> batches =
-            new Dictionary<(Mesh, Material, int), Batch>();
+        private readonly Dictionary<(Mesh, Material, int, BlueprintMaterialVariation.Values), Batch> batches =
+            new Dictionary<(Mesh, Material, int, BlueprintMaterialVariation.Values), Batch>();
+        private readonly Dictionary<(Template, int), Dictionary<Renderer, BlueprintMaterialVariation.Values>> variants =
+            new Dictionary<(Template, int), Dictionary<Renderer, BlueprintMaterialVariation.Values>>();
+        private readonly HashSet<(Template, int)> activeVariants = new HashSet<(Template, int)>();
+        private readonly List<(Template, int)> expiredVariants = new List<(Template, int)>();
+        private readonly List<Vector4> instanceVectors = new List<Vector4>(1023);
         private Template[] parts = Array.Empty<Template>();
+        private Dictionary<Renderer, BlueprintMaterialVariation.Values>[] partValues =
+            Array.Empty<Dictionary<Renderer, BlueprintMaterialVariation.Values>>();
         internal bool Ready { get; private set; }
         internal int PreparedCount { get; private set; }
         internal int TemplateCount => templates.Count;
@@ -48,8 +58,26 @@ namespace OstrixMods.BuildWorks
             PreparedCount = 0;
             if (plan == null || pieces == null || plan.Count != pieces.Count ||
                 supplies != null && supplies.Count != plan.Count) return;
-            if (parts.Length != plan.Count) parts = new Template[plan.Count];
-            int created = 0;
+            if (parts.Length != plan.Count)
+            {
+                parts = new Template[plan.Count];
+                partValues = new Dictionary<Renderer, BlueprintMaterialVariation.Values>[plan.Count];
+            }
+            activeVariants.Clear();
+            for (int index = 0; index < plan.Count; ++index)
+            {
+                if (!pieces[index]) return;
+                var data = supplies == null ? plan[index].ItemStandContents : supplies[index]?.Contents;
+                if (plan[index].MaterialSeed.HasValue && templates.TryGetValue(
+                    (pieces[index].gameObject, data?.Format, data?.Info, data?.ContentsCleared ?? false), out Template template))
+                    activeVariants.Add((template, plan[index].MaterialSeed.Value));
+            }
+            expiredVariants.Clear();
+            foreach (var key in variants.Keys)
+                if (!activeVariants.Contains(key)) expiredVariants.Add(key);
+            foreach (var key in expiredVariants) variants.Remove(key);
+            if (expiredVariants.Count > 0) batches.Clear();
+            int created = 0, createdVariants = 0;
             for (int index = 0; index < plan.Count; ++index)
             {
                 if (!pieces[index]) return;
@@ -82,6 +110,7 @@ namespace OstrixMods.BuildWorks
                                     Mesh = filter.sharedMesh,
                                     Material = materials[slot],
                                     Submesh = Math.Min(slot, filter.sharedMesh.subMeshCount - 1),
+                                    Renderer = renderer,
                                     Local = visual.transform.worldToLocalMatrix * filter.transform.localToWorldMatrix,
                                     Attachment = content && filter.transform.IsChildOf(content.transform)
                                 });
@@ -100,6 +129,20 @@ namespace OstrixMods.BuildWorks
                     }
                 }
                 parts[index] = template;
+                partValues[index] = null;
+                if (plan[index].MaterialSeed.HasValue)
+                {
+                    var variantKey = (template, plan[index].MaterialSeed.Value);
+                    if (!variants.TryGetValue(variantKey, out var values))
+                    {
+                        // Seed recipes share geometry; bound their preparation independently.
+                        if (createdVariants == 256) return;
+                        ++createdVariants;
+                        values = BlueprintMaterialVariation.CapturePreview(source, template.Visual, variantKey.Value);
+                        variants.Add(variantKey, values);
+                    }
+                    partValues[index] = values;
+                }
                 ++PreparedCount;
             }
             Ready = true;
@@ -110,7 +153,7 @@ namespace OstrixMods.BuildWorks
             int hiddenIndex, Matrix4x4 root, Camera camera = null, bool attachmentsOnly = false)
         {
             if (!Ready || plan.Count != parts.Length) return;
-            foreach (Batch batch in batches.Values) batch.Count = 0;
+            foreach (Batch batch in batches.Values) { batch.Count = 0; batch.PropertiesPrepared = false; }
             for (int index = 0; index < plan.Count; ++index)
             {
                 var pose = plan[index];
@@ -120,14 +163,28 @@ namespace OstrixMods.BuildWorks
                 {
                     // The native ghost supplies the holder, not its saved item.
                     if ((attachmentsOnly || index == hiddenIndex) && !draw.Attachment) continue;
-                    var key = (draw.Mesh, draw.Material, draw.Submesh);
+                    BlueprintMaterialVariation.Values values = null;
+                    // Supplied mount contents retain their own appearance, like the small preview.
+                    if (!draw.Attachment) partValues[index]?.TryGetValue(draw.Renderer, out values);
+                    // shortcut: distinct seeds need separate draws; merge after native shader parity is proven.
+                    var key = (draw.Mesh, draw.Material, draw.Submesh, values);
                     if (!batches.TryGetValue(key, out Batch batch))
                     {
                         batch = new Batch();
                         batches.Add(key, batch);
                     }
-                    batch.Matrices[batch.Count++] = part * draw.Local;
+                    if (values != null && !batch.PropertiesPrepared)
+                    {
+                        // Unity copies an MPB through an owned renderer; the caller block stays untouched.
+                        draw.Renderer.SetPropertyBlock(properties);
+                        batch.Properties.Clear();
+                        draw.Renderer.GetPropertyBlock(batch.Properties);
+                        batch.PropertiesPrepared = true;
+                    }
                     if (batch.Count == batch.Matrices.Length)
+                        Array.Resize(ref batch.Matrices, Math.Min(1023, batch.Matrices.Length * 2));
+                    batch.Matrices[batch.Count++] = part * draw.Local;
+                    if (batch.Count == 1023)
                         Flush(key, batch, properties, layer, camera);
                 }
             }
@@ -135,18 +192,35 @@ namespace OstrixMods.BuildWorks
                 Flush(entry.Key, entry.Value, properties, layer, camera);
         }
 
-        private static void Flush((Mesh mesh, Material material, int submesh) key,
+        private void Flush((Mesh mesh, Material material, int submesh, BlueprintMaterialVariation.Values values) key,
             Batch batch, MaterialPropertyBlock properties, int layer, Camera camera)
         {
             if (batch.Count == 0) return;
-            if (SystemInfo.supportsInstancing && key.material.enableInstancing)
+            // A scalar caller override already reserves an array of length one in Unity's MPB.
+            if (SystemInfo.supportsInstancing && key.material.enableInstancing &&
+                (key.values == null || !key.values.HasCallerOverride(properties)))
+            {
+                if (key.values != null)
+                {
+                    key.values.ApplyInstances(batch.Properties, properties, instanceVectors, batch.Count);
+                    properties = batch.Properties;
+                }
                 Graphics.DrawMeshInstanced(key.mesh, key.submesh, key.material, batch.Matrices,
                     batch.Count, properties, ShadowCastingMode.Off, false, layer, camera,
                     LightProbeUsage.Off);
+            }
             else
+            {
+                if (key.values != null)
+                {
+                    key.values.Apply(batch.Properties);
+                    BlueprintMaterialVariation.ApplyGhostTint(batch.Properties, properties);
+                    properties = batch.Properties;
+                }
                 for (int index = 0; index < batch.Count; ++index)
                     Graphics.DrawMesh(key.mesh, batch.Matrices[index], key.material, layer, camera,
                         key.submesh, properties, ShadowCastingMode.Off, false, null, LightProbeUsage.Off);
+            }
             batch.Count = 0;
         }
 
@@ -156,7 +230,11 @@ namespace OstrixMods.BuildWorks
                 if (template.Visual) UnityEngine.Object.Destroy(template.Visual);
             templates.Clear();
             batches.Clear();
+            variants.Clear();
+            activeVariants.Clear();
+            expiredVariants.Clear();
             parts = Array.Empty<Template>();
+            partValues = Array.Empty<Dictionary<Renderer, BlueprintMaterialVariation.Values>>();
             Ready = false;
             PreparedCount = 0;
         }

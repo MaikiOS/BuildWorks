@@ -1,5 +1,58 @@
 # Pending material variation data contract
 
+## 2026-10-09 — placement preview stage, not deployed
+
+MaterialSeed now follows passive and expanded placement snapshots. Small preview
+cache keys include it; rejected descriptors hide owned visuals and report an error.
+Heavy previews share prefab/content geometry templates across seeds, cache owned
+native vector recipes, and group only identical recipe contexts. Preparation
+creates at most two templates and 256 recipes per call; obsolete recipes/batches
+are pruned. Matrix buffers grow from one to 1023 rather than reserving 1023 for
+every distinct seed. Distinct seeds still require separate draw groups: 50000-row
+submission checks are not a frame-rate acceptance claim.
+
+GPU instancing receives repeated vector arrays for each exact group. Scalar
+caller collisions use ordinary DrawMesh, retaining the native ghost tint and
+leaving caller/source blocks and shared materials untouched. Supplied mount
+contents retain their own appearance in both small and heavy previews. This is
+preview consistency; native MaterialMan behavior on dynamic mounts remains QA.
+
+Workbench360 passed UTC 2026-10-09T12:07:05.0996737Z. An actually unused layer
+isolates the render proof; solid cube regions reject unrelated geometry. Saved
+clones and batched/fallback images agree for uniform and instanced shader vectors,
+seed A/B/A, grown/multiple-flush groups and caller collisions. Additional checks
+cover small cache/error cleanup, seeded holder/mount isolation, 50000 distinct
+seeds on one geometry template, bounded preparation/buffers and cache pruning.
+Actual-host GetValue parity and Session seed 0/Max/null/repeat/source-isolation
+checks passed against the final normal DLL. These synthetic shader images do not
+establish Valheim shader appearance, native ghost updates or world persistence.
+
+Normal/QA builds: zero warnings/errors. Geometry, Store, localization878,
+Controller bridge, actual Session/host checks, HostContract25185596, compiled
+QA separation, launch-profile preflight and format passed (format retains the
+existing workspace warning). The verify helper remains unavailable.
+Normal SHA: `D4383896C0B6F08BAD85CD21B18AB77AD562BA5731CFD4AFD0F03814FCC341C5`.
+QA SHA: `E3E47E441527A79515D362D57B2D901BE67136CEC57537355BC7B5403072B6E3`.
+Installed QA SHA is still
+`867E5E474A3C1B335500E47F1B2DC3A6250AC1FAA36E6D92E766E904F33DCF3A`.
+No deployment, Valheim launch, save writes or network test.
+
+Failures corrected during this stage: old mount-test tuple cast; GPU repeated
+instance lost its vector; Unity array-size cap after scalar assignment; allocation
+test reused an intentionally grown buffer; render proof shared an occupied layer.
+Independent review found holder variation leaking onto heavy mount contents;
+the attachment exclusion and small/heavy regression now pass. A malformed tool
+call (`missing field cmd`) and wrong documentation paths were corrected; neither
+was a product check. Independent final correctness/Ponytail review passed with
+no blocking findings or needless complexity; it relied on the checks above.
+
+Remaining: typed external RandMatSeed conversion, native ghost update, capture,
+fresh-ZDO write/readback and failure rollback, actual shaders/FPS, reload/network.
+Keep seeded world preflight blocked until these agree. This section supersedes
+the small/heavy preview TODO below; it does not complete imported construction.
+Evidence: `artifacts/ui-runtime/material-placement-check.txt`, the material PNGs,
+`verification-status.json`, `source-sha256.txt`, and actual WorldLayout result.
+
 ## 2026-10-09 — renderer stage, not deployed
 
 `BlueprintMaterialVariation` now evaluates owned native vector descriptors via

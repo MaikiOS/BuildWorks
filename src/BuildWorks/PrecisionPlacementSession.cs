@@ -111,7 +111,7 @@ namespace OstrixMods.BuildWorks
         internal readonly struct TransformSnapshot
         {
             public TransformSnapshot(Vector3 position, Quaternion rotation, Vector3? scale = null, string signText = null,
-                BlueprintForeignPartData itemStandContents = null, Point3[] customSnapPoints = null)
+                BlueprintForeignPartData itemStandContents = null, Point3[] customSnapPoints = null, int? materialSeed = null)
             {
                 Position = position;
                 Rotation = rotation;
@@ -119,6 +119,7 @@ namespace OstrixMods.BuildWorks
                 SignText = signText;
                 ItemStandContents = itemStandContents;
                 CustomSnapPoints = customSnapPoints;
+                MaterialSeed = materialSeed;
             }
 
             public Vector3 Position { get; }
@@ -127,6 +128,7 @@ namespace OstrixMods.BuildWorks
             public string SignText { get; }
             public BlueprintForeignPartData ItemStandContents { get; }
             public Point3[] CustomSnapPoints { get; }
+            public int? MaterialSeed { get; }
         }
 
         private readonly struct SnapEdge
@@ -2250,7 +2252,7 @@ namespace OstrixMods.BuildWorks
                         var part = blueprint.parts[index];
                         passivePreviewPlan.Add(new TransformSnapshot(part.position.ToVector3(),
                             part.rotation.ToQuaternion(), part.PlacementScale(pieces[index].transform.localScale), part.signText,
-                            part.foreignData?.ToGeometry()));
+                            part.foreignData?.ToGeometry(), materialSeed: part.materialSeed));
                     }
                 }
                 blueprintPieceRegistry.TryGetPlacementOrigin(palettePiece, out Vector3 origin);
@@ -4767,7 +4769,7 @@ namespace OstrixMods.BuildWorks
                     position + rotation * (localPosition * uniformScale),
                     rotation * localRotation,
                     relativeScales[index], part.signText,
-                    part.foreignData?.ToGeometry(), blueprintSnapLocalSets[index]));
+                    part.foreignData?.ToGeometry(), blueprintSnapLocalSets[index], part.materialSeed));
                 placementPlanPieces.Add(activeBlueprintPieces[index]);
             }
             return true;

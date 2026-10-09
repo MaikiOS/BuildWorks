@@ -1,3 +1,18 @@
+## 2026-10-09 — seeded placement previews; native restoration still blocked
+
+MaterialSeed now follows passive/expanded plans and small/heavy renderer previews.
+Heavy geometry is shared across seeds; recipe preparation, matrix allocation and
+obsolete caches are bounded. Uniform/instanced/fallback GPU comparisons on an
+unused layer, multi-flush/caller conflicts, holder-content isolation and 50000
+seed preparation/submission passed. Workbench360 UTC12:07:05, final normal/QA,
+actual GetValue + Session, required checks and independent correctness/Ponytail
+passed. See docs/MATERIAL_VARIATION_CONTRACT.md for exact scope, hashes and limits.
+No deployment/game/save writes. Installed QA .116 is unchanged. Typed external
+conversion, native ghost, capture/fresh ZDO, actual shaders/FPS, reload/network
+remain open; keep seeded world preflight blocked. The whole import path is not
+complete. Next: native seed lifecycle with existing placement receipts/rollback,
+then supported stable snap QA and the remaining editor requests.
+
 ## 2026-10-09 — material renderer parameters; world restoration pending
 
 Owned native GetValue descriptors now supply nested renderer-only copies. Editor

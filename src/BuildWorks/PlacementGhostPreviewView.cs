@@ -28,7 +28,7 @@ namespace OstrixMods.BuildWorks
     {
         private readonly List<GameObject> instances = new List<GameObject>();
         private readonly List<GameObject> instanceSources = new List<GameObject>();
-        private readonly List<(string, string, bool, bool)> instanceContents = new List<(string, string, bool, bool)>();
+        private readonly List<(string, string, bool, bool, int?)> instanceContents = new List<(string, string, bool, bool, int?)>();
         private readonly List<BlueprintItemStandPlacement.Supply> liveSupplies = new List<BlueprintItemStandPlacement.Supply>();
         private readonly MaterialPropertyBlock ghostProperties = new MaterialPropertyBlock();
         private GameObject source;
@@ -101,7 +101,8 @@ namespace OstrixMods.BuildWorks
                 }
                 int planIndex = index;
                 var data = supplies == null ? plan[planIndex].ItemStandContents : supplies[planIndex]?.Contents;
-                var contentKey = (data?.Format, data?.Info, data?.ContentsCleared ?? false, planIndex == hiddenIndex);
+                var contentKey = (data?.Format, data?.Info, data?.ContentsCleared ?? false, planIndex == hiddenIndex,
+                    plan[planIndex].MaterialSeed);
                 GameObject visualSource = pieces != null && pieces.Count == plan.Count &&
                     pieces[planIndex]
                     ? pieces[planIndex].gameObject
@@ -113,11 +114,17 @@ namespace OstrixMods.BuildWorks
                         instances[index].SetActive(false);
                         UnityEngine.Object.Destroy(instances[index]);
                     }
-                    instances[index] = CreatePreview(
-                        visualSource,
-                        index,
-                        hideOne ? ghostProperties : null,
-                        placementGhost.layer);
+                    instances[index] = null;
+                    try
+                    {
+                        instances[index] = CreatePreview(
+                            visualSource,
+                            index,
+                            hideOne ? ghostProperties : null,
+                            placementGhost.layer, plan[planIndex].MaterialSeed);
+                    }
+                    catch (Exception error) when (error is ArgumentException || error is UnityException)
+                    { Hide(); HeavyError = error.Message; return; }
                     instanceSources[index] = visualSource;
                     instanceContents[index] = contentKey;
                     if (planIndex == hiddenIndex)
@@ -172,13 +179,34 @@ namespace OstrixMods.BuildWorks
             GameObject visualSource,
             int index,
             MaterialPropertyBlock ghostProperties,
-            int layer)
+            int layer, int? materialSeed)
         {
-            return CreateVisualCloneCore(
+            GameObject visual = CreateVisualCloneCore(
                 visualSource,
                 "BuildWorks_PlacementPreview_" + index,
                 layer,
                 ghostProperties);
+            try
+            {
+                BlueprintMaterialVariation.ApplyPreview(visualSource, visual, materialSeed);
+                if (materialSeed.HasValue && ghostProperties != null)
+                {
+                    var block = new MaterialPropertyBlock();
+                    foreach (Renderer renderer in visual.GetComponentsInChildren<Renderer>(true))
+                    {
+                        renderer.GetPropertyBlock(block);
+                        BlueprintMaterialVariation.ApplyGhostTint(block, ghostProperties);
+                        renderer.SetPropertyBlock(block);
+                    }
+                }
+                return visual;
+            }
+            catch
+            {
+                visual.SetActive(false);
+                UnityEngine.Object.Destroy(visual);
+                throw;
+            }
         }
 
         internal static GameObject CreateVisualClone(

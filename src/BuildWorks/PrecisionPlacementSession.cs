@@ -4917,7 +4917,7 @@ namespace OstrixMods.BuildWorks
             Vector3 origin = blueprintSelection[0].transform.position;
             var parts = new List<CompositeBlueprintStore.Part>(blueprintSelection.Count);
             var snapSets = new List<IReadOnlyList<Point3>>(blueprintSelection.Count);
-            var customPoints = new List<CompositeBlueprintStore.VectorData>();
+            var customPoints = new Geometry.BlueprintSnapPointSet(Geometry.BlueprintSnapPointCodec.MaximumPoints);
             long capturedStateBytes = 0;
             foreach (Piece piece in blueprintSelection)
             {
@@ -4994,10 +4994,8 @@ namespace OstrixMods.BuildWorks
                 foreach (Point3 point in customLocal)
                 {
                     Vector3 local = inverse * (piece.transform.TransformPoint(ToUnity(point)) - origin);
-                    if (customPoints.Any(existing => (existing.ToVector3() - local).sqrMagnitude < 0.00000001f)) continue;
-                    if (customPoints.Count >= OstrixMods.BuildWorks.Geometry.BlueprintSnapPointCodec.MaximumPoints)
+                    if (!customPoints.TryAdd(ToGeometry(local)))
                     { error = BuildWorksLocalization.Text("import.payload_pending"); return false; }
-                    customPoints.Add(new CompositeBlueprintStore.VectorData(local));
                 }
                 var points = new List<Transform>();
                 piece.GetSnapPoints(points);
@@ -5021,7 +5019,8 @@ namespace OstrixMods.BuildWorks
                 anchors,
                 null, null,
                 out saved,
-                out error, customPoints);
+                out error, customPoints.Points.Select(point =>
+                    new CompositeBlueprintStore.VectorData(ToUnity(point))).ToList());
         }
 
         internal static Vector3 RelativeBlueprintScale(Vector3 worldScale, Vector3 sourceScale) =>

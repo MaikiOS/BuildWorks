@@ -11,6 +11,7 @@ public static class WorldSnapPointAcceptance
     public static void Run(string output)
     {
         TestNearestPartAssignments();
+        TestCapturedSnapDedup(output);
         var source = new GameObject("Source");
         var placed = new GameObject("Placed");
         var reloaded = new GameObject("Reloaded");
@@ -87,6 +88,55 @@ public static class WorldSnapPointAcceptance
 
     private static void Require(bool condition, string message)
     { if (!condition) throw new InvalidOperationException(message); }
+
+    private static void TestCapturedSnapDedup(string output)
+    {
+        var source = new GameObject("CaptureSource");
+        try
+        {
+            Quaternion captureRotation = Quaternion.Euler(21, 87, -13);
+            Quaternion inverse = Quaternion.Inverse(captureRotation);
+            Vector3 origin = new Vector3(140, 3, -72);
+            source.transform.SetPositionAndRotation(new Vector3(143, 4, -70), Quaternion.Euler(-38, 172, 11));
+            source.transform.localScale = new Vector3(0.5f, 3, 1.25f);
+            var expected = new List<Vector3>();
+            var actual = new BlueprintSnapPointSet(20000);
+            for (int i = 0; i < 17125; ++i)
+            {
+                Vector3 raw = new Vector3(i % 137, (i / 137) % 137, 0) * 0.1f;
+                Vector3 local = inverse * (source.transform.TransformPoint(raw) - origin);
+                bool duplicate = expected.Exists(p => (p - local).sqrMagnitude < 0.00000001f);
+                Require(actual.TryAdd(new Point3(local.x, local.y, local.z)), "Capture rejected valid transformed point");
+                if (!duplicate) expected.Add(local);
+                if (i % 7 == 0)
+                    Require(actual.TryAdd(new Point3(local.x, local.y, local.z)), "Capture duplicate refused");
+            }
+            Require(actual.Points.Count == expected.Count && expected.Count == 17125, "Capture lost transformed points");
+            for (int i = 0; i < expected.Count; ++i)
+                Require(actual.Points[i].Equals(new Point3(expected[i].x, expected[i].y, expected[i].z)),
+                    "Capture changed actual Unity coordinates/order");
+            var bounded = new BlueprintSnapPointSet(BlueprintSnapPointCodec.MaximumPoints);
+            for (int i = 0; i < BlueprintSnapPointCodec.MaximumPoints; ++i)
+                Require(bounded.TryAdd(actual.Points[i]), "Existing capture budget changed");
+            Require(bounded.TryAdd(actual.Points[0]) && !bounded.TryAdd(actual.Points[512]) && bounded.Points.Count == 512,
+                "Capture overflow/duplicate-at-capacity behavior changed");
+            var thresholdSet = new BlueprintSnapPointSet(512);
+            var representatives = new List<Vector3>();
+            foreach (float x in new[] { 0f, 0.00009f, 0.00018f, -0.0001f, 0.0001f, 0.00010000001f,
+                0.0002f, -0.0002f, 200000000f, -200000000f, float.MaxValue, float.MaxValue })
+            {
+                var point = new Vector3(x, 0, 0);
+                if (!representatives.Exists(p => (p - point).sqrMagnitude < 0.00000001f)) representatives.Add(point);
+                Require(thresholdSet.TryAdd(new Point3(x, 0, 0)), "Threshold point refused");
+                Require(thresholdSet.Points.Count == representatives.Count, "Unity strict threshold changed");
+            }
+            for (int i = 0; i < representatives.Count; ++i)
+                Require(thresholdSet.Points[i].Equals(new Point3(representatives[i].x, 0, 0)), "Unity representative changed");
+            File.WriteAllText(Path.Combine(output, "capture-snap-dedup-check.txt"),
+                "PASS: 17125 rotated/transformed/XYZ-scaled points match original Unity Vector3.sqrMagnitude duplicate scan; exact order/coordinates, repeated entries, unchanged 512 capacity and no mutation on overflow. Isolated geometry path, not real world capture/save/network.");
+        }
+        finally { Object.DestroyImmediate(source); }
+    }
 
     private static void TestNearestPartAssignments()
     {

@@ -1,3 +1,20 @@
+## 2026-10-09 — source0.19.122: exact spatial capture dedup
+
+TrySaveWorldSelection uses a bounded spatial collector instead of scanning every
+retained point. Strict float threshold, first coordinates/order and failure before
+save are preserved; aggregate capture limit512 remains. Geometry/Store, normal/QA
+0/0, Host25185596, localization930 and compiled QA isolation PASS. Final Unity492
+plus17125 transformed points, threshold/boundary/XYZ assertions and both independent
+reviews PASS, UTC19:29:12.875Z. See docs/CAPTURE_SNAP_CHECKPOINT_2026-10-09.md and
+local checkpoint-0.19.122 evidence. One standalone reference/collector sample:
+19572 inputs/17125 retained,250.1125→12.9544ms; not whole capture or FPS.
+Installed QA.117 hashes unchanged. No deploy/Valheim/saves/network. All12 refusals,
+storage/codec limits and native21/portable10 formats remain. Current native IL
+confirms ordered Hammer transforms, manual source indices and source×target auto
+search. Next measure/accelerate that automatic path without changing selection,
+then coordinate separate blueprint capacity through parser/Store/Geometry/portable/
+capture and prove4 complete roundtrips. Owner .117 scenario remains; goal active.
+
 ## 2026-10-09 — source0.19.121: anchor projection/visibility work
 
 Verified exact camera/view/projection/pixelRect + source center/edge cache;

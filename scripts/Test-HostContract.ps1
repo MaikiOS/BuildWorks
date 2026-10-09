@@ -872,7 +872,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.121.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.122.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -2252,6 +2252,10 @@ Assert-Contract ($null -ne $worldCapture -and
     $worldCaptureCalls -match 'Transform::get_localScale' -and
     $worldCaptureCalls -notmatch 'Transform::get_lossyScale' -and
     $worldCaptureCalls -match 'IsBlueprintPieceSelectable' -and
+    $worldCaptureCalls -match 'BlueprintSnapPointSet::.ctor' -and
+    $worldCaptureCalls -match 'BlueprintSnapPointSet::TryAdd' -and
+    $worldCaptureCalls -match 'BlueprintSnapPointSet::get_Points' -and
+    $sessionSource -match 'new Geometry\.BlueprintSnapPointSet\(Geometry\.BlueprintSnapPointCodec\.MaximumPoints\)' -and
     $worldCaptureCalls -notmatch '::Destroy|::ClaimOwnership|::SetPositionAndRotation|::set_position|::set_rotation|::SetLocalScale' -and
     $sessionSource -match 'pendingWorldBlueprintSelection && GameplayInputAvailable' -and
     $sessionSource -match
@@ -3258,4 +3262,4 @@ $worldCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'Preci
 $worldCaptureCalls = ($worldCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($worldCaptureCalls -match 'BlueprintStorageCapture::TryCapture' -and $worldCaptureCalls -match 'CompositeBlueprintStore/ForeignPartData::FromGeometry') 'World selection does not preserve container snapshots.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.121 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.122 and Valheim Steam build 25185596.'

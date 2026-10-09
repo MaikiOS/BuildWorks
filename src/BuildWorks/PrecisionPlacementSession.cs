@@ -46,11 +46,31 @@ namespace OstrixMods.BuildWorks
             scaleEnabledPrefabs.Clear();
         }
 
+        internal static bool SharesNativePlacementData(GameObject placed, GameObject source)
+        {
+            ZNetView view = placed ? placed.GetComponent<ZNetView>() : null;
+            ZDO data = view ? view.GetZDO() : null;
+            GameObject ghost = Player.m_localPlayer ? PlacementGhostField.GetValue(Player.m_localPlayer) as GameObject : null;
+            return data != null && (BlueprintMaterialState.SharesData(data, source) ||
+                BlueprintMaterialState.SharesData(data, ghost));
+        }
+
+        internal void RequireNativePlacementMaterialCreation(Piece source)
+        {
+            if (state == PlacementState.Armed && source == selectedPiece &&
+                placementPlanIndex >= 0 && placementPlanIndex < placementPlan.Count &&
+                placementPlan[placementPlanIndex].MaterialSeed.HasValue)
+                BlueprintMaterialState.RequireFreshCreation();
+        }
+
         internal void ApplyNativePlacementScale(GameObject placed, Piece source)
         {
             if (state != PlacementState.Armed ||
                 source != selectedPiece || placementPlanIndex >= placementPlan.Count || !placed)
                 return;
+            BlueprintMaterialState.ApplyCreated(placed, source.gameObject,
+                Player.m_localPlayer ? PlacementGhostField.GetValue(Player.m_localPlayer) as GameObject : null,
+                placementPlan[placementPlanIndex].MaterialSeed);
             Vector3 scale = placementPlan[placementPlanIndex].Scale;
             if (scale != Vector3.one)
             {
@@ -4902,6 +4922,11 @@ namespace OstrixMods.BuildWorks
                     error = BuildWorksLocalization.Text("blueprint.sign_capture_failed", PrefabName(piece));
                     return false;
                 }
+                if (!BlueprintMaterialState.TryCapture(piece, out int? materialSeed))
+                {
+                    error = BuildWorksLocalization.Text("blueprint.material_capture_failed", PrefabName(piece));
+                    return false;
+                }
                 if (!BlueprintItemStandCapture.TryCapture(piece, out var contents))
                 {
                     error = BuildWorksLocalization.Text("blueprint.holder_capture_failed", PrefabName(piece));
@@ -4928,6 +4953,7 @@ namespace OstrixMods.BuildWorks
                     scale = new CompositeBlueprintStore.VectorData(Vector3.one),
                     baseScale = new CompositeBlueprintStore.VectorData(worldScale),
                     signText = signText,
+                    materialSeed = materialSeed,
                     foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(storedItems ?? contents)
                 });
                 if (!BlueprintWorldSnapPoints.TryRead(piece, out Point3[] customLocal))
@@ -6243,6 +6269,7 @@ namespace OstrixMods.BuildWorks
                     scale = new CompositeBlueprintStore.VectorData(Vector3.one),
                     baseScale = new CompositeBlueprintStore.VectorData(visual.localScale),
                     signText = workspacePart.SignText,
+                    materialSeed = workspacePart.SourceData?.materialSeed,
                     sourceDocumentId = workspacePart.SourceData?.sourceDocumentId,
                     sourceLine = workspacePart.SourceData?.sourceLine ?? 0,
                     foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(workspacePart.SourceData?.foreignData?.ToGeometry())

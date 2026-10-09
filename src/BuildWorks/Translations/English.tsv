@@ -877,3 +877,5 @@ editor.replace_done	Missing record replaced with {0} selected parts. One Undo re
 editor.replace_limit	Replacement needs one group slot. Remove or ungroup an unused group first.
 editor.save_as	SAVE AS…
 editor.save_as_help	Create a separate blueprint with a new ID. The original stays unchanged. Ctrl+Shift+S.
+placement.material_persistence_unsupported	This piece cannot safely preserve the blueprint material variant. Placement stopped before resource payment.
+blueprint.material_capture_failed	Material variant for {0} is not loaded or is unsupported. The blueprint was not saved.

@@ -42,6 +42,7 @@ internal static class Program
             rotationType = append.GetParameters()[1].ParameterType;
             pieceType = sessionType.GetField("selectedPiece", Instance).FieldType;
             TestNativeMaterialVariation(asm);
+            TestNativeMaterialState(asm);
             TestMaterialSeedPlan();
             TestGridComposition();
             TestSignPayloadLifecycle();
@@ -143,6 +144,133 @@ internal static class Program
             Console.WriteLine("PASS actual host RandomMaterialValues.GetValue: zero/max seed, index wrap, owned RNG, nested renderer scope and unrelated MPB preserved; no world restore executed");
         }
         finally { UnityEngine.Object.DestroyImmediate(source); UnityEngine.Object.DestroyImmediate(copy); }
+    }
+
+    private static void TestNativeMaterialState(Assembly plugin)
+    {
+        const BindingFlags Static = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+        Assembly host = pieceType.Assembly;
+        Type state = plugin.GetType("OstrixMods.BuildWorks.BlueprintMaterialState", true);
+        Type viewType = host.GetType("ZNetView", true), dataType = host.GetType("ZDO", true);
+        Type idType = host.GetType("ZDOID", true), netType = host.GetType("ZNet", true);
+        Type managerType = host.GetType("ZDOMan", true), randomType = host.GetType("RandomMaterialValues", true);
+        FieldInfo netInstance = netType.GetField("m_instance", Static);
+        FieldInfo server = netType.GetField("m_isServer", Static);
+        FieldInfo managerInstance = managerType.GetField("s_instance", Static);
+        FieldInfo init = viewType.GetField("m_initZDO", Static), useInit = viewType.GetField("m_useInitZDO", Static);
+        object oldNet = netInstance.GetValue(null), oldServer = server.GetValue(null);
+        object oldManager = managerInstance.GetValue(null), oldInit = init.GetValue(null), oldUse = useInit.GetValue(null);
+        Require(oldNet == null && oldManager == null && oldInit == null, "Material state fixture requires an isolated host");
+        var roots = new System.Collections.Generic.List<GameObject>();
+        var data = new System.Collections.Generic.List<object>();
+        MethodInfo apply = state.GetMethod("ApplyCreated", Static), capture = state.GetMethod("TryCapture", Static);
+        MethodInfo fresh = state.GetMethod("RequireFreshCreation", Static);
+        MethodInfo sharedCleanup = sessionType.GetMethod("SharesNativePlacementData", Static);
+        int key = (int)state.GetField("Key", Static).GetValue(null);
+        uint nextId = 9000;
+        object Data(uint? id = null)
+        {
+            object value = Activator.CreateInstance(dataType);
+            Set(value, "m_uid", Activator.CreateInstance(idType, 1L, id ?? nextId++));
+            dataType.GetProperty("Owner", Instance).SetValue(value, true);
+            dataType.GetProperty("Valid", Instance).SetValue(value, true);
+            data.Add(value);
+            return value;
+        }
+        GameObject Root(string name, object value)
+        {
+            var root = new GameObject(name); root.SetActive(false); roots.Add(root);
+            root.AddComponent(pieceType);
+            object view = root.AddComponent(viewType); Set(view, "m_zdo", value);
+            object random = root.AddComponent(randomType);
+            Type propertyType = randomType.GetNestedType("VectorVariationProperty", BindingFlags.Public);
+            object property = Activator.CreateInstance(propertyType);
+            Set(property, "m_minimum", Vector4.zero); Set(property, "m_maximum", Vector4.one);
+            Set(property, "m_propertyNames", new System.Collections.Generic.List<string> { "_NativeVariation" });
+            ((IList)Get(random, "m_vectorProperties")).Add(property);
+            return root;
+        }
+        int Read(object value) => (int)dataType.GetMethod("GetInt", new[] { typeof(int), typeof(int) })
+            .Invoke(value, new object[] { key, -1 });
+        void Reject(GameObject placed, GameObject source, GameObject ghost, int seed)
+        {
+            try { apply.Invoke(null, new object[] { placed, source, ghost, seed }); throw new Exception("Unsafe material write accepted"); }
+            catch (TargetInvocationException error) { Require(error.InnerException is InvalidOperationException, "Wrong material refusal"); }
+        }
+        try
+        {
+            var network = new GameObject("Inert material network"); network.SetActive(false); roots.Add(network);
+            netInstance.SetValue(null, network.AddComponent(netType)); server.SetValue(null, true);
+            // Non-persistent data keeps native SetDirtySector away from world/save state.
+            managerInstance.SetValue(null, FormatterServices.GetUninitializedObject(managerType));
+            init.SetValue(null, null); useInit.SetValue(null, false);
+            object sourceData = Data(), ghostData = Data(), placedData = Data();
+            var source = Root("Material source", sourceData); var ghost = Root("Material ghost", ghostData);
+            var placed = Root("Material placed", placedData);
+            Require(!(bool)sharedCleanup.Invoke(null, new object[] { placed, source }), "Fresh placement cannot be cleaned up");
+            fresh.Invoke(null, null);
+            foreach (int seed in new[] { 0, int.MaxValue })
+            {
+                apply.Invoke(null, new object[] { placed, source, ghost, seed });
+                Require(Read(placedData) == seed && Read(sourceData) == -1 && Read(ghostData) == -1,
+                    "Native material write changed source/ghost or lost zero/Max seed");
+                object[] captured = { placed.GetComponent(pieceType), null };
+                Require((bool)capture.Invoke(null, captured) && (int)captured[1] == seed, "Native capture differs from stored material seed");
+                MethodInfo serialize = dataType.GetMethod("Serialize");
+                Type packageType = serialize.GetParameters()[0].ParameterType;
+                object package = Activator.CreateInstance(packageType), received = Data();
+                serialize.Invoke(placedData, new[] { package });
+                packageType.GetMethod("SetPos").Invoke(package, new object[] { 0 });
+                dataType.GetMethod("Deserialize").Invoke(received, new[] { package });
+                Require(Read(received) == seed && !Get(received, "m_uid").Equals(Get(placedData, "m_uid")),
+                    "Native packet round-trip lost seed or replaced recipient identity");
+            }
+            uint revision = (uint)Property(placedData, "DataRevision");
+            apply.Invoke(null, new object[] { placed, source, ghost, null });
+            Require((uint)Property(placedData, "DataRevision") == revision, "Unspecified seed changed native state");
+            Reject(placed, source, ghost, -1); Reject(source, source, ghost, 3); Reject(ghost, source, ghost, 3);
+            dataType.GetProperty("Owner", Instance).SetValue(placedData, false); Reject(placed, source, ghost, 3);
+            dataType.GetProperty("Owner", Instance).SetValue(placedData, true);
+            Set(placed.GetComponent(viewType), "m_zdo", sourceData); Reject(placed, source, ghost, 3);
+            Require((bool)sharedCleanup.Invoke(null, new object[] { placed, source }), "Cleanup would delete aliased source data");
+            object alias = Data((uint)Property(Get(sourceData, "m_uid"), "ID"));
+            Set(placed.GetComponent(viewType), "m_zdo", alias); Reject(placed, source, ghost, 3);
+            Require((bool)sharedCleanup.Invoke(null, new object[] { placed, source }), "Cleanup missed equal source UID");
+            Set(placed.GetComponent(viewType), "m_zdo", placedData);
+            ((Behaviour)placed.GetComponent(randomType)).enabled = false; Reject(placed, source, ghost, 3);
+            ((Behaviour)placed.GetComponent(randomType)).enabled = true;
+            Set(placed.GetComponent(viewType), "m_zdo", null); Reject(placed, source, ghost, 3);
+            Set(placed.GetComponent(viewType), "m_zdo", placedData);
+            object originalId = Get(placedData, "m_uid");
+            Set(placedData, "m_uid", Activator.CreateInstance(idType)); Reject(placed, source, ghost, 3);
+            Set(placedData, "m_uid", originalId);
+            foreach (bool withData in new[] { false, true })
+            {
+                init.SetValue(null, withData ? sourceData : null); useInit.SetValue(null, !withData);
+                try { fresh.Invoke(null, null); throw new Exception("Existing ZDO initialization accepted"); }
+                catch (TargetInvocationException error) { Require(error.InnerException is InvalidOperationException, "Wrong init-ZDO refusal"); }
+            }
+            Require(Read(sourceData) == -1 && Read(ghostData) == -1 && Read(placedData) == int.MaxValue &&
+                (uint)Property(placedData, "DataRevision") == revision, "Rejected write mutated native state");
+            object[] absent = { source.GetComponent(pieceType), null };
+            Require(!(bool)capture.Invoke(null, absent) && absent[1] == null, "Capture invented an uninitialized material variant");
+            var ordinary = new GameObject("Ordinary piece"); ordinary.SetActive(false); roots.Add(ordinary);
+            object[] plain = { ordinary.AddComponent(pieceType), null };
+            Require((bool)capture.Invoke(null, plain) && plain[1] == null, "Ordinary piece acquired a material seed");
+            Console.WriteLine("PASS actual host material state: native Set/Get and in-memory packet round-trip, zero/Max, capture, null no-op, owner/identity/init-ZDO guards; inert data only, no placement/save/network run");
+        }
+        finally
+        {
+            init.SetValue(null, oldInit); useInit.SetValue(null, oldUse);
+            foreach (GameObject root in roots)
+            {
+                Component view = root.GetComponent(viewType);
+                if (view) Set(view, "m_zdo", null);
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+            foreach (object value in data) dataType.GetMethod("Reset").Invoke(value, null);
+            netInstance.SetValue(null, oldNet); server.SetValue(null, oldServer); managerInstance.SetValue(null, oldManager);
+        }
     }
 
     private static void TestSinglePartBlueprint()

@@ -1,5 +1,38 @@
 # Pending material variation data contract
 
+## 2026-10-09 — native state boundary, not deployed
+
+The existing Instantiate wrapper now rejects inherited init-ZDO state before
+creating a seeded piece. After native Awake, it writes only RandMatSeed to a
+valid, owned ZDO distinct from the source and current ghost, then reads it back.
+This happens before scale/snaps, construction registration and native payment.
+Failure retains the existing cleanup/exception route; a known shared source or
+ghost ZDO receives local GameObject cleanup only, avoiding network deletion of
+that identity. No owner, identity, wear, inventory or resource state is restored.
+
+World capture reads a stable native seed and legacy workspace saving retains it.
+Pieces without RandomMaterialValues keep a null seed. Missing/negative state,
+unsupported descriptors, disabled components and nested foreign network scopes
+are refused with a localized message; no appearance is invented.
+
+Actual-host inert tests passed for native Set/Get, seed 0/Max, capture, null no-op,
+ownership, source/reference/UID isolation, empty UID, init-ZDO refusal and cleanup
+classification. Native ZPackage memory serialization/deserialization retains the
+seed and the recipient's distinct identity. This is not a network or world-save
+test. Normal/QA builds, Geometry, Store, Controller bridge, HostContract25185596,
+localization880, QA compiled/profile guards and format passed (existing format
+workspace warning). The fixture initially omitted native Valid initialization;
+both failed runs were diagnosed before correcting the fixture. Product guards
+were not relaxed. The verify helper is absent. Renderer/UI assets did not change;
+the previous Workbench360 proof was not rerun for this native-state stage.
+
+Seeded world preflight remains blocked. Typed external conversion, native ghost,
+RandomMaterialValues.Start timing/appearance, in-game failure/refund, reload and
+multiplayer remain open. No deployment, Valheim launch or save writes.
+See `artifacts/checkpoint-0.19.117/native-material-state-verification.json` for
+final hashes, review and the retained actual-host result. Earlier hashes below
+belong to earlier stages and are not the current source build.
+
 ## 2026-10-09 — placement preview stage, not deployed
 
 MaterialSeed now follows passive and expanded placement snapshots. Small preview

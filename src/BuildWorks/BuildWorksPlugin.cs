@@ -1094,16 +1094,22 @@ namespace OstrixMods.BuildWorks
 
             private static GameObject InstantiatePiece(GameObject source, Vector3 position, Quaternion rotation)
             {
-                GameObject placed = UnityEngine.Object.Instantiate(source, position, rotation);
+                GameObject placed = null;
                 try
                 {
-                    instance?.session?.ApplyNativePlacementScale(placed, source.GetComponent<Piece>());
+                    Piece piece = source.GetComponent<Piece>();
+                    instance?.session?.RequireNativePlacementMaterialCreation(piece);
+                    placed = UnityEngine.Object.Instantiate(source, position, rotation);
+                    instance?.session?.ApplyNativePlacementScale(placed, piece);
                     return placed;
                 }
                 catch
                 {
                     TerrainModifier.SetTriggerOnPlaced(false);
-                    if (placed && ZNetScene.instance) ZNetScene.instance.Destroy(placed);
+                    // A foreign init hook must not turn cleanup into deletion of source/ghost data.
+                    if (placed && PrecisionPlacementSession.SharesNativePlacementData(placed, source))
+                        UnityEngine.Object.Destroy(placed);
+                    else if (placed && ZNetScene.instance) ZNetScene.instance.Destroy(placed);
                     else if (placed) UnityEngine.Object.Destroy(placed);
                     throw;
                 }

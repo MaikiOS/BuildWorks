@@ -1,3 +1,18 @@
+## 2026-10-09 — native material-state boundary; seeded world placement still blocked
+
+Owned RandMatSeed write/readback is connected to the existing Instantiate wrapper,
+after native creation and before scale/snaps/payment registration. Existing-init
+ZDO is rejected before creation; failure cleanup protects known shared source/ghost
+identities from network deletion. World capture and legacy workspace saving retain
+the seed. Actual-host inert Set/Get, memory ZPackage round-trip and source-identity
+cleanup tests pass. Final builds/checks and independent correctness/Ponytail pass;
+see docs/MATERIAL_VARIATION_CONTRACT.md for evidence and exact limits.
+No deployment/game/save writes. Installed QA .116 is unchanged. External conversion,
+native ghost and RandomMaterialValues.Start appearance, game failure/refund,
+reload/network remain open; seeded world preflight is still blocked. The active
+goal is not complete. Next: converter + native ghost, then supported stable snap QA
+and the remaining XYZ/delete/replacement/filter/camera requests.
+
 ## 2026-10-09 — seeded placement previews; native restoration still blocked
 
 MaterialSeed now follows passive/expanded plans and small/heavy renderer previews.

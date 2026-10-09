@@ -767,6 +767,9 @@ Assert-Contract ($scaleWrapperCalls -match 'Object::Instantiate<UnityEngine.Game
     $scaleWrapperCalls -match 'PrecisionPlacementSession::ApplyNativePlacementScale' -and
     $scaleWrapperCalls -match 'ZNetScene::Destroy' -and
     $scaleWrapperCalls -match 'TerrainModifier::SetTriggerOnPlaced' -and
+    $scaleWrapperCalls.IndexOf('PrecisionPlacementSession::SharesNativePlacementData') -ge 0 -and
+    $scaleWrapperCalls.IndexOf('PrecisionPlacementSession::SharesNativePlacementData') -lt
+        $scaleWrapperCalls.IndexOf('ZNetScene::Destroy') -and
     $scaleWrapper.Body.ExceptionHandlers.Count -gt 0) `
     'Native scale wrapper must clean up an instantiated piece on failure.'
 $precisionSessionType = $plugin.MainModule.Types | Where-Object {
@@ -778,6 +781,20 @@ $applyPlacementScale = $precisionSessionType.Methods | Where-Object {
 $applyPlacementScaleOperands = @(
     $applyPlacementScale.Body.Instructions | ForEach-Object { [string]$_.Operand }
 ) -join "`n"
+$materialStateType = $plugin.MainModule.Types | Where-Object Name -eq 'BlueprintMaterialState'
+$materialApply = $materialStateType.Methods | Where-Object Name -eq 'ApplyCreated'
+$materialCalls = @($materialApply.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($materialCalls -match 'ZNetView::IsOwner' -and $materialCalls -match 'ZDO::Set' -and
+    $materialCalls -match 'ZDO::GetInt' -and $materialCalls -match 'BlueprintMaterialState::SharesData' -and
+    $materialCalls -notmatch 'ClaimOwnership|SetOwner|Deserialize|Load') `
+    'Material restoration must write/read only an owned distinct ZDO without importing identity or foreign state.'
+Assert-Contract ($scaleWrapperCalls.IndexOf('RequireNativePlacementMaterialCreation') -ge 0 -and
+    $scaleWrapperCalls.IndexOf('RequireNativePlacementMaterialCreation') -lt
+        $scaleWrapperCalls.IndexOf('Object::Instantiate<UnityEngine.GameObject>') -and
+    $applyPlacementScaleOperands.IndexOf('BlueprintMaterialState::ApplyCreated') -ge 0 -and
+    $applyPlacementScaleOperands.IndexOf('BlueprintMaterialState::ApplyCreated') -lt
+        $applyPlacementScaleOperands.IndexOf('currentBlueprintPlacements')) `
+    'Material initialization must reject reused ZDOs before Instantiate and write before registering construction/payment.'
 $cancelBlueprintPlacement = $precisionSessionType.Methods | Where-Object {
     $_.Name -eq 'CancelBlueprintPlacement'
 }

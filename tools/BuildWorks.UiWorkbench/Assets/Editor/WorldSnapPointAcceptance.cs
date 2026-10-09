@@ -10,6 +10,7 @@ public static class WorldSnapPointAcceptance
 {
     public static void Run(string output)
     {
+        TestNearestPartAssignments();
         var source = new GameObject("Source");
         var placed = new GameObject("Placed");
         var reloaded = new GameObject("Reloaded");
@@ -86,4 +87,64 @@ public static class WorldSnapPointAcceptance
 
     private static void Require(bool condition, string message)
     { if (!condition) throw new InvalidOperationException(message); }
+
+    private static void TestNearestPartAssignments()
+    {
+        var first = new GameObject("NearestPrefabA");
+        var second = new GameObject("NearestPrefabB");
+        try
+        {
+            var prefabs = new[] { first.AddComponent<Piece>(), second.AddComponent<Piece>() };
+            first.transform.localScale = new Vector3(0.5f, 2, 1);
+            second.transform.localScale = new Vector3(3, 0.25f, 2);
+            var random = new System.Random(120);
+            var blueprint = new CompositeBlueprintStore.Blueprint {
+                parts = new List<CompositeBlueprintStore.Part>(), customSnapPoints = new List<CompositeBlueprintStore.VectorData>() };
+            var pieces = new List<Piece>();
+            var expected = new List<Point3>[257];
+            for (int i = 0; i < expected.Length; ++i)
+            {
+                blueprint.parts.Add(new CompositeBlueprintStore.Part {
+                    position = new CompositeBlueprintStore.VectorData(RandomPoint(random)),
+                    rotation = new CompositeBlueprintStore.QuaternionData(Quaternion.Euler(RandomPoint(random))),
+                    scale = new CompositeBlueprintStore.VectorData(new Vector3(0.5f + i % 3, 1 + i % 2, 2)) });
+                pieces.Add(prefabs[i % 2]);
+            }
+            blueprint.parts[0].position = new CompositeBlueprintStore.VectorData(Vector3.right);
+            blueprint.parts[1].position = new CompositeBlueprintStore.VectorData(Vector3.left);
+            for (int i = 0; i < 1200; ++i)
+            {
+                Vector3 point = i < 3 ? Vector3.zero : RandomPoint(random);
+                blueprint.customSnapPoints.Add(new CompositeBlueprintStore.VectorData(point));
+                int nearest = 0; float distance = float.PositiveInfinity;
+                for (int partIndex = 0; partIndex < blueprint.parts.Count; ++partIndex)
+                {
+                    float candidate = (point - blueprint.parts[partIndex].position.ToVector3()).sqrMagnitude;
+                    if (candidate < distance) { nearest = partIndex; distance = candidate; }
+                }
+                var part = blueprint.parts[nearest];
+                Vector3 unscaled = Quaternion.Inverse(part.rotation.ToQuaternion()) * (point - part.position.ToVector3());
+                Vector3 scale = part.RootScale(pieces[nearest].transform.localScale);
+                (expected[nearest] ?? (expected[nearest] = new List<Point3>())).Add(
+                    new Point3(unscaled.x / scale.x, unscaled.y / scale.y, unscaled.z / scale.z));
+            }
+            Point3[][] actual = BlueprintPlacementFrame.SnapLocalSets(blueprint, pieces);
+            for (int i = 0; i < expected.Length; ++i)
+            {
+                Require((expected[i] == null) == (actual[i] == null), "Nearest part membership changed");
+                if (expected[i] == null) continue;
+                Require(expected[i].Count == actual[i].Length, "Nearest point count changed");
+                for (int p = 0; p < actual[i].Length; ++p)
+                    Require(expected[i][p].Equals(actual[i][p]), "Float local snap position/order changed");
+            }
+            blueprint.customSnapPoints.Clear();
+            actual = BlueprintPlacementFrame.SnapLocalSets(blueprint, pieces);
+            Require(actual.Length == expected.Length && Array.TrueForAll(actual, set => set == null), "Empty snap sets changed");
+        }
+        finally { Object.DestroyImmediate(first); Object.DestroyImmediate(second); }
+    }
+
+    private static Vector3 RandomPoint(System.Random random) => new Vector3(
+        (float)(random.NextDouble() * 100 - 50), (float)(random.NextDouble() * 100 - 50),
+        (float)(random.NextDouble() * 100 - 50));
 }

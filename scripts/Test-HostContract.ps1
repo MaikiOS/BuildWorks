@@ -872,7 +872,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.119.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.120.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -2616,6 +2616,16 @@ Assert-Contract ($midpointPatchOperands -match 'BlueprintWorldSnapPoints::Append
     $pluginOnDestroyOperands -match 'BlueprintWorldSnapPoints::RemoveAll') `
     'World custom snap-point reconstruction or unload cleanup is missing.'
 $worldSnapType = $pluginTypes | Where-Object Name -eq 'BlueprintWorldSnapPoints'
+$snapLocalSets = $pluginMethods | Where-Object {
+    $_.Name -eq 'SnapLocalSets' -and $_.DeclaringType.Name -eq 'BlueprintPlacementFrame'
+}
+$snapLocalOperands = @($snapLocalSets.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($snapLocalOperands -match 'BlueprintNearestPartIndex::.ctor' -and
+    $snapLocalOperands -match 'BlueprintNearestPartIndex::FindNearest' -and
+    $snapLocalOperands -match 'BlueprintSnapPointCodec::Encode' -and
+    $snapLocalOperands -match 'Quaternion::Inverse' -and
+    $snapLocalOperands -match 'Part::RootScale') `
+    'Snap assignment must use the shared nearest index while retaining rotation, prefab scale and per-piece codec validation.'
 $worldSnapApply = $worldSnapType.Methods | Where-Object Name -eq 'Apply'
 $worldSnapApplyOperands = @(
     $worldSnapApply.Body.Instructions | ForEach-Object { [string]$_.Operand }
@@ -3235,4 +3245,4 @@ $worldCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'Preci
 $worldCaptureCalls = ($worldCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($worldCaptureCalls -match 'BlueprintStorageCapture::TryCapture' -and $worldCaptureCalls -match 'CompositeBlueprintStore/ForeignPartData::FromGeometry') 'World selection does not preserve container snapshots.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.119 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.120 and Valheim Steam build 25185596.'

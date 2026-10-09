@@ -26,17 +26,16 @@ namespace OstrixMods.BuildWorks
         internal static Point3[][] SnapLocalSets(CompositeBlueprintStore.Blueprint blueprint, IReadOnlyList<Piece> pieces)
         {
             var sets = new List<Point3>[blueprint.parts.Count];
-            foreach (CompositeBlueprintStore.VectorData point in blueprint.customSnapPoints ??
+            var points = blueprint.customSnapPoints;
+            BlueprintNearestPartIndex origins = points?.Count > 0
+                ? new BlueprintNearestPartIndex(blueprint.parts.Select(part =>
+                    new Point3(part.position.x, part.position.y, part.position.z)).ToArray())
+                : null;
+            foreach (CompositeBlueprintStore.VectorData point in points ??
                 Enumerable.Empty<CompositeBlueprintStore.VectorData>())
             {
                 Vector3 position = point.ToVector3();
-                int nearest = 0;
-                float distance = float.PositiveInfinity;
-                for (int index = 0; index < blueprint.parts.Count; ++index)
-                {
-                    float candidate = (position - blueprint.parts[index].position.ToVector3()).sqrMagnitude;
-                    if (candidate < distance) { nearest = index; distance = candidate; }
-                }
+                int nearest = origins.FindNearest(new Point3(point.x, point.y, point.z));
                 var part = blueprint.parts[nearest];
                 Vector3 unscaled = Quaternion.Inverse(part.rotation.ToQuaternion()) * (position - part.position.ToVector3());
                 Vector3 scale = part.RootScale(pieces[nearest].transform.localScale);

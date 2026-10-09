@@ -1,3 +1,20 @@
+## 2026-10-09 — source0.19.120: exact nearest-part index
+
+SnapLocalSets uses a bounded balanced index with the same float metric and
+first-source-index ties. Local inverse rotation, prefab/relative scale, point
+order and per-piece codec guards remain. Every source ID matched the old full
+scan for all4 named 2v2t samples; five-pass benchmark, Flabellum build+query
+7.253ms vs273.509ms old scan in standalone .NET (not Unity/Valheim FPS).
+Geometry through50000origins, normal/QA0/0, Store/Host25185596/localization930/
+compiled QA isolation and Unity492 passed; new257parts/1200points test compares
+exact Unity local coordinates/order with two native prefab scales and XYZ.
+Unity receipt18:48:39.515Z. See docs/NEAREST_PART_CHECKPOINT_2026-10-09.md/RU and
+artifacts/checkpoint-0.19.120. Installed QA.117 pair unchanged, no deployment,
+Valheim launch, save or multiplayer test. All12 parser refusals remain open;
+storage limits and formats21/10 unchanged. Next: bound full gizmo visibility/
+projection/candidate work, coordinate large storage, full import/reload/network.
+Existing owner .117 scenario remains valid; full goal active.
+
 ## 2026-10-09 — source0.19.119: pooled gizmo anchor renderers
 
 Before-fix Unity600-point repro created600 main anchor renderer slots. Pool now

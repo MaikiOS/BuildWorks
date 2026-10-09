@@ -13,6 +13,8 @@ namespace OstrixMods.BuildWorks.GeometryTests
         {
             if (args.Length > 0 && args[0] == "--benchmark")
                 return BlueprintDocumentBenchmark.Run(args);
+            if (args.Length > 0 && args[0] == "--snap-benchmark")
+                return NearestPartBenchmark.Run(args);
             Run("Cubic curve keeps exact endpoints", CurveEndpointsAreExact);
             Run("Cubic curve midpoint is exact", CurveMidpointIsExact);
             Run("Cubic curve sampling is deterministic", CurveSamplingIsDeterministic);
@@ -49,6 +51,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Run("Composite snap points keep same-part neighbors", CompositeSnapPointsKeepSamePartNeighbors);
             Run("Spatial snap clustering preserves original first-match semantics and large sets", CompositeSnapSpatialParity);
             Run("World snap-point packages are bounded, exact and reject corrupt coordinates", WorldSnapPointPackages);
+            Run("Nearest part index preserves full float scan IDs, ties and bounded immutable origins", NearestPartChecks.Run);
             Run("Foreign ZDO reader is typed, immutable, bounded and rejects malformed packages", ForeignZdoChecks.Run);
             Run("Construction cancellation refunds actual paid item stacks only", ConstructionRefundTests.Run);
             Run("Straight repeat uses exact step", StraightRepeatUsesExactStep);

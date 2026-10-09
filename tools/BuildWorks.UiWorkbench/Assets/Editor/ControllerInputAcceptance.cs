@@ -185,6 +185,85 @@ internal static class ControllerInputAcceptance
         }
     }
 
+    internal static IEnumerable<object> RunCatalogManagement(Camera template, TMP_Text font, GameObject wall, string output)
+    {
+        string directory = Path.Combine(output, "catalog-management-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(directory, "imports"));
+        string sourcePath = Path.Combine(directory, "imports", "table.blueprint");
+        const string raw = "#Name:External table\n#Pieces\nwoodwall;;0;0;0;0;0;0;1;\"\";1;1;1\n";
+        File.WriteAllText(sourcePath, raw);
+        string path = Path.Combine(directory, "library.json");
+        var store = new CompositeBlueprintStore(path);
+        var source = store.CatalogAll().Single();
+        Require(store.TryGetOrCreatePlacementCopy(source, out var owned, out string error), error);
+        Func<IReadOnlyList<BlueprintEditorCatalogItem>> catalogue = () => store.CatalogAll(true).Select((item, index) =>
+            new BlueprintEditorCatalogItem("blueprint_" + item.id, item.name, null, item.category, "Blueprints", "source", index, item,
+                unavailableReason: item.IsExternal ? "QA unavailable entry" : null, hidden: store.IsHidden(item))).ToArray();
+        using (var controller = new BlueprintEditorController(store, template, font, name => name == "woodwall" ? wall : null,
+            name => name, catalogue, message => { throw new InvalidOperationException(message); }))
+        {
+            Require(controller.OpenExisting(owned, out error), error); yield return null;
+            var view = Field<BlueprintEditorView>(controller, "view");
+            var document = controller.Document;
+            Require(document.Rename(document.Parts[0].StableId, "Draft edit"), "Cannot edit deletion draft");
+            Call(controller, "Bind", (object)null);
+            int history = Field<IList>(document, "undo").Count;
+            string bytes = File.ReadAllText(path);
+            view.ShowCatalog(catalogue()); yield return null;
+            NativeClick(view, null, "CatalogBlueprintsMode"); yield return null;
+            Button Manage(string id) => view.RootCanvas.GetComponentsInChildren<Button>().Single(button =>
+                button.name == "CatalogManage" && button.transform.parent.name == "Catalog_blueprint_" + id);
+            NativeClick(view, null, Manage(owned.id)); yield return null;
+            Require(view.HasModal && Field<TMP_Text>(view, "modalMessage").text.Contains(BuildWorksLocalization.Text("catalog.open_draft")),
+                "Current document deletion lacks draft explanation");
+            NativeClick(view, null, Field<Button>(view, "dialogCancelButton")); yield return null;
+            Require(File.ReadAllText(path) == bytes && store.All().Count == 1 && Field<IList>(document, "undo").Count == history,
+                "Cancelled deletion changed storage or history");
+            NativeClick(view, null, Manage(source.id)); yield return null;
+            NativeClick(view, null, Field<Button>(view, "dialogCancelButton")); yield return null;
+            Require(!store.IsHidden(source) && File.ReadAllText(path) == bytes, "Cancelled hiding changed storage");
+            NativeClick(view, null, Manage(source.id)); yield return null;
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            Require(store.IsHidden(source) && Field<RectTransform>(view, "catalogGrid").childCount == 1 && document.Parts.Count == 1,
+                "Hide placed/deleted a part or left source visible");
+            NativeClick(view, null, "Category_hidden"); yield return null;
+            Require(Field<RectTransform>(view, "catalogGrid").childCount == 1 &&
+                view.RootCanvas.GetComponentsInChildren<Button>().Any(button => button.name == "CatalogManageDetails" &&
+                    button.GetComponentInChildren<TMP_Text>().text == BuildWorksLocalization.Text("catalog.action.restore")),
+                "Unavailable hidden entry lost visible restore action");
+            NativeClick(view, null, Manage(source.id)); yield return null;
+            Require(!view.HasModal && !store.IsHidden(source) && Field<RectTransform>(view, "catalogGrid").childCount == 0,
+                "Restore required destructive confirmation or did not return entry");
+            NativeClick(view, null, "Category_all"); yield return null;
+            Set(store, "writeBlockReason", "QA synthetic write refusal");
+            NativeClick(view, null, Manage(owned.id)); yield return null;
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            Require(view.HasModal && store.All().Count == 1 && ReferenceEquals(Field<CompositeBlueprintStore.Blueprint>(controller, "sourceBlueprint"), owned),
+                "Failed deletion detached document or removed record");
+            NativeClick(view, null, Field<Button>(view, "dialogCancelButton")); yield return null;
+            Set(store, "writeBlockReason", null);
+            NativeClick(view, null, Manage(owned.id)); yield return null;
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            Require(store.All().Count == 0 && Field<CompositeBlueprintStore.Blueprint>(controller, "sourceBlueprint") == null &&
+                document.IsDirty && document.Parts[0].DisplayName == "Draft edit" && Field<IList>(document, "undo").Count == history,
+                "Deletion destroyed current draft/history or kept stale save target");
+            view.HideCatalog();
+            Require(document.Undo() && document.IsDirty && document.Redo() && document.IsDirty, "Deletion lost Undo/Redo or unsaved state");
+            Call(controller, "Bind", (object)null);
+            controller.Close(false); yield return null;
+            Require(view.HasModal, "Deleted open draft closed without unsaved prompt");
+            NativeClick(view, null, Field<Button>(view, "dialogCancelButton")); yield return null;
+            NativeClick(view, null, "Save"); yield return null;
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            var saved = new CompositeBlueprintStore(path).All().Single();
+            Require(saved.id != owned.id && saved.parts[0].displayName == "Draft edit" && !document.IsDirty &&
+                saved.sourceDocuments[0].text == source.sourceDocuments[0].text && File.ReadAllText(sourcePath) == raw,
+                "Saving deleted draft reused old ID or lost provenance/source bytes");
+        }
+        File.WriteAllText(Path.Combine(output, "catalog-management-check.txt"),
+            "PASS actual card/buttons: owned deletion/hide confirmation + cancel, unavailable hidden restore, failed write, open draft Undo/Redo/close prompt/Save/new ID/reopen/source immutable. No game proof.");
+    }
+
     internal static IEnumerable<object> RunMissingReplacement(Camera template, TMP_Text font, GameObject wall, string output)
     {
         string path = Path.Combine(output, "replace-" + Guid.NewGuid().ToString("N") + ".json");

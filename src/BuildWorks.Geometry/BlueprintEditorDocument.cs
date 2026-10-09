@@ -1269,6 +1269,8 @@ namespace OstrixMods.BuildWorks.Geometry
             cleanToken = currentToken;
         }
 
+        public void MarkUnsaved() => cleanToken = -1;
+
         public List<BlueprintEditorPart> CopyParts()
         {
             var copy = new List<BlueprintEditorPart>(parts.Count);

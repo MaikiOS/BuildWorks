@@ -33,7 +33,7 @@ namespace OstrixMods.BuildWorks
         internal const string DefaultCategory = "OTHER";
         private const string LegacyDefaultCategory = "ПРОЧЕЕ";
         private const string LocalizationPrefix = "$buildworks_";
-        private const int FormatVersion = 20;
+        private const int FormatVersion = 21;
         private const int MaximumBlueprints = 32;
         private const int MaximumCategories = 12;
         private const int MaximumAnchors = 512;
@@ -42,6 +42,8 @@ namespace OstrixMods.BuildWorks
         private LibraryData data = new LibraryData();
         private List<Blueprint> externalBlueprints;
         private IReadOnlyList<Blueprint> catalogSnapshot;
+        private IReadOnlyList<Blueprint> fullCatalogSnapshot;
+        private HashSet<string> hiddenSourceSnapshot;
         private IReadOnlyList<Blueprint> preparedExternalBlueprints;
         private Task<List<Blueprint>> importTask;
         private readonly bool backgroundImports;
@@ -96,7 +98,7 @@ namespace OstrixMods.BuildWorks
             ++importGeneration;
         }
 
-        internal IReadOnlyList<Blueprint> CatalogAll()
+        internal IReadOnlyList<Blueprint> CatalogAll(bool includeHidden = false)
         {
             object hostContext = importHostContext?.Invoke();
             int? worldLevel = importWorldLevel?.Invoke();
@@ -117,7 +119,7 @@ namespace OstrixMods.BuildWorks
                 if (importTask != null) return data.blueprints;
                 externalBlueprints = ExternalBlueprintLibrary.Load(ImportDirectory);
             }
-            if (catalogSnapshot != null) return catalogSnapshot;
+            if (catalogSnapshot != null) return includeHidden ? fullCatalogSnapshot : catalogSnapshot;
             if (preparedExternalBlueprints == null)
             {
                 if (backgroundImports)
@@ -158,8 +160,37 @@ namespace OstrixMods.BuildWorks
             }
             var result = new List<Blueprint>(data.blueprints);
             result.AddRange(preparedExternalBlueprints);
-            return catalogSnapshot = result;
+            fullCatalogSnapshot = result;
+            catalogSnapshot = result.Where(blueprint => !IsHidden(blueprint)).ToArray();
+            return includeHidden ? fullCatalogSnapshot : catalogSnapshot;
         }
+
+        internal bool IsHidden(Blueprint blueprint) => blueprint?.IsExternal == true &&
+            (hiddenSourceSnapshot ?? (hiddenSourceSnapshot = new HashSet<string>(data.hiddenSources, StringComparer.Ordinal)))
+                .Contains(blueprint.importSource);
+
+        internal bool TrySetHidden(Blueprint blueprint, bool hidden, out string error)
+        {
+            error = writeBlockReason;
+            if (error != null) return false;
+            if (blueprint?.IsExternal != true || !CatalogAll(true).Any(candidate =>
+                candidate.id == blueprint.id && candidate.importSource == blueprint.importSource))
+            { error = UserError("store.blueprint_missing"); return false; }
+            bool previous = IsHidden(blueprint);
+            if (previous == hidden) return true;
+            if (hidden && data.hiddenSources.Count >= ExternalBlueprintLibrary.MaximumFiles)
+            { error = UserError("import.library_limit"); return false; }
+            var before = new List<string>(data.hiddenSources);
+            if (hidden) data.hiddenSources.Add(blueprint.importSource);
+            else data.hiddenSources.Remove(blueprint.importSource);
+            hiddenSourceSnapshot = null;
+            return TryCommit(() => { data.hiddenSources = before; hiddenSourceSnapshot = null; }, out error);
+        }
+
+        private static bool ValidHiddenSources(List<string> sources) => sources != null &&
+            sources.Count <= ExternalBlueprintLibrary.MaximumFiles &&
+            sources.All(source => !string.IsNullOrWhiteSpace(source) && source.Length <= 32768) &&
+            sources.Distinct(StringComparer.Ordinal).Count() == sources.Count;
 
         internal void ConfigurePrefabMetadata(Func<string, PrefabMetadata> resolve) => prefabMetadata = resolve;
 
@@ -1248,9 +1279,12 @@ namespace OstrixMods.BuildWorks
                     allowForeignFields: loaded.version >= 13, allowContentsFields: loaded.version >= 14,
                     allowAbsoluteScaleFields: loaded.version >= 15, allowPlacementImportFields: loaded.version >= 16,
                     allowBaseScaleFields: loaded.version >= 17, allowMetadataFields: loaded.version >= 19,
-                    allowMaterialSeedFields: loaded.version >= 20);
+                    allowMaterialSeedFields: loaded.version >= 20, allowHiddenSources: loaded.version >= 21);
                 loaded.blueprints = loaded.blueprints ?? new List<Blueprint>();
                 loaded.categories = loaded.categories ?? new List<string>();
+                loaded.hiddenSources = loaded.hiddenSources ?? new List<string>();
+                if (!ValidHiddenSources(loaded.hiddenSources))
+                    throw new InvalidDataException(UserError("store.invalid_composition"));
                 if (loaded.version == 1)
                 {
                     foreach (Blueprint blueprint in loaded.blueprints)
@@ -1344,7 +1378,8 @@ namespace OstrixMods.BuildWorks
                 if (verified == null || verified.version != FormatVersion ||
                     verified.blueprints == null || verified.categories == null ||
                     verified.blueprints.Count != data.blueprints.Count ||
-                    verified.categories.Count != data.categories.Count)
+                    verified.categories.Count != data.categories.Count || !ValidHiddenSources(verified.hiddenSources) ||
+                    !verified.hiddenSources.SequenceEqual(data.hiddenSources, StringComparer.Ordinal))
                     throw new InvalidDataException(UserError("store.verify_file_failed"));
                 var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (Blueprint blueprint in verified.blueprints)
@@ -1807,6 +1842,8 @@ namespace OstrixMods.BuildWorks
             public List<Blueprint> blueprints = new List<Blueprint>();
             [DataMember(Order = 2)]
             public List<string> categories = new List<string> { DefaultCategory };
+            [DataMember(Order = 3, EmitDefaultValue = false)]
+            public List<string> hiddenSources = new List<string>();
         }
 
         [DataContract]

@@ -16,6 +16,7 @@ namespace OstrixMods.BuildWorks
         private BlueprintEditorCatalogItem catalogPreviewItem;
         internal event Action CatalogImportRequested;
         internal event Action<CompositeBlueprintStore.Blueprint> CatalogExportRequested;
+        internal event Action<CompositeBlueprintStore.Blueprint> CatalogManageRequested;
         private Button catalogImportButton, catalogExportButton;
         private TMP_InputField catalogSearch, catalogPageInput;
         private TMP_Text catalogPageText, catalogBreadcrumb, catalogEmpty;
@@ -183,8 +184,10 @@ namespace OstrixMods.BuildWorks
             LayoutCatalog(); ClearCatalogChildren(catalogGrid);
             CatalogFilters f = CatalogFilter;
             var filtered = shownCatalogItems.Where(item => item.IsBlueprint == catalogBlueprintMode &&
+                item.Hidden == (catalogBlueprintMode && f.Section == "hidden") &&
                 (f.Section == null || (f.Section == "favorites" ? catalogFavorites.Contains(item.PrefabName) :
                  f.Section == "recent" ? catalogRecent.Contains(item.PrefabName) :
+                 catalogBlueprintMode && f.Section == "hidden" ? true :
                  catalogBlueprintMode ? f.Section == "category:" + item.Category : item.Section == f.Section)) &&
                 (f.Family == null || item.Family == f.Family) && (f.Material == null || item.Materials.Contains(f.Material)) &&
                 (f.Source == null || item.Source == f.Source) && (f.Station == null || item.StationId == f.Station) &&
@@ -216,6 +219,7 @@ namespace OstrixMods.BuildWorks
             BlueprintEditorCatalogItem captured = item;
             Button button = CreateButton("Catalog_" + item.PrefabName, catalogGrid, item.DisplayName, (float)catalogLayout.CellWidth, () =>
             {
+                if (captured.Hidden) { PreviewCatalogItem(captured); return; }
                 if (!string.IsNullOrEmpty(captured.UnavailableReason))
                 { PreviewCatalogItem(captured); SetStatus(captured.UnavailableReason, error: true); return; }
                 catalogRecent.Remove(captured.PrefabName); catalogRecent.Insert(0, captured.PrefabName);
@@ -226,6 +230,7 @@ namespace OstrixMods.BuildWorks
             TMP_Text name = button.GetComponentInChildren<TMP_Text>(); name.enableAutoSizing = false; name.fontSize = 14;
             if (!string.IsNullOrEmpty(item.UnavailableReason) || !string.IsNullOrEmpty(item.WarningReason)) name.text = "[!] " + item.DisplayName;
             name.textWrappingMode = TextWrappingModes.Normal; name.alignment = TextAlignmentOptions.TopLeft;
+            name.overflowMode = TextOverflowModes.Ellipsis;
             name.margin = Vector4.zero; name.maxVisibleLines = item.IsUpgrade ? 2 : 3;
             SetTopAnchored((RectTransform)name.transform, 8, 94, 8, item.IsUpgrade ? 36 : 52);
             AddCatalogImage(button.transform, "Thumbnail", item.Icon, 8, 6, (float)catalogLayout.CellWidth - 16, 82);
@@ -233,6 +238,12 @@ namespace OstrixMods.BuildWorks
             { if (!catalogFavorites.Add(captured.PrefabName)) catalogFavorites.Remove(captured.PrefabName); RebuildCatalog(); }, CatalogText("favorites"));
             SetTopRight((RectTransform)favorite.transform, 4, 4, 28, 28);
             SetSelected(favorite, catalogFavorites.Contains(item.PrefabName));
+            if (item.IsBlueprint)
+            {
+                Button manage = CreateIconButton("CatalogManage", button.transform, "menu", "...", 28,
+                    () => CatalogManageRequested?.Invoke(captured.Blueprint), CatalogManagementLabel(item));
+                SetTopRight((RectTransform)manage.transform, 36, 4, 28, 28);
+            }
             if (item.IsUpgrade)
             {
                 TMP_Text station = CreateText("StationRelation", button.transform, "→ " + (item.StationName ?? CatalogText("unknown_station")),
@@ -254,10 +265,14 @@ namespace OstrixMods.BuildWorks
         {
             ClearCatalogChildren(catalogNavigation);
             var values = new List<string> { "all", "favorites", "recent" };
-            if (catalogBlueprintMode) values.AddRange(shownCatalogItems.Where(x => x.IsBlueprint).Select(x => "category:" + x.Category).Distinct());
+            if (catalogBlueprintMode)
+            {
+                values.Add("hidden");
+                values.AddRange(shownCatalogItems.Where(x => x.IsBlueprint && !x.Hidden).Select(x => "category:" + x.Category).Distinct());
+            }
             else if (!catalogAttachmentMode) values.AddRange(new[] { "building", "decor", "lighting", "furniture", "resources", "crafting" });
             // ponytail: blueprint user categories scroll in Atlas; Quick has a compact category picker.
-            if (catalogBlueprintMode && catalogQuick && values.Count > 8) values = new List<string> { "all", "favorites", "recent", "categories" };
+            if (catalogBlueprintMode && catalogQuick && values.Count > 8) values = new List<string> { "all", "favorites", "recent", "hidden", "categories" };
             int columns = catalogQuick ? Math.Max(1, (int)Math.Floor(catalogNavigation.rect.width / 116)) : 1;
             RectTransform content = catalogNavigation;
             if (!catalogQuick)
@@ -341,10 +356,18 @@ namespace OstrixMods.BuildWorks
             TMP_Text body = CreateText("PreviewMetadata", content, description, 14, FontStyles.Normal, TextAlignmentOptions.TopLeft);
             body.textWrappingMode = TextWrappingModes.Normal; body.overflowMode = TextOverflowModes.Ellipsis;
             float metadataHeight = body.GetPreferredValues(description, 204, Mathf.Infinity).y + 8;
-            SetTopLeft((RectTransform)body.transform, 4, 0, 204, metadataHeight);
-            float y = metadataHeight;
+            float y = 0;
+            if (item.IsBlueprint)
+            {
+                Button manage = CreateButton("CatalogManageDetails", content, CatalogManagementLabel(item), 204,
+                    () => CatalogManageRequested?.Invoke(item.Blueprint));
+                SetTopLeft((RectTransform)manage.transform, 4, 0, 204, 38);
+                y = 44;
+            }
+            SetTopLeft((RectTransform)body.transform, 4, y, 204, metadataHeight);
+            y += metadataHeight;
             if (!string.IsNullOrEmpty(item.UnavailableReason) || item.ItemContents != null || !item.ResourcesKnown)
-            { SetTopLeft(content, 0, 0, 212, metadataHeight); return; }
+            { SetTopLeft(content, 0, 0, 212, y); return; }
             TMP_Text costTitle = CreateText("PreviewCostTitle", content, CatalogText("build_cost"), 14, FontStyles.Bold, TextAlignmentOptions.TopLeft);
             SetTopLeft(costTitle.rectTransform, 4, y, 204, 24); y += 26;
             foreach (BlueprintEditorCatalogResource resource in item.Resources)
@@ -373,6 +396,8 @@ namespace OstrixMods.BuildWorks
                 SetBottomLeft((RectTransform)station.transform, 50, 12, 178, 38);
             }
         }
+        private static string CatalogManagementLabel(BlueprintEditorCatalogItem item) => BuildWorksLocalization.Text(
+            !item.Blueprint.IsExternal ? "catalog.action.delete" : item.Hidden ? "catalog.action.restore" : "catalog.action.hide");
         internal void UpdateCatalogThumbnail(string id, Sprite icon)
         {
             foreach (BlueprintEditorCatalogItem item in shownCatalogItems)

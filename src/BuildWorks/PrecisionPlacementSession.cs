@@ -802,7 +802,7 @@ namespace OstrixMods.BuildWorks
                 int material = left.MaterialOrder.CompareTo(right.MaterialOrder);
                 return material != 0 ? material : left.Index.CompareTo(right.Index);
             });
-            foreach (CompositeBlueprintStore.Blueprint blueprint in blueprintStore.CatalogAll())
+            foreach (CompositeBlueprintStore.Blueprint blueprint in blueprintStore.CatalogAll(true))
             {
                 BlueprintEditorController.EditorCatalogStatus(blueprint, name => ResolveBlueprintEditorVisual(name),
                     out string unavailable, out string warning);
@@ -828,7 +828,7 @@ namespace OstrixMods.BuildWorks
                     blueprint.IsExternal ? "external_blueprints" : "my_blueprints",
                     result.Count, blueprint, resources: costs, requiredStation: requiredStations,
                     requiredStationIcon: requiredIcon, unavailableReason: unavailable,
-                    warningReason: warning, resourcesKnown: resolved));
+                    warningReason: warning, resourcesKnown: resolved, hidden: blueprintStore.IsHidden(blueprint)));
             }
             return result;
         }

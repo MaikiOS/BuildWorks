@@ -338,7 +338,7 @@ public static class RuntimeEditorAcceptance
                     scene.SetViewport(view.ViewportScreenRect());
                     Call(controller, "FrameAll");
                     foreach (string state in new[] { "select", "transform", "scale-xyz-ru", "array", "contour", "catalog",
-                        "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "save-metadata", "save-as", "save-as-ru", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru", "exchange-armor", "exchange-armor-ru", "exchange-missing", "exchange-missing-ru", "replace-tools", "replace-confirm", "replace-confirm-ru" })
+                        "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "catalog-managed-ru", "catalog-hidden-ru", "delete-confirm-ru", "hide-confirm-ru", "save-metadata", "save-as", "save-as-ru", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru", "exchange-armor", "exchange-armor-ru", "exchange-missing", "exchange-missing-ru", "replace-tools", "replace-confirm", "replace-confirm-ru" })
                     {
                         Require(Screen.width == width && Screen.height == height,
                             "GameView changed before " + state + ": " + Screen.width + "x" + Screen.height);
@@ -378,6 +378,27 @@ public static class RuntimeEditorAcceptance
                                 ((RectTransform)button.transform).GetWorldCorners(corners);
                                 Require(bottom >= corners[1].y - .1f, "XYZ fields overlap the proportions control");
                             }
+                        }
+                        else if (state == "catalog-managed-ru" || state == "catalog-hidden-ru" || state == "delete-confirm-ru" || state == "hide-confirm-ru")
+                        {
+                            BuildWorksLocalization.RussianLanguage = true;
+                            var external = ExternalBlueprintLibrary.Parse("#Name:External\n#Pieces\nwoodwall;;0;0;0;0;0;0;1;\"\";1;1;1\n", "archive/source.blueprint");
+                            external.name = "Внешний чертёж";
+                            var owned = new CompositeBlueprintStore.Blueprint {
+                                id = Field<CompositeBlueprintStore.Blueprint>(controller, "sourceBlueprint").id,
+                                name = new string('W', 48), category = "Декор" };
+                            view.ShowCatalog(new[] {
+                                new BlueprintEditorCatalogItem("owned-layout", owned.name, thumbnails["woodwall"], owned.category, "Чертёж", "Мои чертежи", 0, owned),
+                                new BlueprintEditorCatalogItem("external-layout", external.name, thumbnails["woodwall"], external.category, "Чертёж", "Внешняя библиотека", 1,
+                                    external, unavailableReason: "Недостающие детали: qa_missing. Мод не определён.", hidden: state == "catalog-hidden-ru") });
+                            yield return null;
+                            ControllerInputAcceptance.NativeClick(view, uiCamera, "CatalogBlueprintsMode", true); yield return null;
+                            ControllerInputAcceptance.NativeClick(view, uiCamera, "CatalogReset"); yield return null;
+                            ControllerInputAcceptance.NativeClick(view, uiCamera, "CatalogAtlas"); yield return null;
+                            if (state == "catalog-hidden-ru")
+                                ControllerInputAcceptance.NativeClick(view, uiCamera, "Category_hidden");
+                            else if (state == "delete-confirm-ru" || state == "hide-confirm-ru")
+                                Call(controller, "ManageCatalogBlueprint", state == "delete-confirm-ru" ? owned : external);
                         }
                         else if (state.StartsWith("catalog"))
                         {
@@ -588,6 +609,8 @@ public static class RuntimeEditorAcceptance
                     yield return null;
                     foreach (object step in ControllerInputAcceptance.RunSinglePart(template, fontTemplate, source["woodwall"], output)) yield return step;
                     foreach (object step in ControllerInputAcceptance.RunSaveAs(template, fontTemplate, source["woodwall"], output)) yield return step;
+                    foreach (object step in ControllerInputAcceptance.RunCatalogManagement(template, fontTemplate, source["woodwall"], output)) yield return step;
+                    checks.Add("Catalogue management: actual owned delete/hide/cancel/unavailable restore/write refusal; open draft Undo/Redo/close prompt/new ID Save/reload; source immutable. No game proof.");
                     checks.Add("Save As native UI preserves original, supported data and copy identity through cancel, failure, retry and reopen");
                     foreach (object step in ControllerInputAcceptance.RunMissingExchange(template, fontTemplate, source["woodwall"], output)) yield return step;
                     foreach (object step in ControllerInputAcceptance.RunPrefabMetadata(template, fontTemplate, output)) yield return step;
@@ -638,11 +661,18 @@ public static class RuntimeEditorAcceptance
             Require(text.font && text.font.material && text.font.material.shader.isSupported,
                 "Text has no supported material: " + text.name);
             Require(text.textInfo.characterCount > 0, "Text generated no characters: " + text.name);
-            if (text.GetComponentInParent<Button>())
+            bool cardCaption = text.name == "Label" && text.transform.parent.name.StartsWith("Catalog_", StringComparison.Ordinal);
+            if (cardCaption)
+                Require(text.overflowMode == TextOverflowModes.Ellipsis && text.maxVisibleLines <= 3 &&
+                    text.transform.parent.GetComponent<BlueprintEditorHoverTarget>(),
+                    "Long catalogue name lacks bounded ellipsis and full card hover");
+            if (text.GetComponentInParent<Button>() && !cardCaption)
                 Require(!text.isTextOverflowing, "Button text overflows: " + text.text);
             if (text.name == "ContourInfo" || text.name == "ArrayInfo")
                 Require(!text.isTextOverflowing, "Tool instructions overflow: " + text.name);
-            if (text.name == "PreviewName" || text.name == "PreviewMetadata")
+            if (text.name == "PreviewName") Require(text.overflowMode == TextOverflowModes.Ellipsis && text.maxVisibleLines == 3,
+                "Long preview name lacks bounded ellipsis");
+            if (text.name == "PreviewMetadata")
                 Require(!text.isTextOverflowing, "Catalog preview text overflows: " + text.name);
             if (text.name.StartsWith("StatusHints", StringComparison.Ordinal))
                 Require(!text.isTextTruncated && !text.isTextOverflowing,
@@ -685,6 +715,21 @@ public static class RuntimeEditorAcceptance
             (RectTransform)Field<GameObject>(view, "outlinerMenu").transform);
         if (state == "catalog-blueprints") Require(Field<RectTransform>(view, "catalogGrid").childCount == 2,
             "Blueprint mode should show both stored category examples");
+        if (state == "catalog-managed-ru" || state == "catalog-hidden-ru")
+        {
+            var grid = Field<RectTransform>(view, "catalogGrid");
+            Require(grid.childCount == (state == "catalog-hidden-ru" ? 1 : 2), "Management visibility filter lost entries");
+            foreach (Transform card in grid)
+                Require(card.Find("CatalogManage"), "Management button missing at target resolution");
+            EnsureInside(Field<RectTransform>(view, "safeRoot"), Field<RectTransform>(view, "catalogPanel"));
+        }
+        if (state == "delete-confirm-ru" || state == "hide-confirm-ru")
+        {
+            TMP_Text message = Field<TMP_Text>(view, "modalMessage");
+            Require(message.GetPreferredValues(message.text, message.rectTransform.rect.width, 0).y <= message.rectTransform.rect.height,
+                "Catalogue confirmation truncates source/draft explanation");
+            EnsureInside(Field<RectTransform>(view, "safeRoot"), (RectTransform)message.transform.parent);
+        }
         if (state == "catalog-crafting") Require(Field<RectTransform>(view, "catalogGrid").childCount == 3,
             "Crafting fixture must expose station, upgrade and device");
         if (state == "catalog-materials")
@@ -1062,8 +1107,8 @@ public static class RuntimeEditorAcceptance
         Require(reloaded.All().Count == 1, "Actual disk library roundtrip");
         Require(Mathf.Abs(reloaded.All()[0].parts[0].scale.x - expected) < 0.0001f, "Store discarded scale");
         CheckReopenedCopy(controller, reloaded, expected);
-        Require(File.ReadAllText(path).Contains("\"version\":20"), "Controller did not write format20");
-        checks.Add("Controller save -> disk format20 -> new store -> OpenExisting retains scale, rotated root-owned support and placement reference; transient support focus absent");
+        Require(File.ReadAllText(path).Contains("\"version\":21"), "Controller did not write format21");
+        checks.Add("Controller save -> disk format21 -> new store -> OpenExisting retains scale, rotated root-owned support and placement reference; transient support focus absent");
     }
 
     private static void TestPendingMaterialSeedEditor(Camera camera, TMP_Text font, GameObject wall, string output)
@@ -1090,7 +1135,7 @@ public static class RuntimeEditorAcceptance
                 "Editor/native reopen lost the pending appearance recipe: " + error);
             editor.Close(true);
         }
-        checks.Add("Material seed native20/portable10 data contract: actual editor save/reopen preserves zero and keeps an explicit pending-state warning; external conversion/native placement remain incomplete.");
+        checks.Add("Material seed native21/portable10 data contract: actual editor save/reopen preserves zero and keeps an explicit pending-state warning; external conversion/native placement remain incomplete.");
     }
 
     private static void TestIncompleteExternalEditor(Camera camera, TMP_Text font, GameObject wall, string output)

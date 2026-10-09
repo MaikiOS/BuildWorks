@@ -44,8 +44,8 @@ namespace OstrixMods.BuildWorks
 
         internal static void ValidateLibraryJson(string text, bool requireFields, bool allowSupportFields, bool allowSourceFields,
             bool allowForeignFields, bool allowContentsFields, bool allowAbsoluteScaleFields, bool allowPlacementImportFields,
-            bool allowBaseScaleFields, bool allowMetadataFields = true, bool allowMaterialSeedFields = true) => ValidateStructure(
-            Encoding.UTF8.GetBytes(text), typeof(CompositeBlueprintStore.LibraryData), requireFields, allowSupportFields, allowSourceFields, allowForeignFields, allowContentsFields, allowAbsoluteScaleFields, allowPlacementImportFields, allowBaseScaleFields, allowMetadataFields, allowMaterialSeedFields);
+            bool allowBaseScaleFields, bool allowMetadataFields = true, bool allowMaterialSeedFields = true, bool allowHiddenSources = true) => ValidateStructure(
+            Encoding.UTF8.GetBytes(text), typeof(CompositeBlueprintStore.LibraryData), requireFields, allowSupportFields, allowSourceFields, allowForeignFields, allowContentsFields, allowAbsoluteScaleFields, allowPlacementImportFields, allowBaseScaleFields, allowMetadataFields, allowMaterialSeedFields, allowHiddenSources);
 
         internal static string DecodeSignText(string token)
         {
@@ -69,7 +69,7 @@ namespace OstrixMods.BuildWorks
         }
 
         private static void ValidateStructure(byte[] bytes, Type expected, bool requireFields = true, bool allowSupportFields = true,
-            bool allowSourceFields = true, bool allowForeignFields = true, bool allowContentsFields = true, bool allowAbsoluteScaleFields = true, bool allowPlacementImportFields = false, bool allowBaseScaleFields = true, bool allowMetadataFields = true, bool allowMaterialSeedFields = true)
+            bool allowSourceFields = true, bool allowForeignFields = true, bool allowContentsFields = true, bool allowAbsoluteScaleFields = true, bool allowPlacementImportFields = false, bool allowBaseScaleFields = true, bool allowMetadataFields = true, bool allowMaterialSeedFields = true, bool allowHiddenSources = true)
         {
             using (XmlDictionaryReader reader = JsonReaderWriterFactory.CreateJsonReader(bytes,
                 new XmlDictionaryReaderQuotas
@@ -82,7 +82,7 @@ namespace OstrixMods.BuildWorks
                 }))
             {
                 reader.MoveToContent();
-                ValidateNode(reader, expected, requireFields, allowSupportFields, allowSourceFields, allowForeignFields, allowContentsFields, allowAbsoluteScaleFields, allowPlacementImportFields, allowBaseScaleFields, allowMetadataFields, allowMaterialSeedFields);
+                ValidateNode(reader, expected, requireFields, allowSupportFields, allowSourceFields, allowForeignFields, allowContentsFields, allowAbsoluteScaleFields, allowPlacementImportFields, allowBaseScaleFields, allowMetadataFields, allowMaterialSeedFields, allowHiddenSources);
                 if (reader.MoveToContent() != XmlNodeType.None) throw new InvalidDataException("$buildworks_import.fields");
             }
         }
@@ -165,7 +165,7 @@ namespace OstrixMods.BuildWorks
 
         // Reject unknown and duplicate fields rather than silently converting a newer document with data loss.
         private static void ValidateNode(XmlReader reader, Type expected, bool requireFields, bool allowSupportFields,
-            bool allowSourceFields, bool allowForeignFields, bool allowContentsFields, bool allowAbsoluteScaleFields, bool allowPlacementImportFields, bool allowBaseScaleFields, bool allowMetadataFields, bool allowMaterialSeedFields, bool sourceText = false, bool inventoryPackage = false)
+            bool allowSourceFields, bool allowForeignFields, bool allowContentsFields, bool allowAbsoluteScaleFields, bool allowPlacementImportFields, bool allowBaseScaleFields, bool allowMetadataFields, bool allowMaterialSeedFields, bool allowHiddenSources, bool sourceText = false, bool inventoryPackage = false)
         {
             string kind = reader.GetAttribute("type");
             if (kind == "null")
@@ -186,7 +186,7 @@ namespace OstrixMods.BuildWorks
                 while (reader.MoveToContent() == XmlNodeType.Element)
                 {
                     if (reader.LocalName != "item" || ++count > limit) throw new InvalidDataException("$buildworks_import.fields");
-                    ValidateNode(reader, item, requireFields, allowSupportFields, allowSourceFields, allowForeignFields, allowContentsFields, allowAbsoluteScaleFields, allowPlacementImportFields, allowBaseScaleFields, allowMetadataFields, allowMaterialSeedFields);
+                    ValidateNode(reader, item, requireFields, allowSupportFields, allowSourceFields, allowForeignFields, allowContentsFields, allowAbsoluteScaleFields, allowPlacementImportFields, allowBaseScaleFields, allowMetadataFields, allowMaterialSeedFields, allowHiddenSources);
                 }
                 reader.ReadEndElement();
                 return;
@@ -222,11 +222,12 @@ namespace OstrixMods.BuildWorks
                     !allowPlacementImportFields && expected == typeof(CompositeBlueprintStore.Blueprint) && reader.LocalName == "placementImportId" ||
                     !allowBaseScaleFields && expected == typeof(CompositeBlueprintStore.Part) && reader.LocalName == "baseScale" ||
                     !allowMetadataFields && expected == typeof(CompositeBlueprintStore.Part) && reader.LocalName == "metadata" ||
-                    !allowMaterialSeedFields && expected == typeof(CompositeBlueprintStore.Part) && reader.LocalName == "materialSeed")
+                    !allowMaterialSeedFields && expected == typeof(CompositeBlueprintStore.Part) && reader.LocalName == "materialSeed" ||
+                    !allowHiddenSources && expected == typeof(CompositeBlueprintStore.LibraryData) && reader.LocalName == "hiddenSources")
                     throw new InvalidDataException("$buildworks_import.fields");
                 bool textField = expected == typeof(CompositeBlueprintStore.SourceDocument) && reader.LocalName == "text";
                 bool packageField = expected == typeof(CompositeBlueprintStore.ForeignPartData) && reader.LocalName == "zdo";
-                ValidateNode(reader, field, requireFields, allowSupportFields, allowSourceFields, allowForeignFields, allowContentsFields, allowAbsoluteScaleFields, allowPlacementImportFields, allowBaseScaleFields, allowMetadataFields, allowMaterialSeedFields, textField, packageField);
+                ValidateNode(reader, field, requireFields, allowSupportFields, allowSourceFields, allowForeignFields, allowContentsFields, allowAbsoluteScaleFields, allowPlacementImportFields, allowBaseScaleFields, allowMetadataFields, allowMaterialSeedFields, allowHiddenSources, textField, packageField);
             }
             if (requireFields && RequiredFields[expected].Any(name => !seen.Contains(name)))
                 throw new InvalidDataException("$buildworks_import.fields");

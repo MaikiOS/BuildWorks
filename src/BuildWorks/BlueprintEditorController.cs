@@ -672,6 +672,7 @@ namespace OstrixMods.BuildWorks
                 document.SetLocked(id, locked));
             view.DialogDecided += HandleDialog;
             view.CatalogPartSelected += BeginPartPlacement;
+            view.CatalogManageRequested += ManageCatalogBlueprint;
             view.ItemContentsRequested += RequestItemContents;
             view.CatalogImportRequested += () => view.ShowExchange((parent, font, closed) => new BlueprintExchangeView(parent, font, store, null, closed), () =>
             {
@@ -3705,6 +3706,39 @@ namespace OstrixMods.BuildWorks
             view?.SetPointContext(scene != null && scene.ModelSpaceGizmo, scene != null && scene.NativePointsOnly,
                   showAllAnchors, TransformFrameKey, pickingFramePoint,
                 framePointWorld.HasValue, scene != null && scene.ExperimentalGeometryPoints, IsGizmoDragging);
+        }
+
+        private void ManageCatalogBlueprint(CompositeBlueprintStore.Blueprint blueprint)
+        {
+            if (blueprint == null) return;
+            bool restore = store.IsHidden(blueprint);
+            string action = BuildWorksLocalization.Text(!blueprint.IsExternal ? "catalog.action.delete" :
+                restore ? "catalog.action.restore" : "catalog.action.hide");
+            Action apply = () =>
+            {
+                string error;
+                bool success = blueprint.IsExternal ? store.TrySetHidden(blueprint, !restore, out error) :
+                    store.TryDelete(blueprint, out error);
+                if (!success) { view.ShowError(action, error, canRetry: false); return; }
+                if (!blueprint.IsExternal && sourceBlueprint?.id == blueprint.id)
+                {
+                    sourceBlueprint = null;
+                    document.MarkUnsaved();
+                }
+                Bind(BuildWorksLocalization.Text(restore ? "catalog.restored" : blueprint.IsExternal ? "catalog.hidden" : "catalog.deleted"));
+                try { saved?.Invoke(blueprint); }
+                catch (Exception exception)
+                {
+                    logError("BuildWorks catalog refresh failed: " + exception);
+                    view.SetStatus(BuildWorksLocalization.Text("editor.library_refresh_failed"), error: true);
+                }
+                view.ShowCatalog(catalogItems());
+            };
+            if (restore) { apply(); return; }
+            string message = BuildWorksLocalization.Text(blueprint.IsExternal ? "catalog.confirm_hide" : "catalog.confirm_delete", blueprint.name);
+            if (!blueprint.IsExternal && sourceBlueprint?.id == blueprint.id)
+                message += "\n\n" + BuildWorksLocalization.Text("catalog.open_draft");
+            view.ShowConfirmation(action, message, apply, height: 330, acceptLabel: action);
         }
 
         private bool TrySave(bool closeAfterSave, bool metadataConfirmed = false)

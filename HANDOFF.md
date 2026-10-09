@@ -1,3 +1,16 @@
+## 2026-10-09 — catalogue delete/hide, source only
+
+Both catalogues expose owned delete/confirm/cancel and external hide/Hidden/restore.
+Native21 stores importSource, portable10 unchanged. An open deleted record remains
+an unsaved draft with Undo/Redo; saving creates a new ID. Normal/QA0/0,
+Geometry/Store/Bridge, localization895, HostContract25185596, Unity420 UTC15:16:34
+and independent correctness/Ponytail reviews pass. See
+ docs/CATALOG_MANAGEMENT_CHECKPOINT_2026-10-09.md.
+QA .116 SHA867E5E47…DCF3A unchanged; no deployment/game/saves. Native Hammer
+pixels, world/restart acceptance remain open. Next: visible missing replacement,
+thumbnail, tree and interior camera. Live checklist: docs/LIVE_CHECKLIST_RU.md.
+The full goal remains active and incomplete.
+
 ## 2026-10-09 — supported native scale/snap fixtures; not deployed
 
 Three original fixtures16/17/18 contain native floors and support poles.

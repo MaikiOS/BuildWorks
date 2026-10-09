@@ -83,7 +83,7 @@ catalog.action.category	CATEGORY: {0}
 catalog.action.refresh_preview	REFRESH PREVIEW
 catalog.action.resources	RESOURCES
 catalog.action.hide_resources	HIDE RESOURCES
-catalog.action.delete	DELETE
+catalog.action.delete	Delete blueprint
 catalog.action.confirm_delete	CONFIRM DELETE
 catalog.choose_blueprint	Choose a blueprint
 catalog.blueprint_summary	{0} parts  ·  {1}
@@ -884,3 +884,13 @@ editor.save_as	SAVE AS…
 editor.save_as_help	Create a separate blueprint with a new ID. The original stays unchanged. Ctrl+Shift+S.
 placement.material_persistence_unsupported	This piece cannot safely preserve the blueprint material variant. Placement stopped before resource payment.
 blueprint.material_capture_failed	Material variant for {0} is not loaded or is unsupported. The blueprint was not saved.
+catalog.confirm_delete	Delete saved blueprint “{0}”? The external source file and built world objects will remain. This deletion cannot be undone after confirmation.
+catalog.action.hide	Hide from catalogue
+editor.catalog.hidden	Hidden
+catalog.restored	Blueprint restored to the catalogue.
+catalog.action.confirm_hide	CONFIRM HIDE
+catalog.deleted	Saved blueprint deleted. Built world objects remain.
+catalog.open_draft	The open document will remain an unsaved draft with its edit history. Saving it again creates a new blueprint.
+catalog.action.restore	Restore to catalogue
+catalog.confirm_hide	Hide “{0}” from the catalogue? The source file, saved copies and built world objects will remain. Restore this entry in Hidden.
+catalog.hidden	Blueprint hidden. Restore it in Hidden.

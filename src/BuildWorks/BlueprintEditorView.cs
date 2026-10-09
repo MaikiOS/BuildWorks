@@ -60,7 +60,7 @@ namespace OstrixMods.BuildWorks
             string requiredStation = null, Sprite requiredStationIcon = null,
             IReadOnlyList<string> materials = null, int materialOrder = 0,
             string unavailableReason = null, BlueprintForeignPartData itemContents = null,
-            string warningReason = null, bool resourcesKnown = true)
+            string warningReason = null, bool resourcesKnown = true, bool hidden = false)
         {
             PrefabName = prefabName;
             DisplayName = displayName;
@@ -91,6 +91,7 @@ namespace OstrixMods.BuildWorks
             UnavailableReason = unavailableReason;
             WarningReason = warningReason;
             ResourcesKnown = resourcesKnown;
+            Hidden = hidden;
             ItemContents = itemContents;
         }
 
@@ -112,6 +113,7 @@ namespace OstrixMods.BuildWorks
         internal string UnavailableReason { get; }
         internal string WarningReason { get; }
         internal bool ResourcesKnown { get; }
+        internal bool Hidden { get; }
         internal string Section { get; }
         internal string Family { get; }
         internal string StationId { get; }
@@ -2190,7 +2192,7 @@ namespace OstrixMods.BuildWorks
             ShowDialog();
         }
 
-        internal void ShowConfirmation(string title, string message, Action accepted, float height = 260f)
+        internal void ShowConfirmation(string title, string message, Action accepted, float height = 260f, string acceptLabel = null)
         {
             ResetSaveMetadata();
             ((RectTransform)modalTitle.transform.parent).sizeDelta = new Vector2(520f, height);
@@ -2198,7 +2200,7 @@ namespace OstrixMods.BuildWorks
             confirmationAccepted = accepted;
             modalTitle.text = title;
             modalMessage.text = message;
-            SetButtonLabel(dialogPrimaryButton, T("editor.view.apply"));
+            SetButtonLabel(dialogPrimaryButton, acceptLabel ?? T("editor.view.apply"));
             SetButtonLabel(dialogCancelButton, T("editor.view.cancel"));
             dialogPrimaryButton.gameObject.SetActive(true);
             dialogDiscardButton.gameObject.SetActive(false);

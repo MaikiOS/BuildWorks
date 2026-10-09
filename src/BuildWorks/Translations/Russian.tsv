@@ -83,7 +83,7 @@ catalog.action.category	КАТЕГОРИЯ: {0}
 catalog.action.refresh_preview	ОБНОВИТЬ ПРЕВЬЮ
 catalog.action.resources	РЕСУРСЫ
 catalog.action.hide_resources	СКРЫТЬ РЕСУРСЫ
-catalog.action.delete	УДАЛИТЬ
+catalog.action.delete	Удалить чертёж
 catalog.action.confirm_delete	ПОДТВЕРДИТЬ УДАЛЕНИЕ
 catalog.choose_blueprint	Выбери чертёж
 catalog.blueprint_summary	{0} деталей  ·  {1}
@@ -884,3 +884,13 @@ editor.save_as	СОХРАНИТЬ КАК…
 editor.save_as_help	Создать отдельный чертёж с новым ID. Исходный чертёж не изменится. Ctrl+Shift+S.
 placement.material_persistence_unsupported	Деталь не может безопасно сохранить вариант материала из чертежа. Размещение остановлено до списания ресурсов.
 blueprint.material_capture_failed	Вариант материала детали {0} ещё не загружен или не поддерживается. Чертёж не сохранён.
+catalog.confirm_delete	Удалить сохранённый чертёж «{0}»? Исходный внешний файл и постройки в мире сохранятся. Отменить удаление после подтверждения нельзя.
+catalog.action.hide	Скрыть из каталога
+editor.catalog.hidden	Скрытые
+catalog.restored	Чертёж возвращён в каталог.
+catalog.action.confirm_hide	ПОДТВЕРДИТЬ СКРЫТИЕ
+catalog.deleted	Сохранённый чертёж удалён. Постройки в мире сохранены.
+catalog.open_draft	Открытый документ останется несохранённым черновиком с историей изменений. Следующее сохранение создаст новый чертёж.
+catalog.action.restore	Вернуть в каталог
+catalog.confirm_hide	Скрыть «{0}» из каталога? Исходный файл, сохранённые копии и постройки в мире сохранятся. Вернуть запись можно в разделе «Скрытые».
+catalog.hidden	Чертёж скрыт. Вернуть его можно в разделе «Скрытые».

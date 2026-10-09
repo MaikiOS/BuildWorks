@@ -1149,6 +1149,7 @@ namespace OstrixMods.BuildWorks
         private static int blueprintsPerPage = 8;
         private static string deleteConfirmationId;
         private static bool showResources;
+        private static bool showHiddenBlueprints;
         private static float layoutRailWidth;
         private static float layoutWindowWidth;
         private static float layoutWindowHeight;
@@ -1354,12 +1355,14 @@ namespace OstrixMods.BuildWorks
                 if (blueprintStore != null)
                 {
                     blueprintStore.CatalogAll();
+                    signature = signature * 31 + blueprintStore.Revision;
+                    signature = signature * 31 + (showHiddenBlueprints ? 1 : 0);
                     if (blueprintImportPending && !blueprintStore.CatalogLoading)
                     {
                         blueprintImportPending = false;
                         ShowStatus(blueprintStore.ImportError ?? BuildWorksLocalization.Text("exchange.ready"));
                     }
-                    foreach (CompositeBlueprintStore.Blueprint blueprint in blueprintStore.CatalogAll())
+                    foreach (CompositeBlueprintStore.Blueprint blueprint in blueprintStore.CatalogAll(true))
                     {
                         signature = signature * 31 + blueprint.id.GetHashCode();
                         signature = signature * 31 + blueprint.name.GetHashCode();
@@ -2192,6 +2195,15 @@ namespace OstrixMods.BuildWorks
             AddRailButton(hud, rail, BuildWorksLocalization.Text("exchange.import"), y, 27f,
                 Accent(HammerCatalogOrganizer.BlueprintsGroup), false, ImportBlueprintFile, width: width);
             y -= 32f;
+            AddRailButton(hud, rail, BuildWorksLocalization.Text("editor.catalog.hidden") + "  " +
+                blueprintStore.CatalogAll(true).Count(blueprintStore.IsHidden), y, 27f,
+                Accent(HammerCatalogOrganizer.BlueprintsGroup), showHiddenBlueprints, () =>
+                {
+                    showHiddenBlueprints = true; blueprintCategory = AllBlueprintCategories;
+                    blueprintPage = 0; selectedBlueprint = null; showResources = false;
+                    deleteConfirmationId = null; Invalidate();
+                }, width: width);
+            y -= 32f;
             GameObject viewport = AddPanel(rail, "BlueprintCategoriesViewport", new Vector2(0, y),
                 new Vector2(width + 14, Mathf.Max(24, layoutWindowHeight - 82 + y - 8)), Color.clear);
             blueprintCategoryViewport = (RectTransform)viewport.transform;
@@ -2221,10 +2233,12 @@ namespace OstrixMods.BuildWorks
                     y,
                     23f,
                     Accent(HammerCatalogOrganizer.BlueprintsGroup),
-                    string.Equals(blueprintCategory, category, StringComparison.Ordinal),
+                    !showHiddenBlueprints && string.Equals(blueprintCategory, category, StringComparison.Ordinal),
                     () =>
                     {
                         blueprintCategory = target;
+                        showHiddenBlueprints = false;
+                        deleteConfirmationId = null;
                         blueprintPage = 0;
                         selectedBlueprint = null;
                         showResources = false;
@@ -2249,6 +2263,7 @@ namespace OstrixMods.BuildWorks
                             if (blueprintStore.TryAddCategory(value, out string error))
                             {
                                 blueprintCategory = value.Trim().ToUpperInvariant();
+                                showHiddenBlueprints = false;
                                 Invalidate();
                             }
                             else ShowStatus(error);
@@ -2384,8 +2399,9 @@ namespace OstrixMods.BuildWorks
             blueprintsPerPage = Math.Max(1, columns * rows);
 
             var filtered = new List<CompositeBlueprintStore.Blueprint>();
-            foreach (CompositeBlueprintStore.Blueprint blueprint in blueprintStore.CatalogAll())
+            foreach (CompositeBlueprintStore.Blueprint blueprint in blueprintStore.CatalogAll(showHiddenBlueprints))
             {
+                if (blueprintStore.IsHidden(blueprint) != showHiddenBlueprints) continue;
                 if (blueprintCategory != AllBlueprintCategories && !string.Equals(
                     blueprint.category,
                     blueprintCategory,
@@ -2536,9 +2552,10 @@ namespace OstrixMods.BuildWorks
         {
             if (contextMenu) UnityEngine.Object.Destroy(contextMenu);
             ContextButtons.Clear();
+            float menuHeight = deleteConfirmationId == blueprint.id ? 330f : 290f;
             GameObject menu = AddPanel(parent, "BlueprintContextMenu",
                 Vector2.zero,
-                new Vector2(244f, 290f), new Color(0.08f, 0.04f, 0.02f, 0.98f));
+                new Vector2(244f, menuHeight), new Color(0.08f, 0.04f, 0.02f, 0.98f));
             contextMenu = menu;
             RectTransform parentRect = parent as RectTransform;
             RectTransformUtility.ScreenPointToLocalPointInRectangle(parentRect, screenPosition,
@@ -2547,7 +2564,7 @@ namespace OstrixMods.BuildWorks
             RectTransform menuRect = (RectTransform)menu.transform;
             menuRect.pivot = new Vector2(
                 local.x + 244f <= bounds.xMax ? 0f : 1f,
-                local.y - 290f >= bounds.yMin ? 1f : 0f);
+                local.y - menuHeight >= bounds.yMin ? 1f : 0f);
             menuRect.anchoredPosition = new Vector2(
                 Mathf.Clamp(local.x, bounds.xMin, bounds.xMax),
                 Mathf.Clamp(local.y, bounds.yMin, bounds.yMax));
@@ -2568,8 +2585,17 @@ namespace OstrixMods.BuildWorks
                 () => { contextBlueprint = null; ExportBlueprintFile(blueprint); });
             if (blueprint.IsExternal)
             {
+                y -= 30f;
+                AddContextAction(hud, menu.transform, BlueprintManagementLabel(blueprint), y, width,
+                    () => DeleteBlueprint(player, blueprint), danger: !blueprintStore.IsHidden(blueprint));
+                if (deleteConfirmationId == blueprint.id)
+                {
+                    y -= 30f;
+                    AddContextAction(hud, menu.transform, BuildWorksLocalization.Text("editor.view.cancel"), y, width,
+                        CancelBlueprintDeletion);
+                }
                 AddRailText(hud, menu.transform, BuildWorksLocalization.Text("import.read_only"),
-                    new Vector2(10f, -140f), 14f, Color.white, FontStyles.Normal, width: width);
+                    new Vector2(10f, y - 36f), 14f, Color.white, FontStyles.Normal, width: width);
                 return;
             }
             y -= 30f;
@@ -2604,6 +2630,9 @@ namespace OstrixMods.BuildWorks
                     ? BuildWorksLocalization.Text("catalog.action.confirm_delete")
                     : BuildWorksLocalization.Text("catalog.action.delete"), y, width,
                 () => DeleteBlueprint(player, blueprint), danger: true);
+            if (confirming)
+                AddContextAction(hud, menu.transform, BuildWorksLocalization.Text("editor.view.cancel"), y - 30f, width,
+                    CancelBlueprintDeletion);
         }
 
         private static void AddContextAction(Hud hud, Transform parent, string label,
@@ -2661,7 +2690,7 @@ namespace OstrixMods.BuildWorks
                 new Vector2(width - 32f, Mathf.Min(104f, height * 0.20f)), blueprint.id);
 
             const float actionHeight = 28f;
-            const int actionCount = 9;
+            int actionCount = deleteConfirmationId == blueprint.id ? 10 : 9;
             float actionTop = Mathf.Min(184f, 86f + height * 0.20f);
             actionTop = Mathf.Min(actionTop, Mathf.Max(0, height - 28));
             Transform inspectorParent = parent;
@@ -2694,7 +2723,16 @@ namespace OstrixMods.BuildWorks
             y -= actionHeight;
             if (blueprint.IsExternal)
             {
-                scroll.content.sizeDelta = new Vector2(width, 260);
+                AddActionButton(hud, parent, BlueprintManagementLabel(blueprint), y, buttonWidth,
+                    () => DeleteBlueprint(player, blueprint), danger: !blueprintStore.IsHidden(blueprint));
+                y -= actionHeight;
+                if (deleteConfirmationId == blueprint.id)
+                {
+                    AddActionButton(hud, parent, BuildWorksLocalization.Text("editor.view.cancel"), y, buttonWidth,
+                        CancelBlueprintDeletion);
+                    y -= actionHeight;
+                }
+                scroll.content.sizeDelta = new Vector2(width, Mathf.Max(300, -y + 200));
                 string reason = BuildWorksLocalization.ResolveUserText(blueprint.importError);
                 if (string.IsNullOrEmpty(reason) && !PrecisionPlacementSession.TryResolveBlueprintPieces(
                     player, blueprint, out _, out string missing))
@@ -2744,6 +2782,10 @@ namespace OstrixMods.BuildWorks
                 buttonWidth,
                 () => DeleteBlueprint(player, blueprint),
                 danger: true);
+
+            if (confirming)
+                AddActionButton(hud, parent, BuildWorksLocalization.Text("editor.view.cancel"), y - actionHeight, buttonWidth,
+                    CancelBlueprintDeletion);
 
             if (showResources) AddResourcesPopup(hud, inspectorParent, blueprint, width, height);
         }
@@ -3135,34 +3177,47 @@ namespace OstrixMods.BuildWorks
             Player player,
             CompositeBlueprintStore.Blueprint blueprint)
         {
-            if (deleteConfirmationId != blueprint.id)
+            bool restore = blueprintStore.IsHidden(blueprint);
+            if (!restore && deleteConfirmationId != blueprint.id)
             {
                 deleteConfirmationId = blueprint.id;
+                ShowStatus(BuildWorksLocalization.Text(blueprint.IsExternal ? "catalog.confirm_hide" : "catalog.confirm_delete", blueprint.name));
                 Invalidate();
                 return;
             }
-            blueprintRegistry.SelectSafePieceBeforeDelete(player, blueprint);
-            if (!blueprintStore.TryDelete(blueprint, out string error))
+            string error;
+            bool success = blueprint.IsExternal ? blueprintStore.TrySetHidden(blueprint, !restore, out error) :
+                blueprintStore.TryDelete(blueprint, out error);
+            if (!success)
             {
                 ShowStatus(error);
                 deleteConfirmationId = null;
                 Invalidate();
                 return;
             }
+            if (!restore) blueprintRegistry.SelectSafePieceBeforeDelete(player, blueprint);
             blueprintRegistry.DeleteThumbnail(blueprint.id);
+            ShowStatus(BuildWorksLocalization.Text(restore ? "catalog.restored" : blueprint.IsExternal ? "catalog.hidden" : "catalog.deleted"));
             selectedBlueprint = null;
             deleteConfirmationId = null;
             showResources = false;
             Invalidate();
         }
 
+        private static string BlueprintManagementLabel(CompositeBlueprintStore.Blueprint blueprint) =>
+            BuildWorksLocalization.Text(blueprintStore.IsHidden(blueprint) ? "catalog.action.restore" :
+                blueprint.IsExternal ? deleteConfirmationId == blueprint.id ? "catalog.action.confirm_hide" : "catalog.action.hide" :
+                deleteConfirmationId == blueprint.id ? "catalog.action.confirm_delete" : "catalog.action.delete");
+
+        private static void CancelBlueprintDeletion() { deleteConfirmationId = null; Invalidate(); }
+
         private static void ChangeBlueprintPage(int direction)
         {
             int count = 0;
             if (blueprintStore != null)
             {
-                foreach (CompositeBlueprintStore.Blueprint blueprint in blueprintStore.CatalogAll())
-                    if ((blueprintCategory == AllBlueprintCategories ||
+                foreach (CompositeBlueprintStore.Blueprint blueprint in blueprintStore.CatalogAll(showHiddenBlueprints))
+                    if (blueprintStore.IsHidden(blueprint) == showHiddenBlueprints && (blueprintCategory == AllBlueprintCategories ||
                             blueprint.category == blueprintCategory) &&
                         (string.IsNullOrEmpty(HammerCatalogOrganizer.Search) ||
                         blueprint.name.IndexOf(HammerCatalogOrganizer.Search,

@@ -1899,7 +1899,7 @@ Assert-Contract ($updateDocumentMethods.Count -eq 5 -and
         @($_.Parameters | Where-Object Name -eq 'placementSupportId').Count -eq 1
     }).Count -eq 1) `
     'Blueprint frame update overload or a compatibility overload is missing.'
-Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion = 20' -and
+Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion = 21' -and
     $blueprintStoreSource -match 'loaded\.version < 6' -and
     $blueprintStoreSource -match 'ValidScale\(part\.scale\)' -and
     $blueprintStoreSource -match 'if \(loaded\.version < 4\)' -and
@@ -1923,6 +1923,20 @@ Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion =
     $editorSceneSource -match 'used\[BlueprintThumbnailRenderer.ThumbnailLayer\] = true' -and
     $thumbnailSource -match '-contents-v3.png') `
     'Blueprint v3/v4 migration, nested groups, or isolated persistent previews are missing.'
+$catalogManagement = $catalogView.Methods | Where-Object Name -eq 'DeleteBlueprint'
+$catalogManagementOperands = @($catalogManagement.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($catalogManagementOperands -match 'CompositeBlueprintStore::TrySetHidden' -and
+    $catalogManagementOperands -match 'CompositeBlueprintStore::TryDelete' -and
+    $catalogManagementOperands -match 'CompositeBlueprintStore::IsHidden' -and
+    $catalogSource -match 'private static void CancelBlueprintDeletion' -and
+    $catalogSource -match 'CatalogAll\(showHiddenBlueprints\)' -and
+    $sessionSource -match 'blueprintStore.CatalogAll\(true\)' -and
+    $sessionSource -match 'hidden: blueprintStore.IsHidden\(blueprint\)' -and
+    $editorControllerSource -match 'view.CatalogManageRequested \+= ManageCatalogBlueprint' -and
+    $editorControllerSource -match 'document.MarkUnsaved\(\)' -and
+    $editorViewSource -match 'item.Hidden == \(catalogBlueprintMode && f.Section == "hidden"\)' -and
+    $blueprintStoreSource -match 'allowHiddenSources: loaded.version >= 21') `
+    'Catalogue delete/hide/restore producer, persistence, cancellation or editor draft wiring is missing.'
 Assert-Contract ($catalogSource -match 'typeof\(RectMask2D\)' -and
     $catalogSource -match 'popup\.AddComponent<ScrollRect>\(\)' -and
     $catalogSource -match 'modalCanvas\.overrideSorting = true' -and
@@ -2346,7 +2360,7 @@ Assert-Contract ($catalogSource -match
     $catalogSource -match 'new Vector2\(16f, y\)') `
     'Blueprint inspector no longer keeps a responsive width and safe inner padding.'
 Assert-Contract ($catalogSource -match 'const float actionHeight = 28f' -and
-    $catalogSource -match 'const int actionCount = 9' -and
+    $catalogSource -match 'int actionCount = deleteConfirmationId == blueprint.id \? 10 : 9' -and
     $catalogSource -match 'BlueprintActionsViewport' -and
     $catalogSource -match 'viewport.AddComponent<RectMask2D>' -and
     $catalogSource -match 'viewport.AddComponent<ScrollRect>' -and

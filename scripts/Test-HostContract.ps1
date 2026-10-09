@@ -872,7 +872,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.120.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.121.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -2559,10 +2559,23 @@ $gizmoPrepareOperands = @(
 Assert-Contract ($gizmoShowOperands -match 'PrepareAnchorHandles' -and
     $gizmoShowOperands -match 'visibleAnchors' -and
     $gizmoShowOperands -match 'anchorHandleIndices' -and
-    $gizmoPrepareOperands -match 'IsPointVisible' -and
+    $gizmoPrepareOperands -match 'CheckAnchorVisibility' -and
     $gizmoPrepareOperands -match 'visibleAnchors' -and
-    $gizmoPrepareOperands -match 'HitTestAnchor') `
+    $gizmoPrepareOperands -match 'ConsiderAnchor') `
     'Compiled contextual handles do not share camera visibility with hit testing.'
+$gizmoVisibility = $pluginMethods | Where-Object {
+    $_.Name -eq 'CheckAnchorVisibility' -and $_.DeclaringType.Name -eq 'TransformGizmoView'
+}
+$gizmoConsider = $pluginMethods | Where-Object {
+    $_.Name -eq 'ConsiderAnchor' -and $_.DeclaringType.Name -eq 'TransformGizmoView'
+}
+$gizmoVisibilityOperands = @($gizmoVisibility.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+$gizmoConsiderOperands = @($gizmoConsider.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($gizmoVisibilityOperands -match 'IsPointVisible' -and
+    $gizmoConsiderOperands -match 'CheckAnchorVisibility' -and
+    $gizmoConsiderOperands -match 'ProjectAnchor' -and
+    $gizmoShowOperands -match 'PrepareAnchorProjections') `
+    'Lazy anchor queries lost fresh visibility or the camera/coordinate projection cache.'
 $refreshSnap = $pluginMethods | Where-Object Name -eq 'RefreshSnapTargets'
 $refreshOperands = @($refreshSnap.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($refreshOperands -match 'Piece::GetSnapPoints' -and
@@ -3245,4 +3258,4 @@ $worldCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'Preci
 $worldCaptureCalls = ($worldCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($worldCaptureCalls -match 'BlueprintStorageCapture::TryCapture' -and $worldCaptureCalls -match 'CompositeBlueprintStore/ForeignPartData::FromGeometry') 'World selection does not preserve container snapshots.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.120 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.121 and Valheim Steam build 25185596.'

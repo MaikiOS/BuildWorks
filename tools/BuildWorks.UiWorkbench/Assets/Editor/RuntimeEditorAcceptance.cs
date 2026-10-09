@@ -625,6 +625,7 @@ public static class RuntimeEditorAcceptance
                 LargeGizmoAcceptance.Run(template, output);
                 TestExperimentalGeometry(template, fontTemplate);
                 WorldSnapPointAcceptance.Run(output);
+                GizmoQueryAcceptance.Run(template, output);
                 HeavyBlueprintAcceptance.Run(output);
                 MaterialVariationAcceptance.RunPlacement(output);
                 NativeMaterialPreviewAcceptance.Run(output);

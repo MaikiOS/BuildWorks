@@ -1,3 +1,21 @@
+## 2026-10-09 — source0.19.121: anchor projection/visibility work
+
+Verified exact camera/view/projection/pixelRect + source center/edge cache;
+static/cloned17125point arrays require zero repeated anchor projections, one
+in-place change2calls. Visibility refreshes perShow, editor512callbacks vs17125
+before; world17125coincident clear512, all-occluded17125onceeach, obstacle removal
+and point/camera-before-Show fresh. Legacy shortlist/public hit IDs and ties match
+on random/dense/small/large sets. Normal/QA0/0, Geometry/Store/Host25185596/
+localization930/compiled QA isolation and finalUnity492 UTC19:09:37.573Z pass.
+Correctness/Ponytail no blocker; isolated glyph screenshot inspected.
+See docs/GIZMO_QUERY_CHECKPOINT_2026-10-09.md/RU; checkpoint-0.19.121 evidence.
+No deployment/Valheim/saves/network. QA.117 unchanged, all12parserrefusals open,
+storage limits and formats21/10 unchanged. Cheap source scan/sort and worst-case
+worldvisibility remain. Before enabling4largeimports: Hammer creates childnode
+percustompoint, TrySaveWorldSelection refuses total>512 and scanspriorpointsfor
+duplicates; coordinate these consumers with separate custompoint guards and real
+native/portable/save/copy roundtrips. Existing .117 owner scenario valid; goal active.
+
 ## 2026-10-09 — source0.19.120: exact nearest-part index
 
 SnapLocalSets uses a bounded balanced index with the same float metric and

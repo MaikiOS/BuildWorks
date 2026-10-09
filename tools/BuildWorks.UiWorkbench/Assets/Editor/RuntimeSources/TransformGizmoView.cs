@@ -84,6 +84,17 @@ namespace OstrixMods.BuildWorks
         private readonly List<int> anchorHandleIndices = new List<int>();
         private readonly List<AnchorCandidate> anchorCandidates = new List<AnchorCandidate>();
         private readonly List<bool> visibleAnchors = new List<bool>();
+        private readonly List<bool> anchorVisibilityChecked = new List<bool>();
+        private readonly List<AnchorProjection> anchorProjections = new List<AnchorProjection>();
+        private Camera anchorProjectionCamera;
+        private Matrix4x4 anchorViewMatrix, anchorProjectionMatrix;
+        private Rect anchorPixelRect;
+        private int anchorProjectionCalls;
+        private struct AnchorProjection
+        {
+            public Vector3 World, Screen, EdgeWorld, EdgeScreen;
+            public bool Valid, EdgeValid;
+        }
         private struct AnchorCandidate
         {
             public int Index, Priority;
@@ -243,6 +254,8 @@ namespace OstrixMods.BuildWorks
             }
 
             Scale = GizmoScale(camera, pivot);
+            anchorProjectionCalls = 0;
+            PrepareAnchorProjections(camera);
             handleScale *= pointSize;
             anchorHandleScale = handleScale;
             nativeAnchorStartIndex = nativeAnchorStart;
@@ -404,7 +417,7 @@ namespace OstrixMods.BuildWorks
                 int i = anchorHandleIndices[slot];
                 bool important = i == selectedAnchor || i == pinnedAnchor;
                 Vector3 screen = showAnchors && i < anchorCount
-                    ? camera.WorldToScreenPoint(anchorPoints[i])
+                    ? ProjectAnchor(camera, i, anchorPoints[i])
                     : Vector3.back;
                 float screenDistance = screen.z > 0f
                     ? Vector2.Distance(mouse, new Vector2(screen.x, screen.y))
@@ -773,33 +786,68 @@ namespace OstrixMods.BuildWorks
             int bestAnchor = -1;
             float bestDistance = float.PositiveInfinity;
             float bestDepth = float.PositiveInfinity;
-            for (int i = points.Length - 1; i >= 0; --i)
+            PrepareAnchorProjections(camera);
+            for (int slot = anchorHandleIndices.Count - 1; slot >= 0; --slot)
             {
-                if (i >= visibleAnchors.Count || !visibleAnchors[i])
-                {
-                    continue;
-                }
-                Vector3 screen = camera.WorldToScreenPoint(points[i]);
-                if (screen.z <= 0f)
-                {
-                    continue;
-                }
-                float distance = Vector2.Distance(
-                    mousePosition,
-                    new Vector2(screen.x, screen.y));
-                if (distance > AnchorHitRadius(i)) continue;
-                bool coincident = screenSpaceSizing && bestAnchor >= 0 &&
-                    Vector3.Distance(points[i], points[bestAnchor]) < .0001f;
-                bool smallerTarget = coincident && AnchorHitRadius(i) < AnchorHitRadius(bestAnchor);
-                if (smallerTarget || !coincident && (distance < bestDistance - 0.5f ||
-                    distance <= bestDistance + 0.5f && screen.z < bestDepth))
-                {
-                    bestDistance = distance;
-                    bestDepth = screen.z;
-                    bestAnchor = i;
-                }
+                int i = anchorHandleIndices[slot];
+                if (i >= points.Length || !visibleAnchors[i]) continue;
+                ConsiderAnchor(camera, points, mousePosition, i, ref bestAnchor, ref bestDistance, ref bestDepth);
             }
             return bestAnchor;
+        }
+
+        private void ConsiderAnchor(Camera camera, Vector3[] points, Vector2 mouse, int i,
+            ref int best, ref float bestDistance, ref float bestDepth,
+            bool checkVisibility = false, Func<Vector3, bool> pointVisibility = null)
+        {
+            Vector3 screen = ProjectAnchor(camera, i, points[i]);
+            if (screen.z <= 0f) return;
+            float distance = Vector2.Distance(mouse, new Vector2(screen.x, screen.y));
+            if (distance > AnchorHitRadius(i)) return;
+            bool coincident = screenSpaceSizing && best >= 0 && Vector3.Distance(points[i], points[best]) < .0001f;
+            bool smallerTarget = coincident && AnchorHitRadius(i) < AnchorHitRadius(best);
+            if (!(smallerTarget || !coincident && (distance < bestDistance - 0.5f ||
+                distance <= bestDistance + 0.5f && screen.z < bestDepth))) return;
+            if (checkVisibility && !screenSpaceSizing && !CheckAnchorVisibility(camera, points, i, pointVisibility)) return;
+            best = i; bestDistance = distance; bestDepth = screen.z;
+        }
+
+        private void PrepareAnchorProjections(Camera camera)
+        {
+            Matrix4x4 view = camera.worldToCameraMatrix, projection = camera.projectionMatrix;
+            Rect pixels = camera.pixelRect;
+            if (anchorProjectionCamera != camera || !anchorViewMatrix.Equals(view) ||
+                !anchorProjectionMatrix.Equals(projection) || !anchorPixelRect.Equals(pixels))
+            {
+                anchorProjections.Clear();
+                anchorProjectionCamera = camera; anchorViewMatrix = view;
+                anchorProjectionMatrix = projection; anchorPixelRect = pixels;
+            }
+        }
+
+        private Vector3 ProjectAnchor(Camera camera, int index, Vector3 world, bool edge = false)
+        {
+            while (anchorProjections.Count <= index) anchorProjections.Add(default);
+            AnchorProjection cached = anchorProjections[index];
+            if (edge ? !cached.EdgeValid || !cached.EdgeWorld.Equals(world) : !cached.Valid || !cached.World.Equals(world))
+            {
+                Vector3 screen = camera.WorldToScreenPoint(world);
+                ++anchorProjectionCalls;
+                if (edge) { cached.EdgeValid = true; cached.EdgeWorld = world; cached.EdgeScreen = screen; }
+                else { cached.Valid = true; cached.World = world; cached.Screen = screen; }
+                anchorProjections[index] = cached;
+            }
+            return edge ? cached.EdgeScreen : cached.Screen;
+        }
+
+        private bool CheckAnchorVisibility(Camera camera, Vector3[] points, int index, Func<Vector3, bool> visibility)
+        {
+            if (!anchorVisibilityChecked[index])
+            {
+                anchorOccluded[index] = !(visibility != null ? visibility(points[index]) : IsPointVisible(camera, points[index]));
+                anchorVisibilityChecked[index] = true;
+            }
+            return !anchorOccluded[index];
         }
 
         private float AnchorHitRadius(int index)
@@ -1023,46 +1071,61 @@ namespace OstrixMods.BuildWorks
             while (visibleAnchors.Count < count) visibleAnchors.Add(false);
             while (anchorOccluded.Count < count) anchorOccluded.Add(false);
             while (anchorHitRadii.Count < count) anchorHitRadii.Add(0f);
+            while (anchorVisibilityChecked.Count < count) anchorVisibilityChecked.Add(false);
             for (int i = 0; i < visibleAnchors.Count; ++i) visibleAnchors[i] = false;
+            for (int i = 0; i < count; ++i) anchorVisibilityChecked[i] = false;
+            Vector3 cameraRight = camera.transform.right;
             for (int i = 0; showAnchors && i < count; ++i)
             {
                 bool important = i == selected || i == pinned;
-                Vector3 screen = camera.WorldToScreenPoint(points[i]);
-                float distance = Vector2.Distance(mouse, new Vector2(screen.x, screen.y));
                 bool native = IsNativeAnchor(i), geometry = IsGeometryAnchor(i);
-                if (!(screen.z > 0f) || !(distance < float.PositiveInfinity) ||
-                    !(combined || Family == GizmoFamily.Points || important || mode == GizmoMode.Guide) ||
-                    !(showAll || important || distance <= 120f) ||
+                if (!(combined || Family == GizmoFamily.Points || important || mode == GizmoMode.Guide) ||
                     screenSpaceSizing && NativePointsOnly && !native && !important) continue;
-                bool unobstructed = pointVisibility != null ? pointVisibility(points[i]) : IsPointVisible(camera, points[i]);
-                anchorOccluded[i] = !unobstructed;
-                if (!screenSpaceSizing && !unobstructed) continue;
-                visibleAnchors[i] = true;
+                Vector3 screen = ProjectAnchor(camera, i, points[i]);
+                float distance = Vector2.Distance(mouse, new Vector2(screen.x, screen.y));
+                if (!(screen.z > 0f) || !(distance < float.PositiveInfinity) ||
+                    !(showAll || important || distance <= 120f)) continue;
                 // Picking and the shortlist use the same projected badge, including tiny helpers.
-                Vector3 edge = camera.WorldToScreenPoint(points[i] + camera.transform.right *
-                    GizmoScale(camera, points[i]) * (geometry ? .035f : native ? .128f : .072f) * handleScale);
-                anchorHitRadii[i] = ModelSpaceSizing ? Vector2.Distance(screen, edge) + 2f
+                anchorHitRadii[i] = ModelSpaceSizing ? Vector2.Distance(screen, ProjectAnchor(camera, i,
+                    points[i] + cameraRight * GizmoScale(camera, points[i]) *
+                        (geometry ? .035f : native ? .128f : .072f) * handleScale, edge: true)) + 2f
                     : (geometry ? 5f : native ? 18f : 10.5f) * handleScale;
                 anchorCandidates.Add(new AnchorCandidate { Index = i, Priority = important ? 0 : 1, Distance = distance });
             }
             if (count <= MaximumAnchorHandles)
+            {
+                foreach (AnchorCandidate candidate in anchorCandidates)
+                {
+                    bool clear = CheckAnchorVisibility(camera, points, candidate.Index, pointVisibility);
+                    visibleAnchors[candidate.Index] = screenSpaceSizing || clear;
+                }
                 for (int i = 0; i < count; ++i) anchorHandleIndices.Add(i);
+            }
             else
             {
                 // Preserve the full-set hit winner before limiting only its visual representation.
-                int hovered = HitTestAnchor(camera, points, mouse);
+                int hovered = -1;
+                float distance = float.PositiveInfinity, depth = float.PositiveInfinity;
+                if (!screenSpaceSizing || combined || Family == GizmoFamily.Points)
+                    for (int i = anchorCandidates.Count - 1; i >= 0; --i)
+                        ConsiderAnchor(camera, points, mouse, anchorCandidates[i].Index,
+                            ref hovered, ref distance, ref depth, true, pointVisibility);
                 for (int i = 0; i < anchorCandidates.Count; ++i)
                 {
                     AnchorCandidate candidate = anchorCandidates[i];
                     if (candidate.Index == hovered) { candidate.Priority = 0; anchorCandidates[i] = candidate; break; }
                 }
-                // shortcut: full candidate scan/sort; bound spatial queries before enabling large world snap sets.
+                // shortcut: cheap source scan/sort remains; exact all-occluded world queries can require every candidate.
                 anchorCandidates.Sort(CompareAnchorCandidates);
-                for (int i = 0; i < anchorCandidates.Count && i < MaximumAnchorHandles; ++i)
-                    anchorHandleIndices.Add(anchorCandidates[i].Index);
+                for (int i = 0; i < anchorCandidates.Count && anchorHandleIndices.Count < MaximumAnchorHandles; ++i)
+                {
+                    int index = anchorCandidates[i].Index;
+                    bool clear = CheckAnchorVisibility(camera, points, index, pointVisibility);
+                    if (!screenSpaceSizing && !clear) continue;
+                    anchorHandleIndices.Add(index);
+                    visibleAnchors[index] = true;
+                }
                 anchorHandleIndices.Sort();
-                for (int i = 0; i < visibleAnchors.Count; ++i) visibleAnchors[i] = false;
-                foreach (int index in anchorHandleIndices) visibleAnchors[index] = true;
             }
             EnsureAnchorHandleCount(anchorHandleIndices.Count);
         }

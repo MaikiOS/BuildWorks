@@ -3004,8 +3004,17 @@ Assert-Contract ($editorResolveCall.Count -eq 1 -and $editorResolveCall[0].Previ
 $resolveCalls = ($resolveBlueprint.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($resolveCalls -match 'BlueprintItemStandPlacement::CanRestore' -and
     $sessionSource -match 'sourceDocuments\?\.Any\(source => source.ToGeometry\(\).HasOpaqueSections\)' -and
-    $sessionSource -match '!forEditor && \(part.materialSeed.HasValue \|\| !BlueprintItemStandPlacement.CanRestore') `
-    'Only allowlisted native ItemStand state may pass world placement; opaque sections and pending appearance remain blocked.'
+    $resolveCalls -match 'BlueprintMaterialState::CanRestore') `
+    'Only supported material recipes and allowlisted native ItemStand state may pass world placement; opaque sections remain blocked.'
+
+$nativeRandomMaterial = $hostAssembly.MainModule.Types | Where-Object Name -eq 'RandomMaterialValues'
+$nativeMaterialStart = $nativeRandomMaterial.Methods | Where-Object Name -eq 'Start'
+$nativeMaterialStartCalls = @($nativeMaterialStart.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($nativeMaterialStartCalls -match 'GetComponentInParent<ZNetView>' -and
+    $nativeMaterialStartCalls -match 'GetComponentInParent<Piece>' -and
+    $nativeMaterialStartCalls -match 'InvokeRepeating' -and $nativeMaterialStartCalls -match 'CheckMaterial' -and
+    $nativeMaterialStartCalls -notmatch 'ZDO::Set|ZNetView::SetZDO|Deserialize') `
+    'Native material Start binding/scheduling or seed ownership contract changed.'
 
 $standType = $hostAssembly.MainModule.Types | Where-Object Name -eq 'ItemStand'
 foreach ($name in 'GetAttach', 'GetAttachPrefab', 'GetAttachGameObject', 'GetOrientationSettings', 'IsUnsupported', 'IsSupported') {

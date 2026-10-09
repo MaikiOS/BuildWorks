@@ -52,6 +52,7 @@ namespace OstrixMods.BuildWorks
         private Func<string, PrefabMetadata> prefabMetadata;
         private Func<string, int> importPrefabHash;
         private Func<int> importWorldLevel;
+        private Func<string, bool> importMaterialSeedSupport;
         private int? preparedWorldLevel;
         private Func<object> importHostContext;
         private object preparedHostContext;
@@ -83,12 +84,13 @@ namespace OstrixMods.BuildWorks
 
         // Called on the Unity thread only; prefabHash must be a pure stable string hash.
         internal void ConfigureImportScale(Func<string, VectorData?> resolve, Func<object> context = null,
-            Func<string, int> prefabHash = null, Func<int> worldLevel = null)
+            Func<string, int> prefabHash = null, Func<int> worldLevel = null, Func<string, bool> supportsMaterialSeed = null)
         {
             importPrefabScale = resolve;
             importHostContext = context;
             importPrefabHash = prefabHash;
             importWorldLevel = worldLevel;
+            importMaterialSeedSupport = supportsMaterialSeed;
             catalogSnapshot = null;
             preparedExternalBlueprints = null;
             ++importGeneration;
@@ -142,14 +144,17 @@ namespace OstrixMods.BuildWorks
                         var scales = externalBlueprints.SelectMany(source => source.parts).Select(part => part.prefabName)
                             .Distinct(StringComparer.Ordinal).ToDictionary(name => name, name => importPrefabScale?.Invoke(name), StringComparer.Ordinal);
                         var sources = externalBlueprints;
+                        var materialSupport = scales.Keys.ToDictionary(name => name,
+                            name => importMaterialSeedSupport?.Invoke(name) == true, StringComparer.Ordinal);
                         var hash = importPrefabHash;
                         preparationGeneration = importGeneration;
                         preparationTask = Task.Run(() => sources.Select(source => ExternalBlueprintLibrary.PrepareForHost(
-                            source, name => scales.TryGetValue(name, out var scale) ? scale : null, hash, worldLevel)).ToList());
+                            source, name => scales.TryGetValue(name, out var scale) ? scale : null, hash, worldLevel,
+                            name => materialSupport.TryGetValue(name, out bool supported) && supported)).ToList());
                         return data.blueprints;
                     }
                 }
-                else preparedExternalBlueprints = externalBlueprints.Select(source => ExternalBlueprintLibrary.PrepareForHost(source, importPrefabScale, importPrefabHash, worldLevel)).ToList();
+                else preparedExternalBlueprints = externalBlueprints.Select(source => ExternalBlueprintLibrary.PrepareForHost(source, importPrefabScale, importPrefabHash, worldLevel, importMaterialSeedSupport)).ToList();
             }
             var result = new List<Blueprint>(data.blueprints);
             result.AddRange(preparedExternalBlueprints);
@@ -242,6 +247,34 @@ namespace OstrixMods.BuildWorks
             internal ContentsSummary Contents;
         }
 
+        // Unity thread only; workers receive the resulting pure name lookup.
+        internal Func<string, bool> MaterialSeedSupportSnapshot(IEnumerable<Blueprint> documents)
+        {
+            var supported = documents.SelectMany(document => document.parts).Select(part => part.prefabName)
+                .Distinct(StringComparer.Ordinal).ToDictionary(name => name, SupportsMaterialSeed, StringComparer.Ordinal);
+            return name => supported.TryGetValue(name, out bool value) && value;
+        }
+
+        internal bool SupportsMaterialSeed(string name) =>
+            (importHostContext == null || importHostContext() != null) && importMaterialSeedSupport?.Invoke(name) == true;
+
+        // Refine conservative file inspection with the current host before presenting choices.
+        internal ImportReview PrepareImportReview(ImportReview review, Func<string, int> prefabHash)
+        {
+            var supports = MaterialSeedSupportSnapshot(review.Documents);
+            var result = new ImportReview
+            {
+                Source = review.Source,
+                Bytes = review.Bytes,
+                Contents = new ContentsSummary(),
+                Documents = review.Documents.Select(document => ExternalBlueprintLibrary.PrepareForHost(document,
+                    importPrefabScale, prefabHash, importWorldLevel?.Invoke(), supports)).ToList()
+            };
+            foreach (Blueprint document in result.Documents)
+                result.Contents.Add(InspectContents(document, prefabHash, supports));
+            return result;
+        }
+
         private static byte[] ReadImportBytes(string source)
         {
             ValidateExchangeDirectory(Path.GetDirectoryName(source));
@@ -310,7 +343,7 @@ namespace OstrixMods.BuildWorks
             {
                 if (review == null) throw new InvalidDataException("$buildworks_import.format");
                 if (omitMissing != null) ValidateMissingReview(review.Documents, omitMissing, prefabHash);
-                var prepared = review.Documents.Select(document => ExternalBlueprintLibrary.PrepareForHost(document, importPrefabScale, importPrefabHash, importWorldLevel?.Invoke())).ToArray();
+                var prepared = review.Documents.Select(document => ExternalBlueprintLibrary.PrepareForHost(document, importPrefabScale, importPrefabHash, importWorldLevel?.Invoke(), importMaterialSeedSupport)).ToArray();
                 if (prepared.Any(document => document.importError != null))
                     throw new InvalidDataException(prepared.First(document => document.importError != null).importError);
                 if (omitMissing != null)
@@ -389,7 +422,7 @@ namespace OstrixMods.BuildWorks
                 {
                     ValidateMissingReview(new[] { blueprint }, omitMissing, prefabHash);
                     blueprint = CopyWithoutMissing(ExternalBlueprintLibrary.PrepareForHost(blueprint,
-                        importPrefabScale, importPrefabHash, importWorldLevel?.Invoke()), omitMissing.PrefabIds);
+                        importPrefabScale, importPrefabHash, importWorldLevel?.Invoke(), importMaterialSeedSupport), omitMissing.PrefabIds);
                 }
                 blueprint = blueprint.ImportCopy();
                 CaptureMetadata(blueprint.parts);
@@ -484,7 +517,7 @@ namespace OstrixMods.BuildWorks
                 }
                 result.Parts += removed;
                 if (removed == document.parts.Count) ++result.EmptyDocuments;
-                else result.RetainedContents.Add(InspectContents(removed == 0 ? document : CopyWithoutMissing(document, result.PrefabIds), prefabHash));
+                else result.RetainedContents.Add(InspectContents(removed == 0 ? document : CopyWithoutMissing(document, result.PrefabIds), prefabHash, SupportsMaterialSeed));
             }
             return result;
         }
@@ -517,7 +550,8 @@ namespace OstrixMods.BuildWorks
         }
 
         // Read effective contents only. Unknown data is never reported as an empty inventory.
-        internal static ContentsSummary InspectContents(Blueprint source, Func<string, int> prefabHash)
+        internal static ContentsSummary InspectContents(Blueprint source, Func<string, int> prefabHash,
+            Func<string, bool> supportsMaterialSeed = null)
         {
             var result = new ContentsSummary();
             if (source == null || !string.IsNullOrEmpty(source.importError))
@@ -526,7 +560,7 @@ namespace OstrixMods.BuildWorks
             result.Unknown = evidenceIndex.Values.Count(document => document.HasOpaqueSections);
             foreach (Part part in source.parts)
             {
-                if (part.materialSeed.HasValue) ++result.Unknown;
+                if (part.materialSeed.HasValue && supportsMaterialSeed?.Invoke(part.prefabName) != true) ++result.Unknown;
                 var contents = part.foreignData?.ToGeometry();
                 if (contents == null) continue;
                 if (contents.Format == Geometry.BlueprintForeignPartData.NativeItemStandFormat && contents.Zdo != null &&

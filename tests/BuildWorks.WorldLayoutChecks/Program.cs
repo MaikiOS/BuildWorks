@@ -174,17 +174,22 @@ internal static class Program
         Type viewType = host.GetType("ZNetView", true), dataType = host.GetType("ZDO", true);
         Type idType = host.GetType("ZDOID", true), netType = host.GetType("ZNet", true);
         Type managerType = host.GetType("ZDOMan", true), randomType = host.GetType("RandomMaterialValues", true);
+        Type materialManType = host.GetType("MaterialMan", true);
+        FieldInfo materialInstance = materialManType.GetField("s_instance", Static);
+        object oldMaterialMan = materialInstance.GetValue(null);
         FieldInfo netInstance = netType.GetField("m_instance", Static);
         FieldInfo server = netType.GetField("m_isServer", Static);
         FieldInfo managerInstance = managerType.GetField("s_instance", Static);
         FieldInfo init = viewType.GetField("m_initZDO", Static), useInit = viewType.GetField("m_useInitZDO", Static);
         object oldNet = netInstance.GetValue(null), oldServer = server.GetValue(null);
         object oldManager = managerInstance.GetValue(null), oldInit = init.GetValue(null), oldUse = useInit.GetValue(null);
-        Require(oldNet == null && oldManager == null && oldInit == null, "Material state fixture requires an isolated host");
+        Require(oldNet == null && oldManager == null && oldInit == null && oldMaterialMan == null, "Material state fixture requires an isolated host");
         var roots = new System.Collections.Generic.List<GameObject>();
+        GameObject materialRoot = null;
         var data = new System.Collections.Generic.List<object>();
         MethodInfo apply = state.GetMethod("ApplyCreated", Static), capture = state.GetMethod("TryCapture", Static);
         MethodInfo fresh = state.GetMethod("RequireFreshCreation", Static);
+        MethodInfo canRestore = state.GetMethod("CanRestore", Static);
         MethodInfo sharedCleanup = sessionType.GetMethod("SharesNativePlacementData", Static);
         int key = (int)state.GetField("Key", Static).GetValue(null);
         uint nextId = 9000;
@@ -227,6 +232,15 @@ internal static class Program
             object sourceData = Data(), ghostData = Data(), placedData = Data();
             var source = Root("Material source", sourceData); var ghost = Root("Material ghost", ghostData);
             var placed = Root("Material placed", placedData);
+            Renderer renderer = placed.AddComponent<MeshRenderer>();
+            materialRoot = new GameObject("Inert native MaterialMan"); materialRoot.SetActive(false);
+            object materialMan = materialRoot.AddComponent(materialManType);
+            materialInstance.SetValue(null, materialMan);
+            Set(materialMan, "m_propertyBlock", new MaterialPropertyBlock());
+            var randomComponent = (MonoBehaviour)placed.GetComponent(randomType);
+            // Inactive fixtures deliberately skip native Start's active-hierarchy lookup/scheduling.
+            Set(randomComponent, "m_nview", placed.GetComponent(viewType));
+            Set(randomComponent, "m_piece", placed.GetComponent(pieceType));
             Require(!(bool)sharedCleanup.Invoke(null, new object[] { placed, source }), "Fresh placement cannot be cleaned up");
             fresh.Invoke(null, null);
             foreach (int seed in new[] { 0, int.MaxValue })
@@ -234,6 +248,16 @@ internal static class Program
                 apply.Invoke(null, new object[] { placed, source, ghost, seed });
                 Require(Read(placedData) == seed && Read(sourceData) == -1 && Read(ghostData) == -1,
                     "Native material write changed source/ghost or lost zero/Max seed");
+                Set(randomComponent, "m_randomSeed", -1); Set(randomComponent, "m_isSet", false);
+                randomType.GetMethod("CheckMaterial", Instance).Invoke(randomComponent, null);
+                materialManType.GetMethod("Update", Instance).Invoke(materialMan, null);
+                var block = new MaterialPropertyBlock(); renderer.GetPropertyBlock(block);
+                var expectedRandom = new System.Random(seed);
+                var expected = new Vector4((float)expectedRandom.NextDouble(), (float)expectedRandom.NextDouble(),
+                    (float)expectedRandom.NextDouble(), (float)expectedRandom.NextDouble());
+                Require(block.GetVector("_NativeVariation") == expected && Read(placedData) == seed &&
+                    (int)Get(randomComponent, "m_randomSeed") == seed && (bool)Get(randomComponent, "m_isSet"),
+                    "Native CheckMaterial/MaterialMan did not retain the applied seed and appearance");
                 object[] captured = { placed.GetComponent(pieceType), null };
                 Require((bool)capture.Invoke(null, captured) && (int)captured[1] == seed, "Native capture differs from stored material seed");
                 MethodInfo serialize = dataType.GetMethod("Serialize");
@@ -277,7 +301,13 @@ internal static class Program
             var ordinary = new GameObject("Ordinary piece"); ordinary.SetActive(false); roots.Add(ordinary);
             object[] plain = { ordinary.AddComponent(pieceType), null };
             Require((bool)capture.Invoke(null, plain) && plain[1] == null, "Ordinary piece acquired a material seed");
+            Require((bool)canRestore.Invoke(null, new object[] { ordinary, null }) &&
+                !(bool)canRestore.Invoke(null, new object[] { ordinary, 0 }) &&
+                (bool)canRestore.Invoke(null, new object[] { source, 0 }) &&
+                (bool)canRestore.Invoke(null, new object[] { source, int.MaxValue }) &&
+                !(bool)canRestore.Invoke(null, new object[] { source, -1 }), "Material readiness lost supported/null/unsupported distinctions");
             Console.WriteLine("PASS actual host material state: native Set/Get and in-memory packet round-trip, zero/Max, capture, null no-op, owner/identity/init-ZDO guards; inert data only, no placement/save/network run");
+            Console.WriteLine("PASS actual host CheckMaterial/MaterialMan: applied zero/Max seed reaches renderer block without replacement; explicit inactive bindings, no Start/frame scheduling/game lifecycle proof");
         }
         finally
         {
@@ -289,6 +319,8 @@ internal static class Program
                 UnityEngine.Object.DestroyImmediate(root);
             }
             foreach (object value in data) dataType.GetMethod("Reset").Invoke(value, null);
+            if (materialRoot) UnityEngine.Object.DestroyImmediate(materialRoot);
+            materialInstance.SetValue(null, oldMaterialMan);
             netInstance.SetValue(null, oldNet); server.SetValue(null, oldServer); managerInstance.SetValue(null, oldManager);
         }
     }

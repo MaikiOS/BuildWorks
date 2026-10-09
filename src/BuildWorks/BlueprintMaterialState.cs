@@ -8,6 +8,9 @@ namespace OstrixMods.BuildWorks
     {
         private static readonly int Key = "RandMatSeed".GetStableHashCode();
 
+        internal static bool CanRestore(GameObject source, int? seed) =>
+            !seed.HasValue || seed.Value >= 0 && Supports(source);
+
         internal static bool Supports(GameObject root)
         {
             if (!BlueprintMaterialVariation.IsSupported(root)) return false;

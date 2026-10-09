@@ -247,6 +247,34 @@ namespace OstrixMods.BuildWorks
             internal ContentsSummary Contents;
         }
 
+        // Unity thread only; workers receive the resulting pure name lookup.
+        internal Func<string, bool> MaterialSeedSupportSnapshot(IEnumerable<Blueprint> documents)
+        {
+            var supported = documents.SelectMany(document => document.parts).Select(part => part.prefabName)
+                .Distinct(StringComparer.Ordinal).ToDictionary(name => name, SupportsMaterialSeed, StringComparer.Ordinal);
+            return name => supported.TryGetValue(name, out bool value) && value;
+        }
+
+        internal bool SupportsMaterialSeed(string name) =>
+            (importHostContext == null || importHostContext() != null) && importMaterialSeedSupport?.Invoke(name) == true;
+
+        // Refine conservative file inspection with the current host before presenting choices.
+        internal ImportReview PrepareImportReview(ImportReview review, Func<string, int> prefabHash)
+        {
+            var supports = MaterialSeedSupportSnapshot(review.Documents);
+            var result = new ImportReview
+            {
+                Source = review.Source,
+                Bytes = review.Bytes,
+                Contents = new ContentsSummary(),
+                Documents = review.Documents.Select(document => ExternalBlueprintLibrary.PrepareForHost(document,
+                    importPrefabScale, prefabHash, importWorldLevel?.Invoke(), supports)).ToList()
+            };
+            foreach (Blueprint document in result.Documents)
+                result.Contents.Add(InspectContents(document, prefabHash, supports));
+            return result;
+        }
+
         private static byte[] ReadImportBytes(string source)
         {
             ValidateExchangeDirectory(Path.GetDirectoryName(source));
@@ -489,7 +517,7 @@ namespace OstrixMods.BuildWorks
                 }
                 result.Parts += removed;
                 if (removed == document.parts.Count) ++result.EmptyDocuments;
-                else result.RetainedContents.Add(InspectContents(removed == 0 ? document : CopyWithoutMissing(document, result.PrefabIds), prefabHash));
+                else result.RetainedContents.Add(InspectContents(removed == 0 ? document : CopyWithoutMissing(document, result.PrefabIds), prefabHash, SupportsMaterialSeed));
             }
             return result;
         }
@@ -522,7 +550,8 @@ namespace OstrixMods.BuildWorks
         }
 
         // Read effective contents only. Unknown data is never reported as an empty inventory.
-        internal static ContentsSummary InspectContents(Blueprint source, Func<string, int> prefabHash)
+        internal static ContentsSummary InspectContents(Blueprint source, Func<string, int> prefabHash,
+            Func<string, bool> supportsMaterialSeed = null)
         {
             var result = new ContentsSummary();
             if (source == null || !string.IsNullOrEmpty(source.importError))
@@ -531,7 +560,7 @@ namespace OstrixMods.BuildWorks
             result.Unknown = evidenceIndex.Values.Count(document => document.HasOpaqueSections);
             foreach (Part part in source.parts)
             {
-                if (part.materialSeed.HasValue) ++result.Unknown;
+                if (part.materialSeed.HasValue && supportsMaterialSeed?.Invoke(part.prefabName) != true) ++result.Unknown;
                 var contents = part.foreignData?.ToGeometry();
                 if (contents == null) continue;
                 if (contents.Format == Geometry.BlueprintForeignPartData.NativeItemStandFormat && contents.Zdo != null &&

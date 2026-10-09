@@ -3934,7 +3934,8 @@ namespace OstrixMods.BuildWorks
 
         private void Bind(string status)
         {
-            if (string.IsNullOrEmpty(status) && (document.Parts.Any(part => part.ForeignData != null || part.MaterialSeed.HasValue) ||
+            if (string.IsNullOrEmpty(status) && (document.Parts.Any(part => part.ForeignData != null ||
+                part.MaterialSeed.HasValue && !store.SupportsMaterialSeed(part.PrefabName)) ||
                 document.Sources.Any(source => source.HasOpaqueSections))) status = BuildWorksLocalization.Text("import.foreign_pending");
             var missing = new HashSet<string>(StringComparer.Ordinal);
             foreach (BlueprintEditorPart part in document.Parts)

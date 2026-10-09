@@ -123,7 +123,40 @@ namespace OstrixMods.BuildWorks.StoreTests
             var conflict = Parse(Packet(1234)); conflict.parts[0].materialSeed = 9;
             Require(Convert(conflict).parts[0].materialSeed == 9 && Convert(conflict).parts[0].foreignData != null,
                 "Foreign state silently overrode an existing material seed");
+            var store = new CompositeBlueprintStore(Path.Combine(Path.GetTempPath(), "BuildWorks-seed-review-" + Guid.NewGuid() + ".json"));
+            bool support = true; object context = new object(); int thread = Environment.CurrentManagedThreadId;
+            store.ConfigureImportScale(_ => new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 }, () => context,
+                Hash, () => 0, _ => {
+                    Require(Environment.CurrentManagedThreadId == thread, "Worker accessed the live host material resolver");
+                    return support;
+                });
+            var raw = Parse(Packet(1234));
+            var review = new CompositeBlueprintStore.ImportReview { Source = "source.blueprint", Bytes = new byte[] { 1, 2 },
+                Documents = new System.Collections.Generic.List<CompositeBlueprintStore.Blueprint> { raw } };
+            var prepared = store.PrepareImportReview(review, Hash);
+            Require(prepared.Contents.Unknown == 0 && prepared.Documents[0].parts[0].materialSeed == 1234 &&
+                raw.parts[0].materialSeed == null && prepared.Source == review.Source && ReferenceEquals(prepared.Bytes, review.Bytes),
+                "Host review lost source or reported supported appearance unknown");
+            var snapshot = store.MaterialSeedSupportSnapshot(prepared.Documents); support = false;
+            Require(System.Threading.Tasks.Task.Run(() => CompositeBlueprintStore.InspectContents(prepared.Documents[0], Hash, snapshot)).Result.Unknown == 0 &&
+                CompositeBlueprintStore.InspectContents(prepared.Documents[0], Hash, store.SupportsMaterialSeed).Unknown == 1 &&
+                store.PrepareImportReview(review, Hash).Contents.Unknown > 0, "Material summary used a stale host or worker resolver");
+            support = true; context = null;
+            Require(!store.SupportsMaterialSeed("woodwall"), "Absent host context declared material support");
+            context = new object();
+            store.ConfigureImportScale(_ => new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 },
+                () => context, supportsMaterialSeed: _ => true);
+            prepared.Documents[0].parts[0].sourceDocumentId = null; prepared.Documents[0].parts[0].sourceLine = 0;
+            prepared.Documents[0].parts[0].foreignData = new CompositeBlueprintStore.ForeignPartData {
+                format = BlueprintForeignPartData.NativeContainerFormat, info = "5:2:0:0", zdo = "bQAAAAAA" };
+            var contentsReview = store.PrepareImportReview(prepared, Hash);
+            Require(contentsReview.Contents.Storages == 1 && contentsReview.Contents.Unknown == 0 &&
+                contentsReview.Contents.CanClearStorage && contentsReview.Contents.CanClearMounts,
+                "Host review dropped the inspection hash or blocked contents choices for supported material");
+            Require(CompositeBlueprintStore.CopyWithContentsPolicy(contentsReview.Documents[0], true, false, Hash)
+                .parts[0].materialSeed == 1234, "Clearing storage lost independent material state");
             Console.WriteLine("PASS source-bound blueprint/vbuild material seeds: zero/Max, capability, strict types, sibling atomicity, provenance, portable and independent contents settings");
+            Console.WriteLine("PASS host material review: conservative raw, supported/unsupported current host, source unchanged, pure worker snapshot and lost-context refusal");
         }
         private static string Package(Action<BinaryWriter> write)
         {

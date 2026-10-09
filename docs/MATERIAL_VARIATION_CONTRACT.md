@@ -1,4 +1,35 @@
-# Pending material variation data contract
+# Material variation data contract — game acceptance open
+
+## 2026-10-09 — supported material placement gate; game acceptance open
+
+The blanket materialSeed world rejection is replaced by a resolved-prefab check:
+null stays ordinary; nonnegative seeds require BlueprintMaterialState.Supports.
+Opaque source sections, unknown foreign state, native identity/ownership, scales,
+signs, item-stand and matching visual-copy creation guards are retained.
+Editor pending warnings and import/export summaries use current host capability;
+background export inspection gets a pure snapshot. Conservative file inspection
+is refined on the host before showing import choices. The hash dependency stays
+explicit, preserving native storage/mount counts and independent clear choices.
+Host review normalization currently runs on the UI thread; heavy latency remains
+a measurement task, not an optimization claim.
+
+Actual CheckMaterial and MaterialMan methods transfer stored zero/Max seeds to
+renderer parameters on inert objects with explicit bindings. Native Start's
+binding/scheduling is inspected by HostContract; a direct inactive Start trial
+failed with Missing nview and is not game timing proof. Product code was not
+changed to bypass host lifecycle. Source/ghost ZDOs stay unchanged.
+Normal/QA0/0, Store (including lost inspection-hash regression), Controller bridge,
+actual Session, HostContract25185596, localization880, QA guards and format passed.
+Workbench360 passed UTC2026-10-09T13:23:07.4766485Z;
+its first run caught the lost hash; the dependency was fixed before the successful
+rerun. Independent correctness and Ponytail review passed. See artifacts/
+checkpoint-0.19.117/material-readiness-verification.json for hashes/results.
+
+This supersedes the earlier blanket-block notes below. No deployment, Valheim
+launch, saves or network execution; installed QA .116 remains unchanged. Native
+Start timing, real shaders/child lifecycles, actual placement/failure/refund and
+reload/network still require the isolated game scenario. Active goal incomplete.
+Next: supported stable QA fixture/build, then XYZ/delete/replacement/filter/camera.
 
 ## 2026-10-09 — typed material conversion and native visual copy; not deployed
 

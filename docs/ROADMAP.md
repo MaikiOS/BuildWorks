@@ -1,3 +1,14 @@
+## 2026-10-09 — supported material placement; game acceptance open
+
+Shared world preflight now checks the resolved prefab instead of blocking every
+seed. Host-aware editor/exchange warnings, pure worker snapshots, existing costs
+and native creation guards are retained. Required builds/tests, Workbench360 and
+independent correctness/Ponytail review pass; details and failures are recorded in
+docs/MATERIAL_VARIATION_CONTRACT.md. No deployment/game/save/network execution.
+Installed QA .116 unchanged. Start timing, native appearance/failure/refund and
+reload/network remain QA; goal active. Next: stable supported fixture/build, then
+XYZ/delete/replacement/filter/interior camera.
+
 ## 2026-10-09 — typed material conversion and native visual copy; not deployed
 
 External `.blueprint`/`.vbuild` RandMatSeed becomes typed materialSeed only for an

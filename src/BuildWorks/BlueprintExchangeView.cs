@@ -154,7 +154,7 @@ namespace OstrixMods.BuildWorks
                 try
                 {
                     var review = importInspection.GetAwaiter().GetResult();
-                    if (reviewingContents) { importReview = review; contentsSummary = review.Contents; RefreshMissing(); RenderContents(); }
+                    if (reviewingContents) { importReview = store.PrepareImportReview(review, name => name.GetStableHashCode()); contentsSummary = importReview.Contents; RefreshMissing(); RenderContents(); }
                 }
                 catch (Exception error) { if (reviewingContents) SetError(error); }
                 importInspection = null;
@@ -295,7 +295,10 @@ namespace OstrixMods.BuildWorks
             primary.GetComponentInChildren<TMP_Text>().text = T(blueprint == null ? "exchange.confirm_import" : "exchange.confirm_export");
             message.text = T("exchange.loading");
             if (blueprint != null)
-                contentsInspection = Task.Run(() => CompositeBlueprintStore.InspectContents(blueprint, name => name.GetStableHashCode()));
+            {
+                var supports = store.MaterialSeedSupportSnapshot(new[] { blueprint });
+                contentsInspection = Task.Run(() => CompositeBlueprintStore.InspectContents(blueprint, name => name.GetStableHashCode(), supports));
+            }
             else
             {
                 string source = selected;

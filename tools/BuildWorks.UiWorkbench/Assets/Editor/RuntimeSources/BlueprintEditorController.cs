@@ -288,11 +288,15 @@ namespace OstrixMods.BuildWorks
             Quaternion rotation,
             Vector3 pivot,
             float uniformScale = 1f)
+            => ApplyTransformDelta(translation, rotation, pivot, Vector3.one * uniformScale, Quaternion.identity);
+
+        internal bool ApplyTransformDelta(
+            Vector3 translation, Quaternion rotation, Vector3 pivot, Vector3 scale, Quaternion scaleFrame)
         {
             if (!IsEditing) return false;
             if (ActiveSupport is BlueprintEditorSupport support)
             {
-                if (Mathf.Abs(uniformScale - 1f) > .00001f)
+                if ((scale - Vector3.one).sqrMagnitude > .0000000001f)
                 { view.SetStatus(BuildWorksLocalization.Text("editor.support.no_scale")); return false; }
                 return ApplyDocumentEdit(() => document.SetSupportPose(support.StableId,
                     ToPoint(pivot + rotation * (ToVector(support.Position) - pivot) + translation),
@@ -302,15 +306,15 @@ namespace OstrixMods.BuildWorks
                 ToPoint(translation),
                 ToRotation(rotation),
                 ToPoint(pivot),
-                uniformScale), preserveModifier: true);
+                ToPoint(scale), ToRotation(scaleFrame)), preserveModifier: true);
             if (changed)
             {
                 if (pinnedAnchorWorld.HasValue)
-                    pinnedAnchorWorld = pivot + rotation * ((pinnedAnchorWorld.Value - pivot) * uniformScale) + translation;
+                    pinnedAnchorWorld = TransformPoint(pinnedAnchorWorld.Value);
                 if (selectedAnchorWorld.HasValue)
-                    selectedAnchorWorld = pivot + rotation * ((selectedAnchorWorld.Value - pivot) * uniformScale) + translation;
+                    selectedAnchorWorld = TransformPoint(selectedAnchorWorld.Value);
                 if (framePointWorld.HasValue)
-                    framePointWorld = pivot + rotation * ((framePointWorld.Value - pivot) * uniformScale) + translation;
+                    framePointWorld = TransformPoint(framePointWorld.Value);
                 if (activeTool == BlueprintEditorTool.Array && localSpace)
                 {
                     arrayStepX = rotation * arrayStepX;
@@ -320,6 +324,9 @@ namespace OstrixMods.BuildWorks
                 UpdateGizmo();
             }
             return changed;
+
+            Vector3 TransformPoint(Vector3 point) => pivot + rotation * (scaleFrame *
+                Vector3.Scale(Quaternion.Inverse(scaleFrame) * (point - pivot), scale)) + translation;
         }
 
         internal void SetUiScale(float value)
@@ -2706,7 +2713,8 @@ namespace OstrixMods.BuildWorks
             catch (Exception exception)
             {
                 logError("BuildWorks blueprint editor command failed: " + exception);
-                view.SetStatus(exception.Message, error: true);
+                view.SetStatus(exception.Message == BlueprintEditorDocument.NonUniformScaleShearError
+                    ? BuildWorksLocalization.Text("editor.scale.shear") : exception.Message, error: true);
             }
             return false;
         }
@@ -3035,7 +3043,7 @@ namespace OstrixMods.BuildWorks
             string displayName,
             Vector3 position,
             Vector3 euler,
-            float uniformScale,
+            Vector3 scale,
             bool delta)
         {
             if (delta)
@@ -3046,19 +3054,21 @@ namespace OstrixMods.BuildWorks
                 Quaternion rotation = Quaternion.Euler(euler);
                 if (localSpace)
                     rotation = orientation * rotation * Quaternion.Inverse(orientation);
-                ApplyTransformDelta(translation, rotation, pivot, uniformScale);
+                ApplyTransformDelta(translation, rotation, pivot, scale,
+                    localSpace ? orientation : Quaternion.identity);
                 return;
             }
             BlueprintEditorPart original = document.Parts.FirstOrDefault(part => part.StableId == stableId);
             if (original == null) return;
-            Vector3 scale = ToVector(original.Scale);
-            if (uniformScale != scale.x) scale *= uniformScale / scale.x;
             ApplyDocumentEdit(() => document.SetPartProperties(
                 stableId,
                 displayName,
                 ToPoint(position),
                 ToRotation(Quaternion.Euler(euler)),
-                ToPoint(scale)));
+                new Point3(
+                    scale.x == (float)original.Scale.X ? original.Scale.X : scale.x,
+                    scale.y == (float)original.Scale.Y ? original.Scale.Y : scale.y,
+                    scale.z == (float)original.Scale.Z ? original.Scale.Z : scale.z)));
         }
 
         private void HandlePartPlacement(Vector2 mouse, bool inside)

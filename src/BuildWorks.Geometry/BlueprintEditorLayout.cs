@@ -42,7 +42,7 @@ namespace OstrixMods.BuildWorks.Geometry
         public const double MinimumViewportWidth = 720.0;
         public const double OutlinerHeaderHeight = 116.0;
         public const double OutlinerRowHeight = 30.0;
-        public const double MinimumInspectorHeight = 440.0;
+        public const double MinimumInspectorHeight = 472.0;
 
         private BlueprintEditorLayout(
             EditorRect safeArea,

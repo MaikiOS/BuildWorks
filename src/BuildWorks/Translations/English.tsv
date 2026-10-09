@@ -866,6 +866,11 @@ placement.mount_supply_changed	The item selected for this mount changed or disap
 editor.missing_dimensions	Model or original prefab scale unavailable: {0}. Frames show recorded visual bounds; small markers mean dimensions are unknown. Neither is the missing model.
 editor.array_missing_dimensions	Packing requires the selected models, not recorded bounds. Use an explicit spacing or install the missing model.
 editor.view.source_scale	Source scale (%)
+editor.view.scale_xyz	SCALE X / Y / Z · %
+editor.scale.keep_proportions	Keep proportions · on
+editor.scale.independent	Independent X / Y / Z
+editor.scale.tooltip	On: changing one axis scales all axes proportionally. Off: edit axes independently. A single part uses its own axes; a selection uses the selected Local/World frame. A transform that would shear rotated parts is rejected.
+editor.scale.shear	Cannot scale this selection independently: rotated parts would be skewed. Keep proportions, change the Local/World axes or scale the parts separately. No changes were made.
 editor.catalog_cost_unknown	Full construction cost and required stations are unknown. This blueprint can be edited; world placement is checked separately.
 blueprint.capture_parent_frame	Cannot capture {0} exactly: its parent changes scale or shears the object.
 editor.replace_title	REPLACE MISSING PART

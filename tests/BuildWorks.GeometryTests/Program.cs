@@ -104,6 +104,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Run("Blueprint empty group is editable and undoable", BlueprintEmptyGroupIsUndoable);
             Run("Blueprint duplicate limit is atomic", BlueprintDuplicateLimitIsAtomic);
             Run("Blueprint scale is atomic and bounded", BlueprintScaleIsAtomicAndBounded);
+            Run("XYZ scale preserves representable group transforms and atomically refuses shear", BlueprintAxisScaleTests.Run);
             Run("Pinned blueprint scale survives history and copies without prefab dependence", BlueprintPinnedScale);
             Run("Blueprint scale absorbs only boundary roundoff", BlueprintScaleAbsorbsOnlyBoundaryRoundoff);
             Run("Blueprint group reset preserves arrangement and is atomic", BlueprintGroupResetPreservesArrangementAndIsAtomic);

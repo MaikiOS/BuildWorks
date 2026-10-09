@@ -101,7 +101,7 @@ if ($process.ExitCode -ne 0) {
 }
 
 $outputPath = Join-Path $repositoryRoot 'artifacts\ui-runtime'
-$expected = foreach ($state in 'select', 'transform', 'array', 'contour', 'catalog', 'outliner', 'settings', 'catalog-blueprints', 'catalog-materials', 'catalog-quick', 'catalog-crafting', 'save-metadata', 'save-as', 'save-as-ru', 'supports', 'exchange-import', 'exchange-import-ru', 'exchange-import-path-ru', 'exchange-export', 'exchange-contents', 'exchange-contents-ru', 'exchange-import-review', 'exchange-import-review-ru', 'exchange-armor', 'exchange-armor-ru', 'exchange-missing', 'exchange-missing-ru', 'replace-tools', 'replace-confirm', 'replace-confirm-ru') {
+$expected = foreach ($state in 'select', 'transform', 'scale-xyz-ru', 'array', 'contour', 'catalog', 'outliner', 'settings', 'catalog-blueprints', 'catalog-materials', 'catalog-quick', 'catalog-crafting', 'save-metadata', 'save-as', 'save-as-ru', 'supports', 'exchange-import', 'exchange-import-ru', 'exchange-import-path-ru', 'exchange-export', 'exchange-contents', 'exchange-contents-ru', 'exchange-import-review', 'exchange-import-review-ru', 'exchange-armor', 'exchange-armor-ru', 'exchange-missing', 'exchange-missing-ru', 'replace-tools', 'replace-confirm', 'replace-confirm-ru') {
     foreach ($size in '1280x720', '1920x1080', '2560x1440', '3440x1440') {
         foreach ($scale in 100,120,140) { "$state-$size-$scale.png" }
     }

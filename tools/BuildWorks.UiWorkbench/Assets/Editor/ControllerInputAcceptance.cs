@@ -39,8 +39,35 @@ internal static class ControllerInputAcceptance
             Require(controller.Document.Parts.Count == 1 && controller.Document.Rename(controller.Document.Parts[0].StableId, "Changed"),
                 "Single editor did not open/edit one part");
             yield return null;
+            controller.Document.SelectOnly(controller.Document.Parts[0].StableId);
             Call(controller, "Bind", (object)null);
             var view = Field<BlueprintEditorView>(controller, "view");
+            Call(controller, "SetActiveTool", BlueprintEditorTool.Transform);
+            yield return null;
+            Canvas.ForceUpdateCanvases();
+            var fields = Field<TMP_InputField[]>(view, "inspectorScale");
+            NativeClick(view, null, Field<Button>(view, "inspectorProportionsButton"));
+            Require(!Field<bool>(view, "inspectorKeepProportions"), "XYZ toggle did not disable proportions");
+            int history = Field<IList>(controller.Document, "undo").Count;
+            fields[1].text = "75"; fields[1].onEndEdit.Invoke(fields[1].text);
+            Require(controller.Document.Parts[0].Scale.Equals(new Point3(2, .75, 1.25)) &&
+                Field<IList>(controller.Document, "undo").Count == history + 1,
+                "Independent Y changed X/Z or did not make one history entry");
+            Require(controller.Document.Undo(), "XYZ edit cannot be undone"); Call(controller, "Bind", (object)null);
+            Require(controller.Document.Parts[0].Scale.Equals(new Point3(2, .5, 1.25)), "XYZ Undo lost original scale");
+            Require(controller.Document.Redo(), "XYZ edit cannot be redone"); Call(controller, "Bind", (object)null);
+            NativeClick(view, null, Field<Button>(view, "inspectorProportionsButton"));
+            fields[2].text = "150"; fields[2].onEndEdit.Invoke(fields[2].text);
+            var resized = controller.Document.Parts[0].Scale;
+            Require(Math.Abs(resized.X - 2.4) < .000001 && Math.Abs(resized.Y - .9) < .000001 &&
+                Math.Abs(resized.Z - 1.5) < .000001, "Linked Z did not preserve all proportions");
+            Require(controller.Document.Undo(), "Linked edit cannot be undone"); Call(controller, "Bind", (object)null);
+            foreach (string invalid in new[] { "0", "-1", "NaN", "Infinity", "401" })
+            {
+                fields[0].text = invalid; fields[0].onEndEdit.Invoke(invalid);
+                Require(controller.Document.Parts[0].Scale.Equals(new Point3(2, .75, 1.25)), "Invalid XYZ altered document");
+                Call(controller, "Bind", (object)null);
+            }
             Require(Field<Button>(view, "saveButton").interactable, "Single editor Save remains disabled");
             NativeClick(view, null, "Save"); yield return null;
             Require(view.HasModal, "Single editor Save did not request metadata");
@@ -48,7 +75,8 @@ internal static class ControllerInputAcceptance
             Require(!controller.Document.IsDirty && !view.HasModal, "Single editor native Save click failed");
             controller.Close(true);
             var reopened = new CompositeBlueprintStore(path).All().Single();
-            Require(reopened.parts.Count == 1 && reopened.parts[0].displayName == "Changed" && reopened.parts[0].scale.x == 2,
+            Require(reopened.parts.Count == 1 && reopened.parts[0].displayName == "Changed" &&
+                reopened.parts[0].scale.ToVector3() == new Vector3(2, .75f, 1.25f),
                 "Single actual editor save lost row/name/scale");
             Require(controller.OpenNew(out error), error); yield return null;
             Require(!Field<Button>(view, "saveButton").interactable && !(bool)Call(controller, "TrySave", false, true) &&
@@ -461,13 +489,29 @@ internal static class ControllerInputAcceptance
         Call(view, "SubmitInspector");
         Require(doc.Parts.First(x => x.StableId == "left").Scale.Equals(scale),
             "Unchanged rounded scale field changed exact XYZ");
-        Field<TMP_InputField>(view, "inspectorScale").SetTextWithoutNotify("154.320875");
+        Field<TMP_InputField[]>(view, "inspectorScale")[0].SetTextWithoutNotify("154.320875");
         Call(view, "SubmitInspector");
         var resized = doc.Parts.First(x => x.StableId == "left").Scale;
         Require(resized.X > scale.X && Math.Abs(resized.Y / resized.X - scale.Y / scale.X) < .00001 &&
             Math.Abs(resized.Z / resized.X - scale.Z / scale.X) < .00001, "Resize lost XYZ proportions");
+        Field<Button>(view, "inspectorProportionsButton").onClick.Invoke();
+        var fields = Field<TMP_InputField[]>(view, "inspectorScale");
+        double originalX = resized.X, originalZ = resized.Z;
+        fields[1].text = "150"; fields[1].onEndEdit.Invoke(fields[1].text);
+        resized = doc.Parts.First(x => x.StableId == "left").Scale;
+        Require(resized.X == originalX && resized.Y == 1.5 && resized.Z == originalZ,
+            "Independent edit changed untouched exact components");
+        Field<Button>(view, "inspectorProportionsButton").onClick.Invoke();
         doc.SetPartProperties("left", part.DisplayName, part.Position, part.Rotation, new Point3(1,1,1));
         Call(controller, "Bind", new object[] { null });
+        doc.ToggleSelection("right"); Call(controller, "Bind", new object[] { null });
+        Field<Button>(view, "inspectorProportionsButton").onClick.Invoke();
+        fields[0].text = "150"; fields[0].onEndEdit.Invoke(fields[0].text);
+        Require(doc.Parts.Where(x => x.StableId == "left" || x.StableId == "right")
+            .All(x => x.Scale.Equals(new Point3(1.5, 1, 1))), "Selection XYZ fields did not reach the shared transform");
+        Require(doc.Undo(), "Selection XYZ edit cannot be undone");
+        doc.SelectOnly("left"); Call(controller, "Bind", new object[] { null });
+        Field<Button>(view, "inspectorProportionsButton").onClick.Invoke();
     }
 
     private static void TestPointHoverHints(BlueprintEditorController controller, InputFrames input,
@@ -2383,7 +2427,7 @@ internal static class ControllerInputAcceptance
         Require(Field<BlueprintEditorTool>(controller, "activeTool") == BlueprintEditorTool.Transform &&
             Field<GameObject>(view, "inspectorEditPanel").activeSelf,
             "Array fixture did not open the Transform inspector");
-        TMP_InputField sourceScale = Field<TMP_InputField>(view, "inspectorScale");
+        TMP_InputField sourceScale = Field<TMP_InputField[]>(view, "inspectorScale")[0];
         sourceScale.text = "200"; sourceScale.onEndEdit.Invoke(sourceScale.text);
         Frame(controller, input, mouse); yield return null;
         Require(Math.Abs(doc.Parts[0].Scale.X - 2) < .00001, "Array fixture did not establish 2m native span");

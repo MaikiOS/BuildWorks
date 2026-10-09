@@ -855,25 +855,77 @@ namespace OstrixMods.BuildWorks.Geometry
             Rotation3 rotation,
             Point3 pivot,
             double uniformScale = 1.0)
+            => ApplyTransformDelta(translation, rotation, pivot,
+                new Point3(uniformScale, uniformScale, uniformScale), new Rotation3(0, 0, 0, 1));
+
+        public const string NonUniformScaleShearError = "Non-uniform scaling would shear a rotated part.";
+
+        public bool ApplyTransformDelta(
+            Point3 translation,
+            Rotation3 rotation,
+            Point3 pivot,
+            Point3 scale,
+            Rotation3 scaleFrame)
         {
             BlueprintEditorPart.Validate(translation, nameof(translation));
             BlueprintEditorPart.Validate(pivot, nameof(pivot));
-            if (!GeometryMath.IsFinite(uniformScale) || uniformScale <= 0.0)
-                throw new ArgumentOutOfRangeException(nameof(uniformScale));
+            BlueprintEditorPart.Validate(scale, nameof(scale));
+            if (scale.X <= 0 || scale.Y <= 0 || scale.Z <= 0)
+                throw new ArgumentOutOfRangeException(nameof(scale));
             Rotation3 delta = rotation.Normalized();
+            Rotation3 frame = scaleFrame.Normalized(), inverseFrame = Inverse(frame);
             List<BlueprintEditorPart> targets = SelectedEditableParts();
             if (targets.Count == 0) return false;
+            var positions = new Point3[targets.Count];
+            var rotations = new Rotation3[targets.Count];
+            var scales = new Point3[targets.Count];
+            for (int index = 0; index < targets.Count; ++index)
+            {
+                BlueprintEditorPart part = targets[index];
+                Point3 offset = inverseFrame.Rotate(part.Position - pivot);
+                positions[index] = pivot + delta.Rotate(frame.Rotate(new Point3(
+                    offset.X * scale.X, offset.Y * scale.Y, offset.Z * scale.Z))) + translation;
+                BlueprintEditorPart.Validate(positions[index], nameof(translation));
+                rotations[index] = Multiply(delta, part.Rotation).Normalized();
+                Rotation3 localFrame = Multiply(inverseFrame, part.Rotation).Normalized();
+                Point3 multipliers = new Point3(
+                    AxisScale(localFrame.Rotate(new Point3(1, 0, 0)), scale),
+                    AxisScale(localFrame.Rotate(new Point3(0, 1, 0)), scale),
+                    AxisScale(localFrame.Rotate(new Point3(0, 0, 1)), scale));
+                scales[index] = BlueprintEditorPart.NormalizeScale(new Point3(
+                    part.Scale.X * multipliers.X, part.Scale.Y * multipliers.Y,
+                    part.Scale.Z * multipliers.Z), nameof(scale), part.ScaleIsAbsolute);
+                if (part.BaseScale.HasValue)
+                {
+                    Point3 basis = part.BaseScale.Value;
+                    BlueprintEditorPart.NormalizeScale(new Point3(basis.X * scales[index].X,
+                        basis.Y * scales[index].Y, basis.Z * scales[index].Z), nameof(scale), true);
+                }
+            }
             return Commit(() =>
             {
-                foreach (BlueprintEditorPart part in targets)
+                for (int index = 0; index < targets.Count; ++index)
                 {
-                    part.Position = pivot +
-                        delta.Rotate((part.Position - pivot) * uniformScale) + translation;
-                    part.Rotation = Multiply(delta, part.Rotation).Normalized();
-                    part.Scale = BlueprintEditorPart.NormalizeScale(
-                        part.Scale * uniformScale, nameof(uniformScale), part.ScaleIsAbsolute);
+                    targets[index].Position = positions[index];
+                    targets[index].Rotation = rotations[index];
+                    targets[index].Scale = scales[index];
                 }
             });
+        }
+
+        private static double AxisScale(Point3 axis, Point3 scale)
+        {
+            if (scale.X == scale.Y && scale.Y == scale.Z) return scale.X;
+            Point3 transformed = new Point3(axis.X * scale.X, axis.Y * scale.Y, axis.Z * scale.Z);
+            double multiplier = axis.X * transformed.X + axis.Y * transformed.Y + axis.Z * transformed.Z;
+            if (!GeometryMath.IsFinite(multiplier) || multiplier <= 0)
+                throw new ArgumentOutOfRangeException(nameof(scale));
+            Point3 residual = transformed - axis * multiplier;
+            // Rotations cross the Unity float boundary; allow only that roundoff, never a visible shear.
+            double tolerance = Math.Max(scale.X, Math.Max(scale.Y, scale.Z)) * 1e-6;
+            if (Math.Abs(residual.X) > tolerance || Math.Abs(residual.Y) > tolerance || Math.Abs(residual.Z) > tolerance)
+                throw new InvalidOperationException(NonUniformScaleShearError);
+            return multiplier;
         }
 
         public bool DuplicateSelection(Point3 offset, string copyLabel = "copy")

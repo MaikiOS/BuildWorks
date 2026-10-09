@@ -1,3 +1,15 @@
+## 2026-10-09 — independent XYZ editor scale; not deployed
+
+Three percent fields and a keep-proportions toggle use existing document/history
+and persistence. Groups use Local/World; shear and overflow reject before mutation.
+Native float180 roundoff is accepted; actual45 shear stays rejected. Final normal/QA
+builds0/0, Geometry/Store/EditorBridge, Unity372 UTC14:01:10, localization885,
+HostContract25185596, QA guards, format exit0 (existing warning) and independent
+correctness/Ponytail review passed. See docs/XYZ_SCALE_CHECKPOINT_2026-10-09.md.
+Installed QA .116 unchanged; no deployment/game/save/network execution. Native
+world snap/collisions/stability/reload stay open; retain accepted user evidence.
+Next: automatic supported QA fixture, delete/hide, visible missing replacement,
+filters and interior camera. The full goal remains active and incomplete.
 ## 2026-10-09 — supported material placement; game acceptance open
 
 Shared world preflight now checks the resolved prefab instead of blocking every

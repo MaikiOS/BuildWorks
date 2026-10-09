@@ -382,7 +382,9 @@ namespace OstrixMods.BuildWorks
         private readonly TMP_Text inspectorScaleLabel;
         private readonly TMP_InputField[] inspectorPosition = new TMP_InputField[3];
         private readonly TMP_InputField[] inspectorRotation = new TMP_InputField[3];
-        private readonly TMP_InputField inspectorScale;
+        private readonly TMP_InputField[] inspectorScale = new TMP_InputField[3];
+        private readonly Button inspectorProportionsButton;
+        private bool inspectorKeepProportions = true;
         private readonly Button inspectorResetButton;
         private readonly Button inspectorSpaceButton;
         private readonly TMP_InputField inspectorMoveStep;
@@ -449,9 +451,9 @@ namespace OstrixMods.BuildWorks
         internal bool ItemStandEditable { get; set; }
         internal bool ItemStandHasContents { get; set; }
         private BlueprintExchangeView exchangeView;
-        private float inspectorOriginalScale;
+        private Vector3 inspectorOriginalScale;
         private bool inspectorScaleIsAbsolute;
-        private string inspectorOriginalScaleText;
+        private readonly string[] inspectorOriginalScaleText = new string[3];
         private TMP_InputField fieldOfViewInput;
         private Slider fieldOfViewSlider;
         private Button fieldOfViewReset;
@@ -851,7 +853,7 @@ namespace OstrixMods.BuildWorks
                 inspectorBody.anchorMax = new Vector2(1f, 1f);
                 inspectorBody.pivot = new Vector2(0.5f, 1f);
                 inspectorBody.anchoredPosition = Vector2.zero;
-                inspectorBody.sizeDelta = new Vector2(0f, 500f);
+                inspectorBody.sizeDelta = new Vector2(0f, 532f);
                 ScrollRect inspectorScroll = inspectorViewport.gameObject.AddComponent<ScrollRect>();
                 inspectorScroll.viewport = inspectorViewport;
                 inspectorScroll.content = inspectorBody;
@@ -886,38 +888,48 @@ namespace OstrixMods.BuildWorks
                     input.onEndEdit.AddListener(_ => SubmitInspector());
                 }
                 inspectorScaleLabel = CreateInspectorLabel(
-                    inspectorEditPanel.transform, T("editor.view.uniform_scale"), 124f);
-                inspectorScale = CreateInput(
-                    "Scale", inspectorEditPanel.transform, new Vector2(0f, -148f), 228f,
-                    1f, 1f, 400f, true, 100f);
-                inspectorScale.GetComponent<BlueprintEditorNumericScrub>().StepProvider = () => ScaleStepPercent;
-                inspectorScale.onSubmit.AddListener(_ => SubmitInspector());
-                inspectorScale.onEndEdit.AddListener(_ => SubmitInspector());
+                    inspectorEditPanel.transform, T("editor.view.scale_xyz"), 124f);
+                CreateAxisInputs(inspectorEditPanel.transform, inspectorScale, 148f, 1f);
+                for (int index = 0; index < inspectorScale.Length; ++index)
+                {
+                    TMP_InputField field = inspectorScale[index];
+                    var scrub = field.GetComponent<BlueprintEditorNumericScrub>();
+                    scrub.Initialize(field, 1f, 1f, 400f, false, this.input, 100f);
+                    scrub.StepProvider = () => ScaleStepPercent;
+                    field.onSubmit.AddListener(_ => SubmitInspector());
+                    field.onEndEdit.AddListener(_ => SubmitInspector());
+                }
+                inspectorProportionsButton = CreateButton(
+                    "KeepScaleProportions", inspectorEditPanel.transform, T("editor.scale.keep_proportions"), 228f,
+                    () => { inspectorKeepProportions = !inspectorKeepProportions; UpdateTransformControls(); });
+                SetInspectorButton((RectTransform)inspectorProportionsButton.transform, 0f, 184f, 228f);
+                ((RectTransform)inspectorProportionsButton.transform).sizeDelta = new Vector2(228f, 28f);
+                AddTooltip((RectTransform)inspectorProportionsButton.transform, T("editor.scale.tooltip"));
                 Button applyInspector = CreateButton(
                     "ApplyInspector", inspectorEditPanel.transform, T("editor.view.apply"), 120f,
                     SubmitInspector, primary: true);
-                SetInspectorButton((RectTransform)applyInspector.transform, 0f, 188f, 120f);
+                SetInspectorButton((RectTransform)applyInspector.transform, 0f, 220f, 120f);
                 inspectorResetButton = CreateButton(
                     "ResetInspector", inspectorEditPanel.transform, T("editor.view.reset"), 100f,
                     ResetInspector);
-                SetInspectorButton((RectTransform)inspectorResetButton.transform, 128f, 188f, 100f);
+                SetInspectorButton((RectTransform)inspectorResetButton.transform, 128f, 220f, 100f);
                 inspectorSpaceButton = CreateButton(
                     "TransformSpace", inspectorEditPanel.transform, T("editor.view.axes_local"), 110f,
                     () => SpaceRequested?.Invoke());
-                SetInspectorButton((RectTransform)inspectorSpaceButton.transform, 0f, 232f, 70f);
+                SetInspectorButton((RectTransform)inspectorSpaceButton.transform, 0f, 264f, 70f);
                 TMP_Text moveStepLabel = CreateText(
                     "MoveStepLabel", inspectorEditPanel.transform, T("editor.view.move_step_short"), 10f,
                     FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
-                SetTopLeft((RectTransform)moveStepLabel.transform, 76f, 232f, 22f, 36f);
+                SetTopLeft((RectTransform)moveStepLabel.transform, 76f, 264f, 22f, 36f);
                 inspectorMoveStep = CreateInput(
-                    "MoveStep", inspectorEditPanel.transform, new Vector2(98f, -232f), 48f,
+                    "MoveStep", inspectorEditPanel.transform, new Vector2(98f, -264f), 48f,
                     0.001f, 0.001f, 10f, resetValue: 0.05f);
                 TMP_Text angleStepLabel = CreateText(
                     "AngleStepLabel", inspectorEditPanel.transform, "Δ°", 10f,
                     FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
-                SetTopLeft((RectTransform)angleStepLabel.transform, 150f, 232f, 22f, 36f);
+                SetTopLeft((RectTransform)angleStepLabel.transform, 150f, 264f, 22f, 36f);
                 inspectorAngleStep = CreateInput(
-                    "AngleStep", inspectorEditPanel.transform, new Vector2(172f, -232f), 56f,
+                    "AngleStep", inspectorEditPanel.transform, new Vector2(172f, -264f), 56f,
                     0.1f, 0.1f, 90f, resetValue: 1f);
                 inspectorMoveStep.onEndEdit.AddListener(_ => SubmitSnap());
                 inspectorAngleStep.onEndEdit.AddListener(_ => SubmitSnap());
@@ -929,28 +941,28 @@ namespace OstrixMods.BuildWorks
                     "TransformAnchors", inspectorEditPanel.transform, T("editor.view.points_all"), 110f,
                     () => AnchorVisibilityRequested?.Invoke());
                 SetInspectorButton(
-                    (RectTransform)inspectorAnchorVisibilityButton.transform, 0f, 276f, 110f);
+                    (RectTransform)inspectorAnchorVisibilityButton.transform, 0f, 308f, 110f);
                 inspectorMagnetButton = CreateButton(
                     "TransformMagnet", inspectorEditPanel.transform, T("editor.view.magnet_game"), 110f,
                     () => MeshSnapRequested?.Invoke());
                 SetInspectorButton(
-                    (RectTransform)inspectorMagnetButton.transform, 118f, 276f, 110f);
+                    (RectTransform)inspectorMagnetButton.transform, 118f, 308f, 110f);
                 inspectorSelectionPivotButton = CreateButton(
                     "PivotSelection", inspectorEditPanel.transform, T("editor.view.center"), 70f,
                     () => PivotModeRequested?.Invoke(BlueprintEditorPivotMode.SelectionCenter));
                 SetInspectorButton(
-                    (RectTransform)inspectorSelectionPivotButton.transform, 0f, 320f, 70f);
+                    (RectTransform)inspectorSelectionPivotButton.transform, 0f, 352f, 70f);
                 inspectorActivePivotButton = CreateButton(
                     "PivotActive", inspectorEditPanel.transform, T("editor.view.active_short"), 70f,
                     () => PivotModeRequested?.Invoke(BlueprintEditorPivotMode.ActiveObject));
                 SetInspectorButton(
-                    (RectTransform)inspectorActivePivotButton.transform, 78f, 320f, 70f);
+                    (RectTransform)inspectorActivePivotButton.transform, 78f, 352f, 70f);
                 inspectorPivotButton = CreateButton(
                     "TransformPivot", inspectorEditPanel.transform, T("editor.view.select"), 72f,
                     () => PivotRequested?.Invoke());
-                SetInspectorButton((RectTransform)inspectorPivotButton.transform, 156f, 320f, 72f);
+                SetInspectorButton((RectTransform)inspectorPivotButton.transform, 156f, 352f, 72f);
                 TMP_Text boundsPivotLabel = CreateInspectorLabel(
-                    inspectorEditPanel.transform, T("editor.view.bounds_pivot"), 366f);
+                    inspectorEditPanel.transform, T("editor.view.bounds_pivot"), 398f);
                 string[] pivotLabels = { "↖", "↑", "↗", "←", "•", "→", "↙", "↓", "↘" };
                 for (int index = 0; index < inspectorBoundsButtons.Length; ++index)
                 {
@@ -962,7 +974,7 @@ namespace OstrixMods.BuildWorks
                         68f,
                         () => BoundsPivotRequested?.Invoke(captured));
                     RectTransform rect = (RectTransform)button.transform;
-                    SetInspectorButton(rect, index % 3 * 80f, 390f + index / 3 * 34f, 68f);
+                    SetInspectorButton(rect, index % 3 * 80f, 422f + index / 3 * 34f, 68f);
                     rect.sizeDelta = new Vector2(68f, 28f);
                     inspectorBoundsButtons[index] = button;
                 }
@@ -972,7 +984,7 @@ namespace OstrixMods.BuildWorks
                 boundsPivotLabel.gameObject.SetActive(false);
                 foreach (Button button in inspectorBoundsButtons)
                     button.gameObject.SetActive(false);
-                CreateAnchorControls(inspectorEditPanel.transform, 320f);
+                CreateAnchorControls(inspectorEditPanel.transform, 352f);
                 inspectorEditPanel.SetActive(false);
 
                 supportEditPanel = CreateRect("SupportEdit", inspectorBody).gameObject;
@@ -1182,6 +1194,9 @@ namespace OstrixMods.BuildWorks
                 {
                     TMP_Text hint = CreateText("StatusHints" + index, hintGroupsArea, string.Empty,
                         12f, FontStyles.Normal, TextAlignmentOptions.TopLeft);
+                    hint.enableAutoSizing = true;
+                    hint.fontSizeMin = 10f;
+                    hint.fontSizeMax = 12f;
                     hint.raycastTarget = false;
                     hint.textWrappingMode = TextWrappingModes.Normal;
                     hint.overflowMode = TextOverflowModes.Ellipsis;
@@ -1610,7 +1625,7 @@ namespace OstrixMods.BuildWorks
         internal event Action<string, bool> LockChanged;
         internal event Action<BlueprintEditorDialogDecision> DialogDecided;
         internal event Action<BlueprintEditorCatalogItem, bool> CatalogPartSelected;
-        internal event Action<string, string, Vector3, Vector3, float, bool> InspectorSubmitted;
+        internal event Action<string, string, Vector3, Vector3, Vector3, bool> InspectorSubmitted;
         internal event Action<string, string> RenameSubmitted;
         internal event Action<string, string> BlueprintMetadataSubmitted;
         internal event Action<bool> SelectionVisibilityRequested;
@@ -3271,13 +3286,12 @@ namespace OstrixMods.BuildWorks
                 : "editor.view.rotation_deg");
             inspectorScaleLabel.text = T(inspectorDelta
                 ? "editor.view.selection_scale"
-                : inspectorScaleIsAbsolute ? "editor.view.source_scale" : "editor.view.uniform_scale");
+                : inspectorScaleIsAbsolute ? "editor.view.source_scale" : "editor.view.scale_xyz");
             SetButtonLabel(inspectorResetButton, T("editor.view.reset"));
             if (singlePart == null)
             {
                 SetAxisValues(inspectorPosition, Vector3.zero);
                 SetAxisValues(inspectorRotation, Vector3.zero);
-                inspectorScale.SetTextWithoutNotify("100");
             }
             else
             {
@@ -3293,9 +3307,14 @@ namespace OstrixMods.BuildWorks
                 Vector3 euler = quaternion.eulerAngles;
                 SetAxisValues(inspectorRotation, new Vector3(
                     SignedAngle(euler.x), SignedAngle(euler.y), SignedAngle(euler.z)));
-                inspectorOriginalScale = (float)singlePart.Scale.X;
-                inspectorOriginalScaleText = ((double)inspectorOriginalScale * 100).ToString(inspectorScaleIsAbsolute ? "G9" : "0.##");
-                inspectorScale.SetTextWithoutNotify(inspectorOriginalScaleText);
+            }
+            inspectorOriginalScale = singlePart == null ? Vector3.one : new Vector3(
+                (float)singlePart.Scale.X, (float)singlePart.Scale.Y, (float)singlePart.Scale.Z);
+            for (int index = 0; index < inspectorScale.Length; ++index)
+            {
+                inspectorOriginalScaleText[index] = ((double)inspectorOriginalScale[index] * 100)
+                    .ToString(inspectorScaleIsAbsolute ? "G9" : "0.##");
+                inspectorScale[index].SetTextWithoutNotify(inspectorOriginalScaleText[index]);
             }
             UpdateTransformControls();
         }
@@ -3452,17 +3471,44 @@ namespace OstrixMods.BuildWorks
             bool rxValid = TryRead(inspectorRotation[0], out float rx);
             bool ryValid = TryRead(inspectorRotation[1], out float ry);
             bool rzValid = TryRead(inspectorRotation[2], out float rz);
-            bool scaleUnchanged = !inspectorDelta && inspectorScale.text == inspectorOriginalScaleText;
-            bool scaleValid = TryRead(inspectorScale, out float scale) &&
-                (inspectorScaleIsAbsolute ? scale / 100f >= float.Epsilon && scale / 100f <= float.MaxValue : scale >= 1f && scale <= 400f);
-            scaleValid |= scaleUnchanged;
+            Vector3 scale = inspectorOriginalScale;
+            bool scaleValid = true;
+            int changedScaleAxis = -1;
+            float proportion = 1f;
+            for (int index = 0; index < inspectorScale.Length; ++index)
+            {
+                if (inspectorScale[index].text == inspectorOriginalScaleText[index])
+                { SetInputValid(inspectorScale[index], true); continue; }
+                bool valid = TryRead(inspectorScale[index], out float percent);
+                scale[index] = percent / 100f;
+                valid &= ValidInspectorScale(scale[index]);
+                if (valid && inspectorKeepProportions)
+                {
+                    float ratio = scale[index] / inspectorOriginalScale[index];
+                    valid = !float.IsNaN(ratio) && !float.IsInfinity(ratio) && ratio > 0f &&
+                        (changedScaleAxis < 0 || Mathf.Abs(ratio - proportion) <= Mathf.Abs(proportion) * .000001f);
+                    proportion = ratio;
+                }
+                SetInputValid(inspectorScale[index], valid);
+                scaleValid &= valid;
+                changedScaleAxis = index;
+            }
+            if (scaleValid && inspectorKeepProportions && changedScaleAxis >= 0)
+            {
+                for (int index = 0; index < inspectorScale.Length; ++index)
+                {
+                    scale[index] = inspectorOriginalScale[index] * proportion;
+                    bool valid = ValidInspectorScale(scale[index]);
+                    SetInputValid(inspectorScale[index], valid);
+                    scaleValid &= valid;
+                }
+            }
             SetInputValid(inspectorPosition[0], pxValid);
             SetInputValid(inspectorPosition[1], pyValid);
             SetInputValid(inspectorPosition[2], pzValid);
             SetInputValid(inspectorRotation[0], rxValid);
             SetInputValid(inspectorRotation[1], ryValid);
             SetInputValid(inspectorRotation[2], rzValid);
-            SetInputValid(inspectorScale, scaleValid);
             bool nameValid = inspectorDelta || !string.IsNullOrWhiteSpace(inspectorName.text);
             SetInputValid(inspectorName, nameValid);
             if (!pxValid || !pyValid || !pzValid || !rxValid || !ryValid ||
@@ -3476,10 +3522,13 @@ namespace OstrixMods.BuildWorks
                 inspectorName.text,
                 new Vector3(px, py, pz),
                 new Vector3(rx, ry, rz),
-                scaleUnchanged
-                    ? inspectorOriginalScale : scale / 100f,
+                scale,
                 inspectorDelta);
         }
+
+        private bool ValidInspectorScale(float value) => !float.IsNaN(value) && !float.IsInfinity(value) &&
+            (inspectorScaleIsAbsolute ? value >= float.Epsilon : value >= .01f) &&
+            (inspectorScaleIsAbsolute ? value <= float.MaxValue : value <= 4f);
 
         private void SubmitSnap()
         {
@@ -3595,6 +3644,9 @@ namespace OstrixMods.BuildWorks
         private void UpdateTransformControls()
         {
             if (inspectorSpaceButton == null) return;
+            SetButtonLabel(inspectorProportionsButton, T(inspectorKeepProportions
+                ? "editor.scale.keep_proportions" : "editor.scale.independent"));
+            SetSelected(inspectorProportionsButton, inspectorKeepProportions);
             SetButtonLabel(inspectorSpaceButton,
                 T(localTransformSpace
                     ? "editor.view.axes_local"
@@ -3849,7 +3901,7 @@ namespace OstrixMods.BuildWorks
             SetInputValid(blueprintCategory, true);
             foreach (TMP_InputField input in inspectorPosition) SetInputValid(input, true);
             foreach (TMP_InputField input in inspectorRotation) SetInputValid(input, true);
-            SetInputValid(inspectorScale, true);
+            foreach (TMP_InputField field in inspectorScale) SetInputValid(field, true);
             SetInputValid(inspectorMoveStep, true);
             SetInputValid(inspectorAngleStep, true);
             foreach (TMP_InputField input in arrayCount) SetInputValid(input, true);

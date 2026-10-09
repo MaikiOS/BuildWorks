@@ -255,7 +255,7 @@ public static class RuntimeEditorAcceptance
                 document.SelectOnly(selected);
                 Call(controller, "Bind", "Проверка фактического редактора");
                 Call(controller, "SetActiveTool", BlueprintEditorTool.Transform);
-                TMP_InputField scale = Field<TMP_InputField>(view, "inspectorScale");
+                TMP_InputField scale = Field<TMP_InputField[]>(view, "inspectorScale")[0];
                 Require(scale.text == "100", "Scale must display percent, not factor");
                 scale.text = "125";
                 scale.onEndEdit.Invoke(scale.text);
@@ -337,7 +337,7 @@ public static class RuntimeEditorAcceptance
                     Canvas.ForceUpdateCanvases();
                     scene.SetViewport(view.ViewportScreenRect());
                     Call(controller, "FrameAll");
-                    foreach (string state in new[] { "select", "transform", "array", "contour", "catalog",
+                    foreach (string state in new[] { "select", "transform", "scale-xyz-ru", "array", "contour", "catalog",
                         "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "save-metadata", "save-as", "save-as-ru", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru", "exchange-armor", "exchange-armor-ru", "exchange-missing", "exchange-missing-ru", "replace-tools", "replace-confirm", "replace-confirm-ru" })
                     {
                         Require(Screen.width == width && Screen.height == height,
@@ -358,7 +358,28 @@ public static class RuntimeEditorAcceptance
                             state == "contour" ? BlueprintEditorTool.Contour :
                             state == "select" ? BlueprintEditorTool.Select : BlueprintEditorTool.Transform;
                         Call(controller, "SetActiveTool", tool);
-                        if (state.StartsWith("catalog"))
+                        if (state == "scale-xyz-ru")
+                        {
+                            BuildWorksLocalization.RussianLanguage = true;
+                            document.SelectOnly(selected);
+                            Call(controller, "Bind", (object)null);
+                            Field<Button>(view, "inspectorProportionsButton").onClick.Invoke();
+                            Canvas.ForceUpdateCanvases();
+                            var fields = Field<TMP_InputField[]>(view, "inspectorScale");
+                            var button = Field<Button>(view, "inspectorProportionsButton");
+                            Require(fields.Length == 3 && fields.All(field => field.IsInteractable()) &&
+                                button.GetComponentInChildren<TMP_Text>().text == BuildWorksLocalization.Text("editor.scale.independent"),
+                                "XYZ fields/mode unavailable at target resolution");
+                            Vector3[] corners = new Vector3[4];
+                            foreach (var field in fields)
+                            {
+                                ((RectTransform)field.transform).GetWorldCorners(corners);
+                                float bottom = corners[0].y;
+                                ((RectTransform)button.transform).GetWorldCorners(corners);
+                                Require(bottom >= corners[1].y - .1f, "XYZ fields overlap the proportions control");
+                            }
+                        }
+                        else if (state.StartsWith("catalog"))
                         {
                             Call(controller, "RequestCatalog");
                             yield return null;
@@ -527,6 +548,7 @@ public static class RuntimeEditorAcceptance
                         scene.Camera.targetTexture = null;
                         view.RootCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
                         if (state.StartsWith("exchange")) ControllerInputAcceptance.NativeClick(view, uiCamera, "ExchangeClose");
+                        if (state == "scale-xyz-ru") Field<Button>(view, "inspectorProportionsButton").onClick.Invoke();
                         BuildWorksLocalization.RussianLanguage = false;
                         yield return null;
                     }
@@ -1138,12 +1160,12 @@ public static class RuntimeEditorAcceptance
                 Call(editor, "Bind", "");
                 var positionInputs = Field<TMP_InputField[]>(view, "inspectorPosition");
                 positionInputs[0].text = "3.25";
-                var scaleInput = Field<TMP_InputField>(view, "inspectorScale");
+                var scaleInput = Field<TMP_InputField[]>(view, "inspectorScale")[0];
                 scaleInput.text = "Infinity";
                 scaleInput.onEndEdit.Invoke("Infinity");
                 Require(editor.Document.Parts[1].Position.X == 3 && editor.Document.Parts[1].Scale.X == .001f,
                     "Nonfinite pending scale was accepted by inspector");
-                scaleInput.text = Field<string>(view, "inspectorOriginalScaleText");
+                scaleInput.text = Field<string[]>(view, "inspectorOriginalScaleText")[0];
                 positionInputs[0].onEndEdit.Invoke("3.25");
                 Require(editor.Document.Parts[1].Position.X == 3.25 && editor.Document.Parts[1].Scale.X == .001f &&
                     editor.Document.Undo(), "Inspector position edit rejects or changes pending scale");
@@ -1266,7 +1288,7 @@ public static class RuntimeEditorAcceptance
             controller.Document.SelectOnly(selected);
             Call(controller, "SetActiveTool", BlueprintEditorTool.Transform);
             Call(controller, "Bind", "Проверка границ масштаба");
-            var input = Field<TMP_InputField>(Field<BlueprintEditorView>(controller, "view"), "inspectorScale");
+            var input = Field<TMP_InputField[]>(Field<BlueprintEditorView>(controller, "view"), "inspectorScale")[0];
             input.text = percent.ToString(System.Globalization.CultureInfo.InvariantCulture);
             input.onEndEdit.Invoke(input.text);
             Require(Math.Abs(controller.Document.Parts[0].Scale.X - percent / 100.0) < 0.00001,
@@ -1397,7 +1419,7 @@ public static class RuntimeEditorAcceptance
         Require(!Field<Vector3?>(controller, "pinnedAnchorWorld").HasValue, "Undo retained stale world pin");
 
         Call(controller, "Bind", "Проверка ручки масштаба");
-        TMP_InputField scale = Field<TMP_InputField>(view, "inspectorScale");
+        TMP_InputField scale = Field<TMP_InputField[]>(view, "inspectorScale")[0];
         scale.text = "400"; scale.onEndEdit.Invoke(scale.text);
         Set(controller, "dragHandle", GizmoHandleKind.Scale);
         Set(controller, "dragStartMouse", Vector2.zero);
@@ -1522,7 +1544,7 @@ public static class RuntimeEditorAcceptance
                 Field<Button>(view, "undoButton").onClick.Invoke();
                 Require(!Field<Vector3?>(controller, "pinnedAnchorWorld").HasValue &&
                     !Field<Vector3?>(controller, "selectedAnchorWorld").HasValue, "Undo retained stale native point selection");
-                TMP_InputField scale = Field<TMP_InputField>(view, "inspectorScale");
+                TMP_InputField scale = Field<TMP_InputField[]>(view, "inspectorScale")[0];
                 scale.text = "1"; scale.onEndEdit.Invoke(scale.text);
                 Call(controller, "SetActiveTool", BlueprintEditorTool.Array);
                 DragArray(controller, GizmoAxis.X, 2, 1);

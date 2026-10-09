@@ -473,7 +473,7 @@ internal static class UICatalogAcceptance
         view.SetTool(BlueprintEditorTool.Transform);
         foreach (TMP_InputField field in Field<TMP_InputField[]>(view, "inspectorPosition")) Reset(field, "0");
         foreach (TMP_InputField field in Field<TMP_InputField[]>(view, "inspectorRotation")) Reset(field, "0");
-        TMP_InputField scale = Field<TMP_InputField>(view, "inspectorScale");
+        TMP_InputField scale = Field<TMP_InputField[]>(view, "inspectorScale")[0];
         Reset(scale, "100");
         Reset(Field<TMP_InputField>(view, "inspectorMoveStep"), "0.05");
         Reset(Field<TMP_InputField>(view, "inspectorAngleStep"), "1");

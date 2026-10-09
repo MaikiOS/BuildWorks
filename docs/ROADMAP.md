@@ -1,3 +1,13 @@
+## Owner QA clarification — 2026-10-09
+
+Accepted spending/refunds and reload of the tested modified piece; no noticeable
+catalogue delay now. Do not generalize to every prefab/item/network path. Missing
+replacement is not accepted; world snap needs reproduction. Supply stable support
+before the next owner series. Added Save As, clear deletion/hiding, independent
+XYZ, tree filters and interior-camera requirements; not an implemented release.
+Details/dependencies: [feedback](feedback-2026-10-09.md),
+[goal amendment](GOAL_AMENDMENT_2026-10-09.md).
+
 # BuildWorks development roadmap
 
 ## After .116 — pending material variation data; not deployed

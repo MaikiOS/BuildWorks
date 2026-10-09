@@ -1,3 +1,24 @@
+## 2026-10-09 — owner QA .116 and goal amendment
+
+Ostrix accepted spending matching displayed cost, destruction refunds and the
+tested modified piece surviving re-entry; no noticeable catalogue delay now.
+This is scoped acceptance, not every prefab/item/failure/network path. Missing
+document opening shows two walls and a red envelope. Replacement1→N is not
+accepted; the deletion found by the owner is not replacement.
+
+Audit confirms missing Save As and independent XYZ inspector operations. Stored
+copy deletion, missing filter and camera flight exist but need clearer affordances.
+Modified-piece world snap remains an unreproduced report. The three-wall fixture
+needs guaranteed support; preserve native stability. Corrected the prior manual
+instruction that incorrectly promised a separate copy through ordinary Save.
+
+See docs/feedback-2026-10-09.md, docs/GOAL_AMENDMENT_2026-10-09.md and
+docs/WORK_STATUS_RU.md (80 requirements). No code/DLL/save changes today. New
+capabilities are requirements only. Installed .116 retains its verified SHA;
+edc9b06 materialSeed preparation remains undeployed and v11 is not integrated.
+Next: native snap/stable QA; Save As/delete/replacement; XYZ/filter/camera.
+Preserve the primary import path and material-variation completion priority.
+
 # BuildWorks current development handoff
 
 ## After .116 — pending material variation data; not deployed

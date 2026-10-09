@@ -17,6 +17,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             Directory.CreateDirectory(directory);
             try
             {
+                VbuildDialectChecks.Run(Path.Combine(directory, "legacy-vbuild"));
                 MaterialSeedChecks.Run(Path.Combine(directory, "material-seed"));
                 RoundTripV9(Path.Combine(directory, "roundtrip.json"));
                 PrimaryPartRoundTrip(Path.Combine(directory, "primary.json"));

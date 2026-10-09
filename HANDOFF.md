@@ -1,3 +1,20 @@
+## 2026-10-09 — source0.19.118: legacy .vbuild numeric slots
+
+Legacy whitespace .vbuild now preserves blank zero slots and parses comma decimals
+for quaternion/position; import and source-bound state share the same field layout.
+Only excess empty padding after10 slots is removed. Other dialects stay strict.
+Regression reproduced before fix; reviewed trailing-padding issue also reproduced
+and corrected. Final normal/QA0/0, Store/fixture22, Host25185596, localization930
+and compiled isolation PASS. Existing353 corpus remains350 parsed/3 refused.
+Against HEAD0b6b5b8 on209 local2v2t files:156→197 parsed,41 improved/0 regressed.
+Remaining12 parser refusals:4 snap-count limits,7 distant positions,1 object payload.
+This is parser coverage, not prefab/build/reload/network acceptance. Correctness and
+corrected Ponytail review: no blocker. Receipt: artifacts/checkpoint-0.19.118.
+Protocol/readyfixture22: docs/LEGACY_VBUILD_CHECKPOINT_2026-10-09.md and RU duplicate.
+Installed QA stays.117 with SHA C43966C8…C701C6; no deployment/game/save changes.
+Owner QA.117 acceptance remains current; fixture22 awaits a separate future install.
+Named Center/unknown state, world snap, items/rights/jobs/v11 and full goal stay open.
+
 ## 2026-10-09 — QA0.19.117 installed; game acceptance pending
 
 Accumulated Save As, XYZ/native ghost, catalogue delete/hide, explicit missing

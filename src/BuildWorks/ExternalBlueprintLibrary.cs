@@ -246,8 +246,8 @@ namespace OstrixMods.BuildWorks
                             throw new InvalidDataException("$buildworks_import.part_limit");
                         // BuildShare uses whitespace; Infinity Hammer also writes a
                         // semicolon dialect. Both share the same eight core fields.
-                        string[] fields = vbuild && !line.Contains(";")
-                            ? line.Split((char[])null, StringSplitOptions.RemoveEmptyEntries) : line.Split(';');
+                        bool legacyVbuild = vbuild && !line.Contains(";");
+                        string[] fields = PartFields(line, legacyVbuild);
                         int basic = vbuild ? 8 : 10;
                         if (fields.Length < basic || fields.Length > (vbuild ? 10 : 15) ||
                             (!vbuild && (fields.Length == 11 || fields.Length == 12)))
@@ -282,8 +282,8 @@ namespace OstrixMods.BuildWorks
                             stableId = blueprint.id + "_" + blueprint.importPartCount,
                             prefabName = prefab,
                             displayName = prefab,
-                            position = new CompositeBlueprintStore.VectorData { x = Number(fields[p]), y = Number(fields[p + 1]), z = Number(fields[p + 2]) },
-                            rotation = new CompositeBlueprintStore.QuaternionData { x = Number(fields[q]), y = Number(fields[q + 1]), z = Number(fields[q + 2]), w = Number(fields[q + 3]) },
+                            position = new CompositeBlueprintStore.VectorData { x = Number(fields[p], legacyVbuild), y = Number(fields[p + 1], legacyVbuild), z = Number(fields[p + 2], legacyVbuild) },
+                            rotation = new CompositeBlueprintStore.QuaternionData { x = Number(fields[q], legacyVbuild), y = Number(fields[q + 1], legacyVbuild), z = Number(fields[q + 2], legacyVbuild), w = Number(fields[q + 3], legacyVbuild) },
                             scale = new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 },
                             scaleIsAbsolute = true,
                             signText = signText,
@@ -411,7 +411,7 @@ namespace OstrixMods.BuildWorks
             // vbuild has no row-scale columns; dropping a ZDO scale would change its geometry.
             // Keep this dialect blocked until its absolute-scale adapter is verified.
             if (vbuild && (state.HasHash(hash("scale")) || state.HasHash(hash("scaleScalar")))) return;
-            string[] fields = vbuild && !row.Contains(";") ? row.Split((char[])null, StringSplitOptions.RemoveEmptyEntries) : row.Split(';');
+            string[] fields = PartFields(row, vbuild && !row.Contains(";"));
             int dataIndex = vbuild ? 8 : 13;
             if (fields.Length <= dataIndex || fields[dataIndex] != original.zdo ||
                 fields.Length > dataIndex + 1 && HasData(fields[dataIndex + 1]) && fields[dataIndex + 1] != "1" ||
@@ -542,8 +542,24 @@ namespace OstrixMods.BuildWorks
 
         private static bool HasData(string value) => value != "" && value != "\"\"" && value != "null";
 
-        private static float Number(string value)
+        // Legacy BuildShare slots are positional: a blank numeric slot means zero.
+        private static string[] PartFields(string row, bool legacyVbuild)
         {
+            if (!legacyVbuild) return row.Split(';');
+            string[] fields = row.TrimStart().Split(new[] { ' ', '\t' }, StringSplitOptions.None);
+            int count = fields.Length;
+            while (count > 10 && fields[count - 1].Length == 0) --count;
+            if (count != fields.Length) Array.Resize(ref fields, count);
+            return fields;
+        }
+
+        private static float Number(string value, bool legacyVbuild = false)
+        {
+            if (legacyVbuild)
+            {
+                if (value.Length == 0) return 0;
+                value = value.Replace(',', '.');
+            }
             float result = float.Parse(value, NumberStyles.Float, CultureInfo.InvariantCulture);
             if (float.IsNaN(result) || float.IsInfinity(result)) throw new InvalidDataException("$buildworks_import.transform");
             return result;

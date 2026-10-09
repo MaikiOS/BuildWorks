@@ -1,3 +1,20 @@
+## 2026-10-09 — QA0.19.117 installed; game acceptance pending
+
+Accumulated Save As, XYZ/native ghost, catalogue delete/hide, explicit missing
+replacement, partial thumbnails, outliner filters and interior camera are now
+installed only in TerrainRamp-1.0-Test via Deploy-TestBuild.ps1 with the same token.
+BuildWorks.dll SHA C43966C8FFB5BC83D5B725BACD04E4C30F8BA7BD497B58D4D52C853AC9C701C6;
+Geometry SHA 799C949B9E4139F0A527EF35BA3D520CE3D67D6C53709E9794DBCB962BB4FD5D.
+Both installed DLLs match the built pair. Normal/QA0/0, localization930,
+HostContract25185596, compiled isolation and13 replica deployment cases PASS.
+Default clean; metadata for44 save files unchanged; no game launch.
+The previous .116 pair is backed up in artifacts/checkpoint-0.19.117/installed-0.19.116-backup.
+E09 source checkpoint41cacb3; deployment receipt is install-verification.json
+in the same directory. Owner scenario: docs/QA_0.19.117_RU.md; live checklist updated.
+Next: new scale/snap/reload and editor acceptance. Do not repeat accepted cases.
+The full goal, networking and v11 remain open. Earlier source-only entries below
+are historical checkpoint evidence, not the current installation state.
+
 ## 2026-10-09 — E09: interior editor camera, source only
 
 Camera Inside/Return: independent pose/speed0.1–30m/s, perspective/.02 near,

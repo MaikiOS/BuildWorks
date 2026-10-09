@@ -22,6 +22,14 @@ Pause for UI/icon design approval, a prepared game-test series, and renewed guid
 tool discussion before Line A/B or any curves. Historical status/STOP is not the
 current work order. Work one bounded stage at a time.
 
+## Visible progress
+
+Maintain `docs/LIVE_CHECKLIST_RU.md` for Ostrix. Update its current action at meaningful
+step starts, after verification, and when direction changes. Separate source/test
+completion, deployment and user game acceptance; mark only evidenced results.
+List pending user checks with their prerequisites. Keep the full requirements in
+`docs/WORK_STATUS_RU.md`; this checklist does not replace or update the goal API.
+
 ## Invariants
 
 - BepInEx is the loader; no required Jotunn, copied gameplay-mod code or assets.

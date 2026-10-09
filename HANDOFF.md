@@ -1,3 +1,18 @@
+## 2026-10-09 — large snap-set limit investigated
+
+Source remains0.19.118; installed QA0.19.117 pair hashes unchanged.
+Four2v2t files contain2012/6596/11790/17125 points, with14/46/24/17 assigned to
+one nearest source part at most. All source XYZ are within512. The per-piece
+world codec512 limit is not exceeded by these distributions. Up to107288125
+nearest comparisons, full-array runtime scans and one gizmo LineRenderer per
+point require attention before increasing storage capacity. Duplicates do not
+solve the limit. Read-only measurement, self-checks and independent review passed.
+Product/archive/deployment unchanged; no game/build/full-test run. All12 imports
+remain refused. See docs/LARGE_SNAP_AUDIT_2026-10-09.md and RU companion;
+local JSON/script under artifacts/checkpoint-0.19.118. Next: consistent storage
+guards, exact accelerated assignment and bounded gizmo work without losing access
+to saved points, then roundtrip/Unity/game. Goal and installed .117 QA stay open.
+
 ## 2026-10-09 — source0.19.118: legacy .vbuild numeric slots
 
 Legacy whitespace .vbuild now preserves blank zero slots and parses comma decimals

@@ -53,7 +53,7 @@ namespace OstrixMods.BuildWorks
         private CursorLockMode previousCursorLock;
         private bool previousCursorVisible;
         private bool restoreCursor;
-        private bool saveClosesOnSuccess;
+        private Action retrySave;
         private Vector3 cameraFocus;
         private float cameraDistance = 8f;
         private float cameraYaw = 45f;
@@ -563,6 +563,7 @@ namespace OstrixMods.BuildWorks
             view.SupportPlacementRequested += id => ApplyDocumentEdit(() => document.SetPlacementSupport(id));
             view.SupportCentreRequested += SetSupportCentre;
             view.SaveRequested += () => TrySave(closeAfterSave: false);
+            view.SaveAsRequested += () => TrySaveAs();
             view.UndoRequested += () => ApplyHistory(document.Undo, document.Redo);
             view.RedoRequested += () => ApplyHistory(document.Redo, document.Undo);
             view.GroupRequested += () => ApplyDocumentEdit(() => document.CreateGroup(
@@ -913,7 +914,8 @@ namespace OstrixMods.BuildWorks
             }
             if (control && input.GetKeyDown(KeyCode.S))
             {
-                TrySave(closeAfterSave: false);
+                if (shift) TrySaveAs();
+                else TrySave(closeAfterSave: false);
                 return true;
             }
             if (shift && input.GetKeyDown(KeyCode.A))
@@ -3696,10 +3698,17 @@ namespace OstrixMods.BuildWorks
         }
 
         private bool TrySave(bool closeAfterSave, bool metadataConfirmed = false)
+            => TrySaveDocument(closeAfterSave, metadataConfirmed, saveCopy: false);
+
+        private bool TrySaveAs(bool metadataConfirmed = false)
+            => TrySaveDocument(closeAfterSave: false, metadataConfirmed, saveCopy: true);
+
+        private bool TrySaveDocument(bool closeAfterSave, bool metadataConfirmed, bool saveCopy,
+            string copyName = null, string copyCategory = null)
         {
             if (keyboardPreview) return false;
             if (!IsEditing) return false;
-            saveClosesOnSuccess = closeAfterSave;
+            retrySave = () => TrySaveDocument(closeAfterSave, metadataConfirmed: false, saveCopy, copyName, copyCategory);
             if (document.Parts.Count < 1)
             {
                 view.ShowError(
@@ -3710,12 +3719,13 @@ namespace OstrixMods.BuildWorks
             }
             if (!metadataConfirmed)
             {
-                view.ShowSaveMetadata(document.Name, document.Category,
+                view.ShowSaveMetadata(copyName ?? document.Name, copyCategory ?? document.Category,
                     store.All().Select(x => x.category).Distinct(), (name, category) =>
                     {
-                        document.SetMetadata(name, category);
-                        TrySave(closeAfterSave, metadataConfirmed: true);
-                    });
+                        if (!saveCopy) document.SetMetadata(name, category);
+                        TrySaveDocument(closeAfterSave, metadataConfirmed: true, saveCopy,
+                            saveCopy ? name : null, saveCopy ? category : null);
+                    }, saveCopy);
                 return false;
             }
             state = EditorState.Saving;
@@ -3731,10 +3741,20 @@ namespace OstrixMods.BuildWorks
                 string error;
                 List<CompositeBlueprintStore.Group> groups = BuildStoreGroups();
                 List<CompositeBlueprintStore.Support> supports = BuildStoreSupports();
-                if (sourceBlueprint == null)
+                CompositeBlueprintStore.Blueprint savedBlueprint = sourceBlueprint;
+                if (saveCopy || sourceBlueprint == null)
+                {
+                    CompositeBlueprintStore.Blueprint template = sourceBlueprint ?? previewTemplate;
+                    if (saveCopy && template != null)
+                        template = new CompositeBlueprintStore.Blueprint
+                        {
+                            previewYaw = template.previewYaw,
+                            previewPitch = template.previewPitch,
+                            previewZoom = template.previewZoom
+                        };
                     success = store.TrySaveDocument(
-                        document.Name,
-                        document.Category,
+                        copyName ?? document.Name,
+                        copyCategory ?? document.Category,
                         parts,
                         groups,
                         anchors,
@@ -3742,8 +3762,9 @@ namespace OstrixMods.BuildWorks
                         document.PrimaryGroupId,
                         supports,
                         document.PlacementSupportId,
-                        out sourceBlueprint,
-                        out error, customPoints, previewTemplate, BuildStoreSources());
+                        out savedBlueprint,
+                        out error, customPoints, template, BuildStoreSources());
+                }
                 else
                     success = store.TryUpdateDocument(
                         sourceBlueprint,
@@ -3764,6 +3785,8 @@ namespace OstrixMods.BuildWorks
                         BuildWorksLocalization.Text("editor.save_error_title"), error);
                     return false;
                 }
+                sourceBlueprint = savedBlueprint;
+                previewTemplate = savedBlueprint;
                 document.AdoptSavedIdentity(
                     sourceBlueprint.id, sourceBlueprint.name, sourceBlueprint.category);
                 document.MarkClean();
@@ -3904,7 +3927,7 @@ namespace OstrixMods.BuildWorks
                     break;
                 case BlueprintEditorDialogDecision.Retry:
                     view.HideDialog();
-                    TrySave(saveClosesOnSuccess);
+                    retrySave?.Invoke();
                     break;
             }
         }

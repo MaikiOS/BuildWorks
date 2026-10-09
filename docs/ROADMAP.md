@@ -1,3 +1,15 @@
+## 2026-10-09 — Save As source checkpoint; not deployed
+
+Separate Save As/Ctrl+Shift+S creates a new ID and adopts the copy only on success.
+Provisional copy metadata prevents refused-write/cancel/ordinary-Save renaming the
+original. Native UI regression, final normal/QA builds, bridge, Session17,
+localization878, QA isolation and format passed; Workbench360 and independent
+correctness/Ponytail reviews passed. See docs/SAVE_AS_CHECKPOINT_2026-10-09.md
+(or SAVE_AS_CHECKPOINT_2026-10-09.md from this docs directory).
+Installed QA .116 remains unchanged. No game/save/network acceptance of Save As.
+World snap remains unreproduced; stable supported native-pair QA is required.
+Pending material variation, XYZ/filter/replacement/camera and fog v11 remain open.
+
 ## Owner QA clarification — 2026-10-09
 
 Accepted spending/refunds and reload of the tested modified piece; no noticeable

@@ -459,6 +459,7 @@ namespace OstrixMods.BuildWorks
         private readonly Button undoButton;
         private readonly Button redoButton;
         private readonly Button saveButton;
+        private readonly Button saveAsButton;
         private readonly Button compactPaneButton;
         private readonly Button outlinerNewGroupButton;
         private readonly List<Button> outlinerSelectionButtons = new List<Button>();
@@ -606,6 +607,7 @@ namespace OstrixMods.BuildWorks
                 fullTitle = CreateText("Header", top, T("editor.view.title"), 18f,
                     FontStyles.Bold, TextAlignmentOptions.MidlineLeft).gameObject;
                 fullTitle.AddComponent<LayoutElement>().preferredWidth = 300f;
+                fullTitle.GetComponent<TMP_Text>().overflowMode = TextOverflowModes.Ellipsis;
                 documentTitle = CreateText("Document", top, T("editor.new_blueprint"), 16f,
                     FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
                 documentTitle.overflowMode = TextOverflowModes.Ellipsis;
@@ -622,6 +624,9 @@ namespace OstrixMods.BuildWorks
                 lightingLabel = lightButton.GetComponentInChildren<TMP_Text>();
                 saveButton = CreateButton("Save", top, T("editor.view.save"), 110f,
                     () => SaveRequested?.Invoke(), primary: true);
+                saveAsButton = CreateButton("SaveAs", top, T("editor.save_as"), 158f,
+                    () => SaveAsRequested?.Invoke());
+                AddTooltip((RectTransform)saveAsButton.transform, T("editor.save_as_help"));
                 CreateButton("Exit", top, T("editor.view.exit"), 80f, () => CloseRequested?.Invoke());
                 compactPaneButton = CreateButton("CompactPane", top, T("editor.view.objects"), 96f,
                     ToggleCompactPane);
@@ -1525,6 +1530,7 @@ namespace OstrixMods.BuildWorks
 
         internal event Action CloseRequested;
         internal event Action SaveRequested;
+        internal event Action SaveAsRequested;
         internal event Action UndoRequested;
         internal event Action RedoRequested;
         internal event Action GroupRequested;
@@ -1759,6 +1765,7 @@ namespace OstrixMods.BuildWorks
             SetButtonInteractable(undoButton, document.CanUndo);
             SetButtonInteractable(redoButton, document.CanRedo);
             saveButton.interactable = canSave && document.IsDirty && document.Parts.Count >= 1;
+            saveAsButton.interactable = canSave && document.Parts.Count >= 1;
             bool editingSupport = document.FindSupport(document.ActiveSupportId) != null;
             bool hasSelection = !editingSupport && document.Selection.Count > 0;
             int editableCount = document.EditablePartSelectionCount;
@@ -2223,7 +2230,8 @@ namespace OstrixMods.BuildWorks
             { exchangeView = null; SetPanelsInteractable(true); closed?.Invoke(); });
         }
 
-        internal void ShowSaveMetadata(string name, string category, IEnumerable<string> categories, Action<string, string> accepted)
+        internal void ShowSaveMetadata(string name, string category, IEnumerable<string> categories,
+            Action<string, string> accepted, bool saveCopy = false)
         {
             ResetSaveMetadata();
             RectTransform dialog = (RectTransform)modalTitle.transform.parent;
@@ -2260,7 +2268,8 @@ namespace OstrixMods.BuildWorks
                 () => options.gameObject.SetActive(!options.gameObject.activeSelf));
             SetTopLeft((RectTransform)choose.transform, 308, 90, 152, 36);
             options.gameObject.SetActive(false);
-            modalTitle.text = T("editor.save_title"); modalMessage.text = T("editor.save_metadata_help");
+            modalTitle.text = T(saveCopy ? "editor.save_as" : "editor.save_title");
+            modalMessage.text = T(saveCopy ? "editor.save_as_help" : "editor.save_metadata_help");
             SetTopAnchored(modalMessage.rectTransform, 20, 64, 20, 40);
             SetButtonLabel(dialogPrimaryButton, T("editor.view.save"));
             SetButtonLabel(dialogCancelButton, T("editor.view.cancel"));

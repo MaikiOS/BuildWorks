@@ -338,7 +338,7 @@ public static class RuntimeEditorAcceptance
                     scene.SetViewport(view.ViewportScreenRect());
                     Call(controller, "FrameAll");
                     foreach (string state in new[] { "select", "transform", "array", "contour", "catalog",
-                        "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "save-metadata", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru", "exchange-armor", "exchange-armor-ru", "exchange-missing", "exchange-missing-ru", "replace-tools", "replace-confirm", "replace-confirm-ru" })
+                        "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "save-metadata", "save-as", "save-as-ru", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru", "exchange-armor", "exchange-armor-ru", "exchange-missing", "exchange-missing-ru", "replace-tools", "replace-confirm", "replace-confirm-ru" })
                     {
                         Require(Screen.width == width && Screen.height == height,
                             "GameView changed before " + state + ": " + Screen.width + "x" + Screen.height);
@@ -387,6 +387,11 @@ public static class RuntimeEditorAcceptance
                         else if (state == "settings") ControllerInputAcceptance.NativeClick(view, uiCamera, "View");
                         else if (state == "save-metadata") view.ShowSaveMetadata("Новый чертёж", "Дома",
                             new[] { "Дома", "Мебель" }, (_, __) => { });
+                        else if (state.StartsWith("save-as", StringComparison.Ordinal))
+                        {
+                            BuildWorksLocalization.RussianLanguage = state.EndsWith("-ru", StringComparison.Ordinal);
+                            view.ShowSaveMetadata("Новая копия", "Дома", new[] { "Дома", "Декор" }, (_, __) => { }, saveCopy: true);
+                        }
                         else if (state.StartsWith("exchange"))
                         {
                             string folder = Path.Combine(output, "exchange-layout"); Directory.CreateDirectory(folder);
@@ -555,6 +560,8 @@ public static class RuntimeEditorAcceptance
                 {
                     yield return null;
                     foreach (object step in ControllerInputAcceptance.RunSinglePart(template, fontTemplate, source["woodwall"], output)) yield return step;
+                    foreach (object step in ControllerInputAcceptance.RunSaveAs(template, fontTemplate, source["woodwall"], output)) yield return step;
+                    checks.Add("Save As native UI preserves original, supported data and copy identity through cancel, failure, retry and reopen");
                     foreach (object step in ControllerInputAcceptance.RunMissingExchange(template, fontTemplate, source["woodwall"], output)) yield return step;
                     foreach (object step in ControllerInputAcceptance.RunPrefabMetadata(template, fontTemplate, output)) yield return step;
                     foreach (object step in ControllerInputAcceptance.RunMissingReplacement(template, fontTemplate, source["woodwall"], output)) yield return step;

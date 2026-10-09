@@ -875,3 +875,5 @@ editor.replace_changed	Selection, document or available prefabs changed. Review 
 editor.replace_group	Replacement
 editor.replace_done	Missing record replaced with {0} selected parts. One Undo restores it.
 editor.replace_limit	Replacement needs one group slot. Remove or ungroup an unused group first.
+editor.save_as	SAVE AS…
+editor.save_as_help	Create a separate blueprint with a new ID. The original stays unchanged. Ctrl+Shift+S.

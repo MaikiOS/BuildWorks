@@ -56,6 +56,107 @@ internal static class ControllerInputAcceptance
         }
     }
 
+    internal static IEnumerable<object> RunSaveAs(Camera template, TMP_Text font, GameObject wall, string output)
+    {
+        string path = Path.Combine(output, "save-as-" + Guid.NewGuid().ToString("N") + ".json");
+        var store = new CompositeBlueprintStore(path);
+        var evidence = new BlueprintSourceDocument("blueprint", "save-as.blueprint",
+            "#Pieces\nwoodwall;;0;0;0;0;0;0;1;\"\";2;.5;1.25");
+        var part = new CompositeBlueprintStore.Part { stableId = "wall", prefabName = "woodwall",
+            displayName = "Original wall", parentGroupId = "g", rotation = new CompositeBlueprintStore.QuaternionData { w = 1 },
+            scale = new CompositeBlueprintStore.VectorData { x = 2, y = .5f, z = 1.25f },
+            baseScale = new CompositeBlueprintStore.VectorData(wall.transform.localScale), materialSeed = 0,
+            sourceDocumentId = evidence.Id, sourceLine = 2 };
+        var support = new CompositeBlueprintStore.Support { stableId = "s", name = "Support",
+            rotation = new CompositeBlueprintStore.QuaternionData { w = 1 } };
+        var preview = new CompositeBlueprintStore.Blueprint { previewYaw = 67, previewPitch = 23, previewZoom = 1.3f,
+            placementImportId = "original-import" };
+        Require(store.TrySaveDocument("Original", "OTHER", new[] { part },
+            new[] { new CompositeBlueprintStore.Group { stableId = "g", name = "Group", pivotPartId = "wall" } },
+            Array.Empty<CompositeBlueprintStore.VectorData>(), "wall", null, new[] { support }, "s",
+            out var original, out string error, new[] { new CompositeBlueprintStore.VectorData { x = 3 } }, preview,
+            new[] { CompositeBlueprintStore.SourceDocument.FromGeometry(evidence) }), error);
+        var input = new InputFrames();
+        using (var controller = new BlueprintEditorController(store, template, font, name => name == "woodwall" ? wall : null,
+            name => name, () => Array.Empty<BlueprintEditorCatalogItem>(), message => { throw new InvalidOperationException(message); },
+            editorInput: input))
+        {
+            Require(controller.OpenExisting(original, out error), error); yield return null;
+            var view = Field<BlueprintEditorView>(controller, "view");
+            Require(Field<Button>(view, "saveAsButton").interactable && !Field<Button>(view, "saveButton").interactable,
+                "Clean document cannot Save As independently of ordinary Save");
+            string before = File.ReadAllText(path);
+            NativeClick(view, null, "SaveAs"); yield return null;
+            Require(view.HasModal && Field<TMP_Text>(view, "modalTitle").text == BuildWorksLocalization.Text("editor.save_as"),
+                "Save As did not identify the copy operation");
+            NativeClick(view, null, Field<Button>(view, "dialogCancelButton")); yield return null;
+            Require(!view.HasModal && controller.Document.SourceBlueprintId == original.id && !controller.Document.IsDirty &&
+                File.ReadAllText(path) == before, "Cancelled Save As changed identity, dirty state or storage");
+            Frame(controller, input, view.ViewportScreenRect().center, 0, KeyCode.LeftControl, KeyCode.LeftShift, KeyCode.S);
+            Require(view.HasModal && Field<TMP_Text>(view, "modalTitle").text == BuildWorksLocalization.Text("editor.save_as"),
+                "Ctrl+Shift+S dispatched ordinary Save or a transform instead of Save As");
+            Frame(controller, input, view.ViewportScreenRect().center);
+            NativeClick(view, null, Field<Button>(view, "dialogCancelButton")); yield return null;
+            Require(File.ReadAllText(path) == before && !controller.Document.IsDirty,
+                "Cancelled Save As shortcut changed the document");
+            Require(controller.Document.Rename("wall", "Edited wall"), "Cannot prepare edited copy");
+            Call(controller, "Bind", (object)null);
+            NativeClick(view, null, "SaveAs"); yield return null;
+            Field<TMP_InputField>(view, "saveMetadataName").SetTextWithoutNotify(" ");
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            Require(view.HasModal && File.ReadAllText(path) == before, "Invalid copy name reached persistence");
+            Field<TMP_InputField>(view, "saveMetadataName").SetTextWithoutNotify("Copy");
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            var copy = store.All().Single(item => item.id != original.id);
+            Require(controller.Document.SourceBlueprintId == copy.id && !controller.Document.IsDirty && copy.name == "Copy" &&
+                original.name == "Original" && original.parts[0].displayName == "Original wall" &&
+                copy.parts[0].displayName == "Edited wall" && copy.parts[0].scale.y == .5f && copy.parts[0].materialSeed == 0 &&
+                copy.groups[0].pivotPartId == "wall" && copy.placementSupportId == "s" && copy.customSnapPoints[0].x == 3 &&
+                copy.sourceDocuments[0].text == evidence.Text && copy.previewYaw == 67 && copy.previewPitch == 23 &&
+                copy.previewZoom == 1.3f && copy.placementImportId == null,
+                "Save As lost supported data, reused import identity or overwrote original");
+            Require(controller.Document.Rename("wall", "Updated copy"), "Cannot edit saved copy");
+            Call(controller, "Bind", (object)null);
+            NativeClick(view, null, "Save"); yield return null;
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            Require(store.All().Count == 2 && copy.parts[0].displayName == "Updated copy" &&
+                original.parts[0].displayName == "Original wall", "Ordinary Save updated original or created another copy");
+            before = File.ReadAllText(path);
+            Set(store, "writeBlockReason", "QA synthetic write refusal");
+            NativeClick(view, null, "SaveAs"); yield return null;
+            Field<TMP_InputField>(view, "saveMetadataName").SetTextWithoutNotify("Abandoned copy");
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            Require(controller.Document.Name == "Copy" && !controller.Document.IsDirty &&
+                File.ReadAllText(path) == before, "Failed copy metadata changed the source document");
+            NativeClick(view, null, Field<Button>(view, "dialogCancelButton")); yield return null;
+            Set(store, "writeBlockReason", null);
+            Require(controller.Document.Rename("wall", "After cancelled copy"), "Cannot edit after cancelled failure");
+            Frame(controller, input, view.ViewportScreenRect().center, 0, KeyCode.LeftControl, KeyCode.S);
+            Frame(controller, input, view.ViewportScreenRect().center);
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            Require(copy.name == "Copy" && store.All().Count == 2 && original.name == "Original" &&
+                copy.parts[0].displayName == "After cancelled copy", "Ordinary Save applied abandoned copy metadata");
+            before = File.ReadAllText(path);
+            Set(store, "writeBlockReason", "QA synthetic write refusal");
+            NativeClick(view, null, "SaveAs"); yield return null;
+            Field<TMP_InputField>(view, "saveMetadataName").SetTextWithoutNotify("Retry copy");
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            Require(view.HasModal && store.All().Count == 2 && controller.Document.SourceBlueprintId == copy.id &&
+                ReferenceEquals(Field<CompositeBlueprintStore.Blueprint>(controller, "sourceBlueprint"), copy) &&
+                File.ReadAllText(path) == before, "Failed Save As changed source identity or library");
+            Set(store, "writeBlockReason", null);
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            Require(view.HasModal && Field<TMP_Text>(view, "modalTitle").text == BuildWorksLocalization.Text("editor.save_as"),
+                "Retry changed Save As into ordinary Save");
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            var reloaded = new CompositeBlueprintStore(path).All();
+            Require(reloaded.Count == 3 && reloaded.Single(item => item.id == original.id).name == "Original" &&
+                reloaded.Single(item => item.id == copy.id).name == "Copy" &&
+                reloaded.Single(item => item.id == controller.Document.SourceBlueprintId).name == "Retry copy",
+                "Retry/reload overwrote an existing blueprint or created duplicate copies");
+        }
+    }
+
     internal static IEnumerable<object> RunMissingReplacement(Camera template, TMP_Text font, GameObject wall, string output)
     {
         string path = Path.Combine(output, "replace-" + Guid.NewGuid().ToString("N") + ".json");

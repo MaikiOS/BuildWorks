@@ -18,7 +18,7 @@ public static class ActualDividerAcceptance
     private const string Divider = "ashwood_decowall_divider";
     private const string Wall = "woodwall";
     private static readonly string[] PlacementProbes =
-        { "woodwall", "wood_beam_26", "wood_roof", "piece_chair" };
+        { "woodwall", "wood_floor", "wood_pole", "wood_beam_26", "wood_roof", "piece_chair" };
 
     public static void Run(string outputDirectory)
     {
@@ -109,6 +109,7 @@ public static class ActualDividerAcceptance
             cameraObject = new GameObject("ExactDividerCameraTemplate", typeof(Camera));
             Camera template = cameraObject.GetComponent<Camera>();
             template.enabled = false;
+            RunSupportedSnapFixture(template, placementPrefabs["wood_floor"], placementPrefabs["wood_pole"], outputDirectory, evidence);
             RunRealExternalBlueprints(template, LoadPrefab, outputDirectory, evidence);
             RunPlacementAcceptance(template, placementPrefabs, evidence);
             DiagnoseChairCorners(template, LoadPrefab("piece_chair02"), outputDirectory, evidence);
@@ -488,6 +489,128 @@ public static class ActualDividerAcceptance
     private static BlueprintEditorPart Part(string id, string name, Vector3 position) =>
         new BlueprintEditorPart(id, name, name, new Point3(position.x, position.y, position.z), new Rotation3(0, 0, 0, 1));
 
+    private static void RunSupportedSnapFixture(Camera template, GameObject floor, GameObject pole,
+        string output, ICollection<string> evidence)
+    {
+        Bounds Colliders(GameObject prefab)
+        {
+            bool found = false;
+            Bounds result = default;
+            foreach (Collider collider in prefab.GetComponentsInChildren<Collider>(true))
+            {
+                if (!collider.enabled || collider.isTrigger) continue;
+                Require(collider is BoxCollider, "Unreviewed supported fixture collider: " + collider.GetType().Name);
+                var box = (BoxCollider)collider;
+                Matrix4x4 matrix = Matrix4x4.Scale(prefab.transform.localScale) *
+                    prefab.transform.worldToLocalMatrix * box.transform.localToWorldMatrix;
+                for (int corner = 0; corner < 8; ++corner)
+                {
+                    Vector3 point = matrix.MultiplyPoint3x4(box.center + Vector3.Scale(box.size * .5f,
+                        new Vector3((corner & 1) == 0 ? -1 : 1, (corner & 2) == 0 ? -1 : 1, (corner & 4) == 0 ? -1 : 1)));
+                    if (found) result.Encapsulate(point);
+                    else { result = new Bounds(point, Vector3.zero); found = true; }
+                }
+            }
+            Require(found && result.size.y > .01f && result.size.magnitude < 8, "Invalid supported fixture footprint");
+            evidence.Add("SUPPORTED collider " + prefab.name + "; min=" + result.min.ToString("R") + "; max=" + result.max.ToString("R"));
+            return result;
+        }
+        Bounds floorBounds = Colliders(floor), poleBounds = Colliders(pole);
+        Require(floor.transform.localScale == Vector3.one && pole.transform.localScale == Vector3.one,
+            "Fixture native base scale changed; recalibrate explicitly");
+        Vector3[] snaps = floor.transform.Cast<Transform>().Where(child => child.CompareTag("snappoint"))
+            .Select(child => child.localPosition).ToArray();
+        Require(snaps.Length == 4 && snaps.Contains(new Vector3(1, 0, 1)) && snaps.Contains(new Vector3(-1, 0, -1)),
+            "Fixture native floor snap points changed");
+        Quaternion rotationA = Quaternion.Euler(0, 30, 0), rotationB = Quaternion.Euler(0, 120, 0);
+        Vector3 scaleA = new Vector3(1.25f, 1, .75f);
+        Vector3 delta = rotationA * Vector3.Scale(new Vector3(1, 0, 1), scaleA) - rotationB * new Vector3(-1, 0, -1);
+        int coincident = snaps.Sum(a => snaps.Count(b => Vector3.Distance(rotationA * Vector3.Scale(a, scaleA), delta + rotationB * b) < .0001f));
+        Require(coincident == 1, "Supported fixture has ambiguous or disconnected native snap points");
+        // Native colliders, rather than decorative mesh edges, determine the pole/floor contact.
+        float floorY = poleBounds.max.y - floorBounds.min.y - .01f;
+        var positions = new[] { Vector3.zero, delta, new Vector3(0, floorY, 0), delta + Vector3.up * floorY };
+        var rotations = new[] { rotationA, rotationB, rotationA, rotationB };
+        var scales = new[] { Vector3.one, Vector3.one, scaleA, Vector3.one };
+        string Number(float value) => value.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
+        string Row(string name, Vector3 p, Quaternion q, Vector3 s) => name + ";;" +
+            string.Join(";", new[] { p.x, p.y, p.z, q.x, q.y, q.z, q.w }.Select(Number)) +
+            ";\"\";" + string.Join(";", new[] { s.x, s.y, s.z }.Select(Number)) + ";";
+        var rows = new List<string> { "#Name: TEST 16 Supported XYZ Snap", "#Category: BW TEST", "#Pieces" };
+        var parts = new List<BlueprintEditorPart>();
+        for (int index = 0; index < 4; ++index)
+        {
+            string name = index < 2 ? pole.name : floor.name;
+            Vector3 p = positions[index], s = scales[index]; Quaternion q = rotations[index];
+            rows.Add(Row(name, p, q, s));
+            parts.Add(new BlueprintEditorPart("supported-" + index, name, name,
+                new Point3(p.x, p.y, p.z), new Rotation3(q.x, q.y, q.z, q.w), scale: new Point3(s.x, s.y, s.z)));
+        }
+        string candidate = Path.Combine(output, "16-supported-snap.blueprint");
+        byte[] bytes = new System.Text.UTF8Encoding(false).GetBytes(string.Join("\n", rows) + "\n");
+        File.WriteAllBytes(candidate, bytes);
+        string repository = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", ".."));
+        string fixture = Path.Combine(repository, "tests", "fixtures", "player-exchange", "16-supported-snap.blueprint");
+        Require(File.Exists(fixture) && File.ReadAllBytes(fixture).SequenceEqual(bytes), "Supported fixture differs from exact native calibration: " + candidate);
+        foreach (bool first in new[] { true, false })
+        {
+            string name = first ? "17-supported-snap-a.blueprint" : "18-supported-snap-b.blueprint";
+            Quaternion q = first ? rotationA : rotationB;
+            string text = "#Name: TEST " + (first ? "17 Snap A" : "18 Snap B") + "\n#Category: BW TEST\n#Pieces\n" +
+                Row(pole.name, Vector3.zero, q, Vector3.one) + "\n" +
+                Row(floor.name, Vector3.up * floorY, q, first ? scaleA : Vector3.one) + "\n";
+            byte[] pairBytes = new System.Text.UTF8Encoding(false).GetBytes(text);
+            File.WriteAllBytes(Path.Combine(output, name), pairBytes);
+            string pairPath = Path.Combine(repository, "tests", "fixtures", "player-exchange", name);
+            Require(File.Exists(pairPath) && File.ReadAllBytes(pairPath).SequenceEqual(pairBytes), "Native snap pair fixture differs: " + name);
+            var pair = CompositeBlueprintStore.ReviewImportFile(pairPath, prefabName => prefabName.GetStableHashCode(), 0);
+            Require(pair.Documents.Count == 1 && pair.Documents[0].importError == null && pair.Documents[0].parts.Count == 2,
+                "Independent supported snap fixture cannot import: " + name);
+        }
+        var review = CompositeBlueprintStore.ReviewImportFile(fixture, name => name.GetStableHashCode(), 0);
+        Require(review.Documents.Count == 1 && review.Documents[0].importError == null && review.Documents[0].parts.Count == 4,
+            "Supported external fixture cannot be imported");
+        string storeDirectory = Path.Combine(output, "supported-snap-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(storeDirectory);
+        string storePath = Path.Combine(storeDirectory, "library.json");
+        var store = new CompositeBlueprintStore(storePath);
+        var prefabs = new Dictionary<string, GameObject> { [floor.name] = floor, [pole.name] = pole };
+        store.ConfigureImportScale(name => new CompositeBlueprintStore.VectorData(prefabs[name].transform.localScale),
+            () => prefabs, name => name.GetStableHashCode(), () => 0);
+        Require(store.TryImportReviewed(review, false, false, name => name.GetStableHashCode(), out string importError), importError);
+        var wait = System.Diagnostics.Stopwatch.StartNew();
+        while (store.CatalogLoading && wait.ElapsedMilliseconds < 10000)
+        { store.CatalogAll(); System.Threading.Thread.Sleep(10); }
+        Require(!store.CatalogLoading && store.ImportError == null, "Supported fixture import did not finish");
+        using (var editor = new BlueprintEditorController(store, template, null, name => prefabs[name], name => name,
+            () => Array.Empty<BlueprintEditorCatalogItem>(), message => { throw new InvalidOperationException(message); }))
+        {
+            Require(editor.OpenExisting(store.CatalogAll().Single(), out string error), error);
+            Require((bool)typeof(BlueprintEditorController).GetMethod("TrySave", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(editor, new object[] { false, true }), "Supported native copy save failed");
+        }
+        var saved = new CompositeBlueprintStore(storePath).All().Single();
+        var restored = BlueprintExchangeFormat.Decode(new System.Text.UTF8Encoding(false).GetString(BlueprintExchangeFormat.Encode(saved)));
+        for (int index = 0; index < 4; ++index)
+            Require(Vector3.Distance(restored.parts[index].position.ToVector3(), positions[index]) < .0001f &&
+                Quaternion.Angle(restored.parts[index].rotation.ToQuaternion(), rotations[index]) < .001f &&
+                !restored.parts[index].scaleIsAbsolute &&
+                Vector3.Distance(restored.parts[index].RootScale(prefabs[restored.parts[index].prefabName].transform.localScale), scales[index]) < .0001f,
+                "Supported fixture import/save changed transform " + index);
+        using (var scene = new BlueprintEditorScene(template, name => name == floor.name ? floor : pole))
+        {
+            Require(scene.TrySync(new BlueprintEditorDocument(null, "Supported snap", "Test", parts), out string error), error);
+            Require(scene.TryGetContentBounds(out Bounds visualBounds), "Supported fixture visuals missing");
+            Require(poleBounds.min.y - visualBounds.min.y < .05f && visualBounds.size.magnitude < 8,
+                "Supported poles float above the visual placement base or exceed the test footprint");
+            scene.SetViewport(new Rect(0, 0, 1024, 1024));
+            scene.Camera.orthographic = true; scene.Camera.orthographicSize = 3;
+            scene.SetCameraPose(visualBounds.center + new Vector3(4, 3, -5), Quaternion.LookRotation(new Vector3(-4, -3, 5)));
+            Capture(scene.Camera, Path.Combine(output, "actual-supported-snap.png"));
+        }
+        evidence.Add("PASS supported fixture: four native pieces, one coincident floor snap pair, pole/floor collider overlap0.01m, exact import/internal roundtrip. Game stability remains unverified.");
+    }
+
     private static void RecordPlacementMetadata(GameObject prefab, ICollection<string> evidence)
     {
         GameObject clone = PlacementGhostPreviewView.CreateVisualClone(
@@ -515,6 +638,19 @@ public static class ActualDividerAcceptance
                 "; boundsMin=" + bounds.min.ToString("F4") +
                 "; boundsMax=" + bounds.max.ToString("F4") +
                 "; native=" + snaps.Count + " [" + string.Join(", ", snaps) + "]");
+            if (prefab.name == "wood_floor")
+            {
+                evidence.Add("FLOOR sourceScale=" + prefab.transform.localScale.ToString("R"));
+                foreach (Collider collider in prefab.GetComponentsInChildren<Collider>(true))
+                {
+                    if (!collider.enabled || collider.isTrigger) continue;
+                    Require(collider is BoxCollider, "Native floor collider changed: " + collider.GetType().Name);
+                    var box = (BoxCollider)collider;
+                    evidence.Add("FLOOR collider=" + collider.name + "; center=" + box.center.ToString("R") +
+                        "; size=" + box.size.ToString("R") + "; matrix=" +
+                        (prefab.transform.worldToLocalMatrix * collider.transform.localToWorldMatrix).ToString("R"));
+                }
+            }
         }
         finally
         {

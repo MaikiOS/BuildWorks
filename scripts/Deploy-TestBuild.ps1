@@ -121,7 +121,8 @@ if ($PlayerTestFixtures) {
     $fixtureTarget = Join-Path $qaConfig 'test-fixtures'
     foreach ($path in @($fixtureSource, $fixtureTarget)) { Assert-NotReparsePoint $path }
     foreach ($name in '01-walls.blueprint', '02-sign.blueprint', '03-opaque.blueprint',
-        '04-snap.blueprint', '05-missing.blueprint', '06-lamp.blueprint') {
+        '04-snap.blueprint', '05-missing.blueprint', '06-lamp.blueprint', '16-supported-snap.blueprint',
+        '17-supported-snap-a.blueprint', '18-supported-snap-b.blueprint') {
         $fixtureCopies += @{ Source = (Join-Path $fixtureSource $name); Name = $name; Expected = $null }
     }
     if ($QaStandToken) {
@@ -132,6 +133,15 @@ if ($PlayerTestFixtures) {
             $manifest = @((($supplies.Methods | Where-Object Name -eq '.cctor').Body.Instructions |
                 Where-Object { $_.OpCode.Name -eq 'ldstr' }).Operand)
             if ($manifest.Count -ne 7) { throw 'Unexpected QA source fixture manifest.' }
+            foreach ($field in @(@('SupportedSnapFixture','16-supported-snap.blueprint'),
+                @('SupportedSnapAFixture','17-supported-snap-a.blueprint'), @('SupportedSnapBFixture','18-supported-snap-b.blueprint'))) {
+                $supplement = @($supplies.Fields | Where-Object Name -CEQ $field[0])
+                if ($supplement.Count -ne 1 -or -not $supplement[0].HasConstant -or
+                    $supplement[0].Constant -cnotmatch ('^' + [regex]::Escape($field[1]) + '\|[A-F0-9]{64}$')) {
+                    throw 'Unexpected supported-snap QA fixture manifest.'
+                }
+                $manifest += [string]$supplement[0].Constant
+            }
             foreach ($entry in $manifest) {
                 if ($entry -cnotmatch '^([a-zA-Z0-9_-]+\.blueprint)\|([A-F0-9]{64})$') { throw 'Invalid QA source fixture manifest entry.' }
                 $name = $Matches[1]; $expected = $Matches[2]

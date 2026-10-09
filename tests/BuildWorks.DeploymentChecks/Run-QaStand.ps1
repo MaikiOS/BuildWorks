@@ -16,7 +16,8 @@ foreach ($relative in @('scripts/Deploy-TestBuild.ps1', 'scripts/Test-QASaveIsol
     Copy-Replica (Join-Path $source $relative) (Join-Path $replica $relative)
 }
 foreach ($name in @('01-walls.blueprint','02-sign.blueprint','03-opaque.blueprint',
-    '04-snap.blueprint','05-missing.blueprint','06-lamp.blueprint')) {
+    '04-snap.blueprint','05-missing.blueprint','06-lamp.blueprint','16-supported-snap.blueprint',
+    '17-supported-snap-a.blueprint','18-supported-snap-b.blueprint')) {
     $relative = 'tests/fixtures/player-exchange/' + $name
     Copy-Replica (Join-Path $source $relative) (Join-Path $replica $relative)
 }
@@ -64,6 +65,12 @@ $original = [IO.File]::ReadAllBytes($external)
 Refuses { & $deploy -TargetProfile TerrainRamp-1.0-Test -QaStandToken $token } 'QA source fixture hash changed'
 $cases++
 [IO.File]::WriteAllBytes($external,$original)
+$supplement = Join-Path $replica 'tests/fixtures/player-exchange/16-supported-snap.blueprint'
+$supplementBytes = [IO.File]::ReadAllBytes($supplement)
+[IO.File]::AppendAllText($supplement,'changed')
+Refuses { & $deploy -TargetProfile TerrainRamp-1.0-Test -QaStandToken $token } 'QA source fixture hash changed'
+$cases++
+[IO.File]::WriteAllBytes($supplement,$supplementBytes)
 # Junction named like a DLL also redirects Copy-Item outside the target profile.
 [IO.Directory]::CreateDirectory((Split-Path $installed)) | Out-Null
 $outside = Join-Path $output 'outside-profile'
@@ -79,7 +86,7 @@ $cases++
 Require ([IO.File]::ReadAllText($marker) -ceq $token) 'Explicit QA identity marker not written exactly.'
 Require ((Get-FileHash $installed).Hash -ceq (Get-FileHash (Join-Path $replica 'artifacts/test-stand-bin/BuildWorks.dll')).Hash) 'QA DLL was not selected.'
 $fixtureTarget = Join-Path $target 'BepInEx/config/BuildWorks/test-fixtures'
-Require (@(Get-ChildItem -LiteralPath $fixtureTarget -File).Count -eq 8) 'Expected six owned and two external local QA files.'
+Require (@(Get-ChildItem -LiteralPath $fixtureTarget -File).Count -eq 11) 'Expected nine owned and two external local QA files.'
 Require (-not (Test-Path -LiteralPath (Join-Path $target 'BepInEx/config/BuildWorks/qa-saves'))) 'Deployment created a game save root.'
 $cases++
 $before = Snapshot

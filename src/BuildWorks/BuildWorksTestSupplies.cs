@@ -12,6 +12,9 @@ namespace OstrixMods.BuildWorks
     // Isolated QA preparation only; never a survival placement or administrator restore path.
     internal static class BuildWorksTestSupplies
     {
+        internal const string SupportedSnapFixture = "16-supported-snap.blueprint|0581781B12DE25323C3F85E7F9747B9CD2AE9D5F6C5482CC65A4998B0CB0D427";
+        internal const string SupportedSnapAFixture = "17-supported-snap-a.blueprint|6C2C666C6934638732E8270533F3B9EBB1BDA63180B3E503B1834D6BB21A226C";
+        internal const string SupportedSnapBFixture = "18-supported-snap-b.blueprint|C5C28366DC4A367C15B53204F5721C3A4D61AE7921D3B9138BBC26DEDE8222EF";
         private static readonly string[] Fixtures =
         {
             "01-walls.blueprint|E65CB24CB573FE4C8E320918049EB0A1EBC05AF66A8D944E60AC618A9731AFBB",
@@ -38,14 +41,14 @@ namespace OstrixMods.BuildWorks
             using (var hash = SHA256.Create()) return BitConverter.ToString(hash.ComputeHash(bytes)).Replace("-", "");
         }
 
-        internal static Dictionary<GameObject, int> Plan(out List<Piece> pieces)
+        internal static Dictionary<GameObject, int> Plan(out List<Piece> pieces, bool supportedSnap = false)
         {
             if (!ZNetScene.instance || !ObjectDB.instance || !MessageHud.instance)
                 throw new InvalidOperationException("QA supplies require loaded prefab/item databases and MessageHud.");
             string directory = CompositeBlueprintStore.ValidateExchangeDirectory(BuildWorksTestIsolation.FixtureDirectory);
             pieces = new List<Piece>();
             int resourceBudget = 0;
-            foreach (string manifest in Fixtures)
+            foreach (string manifest in supportedSnap ? new[] { SupportedSnapFixture, SupportedSnapAFixture, SupportedSnapBFixture } : Fixtures)
             {
                 string[] entry = manifest.Split('|');
                 string path = Path.Combine(directory, entry[0]);
@@ -82,9 +85,12 @@ namespace OstrixMods.BuildWorks
                     throw new InvalidDataException("Invalid native QA resource prefab/amount.");
                 result.Add(prefab, resource.Amount);
             }
-            GameObject hammer = ObjectDB.instance.GetItemPrefab("Hammer");
-            if (!hammer || result.ContainsKey(hammer)) throw new InvalidDataException("QA Hammer is missing or conflicts with resources.");
-            result.Add(hammer, 1);
+            if (!supportedSnap)
+            {
+                GameObject hammer = ObjectDB.instance.GetItemPrefab("Hammer");
+                if (!hammer || result.ContainsKey(hammer)) throw new InvalidDataException("QA Hammer is missing or conflicts with resources.");
+                result.Add(hammer, 1);
+            }
             return result;
         }
 
@@ -96,14 +102,14 @@ namespace OstrixMods.BuildWorks
             return count;
         }
 
-        internal static bool Prepare()
+        internal static bool Prepare(bool supportedSnap = false)
         {
             Player player = BuildWorksTestIsolation.RequireLoadedSession();
-            Dictionary<GameObject, int> plan = Plan(out _);
-            string description = string.Join("\n", Fixtures) + "\n" + string.Join("\n", plan.OrderBy(pair => pair.Key.name, StringComparer.Ordinal)
+            Dictionary<GameObject, int> plan = Plan(out _, supportedSnap);
+            string description = string.Join("\n", supportedSnap ? new[] { SupportedSnapFixture, SupportedSnapAFixture, SupportedSnapBFixture } : Fixtures) + "\n" + string.Join("\n", plan.OrderBy(pair => pair.Key.name, StringComparer.Ordinal)
                 .Select(pair => pair.Key.name + "=" + pair.Value.ToString(CultureInfo.InvariantCulture)));
             string stamp = BuildWorksTestIsolation.SupplyStamp(description);
-            string receipt = BuildWorksTestIsolation.SupplyReceiptPath;
+            string receipt = supportedSnap ? BuildWorksTestIsolation.SupportedSnapSupplyReceiptPath : BuildWorksTestIsolation.SupplyReceiptPath;
             if (BuildWorksTestIsolation.OnceComplete(receipt, stamp)) return false;
             Inventory inventory = player.GetInventory();
             int slots = 0;

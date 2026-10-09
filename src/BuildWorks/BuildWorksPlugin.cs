@@ -196,6 +196,18 @@ namespace OstrixMods.BuildWorks
                     }
                 }
                 finally { (stations as IDisposable)?.Dispose(); }
+                try
+                {
+                    bool supplied = BuildWorksTestSupplies.Prepare(supportedSnap: true);
+                    Logger.LogInfo(supplied
+                        ? "BuildWorks QA supported-snap resources saved separately; previous supplies were not reissued."
+                        : "BuildWorks QA supported-snap resources were already prepared; nothing was reissued.");
+                }
+                catch (Exception exception)
+                {
+                    Logger.LogError("BuildWorks QA supported-snap supplies stopped; no automatic reissue: " + exception);
+                    yield break;
+                }
                 Logger.LogInfo("BuildWorks QA preparation completed or previously recorded. Native blueprint construction and reload still require acceptance.");
                 while (Player.m_localPlayer) yield return null;
             }

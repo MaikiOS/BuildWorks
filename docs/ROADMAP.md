@@ -1,3 +1,17 @@
+## 2026-10-09 — supported native scale/snap fixtures; not deployed
+
+Three original fixtures16/17/18 contain native floors and support poles.
+Installed native sockets/colliders calibrate yaws30/120, XYZ and support contact;
+survival stability remains enabled. Combined reference and independent A/B import;
+actual editor/save/reopen/effective scale pass. A separate once-only native-cost
+cohort funds eight pieces; original7 fixtures/stamp/receipt remain unchanged.
+Normal/QA0/0, Store, Unity372 UTC14:30:37, QA isolation15 one-shot, deployment13
+replica cases and independent/Ponytail review pass. See
+ docs/SUPPORTED_SNAP_CHECKPOINT_2026-10-09.md.
+Installed QA .116 SHA867E5E47…DCF3A unchanged; no deployment/game/saves/grants.
+Native stability, world snap/reload/network remain open. Next: deletion/hiding,
+visible missing replacement, tree filters and interior camera. Goal remains active.
+
 ## 2026-10-09 — independent XYZ editor scale; not deployed
 
 Three percent fields and a keep-proportions toggle use existing document/history

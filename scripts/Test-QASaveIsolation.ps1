@@ -87,7 +87,14 @@ $suppliesName = 'OstrixMods.BuildWorks.BuildWorksTestSupplies'
 $suppliesType = $qa.MainModule.GetType($suppliesName)
 Require ($null -ne $suppliesType -and $null -eq $normal.MainModule.GetType($suppliesName)) 'QA supplies leaked into normal build or are missing.'
 $prepare = $suppliesType.Methods | Where-Object Name -eq 'Prepare'
+Require ($prepare.Parameters.Count -eq 1 -and $prepare.Parameters[0].ParameterType.FullName -eq 'System.Boolean' -and
+    $prepare.Parameters[0].HasConstant -and $prepare.Parameters[0].Constant -eq $false) 'Default supplies must retain the original cohort.'
 $prepareCalls = @($prepare.Body.Instructions | Where-Object { $_.OpCode.Name -in @('call','callvirt') })
+foreach ($name in @('get_SupplyReceiptPath','get_SupportedSnapSupplyReceiptPath')) {
+    Require ([bool]($prepareCalls | Where-Object { [string]$_.Operand -match "::$name\(" })) "Supplies omit separate receipt $name"
+}
+$planCall = $prepareCalls | Where-Object { [string]$_.Operand -match '::Plan\(' } | Select-Object -First 1
+Require ($planCall.Previous.OpCode.Name -eq 'ldarg.0') 'Supply cohort is not passed into its native resource plan.'
 foreach ($name in @('RequireLoadedSession','Plan','SupplyStamp','OnceComplete','BeginOnce','Count','AddItem','AddKnownItem','SavePlayerData','Save','CompleteOnce')) {
     Require ([bool]($prepareCalls | Where-Object { [string]$_.Operand -match "::$name\(" })) "Native supply path omits $name"
 }
@@ -124,6 +131,9 @@ Require ($respawnWait.Next.OpCode.Name -in @('brtrue','brtrue.s') -and
 Require ([bool](@($coroutine.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -match '::RequireLoadedSession\(')) 'QA loaded gate is not called by the actual plugin coroutine.'
 Require ([bool](@($coroutine.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -match '(Character|Player)::InIntro\(')) 'QA provisioning does not wait for the fresh-player intro flight.'
 Require ([bool](@($coroutine.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -match 'BuildWorksTestSupplies::Prepare\(')) 'QA supply path is not called by actual plugin coroutine.'
+$supplyCalls = @($coroutine.Methods.Body.Instructions | Where-Object { [string]$_.Operand -match 'BuildWorksTestSupplies::Prepare\(' })
+Require ($supplyCalls.Count -eq 2 -and $supplyCalls[0].Previous.OpCode.Name -eq 'ldc.i4.0' -and
+    $supplyCalls[1].Previous.OpCode.Name -eq 'ldc.i4.1') 'Plugin must provision original and supported-snap cohorts independently.'
 $stationsName = 'OstrixMods.BuildWorks.BuildWorksTestStations'
 $stations = $qa.MainModule.GetType($stationsName)
 Require ($null -ne $stations -and $null -eq $normal.MainModule.GetType($stationsName)) 'QA stations leaked into the normal build or are missing.'
@@ -351,6 +361,15 @@ $completeHash = (Get-FileHash $supplyReceipt).Hash
 Require (-not [bool](Invoke-PathCheck 'BeginOnce' @($supplyReceipt,$stamp))) 'Completed preparation reissued supplies.'
 Require ((Get-FileHash $supplyReceipt).Hash -eq $completeHash) 'Replay changed complete receipt.'
 $onceChecks++
+$snapReceipt = Join-Path $isolated 'qa-supported-snap-supplies.txt'
+$snapStamp = 'C' * 64
+Require ([bool](Invoke-PathCheck 'BeginOnce' @($snapReceipt,$snapStamp))) 'Supplement did not start independently.'
+Refuses { Invoke-PathCheck 'BeginOnce' @($snapReceipt,$snapStamp) } 'Interrupted supplement retried.'
+Invoke-PathCheck 'CompleteOnce' @($snapReceipt,$snapStamp)
+Require (-not [bool](Invoke-PathCheck 'BeginOnce' @($snapReceipt,$snapStamp))) 'Completed supplement was reissued.'
+Require ((Get-FileHash $supplyReceipt).Hash -ceq $completeHash -and
+    [bool](Invoke-PathCheck 'OnceComplete' @($supplyReceipt,$stamp))) 'Supplement invalidated previous supplies.'
+$onceChecks += 4
 foreach ($invalidStamp in @('A',('a'*64),('G'*64),'../escape')) {
     Refuses { Invoke-PathCheck 'BeginOnce' @((Join-Path $isolated 'never-created.txt'),$invalidStamp) } 'Malformed supply stamp accepted.'
     $onceChecks++

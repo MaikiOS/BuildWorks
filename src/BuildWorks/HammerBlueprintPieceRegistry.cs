@@ -437,7 +437,7 @@ namespace OstrixMods.BuildWorks
                 GameObject visual = PlacementGhostPreviewView.CreateVisualClone(
                     pieces[index].gameObject,
                     "Part_" + index,
-                    prefab.layer);
+                    prefab.layer, blueprint.parts[index].materialSeed);
                 visual.transform.SetParent(prefab.transform, false);
                 visual.transform.localPosition = blueprint.parts[index].position.ToVector3();
                 visual.transform.localRotation = blueprint.parts[index].rotation.ToQuaternion();

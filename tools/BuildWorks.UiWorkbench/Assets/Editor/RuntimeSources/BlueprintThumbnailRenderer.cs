@@ -318,7 +318,7 @@ namespace OstrixMods.BuildWorks
                     GameObject visual = PlacementGhostPreviewView.CreateVisualClone(
                         piece.gameObject,
                         "Part_" + index,
-                        ThumbnailLayer);
+                        ThumbnailLayer, blueprint.parts[index].materialSeed);
                     visual.transform.SetParent(root.transform, false);
                     BlueprintItemStandPreview.TryAdd(piece.gameObject, visual,
                         blueprint.parts[index].foreignData?.ToGeometry(), out string warning);
@@ -566,7 +566,7 @@ namespace OstrixMods.BuildWorks
                         GameObject visual = PlacementGhostPreviewView.CreateVisualClone(
                             piece.gameObject,
                             "Part_" + index,
-                            ThumbnailLayer);
+                            ThumbnailLayer, blueprint.parts[index].materialSeed);
                         visual.transform.SetParent(root.transform, false);
                         BlueprintItemStandPreview.TryAdd(piece.gameObject, visual,
                             blueprint.parts[index].foreignData?.ToGeometry(), out string warning);

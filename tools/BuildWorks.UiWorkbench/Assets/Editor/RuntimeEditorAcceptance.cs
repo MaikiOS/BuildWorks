@@ -534,6 +534,8 @@ public static class RuntimeEditorAcceptance
                     restoreScreen();
                 }
                 TestUnreadablePicking(template);
+                MaterialVariationAcceptance.Run(template, source["woodwall"]);
+                checks.Add("Seeded renderer-only/editor previews: native descriptor API fixture, zero/max seed, nested scope, source isolation and hover restore; native API parity is checked separately. Heavy batching/world restoration remain pending.");
                 TestPlacementSurface(template);
                 TestContourNativeEdges(template);
                 TestNestedSelection(template, source["woodwall"]);

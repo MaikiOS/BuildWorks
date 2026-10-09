@@ -174,7 +174,7 @@ namespace OstrixMods.BuildWorks
             MaterialPropertyBlock ghostProperties,
             int layer)
         {
-            return CreateVisualClone(
+            return CreateVisualCloneCore(
                 visualSource,
                 "BuildWorks_PlacementPreview_" + index,
                 layer,
@@ -184,12 +184,23 @@ namespace OstrixMods.BuildWorks
         internal static GameObject CreateVisualClone(
             GameObject visualSource,
             string name,
-            int layer)
+            int layer, int? materialSeed = null)
         {
-            return CreateVisualClone(visualSource, name, layer, null);
+            GameObject visual = CreateVisualCloneCore(visualSource, name, layer, null);
+            try
+            {
+                BlueprintMaterialVariation.ApplyPreview(visualSource, visual, materialSeed);
+                return visual;
+            }
+            catch
+            {
+                visual.SetActive(false);
+                UnityEngine.Object.Destroy(visual);
+                throw;
+            }
         }
 
-        private static GameObject CreateVisualClone(
+        private static GameObject CreateVisualCloneCore(
             GameObject visualSource,
             string name,
             int layer,

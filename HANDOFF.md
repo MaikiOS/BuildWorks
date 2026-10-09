@@ -1,3 +1,16 @@
+## 2026-10-09 — material renderer parameters; world restoration pending
+
+Owned native GetValue descriptors now supply nested renderer-only copies. Editor
+hover/restore and document/temporary seed cache changes passed; thumbnails and
+palette visual creation are wired. Unsupported seeds remain editable with pending
+state. Native GetValue parity + Session17, Workbench360, normal/QA, required checks
+and independent correctness/Ponytail passed. See docs/MATERIAL_VARIATION_CONTRACT.md
+(or the same filename in this docs directory) for hashes and exact limits.
+External conversion, small/heavy world preview, native seed write, capture/reload
+and network remain open. Keep seeded world preflight blocked until those agree.
+Installed QA .116 unchanged; no game launch/save writes. Next priority remains
+complete imported blueprint placement, with stable native-snap QA, then editor UX.
+
 ## 2026-10-09 — Save As source checkpoint; not deployed
 
 Separate Save As/Ctrl+Shift+S creates a new ID and adopts the copy only on success.

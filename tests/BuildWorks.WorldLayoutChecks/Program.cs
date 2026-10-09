@@ -41,6 +41,7 @@ internal static class Program
             vectorType = append.GetParameters()[0].ParameterType;
             rotationType = append.GetParameters()[1].ParameterType;
             pieceType = sessionType.GetField("selectedPiece", Instance).FieldType;
+            TestNativeMaterialVariation(asm);
             TestGridComposition();
             TestSignPayloadLifecycle();
             TestItemStandPayloadLifecycle();
@@ -71,6 +72,54 @@ internal static class Program
             foreach (GameObject fixture in fixtureObjects)
                 if (fixture) UnityEngine.Object.DestroyImmediate(fixture);
         }
+    }
+
+    private static void TestNativeMaterialVariation(Assembly plugin)
+    {
+        Type componentType = pieceType.Assembly.GetType("RandomMaterialValues", true);
+        Type propertyType = componentType.GetNestedType("VectorVariationProperty", BindingFlags.Public);
+        Type adapter = plugin.GetType("OstrixMods.BuildWorks.BlueprintMaterialVariation", true);
+        MethodInfo apply = adapter.GetMethod("ApplyPreview", BindingFlags.NonPublic | BindingFlags.Static);
+        var source = new GameObject("Native material source"); source.SetActive(false);
+        var copy = new GameObject("Native material copy"); copy.SetActive(false);
+        try
+        {
+            var scope = new GameObject("scope"); scope.transform.SetParent(source.transform, false);
+            var visualScope = new GameObject("scope"); visualScope.transform.SetParent(copy.transform, false);
+            Renderer renderer = visualScope.AddComponent<MeshRenderer>();
+            Renderer sibling = copy.AddComponent<MeshRenderer>();
+            object component = scope.AddComponent(componentType);
+            object property = Activator.CreateInstance(propertyType);
+            var minimum = new Vector4(.1f, .2f, .3f, .4f);
+            var maximum = new Vector4(.6f, .7f, .8f, .9f);
+            Set(property, "m_minimum", minimum); Set(property, "m_maximum", maximum);
+            Set(property, "m_propertyNames", new System.Collections.Generic.List<string> { "_NativeVariation" });
+            IList properties = (IList)Get(component, "m_vectorProperties");
+            properties.Add(property); properties.Add(property);
+            FieldInfo rng = propertyType.BaseType.GetField("m_random", Instance);
+            Require(rng != null && rng.GetValue(property) == null, "Native variation source RNG is not pristine");
+            var block = new MaterialPropertyBlock(); block.SetFloat("_Unrelated", 42); renderer.SetPropertyBlock(block);
+            foreach (int seed in new[] { 0, 1234, int.MaxValue })
+            {
+                apply.Invoke(null, new object[] { source, copy, seed });
+                renderer.GetPropertyBlock(block);
+                var random = new System.Random(unchecked(seed + 1));
+                var expected = new Vector4(
+                    Mathf.Lerp(minimum.x, maximum.x, (float)random.NextDouble()),
+                    Mathf.Lerp(minimum.y, maximum.y, (float)random.NextDouble()),
+                    Mathf.Lerp(minimum.z, maximum.z, (float)random.NextDouble()),
+                    Mathf.Lerp(minimum.w, maximum.w, (float)random.NextDouble()));
+                Require(block.GetVector("_NativeVariation") == expected && block.GetFloat("_Unrelated") == 42,
+                    "Native GetValue/seed index overflow or unrelated MPB preservation differs");
+                Require(rng.GetValue(property) == null, "Adapter mutated native source descriptor RNG");
+                sibling.GetPropertyBlock(block);
+                Require(block.GetVector("_NativeVariation") == Vector4.zero, "Variation escaped native child scope");
+            }
+            try { apply.Invoke(null, new object[] { source, copy, -1 }); throw new Exception("Negative seed accepted"); }
+            catch (TargetInvocationException error) { Require(error.InnerException is ArgumentException, "Wrong negative seed failure"); }
+            Console.WriteLine("PASS actual host RandomMaterialValues.GetValue: zero/max seed, index wrap, owned RNG, nested renderer scope and unrelated MPB preserved; no world restore executed");
+        }
+        finally { UnityEngine.Object.DestroyImmediate(source); UnityEngine.Object.DestroyImmediate(copy); }
     }
 
     private static void TestSinglePartBlueprint()

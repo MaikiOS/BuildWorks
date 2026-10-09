@@ -126,12 +126,14 @@ namespace OstrixMods.BuildWorks
             public string PrefabName;
             public BlueprintForeignPartData ForeignData;
             public BlueprintPrefabMetadata Metadata;
+            public int? MaterialSeed;
             public string ContentWarning;
             public bool Placeholder;
             public bool Locked;
             public GameObject Root;
             public Vector3 BaseScale = Vector3.one;
             public Renderer[] Renderers;
+            public readonly List<MaterialPropertyBlock> MaterialProperties = new List<MaterialPropertyBlock>();
             public bool Selected;
             public bool ActiveSelection;
             public bool Hovered;
@@ -241,6 +243,7 @@ namespace OstrixMods.BuildWorks
             visuals.TryGetValue(stableId, out VisualNode visual) && !visual.Placeholder
                 ? visual.BaseScale : (Vector3?)null;
         private readonly MaterialPropertyBlock hoverProperties = new MaterialPropertyBlock();
+        private readonly MaterialPropertyBlock appearanceProperties = new MaterialPropertyBlock();
         private string[] cachedAnchorIds;
         private Vector3[] cachedGizmoAnchors;
         private int cachedNativeAnchorStart;
@@ -567,7 +570,8 @@ namespace OstrixMods.BuildWorks
                     bool placeholder = !source;
                     if (!visuals.TryGetValue(part.StableId, out VisualNode visual) ||
                         visual.PrefabName != part.PrefabName || visual.Placeholder != placeholder ||
-                        !ReferenceEquals(visual.ForeignData, part.ForeignData) || !ReferenceEquals(visual.Metadata, part.Metadata))
+                        !ReferenceEquals(visual.ForeignData, part.ForeignData) || !ReferenceEquals(visual.Metadata, part.Metadata) ||
+                        visual.MaterialSeed != part.MaterialSeed)
                     {
                         visual = CreateVisual(part, source, cacheMaterials: true);
                         visual.Root.SetActive(false);
@@ -1083,7 +1087,8 @@ namespace OstrixMods.BuildWorks
                     VisualNode visual = index < target.Count ? target[index] : null;
                     if (visual == null || visual.PrefabName != part.PrefabName ||
                         visual.Placeholder != !source ||
-                        !ReferenceEquals(visual.ForeignData, part.ForeignData) || !ReferenceEquals(visual.Metadata, part.Metadata))
+                        !ReferenceEquals(visual.ForeignData, part.ForeignData) || !ReferenceEquals(visual.Metadata, part.Metadata) ||
+                        visual.MaterialSeed != part.MaterialSeed)
                     {
                         VisualNode replacement = CreateVisual(part, source, selectable: false);
                         DestroyVisual(visual);
@@ -2132,13 +2137,15 @@ namespace OstrixMods.BuildWorks
                 PrefabName = part.PrefabName,
                 ForeignData = part.ForeignData,
                 Metadata = part.Metadata,
+                MaterialSeed = part.MaterialSeed,
                 Placeholder = !source
             };
             try
             {
                 result.Root = source
                     ? PlacementGhostPreviewView.CreateVisualClone(
-                        source, "Part_" + part.StableId, editorLayer)
+                        source, "Part_" + part.StableId, editorLayer,
+                        part.MaterialSeed.HasValue && BlueprintMaterialVariation.IsSupported(source) ? part.MaterialSeed : null)
                     : CreatePlaceholder(part.StableId, part.Metadata, result.OwnedAssets);
                 result.Root.transform.SetParent(root.transform, false);
                 if (source) result.Root.transform.localScale = source.transform.localScale;
@@ -2174,6 +2181,12 @@ namespace OstrixMods.BuildWorks
                         });
                     }
                     renderer.sharedMaterials = previewMaterials;
+                    if (part.MaterialSeed.HasValue)
+                    {
+                        var block = new MaterialPropertyBlock();
+                        renderer.GetPropertyBlock(block);
+                        result.MaterialProperties.Add(block);
+                    }
                     result.OriginalRenderingOff.Add(renderer.forceRenderingOff);
                 }
                 if (selectable || captureSurfaces) CapturePickSurfaces(result, cacheMaterials);
@@ -2408,8 +2421,22 @@ namespace OstrixMods.BuildWorks
             bool selected = visual.Selected || visual.ActiveSelection;
             MaterialPropertyBlock properties = visual.SeeThrough ? null : selected ? temporarySelectionHighlight ? hoverProperties : null
                 : visual.Hovered ? hoverProperties : null;
-            foreach (Renderer renderer in visual.Renderers)
-                if (renderer) renderer.SetPropertyBlock(properties);
+            for (int index = 0; index < visual.Renderers.Length; ++index)
+            {
+                Renderer renderer = visual.Renderers[index];
+                if (!renderer) continue;
+                if (visual.MaterialProperties.Count == 0) renderer.SetPropertyBlock(properties);
+                else
+                {
+                    renderer.SetPropertyBlock(visual.MaterialProperties[index]);
+                    if (properties == null) continue;
+                    renderer.GetPropertyBlock(appearanceProperties);
+                    appearanceProperties.SetColor("_Color", properties.GetColor("_Color"));
+                    appearanceProperties.SetColor("_BaseColor", properties.GetColor("_BaseColor"));
+                    appearanceProperties.SetColor("_EmissionColor", properties.GetColor("_EmissionColor"));
+                    renderer.SetPropertyBlock(appearanceProperties);
+                }
+            }
         }
 
         private void ConfigureStudioLighting()

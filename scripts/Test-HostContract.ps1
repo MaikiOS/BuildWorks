@@ -872,7 +872,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.118.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.119.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -2550,8 +2550,18 @@ $gizmoShow = $pluginMethods | Where-Object {
 $gizmoShowOperands = @(
     $gizmoShow.Body.Instructions | ForEach-Object { [string]$_.Operand }
 ) -join "`n"
-Assert-Contract ($gizmoShowOperands -match 'IsPointVisible' -and
-    $gizmoShowOperands -match 'visibleAnchors') `
+$gizmoPrepare = $pluginMethods | Where-Object {
+    $_.Name -eq 'PrepareAnchorHandles' -and $_.DeclaringType.Name -eq 'TransformGizmoView'
+}
+$gizmoPrepareOperands = @(
+    $gizmoPrepare.Body.Instructions | ForEach-Object { [string]$_.Operand }
+) -join "`n"
+Assert-Contract ($gizmoShowOperands -match 'PrepareAnchorHandles' -and
+    $gizmoShowOperands -match 'visibleAnchors' -and
+    $gizmoShowOperands -match 'anchorHandleIndices' -and
+    $gizmoPrepareOperands -match 'IsPointVisible' -and
+    $gizmoPrepareOperands -match 'visibleAnchors' -and
+    $gizmoPrepareOperands -match 'HitTestAnchor') `
     'Compiled contextual handles do not share camera visibility with hit testing.'
 $refreshSnap = $pluginMethods | Where-Object Name -eq 'RefreshSnapTargets'
 $refreshOperands = @($refreshSnap.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
@@ -3225,4 +3235,4 @@ $worldCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'Preci
 $worldCaptureCalls = ($worldCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($worldCaptureCalls -match 'BlueprintStorageCapture::TryCapture' -and $worldCaptureCalls -match 'CompositeBlueprintStore/ForeignPartData::FromGeometry') 'World selection does not preserve container snapshots.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.118 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.119 and Valheim Steam build 25185596.'

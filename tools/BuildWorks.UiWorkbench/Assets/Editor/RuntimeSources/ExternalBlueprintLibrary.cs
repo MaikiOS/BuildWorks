@@ -246,8 +246,8 @@ namespace OstrixMods.BuildWorks
                             throw new InvalidDataException("$buildworks_import.part_limit");
                         // BuildShare uses whitespace; Infinity Hammer also writes a
                         // semicolon dialect. Both share the same eight core fields.
-                        string[] fields = vbuild && !line.Contains(";")
-                            ? line.Split((char[])null, StringSplitOptions.RemoveEmptyEntries) : line.Split(';');
+                        bool legacyVbuild = vbuild && !line.Contains(";");
+                        string[] fields = PartFields(line, legacyVbuild);
                         int basic = vbuild ? 8 : 10;
                         if (fields.Length < basic || fields.Length > (vbuild ? 10 : 15) ||
                             (!vbuild && (fields.Length == 11 || fields.Length == 12)))
@@ -282,8 +282,8 @@ namespace OstrixMods.BuildWorks
                             stableId = blueprint.id + "_" + blueprint.importPartCount,
                             prefabName = prefab,
                             displayName = prefab,
-                            position = new CompositeBlueprintStore.VectorData { x = Number(fields[p]), y = Number(fields[p + 1]), z = Number(fields[p + 2]) },
-                            rotation = new CompositeBlueprintStore.QuaternionData { x = Number(fields[q]), y = Number(fields[q + 1]), z = Number(fields[q + 2]), w = Number(fields[q + 3]) },
+                            position = new CompositeBlueprintStore.VectorData { x = Number(fields[p], legacyVbuild), y = Number(fields[p + 1], legacyVbuild), z = Number(fields[p + 2], legacyVbuild) },
+                            rotation = new CompositeBlueprintStore.QuaternionData { x = Number(fields[q], legacyVbuild), y = Number(fields[q + 1], legacyVbuild), z = Number(fields[q + 2], legacyVbuild), w = Number(fields[q + 3], legacyVbuild) },
                             scale = new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 },
                             scaleIsAbsolute = true,
                             signText = signText,
@@ -319,7 +319,8 @@ namespace OstrixMods.BuildWorks
         }
 
         internal static CompositeBlueprintStore.Blueprint PrepareForHost(CompositeBlueprintStore.Blueprint source,
-            Func<string, CompositeBlueprintStore.VectorData?> resolvePrefabScale, Func<string, int> hash = null, int? worldLevel = null)
+            Func<string, CompositeBlueprintStore.VectorData?> resolvePrefabScale, Func<string, int> hash = null, int? worldLevel = null,
+            Func<string, bool> supportsMaterialSeed = null)
         {
             if (source == null || source.importError != null || !source.importAbsoluteScale && !source.parts.Any(part => part.scaleIsAbsolute) &&
                 (hash == null || !source.parts.Any(part => part.foreignData?.format == "blueprint" || part.foreignData?.format == "vbuild"))) return source;
@@ -349,13 +350,16 @@ namespace OstrixMods.BuildWorks
                         part.scaleIsAbsolute = false;
                     }
                     if (hash != null && part.sourceDocumentId != null && evidenceIndex.TryGetValue(part.sourceDocumentId, out var evidence))
-                        ConvertKnownState(part, evidence, hash, worldLevel);
+                        ConvertKnownState(part, evidence, hash, worldLevel, supportsMaterialSeed);
                 }
                 copy.importAbsoluteScale = false;
                 // Derived cache identity must not reuse pre-normalization thumbnails or another prefab revision.
                 if (source.IsExternal) copy.id = Identity(source.id + "\npinned-scale-v1-pending-parts\n" + (hash == null ? "inert" : worldLevel?.ToString(CultureInfo.InvariantCulture) ?? "pending-world") + "\n" + string.Join("\n", scales.OrderBy(pair => pair.Key, StringComparer.Ordinal)
                     .Select(pair => pair.Key + "\t" + (pair.Value.HasValue ? pair.Value.Value.x.ToString("R", CultureInfo.InvariantCulture) + "\t" +
                         pair.Value.Value.y.ToString("R", CultureInfo.InvariantCulture) + "\t" + pair.Value.Value.z.ToString("R", CultureInfo.InvariantCulture) : "unknown"))));
+                if (source.IsExternal && copy.parts.Any(part => part.materialSeed.HasValue))
+                    copy.id = Identity(copy.id + "\nmaterial-seed-v1\n" + string.Join(",",
+                        copy.parts.Select(part => part.materialSeed?.ToString(CultureInfo.InvariantCulture) ?? "null")));
             }
             catch (Exception error) when (error is InvalidDataException || error is ArgumentException)
             {
@@ -394,7 +398,7 @@ namespace OstrixMods.BuildWorks
         }
 
         internal static void ConvertKnownState(CompositeBlueprintStore.Part part, Geometry.BlueprintSourceDocument evidence,
-            Func<string, int> hash, int? worldLevel)
+            Func<string, int> hash, int? worldLevel, Func<string, bool> supportsMaterialSeed = null)
         {
             var original = part.foreignData;
             if (original == null || original.format != "blueprint" && original.format != "vbuild" || original.chance != null ||
@@ -407,7 +411,7 @@ namespace OstrixMods.BuildWorks
             // vbuild has no row-scale columns; dropping a ZDO scale would change its geometry.
             // Keep this dialect blocked until its absolute-scale adapter is verified.
             if (vbuild && (state.HasHash(hash("scale")) || state.HasHash(hash("scaleScalar")))) return;
-            string[] fields = vbuild && !row.Contains(";") ? row.Split((char[])null, StringSplitOptions.RemoveEmptyEntries) : row.Split(';');
+            string[] fields = PartFields(row, vbuild && !row.Contains(";"));
             int dataIndex = vbuild ? 8 : 13;
             if (fields.Length <= dataIndex || fields[dataIndex] != original.zdo ||
                 fields.Length > dataIndex + 1 && HasData(fields[dataIndex + 1]) && fields[dataIndex + 1] != "1" ||
@@ -436,6 +440,16 @@ namespace OstrixMods.BuildWorks
                 }
             }
             else if (original.info != null) return;
+            int? materialSeed = part.materialSeed;
+            int materialKey = hash("RandMatSeed");
+            if (state.HasHash(materialKey))
+            {
+                if (supportsMaterialSeed?.Invoke(part.prefabName) != true ||
+                    !state.TryGet<int>(materialKey, out int seed) || seed < 0 ||
+                    materialSeed.HasValue && materialSeed.Value != seed) return;
+                materialSeed = seed;
+                consumed.Add(new KeyValuePair<int, Type>(materialKey, typeof(int)));
+            }
             // Construction creates NEW ordinary native pieces: no inherited ownership, stale support,
             // damage, invulnerability, AI overrides or network lifetime flags. All originals remain in
             // the exact source document. This is NOT an administrator-state restoration adapter.
@@ -459,6 +473,7 @@ namespace OstrixMods.BuildWorks
                 if (expected == typeof(int) && (!state.TryGet<int>(key.Key, out int flag) || flag < 0 || flag > 1)) return;
             }
             part.signText = text;
+            part.materialSeed = materialSeed;
             part.foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(contents);
         }
 
@@ -527,8 +542,24 @@ namespace OstrixMods.BuildWorks
 
         private static bool HasData(string value) => value != "" && value != "\"\"" && value != "null";
 
-        private static float Number(string value)
+        // Legacy BuildShare slots are positional: a blank numeric slot means zero.
+        private static string[] PartFields(string row, bool legacyVbuild)
         {
+            if (!legacyVbuild) return row.Split(';');
+            string[] fields = row.TrimStart().Split(new[] { ' ', '\t' }, StringSplitOptions.None);
+            int count = fields.Length;
+            while (count > 10 && fields[count - 1].Length == 0) --count;
+            if (count != fields.Length) Array.Resize(ref fields, count);
+            return fields;
+        }
+
+        private static float Number(string value, bool legacyVbuild = false)
+        {
+            if (legacyVbuild)
+            {
+                if (value.Length == 0) return 0;
+                value = value.Replace(',', '.');
+            }
             float result = float.Parse(value, NumberStyles.Float, CultureInfo.InvariantCulture);
             if (float.IsNaN(result) || float.IsInfinity(result)) throw new InvalidDataException("$buildworks_import.transform");
             return result;

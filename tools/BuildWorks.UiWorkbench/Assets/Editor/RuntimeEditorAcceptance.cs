@@ -622,6 +622,7 @@ public static class RuntimeEditorAcceptance
                 TestOccluderFade(template, output);
                 TestGizmoHits(template);
                 TestModelSpaceGizmo(template);
+                LargeGizmoAcceptance.Run(template, output);
                 TestExperimentalGeometry(template, fontTemplate);
                 WorldSnapPointAcceptance.Run(output);
                 HeavyBlueprintAcceptance.Run(output);

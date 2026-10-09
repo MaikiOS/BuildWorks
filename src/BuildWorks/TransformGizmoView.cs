@@ -44,6 +44,7 @@ namespace OstrixMods.BuildWorks
     internal sealed class TransformGizmoView : IDisposable
     {
         private const int RingSegments = 48;
+        private const int MaximumAnchorHandles = 512;
         private static readonly RaycastHit[] VisibilityHits = new RaycastHit[32];
         private static readonly Color[] AxisColors =
         {
@@ -80,7 +81,14 @@ namespace OstrixMods.BuildWorks
         private readonly LineRenderer[] layoutAxisLines = new LineRenderer[3];
         private readonly LineRenderer[] alignmentAxisLines = new LineRenderer[3];
         private readonly List<LineRenderer> anchorHandles = new List<LineRenderer>();
+        private readonly List<int> anchorHandleIndices = new List<int>();
+        private readonly List<AnchorCandidate> anchorCandidates = new List<AnchorCandidate>();
         private readonly List<bool> visibleAnchors = new List<bool>();
+        private struct AnchorCandidate
+        {
+            public int Index, Priority;
+            public float Distance;
+        }
         private readonly bool screenSpaceSizing;
         private float anchorHandleScale = 1f;
         private int nativeAnchorStartIndex = int.MaxValue;
@@ -384,11 +392,16 @@ namespace OstrixMods.BuildWorks
                 DrawAxisLabel(axisLabels[2], camera, center, camera.transform.up, 2, color, .15f);
             }
             int anchorCount = anchorPoints?.Length ?? 0;
-            EnsureAnchorHandleCount(anchorCount);
             bool showAnchors = mode != GizmoMode.Plane && anchorCount > 0;
             Vector2 mouse = EditorMouse ?? (Vector2)Input.mousePosition;
-            for (int i = 0; i < anchorHandles.Count; ++i)
+            PrepareAnchorHandles(camera, anchorPoints, mouse, showAnchors, combined, mode,
+                selectedAnchor, pinnedAnchor, showAllAnchors, handleScale, pointVisibility);
+            for (int slot = 0; slot < anchorHandles.Count; ++slot)
             {
+                LineRenderer handle = anchorHandles[slot];
+                if (slot >= anchorHandleIndices.Count)
+                { handle.gameObject.SetActive(false); continue; }
+                int i = anchorHandleIndices[slot];
                 bool important = i == selectedAnchor || i == pinnedAnchor;
                 Vector3 screen = showAnchors && i < anchorCount
                     ? camera.WorldToScreenPoint(anchorPoints[i])
@@ -399,24 +412,15 @@ namespace OstrixMods.BuildWorks
                 bool hovered = screenDistance <= AnchorHitRadius(i);
                 bool nativeAnchor = IsNativeAnchor(i);
                 bool geometryAnchor = IsGeometryAnchor(i);
-                bool unobstructed = !showAnchors || i >= anchorCount || (pointVisibility != null
-                    ? pointVisibility(anchorPoints[i]) : IsPointVisible(camera, anchorPoints[i]));
-                bool showAnchor = showAnchors && (combined || Family == GizmoFamily.Points || important ||
-                    mode == GizmoMode.Guide) && i < anchorCount && screen.z > 0f &&
-                    (showAllAnchors || important || screenDistance <= 120f) &&
-                    (!screenSpaceSizing || !NativePointsOnly || nativeAnchor || important);
-                if (!screenSpaceSizing) showAnchor &= unobstructed;
-                while (anchorOccluded.Count <= i) anchorOccluded.Add(false);
-                anchorOccluded[i] = !unobstructed;
+                bool showAnchor = visibleAnchors[i];
                 if (screenSpaceSizing && showAnchor)
                 {
                     // Open native clasps surround compact helpers at the same real coordinates.
-                    anchorHandles[i].sortingOrder = i == pinnedAnchor ? short.MaxValue
+                    handle.sortingOrder = i == pinnedAnchor ? short.MaxValue
                         : i == selectedAnchor ? short.MaxValue - 1 : short.MaxValue - 2;
                 }
-                visibleAnchors[i] = showAnchor;
-                anchorHandles[i].gameObject.SetActive(showAnchor);
-                anchorHandles[i].sharedMaterial = showAllAnchors ? material : anchorMaterial;
+                handle.gameObject.SetActive(showAnchor);
+                handle.sharedMaterial = showAllAnchors ? material : anchorMaterial;
                 if (showAnchor)
                 {
                     Color color = geometryAnchor ? new Color(1f, .84f, .4f, .28f)
@@ -426,7 +430,7 @@ namespace OstrixMods.BuildWorks
                         : screenSpaceSizing ? 0.75f : showAllAnchors ? 0.22f : 0.45f;
                     if (geometryAnchor) color.a = hovered || important ? .85f : .28f;
                     DrawAnchor(
-                        anchorHandles[i],
+                        handle,
                         camera,
                         anchorPoints[i],
                         color,
@@ -436,12 +440,6 @@ namespace OstrixMods.BuildWorks
                             : nativeAnchor ? 0.010f : 0.007f, nativeAnchor,
                         i == pinnedAnchor,
                         nativeAnchor ? "snap-native" : "snap-helper", i == selectedAnchor, geometryAnchor);
-                    // Picking follows the actual projected badge in both size modes.
-                    Vector3 edge = camera.WorldToScreenPoint(anchorPoints[i] + camera.transform.right *
-                        GizmoScale(camera, anchorPoints[i]) * (geometryAnchor ? .035f : nativeAnchor ? .128f : .072f) * handleScale);
-                    while (anchorHitRadii.Count <= i) anchorHitRadii.Add(0f);
-                    anchorHitRadii[i] = ModelSpaceSizing ? Vector2.Distance(screen, edge) + 2f
-                        : (geometryAnchor ? 5f : nativeAnchor ? 18f : 10.5f) * handleScale;
                 }
             }
             bool drawSnapTarget = showAnchors && showSnapTarget;
@@ -1015,6 +1013,67 @@ namespace OstrixMods.BuildWorks
             return line;
         }
 
+        private void PrepareAnchorHandles(Camera camera, Vector3[] points, Vector2 mouse,
+            bool showAnchors, bool combined, GizmoMode mode, int selected, int pinned,
+            bool showAll, float handleScale, Func<Vector3, bool> pointVisibility)
+        {
+            int count = points?.Length ?? 0;
+            anchorHandleIndices.Clear();
+            anchorCandidates.Clear();
+            while (visibleAnchors.Count < count) visibleAnchors.Add(false);
+            while (anchorOccluded.Count < count) anchorOccluded.Add(false);
+            while (anchorHitRadii.Count < count) anchorHitRadii.Add(0f);
+            for (int i = 0; i < visibleAnchors.Count; ++i) visibleAnchors[i] = false;
+            for (int i = 0; showAnchors && i < count; ++i)
+            {
+                bool important = i == selected || i == pinned;
+                Vector3 screen = camera.WorldToScreenPoint(points[i]);
+                float distance = Vector2.Distance(mouse, new Vector2(screen.x, screen.y));
+                bool native = IsNativeAnchor(i), geometry = IsGeometryAnchor(i);
+                if (!(screen.z > 0f) || !(distance < float.PositiveInfinity) ||
+                    !(combined || Family == GizmoFamily.Points || important || mode == GizmoMode.Guide) ||
+                    !(showAll || important || distance <= 120f) ||
+                    screenSpaceSizing && NativePointsOnly && !native && !important) continue;
+                bool unobstructed = pointVisibility != null ? pointVisibility(points[i]) : IsPointVisible(camera, points[i]);
+                anchorOccluded[i] = !unobstructed;
+                if (!screenSpaceSizing && !unobstructed) continue;
+                visibleAnchors[i] = true;
+                // Picking and the shortlist use the same projected badge, including tiny helpers.
+                Vector3 edge = camera.WorldToScreenPoint(points[i] + camera.transform.right *
+                    GizmoScale(camera, points[i]) * (geometry ? .035f : native ? .128f : .072f) * handleScale);
+                anchorHitRadii[i] = ModelSpaceSizing ? Vector2.Distance(screen, edge) + 2f
+                    : (geometry ? 5f : native ? 18f : 10.5f) * handleScale;
+                anchorCandidates.Add(new AnchorCandidate { Index = i, Priority = important ? 0 : 1, Distance = distance });
+            }
+            if (count <= MaximumAnchorHandles)
+                for (int i = 0; i < count; ++i) anchorHandleIndices.Add(i);
+            else
+            {
+                // Preserve the full-set hit winner before limiting only its visual representation.
+                int hovered = HitTestAnchor(camera, points, mouse);
+                for (int i = 0; i < anchorCandidates.Count; ++i)
+                {
+                    AnchorCandidate candidate = anchorCandidates[i];
+                    if (candidate.Index == hovered) { candidate.Priority = 0; anchorCandidates[i] = candidate; break; }
+                }
+                // shortcut: full candidate scan/sort; bound spatial queries before enabling large world snap sets.
+                anchorCandidates.Sort(CompareAnchorCandidates);
+                for (int i = 0; i < anchorCandidates.Count && i < MaximumAnchorHandles; ++i)
+                    anchorHandleIndices.Add(anchorCandidates[i].Index);
+                anchorHandleIndices.Sort();
+                for (int i = 0; i < visibleAnchors.Count; ++i) visibleAnchors[i] = false;
+                foreach (int index in anchorHandleIndices) visibleAnchors[index] = true;
+            }
+            EnsureAnchorHandleCount(anchorHandleIndices.Count);
+        }
+
+        private static int CompareAnchorCandidates(AnchorCandidate left, AnchorCandidate right)
+        {
+            int order = left.Priority.CompareTo(right.Priority);
+            if (order == 0) order = left.Distance.CompareTo(right.Distance);
+            return order != 0 ? order : right.Index.CompareTo(left.Index);
+        }
+
         private void EnsureAnchorHandleCount(int count)
         {
             while (anchorHandles.Count < count)
@@ -1023,7 +1082,6 @@ namespace OstrixMods.BuildWorks
                     "Anchor" + anchorHandles.Count,
                     5,
                     depthTested: true));
-                visibleAnchors.Add(false);
             }
         }
 
@@ -1336,9 +1394,12 @@ namespace OstrixMods.BuildWorks
             Feedback(scaleHandle, GizmoHandleKind.Scale, GizmoAxis.None);
             for (int index = 0; index < anchorHandles.Count; ++index)
                 if (anchorHandles[index].gameObject.activeInHierarchy)
-                    SetFeedback(anchorHandles[index], index == point && selected == GizmoHandleKind.None,
-                        index == selectedPoint || index == pinnedPoint, selected != GizmoHandleKind.None, true,
-                        IsNativeAnchor(index), anchorOccluded[index], IsGeometryAnchor(index));
+                {
+                    int source = anchorHandleIndices[index];
+                    SetFeedback(anchorHandles[index], source == point && selected == GizmoHandleKind.None,
+                        source == selectedPoint || source == pinnedPoint, selected != GizmoHandleKind.None, true,
+                        IsNativeAnchor(source), anchorOccluded[source], IsGeometryAnchor(source));
+                }
             void Feedback(LineRenderer line, GizmoHandleKind kind, GizmoAxis axis)
             {
                 if (!line.gameObject.activeInHierarchy) return;

@@ -1,3 +1,19 @@
+## 2026-10-09 — source0.19.119: pooled gizmo anchor renderers
+
+Before-fix Unity600-point repro created600 main anchor renderer slots. Pool now
+caps at512 with original point coordinates/indices, full-set hit winner and
+selected/pinned retained before cursor-nearest shortlisting. Tested17125 points,
+coincident/depth priorities, lifecycle and pooled world-occlusion. Normal/QA0/0,
+Store/Host25185596/localization930/QA isolation and Unity492 passed; final receipt
+18:30:54.702Z, correctness/Ponytail no blocker, isolated image inspected.
+See docs/GIZMO_POOL_CHECKPOINT_2026-10-09.md and RU; artifacts/checkpoint-0.19.119.
+Workbench legacy importer .118 copy synchronized. Open: full source projection/
+visibility scan and candidate sorting; storage512 unchanged, all12 imports still
+refused. Formats21/10 unchanged. QA.117 pair unchanged; no deployment/game/saves.
+Next: bounded spatial queries, exact accelerated assignment, coordinated parser/
+Store/Geometry/portable guards and large roundtrips. Full goal remains active;
+current .117 owner acceptance stays valid, no new manual check requested yet.
+
 ## 2026-10-09 — large snap-set limit investigated
 
 Source remains0.19.118; installed QA0.19.117 pair hashes unchanged.

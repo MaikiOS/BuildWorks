@@ -924,3 +924,8 @@ editor.outliner.query3	ID источника или версия…
 editor.outliner.query4	Записанный тип детали…
 editor.outliner.no_results	Нет совпадений · СБРОС
 editor.outliner.details	ID prefab: {0}\nID записи: {1}\nИсточник: {2}\nЗаписанный тип: {3}
+editor.camera.enter	Внутри постройки
+editor.camera.exit	Вернуться к обзору
+editor.camera.speed	Скорость внутри, м/с
+editor.camera.help	ПКМ: осмотр; WASD — движение, Q/E — вниз/вверх, Shift быстрее. Колесо: скорость. При выбранной детали ПКМ+ЛКМ ставит из центра. Отпусти ПКМ для курсора. Кнопка выше возвращает обзор.
+editor.camera.active	Внутри постройки · ПКМ: полёт · Камера: выход

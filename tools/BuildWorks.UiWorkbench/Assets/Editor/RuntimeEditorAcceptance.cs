@@ -338,7 +338,7 @@ public static class RuntimeEditorAcceptance
                     scene.SetViewport(view.ViewportScreenRect());
                     Call(controller, "FrameAll");
                     foreach (string state in new[] { "select", "transform", "scale-xyz-ru", "array", "contour", "catalog",
-                        "outliner", "outliner-filter-ru", "outliner-fields-ru", "outliner-empty-ru", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "catalog-managed-ru", "catalog-hidden-ru", "delete-confirm-ru", "hide-confirm-ru", "save-metadata", "save-as", "save-as-ru", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru", "exchange-armor", "exchange-armor-ru", "exchange-missing", "exchange-missing-ru", "replace-tools", "replace-confirm", "replace-confirm-ru", "replace-entry-ru", "replace-help-ru" })
+                        "outliner", "outliner-filter-ru", "outliner-fields-ru", "outliner-empty-ru", "interior-camera-ru", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "catalog-managed-ru", "catalog-hidden-ru", "delete-confirm-ru", "hide-confirm-ru", "save-metadata", "save-as", "save-as-ru", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru", "exchange-armor", "exchange-armor-ru", "exchange-missing", "exchange-missing-ru", "replace-tools", "replace-confirm", "replace-confirm-ru", "replace-entry-ru", "replace-help-ru" })
                     {
                         Require(Screen.width == width && Screen.height == height,
                             "GameView changed before " + state + ": " + Screen.width + "x" + Screen.height);
@@ -369,6 +369,16 @@ public static class RuntimeEditorAcceptance
                                 Canvas.ForceUpdateCanvases();
                                 if (state == "outliner-fields-ru") Field<GameObject>(view, "outlinerMenu").GetComponent<ScrollRect>().verticalNormalizedPosition = 0;
                             }
+                        }
+                        else if (state == "interior-camera-ru")
+                        {
+                            BuildWorksLocalization.RussianLanguage = true;
+                            ControllerInputAcceptance.NativeClick(view, uiCamera, "ViewportSectionButton0");
+                            yield return null;
+                            ControllerInputAcceptance.NativeClick(view, uiCamera, "InteriorCamera");
+                            yield return null;
+                            ControllerInputAcceptance.NativeClick(view, uiCamera, "ViewportSectionButton0");
+                            yield return null;
                         }
                         else if (state == "scale-xyz-ru")
                         {
@@ -594,6 +604,8 @@ public static class RuntimeEditorAcceptance
                         }
                         if (state == "outliner-filter-ru" || state == "outliner-fields-ru" || state == "outliner-empty-ru")
                             Call(view, "ResetOutlinerFilter");
+                        if (state == "interior-camera-ru")
+                            ControllerInputAcceptance.NativeClick(view, uiCamera, "InteriorCamera");
                         BuildWorksLocalization.RussianLanguage = false;
                         yield return null;
                     }
@@ -750,12 +762,20 @@ public static class RuntimeEditorAcceptance
                 "Actual catalog does not fill its adaptive page");
             for (int i = 0; i < grid.childCount; ++i) EnsureInside(grid, (RectTransform)grid.GetChild(i));
         }
-        if (state == "settings")
+        if (state == "settings" || state == "interior-camera-ru")
         {
             RectTransform settings = (RectTransform)Field<GameObject>(view, "viewportSettings").transform;
             EnsureInside(view.Viewport, settings);
             foreach (Button button in settings.GetComponentsInChildren<Button>()) EnsureInside(settings, (RectTransform)button.transform);
             foreach (TMP_InputField input in settings.GetComponentsInChildren<TMP_InputField>()) EnsureInside(settings, (RectTransform)input.transform);
+            if (state == "interior-camera-ru")
+            {
+                Require(!Field<TMP_Text>(view, "interiorHelp").isTextOverflowing &&
+                    !Field<TMP_Text>(view, "interiorCameraHint").isTextOverflowing,
+                    "Russian interior camera instructions overflow");
+                Require(Field<TMP_Text>(view, "interiorCameraHint").gameObject.activeSelf,
+                    "Interior camera mode has no persistent visible indication");
+            }
         }
         if (state == "outliner") EnsureInside(Field<RectTransform>(view, "outliner"),
             (RectTransform)Field<GameObject>(view, "outlinerMenu").transform);

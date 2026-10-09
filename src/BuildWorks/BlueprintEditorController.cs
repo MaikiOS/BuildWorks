@@ -191,6 +191,10 @@ namespace OstrixMods.BuildWorks
         private string middleDeleteTarget;
         private bool rightCameraTracking;
         private bool cameraFlying;
+        private bool interiorCamera;
+        private Vector3 interiorPosition;
+        private float interiorYaw, interiorPitch, overviewNearClip;
+        private float interiorSpeed = 3f;
         private bool orthographic;
         private Vector2 rightCameraStart;
         private bool selectionPending;
@@ -381,6 +385,7 @@ namespace OstrixMods.BuildWorks
             if (!input.HasFocus)
             {
                 if (IsGizmoDragging) CancelGizmoDrag();
+                StopCameraFlight();
                 cameraDragging = middleCameraMoved = rightCameraTracking = cameraFlying = selectionPending = false;
                 middleDeleteTarget = null;
                 Cursor.lockState = CursorLockMode.None;
@@ -388,6 +393,9 @@ namespace OstrixMods.BuildWorks
                 ApplyCamera();
                 return;
             }
+            if (view.HasModal || view.HasCatalog || view.HasOutlinerMenu || view.HasViewportSettings ||
+                view.HasToolsMenu || view.IsTextInputFocused || view.IsOutlinerDragging)
+                StopCameraFlight();
             if (cameraDragging && (view.HasModal || view.HasCatalog || view.HasOutlinerMenu ||
                 view.HasViewportSettings || view.HasToolsMenu || view.IsTextInputFocused || view.IsOutlinerDragging))
             { cameraDragging = false; middleDeleteTarget = null; }
@@ -655,15 +663,18 @@ namespace OstrixMods.BuildWorks
             view.LightingChanged += scene.SetLighting;
             view.ViewportSettingsChanged += (move, rotation, array, points, scale, grid) =>
                 scene.SetViewportSettings(move, rotation, array, points, scale, grid);
-            view.ProjectionChanged += value => { orthographic = value; ApplyCamera(); };
+            view.InteriorCameraRequested += ToggleInteriorCamera;
+            view.InteriorSpeedChanged += SetInteriorSpeed;
+            view.ProjectionChanged += value => { if (!interiorCamera) orthographic = value; ApplyCamera(); };
             view.FieldOfViewChanged += degrees => { scene.SetFieldOfView(degrees); ApplyCamera(); };
             view.FieldOfViewResetRequested += () =>
             {
                 scene.SetFieldOfView(cameraTemplate.fieldOfView);
-                view.SetFieldOfView(scene.Camera.fieldOfView, orthographic);
+                view.SetFieldOfView(scene.Camera.fieldOfView, orthographic && !interiorCamera);
                 ApplyCamera();
             };
             view.SetFieldOfView(scene.Camera.fieldOfView, orthographic);
+            view.SetInteriorCamera(interiorCamera, interiorSpeed);
             view.OccluderFadeRequested += ToggleOccluderFade;
             view.NodeClicked += SelectNode;
             view.VisibilityChanged += (id, visible) => ApplyDocumentEdit(() =>
@@ -1165,7 +1176,9 @@ namespace OstrixMods.BuildWorks
             if (inside && input.MouseScrollDelta.y != 0f)
             {
                 bool control = input.GetKey(KeyCode.LeftControl) || input.GetKey(KeyCode.RightControl);
-                if (keyboardPreview && keyboardNumber.Length == 0 && keyboardSurface && !control && !input.GetMouseButton(1))
+                if (interiorCamera && input.GetMouseButton(1))
+                    SetInteriorSpeed(interiorSpeed * Mathf.Pow(1.2f, input.MouseScrollDelta.y));
+                else if (keyboardPreview && keyboardNumber.Length == 0 && keyboardSurface && !control && !input.GetMouseButton(1))
                 {
                     int sourceIndex = keyboardSourceIndex >= 0 ? keyboardSourceIndex : keyboardAutoSource;
                     Vector3 source = sourceIndex >= 0 ? dragSourceAnchors[sourceIndex] : dragPivot;
@@ -1184,6 +1197,8 @@ namespace OstrixMods.BuildWorks
                 else if (activeTool == BlueprintEditorTool.Array && arrayPrimaryAxis != GizmoAxis.None &&
                     !control && !IsGizmoDragging)
                     AdjustArrayCount(input.MouseScrollDelta.y > 0f ? 1 : -1);
+                else if (interiorCamera)
+                    SetInteriorSpeed(interiorSpeed * Mathf.Pow(1.2f, input.MouseScrollDelta.y));
                 else
                 {
                     cameraDistance = Mathf.Clamp(
@@ -1226,14 +1241,14 @@ namespace OstrixMods.BuildWorks
                 if (pan)
                 {
                     Quaternion rotation = CameraRotation();
-                    float scale = cameraDistance * 0.0015f;
-                    cameraFocus -= rotation * Vector3.right * delta.x * scale;
-                    cameraFocus -= rotation * Vector3.up * delta.y * scale;
+                    float scale = interiorCamera ? interiorSpeed * .003f : cameraDistance * 0.0015f;
+                    Vector3 offset = rotation * Vector3.right * delta.x * scale + rotation * Vector3.up * delta.y * scale;
+                    if (interiorCamera) interiorPosition -= offset;
+                    else cameraFocus -= offset;
                 }
                 else
                 {
-                    cameraYaw += delta.x * 0.25f;
-                    cameraPitch = Mathf.Clamp(cameraPitch - delta.y * 0.25f, -85f, 85f);
+                    TurnCamera(delta.x * .25f, delta.y * .25f);
                 }
             }
             if (cameraDragging && input.GetMouseButtonUp(2))
@@ -1265,17 +1280,17 @@ namespace OstrixMods.BuildWorks
                 bool moving = input.GetKey(KeyCode.W) || input.GetKey(KeyCode.A) ||
                     input.GetKey(KeyCode.S) || input.GetKey(KeyCode.D) ||
                     input.GetKey(KeyCode.Q) || input.GetKey(KeyCode.E);
-                if (!cameraFlying && ((mouse - rightCameraStart).sqrMagnitude > 36f || moving))
+                if (!cameraFlying && (interiorCamera || (mouse - rightCameraStart).sqrMagnitude > 36f || moving))
                 {
                     cameraFlying = true;
+                    view.SetCameraFlight(true);
                     Cursor.lockState = CursorLockMode.Locked;
                     Cursor.visible = false;
                 }
                 if (cameraFlying)
                 {
-                    Vector3 position = cameraFocus - CameraRotation() * Vector3.forward * cameraDistance;
-                    cameraYaw += input.GetAxis("Mouse X") * 3f;
-                    cameraPitch = Mathf.Clamp(cameraPitch - input.GetAxis("Mouse Y") * 3f, -85f, 85f);
+                    Vector3 position = interiorCamera ? interiorPosition : cameraFocus - CameraRotation() * Vector3.forward * cameraDistance;
+                    TurnCamera(input.GetAxis("Mouse X") * 3f, input.GetAxis("Mouse Y") * 3f);
                     Quaternion rotation = CameraRotation();
                     Vector3 movement = Vector3.zero;
                     if (input.GetKey(KeyCode.W)) movement += rotation * Vector3.forward;
@@ -1284,9 +1299,11 @@ namespace OstrixMods.BuildWorks
                     if (input.GetKey(KeyCode.A)) movement -= rotation * Vector3.right;
                     if (input.GetKey(KeyCode.E)) movement += Vector3.up;
                     if (input.GetKey(KeyCode.Q)) movement -= Vector3.up;
-                    float speed = Mathf.Max(1.5f, cameraDistance * 0.5f) * input.UnscaledDeltaTime;
+                    float speed = (interiorCamera ? interiorSpeed : Mathf.Max(1.5f, cameraDistance * 0.5f)) * input.UnscaledDeltaTime;
                     if (input.GetKey(KeyCode.LeftShift) || input.GetKey(KeyCode.RightShift)) speed *= 3f;
-                    cameraFocus = position + movement.normalized * speed + rotation * Vector3.forward * cameraDistance;
+                    position += movement.normalized * speed;
+                    if (interiorCamera) interiorPosition = position;
+                    else cameraFocus = position + rotation * Vector3.forward * cameraDistance;
                 }
                 if (placementItem != null)
                 {
@@ -1298,9 +1315,7 @@ namespace OstrixMods.BuildWorks
             if (rightCameraTracking && !input.GetMouseButton(1))
             {
                 bool click = !cameraFlying && inside && !keyboardPreview;
-                rightCameraTracking = cameraFlying = false;
-                Cursor.lockState = CursorLockMode.None;
-                Cursor.visible = true;
+                StopCameraFlight();
                 if (click)
                 {
                     if (placementItem != null) CancelPartPlacement();
@@ -3139,7 +3154,7 @@ namespace OstrixMods.BuildWorks
             scene.ShowSnapCandidates(
                 scene.PlacementSnapPreviewTargets,
                 scene.PlacementSnapPreviewNative);
-            if (!input.GetMouseButtonDown(0) || cameraDragging || rightCameraTracking) return;
+            if (!input.GetMouseButtonDown(0) || cameraDragging || rightCameraTracking && !(interiorCamera && cameraFlying)) return;
             BlueprintEditorCatalogItem item = placementItem;
             bool added = placementBlueprint != null
                 ? ApplyDocumentEdit(() => document.InsertBlueprint(placementBlueprint, ToPoint(placementPosition),
@@ -4010,6 +4025,7 @@ namespace OstrixMods.BuildWorks
 
         private void FrameAll()
         {
+            if (interiorCamera) ToggleInteriorCamera();
             if (scene == null || !scene.TryGetContentBounds(out Bounds bounds))
             {
                 cameraFocus = Vector3.zero;
@@ -4025,6 +4041,7 @@ namespace OstrixMods.BuildWorks
 
         private void FrameSelectionOrAll()
         {
+            if (interiorCamera) ToggleInteriorCamera();
             Bounds bounds;
             if (ActiveSupport != null && scene != null)
                 bounds = new Bounds(ToVector(ActiveSupport.Position), Vector3.one);
@@ -4043,12 +4060,58 @@ namespace OstrixMods.BuildWorks
             if (scene == null) return;
             Quaternion rotation = CameraRotation();
             scene.SetCameraPose(
-                cameraFocus - rotation * Vector3.forward * cameraDistance,
+                interiorCamera ? interiorPosition : cameraFocus - rotation * Vector3.forward * cameraDistance,
                 rotation);
-            scene.SetProjection(orthographic, cameraDistance);
+            scene.SetProjection(orthographic && !interiorCamera, cameraDistance);
         }
 
-        private Quaternion CameraRotation() => Quaternion.Euler(cameraPitch, cameraYaw, 0f);
+        private Quaternion CameraRotation() => Quaternion.Euler(interiorCamera ? interiorPitch : cameraPitch,
+            interiorCamera ? interiorYaw : cameraYaw, 0f);
+
+        private void TurnCamera(float yaw, float pitch)
+        {
+            if (interiorCamera)
+            { interiorYaw += yaw; interiorPitch = Mathf.Clamp(interiorPitch - pitch, -85f, 85f); }
+            else
+            { cameraYaw += yaw; cameraPitch = Mathf.Clamp(cameraPitch - pitch, -85f, 85f); }
+        }
+
+        private void SetInteriorSpeed(float value)
+        {
+            if (float.IsNaN(value) || float.IsInfinity(value)) return;
+            interiorSpeed = Mathf.Clamp(value, .1f, 30f);
+            view.SetInteriorCamera(interiorCamera, interiorSpeed);
+        }
+
+        private void ToggleInteriorCamera()
+        {
+            if (IsGizmoDragging) CancelGizmoDrag();
+            StopCameraFlight();
+            cameraDragging = selectionPending = false;
+            middleDeleteTarget = null;
+            interiorCamera = !interiorCamera;
+            if (interiorCamera)
+            {
+                interiorPosition = scene.Camera.transform.position;
+                interiorYaw = cameraYaw; interiorPitch = cameraPitch;
+                overviewNearClip = scene.Camera.nearClipPlane;
+                scene.Camera.nearClipPlane = .02f;
+            }
+            else scene.Camera.nearClipPlane = overviewNearClip;
+            view.SetProjection(orthographic && !interiorCamera);
+            view.SetInteriorCamera(interiorCamera, interiorSpeed);
+            view.HideViewportSettings();
+            ApplyCamera();
+        }
+
+        private void StopCameraFlight()
+        {
+            if (!rightCameraTracking && !cameraFlying) return;
+            rightCameraTracking = cameraFlying = false;
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+            view?.SetCameraFlight(false);
+        }
 
         private void Cleanup()
         {
@@ -4056,6 +4119,8 @@ namespace OstrixMods.BuildWorks
             blockWorldInputThroughFrame = Math.Max(
                 blockWorldInputThroughFrame, Time.frameCount);
             state = EditorState.Closing;
+            StopCameraFlight();
+            interiorCamera = false;
             initialLoadFailed = false;
             transformSupportPivotId = null;
             selectionPending = false;

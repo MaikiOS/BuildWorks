@@ -1157,6 +1157,8 @@ internal static class ControllerInputAcceptance
 
             foreach (object tick in TestViewportToolbar(controller, input, scene, view, uiCamera))
                 yield return tick;
+            foreach (object tick in TestInteriorCamera(controller, input, scene, view, uiCamera, output))
+                yield return tick;
 
             NativeClick(view, uiCamera, "View"); yield return null;
             Require(view.HasViewportSettings, "View options failed to open");
@@ -1338,7 +1340,13 @@ internal static class ControllerInputAcceptance
             NativeClick(view, uiCamera, "ViewportSectionButton0"); yield return null;
             NativeClick(view, uiCamera, "ProjectionToggle"); yield return null;
             Require(scene.Camera.orthographic, "Projection precondition before reopen");
+            Call(controller, "ToggleInteriorCamera");
+            Frame(controller, input, view.ViewportScreenRect().center, 2, KeyCode.W); yield return null;
             controller.Close(true);
+            Require(!Field<bool>(controller, "interiorCamera") && !Field<bool>(controller, "cameraFlying") &&
+                Cursor.lockState == Field<CursorLockMode>(controller, "previousCursorLock") &&
+                Cursor.visible == Field<bool>(controller, "previousCursorVisible"),
+                "Closing the editor left interior navigation or cursor ownership active");
             Require(controller.OpenNew(out error), "Reopen after projection: " + error);
             scene = Field<BlueprintEditorScene>(controller, "scene"); view = Field<BlueprintEditorView>(controller, "view");
             Require(scene.Camera.orthographic && Field<bool>(view, "orthographic"), "Reopen projection UI disagrees with camera");
@@ -1977,6 +1985,100 @@ internal static class ControllerInputAcceptance
         Frame(controller, input, scene.Camera.WorldToScreenPoint(new Vector3(0,.5f,0))); yield return null;
         Require(doc.Selection.Count == 1 && doc.Selection[0] == originalGroup,
             "Tree cancellation fixture did not restore the selected group");
+    }
+
+    private static IEnumerable TestInteriorCamera(BlueprintEditorController controller, InputFrames input,
+        BlueprintEditorScene scene, BlueprintEditorView view, Camera uiCamera, string output)
+    {
+        var doc = controller.Document;
+        int revision = doc.RevisionToken;
+        bool originalProjection = Field<bool>(controller, "orthographic");
+        bool originalSnap = Field<bool>(controller, "placementSnap");
+        Set(controller, "orthographic", true); view.SetProjection(true); Call(controller, "ApplyCamera");
+        Vector3 overviewPosition = scene.Camera.transform.position, focus = Field<Vector3>(controller, "cameraFocus");
+        Quaternion overviewRotation = scene.Camera.transform.rotation;
+        float distance = Field<float>(controller, "cameraDistance"), yaw = Field<float>(controller, "cameraYaw"),
+            pitch = Field<float>(controller, "cameraPitch"), clip = scene.Camera.nearClipPlane;
+        NativeClick(view, uiCamera, "ViewportSectionButton0"); yield return null;
+        var speed = Field<TMP_InputField>(view, "interiorSpeedInput");
+        speed.text = "0.5"; speed.onEndEdit.Invoke(speed.text); yield return null;
+        Require(Mathf.Abs(Field<float>(controller, "interiorSpeed") - .5f) < .0001f, "Interior speed input is not connected");
+        Call(controller, "SetInteriorSpeed", float.NaN);
+        Require(Field<float>(controller, "interiorSpeed") == .5f, "Invalid speed reached camera movement");
+        NativeClick(view, uiCamera, "InteriorCamera"); yield return null;
+        Require(Field<bool>(controller, "interiorCamera") && !view.HasViewportSettings && !scene.Camera.orthographic &&
+            scene.Camera.nearClipPlane == .02f && !Field<Button>(view, "projectionButton").interactable &&
+            Field<TMP_Text>(view, "interiorCameraHint").gameObject.activeSelf && scene.Camera.transform.position == overviewPosition,
+            "Inside entry lost pose, perspective, near clip, visible mode or UI exit");
+        Vector2 mouse = view.ViewportScreenRect().center;
+        Vector3 start = scene.Camera.transform.position;
+        Frame(controller, input, mouse, 2); yield return null;
+        Require(Field<bool>(controller, "cameraFlying") && scene.Camera.transform.position == start,
+            "Interior RMB did not immediately acquire stationary center aiming");
+        Frame(controller, input, mouse, 2, KeyCode.W); yield return null;
+        Require(Mathf.Abs(Vector3.Distance(start, scene.Camera.transform.position) - .5f / 30f) < .0001f &&
+            Field<bool>(controller, "cameraFlying") && Field<TMP_Text>(view, "cameraReticle").gameObject.activeSelf,
+            "Interior speed depends on overview distance or flight lacks its center marker");
+        input.Next(mouse, 2); input.MouseX = .2f; input.MouseY = .1f;
+        controller.Update(); controller.LateUpdate(); yield return null;
+        Require(Quaternion.Angle(scene.Camera.transform.rotation, overviewRotation) > .1f,
+            "Interior look input did not turn its own camera");
+        start = scene.Camera.transform.position;
+        input.HasFocus = false; Frame(controller, input, mouse, 2, KeyCode.W); yield return null;
+        Require(!Field<bool>(controller, "cameraFlying") && !Field<TMP_Text>(view, "cameraReticle").gameObject.activeSelf &&
+            Cursor.visible && scene.Camera.transform.position == start && Field<bool>(controller, "interiorCamera"),
+            "Focus loss did not release flight without moving or losing the interior pose");
+        input.HasFocus = true; Frame(controller, input, mouse); yield return null;
+        Frame(controller, input, mouse, 2, KeyCode.W); yield return null;
+        start = scene.Camera.transform.position;
+        view.ShowError("QA", "Camera blocker");
+        Frame(controller, input, mouse, 2, KeyCode.W); yield return null;
+        Require(!Field<bool>(controller, "cameraFlying") && Cursor.visible && scene.Camera.transform.position == start,
+            "Modal kept flight/cursor capture alive");
+        Frame(controller, input, mouse, 0, KeyCode.Escape); yield return null;
+        Require(!view.HasModal && Field<bool>(controller, "interiorCamera"), "Modal Escape exited the interior mode");
+        Frame(controller, input, mouse); yield return null;
+        input.Next(mouse, 2, KeyCode.W); input.MouseScrollDelta = Vector2.up;
+        controller.Update(); controller.LateUpdate(); yield return null;
+        Require(Mathf.Abs(Field<float>(controller, "interiorSpeed") - .6f) < .0001f,
+            "Interior wheel did not change speed");
+        Frame(controller, input, mouse); yield return null;
+        Require(Field<Vector3>(controller, "cameraFocus") == focus && Field<float>(controller, "cameraDistance") == distance &&
+            Field<float>(controller, "cameraYaw") == yaw && Field<float>(controller, "cameraPitch") == pitch && doc.RevisionToken == revision,
+            "Interior navigation changed the saved overview or document");
+        Call(controller, "RequestCatalog"); yield return null;
+        NativeClick(view, uiCamera, "Catalog_fixture"); yield return null;
+        Set(controller, "placementSnap", false);
+        int count = doc.Parts.Count;
+        Frame(controller, input, mouse, 2, KeyCode.W); yield return null;
+        Frame(controller, input, mouse + Vector2.right * 100, 2); yield return null;
+        Require(scene.TryPlacementSurface(mouse, out Vector3 surface), "Interior test has no center-ray target");
+        Vector3 preview = Field<Vector3>(controller, "placementPosition");
+        Require(Mathf.Abs(preview.x - surface.x) < .001f && Mathf.Abs(preview.z - surface.z) < .001f,
+            "Interior preview follows hidden pointer instead of viewport center");
+        Frame(controller, input, mouse + Vector2.right * 100, 3); yield return null;
+        Require(doc.Parts.Count == count + 1 && Vector3.Distance(V(doc.Parts.Last().Position), preview) < .001f,
+            "Interior placement differs from the center-ray preview");
+        Frame(controller, input, mouse); yield return null;
+        Frame(controller, input, mouse, 0, KeyCode.Escape); yield return null;
+        Require(Field<BlueprintEditorCatalogItem>(controller, "placementItem") == null && Field<bool>(controller, "interiorCamera"),
+            "Placement Escape lost its existing cancellation priority");
+        Frame(controller, input, mouse); yield return null;
+        Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
+        Require(doc.Parts.Count == count, "Interior placement cannot be undone");
+        Frame(controller, input, mouse); yield return null;
+        NativeClick(view, uiCamera, "ViewportSectionButton0"); yield return null;
+        NativeClick(view, uiCamera, "InteriorCamera"); yield return null;
+        Require(!Field<bool>(controller, "interiorCamera") && scene.Camera.orthographic && scene.Camera.nearClipPlane == clip &&
+            Vector3.Distance(scene.Camera.transform.position, overviewPosition) < .0001f &&
+            Quaternion.Angle(scene.Camera.transform.rotation, overviewRotation) < .001f && Cursor.visible &&
+            !Field<TMP_Text>(view, "cameraReticle").gameObject.activeSelf,
+            "Return to overview did not restore the exact pose/projection/clip or release input");
+        Set(controller, "orthographic", originalProjection); view.SetProjection(originalProjection); Call(controller, "ApplyCamera");
+        Set(controller, "placementSnap", originalSnap);
+        File.WriteAllText(Path.Combine(output, "interior-camera-check.txt"),
+            "PASS actual menu entry/speed and independent position/look; perspective/.02 near clip; RMB release/focus loss/modal pause; " +
+            "wheel speed; saved overview/document unchanged by navigation; center-ray preview and placement/Undo, Escape priorities; exact overview pose/projection/clip return. Workbench only; native game cursor/input unverified.");
     }
 
     private static IEnumerable TestViewportToolbar(BlueprintEditorController controller, InputFrames input,
@@ -3079,7 +3181,9 @@ internal static class ControllerInputAcceptance
         if (verifyRaycast)
         {
             var hits = new List<RaycastResult>(); EventSystem.current.RaycastAll(pointer, hits);
-            Require(hits.Count > 0, "No actual UI raycast at " + name);
+            Require(hits.Count > 0, "No actual UI raycast at " + name + "; position=" + position +
+                "; screen=" + Screen.width + "x" + Screen.height + "; active=" + expected.gameObject.activeInHierarchy +
+                "; graphicDepth=" + expected.GetComponent<Graphic>()?.depth + "; culled=" + expected.GetComponent<Graphic>()?.canvasRenderer.cull);
             target = ExecuteEvents.GetEventHandler<IPointerClickHandler>(hits[0].gameObject);
             if (target != expected.gameObject)
             {

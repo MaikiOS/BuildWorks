@@ -924,3 +924,8 @@ editor.outliner.query3	Source ID or version…
 editor.outliner.query4	Recorded part type…
 editor.outliner.no_results	No matches · RESET
 editor.outliner.details	Prefab ID: {0}\nRecord ID: {1}\nSource: {2}\nRecorded type: {3}
+editor.camera.enter	Inside the building
+editor.camera.exit	Return to overview
+editor.camera.speed	Interior speed, m/s
+editor.camera.help	RMB: look; WASD move, Q/E down/up, Shift faster. Wheel: speed. With a piece selected, RMB+LMB places from center. Release RMB for the pointer. The button above restores the overview.
+editor.camera.active	Inside building · RMB: fly · Camera: return

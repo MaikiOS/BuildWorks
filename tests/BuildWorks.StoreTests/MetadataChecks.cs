@@ -113,7 +113,18 @@ namespace OstrixMods.BuildWorks.StoreTests
                 treeCopy.groups.All(group => tree.groups.All(source => source.stableId != group.stableId)) &&
                 treeCopy.parts[0].metadata.hostId == "synthetic-fixture" && treeCopy.parts[0].metadata.sourceId == null,
                 "Ready tree filter fixture lost group paths or invented missing provenance");
-            Console.WriteLine("PASS metadata native19/portable9: capture/save/update/import/export/reopen, unique snapshots/fresh host, missing retain, immutable copies/Undo, strict versions/IDs/fields/bounds, legacy8 and grouped filter fixture20");
+            var room = ExternalBlueprintLibrary.LoadFile(Path.Combine(Path.GetDirectoryName(fixture),
+                "21-camera-room.buildworks.json")).Single();
+            Require(room.importError == null, room.importError);
+            var roomCopy = BlueprintExchangeFormat.Decode(Encoding.UTF8.GetString(
+                BlueprintExchangeFormat.Encode(ExternalBlueprintLibrary.DetachedCopy(room))));
+            Require(roomCopy.parts.Count == 6 && roomCopy.groups.Count == 1 &&
+                roomCopy.parts.All(part => part.parentGroupId == roomCopy.groups[0].stableId) &&
+                roomCopy.parts.Count(part => part.prefabName == "woodwall") == 4 &&
+                roomCopy.parts.Count(part => part.prefabName == "wood_floor") == 2 &&
+                roomCopy.parts.Single(part => part.displayName == "QA ceiling").position.y == 2,
+                "Ready interior camera fixture lost its room records or parent");
+            Console.WriteLine("PASS metadata native19/portable9: capture/save/update/import/export/reopen, unique snapshots/fresh host, missing retain, immutable copies/Undo, strict versions/IDs/fields/bounds, legacy8 and ready fixtures20/21");
         }
 
         private static void Geometry(BlueprintPrefabMetadata metadata)

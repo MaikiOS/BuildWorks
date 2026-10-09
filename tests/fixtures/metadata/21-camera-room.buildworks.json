@@ -1,0 +1,203 @@
+{
+  "version": 9,
+  "requiredPrefabIds": [
+    "wood_floor",
+    "woodwall"
+  ],
+  "blueprint": {
+    "prefabName": "woodwall",
+    "name": "QA E09 Interior Camera",
+    "category": "OTHER",
+    "previewPitch": 30,
+    "primaryPartId": "north",
+    "groups": [
+      {
+        "editorVisible": true,
+        "name": "QA room",
+        "stableId": "room",
+        "editorLocked": false
+      }
+    ],
+    "previewZoom": 1,
+    "id": "b46e65603bed4a4da4184598e73ac121",
+    "previewYaw": 45,
+    "parts": [
+      {
+        "prefabName": "woodwall",
+        "parentGroupId": "room",
+        "editorVisible": true,
+        "rotation": {
+          "w": 1,
+          "y": 0,
+          "x": 0,
+          "z": 0
+        },
+        "editorLocked": false,
+        "stableId": "north",
+        "displayName": "QA north",
+        "position": {
+          "y": 0,
+          "x": 0,
+          "z": 1
+        },
+        "scale": {
+          "y": 1,
+          "x": 1,
+          "z": 1
+        },
+        "baseScale": {
+          "y": 1,
+          "x": 1,
+          "z": 1
+        }
+      },
+      {
+        "prefabName": "woodwall",
+        "parentGroupId": "room",
+        "editorVisible": true,
+        "rotation": {
+          "w": 0,
+          "y": 1,
+          "x": 0,
+          "z": 0
+        },
+        "editorLocked": false,
+        "stableId": "south",
+        "displayName": "QA south",
+        "position": {
+          "y": 0,
+          "x": 0,
+          "z": -1
+        },
+        "scale": {
+          "y": 1,
+          "x": 1,
+          "z": 1
+        },
+        "baseScale": {
+          "y": 1,
+          "x": 1,
+          "z": 1
+        }
+      },
+      {
+        "prefabName": "woodwall",
+        "parentGroupId": "room",
+        "editorVisible": true,
+        "rotation": {
+          "w": 0.70710678,
+          "y": 0.70710678,
+          "x": 0,
+          "z": 0
+        },
+        "editorLocked": false,
+        "stableId": "west",
+        "displayName": "QA west",
+        "position": {
+          "y": 0,
+          "x": -1,
+          "z": 0
+        },
+        "scale": {
+          "y": 1,
+          "x": 1,
+          "z": 1
+        },
+        "baseScale": {
+          "y": 1,
+          "x": 1,
+          "z": 1
+        }
+      },
+      {
+        "prefabName": "woodwall",
+        "parentGroupId": "room",
+        "editorVisible": true,
+        "rotation": {
+          "w": 0.70710678,
+          "y": -0.70710678,
+          "x": 0,
+          "z": 0
+        },
+        "editorLocked": false,
+        "stableId": "east",
+        "displayName": "QA east",
+        "position": {
+          "y": 0,
+          "x": 1,
+          "z": 0
+        },
+        "scale": {
+          "y": 1,
+          "x": 1,
+          "z": 1
+        },
+        "baseScale": {
+          "y": 1,
+          "x": 1,
+          "z": 1
+        }
+      },
+      {
+        "prefabName": "wood_floor",
+        "parentGroupId": "room",
+        "editorVisible": true,
+        "rotation": {
+          "w": 1,
+          "y": 0,
+          "x": 0,
+          "z": 0
+        },
+        "editorLocked": false,
+        "stableId": "floor",
+        "displayName": "QA floor",
+        "position": {
+          "y": 0,
+          "x": 0,
+          "z": 0
+        },
+        "scale": {
+          "y": 1,
+          "x": 1,
+          "z": 1
+        },
+        "baseScale": {
+          "y": 1,
+          "x": 1,
+          "z": 1
+        }
+      },
+      {
+        "prefabName": "wood_floor",
+        "parentGroupId": "room",
+        "editorVisible": true,
+        "rotation": {
+          "w": 1,
+          "y": 0,
+          "x": 0,
+          "z": 0
+        },
+        "editorLocked": false,
+        "stableId": "ceiling",
+        "displayName": "QA ceiling",
+        "position": {
+          "y": 2,
+          "x": 0,
+          "z": 0
+        },
+        "scale": {
+          "y": 1,
+          "x": 1,
+          "z": 1
+        },
+        "baseScale": {
+          "y": 1,
+          "x": 1,
+          "z": 1
+        }
+      }
+    ],
+    "anchors": []
+  },
+  "format": "buildworks-blueprint"
+}

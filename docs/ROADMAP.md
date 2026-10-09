@@ -1,3 +1,17 @@
+## 2026-10-09 — E09: interior editor camera, source only
+
+Camera Inside/Return: independent pose/speed0.1–30m/s, perspective/.02 near,
+reticle and center-ray placement with Undo. Overview stays untouched;
+RMB release, modal/text/focus loss and closing release flight/cursor.
+Existing Escape priorities and all world cost/permission/network rules stay.
+Normal/QA0/0, localization930, Store fixture21, HostContract25185596 and
+Unity492 passed; final UTC17:17:41.7934306Z. Correctness/Ponytail no blockers.
+Evidence/SHA/commit: artifacts/checkpoint-0.19.117/interior-verification.json.
+Ready procedure: docs/INTERIOR_CAMERA_CHECKPOINT_2026-10-09.md.
+QA.116 SHA867E5E47…DCF3A unchanged; no deployment/Valheim/save mutation.
+Physical input/Valheim remain open. Next: new QA build and targeted acceptance.
+Full goal active; progress docs/LIVE_CHECKLIST_RU.md.
+
 ## 2026-10-09 — E08: hierarchy-preserving outliner filters, source only
 
 Explicit nine-mode menu and scoped name/ID/source/version/recorded-type search.

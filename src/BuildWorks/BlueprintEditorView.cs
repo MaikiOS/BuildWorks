@@ -460,6 +460,9 @@ namespace OstrixMods.BuildWorks
         private bool inspectorScaleIsAbsolute;
         private readonly string[] inspectorOriginalScaleText = new string[3];
         private TMP_InputField fieldOfViewInput;
+        private TMP_InputField interiorSpeedInput;
+        private Button interiorCameraButton;
+        private TMP_Text interiorCameraHint, interiorSpeedLabel, interiorHelp, cameraReticle;
         private Slider fieldOfViewSlider;
         private Button fieldOfViewReset;
         private float statusMessageUntil;
@@ -1372,6 +1375,36 @@ namespace OstrixMods.BuildWorks
                 SetButtonLabel(projectionButton, T("editor.view.projection_tooltip"));
                 Transform projectionIcon = projectionButton.transform.Find("Icon");
                 if (projectionIcon) projectionIcon.gameObject.SetActive(false);
+                interiorCameraButton = CreateButton("InteriorCamera", viewportSections[0].transform,
+                    T("editor.camera.enter"), 294f, () => InteriorCameraRequested?.Invoke());
+                SetTopLeft((RectTransform)interiorCameraButton.transform, 12f, 172f, 294f, 32f);
+                interiorSpeedLabel = CreateText("InteriorSpeedLabel", viewportSections[0].transform,
+                    T("editor.camera.speed"), 13f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+                SetTopLeft(interiorSpeedLabel.rectTransform, 12f, 212f, 190f, 32f);
+                interiorSpeedInput = CreateInput("InteriorSpeed", viewportSections[0].transform,
+                    new Vector2(212f, -212f), 94f, .1f, .1f, 30f, resetValue: 3f);
+                ((RectTransform)interiorSpeedInput.transform).sizeDelta = new Vector2(94f, 32f);
+                interiorSpeedInput.SetTextWithoutNotify("3");
+                interiorSpeedInput.onEndEdit.AddListener(_ =>
+                { if (TryRead(interiorSpeedInput, out float speed)) InteriorSpeedChanged?.Invoke(speed); });
+                interiorHelp = CreateText("InteriorHelp", viewportSections[0].transform,
+                    T("editor.camera.help"), 12f, FontStyles.Normal, TextAlignmentOptions.TopLeft);
+                SetTopLeft(interiorHelp.rectTransform, 12f, 252f, 294f, 76f);
+                interiorHelp.textWrappingMode = TextWrappingModes.Normal;
+                interiorCameraHint = CreateText("InteriorCameraHint", viewport, T("editor.camera.active"),
+                    12f, FontStyles.Normal, TextAlignmentOptions.BottomLeft);
+                interiorCameraHint.rectTransform.anchorMin = Vector2.up;
+                interiorCameraHint.rectTransform.anchorMax = Vector2.one;
+                interiorCameraHint.rectTransform.offsetMin = new Vector2(12f, -92f);
+                interiorCameraHint.rectTransform.offsetMax = new Vector2(-344f, -52f);
+                interiorCameraHint.textWrappingMode = TextWrappingModes.Normal;
+                interiorCameraHint.gameObject.SetActive(false);
+                cameraReticle = CreateText("CameraReticle", viewport, "+", 18f, FontStyles.Normal,
+                    TextAlignmentOptions.Center);
+                cameraReticle.rectTransform.anchorMin = cameraReticle.rectTransform.anchorMax = new Vector2(.5f, .5f);
+                cameraReticle.rectTransform.anchoredPosition = Vector2.zero;
+                cameraReticle.rectTransform.sizeDelta = new Vector2(24f, 24f);
+                cameraReticle.gameObject.SetActive(false);
                 RepositionViewControl(occluderFadeButton.transform, 1, 12f, 4f, 294f, 32f);
                 RepositionViewControl(gridButton.transform, 1, 12f, 44f, 294f, 32f);
                 SetButtonLabel(gridButton, T("editor.view.grid_tooltip"));
@@ -1629,6 +1662,20 @@ namespace OstrixMods.BuildWorks
         internal event Action<int> CursorSourceHovered;
         internal event Action<bool> ProjectionChanged;
         internal event Action<float> FieldOfViewChanged;
+        internal event Action InteriorCameraRequested;
+        internal event Action<float> InteriorSpeedChanged;
+        internal void SetInteriorCamera(bool active, float speed)
+        {
+            SetButtonLabel(interiorCameraButton, T(active ? "editor.camera.exit" : "editor.camera.enter"));
+            SetSelected(interiorCameraButton, active);
+            interiorSpeedLabel.text = T("editor.camera.speed");
+            interiorHelp.text = T("editor.camera.help");
+            interiorCameraHint.text = T("editor.camera.active");
+            interiorSpeedInput.SetTextWithoutNotify(speed.ToString("0.##", CultureInfo.InvariantCulture));
+            interiorCameraHint.gameObject.SetActive(active);
+            projectionButton.interactable = !active;
+        }
+        internal void SetCameraFlight(bool flying) => cameraReticle.gameObject.SetActive(flying);
         internal event Action FieldOfViewResetRequested;
 
         internal void SetFieldOfView(float degrees, bool orthographicView)
@@ -2409,7 +2456,7 @@ namespace OstrixMods.BuildWorks
                 SetSelected(viewportSectionButtons[index], open && index == section);
             }
             SetTopRight((RectTransform)viewportSettings.transform, 8f, 48f, 320f,
-                section == 0 ? 216f : section == 1 ? 176f : section == 3 ? 416f : 480f);
+                section == 0 ? 380f : section == 1 ? 176f : section == 3 ? 416f : 480f);
             FitViewportSettings();
             EndTooltip();
         }

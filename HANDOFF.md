@@ -1,3 +1,15 @@
+## 2026-10-09 — visible missing-part replacement, source only
+
+Persistent Inspector/Tools entry opens steps and the catalogue for incomplete
+selection; one missing row plus own parts reaches the guarded confirmation.
+Deletion stays separate. Poses, history, independent supports and evidence remain.
+Normal/QA0/0, localization897, HostContract25185596, Geometry and Unity444 passed;
+final Unity UTC15:38:24.9969973Z; correctness/Ponytail found no blocker.
+Evidence/scenario: docs/MISSING_REPLACEMENT_ENTRY_CHECKPOINT_2026-10-09.md.
+Installed QA .116 SHA867E5E47…DCF3A unchanged; no install/game/save mutation.
+Next: incomplete-blueprint thumbnail; tree filters and camera remain queued.
+Full goal stays active. Visible progress: docs/LIVE_CHECKLIST_RU.md.
+
 ## 2026-10-09 — catalogue delete/hide, source only
 
 Both catalogues expose owned delete/confirm/cancel and external hide/Hidden/restore.

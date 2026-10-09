@@ -2873,7 +2873,12 @@ namespace OstrixMods.BuildWorks
             if (document.Groups.Count >= BlueprintEditorDocument.MaximumGroups)
             { view.SetStatus(BuildWorksLocalization.Text("editor.replace_limit"), error: true); return; }
             if (!TryMissingReplacement(out BlueprintEditorPart target, out BlueprintEditorPart[] replacements))
-            { view.SetStatus(BuildWorksLocalization.Text("editor.replace_hint"), error: true); return; }
+            {
+                view.ShowConfirmation(BuildWorksLocalization.Text("editor.replace_title"),
+                    BuildWorksLocalization.Text("editor.replace_steps"), RequestCatalog,
+                    height: 500f, acceptLabel: BuildWorksLocalization.Text("editor.replace_catalog"));
+                return;
+            }
             var expectedDocument = document;
             int revision = document.RevisionToken;
             string[] selection = document.Selection.ToArray();

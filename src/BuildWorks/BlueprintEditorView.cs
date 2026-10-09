@@ -353,6 +353,8 @@ namespace OstrixMods.BuildWorks
         private readonly RectTransform inspector;
         private readonly TMP_Text inspectorTitle;
         private readonly RectTransform inspectorTabs;
+        private readonly RectTransform inspectorViewport;
+        private readonly Button replaceMissingButton;
         private readonly RectTransform status;
         private readonly RectTransform outlinerRows;
         private readonly List<Action> outlinerRowBuilders = new List<Action>();
@@ -847,7 +849,12 @@ namespace OstrixMods.BuildWorks
                         ((RectTransform)button.transform).sizeDelta.x, 28f);
                     button.GetComponentInChildren<TMP_Text>().fontSize = 11f;
                 }
-                RectTransform inspectorViewport = CreateRect("InspectorViewport", inspector);
+                replaceMissingButton = CreateButton("InspectorReplaceMissing", inspector,
+                    T("editor.replace_title"), 228f, () => MissingReplacementRequested?.Invoke());
+                SetTopAnchored((RectTransform)replaceMissingButton.transform, 12f, 38f, 12f, 28f);
+                AddTooltip((RectTransform)replaceMissingButton.transform, T("editor.replace_hint"));
+                replaceMissingButton.gameObject.SetActive(false);
+                inspectorViewport = CreateRect("InspectorViewport", inspector);
                 SetInsets(inspectorViewport, 12f, 42f, 12f, 8f);
                 inspectorViewport.gameObject.AddComponent<RectMask2D>();
                 RectTransform inspectorBody = CreateRect("InspectorBody", inspectorViewport);
@@ -2074,7 +2081,7 @@ namespace OstrixMods.BuildWorks
                     "ToolsEntry6" => SupportCentreId != null,
                     "ToolsItem0" => ItemStandEditable,
                     "ToolsItem1" => ItemStandEditable && ItemStandHasContents,
-                    "ToolsReplaceMissing" => MissingReplacementAvailable,
+                    "ToolsReplaceMissing" => missingPrefabNodes.Count > 0,
                     _ => boundDocument?.EditablePartSelectionCount > 0
                 };
                 if (match) SetTopLeft((RectTransform)entry.transform, 12f, 82f + row++ * 36f, 286f, 32f);
@@ -3168,6 +3175,12 @@ namespace OstrixMods.BuildWorks
 
         private void BindInspector(BlueprintEditorDocument document)
         {
+            bool hasMissing = missingPrefabNodes.Count > 0;
+            bool missingEntryChanged = replaceMissingButton.gameObject.activeSelf != hasMissing;
+            SetButtonLabel(replaceMissingButton, T("editor.replace_title"));
+            replaceMissingButton.gameObject.SetActive(hasMissing);
+            SetInsets(inspectorViewport, 12f, hasMissing ? 70f : 42f, 12f, 8f);
+            if (missingEntryChanged) ApplySafeAreaAndLayout(true);
             inspectorEditPanel.SetActive(false);
             supportEditPanel.SetActive(false);
             groupEditPanel.SetActive(false);
@@ -4102,7 +4115,8 @@ namespace OstrixMods.BuildWorks
             if (!layout.Compact)
             {
                 double treeHeight = 116 + Math.Floor((layout.RightColumn.Height * outlinerFraction - 116) / 30.0) * 30.0;
-                double maximumTree = 116 + Math.Floor((layout.RightColumn.Height - BlueprintEditorLayout.MinimumInspectorHeight - 116) / 30) * 30;
+                double replacementHeight = replaceMissingButton.gameObject.activeSelf ? 28 : 0;
+                double maximumTree = 116 + Math.Floor((layout.RightColumn.Height - BlueprintEditorLayout.MinimumInspectorHeight - replacementHeight - 116) / 30) * 30;
                 treeHeight = Math.Max(146, Math.Min(treeHeight, maximumTree));
                 Place(outliner, new EditorRect(layout.RightColumn.X, layout.RightColumn.Y, layout.RightColumn.Width, treeHeight));
                 Place(inspector, new EditorRect(layout.RightColumn.X, layout.RightColumn.Y + treeHeight, layout.RightColumn.Width, layout.RightColumn.Height - treeHeight));

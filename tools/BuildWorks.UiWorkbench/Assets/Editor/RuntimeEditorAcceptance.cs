@@ -338,7 +338,7 @@ public static class RuntimeEditorAcceptance
                     scene.SetViewport(view.ViewportScreenRect());
                     Call(controller, "FrameAll");
                     foreach (string state in new[] { "select", "transform", "scale-xyz-ru", "array", "contour", "catalog",
-                        "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "catalog-managed-ru", "catalog-hidden-ru", "delete-confirm-ru", "hide-confirm-ru", "save-metadata", "save-as", "save-as-ru", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru", "exchange-armor", "exchange-armor-ru", "exchange-missing", "exchange-missing-ru", "replace-tools", "replace-confirm", "replace-confirm-ru" })
+                        "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "catalog-managed-ru", "catalog-hidden-ru", "delete-confirm-ru", "hide-confirm-ru", "save-metadata", "save-as", "save-as-ru", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru", "exchange-armor", "exchange-armor-ru", "exchange-missing", "exchange-missing-ru", "replace-tools", "replace-confirm", "replace-confirm-ru", "replace-entry-ru", "replace-help-ru" })
                     {
                         Require(Screen.width == width && Screen.height == height,
                             "GameView changed before " + state + ": " + Screen.width + "x" + Screen.height);
@@ -520,10 +520,15 @@ public static class RuntimeEditorAcceptance
                                     "Import screenshot missed completed inspection");
                             }
                         }
-                        else if (state == "replace-tools")
+                        else if (state == "replace-tools" || state == "replace-entry-ru" || state == "replace-help-ru")
                         {
-                            view.MissingReplacementAvailable = true;
-                            view.ShowToolsMenu(new Vector2(width * .5f, height * .5f), false);
+                            BuildWorksLocalization.RussianLanguage = state.EndsWith("-ru", StringComparison.Ordinal);
+                            Require(controller.AddPart("qa_absent", "Отсутствующая деталь"), "Missing layout fixture was not added");
+                            Call(controller, "Bind", (object)null);
+                            yield return null;
+                            if (state == "replace-tools") view.ShowToolsMenu(new Vector2(width * .5f, height * .5f), false);
+                            else if (state == "replace-help-ru")
+                                ControllerInputAcceptance.NativeClick(view, uiCamera, "InspectorReplaceMissing");
                         }
                         else if (state.StartsWith("replace-confirm", StringComparison.Ordinal))
                         {
@@ -570,6 +575,11 @@ public static class RuntimeEditorAcceptance
                         view.RootCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
                         if (state.StartsWith("exchange")) ControllerInputAcceptance.NativeClick(view, uiCamera, "ExchangeClose");
                         if (state == "scale-xyz-ru") Field<Button>(view, "inspectorProportionsButton").onClick.Invoke();
+                        if (state == "replace-tools" || state == "replace-entry-ru" || state == "replace-help-ru")
+                        {
+                            view.HideDialog(); view.HideToolsMenu();
+                            Field<Button>(view, "undoButton").onClick.Invoke();
+                        }
                         BuildWorksLocalization.RussianLanguage = false;
                         yield return null;
                     }
@@ -654,6 +664,23 @@ public static class RuntimeEditorAcceptance
             "Select with an editable selection does not expose transform controls");
         RectTransform clip = Field<RectTransform>(view, "inspector").Find("InspectorViewport") as RectTransform;
         Require(clip, "Actual inspector clipping viewport is missing");
+        if (state == "replace-entry-ru" || state == "replace-help-ru")
+        {
+            var button = Field<Button>(view, "replaceMissingButton");
+            Require(button.gameObject.activeInHierarchy && button.interactable, "Persistent replacement entry is unavailable");
+            Require(button.GetComponentInChildren<TMP_Text>().text == BuildWorksLocalization.Text("editor.replace_title"),
+                "Replacement entry missed the current Russian language");
+            EnsureInside(Field<RectTransform>(view, "inspector"), (RectTransform)button.transform);
+            Vector3[] buttonCorners = new Vector3[4], clipCorners = new Vector3[4];
+            ((RectTransform)button.transform).GetWorldCorners(buttonCorners); clip.GetWorldCorners(clipCorners);
+            Require(buttonCorners[0].y >= clipCorners[1].y - .5f, "Replacement entry overlaps inspector content");
+            if (state == "replace-help-ru")
+            {
+                Require(view.HasModal && !Field<TMP_Text>(view, "modalMessage").isTextOverflowing,
+                    "Replacement instructions are absent or overflow");
+                EnsureInside(Field<RectTransform>(view, "safeRoot"), (RectTransform)Field<TMP_Text>(view, "modalTitle").transform.parent);
+            }
+        }
         foreach (TextMeshProUGUI text in view.RootCanvas.GetComponentsInChildren<TextMeshProUGUI>())
         {
             if (string.IsNullOrWhiteSpace(text.text)) continue;

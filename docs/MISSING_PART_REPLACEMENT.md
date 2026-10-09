@@ -1,8 +1,15 @@
-# Explicit missing-part replacement — .115
+# Explicit missing-part replacement — current source
+
+Updated 2026-10-09. The new entry is not deployed to QA .116.
+Incomplete documents keep REPLACE MISSING PART visible above the inspector.
+Without a ready selection it explains the steps and opens the real catalogue,
+without deleting anything. Select the missing row and own parts together again
+after placing your replacement.
 
 Use existing placement and gizmo tools to prepare your own replacement. Select
 exactly one missing row directly and the available replacement parts/group, then
-Tools → REPLACE MISSING PART. Confirmation identifies the missing prefab and
+the inspector button or Tools → REPLACE MISSING PART. Ctrl-click adds tree rows.
+Confirmation identifies the missing prefab and
 replacement count. Already placed selected parts are used; no extra copies,
 automatic alignment, resizing or name matching are performed.
 
@@ -15,8 +22,9 @@ source documents are unchanged. One Undo restores the full prior state.
 
 Hidden/locked parts, two missing rows, overlapping parent/child selection and group
 capacity are refused. Confirmation rechecks document revision, selection and live
-prefab availability. Cancel or stale review changes nothing. Native19/portable9
-remain unchanged. Save/reopen uses the existing atomic store path.
+prefab availability. Cancel or stale review changes nothing. This step does not
+change current native21/portable10. Save/reopen uses the existing atomic store path.
 
 Workbench verifies actual controls and disk reopen. Native construction, world
-reload and multiplayer still require game acceptance. See QA_0.19.115_RU.md.
+reload and multiplayer still require game acceptance. Current scenario:
+[visible replacement](MISSING_REPLACEMENT_ENTRY_CHECKPOINT_2026-10-09.md).

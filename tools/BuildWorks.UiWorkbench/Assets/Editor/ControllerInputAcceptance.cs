@@ -289,18 +289,32 @@ internal static class ControllerInputAcceptance
         bool ownAvailable = true;
         using (var controller = new BlueprintEditorController(store, template, font,
             name => name == "woodwall" && ownAvailable ? wall : null, name => name,
-            () => Array.Empty<BlueprintEditorCatalogItem>(), message => { throw new InvalidOperationException(message); }))
+            () => new[] { new BlueprintEditorCatalogItem("woodwall", "Own wall", null, "OTHER", "WOOD", "Valheim", 0) },
+            message => { throw new InvalidOperationException(message); }))
         {
             Require(controller.OpenExisting(saved, out error), error); yield return null;
             var document = controller.Document;
             var view = Field<BlueprintEditorView>(controller, "view");
             document.SelectOnly("missing"); Call(controller, "Bind", (object)null);
             Require(!view.MissingReplacementAvailable, "Replacement enabled without any chosen own part");
+            int initialRevision = document.RevisionToken;
+            NativeClick(view, null, "InspectorReplaceMissing"); yield return null;
+            Require(view.HasModal && Field<TMP_Text>(view, "modalMessage").text == BuildWorksLocalization.Text("editor.replace_steps"),
+                "Single missing row must expose replacement instructions without a hidden selection prerequisite");
+            NativeClick(view, null, Field<Button>(view, "dialogCancelButton")); yield return null;
+            Require(document.RevisionToken == initialRevision && document.Parts.Count == 3 && !view.HasModal,
+                "Instruction cancellation changed the document");
+            view.ShowToolsMenu(new Vector2(Screen.width * .5f, Screen.height * .5f), false); yield return null;
+            NativeClick(view, null, "ToolsReplaceMissing"); yield return null;
+            Require(view.HasModal, "Tools replacement is inaccessible with only the missing row selected");
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            Require(view.HasCatalog && !view.HasModal && document.RevisionToken == initialRevision,
+                "Instruction action did not open the real catalogue without mutation");
+            view.HideCatalog();
             document.ToggleSelection("a"); document.ToggleSelection("b"); Call(controller, "Bind", (object)null);
             Require(view.MissingReplacementAvailable, "Explicit one-to-many selection not available");
             int revision = document.RevisionToken;
-            view.ShowToolsMenu(new Vector2(Screen.width * .5f, Screen.height * .5f), false); yield return null;
-            NativeClick(view, null, "ToolsReplaceMissing"); yield return null;
+            NativeClick(view, null, "InspectorReplaceMissing"); yield return null;
             Require(view.HasModal && document.Parts.Count == 3 && document.RevisionToken == revision,
                 "Tools action removed the missing row before confirmation");
             NativeClick(view, null, Field<Button>(view, "dialogCancelButton")); yield return null;
@@ -318,9 +332,13 @@ internal static class ControllerInputAcceptance
             Require(document.Parts.Count == 2 && document.PrimaryPartId == "a" && document.PlacementSupportId == "s" &&
                 document.Sources[0].Text == evidence.Text && document.Groups.Single(group => group.StableId == "g").PivotPartId == "a" &&
                 document.Parts[0].Position.X == 3 && document.Parts[0].Scale.X == 2, "Confirmed replacement lost pose/source/support/pivot");
+            Require(!Field<Button>(view, "replaceMissingButton").gameObject.activeSelf,
+                "Replacement entry remains after the last missing part was replaced");
             NativeClick(view, null, Field<Button>(view, "undoButton")); yield return null;
             Require(document.Parts.Count == 3 && document.PrimaryPartId == "missing" && document.Groups.Count == 1,
                 "One native Undo did not restore missing row and hierarchy");
+            Require(Field<Button>(view, "replaceMissingButton").gameObject.activeSelf,
+                "Undo did not restore visible replacement entry");
             NativeClick(view, null, Field<Button>(view, "redoButton")); yield return null;
             Require(document.Parts.Count == 2 && document.Groups.Count == 2, "Native Redo failed");
             NativeClick(view, null, "Save"); yield return null;
@@ -332,7 +350,7 @@ internal static class ControllerInputAcceptance
             reopened.groups.Count == 2 && reopened.placementSupportId == "s" && reopened.sourceDocuments[0].text == evidence.Text,
             "Replacement disk reopen lost structure or original evidence");
         File.WriteAllText(Path.Combine(output, "replacement-check.txt"),
-            "PASS actual Tools/Cancel/confirmation/stale prefab/one Undo/Redo/Save/reopen; own poses, groups, primary/pivots, independent support and source preserved. No game construction proof.");
+            "PASS actual persistent Inspector/Tools entry with only missing selected; instructions/Cancel/Open catalogue without mutation; explicit one-to-many confirmation/stale prefab/one Undo/Redo/Save/reopen; own poses, groups, primary/pivots, independent support and source preserved. No game construction proof.");
     }
 
     internal static IEnumerable<object> RunPrefabMetadata(Camera template, TMP_Text font, string output)

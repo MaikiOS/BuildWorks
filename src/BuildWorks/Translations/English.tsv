@@ -874,6 +874,8 @@ editor.scale.shear	Cannot scale this selection independently: rotated parts woul
 editor.catalog_cost_unknown	Full construction cost and required stations are unknown. This blueprint can be edited; world placement is checked separately.
 blueprint.capture_parent_frame	Cannot capture {0} exactly: its parent changes scale or shears the object.
 editor.replace_title	REPLACE MISSING PART
+editor.replace_catalog	Open catalogue
+editor.replace_steps	1. Open the catalogue and place one or more available parts at the missing part's location. Their shape and pose in the scene preview the result.\n2. In the tree, select the missing row itself, then Ctrl-click your parts or their group. Select them together again after placement.\n3. Click Replace missing part and review the confirmation.\nSelect exactly one missing row. Hidden/locked objects and overlapping parent/child selections are not allowed. The record remains until confirmation; deletion is a separate action.
 editor.replace_hint	Place your replacement first. Select exactly one missing row directly and your available replacement parts or group. Hidden/locked parts and overlapping parent/child selections are not allowed.
 editor.replace_confirm	Remove missing record: {0}\nReplacement: {1} selected parts; their poses and sizes stay unchanged.\nPrimary/pivot links move to: {2}\nIndependent supports and original source stay unchanged. One Undo restores the record.
 editor.replace_changed	Selection, document or available prefabs changed. Review replacement again.

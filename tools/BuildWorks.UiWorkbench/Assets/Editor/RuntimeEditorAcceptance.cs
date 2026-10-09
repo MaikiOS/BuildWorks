@@ -338,7 +338,7 @@ public static class RuntimeEditorAcceptance
                     scene.SetViewport(view.ViewportScreenRect());
                     Call(controller, "FrameAll");
                     foreach (string state in new[] { "select", "transform", "scale-xyz-ru", "array", "contour", "catalog",
-                        "outliner", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "catalog-managed-ru", "catalog-hidden-ru", "delete-confirm-ru", "hide-confirm-ru", "save-metadata", "save-as", "save-as-ru", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru", "exchange-armor", "exchange-armor-ru", "exchange-missing", "exchange-missing-ru", "replace-tools", "replace-confirm", "replace-confirm-ru", "replace-entry-ru", "replace-help-ru" })
+                        "outliner", "outliner-filter-ru", "outliner-fields-ru", "outliner-empty-ru", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "catalog-managed-ru", "catalog-hidden-ru", "delete-confirm-ru", "hide-confirm-ru", "save-metadata", "save-as", "save-as-ru", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru", "exchange-armor", "exchange-armor-ru", "exchange-missing", "exchange-missing-ru", "replace-tools", "replace-confirm", "replace-confirm-ru", "replace-entry-ru", "replace-help-ru" })
                     {
                         Require(Screen.width == width && Screen.height == height,
                             "GameView changed before " + state + ": " + Screen.width + "x" + Screen.height);
@@ -358,7 +358,19 @@ public static class RuntimeEditorAcceptance
                             state == "contour" ? BlueprintEditorTool.Contour :
                             state == "select" ? BlueprintEditorTool.Select : BlueprintEditorTool.Transform;
                         Call(controller, "SetActiveTool", tool);
-                        if (state == "scale-xyz-ru")
+                        if (state == "outliner-filter-ru" || state == "outliner-fields-ru" || state == "outliner-empty-ru")
+                        {
+                            BuildWorksLocalization.RussianLanguage = true;
+                            Call(view, "RefreshOutlinerFilter");
+                            if (state == "outliner-empty-ru") Field<TMP_InputField>(view, "outlinerSearch").text = "Нет такого объекта";
+                            else
+                            {
+                                ControllerInputAcceptance.NativeClick(view, uiCamera, "OutlinerFilter");
+                                Canvas.ForceUpdateCanvases();
+                                if (state == "outliner-fields-ru") Field<GameObject>(view, "outlinerMenu").GetComponent<ScrollRect>().verticalNormalizedPosition = 0;
+                            }
+                        }
+                        else if (state == "scale-xyz-ru")
                         {
                             BuildWorksLocalization.RussianLanguage = true;
                             document.SelectOnly(selected);
@@ -580,6 +592,8 @@ public static class RuntimeEditorAcceptance
                             view.HideDialog(); view.HideToolsMenu();
                             Field<Button>(view, "undoButton").onClick.Invoke();
                         }
+                        if (state == "outliner-filter-ru" || state == "outliner-fields-ru" || state == "outliner-empty-ru")
+                            Call(view, "ResetOutlinerFilter");
                         BuildWorksLocalization.RussianLanguage = false;
                         yield return null;
                     }
@@ -626,6 +640,7 @@ public static class RuntimeEditorAcceptance
                     foreach (object step in ControllerInputAcceptance.RunPrefabMetadata(template, fontTemplate, output)) yield return step;
                     foreach (object step in ControllerInputAcceptance.RunMissingReplacement(template, fontTemplate, source["woodwall"], output)) yield return step;
                     foreach (object step in ControllerInputAcceptance.RunPartialThumbnails(template, fontTemplate, source["woodwall"], output)) yield return step;
+                    foreach (object step in ControllerInputAcceptance.RunOutlinerFilters(fontTemplate, output)) yield return step;
                     checks.Add("Explicit missing replacement: actual Tools button/Cancel/review/commit, one Undo/Redo, stale prefab refusal, exact source/poses and native Save/reopen. No game construction proof.");
                     checks.Add("Prefab metadata: actual nested root-local capture/fresh save, unknown source owner, missing recorded frame pose/scale, no snap/model surfaces, native Save and disk reopen; no game proof.");
                     checks.Add("Explicit missing-part copy: actual default/ID/count/Back reset/native confirmation/stale host refusal/new confirmation -> one-part editor; exact source retained. No game construction proof.");
@@ -704,6 +719,7 @@ public static class RuntimeEditorAcceptance
                 Require(!text.isTextOverflowing, "Catalog preview text overflows: " + text.name);
             if (text.name == "EmptyPreview")
                 Require(!text.isTextOverflowing, "Empty-image explanation overflows");
+            if (text.name == "FilterHelp") Require(!text.isTextOverflowing, "Outliner filter instructions overflow");
             if (text.name.StartsWith("StatusHints", StringComparison.Ordinal))
                 Require(!text.isTextTruncated && !text.isTextOverflowing,
                     "Context hotkeys are clipped: " + text.text);
@@ -743,6 +759,12 @@ public static class RuntimeEditorAcceptance
         }
         if (state == "outliner") EnsureInside(Field<RectTransform>(view, "outliner"),
             (RectTransform)Field<GameObject>(view, "outlinerMenu").transform);
+        if (state == "outliner-filter-ru" || state == "outliner-fields-ru")
+        {
+            var menu = (RectTransform)Field<GameObject>(view, "outlinerMenu").transform;
+            EnsureInside(Field<RectTransform>(view, "safeRoot"), menu);
+            Require(menu.rect.height >= 200, "Filter choices remain trapped in the short tree viewport");
+        }
         if (state == "catalog-blueprints") Require(Field<RectTransform>(view, "catalogGrid").childCount == 2,
             "Blueprint mode should show both stored category examples");
         if (state == "catalog-managed-ru" || state == "catalog-hidden-ru")

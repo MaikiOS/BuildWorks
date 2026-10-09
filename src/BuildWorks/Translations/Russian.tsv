@@ -898,3 +898,29 @@ catalog.open_draft	Открытый документ останется несо
 catalog.action.restore	Вернуть в каталог
 catalog.confirm_hide	Скрыть «{0}» из каталога? Исходный файл, сохранённые копии и постройки в мире сохранятся. Вернуть запись можно в разделе «Скрытые».
 catalog.hidden	Чертёж скрыт. Вернуть его можно в разделе «Скрытые».
+editor.outliner.filters	ФИЛЬТР
+editor.outliner.filters_active	ФИЛЬТР *
+editor.outliner.unknown	неизвестен
+editor.outliner.help	Фильтр меняет только список; ветки раскрываются временно. Выбор группы и Ctrl+A затрагивают детали вне фильтра. Прокрути ниже: режим и поле поиска.
+editor.outliner.reset	Сбросить фильтры и поиск
+editor.outliner.filter0	Все объекты
+editor.outliner.filter1	Только выбранные
+editor.outliner.filter2	Скрытые
+editor.outliner.filter3	Заблокированные
+editor.outliner.filter4	Отсутствующие детали
+editor.outliner.filter5	Источник неизвестен
+editor.outliner.filter6	Тип неизвестен
+editor.outliner.filter7	С непустой надписью
+editor.outliner.filter8	Масштаб не 100%
+editor.outliner.scope0	Поиск: все поля
+editor.outliner.scope1	Поиск: имя
+editor.outliner.scope2	Поиск: ID детали или записи
+editor.outliner.scope3	Поиск: источник / версия
+editor.outliner.scope4	Поиск: записанный тип
+editor.outliner.query0	Имя / ID / источник / тип…
+editor.outliner.query1	Имя детали или группы…
+editor.outliner.query2	ID детали, записи или группы…
+editor.outliner.query3	ID источника или версия…
+editor.outliner.query4	Записанный тип детали…
+editor.outliner.no_results	Нет совпадений · СБРОС
+editor.outliner.details	ID prefab: {0}\nID записи: {1}\nИсточник: {2}\nЗаписанный тип: {3}

@@ -1,3 +1,17 @@
+## 2026-10-09 — E08: hierarchy-preserving outliner filters, source only
+
+Explicit nine-mode menu and scoped name/ID/source/version/recorded-type search.
+Unknown metadata is not inferred. Matches retain ancestor groups; temporary
+expansion/reset never alter selection, hierarchy, history or document state.
+Normal/QA0/0, localization925, Store fixture20, HostContract25185596 and
+Unity480 passed; final UTC16:52:28.5095963Z. Last missing record found among
+50000 parts/64 groups with bounded instantiated rows;69ms bind is Workbench
+list evidence, not game FPS. Independent reviews/SHA: outliner-verification.json.
+Evidence/ready scenario: docs/OUTLINER_FILTER_CHECKPOINT_2026-10-09.md.
+Installed QA.116 SHA867E5E47…DCF3A unchanged; no deployment/game/save mutation.
+Next: E09 camera; world snapping and the rest of the full goal remain open.
+Progress: docs/LIVE_CHECKLIST_RU.md. Full goal active.
+
 ## 2026-10-09 — incomplete blueprint thumbnails, source only
 
 U10 renders available parts with recorded bbox/unknown-size markers through one

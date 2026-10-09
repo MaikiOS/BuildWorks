@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using OstrixMods.BuildWorks.Geometry;
 using TMPro;
 using UnityEngine;
@@ -553,7 +554,18 @@ namespace OstrixMods.BuildWorks
         private string statusMessage = string.Empty;
         private bool showGrid = true;
         private bool orthographic;
-        private int outlinerFilter;
+        private int outlinerFilter, outlinerSearchScope;
+        private bool outlinerFilterMenu;
+        private static readonly string[] OutlinerFilterKeys = {
+            "editor.outliner.filter0", "editor.outliner.filter1", "editor.outliner.filter2",
+            "editor.outliner.filter3", "editor.outliner.filter4", "editor.outliner.filter5",
+            "editor.outliner.filter6", "editor.outliner.filter7", "editor.outliner.filter8" };
+        private static readonly string[] OutlinerScopeKeys = {
+            "editor.outliner.scope0", "editor.outliner.scope1", "editor.outliner.scope2",
+            "editor.outliner.scope3", "editor.outliner.scope4" };
+        private static readonly string[] OutlinerQueryKeys = {
+            "editor.outliner.query0", "editor.outliner.query1", "editor.outliner.query2",
+            "editor.outliner.query3", "editor.outliner.query4" };
         private bool outlinerReparentOnly;
         private bool outlinerContextTracking;
         private float requestedUiScale = 1f;
@@ -719,13 +731,12 @@ namespace OstrixMods.BuildWorks
                 outlinerSearch.textComponent = search;
                 outlinerSearch.placeholder = searchPlaceholder;
                 outlinerSearch.lineType = TMP_InputField.LineType.SingleLine;
-                outlinerSearch.characterLimit = 48;
-                outlinerSearch.onValueChanged.AddListener(_ =>
-                {
-                    if (boundDocument != null) RebuildOutliner(boundDocument);
-                });
+                outlinerSearch.characterLimit = 128;
+                searchPlaceholder.text = T("editor.outliner.query0");
+                outlinerSearch.onValueChanged.AddListener(_ => RefreshOutlinerFilter());
                 outlinerFilterButton = CreateButton(
-                    "OutlinerFilter", outliner, T("editor.view.all"), 76f, CycleOutlinerFilter);
+                    "OutlinerFilter", outliner, T("editor.outliner.filters"), 76f, () =>
+                    { if (outlinerMenu.activeSelf && outlinerFilterMenu) HideOutlinerMenu(); else ShowOutlinerMenu(false, true); });
                 SetTopRight((RectTransform)outlinerFilterButton.transform, 8f, 76f, 76f, 32f);
                 RectTransform rowViewport = CreateRect("RowsViewport", outliner);
                 outlinerRowViewport = rowViewport;
@@ -2640,33 +2651,70 @@ namespace OstrixMods.BuildWorks
         private void CollectOutlinerRows(BlueprintEditorDocument document)
         {
             string filter = (outlinerSearch.text ?? string.Empty).Trim();
+            var groupsById = document.Groups.ToDictionary(group => group.StableId);
+            var groupChildren = document.Groups.ToLookup(group => group.ParentGroupId);
+            var partChildren = document.Parts.ToLookup(part => part.ParentGroupId);
+            var keptGroups = new HashSet<string>(StringComparer.Ordinal);
+            var keptParts = new HashSet<string>(StringComparer.Ordinal);
             foreach (BlueprintEditorGroup group in document.Groups)
             {
-                if (group.ParentGroupId == null && BranchMatches(document, group, filter))
-                    AddOutlinerGroup(document, group, filter, 0);
+                bool queryMatches = outlinerSearchScope < 3 &&
+                    (outlinerSearchScope != 2 && Matches(group.Name, filter) ||
+                     outlinerSearchScope != 1 && Matches(group.StableId, filter));
+                if ((string.IsNullOrEmpty(filter) || queryMatches) && PassesOutlinerFilter(
+                    Contains(document.Selection, group.StableId), document.IsEffectivelyVisible(group.StableId),
+                    document.IsEffectivelyLocked(group.StableId), false)) keptGroups.Add(group.StableId);
             }
             foreach (BlueprintEditorPart part in document.Parts)
             {
-                if (part.ParentGroupId != null) continue;
-                if (!Matches(part.DisplayName, filter) &&
-                    !Matches(part.PrefabName, filter)) continue;
+                if (!MatchesOutlinerPart(part, filter)) continue;
                 if (!PassesOutlinerFilter(
                     document.IsPartSelected(part.StableId),
                     document.IsEffectivelyVisible(part.StableId),
                     document.IsEffectivelyLocked(part.StableId),
-                    missingPrefabNodes.Contains(part.StableId))) continue;
+                    missingPrefabNodes.Contains(part.StableId), part)) continue;
+                keptParts.Add(part.StableId);
+                if (part.ParentGroupId != null) keptGroups.Add(part.ParentGroupId);
+            }
+            foreach (string id in keptGroups.ToArray())
+            {
+                string parent = groupsById[id].ParentGroupId;
+                while (parent != null && keptGroups.Add(parent)) parent = groupsById[parent].ParentGroupId;
+            }
+            foreach (BlueprintEditorGroup group in groupChildren[null]) AddGroup(group, 0);
+            foreach (BlueprintEditorPart part in partChildren[null])
+            {
+                if (!keptParts.Contains(part.StableId)) continue;
                 AddOutlinerRow(document, part.StableId, part.DisplayName,
                     part.Visible, part.Locked, true, false, 0, part.ForeignData);
             }
-            if (document.Supports.Count == 0) return;
-            AddSupportRow("Supports", (supportsCollapsed ? "+ " : "- ") +
+            void AddGroup(BlueprintEditorGroup group, int depth)
+            {
+                if (!keptGroups.Contains(group.StableId)) return;
+                bool collapsed = collapsedGroups.Contains(group.StableId) && !OutlinerIsFiltered;
+                AddOutlinerRow(document, group.StableId, group.Name, group.Visible, group.Locked, false, collapsed, depth);
+                if (collapsed) return;
+                foreach (BlueprintEditorGroup child in groupChildren[group.StableId]) AddGroup(child, depth + 1);
+                foreach (BlueprintEditorPart part in partChildren[group.StableId])
+                    if (keptParts.Contains(part.StableId)) AddOutlinerRow(document, part.StableId, part.DisplayName,
+                        part.Visible, part.Locked, true, false, depth + 1, part.ForeignData);
+            }
+            var supports = document.Supports.Where(support =>
+                (string.IsNullOrEmpty(filter) || outlinerSearchScope < 3 &&
+                 (outlinerSearchScope != 2 && Matches(support.Name, filter) ||
+                  outlinerSearchScope != 1 && Matches(support.StableId, filter))) &&
+                PassesOutlinerFilter(document.ActiveSupportId == support.StableId, true, false, false)).ToArray();
+            if (outlinerRowBuilders.Count == 0 && supports.Length == 0 && OutlinerIsFiltered)
+                AddSupportRow("NoMatches", T("editor.outliner.no_results"), ResetOutlinerFilter);
+            if (supports.Length == 0) return;
+            bool supportClosed = supportsCollapsed && !OutlinerIsFiltered;
+            AddSupportRow("Supports", (supportClosed ? "+ " : "- ") +
                 T("editor.support.branch", document.Supports.Count), () =>
-                { supportsCollapsed = !supportsCollapsed; RebuildOutliner(document); });
-            if (supportsCollapsed) return;
-            foreach (BlueprintEditorSupport support in document.Supports)
+                { if (!OutlinerIsFiltered) { supportsCollapsed = !supportsCollapsed; RebuildOutliner(document); } });
+            if (supportClosed) return;
+            foreach (BlueprintEditorSupport support in supports)
             {
                 bool active = document.ActiveSupportId == support.StableId;
-                if (!Matches(support.Name, filter) || !PassesOutlinerFilter(active, true, false, false)) continue;
                 string id = support.StableId;
                 string label = support.Name + (document.PlacementSupportId == id
                     ? " · " + T("editor.support.placement_role") : string.Empty);
@@ -2694,59 +2742,6 @@ namespace OstrixMods.BuildWorks
             SetInsets(text.rectTransform, 12f, 0f, 8f, 0f);
             AddTooltip(row, label);
             return button;
-        }
-
-        private bool BranchMatches(
-            BlueprintEditorDocument document,
-            BlueprintEditorGroup group,
-            string filter)
-        {
-            if (Matches(group.Name, filter) && PassesOutlinerFilter(
-                Contains(document.Selection, group.StableId),
-                document.IsEffectivelyVisible(group.StableId),
-                document.IsEffectivelyLocked(group.StableId), missing: false)) return true;
-            foreach (BlueprintEditorGroup child in document.Groups)
-                if (child.ParentGroupId == group.StableId &&
-                    BranchMatches(document, child, filter)) return true;
-            foreach (BlueprintEditorPart part in document.Parts)
-                if (part.ParentGroupId == group.StableId &&
-                    (Matches(part.DisplayName, filter) || Matches(part.PrefabName, filter)) &&
-                    PassesOutlinerFilter(
-                        document.IsPartSelected(part.StableId),
-                        document.IsEffectivelyVisible(part.StableId),
-                        document.IsEffectivelyLocked(part.StableId),
-                        missingPrefabNodes.Contains(part.StableId))) return true;
-            return false;
-        }
-
-        private void AddOutlinerGroup(
-            BlueprintEditorDocument document,
-            BlueprintEditorGroup group,
-            string filter,
-            int depth)
-        {
-            bool collapsed = collapsedGroups.Contains(group.StableId) &&
-                string.IsNullOrEmpty(filter);
-            AddOutlinerRow(document, group.StableId, group.Name,
-                group.Visible, group.Locked, false, collapsed, depth);
-            if (collapsed) return;
-            foreach (BlueprintEditorGroup child in document.Groups)
-                if (child.ParentGroupId == group.StableId &&
-                    BranchMatches(document, child, filter))
-                    AddOutlinerGroup(document, child, filter, depth + 1);
-            foreach (BlueprintEditorPart part in document.Parts)
-            {
-                if (part.ParentGroupId != group.StableId ||
-                    !Matches(part.DisplayName, filter) &&
-                    !Matches(part.PrefabName, filter) ||
-                    !PassesOutlinerFilter(
-                        document.IsPartSelected(part.StableId),
-                        document.IsEffectivelyVisible(part.StableId),
-                        document.IsEffectivelyLocked(part.StableId),
-                        missingPrefabNodes.Contains(part.StableId))) continue;
-                AddOutlinerRow(document, part.StableId, part.DisplayName,
-                    part.Visible, part.Locked, true, false, depth + 1, part.ForeignData);
-            }
         }
 
         private void AddOutlinerRow(
@@ -2832,6 +2827,7 @@ namespace OstrixMods.BuildWorks
                 disclosureRect.anchoredPosition = new Vector2(depth * 15f, 0f);
                 disclosureRect.sizeDelta = new Vector2(20f, 28f);
                 StyleTreeControl(disclosure);
+                disclosure.interactable = !OutlinerIsFiltered;
             }
             Button eye = CreateIconButton(
                 "Eye", row, visible ? "visibility" : "hidden", visible ? "●" : "○", 28f,
@@ -2857,6 +2853,13 @@ namespace OstrixMods.BuildWorks
             if (lockIcon) lockIcon.color = locked ? AccentColor : MutedColor;
             if (!part) name.color = AccentColor;
             if (!visible) name.color = MutedColor;
+            if (part)
+            {
+                BlueprintEditorPart record = FindPart(document, stableId);
+                AddTooltip(row, T("editor.outliner.details", record.PrefabName, stableId,
+                    record.Metadata?.SourceId ?? T("editor.outliner.unknown"),
+                    record.Metadata?.Kind ?? T("editor.outliner.unknown")));
+            }
         }
 
         private void AddOutlinerContentsRow(string stableId, BlueprintForeignPartData contents, int depth)
@@ -2890,7 +2893,8 @@ namespace OstrixMods.BuildWorks
             bool selected,
             bool visible,
             bool locked,
-            bool missing)
+            bool missing,
+            BlueprintEditorPart part = null)
         {
             switch (outlinerFilter)
             {
@@ -2898,27 +2902,58 @@ namespace OstrixMods.BuildWorks
                 case 2: return !visible;
                 case 3: return locked;
                 case 4: return missing;
+                case 5: return part != null && part.Metadata?.SourceId == null;
+                case 6: return part != null && part.Metadata == null;
+                case 7: return !string.IsNullOrEmpty(part?.SignText);
+                case 8: return part != null && !part.ScaleIsAbsolute &&
+                    (part.Scale.X != 1 || part.Scale.Y != 1 || part.Scale.Z != 1);
                 default: return true;
             }
         }
 
         private void ToggleGroupCollapsed(string stableId)
         {
+            if (OutlinerIsFiltered) return;
             if (!collapsedGroups.Add(stableId)) collapsedGroups.Remove(stableId);
             if (boundDocument != null) RebuildOutliner(boundDocument);
         }
 
-        private void CycleOutlinerFilter()
+        private bool OutlinerIsFiltered => outlinerFilter != 0 || !string.IsNullOrWhiteSpace(outlinerSearch.text);
+
+        private bool MatchesOutlinerPart(BlueprintEditorPart part, string query)
         {
-            outlinerFilter = (outlinerFilter + 1) % 5;
-            string[] labels = {
-                T("editor.view.all"),
-                T("editor.view.selection"),
-                T("editor.view.hidden"),
-                T("editor.view.locked"),
-                T("editor.view.missing") };
-            SetButtonLabel(outlinerFilterButton, labels[outlinerFilter]);
+            if (string.IsNullOrEmpty(query)) return true;
+            bool Name() => Matches(part.DisplayName, query) || Matches(part.Metadata?.Name, query);
+            bool Id() => Matches(part.PrefabName, query) || Matches(part.StableId, query);
+            bool Source() => Matches(part.Metadata?.SourceId ?? T("editor.outliner.unknown"), query) ||
+                Matches(part.Metadata?.SourceVersion, query);
+            bool Kind() => Matches(part.Metadata?.Kind ?? T("editor.outliner.unknown"), query);
+            switch (outlinerSearchScope)
+            {
+                case 1: return Name();
+                case 2: return Id();
+                case 3: return Source();
+                case 4: return Kind();
+                default: return Name() || Id() || Source() || Kind();
+            }
+        }
+
+        private void RefreshOutlinerFilter()
+        {
+            EndOutlinerDrag();
+            outlinerRows.anchoredPosition = Vector2.zero;
+            SetButtonLabel(outlinerFilterButton, T(OutlinerIsFiltered || outlinerSearchScope != 0
+                ? "editor.outliner.filters_active" : "editor.outliner.filters"));
+            ((TMP_Text)outlinerSearch.placeholder).text = T(OutlinerQueryKeys[outlinerSearchScope]);
             if (boundDocument != null) RebuildOutliner(boundDocument);
+        }
+
+        private void ResetOutlinerFilter()
+        {
+            outlinerFilter = outlinerSearchScope = 0;
+            outlinerSearch.SetTextWithoutNotify(string.Empty);
+            HideOutlinerMenu();
+            RefreshOutlinerFilter();
         }
 
         private Button AddOutlinerToolbarButton(Transform parent, string name, string icon,
@@ -3116,24 +3151,68 @@ namespace OstrixMods.BuildWorks
 
         private void ToggleOutlinerMenu(bool reparentOnly)
         {
-            bool show = !outlinerMenu.activeSelf || outlinerReparentOnly != reparentOnly;
+            bool show = !outlinerMenu.activeSelf || outlinerReparentOnly != reparentOnly || outlinerFilterMenu;
             if (!show) { HideOutlinerMenu(); return; }
             ShowOutlinerMenu(reparentOnly);
         }
 
-        private void ShowOutlinerMenu(bool reparentOnly)
+        private void ShowOutlinerMenu(bool reparentOnly, bool filters = false)
         {
             outlinerReparentOnly = reparentOnly;
+            outlinerFilterMenu = filters;
             HideViewportSettings();
             outlinerMenu.SetActive(true);
             outlinerRowViewport.gameObject.SetActive(false);
             RebuildOutlinerMenu();
+            LayoutOutlinerMenu();
+            if (filters) outliner.SetAsLastSibling();
+            outlinerMenu.GetComponent<ScrollRect>().StopMovement();
+            outlinerMenuRows.anchoredPosition = Vector2.zero;
             outlinerMenu.transform.SetAsLastSibling();
+        }
+
+        private void LayoutOutlinerMenu()
+        {
+            float bottom = 4f;
+            if (outlinerFilterMenu)
+            {
+                float availableHeight = safeRoot.rect.height + outliner.anchoredPosition.y - 8f;
+                bottom = Mathf.Min(4f, outliner.rect.height - availableHeight);
+            }
+            SetInsets((RectTransform)outlinerMenu.transform, 4f,
+                (float)BlueprintEditorLayout.OutlinerHeaderHeight - 4f, 4f, bottom);
         }
 
         private void RebuildOutlinerMenu()
         {
             ClearChildren(outlinerMenuRows);
+            if (outlinerFilterMenu)
+            {
+                TMP_Text help = CreateText("FilterHelp", outlinerMenuRows, T("editor.outliner.help"), 11f,
+                    FontStyles.Normal, TextAlignmentOptions.TopLeft);
+                help.textWrappingMode = TextWrappingModes.Normal;
+                help.gameObject.AddComponent<LayoutElement>().preferredHeight = 76f;
+                CreateButton("OutlinerFilterReset", outlinerMenuRows, T("editor.outliner.reset"), 238f, ResetOutlinerFilter);
+                for (int index = 0; index < OutlinerFilterKeys.Length; ++index)
+                {
+                    int choice = index;
+                    CreateButton("OutlinerFilter" + choice, outlinerMenuRows,
+                        (outlinerFilter == choice ? "[x] " : "[ ] ") + T(OutlinerFilterKeys[choice]), 238f, () =>
+                        { outlinerFilter = choice; HideOutlinerMenu(); RefreshOutlinerFilter(); });
+                }
+                for (int index = 0; index < OutlinerScopeKeys.Length; ++index)
+                {
+                    int choice = index;
+                    CreateButton("OutlinerScope" + choice, outlinerMenuRows,
+                        (outlinerSearchScope == choice ? "[x] " : "[ ] ") + T(OutlinerScopeKeys[choice]), 238f, () =>
+                        {
+                            outlinerSearchScope = choice; HideOutlinerMenu(); RefreshOutlinerFilter();
+                            EventSystem.current?.SetSelectedGameObject(outlinerSearch.gameObject);
+                            outlinerSearch.ActivateInputField();
+                        });
+                }
+                return;
+            }
             if (!outlinerReparentOnly)
             {
                 CreateButton("ShowAll", outlinerMenuRows, T("editor.view.show_all"), 238f,
@@ -4160,6 +4239,7 @@ namespace OstrixMods.BuildWorks
                 Place(status, new EditorRect(0, layout.Status.Y, width, layout.Status.Height));
             }
             else { rail.gameObject.SetActive(true); rightColumn.gameObject.SetActive(true); }
+            LayoutOutlinerMenu();
             double visibleRailHeight = Math.Floor(layout.Rail.Height / 48.0) * 48.0;
             SetTopAnchored(railViewport, 0f, 0f, 0f, (float)visibleRailHeight);
         }

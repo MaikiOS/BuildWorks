@@ -353,6 +353,116 @@ internal static class ControllerInputAcceptance
             "PASS actual persistent Inspector/Tools entry with only missing selected; instructions/Cancel/Open catalogue without mutation; explicit one-to-many confirmation/stale prefab/one Undo/Redo/Save/reopen; own poses, groups, primary/pivots, independent support and source preserved. No game construction proof.");
     }
 
+    internal static IEnumerable<object> RunOutlinerFilters(TMP_Text font, string output)
+    {
+        var unit = new Point3(1, 1, 1); var zero = new Point3(0, 0, 0); var rotation = new Rotation3(0, 0, 0, 1);
+        var known = new BlueprintPrefabMetadata(1, "woodwall", "Recorded wall", "Structure", "QA", unit,
+            sourceId: "qa.author.mod", sourceVersion: "7.3");
+        var other = new BlueprintPrefabMetadata(1, "woodwall", "Recorded furniture", "Furniture", "QA", unit, sourceId: "qa.other");
+        var doc = new BlueprintEditorDocument(null, "Tree filters", "OTHER", new[] {
+            new BlueprintEditorPart("missing", "qa_absent", "Пропавшая", zero, rotation, "inner"),
+            new BlueprintEditorPart("known", "woodwall", "Деревянная стена", zero, rotation, "inner", scale: new Point3(2,1,1), signText: "Тест", metadata: known),
+            new BlueprintEditorPart("hidden", "woodwall", "Скрытая", zero, rotation, "other", visible: false, locked: true),
+            new BlueprintEditorPart("root", "woodwall", "Отдельная", zero, rotation, metadata: other)
+        }, new[] { new BlueprintEditorGroup("outer", "Сборка"), new BlueprintEditorGroup("inner", "Вложенная", parentGroupId: "outer"),
+            new BlueprintEditorGroup("other", "Другой узел") });
+        doc.SelectOnly("known"); int revision = doc.RevisionToken;
+        string[] hierarchy = doc.Parts.Select(part => part.StableId + ":" + part.ParentGroupId)
+            .Concat(doc.Groups.Select(group => group.StableId + ":" + group.ParentGroupId)).ToArray();
+        using (var view = new BlueprintEditorView(font))
+        {
+            view.Bind(doc, true, new[] { "missing" }, null); yield return null;
+            var rows = Field<RectTransform>(view, "outlinerRows");
+            var search = Field<TMP_InputField>(view, "outlinerSearch");
+            NativeClick(view, null, rows.Find("Row_outer/Disclosure").GetComponent<Button>()); yield return null;
+            Require(!rows.Find("Row_missing"), "Tree fixture was not initially collapsed");
+            NativeClick(view, null, "OutlinerFilter"); yield return null;
+            ClickOutlinerChoice(view, "OutlinerFilter4"); yield return null;
+            Require(rows.Find("Row_outer") && rows.Find("Row_inner") && rows.Find("Row_missing") &&
+                !rows.Find("Row_known") && !rows.Find("Row_other") && !rows.Find("Row_root") &&
+                !rows.Find("Row_outer/Disclosure").GetComponent<Button>().interactable,
+                "Missing filter lost a collapsed ancestor path or included unrelated parts");
+            string picked = null; view.NodeClicked += (id, ctrl, shift) => picked = id;
+            NativeClick(view, null, "Row_missing"); Require(picked == "missing", "Filtered row lost its native selection identity");
+            NativeClick(view, null, "OutlinerFilter"); yield return null;
+            ClickOutlinerChoice(view, "OutlinerFilterReset"); yield return null;
+            Require(!rows.Find("Row_missing") && Field<HashSet<string>>(view, "collapsedGroups").Contains("outer"),
+                "Reset changed the original collapsed state");
+            foreach (var test in new[] { (scope: 2, query: "qa_absent"), (scope: 1, query: "ДЕРЕВЯННАЯ"),
+                (scope: 3, query: "QA.AUTHOR.MOD"), (scope: 3, query: "7.3"), (scope: 4, query: "Structure") })
+            {
+                NativeClick(view, null, "OutlinerFilter"); yield return null;
+                ClickOutlinerChoice(view, "OutlinerScope" + test.scope); yield return null;
+                Require(EventSystem.current.currentSelectedGameObject == search.gameObject,
+                    "Choosing a search field did not focus its actual input");
+                search.text = test.query; yield return null;
+                string id = test.scope == 2 ? "missing" : "known";
+                Require(rows.Find("Row_outer") && rows.Find("Row_inner") && rows.Find("Row_" + id) &&
+                    !rows.Find("Row_root") && !rows.Find("Row_hidden"), "Scoped query lost its ancestors or matched the wrong field");
+            }
+            Call(view, "ResetOutlinerFilter");
+            int[] modes = { 1, 2, 3, 5, 6, 7, 8 };
+            string[][] expected = { new[] { "known" }, new[] { "hidden" }, new[] { "hidden" }, new[] { "missing", "hidden" },
+                new[] { "missing", "hidden" }, new[] { "known" }, new[] { "known" } };
+            for (int i = 0; i < modes.Length; ++i)
+            {
+                NativeClick(view, null, "OutlinerFilter"); yield return null;
+                ClickOutlinerChoice(view, "OutlinerFilter" + modes[i]); yield return null;
+                foreach (BlueprintEditorPart part in doc.Parts)
+                    Require((bool)rows.Find("Row_" + part.StableId) == expected[i].Contains(part.StableId),
+                        "Filter " + modes[i] + " misclassified " + part.StableId);
+            }
+            search.text = "No such record"; yield return null;
+            Require(rows.Find("NoMatches"), "No-match search has no reset action");
+            NativeClick(view, null, "NoMatches"); yield return null;
+            Require(search.text == "" && Field<int>(view, "outlinerFilter") == 0 && Field<int>(view, "outlinerSearchScope") == 0 &&
+                !rows.Find("Row_missing"), "No-match reset lost the previous collapse or left a hidden filter");
+            Require(doc.RevisionToken == revision && !doc.IsDirty && !doc.CanUndo && doc.Selection.SequenceEqual(new[] { "known" }) &&
+                hierarchy.SequenceEqual(doc.Parts.Select(part => part.StableId + ":" + part.ParentGroupId)
+                    .Concat(doc.Groups.Select(group => group.StableId + ":" + group.ParentGroupId))),
+                "Search/filter changed document history, selection or hierarchy");
+            view.Bind(new BlueprintEditorDocument(null, "Empty tree", "OTHER", Array.Empty<BlueprintEditorPart>()), true, null, null);
+            yield return null;
+            Require(!rows.Find("NoMatches") && Field<List<Action>>(view, "outlinerRowBuilders").Count == 0,
+                "Unfiltered empty document displayed a misleading search reset");
+            search.text = "No such record"; yield return null;
+            Require(rows.Find("NoMatches"), "Filtered empty document lost its search reset");
+            NativeClick(view, null, "NoMatches"); yield return null;
+            Require(!rows.Find("NoMatches"), "Reset left a misleading action in the empty document");
+            var heavy = new BlueprintEditorDocument(null, "Heavy tree", "OTHER",
+                Enumerable.Range(0, 50000).Select(i => new BlueprintEditorPart("heavy" + i, "wall", "Wall", zero, rotation, "g" + i % 64)),
+                Enumerable.Range(0, 64).Select(i => new BlueprintEditorGroup("g" + i, "Group")));
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            view.Bind(heavy, true, new[] { "heavy49999" }, null); watch.Stop(); yield return null;
+            Require(Field<List<Action>>(view, "outlinerRowBuilders").Count == 50064 && rows.childCount < 64,
+                "Grouped heavy tree lost bounded row virtualization");
+            NativeClick(view, null, "OutlinerFilter"); yield return null;
+            ClickOutlinerChoice(view, "OutlinerFilter4"); yield return null;
+            Require(rows.Find("Row_g15") && rows.Find("Row_heavy49999") &&
+                Field<List<Action>>(view, "outlinerRowBuilders").Count == 2 && !heavy.IsDirty,
+                "Missing filter failed near the end of the grouped heavy tree");
+            File.WriteAllText(Path.Combine(output, "outliner-filters-check.txt"),
+                "PASS actual native filter-menu clicks, missing collapsed ancestors, unchanged collapse/selection/revision/history/hierarchy; " +
+                "name/record or prefab ID/source/version/type queries with input focus; unknown metadata/hidden/locked/sign/scale; " +
+                "no-match/reset and unfiltered/filtered empty document; 64 groups + 50000 parts, virtualized rows, last missing record. Grouped tree bind " + watch.ElapsedMilliseconds +
+                " ms. Workbench only; no Valheim proof.");
+        }
+    }
+
+    private static void ClickOutlinerChoice(BlueprintEditorView view, string name)
+    {
+        var menu = Field<GameObject>(view, "outlinerMenu");
+        var button = menu.GetComponentsInChildren<Button>().Single(value => value.name == name);
+        var scroll = menu.GetComponent<ScrollRect>();
+        Canvas.ForceUpdateCanvases();
+        Bounds bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(scroll.content, button.transform);
+        float y = Mathf.Clamp(-bounds.center.y - scroll.viewport.rect.height * .5f, 0,
+            Mathf.Max(0, scroll.content.rect.height - scroll.viewport.rect.height));
+        scroll.content.anchoredPosition = new Vector2(scroll.content.anchoredPosition.x, y);
+        Canvas.ForceUpdateCanvases();
+        NativeClick(view, null, button);
+    }
+
     internal static IEnumerable<object> RunPartialThumbnails(Camera template, TMP_Text font, GameObject wall, string output)
     {
         GameObject model = PlacementGhostPreviewView.CreateVisualClone(wall, "PartialThumbnailSource", BlueprintThumbnailRenderer.ThumbnailLayer);

@@ -99,7 +99,21 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(unknownCopy.parts.Count == 3 && unknownCopy.parts[0].metadata == null &&
                 unknownCopy.parts[0].position.z == 3 && unknownCopy.parts.Skip(1).All(part => part.prefabName == "woodwall"),
                 "Ready unknown-size preview fixture lost available walls or invented metadata");
-            Console.WriteLine("PASS metadata native19/portable9: capture/save/update/import/export/reopen, unique snapshots/fresh host, missing retain, immutable copies/Undo, strict versions/IDs/fields/bounds and legacy8");
+            var tree = ExternalBlueprintLibrary.LoadFile(Path.Combine(Path.GetDirectoryName(fixture),
+                "20-tree-filters.buildworks.json")).Single();
+            Require(tree.importError == null, tree.importError);
+            var treeCopy = BlueprintExchangeFormat.Decode(Encoding.UTF8.GetString(
+                BlueprintExchangeFormat.Encode(ExternalBlueprintLibrary.DetachedCopy(tree))));
+            string innerId = treeCopy.groups.Single(group => group.name == "QA room").stableId;
+            Require(treeCopy.parts.Count == 3 && treeCopy.groups.Count == 3 &&
+                treeCopy.parts[0].parentGroupId == innerId && treeCopy.parts[1].parentGroupId == innerId &&
+                treeCopy.parts[2].parentGroupId == treeCopy.groups.Single(group => group.name == "QA other").stableId &&
+                treeCopy.groups.Single(group => group.stableId == innerId).parentGroupId ==
+                    treeCopy.groups.Single(group => group.name == "QA assembly").stableId &&
+                treeCopy.groups.All(group => tree.groups.All(source => source.stableId != group.stableId)) &&
+                treeCopy.parts[0].metadata.hostId == "synthetic-fixture" && treeCopy.parts[0].metadata.sourceId == null,
+                "Ready tree filter fixture lost group paths or invented missing provenance");
+            Console.WriteLine("PASS metadata native19/portable9: capture/save/update/import/export/reopen, unique snapshots/fresh host, missing retain, immutable copies/Undo, strict versions/IDs/fields/bounds, legacy8 and grouped filter fixture20");
         }
 
         private static void Geometry(BlueprintPrefabMetadata metadata)

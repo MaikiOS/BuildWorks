@@ -25,6 +25,19 @@ namespace OstrixMods.BuildWorks
     internal sealed class PrecisionPlacementSession : IDisposable
     {
         private static readonly List<ZNetView> scaleEnabledPrefabs = new List<ZNetView>();
+        private readonly NativePlacementMaterialPreview materialPreview = new NativePlacementMaterialPreview();
+        private bool materialPreviewFailureShown;
+
+        private void UpdateNativeMaterialPreview(GameObject source, GameObject ghost, int? seed)
+        {
+            try { materialPreview.Show(source, ghost, seed); materialPreviewFailureShown = false; }
+            catch (Exception error) when (error is ArgumentException || error is UnityException)
+            {
+                if (!materialPreviewFailureShown && Player.m_localPlayer)
+                    ShowStatus(Player.m_localPlayer, BuildWorksLocalization.Text("placement.material_persistence_unsupported"));
+                materialPreviewFailureShown = true;
+            }
+        }
 
         internal static void EnableNativePieceScale(ZNetScene scene)
         {
@@ -60,7 +73,12 @@ namespace OstrixMods.BuildWorks
             if (state == PlacementState.Armed && source == selectedPiece &&
                 placementPlanIndex >= 0 && placementPlanIndex < placementPlan.Count &&
                 placementPlan[placementPlanIndex].MaterialSeed.HasValue)
+            {
                 BlueprintMaterialState.RequireFreshCreation();
+                GameObject ghost = Player.m_localPlayer ? PlacementGhostField.GetValue(Player.m_localPlayer) as GameObject : null;
+                if (!materialPreview.Matches(source.gameObject, ghost, placementPlan[placementPlanIndex].MaterialSeed))
+                    throw new InvalidOperationException(BuildWorksLocalization.Text("placement.material_persistence_unsupported"));
+            }
         }
 
         internal void ApplyNativePlacementScale(GameObject placed, Piece source)
@@ -622,7 +640,8 @@ namespace OstrixMods.BuildWorks
                 GameObject prefab = ZNetScene.instance ? ZNetScene.instance.GetPrefab(name) : null;
                 return prefab ? new CompositeBlueprintStore.VectorData(prefab.transform.localScale)
                     : (CompositeBlueprintStore.VectorData?)null;
-            }, () => ZNetScene.instance, name => name.GetStableHashCode(), () => Game.m_worldLevel);
+            }, () => ZNetScene.instance, name => name.GetStableHashCode(), () => Game.m_worldLevel,
+                name => BlueprintMaterialState.Supports(ZNetScene.instance ? ZNetScene.instance.GetPrefab(name) : null));
             blueprintStore.ConfigurePrefabMetadata(name => BlueprintPrefabMetadataCapture.Capture(
                 ZNetScene.instance ? ZNetScene.instance.GetPrefab(name) : null));
             blueprintPieceRegistry = new HammerBlueprintPieceRegistry(blueprintStore);
@@ -2169,6 +2188,7 @@ namespace OstrixMods.BuildWorks
             Player player = Player.m_localPlayer;
             if (!player)
             {
+                materialPreview.Clear();
                 gizmo.Hide();
                 previews.Hide();
                 hud.Hide();
@@ -2185,6 +2205,7 @@ namespace OstrixMods.BuildWorks
                 if (!ShowPassiveBlueprintPreview(ghost, piece)) previews.Hide();
                 return;
             }
+            materialPreview.Clear();
             if (!GameplayInputAvailable(player))
             {
                 gizmo.Hide();
@@ -2256,11 +2277,14 @@ namespace OstrixMods.BuildWorks
                     palettePiece,
                     out CompositeBlueprintStore.Blueprint blueprint))
             {
+                materialPreview.Clear();
                 return false;
             }
 
             if (blueprintPieceRegistry.TryGetSourcePieces(blueprint, out IReadOnlyList<Piece> pieces))
             {
+                int frame = CompositeBlueprintStore.FramePartIndex(blueprint);
+                UpdateNativeMaterialPreview(pieces[frame].gameObject, ghost, blueprint.parts[frame].materialSeed);
                 if (passivePreviewBlueprint != blueprint || passivePreviewRevision != blueprintStore.Revision)
                 {
                     previews.Clear();
@@ -2287,6 +2311,7 @@ namespace OstrixMods.BuildWorks
             }
             else
             {
+                materialPreview.Clear();
                 if (passivePreviewBlueprint != null)
                 {
                     previews.Clear();
@@ -2336,6 +2361,11 @@ namespace OstrixMods.BuildWorks
                     ? activeBlueprint.parts[blueprintGhostIndex].PlacementScale(selectedPiece.transform.localScale)
                 : transform.Scale;
             placementGhost.transform.localScale = Vector3.Scale(selectedPiece.transform.localScale, scale);
+            int? materialSeed = state == PlacementState.Armed && placementPlanIndex < placementPlan.Count
+                ? placementPlan[placementPlanIndex].MaterialSeed
+                : activeBlueprint != null && blueprintGhostIndex < activeBlueprint.parts.Count
+                    ? activeBlueprint.parts[blueprintGhostIndex].materialSeed : null;
+            UpdateNativeMaterialPreview(selectedPiece.gameObject, placementGhost, materialSeed);
         }
 
         public bool ApplyPassiveAutoJoin(
@@ -2434,6 +2464,7 @@ namespace OstrixMods.BuildWorks
             TransformSnapshot pose = placementPlan[placementPlanIndex];
             placementGhost.transform.SetPositionAndRotation(pose.Position, pose.Rotation);
             placementGhost.transform.localScale = Vector3.Scale(selectedPiece.transform.localScale, pose.Scale);
+            UpdateNativeMaterialPreview(selectedPiece.gameObject, placementGhost, pose.MaterialSeed);
             ghost = placementGhost;
             source = selectedPiece;
             return true;
@@ -3095,6 +3126,7 @@ namespace OstrixMods.BuildWorks
 
         public void Dispose()
         {
+            materialPreview.Dispose();
             blueprintResourceHud.Dispose();
             precisionEnabled = false;
             Cancel();
@@ -3107,6 +3139,7 @@ namespace OstrixMods.BuildWorks
 
         public void DisposeForHostTransition()
         {
+            materialPreview.Dispose();
             blueprintResourceHud.Dispose();
             precisionEnabled = false;
             Cancel(restoreCursor: false);
@@ -6802,6 +6835,8 @@ namespace OstrixMods.BuildWorks
             bool restoreWorldSelectionGhost =
                 sessionMode == SessionMode.BlueprintWorldSelection;
             pendingWorldBlueprintSelection = false;
+            materialPreview.Clear();
+            materialPreviewFailureShown = false;
             EndBlueprintSelection(clearSelection: true);
             Piece restorePiece = sessionMode == SessionMode.BlueprintEditor
                 ? editorReturnPiece

@@ -1,5 +1,33 @@
 # Pending material variation data contract
 
+## 2026-10-09 — typed material conversion and native visual copy; not deployed
+
+External `.blueprint`/`.vbuild` RandMatSeed becomes typed materialSeed only for an
+exact source-bound packet, nonnegative Int32, completely understood sibling
+state and a verified supported prefab. Missing capability, ambiguous types,
+unknown siblings and changed provenance stay inert; source bytes are retained.
+Catalogue workers use a main-thread capability snapshot. File review remains
+conservative. Material seed is independent of storage/mounted-content choices;
+derived identity changes when typed seeds change, avoiding stale thumbnails.
+
+The native ghost keeps its validation, material blocks and network state. An
+owned visual copy receives the seeded recipe, pose, live validation tint and
+global/indexed property blocks; cancellation/error restores native visibility.
+Session contains preparation errors and creation still requires a matching copy.
+Normal/QA builds 0/0, Store, Controller bridge, actual-host Session, HostContract
+25185596, localization880, QA guards and format passed (existing format warning).
+Workbench360 passed UTC 2026-10-09T13:01:26.6063597Z; seed A/B/A, XYZ pose,
+cache, native global/indexed overrides and cleanup passed. Independent correctness
+and Ponytail review passed. Evidence: artifacts/checkpoint-0.19.117/
+material-conversion-native-preview-verification.json. verify helper unavailable.
+
+Seeded world preflight remains blocked: native Start timing, actual Valheim
+shaders/child lifecycles, failure/refund, reload and network are unverified.
+Installed QA .116 is unchanged; no deployment, game launch or save writes.
+Next: supported-prefab preflight and native Start lifecycle, then stable snap QA
+and remaining XYZ/delete/replacement/filter/interior-camera requests.
+The active goal remains incomplete; these are isolated checks, not game acceptance.
+
 ## 2026-10-09 — native state boundary, not deployed
 
 The existing Instantiate wrapper now rejects inherited init-ZDO state before

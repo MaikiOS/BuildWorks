@@ -52,6 +52,7 @@ namespace OstrixMods.BuildWorks
         private Func<string, PrefabMetadata> prefabMetadata;
         private Func<string, int> importPrefabHash;
         private Func<int> importWorldLevel;
+        private Func<string, bool> importMaterialSeedSupport;
         private int? preparedWorldLevel;
         private Func<object> importHostContext;
         private object preparedHostContext;
@@ -83,12 +84,13 @@ namespace OstrixMods.BuildWorks
 
         // Called on the Unity thread only; prefabHash must be a pure stable string hash.
         internal void ConfigureImportScale(Func<string, VectorData?> resolve, Func<object> context = null,
-            Func<string, int> prefabHash = null, Func<int> worldLevel = null)
+            Func<string, int> prefabHash = null, Func<int> worldLevel = null, Func<string, bool> supportsMaterialSeed = null)
         {
             importPrefabScale = resolve;
             importHostContext = context;
             importPrefabHash = prefabHash;
             importWorldLevel = worldLevel;
+            importMaterialSeedSupport = supportsMaterialSeed;
             catalogSnapshot = null;
             preparedExternalBlueprints = null;
             ++importGeneration;
@@ -142,14 +144,17 @@ namespace OstrixMods.BuildWorks
                         var scales = externalBlueprints.SelectMany(source => source.parts).Select(part => part.prefabName)
                             .Distinct(StringComparer.Ordinal).ToDictionary(name => name, name => importPrefabScale?.Invoke(name), StringComparer.Ordinal);
                         var sources = externalBlueprints;
+                        var materialSupport = scales.Keys.ToDictionary(name => name,
+                            name => importMaterialSeedSupport?.Invoke(name) == true, StringComparer.Ordinal);
                         var hash = importPrefabHash;
                         preparationGeneration = importGeneration;
                         preparationTask = Task.Run(() => sources.Select(source => ExternalBlueprintLibrary.PrepareForHost(
-                            source, name => scales.TryGetValue(name, out var scale) ? scale : null, hash, worldLevel)).ToList());
+                            source, name => scales.TryGetValue(name, out var scale) ? scale : null, hash, worldLevel,
+                            name => materialSupport.TryGetValue(name, out bool supported) && supported)).ToList());
                         return data.blueprints;
                     }
                 }
-                else preparedExternalBlueprints = externalBlueprints.Select(source => ExternalBlueprintLibrary.PrepareForHost(source, importPrefabScale, importPrefabHash, worldLevel)).ToList();
+                else preparedExternalBlueprints = externalBlueprints.Select(source => ExternalBlueprintLibrary.PrepareForHost(source, importPrefabScale, importPrefabHash, worldLevel, importMaterialSeedSupport)).ToList();
             }
             var result = new List<Blueprint>(data.blueprints);
             result.AddRange(preparedExternalBlueprints);
@@ -310,7 +315,7 @@ namespace OstrixMods.BuildWorks
             {
                 if (review == null) throw new InvalidDataException("$buildworks_import.format");
                 if (omitMissing != null) ValidateMissingReview(review.Documents, omitMissing, prefabHash);
-                var prepared = review.Documents.Select(document => ExternalBlueprintLibrary.PrepareForHost(document, importPrefabScale, importPrefabHash, importWorldLevel?.Invoke())).ToArray();
+                var prepared = review.Documents.Select(document => ExternalBlueprintLibrary.PrepareForHost(document, importPrefabScale, importPrefabHash, importWorldLevel?.Invoke(), importMaterialSeedSupport)).ToArray();
                 if (prepared.Any(document => document.importError != null))
                     throw new InvalidDataException(prepared.First(document => document.importError != null).importError);
                 if (omitMissing != null)
@@ -389,7 +394,7 @@ namespace OstrixMods.BuildWorks
                 {
                     ValidateMissingReview(new[] { blueprint }, omitMissing, prefabHash);
                     blueprint = CopyWithoutMissing(ExternalBlueprintLibrary.PrepareForHost(blueprint,
-                        importPrefabScale, importPrefabHash, importWorldLevel?.Invoke()), omitMissing.PrefabIds);
+                        importPrefabScale, importPrefabHash, importWorldLevel?.Invoke(), importMaterialSeedSupport), omitMissing.PrefabIds);
                 }
                 blueprint = blueprint.ImportCopy();
                 CaptureMetadata(blueprint.parts);

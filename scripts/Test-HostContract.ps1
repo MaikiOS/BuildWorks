@@ -782,6 +782,16 @@ $applyPlacementScaleOperands = @(
     $applyPlacementScale.Body.Instructions | ForEach-Object { [string]$_.Operand }
 ) -join "`n"
 $materialStateType = $plugin.MainModule.Types | Where-Object Name -eq 'BlueprintMaterialState'
+$materialPreviewType = $plugin.MainModule.Types | Where-Object Name -eq 'NativePlacementMaterialPreview'
+$materialPreviewShow = $materialPreviewType.Methods | Where-Object Name -eq 'Show'
+$materialPreviewCalls = @($materialPreviewShow.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($materialPreviewCalls -match 'BlueprintMaterialVariation::CapturePreview' -and
+    $materialPreviewCalls -match 'Renderer::set_forceRenderingOff' -and
+    $materialPreviewCalls -notmatch 'ZDO::|ZNetView::|Material::Set|Renderer::get_materials') `
+    'Native material preview must own only a visual copy without network or shared material mutation.'
+$materialCreationGuard = $precisionSessionType.Methods | Where-Object Name -eq 'RequireNativePlacementMaterialCreation'
+Assert-Contract ((@($materialCreationGuard.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n") -match
+    'NativePlacementMaterialPreview::Matches') 'Seeded native placement must require its matching visible material preview.'
 $materialApply = $materialStateType.Methods | Where-Object Name -eq 'ApplyCreated'
 $materialCalls = @($materialApply.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($materialCalls -match 'ZNetView::IsOwner' -and $materialCalls -match 'ZDO::Set' -and

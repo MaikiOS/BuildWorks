@@ -26,6 +26,7 @@ namespace OstrixMods.BuildWorks.StoreTests
         }
         internal static void Run()
         {
+            MaterialSeeds();
             Require(Hash("item") == -1126421579 && Hash("health") == -883022132, "Host hash drift");
             string raw = Package(w => {
                 w.Write(9); w.Write((byte)2);
@@ -80,6 +81,50 @@ namespace OstrixMods.BuildWorks.StoreTests
         }
         private static CompositeBlueprintStore.Blueprint Prepare(CompositeBlueprintStore.Blueprint source) =>
             ExternalBlueprintLibrary.PrepareForHost(source, _ => new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 }, Hash, 0);
+        private static void MaterialSeeds()
+        {
+            string Packet(int seed, bool unknown = false) => Package(w => {
+                w.Write(8); w.Write((byte)(unknown ? 2 : 1)); w.Write(Hash("RandMatSeed")); w.Write(seed);
+                if (unknown) { w.Write(Hash("unknown")); w.Write(1); }
+            });
+            CompositeBlueprintStore.Blueprint Parse(string packet, bool vbuild = false) => ExternalBlueprintLibrary.Parse(vbuild
+                ? "woodwall;0;0;0;1;0;0;0;" + packet + "\nwoodwall;0;0;0;1;1;0;0"
+                : "#Name:Seed\n#Pieces\nwoodwall;;0;0;0;0;0;0;1;\"\";1;1;1;" + packet + "\nwoodwall;;1;0;0;0;0;0;1;\"\"", vbuild ? "seed.vbuild" : "seed.blueprint");
+            CompositeBlueprintStore.Blueprint Convert(CompositeBlueprintStore.Blueprint source, bool supported = true) =>
+                ExternalBlueprintLibrary.PrepareForHost(source, _ => new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 },
+                    Hash, 0, _ => supported);
+            foreach (bool vbuild in new[] { false, true })
+                foreach (int seed in new[] { 0, 1234, int.MaxValue })
+                {
+                    var source = Parse(Packet(seed), vbuild); var converted = Convert(source);
+                    Require(converted.importError == null && converted.parts[0].materialSeed == seed && converted.parts[0].foreignData == null,
+                        "Eligible material seed not converted");
+                    Require(source.parts[0].materialSeed == null && source.parts[0].foreignData.zdo == Packet(seed) &&
+                        source.sourceDocuments[0].ToGeometry().Text == converted.sourceDocuments[0].ToGeometry().Text,
+                        "Material conversion mutated source or provenance");
+                    var roundtrip = BlueprintExchangeFormat.Decode(Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(ExternalBlueprintLibrary.DetachedCopy(converted))));
+                    Require(roundtrip.parts[0].materialSeed == seed &&
+                        CompositeBlueprintStore.CopyWithContentsPolicy(roundtrip, true, true, Hash).parts[0].materialSeed == seed,
+                        "Roundtrip/contents settings lost constructive material state");
+                }
+            foreach (string packet in new[] { Packet(-1), Packet(1234, true),
+                Package(w => { w.Write(1); w.Write((byte)1); w.Write(Hash("RandMatSeed")); w.Write(1234f); }),
+                Package(w => { w.Write(24); w.Write((byte)1); w.Write(Hash("RandMatSeed")); w.Write(1);
+                    w.Write((byte)1); w.Write(Hash("RandMatSeed")); w.Write("1"); }) })
+            {
+                var converted = Convert(Parse(packet));
+                Require(converted.parts[0].materialSeed == null && converted.parts[0].foreignData.zdo == packet,
+                    "Invalid or partially understood material packet was extracted");
+            }
+            Require(Convert(Parse(Packet(1234)), false).parts[0].materialSeed == null &&
+                Prepare(Parse(Packet(1234))).parts[0].foreignData != null, "Missing capability callback invented support");
+            var rebound = Parse(Packet(1234)); rebound.parts[0].foreignData.zdo = Packet(12);
+            Require(Convert(rebound).parts[0].materialSeed == null, "Unbound source material packet converted");
+            var conflict = Parse(Packet(1234)); conflict.parts[0].materialSeed = 9;
+            Require(Convert(conflict).parts[0].materialSeed == 9 && Convert(conflict).parts[0].foreignData != null,
+                "Foreign state silently overrode an existing material seed");
+            Console.WriteLine("PASS source-bound blueprint/vbuild material seeds: zero/Max, capability, strict types, sibling atomicity, provenance, portable and independent contents settings");
+        }
         private static string Package(Action<BinaryWriter> write)
         {
             using (var stream = new MemoryStream()) using (var writer = new BinaryWriter(stream, Encoding.UTF8))

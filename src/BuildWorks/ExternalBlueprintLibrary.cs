@@ -319,7 +319,8 @@ namespace OstrixMods.BuildWorks
         }
 
         internal static CompositeBlueprintStore.Blueprint PrepareForHost(CompositeBlueprintStore.Blueprint source,
-            Func<string, CompositeBlueprintStore.VectorData?> resolvePrefabScale, Func<string, int> hash = null, int? worldLevel = null)
+            Func<string, CompositeBlueprintStore.VectorData?> resolvePrefabScale, Func<string, int> hash = null, int? worldLevel = null,
+            Func<string, bool> supportsMaterialSeed = null)
         {
             if (source == null || source.importError != null || !source.importAbsoluteScale && !source.parts.Any(part => part.scaleIsAbsolute) &&
                 (hash == null || !source.parts.Any(part => part.foreignData?.format == "blueprint" || part.foreignData?.format == "vbuild"))) return source;
@@ -349,13 +350,16 @@ namespace OstrixMods.BuildWorks
                         part.scaleIsAbsolute = false;
                     }
                     if (hash != null && part.sourceDocumentId != null && evidenceIndex.TryGetValue(part.sourceDocumentId, out var evidence))
-                        ConvertKnownState(part, evidence, hash, worldLevel);
+                        ConvertKnownState(part, evidence, hash, worldLevel, supportsMaterialSeed);
                 }
                 copy.importAbsoluteScale = false;
                 // Derived cache identity must not reuse pre-normalization thumbnails or another prefab revision.
                 if (source.IsExternal) copy.id = Identity(source.id + "\npinned-scale-v1-pending-parts\n" + (hash == null ? "inert" : worldLevel?.ToString(CultureInfo.InvariantCulture) ?? "pending-world") + "\n" + string.Join("\n", scales.OrderBy(pair => pair.Key, StringComparer.Ordinal)
                     .Select(pair => pair.Key + "\t" + (pair.Value.HasValue ? pair.Value.Value.x.ToString("R", CultureInfo.InvariantCulture) + "\t" +
                         pair.Value.Value.y.ToString("R", CultureInfo.InvariantCulture) + "\t" + pair.Value.Value.z.ToString("R", CultureInfo.InvariantCulture) : "unknown"))));
+                if (source.IsExternal && copy.parts.Any(part => part.materialSeed.HasValue))
+                    copy.id = Identity(copy.id + "\nmaterial-seed-v1\n" + string.Join(",",
+                        copy.parts.Select(part => part.materialSeed?.ToString(CultureInfo.InvariantCulture) ?? "null")));
             }
             catch (Exception error) when (error is InvalidDataException || error is ArgumentException)
             {
@@ -394,7 +398,7 @@ namespace OstrixMods.BuildWorks
         }
 
         internal static void ConvertKnownState(CompositeBlueprintStore.Part part, Geometry.BlueprintSourceDocument evidence,
-            Func<string, int> hash, int? worldLevel)
+            Func<string, int> hash, int? worldLevel, Func<string, bool> supportsMaterialSeed = null)
         {
             var original = part.foreignData;
             if (original == null || original.format != "blueprint" && original.format != "vbuild" || original.chance != null ||
@@ -436,6 +440,16 @@ namespace OstrixMods.BuildWorks
                 }
             }
             else if (original.info != null) return;
+            int? materialSeed = part.materialSeed;
+            int materialKey = hash("RandMatSeed");
+            if (state.HasHash(materialKey))
+            {
+                if (supportsMaterialSeed?.Invoke(part.prefabName) != true ||
+                    !state.TryGet<int>(materialKey, out int seed) || seed < 0 ||
+                    materialSeed.HasValue && materialSeed.Value != seed) return;
+                materialSeed = seed;
+                consumed.Add(new KeyValuePair<int, Type>(materialKey, typeof(int)));
+            }
             // Construction creates NEW ordinary native pieces: no inherited ownership, stale support,
             // damage, invulnerability, AI overrides or network lifetime flags. All originals remain in
             // the exact source document. This is NOT an administrator-state restoration adapter.
@@ -459,6 +473,7 @@ namespace OstrixMods.BuildWorks
                 if (expected == typeof(int) && (!state.TryGet<int>(key.Key, out int flag) || flag < 0 || flag > 1)) return;
             }
             part.signText = text;
+            part.materialSeed = materialSeed;
             part.foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(contents);
         }
 

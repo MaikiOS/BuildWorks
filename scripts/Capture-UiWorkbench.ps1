@@ -48,7 +48,7 @@ Copy-Item -LiteralPath $geometryDll -Destination $pluginsPath -Force
 # Compile the actual editor implementation. No separate visual facsimile is accepted.
 $runtimeSources = Join-Path $projectPath 'Assets\Editor\RuntimeSources'
 New-Item -ItemType Directory -Path $runtimeSources -Force | Out-Null
-$runtimeFiles = @('BlueprintMaterialVariation.cs', 'BlueprintEditorView.cs', 'BlueprintEditorCatalogView.cs', 'BlueprintEditorSkin.cs', 'BlueprintEditorInput.cs', 'BlueprintEditorController.cs',
+$runtimeFiles = @('NativePlacementMaterialPreview.cs', 'BlueprintMaterialVariation.cs', 'BlueprintEditorView.cs', 'BlueprintEditorCatalogView.cs', 'BlueprintEditorSkin.cs', 'BlueprintEditorInput.cs', 'BlueprintEditorController.cs',
     'BlueprintEditorScene.cs', 'BlueprintEditorMeshData.cs', 'BlueprintEditorIconLibrary.cs',
     'TransformGizmoView.cs', 'PlacementGhostPreviewView.cs', 'BlueprintBatchedPreview.cs', 'BlueprintWorldSnapPoints.cs', 'BlueprintItemStandPreview.cs', 'BlueprintItemStandCapture.cs', 'BlueprintItemStandPlacement.cs', 'BlueprintStorageCapture.cs', 'BlueprintThumbnailRenderer.cs', 'BlueprintPlacementFrame.cs', 'CompositeBlueprintStore.cs', 'BlueprintPrefabMetadataCapture.cs', 'ExternalBlueprintLibrary.cs', 'BlueprintExchangeFormat.cs',
     'PrecisionPlacementHudView.cs', 'BlueprintResourceHudView.cs', 'WorldSelectionHighlight.cs', 'BuildWorksPlacementValidation.cs', 'BlueprintSignText.cs', 'BlueprintExchangeView.cs')

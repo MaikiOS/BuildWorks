@@ -43,6 +43,7 @@ internal static class Program
             pieceType = sessionType.GetField("selectedPiece", Instance).FieldType;
             TestNativeMaterialVariation(asm);
             TestNativeMaterialState(asm);
+            TestMaterialPreviewFailure(asm);
             TestMaterialSeedPlan();
             TestGridComposition();
             TestSignPayloadLifecycle();
@@ -96,6 +97,25 @@ internal static class Program
         Require((int)Property(plan[0], "MaterialSeed") == 1234 && Property(plan[1], "MaterialSeed") == null,
             "Plan confused unspecified, zero and changed material seed");
         Console.WriteLine("PASS actual Session: material seed zero/Max/null follows repeated parts without source aliasing; world guard remains separate");
+    }
+
+    private static void TestMaterialPreviewFailure(Assembly plugin)
+    {
+        object session = FormatterServices.GetUninitializedObject(sessionType);
+        Set(session, "materialPreview", Activator.CreateInstance(plugin.GetType("OstrixMods.BuildWorks.NativePlacementMaterialPreview", true), true));
+        MethodInfo update = sessionType.GetMethod("UpdateNativeMaterialPreview", Instance);
+        var ghost = new GameObject("Inert invalid material preview");
+        try
+        {
+            update.Invoke(session, new object[] { ghost, ghost, 0 });
+            Require((bool)Get(session, "materialPreviewFailureShown"), "Preview failure was not contained/reported");
+            update.Invoke(session, new object[] { ghost, ghost, 0 });
+            Require((bool)Get(session, "materialPreviewFailureShown"), "Repeated preview failure escaped containment");
+            update.Invoke(session, new object[] { ghost, ghost, null });
+            Require(!(bool)Get(session, "materialPreviewFailureShown"), "Cleared material preview retained a stale failure");
+            Console.WriteLine("PASS actual Session: invalid native preview is contained before creation; repeated failure and null reset leave native ghost intact");
+        }
+        finally { UnityEngine.Object.DestroyImmediate(ghost); }
     }
 
     private static void TestNativeMaterialVariation(Assembly plugin)

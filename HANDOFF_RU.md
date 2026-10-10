@@ -1,3 +1,15 @@
+## 2026-10-10 — установленная QA0.19.139
+
+Код a4e66c95ef294a7f1c120eacd7712a79b4b3ed33. EditorCatalogStatus проверяет каждый
+точный ID prefab один раз внутри одной карточки; absolute/mixed/case warnings
+и свежий следующий проход сохранены. Регрессия50 000:30 000→3 callbacks.
+Normal/QA0/0, Store, Host25185596, localization948, isolation/preflight,
+Unity492 и оба обзора PASSED/Ship. Это не доказательство скорости Valheim.
+Установлено только TerrainRamp-1.0-Test, SHA сверены, Default чист;137 файлов
+config/import/save неизменны. Игра не запускалась. Полный импорт/стройка/reload/
+сеть и физический backend мыши открыты. Инструкции: docs/QA_0.19.139_RU.md;
+протокол: docs/CATALOG_STATUS_CHECKPOINT_2026-10-10_RU.md. Цель остаётся активной.
+
 ## 2026-10-10 — установленная QA0.19.138
 
 Код b89cac712e15e2853fb13111d5502b42c1c8f848. В PrepareForHost/ReviewImportFile

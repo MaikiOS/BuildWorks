@@ -1,3 +1,15 @@
+## 2026-10-10 — installed QA0.19.139
+
+Code a4e66c95ef294a7f1c120eacd7712a79b4b3ed33. EditorCatalogStatus checks each exact
+prefab ID once per card; absolute/mixed/case warnings and fresh next passes remain.
+50k regression:30k→3 callbacks. Normal/QA0/0, full Store, Host25185596,
+localization948, isolation/preflight, Unity492 and both reviews PASSED/Ship.
+This does not prove real Valheim speed. Installed only TerrainRamp-1.0-Test;
+SHA pair verified, Default clean,137 config/import/save files unchanged.
+No game launch. Full import/construction/reload/network and physical mouse backend
+remain open. See docs/QA_0.19.139_RU.md and CATALOG_STATUS_CHECKPOINT_2026-10-10.md.
+Goal remains active.
+
 ## 2026-10-10 — installed QA0.19.138
 
 Code b89cac712e15e2853fb13111d5502b42c1c8f848. Lazy per-document ordinary ZDO field

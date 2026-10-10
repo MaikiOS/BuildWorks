@@ -1,3 +1,12 @@
+## 2026-10-10 — source .133: cloning already validated source evidence
+
+Checkpoint5dfeaa2; full Store, normal/QA0/0, Host/localization933/isolation/preflight
+and repeated correctness/Ponytail reviews PASSED/Ship. Copies retain only an existing
+immutable evidence cache; early raw-library retention was removed after worker slowdown.
+Warm Copy+Index probe370–379→45–47ms; cold catalogue/full import not improved.
+Geometry/Unity not rerun; memory/game not measured. Evidence:
+docs/SOURCE_EVIDENCE_COPY_CHECKPOINT_2026-10-10.md. Installed .132/manual scenario
+unchanged. Next: synchronous catalogue/prefab lookup, main game path acceptance.
 ## 2026-10-10 — QA0.19.132 installed: import validation and accumulated fixes
 
 Code4e9b34e, diagnosticb9e6312. Full Store, normal/QA0/0, Host/localization933,

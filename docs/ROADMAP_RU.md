@@ -1,3 +1,28 @@
+## 2026-10-10 — установленная QA0.19.138
+
+Код b89cac712e15e2853fb13111d5502b42c1c8f848. В PrepareForHost/ReviewImportFile
+обычная ZDO-таблица лениво одна на документ/hash callback; неизвестные поля,
+типы, source binding и атомарность сохранены. Number fastpath только точные0/1/−1
+после legacy blank/comma, прочая числовая семантика прежняя. Полный Store,
+normal/QA0/0, Host25185596, localization948, isolation/preflight и оба обзора
+PASSED/Ship. Regression64→1, independent salted hash, source immutable и float-bit
+parity прошли. verify отсутствует; Geometry/UI/Unity не перезапускались.
+
+Локальные копии364docs/610822parts: CoffeeTable worker2275→2098мс (4пробы/версию,
+включая reverse order), каталог после880,6→805,9мс.4096 worker2484,7→2472,4мс —
+заметное ускорение тяжёлого импорта не доказано. Hashcalls1403214→196784 сами по
+себе не speed proof. Первые build-overlap логи исключены; sandbox Store/NuGet
+отказы повторены с доступом и прошли. Старый .133 source-cache не возвращён.
+
+Установлено штатным скриптом только TerrainRamp-1.0-Test; SHA:
+BuildWorks61C399D0EB6008072C13E364EE15DB7AD7930E58D2459D8593DAB7260F94F7A9;
+GeometryAE5341BC76B709870E2CC822A78AC982DFAF330411E858E989438798C92E7A8D.
+Default чист,137 config/import/save файлов неизменны, квитанции не сброшены.
+Игру/сохранения/сеть не запускали. Точные границы: docs/IMPORT_STATE_CHECKPOINT_2026-10-10_RU.md.
+Текущие ручные проверки: docs/QA_0.19.138_RU.md, без повторения принятого/новой
+обязательной ручной серии. .137 real cursor backend, native строительство/reload,
+сеть, тяжёлый импорт и вся цель остаются открыты. Следующий шаг — отдельные
+измерения synchronous prefab-name snapshot и цепочки каталога/миниатюр.
 ## 2026-10-10 — установленная QA0.19.137
 
 Перенос указателя через край для гизмы и G/R/S вне свободного наведения;

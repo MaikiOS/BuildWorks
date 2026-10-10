@@ -1,3 +1,22 @@
+## 2026-10-10 — installed QA0.19.138
+
+Code b89cac712e15e2853fb13111d5502b42c1c8f848. Lazy per-document ordinary ZDO field
+map in PrepareForHost/ReviewImportFile; no cross-host hash sharing. Exact numeric
+0/1/-1 only, after legacy handling. Source/type/unknown-data guards unchanged.
+Full Store, normal/QA0/0, Host25185596, localization948, isolation/preflight and
+both reviews passed. Regression64→1/salted hashes/source/float-bit parity passed.
+verify absent; unchanged Geometry/UI/Unity not rerun. Temporary364doc/610822part
+library: CoffeeTable worker2275→2098ms (4samples/version incl reverse order),
+later catalog880.6→805.9ms.4096worker2484.7→2472.4ms: heavy improvement unproven.
+Hashcalls1403214→196784 alone not speed proof. Build-overlap trials excluded;
+initial Store/NuGet sandbox access failures passed on same elevated checks.
+Guarded install only TerrainRamp-1.0-Test; Default clean,137 protectedfiles unchanged.
+BuildWorks SHA61C399D0EB6008072C13E364EE15DB7AD7930E58D2459D8593DAB7260F94F7A9;
+GeometryAE5341BC76B709870E2CC822A78AC982DFAF330411E858E989438798C92E7A8D.
+No game/world/network run. docs/IMPORT_STATE_CHECKPOINT_2026-10-10.md documents
+limits; QA_0.19.138_RU.md retains pending .137 cases without accepted-case repeats.
+Full goal/cursor backend/native build/reload/network/heavy import remain open.
+Next: isolate synchronous prefab-name snapshot and catalogue/thumbnail costs.
 ## 2026-10-10 — installed QA0.19.137
 
 Optional continuous pointer for physical transform gizmos and constrained G/R/S;

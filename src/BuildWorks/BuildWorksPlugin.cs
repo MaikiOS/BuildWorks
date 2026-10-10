@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.143";
+        internal const string PluginVersion = "0.19.144";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -215,6 +215,18 @@ namespace OstrixMods.BuildWorks
                 catch (Exception exception)
                 {
                     Logger.LogError("BuildWorks QA supported-snap supplies stopped; no automatic reissue: " + exception);
+                    yield break;
+                }
+                try
+                {
+                    bool supplied = BuildWorksTestSupplies.Prepare(contents: true);
+                    Logger.LogInfo(supplied
+                        ? "BuildWorks QA contents resources/items saved separately; previous supplies were not reissued."
+                        : "BuildWorks QA contents resources/items were already prepared; nothing was reissued.");
+                }
+                catch (Exception exception)
+                {
+                    Logger.LogError("BuildWorks QA contents supplies stopped; no automatic reissue: " + exception);
                     yield break;
                 }
                 Logger.LogInfo("BuildWorks QA preparation completed or previously recorded. Native blueprint construction and reload still require acceptance.");

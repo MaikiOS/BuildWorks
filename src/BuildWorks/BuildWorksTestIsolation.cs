@@ -271,6 +271,7 @@ namespace OstrixMods.BuildWorks
         internal static string ControlDirectory => Path.Combine(root, "qa-control");
         internal static string SupplyReceiptPath => Path.Combine(root, "qa-supplies.txt");
         internal static string SupportedSnapSupplyReceiptPath => Path.Combine(root, "qa-supported-snap-supplies.txt");
+        internal static string ContentsSupplyReceiptPath => Path.Combine(root, "qa-contents-supplies.txt");
         internal static string StationReceiptPath => Path.Combine(root, "qa-stations.txt");
         internal static string YardRequestPath => Path.Combine(root, "qa-yard.request");
         internal static string YardPlanPath => Path.Combine(root, "qa-yard-plan.txt");

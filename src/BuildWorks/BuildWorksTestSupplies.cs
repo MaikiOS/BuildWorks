@@ -15,6 +15,8 @@ namespace OstrixMods.BuildWorks
         internal const string SupportedSnapFixture = "16-supported-snap.blueprint|0581781B12DE25323C3F85E7F9747B9CD2AE9D5F6C5482CC65A4998B0CB0D427";
         internal const string SupportedSnapAFixture = "17-supported-snap-a.blueprint|6C2C666C6934638732E8270533F3B9EBB1BDA63180B3E503B1834D6BB21A226C";
         internal const string SupportedSnapBFixture = "18-supported-snap-b.blueprint|C5C28366DC4A367C15B53204F5721C3A4D61AE7921D3B9138BBC26DEDE8222EF";
+        internal const string ContentsEmptyFixture = "24-contents-empty.buildworks.json|B6340C24B49EC92D4A4544B1AFE47F91E7E6892C8A99863D46F1B4809158E33F";
+        internal const string ContentsPopulatedFixture = "25-contents-populated.buildworks.json|49809C3F00F7C08EC229A7CC4E5B2A93BBEE1C83624CBF4D2FA655CCA7132FB2";
         private static readonly string[] Fixtures =
         {
             "01-walls.blueprint|E65CB24CB573FE4C8E320918049EB0A1EBC05AF66A8D944E60AC618A9731AFBB",
@@ -41,14 +43,17 @@ namespace OstrixMods.BuildWorks
             using (var hash = SHA256.Create()) return BitConverter.ToString(hash.ComputeHash(bytes)).Replace("-", "");
         }
 
-        internal static Dictionary<GameObject, int> Plan(out List<Piece> pieces, bool supportedSnap = false)
+        internal static Dictionary<GameObject, int> Plan(out List<Piece> pieces, bool supportedSnap = false, bool contents = false)
         {
+            if (supportedSnap && contents) throw new ArgumentException("Choose one QA supply cohort.");
             if (!ZNetScene.instance || !ObjectDB.instance || !MessageHud.instance)
                 throw new InvalidOperationException("QA supplies require loaded prefab/item databases and MessageHud.");
             string directory = CompositeBlueprintStore.ValidateExchangeDirectory(BuildWorksTestIsolation.FixtureDirectory);
             pieces = new List<Piece>();
+            int mountedItems = 0;
             int resourceBudget = 0;
-            foreach (string manifest in supportedSnap ? new[] { SupportedSnapFixture, SupportedSnapAFixture, SupportedSnapBFixture } : Fixtures)
+            foreach (string manifest in contents ? new[] { ContentsEmptyFixture, ContentsPopulatedFixture } :
+                supportedSnap ? new[] { SupportedSnapFixture, SupportedSnapAFixture, SupportedSnapBFixture } : Fixtures)
             {
                 string[] entry = manifest.Split('|');
                 string path = Path.Combine(directory, entry[0]);
@@ -64,6 +69,16 @@ namespace OstrixMods.BuildWorks
                     Piece piece = prefab ? prefab.GetComponent<Piece>() : null;
                     if (!piece || ZoneSystem.instance.GetGlobalKey(piece.FreeBuildKey()))
                         throw new InvalidDataException("Missing or free-cost QA piece: " + part.prefabName);
+                    if (contents && part.foreignData != null)
+                    {
+                        var data = part.foreignData.ToGeometry();
+                        var placeable = data.Format == Geometry.BlueprintForeignPartData.NativeContainerFormat
+                            ? data.WithoutContents(name => name.GetStableHashCode()) : data;
+                        if (!BlueprintItemStandPlacement.CanRestore(piece, placeable))
+                            throw new InvalidDataException("QA contents prefab cannot use the intended survival policy: " + part.prefabName);
+                        if (data.Format == Geometry.BlueprintForeignPartData.NativeItemStandFormat &&
+                            BlueprintItemStandPlacement.NeedsSupply(data)) ++mountedItems;
+                    }
                     pieces.Add(piece);
                     if (pieces.Count > 512) throw new InvalidDataException("Unexpected QA fixture size.");
                     foreach (var requirement in piece.m_resources ?? Array.Empty<Piece.Requirement>())
@@ -85,7 +100,14 @@ namespace OstrixMods.BuildWorks
                     throw new InvalidDataException("Invalid native QA resource prefab/amount.");
                 result.Add(prefab, resource.Amount);
             }
-            if (!supportedSnap)
+            if (contents)
+            {
+                GameObject sword = ObjectDB.instance.GetItemPrefab("SwordIron");
+                if (mountedItems != 2 || !sword || result.ContainsKey(sword))
+                    throw new InvalidDataException("Unexpected QA contents supply requirement.");
+                result.Add(sword, mountedItems);
+            }
+            else if (!supportedSnap)
             {
                 GameObject hammer = ObjectDB.instance.GetItemPrefab("Hammer");
                 if (!hammer || result.ContainsKey(hammer)) throw new InvalidDataException("QA Hammer is missing or conflicts with resources.");
@@ -102,14 +124,16 @@ namespace OstrixMods.BuildWorks
             return count;
         }
 
-        internal static bool Prepare(bool supportedSnap = false)
+        internal static bool Prepare(bool supportedSnap = false, bool contents = false)
         {
             Player player = BuildWorksTestIsolation.RequireLoadedSession();
-            Dictionary<GameObject, int> plan = Plan(out _, supportedSnap);
-            string description = string.Join("\n", supportedSnap ? new[] { SupportedSnapFixture, SupportedSnapAFixture, SupportedSnapBFixture } : Fixtures) + "\n" + string.Join("\n", plan.OrderBy(pair => pair.Key.name, StringComparer.Ordinal)
+            Dictionary<GameObject, int> plan = Plan(out _, supportedSnap, contents);
+            string description = string.Join("\n", contents ? new[] { ContentsEmptyFixture, ContentsPopulatedFixture } :
+                supportedSnap ? new[] { SupportedSnapFixture, SupportedSnapAFixture, SupportedSnapBFixture } : Fixtures) + "\n" + string.Join("\n", plan.OrderBy(pair => pair.Key.name, StringComparer.Ordinal)
                 .Select(pair => pair.Key.name + "=" + pair.Value.ToString(CultureInfo.InvariantCulture)));
             string stamp = BuildWorksTestIsolation.SupplyStamp(description);
-            string receipt = supportedSnap ? BuildWorksTestIsolation.SupportedSnapSupplyReceiptPath : BuildWorksTestIsolation.SupplyReceiptPath;
+            string receipt = contents ? BuildWorksTestIsolation.ContentsSupplyReceiptPath :
+                supportedSnap ? BuildWorksTestIsolation.SupportedSnapSupplyReceiptPath : BuildWorksTestIsolation.SupplyReceiptPath;
             if (BuildWorksTestIsolation.OnceComplete(receipt, stamp)) return false;
             Inventory inventory = player.GetInventory();
             int slots = 0;

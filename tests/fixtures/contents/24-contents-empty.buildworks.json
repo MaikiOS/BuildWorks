@@ -1,0 +1,129 @@
+{
+  "format": "buildworks-blueprint",
+  "version": 11,
+  "requiredPrefabIds": [
+    "SwordIron",
+    "itemstand",
+    "piece_chest_wood",
+    "wood_floor",
+    "woodwall"
+  ],
+  "blueprint": {
+    "id": "00000000000000000000000000000024",
+    "name": "TEST 24 Empty Storage Mount",
+    "prefabName": "wood_floor",
+    "parts": [
+      {
+        "prefabName": "wood_floor",
+        "position": {
+          "y": 0.0,
+          "x": 0.0,
+          "z": 0.0
+        },
+        "rotation": {
+          "y": 0,
+          "w": 1,
+          "x": 0,
+          "z": 0
+        },
+        "stableId": "floor",
+        "displayName": "floor",
+        "editorVisible": true,
+        "editorLocked": false,
+        "scale": {
+          "y": 1,
+          "x": 1,
+          "z": 1
+        }
+      },
+      {
+        "prefabName": "woodwall",
+        "position": {
+          "y": 0.0,
+          "x": 0.0,
+          "z": -0.9
+        },
+        "rotation": {
+          "y": 0,
+          "w": 1,
+          "x": 0,
+          "z": 0
+        },
+        "stableId": "wall",
+        "displayName": "wall",
+        "editorVisible": true,
+        "editorLocked": false,
+        "scale": {
+          "y": 1,
+          "x": 1,
+          "z": 1
+        }
+      },
+      {
+        "prefabName": "piece_chest_wood",
+        "position": {
+          "y": 0.15,
+          "x": -0.5,
+          "z": 0.0
+        },
+        "rotation": {
+          "y": 0,
+          "w": 1,
+          "x": 0,
+          "z": 0
+        },
+        "stableId": "chest",
+        "displayName": "chest",
+        "editorVisible": true,
+        "editorLocked": false,
+        "scale": {
+          "y": 1,
+          "x": 1,
+          "z": 1
+        },
+        "foreignData": {
+          "format": "valheim-container-v1",
+          "chance": null,
+          "info": "5:2:0:0",
+          "zdo": "bQAAAAAA"
+        }
+      },
+      {
+        "prefabName": "itemstand",
+        "position": {
+          "y": 1.1,
+          "x": 0.5,
+          "z": -0.8
+        },
+        "rotation": {
+          "y": 0,
+          "w": 1,
+          "x": 0,
+          "z": 0
+        },
+        "stableId": "mount",
+        "displayName": "mount",
+        "editorVisible": true,
+        "editorLocked": false,
+        "scale": {
+          "y": 1,
+          "x": 1,
+          "z": 1
+        },
+        "foreignData": {
+          "format": "valheim-itemstand-v1",
+          "chance": null,
+          "info": "SwordIron:0:3:0",
+          "zdo": "bdkwAAAAAABEAwA/g235AA=="
+        }
+      }
+    ],
+    "anchors": [],
+    "category": "BW TEST",
+    "previewYaw": 45,
+    "previewPitch": 30,
+    "previewZoom": 1,
+    "groups": [],
+    "primaryPartId": "floor"
+  }
+}

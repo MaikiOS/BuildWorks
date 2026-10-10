@@ -125,6 +125,10 @@ if ($PlayerTestFixtures) {
         '17-supported-snap-a.blueprint', '18-supported-snap-b.blueprint') {
         $fixtureCopies += @{ Source = (Join-Path $fixtureSource $name); Name = $name; Expected = $null }
     }
+    Assert-NotReparsePoint (Join-Path $projectRoot 'tests\fixtures\contents')
+    foreach ($name in '24-contents-empty.buildworks.json', '25-contents-populated.buildworks.json') {
+        $fixtureCopies += @{ Source = (Join-Path $projectRoot ('tests\fixtures\contents\' + $name)); Name = $name; Expected = $null }
+    }
     if ($QaStandToken) {
         Add-Type -Path (Join-Path $targetBepInEx 'core\Mono.Cecil.dll')
         $qaAssembly = [Mono.Cecil.AssemblyDefinition]::ReadAssembly((Join-Path $artifactRoot 'BuildWorks.dll'))
@@ -134,16 +138,17 @@ if ($PlayerTestFixtures) {
                 Where-Object { $_.OpCode.Name -eq 'ldstr' }).Operand)
             if ($manifest.Count -ne 7) { throw 'Unexpected QA source fixture manifest.' }
             foreach ($field in @(@('SupportedSnapFixture','16-supported-snap.blueprint'),
-                @('SupportedSnapAFixture','17-supported-snap-a.blueprint'), @('SupportedSnapBFixture','18-supported-snap-b.blueprint'))) {
+                @('SupportedSnapAFixture','17-supported-snap-a.blueprint'), @('SupportedSnapBFixture','18-supported-snap-b.blueprint'),
+                @('ContentsEmptyFixture','24-contents-empty.buildworks.json'), @('ContentsPopulatedFixture','25-contents-populated.buildworks.json'))) {
                 $supplement = @($supplies.Fields | Where-Object Name -CEQ $field[0])
                 if ($supplement.Count -ne 1 -or -not $supplement[0].HasConstant -or
                     $supplement[0].Constant -cnotmatch ('^' + [regex]::Escape($field[1]) + '\|[A-F0-9]{64}$')) {
-                    throw 'Unexpected supported-snap QA fixture manifest.'
+                    throw 'Unexpected supplemental QA fixture manifest.'
                 }
                 $manifest += [string]$supplement[0].Constant
             }
             foreach ($entry in $manifest) {
-                if ($entry -cnotmatch '^([a-zA-Z0-9_-]+\.blueprint)\|([A-F0-9]{64})$') { throw 'Invalid QA source fixture manifest entry.' }
+                if ($entry -cnotmatch '^([a-zA-Z0-9_-]+\.(?:blueprint|buildworks\.json))\|([A-F0-9]{64})$') { throw 'Invalid QA source fixture manifest entry.' }
                 $name = $Matches[1]; $expected = $Matches[2]
                 $owned = @($fixtureCopies | Where-Object Name -CEQ $name)
                 if ($owned.Count -eq 1) { $owned[0].Expected = $expected }

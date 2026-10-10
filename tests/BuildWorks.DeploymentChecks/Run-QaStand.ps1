@@ -25,6 +25,10 @@ foreach ($name in @('hs_ashlands_madzobuild_coffeetable.blueprint','hs_blackfore
     $relative = 'artifacts/external-blueprints/BiomeBlueprints-1.0.3/smoke/' + $name
     Copy-Replica (Join-Path $source $relative) (Join-Path $replica $relative)
 }
+foreach ($name in @('24-contents-empty.buildworks.json','25-contents-populated.buildworks.json')) {
+    $relative = 'tests/fixtures/contents/' + $name
+    Copy-Replica (Join-Path $source $relative) (Join-Path $replica $relative)
+}
 $liveProfile = Join-Path (Split-Path (Split-Path $source)) 'TerrainRamp-1.0-Test'
 Copy-Replica (Join-Path $liveProfile 'BepInEx/core/Mono.Cecil.dll') (Join-Path $target 'BepInEx/core/Mono.Cecil.dll')
 [IO.Directory]::CreateDirectory((Join-Path $target 'BepInEx/plugins')) | Out-Null
@@ -71,6 +75,14 @@ $supplementBytes = [IO.File]::ReadAllBytes($supplement)
 Refuses { & $deploy -TargetProfile TerrainRamp-1.0-Test -QaStandToken $token } 'QA source fixture hash changed'
 $cases++
 [IO.File]::WriteAllBytes($supplement,$supplementBytes)
+foreach ($name in @('24-contents-empty.buildworks.json','25-contents-populated.buildworks.json')) {
+    $contents = Join-Path $replica ('tests/fixtures/contents/' + $name)
+    $contentsBytes = [IO.File]::ReadAllBytes($contents)
+    [IO.File]::AppendAllText($contents,'changed')
+    Refuses { & $deploy -TargetProfile TerrainRamp-1.0-Test -QaStandToken $token } 'QA source fixture hash changed'
+    $cases++
+    [IO.File]::WriteAllBytes($contents,$contentsBytes)
+}
 # Junction named like a DLL also redirects Copy-Item outside the target profile.
 [IO.Directory]::CreateDirectory((Split-Path $installed)) | Out-Null
 $outside = Join-Path $output 'outside-profile'
@@ -86,7 +98,11 @@ $cases++
 Require ([IO.File]::ReadAllText($marker) -ceq $token) 'Explicit QA identity marker not written exactly.'
 Require ((Get-FileHash $installed).Hash -ceq (Get-FileHash (Join-Path $replica 'artifacts/test-stand-bin/BuildWorks.dll')).Hash) 'QA DLL was not selected.'
 $fixtureTarget = Join-Path $target 'BepInEx/config/BuildWorks/test-fixtures'
-Require (@(Get-ChildItem -LiteralPath $fixtureTarget -File).Count -eq 11) 'Expected nine owned and two external local QA files.'
+Require (@(Get-ChildItem -LiteralPath $fixtureTarget -File).Count -eq 13) 'Expected eleven owned and two external local QA files.'
+foreach ($name in @('24-contents-empty.buildworks.json','25-contents-populated.buildworks.json')) {
+    Require ((Get-FileHash (Join-Path $fixtureTarget $name)).Hash -ceq
+        (Get-FileHash (Join-Path $replica ('tests/fixtures/contents/' + $name))).Hash) 'Contents fixture copy changed bytes.'
+}
 Require (-not (Test-Path -LiteralPath (Join-Path $target 'BepInEx/config/BuildWorks/qa-saves'))) 'Deployment created a game save root.'
 $cases++
 $before = Snapshot
@@ -99,6 +115,10 @@ Refuses { & $deploy -TargetProfile TerrainRamp-1.0-Test -QaStandToken ([guid]::N
 $cases++
 $fixture = Join-Path $fixtureTarget '02-sign.blueprint'
 [IO.File]::AppendAllText($fixture,'changed')
+Refuses { & $deploy -TargetProfile TerrainRamp-1.0-Test -QaStandToken $token } 'different contents; refusing overwrite'
+$cases++
+$contents = Join-Path $fixtureTarget '24-contents-empty.buildworks.json'
+[IO.File]::AppendAllText($contents,'changed')
 Refuses { & $deploy -TargetProfile TerrainRamp-1.0-Test -QaStandToken $token } 'different contents; refusing overwrite'
 $cases++
 @{status='passed_replica_only';cases=$cases;replica=$replica;liveProfileModified=$false;gameExecuted=$false;saveFilesModified=$false} |

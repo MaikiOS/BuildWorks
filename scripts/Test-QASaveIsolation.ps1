@@ -126,19 +126,25 @@ $suppliesName = 'OstrixMods.BuildWorks.BuildWorksTestSupplies'
 $suppliesType = $qa.MainModule.GetType($suppliesName)
 Require ($null -ne $suppliesType -and $null -eq $normal.MainModule.GetType($suppliesName)) 'QA supplies leaked into normal build or are missing.'
 $prepare = $suppliesType.Methods | Where-Object Name -eq 'Prepare'
-Require ($prepare.Parameters.Count -eq 1 -and $prepare.Parameters[0].ParameterType.FullName -eq 'System.Boolean' -and
-    $prepare.Parameters[0].HasConstant -and $prepare.Parameters[0].Constant -eq $false) 'Default supplies must retain the original cohort.'
+Require ($prepare.Parameters.Count -eq 2 -and
+    @($prepare.Parameters | Where-Object { $_.ParameterType.FullName -ne 'System.Boolean' -or
+        -not $_.HasConstant -or $_.Constant -ne $false }).Count -eq 0) 'Default supplies must retain the original cohort.'
 $prepareCalls = @($prepare.Body.Instructions | Where-Object { $_.OpCode.Name -in @('call','callvirt') })
-foreach ($name in @('get_SupplyReceiptPath','get_SupportedSnapSupplyReceiptPath')) {
+foreach ($name in @('get_SupplyReceiptPath','get_SupportedSnapSupplyReceiptPath','get_ContentsSupplyReceiptPath')) {
     Require ([bool]($prepareCalls | Where-Object { [string]$_.Operand -match "::$name\(" })) "Supplies omit separate receipt $name"
 }
 $planCall = $prepareCalls | Where-Object { [string]$_.Operand -match '::Plan\(' } | Select-Object -First 1
-Require ($planCall.Previous.OpCode.Name -eq 'ldarg.0') 'Supply cohort is not passed into its native resource plan.'
+Require ($planCall.Previous.OpCode.Name -eq 'ldarg.1' -and $planCall.Previous.Previous.OpCode.Name -eq 'ldarg.0') 'Supply cohort is not passed into its native resource plan.'
 foreach ($name in @('RequireLoadedSession','Plan','SupplyStamp','OnceComplete','BeginOnce','Count','AddItem','AddKnownItem','SavePlayerData','Save','CompleteOnce')) {
     Require ([bool]($prepareCalls | Where-Object { [string]$_.Operand -match "::$name\(" })) "Native supply path omits $name"
 }
 function SupplyOffset([string]$name) { ($prepareCalls | Where-Object { [string]$_.Operand -match "::$name\(" } | Select-Object -First 1).Offset }
 Require ((SupplyOffset 'BeginOnce') -lt (SupplyOffset 'AddItem') -and (SupplyOffset 'Save') -lt (SupplyOffset 'CompleteOnce')) 'Supply receipt ordering lost started-before-grant or saved-before-complete.'
+$planIl = ($suppliesType.Methods | Where-Object Name -eq 'Plan').Body.Instructions
+Require ([bool]($planIl | Where-Object { [string]$_.Operand -match 'BlueprintItemStandPlacement::CanRestore\(' }) -and
+    [bool]($planIl | Where-Object { [string]$_.Operand -match 'BlueprintForeignPartData::WithoutContents\(' })) `
+    'Contents supplies omit native placement preflight or empty-storage policy.'
+Require (-not [bool]($planIl | Where-Object { [string]$_.Operand -match '(ItemData|Inventory)::Load\(' })) 'Contents supply plan loads archived item state.'
 $coroutine = $pluginType.NestedTypes | Where-Object Name -Like '<PrepareQaSaves>*'
 function Require-StorageStartGuard($method) {
     $instructions = @($method.Body.Instructions)
@@ -171,8 +177,11 @@ Require ([bool](@($coroutine.Methods.Body.Instructions | ForEach-Object { [strin
 Require ([bool](@($coroutine.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -match '(Character|Player)::InIntro\(')) 'QA provisioning does not wait for the fresh-player intro flight.'
 Require ([bool](@($coroutine.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -match 'BuildWorksTestSupplies::Prepare\(')) 'QA supply path is not called by actual plugin coroutine.'
 $supplyCalls = @($coroutine.Methods.Body.Instructions | Where-Object { [string]$_.Operand -match 'BuildWorksTestSupplies::Prepare\(' })
-Require ($supplyCalls.Count -eq 2 -and $supplyCalls[0].Previous.OpCode.Name -eq 'ldc.i4.0' -and
-    $supplyCalls[1].Previous.OpCode.Name -eq 'ldc.i4.1') 'Plugin must provision original and supported-snap cohorts independently.'
+Require ($supplyCalls.Count -eq 3 -and $supplyCalls[0].Previous.OpCode.Name -eq 'ldc.i4.0' -and
+    $supplyCalls[0].Previous.Previous.OpCode.Name -eq 'ldc.i4.0' -and
+    $supplyCalls[1].Previous.OpCode.Name -eq 'ldc.i4.0' -and $supplyCalls[1].Previous.Previous.OpCode.Name -eq 'ldc.i4.1' -and
+    $supplyCalls[2].Previous.OpCode.Name -eq 'ldc.i4.1' -and $supplyCalls[2].Previous.Previous.OpCode.Name -eq 'ldc.i4.0') `
+    'Plugin must provision original, supported-snap and contents cohorts independently.'
 $stationsName = 'OstrixMods.BuildWorks.BuildWorksTestStations'
 $stations = $qa.MainModule.GetType($stationsName)
 Require ($null -ne $stations -and $null -eq $normal.MainModule.GetType($stationsName)) 'QA stations leaked into the normal build or are missing.'
@@ -409,6 +418,17 @@ Require (-not [bool](Invoke-PathCheck 'BeginOnce' @($snapReceipt,$snapStamp))) '
 Require ((Get-FileHash $supplyReceipt).Hash -ceq $completeHash -and
     [bool](Invoke-PathCheck 'OnceComplete' @($supplyReceipt,$stamp))) 'Supplement invalidated previous supplies.'
 $onceChecks += 4
+$contentsReceipt = Invoke-PathCheck 'get_ContentsSupplyReceiptPath' @()
+Require ($contentsReceipt -ceq (Join-Path $isolated 'qa-contents-supplies.txt')) 'Contents receipt is not isolated and distinct.'
+$snapHash = (Get-FileHash $snapReceipt).Hash
+$contentsStamp = 'D' * 64
+Require ([bool](Invoke-PathCheck 'BeginOnce' @($contentsReceipt,$contentsStamp))) 'Contents supplement did not start independently.'
+Refuses { Invoke-PathCheck 'BeginOnce' @($contentsReceipt,$contentsStamp) } 'Interrupted contents supplement retried.'
+Invoke-PathCheck 'CompleteOnce' @($contentsReceipt,$contentsStamp)
+Require (-not [bool](Invoke-PathCheck 'BeginOnce' @($contentsReceipt,$contentsStamp))) 'Completed contents supplement was reissued.'
+Require ((Get-FileHash $supplyReceipt).Hash -ceq $completeHash -and
+    (Get-FileHash $snapReceipt).Hash -ceq $snapHash) 'Contents supplement changed earlier supply receipts.'
+$onceChecks += 5
 foreach ($invalidStamp in @('A',('a'*64),('G'*64),'../escape')) {
     Refuses { Invoke-PathCheck 'BeginOnce' @((Join-Path $isolated 'never-created.txt'),$invalidStamp) } 'Malformed supply stamp accepted.'
     $onceChecks++

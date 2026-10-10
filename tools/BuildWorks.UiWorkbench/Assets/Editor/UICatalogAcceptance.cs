@@ -33,6 +33,7 @@ internal static class UICatalogAcceptance
         public bool GetMouseButtonDown(int button) => false;
         public bool GetMouseButtonUp(int button) => false;
         public float GetAxis(string axis) => 0f;
+        public bool TryWarpMousePosition(Vector2 position) => false;
     }
 
     internal static string Run(TMP_FontAsset font)

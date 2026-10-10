@@ -957,6 +957,16 @@ internal static class ControllerInputAcceptance
         public bool HasFocus { get; set; } = true;
         public string InputString { get; set; } = "";
         public float MouseX, MouseY;
+        public bool WarpAvailable;
+        public int WarpAttempts;
+        public readonly List<Vector2> WarpTargets = new List<Vector2>();
+        public bool TryWarpMousePosition(Vector2 position)
+        {
+            ++WarpAttempts;
+            if (!WarpAvailable) return false;
+            WarpTargets.Add(position);
+            return true;
+        }
         public bool GetKey(KeyCode key) => keys.Contains(key);
         public bool GetKeyDown(KeyCode key) => keys.Contains(key) && !previousKeys.Contains(key);
         public bool GetMouseButton(int button) => (buttons & 1 << button) != 0;
@@ -1242,6 +1252,8 @@ internal static class ControllerInputAcceptance
             foreach (object tick in TestCursorPreview(controller, input, scene, view, uiCamera, target, output))
                 yield return tick;
             foreach (object tick in TestInputRevision(controller, input, scene, view, uiCamera, target, output))
+                yield return tick;
+            foreach (object tick in TestContinuousPointer(controller, input, scene, view, uiCamera, target, output))
                 yield return tick;
 
             Frame(controller, input, Vector2.zero); NativeClick(view, uiCamera, "Row_left"); yield return null;
@@ -2560,6 +2572,160 @@ internal static class ControllerInputAcceptance
     {
         input.Next(mouse, 0, keys); input.InputString = text;
         controller.Update(); controller.LateUpdate(); Canvas.ForceUpdateCanvases();
+    }
+
+    private static IEnumerable TestContinuousPointer(BlueprintEditorController controller, InputFrames input,
+        BlueprintEditorScene scene, BlueprintEditorView view, Camera uiCamera, RenderTexture renderTarget, string output)
+    {
+        Frame(controller, input, Vector2.zero); NativeClick(view, uiCamera, "Row_left"); yield return null;
+        Rect viewport = view.ViewportScreenRect();
+        Vector2 start = viewport.center;
+        Vector2 edge = new Vector2(viewport.xMin + viewport.width * .3f, viewport.yMax - 2f);
+        Require(!view.IsViewportControlHit(edge), "Continuous pointer test edge is covered by UI");
+        var doc = controller.Document;
+        BlueprintEditorPart Part() => doc.Parts.First(x => x.StableId == "left");
+        Point3 originalScale = Part().Scale, originalPosition = Part().Position;
+        int history = Field<IList>(doc, "undo").Count;
+        object savedFrame = Field<object>(controller, "transformFrame");
+        bool savedLocal = Field<bool>(controller, "localSpace");
+        input.WarpAvailable = true;
+        foreach (Vector2 border in new[] { edge,
+            new Vector2(edge.x, viewport.yMin + 2),
+            new Vector2(viewport.xMin + 2, viewport.center.y),
+            new Vector2(viewport.xMax - 2, viewport.center.y),
+            new Vector2(edge.x, viewport.yMin - 15) })
+        {
+            input.WarpTargets.Clear();
+            Frame(controller, input, start, 0, KeyCode.S); yield return null;
+            Frame(controller, input, border); yield return null;
+            Require(input.WarpTargets.Count == 1 && viewport.Contains(input.WarpTargets[0]),
+                "Scale pointer stops at viewport edge instead of wrapping: " + border +
+                " viewport=" + viewport + " targets=" + input.WarpTargets.Count +
+                " unavailable=" + Field<bool>(controller, "pointerWrapUnavailable") +
+                " paused=" + Field<bool>(controller, "keyboardPaused") +
+                " handle=" + Field<GizmoHandleKind>(controller, "dragHandle") +
+                " cursor=" + Cursor.lockState + " screen=" + Screen.width + "x" + Screen.height);
+            float preview = Field<float>(controller, "dragScale");
+            Vector2 target = input.WarpTargets[0];
+            Frame(controller, input, border); yield return null;
+            Frame(controller, input, border); yield return null;
+            Require(Field<bool>(controller, "pointerWarpPending") &&
+                Field<float>(controller, "dragScale") == preview && input.WarpTargets.Count == 1,
+                "Delayed warp moved preview or retried an outstanding native command");
+            // Hand motion toward the landing edge is not acknowledgement of a delayed native warp.
+            Frame(controller, input, Vector2.Lerp(border, target, .55f)); yield return null;
+            Require(Field<bool>(controller, "pointerWarpPending") &&
+                Field<float>(controller, "dragScale") == preview && input.WarpTargets.Count == 1,
+                "Manual halfway motion falsely acknowledged a pending warp and jumped preview");
+            Frame(controller, input, target); yield return null;
+            Require(!Field<bool>(controller, "pointerWarpPending") &&
+                Mathf.Abs(Field<float>(controller, "dragScale") - preview) < .00001f,
+                "Warp-generated pointer jump changed scale");
+            if (border == edge)
+                Save(scene, view, uiCamera, renderTarget, Path.Combine(output, "input-pointer-wrap.png"));
+            Vector2 continued = target + start - border + Vector2.up * 20f;
+            Frame(controller, input, continued); yield return null;
+            Require(Field<float>(controller, "dragScale") != preview,
+                "Hand motion after acknowledged warp did not continue scaling");
+            Frame(controller, input, continued, 0, KeyCode.Escape); yield return null;
+            Require(Part().Scale.Equals(originalScale) && Part().Position.Equals(originalPosition) &&
+                Field<IList>(doc, "undo").Count == history &&
+                Field<Vector2>(controller, "transformPointerOffset") == Vector2.zero,
+                "Wrapping cancellation changed document/history or left pointer offset");
+        }
+
+        input.WarpTargets.Clear();
+        Frame(controller, input, start, 0, KeyCode.S); yield return null;
+        Frame(controller, input, edge, 0, KeyCode.LeftControl); yield return null;
+        Require(input.WarpTargets.Count == 0, "Ctrl cannot release pointer to panels");
+        NativeClick(view, uiCamera, "PreviewAxisX"); yield return null;
+        Require(Field<GizmoAxis>(controller, "dragAxis") == GizmoAxis.X,
+            "Ctrl panel access lost native axis button input");
+        Frame(controller, input, edge, 0, KeyCode.Escape); yield return null;
+        Frame(controller, input, start, 0, KeyCode.G); yield return null;
+        Frame(controller, input, edge); yield return null;
+        Require(input.WarpTargets.Count == 0, "Surface placement was warped to another target");
+        Frame(controller, input, edge, 0, KeyCode.Escape); yield return null;
+
+        foreach (bool focusLoss in new[] { false, true })
+        {
+            Frame(controller, input, start, 0, KeyCode.S); yield return null;
+            Frame(controller, input, edge); yield return null;
+            input.HasFocus = !focusLoss;
+            for (int i = 0; i < (focusLoss ? 1 : 9); ++i)
+            { Frame(controller, input, edge); yield return null; }
+            input.HasFocus = true;
+            Require(!Field<bool>(controller, "keyboardPreview") && !Field<bool>(controller, "pointerWarpPending") &&
+                Part().Scale.Equals(originalScale) && Field<IList>(doc, "undo").Count == history &&
+                Cursor.lockState == CursorLockMode.None && Cursor.visible,
+                "Unacknowledged warp or focus loss kept transform/cursor or changed data");
+        }
+
+        Frame(controller, input, start, 0, KeyCode.S); yield return null;
+        Frame(controller, input, edge); yield return null;
+        float confirmedScale = Field<float>(controller, "dragScale");
+        Frame(controller, input, edge, 0, KeyCode.Return); yield return null;
+        Require(!Field<bool>(controller, "keyboardPreview") && !Field<bool>(controller, "pointerWarpPending") &&
+            Mathf.Abs((float)Part().Scale.X - (float)originalScale.X * confirmedScale) < .0001f &&
+            Field<IList>(doc, "undo").Count == history + 1,
+            "Enter during pending warp changed accepted scale or failed one-step commit");
+        Require(doc.Undo(), "Pending-warp commit cannot Undo"); Call(controller, "Bind", (object)null);
+
+        input.WarpAvailable = false; input.WarpAttempts = 0;
+        Frame(controller, input, start, 0, KeyCode.S); yield return null;
+        Frame(controller, input, edge); yield return null;
+        Frame(controller, input, edge); yield return null;
+        Require(input.WarpAttempts == 1 && Field<bool>(controller, "pointerWrapUnavailable") &&
+            !Field<bool>(controller, "pointerWarpPending") && Cursor.lockState == CursorLockMode.None && Cursor.visible,
+            "Unavailable backend was retried or captured cursor");
+        input.Next(start); input.InputString = "1.25"; controller.Update(); yield return null;
+        Frame(controller, input, start, 0, KeyCode.Return); yield return null;
+        Require(Mathf.Abs((float)Part().Scale.X - (float)originalScale.X * 1.25f) < .0001f,
+            "Unsupported warp broke existing numeric confirmation");
+        Require(doc.Undo(), "Unsupported-warp numeric commit cannot Undo"); Call(controller, "Bind", (object)null);
+
+        input.WarpAvailable = true; input.WarpTargets.Clear();
+        Set(controller, "transformFrame", Enum.Parse(savedFrame.GetType(), "View"));
+        Set(controller, "localSpace", true); Set(controller, "gizmoFamily", GizmoFamily.Combined);
+        Call(controller, "SetActiveTool", BlueprintEditorTool.Transform); Call(controller, "UpdateTransformContext");
+        foreach (KeyCode mode in new[] { KeyCode.G, KeyCode.R })
+        {
+            input.WarpTargets.Clear();
+            Frame(controller, input, start, 0, mode); yield return null;
+            Frame(controller, input, start, 0, KeyCode.X); yield return null;
+            Frame(controller, input, start, 0, KeyCode.Z); yield return null;
+            Vector2 rightEdge = new Vector2(viewport.xMax - 2, viewport.center.y);
+            Frame(controller, input, rightEdge); yield return null;
+            Require(input.WarpTargets.Count == 1, "G/R mouse preview did not wrap");
+            Vector3 beforeTranslation = Field<Vector3>(controller, "dragTranslation");
+            Quaternion beforeRotation = Field<Quaternion>(controller, "dragRotation");
+            Frame(controller, input, input.WarpTargets[0]); yield return null;
+            Require(Vector3.Distance(Field<Vector3>(controller, "dragTranslation"), beforeTranslation) < .0001f &&
+                Quaternion.Angle(Field<Quaternion>(controller, "dragRotation"), beforeRotation) < .01f,
+                "Warp jump changed G-plane/R rotation preview");
+            Frame(controller, input, start, 0, KeyCode.Escape); yield return null;
+        }
+        // Physical LMB drag must commit its last preview even before the warp event arrives.
+        input.WarpTargets.Clear();
+        Frame(controller, input, start); yield return null;
+        var gizmo = Field<TransformGizmoView>(scene, "gizmo");
+        var handle = Field<LineRenderer>(gizmo, "depthHandle");
+        Vector2 handleMouse = scene.Camera.WorldToScreenPoint((handle.GetPosition(0) + handle.GetPosition(2)) * .5f);
+        Frame(controller, input, handleMouse, 1); yield return null;
+        Require(Field<GizmoHandleKind>(controller, "dragHandle") == GizmoHandleKind.Move,
+            "Physical continuous pointer fixture missed depth handle");
+        Frame(controller, input, edge, 1); yield return null;
+        Require(input.WarpTargets.Count == 1, "Physical gizmo did not wrap");
+        Vector3 translation = Field<Vector3>(controller, "dragTranslation");
+        Frame(controller, input, edge); yield return null;
+        Require(!Field<bool>(controller, "pointerWarpPending") &&
+            Vector3.Distance(V(Part().Position), V(originalPosition) + translation) < .0001f,
+            "Physical release during pending warp lost preview or moved twice");
+        Require(doc.Undo(), "Physical wrapped move cannot Undo"); Call(controller, "Bind", (object)null);
+        Set(controller, "transformFrame", savedFrame); Set(controller, "localSpace", savedLocal);
+        Call(controller, "UpdateTransformContext");
+        input.WarpAvailable = false;
+        Frame(controller, input, start); yield return null;
     }
 
     private static IEnumerable TestInputRevision(BlueprintEditorController controller, InputFrames input,

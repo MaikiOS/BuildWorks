@@ -873,7 +873,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.136.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.137.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -3315,4 +3315,24 @@ Assert-Contract ($nativeDistanceCalls -match 'System.Math::Sqrt' -and
     @($nativeDistance.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'conv.r4' }).Count -ge 1) `
     'Native Vector3.Distance float/sqrt metric changed.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.136 and Valheim Steam build 25185596.'
+$nativeInputSystem = [Mono.Cecil.AssemblyDefinition]::ReadAssembly((Join-Path $ValheimManagedDir 'Unity.InputSystem.dll'))
+try {
+    $nativeMouse = $nativeInputSystem.MainModule.GetType('UnityEngine.InputSystem.Mouse')
+    $nativeDevice = $nativeInputSystem.MainModule.GetType('UnityEngine.InputSystem.InputDevice')
+    $warpCommand = $nativeInputSystem.MainModule.GetType('UnityEngine.InputSystem.LowLevel.WarpMousePositionCommand')
+    $warp = $nativeMouse.Methods | Where-Object Name -eq 'WarpCursorPosition'
+    $warpCalls = @($warp.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+    Assert-Contract ($warp.IsPublic -and $warpCalls -match 'WarpMousePositionCommand::Create' -and
+        $warpCalls -match 'InputDevice::ExecuteCommand' -and
+        @($nativeMouse.Properties | Where-Object { $_.Name -eq 'current' -and $_.GetMethod.IsPublic -and $_.GetMethod.IsStatic }).Count -eq 1 -and
+        @($nativeDevice.Properties | Where-Object { $_.Name -in @('native', 'enabled', 'added') -and $_.GetMethod.IsPublic }).Count -eq 3 -and
+        @($nativeDevice.Methods | Where-Object { $_.Name -eq 'ExecuteCommand' -and $_.IsPublic -and
+            $_.HasGenericParameters -and $_.Parameters.Count -eq 1 -and $_.Parameters[0].ParameterType.IsByReference -and
+            $_.ReturnType.FullName -eq 'System.Int64' }).Count -eq 1 -and
+        @($warpCommand.Methods | Where-Object { $_.Name -eq 'Create' -and $_.IsPublic -and $_.IsStatic -and
+            $_.Parameters.Count -eq 1 -and $_.Parameters[0].ParameterType.FullName -eq 'UnityEngine.Vector2' }).Count -eq 1) `
+        'Optional cursor warp reflection contract changed; this check does not prove runtime backend/device availability.'
+}
+finally { $nativeInputSystem.Dispose() }
+
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.137 and Valheim Steam build 25185596.'

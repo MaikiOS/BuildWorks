@@ -944,3 +944,7 @@ editor.position_catalog_help	Режим совмещения: выбери де�
 editor.replace_short	ЗАМЕНИТЬ
 editor.position_short	СОВМЕСТИТЬ
 editor.view.axis_pair	{0}{1} · {2} · Число: по каждой оси
+
+editor.pointer_wrap_controls	Ctrl — к панелям
+editor.pointer_wrap_unavailable	Перенос мыши недоступен в текущем обработчике ввода. Можно вводить число; курсор свободен.
+editor.pointer_wrap_failed	Перенос мыши не подтверждён. Преобразование отменено, курсор свободен.

@@ -944,3 +944,7 @@ editor.position_catalog_help	Alignment mode: choose a part or blueprint. The mis
 editor.replace_short	REPLACE
 editor.position_short	ALIGN
 editor.view.axis_pair	{0}{1} · {2} · Number: per selected axis
+
+editor.pointer_wrap_controls	Ctrl: reach panels
+editor.pointer_wrap_unavailable	Cursor warp is unavailable in this input backend. Numeric input remains available; cursor is free.
+editor.pointer_wrap_failed	Cursor warp was not acknowledged. Transform cancelled; cursor is free.

@@ -135,6 +135,9 @@ namespace OstrixMods.BuildWorks
         private bool keyboardSavedLocalSpace;
         private GizmoAxis dragAxis;
         private Vector2 dragStartMouse;
+        private Vector2 transformPointerOffset, pointerWarpFrom, pointerWarpTo;
+        private bool pointerWarpPending, pointerWrapUnavailable, pointerWrapNotice;
+        private float pointerWarpWait;
         private Vector2 dragScreenDirection;
         private Vector3 dragPivot;
         private Vector3 dragAxisWorld;
@@ -395,6 +398,12 @@ namespace OstrixMods.BuildWorks
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
                 ApplyCamera();
+                return;
+            }
+            if (pointerWarpPending && !FinishPointerWarp(viewport))
+            {
+                ApplyCamera();
+                UpdateGizmo();
                 return;
             }
             if (view.HasModal || view.HasCatalog || view.HasOutlinerMenu || view.HasViewportSettings ||
@@ -1101,7 +1110,8 @@ namespace OstrixMods.BuildWorks
                         dragAxis + " · " + BuildWorksLocalization.Text(TransformFrameKey),
                     keyboardNumber.Length > 0 ? BuildWorksLocalization.Text("editor.hint.numeric_value", keyboardNumber,
                         keyboardValid ? "" : BuildWorksLocalization.Text("editor.hint.numeric_invalid")) :
-                    keyboardValid ? "" : BuildWorksLocalization.Text("editor.view.no_surface"))
+                    keyboardValid ? !keyboardSurface ? BuildWorksLocalization.Text("editor.pointer_wrap_controls") : ""
+                        : BuildWorksLocalization.Text("editor.view.no_surface"))
                 : !IsGizmoDragging && placementItem == null && !view.HasModal && !view.HasCatalog &&
                     !view.HasToolsMenu && !view.HasViewportSettings &&
                     (activeTool == BlueprintEditorTool.Select || activeTool == BlueprintEditorTool.Transform)
@@ -1179,6 +1189,13 @@ namespace OstrixMods.BuildWorks
                 scene.SetHovered(null, document);
                 view.SetHoveredNode(null);
                 if (keyboardPreview) keyboardPaused = true;
+                return;
+            }
+            if (keyboardPreview && !inside && CanWrapTransformPointer && !keyboardPaused)
+            {
+                PreviewKeyboardTransform(mouse + transformPointerOffset);
+                if (keyboardConfirmRequested && keyboardValid) CommitGizmoDrag();
+                else WrapTransformPointer(viewport, mouse);
                 return;
             }
             if (inside && input.MouseScrollDelta.y != 0f)
@@ -1344,8 +1361,9 @@ namespace OstrixMods.BuildWorks
                 { keyboardPaused = true; return; }
                 if (keyboardPaused)
                 { RebaseKeyboardPreview(mouse); keyboardMoved = keyboardSourceChanged; keyboardPaused = false; return; }
-                PreviewKeyboardTransform(mouse);
+                PreviewKeyboardTransform(mouse + transformPointerOffset);
                 if ((input.GetMouseButtonDown(0) || keyboardConfirmRequested) && keyboardValid) CommitGizmoDrag();
+                else WrapTransformPointer(viewport, mouse);
                 return;
             }
 
@@ -1379,9 +1397,10 @@ namespace OstrixMods.BuildWorks
                 }
             }
             if (IsGizmoDragging && input.GetMouseButton(0))
-                PreviewGizmoDrag(mouse);
+                PreviewGizmoDrag(mouse + transformPointerOffset);
             if (IsGizmoDragging && input.GetMouseButtonUp(0))
                 CommitGizmoDrag();
+            else if (IsGizmoDragging) WrapTransformPointer(viewport, mouse);
             if (selectionPending && input.GetMouseButtonUp(0))
             {
                 selectionPending = false;
@@ -1395,6 +1414,69 @@ namespace OstrixMods.BuildWorks
                 scene.TryPick(mouse, out hovered);
             scene.SetHovered(hovered, document);
             view.SetHoveredNode(hovered);
+        }
+
+        private bool CanWrapTransformPointer => IsGizmoDragging && !pointerWrapUnavailable &&
+            (!keyboardPreview || !keyboardSurface && keyboardNumber.Length == 0) &&
+            dragAnchorPoint < 0 && dragHandle != GizmoHandleKind.Layout &&
+            !cameraDragging && !rightCameraTracking && !input.GetMouseButton(1) && !input.GetMouseButton(2) &&
+            !input.GetKey(KeyCode.LeftControl) && !input.GetKey(KeyCode.RightControl) &&
+            input.HasFocus && Cursor.lockState == CursorLockMode.None;
+
+        private void WrapTransformPointer(Rect viewport, Vector2 mouse)
+        {
+            if (!CanWrapTransformPointer || pointerWarpPending || viewport.width < 48f || viewport.height < 48f ||
+                (mouse + transformPointerOffset - dragStartMouse).sqrMagnitude < 1f) return;
+            Vector2 target = mouse;
+            float width = viewport.width - 24f, height = viewport.height - 24f;
+            if (mouse.x <= viewport.xMin + 4f)
+                target.x = viewport.xMax - 12f - Mathf.Repeat(viewport.xMin + 4f - mouse.x, width);
+            else if (mouse.x >= viewport.xMax - 4f)
+                target.x = viewport.xMin + 12f + Mathf.Repeat(mouse.x - viewport.xMax + 4f, width);
+            if (mouse.y <= viewport.yMin + 4f)
+                target.y = viewport.yMax - 12f - Mathf.Repeat(viewport.yMin + 4f - mouse.y, height);
+            else if (mouse.y >= viewport.yMax - 4f)
+                target.y = viewport.yMin + 12f + Mathf.Repeat(mouse.y - viewport.yMax + 4f, height);
+            if (target == mouse) return;
+            // The top edge may contain viewport buttons; land just beyond them, never on a control.
+            for (int step = 0; step < 8 && view.IsViewportControlHit(target); ++step)
+                target = Vector2.MoveTowards(target, viewport.center, 16f);
+            if (view.IsViewportControlHit(target)) return;
+            if (!input.TryWarpMousePosition(target))
+            {
+                pointerWrapUnavailable = true;
+                view.SetStatus(BuildWorksLocalization.Text("editor.pointer_wrap_unavailable"));
+                return;
+            }
+            pointerWarpFrom = mouse; pointerWarpTo = target;
+            pointerWarpWait = 0f; pointerWarpPending = true;
+            if (!pointerWrapNotice)
+            {
+                pointerWrapNotice = true;
+                view.SetStatus(BuildWorksLocalization.Text("editor.pointer_wrap_controls"));
+            }
+        }
+
+        private bool FinishPointerWarp(Rect viewport)
+        {
+            Vector2 mouse = input.MousePosition;
+            // Allow 8px of hand motion at landing; movement merely toward that edge is not warp evidence.
+            if (viewport.Contains(mouse) && (mouse - pointerWarpTo).sqrMagnitude <= 8f * 8f)
+            {
+                transformPointerOffset += pointerWarpFrom - pointerWarpTo;
+                pointerWarpPending = false;
+                return true;
+            }
+            if (input.GetKeyDown(KeyCode.Escape)) CancelGizmoDrag();
+            else if (keyboardPreview && keyboardValid &&
+                (input.GetKeyDown(KeyCode.Return) || input.GetKeyDown(KeyCode.KeypadEnter)) ||
+                !keyboardPreview && input.GetMouseButtonUp(0)) CommitGizmoDrag();
+            else if ((pointerWarpWait += Mathf.Max(0f, input.UnscaledDeltaTime)) >= .25f)
+            {
+                CancelGizmoDrag();
+                view.SetStatus(BuildWorksLocalization.Text("editor.pointer_wrap_failed"));
+            }
+            return false;
         }
 
         private void BeginKeyboardPreview(GizmoHandleKind handle)
@@ -1503,6 +1585,8 @@ namespace OstrixMods.BuildWorks
 
         private void RebaseKeyboardPreview(Vector2 mouse)
         {
+            transformPointerOffset = Vector2.zero;
+            pointerWarpPending = false;
             keyboardBaseTranslation = dragTranslation;
             keyboardBaseRotation = dragRotation;
             keyboardBaseScale = dragScale;
@@ -2159,6 +2243,9 @@ namespace OstrixMods.BuildWorks
 
         private void ResetGizmoDrag()
         {
+            transformPointerOffset = Vector2.zero;
+            pointerWarpPending = pointerWrapUnavailable = pointerWrapNotice = false;
+            pointerWarpWait = 0f;
             keyboardNumber = "";
             keyboardPreview = keyboardPaused = keyboardConfirmRequested = keyboardMoved = false;
             keyboardSourceChanged = false;

@@ -497,6 +497,7 @@ namespace OstrixMods.BuildWorks
         private readonly TMP_InputField toolsSearch;
         private readonly List<Button> toolsEntries = new List<Button>();
         private int toolsMenuIndex;
+        private Vector2 toolsMenuPoint;
         internal bool HasToolsMenu => toolsMenu && toolsMenu.activeSelf;
         private readonly Button interfaceScaleButton;
         private readonly RectTransform viewportControls;
@@ -1827,7 +1828,7 @@ namespace OstrixMods.BuildWorks
             if (pendingTooltipAnchor && !tooltip.gameObject.activeSelf &&
                 Time.unscaledTime >= tooltipAt)
                 ShowTooltipNow();
-            if (!HasModal) status.SetAsLastSibling();
+            if (!HasModal && !HasToolsMenu) status.SetAsLastSibling();
         }
 
         internal void Bind(
@@ -2106,13 +2107,23 @@ namespace OstrixMods.BuildWorks
             EndTooltip();
             toolsSearch.SetTextWithoutNotify("");
             toolsMenu.SetActive(true);
-            FilterTools();
+            toolsMenu.transform.SetAsLastSibling();
             Camera uiCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(safeRoot, mouse, uiCamera, out Vector2 point);
-            Rect safe = safeRoot.rect;
-            toolsPanel.anchoredPosition = new Vector2(Mathf.Clamp(point.x, safe.xMin, safe.xMax - toolsPanel.rect.width),
-                Mathf.Clamp(point.y, safe.yMin + toolsPanel.rect.height, safe.yMax));
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(safeRoot, mouse, uiCamera, out toolsMenuPoint);
+            FilterTools();
             if (searchFocused) toolsSearch.ActivateInputField();
+        }
+
+        private void FitToolsMenu()
+        {
+            Vector3 minimum = safeRoot.InverseTransformPoint(viewport.TransformPoint(viewport.rect.min));
+            Vector3 maximum = safeRoot.InverseTransformPoint(viewport.TransformPoint(viewport.rect.max));
+            float scale = Mathf.Min(1f, (maximum.x - minimum.x - 8f) / toolsPanel.rect.width,
+                (maximum.y - minimum.y - 8f) / toolsPanel.rect.height);
+            toolsPanel.localScale = Vector3.one * scale;
+            toolsPanel.anchoredPosition = new Vector2(
+                Mathf.Clamp(toolsMenuPoint.x, minimum.x + 4f, maximum.x - toolsPanel.rect.width * scale - 4f),
+                Mathf.Clamp(toolsMenuPoint.y, minimum.y + toolsPanel.rect.height * scale + 4f, maximum.y - 4f));
         }
 
         internal void HideToolsMenu()
@@ -2146,6 +2157,7 @@ namespace OstrixMods.BuildWorks
                 if (match) SetTopLeft((RectTransform)entry.transform, 12f, 82f + row++ * 36f, 286f, 32f);
             }
             toolsPanel.sizeDelta = new Vector2(310f, 88f + row * 36f);
+            FitToolsMenu();
             toolsMenuIndex = 0;
             RefreshToolsHighlight();
         }
@@ -3239,7 +3251,10 @@ namespace OstrixMods.BuildWorks
             if (outlinerFilterMenu)
             {
                 float availableHeight = safeRoot.rect.height + outliner.anchoredPosition.y - 8f;
-                bottom = Mathf.Min(4f, outliner.rect.height - availableHeight);
+                LayoutRebuilder.ForceRebuildLayoutImmediate(outlinerMenuRows);
+                float top = (float)BlueprintEditorLayout.OutlinerHeaderHeight - 4f;
+                float contentHeight = LayoutUtility.GetPreferredHeight(outlinerMenuRows) + 12f;
+                bottom = outliner.rect.height - top - Mathf.Min(availableHeight - top, contentHeight);
             }
             SetInsets((RectTransform)outlinerMenu.transform, 4f,
                 (float)BlueprintEditorLayout.OutlinerHeaderHeight - 4f, 4f, bottom);
@@ -3248,12 +3263,12 @@ namespace OstrixMods.BuildWorks
         private void RebuildOutlinerMenu()
         {
             ClearChildren(outlinerMenuRows);
+            outlinerMenuRows.GetComponent<VerticalLayoutGroup>().spacing = outlinerFilterMenu ? 2f : 4f;
             if (outlinerFilterMenu)
             {
                 TMP_Text help = CreateText("FilterHelp", outlinerMenuRows, T("editor.outliner.help"), 11f,
                     FontStyles.Normal, TextAlignmentOptions.TopLeft);
                 help.textWrappingMode = TextWrappingModes.Normal;
-                help.gameObject.AddComponent<LayoutElement>().preferredHeight = 76f;
                 CreateButton("OutlinerFilterReset", outlinerMenuRows, T("editor.outliner.reset"), 238f, ResetOutlinerFilter);
                 for (int index = 0; index < OutlinerFilterKeys.Length; ++index)
                 {
@@ -3272,6 +3287,14 @@ namespace OstrixMods.BuildWorks
                             EventSystem.current?.SetSelectedGameObject(outlinerSearch.gameObject);
                             outlinerSearch.ActivateInputField();
                         });
+                }
+                foreach (Button button in outlinerMenuRows.GetComponentsInChildren<Button>())
+                {
+                    LayoutElement layout = button.GetComponent<LayoutElement>();
+                    layout.minHeight = layout.preferredHeight = 28f;
+                    TMP_Text label = button.GetComponentInChildren<TMP_Text>();
+                    label.fontSize = label.fontSizeMax = 12f;
+                    label.alignment = TextAlignmentOptions.MidlineLeft;
                 }
                 return;
             }
@@ -4302,6 +4325,7 @@ namespace OstrixMods.BuildWorks
             }
             else { rail.gameObject.SetActive(true); rightColumn.gameObject.SetActive(true); }
             LayoutOutlinerMenu();
+            if (HasToolsMenu) FitToolsMenu();
             double visibleRailHeight = Math.Floor(layout.Rail.Height / 48.0) * 48.0;
             SetTopAnchored(railViewport, 0f, 0f, 0f, (float)visibleRailHeight);
         }

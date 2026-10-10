@@ -553,7 +553,7 @@ public static class RuntimeEditorAcceptance
                             Require(controller.AddPart("qa_absent", "Отсутствующая деталь"), "Missing layout fixture was not added");
                             Call(controller, "Bind", (object)null);
                             yield return null;
-                            if (state == "replace-tools") view.ShowToolsMenu(new Vector2(width * .5f, height * .5f), false);
+                            if (state == "replace-tools") view.ShowToolsMenu(new Vector2(width * .5f, height * .15f), false);
                             else if (state == "replace-help-ru")
                                 ControllerInputAcceptance.NativeClick(view, uiCamera, "InspectorReplaceMissing");
                         }
@@ -568,6 +568,7 @@ public static class RuntimeEditorAcceptance
                         // Product Destroy() and TMP rebuilds must see a real frame.
                         yield return null;
                         Call(controller, "RefreshContextHints");
+                        if (state == "replace-tools") view.Tick();
                         Canvas.ForceUpdateCanvases();
                         ValidateControls(view, state);
                         if (state == "supports")
@@ -600,6 +601,7 @@ public static class RuntimeEditorAcceptance
                         uiCamera.targetTexture = null;
                         scene.Camera.targetTexture = null;
                         view.RootCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                        if (state == "replace-tools") ControllerInputAcceptance.NativeClick(view, uiCamera, "ToolsEntry0");
                         if (state.StartsWith("exchange")) ControllerInputAcceptance.NativeClick(view, uiCamera, "ExchangeClose");
                         if (state == "scale-xyz-ru") Field<Button>(view, "inspectorProportionsButton").onClick.Invoke();
                         if (state == "replace-tools" || state == "replace-entry-ru" || state == "replace-help-ru")
@@ -794,6 +796,16 @@ public static class RuntimeEditorAcceptance
             var menu = (RectTransform)Field<GameObject>(view, "outlinerMenu").transform;
             EnsureInside(Field<RectTransform>(view, "safeRoot"), menu);
             Require(menu.rect.height >= 200, "Filter choices remain trapped in the short tree viewport");
+            var rows = Field<RectTransform>(view, "outlinerMenuRows");
+            foreach (Button choice in rows.GetComponentsInChildren<Button>())
+            {
+                Require(((RectTransform)choice.transform).rect.height <= 28.1f,
+                    "Filter choice still uses an oversized row");
+                Require(choice.GetComponentInChildren<TMP_Text>().fontSize <= 12.1f,
+                    "Filter choice font remains oversized");
+            }
+            Require(menu.rect.height <= LayoutUtility.GetPreferredHeight(rows) + 12.1f,
+                "Filter menu reserves empty space below its content");
         }
         if (state == "catalog-blueprints") Require(Field<RectTransform>(view, "catalogGrid").childCount == 2,
             "Blueprint mode should show both stored category examples");
@@ -820,7 +832,12 @@ public static class RuntimeEditorAcceptance
             Require(scroll.verticalNormalizedPosition <= .001f, "Material paging did not reach last items");
             EnsureInside(scroll.viewport, (RectTransform)scroll.content.Find("CatalogOption_Материал 35"));
         }
-        if (state == "replace-tools") EnsureInside(Field<RectTransform>(view, "safeRoot"), Field<RectTransform>(view, "toolsPanel"));
+        if (state == "replace-tools")
+        {
+            EnsureInside(Field<RectTransform>(view, "viewport"), Field<RectTransform>(view, "toolsPanel"));
+            Require(Field<GameObject>(view, "toolsMenu").transform.GetSiblingIndex() >
+                Field<RectTransform>(view, "status").GetSiblingIndex(), "Tools menu is behind the context hints after Tick");
+        }
         if (state.StartsWith("replace-confirm", StringComparison.Ordinal))
         {
             TMP_Text message = Field<TMP_Text>(view, "modalMessage");

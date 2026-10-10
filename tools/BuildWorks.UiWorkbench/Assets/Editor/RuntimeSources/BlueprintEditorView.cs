@@ -1,6 +1,10 @@
+#if BUILDWORKS_TEST_STAND
+using Input = OstrixMods.BuildWorks.BuildWorksQaInput;
+#endif
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using OstrixMods.BuildWorks.Geometry;
 using TMPro;
 using UnityEngine;
@@ -60,7 +64,7 @@ namespace OstrixMods.BuildWorks
             string requiredStation = null, Sprite requiredStationIcon = null,
             IReadOnlyList<string> materials = null, int materialOrder = 0,
             string unavailableReason = null, BlueprintForeignPartData itemContents = null,
-            string warningReason = null, bool resourcesKnown = true)
+            string warningReason = null, bool resourcesKnown = true, bool hidden = false)
         {
             PrefabName = prefabName;
             DisplayName = displayName;
@@ -91,6 +95,7 @@ namespace OstrixMods.BuildWorks
             UnavailableReason = unavailableReason;
             WarningReason = warningReason;
             ResourcesKnown = resourcesKnown;
+            Hidden = hidden;
             ItemContents = itemContents;
         }
 
@@ -112,6 +117,7 @@ namespace OstrixMods.BuildWorks
         internal string UnavailableReason { get; }
         internal string WarningReason { get; }
         internal bool ResourcesKnown { get; }
+        internal bool Hidden { get; }
         internal string Section { get; }
         internal string Family { get; }
         internal string StationId { get; }
@@ -351,6 +357,9 @@ namespace OstrixMods.BuildWorks
         private readonly RectTransform inspector;
         private readonly TMP_Text inspectorTitle;
         private readonly RectTransform inspectorTabs;
+        private readonly RectTransform inspectorViewport;
+        private readonly Button replaceMissingButton;
+        private readonly Button positionMissingButton;
         private readonly RectTransform status;
         private readonly RectTransform outlinerRows;
         private readonly List<Action> outlinerRowBuilders = new List<Action>();
@@ -448,6 +457,7 @@ namespace OstrixMods.BuildWorks
         private TMP_InputField saveMetadataName, saveMetadataCategory;
         private Action<string, string> saveMetadataAccepted;
         private Action confirmationAccepted;
+        private Action confirmationClosed;
         internal bool ItemStandEditable { get; set; }
         internal bool ItemStandHasContents { get; set; }
         private BlueprintExchangeView exchangeView;
@@ -455,6 +465,9 @@ namespace OstrixMods.BuildWorks
         private bool inspectorScaleIsAbsolute;
         private readonly string[] inspectorOriginalScaleText = new string[3];
         private TMP_InputField fieldOfViewInput;
+        private TMP_InputField interiorSpeedInput;
+        private Button interiorCameraButton;
+        private TMP_Text interiorCameraHint, interiorSpeedLabel, interiorHelp, cameraReticle;
         private Slider fieldOfViewSlider;
         private Button fieldOfViewReset;
         private float statusMessageUntil;
@@ -488,6 +501,7 @@ namespace OstrixMods.BuildWorks
         private readonly TMP_InputField toolsSearch;
         private readonly List<Button> toolsEntries = new List<Button>();
         private int toolsMenuIndex;
+        private Vector2 toolsMenuPoint;
         internal bool HasToolsMenu => toolsMenu && toolsMenu.activeSelf;
         private readonly Button interfaceScaleButton;
         private readonly RectTransform viewportControls;
@@ -549,7 +563,18 @@ namespace OstrixMods.BuildWorks
         private string statusMessage = string.Empty;
         private bool showGrid = true;
         private bool orthographic;
-        private int outlinerFilter;
+        private int outlinerFilter, outlinerSearchScope;
+        private bool outlinerFilterMenu;
+        private static readonly string[] OutlinerFilterKeys = {
+            "editor.outliner.filter0", "editor.outliner.filter1", "editor.outliner.filter2",
+            "editor.outliner.filter3", "editor.outliner.filter4", "editor.outliner.filter5",
+            "editor.outliner.filter6", "editor.outliner.filter7", "editor.outliner.filter8" };
+        private static readonly string[] OutlinerScopeKeys = {
+            "editor.outliner.scope0", "editor.outliner.scope1", "editor.outliner.scope2",
+            "editor.outliner.scope3", "editor.outliner.scope4" };
+        private static readonly string[] OutlinerQueryKeys = {
+            "editor.outliner.query0", "editor.outliner.query1", "editor.outliner.query2",
+            "editor.outliner.query3", "editor.outliner.query4" };
         private bool outlinerReparentOnly;
         private bool outlinerContextTracking;
         private float requestedUiScale = 1f;
@@ -715,13 +740,12 @@ namespace OstrixMods.BuildWorks
                 outlinerSearch.textComponent = search;
                 outlinerSearch.placeholder = searchPlaceholder;
                 outlinerSearch.lineType = TMP_InputField.LineType.SingleLine;
-                outlinerSearch.characterLimit = 48;
-                outlinerSearch.onValueChanged.AddListener(_ =>
-                {
-                    if (boundDocument != null) RebuildOutliner(boundDocument);
-                });
+                outlinerSearch.characterLimit = 128;
+                searchPlaceholder.text = T("editor.outliner.query0");
+                outlinerSearch.onValueChanged.AddListener(_ => RefreshOutlinerFilter());
                 outlinerFilterButton = CreateButton(
-                    "OutlinerFilter", outliner, T("editor.view.all"), 76f, CycleOutlinerFilter);
+                    "OutlinerFilter", outliner, T("editor.outliner.filters"), 76f, () =>
+                    { if (outlinerMenu.activeSelf && outlinerFilterMenu) HideOutlinerMenu(); else ShowOutlinerMenu(false, true); });
                 SetTopRight((RectTransform)outlinerFilterButton.transform, 8f, 76f, 76f, 32f);
                 RectTransform rowViewport = CreateRect("RowsViewport", outliner);
                 outlinerRowViewport = rowViewport;
@@ -845,7 +869,19 @@ namespace OstrixMods.BuildWorks
                         ((RectTransform)button.transform).sizeDelta.x, 28f);
                     button.GetComponentInChildren<TMP_Text>().fontSize = 11f;
                 }
-                RectTransform inspectorViewport = CreateRect("InspectorViewport", inspector);
+                replaceMissingButton = CreateButton("InspectorReplaceMissing", inspector,
+                    T("editor.replace_short"), 110f, () => MissingReplacementRequested?.Invoke());
+                SetTopAnchored((RectTransform)replaceMissingButton.transform, 12f, 38f, 6f, 28f);
+                ((RectTransform)replaceMissingButton.transform).anchorMax = new Vector2(.5f, 1f);
+                AddTooltip((RectTransform)replaceMissingButton.transform, T("editor.replace_hint"));
+                replaceMissingButton.gameObject.SetActive(false);
+                positionMissingButton = CreateButton("InspectorPositionMissing", inspector,
+                    T("editor.position_short"), 110f, () => MissingPositioningRequested?.Invoke());
+                SetTopAnchored((RectTransform)positionMissingButton.transform, 6f, 38f, 12f, 28f);
+                ((RectTransform)positionMissingButton.transform).anchorMin = new Vector2(.5f, 1f);
+                AddTooltip((RectTransform)positionMissingButton.transform, T("editor.position_hint"));
+                positionMissingButton.gameObject.SetActive(false);
+                inspectorViewport = CreateRect("InspectorViewport", inspector);
                 SetInsets(inspectorViewport, 12f, 42f, 12f, 8f);
                 inspectorViewport.gameObject.AddComponent<RectMask2D>();
                 RectTransform inspectorBody = CreateRect("InspectorBody", inspectorViewport);
@@ -1352,6 +1388,36 @@ namespace OstrixMods.BuildWorks
                 SetButtonLabel(projectionButton, T("editor.view.projection_tooltip"));
                 Transform projectionIcon = projectionButton.transform.Find("Icon");
                 if (projectionIcon) projectionIcon.gameObject.SetActive(false);
+                interiorCameraButton = CreateButton("InteriorCamera", viewportSections[0].transform,
+                    T("editor.camera.enter"), 294f, () => InteriorCameraRequested?.Invoke());
+                SetTopLeft((RectTransform)interiorCameraButton.transform, 12f, 172f, 294f, 32f);
+                interiorSpeedLabel = CreateText("InteriorSpeedLabel", viewportSections[0].transform,
+                    T("editor.camera.speed"), 13f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+                SetTopLeft(interiorSpeedLabel.rectTransform, 12f, 212f, 190f, 32f);
+                interiorSpeedInput = CreateInput("InteriorSpeed", viewportSections[0].transform,
+                    new Vector2(212f, -212f), 94f, .1f, .1f, 30f, resetValue: 3f);
+                ((RectTransform)interiorSpeedInput.transform).sizeDelta = new Vector2(94f, 32f);
+                interiorSpeedInput.SetTextWithoutNotify("3");
+                interiorSpeedInput.onEndEdit.AddListener(_ =>
+                { if (TryRead(interiorSpeedInput, out float speed)) InteriorSpeedChanged?.Invoke(speed); });
+                interiorHelp = CreateText("InteriorHelp", viewportSections[0].transform,
+                    T("editor.camera.help"), 12f, FontStyles.Normal, TextAlignmentOptions.TopLeft);
+                SetTopLeft(interiorHelp.rectTransform, 12f, 252f, 294f, 76f);
+                interiorHelp.textWrappingMode = TextWrappingModes.Normal;
+                interiorCameraHint = CreateText("InteriorCameraHint", viewport, T("editor.camera.active"),
+                    12f, FontStyles.Normal, TextAlignmentOptions.BottomLeft);
+                interiorCameraHint.rectTransform.anchorMin = Vector2.up;
+                interiorCameraHint.rectTransform.anchorMax = Vector2.one;
+                interiorCameraHint.rectTransform.offsetMin = new Vector2(12f, -92f);
+                interiorCameraHint.rectTransform.offsetMax = new Vector2(-344f, -52f);
+                interiorCameraHint.textWrappingMode = TextWrappingModes.Normal;
+                interiorCameraHint.gameObject.SetActive(false);
+                cameraReticle = CreateText("CameraReticle", viewport, "+", 18f, FontStyles.Normal,
+                    TextAlignmentOptions.Center);
+                cameraReticle.rectTransform.anchorMin = cameraReticle.rectTransform.anchorMax = new Vector2(.5f, .5f);
+                cameraReticle.rectTransform.anchoredPosition = Vector2.zero;
+                cameraReticle.rectTransform.sizeDelta = new Vector2(24f, 24f);
+                cameraReticle.gameObject.SetActive(false);
                 RepositionViewControl(occluderFadeButton.transform, 1, 12f, 4f, 294f, 32f);
                 RepositionViewControl(gridButton.transform, 1, 12f, 44f, 294f, 32f);
                 SetButtonLabel(gridButton, T("editor.view.grid_tooltip"));
@@ -1492,6 +1558,10 @@ namespace OstrixMods.BuildWorks
                     T("editor.replace_title"), 286f, () => { HideToolsMenu(); MissingReplacementRequested?.Invoke(); });
                 AddTooltip((RectTransform)replaceMissing.transform, T("editor.replace_hint"));
                 toolsEntries.Add(replaceMissing);
+                Button positionMissing = CreateButton("ToolsPositionMissing", toolsPanel,
+                    T("editor.position_title"), 286f, () => { HideToolsMenu(); MissingPositioningRequested?.Invoke(); });
+                AddTooltip((RectTransform)positionMissing.transform, T("editor.position_hint"));
+                toolsEntries.Add(positionMissing);
 
                 InitializeCatalog();
 
@@ -1558,6 +1628,7 @@ namespace OstrixMods.BuildWorks
         internal event Action DuplicateSelectionRequested;
         internal event Action DeleteSelectionRequested;
         internal event Action MissingReplacementRequested;
+        internal event Action MissingPositioningRequested;
         internal bool MissingReplacementAvailable { get; set; }
         internal event Action SupportCreated;
         internal event Action<bool> ItemContentsRequested;
@@ -1609,6 +1680,20 @@ namespace OstrixMods.BuildWorks
         internal event Action<int> CursorSourceHovered;
         internal event Action<bool> ProjectionChanged;
         internal event Action<float> FieldOfViewChanged;
+        internal event Action InteriorCameraRequested;
+        internal event Action<float> InteriorSpeedChanged;
+        internal void SetInteriorCamera(bool active, float speed)
+        {
+            SetButtonLabel(interiorCameraButton, T(active ? "editor.camera.exit" : "editor.camera.enter"));
+            SetSelected(interiorCameraButton, active);
+            interiorSpeedLabel.text = T("editor.camera.speed");
+            interiorHelp.text = T("editor.camera.help");
+            interiorCameraHint.text = T("editor.camera.active");
+            interiorSpeedInput.SetTextWithoutNotify(speed.ToString("0.##", CultureInfo.InvariantCulture));
+            interiorCameraHint.gameObject.SetActive(active);
+            projectionButton.interactable = !active;
+        }
+        internal void SetCameraFlight(bool flying) => cameraReticle.gameObject.SetActive(flying);
         internal event Action FieldOfViewResetRequested;
 
         internal void SetFieldOfView(float degrees, bool orthographicView)
@@ -1759,7 +1844,7 @@ namespace OstrixMods.BuildWorks
             if (pendingTooltipAnchor && !tooltip.gameObject.activeSelf &&
                 Time.unscaledTime >= tooltipAt)
                 ShowTooltipNow();
-            if (!HasModal) status.SetAsLastSibling();
+            if (!HasModal && !HasToolsMenu) status.SetAsLastSibling();
         }
 
         internal void Bind(
@@ -2038,13 +2123,23 @@ namespace OstrixMods.BuildWorks
             EndTooltip();
             toolsSearch.SetTextWithoutNotify("");
             toolsMenu.SetActive(true);
-            FilterTools();
+            toolsMenu.transform.SetAsLastSibling();
             Camera uiCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(safeRoot, mouse, uiCamera, out Vector2 point);
-            Rect safe = safeRoot.rect;
-            toolsPanel.anchoredPosition = new Vector2(Mathf.Clamp(point.x, safe.xMin, safe.xMax - toolsPanel.rect.width),
-                Mathf.Clamp(point.y, safe.yMin + toolsPanel.rect.height, safe.yMax));
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(safeRoot, mouse, uiCamera, out toolsMenuPoint);
+            FilterTools();
             if (searchFocused) toolsSearch.ActivateInputField();
+        }
+
+        private void FitToolsMenu()
+        {
+            Vector3 minimum = safeRoot.InverseTransformPoint(viewport.TransformPoint(viewport.rect.min));
+            Vector3 maximum = safeRoot.InverseTransformPoint(viewport.TransformPoint(viewport.rect.max));
+            float scale = Mathf.Min(1f, (maximum.x - minimum.x - 8f) / toolsPanel.rect.width,
+                (maximum.y - minimum.y - 8f) / toolsPanel.rect.height);
+            toolsPanel.localScale = Vector3.one * scale;
+            toolsPanel.anchoredPosition = new Vector2(
+                Mathf.Clamp(toolsMenuPoint.x, minimum.x + 4f, maximum.x - toolsPanel.rect.width * scale - 4f),
+                Mathf.Clamp(toolsMenuPoint.y, minimum.y + toolsPanel.rect.height * scale + 4f, maximum.y - 4f));
         }
 
         internal void HideToolsMenu()
@@ -2072,12 +2167,13 @@ namespace OstrixMods.BuildWorks
                     "ToolsEntry6" => SupportCentreId != null,
                     "ToolsItem0" => ItemStandEditable,
                     "ToolsItem1" => ItemStandEditable && ItemStandHasContents,
-                    "ToolsReplaceMissing" => MissingReplacementAvailable,
+                    "ToolsReplaceMissing" => missingPrefabNodes.Count > 0,
                     _ => boundDocument?.EditablePartSelectionCount > 0
                 };
                 if (match) SetTopLeft((RectTransform)entry.transform, 12f, 82f + row++ * 36f, 286f, 32f);
             }
             toolsPanel.sizeDelta = new Vector2(310f, 88f + row * 36f);
+            FitToolsMenu();
             toolsMenuIndex = 0;
             RefreshToolsHighlight();
         }
@@ -2190,19 +2286,27 @@ namespace OstrixMods.BuildWorks
             ShowDialog();
         }
 
-        internal void ShowConfirmation(string title, string message, Action accepted, float height = 260f)
+        internal void ShowConfirmation(string title, string message, Action accepted, float height = 260f,
+            string acceptLabel = null, Action closed = null, bool scenePreview = false)
         {
             ResetSaveMetadata();
             ((RectTransform)modalTitle.transform.parent).sizeDelta = new Vector2(520f, height);
             errorDialog = false;
             confirmationAccepted = accepted;
+            confirmationClosed = closed;
             modalTitle.text = title;
             modalMessage.text = message;
-            SetButtonLabel(dialogPrimaryButton, T("editor.view.apply"));
+            SetButtonLabel(dialogPrimaryButton, acceptLabel ?? T("editor.view.apply"));
             SetButtonLabel(dialogCancelButton, T("editor.view.cancel"));
             dialogPrimaryButton.gameObject.SetActive(true);
             dialogDiscardButton.gameObject.SetActive(false);
             ShowDialog();
+            if (scenePreview)
+            {
+                modal.GetComponent<Image>().color = Color.clear;
+                RectTransform dialog = (RectTransform)modalTitle.transform.parent;
+                dialog.anchoredPosition = new Vector2((safeRoot.rect.width - dialog.sizeDelta.x * dialog.localScale.x) * .5f - 12f, 0);
+            }
         }
 
         internal void ShowError(string titleText, string message, bool canRetry = true)
@@ -2231,10 +2335,15 @@ namespace OstrixMods.BuildWorks
 
         private void ResetSaveMetadata()
         {
+            Action closed = confirmationClosed;
+            confirmationClosed = null;
+            closed?.Invoke();
             saveMetadataAccepted = null;
             confirmationAccepted = null;
             if (saveMetadataFields) saveMetadataFields.gameObject.SetActive(false);
             ((RectTransform)modalTitle.transform.parent).sizeDelta = new Vector2(520, 260);
+            ((RectTransform)modalTitle.transform.parent).anchoredPosition = Vector2.zero;
+            modal.GetComponent<Image>().color = new Color(0f, 0f, 0f, .72f);
             SetInsets(modalMessage.rectTransform, 20, 64, 20, 90);
         }
 
@@ -2366,12 +2475,12 @@ namespace OstrixMods.BuildWorks
                 SetSelected(familyButtons[index], (int)family == index + 1);
         }
 
-        internal void SetPreviewAxes(bool available, GizmoAxis active)
+        internal void SetPreviewAxes(bool available, GizmoAxis active, GizmoAxis second = GizmoAxis.None)
         {
             for (int index = 0; index < previewAxisButtons.Length; ++index)
             {
                 previewAxisButtons[index].gameObject.SetActive(available);
-                SetSelected(previewAxisButtons[index], (int)active == index + 1);
+                SetSelected(previewAxisButtons[index], (int)active == index + 1 || (int)second == index + 1);
             }
         }
 
@@ -2389,7 +2498,7 @@ namespace OstrixMods.BuildWorks
                 SetSelected(viewportSectionButtons[index], open && index == section);
             }
             SetTopRight((RectTransform)viewportSettings.transform, 8f, 48f, 320f,
-                section == 0 ? 216f : section == 1 ? 176f : section == 3 ? 416f : 480f);
+                section == 0 ? 380f : section == 1 ? 176f : section == 3 ? 416f : 480f);
             FitViewportSettings();
             EndTooltip();
         }
@@ -2436,6 +2545,7 @@ namespace OstrixMods.BuildWorks
         {
             if (disposed) return;
             disposed = true;
+            confirmationClosed = null;
             exchangeView?.Dispose(); exchangeView = null;
             EndOutlinerDrag();
             boundDocument = null;
@@ -2631,33 +2741,70 @@ namespace OstrixMods.BuildWorks
         private void CollectOutlinerRows(BlueprintEditorDocument document)
         {
             string filter = (outlinerSearch.text ?? string.Empty).Trim();
+            var groupsById = document.Groups.ToDictionary(group => group.StableId);
+            var groupChildren = document.Groups.ToLookup(group => group.ParentGroupId);
+            var partChildren = document.Parts.ToLookup(part => part.ParentGroupId);
+            var keptGroups = new HashSet<string>(StringComparer.Ordinal);
+            var keptParts = new HashSet<string>(StringComparer.Ordinal);
             foreach (BlueprintEditorGroup group in document.Groups)
             {
-                if (group.ParentGroupId == null && BranchMatches(document, group, filter))
-                    AddOutlinerGroup(document, group, filter, 0);
+                bool queryMatches = outlinerSearchScope < 3 &&
+                    (outlinerSearchScope != 2 && Matches(group.Name, filter) ||
+                     outlinerSearchScope != 1 && Matches(group.StableId, filter));
+                if ((string.IsNullOrEmpty(filter) || queryMatches) && PassesOutlinerFilter(
+                    Contains(document.Selection, group.StableId), document.IsEffectivelyVisible(group.StableId),
+                    document.IsEffectivelyLocked(group.StableId), false)) keptGroups.Add(group.StableId);
             }
             foreach (BlueprintEditorPart part in document.Parts)
             {
-                if (part.ParentGroupId != null) continue;
-                if (!Matches(part.DisplayName, filter) &&
-                    !Matches(part.PrefabName, filter)) continue;
+                if (!MatchesOutlinerPart(part, filter)) continue;
                 if (!PassesOutlinerFilter(
                     document.IsPartSelected(part.StableId),
                     document.IsEffectivelyVisible(part.StableId),
                     document.IsEffectivelyLocked(part.StableId),
-                    missingPrefabNodes.Contains(part.StableId))) continue;
+                    missingPrefabNodes.Contains(part.StableId), part)) continue;
+                keptParts.Add(part.StableId);
+                if (part.ParentGroupId != null) keptGroups.Add(part.ParentGroupId);
+            }
+            foreach (string id in keptGroups.ToArray())
+            {
+                string parent = groupsById[id].ParentGroupId;
+                while (parent != null && keptGroups.Add(parent)) parent = groupsById[parent].ParentGroupId;
+            }
+            foreach (BlueprintEditorGroup group in groupChildren[null]) AddGroup(group, 0);
+            foreach (BlueprintEditorPart part in partChildren[null])
+            {
+                if (!keptParts.Contains(part.StableId)) continue;
                 AddOutlinerRow(document, part.StableId, part.DisplayName,
                     part.Visible, part.Locked, true, false, 0, part.ForeignData);
             }
-            if (document.Supports.Count == 0) return;
-            AddSupportRow("Supports", (supportsCollapsed ? "+ " : "- ") +
+            void AddGroup(BlueprintEditorGroup group, int depth)
+            {
+                if (!keptGroups.Contains(group.StableId)) return;
+                bool collapsed = collapsedGroups.Contains(group.StableId) && !OutlinerIsFiltered;
+                AddOutlinerRow(document, group.StableId, group.Name, group.Visible, group.Locked, false, collapsed, depth);
+                if (collapsed) return;
+                foreach (BlueprintEditorGroup child in groupChildren[group.StableId]) AddGroup(child, depth + 1);
+                foreach (BlueprintEditorPart part in partChildren[group.StableId])
+                    if (keptParts.Contains(part.StableId)) AddOutlinerRow(document, part.StableId, part.DisplayName,
+                        part.Visible, part.Locked, true, false, depth + 1, part.ForeignData);
+            }
+            var supports = document.Supports.Where(support =>
+                (string.IsNullOrEmpty(filter) || outlinerSearchScope < 3 &&
+                 (outlinerSearchScope != 2 && Matches(support.Name, filter) ||
+                  outlinerSearchScope != 1 && Matches(support.StableId, filter))) &&
+                PassesOutlinerFilter(document.ActiveSupportId == support.StableId, true, false, false)).ToArray();
+            if (outlinerRowBuilders.Count == 0 && supports.Length == 0 && OutlinerIsFiltered)
+                AddSupportRow("NoMatches", T("editor.outliner.no_results"), ResetOutlinerFilter);
+            if (supports.Length == 0) return;
+            bool supportClosed = supportsCollapsed && !OutlinerIsFiltered;
+            AddSupportRow("Supports", (supportClosed ? "+ " : "- ") +
                 T("editor.support.branch", document.Supports.Count), () =>
-                { supportsCollapsed = !supportsCollapsed; RebuildOutliner(document); });
-            if (supportsCollapsed) return;
-            foreach (BlueprintEditorSupport support in document.Supports)
+                { if (!OutlinerIsFiltered) { supportsCollapsed = !supportsCollapsed; RebuildOutliner(document); } });
+            if (supportClosed) return;
+            foreach (BlueprintEditorSupport support in supports)
             {
                 bool active = document.ActiveSupportId == support.StableId;
-                if (!Matches(support.Name, filter) || !PassesOutlinerFilter(active, true, false, false)) continue;
                 string id = support.StableId;
                 string label = support.Name + (document.PlacementSupportId == id
                     ? " · " + T("editor.support.placement_role") : string.Empty);
@@ -2685,59 +2832,6 @@ namespace OstrixMods.BuildWorks
             SetInsets(text.rectTransform, 12f, 0f, 8f, 0f);
             AddTooltip(row, label);
             return button;
-        }
-
-        private bool BranchMatches(
-            BlueprintEditorDocument document,
-            BlueprintEditorGroup group,
-            string filter)
-        {
-            if (Matches(group.Name, filter) && PassesOutlinerFilter(
-                Contains(document.Selection, group.StableId),
-                document.IsEffectivelyVisible(group.StableId),
-                document.IsEffectivelyLocked(group.StableId), missing: false)) return true;
-            foreach (BlueprintEditorGroup child in document.Groups)
-                if (child.ParentGroupId == group.StableId &&
-                    BranchMatches(document, child, filter)) return true;
-            foreach (BlueprintEditorPart part in document.Parts)
-                if (part.ParentGroupId == group.StableId &&
-                    (Matches(part.DisplayName, filter) || Matches(part.PrefabName, filter)) &&
-                    PassesOutlinerFilter(
-                        document.IsPartSelected(part.StableId),
-                        document.IsEffectivelyVisible(part.StableId),
-                        document.IsEffectivelyLocked(part.StableId),
-                        missingPrefabNodes.Contains(part.StableId))) return true;
-            return false;
-        }
-
-        private void AddOutlinerGroup(
-            BlueprintEditorDocument document,
-            BlueprintEditorGroup group,
-            string filter,
-            int depth)
-        {
-            bool collapsed = collapsedGroups.Contains(group.StableId) &&
-                string.IsNullOrEmpty(filter);
-            AddOutlinerRow(document, group.StableId, group.Name,
-                group.Visible, group.Locked, false, collapsed, depth);
-            if (collapsed) return;
-            foreach (BlueprintEditorGroup child in document.Groups)
-                if (child.ParentGroupId == group.StableId &&
-                    BranchMatches(document, child, filter))
-                    AddOutlinerGroup(document, child, filter, depth + 1);
-            foreach (BlueprintEditorPart part in document.Parts)
-            {
-                if (part.ParentGroupId != group.StableId ||
-                    !Matches(part.DisplayName, filter) &&
-                    !Matches(part.PrefabName, filter) ||
-                    !PassesOutlinerFilter(
-                        document.IsPartSelected(part.StableId),
-                        document.IsEffectivelyVisible(part.StableId),
-                        document.IsEffectivelyLocked(part.StableId),
-                        missingPrefabNodes.Contains(part.StableId))) continue;
-                AddOutlinerRow(document, part.StableId, part.DisplayName,
-                    part.Visible, part.Locked, true, false, depth + 1, part.ForeignData);
-            }
         }
 
         private void AddOutlinerRow(
@@ -2823,6 +2917,7 @@ namespace OstrixMods.BuildWorks
                 disclosureRect.anchoredPosition = new Vector2(depth * 15f, 0f);
                 disclosureRect.sizeDelta = new Vector2(20f, 28f);
                 StyleTreeControl(disclosure);
+                disclosure.interactable = !OutlinerIsFiltered;
             }
             Button eye = CreateIconButton(
                 "Eye", row, visible ? "visibility" : "hidden", visible ? "●" : "○", 28f,
@@ -2848,6 +2943,13 @@ namespace OstrixMods.BuildWorks
             if (lockIcon) lockIcon.color = locked ? AccentColor : MutedColor;
             if (!part) name.color = AccentColor;
             if (!visible) name.color = MutedColor;
+            if (part)
+            {
+                BlueprintEditorPart record = FindPart(document, stableId);
+                AddTooltip(row, T("editor.outliner.details", record.PrefabName, stableId,
+                    record.Metadata?.SourceId ?? T("editor.outliner.unknown"),
+                    record.Metadata?.Kind ?? T("editor.outliner.unknown")));
+            }
         }
 
         private void AddOutlinerContentsRow(string stableId, BlueprintForeignPartData contents, int depth)
@@ -2881,7 +2983,8 @@ namespace OstrixMods.BuildWorks
             bool selected,
             bool visible,
             bool locked,
-            bool missing)
+            bool missing,
+            BlueprintEditorPart part = null)
         {
             switch (outlinerFilter)
             {
@@ -2889,27 +2992,58 @@ namespace OstrixMods.BuildWorks
                 case 2: return !visible;
                 case 3: return locked;
                 case 4: return missing;
+                case 5: return part != null && part.Metadata?.SourceId == null;
+                case 6: return part != null && part.Metadata == null;
+                case 7: return !string.IsNullOrEmpty(part?.SignText);
+                case 8: return part != null && !part.ScaleIsAbsolute &&
+                    (part.Scale.X != 1 || part.Scale.Y != 1 || part.Scale.Z != 1);
                 default: return true;
             }
         }
 
         private void ToggleGroupCollapsed(string stableId)
         {
+            if (OutlinerIsFiltered) return;
             if (!collapsedGroups.Add(stableId)) collapsedGroups.Remove(stableId);
             if (boundDocument != null) RebuildOutliner(boundDocument);
         }
 
-        private void CycleOutlinerFilter()
+        private bool OutlinerIsFiltered => outlinerFilter != 0 || !string.IsNullOrWhiteSpace(outlinerSearch.text);
+
+        private bool MatchesOutlinerPart(BlueprintEditorPart part, string query)
         {
-            outlinerFilter = (outlinerFilter + 1) % 5;
-            string[] labels = {
-                T("editor.view.all"),
-                T("editor.view.selection"),
-                T("editor.view.hidden"),
-                T("editor.view.locked"),
-                T("editor.view.missing") };
-            SetButtonLabel(outlinerFilterButton, labels[outlinerFilter]);
+            if (string.IsNullOrEmpty(query)) return true;
+            bool Name() => Matches(part.DisplayName, query) || Matches(part.Metadata?.Name, query);
+            bool Id() => Matches(part.PrefabName, query) || Matches(part.StableId, query);
+            bool Source() => Matches(part.Metadata?.SourceId ?? T("editor.outliner.unknown"), query) ||
+                Matches(part.Metadata?.SourceVersion, query);
+            bool Kind() => Matches(part.Metadata?.Kind ?? T("editor.outliner.unknown"), query);
+            switch (outlinerSearchScope)
+            {
+                case 1: return Name();
+                case 2: return Id();
+                case 3: return Source();
+                case 4: return Kind();
+                default: return Name() || Id() || Source() || Kind();
+            }
+        }
+
+        private void RefreshOutlinerFilter()
+        {
+            EndOutlinerDrag();
+            outlinerRows.anchoredPosition = Vector2.zero;
+            SetButtonLabel(outlinerFilterButton, T(OutlinerIsFiltered || outlinerSearchScope != 0
+                ? "editor.outliner.filters_active" : "editor.outliner.filters"));
+            ((TMP_Text)outlinerSearch.placeholder).text = T(OutlinerQueryKeys[outlinerSearchScope]);
             if (boundDocument != null) RebuildOutliner(boundDocument);
+        }
+
+        private void ResetOutlinerFilter()
+        {
+            outlinerFilter = outlinerSearchScope = 0;
+            outlinerSearch.SetTextWithoutNotify(string.Empty);
+            HideOutlinerMenu();
+            RefreshOutlinerFilter();
         }
 
         private Button AddOutlinerToolbarButton(Transform parent, string name, string icon,
@@ -3107,24 +3241,79 @@ namespace OstrixMods.BuildWorks
 
         private void ToggleOutlinerMenu(bool reparentOnly)
         {
-            bool show = !outlinerMenu.activeSelf || outlinerReparentOnly != reparentOnly;
+            bool show = !outlinerMenu.activeSelf || outlinerReparentOnly != reparentOnly || outlinerFilterMenu;
             if (!show) { HideOutlinerMenu(); return; }
             ShowOutlinerMenu(reparentOnly);
         }
 
-        private void ShowOutlinerMenu(bool reparentOnly)
+        private void ShowOutlinerMenu(bool reparentOnly, bool filters = false)
         {
             outlinerReparentOnly = reparentOnly;
+            outlinerFilterMenu = filters;
             HideViewportSettings();
             outlinerMenu.SetActive(true);
             outlinerRowViewport.gameObject.SetActive(false);
             RebuildOutlinerMenu();
+            LayoutOutlinerMenu();
+            if (filters) outliner.SetAsLastSibling();
+            outlinerMenu.GetComponent<ScrollRect>().StopMovement();
+            outlinerMenuRows.anchoredPosition = Vector2.zero;
             outlinerMenu.transform.SetAsLastSibling();
+        }
+
+        private void LayoutOutlinerMenu()
+        {
+            float bottom = 4f;
+            if (outlinerFilterMenu)
+            {
+                float availableHeight = safeRoot.rect.height + outliner.anchoredPosition.y - 8f;
+                LayoutRebuilder.ForceRebuildLayoutImmediate(outlinerMenuRows);
+                float top = (float)BlueprintEditorLayout.OutlinerHeaderHeight - 4f;
+                float contentHeight = LayoutUtility.GetPreferredHeight(outlinerMenuRows) + 12f;
+                bottom = outliner.rect.height - top - Mathf.Min(availableHeight - top, contentHeight);
+            }
+            SetInsets((RectTransform)outlinerMenu.transform, 4f,
+                (float)BlueprintEditorLayout.OutlinerHeaderHeight - 4f, 4f, bottom);
         }
 
         private void RebuildOutlinerMenu()
         {
             ClearChildren(outlinerMenuRows);
+            outlinerMenuRows.GetComponent<VerticalLayoutGroup>().spacing = outlinerFilterMenu ? 2f : 4f;
+            if (outlinerFilterMenu)
+            {
+                TMP_Text help = CreateText("FilterHelp", outlinerMenuRows, T("editor.outliner.help"), 11f,
+                    FontStyles.Normal, TextAlignmentOptions.TopLeft);
+                help.textWrappingMode = TextWrappingModes.Normal;
+                CreateButton("OutlinerFilterReset", outlinerMenuRows, T("editor.outliner.reset"), 238f, ResetOutlinerFilter);
+                for (int index = 0; index < OutlinerFilterKeys.Length; ++index)
+                {
+                    int choice = index;
+                    CreateButton("OutlinerFilter" + choice, outlinerMenuRows,
+                        (outlinerFilter == choice ? "[x] " : "[ ] ") + T(OutlinerFilterKeys[choice]), 238f, () =>
+                        { outlinerFilter = choice; HideOutlinerMenu(); RefreshOutlinerFilter(); });
+                }
+                for (int index = 0; index < OutlinerScopeKeys.Length; ++index)
+                {
+                    int choice = index;
+                    CreateButton("OutlinerScope" + choice, outlinerMenuRows,
+                        (outlinerSearchScope == choice ? "[x] " : "[ ] ") + T(OutlinerScopeKeys[choice]), 238f, () =>
+                        {
+                            outlinerSearchScope = choice; HideOutlinerMenu(); RefreshOutlinerFilter();
+                            EventSystem.current?.SetSelectedGameObject(outlinerSearch.gameObject);
+                            outlinerSearch.ActivateInputField();
+                        });
+                }
+                foreach (Button button in outlinerMenuRows.GetComponentsInChildren<Button>())
+                {
+                    LayoutElement layout = button.GetComponent<LayoutElement>();
+                    layout.minHeight = layout.preferredHeight = 28f;
+                    TMP_Text label = button.GetComponentInChildren<TMP_Text>();
+                    label.fontSize = label.fontSizeMax = 12f;
+                    label.alignment = TextAlignmentOptions.MidlineLeft;
+                }
+                return;
+            }
             if (!outlinerReparentOnly)
             {
                 CreateButton("ShowAll", outlinerMenuRows, T("editor.view.show_all"), 238f,
@@ -3166,6 +3355,14 @@ namespace OstrixMods.BuildWorks
 
         private void BindInspector(BlueprintEditorDocument document)
         {
+            bool hasMissing = missingPrefabNodes.Count > 0;
+            bool missingEntryChanged = replaceMissingButton.gameObject.activeSelf != hasMissing;
+            SetButtonLabel(replaceMissingButton, T("editor.replace_short"));
+            replaceMissingButton.gameObject.SetActive(hasMissing);
+            SetButtonLabel(positionMissingButton, T("editor.position_short"));
+            positionMissingButton.gameObject.SetActive(hasMissing);
+            SetInsets(inspectorViewport, 12f, hasMissing ? 70f : 42f, 12f, 8f);
+            if (missingEntryChanged) ApplySafeAreaAndLayout(true);
             inspectorEditPanel.SetActive(false);
             supportEditPanel.SetActive(false);
             groupEditPanel.SetActive(false);
@@ -3528,7 +3725,7 @@ namespace OstrixMods.BuildWorks
 
         private bool ValidInspectorScale(float value) => !float.IsNaN(value) && !float.IsInfinity(value) &&
             (inspectorScaleIsAbsolute ? value >= float.Epsilon : value >= .01f) &&
-            (inspectorScaleIsAbsolute ? value <= float.MaxValue : value <= 4f);
+            (inspectorScaleIsAbsolute ? value <= float.MaxValue : value <= BlueprintEditorDocument.MaximumScale);
 
         private void SubmitSnap()
         {
@@ -4100,7 +4297,8 @@ namespace OstrixMods.BuildWorks
             if (!layout.Compact)
             {
                 double treeHeight = 116 + Math.Floor((layout.RightColumn.Height * outlinerFraction - 116) / 30.0) * 30.0;
-                double maximumTree = 116 + Math.Floor((layout.RightColumn.Height - BlueprintEditorLayout.MinimumInspectorHeight - 116) / 30) * 30;
+                double replacementHeight = replaceMissingButton.gameObject.activeSelf ? 28 : 0;
+                double maximumTree = 116 + Math.Floor((layout.RightColumn.Height - BlueprintEditorLayout.MinimumInspectorHeight - replacementHeight - 116) / 30) * 30;
                 treeHeight = Math.Max(146, Math.Min(treeHeight, maximumTree));
                 Place(outliner, new EditorRect(layout.RightColumn.X, layout.RightColumn.Y, layout.RightColumn.Width, treeHeight));
                 Place(inspector, new EditorRect(layout.RightColumn.X, layout.RightColumn.Y + treeHeight, layout.RightColumn.Width, layout.RightColumn.Height - treeHeight));
@@ -4144,6 +4342,8 @@ namespace OstrixMods.BuildWorks
                 Place(status, new EditorRect(0, layout.Status.Y, width, layout.Status.Height));
             }
             else { rail.gameObject.SetActive(true); rightColumn.gameObject.SetActive(true); }
+            LayoutOutlinerMenu();
+            if (HasToolsMenu) FitToolsMenu();
             double visibleRailHeight = Math.Floor(layout.Rail.Height / 48.0) * 48.0;
             SetTopAnchored(railViewport, 0f, 0f, 0f, (float)visibleRailHeight);
         }

@@ -174,6 +174,7 @@ public static class RuntimeEditorAcceptance
                     runtimeErrors.Add(message);
             };
             new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+            checks.Add(QaUiCancellationAcceptance.Run());
             foreach (object step in TestSkin()) yield return step;
             string repository = Path.GetFullPath(Path.Combine(Application.dataPath, "../../.."));
             string output = Path.Combine(repository, "artifacts", "ui-runtime");
@@ -1529,7 +1530,13 @@ public static class RuntimeEditorAcceptance
             Require(Vector3.Distance(after - before, new Vector3(0,0.4f,0)) < 0.001f, tool + " does not follow pending drag");
             Require(Vector3.Distance(afterScale, beforeScale * 1.1f) < 0.001f, tool + " loses pending scale");
             Require((doc.Parts[0].Position - original).LengthSquared < 0.000001, tool + " preview mutated source");
-            Call(controller, "CancelGizmoDrag");
+            Set(controller, "selectionPending", true);
+            Set(controller, "cameraDragging", true);
+            controller.CancelInputInteraction();
+            Require(!Field<bool>(controller, "selectionPending") && !Field<bool>(controller, "cameraDragging") &&
+                Field<GizmoHandleKind>(controller, "dragHandle") == GizmoHandleKind.None &&
+                (doc.Parts[0].Position - original).LengthSquared < 0.000001,
+                tool + " emergency interaction abort left a gesture or committed its preview");
             Vector3 restored = Field<GameObject>(previews[0], "Root").transform.position;
             Require(Vector3.Distance(restored, before) < 0.001f, tool + " cancel retained pending transform");
         }

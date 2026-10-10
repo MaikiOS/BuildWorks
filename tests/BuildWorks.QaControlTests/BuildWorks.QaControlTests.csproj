@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <LangVersion>latest</LangVersion>
+    <DefineConstants>BUILDWORKS_QA_CONTROL_TESTS</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/BuildWorks/BuildWorksQaControlProtocol.cs" Link="BuildWorksQaControlProtocol.cs" />
+    <Reference Include="System.Runtime.Serialization" />
+  </ItemGroup>
+</Project>

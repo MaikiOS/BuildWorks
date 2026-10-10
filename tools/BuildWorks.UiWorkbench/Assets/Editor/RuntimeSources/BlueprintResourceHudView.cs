@@ -1,3 +1,6 @@
+#if BUILDWORKS_TEST_STAND
+using Input = OstrixMods.BuildWorks.BuildWorksQaInput;
+#endif
 using System;
 using System.Collections.Generic;
 using TMPro;

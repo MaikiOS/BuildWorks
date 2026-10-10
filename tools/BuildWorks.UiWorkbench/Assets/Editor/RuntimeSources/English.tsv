@@ -83,7 +83,7 @@ catalog.action.category	CATEGORY: {0}
 catalog.action.refresh_preview	REFRESH PREVIEW
 catalog.action.resources	RESOURCES
 catalog.action.hide_resources	HIDE RESOURCES
-catalog.action.delete	DELETE
+catalog.action.delete	Delete blueprint
 catalog.action.confirm_delete	CONFIRM DELETE
 catalog.choose_blueprint	Choose a blueprint
 catalog.blueprint_summary	{0} parts  ·  {1}
@@ -231,7 +231,7 @@ placement.special_unsupported	BuildWorks: this special part is not supported yet
 layout.row_ready	BuildWorks: row {0}×1 is ready. Drag the other gold arrow to add width.
 layout.plane_ready	BuildWorks: grid {0}×{1} is ready.
 layout.scale_positive	ARRAY: reduce the scale step or count — every copy scale must be positive
-layout.scale_bounds	ARRAY: every part scale must remain within 1–400%; reduce the step or count
+layout.scale_bounds	ARRAY: every part scale must remain within 1–1000%; reduce the step or count
 layout.distribution.fit	FIT SPAN
 layout.distribution.size	BY SIZE
 layout.distribution.size_gap	SIZE + {0} cm
@@ -601,7 +601,7 @@ editor.view.tool_array	Ctrl+3 · Array\nRepeat the selection in two directions
 editor.view.tool_contour	Ctrl+4 · Contour\nRepeat the selection along native snap-point chains
 editor.view.tool_parameters	TOOL PARAMETERS
 editor.view.tool_select	Ctrl+1 · Select\nSelection shows handles · G — surface move · MMB click/Delete — remove
-editor.view.tool_transform	G / Ctrl+2 · Gizmo\nG — surface move · X/Y/Z — axis move · R — rotate · S — uniform scale\nType a number — exact delta from the action start
+editor.view.tool_transform	G / Ctrl+2 · Gizmo\nG — surface move · X/Y/Z — axis move · R — rotate · S — scale; then X/Y/Z — selected axis\nType a number — exact delta; scale 1.5 = 150%
 editor.view.transform_short	TRANSFORM
 editor.view.turn_deg	TURN · °
 editor.view.type	TYPE
@@ -789,7 +789,7 @@ exchange.ready	Blueprint library updated. Use ⋯ to edit/export; click a card t
 exchange.exported	Export saved: {0}
 exchange.exists	The library already contains this file: {0}
 import.scale_pending	Load the blueprint in the game catalogue first to resolve prefab scales. The source has not been changed.
-import.scale_range	The scale of prefab {0} cannot be represented within the supported 1–400% multiplier range. No parts were resized or partially converted.
+import.scale_range	The scale of prefab {0} cannot be represented within the supported 1–1000% multiplier range. No parts were resized or partially converted.
 import.scale_missing	Original prefab scale unknown: {0}. Open and save it in the editor after installing its mod; world placement remains blocked.
 exchange.browse_help	Choose a folder and file, then Import. Original files remain unchanged.
 exchange.current_folder	Folder: {0}
@@ -874,8 +874,12 @@ editor.scale.shear	Cannot scale this selection independently: rotated parts woul
 editor.catalog_cost_unknown	Full construction cost and required stations are unknown. This blueprint can be edited; world placement is checked separately.
 blueprint.capture_parent_frame	Cannot capture {0} exactly: its parent changes scale or shears the object.
 editor.replace_title	REPLACE MISSING PART
-editor.replace_hint	Place your replacement first. Select exactly one missing row directly and your available replacement parts or group. Hidden/locked parts and overlapping parent/child selections are not allowed.
-editor.replace_confirm	Remove missing record: {0}\nReplacement: {1} selected parts; their poses and sizes stay unchanged.\nPrimary/pivot links move to: {2}\nIndependent supports and original source stay unchanged. One Undo restores the record.
+editor.replace_catalog	Open catalogue
+catalog.thumbnail_pending	Image not available yet\nSee card details
+catalog.thumbnail_markers	A red frame shows recorded missing-part bounds; a small red marker shows only its position, with unknown size.
+editor.replace_steps	Select one missing record and open the catalogue. The chosen part or blueprint appears at its pose for confirmation.\nTo use your existing parts, select the missing row, then Ctrl-select your available parts or their group. Choose Replace missing. The first own part anchors the assembly; the others move with it.\nOwn sizes stay unchanged. Unknown model surfaces may not match; refine with the gizmo afterwards. Hidden/locked parts and selecting both a parent and its child are not allowed. Cancel changes nothing.
+editor.replace_hint	Select one missing record for a catalogue replacement preview at its pose. Or Ctrl-add your available parts/group: the first part anchors the whole replacement. Own sizes remain unchanged.
+editor.replace_confirm	Replace missing record: {0}\nReplacement parts: {1}.\nReplacement anchor: {2}\nIts origin and full rotation match the record. Own sizes and relative poses are preserved. Unknown model surfaces are not guessed.\nInspect the result on the left. Independent supports and source evidence are retained. Cancel leaves the blueprint unchanged; one Undo restores the record.
 editor.replace_changed	Selection, document or available prefabs changed. Review replacement again.
 editor.replace_group	Replacement
 editor.replace_done	Missing record replaced with {0} selected parts. One Undo restores it.
@@ -884,3 +888,77 @@ editor.save_as	SAVE AS…
 editor.save_as_help	Create a separate blueprint with a new ID. The original stays unchanged. Ctrl+Shift+S.
 placement.material_persistence_unsupported	This piece cannot safely preserve the blueprint material variant. Placement stopped before resource payment.
 blueprint.material_capture_failed	Material variant for {0} is not loaded or is unsupported. The blueprint was not saved.
+catalog.confirm_delete	Delete saved blueprint “{0}”? The external source file and built world objects will remain. This deletion cannot be undone after confirmation.
+catalog.action.hide	Hide from catalogue
+editor.catalog.hidden	Hidden
+catalog.restored	Blueprint restored to the catalogue.
+catalog.action.confirm_hide	CONFIRM HIDE
+catalog.deleted	Saved blueprint deleted. Built world objects remain.
+catalog.open_draft	The open document will remain an unsaved draft with its edit history. Saving it again creates a new blueprint.
+catalog.action.restore	Restore to catalogue
+catalog.confirm_hide	Hide “{0}” from the catalogue? The source file, saved copies and built world objects will remain. Restore this entry in Hidden.
+catalog.hidden	Blueprint hidden. Restore it in Hidden.
+editor.outliner.filters	FILTER
+editor.outliner.filters_active	FILTER *
+editor.outliner.unknown	unknown
+editor.outliner.help	Filters only change this list; branches temporarily expand. Group selection and Ctrl+A affect parts outside the filter. Scroll below for the mode and search field.
+editor.outliner.reset	Reset filters and search
+editor.outliner.filter0	All objects
+editor.outliner.filter1	Selected only
+editor.outliner.filter2	Hidden
+editor.outliner.filter3	Locked
+editor.outliner.filter4	Missing parts
+editor.outliner.filter5	Unknown source
+editor.outliner.filter6	Unknown type
+editor.outliner.filter7	Nonempty sign text
+editor.outliner.filter8	Scale differs from 100%
+editor.outliner.scope0	Search: all fields
+editor.outliner.scope1	Search: name
+editor.outliner.scope2	Search: prefab or record ID
+editor.outliner.scope3	Search: source / version
+editor.outliner.scope4	Search: recorded type
+editor.outliner.query0	Name / ID / source / type…
+editor.outliner.query1	Part or group name…
+editor.outliner.query2	Prefab, record or group ID…
+editor.outliner.query3	Source ID or version…
+editor.outliner.query4	Recorded part type…
+editor.outliner.no_results	No matches · RESET
+editor.outliner.details	Prefab ID: {0}\nRecord ID: {1}\nSource: {2}\nRecorded type: {3}
+editor.camera.enter	Inside the building
+editor.camera.exit	Return to overview
+editor.camera.speed	Interior speed, m/s
+editor.camera.help	RMB: look; WASD move, Q/E down/up, Shift faster. Wheel: speed. With a piece selected, RMB+LMB places from center. Release RMB for the pointer. The button above restores the overview.
+editor.camera.active	Inside building · RMB: fly · Camera: return
+qa.large_selection_blocked	Large selection requires the isolated BuildWorks QA world. Safety check failed: {0}.
+editor.replace_catalog_help	Replacement mode: click a part or blueprint to preview it at the missing record
+editor.replace_source_missing	Choose an available part or a blueprint without missing parts for replacement. This source is still incomplete.
+editor.position_title	ALIGN TO MISSING
+editor.position_hint	Move your parts to a missing record and keep its marker. Ctrl-select your parts/group, or select only the record and open the catalogue.
+editor.position_steps	Select one missing record and open the catalogue, or Ctrl-add your own parts/group. Aligns the recorded envelope centre with your visible parts and uses the first own part for orientation. Own sizes and relative layout are preserved. Unknown dimensions use only the recorded origin. The missing record remains: adjust your parts with the gizmo, then delete it separately. Cancel changes nothing.
+editor.position_confirm	Missing record: {0}\nOwn parts: {1}\n{2}\nOwn sizes and relative layout are preserved; the unknown model shape is not reconstructed. Inspect the preview on the left. The record and marker will remain for manual adjustment. Delete the record separately when finished. Cancel changes nothing; one Undo reverts positioning.
+editor.position_known	The recorded envelope centre and visible own parts centre are aligned; the first own part supplies orientation.
+editor.position_unknown	Model dimensions are unknown: only the recorded origin and rotation are aligned. The marker does not represent real dimensions.
+editor.position_no_bounds	Could not determine the visible bounds of your parts. Positioning cancelled.
+editor.position_done	Aligned parts: {0}. The missing record remains for adjustment and separate deletion.
+editor.position_catalog_help	Alignment mode: choose a part or blueprint. The missing record will remain.
+editor.replace_short	REPLACE
+editor.position_short	ALIGN
+editor.view.axis_pair	{0}{1} · {2} · Number: per selected axis
+
+editor.pointer_wrap_controls	Ctrl: reach panels
+editor.pointer_wrap_unavailable	Cursor warp is unavailable in this input backend. Numeric input remains available; cursor is free.
+editor.pointer_wrap_failed	Cursor warp was not acknowledged. Transform cancelled; cursor is free.
+
+exchange.format_plan	PlanBuild
+exchange.plan_help	PlanBuild .blueprint + full BuildWorks copy in a new named folder. Review losses before writing.
+exchange.plan_title	PlanBuild: review losses
+exchange.plan_confirm	Export with losses
+exchange.plan_warning	Only the .buildworks.json copy keeps all construction data. Scroll the review; Back changes the destination or format.
+exchange.plan_review	Folder: {0}\n{1}.blueprint — {2} prefab records with poses and absolute XYZ scale; {3} custom snap positions.\n{1}.buildworks.json — full original construction document, including contents and unknown source data.\n\nPlanBuild omits: groups ({4}), free supports and their placement frame ({5}), anchors ({6}), metadata and mod dependencies ({7}), source archives, complete attribution and usage terms ({8}), material seeds ({9}). IDs, labels, visibility/locks, primary transform frame and preview settings are not carried over. Positions remain in the document coordinate system.\nRequired prefab IDs remain, but missing models still need their mods. A prefab without ZNetView may not restore scale or persist in PlanBuild. World placement, support and resources follow the receiving mod; this export cannot guarantee them.
+exchange.plan_signs	These text overrides are omitted: only nonempty sign text without commas or semicolons is stable in the verified PlanBuild reader. Empty text cannot clear a prefab default. The full copy keeps every text override.
+exchange.plan_state	Object data omitted from PlanBuild, by prefab / format (includes containers, mounts, armor, unknown and administrative state). No raw ZDO or foreign extensions are emitted; the full copy retains this data.
+exchange.plan_identifier	A prefab ID contains ; , ( or starts with #; the PlanBuild reader would change it or skip the row. Nothing was exported.
+exchange.plan_changed	The blueprint or prefab scale changed after review. Press Back and review the export again. Nothing was written.
+exchange.plan_path	The bundle path exceeds this Unity Windows runtime limit (260 characters). Choose a shorter parent folder or bundle name; no files were written. Folder: {0}
+exchange.plan_cancelled	Unfinished PlanBuild export cancelled. No bundle was published.
+qa.control.paused	QA input stopped. Inspect already built parts before resuming.

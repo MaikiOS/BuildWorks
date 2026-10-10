@@ -961,3 +961,4 @@ exchange.plan_identifier	A prefab ID contains ; , ( or starts with #; the PlanBu
 exchange.plan_changed	The blueprint or prefab scale changed after review. Press Back and review the export again. Nothing was written.
 exchange.plan_path	The bundle path exceeds this Unity Windows runtime limit (260 characters). Choose a shorter parent folder or bundle name; no files were written. Folder: {0}
 exchange.plan_cancelled	Unfinished PlanBuild export cancelled. No bundle was published.
+qa.control.paused	QA input stopped. Inspect already built parts before resuming.

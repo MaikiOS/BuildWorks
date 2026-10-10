@@ -391,12 +391,7 @@ namespace OstrixMods.BuildWorks
             scene.SetTemporarySelectionHighlight(ShiftHeld && !IsGizmoDragging, document);
             if (!input.HasFocus)
             {
-                if (IsGizmoDragging) CancelGizmoDrag();
-                StopCameraFlight();
-                cameraDragging = middleCameraMoved = rightCameraTracking = cameraFlying = selectionPending = false;
-                middleDeleteTarget = null;
-                Cursor.lockState = CursorLockMode.None;
-                Cursor.visible = true;
+                CancelInputInteraction();
                 ApplyCamera();
                 return;
             }
@@ -2222,6 +2217,17 @@ namespace OstrixMods.BuildWorks
                 ApplyDocumentEdit(() => document.DuplicateSelection(ToPoint(translation),
                     BuildWorksLocalization.Text("editor.generated.copy")));
             else ApplyTransformDelta(translation, rotation, pivot, scale, scaleFrame);
+        }
+
+        internal void CancelInputInteraction()
+        {
+            if (IsGizmoDragging) CancelGizmoDrag();
+            StopCameraFlight();
+            cameraDragging = middleCameraMoved = rightCameraTracking = cameraFlying = selectionPending = false;
+            middleDeleteTarget = null;
+            view?.CancelOutlinerDrag();
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
         }
 
         private void CancelGizmoDrag()

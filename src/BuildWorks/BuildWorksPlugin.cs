@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.140";
+        internal const string PluginVersion = "0.19.141";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -31,6 +31,9 @@ namespace OstrixMods.BuildWorks
         private static BuildWorksPlugin instance;
         private Harmony harmony;
         private PrecisionPlacementSession session;
+#if BUILDWORKS_TEST_STAND
+        private BuildWorksQaControl qaControl;
+#endif
         private BlueprintEditorController blueprintEditor;
         private CompositeBlueprintStore.Blueprint pendingBlueprintEditor;
         private bool pendingNewBlueprintEditor;
@@ -125,7 +128,13 @@ namespace OstrixMods.BuildWorks
 
             Logger.LogInfo("BuildWorks " + PluginVersion + " loaded.");
 #if BUILDWORKS_TEST_STAND
-            if (qaActive) StartCoroutine(PrepareQaSaves());
+            if (qaActive)
+            {
+                StartCoroutine(PrepareQaSaves());
+                qaControl = gameObject.AddComponent<BuildWorksQaControl>();
+                try { qaControl.Initialize(); }
+                catch (Exception error) { qaControl.enabled = false; Logger.LogError("BuildWorks QA control unavailable: " + error); }
+            }
 #endif
         }
 
@@ -306,9 +315,19 @@ namespace OstrixMods.BuildWorks
             session?.LateUpdate();
         }
 
+#if BUILDWORKS_TEST_STAND
+        internal static void AbortQaControlInput()
+        {
+            instance?.blueprintEditor?.CancelInputInteraction();
+            instance?.session?.AbortQaInput();
+        }
+
+        private void OnDisable() { if (qaControl) qaControl.enabled = false; }
+#endif
         private void OnDestroy()
         {
 #if BUILDWORKS_TEST_STAND
+            qaControl?.Stop("Plugin destroyed.");
             BuildWorksTestYard.RestoreDaylight();
 #endif
             DisposeBlueprintEditor();
@@ -366,6 +385,7 @@ namespace OstrixMods.BuildWorks
         private void HandleHostLogout()
         {
 #if BUILDWORKS_TEST_STAND
+            qaControl?.ResetSession();
             BuildWorksTestYard.RestoreDaylight();
 #endif
             DisposeBlueprintEditor();

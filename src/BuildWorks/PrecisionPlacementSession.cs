@@ -1,3 +1,6 @@
+#if BUILDWORKS_TEST_STAND
+using Input = OstrixMods.BuildWorks.BuildWorksQaInput;
+#endif
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -5684,6 +5687,18 @@ namespace OstrixMods.BuildWorks
                 RebuildBlueprintPlan();
         }
 
+#if BUILDWORKS_TEST_STAND
+        internal void AbortQaInput()
+        {
+            blueprintSelectionDragging = false;
+            blueprintWorkspaceRightTracking = blueprintWorkspaceRightDragged = false;
+            hud?.HideSelectionBox();
+            if (dragAxis != GizmoAxis.None || dragAnchorPoint >= 0) { CancelNewestStage(); FreezeEditor(); }
+            freeViewDragging = freeViewFlyLooking = false;
+            if (state == PlacementState.Armed && requestAutomaticPlacement)
+                PauseAutomaticPlacement(Player.m_localPlayer, BuildWorksLocalization.Text("qa.control.paused"));
+        }
+#endif
         private bool CancelNewestStage()
         {
             if (dragAxis != GizmoAxis.None || dragAnchorPoint >= 0)

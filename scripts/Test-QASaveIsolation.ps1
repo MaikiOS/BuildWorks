@@ -42,6 +42,45 @@ $editorCalls = @(($editor.Methods | Where-Object Name -eq 'Open').Body.Instructi
 Require ($editorCalls -match 'BuildWorksTestIsolation::RequireLoadedSession') 'Heavy QA editor lost the loaded-session isolation guard.'
 $store = $qa.MainModule.GetType('OstrixMods.BuildWorks.CompositeBlueprintStore')
 Require (($store.Fields | Where-Object Name -eq 'EditorPartBudget').Constant -eq 50000) 'QA heavy editor budget is missing or differs from the storage ceiling.'
+$qaSession = $qa.MainModule.GetType('OstrixMods.BuildWorks.PrecisionPlacementSession')
+$normalSession = $normal.MainModule.GetType('OstrixMods.BuildWorks.PrecisionPlacementSession')
+foreach ($session in @($qaSession,$normalSession)) {
+    $select = $session.Methods | Where-Object Name -eq 'SetBlueprintPieceSelected'
+    $area = $session.Methods | Where-Object Name -eq 'SelectBlueprintArea'
+    $attempt = $area.Body.Instructions | Where-Object { [string]$_.Operand -match '::SetBlueprintPieceSelected\(' } | Select-Object -First 1
+    Require ($select.ReturnType.FullName -eq 'System.Boolean' -and $null -ne $attempt -and
+        $attempt.Next.OpCode.FlowControl.ToString() -eq 'Cond_Branch') `
+        'Area selection must stop its current batch on refusal, not retry the QA safety gate for every remaining candidate.'
+}
+foreach ($name in @('SetBlueprintPieceSelected','TrySaveWorldSelection')) {
+    $qaMethod = $qaSession.Methods | Where-Object Name -eq $name
+    $normalMethod = $normalSession.Methods | Where-Object Name -eq $name
+    $instructions = @($qaMethod.Body.Instructions)
+    $normalInstructions = @($normalMethod.Body.Instructions)
+    Require ([bool]($instructions | Where-Object { $_.OpCode.Name -eq 'ldc.i4' -and $_.Operand -eq 50000 }) -and
+        [bool]($normalInstructions | Where-Object { $_.OpCode.Name -eq 'ldc.i4' -and $_.Operand -eq 512 }) -and
+        -not [bool]($normalInstructions | Where-Object { $_.OpCode.Name -eq 'ldc.i4' -and $_.Operand -eq 50000 })) `
+        "World selection/capture lost the separate normal512/QA50000 budget: $name"
+    $gates = @($instructions | Where-Object { [string]$_.Operand -match 'BuildWorksTestIsolation::RequireLoadedSession\(' })
+    Require ($gates.Count -eq 1 -and
+        -not [bool]($normalInstructions | Where-Object { [string]$_.Operand -match 'BuildWorksTestIsolation' })) `
+        "Large world selection/capture lost its QA-only loaded identity gate: $name"
+    $write = $instructions | Where-Object { [string]$_.Operand -match $(if ($name -eq 'SetBlueprintPieceSelected') {
+        'List`1<Piece>::Add\('
+    } else { 'CompositeBlueprintStore::TrySaveDocument\(' }) } | Select-Object -First 1
+    Require ($null -ne $write -and $gates[0].Offset -lt $write.Offset -and
+        [bool]($qaMethod.Body.ExceptionHandlers | Where-Object {
+            $_.TryStart.Offset -le $gates[0].Offset -and $_.TryEnd.Offset -gt $gates[0].Offset })) `
+        "Loaded QA gate must precede mutation and have a refusal handler: $name"
+    $thresholdBranch = $instructions | Where-Object {
+        $_.Previous -and $_.Previous.OpCode.Name -eq 'ldc.i4' -and $_.Previous.Operand -eq 512 -and
+        $_.Offset -lt $gates[0].Offset -and $_.Operand -is [Mono.Cecil.Cil.Instruction] -and
+        $_.Operand.Offset -gt $gates[0].Offset -and $_.OpCode.Name -match $(if ($name -eq 'SetBlueprintPieceSelected') {
+            '^bne\.un(\.s)?$'
+        } else { '^ble(\.s)?$' })
+    }
+    Require ([bool]$thresholdBranch) "QA gate no longer runs at selection boundary512 or before capture>512: $name"
+}
 $activate = $type.Methods | Where-Object Name -eq 'Activate'
 $calls = @($activate.Body.Instructions | Where-Object { $_.OpCode.Name -in @('call','callvirt') } | ForEach-Object { [string]$_.Operand })
 $cold = $activate.Body.Instructions | Where-Object { [string]$_.Operand -match '::RequireColdStorage' } | Select-Object -First 1

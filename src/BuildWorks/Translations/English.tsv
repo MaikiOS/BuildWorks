@@ -929,3 +929,4 @@ editor.camera.exit	Return to overview
 editor.camera.speed	Interior speed, m/s
 editor.camera.help	RMB: look; WASD move, Q/E down/up, Shift faster. Wheel: speed. With a piece selected, RMB+LMB places from center. Release RMB for the pointer. The button above restores the overview.
 editor.camera.active	Inside building · RMB: fly · Camera: return
+qa.large_selection_blocked	Large selection requires the isolated BuildWorks QA world. Safety check failed: {0}.

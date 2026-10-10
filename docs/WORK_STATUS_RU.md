@@ -8,7 +8,7 @@
 проведён через хранение; четыре файловых цикла проходят, строительство ещё не доказано.
 
 Обновлено 2026-10-10. Это перечень работ, а не заявление о готовности всего мода.
-Исходники: `Default/BuildWorks`, **0.19.125**; установленная QA **0.19.117**,
+Исходники: `Default/BuildWorks`, **0.19.126**; установленная QA **0.19.117**,
 только `TerrainRamp-1.0-Test`. SHA BuildWorks.dll:
 `C43966C8FFB5BC83D5B725BACD04E4C30F8BA7BD497B58D4D52C853AC9C701C6`.
 Обе DLL сверены; Default чист, метаданные44 файлов saves не изменились.
@@ -18,7 +18,13 @@
 фильтры и камера установлены; игровая проверка открыта:
 [точный сценарий .117](QA_0.19.117_RU.md).
 
-Исходники .125: [общий список мировых привязок](WORLD_SNAP_COLLECTION_CHECKPOINT_2026-10-10_RU.md).
+Исходники .126: [QA-предел мирового выделения/захвата](QA_WORLD_CAPTURE_CHECKPOINT_2026-10-10_RU.md).
+Normal512/QA50000, loaded guard перед513-й деталью и заново перед save;
+первый отказ останавливает batch. Обе сборки0/0, Host, localization931,
+compiled isolation и оба обзора прошли. Не установлено. Полный volume UX,
+большой Session capture/performance/Valheim/reload/network ещё не доказаны.
+
+Исторический этап .125: [общий список мировых привязок](WORLD_SNAP_COLLECTION_CHECKPOINT_2026-10-10_RU.md).
 Оба обзора/normal/QA/Geometry/Store/Host/localization/isolation/Unity492 прошли.
 Точный список17125 точек:1224,37→20,48мс на инертном Unity-наборе; не FPS.
 Нативные/midpoint-heavy модели, Session capture, Valheim/reload/network открыты.

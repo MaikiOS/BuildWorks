@@ -3580,7 +3580,7 @@ namespace OstrixMods.BuildWorks
                     (rightScreen - center).sqrMagnitude);
             });
             foreach (Piece piece in visible)
-                SetBlueprintPieceSelected(piece, remove, toggle: false);
+                if (!SetBlueprintPieceSelected(piece, remove, toggle: false)) break;
         }
 
         private bool IsBlueprintPieceSelectable(Piece piece)
@@ -3593,7 +3593,7 @@ namespace OstrixMods.BuildWorks
                 SupportsBlueprintWorkspacePiece(prefab);
         }
 
-        private void SetBlueprintPieceSelected(Piece piece, bool remove, bool toggle)
+        private bool SetBlueprintPieceSelected(Piece piece, bool remove, bool toggle)
         {
             int index = blueprintSelection.IndexOf(piece);
             bool selected = index >= 0;
@@ -3604,12 +3604,26 @@ namespace OstrixMods.BuildWorks
                     blueprintSelection.RemoveAt(index);
                     SetBlueprintPieceHighlight(piece, false);
                 }
-                return;
+                return true;
             }
-            if (selected || blueprintSelection.Count >= CompositeBlueprintStore.InteractivePartBudget)
-                return;
+            if (selected) return true;
+            if (blueprintSelection.Count >= CompositeBlueprintStore.EditorPartBudget)
+                return false;
+#if BUILDWORKS_TEST_STAND
+            // Check once at the boundary, not once per piece in a large area selection.
+            if (blueprintSelection.Count == CompositeBlueprintStore.InteractivePartBudget)
+            {
+                try { BuildWorksTestIsolation.RequireLoadedSession(); }
+                catch (Exception failure)
+                {
+                    ShowStatus(Player.m_localPlayer, BuildWorksLocalization.Text("qa.large_selection_blocked", failure.Message));
+                    return false;
+                }
+            }
+#endif
             blueprintSelection.Add(piece);
             SetBlueprintPieceHighlight(piece, true);
+            return true;
         }
 
         private void SetBlueprintPieceHighlight(Piece piece, bool selected)
@@ -4909,9 +4923,20 @@ namespace OstrixMods.BuildWorks
             saved = null;
             PruneBlueprintSelection();
             error = BuildWorksLocalization.Text(
-                "blueprint.select_part_count", CompositeBlueprintStore.InteractivePartBudget);
+                "blueprint.select_part_count", CompositeBlueprintStore.EditorPartBudget);
             if (blueprintSelection.Count < 1 ||
-                blueprintSelection.Count > CompositeBlueprintStore.InteractivePartBudget) return false;
+                blueprintSelection.Count > CompositeBlueprintStore.EditorPartBudget) return false;
+#if BUILDWORKS_TEST_STAND
+            if (blueprintSelection.Count > CompositeBlueprintStore.InteractivePartBudget)
+            {
+                try { BuildWorksTestIsolation.RequireLoadedSession(); }
+                catch (Exception failure)
+                {
+                    error = BuildWorksLocalization.Text("qa.large_selection_blocked", failure.Message);
+                    return false;
+                }
+            }
+#endif
             Quaternion rotation = blueprintSelection[0].transform.rotation;
             Quaternion inverse = Quaternion.Inverse(rotation);
             Vector3 origin = blueprintSelection[0].transform.position;

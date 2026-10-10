@@ -1,3 +1,12 @@
+## 2026-10-10 — source0.19.126: isolated QA selection/capture cap
+
+Normal512/QA50000 reuse editor budget. Loaded identity guard before piece513
+and again before large capture; refusal stops the current area batch. Normal/QA
+0/0, Host25185596, localization931, compiled isolation and both independent
+reviews PASS after the repeated-denial fix. No new Unity/game claim.
+docs/QA_WORLD_CAPTURE_CHECKPOINT_2026-10-10.md. InstalledQA.117 unchanged;
+no deploy/Valheim/saves/network. Actual large capture/performance, volume UX,
+8 parser refusals and full external build/reload remain open.
 ## 2026-10-10 — source0.19.125: shared world snap collection
 
 Scoped reusable custom-point membership preserves exact native/midpoint/custom

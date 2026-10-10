@@ -608,6 +608,7 @@ This QA terrain requires the QA binary after reload; it is not a product terrain
 Native backup precedes terrain changes; supplies and previous receipts are never reset.
 CoffeeTable construction and world-reload acceptance remain open.
 
+
 ## QA .99 search follow-up
 
 Native .98 enabled noon but found no qualifying192m yard within +/-1024m; it refused
@@ -1496,6 +1497,7 @@ Owner clarified [free support frames](specs/roadmap/blueprint-support-frames.md)
 only, no new point-authoring UI/world persistence yet. Heavy rendering/export UI remain.
 Installed .56, worlds/saves unchanged. Older checkpoint sections below are historical.
 
+
 ## Source checkpoint 0.19.57 — not deployed; development remains active
 
 2026-10-05: [format and large-construction contract](specs/roadmap/blueprint-format.md)
@@ -1505,31 +1507,29 @@ Storage 50000 parts is not rendering capacity: the synchronous budget stays 512.
 Sign/socket world placement is explicitly blocked until native integration is ready.
 Installed .56, worlds and saves remain unchanged. The .56 figures below are historical.
 
-## Verified test build 0.19.56 — deployed, Valheim acceptance pending
+## Verified test build 0.19.56
 
-2026-10-05: shared read-only ExternalBlueprintLibrary adapter reads `.blueprint`,
-both `.vbuild` dialects and inert ZIP from config/BuildWorks/imports. Open detaches
-an editable draft; one card click inserts the whole construction; Hammer saves a
-native copy before world placement. Originals stay untouched, terrain never executes,
-foreign DLL/assets are not extracted. Store v9 is unchanged. Actual library: 353
-sources, 62 format-compatible, 291 blocked; host prefab/game operation not confirmed.
+2026-10-05: approved construction-only external library adapter reads .blueprint,
+both .vbuild dialects and inert ZIP without extraction. External Edit opens a detached
+draft; one editor card click inserts the whole construction; Hammer Place copy saves
+a native copy before existing per-piece world validation. Originals remain untouched;
+Store v9 unchanged, no terrain execution or foreign DLL/assets installed.
 
-Latest Release, Store, EditorBridge, WorldLayout, DeploymentChecks, HostContract,
-localization (749 keys / 658 static references) PASS; independent source review PASS.
-Ponytail removed unused/repeated piece resolution. verify skill is absent.
-After Hub/licence activation, supported Capture-UiWorkbench synchronized RuntimeSources;
-new fixture name collisions CS0128/CS0841 fixed. 144 states now PASS including
-import/edit/save-copy/insert and thumbnail completion without picker/page resets.
-Log: artifacts/unity-workbench-capture.log; verification-status.json =
-passed_runtime_workbench, gameHostTested=false. .56 and inert ZIP deployed only to
-TerrainRamp-1.0-Test with verified SHA256; Default, worlds and saves untouched.
-Displayed rejection: 104 limit, 124 #SnapPoints, 63 object data; 62 accepted. Reasons
-overlap: 253 constructions >128, maximum 39,487. Limits/data guards were not bypassed.
-Next owner decision: extend large-construction/snap/object-data support, never silently
-strip unsupported contents or remove safety checks.
-Scope/limits: specs/roadmap/blueprint-exchange-research.md.
+Release, Geometry(105), Store, Localization, EditorBridge, WorldLayout, DeploymentChecks,
+HostContract and 144 exact-source Unity UI states PASS; independent correctness and
+complexity review complete. verify skill absent. Hub activation resolved exit198;
+fixture local-name collisions CS0128/CS0841 fixed. UI includes import/edit/save-copy/
+insert/Cancel and thumbnail updates without resetting picker/page.
+Final whitespace verification also passes; old Scene/Gizmo and new reader spacing fixed.
+.56 and source ZIP installed only TerrainRamp-1.0-Test with verified SHA256.
+Default/worlds/saves unchanged. gameHostTested=false; no Valheim launch.
 
-## Installed verified build 0.19.55
+353 library entries: 62 format-compatible, 291 blocked. Displayed reasons: 104 limit,
+124 #SnapPoints, 63 object data. Reasons overlap: 253 exceed128, maximum39,487.
+Large-size/snap/object-data support and BW-04/BW-05 full exchange remain pending.
+See specs/roadmap/blueprint-exchange-research.md. No library/package assets enter Git.
+
+## Historical verified source candidate 0.19.55
 
 2026-10-05: .54 owner feedback accepts catalog checks 2,3,5,6,7; changes 1,4,8
 and adds focused gizmo/save checks 9,10 in [the single current series](specs/roadmap/current-pass.md).
@@ -2018,637 +2018,61 @@ Source-only synchronization targets MaikiOS/BuildWorks main; no binary release,
 Valheim launch, save/other-profile/other-mod mutation is part of this checkpoint.
 
 
-## Historical checkpoint 0.19.42 — 2026-10-01
-
-Ostrix authorized the complete approved editor implementation; do not reopen
-settled input/design questions. Source .42, Store v9 unchanged, Valheim 1.0.16.
-Editor 1–4 persistent tools and Space/F3 menu; temporary G surface/P plane, R plane
-rotation, S uniform scaling, XYZ/repeat-local/Shift-plane constraints. Preview
-reuses existing snapshots, exact cancel and one Undo. Enter validates current-frame
-surface; source/camera rebasing and return-to-origin regressions pass. Editor MMB
-is camera-only, Delete removes; world/F9 behavior retained.
-
-Move/Rotate/Points/Scale families match visibility/hit tests, with original Nordic
-leaf tips, chamfered planes, open arcs and paired snap glyphs. Hover/drag/occluded
-states, axis labels and independent sizes remain. Collapsible hints return 144
-layout units, highlighted next-action strip stays. Camera/Display/Manipulator
-dropdowns reuse controls; Focus and tree/inspector split recover viewport space.
-Actual TMP tooltip sizing replaces fixed rectangles. F7 remains reversible hiding,
-with an outline only for the active hidden snap target; candidate eligibility unchanged.
-
-Release: zero warnings/errors. Geometry, Store, EditorBridge, WorldLayout,
-Localization and HostContract pass. Localization: 633 matching keys and built
-resources. Deployment forbidden-target checks pass. Format exits 0. Unity
-6000.0.61f1 Workbench: 81 fresh captures, native input/raycast checks, hidden-family
-hit guards and EN/RU tooltip strings at 100/120/140%; completed
-2026-10-01T13:48:43.1597938Z. Two independent final read-only reviews PASS.
-This is not Valheim, save/reload, multiplayer or all narrow-window tooltip proof.
-Focused six-step owner checks: specs/roadmap/current-pass.md and Russian duplicate.
-
-Build DLL SHA-256:
-BuildWorks: C9DFFEF5A9E989AA00A084906CF6BCCB0617FDA15EB964C4DFC883DB092570D0
-Geometry: 3EF58DB30AE547E99293DD2B90E97BF8FEE005534C055D23656714FA09D9EA16
-Installed only in TerrainRamp-1.0-Test through the guarded script with Valheim
-closed; installed SHA-256 matches. Previous pair: artifacts/checkpoint-0.19.42/preinstall.
-Source-only GitHub main synchronized and remotely verified at
-24c6be295d29a635b12dd5c5581e14a86e4056ee; public checkout clean. Public Release
-also passes zero warnings/errors with --no-restore. A redundant restore attempt
-failed on the inaccessible NuGetScratch lock; no lock files were deleted.
-Next step is only the focused owner Valheim series.
-No game launch, save/other-mod mutation or binary publication authorized here.
-
-## Historical owner acceptance and design gate — 2026-10-01
-
-Ostrix accepts the focused 0.19.41 game series by report: stationary contour,
-cleanup, translated grouped hints, F7, camera and tree. This is owner-reported
-acceptance, not an independently run host test. Cost/refund counts and networking
-remain open. New requests are captured in specs/roadmap/editor-visibility-proposal.md
-and its Russian duplicate. Explicit Move/Rotate/Points families, collapsible hints,
-compact viewer dropdowns and target context are proposals awaiting approval.
-No new code, version, installation or binary release in this design pass.
-
-## Verified checkpoint 2026-09-30
-
-Source and installed candidate **0.19.41**, Store v9 unchanged. Ostrix approved the editor
-proposal and accepts .40 contour cleanup; this checkpoint fixes the guide to
-full detected edge endpoints instead of mouse-relative points. F7/button fully
-hides unselected mesh occluders and restores drawing on camera/selection/off.
-Materials and document visibility remain unchanged; temporary occluders no
-longer intercept editor selection. Occlusion remains a seven-ray heuristic.
-
-The footer has six labeled groups with emphasized keys. Editor camera FOV has
-a 10–120 degree slider/input and game-value reset, disabled in orthographic view;
-world camera is untouched. Compact 30-unit tree rows have independent anchor
-badges, small unframed eye/lock controls, striping, an overflow scrollbar and
-1.5x wheel speed. The first row no longer sits beneath Search.
-
-Source/public Release: zero warnings/errors. Localization verifies 615 matched
-keys and embedded resources. Geometry, Store, EditorBridge, WorldLayout,
-HostContract and forbidden deployment targets pass. Format exits 0 with the
-existing workspace-loading warning. Unity Workbench passes 81 fresh captures
-and stationary-guide, reversible occluder/picking, FOV and overflow regressions.
-Independent correctness PASSED after badge-tooltip and Russian handoff fixes;
-complexity: Lean already. Guarded deployment installed only TerrainRamp-1.0-Test
-with Valheim closed. Previous DLL pair: artifacts/checkpoint-0.19.41/preinstall.
-Plugin SHA-256: A1D1CAF28246E6E4D2A8E9908B06BDD56AE8C6492FBD1CB2EBD7D7DE5DE0F10C.
-Geometry SHA-256: B449F58CE647F6FB92127015710B9EC9657F5E7F816DFCEA1ACE04C26151FCED.
-No binary release, game launch, save/other-profile/other-mod mutation.
-This checkpoint did not independently verify Valheim/save/reload/network; five owner checks
-are in specs/roadmap/current-pass.md and its Russian duplicate.
-Source-only GitHub main synchronized and remotely verified:
-`cfd5c53d57268da93baaffcbe117c4dde61f0862`. Public checkout is clean.
-
-## Previous checkpoint 0.19.40
-
-Source and installed candidate **0.19.40**, Store v9 unchanged. Contour hover now
-shows only a guide; click creates copies. Shared layout cleanup clears the line
-on Cancel/Esc/tool switch/deletion and prevents resurrection after reselection.
-Mode, tool, group/history/visibility and camera hints are visible below the
-viewport without shortening the Inspector. Selected Select mode includes gizmo keys.
-Ostrix approved editor-only see-through via viewport button/F7, off by default.
-Sampled mesh rays identify unselected occluders; temporary silhouettes restore
-exact editor materials on camera/selection/off. Hidden flags, picking, source
-prefabs, Store and world behavior are unchanged.
-
-Release source and public builds: zero warnings/errors. Localization (603 keys),
-Geometry, Store, EditorBridge, WorldLayout, HostContract and forbidden deployment
-targets pass. Formatting exits 0 with workspace-loading warnings. Unity Workbench
-passes 81 captures plus actual contour lifecycle and see-through input/render tests.
-Independent correctness PASSED after EN/RU status correction; complexity Lean already.
-Workbench is not Valheim acceptance; four focused owner checks are in current-pass.
-Earlier .39 owner feedback accepts menu hover, tab language refresh and framing;
-Transform selection/box is provisional pending recurrence reports.
-
-Installed in TerrainRamp-1.0-Test only through Deploy-TestBuild.ps1, game closed.
-Previous DLL pair: artifacts/checkpoint-0.19.40/preinstall.
-Plugin SHA-256: ED3BE3EB60B9A03A986013BCD60460926C0BBC6048EBAF69455AE00429E70858.
-Geometry SHA-256: 22906B26CA2C7CD3D5887F819282AF30BC935C00AE10EC34449503CC8FFDBCE8.
-No binary release, game launch, save/other-profile/other-mod mutation.
-GitHub main synchronized: 7ce7d21300a71330beadecb6f79640362faa28a1;
-remote HEAD verified equal and public checkout clean.
-UI gates still open: native resources/stations, category picker, shortcut rebinding,
-double-click framing. Translation override files, resource accounting and networking
-remain open. Curves still require discussion before implementation.
-
-## Previous checkpoint 0.19.39
-
-Source candidate **0.19.39** fixes Transform viewport selection without Esc,
-the visible drag rectangle, connected contour edges that were split by generated
-midpoints, native Favorites/Blueprints labels after language changes, menu hover
-feedback and group/Array/Contour footer hints. Store v9 is unchanged.
-Release build (zero warnings/errors), Localization, Geometry, Store, EditorBridge,
-WorldLayout, HostContract and deployment guards pass. Formatting exits 0 with
-workspace-loading warnings. Unity Workbench passes 81 actual UI captures and the
-new selection/three-wall contour regressions; this is not Valheim acceptance.
-
-Latest owner report confirms furniture, targets/below-grid, pivots, Array,
-two-piece save/reopen, world reload and camera. Hover-only contour, resources in
-the native panel, explicit category picker, shortcut rebinding, double-click frame,
-community translation files and networking remain open. F already frames selection.
-Esc cleanup restores the same ghost; dropped resources need count-based audit.
-Use the updated five-step guide; do not repeat all accepted tests.
-
-Installed **0.19.39** in TerrainRamp-1.0-Test through the guarded script with
-Valheim closed. Previous pair retained under artifacts/checkpoint-0.19.39/preinstall.
-Installed plugin SHA-256: 1E80E0CD64DBEE23786C92A15208904F4FB4D457AC6FE82C57ADE0DFD5A0B0EA.
-Geometry SHA-256: 29746E620709B0964A6345613A8AA75C261B35D9C22887F5F67A0AF0877AAB82.
-Independent correctness verdict PASSED; complexity: Lean already. Ship.
-Owner Valheim checks for this candidate remain pending. No binary release published.
-GitHub main synchronized: ad3941b032821b284b8b6ff13fed2e62bf4c2e5a; clean checkout,
-remote HEAD verified equal. Public README artwork/features preserved.
-
-## Previous checkpoint history
-
-Owner feedback after deployment: ordinary Hammer behavior/favorites, Outliner RMB
-and structural-piece Q/E passed by report. Blueprint cards have no MMB favorite
-handler; the ellipsis selects the card instead of opening a popup (code confirmed).
-Furniture Q/E reportedly does not respond; the exact mode needs the revised
-reproduction. Snap was not tested because the old checklist confused editor
-placement with world F9. Checks 5–12 remain untested. The acceptance guide now
-uses explicit entry paths, actions and observations; next batch is 1b, 3b, 4a.
-No runtime fix, rebuild or deployment was performed for this documentation update.
-
-Active stage: **BW-00 / awaiting owner game series**. Source and installed
-BuildWorks: **0.19.38**, Store v9, Valheim 1.0.16. Deployments, upgrades and game
-tests now use **TerrainRamp-1.0-Test only**. This supersedes all earlier profile
-permissions below; historical installations are not removed automatically.
-
-GitHub `main` synchronized and verified:
-`6859275aeed5ca342fbca6e09bdabc9e5b48ba8d` (clean public checkout).
-Baseline implementation checkpoint: `6ee7e6a12414a7241d3f0142dbb220fb6b278425`.
-
-Release builds of the source and GitHub checkout passed with zero warnings/errors.
-Geometry, Store, Localization, embedded localization audit, EditorBridge,
-WorldLayout, HostContract and deployment rejection checks passed. Formatting
-verification exited 0 with workspace-loading warnings. Independent correctness
-review found no blockers; complexity review: Lean already. Ship.
-
-Installed pair, SHA-256:
-- BuildWorks.dll: `6FA1CE3C239232B6CCB67756BBDDF8602A5D88AE3D849C107A33134D032D9E06`
-- BuildWorks.Geometry.dll: `29746E620709B0964A6345613A8AA75C261B35D9C22887F5F67A0AF0877AAB82`
-
-The previous 0.19.37 pair is backed up in
-`artifacts/checkpoint-2026-09-30/preinstall`. Other profiles/mods/saves were not
-modified. No fresh Workbench, game, reload or multiplayer acceptance is claimed.
-No new binary release was published.
-
-Work order: [English roadmap](docs/ROADMAP.md), [русская дорожная карта](docs/ROADMAP_RU.md),
-[игровая серия](specs/roadmap/current-pass_RU.md). Next: owner tests, then bounded
-fixes if needed. Visible UI/icons require approval; guides/curves (including
-Line A/B) require renewed discussion before implementation. Verified checkpoints
-are committed and pushed normally to the existing MaikiOS/BuildWorks checkout.
-
-## Historical handoffs — superseded where policies conflict
-
-# Экспериментальная интеграция — 0.19.38 / Valheim 1.0.16, 2026-09-28
-
-Первый запуск 0.19.37 показал `UpdatePlacementGhost validation injection was not
-installed`: проверка ошибочно требовала немедленного выполнения транспайлера.
-0.19.38 проверяет регистрацию именно своего транспайлера в HarmonyX и сохраняет
-отказ при его отсутствии. Release: 0 warnings / 0 errors; HostContract PASS.
-`Default-Compat-Test` получил `BuildWorks.dll` SHA-256
-`6FA1CE3C239232B6CCB67756BBDDF8602A5D88AE3D849C107A33134D032D9E06`;
-Geometry DLL не менялась. Повторный запуск достиг тестового мира: в логе
-`BuildWorks 0.19.38 loaded`, ошибок BuildWorks и строк `[Error]` нет; Ostrix
-сообщил, что при короткой проверке всё работает. Полный тест инструментов,
-сохранения/загрузки и мультиплеера пока не проводился.
-
-По прямому разрешению Ostrix BuildWorks установлен в `Default-Compat-Test`, не в
-`Default`. Защитный `Deploy-TestBuild.ps1` теперь допускает только этот профиль
-и `TerrainRamp-1.0-Test`. Из Matheba Build Camera 1.3.2 сохраняются и
-восстанавливаются `CameraYaw`/`CameraPitch` при переключении на редактор.
-Исходный 0.19.37: Release 0 warnings / 0 errors; Geometry, Localization и
-HostContract PASS. Его `BuildWorks.dll` SHA-256:
-`09AA0A4E7B39786EDD1AC7639209A82AE79721B30CF52D2DA6D7C90F7652E4DA`.
-Текущий `BuildWorks.Geometry.dll` SHA-256:
-`29746E620709B0964A6345613A8AA75C261B35D9C22887F5F67A0AF0877AAB82`.
-Конфиг взят из лабораторного профиля. Камере отдельно выставлено
-`Restriction Mode = Off` для подбора без уюта. Короткий запуск в игре после
-исправления 0.19.38 пройден; сохранение/загрузка и мультиплеер ещё не
-проверены. Подготовлен и проверен по CRC архив для второго ПК
-`TransferToSecondPC/Valheim-Compat-2026-09-28-buildworks-0.19.38.zip`;
-сетевой запуск на втором ПК остаётся обязательным тестом.
-
----
-
-# Передача BuildWorks — 0.19.37 / Valheim 1.0, 2026-09-13
-
-## ТЕКУЩАЯ СОХРАНЁННАЯ ТОЧКА
-
-Ostrix подтвердил English localization 0.19.35 и корректную геометрию косой детали после переключения Q/E-точки. Русский smoke остаётся открытым. Оставшаяся проблема была в обратной связи редактора: текущий режим Q/E показывался только кратко, а доступные точки соседней детали не были видны до фактического магнитного захвата.
-
-Каталоги не менялись: English/Russian по 596 ключей. Добавлена проверка 596 уникальных runtime-токенов без точек и коллизий, а также отдельный `BuildWorks.LocalizationTests`, который реально прогоняет `Register/AddWord/Localize`, English, Russian, store-error и missing-key fallback без Unity.
-
-0.19.37 постоянно показывает выбранную Q/E-точку в нижней строке подсказок и рисует доступные точки соседних деталей в радиусе 2 м. Фактический магнитный захват оставлен прежним — 0,55 м. Переиспользован существующий рендер точек и текущий placement-проход; отдельный сканер не добавлялся. Release 0 предупреждений/0 ошибок; Localization 596/596 и 596 уникальных runtime-токенов; LocalizationTests; Geometry 104; Store; EditorBridge 3; WorldLayout 10; HostContract; Unity Workbench 81 PASS. `BuildWorks.dll` 0.19.37.0: `3D32B505D6A522213414F2CEBADA27488D554FFC61F408D71C2D67AE79E9D009`. Проверенная пара установлена только в `TerrainRamp-1.0-Test`; установленные хеши совпадают с `artifacts/bin`. Valheim до и после установки закрыт, `Default\BepInEx\plugins` чист.
-
-## СЛЕДУЮЩИЙ ШАГ: КОРОТКИЙ ИГРОВОЙ SMOKE 0.19.37
-
-Запустить профиль `TerrainRamp-1.0-Test` и проверить:
-
-1. В редакторе выбрать одиночную деталь и нажимать Q/E. В нижней строке постоянно должен быть виден режим `AUTO` либо номер и направление выбранной точки; краткое верхнее сообщение может исчезнуть.
-2. Подвести preview к другой детали на расстояние до 2 м. Её доступные точки должны появиться заранее; после удаления дальше 2 м — исчезнуть.
-3. При приближении ближе 0,55 м проверить обычный захват. Радиус показа 2 м не должен превращаться в ранний snap.
-4. Повторить на косой балке/периле, крыше и мебели. Q/E должны менять именно точку под курсором, как уже подтверждено для косой детали.
-5. Переключить Valheim на Russian и проверить те же подписи; весь остальной Russian smoke остаётся открытым.
-
-Recipe foundation v10, сохраняемый Array, Align/Distribute, кривые и новый F9 HUD не начинать автоматически. GitHub-стейджинг синхронизирован с source 0.19.37; commit/push/PR и новый бинарный ZIP не создавались.
-
-Ниже сохранён исторический handoff 0.19.33.
-
----
-
-# Передача BuildWorks — 0.19.33 / Valheim 1.0, 2026-09-11
-
-## ТЕКУЩАЯ СОХРАНЁННАЯ ТОЧКА
-
-Игровой smoke 0.19.32 принял прежние пункты 3–5 и 7–8: numeric Transform в Select, visibility/Undo, временный frame на `N`, атомарный Esc и короткая мировая регрессия работают. Остались три связанных отказа: одиночные скосы/крыши/мебель опирались на неверный editor-frame и частично уходили под сетку; Q/E не совмещал выбранную source-точку с курсором и не давал надёжный snap ниже сетки; новый Array мог наследовать `ПО ДЛИНЕ`, поэтому колесо вставляло копии между фиксированными концами.
-
-В 0.19.33 editor ray возвращает фактическую normal выбранной mesh-поверхности. Одиночный preview сдвигается только вдоль normal до контакта ближайшей реальной видимой вершины с surface. При ручном Q/E выбранная точка детали ставится точно под курсор, затем применяется ближайший target snap. Краткое сообщение Q/E показывает номер и направление точки. Мебель/декор без vanilla `snappoint` получают только внутри редактора семь bounds-точек: низ-центр, четыре нижних угла, центр и верх-центр; world prefab и сохранённые native anchors не меняются.
-
-Каждый новый editor-Array теперь начинает в `УПАКОВАТЬ / БЕЗ ЗАЗОРА`, 2×1, с нулевым профилем. В этом режиме колесо увеличивает количество с постоянным естественным шагом и продлевает ряд. `ПО ДЛИНЕ` остаётся отдельным явным режимом, где колесо действительно перераспределяет копии между концами. Apply захватывает профиль до очистки и остаётся одной операцией Undo.
-
-Автоматическая проверка PASS: Release 0/0; Geometry 104; Store; EditorBridge 3; WorldLayout 10; HostContract; Unity Workbench 81. Exact installed-asset gate проверяет `woodwall`, `wood_beam_26`, `wood_roof`, `piece_chair`: реальные mesh-вершины касаются заданной surface; нижняя native-точка `wood_beam_26` совмещается с курсором; у `piece_chair` есть семь editor-точек. Локальный correctness-review PASS; независимый sub-agent review не запускался из-за действующего ограничения делегации. Ponytail: `Lean already. Ship.`
-
-Проверенная пара установлена только в `TerrainRamp-1.0-Test` при закрытом Valheim. После установки игра остаётся закрытой; `Default\BepInEx\plugins` чист. Игровой лог 0.19.32 не содержит BuildWorks/EarthWorks/TerrainRamp исключений; предупреждения относятся к неоднозначным asset path DeepNorth в Jotunn.
-
-- `BuildWorks.dll` 0.19.33.0: `ED3F13157FD9BE4E05AC98FBB982147FE3C8AB0894C24C1FC5089E8A1E607B63`.
-- `BuildWorks.Geometry.dll`: `A9B4A6408F2C2F10F3C0C04228D0664D8217EE0C6FF8B0BE6CB6BDAE17FEC60C`.
-- Резервная копия установленной 0.19.32: `artifacts/fix-0.19.33/pre-install-0.19.32`.
-
-## СЛЕДУЮЩИЙ ШАГ: КОРОТКИЙ РУЧНОЙ SMOKE 0.19.33
-
-Запустить профиль `TerrainRamp-1.0-Test`. Для каждого пункта ответить `PASS` либо указать точный шаг, фактическое поведение и приложить скриншот.
-
-1. **Скос/крыша/мебель на поверхности.** В редакторе открыть `Tab`, выбрать `Деревянный брус 26°` (`wood_beam_26`) и вести preview над пустой сеткой. В `АВТО` видимая модель должна целиком лежать на сетке, а не наполовину уходить под неё. Колесо вращает деталь без скачка высоты. Повторить на одной крыше/склоне и одном предмете мебели либо декора.
-2. **Q/E и точка под курсором.** На `wood_beam_26` нажимать Q/E: краткое сообщение должно менять `АВТО → 1/N · НИЗ → ... · ВЕРХ → АВТО`. В ручном режиме именно выбранный конец должен идти под курсором. Для мебели без vanilla-точек должны последовательно доступны низ/углы/центр/верх.
-3. **Snap ниже сетки.** Поставить `woodwall` на сетку. Выбрать вторую деталь, Q/E выбрать верхнюю либо нижнюю точку и навести на нижнюю точку первой стены так, чтобы preview оказался ниже текущей сетки. До ЛКМ preview должен реально быть ниже; после ЛКМ взаимное положение деталей сохраняется, даже если сетка пересчитает свой нижний уровень.
-4. **Свежий Array.** Выбрать одну деталь и впервые войти в `Массив`: режим должен быть `УПАКОВАТЬ`, шаг `БЕЗ ЗАЗОРА`, 2×1. Потянуть первую золотую стрелку на несколько копий, отпустить и крутить колесо: ряд должен удлиняться/укорачиваться с постоянным расстоянием, а не заполнять промежуток между двумя концами. Выйти из Array и войти снова — снова получить чистый `УПАКОВАТЬ / БЕЗ ЗАЗОРА`. `Применить`, затем `Ctrl+Z`: весь массив исчезает одной операцией.
-5. **Явный `ПО ДЛИНЕ`.** Только для различения логики вручную переключить режим на `ПО ДЛИНЕ`, задать стрелкой два конца и покрутить колесо. Здесь копии должны перераспределяться между фиксированными концами — это ожидаемое отдельное поведение, а не default.
-
-После пунктов 1–5 прислать `PASS/FAIL` и текущий `BepInEx/LogOutput.log`. Прежние принятые пункты 3–5 и 7–8 повторять полностью не требуется. Save/reload мира и multiplayer остаются отдельными gates.
-
-Recipe foundation v10, сохраняемый Array, Align/Distribute, кривые и новый F9 HUD не начинать автоматически.
-
-Итоговые доказательства: `artifacts/fix-0.19.33/REPORT.md`, `artifacts/fix-0.19.33/final-verification.json`, `artifacts/ui-runtime/actual-divider-check.txt` и `artifacts/ui-runtime/verification-status.json`.
-
-Ниже сохранён исторический handoff 0.19.32.
-
----
-
-# Передача BuildWorks — 0.19.32 / Valheim 1.0, 2026-09-10
-
-## ТЕКУЩАЯ СОХРАНЁННАЯ ТОЧКА
-
-Игровой smoke 0.19.31 принял live Favorites, `Q/E`, Undo/Redo удаления, мировую опору и атомарное уничтожение незавершённого чертежа. Он выявил следующие корни: одиночная деталь редактора предварительно сдвигалась по renderer bounds и поэтому наклонные prefab не совпадали с Hammer; native snap нельзя было опустить ниже сетки; Select с уже видимой гизмой не показывал numeric Transform; не хватало быстрых visibility/frame override; snap-маркеры могли полностью перекрыть Array handles; после Esc возвращался ghost другой palette piece.
-
-В 0.19.32 свободный single-part preview сохраняет настоящий prefab origin, а native snap применяется уже от него; предварительный grounding оставлен только для compound preview. Режим Select при редактируемом выборе показывает существующие числовые Transform-поля. `H` скрывает выбор, `Shift+H` изолирует выбор/группу, `Ctrl+H` показывает всё кроме выбора, `Alt+H` возвращает всё; каждая команда — одна транзакция Undo. Удержание `N` временно игнорирует blueprint/group primary frame и показывает frame всего выбора, не меняя сам выбор и набор движущихся деталей. Сообщение `Q/E` стало кратковременным. Screen-space Array handles выносятся за самую дальнюю projected snap-точку, а hit-test использует реально нарисованную линию. Атомарный rollback теперь сохраняет исходную blueprint palette piece, поэтому следующая попытка возвращает тот же ghost.
-
-Автоматическая проверка PASS: Release 0/0; Geometry 104; Store; EditorBridge 3; WorldLayout 10; HostContract; Unity Workbench 81; независимый read-only review и Ponytail PASS. Проверенная пара установлена только в `TerrainRamp-1.0-Test` при закрытом Valheim; установленная DLL совпадает с artifact и имеет FileVersion 0.19.32.0. Игра Codex не запускалась. Runtime-поведение 0.19.32 ещё не принято; Recipe v10, кривые и будущие этапы не начинались.
-
-- `BuildWorks.dll`: `9B7E59C18637F4FDA6105D04DE8B299C4EFD583EB20BD670A75A9B75AEB4F3D2`.
-- `BuildWorks.Geometry.dll`: `A9B4A6408F2C2F10F3C0C04228D0664D8217EE0C6FF8B0BE6CB6BDAE17FEC60C`.
-- Резервная копия установленной 0.19.31: `artifacts/fix-0.19.32/pre-install-0.19.31`.
-
-## СЛЕДУЮЩИЙ ШАГ: РУЧНОЙ SMOKE 0.19.32
-
-Запустить профиль `TerrainRamp-1.0-Test`. Для каждого пункта ответить `PASS` либо указать точный шаг, фактическое поведение и приложить скриншот.
-
-1. **Origin нестандартных деталей.** В редакторе `Tab` → `Деревянный брус 26°` (`wood_beam_26`). Сравнить его preview с обычным Hammer: точка, относительно которой деталь вращается и снапится, должна совпадать с prefab, а не переноситься в нижний центр renderer. Повторить на крыше/склоне и одной мебели либо декоре.
-2. **Native snap ниже сетки.** Поставить одну деталь на нулевую сетку. Вторую деталь привязать её верхней/нижней native-точкой под первой: preview должен свободно оказаться ниже сетки без последующей гизмы. `Q/E` кратко показывают выбранную точку, но footer не хранит постоянную копию режима.
-3. **Select и точные параметры.** Обычным Select выбрать деталь и затем несколько деталей/группу. Пока гизма видна, справа сразу должны быть числовые смещение/поворот/масштаб и `Применить`, без отдельного нажатия `G`. Снять выбор — должна вернуться справка Select.
-4. **Скрытие и изоляция.** На выборе проверить `H` — скрыть; `Shift+H` — оставить только выбранное либо выбранную группу; `Ctrl+H` — показать всё кроме выбора; `Alt+H` — показать всё. После каждого действия `Ctrl+Z`, затем `Ctrl+Y`: вся операция откатывается/возвращается целиком.
-5. **Frame без опоры.** В multi-selection с назначенной `ОПОРОЙ ЧЕРТЕЖА` либо локальной опорой удержать `N`: гизма временно должна перейти к frame всех выделенных деталей. Отпустить `N`: гизма возвращается на опору. Трансформация в обоих случаях двигает весь выбранный набор, а не только опорную деталь.
-6. **Array handles.** На большой или нестандартной детали открыть `Массив`: все золотые стрелки должны быть видимы и нажимаемы за snap-маркерами. Перетянуть каждую ось; preview меняется в реальном времени, `Применить` остаётся одной записью Undo.
-7. **Атомарный Esc и тот же ghost.** Начать ставить сложный чертёж 5+ деталей и после первых 1–2 частей нажать Esc. Все части только этой попытки исчезают, ресурсы возвращаются ровно один раз, прежняя готовая постройка остаётся. При следующем размещении должен появиться тот же выбранный чертёж, а не другая обычная деталь.
-8. **Короткая мировая регрессия.** Multi-group выбор держит гизму на `ОПОРЕ ЧЕРТЕЖА`; обычный Hammer снапит по этой опоре; F9 и `N` не двигают модель; первый Array/Contour не сдвигает исходник. EarthWorks/TerrainRamp загружаются без исключений.
-
-После пунктов 1–8 прислать `PASS/FAIL` и текущий `BepInEx/LogOutput.log`. Save/reload мира и multiplayer остаются отдельными gates.
-
-Recipe foundation v10, кривые и новые операции редактирования начинаются только отдельным явно разрешённым проходом.
-
-Итоговые доказательства: `artifacts/fix-0.19.32/REPORT.md`, `artifacts/fix-0.19.32/final-verification.json` и Workbench evidence находятся в том же каталоге.
-
-Ниже сохранён исторический handoff 0.19.31.
-
----
-
-# Передача BuildWorks — 0.19.27 / Valheim 1.0, 2026-09-10
-
-## ТЕКУЩАЯ СОХРАНЁННАЯ ТОЧКА
-
-Игровой smoke 0.19.26 подтвердил: ручной `ВАНИЛЬНЫЙ МОЛОТОК` работает; внешняя кнопка стабильна и корректно расположена во всех native-вкладках; held-RMB выбранной строки исправлен; выбор `woodwall` даёт только призрак и размещает стену отдельным вторым ЛКМ. Остались два связанных UX-дефекта: при новом открытии один кадр показывался vanilla Hammer, затем индекс; внешняя кнопка сохраняла старое имя `BUILDWORKS — ЧЕРТЕЖИ 2`, хотя теперь открывает весь BuildWorks.
-
-В 0.19.27 автоматический вход перенесён из следующего `Hud.UpdateBuild` непосредственно в Harmony-postfix `BuildUi.OpenBuildMenu`: host успевает подготовить UI, но `EnterNativeIndex` выполняется до первого рендера. `BuildUi.Close` сбрасывает сессию для следующего открытия. `OpenDefaultIndex` игнорирует повторный `OpenBuildMenu` внутри уже видимой сессии, поэтому ручной vanilla не получает bounce-back даже при смене строительного инструмента. Внешняя кнопка переименована в `BUILDWORKS`; количество чертежей остаётся внутри раздела. Все подтверждённые исправления 0.19.26 и same-frame placement gate сохранены.
-
-Исправление автоматически проверено и установлено **только** в `TerrainRamp-1.0-Test` при закрытом Valheim. Patched Jotunn 2.29.2 (`8ab1ef5`), EarthWorks 0.6.2 и TerrainRamp 0.3.3 не менялись. Никаких commits/push/PR.
-
-- `BuildWorks.dll` 0.19.27.0: `70EF98B926AEAE1AD654D615BC7D39E7AE67282435E99A907C9F4063296AD360`.
-- `BuildWorks.Geometry.dll`: `49F93469527C431FEB321FD4CAA935201B2A739C068FF4DBE0CC225032D0A618`.
-- Release 0/0; Geometry 103; Store; EditorBridge 3; WorldLayout 10; HostContract PASS; Unity Workbench 81 PASS.
-- Независимый read-only correctness review PASS; Ponytail review: `Lean already. Ship.`
-- Exact host/Unity MemberRef: BuildWorks 686/0, EarthWorks 274/0 (3 CLR array pseudo-members исключены), TerrainRamp 178/0, TestBootstrap 141/0, Jotunn 880/0.
-- Installed patched Jotunn: `63301BE5B1F58057BF989896A78CC86D84BB8ACA8D9D82D72E6644AFD5610AC8`, product `2.29.2+8ab1ef583e7d4ab2b005a7baf073a3863286e24d`. Публичный Thunderstore 2.29.2 остаётся старой сборкой и может перезаписать patch при автоматическом обновлении.
-- Installed EarthWorks 0.6.2: `39E1AE348E537DEEADB1A46A7565B09BA18AD785D1EFFAACC7B014F6EE7976B3`; TerrainRamp 0.3.3: `90646761F2A81CCC44AB18DADF28D0ECDB6A3CA29DE9FAAACCFC740B1CD801BB`.
-- Резервная копия установленной 0.19.26: `artifacts/fix-0.19.27/pre-install-0.19.26`.
-- Лог игрового запуска 0.19.26 до исправления: `artifacts/fix-0.19.27/runtime-0.19.26-before-fix.log`, SHA-256 `5A88440308458CC56B6419DBDBFC1D79CF219A458133C8E506561BE860A82802`.
-- `Default\BepInEx\plugins` очищен от Ostrix runtime DLL; прежний установленный `Ostrix-TerrainRamp` сохранён в `artifacts/retired-default-installs/Ostrix-TerrainRamp-20260909-1826`.
-- Текущие BuildWorks, EarthWorks, TerrainRamp и TestBootstrap имеют 0 неразрешённых host/Unity MemberRef. Сторонние моды Default в этом профиле не установлены. Подробности и startup-лог: `artifacts/host-1.0-compat/REPORT.md`.
-- Recipe v10, кривые и будущие этапы ROADMAP не начинались.
-
-## ШАГ A: РЕЗУЛЬТАТ ИГРОВОГО SMOKE 0.19.26
-
-PASS: vanilla-переход, четыре вкладки, внешний вход, held-RMB выбранной строки и ghost-only выбор `woodwall`. PARTIAL: индекс открывался автоматически, но на один кадр позже native окна. Текст внешней кнопки больше не соответствовал её новой общей роли.
-
-## СЛЕДУЮЩИЙ ШАГ B: ЦЕЛЕВОЙ SMOKE 0.19.27 В ЛАБОРАТОРНОМ МИРЕ
-
-1. **Никакого flash.** Взять молоток и открыть меню: первым видимым состоянием сразу является индексный BuildWorks; деревянная vanilla-сетка не появляется даже на долю секунды.
-2. **Точное имя.** Нажать `ВАНИЛЬНЫЙ МОЛОТОК`: внешняя кнопка подписана ровно `BUILDWORKS`, без `ЧЕРТЕЖИ` и числа. Переключить `Категории → Материалы → Недавнее → Избранное`: имя и положение не меняются.
-3. **Сессия и повторное открытие.** Пока native Hammer открыт, сменить доступный строительный инструмент/вкладку: он не должен сам вернуть индекс. Закрыть меню и открыть снова: индекс появляется сразу и без flash.
-
-Для каждого пункта ответить `PASS` либо указать точный шаг, фактическое поведение и приложить скриншот/лог.
-
-## ТОЧНЫЕ КОМАНДЫ АВТОМАТИЧЕСКОЙ ПРОВЕРКИ
-
-PowerShell 7, workdir — корень проекта:
-
-```powershell
-dotnet build src/BuildWorks/BuildWorks.csproj -c Release --no-restore '-p:TargetPlatformSdkPath=C:\Program Files (x86)\Windows Kits\10\' '-p:TargetPlatformDisplayName=Windows'
-dotnet run --project tests/BuildWorks.GeometryTests/BuildWorks.GeometryTests.csproj -c Release --no-restore '-p:TargetPlatformSdkPath=C:\Program Files (x86)\Windows Kits\10\' '-p:TargetPlatformDisplayName=Windows'
-dotnet run --project tests/BuildWorks.StoreTests/BuildWorks.StoreTests.csproj -c Release --no-restore '-p:TargetPlatformSdkPath=C:\Program Files (x86)\Windows Kits\10\' '-p:TargetPlatformDisplayName=Windows'
-./tests/BuildWorks.EditorBridgeChecks/Run.ps1
-./tests/BuildWorks.WorldLayoutChecks/Run.ps1
-./scripts/Test-HostContract.ps1
-./scripts/Capture-UiWorkbench.ps1
-```
-
-Итог: `artifacts/fix-0.19.27/REPORT.md`, `artifacts/fix-0.19.27/final-verification.json` и `artifacts/host-1.0-compat/REPORT.md`.
-
-Ниже сохранён исторический handoff 0.19.16–0.19.17; он больше не является текущей точкой.
-
----
-
-# Передача BuildWorks — автоматический проход 0.19.16 завершён, 2026-09-09
-
-## ТЕКУЩАЯ СОХРАНЁННАЯ ТОЧКА
-
-Согласованная Ostrix модель frame реализована, автоматически проверена и установлена **только** в `TerrainRamp-Test`. Valheim до и после установки был закрыт; Codex игру не запускал. `Default\BepInEx\plugins` чист.
-
-- `BuildWorks.dll` 0.19.16.0: `5D22A690AD852FCF0957DE180695D5F0B8EDFC130DCFB5B25CEECCC905592253`.
-- `BuildWorks.Geometry.dll`: `49F93469527C431FEB321FD4CAA935201B2A739C068FF4DBE0CC225032D0A618`.
-- Release: 0 ошибок/0 предупреждений; Geometry 103; Store; EditorBridge 3; WorldLayout 10; HostContract; Unity Workbench 81 PASS.
-- Независимый correctness review нашёл две ошибки — история F9 хранила pose опоры вместо root, а editor Array использовал средний центр вместо опоры группы. Обе исправлены отдельными регрессиями; повторный review PASS.
-- Ponytail review: `Lean already. Ship.`
-- Игровой smoke 0.19.16, reload мира и multiplayer ещё не выполнялись.
-
-Что изменено:
-
-1. Repeat/Contour теперь один раз переводят пользовательский pivot pose в blueprint root pose; первое перестроение массива не должно сдвигать исходный чертёж.
-2. F9-гизма явной `Опоры чертежа` использует центр bounds этой детали, а не нижнюю точку. RightShift временно включает общий frame без изменения root или истории.
-3. Структура дерева, локальная `Опора группы` и мировая `Опора чертежа` разделены. У каждой группы может быть своя опорная деталь из любых её потомков; мировая опора назначается независимо.
-4. При выборе группы гизма и editor Array используют одну и ту же опору, но transform применяется ко всем потомкам группы. Без опоры используется центр всей группы.
-5. Удерживаемое ПКМ-меню детали предлагает `ОПОРА ЧЕРТЕЖА` и отдельную `ОПОРА ГРУППЫ: <имя>` для каждой родительской группы. Дублирование remap-ит опоры на копии; delete/reparent очищают только ставшие недействительными локальные ссылки одной Undo-операцией.
-6. Store format 9 сохраняет `pivotPartId` группы. Старые `primaryPartId` и `primaryGroupId` читаются совместимо без переписывания координат; `primaryPartId` остаётся внутренним wire-полем мировой опоры.
-
-Следующее действие выполняет Ostrix вручную в игре. Не запускать/закрывать/управлять Valheim. Не начинать редизайн F9 HUD и карточки ROADMAP 03–09. Никаких commits/push/PR.
-
-## РУЧНОЙ ИГРОВОЙ SMOKE 0.19.16
-
-Запустить профиль `TerrainRamp-Test`. Для каждого пункта ответить `PASS` либо указать точный шаг и фактическое поведение.
-
-1. **Обычное размещение `база1`.** Выбрать чертёж молотком, но не ставить. Ожидание: нужная стена остаётся мировой опорой, весь призрак и snap выглядят как до F9.
-2. **Вход F9 без скачка.** Открыть F9. Ожидание: чертёж не двигается, гизма стоит в центре bounds выбранной `Опоры чертежа`, а не у земли и не в центре всего чертежа.
-3. **Первый Array rebuild.** Нажать `МАССИВ`: модель не двигается. Затем изменить число копий или потянуть первую золотую стрелку. Ожидание: исходная модель и первая копия не прыгают вниз; массив растёт от той же опоры. Проверить подъём и один угол. До `УСТАНОВИТЬ` мир не меняется.
-4. **Contour.** Вернуть/сбросить тест, включить `КОНТУР` и задать хотя бы первый сегмент. Ожидание: первое перестроение не переносит исходный чертёж в другой frame.
-5. **RightShift и история.** В whole-blueprint F9 удержать правый Shift. Ожидание: только гизма/точки временно переходят к общему центру, модель остаётся на месте. Отпустить — возврат к мировой опоре. После этого проверить `ОТМЕНИТЬ`, `ВЕРНУТЬ` и `СБРОСИТЬ`: чертёж не получает накопленного смещения.
-6. **Разные опоры вложенных групп.** В Blueprint Editor создать две вложенные группы. Удержать ПКМ на детали: должны быть `ОПОРА ЧЕРТЕЖА` и по одной `ОПОРА ГРУППЫ: <имя>` для каждой группы-предка. Назначить разным группам разные детали.
-7. **Transform группы.** Выбирать по очереди каждую группу. Ожидание: её гизма стоит на собственной опорной детали, но перемещение/вращение двигает всю группу. Один Ctrl+Z возвращает всю операцию. Мировая опора другой детали не перехватывает гизму выбранной группы.
-8. **Fallback и копия.** Дублировать группу: у копии гизма должна использовать скопированную опорную деталь, а не оригинал. Перенести опорную деталь исходной группы наружу: эта группа переходит на общий центр; мировая опора чертежа сохраняется, если деталь не удалена.
-9. **Сохранение.** Сохранить чертёж, закрыть редактор и открыть его снова. Ожидание: мировая опора и локальные опоры групп сохранились, гизмы стоят там же.
-10. **Установка и reload.** Только после пунктов 1–9 поставить тестовый чертёж, сохранить мир, выйти и войти снова. Проверить положение всех частей. Multiplayer в этот smoke не входит.
-
-Особенно важны пункты 2, 3 и 5: приложить скриншот до/после и написать, сдвинулась ли сама модель хоть на одном переходе.
-
-## ТОЧНЫЕ КОМАНДЫ ПОВТОРНОЙ ПРОВЕРКИ
-
-PowerShell 7, workdir — корень проекта:
-
-```powershell
-dotnet build src/BuildWorks/BuildWorks.csproj -c Release --no-restore '-p:TargetPlatformSdkPath=C:\Program Files (x86)\Windows Kits\10\' '-p:TargetPlatformDisplayName=Windows'
-dotnet run --project tests/BuildWorks.GeometryTests/BuildWorks.GeometryTests.csproj -c Release --no-restore '-p:TargetPlatformSdkPath=C:\Program Files (x86)\Windows Kits\10\' '-p:TargetPlatformDisplayName=Windows'
-dotnet run --project tests/BuildWorks.StoreTests/BuildWorks.StoreTests.csproj -c Release --no-restore '-p:TargetPlatformSdkPath=C:\Program Files (x86)\Windows Kits\10\' '-p:TargetPlatformDisplayName=Windows'
-./tests/BuildWorks.EditorBridgeChecks/Run.ps1
-./tests/BuildWorks.WorldLayoutChecks/Run.ps1
-./scripts/Test-HostContract.ps1
-./scripts/Capture-UiWorkbench.ps1
-```
-
-Повторная установка разрешена только после PASS всех проверок и отдельного подтверждения, что Valheim закрыт:
-
-```powershell
-./scripts/Deploy-TestBuild.ps1 -TargetProfile TerrainRamp-Test
-```
-
-Итоговые доказательства: `artifacts/fix-0.19.16/REPORT.md` и `artifacts/fix-0.19.16/final-verification.json`.
-
-Ниже сохранён исторический handoff 0.19.15; он больше не является текущей точкой.
-
----
-
-# АВТОМАТИЧЕСКАЯ БАЗА: BuildWorks 0.19.15, 2026-09-08
-
-## ТЕКУЩЕЕ СОСТОЯНИЕ 0.19.15
-
-Исправления по последнему игровому отзыву реализованы, проверены и установлены **только** в `TerrainRamp-Test`. Valheim был закрыт до и после установки; игра не запускалась. `Default\BepInEx\plugins` чист.
-
-- `BuildWorks.dll` 0.19.15.0: `38BF187F35B803571C59F941E51D466B27280B15F9AEECEA119FBC20665AB637`.
-- `BuildWorks.Geometry.dll`: `819315840F1E82BEF8F08D47B7E33A8DEB2B9CF09D9CB51DD831532D712B7324`.
-- Release 0 ошибок/0 предупреждений; Geometry101; Store; EditorBridge3; WorldLayout8; HostContract; Unity Workbench81 PASS.
-- Независимый correctness review и Ponytail review: PASSED после исправления F9-входа через `FramePartIndex`, frame главной группы в редакторе и удаления недостижимого старого RMB-кода.
-- Игровой smoke 0.19.15, reload мира и multiplayer не выполнялись.
-
-Следующее действие выполняет Ostrix вручную в игре. Не запускать/закрывать/управлять Valheim. Не начинать карточки ROADMAP 03–09 автоматически. Не создавать commits/push/PR.
-
-## РУЧНОЙ ИГРОВОЙ SMOKE 0.19.15
-
-Запустить профиль `TerrainRamp-Test`. Для каждого пункта ответить `PASS` или указать точный шаг и фактическое поведение.
-
-1. **Масштаб Blueprint Editor.** Открыть редактор → `НАСТРОЙКИ` → несколько раз нажать `ИНТЕРФЕЙС`. Ожидание: цикл `60…140%`, весь собственный UI BuildWorks действительно уменьшается/увеличивается, панели остаются доступны. Закрыть и снова открыть редактор: выбранное значение должно сохраниться.
-2. **Масштаб F9.** Выйти в мир, выбрать деталь молотком, открыть F9 и нажать кнопку `UI N%` в заголовке. Ожидание: тот же сохранённый процент и цикл `60…140%`; HUD не закрывает центр экрана после уменьшения. Каталог молотка — native-окно Valheim и пока следует масштабу интерфейса самой игры, а не этой кнопке.
-3. **Outliner marking-меню.** В дереве нажать и **удерживать** ПКМ на детали. Ожидание: компактное меню появляется ровно у курсора, дерево не исчезает и не перекрывается полноэкранной панелью. Не отпуская ПКМ, навести на `ПЕРЕИМЕНОВАТЬ`, затем отпустить: команда срабатывает. Повторить на группе с `ГЛАВНАЯ ГРУППА`. Удержать ПКМ и отпустить вне меню: ничего не меняется, меню закрывается.
-4. **Команды дерева.** Тем же жестом проверить показать/скрыть, блок/разблокировать, сгруппировать/разгруппировать, дублировать, удалить тестовую копию и `В ROOT`. После дублирования один Ctrl+Z должен убрать весь дубль. Перенос в конкретную группу пока проверять drag/drop либо через кнопку `...`: прямого списка целевых групп в удерживаемом меню ещё нет.
-5. **Главная группа без главной детали.** Создать группу минимум из двух деталей и назначить её главной; главную деталь снять. Добавить третью деталь далеко и вне группы. Ожидание: при выборе главной группы гизма/точки относятся к группе, внешняя деталь в frame не входит. Сохранить, закрыть и открыть чертёж: звезда главной группы сохраняется.
-6. **Главная деталь выше главной группы.** В главной группе назначить одну деталь главной. Выбрать саму группу. Ожидание: гизма стоит на главной детали и показывает её точки, но перетаскивание двигает **всю выбранную группу**. Один Ctrl+Z возвращает всю группу. Главная деталь имеет приоритет над главной группой.
-7. **Общий fallback.** Снять и главную деталь, и главную группу. Ожидание: центр, гизма и точки снова считаются по всему чертежу. Старые чертежи без новых полей должны открываться именно так.
-8. **`база1` и F9.** Убедиться, что в `база1` главной назначена нужная стена, а part0-столб остаётся обычной деталью. Начать обычное размещение молотком: снап должен идти по стене. Не ставя чертёж, открыть F9. Ожидание: гизма остаётся на **той же стене**, столб не пропадает, в стороне не появляется дублированная стена, весь призрак сохраняет взаимное расположение. Подвинуть/повернуть и применить.
-9. **RightShift.** Для чертежа с главной деталью в whole-blueprint F9 удержать правый Shift. Ожидание: временно показывается общий frame всего чертежа. Отпустить: возврат к главной детали без изменения сохранённого назначения.
-10. **Каталог по Tab.** В Blueprint Editor без активного текстового поля нажать `Tab`. Ожидание: каталог деталей открывается один раз. Поставить деталь и обычным ПКМ отменить только следующий призрак: уже поставленная деталь остаётся, каталог снова доступен.
-11. **Массив и `БЕЗ ЗАЗОРА`.** Открыть `Массив`, навести на `БЕЗ ЗАЗОРА`. Ожидание: подсказка появляется сбоку и не закрывает кнопку. Нажимать кнопку: текущий точный шаг виден на кнопке либо в строке `Шаг`. Зажать ЛКМ на числовом поле подъёма/угла и тянуть: призрак меняется **до отпускания ЛКМ**; `Применить` создаёт массив одной записью Undo.
-12. **Карточка чертежа в молотке.** Нажать и удерживать ПКМ в разных местах карточки. Ожидание: меню каждый раз открывается именно в точке нажатия; не отпуская, навести на безопасное действие и отпустить — срабатывает ровно оно. Отпускание вне меню закрывает его без действия. Быстрый двойной ЛКМ по карточке по-прежнему начинает размещение.
-13. **Сохранение/reload.** Сохранить тестовый чертёж с главной группой и главной деталью, поставить его, сохранить мир, выйти и снова войти. Проверить положение всех частей и сохранение обоих назначений. Multiplayer в этот smoke не входит.
-
-Особенно важный ответ нужен по пунктам 3, 6, 8, 11 и 12: где был курсор/гизма, что произошло до отпускания кнопки и что сработало после отпускания.
-
-## ТОЧНЫЕ КОМАНДЫ ПОВТОРНОЙ ПРОВЕРКИ
-
-PowerShell 7, workdir — корень проекта:
-
-```powershell
-dotnet build src/BuildWorks/BuildWorks.csproj -c Release --no-restore '-p:TargetPlatformSdkPath=C:\Program Files (x86)\Windows Kits\10\' '-p:TargetPlatformDisplayName=Windows'
-dotnet run --project tests/BuildWorks.GeometryTests/BuildWorks.GeometryTests.csproj -c Release --no-restore '-p:TargetPlatformSdkPath=C:\Program Files (x86)\Windows Kits\10\' '-p:TargetPlatformDisplayName=Windows'
-dotnet run --project tests/BuildWorks.StoreTests/BuildWorks.StoreTests.csproj -c Release --no-restore '-p:TargetPlatformSdkPath=C:\Program Files (x86)\Windows Kits\10\' '-p:TargetPlatformDisplayName=Windows'
-./tests/BuildWorks.EditorBridgeChecks/Run.ps1
-./tests/BuildWorks.WorldLayoutChecks/Run.ps1
-./scripts/Test-HostContract.ps1
-./scripts/Capture-UiWorkbench.ps1
-```
-
-Повторная установка допустима только после PASS всех проверок и подтверждения, что Valheim закрыт:
-
-```powershell
-./scripts/Deploy-TestBuild.ps1 -TargetProfile TerrainRamp-Test
-```
-
-Итоговые доказательства: `artifacts/fix-0.19.15/REPORT.md` и `artifacts/fix-0.19.15/final-verification.json`.
-
-Ниже сохранён исторический handoff 0.19.14; он больше не является текущей точкой.
-
----
-
-# ИСТОРИЯ: передача BuildWorks 0.19.14
-
-## ТЕКУЩЕЕ СОСТОЯНИЕ 0.19.14
-
-Текущий проход по игровому отзыву реализован, проверен и установлен **только** в `TerrainRamp-Test`. `BuildWorks.dll` имеет SHA-256 `3DA142F5D7F9A2CFE0D398B2F1F3860F9CE55EC0193F5805BDFF6805D2C1686D`; установленная копия совпадает с `artifacts/bin`. Valheim при установке был закрыт, игра не запускалась, `Default\BepInEx\plugins` чист.
-
-Release 0/0; Geometry 99; Store; EditorBridge 3; WorldLayout 8; HostContract и Unity Workbench 81 PASS. Итоговые доказательства: `artifacts/fix-0.19.14/REPORT.md` и `artifacts/fix-0.19.14/final-verification.json`.
-
-Следующее действие выполняет Ostrix вручную в игре. Не запускать/закрывать/управлять Valheim. Не начинать карточки ROADMAP 03–09 автоматически. Не создавать commits/push/PR.
-
-## РУЧНОЙ ИГРОВОЙ SMOKE 0.19.14
-
-Запустить профиль `TerrainRamp-Test` и выполнить по порядку:
-
-1. **Цикл добавления детали.** Открыть Blueprint Editor, выбрать деталь, поставить ЛКМ. Пока следующий призрак активен, нажать обычный ПКМ. Ожидание: поставленная деталь остаётся, исчезает только текущий призрак, каталог открывается сразу, без Esc и промежуточного появления гизмы.
-2. **Живой массив.** Выбрать деталь или группу, открыть `Массив`, задать золотой стрелкой направление. Зажать ЛКМ на числовом поле `Подъём` и тянуть. Ожидание: призрак меняется на каждом промежуточном числе **до отпускания ЛКМ**. Повторить для yaw/pitch/roll. Проверить циклы шагов `0.01/0.05/0.10/0.50/1 м` и `0.1/0.5/1/5/15°`. `Отмена` не меняет документ; `Применить` создаёт копии, один Ctrl+Z удаляет весь массив.
-3. **Outliner RMB.** Нажать ПКМ по детали и группе. Ожидание: только команды дерева, без Position/Rotation/Scale. Проверить rename, видимость, lock, group/ungroup, duplicate/delete, перенос в корень/группу. Одно дублирование создаёт один набор; один Ctrl+Z его убирает.
-4. **Главная деталь.** ПКМ по нужной строке → назначить главной; появляется звезда. Добавить далёкую деталь и сохранить. В мировом/F9 whole-blueprint режиме центр, гизма и точки должны оставаться на главной детали. Удерживать `RightShift`: временно появляются общий центр и все точки; отпустить — возврат к главной без изменения чертежа. Снять главную — снова общий центр/точки. Сохранить, закрыть и открыть редактор: назначение должно сохраниться.
-5. **`база1`.** Сначала открыть/разместить старый чертёж без главной детали: ожидание — общий центр, а не столб. Затем назначить осмысленную главную деталь и убедиться, что центр/точки следуют только ей.
-6. **Библиотека молотка.** Один ЛКМ по карточке только выбирает. Быстрый двойной ЛКМ начинает размещение. ПКМ открывает действия боковой панели: разместить, редактировать, переименовать, категория, обновить preview, ресурсы, удалить. Удаление ценного чертежа выполнять не обязательно — достаточно проверить наличие команды и закрытие меню.
-7. **Размещение и reload.** Поставить тестовый чертёж, сохранить мир, выйти и снова войти. Проверить положение деталей и сохранённое назначение главной. Multiplayer в этот smoke не входит.
-
-Ответ Ostrix нужен по пунктам 1–7: `PASS` либо точный шаг отказа; для пункта 2 отдельно указать, двигался ли призрак до отпускания ЛКМ; для пункта 4 — что произошло при нажатии и отпускании `RightShift`.
-
-## ТОЧНЫЕ КОМАНДЫ ПОВТОРНОЙ ПРОВЕРКИ
-
-PowerShell 7, workdir — корень проекта:
-
-```powershell
-dotnet build src/BuildWorks/BuildWorks.csproj -c Release --no-restore '-p:TargetPlatformSdkPath=C:\Program Files (x86)\Windows Kits\10\' '-p:TargetPlatformDisplayName=Windows'
-dotnet run --project tests/BuildWorks.GeometryTests/BuildWorks.GeometryTests.csproj -c Release --no-restore '-p:TargetPlatformSdkPath=C:\Program Files (x86)\Windows Kits\10\' '-p:TargetPlatformDisplayName=Windows'
-dotnet run --project tests/BuildWorks.StoreTests/BuildWorks.StoreTests.csproj -c Release --no-restore '-p:TargetPlatformSdkPath=C:\Program Files (x86)\Windows Kits\10\' '-p:TargetPlatformDisplayName=Windows'
-./tests/BuildWorks.EditorBridgeChecks/Run.ps1
-./tests/BuildWorks.WorldLayoutChecks/Run.ps1
-./scripts/Test-HostContract.ps1
-./scripts/Capture-UiWorkbench.ps1
-```
-
-Повторная установка допустима только после PASS всех проверок и подтверждения, что Valheim закрыт:
-
-```powershell
-./scripts/Deploy-TestBuild.ps1 -TargetProfile TerrainRamp-Test
-```
-
-Ниже сохранён исторический handoff 0.19.13; он больше не является текущей точкой.
-
----
-
-## ИСТОРИЯ: 0.19.13
-
-## ROLE
-Текущий проход0.19.13 завершён. Не продолжать будущие этапы дорожной карты автоматически; следующий игровой smoke выполняет Ostrix.
-
-## GOAL
-Сохранить проверенное состояние0.19.13 и границу следующего действия. Версия установлена только в `TerrainRamp-Test`; это тестовая сборка, не публичный релиз.
-
-## CONTEXT
-
-Корень проекта:
-`C:\Users\nfspr\AppData\Roaming\Thunderstore Mod Manager\DataFolder\Valheim\profiles\Default\BuildWorks`
-
-- Исходники, артефакты и установленная в `TerrainRamp-Test` версия: **0.19.13.0**.
-- `Default\BuildWorks` — исходники, не установленный мод. В `Default\BepInEx\plugins` BuildWorks быть не должно.
-- Git-репозитория нет. База до изменений: `artifacts/fix-0.19.13/baseline` и `baseline-source-hashes.json`. Не перезаписывать их.
-- Итог: `artifacts/fix-0.19.13/REPORT.md` и `final-verification.json`. Исходные и blocker-снимки не менять; финальный снимок: `artifacts/fix-0.19.13/checkpoint-2026-09-08-final`.
-- Полный замысел и статусы: `ROADMAP.md`; задания дальнейшим моделям: `specs/roadmap/README.md` и девять карточек. Точный текущий отзыв: `specs/brief-blueprint-editor-0.19.13.md`.
-
-### Что уже написано
-
-1. Колесо над карточками каталога и Q/E листают страницы. Пользователь подтвердил, что речь именно о карточках. Поиск и прокрутка материалов имеют отдельный ввод.
-2. В «Трансформации» клик по соседней детали не меняет выбор; точки имеют приоритет. «Выбор» сохраняется после каждого клика, поэтому последовательный Shift/Ctrl-выбор работает и общая гизма доступна.
-3. Shift+ЛКМ закрепляет точку даже когда луч попадает в соседнюю деталь. X/Y/Z ограничивают вращение; ось через закреплённую точку видна до движения.
-4. ПКМ по числовому полю сбрасывает его настоящий default с применением. Равномерный масштаб: шаг10 процентных пунктов, настройка0.1–100, Shift для точного движения. Одна деталь130% +10→140%; выбор группы меняет общий множитель.
-5. Только в редакторе золотые точки увеличены вдвое, вспомогательные в1.5 раза; они толще и ярче. F9-размеры не изменены.
-6. «Настройки» на верхней панели; сетка/проекция — постоянные кнопки во вьюпорте. Кнопка сетки использует `#`: прежний символ `▦` отсутствовал в тестовом шрифте.
-7. Перенос строк дерева в группу/корень, множественный перенос, подсказка цели, разворачивание папки и прокрутка у края. Дочерняя строка не уносит выбранную родительскую группу. Esc отменяет только перенос; Ctrl+A/Delete во время переноса не меняют документ.
-
-### Главные файлы
-
-- `src/BuildWorks/BlueprintEditorController.cs`: разделение выбора/трансформации, приоритет точек, масштаб, блокирование жестов над кнопками/при переносе дерева.
-- `src/BuildWorks/BlueprintEditorView.cs`: каталог, числовые поля, настройки, drag/drop дерева.
-- `src/BuildWorks/TransformGizmoView.cs`: размеры/толщина/доступность точек только для `screenSpaceSizing` редактора.
-- `tests/BuildWorks.GeometryTests/Program.cs`: новый `BlueprintGroupDropIsAtomic`, всего98 проверок.
-- `tools/BuildWorks.UiWorkbench/Assets/Editor/UICatalogAcceptance.cs`: реальные UGUI/TMP/drag/drop проверки.
-- `tools/BuildWorks.UiWorkbench/Assets/Editor/ControllerInputAcceptance.cs`: реальные Update/LateUpdate и ввод мыши/клавиш, дополнительные сценарии Transform/pin/axes/scale/DnD.
-- `tools/BuildWorks.UiWorkbench/Assets/Editor/RuntimeEditorAcceptance.cs`: общий прогон, обновлённые размеры точек и граничный масштаб.
-- `tools/BuildWorks.UiWorkbench/Assets/Editor/EditorInteractionAcceptance.cs`: окно анализа пикселей увеличенных золотых/фиолетовых точек.
-
-## SCOPE
-
-Сохранять текущие изменения. Исправлять только причину следующего падения и проверять затронутое поведение. Не переписывать F9, геометрию или весь интерфейс ради удобства теста.
-
-Не запускать/закрывать/управлять Valheim: пользователь ранее закрепил управление игрой за собой. Изолированный Unity Workbench разрешён. Не менять миры/персонажей/библиотеку чертежей для проверки. Установка разрешена только через `scripts/Deploy-TestBuild.ps1 -TargetProfile TerrainRamp-Test` после успешных проверок и при закрытой игре. Сам скрипт не проверяет процессы игры — это обязанность вызывающего. Не создавать commits/PR/push и не публиковать пакет.
-
-## ЗАВЕРШЁННЫЙ LOOP
-
-Scale fixture закрыт: runtime вывел `tool=Select; selection=left; inspectorActive=False`; тест теперь открывает Transform настоящей кнопкой, проверяет `activeTool`/`activeSelf`, затем прежний assert Scale.X=2 проходит.
-
-Измерение Z показало35.5px экранной длины при native anchor hit-radius36. `TransformGizmoView` теперь компенсирует перспективное укорочение каждой editor-оси до100px перед коэффициентом размера; editor Array использует175%, F9 сохраняет135% и прежний world sizing. Controller даёт Layout приоритет над anchor только в режиме Array. Строгий `HitTestAnchor < 0` сохранён.
-
-Финальный Unity6000.0.61f1 завершён `2026-09-08T14:42:53.3351586Z`: `BUILDWORKS_RUNTIME_EDITOR_OK 81 screenshots`. Установка выполнена guarded-скриптом при закрытом Valheim; хеш установленной пары совпал с `artifacts/bin`.
-
-### Что уже произошло с тестами
-
-- Release0 ошибок/предупреждений; Geometry98, Store, EditorBridge3, WorldLayout7 и HostContract PASS на текущем проходе.
-- Первый запуск из песочницы 05.09 не подключался к `LicenseClient-nfspr`. Уже решено запуском Workbench с доступом за пределами песочницы; лицензия получена. Повторной активации у пользователя не просить без нового доказательства проблемы.
-- Первый запуск08.09 остановился на `Missing active UI button: Row_target`. Тест до этого включал свойства в compact-режиме. Исправлено возвратом через реальную кнопку `CompactPane`; следующий прогон прошёл эту точку.
-- Финальный прогон прошёл UICatalog, ControllerInput,81 UI-состояние, native interaction и exact asset.
-- Визуально просмотрены свежие81 UI-состояние,6 input-кадров и4 exact-asset кадра; русский fallback читаем, обрезаний не найдено.
-- Предупреждения Arial fallback и missing host-only Behaviour scripts сохранены в `artifacts/unity-workbench-capture.log`; они не скрыты.
-
-## VERIFY
-
-PowerShell7, workdir — корень проекта:
-
-```powershell
-dotnet build src/BuildWorks/BuildWorks.csproj -c Release --no-restore '-p:TargetPlatformSdkPath=C:\Program Files (x86)\Windows Kits\10\' '-p:TargetPlatformDisplayName=Windows'
-dotnet run --project tests/BuildWorks.GeometryTests/BuildWorks.GeometryTests.csproj -c Release --no-restore '-p:TargetPlatformSdkPath=C:\Program Files (x86)\Windows Kits\10\' '-p:TargetPlatformDisplayName=Windows'
-dotnet run --project tests/BuildWorks.StoreTests/BuildWorks.StoreTests.csproj -c Release --no-restore '-p:TargetPlatformSdkPath=C:\Program Files (x86)\Windows Kits\10\' '-p:TargetPlatformDisplayName=Windows'
-./tests/BuildWorks.EditorBridgeChecks/Run.ps1
-./tests/BuildWorks.WorldLayoutChecks/Run.ps1
-./scripts/Test-HostContract.ps1
-./scripts/Capture-UiWorkbench.ps1
-```
-
-Capture запускает скрытый Unity, копирует13 настоящих исходников, Geometry DLL и иконки. Ожидает81 снимок и маркер `BUILDWORKS_RUNTIME_EDITOR_OK`. Запускать только один Workbench. В текущей среде нужен `sandbox_permissions: require_escalated` для доступа к службе лицензирования. Это не запуск игры. Не редактировать Assets теста во время Unity: это меняет исполняемую версию.
-
-`Test-HostContract.ps1` иногда оставляет старый `$LASTEXITCODE`; оценивать его ошибки/вывод с `$ErrorActionPreference='Stop'`, не приравнивать старый код предыдущей команды к падению проверки.
-
-Указанный пользователем навык `verify` 08.09 не найден в обеих папках навыков. Проектные проверки выполнены напрямую. Перед новым делегированием читать актуальный `ostrix-agent-loops`; новые helper-задачи — только read-only согласно последнему профилю пользователя.
-
-## STOP
-
-Текущий проход закрыт. Не запускать Valheim и не начинать карточки03–09 без нового запроса Ostrix. Игровой smoke, сохранение/перезагрузка и multiplayer не считать выполненными.
-
-## OUTPUT
-
-REPORT, ROADMAP, карточки01–02 и машинный статус обновлены. Следующее действие — только игровой smoke по команде Ostrix; будущие функции остаются отложенными.
+## Historical handoff before .43
+
+Updated 2026-10-01. Active work: **BW-01 owner game acceptance**; BW-00 accounting/network
+gates remain open. Source candidate 0.19.42, Store v9,
+Valheim 1.0.16. Current authorized development/test profile: TerrainRamp-1.0-Test
+only. Earlier integration-profile permission is superseded.
+
+The [roadmap](docs/ROADMAP.md) and [owner test series](specs/roadmap/current-pass.md)
+are the work order. Automated build/geometry/store/localization/bridge/world-layout/
+host/deployment-guard checks pass. Formatting verification exits successfully with
+workspace-loading warnings. Unity Workbench passes 81 captures and actual input
+regressions for stationary contour guides, cancel/tool switching/deletion, F7/button,
+occluder drawing restoration and picking, camera FOV and outliner overflow.
+English/Russian catalogs contain 633 matching keys. The focused 0.19.41 game series
+is accepted by Ostrix's report on 2026-10-01, not independently observed.
+Cost/refund accounting and multiplayer remain untested. No new binary release is published.
+
+0.19.42 is installed in TerrainRamp-1.0-Test through the guarded script with
+Valheim closed; its game series is pending. Previous pair: artifacts/checkpoint-0.19.42/preinstall.
+Installed SHA-256:
+- BuildWorks.dll: `C9DFFEF5A9E989AA00A084906CF6BCCB0617FDA15EB964C4DFC883DB092570D0`
+- BuildWorks.Geometry.dll: `3EF58DB30AE547E99293DD2B90E97BF8FEE005534C055D23656714FA09D9EA16`
+
+Independent correctness re-review passed after anchor-tooltip and Russian handoff fixes. Complexity review:
+Lean already. Ship. Other profiles/mods/saves were not modified.
+
+Latest owner report: held-RMB menu, furniture Q/E, nearby targets, below-grid
+placement, group pivots, Array, two-part save/reopen, world reload and camera pass.
+0.19.39 owner feedback accepts native tab language refresh, menu hover and F framing;
+selection/box is provisionally accepted; .40 contour cleanup is accepted.
+0.19.41 implements the approved editor changes: stationary full-edge contour guides,
+fully hidden occluders (off by default; F7/viewport button), six grouped shortcut hints,
+camera FOV 10–120 with a game-setting reset (disabled in orthographic view), and
+compact 30-unit outliner rows with separate anchor badges, striped rows and a native
+scrollbar. Wheel scrolling is 1.5 times faster. See-through uses seven sampled mesh
+rays per candidate, restores original drawing flags, permits picking through temporary
+occluders, and does not change materials, manual visibility, blueprint data or the world.
+Resources/stations in the native panel, category chooser, shortcut rebinding,
+double-click framing and external translations await their
+UI/format gates. One-piece save remains blocked by the two-part contract.
+Esc removes partial placement and restores its ghost; dropped-resource amounts
+still need accounting. Multiplayer is deferred; no other profile transfer authorized.
+The five focused checks remain a regression reference, not a request to repeat them.
+
+The approved editor design is implemented in .42: explicit Move/Rotate/Points/Scale
+families and Nordic forms, temporary G/R/S with exact cancel/one Undo, 1–4 tools,
+Space/F3 search, compact dropdowns, collapsing hints with next-action strip, Focus,
+resizable tree split, measured tooltips and active hidden-target outline.
+MMB is editor camera-only, Delete removes; world/F9 and Store remain unchanged.
+Unity: 81 fresh captures, current-frame Enter validation, surface/source/camera
+rebasing, return-to-origin, hidden hit-test and EN/RU tooltip scale regressions pass;
+completed 2026-10-01T13:48:43.1597938Z. Release zero warnings/errors, final format
+exit 0 and two independent read-only reviews PASS. No independently observed
+Valheim, networking or full narrow-window tooltip proof. Next: six focused .42
+owner checks. Interior snap access remains separate. Discuss guides/curves again
+before Line A/B implementation.
+After each verified step update EN/RU docs, checkpoint commit and normal GitHub push.
+Keep game binaries, saves and personal logs out of the repository.

@@ -126,6 +126,25 @@ namespace OstrixMods.BuildWorks.StoreTests
                 Console.WriteLine("PASS actual large storage roundtrip " + names[i] + ": " + parts[i] + " parts / " + snaps[i] +
                     " snaps; raw order/source -> document -> native reopen -> portable reimport -> SaveAs; not Valheim build/scale proof");
             }
+            using (var archive = ZipFile.OpenRead(archivePath))
+            {
+                var entry = archive.Entries.Single(e => Path.GetFileName(e.FullName) == "TheDecay CornerStairwell - Apollyon.blueprint");
+                string text; using (var reader = new StreamReader(entry.Open())) text = reader.ReadToEnd();
+                var source = ExternalBlueprintLibrary.Parse(text, entry.FullName);
+                Require(source.importError == null && source.parts.Count == source.importPartCount, "Legacy sign corpus member refused or lost rows");
+                const string literal = "\"3.6 Roentgen. Not Great. Not Terrible\" Achievement";
+                Require(source.parts.Single(p => p.sourceLine == 174).signText == literal, "Actual legacy sign changed");
+                var prepared = ExternalBlueprintLibrary.PrepareForHost(source, _ => UnitScale);
+                string path = Path.Combine(directory, "legacy-sign.json");
+                var store = new CompositeBlueprintStore(path);
+                Require(store.TryGetOrCreatePlacementCopy(prepared, out var saved, out string error), error);
+                var reopened = new CompositeBlueprintStore(path).All().Single();
+                var portable = BlueprintExchangeFormat.Decode(Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(reopened)));
+                Compare(source, reopened); Compare(source, portable);
+                Require(reopened.parts.Single(p => p.sourceLine == 174).signText == literal &&
+                    portable.parts.Single(p => p.sourceLine == 174).signText == literal, "Actual legacy sign lost in roundtrip");
+                Console.WriteLine("PASS actual CornerStairwell legacy sign: " + source.parts.Count + " rows / exact sign174 / source / native reopen / portable; inert unit bases, not game proof");
+            }
             int total = 0, supported = 0;
             using (var archive = ZipFile.OpenRead(archivePath))
             foreach (var entry in archive.Entries.Where(e => e.FullName.EndsWith(".blueprint", StringComparison.OrdinalIgnoreCase) ||
@@ -137,8 +156,8 @@ namespace OstrixMods.BuildWorks.StoreTests
                 if (parsed.importError == null) ++supported;
                 else Console.WriteLine("Remaining parser refusal: " + entry.FullName + " " + parsed.importError);
             }
-            Require(total == 209 && supported == 201, "Whole corpus regression: " + supported + "/" + total);
-            Console.WriteLine("PASS actual209 corpus:201 parsed,8 explicitly refused;4 former snap-limit refusals cleared, no new refusal");
+            Require(total == 209 && supported == 202, "Whole corpus regression: " + supported + "/" + total);
+            Console.WriteLine("PASS actual209 corpus:202 parsed,7 explicitly refused; legacy leading-quote sign refusal cleared, no new refusal");
             Require(Hash(archivePath) == originalHash, "Corpus archive changed");
         }
 

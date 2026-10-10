@@ -60,6 +60,14 @@ namespace OstrixMods.BuildWorks.StoreTests
                 w.Write(Hash("author")); w.Write("старый автор"); });
             var signSource = Prepare(ExternalBlueprintLibrary.Parse(text.Replace("woodwall", "sign").Replace(raw, sign), "sign.blueprint"));
             Require(signSource.parts[0].signText == "Дом Ostrix\nВход" && signSource.parts[0].foreignData == null, "ZDO sign lost");
+            string legacySign = text.Replace("woodwall", "sign").Replace(";\"\";", ";\"quoted\" literal;");
+            var legacySource = Prepare(ExternalBlueprintLibrary.Parse(legacySign.Replace(raw, sign), "legacy-sign-zdo.blueprint"));
+            Require(legacySource.importError == null && legacySource.parts[0].signText == "Дом Ostrix\nВход" &&
+                legacySource.parts[0].foreignData == null && legacySource.sourceDocuments.Single().text == legacySign.Replace(raw, sign),
+                "Legacy literal refused source binding or replaced authoritative ZDO sign text");
+            var legacyUnknown = Prepare(ExternalBlueprintLibrary.Parse(legacySign.Replace(raw, unknown), "legacy-sign-unknown.blueprint"));
+            Require(legacyUnknown.importError == null && legacyUnknown.parts[0].foreignData?.zdo == unknown,
+                "Legacy literal discarded unknown sign ZDO");
             var unarchivedSignInfo = ExternalBlueprintLibrary.Parse(text.Replace("woodwall", "sign").Replace(raw, sign), "unarchived-sign.blueprint");
             unarchivedSignInfo.parts[0].foreignData.info = "unarchived override";
             Require(Prepare(unarchivedSignInfo).parts[0].foreignData?.info == "unarchived override", "Unarchived sign Info lost");

@@ -36,7 +36,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 ExchangeFileWorkflow(Path.Combine(directory, "file-flow"));
                 CatalogRegressionChecks.Run(Path.Combine(directory, "catalog-regressions"));
                 CatalogVisibilityChecks.Run(Path.Combine(directory, "catalog-visibility"));
-                ForeignSignText();
+                ForeignSignText(Path.Combine(directory, "signs"));
                 ForeignSourcesRoundTrip(Path.Combine(directory, "sources.json"));
                 ForeignObjectRoundTrip(Path.Combine(directory, "foreign-objects.json"));
                 ForeignItemStandRecipes();
@@ -773,20 +773,33 @@ namespace OstrixMods.BuildWorks.StoreTests
             Console.WriteLine("PASS inert holder/object/ZDO/chance/unknown-section preservation; native15/portable6; clone/legacy update/rollback; pending execution gate");
         }
 
-        private static void ForeignSignText()
+        private static void ForeignSignText(string directory)
         {
+            Directory.CreateDirectory(directory);
+            int sampleIndex = 0;
             const string prefix = "#Pieces\nwall;;0;0;0;0;0;0;1;\"\"\nsign;;1;0;0;0;0;0;1;";
             foreach (var sample in new[] {
                 Tuple.Create("\"Добро пожаловать!\\n\\\"Дом\\\"\"", "Добро пожаловать!\n\"Дом\""),
                 Tuple.Create(" <color=white>Dock 1 ", " <color=white>Dock 1 "),
-                Tuple.Create("\"\"", (string)null), Tuple.Create("null", (string)null)
+                Tuple.Create("\"\"", (string)null), Tuple.Create("null", (string)null),
+                Tuple.Create("\"3.6 Roentgen. Not Great. Not Terrible\" Achievement", "\"3.6 Roentgen. Not Great. Not Terrible\" Achievement"),
+                Tuple.Create("\"broken", "\"broken"), Tuple.Create("\"valid\" trailing", "\"valid\" trailing")
             })
             {
                 var result = ExternalBlueprintLibrary.Parse(prefix + sample.Item1, "sign.blueprint");
                 Require(result.importError == null && result.parts.Count == 2 && result.parts[1].signText == sample.Item2,
                     "Foreign sign text changed or failed to decode");
+                var prepared = ExternalBlueprintLibrary.PrepareForHost(result, _ => UnitScale);
+                string path = Path.Combine(directory, (++sampleIndex).ToString() + ".json");
+                var store = new CompositeBlueprintStore(path);
+                Require(store.TryGetOrCreatePlacementCopy(prepared, out var saved, out string error), error);
+                var reopened = new CompositeBlueprintStore(path).All().Single();
+                var portable = BlueprintExchangeFormat.Decode(System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(reopened)));
+                foreach (var copy in new[] { saved, reopened, portable })
+                    Require(copy.parts[1].signText == sample.Item2 && copy.parts[1].sourceLine == 3 &&
+                        copy.sourceDocuments.Single().text == prefix + sample.Item1, "Sign/source changed in disk or portable roundtrip");
             }
-            foreach (string text in new[] { "\"broken", "\"valid\" trailing", "\"Bad\\u0001text\"", new string('x', 4097) })
+            foreach (string text in new[] { "\"Bad\\u0001text\"", "\"raw" + (char)1, new string('x', 4097), "\"" + new string('x', 4096) })
             {
                 var result = ExternalBlueprintLibrary.Parse(prefix + text, "bad-sign.blueprint");
                 Require(result.importError != null && result.parts.Count == 0, "Invalid sign accepted partially");
@@ -801,7 +814,13 @@ namespace OstrixMods.BuildWorks.StoreTests
             var extended = ExternalBlueprintLibrary.Parse(prefix + "\"Text\";1;1;1;opaque", "zdo.blueprint");
             Require(extended.parts.Count == 2 && extended.parts[1].signText == "Text" && extended.parts[1].foreignData.zdo == "opaque",
                 "Extended sign ZDO was discarded");
-            Console.WriteLine("PASS sign conversion remains distinct from inert foreign object state; malformed signs reject atomically");
+            foreach (string token in new[] { "\"broken", "\"valid\" trailing" })
+            {
+                bool refused = false;
+                try { BlueprintExchangeFormat.DecodeSignText(token); } catch (InvalidDataException) { refused = true; }
+                Require(refused, "Strict non-sign decoder accepted a legacy literal");
+            }
+            Console.WriteLine("PASS PlanBuild JSON/plain/leading-quote signs; controls/length reject atomically; non-sign decoder remains strict");
         }
 
         private static void ExternalImports(string directory)

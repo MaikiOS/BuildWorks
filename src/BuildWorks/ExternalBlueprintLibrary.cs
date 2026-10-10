@@ -254,7 +254,7 @@ namespace OstrixMods.BuildWorks
                             throw new InvalidDataException("$buildworks_import.fields");
                         string prefab = fields[0].Trim();
                         // Decode only the known sign adapter; every other object payload remains inert and part-bound.
-                        string signText = !vbuild && prefab == "sign" ? BlueprintExchangeFormat.DecodeSignText(fields[9]) : null;
+                        string signText = !vbuild && prefab == "sign" ? BlueprintExchangeFormat.DecodeSignText(fields[9], allowLegacyLiteral: true) : null;
                         int dataIndex = vbuild ? 8 : 13;
                         string info = !vbuild && prefab != "sign" && HasData(fields[9]) ? fields[9] : null;
                         string zdo = fields.Length > dataIndex && HasData(fields[dataIndex]) ? fields[dataIndex] : null;
@@ -416,7 +416,7 @@ namespace OstrixMods.BuildWorks
             if (fields.Length <= dataIndex || fields[dataIndex] != original.zdo ||
                 fields.Length > dataIndex + 1 && HasData(fields[dataIndex + 1]) && fields[dataIndex + 1] != "1" ||
                 (!vbuild && part.prefabName != "sign" && (HasData(fields[9]) ? fields[9] : null) != original.info) ||
-                (!vbuild && part.prefabName == "sign" && BlueprintExchangeFormat.DecodeSignText(fields[9]) != part.signText)) return;
+                (!vbuild && part.prefabName == "sign" && BlueprintExchangeFormat.DecodeSignText(fields[9], allowLegacyLiteral: true) != part.signText)) return;
             var consumed = new HashSet<KeyValuePair<int, Type>>();
             Geometry.BlueprintForeignPartData contents = null;
             string text = part.signText;

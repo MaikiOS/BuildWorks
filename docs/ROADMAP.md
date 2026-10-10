@@ -1,3 +1,17 @@
+## 2026-10-10 — source0.19.127: PlanBuild legacy sign literal
+
+Both sign-only paths now accept leading-quote literals: row parsing and
+source-bound Info validation with ZDO. Holders/preview remain strict;
+known ZDO text keeps authority and unknown data remains inert.
+Normal/QA0/0, Store202/209, Host25185596, localization931, compiled isolation
+and both independent reviews PASSED/Ship after the second-caller fix.
+CornerStairwell467 rows/sign174/exact source survive native/portable roundtrip.
+Seven ±512 refusals were audited: detached far groups/LocationProxy, no
+justified automatic rebase/deletion. Formats22/11 unchanged.
+Protocol: docs/LEGACY_SIGN_CHECKPOINT_2026-10-10.md.
+InstalledQA.117 hashes unchanged; Default clean. No.127 deployment,
+Valheim/saves/network. Next: fresh QA installation and short full
+import→edit→ghost→build→reload scenario without resetting resource receipts.
 ## 2026-10-10 — source0.19.126: isolated QA selection/capture cap
 
 Normal512/QA50000 reuse editor budget. Loaded identity guard before piece513

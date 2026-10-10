@@ -44,6 +44,19 @@ internal static class StorageCaptureAcceptance
                 state.Format == BlueprintForeignPartData.NativeContainerFormat && state.Info == "5:2:1:12|StorageFixtureWood" &&
                 state.Zdo == original && zdo.Writes == writes && ReferenceEquals(zdo.GetByteArray(ZDOVars.s_items, null), bytes),
                 "capture lost data or wrote live ZDO");
+            Require(!BlueprintItemStandPlacement.CanRestore(piece, state), "nonempty archive became a survival restoration recipe");
+            var withoutContents = state.WithoutContents(name => name.GetStableHashCode());
+            Require(BlueprintItemStandPlacement.CanRestore(piece, withoutContents), "explicitly cleared native container blocks the whole blueprint");
+            container.m_defaultItems.m_drops.Add(new DropTable.DropData());
+            Require(!BlueprintItemStandPlacement.CanRestore(piece, withoutContents), "empty construction can generate prefab default loot");
+            container.m_defaultItems = null;
+            Require(!BlueprintItemStandPlacement.CanRestore(piece, withoutContents), "null default loot table accepted");
+            container.m_defaultItems = new DropTable { m_drops = null };
+            Require(!BlueprintItemStandPlacement.CanRestore(piece, withoutContents), "null default loot list accepted");
+            container.m_defaultItems = new DropTable();
+            Require(BlueprintItemStandPlacement.TryApply(player, root, withoutContents, out bool attempted, out bool safe) &&
+                !attempted && safe && zdo.Writes == writes && container.Inventory.Items.Count == 1 &&
+                state.Zdo == original && !state.ContentsCleared, "construction-only container changed live or archived items");
             Require(BlueprintContainerInventory.TryRead(state, name => name.GetStableHashCode(), out var inspection) &&
                 inspection.Count == 1 && inspection[0].Quality == 3 && inspection[0].Stack == 12 &&
                 inspection[0].CustomData["mod:payload"].Length == 40000, "native field inspection lost contents");
@@ -89,6 +102,15 @@ internal static class StorageCaptureAcceptance
             writes = zdo.Writes;
             Require(BlueprintStorageCapture.TryCapture(piece, player, out var emptyState) && emptyState.Info == "5:2:0:0" &&
                 zdo.Writes == writes && emptyState.Zdo == Convert.ToBase64String(empty), "known empty state not preserved");
+            Require(BlueprintItemStandPlacement.CanRestore(piece, emptyState), "verified empty container blocks construction");
+            var supplies = new System.Collections.Generic.List<BlueprintItemStandPlacement.Supply>();
+            Require(BlueprintItemStandPlacement.SelectSupplies(player, new[] { emptyState, withoutContents, emptyState }, supplies) &&
+                supplies.Count == 3 && supplies.TrueForAll(value => value == null), "empty containers require mounted items or lose plan indices");
+            Require(BlueprintItemStandPlacement.TryApply(player, root, emptyState, out attempted, out safe) &&
+                !attempted && safe && zdo.Writes == writes && container.Inventory.Items.Count == 0,
+                "known empty container entered the ItemStand restore path");
+            Require(!BlueprintItemStandPlacement.SelectSupplies(player, new[] { state }, supplies),
+                "nonempty container archive silently treated as empty");
             zdo.Set(ZDOVars.s_items, (byte[])null); zdo.Set(ZDOVars.s_addedDefaultItems, 1); writes = zdo.Writes;
             Require(BlueprintStorageCapture.TryCapture(piece, player, out var freshEmpty) && freshEmpty.Info == "5:2:0:0" &&
                 freshEmpty.Zdo == Convert.ToBase64String(empty) && zdo.Writes == writes && zdo.GetByteArray(ZDOVars.s_items, null) == null,
@@ -100,6 +122,7 @@ internal static class StorageCaptureAcceptance
             typeof(Container).GetField("m_nview", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(derived, view);
             derived.Inventory.Snapshot = empty;
             Require(!BlueprintStorageCapture.TryCapture(derivedPiece, player, out _), "derived storage treated as fully native state");
+            Require(!BlueprintItemStandPlacement.CanRestore(derivedPiece, withoutContents), "derived storage accepted as ordinary construction");
             return "Actual read-only Container capture on inert API fixture: verified v109 records/dependencies, full private package comparison, immutable >32K snapshot, custom map boundary, known empty, access/ward/busy/revision/special/missing/grid/size rejection; no inventory restore or world writes. Native serializer layout pinned separately by HostContract.";
         }
         finally

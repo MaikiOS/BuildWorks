@@ -7,12 +7,18 @@ public class Container : MonoBehaviour
     public readonly Inventory Inventory = new Inventory();
     public bool Denied, Busy, m_autoDestroyEmpty, m_checkGuardStone;
     public Vagon m_wagon;
+    public DropTable m_defaultItems = new DropTable();
     private bool CheckAccess(long playerId) => !Denied;
     public bool IsInUse() => Busy;
     public Inventory GetInventory() => Inventory;
 }
 public class Vagon : MonoBehaviour { }
 public class DerivedStorage : Container { }
+public class DropTable
+{
+    public class DropData { }
+    public System.Collections.Generic.List<DropData> m_drops = new System.Collections.Generic.List<DropData>();
+}
 public class TombStone : MonoBehaviour { }
 public class Corpse : MonoBehaviour { }
 public class Incinerator : MonoBehaviour { }

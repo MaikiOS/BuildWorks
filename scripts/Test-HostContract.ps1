@@ -873,7 +873,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.141.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.142.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -3244,6 +3244,18 @@ foreach ($pattern in 'Player::GetPlayerID', 'PrivateArea::CheckAccess', 'Contain
 }
 Assert-Contract ($storageCalls -notmatch 'Container::Save|Container::Load|Inventory::Load|ZDO::Set|RPC|Object::Instantiate|ItemDrop/ItemData::Load') 'Container snapshot mutates, restores or executes live state.'
 Assert-Contract ($storageCalls -match 'BlueprintContainerInventory::TryRead') 'Container snapshot skips full inert record/dependency validation.'
+$emptyContainer = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintStorageCapture' -and $_.Name -eq 'CanPlaceWithoutContents' }
+$emptyContainerCalls = ($emptyContainer.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+foreach ($pattern in 'BlueprintContainerInventory::TryRead', 'get_ContentsCleared', 'GetComponentsInChildren<Container>',
+    'Container::m_defaultItems', 'DropTable::m_drops', 'get_Count') {
+    Assert-Contract ($emptyContainerCalls -match $pattern) "Empty-container construction lacks gate: $pattern"
+}
+Assert-Contract ($emptyContainerCalls -notmatch 'GetDropListItems|(?<![A-Za-z])Inventory::|ZDO::|RPC|Object::Instantiate|Container::Load') 'Empty-container eligibility executes loot, inventory or world operations.'
+foreach ($name in 'SelectSupplies','TryApply','ContinueAutomaticPlacement','OnNativePlacementFinished') {
+    $method = $pluginMethods | Where-Object { $_.Name -eq $name -and $_.DeclaringType.Name -in @('BlueprintItemStandPlacement','PrecisionPlacementSession') }
+    $calls = ($method.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+    Assert-Contract ($calls -match 'BlueprintItemStandPlacement::NeedsSupply') "Empty-container supply policy is bypassed by $name"
+}
 # The read-only v109 decoder relies on exact native field/flag order and custom-map count encoding.
 # A host update must fail this gate until the new serializer is reviewed, not silently misread bytes.
 $packageType = $hostAssembly.MainModule.Types | Where-Object Name -eq 'ZPackage'
@@ -3335,4 +3347,4 @@ try {
 }
 finally { $nativeInputSystem.Dispose() }
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.141 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.142 and Valheim Steam build 25185596.'

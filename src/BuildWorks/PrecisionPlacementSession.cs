@@ -2847,7 +2847,7 @@ namespace OstrixMods.BuildWorks
                 return;
             }
             BlueprintForeignPartData nextContents = placementPlan[placementPlanIndex].ItemStandContents;
-            if (nextContents != null && !nextContents.ContentsCleared &&
+            if (BlueprintItemStandPlacement.NeedsSupply(nextContents) &&
                 (placementSupplies.Count != placementPlan.Count ||
                     !BlueprintItemStandPlacement.IsAvailable(player, placementSupplies[placementPlanIndex])))
             {
@@ -2991,7 +2991,7 @@ namespace OstrixMods.BuildWorks
             if (placed)
             {
                 BlueprintForeignPartData contents = placementPlan[placementPlanIndex].ItemStandContents;
-                if (contents != null && !contents.ContentsCleared)
+                if (BlueprintItemStandPlacement.NeedsSupply(contents))
                 {
                     // TryPlacePiece's postfix precedes native construction-resource consumption.
                     // ContinueAutomaticPlacement runs the payload only after UpdatePlacement has returned.

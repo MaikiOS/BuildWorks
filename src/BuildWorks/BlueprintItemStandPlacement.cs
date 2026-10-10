@@ -35,7 +35,7 @@ namespace OstrixMods.BuildWorks
             foreach (BlueprintForeignPartData data in contents)
             {
                 Supply supply = null;
-                if (data != null && !data.ContentsCleared)
+                if (NeedsSupply(data))
                 {
                     ItemDrop.ItemData item = FindItem(player, data, reserved, snapshots);
                     if (item == null) complete = false;
@@ -71,6 +71,8 @@ namespace OstrixMods.BuildWorks
         internal static bool CanRestore(Piece piece, BlueprintForeignPartData data)
         {
             if (data == null) return true;
+            if (data.Format == BlueprintForeignPartData.NativeContainerFormat)
+                return BlueprintStorageCapture.CanPlaceWithoutContents(piece, data);
             if (!piece || piece.GetComponent<ArmorStand>() ||
                 data.Format != BlueprintForeignPartData.NativeItemStandFormat ||
                 data.Zdo != null && !BlueprintItemStandContents.TryRead(data, name => name.GetStableHashCode(), out _))
@@ -110,6 +112,10 @@ namespace OstrixMods.BuildWorks
         {
             return SelectSupplies(player, contents, new List<Supply>());
         }
+
+        internal static bool NeedsSupply(BlueprintForeignPartData data) => data != null && !data.ContentsCleared &&
+            (data.Format != BlueprintForeignPartData.NativeContainerFormat ||
+                !BlueprintContainerInventory.TryRead(data, name => name.GetStableHashCode(), out var items) || items.Count != 0);
 
         internal static ItemDrop.ItemData FindItem(Player player, BlueprintForeignPartData data,
             Dictionary<ItemDrop.ItemData, int> reserved = null, Dictionary<ItemDrop.ItemData, string> snapshots = null)
@@ -170,7 +176,7 @@ namespace OstrixMods.BuildWorks
             attempted = false;
             rollbackSafe = true;
             if (!player || !placed || !CanRestore(placed.GetComponent<Piece>(), data)) return false;
-            if (data == null || data.ContentsCleared) return true;
+            if (!NeedsSupply(data)) return true;
             ItemStand stand = placed.GetComponent<ItemStand>();
             var view = StandView.GetValue(stand) as ZNetView;
             ItemDrop.ItemData item = supply == null ? FindItem(player, data) :

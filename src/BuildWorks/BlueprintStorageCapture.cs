@@ -15,6 +15,21 @@ namespace OstrixMods.BuildWorks
         private static readonly FieldInfo ContainerView = typeof(Container).GetField("m_nview", BindingFlags.Instance | BindingFlags.NonPublic);
         private static readonly MethodInfo ContainerAccess = typeof(Container).GetMethod("CheckAccess", BindingFlags.Instance | BindingFlags.NonPublic);
 
+        // Only construction compatibility; do not load, clear or alter a live inventory.
+        internal static bool CanPlaceWithoutContents(Piece piece, BlueprintForeignPartData data)
+        {
+            if (!piece || data == null || data.Format != BlueprintForeignPartData.NativeContainerFormat ||
+                !BlueprintContainerInventory.TryRead(data, name => name.GetStableHashCode(), out var items) ||
+                !data.ContentsCleared && items.Count != 0 || piece.GetComponent<TombStone>() ||
+                piece.GetComponent<Corpse>() || piece.GetComponent<Incinerator>() ||
+                piece.GetComponent<ItemStand>() || piece.GetComponent<ArmorStand>()) return false;
+            Container[] containers = piece.GetComponentsInChildren<Container>(true);
+            return containers.Length == 1 && containers[0].gameObject == piece.gameObject &&
+                containers[0].GetType() == typeof(Container) && !containers[0].m_autoDestroyEmpty && !containers[0].m_wagon &&
+                // shortcut: default-loot prefabs need a scoped pre-Awake policy before they can be constructed empty.
+                containers[0].m_defaultItems?.m_drops != null && containers[0].m_defaultItems.m_drops.Count == 0;
+        }
+
         internal static bool TryCapture(Piece piece, Player player, out BlueprintForeignPartData data)
         {
             data = null;

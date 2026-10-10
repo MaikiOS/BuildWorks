@@ -1,3 +1,15 @@
+## 2026-10-10 — source 0.19.129: axis-constrained scale input
+
+S → X/Y/Z → mouse or number now uses keys and existing axis buttons.
+Local/world coordinates, preview, gizmo anchors, A/B guide and commit share
+scale/frame validation; shear refusal retains the valid preview and blocks commit.
+Normal/QA 0/0, Geometry, Store 202/209, Host 25185596, localization 931,
+isolation/preflight, Unity 492 (10:55:04 UTC), both reviews PASSED/Ship.
+Checkpoint ab2868b. docs/AXIS_SCALE_INPUT_CHECKPOINT_2026-10-10.md.
+Installed .117 hashes verified, Default has no DLL; no .129 deployment,
+Valheim/saves/network execution. Do not repeat accepted .117 cases.
+Next: missing replacement pose, popup/filter layout, import timing; then new QA.
+
 ## 2026-10-10 — source0.19.128: native Hammer blueprint sockets
 
 Ostrix's .117 acceptance received: Save As,16 stability/ghost/reload/no repeat

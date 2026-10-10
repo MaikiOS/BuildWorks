@@ -231,7 +231,7 @@ namespace OstrixMods.BuildWorks
                             if (Math.Abs(point.x) > 512 || Math.Abs(point.y) > 512 || Math.Abs(point.z) > 512)
                                 throw new InvalidDataException("$buildworks_import.transform");
                             if (blueprint.customSnapPoints == null) blueprint.customSnapPoints = new List<CompositeBlueprintStore.VectorData>();
-                            if (blueprint.customSnapPoints.Count >= 512) throw new InvalidDataException("$buildworks_import.fields");
+                            if (blueprint.customSnapPoints.Count >= CompositeBlueprintStore.MaximumCustomSnapPoints) throw new InvalidDataException("$buildworks_import.fields");
                             blueprint.customSnapPoints.Add(point);
                         }
                         catch (Exception exception) when (exception is InvalidDataException || exception is FormatException || exception is OverflowException)

@@ -872,7 +872,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.123.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.124.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -911,6 +911,8 @@ Assert-Contract ($awakeOperands -match 'HasRegisteredPlacementTranspiler' -and
     $registrationOperands -match 'Patch::get_PatchMethod') `
     'Startup must verify the registered placement transpiler, not its eager execution.'
 $geometry = [Mono.Cecil.AssemblyDefinition]::ReadAssembly($geometryPath)
+$documentLimits = $geometry.MainModule.GetType('OstrixMods.BuildWorks.Geometry.BlueprintEditorDocument')
+$worldSnapCodec = $geometry.MainModule.GetType('OstrixMods.BuildWorks.Geometry.BlueprintSnapPointCodec')
 $anchorAdjustment = $geometry.MainModule.Types | Where-Object {
     $_.FullName -eq 'OstrixMods.BuildWorks.Geometry.AnchorAdjustment'
 }
@@ -1104,6 +1106,11 @@ Assert-Contract ($editorOpenOperands -match 'BlueprintEditorScene::BeginInitialL
     $editorOpenOperands -notmatch 'BuildWorksTestIsolation::RequireLoadedSession') `
     'Normal editor must retain staged loading without QA isolation code.'
 $storeType = $pluginTypes | Where-Object Name -eq 'CompositeBlueprintStore'
+Assert-Contract (($documentLimits.Fields | Where-Object Name -eq 'MaximumCustomSnapPoints').Constant -eq 20000 -and
+    ($storeType.Fields | Where-Object Name -eq 'MaximumCustomSnapPoints').Constant -eq 20000 -and
+    ($storeType.Fields | Where-Object Name -eq 'MaximumAnchors').Constant -eq 512 -and
+    ($worldSnapCodec.Fields | Where-Object Name -eq 'MaximumPoints').Constant -eq 512) `
+    'Blueprint custom capacity must be separate from ordinary anchors and per-piece network codec.'
 Assert-Contract (($storeType.Fields | Where-Object Name -eq 'EditorPartBudget').Constant -eq 512) `
     'Normal editor must retain the 512-part gameplay limit.'
 $legacyEditorOperands = @(
@@ -1899,7 +1906,7 @@ Assert-Contract ($updateDocumentMethods.Count -eq 5 -and
         @($_.Parameters | Where-Object Name -eq 'placementSupportId').Count -eq 1
     }).Count -eq 1) `
     'Blueprint frame update overload or a compatibility overload is missing.'
-Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion = 21' -and
+Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion = 22' -and
     $blueprintStoreSource -match 'loaded\.version < 6' -and
     $blueprintStoreSource -match 'ValidScale\(part\.scale\)' -and
     $blueprintStoreSource -match 'if \(loaded\.version < 4\)' -and
@@ -2255,7 +2262,7 @@ Assert-Contract ($null -ne $worldCapture -and
     $worldCaptureCalls -match 'BlueprintSnapPointSet::.ctor' -and
     $worldCaptureCalls -match 'BlueprintSnapPointSet::TryAdd' -and
     $worldCaptureCalls -match 'BlueprintSnapPointSet::get_Points' -and
-    $sessionSource -match 'new Geometry\.BlueprintSnapPointSet\(Geometry\.BlueprintSnapPointCodec\.MaximumPoints\)' -and
+    $sessionSource -match 'new Geometry\.BlueprintSnapPointSet\(CompositeBlueprintStore\.MaximumCustomSnapPoints\)' -and
     $worldCaptureCalls -notmatch '::Destroy|::ClaimOwnership|::SetPositionAndRotation|::set_position|::set_rotation|::SetLocalScale' -and
     $sessionSource -match 'pendingWorldBlueprintSelection && GameplayInputAvailable' -and
     $sessionSource -match
@@ -3296,4 +3303,4 @@ Assert-Contract ($nativeDistanceCalls -match 'System.Math::Sqrt' -and
     @($nativeDistance.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'conv.r4' }).Count -ge 1) `
     'Native Vector3.Distance float/sqrt metric changed.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.123 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.124 and Valheim Steam build 25185596.'

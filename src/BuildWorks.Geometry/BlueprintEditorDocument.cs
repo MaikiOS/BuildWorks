@@ -226,6 +226,7 @@ namespace OstrixMods.BuildWorks.Geometry
     {
         // Storage safety ceiling, not a verified Unity/game rendering budget.
         public const int MaximumParts = 50000;
+        public const int MaximumCustomSnapPoints = 20000;
         public const int MaximumGroups = 64;
         public const int MaximumSupports = 64;
         public const int MaximumHistory = 32;
@@ -1059,7 +1060,7 @@ namespace OstrixMods.BuildWorks.Geometry
             if (source.parts.Count == 0) return false;
             if (parts.Count + source.parts.Count > MaximumParts ||
                 groups.Count + source.groups.Count + 1 > MaximumGroups ||
-                customSnapPoints.Count + source.customSnapPoints.Count > 512 ||
+                customSnapPoints.Count + source.customSnapPoints.Count > MaximumCustomSnapPoints ||
                 supports.Count + source.supports.Count > MaximumSupports)
                 throw new InvalidOperationException("Maximum blueprint size reached.");
             string rootId = Guid.NewGuid().ToString("N");
@@ -1484,7 +1485,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 if (part.SourceDocumentId != null && (!sourceIndex.TryGetValue(part.SourceDocumentId, out var evidence) ||
                     !evidence.HasPartAt(part.SourceLine, part.PrefabName)))
                     throw new ArgumentException("Missing or incorrect source reference.");
-            if (customSnapPoints.Count > 512) throw new InvalidOperationException("Maximum custom snap points reached.");
+            if (customSnapPoints.Count > MaximumCustomSnapPoints) throw new InvalidOperationException("Maximum custom snap points reached.");
             foreach (Point3 point in customSnapPoints) BlueprintEditorPart.Validate(point, nameof(CustomSnapPoints));
             if (parts.Count > MaximumParts || groups.Count > MaximumGroups)
                 throw new ArgumentOutOfRangeException("Document limits exceeded.");

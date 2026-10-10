@@ -1,3 +1,14 @@
+## 2026-10-10 — source0.19.124: large custom snap sets
+
+Separate aggregate20000/native22/portable11, atomic overflow and legacy512 gates
+PASS. Four actual archival storage roundtrips;209 corpus201 parsed/8 refused.
+Geometry/Store, normal/QA0/0, Host25185596, localization930, compiled isolation,
+Unity492 and both independent reviews PASS. Per-piece codec512 and anchors512
+unchanged. See docs/LARGE_SNAP_CHECKPOINT_2026-10-10.md.
+Measured shared-list Append17125=1215.53ms blocks deployment pending repair.
+Actual prefab/build/reload/network and large Session capture remain open.
+InstalledQA.117 unchanged; no deploy/Valheim/save mutation. Next fix shared-list
+collection without altering native point order/manual selection or world state.
 ## 2026-10-10 — source0.19.123: exact Hammer snap search
 
 Geometry/Store, normal/QA0/0, Host25185596, localization930, QA isolation,

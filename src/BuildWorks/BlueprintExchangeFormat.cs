@@ -15,7 +15,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const int MaximumBytes = 32 * 1024 * 1024;
         private const string FormatName = "buildworks-blueprint";
-        private const int Version = 10;
+        private const int Version = 11;
 
         [DataContract]
         private sealed class Envelope
@@ -127,6 +127,8 @@ namespace OstrixMods.BuildWorks
                     envelope.blueprint.supports = envelope.blueprint.supports ?? new List<CompositeBlueprintStore.Support>();
                 if (envelope.version < 8 && envelope.blueprint?.parts?.Count == 1)
                     throw new InvalidDataException("$buildworks_import.part_limit");
+                if (envelope.version < 11 && envelope.blueprint?.customSnapPoints?.Count > 512)
+                    throw new InvalidDataException("$buildworks_import.fields");
                 ValidateBlueprint(envelope.blueprint);
                 if (envelope.requiredPrefabIds == null ||
                     !envelope.requiredPrefabIds.SequenceEqual(Prefabs(envelope.blueprint), StringComparer.Ordinal))
@@ -165,7 +167,7 @@ namespace OstrixMods.BuildWorks
 
         // Reject unknown and duplicate fields rather than silently converting a newer document with data loss.
         private static void ValidateNode(XmlReader reader, Type expected, bool requireFields, bool allowSupportFields,
-            bool allowSourceFields, bool allowForeignFields, bool allowContentsFields, bool allowAbsoluteScaleFields, bool allowPlacementImportFields, bool allowBaseScaleFields, bool allowMetadataFields, bool allowMaterialSeedFields, bool allowHiddenSources, bool sourceText = false, bool inventoryPackage = false)
+            bool allowSourceFields, bool allowForeignFields, bool allowContentsFields, bool allowAbsoluteScaleFields, bool allowPlacementImportFields, bool allowBaseScaleFields, bool allowMetadataFields, bool allowMaterialSeedFields, bool allowHiddenSources, bool sourceText = false, bool inventoryPackage = false, bool customSnapPoints = false)
         {
             string kind = reader.GetAttribute("type");
             if (kind == "null")
@@ -178,7 +180,8 @@ namespace OstrixMods.BuildWorks
             {
                 if (kind != "array") throw new InvalidDataException("$buildworks_import.fields");
                 Type item = expected.GetGenericArguments()[0];
-                int count = 0, limit = item == typeof(CompositeBlueprintStore.Part) || item == typeof(string)
+                int count = 0, limit = customSnapPoints ? CompositeBlueprintStore.MaximumCustomSnapPoints :
+                    item == typeof(CompositeBlueprintStore.Part) || item == typeof(string)
                     ? CompositeBlueprintStore.MaximumParts : item == typeof(CompositeBlueprintStore.Group) ||
                         item == typeof(CompositeBlueprintStore.Support) || item == typeof(CompositeBlueprintStore.SourceDocument) ? 64 : 512;
                 if (reader.IsEmptyElement) { reader.Read(); return; }
@@ -227,7 +230,8 @@ namespace OstrixMods.BuildWorks
                     throw new InvalidDataException("$buildworks_import.fields");
                 bool textField = expected == typeof(CompositeBlueprintStore.SourceDocument) && reader.LocalName == "text";
                 bool packageField = expected == typeof(CompositeBlueprintStore.ForeignPartData) && reader.LocalName == "zdo";
-                ValidateNode(reader, field, requireFields, allowSupportFields, allowSourceFields, allowForeignFields, allowContentsFields, allowAbsoluteScaleFields, allowPlacementImportFields, allowBaseScaleFields, allowMetadataFields, allowMaterialSeedFields, allowHiddenSources, textField, packageField);
+                bool snapField = expected == typeof(CompositeBlueprintStore.Blueprint) && reader.LocalName == "customSnapPoints";
+                ValidateNode(reader, field, requireFields, allowSupportFields, allowSourceFields, allowForeignFields, allowContentsFields, allowAbsoluteScaleFields, allowPlacementImportFields, allowBaseScaleFields, allowMetadataFields, allowMaterialSeedFields, allowHiddenSources, textField, packageField, snapField);
             }
             if (requireFields && RequiredFields[expected].Any(name => !seen.Contains(name)))
                 throw new InvalidDataException("$buildworks_import.fields");

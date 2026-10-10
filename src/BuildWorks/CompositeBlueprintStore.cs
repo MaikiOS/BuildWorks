@@ -19,6 +19,7 @@ namespace OstrixMods.BuildWorks
     internal sealed class CompositeBlueprintStore
     {
         internal const int MaximumParts = Geometry.BlueprintEditorDocument.MaximumParts;
+        internal const int MaximumCustomSnapPoints = Geometry.BlueprintEditorDocument.MaximumCustomSnapPoints;
         internal const int InteractivePartBudget = 512;
 #if BUILDWORKS_TEST_STAND || UNITY_EDITOR
         internal const int EditorPartBudget = MaximumParts;
@@ -33,7 +34,7 @@ namespace OstrixMods.BuildWorks
         internal const string DefaultCategory = "OTHER";
         private const string LegacyDefaultCategory = "ПРОЧЕЕ";
         private const string LocalizationPrefix = "$buildworks_";
-        private const int FormatVersion = 21;
+        private const int FormatVersion = 22;
         private const int MaximumBlueprints = 32;
         private const int MaximumCategories = 12;
         private const int MaximumAnchors = 512;
@@ -1340,12 +1341,14 @@ namespace OstrixMods.BuildWorks
                 foreach (Blueprint blueprint in loaded.blueprints)
                     if (blueprint != null) blueprint.supports = blueprint.supports ?? new List<Support>();
                 bool allowSinglePart = loaded.version >= 18;
+                bool allowLargeSnapSets = loaded.version >= 22;
                 loaded.version = FormatVersion;
                 List<Blueprint> valid = new List<Blueprint>();
                 var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (Blueprint blueprint in loaded.blueprints)
                 {
-                    if (Valid(blueprint) && (allowSinglePart || blueprint.parts.Count >= 2) && ids.Add(blueprint.id)) valid.Add(blueprint);
+                    if (Valid(blueprint) && (allowSinglePart || blueprint.parts.Count >= 2) &&
+                        (allowLargeSnapSets || (blueprint.customSnapPoints?.Count ?? 0) <= 512) && ids.Add(blueprint.id)) valid.Add(blueprint);
                 }
                 if (valid.Count != loaded.blueprints.Count)
                     writeBlockReason = UserError("store.corrupt_entries");
@@ -1513,7 +1516,7 @@ namespace OstrixMods.BuildWorks
         private static bool ValidCustomSnapPoints(IReadOnlyList<VectorData> points)
         {
             if (points == null) return true;
-            if (points.Count > MaximumAnchors) return false;
+            if (points.Count > MaximumCustomSnapPoints) return false;
             foreach (VectorData point in points) if (!Valid(point)) return false;
             return true;
         }

@@ -4917,7 +4917,7 @@ namespace OstrixMods.BuildWorks
             Vector3 origin = blueprintSelection[0].transform.position;
             var parts = new List<CompositeBlueprintStore.Part>(blueprintSelection.Count);
             var snapSets = new List<IReadOnlyList<Point3>>(blueprintSelection.Count);
-            var customPoints = new Geometry.BlueprintSnapPointSet(Geometry.BlueprintSnapPointCodec.MaximumPoints);
+            var customPoints = new Geometry.BlueprintSnapPointSet(CompositeBlueprintStore.MaximumCustomSnapPoints);
             long capturedStateBytes = 0;
             foreach (Piece piece in blueprintSelection)
             {

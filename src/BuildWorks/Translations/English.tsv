@@ -877,9 +877,9 @@ editor.replace_title	REPLACE MISSING PART
 editor.replace_catalog	Open catalogue
 catalog.thumbnail_pending	Image not available yet\nSee card details
 catalog.thumbnail_markers	A red frame shows recorded missing-part bounds; a small red marker shows only its position, with unknown size.
-editor.replace_steps	1. Open the catalogue and place one or more available parts at the missing part's location. Their shape and pose in the scene preview the result.\n2. In the tree, select the missing row itself, then Ctrl-click your parts or their group. Select them together again after placement.\n3. Click Replace missing part and review the confirmation.\nSelect exactly one missing row. Hidden/locked objects and overlapping parent/child selections are not allowed. The record remains until confirmation; deletion is a separate action.
-editor.replace_hint	Place your replacement first. Select exactly one missing row directly and your available replacement parts or group. Hidden/locked parts and overlapping parent/child selections are not allowed.
-editor.replace_confirm	Remove missing record: {0}\nReplacement: {1} selected parts; their poses and sizes stay unchanged.\nPrimary/pivot links move to: {2}\nIndependent supports and original source stay unchanged. One Undo restores the record.
+editor.replace_steps	Select one missing record and open the catalogue. The chosen part or blueprint appears at its pose for confirmation.\nTo use your existing parts, select the missing row, then Ctrl-select your available parts or their group. Choose Replace missing. The first own part anchors the assembly; the others move with it.\nOwn sizes stay unchanged. Unknown model surfaces may not match; refine with the gizmo afterwards. Hidden/locked parts and selecting both a parent and its child are not allowed. Cancel changes nothing.
+editor.replace_hint	Select one missing record for a catalogue replacement preview at its pose. Or Ctrl-add your available parts/group: the first part anchors the whole replacement. Own sizes remain unchanged.
+editor.replace_confirm	Replace missing record: {0}\nReplacement parts: {1}.\nReplacement anchor: {2}\nIts origin and full rotation match the record. Own sizes and relative poses are preserved. Unknown model surfaces are not guessed.\nInspect the result on the left. Independent supports and source evidence are retained. Cancel leaves the blueprint unchanged; one Undo restores the record.
 editor.replace_changed	Selection, document or available prefabs changed. Review replacement again.
 editor.replace_group	Replacement
 editor.replace_done	Missing record replaced with {0} selected parts. One Undo restores it.
@@ -930,3 +930,5 @@ editor.camera.speed	Interior speed, m/s
 editor.camera.help	RMB: look; WASD move, Q/E down/up, Shift faster. Wheel: speed. With a piece selected, RMB+LMB places from center. Release RMB for the pointer. The button above restores the overview.
 editor.camera.active	Inside building · RMB: fly · Camera: return
 qa.large_selection_blocked	Large selection requires the isolated BuildWorks QA world. Safety check failed: {0}.
+editor.replace_catalog_help	Replacement mode: click a part or blueprint to preview it at the missing record
+editor.replace_source_missing	Choose an available part or a blueprint without missing parts for replacement. This source is still incomplete.

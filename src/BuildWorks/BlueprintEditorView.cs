@@ -453,6 +453,7 @@ namespace OstrixMods.BuildWorks
         private TMP_InputField saveMetadataName, saveMetadataCategory;
         private Action<string, string> saveMetadataAccepted;
         private Action confirmationAccepted;
+        private Action confirmationClosed;
         internal bool ItemStandEditable { get; set; }
         internal bool ItemStandHasContents { get; set; }
         private BlueprintExchangeView exchangeView;
@@ -2257,12 +2258,14 @@ namespace OstrixMods.BuildWorks
             ShowDialog();
         }
 
-        internal void ShowConfirmation(string title, string message, Action accepted, float height = 260f, string acceptLabel = null)
+        internal void ShowConfirmation(string title, string message, Action accepted, float height = 260f,
+            string acceptLabel = null, Action closed = null, bool scenePreview = false)
         {
             ResetSaveMetadata();
             ((RectTransform)modalTitle.transform.parent).sizeDelta = new Vector2(520f, height);
             errorDialog = false;
             confirmationAccepted = accepted;
+            confirmationClosed = closed;
             modalTitle.text = title;
             modalMessage.text = message;
             SetButtonLabel(dialogPrimaryButton, acceptLabel ?? T("editor.view.apply"));
@@ -2270,6 +2273,12 @@ namespace OstrixMods.BuildWorks
             dialogPrimaryButton.gameObject.SetActive(true);
             dialogDiscardButton.gameObject.SetActive(false);
             ShowDialog();
+            if (scenePreview)
+            {
+                modal.GetComponent<Image>().color = Color.clear;
+                RectTransform dialog = (RectTransform)modalTitle.transform.parent;
+                dialog.anchoredPosition = new Vector2((safeRoot.rect.width - dialog.sizeDelta.x * dialog.localScale.x) * .5f - 12f, 0);
+            }
         }
 
         internal void ShowError(string titleText, string message, bool canRetry = true)
@@ -2298,10 +2307,15 @@ namespace OstrixMods.BuildWorks
 
         private void ResetSaveMetadata()
         {
+            Action closed = confirmationClosed;
+            confirmationClosed = null;
+            closed?.Invoke();
             saveMetadataAccepted = null;
             confirmationAccepted = null;
             if (saveMetadataFields) saveMetadataFields.gameObject.SetActive(false);
             ((RectTransform)modalTitle.transform.parent).sizeDelta = new Vector2(520, 260);
+            ((RectTransform)modalTitle.transform.parent).anchoredPosition = Vector2.zero;
+            modal.GetComponent<Image>().color = new Color(0f, 0f, 0f, .72f);
             SetInsets(modalMessage.rectTransform, 20, 64, 20, 90);
         }
 
@@ -2503,6 +2517,7 @@ namespace OstrixMods.BuildWorks
         {
             if (disposed) return;
             disposed = true;
+            confirmationClosed = null;
             exchangeView?.Dispose(); exchangeView = null;
             EndOutlinerDrag();
             boundDocument = null;

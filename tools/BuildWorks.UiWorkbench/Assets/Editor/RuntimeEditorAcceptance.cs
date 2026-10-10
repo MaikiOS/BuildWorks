@@ -562,7 +562,7 @@ public static class RuntimeEditorAcceptance
                             BuildWorksLocalization.RussianLanguage = state.EndsWith("-ru", StringComparison.Ordinal);
                             view.ShowConfirmation(BuildWorksLocalization.Text("editor.replace_title"),
                                 BuildWorksLocalization.Text("editor.replace_confirm", new string('W', 128), 50000, new string('W', 64) + "…"),
-                                () => { }, height: 450f);
+                                () => { }, height: 450f, scenePreview: true);
                         }
                         else Call(controller, "UpdateGizmo");
                         // Product Destroy() and TMP rebuilds must see a real frame.

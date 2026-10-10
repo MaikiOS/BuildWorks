@@ -14,6 +14,13 @@ namespace OstrixMods.BuildWorks
         private GameObject catalog;
         private RectTransform catalogPanel, catalogGrid, catalogNavigation, catalogContext, catalogPreview, catalogPicker;
         private BlueprintEditorCatalogItem catalogPreviewItem;
+        private bool catalogReplacementMode;
+
+        internal void SetCatalogReplacement(bool value)
+        {
+            catalogReplacementMode = value;
+            RebuildCatalog();
+        }
         internal event Action CatalogImportRequested;
         internal event Action<CompositeBlueprintStore.Blueprint> CatalogExportRequested;
         internal event Action<CompositeBlueprintStore.Blueprint> CatalogManageRequested;
@@ -149,6 +156,7 @@ namespace OstrixMods.BuildWorks
         internal void ShowCatalog(IReadOnlyList<BlueprintEditorCatalogItem> items)
         {
             catalogAttachmentMode = false;
+            if (!catalog.activeSelf) catalogReplacementMode = false;
             OpenCatalog(items);
         }
 
@@ -206,7 +214,8 @@ namespace OstrixMods.BuildWorks
                 (f.Material == null ? "" : " · " + BuildWorksLocalization.CatalogLabel(f.Material)) +
                 (f.Source == null ? "" : " · " + BuildWorksLocalization.CatalogLabel(f.Source)) +
                 (f.Station == null ? "" : " · " + shownCatalogItems.FirstOrDefault(x => x.StationId == f.Station)?.StationName) +
-                " · " + (catalogAttachmentMode ? T("editor.item.click_help") : CatalogText("click_help"));
+                " · " + (catalogReplacementMode ? T("editor.replace_catalog_help") :
+                    catalogAttachmentMode ? T("editor.item.click_help") : CatalogText("click_help"));
             SetSelected(catalogPartsModeButton, !catalogBlueprintMode); SetSelected(catalogBlueprintsModeButton, catalogBlueprintMode);
             SetSelected(catalogAtlasButton, !catalogQuick); SetSelected(catalogQuickButton, catalogQuick);
             SetSelected(catalogDetailsButton, catalogDetails && catalogLayout.Details.Width > 0);

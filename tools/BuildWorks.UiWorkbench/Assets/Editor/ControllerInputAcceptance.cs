@@ -287,9 +287,27 @@ internal static class ControllerInputAcceptance
                 rotation = new CompositeBlueprintStore.QuaternionData { w = 1 } } }, "s", out var saved, out string error,
             sourceDocuments: new[] { CompositeBlueprintStore.SourceDocument.FromGeometry(evidence) }), error);
         bool ownAvailable = true;
+        var compound = new CompositeBlueprintStore.Blueprint { id = "replaceCompound", name = "Replacement pair", category = "OTHER",
+            primaryPartId = "anchor" };
+        compound.groups.Add(new CompositeBlueprintStore.Group { stableId = "nested", name = "Nested" });
+        compound.parts.Add(new CompositeBlueprintStore.Part { stableId = "other", prefabName = "woodwall", displayName = "Pair other",
+            parentGroupId = "nested", position = new CompositeBlueprintStore.VectorData(new Vector3(2, 1, 0)),
+            rotation = new CompositeBlueprintStore.QuaternionData(Quaternion.identity) });
+        compound.parts.Add(new CompositeBlueprintStore.Part { stableId = "anchor", prefabName = "woodwall", displayName = "Pair anchor",
+            parentGroupId = "nested", position = new CompositeBlueprintStore.VectorData(new Vector3(4, 1, 0)),
+            rotation = new CompositeBlueprintStore.QuaternionData(Quaternion.Euler(35, 20, 15)),
+            scale = new CompositeBlueprintStore.VectorData(new Vector3(.5f, 2, 1)),
+            baseScale = new CompositeBlueprintStore.VectorData(wall.transform.localScale) });
+        compound.parts.Add(new CompositeBlueprintStore.Part { stableId = "hidden", prefabName = "woodwall", displayName = "Hidden source part",
+            parentGroupId = "nested", editorVisible = false, rotation = new CompositeBlueprintStore.QuaternionData(Quaternion.identity) });
+        var incomplete = new CompositeBlueprintStore.Blueprint { id = "replaceIncomplete", name = "Incomplete source", category = "OTHER" };
+        incomplete.parts.Add(new CompositeBlueprintStore.Part { stableId = "absent", prefabName = "qa_absent", displayName = "Absent",
+            rotation = new CompositeBlueprintStore.QuaternionData(Quaternion.identity) });
         using (var controller = new BlueprintEditorController(store, template, font,
             name => name == "woodwall" && ownAvailable ? wall : null, name => name,
-            () => new[] { new BlueprintEditorCatalogItem("woodwall", "Own wall", null, "OTHER", "WOOD", "Valheim", 0) },
+            () => new[] { new BlueprintEditorCatalogItem("woodwall", "Own wall", null, "OTHER", "WOOD", "Valheim", 0),
+                new BlueprintEditorCatalogItem("replaceCompound", compound.name, null, "OTHER", "WOOD", "Valheim", 1, compound),
+                new BlueprintEditorCatalogItem("replaceIncomplete", incomplete.name, null, "OTHER", "WOOD", "Valheim", 2, incomplete) },
             message => { throw new InvalidOperationException(message); }))
         {
             Require(controller.OpenExisting(saved, out error), error); yield return null;
@@ -310,15 +328,85 @@ internal static class ControllerInputAcceptance
             NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
             Require(view.HasCatalog && !view.HasModal && document.RevisionToken == initialRevision,
                 "Instruction action did not open the real catalogue without mutation");
-            view.HideCatalog();
+            var scene = Field<BlueprintEditorScene>(controller, "scene");
+            GameObject root = Field<GameObject>(scene, "root");
+            NativeClick(view, null, "Catalog_woodwall"); yield return null;
+            Require(view.HasModal && !view.HasCatalog && document.RevisionToken == initialRevision &&
+                Field<IList>(scene, "duplicatePreviews").Count == 1 && Field<object>(controller, "placementItem") == null,
+                "Catalogue replacement entered ordinary placement or committed before confirmation");
+            Require(Field<GameObject>(view, "modal").GetComponent<Image>().color.a == 0 &&
+                Field<GameObject>(view, "modal").GetComponent<Image>().raycastTarget,
+                "Replacement preview is obscured or permits clicks through its modal input shield");
+            Transform previewRoot = Field<GameObject>(Field<IList>(scene, "duplicatePreviews")[0], "Root").transform;
+            Require(root.transform.InverseTransformPoint(previewRoot.position).magnitude < .001f,
+                "Catalogue replacement preview added an unwanted ground-contact offset");
+            NativeClick(view, null, Field<Button>(view, "dialogCancelButton")); yield return null;
+            Require(document.RevisionToken == initialRevision && document.Parts.Count == 3 &&
+                Field<IList>(scene, "duplicatePreviews").Count == 0, "Catalogue preview cancellation changed the document or leaked copies");
+            Require(Mathf.Abs(Field<GameObject>(view, "modal").GetComponent<Image>().color.a - .72f) < .001f,
+                "Closing replacement preview left ordinary dialogs transparent");
+            NativeClick(view, null, "InspectorReplaceMissing"); yield return null;
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            NativeClick(view, null, "Catalog_woodwall"); yield return null;
+            document.SelectOnly("a");
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            Require(document.RevisionToken == initialRevision && document.PrimaryPartId == "missing" &&
+                Field<IList>(scene, "duplicatePreviews").Count == 0, "Changed selection committed a stale catalogue replacement");
+            document.SelectOnly("missing"); Call(controller, "Bind", (object)null);
+            NativeClick(view, null, "InspectorReplaceMissing"); yield return null;
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            NativeClick(view, null, "Catalog_woodwall"); yield return null;
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            Require(document.Parts.Count == 3 && document.PrimaryPartId != "missing" &&
+                document.Parts.Single(part => part.StableId == document.PrimaryPartId).Position.X == 0,
+                "Single prefab catalogue replacement did not occupy the missing origin");
+            NativeClick(view, null, Field<Button>(view, "undoButton")); yield return null;
+            Require(document.Parts.Count == 3 && document.PrimaryPartId == "missing" && document.Groups.Count == 1,
+                "Catalogue replacement needed more than one Undo");
+            document.SelectOnly("missing"); Call(controller, "Bind", (object)null);
+            NativeClick(view, null, "InspectorReplaceMissing"); yield return null;
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            NativeClick(view, null, Field<Button>(view, "catalogBlueprintsModeButton")); yield return null;
+            NativeClick(view, null, "Catalog_replaceIncomplete"); yield return null;
+            Require(view.HasCatalog && !view.HasModal && Field<TMP_Text>(view, "statusText").text.Contains(
+                BuildWorksLocalization.Text("editor.replace_source_missing")), "Incomplete replacement source was silently accepted");
+            NativeClick(view, null, "Catalog_replaceCompound"); yield return null;
+            Require(view.HasModal && Field<IList>(scene, "duplicatePreviews").Count == 2, "Whole blueprint replacement preview missing");
+            previewRoot = Field<GameObject>(Field<IList>(scene, "duplicatePreviews")[1], "Root").transform;
+            Require(root.transform.InverseTransformPoint(previewRoot.position).magnitude < .001f &&
+                Quaternion.Angle(Quaternion.Inverse(root.transform.rotation) * previewRoot.rotation, Quaternion.identity) < .01f,
+                "Whole blueprint preview ignored its primary record origin/full rotation");
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            Require(document.Parts.Count == 5 && document.Groups.Count == 3 &&
+                document.Parts.Single(part => part.DisplayName == "Hidden source part").Visible == false &&
+                V(document.Parts.Single(part => part.StableId == document.PrimaryPartId).Position).magnitude < .001f &&
+                document.Parts.Single(part => part.StableId == document.PrimaryPartId).Scale.Y == 2,
+                "Whole blueprint replacement lost its primary, own scale or hierarchy");
+            NativeClick(view, null, Field<Button>(view, "undoButton")); yield return null;
+            Require(document.Parts.Count == 3 && document.PrimaryPartId == "missing" && document.Groups.Count == 1,
+                "Whole blueprint replacement was not one atomic Undo");
+            document.SelectOnly("missing"); Call(controller, "Bind", (object)null);
+            Call(controller, "RequestCatalog"); yield return null;
+            NativeClick(view, null, Field<Button>(view, "catalogPartsModeButton")); yield return null;
+            NativeClick(view, null, "Catalog_woodwall"); yield return null;
+            Require(!view.HasModal && Field<object>(controller, "placementItem") != null,
+                "Replacement catalogue context leaked into ordinary placement");
+            Call(controller, "CancelPartPlacement"); yield return null;
+            document.SelectOnly("missing");
             document.ToggleSelection("a"); document.ToggleSelection("b"); Call(controller, "Bind", (object)null);
             Require(view.MissingReplacementAvailable, "Explicit one-to-many selection not available");
             int revision = document.RevisionToken;
             NativeClick(view, null, "InspectorReplaceMissing"); yield return null;
             Require(view.HasModal && document.Parts.Count == 3 && document.RevisionToken == revision,
                 "Tools action removed the missing row before confirmation");
+            var visuals = Field<IDictionary>(scene, "visuals");
+            Require(root.transform.InverseTransformPoint(Field<GameObject>(visuals["a"], "Root").transform.position).magnitude < .001f &&
+                document.Parts.Single(part => part.StableId == "a").Position.X == 3,
+                "Selected replacement preview failed to align or mutated the document");
             NativeClick(view, null, Field<Button>(view, "dialogCancelButton")); yield return null;
             Require(!view.HasModal && document.Parts.Count == 3 && document.RevisionToken == revision, "Cancel changed document");
+            Require(Vector3.Distance(root.transform.InverseTransformPoint(Field<GameObject>(visuals["a"], "Root").transform.position),
+                new Vector3(3, 2, 1)) < .001f, "Selected replacement cancellation did not restore its visible pose");
             Call(controller, "RequestMissingReplacement"); yield return null;
             Require(view.HasModal, "Stale-prefab confirmation did not open"); ownAvailable = false;
             NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
@@ -331,7 +419,7 @@ internal static class ControllerInputAcceptance
             NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
             Require(document.Parts.Count == 2 && document.PrimaryPartId == "a" && document.PlacementSupportId == "s" &&
                 document.Sources[0].Text == evidence.Text && document.Groups.Single(group => group.StableId == "g").PivotPartId == "a" &&
-                document.Parts[0].Position.X == 3 && document.Parts[0].Scale.X == 2, "Confirmed replacement lost pose/source/support/pivot");
+                V(document.Parts[0].Position).magnitude < .001f && document.Parts[0].Scale.X == 2, "Confirmed replacement lost aligned pose/source/support/pivot");
             Require(!Field<Button>(view, "replaceMissingButton").gameObject.activeSelf,
                 "Replacement entry remains after the last missing part was replaced");
             NativeClick(view, null, Field<Button>(view, "undoButton")); yield return null;
@@ -346,11 +434,11 @@ internal static class ControllerInputAcceptance
             Require(!document.IsDirty, "Replacement Save failed"); controller.Close(true);
         }
         var reopened = new CompositeBlueprintStore(path).All().Single();
-        Require(reopened.parts.Count == 2 && reopened.parts[0].position.x == 3 && reopened.parts[0].scale.x == 2 &&
+        Require(reopened.parts.Count == 2 && reopened.parts[0].position.ToVector3().magnitude < .001f && reopened.parts[0].scale.x == 2 &&
             reopened.groups.Count == 2 && reopened.placementSupportId == "s" && reopened.sourceDocuments[0].text == evidence.Text,
             "Replacement disk reopen lost structure or original evidence");
         File.WriteAllText(Path.Combine(output, "replacement-check.txt"),
-            "PASS actual persistent Inspector/Tools entry with only missing selected; instructions/Cancel/Open catalogue without mutation; explicit one-to-many confirmation/stale prefab/one Undo/Redo/Save/reopen; own poses, groups, primary/pivots, independent support and source preserved. No game construction proof.");
+            "PASS actual Inspector/Tools entry; exact origin/full rotation preview for selected parts and direct single/whole blueprint catalogue replacements; Cancel restores visuals without document mutation; one Undo/Redo, Save/reopen, stale prefab and ordinary placement recovery; own scales, relative poses, groups, primary/pivots, independent supports and source retained. No game construction proof.");
     }
 
     internal static IEnumerable<object> RunOutlinerFilters(TMP_Text font, string output)

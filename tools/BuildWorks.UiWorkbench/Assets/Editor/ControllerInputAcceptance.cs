@@ -2443,6 +2443,66 @@ internal static class ControllerInputAcceptance
         Require(Math.Abs(doc.Parts[0].Scale.X - 1.5) < .00001f && Field<IList>(doc, "undo").Count == history + 1,
             "Uniform numeric scale commit/history failed");
         Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
+        foreach (var axisCase in new[] { (KeyCode.X, GizmoAxis.X, new Vector3(1.5f, 1, 1)),
+            (KeyCode.Y, GizmoAxis.Y, new Vector3(1, 1.5f, 1)), (KeyCode.Z, GizmoAxis.Z, new Vector3(1, 1, 1.5f)) })
+        {
+            Frame(controller, input, mouse, 0, KeyCode.S); yield return null;
+            Frame(controller, input, mouse); yield return null;
+            if (axisCase.Item2 == GizmoAxis.Y) NativeClick(view, uiCamera, "PreviewAxisY");
+            else Frame(controller, input, mouse, 0, axisCase.Item1);
+            yield return null;
+            Frame(controller, input, mouse); yield return null;
+            Require(Field<GizmoHandleKind>(controller, "dragHandle") == GizmoHandleKind.Scale &&
+                Field<GizmoAxis>(controller, "dragAxis") == axisCase.Item2, "Scale ignores the selected axis: " + axisCase.Item2);
+            Frame(controller, input, mouse + Vector2.up * 50); yield return null;
+            Require(Vector3.Distance(VisualRoot(scene, "left").transform.localScale, axisCase.Item3) < .0001f,
+                "Mouse axis scale affects other axes: " + axisCase.Item2);
+            TextFrame(controller, input, mouse, "1.5"); yield return null;
+            Vector3 previewScale = VisualRoot(scene, "left").transform.localScale;
+            Frame(controller, input, mouse, 0, KeyCode.Return); yield return null;
+            Require(Vector3.Distance(V(doc.Parts[0].Scale), axisCase.Item3) < .0001f &&
+                Vector3.Distance(VisualRoot(scene, "left").transform.localScale, previewScale) < .0001f &&
+                Field<IList>(doc, "undo").Count == history + 1, "Axis scale commit differs from preview: " + axisCase.Item2);
+            Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
+            Require(Vector3.Distance(V(doc.Parts[0].Scale), Vector3.one) < .0001f, "Axis scale Undo failed");
+            Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Y); yield return null;
+            Require(Vector3.Distance(V(doc.Parts[0].Scale), axisCase.Item3) < .0001f, "Axis scale Redo failed");
+            Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
+        }
+        bool savedLocal = Field<bool>(controller, "localSpace");
+        object savedFrame = Field<object>(controller, "transformFrame");
+        Quaternion diagonal = Quaternion.Euler(0, 45, 0);
+        Require(doc.SetPartProperties("left", doc.Parts[0].DisplayName, doc.Parts[0].Position,
+            new Rotation3(diagonal.x, diagonal.y, diagonal.z, diagonal.w)), "Cannot arrange rotated axis fixture");
+        doc.AcceptLastEdit(); Call(controller, "Bind", (object)null);
+        Set(controller, "localSpace", true);
+        Set(controller, "transformFrame", Enum.Parse(savedFrame.GetType(), "Local"));
+        Call(controller, "UpdateTransformContext");
+        Frame(controller, input, mouse, 0, KeyCode.S); yield return null;
+        Frame(controller, input, mouse, 0, KeyCode.X); yield return null;
+        TextFrame(controller, input, mouse, "1.5"); yield return null;
+        Require(Field<bool>(controller, "keyboardValid") &&
+            Vector3.Distance(VisualRoot(scene, "left").transform.localScale, new Vector3(1.5f, 1, 1)) < .0001f,
+            "Rotated local X scale was rejected or affected the wrong axis");
+        Vector3 localPreview = VisualRoot(scene, "left").transform.localScale;
+        Frame(controller, input, mouse, 0, KeyCode.Return); yield return null;
+        Require(Vector3.Distance(V(doc.Parts[0].Scale), localPreview) < .0001f, "Rotated local scale differs after commit");
+        Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
+        Frame(controller, input, mouse, 0, KeyCode.S); yield return null;
+        Frame(controller, input, mouse, 0, KeyCode.X); yield return null;
+        Frame(controller, input, mouse); yield return null;
+        Frame(controller, input, mouse, 0, KeyCode.X); yield return null;
+        Require(!Field<bool>(controller, "localSpace"), "Repeated scale axis did not switch to world coordinates");
+        TextFrame(controller, input, mouse, "1.5"); yield return null;
+        Frame(controller, input, mouse, 0, KeyCode.Return); yield return null;
+        Require(!Field<bool>(controller, "keyboardValid") && Field<bool>(controller, "keyboardPreview") &&
+            Vector3.Distance(VisualRoot(scene, "left").transform.localScale, Vector3.one) < .0001f &&
+            Vector3.Distance(V(doc.Parts[0].Scale), Vector3.one) < .0001f && Field<IList>(doc, "undo").Count == history + 1,
+            "Sheared world scale moved the preview, committed, or changed history");
+        Frame(controller, input, mouse, 0, KeyCode.Escape); yield return null;
+        Require(doc.Undo(), "Cannot restore rotated fixture"); Call(controller, "Bind", (object)null);
+        Set(controller, "localSpace", savedLocal); Set(controller, "transformFrame", savedFrame);
+        Call(controller, "UpdateTransformContext");
         foreach (string invalid in new[] { "-", "1,", "0", "-1", "4.01", "99999999999999999999999999999999" })
         {
             Frame(controller, input, mouse, 0, KeyCode.S); yield return null;

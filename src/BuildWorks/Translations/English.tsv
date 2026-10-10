@@ -601,7 +601,7 @@ editor.view.tool_array	Ctrl+3 · Array\nRepeat the selection in two directions
 editor.view.tool_contour	Ctrl+4 · Contour\nRepeat the selection along native snap-point chains
 editor.view.tool_parameters	TOOL PARAMETERS
 editor.view.tool_select	Ctrl+1 · Select\nSelection shows handles · G — surface move · MMB click/Delete — remove
-editor.view.tool_transform	G / Ctrl+2 · Gizmo\nG — surface move · X/Y/Z — axis move · R — rotate · S — uniform scale\nType a number — exact delta from the action start
+editor.view.tool_transform	G / Ctrl+2 · Gizmo\nG — surface move · X/Y/Z — axis move · R — rotate · S — scale; then X/Y/Z — selected axis\nType a number — exact delta; scale 1.5 = 150%
 editor.view.transform_short	TRANSFORM
 editor.view.turn_deg	TURN · °
 editor.view.type	TYPE

@@ -873,8 +873,8 @@ namespace OstrixMods.BuildWorks.Geometry
             BlueprintEditorPart.Validate(scale, nameof(scale));
             if (scale.X <= 0 || scale.Y <= 0 || scale.Z <= 0)
                 throw new ArgumentOutOfRangeException(nameof(scale));
-            Rotation3 delta = rotation.Normalized();
-            Rotation3 frame = scaleFrame.Normalized(), inverseFrame = Inverse(frame);
+            rotation.Normalized();
+            scaleFrame.Normalized();
             List<BlueprintEditorPart> targets = SelectedEditableParts();
             if (targets.Count == 0) return false;
             var positions = new Point3[targets.Count];
@@ -882,26 +882,10 @@ namespace OstrixMods.BuildWorks.Geometry
             var scales = new Point3[targets.Count];
             for (int index = 0; index < targets.Count; ++index)
             {
-                BlueprintEditorPart part = targets[index];
-                Point3 offset = inverseFrame.Rotate(part.Position - pivot);
-                positions[index] = pivot + delta.Rotate(frame.Rotate(new Point3(
-                    offset.X * scale.X, offset.Y * scale.Y, offset.Z * scale.Z))) + translation;
-                BlueprintEditorPart.Validate(positions[index], nameof(translation));
-                rotations[index] = Multiply(delta, part.Rotation).Normalized();
-                Rotation3 localFrame = Multiply(inverseFrame, part.Rotation).Normalized();
-                Point3 multipliers = new Point3(
-                    AxisScale(localFrame.Rotate(new Point3(1, 0, 0)), scale),
-                    AxisScale(localFrame.Rotate(new Point3(0, 1, 0)), scale),
-                    AxisScale(localFrame.Rotate(new Point3(0, 0, 1)), scale));
-                scales[index] = BlueprintEditorPart.NormalizeScale(new Point3(
-                    part.Scale.X * multipliers.X, part.Scale.Y * multipliers.Y,
-                    part.Scale.Z * multipliers.Z), nameof(scale), part.ScaleIsAbsolute);
-                if (part.BaseScale.HasValue)
-                {
-                    Point3 basis = part.BaseScale.Value;
-                    BlueprintEditorPart.NormalizeScale(new Point3(basis.X * scales[index].X,
-                        basis.Y * scales[index].Y, basis.Z * scales[index].Z), nameof(scale), true);
-                }
+                var pose = TransformPart(targets[index], translation, rotation, pivot, scale, scaleFrame);
+                positions[index] = pose.Position;
+                rotations[index] = pose.Rotation;
+                scales[index] = pose.Scale;
             }
             return Commit(() =>
             {
@@ -912,6 +896,40 @@ namespace OstrixMods.BuildWorks.Geometry
                     targets[index].Scale = scales[index];
                 }
             });
+        }
+
+        public static (Point3 Position, Rotation3 Rotation, Point3 Scale) TransformPart(
+            BlueprintEditorPart part, Point3 translation, Rotation3 rotation, Point3 pivot,
+            Point3 scale, Rotation3 scaleFrame)
+        {
+            if (part == null) throw new ArgumentNullException(nameof(part));
+            BlueprintEditorPart.Validate(translation, nameof(translation));
+            BlueprintEditorPart.Validate(pivot, nameof(pivot));
+            BlueprintEditorPart.Validate(scale, nameof(scale));
+            if (scale.X <= 0 || scale.Y <= 0 || scale.Z <= 0)
+                throw new ArgumentOutOfRangeException(nameof(scale));
+            Rotation3 delta = rotation.Normalized();
+            Rotation3 frame = scaleFrame.Normalized(), inverseFrame = Inverse(frame);
+            Point3 offset = inverseFrame.Rotate(part.Position - pivot);
+            Point3 position = pivot + delta.Rotate(frame.Rotate(new Point3(
+                offset.X * scale.X, offset.Y * scale.Y, offset.Z * scale.Z))) + translation;
+            BlueprintEditorPart.Validate(position, nameof(translation));
+            Rotation3 resultRotation = Multiply(delta, part.Rotation).Normalized();
+            Rotation3 localFrame = Multiply(inverseFrame, part.Rotation).Normalized();
+            Point3 multipliers = new Point3(
+                AxisScale(localFrame.Rotate(new Point3(1, 0, 0)), scale),
+                AxisScale(localFrame.Rotate(new Point3(0, 1, 0)), scale),
+                AxisScale(localFrame.Rotate(new Point3(0, 0, 1)), scale));
+            Point3 resultScale = BlueprintEditorPart.NormalizeScale(new Point3(
+                part.Scale.X * multipliers.X, part.Scale.Y * multipliers.Y,
+                part.Scale.Z * multipliers.Z), nameof(scale), part.ScaleIsAbsolute);
+            if (part.BaseScale.HasValue)
+            {
+                Point3 basis = part.BaseScale.Value;
+                BlueprintEditorPart.NormalizeScale(new Point3(basis.X * resultScale.X,
+                    basis.Y * resultScale.Y, basis.Z * resultScale.Z), nameof(scale), true);
+            }
+            return (position, resultRotation, resultScale);
         }
 
         private static double AxisScale(Point3 axis, Point3 scale)

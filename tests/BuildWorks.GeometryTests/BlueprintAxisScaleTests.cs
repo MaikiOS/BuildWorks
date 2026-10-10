@@ -24,6 +24,14 @@ internal static class BlueprintAxisScaleTests
         Near(new Point3(2, .5, 3), doc.Parts[0].Scale);
         Near(new Point3(3, .5, 2), doc.Parts[1].Scale);
         for (int index = 0; index < parts.Length; ++index)
+        {
+            var preview = BlueprintEditorDocument.TransformPart(parts[index], translation, diagonal, pivot, scale, identity);
+            Near(doc.Parts[index].Position, preview.Position);
+            Near(doc.Parts[index].Scale, preview.Scale);
+            Near(doc.Parts[index].Rotation.Rotate(new Point3(1, 2, 3)), preview.Rotation.Rotate(new Point3(1, 2, 3)));
+            Near(new Point3(1, 1, 1), parts[index].Scale);
+        }
+        for (int index = 0; index < parts.Length; ++index)
         for (int x = -1; x <= 1; x += 2)
         for (int y = -1; y <= 1; y += 2)
         for (int z = -1; z <= 1; z += 2)

@@ -115,6 +115,7 @@ namespace OstrixMods.BuildWorks
         private Vector3 keyboardBaseTranslation;
         private Quaternion keyboardBaseRotation;
         private float keyboardBaseScale;
+        private float keyboardValidScale = 1f;
         private Quaternion keyboardOrientation;
         private Vector3 keyboardPlaneFirst;
         private Vector3 keyboardPlaneSecond;
@@ -781,7 +782,7 @@ namespace OstrixMods.BuildWorks
                 GizmoAxis axis = input.GetKeyDown(KeyCode.X) ? GizmoAxis.X :
                     input.GetKeyDown(KeyCode.Y) ? GizmoAxis.Y :
                     input.GetKeyDown(KeyCode.Z) ? GizmoAxis.Z : GizmoAxis.None;
-                if (axis != GizmoAxis.None && dragHandle != GizmoHandleKind.Scale)
+                if (axis != GizmoAxis.None)
                 {
                     SetKeyboardAxis(axis);
                 }
@@ -1100,7 +1101,7 @@ namespace OstrixMods.BuildWorks
                     ? BuildWorksLocalization.Text(document.EditablePartSelectionCount > 0 ?
                         activeTool == BlueprintEditorTool.Transform ? "editor.hint.gizmo_ready" : "editor.hint.next_selected" :
                         "editor.hint.next_empty") : hints);
-            view.SetPreviewAxes(keyboardPreview && dragHandle != GizmoHandleKind.Scale, dragAxis);
+            view.SetPreviewAxes(keyboardPreview, dragAxis);
             if (activeTool == BlueprintEditorTool.Transform && transformFrame == TransformFrame.View &&
                 localSpace && !view.HasCatalog && !view.HasModal && !view.HasViewportSettings &&
                 (!IsGizmoDragging || ViewDepthMove))
@@ -1416,7 +1417,7 @@ namespace OstrixMods.BuildWorks
                 keyboardSourceIndex = preferredCursorSource;
             dragTranslation = Vector3.zero;
             dragRotation = Quaternion.identity;
-            dragScale = 1f;
+            dragScale = keyboardValidScale = 1f;
             dragHandle = handle;
             TrySelectionBasis(out _, out keyboardSourceFrame, null);
             BlueprintEditorPart framePart = SelectedPrimaryPart() ?? ActiveEditablePart();
@@ -1535,7 +1536,6 @@ namespace OstrixMods.BuildWorks
 
         private void SetKeyboardAxis(GizmoAxis axis)
         {
-            if (dragHandle == GizmoHandleKind.Scale) return;
             if (axis == dragAxis)
             {
                 localSpace = !localSpace;
@@ -1546,14 +1546,14 @@ namespace OstrixMods.BuildWorks
             dragAxis = axis;
             keyboardSurface = false;
             view.SetCursorSourcesAvailable(false);
-            if (dragHandle != GizmoHandleKind.Rotate)
+            if (dragHandle != GizmoHandleKind.Rotate && dragHandle != GizmoHandleKind.Scale)
                 dragHandle = ShiftHeld ? GizmoHandleKind.MovePlane : GizmoHandleKind.Move;
             // Changing constraint starts at the original operation pose. Camera
             // rebasing still retains the preview; it is a different operation.
             dragTranslation = Vector3.zero;
             dragRotation = Quaternion.identity;
-            dragScale = 1f;
-            scene.PreviewTransform(document, dragIds, dragTranslation, dragRotation, dragPivot, dragScale);
+            dragScale = keyboardValidScale = 1f;
+            PreviewKeyboardPose();
             RebaseKeyboardPreview(input.MousePosition);
             UpdateGizmo();
         }
@@ -1651,6 +1651,7 @@ namespace OstrixMods.BuildWorks
                 float percent = mouse.y - dragStartMouse.y;
                 if (!ShiftHeld) percent = Mathf.Round(percent / view.ScaleStepPercent) * view.ScaleStepPercent;
                 float minimum = .01f, maximum = 400f;
+                if (dragAxis == GizmoAxis.None)
                 foreach (BlueprintEditorPart part in document.Parts)
                 {
                     if (!dragIds.Contains(part.StableId)) continue;
@@ -1660,8 +1661,37 @@ namespace OstrixMods.BuildWorks
                 }
                 dragScale = Mathf.Clamp(keyboardBaseScale * Mathf.Max(.001f, 1f + percent * .01f), minimum, maximum);
             }
-            scene.PreviewTransform(document, dragIds, dragTranslation, dragRotation, dragPivot, dragScale);
-            UpdateGizmo();
+            if (PreviewKeyboardPose()) UpdateGizmo();
+        }
+
+        private Vector3 DragScaleVector => dragHandle == GizmoHandleKind.Scale && dragAxis != GizmoAxis.None
+            ? Vector3.one + TransformGizmoView.AxisVector(dragAxis, Quaternion.identity, false) * (dragScale - 1f)
+            : Vector3.one * dragScale;
+
+        private Quaternion DragScaleFrame => keyboardPreview && dragHandle == GizmoHandleKind.Scale &&
+            dragAxis != GizmoAxis.None && localSpace ? keyboardOrientation : Quaternion.identity;
+
+        private Vector3 TransformDragPoint(Vector3 point) => dragPivot + dragRotation *
+            (DragScaleFrame * Vector3.Scale(Quaternion.Inverse(DragScaleFrame) * (point - dragPivot), DragScaleVector)) + dragTranslation;
+
+        private bool PreviewKeyboardPose()
+        {
+            try
+            {
+                if (dragHandle == GizmoHandleKind.Scale)
+                    scene.PreviewTransform(document, dragIds, dragTranslation, dragRotation, dragPivot, DragScaleVector, DragScaleFrame);
+                else scene.PreviewTransform(document, dragIds, dragTranslation, dragRotation, dragPivot, dragScale);
+                keyboardValidScale = dragScale;
+                return true;
+            }
+            catch (Exception exception) when (exception is ArgumentException || exception is InvalidOperationException)
+            {
+                keyboardValid = false;
+                dragScale = keyboardValidScale;
+                view.SetStatus(exception.Message == BlueprintEditorDocument.NonUniformScaleShearError
+                    ? BuildWorksLocalization.Text("editor.scale.shear") : BuildWorksLocalization.Text("editor.hint.numeric_invalid"), error: true);
+                return false;
+            }
         }
 
         private void ReadKeyboardNumber()
@@ -1701,13 +1731,6 @@ namespace OstrixMods.BuildWorks
             {
                 scale = value;
                 keyboardValid = scale > 0f;
-                foreach (BlueprintEditorPart part in document.Parts)
-                {
-                    if (!dragIds.Contains(part.StableId)) continue;
-                    Vector3 candidate = ToVector(part.Scale) * scale;
-                    keyboardValid &= Mathf.Min(candidate.x, candidate.y, candidate.z) >= (part.ScaleIsAbsolute ? float.Epsilon : .01f) &&
-                        Mathf.Max(candidate.x, candidate.y, candidate.z) <= (part.ScaleIsAbsolute ? float.MaxValue : 4f);
-                }
             }
             else
             {
@@ -1722,8 +1745,7 @@ namespace OstrixMods.BuildWorks
             snapTargetVisible = false;
             snapPreviewTargets.Clear();
             snapPreviewNative.Clear();
-            scene.PreviewTransform(document, dragIds, dragTranslation, dragRotation, dragPivot, dragScale);
-            UpdateGizmo();
+            if (PreviewKeyboardPose()) UpdateGizmo();
         }
 
         private static bool IsFinite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
@@ -2043,14 +2065,15 @@ namespace OstrixMods.BuildWorks
             Vector3 translation = dragTranslation;
             Quaternion rotation = dragRotation;
             Vector3 pivot = dragPivot;
-            float scale = dragScale;
+            Vector3 scale = DragScaleVector;
+            Quaternion scaleFrame = DragScaleFrame;
             bool duplicate = dragDuplicate;
             string supportId = dragSupportId;
             Vector3 supportPosition = dragSupportPosition;
             Quaternion supportRotation = dragSupportRotation;
             ResetGizmoDrag();
             if (translation.sqrMagnitude < 0.0000001f &&
-                Quaternion.Angle(Quaternion.identity, rotation) < 0.001f && Mathf.Abs(scale - 1f) < 0.00001f)
+                Quaternion.Angle(Quaternion.identity, rotation) < 0.001f && (scale - Vector3.one).sqrMagnitude < 0.0000000001f)
             {
                 scene.TrySync(document, out _);
                 return;
@@ -2061,7 +2084,7 @@ namespace OstrixMods.BuildWorks
             else if (duplicate)
                 ApplyDocumentEdit(() => document.DuplicateSelection(ToPoint(translation),
                     BuildWorksLocalization.Text("editor.generated.copy")));
-            else ApplyTransformDelta(translation, rotation, pivot, scale);
+            else ApplyTransformDelta(translation, rotation, pivot, scale, scaleFrame);
         }
 
         private void CancelGizmoDrag()
@@ -2168,7 +2191,7 @@ namespace OstrixMods.BuildWorks
             if (!IsGizmoDragging || dragHandle == GizmoHandleKind.Layout) return document;
             var preview = CopyDocument(document);
             preview.ApplyTransformDelta(ToPoint(dragTranslation), ToRotation(dragRotation),
-                ToPoint(dragPivot), dragScale);
+                ToPoint(dragPivot), ToPoint(DragScaleVector), ToRotation(DragScaleFrame));
             return preview;
         }
 
@@ -2295,8 +2318,7 @@ namespace OstrixMods.BuildWorks
                 {
                     gizmoAnchors = new Vector3[dragSourceAnchors.Length];
                     for (int index = 0; index < gizmoAnchors.Length; ++index)
-                        gizmoAnchors[index] = dragPivot + dragRotation *
-                            ((dragSourceAnchors[index] - dragPivot) * dragScale) + dragTranslation;
+                        gizmoAnchors[index] = TransformDragPoint(dragSourceAnchors[index]);
                 }
                 else if (!scene.TryGetGizmoAnchors(
                     gizmoIds, out gizmoAnchors, out gizmoNativeAnchorStart,
@@ -2368,8 +2390,9 @@ namespace OstrixMods.BuildWorks
                 scene.ShowSnapCandidates(
                     dragAnchorPoint >= 0 || keyboardSurface && keyboardPreview ? snapPreviewTargets : Array.Empty<Vector3>(),
                     dragAnchorPoint >= 0 || keyboardSurface && keyboardPreview ? snapPreviewNative : Array.Empty<bool>());
-                scene.ShowEdgeFrame(selectedAnchorWorld, framePointWorld, IsGizmoDragging ? dragPivot : pivot,
-                    dragTranslation, dragRotation, dragScale, IsGizmoDragging);
+                scene.ShowEdgeFrame(IsGizmoDragging && selectedAnchorWorld.HasValue ? TransformDragPoint(selectedAnchorWorld.Value) : selectedAnchorWorld,
+                    IsGizmoDragging && framePointWorld.HasValue ? TransformDragPoint(framePointWorld.Value) : framePointWorld,
+                    pivot, Vector3.zero, Quaternion.identity, 1f, false);
             }
             else scene.ShowGizmo(
                 BlueprintEditorTool.Select,
@@ -2400,7 +2423,8 @@ namespace OstrixMods.BuildWorks
             if (selectedCount == 1)
                 foreach (BlueprintEditorPart part in document.Parts)
                     if (document.IsPartSelected(part.StableId) && document.IsEffectivelyVisible(part.StableId) &&
-                        !document.IsEffectivelyLocked(part.StableId)) { scale *= (float)part.Scale.X; break; }
+                        !document.IsEffectivelyLocked(part.StableId))
+                    { scale *= (float)(dragAxis == GizmoAxis.Y ? part.Scale.Y : dragAxis == GizmoAxis.Z ? part.Scale.Z : part.Scale.X); break; }
             view.SetOperationMetrics(selectedCount,
                 dragTranslation, dragRotation.eulerAngles, scale,
                 arrayPreviewCount + contourPreviewCount, document.Parts.Count);
@@ -3212,7 +3236,7 @@ namespace OstrixMods.BuildWorks
             stepY = arrayStepY;
             if (IsGizmoDragging && dragHandle != GizmoHandleKind.Layout)
             {
-                pivot = dragPivot + dragRotation * ((pivot - dragPivot) * dragScale) + dragTranslation;
+                pivot = TransformDragPoint(pivot);
                 orientation = dragRotation * orientation;
                 if (localSpace) { stepX = dragRotation * stepX; stepY = dragRotation * stepY; }
             }

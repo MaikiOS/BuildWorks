@@ -601,7 +601,7 @@ editor.view.tool_array	Ctrl+3 · Массив\nПовторить выбор в 
 editor.view.tool_contour	Ctrl+4 · Контур\nПовторить выбор по цепи точек привязки
 editor.view.tool_parameters	ПАРАМЕТРЫ ИНСТРУМЕНТА
 editor.view.tool_select	Ctrl+1 · Выбор\nРучки сразу при выборе · G — перенос по поверхности · клик СКМ/Delete — удалить
-editor.view.tool_transform	G / Ctrl+2 · Гизма\nG — перенос по поверхности · X/Y/Z — перенос по оси · R — вращать · S — равномерный масштаб\nВвод числа — точное изменение от начала действия
+editor.view.tool_transform	G / Ctrl+2 · Гизма\nG — перенос по поверхности · X/Y/Z — перенос по оси · R — вращать · S — масштаб; затем X/Y/Z — выбранная ось\nВвод числа — точное изменение; масштаб 1,5 = 150%
 editor.view.transform_short	ТРАНСФ.
 editor.view.turn_deg	ПОВОРОТ · °
 editor.view.type	ТИП

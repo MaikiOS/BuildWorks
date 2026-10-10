@@ -2472,12 +2472,12 @@ namespace OstrixMods.BuildWorks
                 SetSelected(familyButtons[index], (int)family == index + 1);
         }
 
-        internal void SetPreviewAxes(bool available, GizmoAxis active)
+        internal void SetPreviewAxes(bool available, GizmoAxis active, GizmoAxis second = GizmoAxis.None)
         {
             for (int index = 0; index < previewAxisButtons.Length; ++index)
             {
                 previewAxisButtons[index].gameObject.SetActive(available);
-                SetSelected(previewAxisButtons[index], (int)active == index + 1);
+                SetSelected(previewAxisButtons[index], (int)active == index + 1 || (int)second == index + 1);
             }
         }
 

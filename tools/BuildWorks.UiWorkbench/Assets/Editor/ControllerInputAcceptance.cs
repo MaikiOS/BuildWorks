@@ -2668,7 +2668,80 @@ internal static class ControllerInputAcceptance
             Require(Vector3.Distance(V(doc.Parts[0].Scale), axisCase.Item3) < .0001f, "Axis scale Redo failed");
             Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
         }
-        foreach (var boundary in new[] { (GizmoAxis.X, true), (GizmoAxis.None, true), (GizmoAxis.X, false) })
+        foreach (var pair in new[] { (KeyCode.X, KeyCode.Y, new Vector3(1, 1, 0)),
+            (KeyCode.X, KeyCode.Z, new Vector3(1, 0, 1)), (KeyCode.Y, KeyCode.Z, new Vector3(0, 1, 1)),
+            (KeyCode.Z, KeyCode.X, new Vector3(1, 0, 1)) })
+        {
+            Frame(controller, input, mouse, 0, KeyCode.S); yield return null;
+            Frame(controller, input, mouse, 0, pair.Item1); yield return null;
+            if (pair.Item1 == KeyCode.X && pair.Item2 == KeyCode.Z) NativeClick(view, uiCamera, "PreviewAxisZ");
+            else Frame(controller, input, mouse, 0, pair.Item2);
+            yield return null;
+            Require(Field<GizmoAxis>(controller, "keyboardSecondAxis") != GizmoAxis.None,
+                "Second scale axis replaced the first");
+            Frame(controller, input, mouse + Vector2.up * 50); yield return null;
+            Vector3 expectedScale = Vector3.one + pair.Item3 * .5f;
+            Require(Vector3.Distance(VisualRoot(scene, "left").transform.localScale, expectedScale) < .0001f,
+                "Pair mouse scale changed the excluded axis");
+            TextFrame(controller, input, mouse, "1.5"); yield return null;
+            Frame(controller, input, mouse, 0, KeyCode.Return); yield return null;
+            Require(Vector3.Distance(V(doc.Parts[0].Scale), expectedScale) < .0001f &&
+                Field<IList>(doc, "undo").Count == history + 1, "Pair numeric scale/commit was not atomic");
+            Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
+            Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Y); yield return null;
+            Require(Vector3.Distance(V(doc.Parts[0].Scale), expectedScale) < .0001f, "Pair scale Redo failed");
+            Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
+            Frame(controller, input, mouse, 0, KeyCode.G); yield return null;
+            Frame(controller, input, mouse, 0, pair.Item1); yield return null;
+            Frame(controller, input, mouse, 0, pair.Item2); yield return null;
+            Require(Field<GizmoHandleKind>(controller, "dragHandle") == GizmoHandleKind.MovePlane,
+                "Pair Move did not select its plane");
+            Vector3 destination = Field<Vector3>(controller, "dragPlaneStart") +
+                Field<Vector3>(controller, "keyboardPlaneFirst") * .4f + Field<Vector3>(controller, "keyboardPlaneSecond") * .6f;
+            Vector2 pairMouse = scene.Camera.WorldToScreenPoint(destination);
+            Frame(controller, input, pairMouse); yield return null;
+            Require(Field<bool>(controller, "keyboardValid"), "Pair plane preview became invalid");
+            Vector3 offset = Field<Vector3>(controller, "dragTranslation");
+            Require(offset.magnitude > .1f && Mathf.Abs(Vector3.Dot(offset, Vector3.one - pair.Item3)) < .0001f,
+                "Pair mouse Move left its plane");
+            TextFrame(controller, input, mouse, "-1.25"); yield return null;
+            Require(Field<bool>(controller, "keyboardValid") &&
+                Vector3.Distance(Field<Vector3>(controller, "dragTranslation"), pair.Item3 * -1.25f) < .0001f,
+                "Pair Move number is not per selected axis");
+            Frame(controller, input, mouse, 0, KeyCode.Return); yield return null;
+            Require(Vector3.Distance(V(doc.Parts[0].Position), original + pair.Item3 * -1.25f) < .001f &&
+                Field<IList>(doc, "undo").Count == history + 1, "Pair Move commit differs from preview");
+            Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
+            Require(Field<GizmoAxis>(controller, "keyboardSecondAxis") == GizmoAxis.None,
+                "Pair constraint leaked after commit");
+        }
+        Frame(controller, input, mouse, 0, KeyCode.S); yield return null;
+        Frame(controller, input, mouse, 0, KeyCode.X); yield return null;
+        Frame(controller, input, mouse, 0, KeyCode.Z); yield return null;
+        bool pairLocal = Field<bool>(controller, "localSpace");
+        Frame(controller, input, mouse, 0, KeyCode.X); yield return null;
+        Require(Field<bool>(controller, "localSpace") != pairLocal &&
+            Field<GizmoAxis>(controller, "keyboardSecondAxis") == GizmoAxis.Z, "Pair repeat lost axes or coordinate toggle");
+        Frame(controller, input, mouse, 0, KeyCode.Y); yield return null;
+        Require(Field<GizmoAxis>(controller, "dragAxis") == GizmoAxis.Y &&
+            Field<GizmoAxis>(controller, "keyboardSecondAxis") == GizmoAxis.None, "Third axis did not reset the pair");
+        Frame(controller, input, mouse, 0, KeyCode.Escape); yield return null;
+        Require(Field<IList>(doc, "undo").Count == history && V(doc.Parts[0].Scale) == Vector3.one,
+            "Pair cancellation changed the document");
+        Frame(controller, input, mouse, 0, KeyCode.G); yield return null;
+        Frame(controller, input, mouse, 0, KeyCode.X); yield return null;
+        Frame(controller, input, mouse, 0, KeyCode.Z); yield return null;
+        Frame(controller, input, mouse, 0, KeyCode.P); yield return null;
+        Require(Field<bool>(controller, "keyboardSurface") && Field<GizmoAxis>(controller, "keyboardSecondAxis") == GizmoAxis.None,
+            "Surface mode retained a pair constraint");
+        Frame(controller, input, mouse, 0, KeyCode.R); yield return null;
+        Frame(controller, input, mouse, 0, KeyCode.X); yield return null;
+        Frame(controller, input, mouse, 0, KeyCode.Z); yield return null;
+        Require(Field<GizmoAxis>(controller, "dragAxis") == GizmoAxis.Z &&
+            Field<GizmoAxis>(controller, "keyboardSecondAxis") == GizmoAxis.None, "Rotation acquired ambiguous dual axes");
+        Frame(controller, input, mouse, 0, KeyCode.Escape); yield return null;
+        foreach (var boundary in new[] { (GizmoAxis.X, true, false), (GizmoAxis.None, true, false),
+            (GizmoAxis.X, false, false), (GizmoAxis.X, true, true) })
         {
             double startScale = boundary.Item2 ? BlueprintEditorDocument.MaximumScale - .1 : .0101;
             var initial = boundary.Item1 == GizmoAxis.None ? new Point3(startScale, startScale, startScale) : new Point3(startScale, 1, 1);
@@ -2677,6 +2750,7 @@ internal static class ControllerInputAcceptance
             Call(controller, "Bind", (object)null);
             Frame(controller, input, mouse, 0, KeyCode.S); yield return null;
             if (boundary.Item1 == GizmoAxis.X) { Frame(controller, input, mouse, 0, KeyCode.X); yield return null; }
+            if (boundary.Item3) { Frame(controller, input, mouse, 0, KeyCode.Z); yield return null; }
             Vector2 beyond = mouse + Vector2.up * (boundary.Item2 ? 100 : -100);
             Frame(controller, input, beyond); yield return null;
             Require(Field<bool>(controller, "keyboardValid"), "Mouse overshoot invalidates a scale boundary");
@@ -2839,9 +2913,12 @@ internal static class ControllerInputAcceptance
         Require(doc.Parts.Count == 4 && doc.IsPartSelected("left"), "Select MMB deletion Undo failed");
         Frame(controller, input, mouse, 0, KeyCode.G); yield return null;
         Frame(controller, input, mouse, 0, KeyCode.S); yield return null;
+        Frame(controller, input, mouse, 0, KeyCode.X); yield return null;
+        Frame(controller, input, mouse, 0, KeyCode.Z); yield return null;
         TextFrame(controller, input, mouse, "1.5"); yield return null;
         input.HasFocus = false; Frame(controller, input, mouse); yield return null; input.HasFocus = true;
-        Require(!Field<bool>(controller, "keyboardPreview") && Field<string>(controller, "keyboardNumber") == "" &&
+        Require(!Field<bool>(controller, "keyboardPreview") && Field<GizmoAxis>(controller, "keyboardSecondAxis") == GizmoAxis.None &&
+            Field<string>(controller, "keyboardNumber") == "" &&
             Math.Abs(doc.Parts[0].Scale.X - 1) < .00001f, "Focus loss leaked numeric preview");
         Frame(controller, input, mouse); yield return null;
         File.WriteAllText(Path.Combine(output, "input-revision-check.txt"),

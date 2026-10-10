@@ -943,3 +943,4 @@ editor.position_done	Aligned parts: {0}. The missing record remains for adjustme
 editor.position_catalog_help	Alignment mode: choose a part or blueprint. The missing record will remain.
 editor.replace_short	REPLACE
 editor.position_short	ALIGN
+editor.view.axis_pair	{0}{1} · {2} · Number: per selected axis

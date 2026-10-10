@@ -943,3 +943,4 @@ editor.position_done	Совмещено деталей: {0}. Отсутству�
 editor.position_catalog_help	Режим совмещения: выбери деталь или чертёж. Отсутствующая запись останется.
 editor.replace_short	ЗАМЕНИТЬ
 editor.position_short	СОВМЕСТИТЬ
+editor.view.axis_pair	{0}{1} · {2} · Число: по каждой оси

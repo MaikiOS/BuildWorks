@@ -112,6 +112,7 @@ namespace OstrixMods.BuildWorks
         private bool keyboardSurface;
         private bool keyboardConfirmRequested;
         private bool keyboardMoved;
+        private GizmoAxis keyboardSecondAxis;
         private Vector3 keyboardBaseTranslation;
         private Quaternion keyboardBaseRotation;
         private float keyboardBaseScale;
@@ -794,6 +795,7 @@ namespace OstrixMods.BuildWorks
                 {
                     keyboardSurface = !keyboardSurface;
                     dragAxis = GizmoAxis.None;
+                    keyboardSecondAxis = GizmoAxis.None;
                     dragHandle = keyboardSurface ? GizmoHandleKind.Move : GizmoHandleKind.MovePlane;
                     if (keyboardSurface) RefreshCursorSources();
                     else view.SetCursorSourcesAvailable(false);
@@ -1094,7 +1096,9 @@ namespace OstrixMods.BuildWorks
                                 ? "editor.view.source_native" : "editor.view.source_helper",
                                 keyboardSourceIndex >= gizmoNativeAnchorStart ? keyboardSourceIndex - gizmoNativeAnchorStart + 1 : keyboardSourceIndex + 1)) :
                     dragAxis == GizmoAxis.None ? BuildWorksLocalization.Text("editor.view.screen_plane") :
-                    dragAxis + " · " + BuildWorksLocalization.Text(TransformFrameKey),
+                    keyboardSecondAxis != GizmoAxis.None ? BuildWorksLocalization.Text("editor.view.axis_pair",
+                        dragAxis, keyboardSecondAxis, BuildWorksLocalization.Text(TransformFrameKey)) :
+                        dragAxis + " · " + BuildWorksLocalization.Text(TransformFrameKey),
                     keyboardNumber.Length > 0 ? BuildWorksLocalization.Text("editor.hint.numeric_value", keyboardNumber,
                         keyboardValid ? "" : BuildWorksLocalization.Text("editor.hint.numeric_invalid")) :
                     keyboardValid ? "" : BuildWorksLocalization.Text("editor.view.no_surface"))
@@ -1104,7 +1108,7 @@ namespace OstrixMods.BuildWorks
                     ? BuildWorksLocalization.Text(document.EditablePartSelectionCount > 0 ?
                         activeTool == BlueprintEditorTool.Transform ? "editor.hint.gizmo_ready" : "editor.hint.next_selected" :
                         "editor.hint.next_empty") : hints);
-            view.SetPreviewAxes(keyboardPreview, dragAxis);
+            view.SetPreviewAxes(keyboardPreview, dragAxis, keyboardSecondAxis);
             if (activeTool == BlueprintEditorTool.Transform && transformFrame == TransformFrame.View &&
                 localSpace && !view.HasCatalog && !view.HasModal && !view.HasViewportSettings &&
                 (!IsGizmoDragging || ViewDepthMove))
@@ -1427,6 +1431,7 @@ namespace OstrixMods.BuildWorks
             if (framePart != null) keyboardSourceFrame = ToQuaternion(framePart.Rotation);
             keyboardSurfaceYaw = 0;
             dragAxis = GizmoAxis.None;
+            keyboardSecondAxis = GizmoAxis.None;
             keyboardPreview = true;
             keyboardSurface = handle == GizmoHandleKind.Move;
             keyboardAutoSource = keyboardHoveredSource = -1;
@@ -1507,6 +1512,9 @@ namespace OstrixMods.BuildWorks
             Quaternion orientation = dragRotation * keyboardOrientation;
             dragAxisWorld = dragAxis == GizmoAxis.None ? scene.Camera.transform.forward :
                 TransformGizmoView.AxisVector(dragAxis, orientation, localSpace);
+            if (dragHandle == GizmoHandleKind.MovePlane && keyboardSecondAxis != GizmoAxis.None)
+                dragAxisWorld = Vector3.Cross(dragAxisWorld,
+                    TransformGizmoView.AxisVector(keyboardSecondAxis, orientation, localSpace)).normalized;
             dragAnchorPlane = new Plane(dragAxisWorld, origin);
             Ray ray = scene.Camera.ScreenPointToRay(mouse);
             keyboardValid = !keyboardSurface && dragAnchorPlane.Raycast(ray, out _);
@@ -1514,6 +1522,11 @@ namespace OstrixMods.BuildWorks
             keyboardPlaneFirst = Vector3.Cross(dragAxisWorld,
                 Mathf.Abs(Vector3.Dot(dragAxisWorld, Vector3.up)) < .9f ? Vector3.up : Vector3.right).normalized;
             keyboardPlaneSecond = Vector3.Cross(dragAxisWorld, keyboardPlaneFirst).normalized;
+            if (dragHandle == GizmoHandleKind.MovePlane && keyboardSecondAxis != GizmoAxis.None)
+            {
+                keyboardPlaneFirst = TransformGizmoView.AxisVector(dragAxis, orientation, localSpace);
+                keyboardPlaneSecond = TransformGizmoView.AxisVector(keyboardSecondAxis, orientation, localSpace);
+            }
             Vector3 start = scene.Camera.WorldToScreenPoint(origin);
             Vector3 end = scene.Camera.WorldToScreenPoint(origin + dragAxisWorld);
             Vector2 screenAxis = new Vector2(end.x - start.x, end.y - start.y);
@@ -1546,11 +1559,18 @@ namespace OstrixMods.BuildWorks
                     : TransformFrame.World;
                 UpdateTransformContext();
             }
-            dragAxis = axis;
+            if (axis != dragAxis)
+            {
+                if (!ShiftHeld && dragHandle != GizmoHandleKind.Rotate && dragAxis != GizmoAxis.None &&
+                    keyboardSecondAxis == GizmoAxis.None)
+                    keyboardSecondAxis = axis;
+                else { dragAxis = axis; keyboardSecondAxis = GizmoAxis.None; }
+            }
+            if (ShiftHeld) keyboardSecondAxis = GizmoAxis.None;
             keyboardSurface = false;
             view.SetCursorSourcesAvailable(false);
             if (dragHandle != GizmoHandleKind.Rotate && dragHandle != GizmoHandleKind.Scale)
-                dragHandle = ShiftHeld ? GizmoHandleKind.MovePlane : GizmoHandleKind.Move;
+                dragHandle = ShiftHeld || keyboardSecondAxis != GizmoAxis.None ? GizmoHandleKind.MovePlane : GizmoHandleKind.Move;
             // Changing constraint starts at the original operation pose. Camera
             // rebasing still retains the preview; it is a different operation.
             dragTranslation = Vector3.zero;
@@ -1658,8 +1678,12 @@ namespace OstrixMods.BuildWorks
             if (PreviewKeyboardPose()) UpdateGizmo();
         }
 
+        private Vector3 KeyboardAxisMask => TransformGizmoView.AxisVector(dragAxis, Quaternion.identity, false) +
+            (keyboardSecondAxis == GizmoAxis.None ? Vector3.zero :
+                TransformGizmoView.AxisVector(keyboardSecondAxis, Quaternion.identity, false));
+
         private Vector3 DragScaleVector => dragHandle == GizmoHandleKind.Scale && dragAxis != GizmoAxis.None
-            ? Vector3.one + TransformGizmoView.AxisVector(dragAxis, Quaternion.identity, false) * (dragScale - 1f)
+            ? Vector3.one + KeyboardAxisMask * (dragScale - 1f)
             : Vector3.one * dragScale;
 
         private Quaternion DragScaleFrame => keyboardPreview && dragHandle == GizmoHandleKind.Scale &&
@@ -1669,7 +1693,7 @@ namespace OstrixMods.BuildWorks
         {
             double minimum = float.Epsilon, maximum = float.MaxValue;
             Vector3 mask = keyboardPreview && dragAxis != GizmoAxis.None
-                ? TransformGizmoView.AxisVector(dragAxis, Quaternion.identity, false) : Vector3.one;
+                ? KeyboardAxisMask : Vector3.one;
             Quaternion inverseFrame = Quaternion.Inverse(DragScaleFrame);
             var selected = new HashSet<string>(dragIds, StringComparer.Ordinal);
             foreach (BlueprintEditorPart part in document.Parts)
@@ -1764,8 +1788,9 @@ namespace OstrixMods.BuildWorks
             }
             else
             {
-                keyboardValid = dragAxis != GizmoAxis.None && dragHandle == GizmoHandleKind.Move;
-                translation = axis * value;
+                bool pair = dragHandle == GizmoHandleKind.MovePlane && keyboardSecondAxis != GizmoAxis.None;
+                keyboardValid = dragAxis != GizmoAxis.None && (dragHandle == GizmoHandleKind.Move || pair);
+                translation = (pair ? axis + TransformGizmoView.AxisVector(keyboardSecondAxis, keyboardOrientation, localSpace) : axis) * value;
                 keyboardValid &= IsFinite(translation.sqrMagnitude);
             }
             if (!keyboardValid) return;
@@ -2143,6 +2168,7 @@ namespace OstrixMods.BuildWorks
             dragDuplicate = false;
             dragHandle = GizmoHandleKind.None;
             dragAxis = GizmoAxis.None;
+            keyboardSecondAxis = GizmoAxis.None;
             dragAnchorPoint = -1;
             dragSourceAnchors = Array.Empty<Vector3>();
             snapTargetVisible = false;

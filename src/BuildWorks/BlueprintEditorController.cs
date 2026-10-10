@@ -3272,9 +3272,13 @@ namespace OstrixMods.BuildWorks
             unavailable = BuildWorksLocalization.ResolveUserText(error);
             warning = null;
             if (!string.IsNullOrEmpty(unavailable)) return;
-            var missing = source.parts.Where(part => part.scaleIsAbsolute || !prefabAvailable(part.prefabName))
-                .Select(part => part.prefabName).Distinct().OrderBy(name => name, StringComparer.Ordinal).ToArray();
-            if (missing.Length > 0) warning = BuildWorksLocalization.Text("editor.missing_dimensions", string.Join(", ", missing));
+            var missing = new HashSet<string>(StringComparer.Ordinal);
+            var checkedPrefabs = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var part in source.parts)
+                if (part.scaleIsAbsolute || (checkedPrefabs.Add(part.prefabName) && !prefabAvailable(part.prefabName)))
+                    missing.Add(part.prefabName);
+            if (missing.Count > 0) warning = BuildWorksLocalization.Text("editor.missing_dimensions",
+                string.Join(", ", missing.OrderBy(name => name, StringComparer.Ordinal)));
         }
 
         private void CyclePlacementSnapPoint(int direction)

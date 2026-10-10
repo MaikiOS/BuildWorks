@@ -127,5 +127,74 @@ namespace OstrixMods.BuildWorks.StoreTests
             }
             return 0;
         }
+
+        internal static int RunCatalogPhases(string imports, string directory)
+        {
+            Console.WriteLine("File-only catalogue phases; temporary copies, unit scale/no material support. No Unity/UI/thumbnails. Independent distinct-name probe is not additive. Worker wait is remaining time after scheduling; OS/JIT caches are not flushed.");
+            Console.WriteLine("run,documents,parts,unique_prefabs,read_ms,distinct_names_probe_ms,sync_schedule_ms,scale_callback_ms,material_callback_ms,worker_wait_ms,final_catalog_ms,cached_catalog_ms");
+            for (int run = 1; run <= 2; ++run)
+            {
+                string folder = Path.Combine(directory, "phases" + run);
+                Directory.CreateDirectory(folder);
+                foreach (string file in Directory.EnumerateFiles(imports))
+                    File.Copy(file, Path.Combine(folder, Path.GetFileName(file)));
+                string[] files = Directory.GetFiles(folder);
+                byte[][] original = files.Select(File.ReadAllBytes).ToArray();
+                var clock = Stopwatch.StartNew();
+                var raw = ExternalBlueprintLibrary.Load(folder);
+                double read = clock.Elapsed.TotalMilliseconds;
+                clock.Restart();
+                string[] names = raw.SelectMany(source => source.parts).Select(part => part.prefabName)
+                    .Distinct(StringComparer.Ordinal).ToArray();
+                double distinct = clock.Elapsed.TotalMilliseconds;
+                var store = new CompositeBlueprintStore(Path.Combine(folder, "empty", "library.json"), true);
+                WaitReady(store, out _);
+                int thread = Thread.CurrentThread.ManagedThreadId, scales = 0, materials = 0;
+                long scaleTicks = 0, materialTicks = 0;
+                store.ConfigureImportScale(name =>
+                {
+                    long start = Stopwatch.GetTimestamp();
+                    if (Thread.CurrentThread.ManagedThreadId != thread) throw new InvalidOperationException("Scale callback left caller thread");
+                    ++scales;
+                    var scale = new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 };
+                    scaleTicks += Stopwatch.GetTimestamp() - start;
+                    return scale;
+                }, prefabHash: ForeignZdoChecks.Hash, worldLevel: () => 0, supportsMaterialSeed: name =>
+                {
+                    long start = Stopwatch.GetTimestamp();
+                    if (Thread.CurrentThread.ManagedThreadId != thread) throw new InvalidOperationException("Material callback left caller thread");
+                    ++materials;
+                    materialTicks += Stopwatch.GetTimestamp() - start;
+                    return false;
+                });
+                // Inject parsed inputs only; measure the real CatalogAll snapshot, worker and publication paths.
+                typeof(CompositeBlueprintStore).GetField("externalBlueprints", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(store, raw);
+                clock.Restart();
+                store.CatalogAll();
+                double schedule = clock.Elapsed.TotalMilliseconds;
+                var worker = (Task)typeof(CompositeBlueprintStore).GetField("preparationTask", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(store);
+                clock.Restart();
+                if (worker == null || !worker.Wait(60000)) throw new InvalidOperationException("Catalogue worker timeout");
+                double wait = clock.Elapsed.TotalMilliseconds;
+                clock.Restart();
+                var catalog = store.CatalogAll();
+                double final = clock.Elapsed.TotalMilliseconds;
+                clock.Restart();
+                var cached = store.CatalogAll();
+                double cache = clock.Elapsed.TotalMilliseconds;
+                if (store.CatalogLoading || store.ImportError != null || catalog.Count != raw.Count ||
+                    !catalog.SequenceEqual(((Task<System.Collections.Generic.List<CompositeBlueprintStore.Blueprint>>)worker).Result) ||
+                    !catalog.Select(item => item.importSource).SequenceEqual(raw.Select(item => item.importSource)) ||
+                    !catalog.Select(item => item.parts.Count).SequenceEqual(raw.Select(item => item.parts.Count)) ||
+                    !ReferenceEquals(cached, catalog) || scales != names.Length || materials != names.Length)
+                    throw new InvalidOperationException("Catalogue phase probe changed catalogue or callback semantics");
+                for (int index = 0; index < files.Length; ++index)
+                    if (!File.ReadAllBytes(files[index]).SequenceEqual(original[index]))
+                        throw new InvalidOperationException("Catalogue phase probe changed source bytes");
+                double tickMs = 1000d / Stopwatch.Frequency;
+                Console.WriteLine(FormattableString.Invariant($"{run},{raw.Count},{raw.Sum(item => item.parts.Count)},{names.Length},{read:F3},{distinct:F3},{schedule:F3},{scaleTicks * tickMs:F3},{materialTicks * tickMs:F3},{wait:F3},{final:F3},{cache:F3}"));
+            }
+            return 0;
+        }
     }
 }

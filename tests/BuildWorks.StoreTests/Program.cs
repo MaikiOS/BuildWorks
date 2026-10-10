@@ -21,6 +21,8 @@ namespace OstrixMods.BuildWorks.StoreTests
                     return ImportTimingChecks.Run(args[1], args.Length == 3 ? args[2] : null, directory);
                 if (args.Length == 2 && args[0] == "--catalog-timings")
                     return ImportTimingChecks.RunCatalog(args[1], directory);
+                if (args.Length == 2 && args[0] == "--catalog-phases")
+                    return ImportTimingChecks.RunCatalogPhases(args[1], directory);
                 SourceEvidenceCacheChecks.Run();
                 ValidationReadChecks.Run(Path.Combine(directory, "validation-reads"));
                 LargeSnapChecks.Run(Path.Combine(directory, "large-snap-bounds"));

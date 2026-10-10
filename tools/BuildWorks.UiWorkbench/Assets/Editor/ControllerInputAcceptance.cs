@@ -902,6 +902,28 @@ internal static class ControllerInputAcceptance
         var imported = store.CatalogAll().Single();
         BlueprintEditorController.EditorCatalogStatus(imported, name => Resolve(name), out string blocked, out string warning);
         Require(string.IsNullOrEmpty(blocked) && warning.Contains("missing_catalog_model"), "Production catalogue status blocks missing records");
+        var repeated = new CompositeBlueprintStore.Blueprint();
+        for (int i = 0; i < 50000; ++i)
+            repeated.parts.Add(new CompositeBlueprintStore.Part {
+                prefabName = i % 5 == 1 ? "missing_catalog_model" : i % 5 == 3 ? "absolute_only" : i % 5 == 4 ? "WoodWall" : "woodwall",
+                scaleIsAbsolute = i % 5 == 2 || i % 5 == 3 });
+        var resolutions = new Dictionary<string, int>(StringComparer.Ordinal);
+        var statusClock = System.Diagnostics.Stopwatch.StartNew();
+        BlueprintEditorController.EditorCatalogStatus(repeated, name => {
+            resolutions.TryGetValue(name, out int count); resolutions[name] = count + 1;
+            return name == "woodwall";
+        }, out string repeatedBlocked, out string repeatedWarning);
+        File.WriteAllText(Path.Combine(output, "catalog-status-check.txt"),
+            "parts=50000; resolutions=" + string.Join(",", resolutions.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => pair.Key + ":" + pair.Value)) +
+            "; elapsedMs=" + statusClock.Elapsed.TotalMilliseconds.ToString("F3", System.Globalization.CultureInfo.InvariantCulture) + "; no Valheim timing proof");
+        Require(repeatedBlocked == null && repeatedWarning == BuildWorksLocalization.Text("editor.missing_dimensions", "WoodWall, absolute_only, missing_catalog_model, woodwall") &&
+            resolutions.Count == 3 && resolutions.Values.All(count => count == 1), "Catalogue status resolves the same prefab more than once or loses absolute/missing/case-sensitive warnings");
+        resolutions.Clear();
+        BlueprintEditorController.EditorCatalogStatus(repeated, name => {
+            resolutions.TryGetValue(name, out int count); resolutions[name] = count + 1; return true;
+        }, out repeatedBlocked, out repeatedWarning);
+        Require(repeatedBlocked == null && repeatedWarning == BuildWorksLocalization.Text("editor.missing_dimensions", "absolute_only, woodwall") &&
+            resolutions.Count == 3 && resolutions.Values.All(count => count == 1), "Catalogue status retained stale availability between passes");
         var overBudget = new CompositeBlueprintStore.Blueprint { importError = string.Empty };
         for (int i = 0; i <= CompositeBlueprintStore.EditorPartBudget; ++i) overBudget.parts.Add(new CompositeBlueprintStore.Part());
         BlueprintEditorController.EditorCatalogStatus(overBudget, name => true, out string limitError, out string limitWarning);

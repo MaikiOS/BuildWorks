@@ -68,6 +68,68 @@ namespace OstrixMods.BuildWorks
             { return false; }
         }
 
+        internal static bool SuppliesAvailable(Player player, List<Supply> supplies, Piece payingPiece = null)
+        {
+            if (!player || supplies == null) return false;
+            if (supplies.Count == 0) return true;
+            try
+            {
+                var reserved = new Dictionary<ItemDrop.ItemData, int>();
+                var snapshots = new Dictionary<ItemDrop.ItemData, string>();
+                foreach (Supply supply in supplies)
+                {
+                    if (supply == null) continue;
+                    if (!snapshots.TryGetValue(supply.Item, out string snapshot))
+                    {
+                        if (!IsAvailable(player, supply)) return false;
+                        snapshots.Add(supply.Item, snapshot = supply.Contents.Zdo);
+                    }
+                    if (snapshot != supply.Contents.Zdo) return false;
+                    reserved.TryGetValue(supply.Item, out int count);
+                    reserved[supply.Item] = checked(count + 1);
+                    if (count + 1 > supply.Item.m_stack) return false;
+                }
+                if (reserved.Count == 0 || !payingPiece) return true;
+                if (!ZoneSystem.instance) return false;
+                if (ZoneSystem.instance.GetGlobalKey(payingPiece.FreeBuildKey())) return true;
+
+                Inventory inventory = player.GetInventory();
+                var remaining = new Dictionary<ItemDrop.ItemData, int>();
+                foreach (ItemDrop.ItemData item in inventory.GetAllItems())
+                {
+                    if (item == null || item.m_shared == null || item.m_stack < 0) return false;
+                    remaining.Add(item, item.m_stack);
+                }
+                CraftingStation station = player.GetCurrentCraftingStation();
+                // Native payment uses shared names and inventory list order, including prefab aliases.
+                foreach (Piece.Requirement requirement in payingPiece.m_resources ?? Array.Empty<Piece.Requirement>())
+                {
+                    if (requirement == null) return false;
+                    if (station ? station.m_upgrader != requirement.m_upgraderResource : requirement.m_upgraderResource)
+                        continue;
+                    if (!requirement.m_resItem) continue;
+                    int amount = requirement.GetAmount(0);
+                    if (amount <= 0) continue;
+                    string name = requirement.m_resItem.m_itemData.m_shared.m_name;
+                    foreach (ItemDrop.ItemData item in inventory.GetAllItems())
+                    {
+                        if (item.m_shared.m_name != name || item.m_worldLevel < Game.m_worldLevel) continue;
+                        int debit = Math.Min(amount, remaining[item]);
+                        remaining[item] -= debit;
+                        amount -= debit;
+                        if (amount == 0) break;
+                    }
+                    if (amount != 0) return false;
+                }
+                foreach (var entry in reserved)
+                    if (!remaining.TryGetValue(entry.Key, out int count) || count < entry.Value) return false;
+                return true;
+            }
+            catch (Exception error) when (error is ArgumentException || error is InvalidOperationException ||
+                error is NullReferenceException || error is OverflowException)
+            { return false; }
+        }
+
         internal static bool CanRestore(Piece piece, BlueprintForeignPartData data)
         {
             if (data == null) return true;

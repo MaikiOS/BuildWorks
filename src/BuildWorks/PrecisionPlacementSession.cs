@@ -469,6 +469,7 @@ namespace OstrixMods.BuildWorks
         private BlueprintForeignPartData pendingItemStandContents;
         private BlueprintItemStandPlacement.Supply pendingItemStandSupply;
         private readonly List<BlueprintItemStandPlacement.Supply> placementSupplies = new List<BlueprintItemStandPlacement.Supply>();
+        private readonly List<BlueprintItemStandPlacement.Supply> heldPlacementSupplies = new List<BlueprintItemStandPlacement.Supply>();
         private bool pendingItemStandAttempted, pendingItemStandSignFailed, pendingItemStandRollbackUnsafe;
         private readonly List<GameObject> currentBlueprintPlacements = new List<GameObject>();
         private readonly Dictionary<GameObject, BlueprintConstructionRefund> constructionPayments =
@@ -2589,6 +2590,13 @@ namespace OstrixMods.BuildWorks
             }
 
             if (state == PlacementState.Armed &&
+                !BlueprintItemStandPlacement.SuppliesAvailable(player, heldPlacementSupplies, piece))
+            {
+                PauseAutomaticPlacement(player, BuildWorksLocalization.Text("placement.mount_reserved"));
+                return true;
+            }
+
+            if (state == PlacementState.Armed &&
                 placementPlanIndex < placementPlan.Count &&
                 placementPlan[placementPlanIndex].Scale != Vector3.one)
             {
@@ -2831,7 +2839,7 @@ namespace OstrixMods.BuildWorks
                 bool safe = true;
                 if (!pendingItemStandAttempted)
                 {
-                    if (!BlueprintItemStandPlacement.IsAvailable(player, pendingItemStandSupply))
+                    if (!BlueprintItemStandPlacement.SuppliesAvailable(player, heldPlacementSupplies))
                     {
                         PauseAutomaticPlacement(player, BuildWorksLocalization.Text("placement.mount_supply_changed"));
                         return;
@@ -3041,7 +3049,7 @@ namespace OstrixMods.BuildWorks
         public void OnNativePlacementFinished(Player player, Piece piece, bool placed)
         {
             // A blocked repeat of TryPlacePiece must not disturb the deferred native attachment.
-            if (pendingItemStandContents != null) return;
+            if (pendingItemStandContents != null || automaticPlacementPaused && !placed) return;
             allowNativeGhostUpdate = false;
             if (state == PlacementState.Inactive && player == Player.m_localPlayer && placed)
             {
@@ -3103,6 +3111,7 @@ namespace OstrixMods.BuildWorks
         private void CompleteNativePlacement(Player player, bool signFailed)
         {
             automaticCooldownOverridden = false;
+            if (placementPlanIndex < placementSupplies.Count) heldPlacementSupplies.Remove(placementSupplies[placementPlanIndex]);
             ++placementPlanIndex;
             Debug.Log("BuildWorks series placed " + placementPlanIndex + "/" + placementPlan.Count + ".");
             if (placementPlanIndex < placementPlan.Count)
@@ -3155,6 +3164,7 @@ namespace OstrixMods.BuildWorks
 
             int skipped = placementPlanIndex + 1;
             ++automaticSkippedPlacements;
+            if (placementPlanIndex < placementSupplies.Count) heldPlacementSupplies.Remove(placementSupplies[placementPlanIndex]);
             ++placementPlanIndex;
             Debug.LogWarning("BuildWorks series skipped player-blocked placement " + skipped +
                 "/" + placementPlan.Count + ".");
@@ -6515,6 +6525,8 @@ namespace OstrixMods.BuildWorks
                 ShowStatus(player, BuildWorksLocalization.Text("placement.mount_unavailable"));
                 return false;
             }
+            heldPlacementSupplies.Clear();
+            heldPlacementSupplies.AddRange(placementSupplies.Where(supply => supply != null));
             previews.Show(placementGhost, placementPlan, placementPlanPieces,
                 CompositeBlueprintStore.FramePartIndex(activeBlueprint), supplies: placementSupplies);
             if (placementPlan.Count > CompositeBlueprintStore.InteractivePartBudget && !previews.HeavyReady ||
@@ -6987,6 +6999,7 @@ namespace OstrixMods.BuildWorks
             pendingItemStandContents = null;
             pendingItemStandSupply = null;
             placementSupplies.Clear();
+            heldPlacementSupplies.Clear();
             pendingItemStandAttempted = pendingItemStandSignFailed = pendingItemStandRollbackUnsafe = false;
             blueprintRootPosition = Vector3.zero;
             blueprintRootRotation = Quaternion.identity;

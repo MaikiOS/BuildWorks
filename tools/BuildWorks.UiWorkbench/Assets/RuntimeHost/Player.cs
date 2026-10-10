@@ -2,6 +2,8 @@ using UnityEngine;
 public class Player : Humanoid
 {
     public static Player m_localPlayer;
+    public CraftingStation Station;
+    public CraftingStation GetCurrentCraftingStation() => Station;
     public long GetPlayerID() => 17;
     // Inert native search contract fixture; world target collection is supplied by the test.
     private readonly System.Collections.Generic.List<Transform> m_tempSnapPoints1 = new System.Collections.Generic.List<Transform>();

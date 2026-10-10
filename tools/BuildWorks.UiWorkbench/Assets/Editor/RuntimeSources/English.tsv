@@ -863,6 +863,7 @@ exchange.copy_report	Copy report
 placement.preview_loading	Preparing blueprint preview: {0}/{1}. Wait for the complete preview before placing.
 placement.preview_failed	Blueprint preview could not be prepared: {0}. Construction has not started.
 placement.mount_supply_changed	The item selected for this mount changed or disappeared. A replacement will not be consumed automatically. Esc cancels placement; then select the blueprint again.
+placement.mount_reserved	Selected mounted items changed, are insufficient, or would be spent on construction. Add resources to that stack, or press Esc, reorder your inventory and prepare the blueprint again. Items are not replaced automatically.
 editor.missing_dimensions	Model or original prefab scale unavailable: {0}. Frames show recorded visual bounds; small markers mean dimensions are unknown. Neither is the missing model.
 editor.array_missing_dimensions	Packing requires the selected models, not recorded bounds. Use an explicit spacing or install the missing model.
 editor.view.source_scale	Source scale (%)

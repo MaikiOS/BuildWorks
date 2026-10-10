@@ -1,6 +1,7 @@
 using UnityEngine;
 public class CraftingStation : MonoBehaviour
 {
+    public bool m_upgrader;
     public string m_name = "$workbench";
     public Sprite m_icon;
     public static bool Available;

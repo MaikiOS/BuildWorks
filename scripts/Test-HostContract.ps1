@@ -880,7 +880,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.144.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.145.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -2349,7 +2349,7 @@ Assert-Contract ($previewShow.Parameters.Count -eq 8 -and
     $passiveBlueprintPreviewOperands -match 'PlacementGhostPreviewView::Show' -and
     $passiveBlueprintPreviewOperands -match 'BlueprintPlacementFrame::ToRootPose') `
     'Blueprint preview overrides source renderer visibility or duplicates the native ghost.'
-Assert-Contract ($sessionSource -match 'IsAvailable\(player, pendingItemStandSupply\)' -and
+Assert-Contract ($sessionSource -match 'SuppliesAvailable\(player, heldPlacementSupplies\)' -and
     $sessionSource -match 'out safe, pendingItemStandSupply' -and
     $sessionSource -match 'supplies: placementSupplies') `
     'Confirmed mount visuals and deferred native attachment must retain the selected supplied item.'
@@ -3179,6 +3179,21 @@ $nativePlacementOrder = ($player.Methods | Where-Object Name -eq 'UpdatePlacemen
 $nativePlaceCall = @($nativePlacementOrder | Where-Object { [string]$_.Operand -match 'Player::TryPlacePiece' })
 $nativeSpendCall = @($nativePlacementOrder | Where-Object { [string]$_.Operand -match 'Player::ConsumeResources' })
 Assert-Contract ($nativePlaceCall.Count -eq 1 -and $nativeSpendCall.Count -eq 1 -and $nativePlaceCall[0].Offset -lt $nativeSpendCall[0].Offset) 'Native construction spending order changed; review deferred attachment.'
+$spendIndex = $nativePlacementOrder.IndexOf($nativeSpendCall[0])
+Assert-Contract ($nativePlacementOrder[$spendIndex - 3].OpCode.Name -eq 'ldc.i4.0' -and
+    $nativePlacementOrder[$spendIndex - 2].OpCode.Name -eq 'ldc.i4.m1' -and
+    $nativePlacementOrder[$spendIndex - 1].OpCode.Name -eq 'ldc.i4.1') 'Native construction payment arguments changed; reservation expects quality0/all qualities/multiplier1.'
+$supplyGate = $mountMethods | Where-Object Name -eq 'SuppliesAvailable'
+$supplyGateCalls = ($supplyGate.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+foreach ($pattern in 'BlueprintItemStandPlacement::IsAvailable', 'Inventory::GetAllItems', 'Player::GetCurrentCraftingStation',
+        'Piece::FreeBuildKey', 'ZoneSystem::GetGlobalKey', 'Piece/Requirement::GetAmount', '::m_upgraderResource', '::m_worldLevel') {
+    Assert-Contract ($supplyGateCalls -match $pattern) "Supply reservation omits native payment gate: $pattern"
+}
+foreach ($name in 'ShouldBlockNativePlacement','ContinueAutomaticPlacement') {
+    $method = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'PrecisionPlacementSession' -and $_.Name -eq $name }
+    $calls = ($method.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+    Assert-Contract ($calls -match 'BlueprintItemStandPlacement::SuppliesAvailable') "Placement bypasses held contents in $name"
+}
 $nativeStandDrop = $standType.Methods | Where-Object Name -eq 'DropItem'
 $standDropCalls = ($nativeStandDrop.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($standDropCalls -match 'ItemDrop::LoadFromExternalZDO') 'Native stand item restoration path changed.'
@@ -3344,6 +3359,10 @@ foreach ($entry in @(@($itemSave, 'DAA9052430B2B766A8F15E221AB0D24C63FD55A6723EE
         @($numItemsSave, 'EFCB67745DEF1986C47B3526000AC07C0114FDA19AF57F0DABCDE653A6DC456E'),
         @($inventoryLoadLayout, 'E0E6FF90F203C6FFE961DE66768CDEDF609B896945E637A8166B121911BEF935'),
         @($prefabHashLayout, '8D6089461A9226DC1BDF23B87784C88F378A57F95C1FF6FFB6CCB85E731BF821'),
+        @(($player.Methods | Where-Object Name -eq 'ConsumeResources'), 'C3BE324204B7736C506C3C3774B7E8E2A118D6B6688FEBBBB3BF676F38689646'),
+        @(($inventoryType.Methods | Where-Object { $_.Name -eq 'RemoveItem' -and $_.Parameters.Count -eq 4 }), '08D969317BA4AD9B43DFDF811968D8E6413DDB990F174B98F9A957E0F213C312'),
+        @((($pieceType.NestedTypes | Where-Object Name -eq 'Requirement').Methods | Where-Object Name -eq 'GetAmount'), 'F1F1B591B27BE1A0B2A998C0E56AD8FF90B97FFA25C51482E6EE1DBEA0B0BE65'),
+        @(($pieceType.Methods | Where-Object Name -eq 'FreeBuildKey'), 'BD493FCB49A05CE3B5441DCD6EDD62D63ED1C395D7D99A54C3373E77D1ED62E7'),
         @($moveToCell, 'A7F221EBB6B801A2EE8EE8607A952A3DC9624BFD3F702BC98C778E7DB01134B6'),
         @($addToCell, '788DD46A71168FE42327FE69F22A32705EDCA5E53C992AAF45D49CD26A491A8D'),
         @($inventoryChanged, '3418372BCABB4C4CB300ACBD8A36CB704AC0F5A7A3F2FC1709798C4050A8DE0E'),
@@ -3428,4 +3447,4 @@ try {
 }
 finally { $nativeInputSystem.Dispose() }
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.144 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.145 and Valheim Steam build 25185596.'

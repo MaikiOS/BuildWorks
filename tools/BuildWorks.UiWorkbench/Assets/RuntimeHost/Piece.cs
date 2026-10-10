@@ -6,7 +6,20 @@ using UnityEngine;
 public sealed class Piece : MonoBehaviour
 {
     public string m_name;
-    public class Requirement { public ItemDrop m_resItem; public int m_amount; }
+    public Requirement[] m_resources = System.Array.Empty<Requirement>();
+    public GlobalKeys FreeKey = GlobalKeys.NoBuildCost;
+    public GlobalKeys FreeBuildKey() => FreeKey;
+    public class Requirement
+    {
+        public ItemDrop m_resItem;
+        public int m_amount;
+        public bool m_upgraderResource;
+        public int GetAmount(int quality)
+        {
+            if (quality != 0) throw new System.InvalidOperationException("Only native construction quality0 is modelled.");
+            return m_amount;
+        }
+    }
     public static readonly List<Piece> NearbyPieces = new List<Piece>();
     public static System.Action<Piece> BeforeCollection;
     public static void GetSnapPoints(Vector3 point, float radius, List<Transform> points, List<Piece> pieces)

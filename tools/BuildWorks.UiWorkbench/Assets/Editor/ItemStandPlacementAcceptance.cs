@@ -14,6 +14,93 @@ internal static class ItemStandPlacementAcceptance
     private static void Set(ItemStand stand, string field, object value) => typeof(ItemStand).GetField(field, Private).SetValue(stand, value);
     private static object Queue(ItemStand stand) => typeof(ItemStand).GetField("m_queuedItem", Private).GetValue(stand);
 
+    private static void ReservationChecks(Player player, GameObject prefab)
+    {
+        ZoneSystem previous = ZoneSystem.instance;
+        int previousLevel = Game.m_worldLevel;
+        var context = new GameObject("InertSupplyPayment");
+        try
+        {
+            ZoneSystem.instance = context.AddComponent<ZoneSystem>();
+            Piece piece = context.AddComponent<Piece>();
+            Piece.Requirement requirement = new Piece.Requirement { m_resItem = prefab.GetComponent<ItemDrop>(), m_amount = 2 };
+            piece.m_resources = new[] { requirement };
+            var held = prefab.GetComponent<ItemDrop>().m_itemData.Clone();
+            held.m_dropPrefab = prefab; held.m_stack = 3; held.m_worldLevel = 0;
+            held.m_quality = 3; held.m_variant = 2; held.m_durability = 7.53f;
+            var spare = held.Clone(); spare.m_stack = 5;
+            player.Inventory.Items.Clear(); player.Inventory.Items.Add(held); player.Inventory.Items.Add(spare);
+            var data = new BlueprintForeignPartData(BlueprintForeignPartData.NativeItemStandFormat,
+                prefab.name + ":0:1:0", null, null);
+            var supplies = new System.Collections.Generic.List<BlueprintItemStandPlacement.Supply>();
+            Require(BlueprintItemStandPlacement.SelectSupplies(player, new[] { data, data, data }, supplies), "reservation setup");
+            Game.m_worldLevel = 0;
+            Require(BlueprintItemStandPlacement.IsAvailable(player, supplies[0]) &&
+                !BlueprintItemStandPlacement.SuppliesAvailable(player, supplies, piece),
+                "native first-stack payment must not consume held items despite sufficient total stock");
+            player.Inventory.Items.Reverse();
+            Require(BlueprintItemStandPlacement.SuppliesAvailable(player, supplies, piece) && held.m_stack == 3 && spare.m_stack == 5,
+                "inventory order or read-only prediction lost");
+            piece.m_resources = new[] { requirement, requirement, requirement };
+            Require(!BlueprintItemStandPlacement.SuppliesAvailable(player, supplies, piece), "repeated requirements counted independently");
+            piece.m_resources = new[] { requirement };
+            player.Inventory.Items.Reverse();
+            requirement.m_amount = 1;
+            Require(!BlueprintItemStandPlacement.SuppliesAvailable(player, supplies, piece) &&
+                BlueprintItemStandPlacement.SuppliesAvailable(player, supplies.GetRange(1, 2), piece), "completed supply not released");
+            held.m_stack = 2;
+            Require(BlueprintItemStandPlacement.IsAvailable(player, supplies[0]) &&
+                !BlueprintItemStandPlacement.SuppliesAvailable(player, supplies) &&
+                BlueprintItemStandPlacement.SuppliesAvailable(player, supplies.GetRange(1, 2)), "aggregate post-payment shortage hidden by individual bindings");
+            held.m_stack = 3;
+            held.m_durability = 1;
+            Require(!BlueprintItemStandPlacement.SuppliesAvailable(player, supplies.GetRange(1, 2)), "future item's properties silently rebound");
+            held.m_durability = 7.53f;
+            requirement.m_upgraderResource = true;
+            Require(BlueprintItemStandPlacement.SuppliesAvailable(player, supplies, piece), "upgrader cost applied without station");
+            player.Station = context.AddComponent<CraftingStation>();
+            Require(BlueprintItemStandPlacement.SuppliesAvailable(player, supplies, piece), "station filter ignored");
+            player.Station.m_upgrader = true;
+            Require(!BlueprintItemStandPlacement.SuppliesAvailable(player, supplies, piece), "matching upgrader cost skipped");
+            player.Station = null;
+            requirement.m_upgraderResource = false;
+            ZoneSystem.instance.Keys.Add(GlobalKeys.NoCraftCost);
+            Require(!BlueprintItemStandPlacement.SuppliesAvailable(player, supplies, piece), "wrong free-cost key skipped build payment");
+            piece.FreeKey = GlobalKeys.NoCraftCost;
+            Require(BlueprintItemStandPlacement.SuppliesAvailable(player, supplies, piece), "piece's own free-cost key ignored");
+            held.m_stack = 2;
+            Require(!BlueprintItemStandPlacement.SuppliesAvailable(player, supplies, piece), "free build waived mounted contents");
+            held.m_stack = 3; piece.FreeKey = GlobalKeys.NoBuildCost;
+            Game.m_worldLevel = 1;
+            spare.m_worldLevel = 1;
+            Require(BlueprintItemStandPlacement.SuppliesAvailable(player, supplies, piece), "world-level material filter ignored");
+            spare.m_worldLevel = 0;
+            Require(!BlueprintItemStandPlacement.SuppliesAvailable(player, supplies, piece), "unpayable current piece accepted");
+            Game.m_worldLevel = 0;
+            var alias = new GameObject("DifferentPrefabSameSharedName");
+            try
+            {
+                ItemDrop aliasDrop = alias.AddComponent<ItemDrop>();
+                aliasDrop.m_itemData.m_shared.m_name = held.m_shared.m_name;
+                requirement.m_resItem = aliasDrop;
+                Require(!BlueprintItemStandPlacement.SuppliesAvailable(player, supplies, piece), "prefab alias escaped shared-name native payment");
+            }
+            finally { Object.DestroyImmediate(alias); }
+            ZoneSystem.instance = null;
+            Require(!BlueprintItemStandPlacement.SuppliesAvailable(player, supplies, piece) &&
+                BlueprintItemStandPlacement.SuppliesAvailable(player, new System.Collections.Generic.List<BlueprintItemStandPlacement.Supply>(), piece),
+                "missing world context or contents-free behavior");
+            Require(held.m_stack == 3 && spare.m_stack == 5 && player.Inventory.Items[0] == held &&
+                supplies[0].Item == held && data.Zdo == null, "prediction mutated inventory, source or binding");
+            Debug.Log("PASS mounted supplies: ordered native cost, aggregate and future bindings, aliases, world/station/free-key gates; inert fixture only.");
+        }
+        finally
+        {
+            player.Station = null; ZoneSystem.instance = previous; Game.m_worldLevel = previousLevel;
+            Object.DestroyImmediate(context);
+        }
+    }
+
     internal static void Run(GameObject prefab)
     {
         Player previous = Player.m_localPlayer;
@@ -151,6 +238,7 @@ internal static class ItemStandPlacementAcceptance
                 stand.CancelInvoke("UpdateAttach");
                 Object.DestroyImmediate(placed);
             }
+            ReservationChecks(player, prefab);
             var reservedHolder = new GameObject("InertReservedRecipe");
             try
             {

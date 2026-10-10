@@ -149,7 +149,7 @@ namespace OstrixMods.BuildWorks.Geometry
         {
             // Unity/Store use float. Absorb at most two float rounding units at
             // the bounds; preserve every in-range value and reject larger errors.
-            const double relativeTolerance = 2.384185791015625e-7;
+            const double relativeTolerance = BlueprintEditorDocument.ScaleBoundaryRelativeTolerance;
             double minimum = BlueprintEditorDocument.MinimumScale;
             double maximum = BlueprintEditorDocument.MaximumScale;
             if (value < minimum && value >= minimum * (1.0 - relativeTolerance))
@@ -231,7 +231,8 @@ namespace OstrixMods.BuildWorks.Geometry
         public const int MaximumSupports = 64;
         public const int MaximumHistory = 32;
         public const double MinimumScale = 0.01;
-        public const double MaximumScale = 4.0;
+        public const double MaximumScale = 10.0;
+        public const double ScaleBoundaryRelativeTolerance = 2.384185791015625e-7;
 
         private sealed class State
         {

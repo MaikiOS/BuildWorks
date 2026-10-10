@@ -49,6 +49,12 @@ internal static class BlueprintAxisScaleTests
         Require(doc.Redo()); Near(scale, doc.Parts[0].Scale);
         Require(doc.Undo());
 
+        Require(doc.ApplyTransformDelta(new Point3(), identity, new Point3(), 10));
+        Near(new Point3(10, 10, 10), doc.Parts[0].Scale);
+        Require(doc.Undo() && doc.Redo());
+        Near(new Point3(10, 10, 10), doc.Parts[1].Scale);
+        Require(doc.Undo());
+
         // A shared rotated frame makes its aligned parts representable.
         var rotated = new BlueprintEditorDocument(null, "Rotated", "Other", new[] {
             new BlueprintEditorPart("p", "wall", "P", diagonal.Rotate(new Point3(2, 0, 0)), diagonal) });
@@ -74,7 +80,7 @@ internal static class BlueprintAxisScaleTests
         Require(doc.ApplyTransformDelta(new Point3(1, 0, 0), identity, new Point3()));
         doc.AcceptLastEdit(); Require(doc.Undo());
         foreach (Point3 invalid in new[] { scale, new Point3(0, 1, 1), new Point3(-1, 1, 1),
-            new Point3(double.NaN, 1, 1), new Point3(double.PositiveInfinity, 1, 1), new Point3(5, 5, 5) })
+            new Point3(double.NaN, 1, 1), new Point3(double.PositiveInfinity, 1, 1), new Point3(10.01, 10.01, 10.01) })
         {
             bool rejected = false;
             try { doc.ApplyTransformDelta(translation, identity, pivot, invalid, identity); }

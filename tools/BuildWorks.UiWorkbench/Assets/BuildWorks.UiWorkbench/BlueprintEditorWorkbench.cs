@@ -560,7 +560,7 @@ namespace OstrixMods.BuildWorks.UiWorkbench
             }
             else if (dragKind == DragKind.Scale)
             {
-                scale = Mathf.Clamp(1f + (mouse.y - dragStartMouse.y) * 0.005f, 0.01f, 4f);
+                scale = Mathf.Clamp(1f + (mouse.y - dragStartMouse.y) * 0.005f, 0.01f, (float)BlueprintEditorDocument.MaximumScale);
                 if (!free) scale = Mathf.Round(scale * 100f) / 100f;
             }
             else

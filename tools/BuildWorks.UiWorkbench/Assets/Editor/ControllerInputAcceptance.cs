@@ -62,7 +62,7 @@ internal static class ControllerInputAcceptance
             Require(Math.Abs(resized.X - 2.4) < .000001 && Math.Abs(resized.Y - .9) < .000001 &&
                 Math.Abs(resized.Z - 1.5) < .000001, "Linked Z did not preserve all proportions");
             Require(controller.Document.Undo(), "Linked edit cannot be undone"); Call(controller, "Bind", (object)null);
-            foreach (string invalid in new[] { "0", "-1", "NaN", "Infinity", "401" })
+            foreach (string invalid in new[] { "0", "-1", "NaN", "Infinity", "1001" })
             {
                 fields[0].text = invalid; fields[0].onEndEdit.Invoke(invalid);
                 Require(controller.Document.Parts[0].Scale.Equals(new Point3(2, .75, 1.25)), "Invalid XYZ altered document");
@@ -2557,6 +2557,74 @@ internal static class ControllerInputAcceptance
             Require(Vector3.Distance(V(doc.Parts[0].Scale), axisCase.Item3) < .0001f, "Axis scale Redo failed");
             Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
         }
+        foreach (var boundary in new[] { (GizmoAxis.X, true), (GizmoAxis.None, true), (GizmoAxis.X, false) })
+        {
+            double startScale = boundary.Item2 ? BlueprintEditorDocument.MaximumScale - .1 : .0101;
+            var initial = boundary.Item1 == GizmoAxis.None ? new Point3(startScale, startScale, startScale) : new Point3(startScale, 1, 1);
+            Require(doc.SetPartProperties("left", doc.Parts[0].DisplayName, doc.Parts[0].Position,
+                doc.Parts[0].Rotation, initial), "Scale boundary fixture failed");
+            Call(controller, "Bind", (object)null);
+            Frame(controller, input, mouse, 0, KeyCode.S); yield return null;
+            if (boundary.Item1 == GizmoAxis.X) { Frame(controller, input, mouse, 0, KeyCode.X); yield return null; }
+            Vector2 beyond = mouse + Vector2.up * (boundary.Item2 ? 100 : -100);
+            Frame(controller, input, beyond); yield return null;
+            Require(Field<bool>(controller, "keyboardValid"), "Mouse overshoot invalidates a scale boundary");
+            double expected = boundary.Item2 ? BlueprintEditorDocument.MaximumScale : BlueprintEditorDocument.MinimumScale;
+            Require(Math.Abs(VisualRoot(scene, "left").transform.localScale.x - expected) < .00001,
+                "Mouse did not retain the reachable scale boundary");
+            Frame(controller, input, beyond, 0, KeyCode.Return); yield return null;
+            Require(!Field<bool>(controller, "keyboardPreview") && Math.Abs(doc.Parts[0].Scale.X - expected) < .00001,
+                "Mouse overshoot cannot commit the visible scale boundary");
+            Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
+            Frame(controller, input, mouse); yield return null;
+            Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
+            Require(Vector3.Distance(V(doc.Parts[0].Scale), Vector3.one) < .0001f && Field<IList>(doc, "undo").Count == history,
+                "Scale boundary Undo did not restore source and history");
+        }
+        bool boundaryLocal = Field<bool>(controller, "localSpace");
+        Set(controller, "localSpace", false);
+        foreach (float angle in new[] { 89.99f, 90f })
+        {
+            Quaternion turn = Quaternion.Euler(0, angle, 0);
+            Require(doc.SetPartProperties("left", doc.Parts[0].DisplayName, doc.Parts[0].Position,
+                new Rotation3(turn.x, turn.y, turn.z, turn.w), new Point3(10, 1, .01)), "Rotated boundary fixture failed");
+            Call(controller, "Bind", (object)null);
+            Frame(controller, input, mouse, 0, KeyCode.S); yield return null;
+            Frame(controller, input, mouse, 0, KeyCode.X); yield return null;
+            // Keep the physical cursor in the viewport; emulate accumulated modal movement.
+            Set(controller, "dragStartMouse", mouse - Vector2.up * 2100);
+            Frame(controller, input, mouse); yield return null;
+            Require(Field<bool>(controller, "keyboardValid") && (angle < 90
+                ? Field<float>(controller, "dragScale") == 1 : Field<float>(controller, "dragScale") > 20),
+                "Tiny projection missed the bound or orthogonal roundoff froze scale");
+            Frame(controller, input, mouse, 0, KeyCode.Return); yield return null;
+            Require(!Field<bool>(controller, "keyboardPreview"), "Rotated boundary cannot confirm");
+            if (angle == 90) { Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Z); yield return null; }
+            Frame(controller, input, mouse); yield return null;
+            Frame(controller, input, mouse, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
+            Require(Field<IList>(doc, "undo").Count == history && Vector3.Distance(V(doc.Parts[0].Scale), Vector3.one) < .0001f,
+                "Rotated boundary changed history or source after Undo");
+        }
+        Set(controller, "localSpace", boundaryLocal);
+        var originalIds = Field<List<string>>(controller, "dragIds").ToArray();
+        try
+        {
+            foreach (bool absolute in new[] { false, true })
+            {
+                var large = new BlueprintEditorPart("bound", "woodwall", "Bound", new Point3(), new Rotation3(0,0,0,1),
+                    scale: absolute ? new Point3(float.MaxValue / 2.0, 1, 1) : new Point3(1,1,1),
+                    scaleIsAbsolute: absolute, baseScale: absolute ? (Point3?)null : new Point3(float.MaxValue / 2.0, 1, 1));
+                Set(controller, "document", new BlueprintEditorDocument(null, "Bound", "OTHER", new[] { large }));
+                var ids = Field<List<string>>(controller, "dragIds"); ids.Clear(); ids.Add("bound");
+                Require(Math.Abs((float)Call(controller, "ClampMouseScale", 20f) - 2) < .00001,
+                    "Mouse scale ignored pinned-product or absolute float bounds");
+            }
+        }
+        finally
+        {
+            Set(controller, "document", doc);
+            var ids = Field<List<string>>(controller, "dragIds"); ids.Clear(); ids.AddRange(originalIds);
+        }
         bool savedLocal = Field<bool>(controller, "localSpace");
         object savedFrame = Field<object>(controller, "transformFrame");
         Quaternion diagonal = Quaternion.Euler(0, 45, 0);
@@ -2591,7 +2659,7 @@ internal static class ControllerInputAcceptance
         Require(doc.Undo(), "Cannot restore rotated fixture"); Call(controller, "Bind", (object)null);
         Set(controller, "localSpace", savedLocal); Set(controller, "transformFrame", savedFrame);
         Call(controller, "UpdateTransformContext");
-        foreach (string invalid in new[] { "-", "1,", "0", "-1", "4.01", "99999999999999999999999999999999" })
+        foreach (string invalid in new[] { "-", "1,", "0", "-1", "10.01", "99999999999999999999999999999999" })
         {
             Frame(controller, input, mouse, 0, KeyCode.S); yield return null;
             TextFrame(controller, input, mouse, invalid); yield return null;

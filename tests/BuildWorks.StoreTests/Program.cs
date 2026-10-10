@@ -1518,7 +1518,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 Part("a", "woodwall", "A", null, true, false, 0f),
                 Part("b", "woodwall", "B", null, true, false, 1f)
             };
-            foreach (float scale in new[] { 0f, -1f, 0.009f, 4.01f, float.NaN, float.PositiveInfinity })
+            foreach (float scale in new[] { 0f, -1f, 0.009f, 10.01f, float.NaN, float.PositiveInfinity })
             {
                 parts[0].scale = Vector(scale, 1f, 1f);
                 Require(!store.TrySaveDocument(parts, Array.Empty<CompositeBlueprintStore.Group>(),
@@ -1537,9 +1537,12 @@ namespace OstrixMods.BuildWorks.StoreTests
                 Part("a", "woodwall", "A", null, true, false, 0f),
                 Part("b", "woodwall", "B", null, true, false, 1f)
             };
-            parts[0].scale = Vector(0.01f, 1.25f, 4f);
+            parts[0].scale = Vector(0.01f, 1.25f, 10f);
             Require(store.TrySaveDocument(parts, Array.Empty<CompositeBlueprintStore.Group>(),
                 Array.Empty<CompositeBlueprintStore.VectorData>(), out var blueprint, out string error), error);
+            Equal(10f, new CompositeBlueprintStore(path).All()[0].parts[0].scale.z, "1000% native reopen");
+            var portable = BlueprintExchangeFormat.Decode(System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(blueprint)));
+            Equal(10f, portable.parts[0].scale.z, "1000% portable roundtrip");
             parts[0].scale = Vector(2f, 3f, 0.5f);
             Equal(0.01f, blueprint.parts[0].scale.x, "saved scale is detached from caller");
             Require(store.TryUpdateDocument(blueprint, parts, blueprint.groups, blueprint.anchors,

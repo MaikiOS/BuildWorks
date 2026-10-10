@@ -1602,7 +1602,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
                 new Point3(0.0, 0.0, 0.0),
                 IdentityRotation(),
                 new Point3(0.0, 0.0, 0.0),
-                4.01));
+                10.01));
             Near(new Point3(2.0, 0.0, 0.0), document.Parts[0].Position);
             Near(new Point3(1.0, 1.0, 1.0), document.Parts[0].Scale);
         }
@@ -1649,26 +1649,26 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Equal(4.0, fromStore.Scale.Z);
 
             var document = EditorDocument(new BlueprintEditorPart("a", "woodwall", "A",
-                new Point3(6, 0, 0), IdentityRotation(), scale: new Point3(3, 3, 3)));
+                new Point3(6, 0, 0), IdentityRotation(), scale: new Point3(7, 7, 7)));
             document.SelectOnly("a");
             Equal(true, document.ApplyTransformDelta(new Point3(), IdentityRotation(),
-                new Point3(), (double)(4f / 3f)));
-            Equal(4.0, document.Parts[0].Scale.X);
+                new Point3(), (double)(10f / 7f)));
+            Equal(10.0, document.Parts[0].Scale.X);
             Equal(true, document.ApplyTransformDelta(new Point3(), IdentityRotation(),
-                new Point3(), (double)(0.01f / 4f)));
+                new Point3(), (double)(0.01f / 10f)));
             Equal(0.01, document.Parts[0].Scale.X);
             Equal(true, document.SetPartProperties("a", "A", new Point3(6, 0, 0),
                 IdentityRotation(), new Point3(floatMinimum, 1, 1)));
             Equal(0.01, document.Parts[0].Scale.X);
 
             var array = EditorDocument(new BlueprintEditorPart("source", "woodwall", "Source",
-                new Point3(), IdentityRotation(), scale: new Point3(3, 3, 3)));
+                new Point3(), IdentityRotation(), scale: new Point3(7, 7, 7)));
             array.SelectOnly("source");
-            var preview = array.PreviewArray(2, 1, new Point3(1, 0, 0), new Point3(0, 0, 1), new Point3(0, 1, 0), 0, 0, false, (double)(1f / 3f), (new Point3(1, 0, 0)) * -0.5, (new Point3(1, 0, 0)) * 0.5);
-            Equal(4.0, preview[0].Scale.X);
+            var preview = array.PreviewArray(2, 1, new Point3(1, 0, 0), new Point3(0, 0, 1), new Point3(0, 1, 0), 0, 0, false, (double)(3f / 7f), (new Point3(1, 0, 0)) * -0.5, (new Point3(1, 0, 0)) * 0.5);
+            Equal(10.0, preview[0].Scale.X);
 
-            foreach (double invalid in new[] { 0.00999, 4.00001, 0.01 * (1 - 3e-7),
-                4 * (1 + 3e-7), double.NaN, double.PositiveInfinity })
+            foreach (double invalid in new[] { 0.00999, 10.00001, 0.01 * (1 - 3e-7),
+                10 * (1 + 3e-7), double.NaN, double.PositiveInfinity })
             {
                 Throws<ArgumentOutOfRangeException>(() => new BlueprintEditorPart("bad", "woodwall", "Bad",
                     new Point3(), IdentityRotation(), scale: new Point3(invalid, 1, 1)));

@@ -1427,7 +1427,7 @@ public static class RuntimeEditorAcceptance
     private static void TestScaleBoundaries(BlueprintEditorController controller, string path)
     {
         string selected = controller.Document.Parts[0].StableId;
-        foreach (float percent in new[] { 1f, 400f, 125.5f, 126f })
+        foreach (float percent in new[] { 1f, 400f, 1000f, 125.5f, 126f })
         {
             controller.Document.SelectOnly(selected);
             Call(controller, "SetActiveTool", BlueprintEditorTool.Transform);
@@ -1441,7 +1441,7 @@ public static class RuntimeEditorAcceptance
             var reloaded = new CompositeBlueprintStore(path);
             CheckReopenedCopy(controller, reloaded, percent / 100.0);
         }
-        checks.Add("Actual TMP 1%, 400%, 125.5% and 126% -> save and reopen");
+        checks.Add("Actual TMP 1%, 400%, 1000%, 125.5% and 126% -> save and reopen");
     }
 
     private static void CheckReopenedCopy(BlueprintEditorController original, CompositeBlueprintStore reloaded, double expected)

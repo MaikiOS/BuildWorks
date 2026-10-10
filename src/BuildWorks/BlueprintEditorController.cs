@@ -1652,16 +1652,7 @@ namespace OstrixMods.BuildWorks
             {
                 float percent = mouse.y - dragStartMouse.y;
                 if (!ShiftHeld) percent = Mathf.Round(percent / view.ScaleStepPercent) * view.ScaleStepPercent;
-                float minimum = .01f, maximum = 400f;
-                if (dragAxis == GizmoAxis.None)
-                foreach (BlueprintEditorPart part in document.Parts)
-                {
-                    if (!dragIds.Contains(part.StableId)) continue;
-                    Vector3 scale = ToVector(part.Scale);
-                    minimum = Mathf.Max(minimum, (part.ScaleIsAbsolute ? float.Epsilon : .01f) / Mathf.Min(scale.x, scale.y, scale.z));
-                    maximum = Mathf.Min(maximum, (part.ScaleIsAbsolute ? float.MaxValue : 4f) / Mathf.Max(scale.x, scale.y, scale.z));
-                }
-                dragScale = Mathf.Clamp(keyboardBaseScale * Mathf.Max(.001f, 1f + percent * .01f), minimum, maximum);
+                dragScale = ClampMouseScale(keyboardBaseScale * Mathf.Max(.001f, 1f + percent * .01f));
             }
             if (PreviewKeyboardPose()) UpdateGizmo();
         }
@@ -1672,6 +1663,42 @@ namespace OstrixMods.BuildWorks
 
         private Quaternion DragScaleFrame => keyboardPreview && dragHandle == GizmoHandleKind.Scale &&
             dragAxis != GizmoAxis.None && localSpace ? keyboardOrientation : Quaternion.identity;
+
+        private float ClampMouseScale(float requested)
+        {
+            double minimum = float.Epsilon, maximum = float.MaxValue;
+            Vector3 mask = keyboardPreview && dragAxis != GizmoAxis.None
+                ? TransformGizmoView.AxisVector(dragAxis, Quaternion.identity, false) : Vector3.one;
+            Quaternion inverseFrame = Quaternion.Inverse(DragScaleFrame);
+            var selected = new HashSet<string>(dragIds, StringComparer.Ordinal);
+            foreach (BlueprintEditorPart part in document.Parts)
+            {
+                if (!selected.Contains(part.StableId)) continue;
+                Quaternion local = inverseFrame * ToQuaternion(part.Rotation);
+                Limit(part.Scale.X, part.BaseScale?.X ?? 1, local * Vector3.right, part.ScaleIsAbsolute);
+                Limit(part.Scale.Y, part.BaseScale?.Y ?? 1, local * Vector3.up, part.ScaleIsAbsolute);
+                Limit(part.Scale.Z, part.BaseScale?.Z ?? 1, local * Vector3.forward, part.ScaleIsAbsolute);
+            }
+            return (float)Math.Max(minimum, Math.Min(maximum, requested));
+
+            void Limit(double current, double basis, Vector3 axis, bool absolute)
+            {
+                double weight = mask == Vector3.one ? 1 :
+                    mask.x * axis.x * axis.x + mask.y * axis.y * axis.y + mask.z * axis.z * axis.z;
+                if (weight == 0) return;
+                // Same projected multiplier as TransformPart; shear is still rejected there.
+                double lower = absolute ? float.Epsilon : BlueprintEditorDocument.MinimumScale;
+                double upper = absolute ? float.MaxValue : BlueprintEditorDocument.MaximumScale;
+                lower = Math.Max(lower, float.Epsilon / basis);
+                upper = Math.Min(upper, float.MaxValue / basis);
+                // Ignore only float-axis noise whose worst relative-scale contribution fits boundary roundoff.
+                double worstFactor = 3 * BlueprintEditorDocument.MaximumScale / BlueprintEditorDocument.MinimumScale + 1;
+                if (!absolute && lower == BlueprintEditorDocument.MinimumScale && upper == BlueprintEditorDocument.MaximumScale &&
+                    weight * worstFactor < BlueprintEditorDocument.ScaleBoundaryRelativeTolerance * .5) return;
+                minimum = Math.Max(minimum, 1 + (lower / current - 1) / weight);
+                maximum = Math.Min(maximum, 1 + (upper / current - 1) / weight);
+            }
+        }
 
         private Vector3 TransformDragPoint(Vector3 point) => dragPivot + dragRotation *
             (DragScaleFrame * Vector3.Scale(Quaternion.Inverse(DragScaleFrame) * (point - dragPivot), DragScaleVector)) + dragTranslation;
@@ -1994,20 +2021,18 @@ namespace OstrixMods.BuildWorks
             }
             else if (dragHandle == GizmoHandleKind.Scale)
             {
-                float minimum = float.Epsilon, maximum = float.MaxValue;
                 float referenceScale = 1f;
+                if (dragIds.Count == 1)
                 foreach (BlueprintEditorPart part in document.Parts)
                 {
-                    if (!dragIds.Contains(part.StableId)) continue;
-                    Vector3 scale = ToVector(part.Scale);
-                    if (dragIds.Count == 1 && !part.ScaleIsAbsolute) referenceScale = scale.x;
-                    minimum = Mathf.Max(minimum, (part.ScaleIsAbsolute ? float.Epsilon : .01f) / Mathf.Min(scale.x, scale.y, scale.z));
-                    maximum = Mathf.Min(maximum, (part.ScaleIsAbsolute ? float.MaxValue : 4f) / Mathf.Max(scale.x, scale.y, scale.z));
+                    if (part.StableId != dragIds[0]) continue;
+                    if (!part.ScaleIsAbsolute) referenceScale = (float)part.Scale.X;
+                    break;
                 }
                 float percent = mouse.y - dragStartMouse.y;
                 if (!ShiftHeld)
                     percent = Mathf.Round(percent / view.ScaleStepPercent) * view.ScaleStepPercent;
-                dragScale = Mathf.Clamp(1f + percent * 0.01f / referenceScale, minimum, maximum);
+                dragScale = ClampMouseScale(Mathf.Max(float.Epsilon, 1f + percent * 0.01f / referenceScale));
             }
             else
             {

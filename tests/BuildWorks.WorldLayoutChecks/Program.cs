@@ -657,7 +657,10 @@ internal static class Program
         object value = method.Invoke(null, new[] { world, basis });
         Require((float)Get(value, "x") == 0.01f, "World 1% scale was not normalized at float boundary");
         CheckVector(value, new Point3(0.01, 4, 1.5));
-        foreach (float invalid in new[] { 0f, 0.009f, 4.001f, float.NaN, float.PositiveInfinity })
+        value = method.Invoke(null, new[] { Activator.CreateInstance(vectorType, 10f, 20f, 5f),
+            Activator.CreateInstance(vectorType, 1f, 2f, .5f) });
+        CheckVector(value, new Point3(10, 10, 10));
+        foreach (float invalid in new[] { 0f, 0.009f, 10.001f, float.NaN, float.PositiveInfinity })
         {
             bool rejected = false;
             try { method.Invoke(null, new[] { Activator.CreateInstance(vectorType, invalid, 1f, 1f),
@@ -702,19 +705,21 @@ internal static class Program
         Set(session, "selectedPiece", piece);
         Require(Add(session, new Point3(1,2,3), Rotation(0,0,0,1), 0.01f), "Native single 1% rejected");
         Require(Add(session, new Point3(4,5,6), Rotation(0,0,0,1), 4f), "Native single 400% rejected");
+        Require(Add(session, new Point3(4,5,6), Rotation(0,0,0,1), 10f), "Native single 1000% rejected");
         IList plan = (IList)Get(session, "placementPlan");
         IList sources = (IList)Get(session, "placementPlanPieces");
         CheckVector(Property(plan[0], "Position"), new Point3(1,2,3));
         CheckVector(Property(plan[0], "Scale"), new Point3(0.01,0.01,0.01));
         CheckVector(Property(plan[1], "Scale"), new Point3(4,4,4));
+        CheckVector(Property(plan[2], "Scale"), new Point3(10,10,10));
         Require(ReferenceEquals(sources[0], piece) && ReferenceEquals(sources[1], piece), "Single scale replaced native source");
-        foreach (float invalid in new[] { 0f, -1f, 0.009f, 4.001f, float.NaN, float.PositiveInfinity })
+        foreach (float invalid in new[] { 0f, -1f, 0.009f, 10.001f, float.NaN, float.PositiveInfinity })
         {
             Require(!Add(session, new Point3(7,8,9), Rotation(0,0,0,1), invalid), "Invalid single scale accepted: " + invalid);
-            Require(plan.Count == 2 && sources.Count == 2, "Invalid single scale changed existing queue");
+            Require(plan.Count == 3 && sources.Count == 3, "Invalid single scale changed existing queue");
             Require(!string.IsNullOrEmpty((string)Get(session, "repeatPlanError")), "Invalid single scale has no arming error");
         }
-        Console.WriteLine("PASS actual Session: native single receives uniform 1%/400% snapshot; invalid factors rejected without queue mutation");
+        Console.WriteLine("PASS actual Session: native single receives uniform 1%/400%/1000% snapshot; invalid factors rejected without queue mutation");
     }
 
     private static void TestInvalidGroupScaleIsAtomic()
@@ -722,11 +727,13 @@ internal static class Program
         foreach (float factor in new[] { 0.5f, 2f, 0f, float.NaN, float.PositiveInfinity })
         {
             object session = Session(2);
+            IList parts = (IList)Get(Get(session, "activeBlueprint"), "parts");
+            Set(parts[1], "scale", StoredVector(.01f, 10f, 1f));
             Require(Add(session, new Point3(10,20,30), Rotation(0,0,0,1)), "Valid baseline group rejected");
             IList plan = (IList)Get(session, "placementPlan");
             IList sources = (IList)Get(session, "placementPlanPieces");
             object first = plan[0], last = plan[1];
-            // At 50%/200% the first part remains legal, while the second crosses 1%/400%.
+            // At 50%/200% the first part remains legal, while the second crosses 1%/1000%.
             Require(!Add(session, new Point3(40,50,60), Rotation(0,0,0,1), factor), "Invalid scaled group accepted: " + factor);
             Require(plan.Count == 2 && sources.Count == 2 && first.Equals(plan[0]) && last.Equals(plan[1]),
                 "Rejected scaled group partially appended or changed previous entries");

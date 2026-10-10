@@ -3707,7 +3707,7 @@ namespace OstrixMods.BuildWorks
 
         private bool ValidInspectorScale(float value) => !float.IsNaN(value) && !float.IsInfinity(value) &&
             (inspectorScaleIsAbsolute ? value >= float.Epsilon : value >= .01f) &&
-            (inspectorScaleIsAbsolute ? value <= float.MaxValue : value <= 4f);
+            (inspectorScaleIsAbsolute ? value <= float.MaxValue : value <= BlueprintEditorDocument.MaximumScale);
 
         private void SubmitSnap()
         {

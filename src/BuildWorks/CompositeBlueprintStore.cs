@@ -1799,7 +1799,9 @@ namespace OstrixMods.BuildWorks
         internal static bool ValidScale(VectorData value) =>
             IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z) &&
             value.x >= 0.01f && value.y >= 0.01f && value.z >= 0.01f &&
-            value.x <= 4f && value.y <= 4f && value.z <= 4f;
+            value.x <= Geometry.BlueprintEditorDocument.MaximumScale &&
+            value.y <= Geometry.BlueprintEditorDocument.MaximumScale &&
+            value.z <= Geometry.BlueprintEditorDocument.MaximumScale;
 
         internal static VectorData RelativeScale(VectorData absolute, VectorData prefab)
         {

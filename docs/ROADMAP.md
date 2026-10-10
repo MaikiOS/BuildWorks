@@ -1,3 +1,16 @@
+## 2026-10-10 — source 0.19.130: missing replacement pose
+
+Selected parts and direct catalogue choices align their origin/full rotation
+with the missing record; own sizes/relative poses/source remain intact.
+Right-side preview without darkening, cancel, one Undo/Redo, save/reopen;
+hidden/incomplete/stale sources checked; same-count1-to-1 part index fixed.
+Normal/QA0/0, Geometry50000, Store202/209, Host25185596, localization933,
+isolation/preflight, Unity492 (11:32:44UTC), both reviews PASSED/Ship.
+Checkpoint d28efc3. docs/REPLACEMENT_POSE_CHECKPOINT_2026-10-10.md.
+Installed .117 hashes verified. No .130 deployment, Valheim/save/network runs.
+Do not repeat accepted .117 cases. Next: popup overlap, compact filters,
+import timing, then fresh guarded QA deployment and targeted acceptance.
+
 ## 2026-10-10 — source 0.19.129: axis-constrained scale input
 
 S → X/Y/Z → mouse or number now uses keys and existing axis buttons.

@@ -223,7 +223,7 @@ namespace OstrixMods.BuildWorks
             { error = UserError("import.fields"); return false; }
             if (source.importAbsoluteScale)
             { error = UserError("import.scale_pending"); return false; }
-            copy = data.blueprints.FirstOrDefault(candidate => candidate.placementImportId == source.id);
+            copy = FindPlacementCopy(source);
             if (copy != null) return true;
             var detached = ExternalBlueprintLibrary.DetachedCopy(source);
             detached.placementImportId = source.id;
@@ -231,6 +231,9 @@ namespace OstrixMods.BuildWorks
                 detached.anchors, detached.primaryPartId, detached.primaryGroupId, detached.supports,
                 detached.placementSupportId, out copy, out error, detached.customSnapPoints, detached);
         }
+
+        internal Blueprint FindPlacementCopy(Blueprint source) => source?.IsExternal == true
+            ? data.blueprints.FirstOrDefault(candidate => candidate.placementImportId == source.id) : null;
 
         internal string ExchangeDirectory => Path.GetDirectoryName(path);
         internal string ImportDirectory => Path.Combine(ExchangeDirectory, "imports");

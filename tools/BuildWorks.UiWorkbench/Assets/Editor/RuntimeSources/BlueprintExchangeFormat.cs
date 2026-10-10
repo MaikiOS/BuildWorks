@@ -47,7 +47,7 @@ namespace OstrixMods.BuildWorks
             bool allowBaseScaleFields, bool allowMetadataFields = true, bool allowMaterialSeedFields = true, bool allowHiddenSources = true) => ValidateStructure(
             Encoding.UTF8.GetBytes(text), typeof(CompositeBlueprintStore.LibraryData), requireFields, allowSupportFields, allowSourceFields, allowForeignFields, allowContentsFields, allowAbsoluteScaleFields, allowPlacementImportFields, allowBaseScaleFields, allowMetadataFields, allowMaterialSeedFields, allowHiddenSources);
 
-        internal static string DecodeSignText(string token)
+        internal static string DecodeSignText(string token, bool allowLegacyLiteral = false)
         {
             if (token == "" || token == "\"\"" || token == "null") return null;
             string text = token;
@@ -60,8 +60,13 @@ namespace OstrixMods.BuildWorks
                     using (var input = new MemoryStream(bytes))
                         text = (string)new DataContractJsonSerializer(typeof(string)).ReadObject(input);
                 }
-                catch (Exception error) when (error is SerializationException || error is XmlException || error is ArgumentException)
-                { throw new InvalidDataException("$buildworks_import.object_data", error); }
+                catch (Exception error) when (error is SerializationException || error is XmlException ||
+                    error is ArgumentException || error is InvalidDataException)
+                {
+                    if (!allowLegacyLiteral) throw new InvalidDataException("$buildworks_import.object_data", error);
+                    // PlanBuild keeps non-JSON additionalInfo verbatim, including a leading quote.
+                    text = token;
+                }
             }
             if (!OstrixMods.BuildWorks.Geometry.BlueprintEditorPart.IsValidSignText(text))
                 throw new InvalidDataException("$buildworks_import.object_data");

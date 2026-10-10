@@ -187,6 +187,8 @@ namespace OstrixMods.BuildWorks
         private readonly Func<string, GameObject> resolveVisualSource;
         private readonly Dictionary<string, VisualNode> visuals =
             new Dictionary<string, VisualNode>(StringComparer.Ordinal);
+        private readonly List<(BlueprintEditorPart Part, VisualNode Visual, Vector3 Position, Quaternion Rotation, Vector3 Scale)>
+            transformPreview = new List<(BlueprintEditorPart, VisualNode, Vector3, Quaternion, Vector3)>();
         private readonly Dictionary<Camera, int> worldCameraMasks =
             new Dictionary<Camera, int>();
         private readonly List<UnityEngine.Object> ownedAssets =
@@ -984,6 +986,27 @@ namespace OstrixMods.BuildWorks
 
         internal void ClearDuplicatePreview() => ClearTemporaryPreview(duplicatePreviews);
 
+        internal bool TryGetPositioningOffset(string targetId, IReadOnlyList<string> selectedIds,
+            out Vector3 offset)
+        {
+            offset = Vector3.zero;
+            if (!visuals.TryGetValue(targetId, out VisualNode target) || !target.Placeholder ||
+                target.Metadata?.Minimum == null || !TryBounds(target, out Bounds targetBounds)) return false;
+            Bounds sourceBounds = default;
+            bool found = false;
+            if (selectedIds != null) found = TryGetBounds(selectedIds, out sourceBounds);
+            else
+                foreach (VisualNode visual in duplicatePreviews)
+                    if (!visual.Placeholder && TryBounds(visual, out Bounds bounds))
+                    {
+                        if (found) sourceBounds.Encapsulate(bounds);
+                        else { sourceBounds = bounds; found = true; }
+                    }
+            if (!found) return false;
+            offset = root.transform.InverseTransformVector(targetBounds.center - sourceBounds.center);
+            return true;
+        }
+
         internal int PlacementSourceSnapPointCount
         {
             get
@@ -1455,6 +1478,42 @@ namespace OstrixMods.BuildWorks
                     (visual.Placeholder && part.Metadata?.Minimum == null ? 1f : uniformScale);
             }
             UpdateHighlights(document);
+        }
+
+        internal void PreviewTransform(
+            BlueprintEditorDocument document, IReadOnlyList<string> stableIds,
+            Vector3 translation, Quaternion rotation, Vector3 pivot, Vector3 scale, Quaternion scaleFrame)
+        {
+            ThrowIfDisposed();
+            if (document == null) throw new ArgumentNullException(nameof(document));
+            var selected = new HashSet<string>(stableIds ?? Array.Empty<string>(), StringComparer.Ordinal);
+            transformPreview.Clear();
+            var delta = new Rotation3(rotation.x, rotation.y, rotation.z, rotation.w);
+            var frame = new Rotation3(scaleFrame.x, scaleFrame.y, scaleFrame.z, scaleFrame.w);
+            try
+            {
+                foreach (BlueprintEditorPart part in document.Parts)
+                {
+                    if (!selected.Contains(part.StableId)) continue;
+                    var pose = BlueprintEditorDocument.TransformPart(part, ToGeometry(translation), delta,
+                        ToGeometry(pivot), ToGeometry(scale), frame);
+                    if (!visuals.TryGetValue(part.StableId, out VisualNode visual)) continue;
+                    Vector3 multiplier = new Vector3((float)(pose.Scale.X / part.Scale.X),
+                        (float)(pose.Scale.Y / part.Scale.Y), (float)(pose.Scale.Z / part.Scale.Z));
+                    transformPreview.Add((part, visual, ToUnity(pose.Position), new Quaternion((float)pose.Rotation.X,
+                        (float)pose.Rotation.Y, (float)pose.Rotation.Z, (float)pose.Rotation.W), multiplier));
+                }
+                // Validate the whole selection before moving any visual, just like the document commit.
+                InvalidateGizmoAnchors(preservePreviewRange: true);
+                foreach (var pose in transformPreview)
+                {
+                    pose.Visual.Root.transform.SetLocalPositionAndRotation(pose.Position, pose.Rotation);
+                    pose.Visual.Root.transform.localScale = Vector3.Scale(VisualScale(pose.Visual, pose.Part),
+                        pose.Visual.Placeholder && pose.Part.Metadata?.Minimum == null ? Vector3.one : pose.Scale);
+                }
+                UpdateHighlights(document);
+            }
+            finally { transformPreview.Clear(); }
         }
 
         internal bool ShowPlacementPreview(
@@ -1965,6 +2024,7 @@ namespace OstrixMods.BuildWorks
                     : entry.Key.cullingMask | (entry.Value & editorMask);
             }
             worldCameraMasks.Clear();
+            transformPreview.Clear();
             disposed = true;
             initialDocument = null;
             initialMissing.Clear();
@@ -2146,7 +2206,7 @@ namespace OstrixMods.BuildWorks
                     ? PlacementGhostPreviewView.CreateVisualClone(
                         source, "Part_" + part.StableId, editorLayer,
                         part.MaterialSeed.HasValue && BlueprintMaterialVariation.IsSupported(source) ? part.MaterialSeed : null)
-                    : CreatePlaceholder(part.StableId, part.Metadata, result.OwnedAssets);
+                    : CreatePlaceholder(part.StableId, part.Metadata, result.OwnedAssets, editorLayer);
                 result.Root.transform.SetParent(root.transform, false);
                 if (source) result.Root.transform.localScale = source.transform.localScale;
                 if (source) BlueprintItemStandPreview.TryAdd(source, result.Root,
@@ -2343,15 +2403,15 @@ namespace OstrixMods.BuildWorks
             visual.PlacementLabels.AddRange(labels);
         }
 
-        private GameObject CreatePlaceholder(
+        internal static GameObject CreatePlaceholder(
             string stableId,
             BlueprintPrefabMetadata metadata,
-            ICollection<UnityEngine.Object> visualAssets)
+            ICollection<UnityEngine.Object> visualAssets, int layer)
         {
             var placeholder = new GameObject("Missing_" + stableId)
             {
                 hideFlags = HideFlags.HideAndDontSave,
-                layer = editorLayer
+                layer = layer
             };
             Mesh mesh = CreateCubeMesh();
             if (metadata?.Minimum != null)
@@ -2365,7 +2425,7 @@ namespace OstrixMods.BuildWorks
             return placeholder;
         }
 
-        private Material CreatePreviewMaterial(
+        internal static Material CreatePreviewMaterial(
             Material source,
             bool missing,
             ICollection<UnityEngine.Object> visualAssets)

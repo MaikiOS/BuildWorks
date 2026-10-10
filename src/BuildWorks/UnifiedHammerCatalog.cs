@@ -1169,6 +1169,7 @@ namespace OstrixMods.BuildWorks
         private static Vector2 previewMouse;
         private static bool previewDragging;
         private static BlueprintExchangeView exchangeView;
+        private static bool placementExchange;
         private static int exchangeClosedFrame = -1;
         internal static bool BlocksExchangeInput => exchangeView?.IsOpen == true || Time.frameCount <= exchangeClosedFrame;
         private static bool indexGridActive;
@@ -1234,11 +1235,12 @@ namespace OstrixMods.BuildWorks
         {
             if (exchangeView != null)
             {
-                if (!hud || !player || !Hud.IsPieceSelectionVisible()) { exchangeView.Dispose(); exchangeView = null; }
+                if (!hud || !player || player.IsDead() ||
+                    (!placementExchange && !Hud.IsPieceSelectionVisible())) { exchangeView.Dispose(); exchangeView = null; }
                 else
                 {
                     exchangeView.Tick();
-                    if (Input.GetKeyDown(KeyCode.Escape)) { exchangeView.Dispose(); exchangeView = null; }
+                    if (Input.GetKeyDown(KeyCode.Escape)) { exchangeView?.Dispose(); exchangeView = null; }
                     return;
                 }
             }
@@ -2318,6 +2320,7 @@ namespace OstrixMods.BuildWorks
             Canvas canvas = hud && hud.m_pieceSelectionWindow ? hud.m_pieceSelectionWindow.GetComponentInParent<Canvas>() : null;
             if (!canvas || blueprintStore == null) return;
             exchangeView?.Dispose();
+            placementExchange = false;
             exchangeView = new BlueprintExchangeView(canvas.transform,
                 hud.m_pieceDescription ? hud.m_pieceDescription : hud.m_buildSelection, blueprintStore, blueprint, () =>
                 {
@@ -2325,6 +2328,43 @@ namespace OstrixMods.BuildWorks
                     if (blueprint == null) blueprintImportPending = true;
                     Invalidate();
                 }, frontCanvas: true, report: report);
+        }
+
+        internal static bool ShowPlacementContents(CompositeBlueprintStore.Blueprint blueprint,
+            Func<CompositeBlueprintStore.Blueprint, string> place, Func<bool> current)
+        {
+            Hud hud = Hud.instance;
+            Canvas canvas = hud && hud.m_pieceSelectionWindow ? hud.m_pieceSelectionWindow.GetComponentInParent<Canvas>() : null;
+            if (!canvas || blueprintStore == null || exchangeView?.IsOpen == true) return false;
+            Player player = Player.m_localPlayer;
+            CursorLockMode oldLock = Cursor.lockState; bool oldVisible = Cursor.visible;
+            placementExchange = true;
+            try
+            {
+                exchangeView = new BlueprintExchangeView(canvas.transform,
+                    hud.m_pieceDescription ? hud.m_pieceDescription : hud.m_buildSelection,
+                    blueprintStore, blueprint, () =>
+                    {
+                        exchangeView = null; placementExchange = false; exchangeClosedFrame = Time.frameCount;
+                        bool samePlayer = player && player == Player.m_localPlayer;
+                        Cursor.lockState = samePlayer ? oldLock : CursorLockMode.None;
+                        Cursor.visible = samePlayer ? oldVisible : true;
+                        Invalidate();
+                    }, frontCanvas: true, place: place, placementCurrent: current);
+                Cursor.lockState = CursorLockMode.None; Cursor.visible = true;
+                return true;
+            }
+            catch
+            {
+                placementExchange = false;
+                Cursor.lockState = oldLock; Cursor.visible = oldVisible;
+                throw;
+            }
+        }
+
+        internal static void CancelPlacementContents()
+        {
+            if (placementExchange) exchangeView?.Dispose();
         }
 
         private static void ShowBlueprintDiagnostics(Player player, CompositeBlueprintStore.Blueprint blueprint)
@@ -2514,6 +2554,9 @@ namespace OstrixMods.BuildWorks
             if (!blueprintRegistry.CanPlace(blueprint))
                 AddRailText(hud, card.transform, "!", new Vector2(8f, -8f), 22f,
                     new Color(1f, 0.65f, 0.2f, 1f), FontStyles.Bold, width: 24f);
+            else if (PrecisionPlacementSession.RequiresContentsChoice(blueprint))
+                AddRailText(hud, card.transform, "?", new Vector2(8f, -8f), 22f,
+                    new Color(1f, 0.8f, 0.35f, 1f), FontStyles.Bold, width: 24f);
             AddRailText(
                 hud,
                 card.transform,
@@ -2710,6 +2753,13 @@ namespace OstrixMods.BuildWorks
             parent = content.transform;
             float y = 0;
             float buttonWidth = width - 32f;
+            if (blueprintRegistry.CanPlace(blueprint) && PrecisionPlacementSession.RequiresContentsChoice(blueprint))
+            {
+                AddRailText(hud, parent, BuildWorksLocalization.Text("placement.contents_required"),
+                    new Vector2(16, y), 13, Color.white, FontStyles.Normal, width: buttonWidth);
+                y -= actionHeight;
+                scroll.content.sizeDelta += new Vector2(0, actionHeight);
+            }
             AddActionButton(hud, parent,
                 BuildWorksLocalization.Text(blueprint.IsExternal ? "import.place_copy" : "catalog.action.place"), y, buttonWidth,
                 () => blueprintAction?.Invoke(blueprint, false));

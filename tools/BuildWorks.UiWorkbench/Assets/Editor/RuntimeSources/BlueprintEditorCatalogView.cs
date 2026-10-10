@@ -14,8 +14,18 @@ namespace OstrixMods.BuildWorks
         private GameObject catalog;
         private RectTransform catalogPanel, catalogGrid, catalogNavigation, catalogContext, catalogPreview, catalogPicker;
         private BlueprintEditorCatalogItem catalogPreviewItem;
+        private bool catalogReplacementMode;
+        private bool catalogPositioningMode;
+
+        internal void SetCatalogReplacement(bool value, bool positioning = false)
+        {
+            catalogReplacementMode = value;
+            catalogPositioningMode = value && positioning;
+            RebuildCatalog();
+        }
         internal event Action CatalogImportRequested;
         internal event Action<CompositeBlueprintStore.Blueprint> CatalogExportRequested;
+        internal event Action<CompositeBlueprintStore.Blueprint> CatalogManageRequested;
         private Button catalogImportButton, catalogExportButton;
         private TMP_InputField catalogSearch, catalogPageInput;
         private TMP_Text catalogPageText, catalogBreadcrumb, catalogEmpty;
@@ -148,6 +158,7 @@ namespace OstrixMods.BuildWorks
         internal void ShowCatalog(IReadOnlyList<BlueprintEditorCatalogItem> items)
         {
             catalogAttachmentMode = false;
+            if (!catalog.activeSelf) catalogReplacementMode = false;
             OpenCatalog(items);
         }
 
@@ -183,8 +194,10 @@ namespace OstrixMods.BuildWorks
             LayoutCatalog(); ClearCatalogChildren(catalogGrid);
             CatalogFilters f = CatalogFilter;
             var filtered = shownCatalogItems.Where(item => item.IsBlueprint == catalogBlueprintMode &&
+                item.Hidden == (catalogBlueprintMode && f.Section == "hidden") &&
                 (f.Section == null || (f.Section == "favorites" ? catalogFavorites.Contains(item.PrefabName) :
                  f.Section == "recent" ? catalogRecent.Contains(item.PrefabName) :
+                 catalogBlueprintMode && f.Section == "hidden" ? true :
                  catalogBlueprintMode ? f.Section == "category:" + item.Category : item.Section == f.Section)) &&
                 (f.Family == null || item.Family == f.Family) && (f.Material == null || item.Materials.Contains(f.Material)) &&
                 (f.Source == null || item.Source == f.Source) && (f.Station == null || item.StationId == f.Station) &&
@@ -203,7 +216,8 @@ namespace OstrixMods.BuildWorks
                 (f.Material == null ? "" : " · " + BuildWorksLocalization.CatalogLabel(f.Material)) +
                 (f.Source == null ? "" : " · " + BuildWorksLocalization.CatalogLabel(f.Source)) +
                 (f.Station == null ? "" : " · " + shownCatalogItems.FirstOrDefault(x => x.StationId == f.Station)?.StationName) +
-                " · " + (catalogAttachmentMode ? T("editor.item.click_help") : CatalogText("click_help"));
+                " · " + (catalogReplacementMode ? T(catalogPositioningMode ? "editor.position_catalog_help" : "editor.replace_catalog_help") :
+                    catalogAttachmentMode ? T("editor.item.click_help") : CatalogText("click_help"));
             SetSelected(catalogPartsModeButton, !catalogBlueprintMode); SetSelected(catalogBlueprintsModeButton, catalogBlueprintMode);
             SetSelected(catalogAtlasButton, !catalogQuick); SetSelected(catalogQuickButton, catalogQuick);
             SetSelected(catalogDetailsButton, catalogDetails && catalogLayout.Details.Width > 0);
@@ -216,6 +230,7 @@ namespace OstrixMods.BuildWorks
             BlueprintEditorCatalogItem captured = item;
             Button button = CreateButton("Catalog_" + item.PrefabName, catalogGrid, item.DisplayName, (float)catalogLayout.CellWidth, () =>
             {
+                if (captured.Hidden) { PreviewCatalogItem(captured); return; }
                 if (!string.IsNullOrEmpty(captured.UnavailableReason))
                 { PreviewCatalogItem(captured); SetStatus(captured.UnavailableReason, error: true); return; }
                 catalogRecent.Remove(captured.PrefabName); catalogRecent.Insert(0, captured.PrefabName);
@@ -226,13 +241,22 @@ namespace OstrixMods.BuildWorks
             TMP_Text name = button.GetComponentInChildren<TMP_Text>(); name.enableAutoSizing = false; name.fontSize = 14;
             if (!string.IsNullOrEmpty(item.UnavailableReason) || !string.IsNullOrEmpty(item.WarningReason)) name.text = "[!] " + item.DisplayName;
             name.textWrappingMode = TextWrappingModes.Normal; name.alignment = TextAlignmentOptions.TopLeft;
+            name.overflowMode = TextOverflowModes.Ellipsis;
             name.margin = Vector4.zero; name.maxVisibleLines = item.IsUpgrade ? 2 : 3;
             SetTopAnchored((RectTransform)name.transform, 8, 94, 8, item.IsUpgrade ? 36 : 52);
             AddCatalogImage(button.transform, "Thumbnail", item.Icon, 8, 6, (float)catalogLayout.CellWidth - 16, 82);
+            if (item.IsBlueprint && !item.Icon)
+                AddEmptyPreview(button.transform.Find("Thumbnail"));
             Button favorite = CreateIconButton("CatalogFavorite", button.transform, "favorite", "*", 28, () =>
             { if (!catalogFavorites.Add(captured.PrefabName)) catalogFavorites.Remove(captured.PrefabName); RebuildCatalog(); }, CatalogText("favorites"));
             SetTopRight((RectTransform)favorite.transform, 4, 4, 28, 28);
             SetSelected(favorite, catalogFavorites.Contains(item.PrefabName));
+            if (item.IsBlueprint)
+            {
+                Button manage = CreateIconButton("CatalogManage", button.transform, "menu", "...", 28,
+                    () => CatalogManageRequested?.Invoke(captured.Blueprint), CatalogManagementLabel(item));
+                SetTopRight((RectTransform)manage.transform, 36, 4, 28, 28);
+            }
             if (item.IsUpgrade)
             {
                 TMP_Text station = CreateText("StationRelation", button.transform, "→ " + (item.StationName ?? CatalogText("unknown_station")),
@@ -250,14 +274,26 @@ namespace OstrixMods.BuildWorks
             Image image = rect.gameObject.AddComponent<Image>(); image.sprite = sprite;
             image.preserveAspect = true; image.raycastTarget = false; image.color = sprite ? Color.white : Color.clear;
         }
+        private void AddEmptyPreview(Transform parent)
+        {
+            TMP_Text text = CreateText("EmptyPreview", parent, T("catalog.thumbnail_pending"), 12f,
+                FontStyles.Normal, TextAlignmentOptions.Center);
+            text.textWrappingMode = TextWrappingModes.Normal;
+            text.raycastTarget = false;
+            SetInsets(text.rectTransform, 8f, 30f, 8f, 4f);
+        }
         private void RebuildCatalogNavigation()
         {
             ClearCatalogChildren(catalogNavigation);
             var values = new List<string> { "all", "favorites", "recent" };
-            if (catalogBlueprintMode) values.AddRange(shownCatalogItems.Where(x => x.IsBlueprint).Select(x => "category:" + x.Category).Distinct());
+            if (catalogBlueprintMode)
+            {
+                values.Add("hidden");
+                values.AddRange(shownCatalogItems.Where(x => x.IsBlueprint && !x.Hidden).Select(x => "category:" + x.Category).Distinct());
+            }
             else if (!catalogAttachmentMode) values.AddRange(new[] { "building", "decor", "lighting", "furniture", "resources", "crafting" });
             // ponytail: blueprint user categories scroll in Atlas; Quick has a compact category picker.
-            if (catalogBlueprintMode && catalogQuick && values.Count > 8) values = new List<string> { "all", "favorites", "recent", "categories" };
+            if (catalogBlueprintMode && catalogQuick && values.Count > 8) values = new List<string> { "all", "favorites", "recent", "hidden", "categories" };
             int columns = catalogQuick ? Math.Max(1, (int)Math.Floor(catalogNavigation.rect.width / 116)) : 1;
             RectTransform content = catalogNavigation;
             if (!catalogQuick)
@@ -322,6 +358,7 @@ namespace OstrixMods.BuildWorks
             title.maxVisibleLines = 3;
             SetTopAnchored((RectTransform)title.transform, 12, 12, 12, 62);
             AddCatalogImage(catalogPreview, "PreviewIcon", item.Icon, 12, 78, 220, 140);
+            if (item.IsBlueprint && !item.Icon) AddEmptyPreview(catalogPreview.Find("PreviewIcon"));
             string description = BuildWorksLocalization.CatalogLabel(item.Material) + "\n" + BuildWorksLocalization.CatalogLabel(item.Source) +
                 "\n" + item.PrefabName + (item.IsUpgrade ? "\n\n" + CatalogText("upgrade_to") + "\n" + (item.StationName ?? CatalogText("unknown_station")) : "");
             if (item.IsBlueprint && item.Blueprint.IsExternal)
@@ -329,7 +366,8 @@ namespace OstrixMods.BuildWorks
                     "\n" + BuildWorksLocalization.Text("catalog.card.parts", item.Blueprint.importPartCount);
             if (item.ItemContents != null) description = T("editor.item.defaults") + "\n\n" + item.PrefabName;
             if (!string.IsNullOrEmpty(item.UnavailableReason)) description += "\n\n" + item.UnavailableReason;
-            else if (!string.IsNullOrEmpty(item.WarningReason)) description += "\n\n" + item.WarningReason;
+            else if (!string.IsNullOrEmpty(item.WarningReason)) description += "\n\n" + item.WarningReason +
+                (item.IsBlueprint ? "\n" + T("catalog.thumbnail_markers") : "");
             if (!item.ResourcesKnown) description += "\n\n" + T("editor.catalog_cost_unknown");
             RectTransform viewport = CreatePanel("PreviewBody", catalogPreview, Color.clear, null);
             SetTopAnchored(viewport, 8, 224, 8, Mathf.Max(32, catalogPreview.rect.height - 286));
@@ -341,10 +379,18 @@ namespace OstrixMods.BuildWorks
             TMP_Text body = CreateText("PreviewMetadata", content, description, 14, FontStyles.Normal, TextAlignmentOptions.TopLeft);
             body.textWrappingMode = TextWrappingModes.Normal; body.overflowMode = TextOverflowModes.Ellipsis;
             float metadataHeight = body.GetPreferredValues(description, 204, Mathf.Infinity).y + 8;
-            SetTopLeft((RectTransform)body.transform, 4, 0, 204, metadataHeight);
-            float y = metadataHeight;
+            float y = 0;
+            if (item.IsBlueprint)
+            {
+                Button manage = CreateButton("CatalogManageDetails", content, CatalogManagementLabel(item), 204,
+                    () => CatalogManageRequested?.Invoke(item.Blueprint));
+                SetTopLeft((RectTransform)manage.transform, 4, 0, 204, 38);
+                y = 44;
+            }
+            SetTopLeft((RectTransform)body.transform, 4, y, 204, metadataHeight);
+            y += metadataHeight;
             if (!string.IsNullOrEmpty(item.UnavailableReason) || item.ItemContents != null || !item.ResourcesKnown)
-            { SetTopLeft(content, 0, 0, 212, metadataHeight); return; }
+            { SetTopLeft(content, 0, 0, 212, y); return; }
             TMP_Text costTitle = CreateText("PreviewCostTitle", content, CatalogText("build_cost"), 14, FontStyles.Bold, TextAlignmentOptions.TopLeft);
             SetTopLeft(costTitle.rectTransform, 4, y, 204, 24); y += 26;
             foreach (BlueprintEditorCatalogResource resource in item.Resources)
@@ -373,6 +419,8 @@ namespace OstrixMods.BuildWorks
                 SetBottomLeft((RectTransform)station.transform, 50, 12, 178, 38);
             }
         }
+        private static string CatalogManagementLabel(BlueprintEditorCatalogItem item) => BuildWorksLocalization.Text(
+            !item.Blueprint.IsExternal ? "catalog.action.delete" : item.Hidden ? "catalog.action.restore" : "catalog.action.hide");
         internal void UpdateCatalogThumbnail(string id, Sprite icon)
         {
             foreach (BlueprintEditorCatalogItem item in shownCatalogItems)
@@ -380,10 +428,12 @@ namespace OstrixMods.BuildWorks
                 if (item.Blueprint?.id != id) continue;
                 item.Icon = icon;
                 Transform image = catalogGrid ? catalogGrid.Find("Catalog_" + item.PrefabName + "/Thumbnail") : null;
+                if (image && image.Find("EmptyPreview")) UnityEngine.Object.Destroy(image.Find("EmptyPreview").gameObject);
                 if (image) { var graphic = image.GetComponent<Image>(); graphic.sprite = icon; graphic.color = Color.white; }
                 if (catalogPreviewItem == item && catalogPreview)
                 {
                     Transform preview = catalogPreview.Find("PreviewIcon");
+                    if (preview && preview.Find("EmptyPreview")) UnityEngine.Object.Destroy(preview.Find("EmptyPreview").gameObject);
                     if (preview) { var graphic = preview.GetComponent<Image>(); graphic.sprite = icon; graphic.color = Color.white; }
                 }
             }

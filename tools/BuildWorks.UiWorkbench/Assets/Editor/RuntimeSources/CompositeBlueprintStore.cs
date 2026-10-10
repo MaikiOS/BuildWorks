@@ -223,7 +223,7 @@ namespace OstrixMods.BuildWorks
             { error = UserError("import.fields"); return false; }
             if (source.importAbsoluteScale)
             { error = UserError("import.scale_pending"); return false; }
-            copy = data.blueprints.FirstOrDefault(candidate => candidate.placementImportId == source.id);
+            copy = FindPlacementCopy(source);
             if (copy != null) return true;
             var detached = ExternalBlueprintLibrary.DetachedCopy(source);
             detached.placementImportId = source.id;
@@ -231,6 +231,9 @@ namespace OstrixMods.BuildWorks
                 detached.anchors, detached.primaryPartId, detached.primaryGroupId, detached.supports,
                 detached.placementSupportId, out copy, out error, detached.customSnapPoints, detached);
         }
+
+        internal Blueprint FindPlacementCopy(Blueprint source) => source?.IsExternal == true
+            ? data.blueprints.FirstOrDefault(candidate => candidate.placementImportId == source.id) : null;
 
         internal string ExchangeDirectory => Path.GetDirectoryName(path);
         internal string ImportDirectory => Path.Combine(ExchangeDirectory, "imports");
@@ -348,9 +351,10 @@ namespace OstrixMods.BuildWorks
                     if (prefabHash != null && document.importError == null)
                     {
                         var evidenceIndex = Geometry.BlueprintSourceDocument.Index(document.sourceDocuments?.Select(evidence => evidence.ToGeometry()));
+                        Dictionary<int, Type> ordinaryStateFields = null;
                         foreach (Part part in document.parts)
                             if (part.sourceDocumentId != null && evidenceIndex.TryGetValue(part.sourceDocumentId, out var evidence))
-                                ExternalBlueprintLibrary.ConvertKnownState(part, evidence, prefabHash, worldLevel);
+                                ExternalBlueprintLibrary.ConvertKnownState(part, evidence, prefabHash, worldLevel, null, ref ordinaryStateFields);
                     }
                     var contents = InspectContents(document, prefabHash); // Reject every blocked member, not just empty archives.
                     summary.Add(contents);
@@ -390,7 +394,8 @@ namespace OstrixMods.BuildWorks
                         throw new InvalidDataException("$buildworks_exchange.source_changed");
                     ValidateExchangeDirectory(ImportDirectory);
                     Directory.CreateDirectory(ImportDirectory);
-                    var catalog = ExternalBlueprintLibrary.Load(ImportDirectory);
+                    var validationReads = new Dictionary<string, Blueprint>(StringComparer.Ordinal);
+                    var catalog = ExternalBlueprintLibrary.Load(ImportDirectory, validationReads: validationReads);
                     string temporary = Path.Combine(ImportDirectory, Guid.NewGuid().ToString("N") + ".tmp.zip");
                     try
                     {
@@ -416,7 +421,7 @@ namespace OstrixMods.BuildWorks
                         if (catalog.Count + validated.Count > ExternalBlueprintLibrary.MaximumFiles)
                             throw new InvalidDataException("$buildworks_import.library_limit");
                         // Validate the exact future sort order and shared read budget, not just this ZIP in isolation.
-                        var candidate = ExternalBlueprintLibrary.Load(ImportDirectory, temporary, Path.GetFileName(target));
+                        var candidate = ExternalBlueprintLibrary.Load(ImportDirectory, temporary, Path.GetFileName(target), validationReads);
                         var validCopies = candidate.Where(document => document.importError == null)
                             .GroupBy(document => document.id).ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
                         if (candidate.Count != catalog.Count + validated.Count ||
@@ -464,10 +469,7 @@ namespace OstrixMods.BuildWorks
                 byte[] bytes = BlueprintExchangeFormat.Encode(prepared);
                 BlueprintExchangeFormat.Decode(new UTF8Encoding(false, true).GetString(bytes));
                 directory = ValidateExchangeDirectory(directory);
-                if (string.IsNullOrWhiteSpace(fileName) || fileName.Length > 120 || fileName != fileName.Trim() ||
-                    fileName.EndsWith(".", StringComparison.Ordinal) || fileName.Any(c => char.IsControl(c) || "<>:\"/\\|?*".Contains(c)) ||
-                    fileName == "." || fileName == "..")
-                    throw new InvalidDataException("$buildworks_exchange.invalid_name");
+                ValidateExportName(fileName);
                 string target = Path.Combine(directory, fileName + (archive ? ".zip" : ".buildworks.json"));
                 if (File.Exists(target)) throw new IOException(UserError("exchange.exists", target));
                 Directory.CreateDirectory(directory);
@@ -490,6 +492,38 @@ namespace OstrixMods.BuildWorks
                 catch (Exception exception) { Debug.LogWarning("BuildWorks export cleanup: " + exception.Message); }
             }
         }
+
+        internal static void ValidateExportName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name) || name.Length > 120 || name != name.Trim() ||
+                name.EndsWith(".", StringComparison.Ordinal) || name.Any(c => char.IsControl(c) || "<>:\"/\\|?*".Contains(c)) ||
+                name == "." || name == "..")
+                throw new InvalidDataException("$buildworks_exchange.invalid_name");
+        }
+
+        internal Task<PlanBuildExport> ReviewPlanBuildExport(Blueprint blueprint)
+        {
+            var copy = blueprint.ImportCopy();
+            var scales = PlanBuildScaleSnapshot(copy);
+            return Task.Run(() => PlanBuildExport.Review(copy, name => scales.TryGetValue(name, out var value) ? value : null));
+        }
+        private Dictionary<string, VectorData?> PlanBuildScaleSnapshot(Blueprint blueprint) =>
+            blueprint.parts.Where(part => !part.scaleIsAbsolute && !part.baseScale.HasValue)
+                .Select(part => part.prefabName).Distinct(StringComparer.Ordinal)
+                .ToDictionary(name => name, name => importPrefabScale?.Invoke(name), StringComparer.Ordinal);
+        internal Task<string> ExportPlanBuild(PlanBuildExport review, Blueprint blueprint, string directory, string name)
+        {
+            var copy = blueprint.ImportCopy();
+            var scales = PlanBuildScaleSnapshot(copy); // Snapshot host values before entering the file worker.
+            return Task.Run(() =>
+            {
+                if (!review.TryWrite(copy, id => scales.TryGetValue(id, out var value) ? value : null, directory, name, out string result, out string error))
+                    throw new IOException(error);
+                return result;
+            });
+        }
+        internal bool TryExportPlanBuild(PlanBuildExport review, Blueprint blueprint, string directory, string name,
+            out string exportedPath, out string error) => review.TryWrite(blueprint, importPrefabScale, directory, name, out exportedPath, out error);
 
         public IReadOnlyList<string> Categories() => data.categories;
 
@@ -1522,7 +1556,7 @@ namespace OstrixMods.BuildWorks
         }
 
         internal static List<SourceDocument> CloneSources(IReadOnlyList<SourceDocument> sources) => sources?.Select(source =>
-            source == null ? null : new SourceDocument { id = source.id, format = source.format, name = source.name, text = source.text }).ToList();
+            source?.Copy()).ToList();
 
         internal static bool ValidSources(IReadOnlyList<Part> parts, IReadOnlyList<SourceDocument> sources)
         {
@@ -1798,7 +1832,9 @@ namespace OstrixMods.BuildWorks
         internal static bool ValidScale(VectorData value) =>
             IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z) &&
             value.x >= 0.01f && value.y >= 0.01f && value.z >= 0.01f &&
-            value.x <= 4f && value.y <= 4f && value.z <= 4f;
+            value.x <= Geometry.BlueprintEditorDocument.MaximumScale &&
+            value.y <= Geometry.BlueprintEditorDocument.MaximumScale &&
+            value.z <= Geometry.BlueprintEditorDocument.MaximumScale;
 
         internal static VectorData RelativeScale(VectorData absolute, VectorData prefab)
         {
@@ -1855,6 +1891,8 @@ namespace OstrixMods.BuildWorks
             // Transient read-only import diagnostics; not persisted library fields.
             internal byte[] importPreview;
             internal bool importAbsoluteScale;
+            // Parsed lists stay read-only within one validation worker; each read owns its optional preview.
+            internal Blueprint ValidationReadCopy() => (Blueprint)MemberwiseClone();
             internal Blueprint ImportCopy()
             {
                 var copy = (Blueprint)MemberwiseClone();
@@ -1921,6 +1959,9 @@ namespace OstrixMods.BuildWorks
 
             internal static SourceDocument FromGeometry(Geometry.BlueprintSourceDocument source) => new SourceDocument
             { id = source.Id, format = source.Format, name = source.Name, text = source.Text };
+
+            // Share only immutable evidence; ToGeometry checks every mutable identity field before reuse.
+            internal SourceDocument Copy() => (SourceDocument)MemberwiseClone();
         }
 
         [DataContract]

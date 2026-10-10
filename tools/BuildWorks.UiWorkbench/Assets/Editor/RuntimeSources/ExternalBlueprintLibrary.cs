@@ -26,7 +26,8 @@ namespace OstrixMods.BuildWorks
             return result;
         }
 
-        internal static List<CompositeBlueprintStore.Blueprint> Load(string directory, string stagedPath = null, string stagedName = null)
+        internal static List<CompositeBlueprintStore.Blueprint> Load(string directory, string stagedPath = null, string stagedName = null,
+            Dictionary<string, CompositeBlueprintStore.Blueprint> validationReads = null)
         {
             var result = new List<CompositeBlueprintStore.Blueprint>();
             if (!Directory.Exists(directory)) return result;
@@ -46,12 +47,13 @@ namespace OstrixMods.BuildWorks
             foreach (string path in paths)
             {
                 if (result.Count >= MaximumFiles) break;
-                AppendFile(path, result, ref budget, path == stagedPath ? stagedName : null);
+                AppendFile(path, result, ref budget, path == stagedPath ? stagedName : null, validationReads);
             }
             return result;
         }
 
-        private static void AppendFile(string path, List<CompositeBlueprintStore.Blueprint> result, ref long budget, string sourceName = null)
+        private static void AppendFile(string path, List<CompositeBlueprintStore.Blueprint> result, ref long budget, string sourceName = null,
+            Dictionary<string, CompositeBlueprintStore.Blueprint> validationReads = null)
         {
             string extension = Path.GetExtension(path).ToLowerInvariant();
             if (extension != ".zip" && !Supported(path)) return;
@@ -74,7 +76,7 @@ namespace OstrixMods.BuildWorks
                             if (result.Count >= MaximumFiles) throw new InvalidDataException("$buildworks_import.library_limit");
                             string source = (sourceName ?? Path.GetFileName(path)) + "/" + entry.FullName;
                             using (Stream data = entry.Open())
-                                result.Add(Read(data, entry.Length, source, ref budget));
+                                result.Add(Read(data, entry.Length, source, ref budget, validationReads));
                             ZipArchiveEntry preview = zip.GetEntry(Path.ChangeExtension(entry.FullName, ".png"));
                             if (preview != null && preview.Length <= MaximumPreviewBytes && preview.Length <= budget)
                             {
@@ -91,7 +93,7 @@ namespace OstrixMods.BuildWorks
                     }
                 }
                 else using (Stream stream = File.OpenRead(path))
-                    result.Add(Read(stream, stream.Length, sourceName ?? Path.GetFileName(path), ref budget));
+                    result.Add(Read(stream, stream.Length, sourceName ?? Path.GetFileName(path), ref budget, validationReads));
             }
             catch (Exception exception) when (exception is IOException || exception is InvalidDataException || exception is UnauthorizedAccessException || exception is ArgumentException)
             {
@@ -133,7 +135,8 @@ namespace OstrixMods.BuildWorks
             name.EndsWith(".vbuild", StringComparison.OrdinalIgnoreCase) ||
             name.EndsWith(".buildworks.json", StringComparison.OrdinalIgnoreCase);
 
-        private static CompositeBlueprintStore.Blueprint Read(Stream stream, long length, string source, ref long budget)
+        private static CompositeBlueprintStore.Blueprint Read(Stream stream, long length, string source, ref long budget,
+            Dictionary<string, CompositeBlueprintStore.Blueprint> validationReads = null)
         {
             int limit = source.EndsWith(".buildworks.json", StringComparison.OrdinalIgnoreCase)
                 ? BlueprintExchangeFormat.MaximumBytes : MaximumFileBytes;
@@ -151,7 +154,19 @@ namespace OstrixMods.BuildWorks
                         if (bytes.Length + read > length) throw new InvalidDataException("$buildworks_import.file_limit");
                         bytes.Write(buffer, 0, read);
                     }
-                    return Parse(new UTF8Encoding(false, true).GetString(bytes.ToArray()), source);
+                    string text = new UTF8Encoding(false, true).GetString(bytes.ToArray());
+                    if (validationReads != null && validationReads.TryGetValue(source, out var cached) &&
+                        cached.sourceDocuments[0].text == text)
+                        return cached.ValidationReadCopy();
+                    var parsed = Parse(text, source);
+                    // One import worker only; exact text is already retained in foreign source evidence.
+                    if (validationReads != null && !source.EndsWith(".buildworks.json", StringComparison.OrdinalIgnoreCase) &&
+                        parsed.sourceDocuments?.Count == 1)
+                    {
+                        validationReads[source] = parsed;
+                        return parsed.ValidationReadCopy();
+                    }
+                    return parsed;
                 }
             }
             catch (Exception exception) when (exception is IOException || exception is InvalidDataException || exception is DecoderFallbackException)
@@ -254,7 +269,7 @@ namespace OstrixMods.BuildWorks
                             throw new InvalidDataException("$buildworks_import.fields");
                         string prefab = fields[0].Trim();
                         // Decode only the known sign adapter; every other object payload remains inert and part-bound.
-                        string signText = !vbuild && prefab == "sign" ? BlueprintExchangeFormat.DecodeSignText(fields[9]) : null;
+                        string signText = !vbuild && prefab == "sign" ? BlueprintExchangeFormat.DecodeSignText(fields[9], allowLegacyLiteral: true) : null;
                         int dataIndex = vbuild ? 8 : 13;
                         string info = !vbuild && prefab != "sign" && HasData(fields[9]) ? fields[9] : null;
                         string zdo = fields.Length > dataIndex && HasData(fields[dataIndex]) ? fields[dataIndex] : null;
@@ -329,6 +344,7 @@ namespace OstrixMods.BuildWorks
             try
             {
                 var scales = new Dictionary<string, CompositeBlueprintStore.VectorData?>(StringComparer.Ordinal);
+                Dictionary<int, Type> ordinaryStateFields = null;
                 var evidenceIndex = hash == null ? null : Geometry.BlueprintSourceDocument.Index(copy.sourceDocuments?.Select(evidence => evidence.ToGeometry()));
                 foreach (CompositeBlueprintStore.Part part in copy.parts)
                 {
@@ -350,7 +366,7 @@ namespace OstrixMods.BuildWorks
                         part.scaleIsAbsolute = false;
                     }
                     if (hash != null && part.sourceDocumentId != null && evidenceIndex.TryGetValue(part.sourceDocumentId, out var evidence))
-                        ConvertKnownState(part, evidence, hash, worldLevel, supportsMaterialSeed);
+                        ConvertKnownState(part, evidence, hash, worldLevel, supportsMaterialSeed, ref ordinaryStateFields);
                 }
                 copy.importAbsoluteScale = false;
                 // Derived cache identity must not reuse pre-normalization thumbnails or another prefab revision.
@@ -398,7 +414,8 @@ namespace OstrixMods.BuildWorks
         }
 
         internal static void ConvertKnownState(CompositeBlueprintStore.Part part, Geometry.BlueprintSourceDocument evidence,
-            Func<string, int> hash, int? worldLevel, Func<string, bool> supportsMaterialSeed = null)
+            Func<string, int> hash, int? worldLevel, Func<string, bool> supportsMaterialSeed,
+            ref Dictionary<int, Type> ordinaryStateFields)
         {
             var original = part.foreignData;
             if (original == null || original.format != "blueprint" && original.format != "vbuild" || original.chance != null ||
@@ -416,7 +433,7 @@ namespace OstrixMods.BuildWorks
             if (fields.Length <= dataIndex || fields[dataIndex] != original.zdo ||
                 fields.Length > dataIndex + 1 && HasData(fields[dataIndex + 1]) && fields[dataIndex + 1] != "1" ||
                 (!vbuild && part.prefabName != "sign" && (HasData(fields[9]) ? fields[9] : null) != original.info) ||
-                (!vbuild && part.prefabName == "sign" && BlueprintExchangeFormat.DecodeSignText(fields[9]) != part.signText)) return;
+                (!vbuild && part.prefabName == "sign" && BlueprintExchangeFormat.DecodeSignText(fields[9], allowLegacyLiteral: true) != part.signText)) return;
             var consumed = new HashSet<KeyValuePair<int, Type>>();
             Geometry.BlueprintForeignPartData contents = null;
             string text = part.signText;
@@ -453,7 +470,8 @@ namespace OstrixMods.BuildWorks
             // Construction creates NEW ordinary native pieces: no inherited ownership, stale support,
             // damage, invulnerability, AI overrides or network lifetime flags. All originals remain in
             // the exact source document. This is NOT an administrator-state restoration adapter.
-            var ordinary = new Dictionary<int, Type>
+            // Hash callbacks belong to this conversion pass; never share the table across hosts.
+            var ordinary = ordinaryStateFields ?? (ordinaryStateFields = new Dictionary<int, Type>
             {
                 [hash("health")] = typeof(float),
                 [hash("support")] = typeof(float),
@@ -465,7 +483,7 @@ namespace OstrixMods.BuildWorks
                 [hash("WearNTear.m_health")] = typeof(float),
                 [hash("HasFieldsStaticTarget")] = typeof(int),
                 [hash("StaticTarget.m_randomTarget")] = typeof(int)
-            };
+            });
             foreach (var key in state.Keys)
             {
                 if (consumed.Contains(key)) continue;
@@ -560,6 +578,10 @@ namespace OstrixMods.BuildWorks
                 if (value.Length == 0) return 0;
                 value = value.Replace(',', '.');
             }
+            // Repeated exact constants dominate piece transforms; all other syntax keeps the host parser.
+            if (value == "0") return 0f;
+            if (value == "1") return 1f;
+            if (value == "-1") return -1f;
             float result = float.Parse(value, NumberStyles.Float, CultureInfo.InvariantCulture);
             if (float.IsNaN(result) || float.IsInfinity(result)) throw new InvalidDataException("$buildworks_import.transform");
             return result;

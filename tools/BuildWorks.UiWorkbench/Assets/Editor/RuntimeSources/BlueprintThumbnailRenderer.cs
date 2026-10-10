@@ -38,6 +38,7 @@ namespace OstrixMods.BuildWorks
             new HashSet<string>(StringComparer.Ordinal);
         private readonly Queue<PendingThumbnail> pending = new Queue<PendingThumbnail>();
         private readonly HashSet<string> queued = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> incomplete = new HashSet<string>(StringComparer.Ordinal);
 
         private static Type ResolveImageConversionType()
         {
@@ -61,12 +62,13 @@ namespace OstrixMods.BuildWorks
             CompositeBlueprintStore.Blueprint blueprint,
             IReadOnlyList<Piece> pieces)
         {
-            Sprite available = GetCached(blueprint);
-            if (available) return available;
             if (blueprint == null || string.IsNullOrWhiteSpace(blueprint.id) ||
                 blueprint.parts == null || pieces == null ||
                 blueprint.parts.Count != pieces.Count || CompositeBlueprintStore.InteractiveError(blueprint.parts.Count) != null)
                 return null;
+            bool partial = PrepareResolutionCache(blueprint, pieces);
+            Sprite available = partial ? null : GetCached(blueprint);
+            if (available) return available;
             if (sprites.TryGetValue(blueprint.id, out Sprite cached)) return cached;
             if (failures.Contains(blueprint.id)) return null;
 
@@ -118,6 +120,7 @@ namespace OstrixMods.BuildWorks
             if (string.IsNullOrWhiteSpace(blueprintId)) return;
             RemoveCached(blueprintId);
             failures.Remove(blueprintId);
+            incomplete.Remove(blueprintId);
             queued.Remove(blueprintId);
             RemovePending(blueprintId);
             string path = ThumbnailPath(blueprintId);
@@ -158,6 +161,7 @@ namespace OstrixMods.BuildWorks
             error = null;
             if (blueprint == null || blueprint.parts == null || pieces == null ||
                 blueprint.parts.Count != pieces.Count || CompositeBlueprintStore.InteractiveError(blueprint.parts.Count) != null) return null;
+            bool partial = PrepareResolutionCache(blueprint, pieces);
 
             Sprite rendered = null;
             string temporary = null;
@@ -171,6 +175,8 @@ namespace OstrixMods.BuildWorks
                         "the render contained no visible model pixels.");
                     return null;
                 }
+                // Partial previews depend on installed prefabs; never persist them across mod changes.
+                if (partial) { sprites[blueprint.id] = rendered; return rendered; }
                 Directory.CreateDirectory(directory);
                 string path = ThumbnailPath(blueprint.id);
                 temporary = path + ".tmp";
@@ -223,6 +229,7 @@ namespace OstrixMods.BuildWorks
             failures.Clear();
             pending.Clear();
             queued.Clear();
+            incomplete.Clear();
         }
 
         private Sprite Load(string blueprintId, byte[] importedPng = null)
@@ -295,6 +302,59 @@ namespace OstrixMods.BuildWorks
             directory,
             Path.GetFileName(blueprintId) + "-contents-v3.png");
 
+        private bool PrepareResolutionCache(CompositeBlueprintStore.Blueprint blueprint, IReadOnlyList<Piece> pieces)
+        {
+            bool partial = false;
+            for (int i = 0; i < pieces.Count; ++i)
+                partial |= !pieces[i] || blueprint.parts[i].scaleIsAbsolute;
+            bool changed = partial ? incomplete.Add(blueprint.id) : incomplete.Remove(blueprint.id);
+            if (changed)
+            {
+                RemoveCached(blueprint.id);
+                failures.Remove(blueprint.id);
+                queued.Remove(blueprint.id);
+                RemovePending(blueprint.id);
+            }
+            return partial;
+        }
+
+        private static void CreateVisuals(GameObject root, CompositeBlueprintStore.Blueprint blueprint, IReadOnlyList<Piece> pieces)
+        {
+            for (int index = 0; index < pieces.Count; ++index)
+            {
+                CompositeBlueprintStore.Part part = blueprint.parts[index];
+                Piece piece = pieces[index];
+                GameObject visual;
+                Vector3 scale;
+                if (piece && !part.scaleIsAbsolute)
+                {
+                    visual = PlacementGhostPreviewView.CreateVisualClone(piece.gameObject,
+                        "Part_" + index, ThumbnailLayer, part.materialSeed);
+                    visual.transform.SetParent(root.transform, false);
+                    BlueprintItemStandPreview.TryAdd(piece.gameObject, visual, part.foreignData?.ToGeometry(), out string warning);
+                    if (warning != null) throw new InvalidOperationException(warning);
+                    scale = part.RootScale(piece.transform.localScale);
+                }
+                else
+                {
+                    var assets = new List<UnityEngine.Object>();
+                    var metadata = part.metadata?.ToGeometry();
+                    visual = BlueprintEditorScene.CreatePlaceholder(part.stableId, metadata, assets, ThumbnailLayer);
+                    visual.transform.SetParent(root.transform, false);
+                    var ownership = visual.AddComponent<VisualCloneOwnedAssets>();
+                    foreach (UnityEngine.Object asset in assets) ownership.Track(asset);
+                    Material material = BlueprintEditorScene.CreatePreviewMaterial(null, true, assets);
+                    ownership.Track(material);
+                    visual.GetComponent<Renderer>().sharedMaterial = material;
+                    scale = metadata?.Minimum != null ? part.RootScale(part.metadata.prefabScale.ToVector3()) : Vector3.one * .3f;
+                    metadata?.ValidateEnvelope(new Geometry.Point3(scale.x, scale.y, scale.z));
+                }
+                visual.transform.SetLocalPositionAndRotation(part.position.ToVector3(), part.rotation.ToQuaternion());
+                visual.transform.localScale = scale;
+                visual.SetActive(true);
+            }
+        }
+
         private static Sprite Render(
             CompositeBlueprintStore.Blueprint blueprint,
             IReadOnlyList<Piece> pieces)
@@ -311,23 +371,7 @@ namespace OstrixMods.BuildWorks
                     hideFlags = HideFlags.HideAndDontSave,
                     layer = ThumbnailLayer
                 };
-                for (int index = 0; index < pieces.Count; ++index)
-                {
-                    Piece piece = pieces[index];
-                    if (!piece) return null;
-                    GameObject visual = PlacementGhostPreviewView.CreateVisualClone(
-                        piece.gameObject,
-                        "Part_" + index,
-                        ThumbnailLayer, blueprint.parts[index].materialSeed);
-                    visual.transform.SetParent(root.transform, false);
-                    BlueprintItemStandPreview.TryAdd(piece.gameObject, visual,
-                        blueprint.parts[index].foreignData?.ToGeometry(), out string warning);
-                    if (warning != null) throw new InvalidOperationException(warning);
-                    visual.transform.localPosition = blueprint.parts[index].position.ToVector3();
-                    visual.transform.localRotation = blueprint.parts[index].rotation.ToQuaternion();
-                    visual.transform.localScale = blueprint.parts[index].RootScale(piece.transform.localScale);
-                    visual.SetActive(true);
-                }
+                CreateVisuals(root, blueprint, pieces);
 
                 if (!TryGetBounds(root, out Bounds bounds)) return null;
                 cameraObject = new GameObject("BuildWorks_BlueprintThumbnailCamera")
@@ -558,24 +602,7 @@ namespace OstrixMods.BuildWorks
                 };
                 try
                 {
-                    for (int index = 0; index < pieces.Count; ++index)
-                    {
-                        Piece piece = pieces[index];
-                        if (!piece)
-                            throw new InvalidOperationException("Blueprint piece is missing");
-                        GameObject visual = PlacementGhostPreviewView.CreateVisualClone(
-                            piece.gameObject,
-                            "Part_" + index,
-                            ThumbnailLayer, blueprint.parts[index].materialSeed);
-                        visual.transform.SetParent(root.transform, false);
-                        BlueprintItemStandPreview.TryAdd(piece.gameObject, visual,
-                            blueprint.parts[index].foreignData?.ToGeometry(), out string warning);
-                        if (warning != null) throw new InvalidOperationException(warning);
-                        visual.transform.localPosition = blueprint.parts[index].position.ToVector3();
-                        visual.transform.localRotation = blueprint.parts[index].rotation.ToQuaternion();
-                        visual.transform.localScale = blueprint.parts[index].RootScale(piece.transform.localScale);
-                        visual.SetActive(true);
-                    }
+                    CreateVisuals(root, blueprint, pieces);
                     if (!TryGetBounds(root, out Bounds sceneBounds))
                         throw new InvalidOperationException("Blueprint has no visible meshes");
                     bounds = sceneBounds;

@@ -590,6 +590,9 @@ namespace OstrixMods.BuildWorks
         private TransformSnapshot editorRootBeforePlacement;
         private bool expandedPlanLimited;
         private CompositeBlueprintStore.Blueprint pendingCatalogBlueprint;
+        private CompositeBlueprintStore.Blueprint contentsSource, contentsRecipe;
+        private int contentsRevision;
+        private bool pendingReviewedPlacement, reviewedPrecision, closeCatalogAfterReview;
         private bool pendingCatalogEditor;
         private bool pendingBlueprintCreation;
         private Piece lastRegularPalettePiece;
@@ -963,8 +966,23 @@ namespace OstrixMods.BuildWorks
                 if (palettePiece && SupportsPrecisionPlacement(palettePiece) &&
                     !blueprintPieceRegistry.TryGetBlueprint(palettePiece, out _))
                     lastRegularPalettePiece = palettePiece;
+                if (closeCatalogAfterReview && !HammerCatalogView.BlocksExchangeInput)
+                {
+                    closeCatalogAfterReview = false;
+                    if (Hud.IsPieceSelectionVisible()) Hud.CloseBuildUi();
+                }
                 ContinueCatalogSelection(player);
                 ContinueBlueprintCreation(player);
+                if (contentsSource != null && (contentsRevision != blueprintStore.Revision ||
+                    pendingCatalogBlueprint == null && (!blueprintPieceRegistry.TryGetBlueprint(player.GetSelectedPiece(), out var selectedContents) ||
+                    !ReferenceEquals(selectedContents, contentsSource))))
+                    ClearContentsRecipe();
+                if (pendingReviewedPlacement && GameplayInputAvailable(player))
+                {
+                    var source = contentsSource; bool precision = reviewedPrecision;
+                    pendingReviewedPlacement = false;
+                    if (source != null) BeginBlueprintPlacement(player, source, precision);
+                }
                 if (state == PlacementState.Inactive)
                     SyncWorldPlacementMode(player.GetSelectedPiece());
             }
@@ -1181,32 +1199,86 @@ namespace OstrixMods.BuildWorks
             bool edit)
         {
             Player player = Player.m_localPlayer;
+            if (!edit && blueprint?.IsExternal == true)
+                blueprint = blueprintStore.FindPlacementCopy(blueprint) ?? blueprint;
+            if (!edit && RequiresContentsChoice(blueprint))
+            {
+                RequestContentsChoice(player, blueprint, fromCatalog: true, precision: false);
+                return;
+            }
+            string failure = PrepareCatalogSelection(player, blueprint, edit, null);
+            if (failure != null) ShowStatus(player, failure);
+        }
+
+        private string PrepareCatalogSelection(Player player, CompositeBlueprintStore.Blueprint blueprint,
+            bool edit, CompositeBlueprintStore.Blueprint recipe)
+        {
             if (player && blueprint != null && blueprint.IsExternal)
             {
                 if (!string.IsNullOrEmpty(blueprint.importError))
-                { ShowStatus(player, blueprint.importError); return; }
-                if (!edit && !TryResolveBlueprintPieces(player, blueprint, out _, out string missing))
-                { ShowStatus(player, BuildWorksLocalization.Text("placement.hammer_piece_missing", missing)); return; }
+                    return blueprint.importError;
+                if (!edit && !TryResolveBlueprintPieces(player, recipe ?? blueprint, out _, out string missing))
+                    return BuildWorksLocalization.Text("placement.hammer_piece_missing", missing);
                 if (!edit)
                 {
                     if (!blueprintStore.TryGetOrCreatePlacementCopy(blueprint,
                         out CompositeBlueprintStore.Blueprint imported, out string error))
-                    { ShowStatus(player, error); return; }
+                        return error;
                     blueprint = imported;
                     RefreshBlueprintEditorLibrary();
                 }
             }
             if (!player || (!edit && !blueprintPieceRegistry.TryGetPiece(blueprint, out _)))
             {
-                ShowStatus(player, BuildWorksLocalization.Text(
-                    "placement.blueprint_unavailable"));
-                return;
+                return BuildWorksLocalization.Text("placement.blueprint_unavailable");
             }
+            if (recipe != null) ApproveContents(blueprint, recipe);
             pendingCatalogBlueprint = blueprint;
             pendingCatalogEditor = edit;
             suppressPlacementFrame = Time.frameCount;
-            if (Hud.IsPieceSelectionVisible()) Hud.CloseBuildUi();
+            if (HammerCatalogView.BlocksExchangeInput) closeCatalogAfterReview = true;
+            else if (Hud.IsPieceSelectionVisible()) Hud.CloseBuildUi();
+            return null;
         }
+
+        internal static bool RequiresContentsChoice(CompositeBlueprintStore.Blueprint blueprint) =>
+            blueprint?.parts?.Any(part => part.foreignData != null && !part.foreignData.contentsCleared) == true;
+
+        private bool RequestContentsChoice(Player player, CompositeBlueprintStore.Blueprint blueprint, bool fromCatalog, bool precision)
+        {
+            string missing = string.Empty;
+            if (!player || !TryResolveBlueprintPieces(player, blueprint, out _, out missing, forContentsReview: true))
+            { ShowStatus(player, BuildWorksLocalization.Text("placement.hammer_piece_missing", missing)); return false; }
+            Piece selected = player.GetSelectedPiece();
+            ClearContentsRecipe();
+            bool opened = HammerCatalogView.ShowPlacementContents(blueprint, recipe =>
+            {
+                if (!TryResolveBlueprintPieces(player, recipe, out _, out string error))
+                    return BuildWorksLocalization.Text("placement.contents_unsupported", error);
+                if (fromCatalog) return PrepareCatalogSelection(player, blueprint, false, recipe);
+                ApproveContents(blueprint, recipe);
+                pendingReviewedPlacement = true; reviewedPrecision = precision;
+                return null;
+            }, () => player && player == Player.m_localPlayer && !player.IsDead() &&
+                Application.isFocused && player.GetSelectedPiece() == selected && UsesHammerPieceTable(player));
+            if (!opened) ShowStatus(player, BuildWorksLocalization.Text("placement.blueprint_unavailable"));
+            suppressPlacementFrame = Time.frameCount;
+            return opened;
+        }
+
+        private void ApproveContents(CompositeBlueprintStore.Blueprint source, CompositeBlueprintStore.Blueprint recipe)
+        {
+            recipe.id = source.id;
+            contentsSource = source; contentsRecipe = recipe; contentsRevision = blueprintStore.Revision;
+        }
+
+        private void ClearContentsRecipe()
+        {
+            contentsSource = contentsRecipe = null; pendingReviewedPlacement = false; closeCatalogAfterReview = false;
+        }
+
+        private CompositeBlueprintStore.Blueprint PlacementRecipe(CompositeBlueprintStore.Blueprint source) =>
+            ReferenceEquals(contentsSource, source) && contentsRevision == blueprintStore.Revision ? contentsRecipe : source;
 
         private void HandleCreateBlueprintCatalogAction()
         {
@@ -1928,6 +2000,9 @@ namespace OstrixMods.BuildWorks
             CompositeBlueprintStore.Blueprint blueprint,
             bool editBeforePlacement = false)
         {
+            if (ReferenceEquals(PlacementRecipe(blueprint), blueprint) && RequiresContentsChoice(blueprint))
+                return RequestContentsChoice(player, blueprint, fromCatalog: false, precision: editBeforePlacement);
+            blueprint = PlacementRecipe(blueprint);
             Piece palettePiece = player ? player.GetSelectedPiece() : null;
             GameObject ghost = player
                 ? PlacementGhostField.GetValue(player) as GameObject
@@ -2283,6 +2358,8 @@ namespace OstrixMods.BuildWorks
                 materialPreview.Clear();
                 return false;
             }
+
+            blueprint = PlacementRecipe(blueprint);
 
             if (blueprintPieceRegistry.TryGetSourcePieces(blueprint, out IReadOnlyList<Piece> pieces))
             {
@@ -5369,7 +5446,7 @@ namespace OstrixMods.BuildWorks
             Player player,
             CompositeBlueprintStore.Blueprint blueprint,
             out List<Piece> pieces,
-            out string missingPrefab, bool forEditor = false)
+            out string missingPrefab, bool forEditor = false, bool forContentsReview = false)
         {
             pieces = new List<Piece>(blueprint?.parts?.Count ?? 0);
             missingPrefab = string.Empty;
@@ -5412,8 +5489,15 @@ namespace OstrixMods.BuildWorks
                     unavailable.Add(BuildWorksLocalization.Text("blueprint.network_identity_required", part.prefabName));
                     continue;
                 }
-                if (!forEditor && (!BlueprintMaterialState.CanRestore(piece.gameObject, part.materialSeed) ||
-                    !BlueprintItemStandPlacement.CanRestore(piece, part.foreignData?.ToGeometry())))
+                var contents = part.foreignData?.ToGeometry();
+                bool canRestoreContents = forEditor || BlueprintItemStandPlacement.CanRestore(piece, contents);
+                if (!canRestoreContents && forContentsReview && contents != null)
+                {
+                    try { canRestoreContents = BlueprintItemStandPlacement.CanRestore(piece,
+                        contents.WithoutContents(name => name.GetStableHashCode())); }
+                    catch (ArgumentException) { canRestoreContents = false; }
+                }
+                if (!forEditor && (!BlueprintMaterialState.CanRestore(piece.gameObject, part.materialSeed) || !canRestoreContents))
                 {
                     unavailable.Add(BuildWorksLocalization.Text("import.foreign_pending"));
                     continue;
@@ -5690,6 +5774,7 @@ namespace OstrixMods.BuildWorks
 #if BUILDWORKS_TEST_STAND
         internal void AbortQaInput()
         {
+            HammerCatalogView.CancelPlacementContents(); ClearContentsRecipe();
             blueprintSelectionDragging = false;
             blueprintWorkspaceRightTracking = blueprintWorkspaceRightDragged = false;
             hud?.HideSelectionBox();
@@ -6872,6 +6957,7 @@ namespace OstrixMods.BuildWorks
 
         private void Finish(bool restoreCursor = true, bool preserveContinuation = false)
         {
+            HammerCatalogView.CancelPlacementContents(); ClearContentsRecipe();
             bool restoreWorldSelectionGhost =
                 sessionMode == SessionMode.BlueprintWorldSelection;
             pendingWorldBlueprintSelection = false;

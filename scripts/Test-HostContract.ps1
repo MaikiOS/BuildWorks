@@ -873,7 +873,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.142.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.143.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -2129,6 +2129,23 @@ Assert-Contract ($beginBlueprintPlacement.Parameters.Count -eq 3 -and
     $sessionSource -notmatch 'OpenBlueprintEditorFromWorld') `
     'World blueprint F9 no longer enters its separate whole-group precision path.'
 $placementInstructions = $beginBlueprintPlacement.Body.Instructions
+$contentsGate = $placementInstructions | Where-Object {
+    $_.OpCode.FlowControl -eq 'Call' -and $_.Operand.Name -eq 'RequestContentsChoice'
+} | Select-Object -First 1
+$strictContents = $placementInstructions | Where-Object {
+    $_.OpCode.FlowControl -eq 'Call' -and $_.Operand.Name -eq 'TryResolveBlueprintPieces'
+} | Select-Object -First 1
+$strictIndex = $placementInstructions.IndexOf($strictContents)
+$contentsResolver = $pluginMethods | Where-Object Name -eq 'TryResolveBlueprintPieces'
+Assert-Contract ($contentsGate -and $strictContents -and $contentsGate.Offset -lt $strictContents.Offset -and
+    $strictIndex -ge 2 -and $placementInstructions[$strictIndex - 1].OpCode.Code -eq 'Ldc_I4_0' -and
+    $placementInstructions[$strictIndex - 2].OpCode.Code -eq 'Ldc_I4_0' -and
+    $contentsResolver.Parameters.Count -eq 6 -and $contentsResolver.Parameters[5].Name -eq 'forContentsReview' -and
+    $contentsResolver.Parameters[5].Constant -eq $false) `
+    'Placement must review contents before strict validation; review eligibility must never become build permission.'
+Assert-Contract ($catalogSource -match
+    'exchangeView\.Tick\(\);\s*if \(Input.GetKeyDown\(KeyCode.Escape\)\) \{ exchangeView\?\.Dispose\(\);') `
+    'Escape must tolerate a placement modal that has closed itself during Tick.'
 $plainPlacementModeReset = $placementInstructions | Where-Object {
     $_.OpCode.Code -eq 'Stfld' -and $_.Operand.Name -eq 'gizmoMode'
 }
@@ -2267,7 +2284,7 @@ Assert-Contract ($null -ne $worldCapture -and
     $worldCaptureCalls -notmatch '::Destroy|::ClaimOwnership|::SetPositionAndRotation|::set_position|::set_rotation|::SetLocalScale' -and
     $sessionSource -match 'pendingWorldBlueprintSelection && GameplayInputAvailable' -and
     $sessionSource -match
-        'private void Finish\([^)]*\)\s*\{[\s\S]{0,180}?pendingWorldBlueprintSelection = false;' -and
+        'private void Finish\([^)]*\)\s*\{\s*HammerCatalogView\.CancelPlacementContents\(\); ClearContentsRecipe\(\);[\s\S]{0,180}?pendingWorldBlueprintSelection = false;' -and
     $hudSource -match 'confirmText\.text = selectingBlueprint \? BuildWorksLocalization\.Text\("hud\.save"\)' -and
     $sessionSource -match 'if \(selectingBlueprint\)\s*\{\s*SaveCurrentBlueprint\(\);\s*return;' -and
     $sessionSource -match 'TrySaveWorldSelection[\s\S]*?Finish\(\);\s*RefreshBlueprintEditorLibrary' -and
@@ -3069,7 +3086,9 @@ Assert-Contract (@($nativeFinished.Body.Instructions | Where-Object { [string]$_
 $resolveBlueprint = $pluginMethods | Where-Object { $_.Name -eq 'TryResolveBlueprintPieces' -and $_.DeclaringType.Name -eq 'PrecisionPlacementSession' }
 $openBlueprintEditor = $pluginMethods | Where-Object { $_.Name -eq 'BeginBlueprintEditor' -and $_.DeclaringType.Name -eq 'PrecisionPlacementSession' }
 $editorResolveCall = @($openBlueprintEditor.Body.Instructions | Where-Object { [string]$_.Operand -match 'PrecisionPlacementSession::TryResolveBlueprintPieces' })
-Assert-Contract ($editorResolveCall.Count -eq 1 -and $editorResolveCall[0].Previous.OpCode.Name -eq 'ldc.i4.1') `
+Assert-Contract ($editorResolveCall.Count -eq 1 -and
+    $editorResolveCall[0].Previous.OpCode.Name -eq 'ldc.i4.0' -and
+    $editorResolveCall[0].Previous.Previous.OpCode.Name -eq 'ldc.i4.1') `
     'Opening the isolated editor must use forEditor=true, not world placement gates.'
 $resolveCalls = ($resolveBlueprint.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($resolveCalls -match 'BlueprintItemStandPlacement::CanRestore' -and
@@ -3347,4 +3366,4 @@ try {
 }
 finally { $nativeInputSystem.Dispose() }
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.142 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.143 and Valheim Steam build 25185596.'

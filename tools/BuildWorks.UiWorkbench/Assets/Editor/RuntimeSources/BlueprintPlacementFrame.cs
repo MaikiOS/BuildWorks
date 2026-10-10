@@ -23,6 +23,72 @@ namespace OstrixMods.BuildWorks
                 (z - rotation * Vector3.forward).sqrMagnitude <= toleranceSquared;
         }
 
+        internal static IEnumerable<Vector3> HammerSnapPoints(
+            CompositeBlueprintStore.Blueprint blueprint, IReadOnlyList<Piece> pieces,
+            Bounds bounds, Vector3 origin, Quaternion orientation)
+        {
+            IReadOnlyList<Vector3> native = NativeSnapPoints(blueprint, pieces);
+            // Envelope corners are not sockets of rotated pieces.
+            if (native.Count == 0 && (blueprint.customSnapPoints == null || blueprint.customSnapPoints.Count == 0))
+            {
+                AnchorBounds anchors = AnchorAdjustment.CreateBounds(new[] {
+                    new Point3(bounds.min.x, bounds.min.y, bounds.min.z),
+                    new Point3(bounds.max.x, bounds.max.y, bounds.max.z) });
+                for (int index = 0; index < AnchorAdjustment.AnchorCount; ++index)
+                {
+                    Point3 point = anchors.Anchor(index);
+                    yield return ToLocal(new Vector3((float)point.X, (float)point.Y, (float)point.Z), origin, orientation);
+                }
+            }
+            foreach (Vector3 point in native) yield return ToLocal(point, origin, orientation);
+            foreach (CompositeBlueprintStore.VectorData point in blueprint.customSnapPoints ??
+                Enumerable.Empty<CompositeBlueprintStore.VectorData>())
+                yield return ToLocal(point.ToVector3(), origin, orientation);
+        }
+
+        internal static Quaternion AutoJoinRotation(Quaternion target, Quaternion ghost, bool blueprint)
+            => blueprint ? ghost : target * ghost;
+
+        internal static IReadOnlyList<Vector3> NativeSnapPoints(
+            CompositeBlueprintStore.Blueprint blueprint,
+            IReadOnlyList<Piece> pieces)
+        {
+            var sets = new List<IReadOnlyList<Point3>>();
+            bool explicitFrame = CompositeBlueprintStore.HasExplicitFrame(blueprint);
+            for (int index = 0; index < pieces.Count; ++index)
+            {
+                if (explicitFrame && !CompositeBlueprintStore.IsFramePart(blueprint, index))
+                    continue;
+                Piece piece = pieces[index];
+                CompositeBlueprintStore.Part part = blueprint.parts[index];
+                var native = new List<Transform>();
+                piece.GetSnapPoints(native);
+                var local = new List<Point3>(native.Count);
+                foreach (Transform snap in native)
+                {
+                    if (!snap) continue;
+                    Vector3 pieceLocal = piece.transform.InverseTransformPoint(snap.position);
+                    Vector3 point = part.position.ToVector3() + part.rotation.ToQuaternion() *
+                        Vector3.Scale(pieceLocal, part.RootScale(piece.transform.localScale));
+                    if (float.IsNaN(point.x) || float.IsInfinity(point.x) ||
+                        float.IsNaN(point.y) || float.IsInfinity(point.y) ||
+                        float.IsNaN(point.z) || float.IsInfinity(point.z)) continue;
+                    local.Add(new Point3(point.x, point.y, point.z));
+                }
+                sets.Add(local);
+            }
+            IReadOnlyList<Point3> selected = explicitFrame && sets.Count == 1
+                ? sets[0]
+                : AnchorAdjustment.ExternalCompositeSnapPoints(sets, tolerance: 0.0001);
+            var result = new List<Vector3>(selected.Count);
+            foreach (Point3 point in selected)
+            {
+                if (result.Count == 512) break;
+                result.Add(new Vector3((float)point.X, (float)point.Y, (float)point.Z));
+            }
+            return result;
+        }
+
         internal static Point3[][] SnapLocalSets(CompositeBlueprintStore.Blueprint blueprint, IReadOnlyList<Piece> pieces)
         {
             var sets = new List<Point3>[blueprint.parts.Count];

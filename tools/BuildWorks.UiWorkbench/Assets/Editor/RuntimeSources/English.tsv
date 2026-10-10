@@ -962,3 +962,14 @@ exchange.plan_changed	The blueprint or prefab scale changed after review. Press 
 exchange.plan_path	The bundle path exceeds this Unity Windows runtime limit (260 characters). Choose a shorter parent folder or bundle name; no files were written. Folder: {0}
 exchange.plan_cancelled	Unfinished PlanBuild export cancelled. No bundle was published.
 qa.control.paused	QA input stopped. Inspect already built parts before resuming.
+placement.contents_title	Before placement: contents
+placement.contents_help	{0}: these choices apply only to this placement.
+placement.contents_confirm	Prepare placement
+placement.contents_stale	The source or game context changed. Close this window and select the blueprint again.
+placement.contents_policy	The original blueprint is preserved. Supply mounted items from your inventory. Populated storage restoration is not supported yet; explicitly exclude its contents to build empty containers.
+placement.contents_unsupported	The selected contents cannot be placed yet: {0}. Change the choices or cancel; nothing was consumed.
+placement.contents_required	Contents choices required
+placement.storage_on	[x] Place storage contents
+placement.storage_off	[ ] Place storage contents
+placement.mounts_on	[x] Place mounted items
+placement.mounts_off	[ ] Place mounted items

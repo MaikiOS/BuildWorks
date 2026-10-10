@@ -1830,6 +1830,63 @@ internal static class ControllerInputAcceptance
                 policy.parts[1].foreignData = new CompositeBlueprintStore.ForeignPartData {
                     format = BlueprintForeignPartData.NativeItemStandFormat, info = "SwordIron:0:1:0",
                     zdo = Convert.ToBase64String(ItemStandPreviewAcceptance.ItemPackage("SwordIron")) };
+                byte[] placementOriginal = BlueprintExchangeFormat.Encode(policy);
+                int placementFiles = Directory.GetFiles(folder, "*", SearchOption.AllDirectories).Length;
+                int placements = 0;
+                foreach (bool excludeStorage in new[] { false, true })
+                foreach (bool excludeMounts in new[] { false, true })
+                {
+                    CompositeBlueprintStore.Blueprint placementRecipe = null;
+                    view.ShowExchange((parent, textFont, closed) => new BlueprintExchangeView(parent, textFont, store, policy, closed,
+                        place: recipe => { placementRecipe = recipe; ++placements; return null; }, placementCurrent: () => true));
+                    yield return null;
+                    exchange = Field<BlueprintExchangeView>(view, "exchangeView");
+                    for (int i = 0; i < 300 && Field<Task<CompositeBlueprintStore.ContentsSummary>>(exchange, "contentsInspection") != null; ++i)
+                    { Frame(controller, input, Vector2.zero); yield return null; }
+                    Require(Field<Button>(exchange, "storageChoice").interactable && Field<Button>(exchange, "mountChoice").interactable &&
+                        !Field<TMP_InputField>(exchange, "directory").gameObject.activeSelf &&
+                        !Field<Button>(exchange, "copyPath").gameObject.activeSelf,
+                        "Placement review missed independent choices or exposed file workflow");
+                    if (excludeStorage) { NativeClick(view, null, "ExchangeStorageChoice"); yield return null; }
+                    if (excludeMounts) { NativeClick(view, null, "ExchangeMountChoice"); yield return null; }
+                    NativeClick(view, null, "ExchangeSubmit");
+                    for (int i = 0; i < 300 && exchange.IsOpen; ++i)
+                    { Frame(controller, input, Vector2.zero); yield return null; }
+                    Require(placementRecipe != null && !exchange.IsOpen &&
+                        placementRecipe.parts[0].foreignData.contentsCleared == excludeStorage &&
+                        placementRecipe.parts[1].foreignData.contentsCleared == excludeMounts &&
+                        BlueprintExchangeFormat.Encode(policy).SequenceEqual(placementOriginal) &&
+                        Directory.GetFiles(folder, "*", SearchOption.AllDirectories).Length == placementFiles,
+                        "Placement choices coupled, mutated source or wrote files");
+                }
+                bool placementCurrent = true;
+                view.ShowExchange((parent, textFont, closed) => new BlueprintExchangeView(parent, textFont, store, policy, closed,
+                    place: recipe => { ++placements; return "$buildworks_import.object_data"; }, placementCurrent: () => placementCurrent));
+                yield return null;
+                exchange = Field<BlueprintExchangeView>(view, "exchangeView");
+                for (int i = 0; i < 300 && Field<Task<CompositeBlueprintStore.ContentsSummary>>(exchange, "contentsInspection") != null; ++i)
+                { Frame(controller, input, Vector2.zero); yield return null; }
+                NativeClick(view, null, "ExchangeSubmit");
+                for (int i = 0; i < 300 && Field<Task<CompositeBlueprintStore.Blueprint>>(exchange, "placementPreparation") != null; ++i)
+                { Frame(controller, input, Vector2.zero); yield return null; }
+                Require(exchange.IsOpen && placements == 5 && !Field<bool>(exchange, "clearStorage") && !Field<bool>(exchange, "clearMounts") &&
+                    Field<Button>(exchange, "primary").interactable && Field<TMP_Text>(exchange, "message").text.Length > 0,
+                    "Unsupported placement closed review, silently cleared contents or prevented retry");
+                placementCurrent = false; exchange.Tick();
+                Require(!Field<Button>(exchange, "primary").interactable && Field<Button>(exchange, "contentsBack").interactable,
+                    "Stale placement was still confirmable or could not be cancelled");
+                NativeClick(view, null, "ExchangeContentsBack"); yield return null;
+                var pendingPlacement = new TaskCompletionSource<CompositeBlueprintStore.Blueprint>();
+                view.ShowExchange((parent, textFont, closed) => new BlueprintExchangeView(parent, textFont, store, policy, closed,
+                    place: recipe => { ++placements; return null; }, placementCurrent: () => true));
+                yield return null;
+                exchange = Field<BlueprintExchangeView>(view, "exchangeView");
+                Set(exchange, "placementPreparation", pendingPlacement.Task); exchange.Tick();
+                NativeClick(view, null, "ExchangeClose"); yield return null;
+                pendingPlacement.SetResult(policy.ImportCopy()); exchange.Tick();
+                Require(placements == 5 && !exchange.IsOpen && BlueprintExchangeFormat.Encode(policy).SequenceEqual(placementOriginal) &&
+                    Directory.GetFiles(folder, "*", SearchOption.AllDirectories).Length == placementFiles,
+                    "Closing pending placement later committed a callback or modified files/source");
                 foreach (bool emptyStorage in new[] { false, true })
                 foreach (bool emptyMounts in new[] { false, true })
                 {

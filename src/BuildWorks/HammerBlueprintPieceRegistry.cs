@@ -116,7 +116,7 @@ namespace OstrixMods.BuildWorks
                     player,
                     blueprint,
                     out List<Piece> pieces,
-                    out string missingPrefab))
+                    out string missingPrefab, forContentsReview: true))
                 {
                     Debug.LogWarning("BuildWorks hid blueprint " + blueprint.name +
                         ": prefab is unavailable in this Hammer: " + missingPrefab);
@@ -200,7 +200,7 @@ namespace OstrixMods.BuildWorks
             if (blueprint == null) return false;
             if (!placementAvailability.TryGetValue(blueprint.id, out bool available))
                 placementAvailability[blueprint.id] = available = PrecisionPlacementSession.TryResolveBlueprintPieces(
-                    Player.m_localPlayer, blueprint, out _, out _);
+                    Player.m_localPlayer, blueprint, out _, out _, forContentsReview: true);
             return available;
         }
 

@@ -566,6 +566,7 @@ public static class ActualDividerAcceptance
             var pair = CompositeBlueprintStore.ReviewImportFile(pairPath, prefabName => prefabName.GetStableHashCode(), 0);
             Require(pair.Documents.Count == 1 && pair.Documents[0].importError == null && pair.Documents[0].parts.Count == 2,
                 "Independent supported snap fixture cannot import: " + name);
+            RunHammerSnapPair(pair.Documents[0], floor, pole, evidence);
         }
         var review = CompositeBlueprintStore.ReviewImportFile(fixture, name => name.GetStableHashCode(), 0);
         Require(review.Documents.Count == 1 && review.Documents[0].importError == null && review.Documents[0].parts.Count == 4,
@@ -609,6 +610,83 @@ public static class ActualDividerAcceptance
             Capture(scene.Camera, Path.Combine(output, "actual-supported-snap.png"));
         }
         evidence.Add("PASS supported fixture: four native pieces, one coincident floor snap pair, pole/floor collider overlap0.01m, exact import/internal roundtrip. Game stability remains unverified.");
+    }
+
+    private static void RunHammerSnapPair(CompositeBlueprintStore.Blueprint blueprint,
+        GameObject floor, GameObject pole, ICollection<string> evidence)
+    {
+        var roots = new List<GameObject>();
+        var pieces = new List<Piece>();
+        try
+        {
+            // Only copy native socket coordinates; never instantiate gameplay components from bundles.
+            foreach (var part in blueprint.parts)
+            {
+                GameObject source = part.prefabName == floor.name ? floor : pole;
+                var root = new GameObject("HammerSocketProbe_" + source.name);
+                roots.Add(root); root.transform.localScale = source.transform.localScale;
+                pieces.Add(root.AddComponent<Piece>());
+                foreach (Transform socket in source.GetComponentsInChildren<Transform>(true))
+                {
+                    if (!socket.CompareTag("snappoint")) continue;
+                    var copy = new GameObject("snappoint") { tag = "snappoint" };
+                    copy.transform.SetParent(root.transform, false);
+                    copy.transform.localPosition = source.transform.InverseTransformPoint(socket.position);
+                }
+            }
+            Vector3[] native = BlueprintPlacementFrame.NativeSnapPoints(blueprint, pieces).ToArray();
+            Require(native.Length > 0, "Native socket probe has no points");
+            Bounds bounds = new Bounds(native[0], Vector3.zero);
+            foreach (Vector3 point in native) bounds.Encapsulate(point);
+            bounds.Expand(.1f); // A visual envelope need not pass through a real socket.
+            Vector3 origin = new Vector3(bounds.center.x, bounds.min.y, bounds.center.z);
+            Quaternion orientation = Quaternion.Euler(7, 37, -11);
+            Vector3[] hammer = BlueprintPlacementFrame.HammerSnapPoints(blueprint, pieces,
+                bounds, origin, orientation).ToArray();
+            Require(hammer.Length == native.Length && hammer.Select((point, index) =>
+                Vector3.Distance(origin + orientation * point, native[index]) < .00001f).All(equal => equal),
+                "Hammer adds false envelope corners despite native sockets: " + blueprint.name);
+
+            Quaternion target = Quaternion.Euler(0, 30, 0), wheel = Quaternion.Euler(0, 15, 0);
+            Require(Quaternion.Angle(BlueprintPlacementFrame.AutoJoinRotation(target, wheel, true), wheel) < .001f,
+                "Composite Hammer rotation is multiplied by a target part rotation");
+            Require(Quaternion.Angle(BlueprintPlacementFrame.AutoJoinRotation(target, wheel, false), target * wheel) < .001f,
+                "Ordinary piece auto-alignment changed");
+            Quaternion support = Quaternion.Euler(13, -48, 21), xyzTarget = Quaternion.Euler(-17, 29, 38);
+            Quaternion frame = BlueprintPlacementFrame.AutoJoinRotation(xyzTarget, wheel, true);
+            BlueprintPlacementFrame.ToRootPose(new Vector3(4, 2, -1), frame,
+                new Vector3(.4f, -.2f, .7f), support, 1.3f, out Vector3 supportedOrigin, out Quaternion supportedRotation);
+            Require(Quaternion.Angle(supportedRotation * support, wheel) < .001f &&
+                Vector3.Distance(supportedOrigin + supportedRotation * (new Vector3(.4f, -.2f, .7f) * 1.3f),
+                    new Vector3(4, 2, -1)) < .00001f, "Saved support applies target orientation twice");
+            int floorIndex = blueprint.parts.FindIndex(part => part.prefabName == floor.name);
+            var floorPart = blueprint.parts[floorIndex];
+            Vector3 localSocket = pieces[floorIndex].transform.GetChild(0).localPosition;
+            Vector3 desired = new Vector3(8, 2, -3);
+            Vector3 sourceSocket = floorPart.position.ToVector3() + floorPart.rotation.ToQuaternion() *
+                Vector3.Scale(localSocket, floorPart.RootScale(floor.transform.localScale));
+            Vector3 ghostPosition = new Vector3(1, .3f, 2);
+            Vector3 snap = ghostPosition + wheel * (sourceSocket - origin);
+            Vector3 moved = desired - (snap - ghostPosition); // Current native placement translation.
+            Require(Vector3.Distance(moved + wheel * (sourceSocket - origin), desired) < .00001f,
+                "Composite native socket translation changed height or position");
+
+            blueprint.primaryPartId = floorPart.stableId;
+            Require(BlueprintPlacementFrame.HammerSnapPoints(blueprint, pieces, bounds, origin, orientation).Count() ==
+                BlueprintPlacementFrame.NativeSnapPoints(blueprint, pieces).Count, "Explicit native frame changed");
+            blueprint.primaryPartId = null;
+            foreach (GameObject root in roots)
+                foreach (Transform child in root.transform) child.tag = "Untagged";
+            Require(BlueprintPlacementFrame.HammerSnapPoints(blueprint, pieces, bounds, origin, orientation).Count() ==
+                AnchorAdjustment.AnchorCount, "Socket-free furniture lost envelope fallback");
+            blueprint.customSnapPoints = new List<CompositeBlueprintStore.VectorData> {
+                new CompositeBlueprintStore.VectorData(new Vector3(.2f, 1, -.4f)) };
+            Require(BlueprintPlacementFrame.HammerSnapPoints(blueprint, pieces, bounds, origin, orientation).Count() == 1,
+                "Custom sockets gain false envelope corners");
+            blueprint.customSnapPoints = null;
+            evidence.Add("PASS Hammer socket generation " + blueprint.name + ": native-only, explicit frame, custom-only, bounds fallback, root rotation, native translation. Host runtime remains unverified.");
+        }
+        finally { foreach (GameObject root in roots) Object.DestroyImmediate(root); }
     }
 
     private static void RecordPlacementMetadata(GameObject prefab, ICollection<string> evidence)

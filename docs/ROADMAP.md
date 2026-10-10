@@ -1,3 +1,18 @@
+## 2026-10-10 — source0.19.128: native Hammer blueprint sockets
+
+Ostrix's .117 acceptance received: Save As,16 stability/ghost/reload/no repeat
+supplies, catalogue management, partial thumbnails, filters and interior camera.
+17/18 snapping, axis-scale/replacement UX, popup/filter layout and import speed
+remain open. docs/feedback-2026-10-10_RU.md; do not repeat accepted cases.
+False envelope corners reproduced with actual17 socket coordinates. Bounds
+are now fallback only without native/custom sockets; blueprint Hammer root
+rotation is retained while ordinary pieces keep target*ghost. Registry and
+acceptance use the same helper. Normal/QA0/0, Store202/209, Host25185596,
+localization931, compiled isolation, Unity49210:20:48UTC and both reviews
+PASSED/Ship. Not native Session/game placement proof.
+docs/HAMMER_NATIVE_SOCKETS_CHECKPOINT_2026-10-10.md. InstalledQA.117 hashes
+verified, Default clean; no.128 deploy/Valheim/saves/network. Next: axis scaling,
+replacement pose, popup/filter layout/import timing, then fresh isolated QA.
 ## 2026-10-10 — source0.19.127: PlanBuild legacy sign literal
 
 Both sign-only paths now accept leading-quote literals: row parsing and

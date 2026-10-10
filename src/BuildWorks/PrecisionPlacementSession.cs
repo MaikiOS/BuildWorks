@@ -2436,8 +2436,9 @@ namespace OstrixMods.BuildWorks
                 return true;
             }
 
-            ghost.transform.rotation =
-                targetPiece.transform.rotation * ghost.transform.rotation;
+            ghost.transform.rotation = BlueprintPlacementFrame.AutoJoinRotation(
+                targetPiece.transform.rotation, ghost.transform.rotation,
+                blueprintPieceRegistry != null && blueprintPieceRegistry.TryGetBlueprint(selected, out _));
             return true;
         }
 

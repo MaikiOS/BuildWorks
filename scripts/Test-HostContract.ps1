@@ -127,6 +127,7 @@ $pluginSource = Get-Content -LiteralPath $pluginSourcePath -Raw
 $sessionSource = Get-Content -LiteralPath $sessionSourcePath -Raw
 $hudSource = Get-Content -LiteralPath $hudSourcePath -Raw
 $blueprintRegistrySource = Get-Content -LiteralPath $blueprintRegistrySourcePath -Raw
+$blueprintFrameSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src/BuildWorks/BlueprintPlacementFrame.cs') -Raw
 $prefabMetadataSource = Get-Content -LiteralPath (Join-Path $projectRoot 'src/BuildWorks/BlueprintPrefabMetadataCapture.cs') -Raw
 $catalogSource = Get-Content -LiteralPath $catalogSourcePath -Raw
 $blueprintStoreSource = Get-Content -LiteralPath $blueprintStoreSourcePath -Raw
@@ -872,7 +873,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.127.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.128.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -1434,25 +1435,25 @@ Assert-Contract ($blueprintRegistrySource -match
     $blueprintRegistrySource -match 'frameBounds = transformed' -and
     $blueprintRegistrySource -match
         'placementOrigin = new Vector3\(\s*frameBounds\.center\.x,\s*frameBounds\.min\.y,\s*frameBounds\.center\.z\)' -and
-    $blueprintRegistrySource -match 'AnchorAdjustment\.AnchorCount' -and
-    $blueprintRegistrySource -match 'bounds\.Anchor\(index\)' -and
-    $blueprintRegistrySource -match 'BlueprintNativeSnapPoints\(blueprint, pieces\)' -and
+    $blueprintFrameSource -match 'AnchorAdjustment\.AnchorCount' -and
+    $blueprintFrameSource -match 'anchors\.Anchor\(index\)' -and
+    $blueprintRegistrySource -match 'BlueprintPlacementFrame\.HammerSnapPoints\(' -and
     $blueprintRegistrySource -match 'collider\.center = localBounds\.center' -and
     $blueprintRegistrySource -match 'Mathf\.Max\(localBounds\.size\.x, 0\.05f\)' -and
-    $blueprintRegistrySource -match 'AnchorAdjustment\.ExternalCompositeSnapPoints') `
+    $blueprintFrameSource -match 'AnchorAdjustment\.ExternalCompositeSnapPoints') `
     'Blueprint placement no longer uses the selected part/group frame or composite fallback.'
 Assert-Contract ($createBlueprintPrefabOperands -match 'BlueprintPlacementFrame::TryResolve' -and
     $createBlueprintPrefabOperands -match 'BlueprintPlacementFrame::RebaseVisuals' -and
-    $createBlueprintPrefabOperands -match 'BlueprintPlacementFrame::ToLocal' -and
+    $createBlueprintPrefabOperands -match 'BlueprintPlacementFrame::HammerSnapPoints' -and
     $sessionSource -match 'BlueprintPlacementFrame\.ToRootPose\(ghost\.transform\.position, ghost\.transform\.rotation' -and
     $sessionSource -match 'baseRotation = currentRotation = blueprintRootRotation' -and
     $sessionSource -match 'blueprintEditPartIndex = -1;\s*baseSnapshot = CaptureHistorySnapshot\(\);\s*history\.Reset\(baseSnapshot\)') `
     'Hammer visuals/snaps/collider and placement root do not share the independent support frame or coherent initial history.'
-Assert-Contract ($blueprintRegistrySource -match
-    'if \(!CompositeBlueprintStore\.HasExplicitFrame\(blueprint\) \|\| nativeSnapPoints\.Count == 0\)' -and
-    $blueprintRegistrySource -match
-    'foreach \(Vector3 point in nativeSnapPoints\)') `
-    'Explicit Hammer blueprint frames must prefer their native snaps; bounds are fallback only.'
+Assert-Contract ($blueprintFrameSource -match
+    'if \(native\.Count == 0 && \(blueprint\.customSnapPoints == null \|\| blueprint\.customSnapPoints\.Count == 0\)\)' -and
+    $blueprintFrameSource -match 'foreach \(Vector3 point in native\)' -and
+    $blueprintFrameSource -match 'foreach \(CompositeBlueprintStore\.VectorData point in blueprint\.customSnapPoints') `
+    'Hammer blueprint bounds must be fallback only when native and custom sockets are absent.'
 Assert-Contract ($pluginSource -match
     '"BlueprintCompositeFrame",\s*KeyCode\.N') `
     'Whole-blueprint composite-frame modifier must default to N instead of RightShift.'
@@ -2511,12 +2512,12 @@ Assert-Contract ($passiveAutoJoin.Parameters.Count -eq 4 -and
         'if \(!aimedPiece \|\| aimedPiece\.transform == ghost\.transform[\s\S]*?return false;' -and
     $sessionSource -match
         'if \(bestSource && bestTarget\)[\s\S]*?else\s*\{\s*return false;\s*\}' -and
-    $sessionSource -match
-        'targetPiece\.transform\.rotation \* ghost\.transform\.rotation;' -and
+    $sessionSource -match 'blueprintPieceRegistry\.TryGetBlueprint\(selected, out _\)' -and
+    $blueprintFrameSource -match '=> blueprint \? ghost : target \* ghost;' -and
     $passiveAutoJoinOperands -match 'Player::get_AlternativePlacementActive' -and
     $passiveAutoJoinOperands -match 'Piece::GetSnapPoints' -and
     $passiveAutoJoinOperands -match 'Transform::IsChildOf' -and
-    $passiveAutoJoinOperands -match 'Quaternion::op_Multiply' -and
+    $passiveAutoJoinOperands -match 'BlueprintPlacementFrame::AutoJoinRotation' -and
     $passiveAutoJoinOperands -match 'Transform::set_rotation') `
     'Passive auto-join no longer rejects foreign fallback targets in automatic wheel rotation.'
 $meshEdges = $pluginMethods | Where-Object Name -eq 'GetMeshFeatureEdges'
@@ -3314,4 +3315,4 @@ Assert-Contract ($nativeDistanceCalls -match 'System.Math::Sqrt' -and
     @($nativeDistance.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'conv.r4' }).Count -ge 1) `
     'Native Vector3.Distance float/sqrt metric changed.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.127 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.128 and Valheim Steam build 25185596.'

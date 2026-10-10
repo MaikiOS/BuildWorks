@@ -509,78 +509,15 @@ namespace OstrixMods.BuildWorks
                     Mathf.Max(localBounds.size.z, 0.05f));
 
                 int snapIndex = 0;
-                IReadOnlyList<Vector3> nativeSnapPoints = BlueprintNativeSnapPoints(blueprint, pieces);
-                // With an explicit world anchor, normal Hammer placement must expose
-                // that part's native points only. Bounds remain a fallback for pieces
-                // such as furniture that do not provide native snap points.
-                if (!CompositeBlueprintStore.HasExplicitFrame(blueprint) || nativeSnapPoints.Count == 0)
-                {
-                    AnchorBounds bounds = AnchorAdjustment.CreateBounds(new[]
-                    {
-                        new Point3(frameBounds.min.x, frameBounds.min.y, frameBounds.min.z),
-                        new Point3(frameBounds.max.x, frameBounds.max.y, frameBounds.max.z)
-                    });
-                    for (int index = 0; index < AnchorAdjustment.AnchorCount; ++index)
-                    {
-                        Point3 point = bounds.Anchor(index);
-                        AddSnapPoint(prefab.transform, snapIndex++, BlueprintPlacementFrame.ToLocal(
-                            new Vector3((float)point.X, (float)point.Y, (float)point.Z),
-                            placementOrigin, placementRotation));
-                    }
-                }
-                foreach (Vector3 point in nativeSnapPoints)
-                    AddSnapPoint(prefab.transform, snapIndex++, BlueprintPlacementFrame.ToLocal(
-                        point, placementOrigin, placementRotation));
-                foreach (CompositeBlueprintStore.VectorData point in blueprint.customSnapPoints ??
-                    Enumerable.Empty<CompositeBlueprintStore.VectorData>())
-                    AddSnapPoint(prefab.transform, snapIndex++, BlueprintPlacementFrame.ToLocal(
-                        point.ToVector3(), placementOrigin, placementRotation));
+                foreach (Vector3 point in BlueprintPlacementFrame.HammerSnapPoints(
+                    blueprint, pieces, frameBounds, placementOrigin, placementRotation))
+                    AddSnapPoint(prefab.transform, snapIndex++, point);
             }
             else if (supportFrame)
                 BlueprintPlacementFrame.RebaseVisuals(prefab.transform, default,
                     placementOrigin, placementRotation);
 
             return prefab;
-        }
-
-        private static IReadOnlyList<Vector3> BlueprintNativeSnapPoints(
-            CompositeBlueprintStore.Blueprint blueprint,
-            IReadOnlyList<Piece> pieces)
-        {
-            var sets = new List<IReadOnlyList<Point3>>();
-            bool explicitFrame = CompositeBlueprintStore.HasExplicitFrame(blueprint);
-            for (int index = 0; index < pieces.Count; ++index)
-            {
-                if (explicitFrame && !CompositeBlueprintStore.IsFramePart(blueprint, index))
-                    continue;
-                Piece piece = pieces[index];
-                CompositeBlueprintStore.Part part = blueprint.parts[index];
-                var native = new List<Transform>();
-                piece.GetSnapPoints(native);
-                var local = new List<Point3>(native.Count);
-                foreach (Transform snap in native)
-                {
-                    if (!snap) continue;
-                    Vector3 pieceLocal = piece.transform.InverseTransformPoint(snap.position);
-                    Vector3 point = part.position.ToVector3() + part.rotation.ToQuaternion() *
-                        Vector3.Scale(pieceLocal, part.RootScale(piece.transform.localScale));
-                    if (float.IsNaN(point.x) || float.IsInfinity(point.x) ||
-                        float.IsNaN(point.y) || float.IsInfinity(point.y) ||
-                        float.IsNaN(point.z) || float.IsInfinity(point.z)) continue;
-                    local.Add(new Point3(point.x, point.y, point.z));
-                }
-                sets.Add(local);
-            }
-            IReadOnlyList<Point3> selected = explicitFrame && sets.Count == 1
-                ? sets[0]
-                : AnchorAdjustment.ExternalCompositeSnapPoints(sets, tolerance: 0.0001);
-            var result = new List<Vector3>(selected.Count);
-            foreach (Point3 point in selected)
-            {
-                if (result.Count == 512) break;
-                result.Add(new Vector3((float)point.X, (float)point.Y, (float)point.Z));
-            }
-            return result;
         }
 
         private bool TryGetBlueprintFrameBounds(CompositeBlueprintStore.Blueprint blueprint,

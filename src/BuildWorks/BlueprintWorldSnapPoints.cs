@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using HarmonyLib;
 using OstrixMods.BuildWorks.Geometry;
 using UnityEngine;
 
@@ -13,6 +14,59 @@ namespace OstrixMods.BuildWorks
         private static readonly HashSet<BlueprintWorldSnapPoints> Created = new HashSet<BlueprintWorldSnapPoints>();
         private readonly List<Transform> nodes = new List<Transform>();
         private byte[] cached;
+        [ThreadStatic] private static Collection current, spare;
+
+        private sealed class Collection
+        {
+            internal List<Transform> Result;
+            internal readonly HashSet<Transform> Seen = new HashSet<Transform>();
+            internal bool Seeded;
+        }
+
+        [HarmonyPatch(typeof(Piece), nameof(Piece.GetSnapPoints), new Type[] {
+            typeof(Vector3), typeof(float), typeof(List<Transform>), typeof(List<Piece>) })]
+        internal static class CollectionPatch
+        {
+            private static readonly System.Reflection.MethodInfo[] Methods = {
+                AccessTools.Method(typeof(Piece), nameof(Piece.GetSnapPoints), new[] { typeof(List<Transform>) }),
+                AccessTools.Method(typeof(Piece), nameof(Piece.GetSnapPoints), new[] {
+                    typeof(Vector3), typeof(float), typeof(List<Transform>), typeof(List<Piece>) }) };
+
+            private static void Prefix(List<Transform> __2, out Collection __state)
+            {
+                __state = current;
+                current = null;
+                foreach (var method in Methods)
+                {
+                    var patches = Harmony.GetPatchInfo(method);
+                    if (patches != null)
+                        foreach (string owner in patches.Owners)
+                            if (owner != BuildWorksPlugin.PluginGuid) return;
+                }
+                if (__2 == null) return;
+                current = spare ?? new Collection();
+                spare = null;
+                current.Result = __2;
+            }
+
+            private static void Finalizer(Collection __state)
+            {
+                if (current != null)
+                {
+                    current.Result = null;
+                    current.Seen.Clear();
+                    current.Seeded = false;
+                    spare = current;
+                }
+                current = __state;
+                if (current != null)
+                {
+                    // A nested collection may have appended to the parent's list.
+                    current.Seen.Clear();
+                    current.Seeded = false;
+                }
+            }
+        }
 
         internal static bool TryRead(Piece piece, out Point3[] points)
         {
@@ -68,8 +122,16 @@ namespace OstrixMods.BuildWorks
                     component.nodes.Add(node.transform);
                 }
             }
+            Collection collection = current;
+            bool scoped = collection != null && ReferenceEquals(collection.Result, result);
+            if (scoped && !collection.Seeded)
+            {
+                collection.Seen.UnionWith(result);
+                collection.Seeded = true;
+            }
+            // Native/midpoint getters only add tagged nodes; our untagged nodes cannot enter the list through them.
             foreach (Transform node in component.nodes)
-                if (node && !result.Contains(node)) result.Add(node);
+                if (node && (scoped ? collection.Seen.Add(node) : !result.Contains(node))) result.Add(node);
         }
 
         internal static void RemoveAll()

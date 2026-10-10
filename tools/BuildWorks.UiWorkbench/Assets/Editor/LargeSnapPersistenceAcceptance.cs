@@ -108,7 +108,8 @@ internal static class LargeSnapPersistenceAcceptance
                 foreach (Piece piece in placedPieces) BlueprintWorldSnapPoints.Append(piece, all);
                 double aggregateMs = watch.Elapsed.TotalMilliseconds;
                 Require(all.Count == created, "Shared world-query list lost nodes");
-                receipts.Add(names[sample] + $": parts={blueprint.parts.Count}, points={created}, maxPerPiece={maxima[sample]}, capturedUnique={captured.Points.Count}; hammerChildren={hammerCreationMs:F4}ms, hammerEnumeration={hammerEnumerationMs:F4}ms, assignment={assignmentMs:F4}ms, coldAppend={coldMs:F4}ms, warmAppend={warmMs:F4}ms, replicaAppend={replicaMs:F4}ms, sharedListAppend={aggregateMs:F4}ms");
+                string collection = WorldSnapCollectionAcceptance.Measure(placedPieces);
+                receipts.Add(names[sample] + $": parts={blueprint.parts.Count}, points={created}, maxPerPiece={maxima[sample]}, capturedUnique={captured.Points.Count}; hammerChildren={hammerCreationMs:F4}ms, hammerEnumeration={hammerEnumerationMs:F4}ms, assignment={assignmentMs:F4}ms, coldAppend={coldMs:F4}ms, warmAppend={warmMs:F4}ms, replicaAppend={replicaMs:F4}ms, sharedListAppend={aggregateMs:F4}ms; {collection}");
             }
             finally { Object.DestroyImmediate(root); Object.DestroyImmediate(prefabObject); BlueprintWorldSnapPoints.RemoveAll(); }
         }

@@ -1,3 +1,13 @@
+## 2026-10-10 — source0.19.125: shared world snap collection
+
+Scoped reusable custom-point membership preserves exact native/midpoint/custom
+order; unrelated lists/foreign patches fall back; nested/fault cleanup proven.
+Normal/QA0/0, Geometry/Store201/209, Host25185596, localization930, compiled
+isolation, Unity492 and both independent reviews PASS. One full-postfix sample
+17125 points:1224.37→20.48ms; not Valheim/FPS. Protocol:
+docs/WORLD_SNAP_COLLECTION_CHECKPOINT_2026-10-10.md. InstalledQA.117 unchanged.
+No deploy/Valheim/save mutation. Formats22/11 remain. Next: actual large QA
+capture/whole build path; native-point-heavy models and8 parser refusals open.
 ## 2026-10-10 — source0.19.124: large custom snap sets
 
 Separate aggregate20000/native22/portable11, atomic overflow and legacy512 gates

@@ -22,17 +22,6 @@ public class Hud : MonoBehaviour
     public GameObject[] m_requirementItems;
 }
 
-namespace OstrixMods.BuildWorks
-{
-    internal static class BuildWorksPlugin
-    {
-        internal const string PluginGuid = "ostrmod.buildworks";
-        internal sealed class DockSetting { public int Value; }
-        internal static readonly DockSetting EditorHudDock = new DockSetting();
-        internal static readonly DockSetting InterfaceScalePercent = new DockSetting { Value = 80 };
-    }
-}
-
 internal static class F9HudAcceptance
 {
     internal static string Run(TMP_FontAsset font)

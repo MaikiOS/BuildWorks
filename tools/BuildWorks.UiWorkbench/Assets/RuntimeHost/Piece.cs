@@ -7,6 +7,18 @@ public sealed class Piece : MonoBehaviour
 {
     public string m_name;
     public class Requirement { public ItemDrop m_resItem; public int m_amount; }
+    public static readonly List<Piece> NearbyPieces = new List<Piece>();
+    public static System.Action<Piece> BeforeCollection;
+    public static void GetSnapPoints(Vector3 point, float radius, List<Transform> points, List<Piece> pieces)
+    {
+        foreach (Piece piece in NearbyPieces.ToArray())
+        {
+            BeforeCollection?.Invoke(piece);
+            if (!piece) continue;
+            piece.GetSnapPoints(points);
+            pieces.Add(piece);
+        }
+    }
     public void GetSnapPoints(List<Transform> points)
     {
         foreach (Transform child in transform)

@@ -10,6 +10,11 @@ namespace BepInEx
 }
 namespace OstrixMods.BuildWorks
 {
+    internal static class HammerBlueprintPieceRegistry
+    {
+        internal const string PrefabPrefix = BlueprintHammerSnapSearch.PrefabPrefix;
+    }
+
     // Stable production IDs required by the isolated editor catalog model.
     internal static class HammerCatalogOrganizer
     {

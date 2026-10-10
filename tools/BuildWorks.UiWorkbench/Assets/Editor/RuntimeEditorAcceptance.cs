@@ -630,6 +630,7 @@ public static class RuntimeEditorAcceptance
                 LargeGizmoAcceptance.Run(template, output);
                 TestExperimentalGeometry(template, fontTemplate);
                 WorldSnapPointAcceptance.Run(output);
+                WorldSnapCollectionAcceptance.Run(output);
                 LargeSnapPersistenceAcceptance.Run(output);
                 HammerSnapSearchAcceptance.Run(output);
                 GizmoQueryAcceptance.Run(template, output);

@@ -872,7 +872,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.124.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.125.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -2637,9 +2637,20 @@ $midpointPatchOperands = @(
 Assert-Contract ($midpointPatchOperands -match 'VanillaMidpointSnapPoints::Append') `
     'Piece.GetSnapPoints patch no longer appends vanilla midpoint snaps.'
 Assert-Contract ($midpointPatchOperands -match 'BlueprintWorldSnapPoints::Append' -and
-    $pluginOnDestroyOperands -match 'BlueprintWorldSnapPoints::RemoveAll') `
+    $pluginOnDestroyOperands -match 'BlueprintWorldSnapPoints::RemoveAll' -and
+    $midpointPatchOperands.IndexOf('VanillaMidpointSnapPoints::Append') -lt
+        $midpointPatchOperands.IndexOf('BlueprintWorldSnapPoints::Append')) `
     'World custom snap-point reconstruction or unload cleanup is missing.'
 $worldSnapType = $pluginTypes | Where-Object Name -eq 'BlueprintWorldSnapPoints'
+$worldCollectionPatch = $pluginTypes | Where-Object {
+    $_.Name -eq 'CollectionPatch' -and $_.DeclaringType.Name -eq 'BlueprintWorldSnapPoints'
+}
+Assert-Contract ($worldCollectionPatch -and
+    @($worldCollectionPatch.Methods | Where-Object Name -eq 'Prefix').Count -eq 1 -and
+    @($worldCollectionPatch.Methods | Where-Object Name -eq 'Finalizer').Count -eq 1 -and
+    @($worldSnapType.Fields | Where-Object { $_.Name -eq 'current' -and
+        @($_.CustomAttributes | Where-Object { $_.AttributeType.FullName -eq 'System.ThreadStaticAttribute' }).Count -eq 1 }).Count -eq 1) `
+    'World snap collection must remain scoped and exception-safe per thread.'
 $snapLocalSets = $pluginMethods | Where-Object {
     $_.Name -eq 'SnapLocalSets' -and $_.DeclaringType.Name -eq 'BlueprintPlacementFrame'
 }
@@ -3303,4 +3314,4 @@ Assert-Contract ($nativeDistanceCalls -match 'System.Math::Sqrt' -and
     @($nativeDistance.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'conv.r4' }).Count -ge 1) `
     'Native Vector3.Distance float/sqrt metric changed.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.124 and Valheim Steam build 25185596.'
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.125 and Valheim Steam build 25185596.'

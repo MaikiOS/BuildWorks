@@ -1,3 +1,18 @@
+## 2026-10-10 — native QA input contract verified without launching Valheim
+
+Verifier checkpoint4f5f2ff reads actual PlayerController/ZInput assemblies and
+checks native movement/camera calls, mouse action bindings/current devices and
+press/release callbacks. An in-memory disconnected camera binding is rejected;
+restored positive and compiled QA controls pass. AST and both reviews pass.
+This is static call/binding evidence, not runtime input proof. Installed QA .142
+DLLs remain unchanged. Receipt: artifacts/checkpoint-0.19.142/native-input-verification.json.
+For I05, read-only audit found registry's populated-Container early rejection
+and catalog bypass via F9/native click. Next implementation must separate review
+candidate eligibility from strict build eligibility and gate all placement entries
+with explicit independent storage/mount choices on a transient recipe. No silent
+clearing, source changes or new saved library copy for policy. UI, supply costs,
+source staleness and cancel/input recovery remain unimplemented; see WORK_STATUS_RU.
+
 ## 2026-10-10 — installed QA0.19.142: empty native containers
 
 The reproduced empty/explicitly cleared Container construction rejection is fixed.

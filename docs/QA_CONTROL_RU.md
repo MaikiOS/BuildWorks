@@ -15,10 +15,20 @@
   настоящие Button/Slider/ScrollRect отпускаются без click/drop, повторная отмена
   безопасна, следующий обычный клик работает.
 - Независимое чтение исходников и IL установленного InputSystem.
+- `Test-QAControlContract.ps1` теперь читает настоящие `assembly_valheim.dll` и
+  `assembly_utils.dll`: движение/камера PlayerController обращаются к ZInput,
+  mouse delta/position/scroll связаны с InputSystem, key state читает текущие
+  Keyboard/Mouse, callbacks проходят Press/Release. Отрицательная проверка
+  разрывает camera binding только в памяти, получает ожидаемый отказ,
+  восстанавливает binding и повторяет положительную проверку. Игровые DLL не записываются.
 
 Это не подтверждает native actions, движение, focus/stop и кадр из Valheim.
 Первый игровой запуск канала ещё предстоит. Текущая установка и SHA находятся в
-`artifacts/checkpoint-0.19.141/installation.json`, когда установка выполнена.
+`artifacts/checkpoint-0.19.142/installation.json`. Проверка native-контракта:
+`artifacts/checkpoint-0.19.142/native-input-contract.log`.
+Она проверяет наличие известных вызовов и bindings, но не полный поток данных.
+Включённые настройки KBM, привязки активного UI asset, порядок FixedUpdate,
+клики и отпускание ввода требуют наблюдения в настоящем Valheim.
 
 ## Первый запуск
 

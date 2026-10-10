@@ -10,6 +10,16 @@ or network services are opened.
 
 ## Evidence
 
+`Test-QAControlContract.ps1` now also reads the real installed host assemblies:
+PlayerController movement/camera call ZInput; mouse delta/position/scroll bind to
+InputSystem; low-level keys use current Keyboard/Mouse; action callbacks reach
+Press/Release. An in-memory missing-camera-binding negative control must fail,
+then the restored positive control passes. Game assemblies are never written.
+This checks known calls/bindings, not complete data flow. Runtime KBM settings,
+active UI action bindings, FixedUpdate scheduling, clicks and release still need
+Valheim smoke. Log: artifacts/checkpoint-0.19.142/native-input-contract.log.
+Current installed DLL receipt: artifacts/checkpoint-0.19.142/installation.json.
+
 Normal/QA builds pass without warnings; HostContract25185596, localization961,
 compiled isolation and the control contract pass. The real protocol reader passes
 28 assertions including identity/replay/expiry and execution-time deadlines.

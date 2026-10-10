@@ -344,6 +344,7 @@ namespace OstrixMods.BuildWorks
             try
             {
                 var scales = new Dictionary<string, CompositeBlueprintStore.VectorData?>(StringComparer.Ordinal);
+                Dictionary<int, Type> ordinaryStateFields = null;
                 var evidenceIndex = hash == null ? null : Geometry.BlueprintSourceDocument.Index(copy.sourceDocuments?.Select(evidence => evidence.ToGeometry()));
                 foreach (CompositeBlueprintStore.Part part in copy.parts)
                 {
@@ -365,7 +366,7 @@ namespace OstrixMods.BuildWorks
                         part.scaleIsAbsolute = false;
                     }
                     if (hash != null && part.sourceDocumentId != null && evidenceIndex.TryGetValue(part.sourceDocumentId, out var evidence))
-                        ConvertKnownState(part, evidence, hash, worldLevel, supportsMaterialSeed);
+                        ConvertKnownState(part, evidence, hash, worldLevel, supportsMaterialSeed, ref ordinaryStateFields);
                 }
                 copy.importAbsoluteScale = false;
                 // Derived cache identity must not reuse pre-normalization thumbnails or another prefab revision.
@@ -413,7 +414,8 @@ namespace OstrixMods.BuildWorks
         }
 
         internal static void ConvertKnownState(CompositeBlueprintStore.Part part, Geometry.BlueprintSourceDocument evidence,
-            Func<string, int> hash, int? worldLevel, Func<string, bool> supportsMaterialSeed = null)
+            Func<string, int> hash, int? worldLevel, Func<string, bool> supportsMaterialSeed,
+            ref Dictionary<int, Type> ordinaryStateFields)
         {
             var original = part.foreignData;
             if (original == null || original.format != "blueprint" && original.format != "vbuild" || original.chance != null ||
@@ -468,7 +470,8 @@ namespace OstrixMods.BuildWorks
             // Construction creates NEW ordinary native pieces: no inherited ownership, stale support,
             // damage, invulnerability, AI overrides or network lifetime flags. All originals remain in
             // the exact source document. This is NOT an administrator-state restoration adapter.
-            var ordinary = new Dictionary<int, Type>
+            // Hash callbacks belong to this conversion pass; never share the table across hosts.
+            var ordinary = ordinaryStateFields ?? (ordinaryStateFields = new Dictionary<int, Type>
             {
                 [hash("health")] = typeof(float),
                 [hash("support")] = typeof(float),
@@ -480,7 +483,7 @@ namespace OstrixMods.BuildWorks
                 [hash("WearNTear.m_health")] = typeof(float),
                 [hash("HasFieldsStaticTarget")] = typeof(int),
                 [hash("StaticTarget.m_randomTarget")] = typeof(int)
-            };
+            });
             foreach (var key in state.Keys)
             {
                 if (consumed.Contains(key)) continue;
@@ -575,6 +578,10 @@ namespace OstrixMods.BuildWorks
                 if (value.Length == 0) return 0;
                 value = value.Replace(',', '.');
             }
+            // Repeated exact constants dominate piece transforms; all other syntax keeps the host parser.
+            if (value == "0") return 0f;
+            if (value == "1") return 1f;
+            if (value == "-1") return -1f;
             float result = float.Parse(value, NumberStyles.Float, CultureInfo.InvariantCulture);
             if (float.IsNaN(result) || float.IsInfinity(result)) throw new InvalidDataException("$buildworks_import.transform");
             return result;

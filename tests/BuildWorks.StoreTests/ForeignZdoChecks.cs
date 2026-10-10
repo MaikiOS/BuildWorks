@@ -26,6 +26,7 @@ namespace OstrixMods.BuildWorks.StoreTests
         }
         internal static void Run()
         {
+            PreparationScope();
             MaterialSeeds();
             Require(Hash("item") == -1126421579 && Hash("health") == -883022132, "Host hash drift");
             string raw = Package(w => {
@@ -165,6 +166,50 @@ namespace OstrixMods.BuildWorks.StoreTests
                 .parts[0].materialSeed == 1234, "Clearing storage lost independent material state");
             Console.WriteLine("PASS source-bound blueprint/vbuild material seeds: zero/Max, capability, strict types, sibling atomicity, provenance, portable and independent contents settings");
             Console.WriteLine("PASS host material review: conservative raw, supported/unsupported current host, source unchanged, pure worker snapshot and lost-context refusal");
+        }
+        private static void PreparationScope()
+        {
+            string Text(Func<string, int> hash, bool unknown = false)
+            {
+                string raw = Package(w => { w.Write(1); w.Write((byte)(unknown ? 2 : 1));
+                    w.Write(hash("health")); w.Write(12f);
+                    if (unknown) { w.Write(hash("unknown_state")); w.Write(7f); } });
+                return "#Name:Preparation\n#Pieces\n" + string.Concat(Enumerable.Range(0, 64).Select(index =>
+                    "woodwall;Workbench;" + index + ";0;0;0;0;0;1;\"\";1;1;1;" + raw + ";1\n"));
+            }
+            var scale = new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 };
+            foreach (int salt in new[] { 0, 12345 })
+            {
+                Func<string, int> hash = name => unchecked(Hash(name) + salt);
+                string text = Text(hash);
+                var source = ExternalBlueprintLibrary.Parse(text, "scope.blueprint");
+                int reads = 0;
+                Func<string, int> measured = name => { if (name == "HasFieldsWearNTear") ++reads; return hash(name); };
+                var prepared = ExternalBlueprintLibrary.PrepareForHost(source, _ => scale, measured, 0);
+                Require(prepared.importError == null && prepared.parts.Count == 64 && prepared.parts.All(part => part.foreignData == null),
+                    "Scoped preparation lost supported state or reused another hash table");
+                Require(reads == 1, "Ordinary ZDO field table rebuilt per part: " + reads);
+                Require(source.parts.All(part => part.foreignData?.zdo != null) && source.sourceDocuments[0].text == text,
+                    "Scoped preparation modified source evidence");
+                string path = Path.Combine(Path.GetTempPath(), "BuildWorks.Scope." + Guid.NewGuid().ToString("N") + ".blueprint");
+                try
+                {
+                    File.WriteAllText(path, text); reads = 0;
+                    var review = CompositeBlueprintStore.ReviewImportFile(path, measured, 0);
+                    Require(reads == 1 && review.Documents.Single().parts.All(part => part.foreignData == null) &&
+                        File.ReadAllText(path) == text, "Review rebuilt field table or changed input");
+                }
+                finally { if (File.Exists(path)) File.Delete(path); }
+                var unknown = ExternalBlueprintLibrary.PrepareForHost(
+                    ExternalBlueprintLibrary.Parse(Text(hash, true), "unknown.blueprint"), _ => scale, hash, 0);
+                Require(unknown.parts.Count == 64 && unknown.parts.All(part => part.foreignData?.zdo != null),
+                    "Scoped table consumed unknown sibling state");
+            }
+            var plain = ExternalBlueprintLibrary.Parse("#Name:Plain\n#Pieces\nwoodwall;Workbench;0;0;0;0;0;0;1;\"\";1;1;1\n", "plain.blueprint");
+            Require(ExternalBlueprintLibrary.PrepareForHost(plain, _ => scale,
+                _ => throw new InvalidOperationException("Hash called without eligible state"), 0).importError == null,
+                "Ordinary state table was not lazy");
+            Console.WriteLine("PASS ordinary ZDO table: one per preparation/review, independent hashes, unknown state and immutable source");
         }
         private static string Package(Action<BinaryWriter> write)
         {

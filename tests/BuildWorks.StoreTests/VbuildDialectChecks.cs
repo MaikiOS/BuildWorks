@@ -12,6 +12,7 @@ namespace OstrixMods.BuildWorks.StoreTests
         internal static void Run(string directory)
         {
             Directory.CreateDirectory(directory);
+            NumericParity();
             const string row = "woodwall  .7071068  .7071068 3,25 -4,5 ";
             const string text = "\uFEFF#Name:QA Legacy Vbuild\r\n" + row + "\r\nwoodwall  1   -2 0 1\r\n";
             var culture = CultureInfo.CurrentCulture;
@@ -78,6 +79,37 @@ namespace OstrixMods.BuildWorks.StoreTests
             Console.WriteLine("PASS legacy vbuild slots/comma decimals: invariant cultures, source-bound state, native/portable reopen and strict dialect boundaries");
         }
 
+        private static void NumericParity()
+        {
+            foreach (string token in new[] { "0", "1", "-1", "-0", " 1 ", "+1", "1e0", "1.0", ".5", "1e-10", "-1.5e2" })
+                Check(token, false);
+            foreach (string token in new[] { "", "0", "1", "-1", "-0", "+1", "1e0", "1,0", "-1,5" })
+                Check(token, true);
+            foreach (string token in new[] { "NaN", "Infinity", "-Infinity", "1e1000", "--1", "0x1", "1x" })
+            foreach (bool legacy in new[] { false, true })
+            {
+                var rejected = ExternalBlueprintLibrary.Parse(Row(token, legacy), legacy ? "numeric.vbuild" : "numeric.blueprint");
+                Require(rejected.importError != null && rejected.parts.Count == 0, "Invalid numeric token accepted: " + token);
+            }
+            var comma = ExternalBlueprintLibrary.Parse(Row("1,0", false), "numeric.blueprint");
+            Require(comma.importError != null && comma.parts.Count == 0, "Blueprint dialect accepted legacy decimal comma");
+            Console.WriteLine("PASS imported numeric parity: exact float bits, signed zero/whitespace/exponents, legacy comma/empty, invalid/overflow refusal and exact source");
+
+            void Check(string token, bool legacy)
+            {
+                string text = Row(token, legacy);
+                var parsed = ExternalBlueprintLibrary.Parse(text, legacy ? "numeric.vbuild" : "numeric.blueprint");
+                float expected = legacy && token == "" ? 0 : float.Parse(legacy ? token.Replace(',', '.') : token,
+                    NumberStyles.Float, CultureInfo.InvariantCulture);
+                Require(parsed.importError == null && parsed.parts.Count == 1 &&
+                    BitConverter.GetBytes(parsed.parts[0].position.x).SequenceEqual(BitConverter.GetBytes(expected)) &&
+                    parsed.parts[0].rotation.w == 1 && parsed.sourceDocuments.Single().text == text,
+                    "Imported numeric semantics changed: " + token + " legacy=" + legacy + " error=" + parsed.importError);
+            }
+            string Row(string token, bool legacy) => legacy
+                ? "#Name:Numeric\nwoodwall 0 0 0 1 " + token + " 0 0\n"
+                : "#Name:Numeric\n#Pieces\nwoodwall;Workbench;" + token + ";0;0;0;0;0;1;\"\";1;1;1\n";
+        }
         private static void Require(bool value, string message)
         {
             if (!value) throw new InvalidOperationException(message);

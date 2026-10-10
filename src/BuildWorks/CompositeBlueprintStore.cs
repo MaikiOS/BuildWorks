@@ -348,9 +348,10 @@ namespace OstrixMods.BuildWorks
                     if (prefabHash != null && document.importError == null)
                     {
                         var evidenceIndex = Geometry.BlueprintSourceDocument.Index(document.sourceDocuments?.Select(evidence => evidence.ToGeometry()));
+                        Dictionary<int, Type> ordinaryStateFields = null;
                         foreach (Part part in document.parts)
                             if (part.sourceDocumentId != null && evidenceIndex.TryGetValue(part.sourceDocumentId, out var evidence))
-                                ExternalBlueprintLibrary.ConvertKnownState(part, evidence, prefabHash, worldLevel);
+                                ExternalBlueprintLibrary.ConvertKnownState(part, evidence, prefabHash, worldLevel, null, ref ordinaryStateFields);
                     }
                     var contents = InspectContents(document, prefabHash); // Reject every blocked member, not just empty archives.
                     summary.Add(contents);

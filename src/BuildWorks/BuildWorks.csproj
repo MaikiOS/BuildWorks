@@ -5,9 +5,9 @@
     <Nullable>disable</Nullable>
     <AssemblyName>BuildWorks</AssemblyName>
     <RootNamespace>OstrixMods.BuildWorks</RootNamespace>
-<Version>0.19.137</Version>
-<AssemblyVersion>0.19.137.0</AssemblyVersion>
-<FileVersion>0.19.137.0</FileVersion>
+<Version>0.19.138</Version>
+<AssemblyVersion>0.19.138.0</AssemblyVersion>
+<FileVersion>0.19.138.0</FileVersion>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <OutputPath>$(MSBuildThisFileDirectory)..\..\artifacts\bin\</OutputPath>
     <DefineConstants Condition="'$(BuildWorksTestStand)' == 'true'">$(DefineConstants);BUILDWORKS_TEST_STAND</DefineConstants>

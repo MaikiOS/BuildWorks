@@ -1523,7 +1523,7 @@ namespace OstrixMods.BuildWorks
         }
 
         internal static List<SourceDocument> CloneSources(IReadOnlyList<SourceDocument> sources) => sources?.Select(source =>
-            source == null ? null : new SourceDocument { id = source.id, format = source.format, name = source.name, text = source.text }).ToList();
+            source?.Copy()).ToList();
 
         internal static bool ValidSources(IReadOnlyList<Part> parts, IReadOnlyList<SourceDocument> sources)
         {
@@ -1924,6 +1924,9 @@ namespace OstrixMods.BuildWorks
 
             internal static SourceDocument FromGeometry(Geometry.BlueprintSourceDocument source) => new SourceDocument
             { id = source.Id, format = source.Format, name = source.Name, text = source.Text };
+
+            // Share only immutable evidence; ToGeometry checks every mutable identity field before reuse.
+            internal SourceDocument Copy() => (SourceDocument)MemberwiseClone();
         }
 
         [DataContract]

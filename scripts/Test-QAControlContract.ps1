@@ -13,7 +13,52 @@ function Calls($type, [string] $name) {
     Require ($methods.Count -eq 1 -and $methods[0].HasBody) "Missing QA method: $name"
     ($methods[0].Body.Instructions | ForEach-Object { [string] $_.Operand }) -join "`n"
 }
+function Require-NativeInput($game, $utils) {
+    $controller = $game.MainModule.GetType('PlayerController')
+    $input = $utils.MainModule.GetType('ZInput')
+    Require ($null -ne $controller -and $null -ne $input) 'Native PlayerController/ZInput moved; review the QA input adapter.'
+    Require ((Calls $controller 'FixedUpdate') -match 'ZInput::GetButton\(' -and
+        (Calls $controller 'LateUpdate') -match 'ZInput::GetMouseDelta\(') 'Native movement/camera no longer reads the verified ZInput path.'
+    $analog = Calls $input 'SetUpAnalogHandlers'
+    foreach ($binding in '<Mouse>/delta','<Mouse>/position','<Mouse>/scroll/y') {
+        Require ($analog.Contains($binding)) "Native mouse binding changed: $binding"
+    }
+    Require ($analog -match 'InputAction::Enable\(' -and
+        (Calls $input 'Internal_GetMouseDelta') -match 'InputAction::ReadValue<UnityEngine.Vector2>') 'Native camera does not read enabled InputSystem actions.'
+    $keys = Calls $input 'TryGetKeyStateLowLevel'
+    Require ($keys -match 'Keyboard::get_current' -and $keys -match 'Mouse::get_current') 'Native keys do not read the current InputSystem devices.'
+    $subscribe = Calls $input 'SubscribeButton'
+    Require ($subscribe -match 'InputAction::Enable' -and $subscribe -match 'InputAction::add_performed' -and
+        $subscribe -match 'InputAction::add_canceled') 'Native button action press/release subscriptions changed.'
+    Require ((Calls $input 'OnActionPerformed') -match 'ButtonDef::Press' -and
+        (Calls $input 'OnActionCanceled') -match 'ButtonDef::Release') 'Native actions do not reach button press/release state.'
+}
 try {
+    # Inspect the real host assemblies, not Workbench stubs or our own input aliases.
+    [xml] $project = Get-Content -LiteralPath (Join-Path $root 'src/BuildWorks/BuildWorks.csproj') -Raw
+    $managedNode = $project.SelectSingleNode('/Project/PropertyGroup/ValheimManagedDir')
+    $managed = if ($managedNode) { $managedNode.InnerText } else { '' }
+    Require (-not [string]::IsNullOrWhiteSpace($managed)) 'ValheimManagedDir is absent from the current project.'
+    $game = $utils = $null
+    try {
+        $game = [Mono.Cecil.AssemblyDefinition]::ReadAssembly((Join-Path $managed 'assembly_valheim.dll'))
+        $utils = [Mono.Cecil.AssemblyDefinition]::ReadAssembly((Join-Path $managed 'assembly_utils.dll'))
+        Require-NativeInput $game $utils
+        $binding = @($utils.MainModule.GetType('ZInput').Methods | Where-Object Name -eq 'SetUpAnalogHandlers')[0].Body.Instructions |
+            Where-Object { $_.OpCode.Code -eq [Mono.Cecil.Cil.Code]::Ldstr -and $_.Operand -ceq '<Mouse>/delta' } |
+            Select-Object -First 1
+        Require ($null -ne $binding) 'Native input contract self-check could not locate the camera binding.'
+        $original = $binding.Operand
+        try {
+            $binding.Operand = '<Mouse>/qa_missing_delta' # In-memory negative control; never write the game assembly.
+            $rejected = $false
+            try { Require-NativeInput $game $utils }
+            catch { if ($_.Exception.Message -cne 'Native mouse binding changed: <Mouse>/delta') { throw }; $rejected = $true }
+            Require $rejected 'Native input contract accepted a disconnected camera binding.'
+        } finally { $binding.Operand = $original }
+        Require-NativeInput $game $utils
+        'PASS native host input contract: PlayerController movement/camera -> ZInput -> enabled InputSystem mouse/actions/current devices; broken-binding negative control rejected. Static evidence only.'
+    } finally { if ($game) { $game.Dispose() }; if ($utils) { $utils.Dispose() } }
     foreach ($name in 'BuildWorksQaControl','BuildWorksQaControlProtocol','BuildWorksQaInput','BuildWorksQaUiInput','BuildWorksQaUiCancellation') {
         Require ($null -eq $normal.MainModule.GetType("OstrixMods.BuildWorks.$name")) "QA type leaked into normal build: $name"
         Require ($null -ne $qa.MainModule.GetType("OstrixMods.BuildWorks.$name")) "QA type absent: $name"

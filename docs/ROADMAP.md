@@ -1,3 +1,12 @@
+## 2026-10-10 — source0.19.131: popup and compact filters
+
+Tools stay inside the viewport above hints; filters use28/12/2 and content-sized
+height. Old clipping reproduced. Normal/QA0/0, Host/localization933, isolation,
+preflight, Unity492(11:47:35UTC), correctness PASSED and Ponytail Ship.
+Local checkpoint279d265; docs/EDITOR_POPUP_FILTER_CHECKPOINT_2026-10-10.md.
+Not deployed: installed QA .117 hashes verified, Default clean. No game/save/network
+execution. Preserve accepted .117 cases. Next: measure import, then fresh verified
+QA deployment and import through construction/reload.
 ## 2026-10-10 — source 0.19.130: missing replacement pose
 
 Selected parts and direct catalogue choices align their origin/full rotation

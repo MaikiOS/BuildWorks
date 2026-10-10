@@ -26,3 +26,10 @@
 Geometry/normal/QA/Store/Host/localization/isolation/Unity492 и оба обзора прошли;
 checkpoint d28efc3, протокол REPLACEMENT_POSE_CHECKPOINT_2026-10-10_RU.md.
 Не установлен, не объявлен принятым в Valheim. Меню/фильтры/импорт ещё открыты.
+
+Ответ в исходниках .131: перекрытие Space/F3 воспроизведено в Unity и исправлено;
+меню ограничено viewport, остаётся над подсказками после Tick. Фильтры уплотнены
+до28/12/2, высота панели следует содержимому и доступному месту. Normal/QA0/0,
+Host/localization933/isolation/preflight, Unity492 и оба обзора PASSED/Ship.
+Checkpoint279d265; протокол EDITOR_POPUP_FILTER_CHECKPOINT_2026-10-10_RU.md.
+Не установлено и не принято в Valheim. Задержка импорта остаётся открытой.

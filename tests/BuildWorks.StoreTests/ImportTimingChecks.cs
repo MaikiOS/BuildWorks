@@ -85,5 +85,42 @@ namespace OstrixMods.BuildWorks.StoreTests
                 Thread.Sleep(1);
             } while (true);
         }
+
+        internal static int RunCatalog(string imports, string directory)
+        {
+            Console.WriteLine("File-only independent probes; unit-scale resolver, no Unity/UI/thumbnails. Clone/evidence probes are not additive sub-stages of prepare. OS/JIT caches are not flushed.");
+            Console.WriteLine("run,documents,parts,sources,read_ms,clone_ms,cloned_evidence_ms,prepare_ms");
+            for (int run = 1; run <= 2; ++run)
+            {
+                string folder = Path.Combine(directory, "catalog" + run);
+                Directory.CreateDirectory(folder);
+                foreach (string file in Directory.EnumerateFiles(imports))
+                    File.Copy(file, Path.Combine(folder, Path.GetFileName(file)));
+                var clock = Stopwatch.StartNew();
+                var raw = ExternalBlueprintLibrary.Load(folder);
+                double read = clock.Elapsed.TotalMilliseconds;
+                string[] files = Directory.GetFiles(folder);
+                byte[][] original = files.Select(File.ReadAllBytes).ToArray();
+                clock.Restart();
+                var copies = raw.Select(document => document.ImportCopy()).ToArray();
+                double clone = clock.Elapsed.TotalMilliseconds;
+                clock.Restart();
+                foreach (var document in copies)
+                    Geometry.BlueprintSourceDocument.Index(document.sourceDocuments?.Select(source => source.ToGeometry()));
+                double evidence = clock.Elapsed.TotalMilliseconds;
+                clock.Restart();
+                var prepared = raw.Select(document => ExternalBlueprintLibrary.PrepareForHost(document,
+                    _ => new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 }, ForeignZdoChecks.Hash, 0)).ToArray();
+                double prepare = clock.Elapsed.TotalMilliseconds;
+                for (int index = 0; index < files.Length; ++index)
+                    if (!File.ReadAllBytes(files[index]).SequenceEqual(original[index]))
+                        throw new InvalidOperationException("Catalogue probe changed source bytes");
+                for (int index = 0; index < raw.Count; ++index)
+                    if (raw[index].parts.Count != prepared[index].parts.Count && prepared[index].importError == null)
+                        throw new InvalidOperationException("Catalogue probe dropped valid parts");
+                Console.WriteLine(FormattableString.Invariant($"{run},{raw.Count},{raw.Sum(document => document.parts.Count)},{raw.Sum(document => document.sourceDocuments?.Count ?? 0)},{read:F3},{clone:F3},{evidence:F3},{prepare:F3}"));
+            }
+            return 0;
+        }
     }
 }

@@ -1,3 +1,13 @@
+## 2026-10-10 — QA0.19.145 installed: mounted-item reservation
+
+Source fc07cf3 protects held mount refs/properties/aggregate quantities from the
+current native construction price; ordered shared-name/world/station/free-key
+prediction, postpayment revalidation, success/skip release and teardown reset.
+NormalQA0/0, Host25185596/loc973/Store/isolation/EditorBridge/control/protocol28,
+Unity492, deployment16+4/preflight and reviews PASSED/Ship. Pair SHA verified;
+139 protected files unchanged. Native channel/payment/reload/network unverified.
+Container N-item allocation/transfer/custody/persistence/server ack remain open.
+See `docs/MOUNT_RESERVATION_CHECKPOINT_2026-10-10_RU.md`, checkpoint-0.19.145.
 ## 2026-10-10 — storage transfer audit, runtime .144 unchanged
 
 Six native Inventory/Container/Clone methods and two in-memory negative probes

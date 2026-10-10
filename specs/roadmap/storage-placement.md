@@ -1,9 +1,14 @@
 # Survival storage placement — implementation contract
 
-Status: dependency audit and native API checks, 2026-10-10. Installed QA .144 still
+Status: mounted-item reservation subset and native API checks, 2026-10-10. Installed QA .145 still
 blocks populated storage unless its contents are explicitly omitted from the
 temporary placement recipe. This document does not enable restoration or replace
 the full BuildWorks goal. Keep archived source state unchanged.
+
+.145 implements the mounted-item subset: aggregate exact bindings, ordered
+next-piece native payment preflight, and postpayment availability checks.
+`docs/MOUNT_RESERVATION_CHECKPOINT_2026-10-10_RU.md` records its tests and limits.
+N-item container allocation/transfer/custody/persistence/server ack remain open.
 
 ## Required behavior
 

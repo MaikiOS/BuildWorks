@@ -61,3 +61,27 @@ Win32-перехват и глобальное удержание курсора
 Общие источники Unity: [Cursor.lockState](https://docs.unity3d.com/ScriptReference/Cursor-lockState.html),
 [Input.GetAxis](https://docs.unity3d.com/ScriptReference/Input.GetAxis.html).
 Исследование API не является проверкой управления в Valheim.
+
+### Дополнение .137 — новый Input System
+
+Предыдущее ограничение относилось к UnityEngine.Cursor. В установленном Valheim
+найден Unity.InputSystem1.19 с Mouse.current/WarpCursorPosition. Код самой команды
+проверен в DLL: WarpMousePositionCommand.Create → InputDevice.ExecuteCommand.
+Адаптер использует тот же публичный путь, проверяя код результата, и не включает
+другой backend, не добавляет зависимость в пакет и не использует Win32 hooks.
+Реальный native/enabled/added Mouse и обратная доставка в legacy Input.mousePosition
+пока не доказаны. Workbench подменяет только физический ввод, а не контроллер.
+
+Сценарий .137: активный обычный drag либо G/R/S вне режима поверхности → край →
+перенос к противоположному краю с сохранением логической позиции. Ctrl позволяет
+дойти до панелей. Свободная поверхность, точки привязки и раскладка Array не
+переносятся: это наведение на конкретное место, а не продолжение transform delta.
+Перед подтверждением сохраняются прежние проверки диапазонов/перекоса.
+Команда переноса может прийти позже: ожидание без повторных команд, затем
+компенсация скачка. Esc/потеря фокуса отменяют; Enter/отпускание гизмы подтверждает
+последний допустимый предпросмотр. Нет подтверждения250мс — отмена предпросмотра.
+Нет backend/команда отклонена — нормальный курсор и числовой ввод остаются доступными,
+показывается ограничение. Это защитный отказ, не заявленная поддержка без backend.
+
+Источники: [Unity1.19 Mouse](https://docs.unity3d.com/Packages/com.unity.inputsystem@1.19/api/UnityEngine.InputSystem.Mouse.html),
+[Unity cursor warping](https://docs.unity3d.com/Packages/com.unity.inputsystem@1.19/manual/Mouse.html#cursor-warping).

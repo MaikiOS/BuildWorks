@@ -1,3 +1,21 @@
+## 2026-10-10 — installed QA0.19.137
+
+Optional continuous pointer for physical transform gizmos and constrained G/R/S;
+Ctrl reaches panels. Deferred warp acknowledgement requires8px landing proximity;
+manual55% motion stays pending. Independent review found/fixed the former closer
+predicate; controller regression covers it. Cancel/focus loss, pending commit,
+timeout250ms and unsupported backend retain safe operation. No cursor lock/hooks.
+Code6186de80c79224b76e6792fc6fa62d7ae68a3bde. Normal/QA0/0, Host25185596,
+localization948, isolation/preflight, Unity492 at14:48:25.0632402UTC and both reviews
+passed. verify absent. Geometry/Store unchanged, last full runs .136/.135, not rerun.
+A mistaken Test-CompiledIsolation.ps1 name failed; actual Test-QASaveIsolation passed.
+Guarded install only TerrainRamp-1.0-Test, both hashes match, Default clean,
+137 existing config/import/save files unchanged. No game/world/network launch.
+BuildWorks SHA AA20923BFB6F722F91639AF1C6CF948DCF906F0A260263372C07CC2B8BCF5154;
+Geometry AE5341BC76B709870E2CC822A78AC982DFAF330411E858E989438798C92E7A8D.
+Actual Mouse.current/backend/native warp/legacy observation remain unverified.
+Manual docs/QA_0.19.137_RU.md; previous scale/XZ/Align cases remain pending.
+Full goal remains active/incomplete; document updates do not update goal API.
 ## 2026-10-10 — installed QA0.19.136
 
 G/S then two axes selects XY/XZ/YZ (including reversed order), with mouse/numeric

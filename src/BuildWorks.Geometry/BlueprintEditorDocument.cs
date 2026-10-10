@@ -1029,6 +1029,13 @@ namespace OstrixMods.BuildWorks.Geometry
         }
 
         public bool ReplacePartWithSelection(string targetId, string groupName)
+            => AlignPartSelection(targetId, groupName, false, default, default);
+
+        public bool PositionPartWithSelection(string targetId, Point3 translation, Rotation3 rotation)
+            => AlignPartSelection(targetId, null, true, translation, rotation);
+
+        private bool AlignPartSelection(string targetId, string groupName, bool keepTarget,
+            Point3 translation, Rotation3 rotation)
         {
             BlueprintEditorPart target = FindPart(targetId);
             if (target == null || !selection.Contains(targetId) || ActiveSupportId != null ||
@@ -1055,12 +1062,24 @@ namespace OstrixMods.BuildWorks.Geometry
                 replacements.Add(part);
             }
             if (replacements.Count == 0) return false;
-            if (groups.Count >= MaximumGroups) throw new InvalidOperationException("Maximum group count reached.");
-            var transform = ReplacementTransform(target, replacements[0]);
+            if (!keepTarget && groups.Count >= MaximumGroups) throw new InvalidOperationException("Maximum group count reached.");
+            var transform = keepTarget ? (Translation: translation, Rotation: rotation.Normalized()) :
+                ReplacementTransform(target, replacements[0]);
             var poses = new List<(Point3 Position, Rotation3 Rotation, Point3 Scale)>(replacements.Count);
             foreach (BlueprintEditorPart part in replacements)
                 poses.Add(TransformPart(part, transform.Translation, transform.Rotation,
                     new Point3(), new Point3(1, 1, 1), new Rotation3(0, 0, 0, 1)));
+            if (keepTarget)
+                return Commit(() =>
+                {
+                    for (int i = 0; i < replacements.Count; i++)
+                    {
+                        replacements[i].Position = poses[i].Position;
+                        replacements[i].Rotation = poses[i].Rotation;
+                    }
+                    selection.Remove(targetId);
+                    ActiveNodeId = selection[selection.Count - 1];
+                });
             string rootId = Guid.NewGuid().ToString("N");
             string firstId = replacements[0].StableId;
             var replacementGroup = new BlueprintEditorGroup(rootId, groupName,

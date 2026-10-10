@@ -986,6 +986,27 @@ namespace OstrixMods.BuildWorks
 
         internal void ClearDuplicatePreview() => ClearTemporaryPreview(duplicatePreviews);
 
+        internal bool TryGetPositioningOffset(string targetId, IReadOnlyList<string> selectedIds,
+            out Vector3 offset)
+        {
+            offset = Vector3.zero;
+            if (!visuals.TryGetValue(targetId, out VisualNode target) || !target.Placeholder ||
+                target.Metadata?.Minimum == null || !TryBounds(target, out Bounds targetBounds)) return false;
+            Bounds sourceBounds = default;
+            bool found = false;
+            if (selectedIds != null) found = TryGetBounds(selectedIds, out sourceBounds);
+            else
+                foreach (VisualNode visual in duplicatePreviews)
+                    if (!visual.Placeholder && TryBounds(visual, out Bounds bounds))
+                    {
+                        if (found) sourceBounds.Encapsulate(bounds);
+                        else { sourceBounds = bounds; found = true; }
+                    }
+            if (!found) return false;
+            offset = root.transform.InverseTransformVector(targetBounds.center - sourceBounds.center);
+            return true;
+        }
+
         internal int PlacementSourceSnapPointCount
         {
             get

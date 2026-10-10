@@ -663,6 +663,7 @@ public static class RuntimeEditorAcceptance
                     foreach (object step in ControllerInputAcceptance.RunMissingExchange(template, fontTemplate, source["woodwall"], output)) yield return step;
                     foreach (object step in ControllerInputAcceptance.RunPrefabMetadata(template, fontTemplate, output)) yield return step;
                     foreach (object step in ControllerInputAcceptance.RunMissingReplacement(template, fontTemplate, source["woodwall"], output)) yield return step;
+                    foreach (object step in ControllerInputAcceptance.RunMissingPositioning(template, fontTemplate, source["woodwall"], output)) yield return step;
                     foreach (object step in ControllerInputAcceptance.RunPartialThumbnails(template, fontTemplate, source["woodwall"], output)) yield return step;
                     foreach (object step in ControllerInputAcceptance.RunOutlinerFilters(fontTemplate, output)) yield return step;
                     checks.Add("Explicit missing replacement: actual Tools button/Cancel/review/commit, one Undo/Redo, stale prefab refusal, exact source/poses and native Save/reopen. No game construction proof.");
@@ -708,12 +709,21 @@ public static class RuntimeEditorAcceptance
         {
             var button = Field<Button>(view, "replaceMissingButton");
             Require(button.gameObject.activeInHierarchy && button.interactable, "Persistent replacement entry is unavailable");
-            Require(button.GetComponentInChildren<TMP_Text>().text == BuildWorksLocalization.Text("editor.replace_title"),
+            Require(button.GetComponentInChildren<TMP_Text>().text == BuildWorksLocalization.Text("editor.replace_short"),
                 "Replacement entry missed the current Russian language");
             EnsureInside(Field<RectTransform>(view, "inspector"), (RectTransform)button.transform);
             Vector3[] buttonCorners = new Vector3[4], clipCorners = new Vector3[4];
             ((RectTransform)button.transform).GetWorldCorners(buttonCorners); clip.GetWorldCorners(clipCorners);
             Require(buttonCorners[0].y >= clipCorners[1].y - .5f, "Replacement entry overlaps inspector content");
+            var positioning = Field<Button>(view, "positionMissingButton");
+            Require(positioning.gameObject.activeInHierarchy && positioning.interactable &&
+                positioning.GetComponentInChildren<TMP_Text>().text == BuildWorksLocalization.Text("editor.position_short"),
+                "Persistent positioning entry is unavailable or has wrong language");
+            EnsureInside(Field<RectTransform>(view, "inspector"), (RectTransform)positioning.transform);
+            Vector3[] positionCorners = new Vector3[4];
+            ((RectTransform)positioning.transform).GetWorldCorners(positionCorners);
+            Require(positionCorners[0].x >= buttonCorners[3].x && positionCorners[0].y >= clipCorners[1].y - .5f,
+                "Positioning entry overlaps replacement or inspector content");
             if (state == "replace-help-ru")
             {
                 Require(view.HasModal && !Field<TMP_Text>(view, "modalMessage").isTextOverflowing,

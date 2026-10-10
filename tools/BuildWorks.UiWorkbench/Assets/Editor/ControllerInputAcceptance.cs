@@ -272,7 +272,10 @@ internal static class ControllerInputAcceptance
             "#Pieces\nqa_absent;;0;0;0;0;0;0;1;\"\";1;1;1");
         var parts = new[] {
             new CompositeBlueprintStore.Part { stableId = "missing", prefabName = "qa_absent", displayName = "Missing", parentGroupId = "g",
-                rotation = new CompositeBlueprintStore.QuaternionData { w = 1 }, sourceDocumentId = evidence.Id, sourceLine = 2 },
+                rotation = new CompositeBlueprintStore.QuaternionData { w = 1 }, sourceDocumentId = evidence.Id, sourceLine = 2,
+                baseScale = new CompositeBlueprintStore.VectorData(new Vector3(2, 1, .5f)),
+                metadata = CompositeBlueprintStore.PrefabMetadata.FromGeometry(new BlueprintPrefabMetadata(1, "qa_absent", "Recorded", "piece", "QA",
+                    new Point3(1, 1, 1), new Point3(0, 0, -1), new Point3(2, 2, 1))) },
             new CompositeBlueprintStore.Part { stableId = "a", prefabName = "woodwall", displayName = "Own wall",
                 position = new CompositeBlueprintStore.VectorData { x = 3, y = 2, z = 1 },
                 rotation = new CompositeBlueprintStore.QuaternionData(Quaternion.Euler(0, 45, 0)),
@@ -395,6 +398,46 @@ internal static class ControllerInputAcceptance
             document.SelectOnly("missing");
             document.ToggleSelection("a"); document.ToggleSelection("b"); Call(controller, "Bind", (object)null);
             Require(view.MissingReplacementAvailable, "Explicit one-to-many selection not available");
+            int positioningRevision = document.RevisionToken;
+            Bounds positionedBounds = default, committedBounds = default;
+            NativeClick(view, null, "InspectorPositionMissing"); yield return null;
+            Require(view.HasModal && document.RevisionToken == positioningRevision &&
+                scene.TryGetBounds(new[] { "a", "b" }, out positionedBounds) &&
+                Vector3.Distance(positionedBounds.center, new Vector3(2, 1, 0)) < .001f &&
+                Field<TMP_Text>(view, "modalMessage").text.Contains(BuildWorksLocalization.Text("editor.position_known")),
+                "Positioning preview aligned origins instead of recorded scaled bounds centres");
+            NativeClick(view, null, Field<Button>(view, "dialogCancelButton")); yield return null;
+            Require(document.RevisionToken == positioningRevision && scene.TryGetBounds(new[] { "a", "b" }, out Bounds restoredBounds) &&
+                Vector3.Distance(restoredBounds.center, positionedBounds.center) > .1f,
+                "Positioning cancel changed history or failed to restore visuals");
+            NativeClick(view, null, "InspectorPositionMissing"); yield return null;
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            Require(document.Parts.Count == 3 && document.PrimaryPartId == "missing" && document.Groups.Count == 1 &&
+                !document.Selection.Contains("missing") && scene.TryGetBounds(new[] { "a", "b" }, out committedBounds) &&
+                Vector3.Distance(committedBounds.center, positionedBounds.center) < .001f &&
+                Field<Button>(view, "positionMissingButton").gameObject.activeSelf &&
+                document.Parts.Single(part => part.StableId == "a").Scale.X == 2,
+                "Positioning commit lost marker, own scale, hierarchy or preview pose");
+            NativeClick(view, null, Field<Button>(view, "undoButton")); yield return null;
+            Require(document.Parts.Count == 3 && document.Selection.Contains("missing") &&
+                document.Parts.Single(part => part.StableId == "a").Position.X == 3, "Positioning one Undo failed");
+            NativeClick(view, null, Field<Button>(view, "redoButton")); yield return null;
+            Require(scene.TryGetBounds(new[] { "a", "b" }, out committedBounds) &&
+                Vector3.Distance(committedBounds.center, positionedBounds.center) < .001f, "Positioning Redo failed");
+            NativeClick(view, null, Field<Button>(view, "undoButton")); yield return null;
+            document.SelectOnly("missing"); Call(controller, "Bind", (object)null);
+            NativeClick(view, null, "InspectorPositionMissing"); yield return null;
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            NativeClick(view, null, Field<Button>(view, "catalogBlueprintsModeButton")); yield return null;
+            NativeClick(view, null, "Catalog_replaceCompound"); yield return null;
+            Require(view.HasModal && scene.TryGetPositioningOffset("missing", null, out Vector3 residual) && residual.magnitude < .001f,
+                "Catalogue positioning failed to align whole visible assembly centre");
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            Require(document.Parts.Count == 6 && document.PrimaryPartId == "missing" &&
+                document.Parts.Any(part => part.StableId == "missing"), "Catalogue positioning removed original missing record");
+            NativeClick(view, null, Field<Button>(view, "undoButton")); yield return null;
+            Require(document.Parts.Count == 3 && document.Groups.Count == 1, "Catalogue positioning was not one Undo");
+            document.SelectOnly("missing"); document.ToggleSelection("a"); document.ToggleSelection("b"); Call(controller, "Bind", (object)null);
             int revision = document.RevisionToken;
             NativeClick(view, null, "InspectorReplaceMissing"); yield return null;
             Require(view.HasModal && document.Parts.Count == 3 && document.RevisionToken == revision,
@@ -439,6 +482,74 @@ internal static class ControllerInputAcceptance
             "Replacement disk reopen lost structure or original evidence");
         File.WriteAllText(Path.Combine(output, "replacement-check.txt"),
             "PASS actual Inspector/Tools entry; exact origin/full rotation preview for selected parts and direct single/whole blueprint catalogue replacements; Cancel restores visuals without document mutation; one Undo/Redo, Save/reopen, stale prefab and ordinary placement recovery; own scales, relative poses, groups, primary/pivots, independent supports and source retained. No game construction proof.");
+    }
+
+    internal static IEnumerable<object> RunMissingPositioning(Camera template, TMP_Text font, GameObject wall, string output)
+    {
+        foreach (bool known in new[] { true, false })
+        {
+            string path = Path.Combine(output, "position-" + known + "-" + Guid.NewGuid().ToString("N") + ".json");
+            var store = new CompositeBlueprintStore(path);
+            Quaternion rotation = Quaternion.Euler(25, 30, 15);
+            Vector3 origin = new Vector3(7, 3, -2);
+            var missing = new CompositeBlueprintStore.Part { stableId = "m", prefabName = "qa_absent", displayName = "Missing",
+                position = new CompositeBlueprintStore.VectorData(origin), rotation = new CompositeBlueprintStore.QuaternionData(rotation),
+                baseScale = new CompositeBlueprintStore.VectorData(new Vector3(2, 1, .5f)),
+                metadata = known ? CompositeBlueprintStore.PrefabMetadata.FromGeometry(new BlueprintPrefabMetadata(1,
+                    "qa_absent", "Recorded", "piece", "QA", new Point3(1, 1, 1), new Point3(0, 0, -1), new Point3(2, 2, 1))) : null };
+            Require(store.TrySaveDocument("Position", "OTHER", new[] { missing,
+                new CompositeBlueprintStore.Part { stableId = "a", prefabName = "woodwall", displayName = "Own wall",
+                    position = new CompositeBlueprintStore.VectorData(new Vector3(-3, 0, 0)), rotation = new CompositeBlueprintStore.QuaternionData(Quaternion.identity) },
+                new CompositeBlueprintStore.Part { stableId = "b", prefabName = "woodwall", displayName = "Own second wall",
+                    position = new CompositeBlueprintStore.VectorData(new Vector3(-1, 0, 0)), rotation = new CompositeBlueprintStore.QuaternionData(Quaternion.identity) }
+            }, Array.Empty<CompositeBlueprintStore.Group>(), Array.Empty<CompositeBlueprintStore.VectorData>(), "m", null,
+                Array.Empty<CompositeBlueprintStore.Support>(), null, out var saved, out string error), error);
+            using (var controller = new BlueprintEditorController(store, template, font,
+                name => name == "woodwall" ? wall : null, name => name,
+                () => Array.Empty<BlueprintEditorCatalogItem>(), message => { throw new InvalidOperationException(message); }))
+            {
+                Require(controller.OpenExisting(saved, out error), error); yield return null;
+                var document = controller.Document;
+                var view = Field<BlueprintEditorView>(controller, "view");
+                var scene = Field<BlueprintEditorScene>(controller, "scene");
+                document.SelectOnly("m"); document.ToggleSelection("a"); document.ToggleSelection("b"); Call(controller, "Bind", (object)null);
+                int revision = document.RevisionToken;
+                NativeClick(view, null, "InspectorPositionMissing"); yield return null;
+                Require(view.HasModal && Field<TMP_Text>(view, "modalMessage").text.Contains(BuildWorksLocalization.Text(
+                    known ? "editor.position_known" : "editor.position_unknown")), "Positioning did not disclose bounds certainty");
+                Vector3 expectedCentre = origin + rotation * new Vector3(2, 1, 0);
+                if (known)
+                    Require(scene.TryGetBounds(new[] { "a", "b" }, out Bounds bounds) &&
+                        Vector3.Distance(bounds.center, expectedCentre) < .001f, "Rotated pinned envelope centre did not align");
+                document.SelectOnly("a");
+                NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+                Require(document.RevisionToken == revision && document.Parts[1].Position.X == -3, "Stale positioning selection committed");
+                document.SelectOnly("m"); document.ToggleSelection("a"); document.ToggleSelection("b"); Call(controller, "Bind", (object)null);
+                NativeClick(view, null, "InspectorPositionMissing"); yield return null;
+                NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+                Vector3 ownPosition = V(document.Parts[1].Position);
+                Rotation3 ownRotation = document.Parts[1].Rotation;
+                Require(document.Parts.Count == 3 && document.PrimaryPartId == "m" && V(document.Parts[0].Position) == origin &&
+                    Quaternion.Angle(new Quaternion((float)ownRotation.X, (float)ownRotation.Y, (float)ownRotation.Z, (float)ownRotation.W), rotation) < .01f &&
+                    (known || Vector3.Distance(ownPosition, origin) < .001f), "Positioning changed target or unknown-origin alignment");
+                NativeClick(view, null, "Save"); yield return null;
+                NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+                Require(!document.IsDirty, "Positioning save failed");
+                controller.Close(true);
+                var reopened = new CompositeBlueprintStore(path).All().Single();
+                Require(controller.OpenExisting(reopened, out error), error); yield return null;
+                scene = Field<BlueprintEditorScene>(controller, "scene");
+                Require(controller.Document.Parts.Count == 3 && controller.Document.PrimaryPartId == "m" &&
+                    Vector3.Distance(V(controller.Document.Parts[1].Position), ownPosition) < .001f &&
+                    (controller.Document.Parts[0].Metadata?.Minimum != null) == known,
+                    "Positioning reopen lost marker, certainty or own pose");
+                if (known) Require(scene.TryGetBounds(new[] { "a", "b" }, out Bounds bounds) &&
+                    Vector3.Distance(bounds.center, expectedCentre) < .001f, "Reopened positioning bounds changed");
+                controller.Close(true);
+            }
+        }
+        File.WriteAllText(Path.Combine(output, "positioning-check.txt"),
+            "PASS rotated XYZ, pinned basis and off-origin recorded envelope centre; unknown origin/rotation with honest warning; stale selection refusal; native Save/reopen retains missing and own pose. No Valheim proof.");
     }
 
     internal static IEnumerable<object> RunOutlinerFilters(TMP_Text font, string output)

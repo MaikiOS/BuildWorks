@@ -47,6 +47,20 @@ namespace OstrixMods.BuildWorks.GeometryTests
                 document.Groups[0].PivotPartId == "m" && document.Groups[1].ParentGroupId == null && !document.CanUndo,
                 "One Undo did not restore the full missing record and hierarchy");
             Check(document.Redo() && document.Parts.Count == 2, "Redo failed");
+            Check(document.Undo(), "Restore positioning fixture");
+            Check(document.PositionPartWithSelection("m", new Point3(1, 2, 3), identity), "Positioning refused");
+            Check(document.Parts.Count == 3 && document.Groups.Count == 2 && document.PrimaryPartId == "m" &&
+                document.Parts[0].Position.X == 4 && document.Parts[0].Metadata == metadata &&
+                document.Groups[0].PivotPartId == "m" && document.Groups[1].ParentGroupId == null &&
+                document.Parts.Single(part => part.StableId == "b").Position.X == 8 &&
+                document.Parts.Single(part => part.StableId == "a").Position.X == -2 &&
+                document.Selection.SequenceEqual(new[] { "h", "a" }) && document.ActiveNodeId == "a" &&
+                document.Supports[0].Position.X == 4 && document.Sources[0].Text == evidence.Text,
+                "Positioning deleted/reparented the target or damaged relative pose, selection or evidence");
+            Check(document.Undo() && document.Parts[1].Position.X == 7 && document.Selection.Contains("m") &&
+                !document.CanUndo, "Positioning Undo was not atomic");
+            Check(document.Redo() && document.Parts.Count == 3 && document.Parts[1].Position.X == 8,
+                "Positioning Redo lost target or pose");
 
             // The source primary is deliberately not its first row; use its origin, never a bounds centre.
             var source = new BlueprintEditorDocument(null, "Catalogue", "OTHER", new[] {
@@ -97,6 +111,9 @@ namespace OstrixMods.BuildWorks.GeometryTests
             try { full.ReplacePartWithSelection("m", "Replace"); } catch (InvalidOperationException) { refused = true; }
             Check(refused && full.Parts.Count == 2 && full.Groups.Count == BlueprintEditorDocument.MaximumGroups &&
                 full.RevisionToken == revision, "Group budget failed non-atomically");
+            Check(full.PositionPartWithSelection("m", new Point3(2, 0, 0), identity) &&
+                full.Groups.Count == BlueprintEditorDocument.MaximumGroups && full.Parts.Count == 2,
+                "Positioning incorrectly needs an extra group");
 
             var emptied = new BlueprintEditorDocument(null, "Primary", "OTHER", new[] {
                 new BlueprintEditorPart("m", "Missing", "Missing", new Point3(), identity),

@@ -356,6 +356,7 @@ namespace OstrixMods.BuildWorks
         private readonly RectTransform inspectorTabs;
         private readonly RectTransform inspectorViewport;
         private readonly Button replaceMissingButton;
+        private readonly Button positionMissingButton;
         private readonly RectTransform status;
         private readonly RectTransform outlinerRows;
         private readonly List<Action> outlinerRowBuilders = new List<Action>();
@@ -866,10 +867,17 @@ namespace OstrixMods.BuildWorks
                     button.GetComponentInChildren<TMP_Text>().fontSize = 11f;
                 }
                 replaceMissingButton = CreateButton("InspectorReplaceMissing", inspector,
-                    T("editor.replace_title"), 228f, () => MissingReplacementRequested?.Invoke());
-                SetTopAnchored((RectTransform)replaceMissingButton.transform, 12f, 38f, 12f, 28f);
+                    T("editor.replace_short"), 110f, () => MissingReplacementRequested?.Invoke());
+                SetTopAnchored((RectTransform)replaceMissingButton.transform, 12f, 38f, 6f, 28f);
+                ((RectTransform)replaceMissingButton.transform).anchorMax = new Vector2(.5f, 1f);
                 AddTooltip((RectTransform)replaceMissingButton.transform, T("editor.replace_hint"));
                 replaceMissingButton.gameObject.SetActive(false);
+                positionMissingButton = CreateButton("InspectorPositionMissing", inspector,
+                    T("editor.position_short"), 110f, () => MissingPositioningRequested?.Invoke());
+                SetTopAnchored((RectTransform)positionMissingButton.transform, 6f, 38f, 12f, 28f);
+                ((RectTransform)positionMissingButton.transform).anchorMin = new Vector2(.5f, 1f);
+                AddTooltip((RectTransform)positionMissingButton.transform, T("editor.position_hint"));
+                positionMissingButton.gameObject.SetActive(false);
                 inspectorViewport = CreateRect("InspectorViewport", inspector);
                 SetInsets(inspectorViewport, 12f, 42f, 12f, 8f);
                 inspectorViewport.gameObject.AddComponent<RectMask2D>();
@@ -1547,6 +1555,10 @@ namespace OstrixMods.BuildWorks
                     T("editor.replace_title"), 286f, () => { HideToolsMenu(); MissingReplacementRequested?.Invoke(); });
                 AddTooltip((RectTransform)replaceMissing.transform, T("editor.replace_hint"));
                 toolsEntries.Add(replaceMissing);
+                Button positionMissing = CreateButton("ToolsPositionMissing", toolsPanel,
+                    T("editor.position_title"), 286f, () => { HideToolsMenu(); MissingPositioningRequested?.Invoke(); });
+                AddTooltip((RectTransform)positionMissing.transform, T("editor.position_hint"));
+                toolsEntries.Add(positionMissing);
 
                 InitializeCatalog();
 
@@ -1613,6 +1625,7 @@ namespace OstrixMods.BuildWorks
         internal event Action DuplicateSelectionRequested;
         internal event Action DeleteSelectionRequested;
         internal event Action MissingReplacementRequested;
+        internal event Action MissingPositioningRequested;
         internal bool MissingReplacementAvailable { get; set; }
         internal event Action SupportCreated;
         internal event Action<bool> ItemContentsRequested;
@@ -3341,8 +3354,10 @@ namespace OstrixMods.BuildWorks
         {
             bool hasMissing = missingPrefabNodes.Count > 0;
             bool missingEntryChanged = replaceMissingButton.gameObject.activeSelf != hasMissing;
-            SetButtonLabel(replaceMissingButton, T("editor.replace_title"));
+            SetButtonLabel(replaceMissingButton, T("editor.replace_short"));
             replaceMissingButton.gameObject.SetActive(hasMissing);
+            SetButtonLabel(positionMissingButton, T("editor.position_short"));
+            positionMissingButton.gameObject.SetActive(hasMissing);
             SetInsets(inspectorViewport, 12f, hasMissing ? 70f : 42f, 12f, 8f);
             if (missingEntryChanged) ApplySafeAreaAndLayout(true);
             inspectorEditPanel.SetActive(false);

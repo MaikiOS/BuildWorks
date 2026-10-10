@@ -15,10 +15,12 @@ namespace OstrixMods.BuildWorks
         private RectTransform catalogPanel, catalogGrid, catalogNavigation, catalogContext, catalogPreview, catalogPicker;
         private BlueprintEditorCatalogItem catalogPreviewItem;
         private bool catalogReplacementMode;
+        private bool catalogPositioningMode;
 
-        internal void SetCatalogReplacement(bool value)
+        internal void SetCatalogReplacement(bool value, bool positioning = false)
         {
             catalogReplacementMode = value;
+            catalogPositioningMode = value && positioning;
             RebuildCatalog();
         }
         internal event Action CatalogImportRequested;
@@ -214,7 +216,7 @@ namespace OstrixMods.BuildWorks
                 (f.Material == null ? "" : " · " + BuildWorksLocalization.CatalogLabel(f.Material)) +
                 (f.Source == null ? "" : " · " + BuildWorksLocalization.CatalogLabel(f.Source)) +
                 (f.Station == null ? "" : " · " + shownCatalogItems.FirstOrDefault(x => x.StationId == f.Station)?.StationName) +
-                " · " + (catalogReplacementMode ? T("editor.replace_catalog_help") :
+                " · " + (catalogReplacementMode ? T(catalogPositioningMode ? "editor.position_catalog_help" : "editor.replace_catalog_help") :
                     catalogAttachmentMode ? T("editor.item.click_help") : CatalogText("click_help"));
             SetSelected(catalogPartsModeButton, !catalogBlueprintMode); SetSelected(catalogBlueprintsModeButton, catalogBlueprintMode);
             SetSelected(catalogAtlasButton, !catalogQuick); SetSelected(catalogQuickButton, catalogQuick);

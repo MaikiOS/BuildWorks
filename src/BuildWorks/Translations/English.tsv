@@ -932,3 +932,14 @@ editor.camera.active	Inside building · RMB: fly · Camera: return
 qa.large_selection_blocked	Large selection requires the isolated BuildWorks QA world. Safety check failed: {0}.
 editor.replace_catalog_help	Replacement mode: click a part or blueprint to preview it at the missing record
 editor.replace_source_missing	Choose an available part or a blueprint without missing parts for replacement. This source is still incomplete.
+editor.position_title	ALIGN TO MISSING
+editor.position_hint	Move your parts to a missing record and keep its marker. Ctrl-select your parts/group, or select only the record and open the catalogue.
+editor.position_steps	Select one missing record and open the catalogue, or Ctrl-add your own parts/group. Aligns the recorded envelope centre with your visible parts and uses the first own part for orientation. Own sizes and relative layout are preserved. Unknown dimensions use only the recorded origin. The missing record remains: adjust your parts with the gizmo, then delete it separately. Cancel changes nothing.
+editor.position_confirm	Missing record: {0}\nOwn parts: {1}\n{2}\nOwn sizes and relative layout are preserved; the unknown model shape is not reconstructed. Inspect the preview on the left. The record and marker will remain for manual adjustment. Delete the record separately when finished. Cancel changes nothing; one Undo reverts positioning.
+editor.position_known	The recorded envelope centre and visible own parts centre are aligned; the first own part supplies orientation.
+editor.position_unknown	Model dimensions are unknown: only the recorded origin and rotation are aligned. The marker does not represent real dimensions.
+editor.position_no_bounds	Could not determine the visible bounds of your parts. Positioning cancelled.
+editor.position_done	Aligned parts: {0}. The missing record remains for adjustment and separate deletion.
+editor.position_catalog_help	Alignment mode: choose a part or blueprint. The missing record will remain.
+editor.replace_short	REPLACE
+editor.position_short	ALIGN

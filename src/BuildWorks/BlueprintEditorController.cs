@@ -603,6 +603,7 @@ namespace OstrixMods.BuildWorks
                     BuildWorksLocalization.Text("editor.generated.copy")));
             view.DeleteSelectionRequested += DeleteActiveSelection;
             view.MissingReplacementRequested += RequestMissingReplacement;
+            view.MissingPositioningRequested += RequestMissingPositioning;
             view.PrimaryPartRequested += stableId => ApplyDocumentEdit(() =>
                 document.SetPrimaryPart(stableId));
             view.PrimaryGroupRequested += stableId => ApplyDocumentEdit(() =>
@@ -2933,15 +2934,18 @@ namespace OstrixMods.BuildWorks
             return true;
         }
 
-        private void RequestMissingReplacement()
+        private void RequestMissingReplacement() => RequestMissingAlignment(false);
+        private void RequestMissingPositioning() => RequestMissingAlignment(true);
+
+        private void RequestMissingAlignment(bool keepTarget)
         {
             if (!IsEditing || keyboardPreview || IsGizmoDragging || placementItem != null || view.HasModal) return;
-            if (document.Groups.Count >= BlueprintEditorDocument.MaximumGroups)
+            if (!keepTarget && document.Groups.Count >= BlueprintEditorDocument.MaximumGroups)
             { view.SetStatus(BuildWorksLocalization.Text("editor.replace_limit"), error: true); return; }
             if (!TryMissingReplacement(out BlueprintEditorPart target, out BlueprintEditorPart[] replacements))
             {
-                view.ShowConfirmation(BuildWorksLocalization.Text("editor.replace_title"),
-                    BuildWorksLocalization.Text("editor.replace_steps"), () =>
+                view.ShowConfirmation(BuildWorksLocalization.Text(keepTarget ? "editor.position_title" : "editor.replace_title"),
+                    BuildWorksLocalization.Text(keepTarget ? "editor.position_steps" : "editor.replace_steps"), () =>
                     {
                         BlueprintEditorPart missing = SingleMissingTarget();
                         if (missing == null) { view.SetStatus(BuildWorksLocalization.Text("editor.replace_changed"), error: true); return; }
@@ -2950,8 +2954,8 @@ namespace OstrixMods.BuildWorks
                         RequestCatalog();
                         if (view.HasCatalog)
                         {
-                            view.SetCatalogReplacement(true);
-                            replacementCatalogSelected = source => RequestCatalogReplacement(expected, expectedRevision, missing.StableId, source);
+                            view.SetCatalogReplacement(true, keepTarget);
+                            replacementCatalogSelected = source => RequestCatalogAlignment(expected, expectedRevision, missing.StableId, source, keepTarget);
                         }
                     },
                     height: 500f, acceptLabel: BuildWorksLocalization.Text("editor.replace_catalog"));
@@ -2961,27 +2965,37 @@ namespace OstrixMods.BuildWorks
             int revision = document.RevisionToken;
             string[] selection = document.Selection.ToArray();
             string[] ids = replacements.Select(part => part.StableId).ToArray();
+            var transform = BlueprintEditorDocument.ReplacementTransform(target, replacements[0]);
             try
             {
-                var transform = BlueprintEditorDocument.ReplacementTransform(target, replacements[0]);
                 scene.PreviewTransform(document, ids, ToVector(transform.Translation), ToQuaternion(transform.Rotation),
                     Vector3.zero, Vector3.one, Quaternion.identity);
+                if (keepTarget && target.Metadata?.Minimum != null)
+                {
+                    if (!scene.TryGetPositioningOffset(target.StableId, ids, out Vector3 offset))
+                        throw new InvalidOperationException(BuildWorksLocalization.Text("editor.position_no_bounds"));
+                    transform.Translation += ToPoint(offset);
+                    scene.PreviewTransform(document, ids, ToVector(transform.Translation), ToQuaternion(transform.Rotation),
+                        Vector3.zero, Vector3.one, Quaternion.identity);
+                }
             }
             catch (Exception exception)
             { RestoreReplacementPreview(expectedDocument); view.SetStatus(exception.Message, error: true); return; }
             string firstName = replacements[0].DisplayName;
             if (firstName.Length > 64) firstName = firstName.Substring(0, 64) + "…";
-            view.ShowConfirmation(BuildWorksLocalization.Text("editor.replace_title"),
-                BuildWorksLocalization.Text("editor.replace_confirm", target.PrefabName, replacements.Length, firstName), () =>
+            view.ShowConfirmation(BuildWorksLocalization.Text(keepTarget ? "editor.position_title" : "editor.replace_title"),
+                keepTarget ? PositioningMessage(target, replacements.Length) :
+                    BuildWorksLocalization.Text("editor.replace_confirm", target.PrefabName, replacements.Length, firstName), () =>
                 {
                     if (!ReferenceEquals(document, expectedDocument) || document.RevisionToken != revision ||
                         !document.Selection.SequenceEqual(selection) ||
                         !TryMissingReplacement(out BlueprintEditorPart current, out BlueprintEditorPart[] fresh) ||
                         current.StableId != target.StableId || !fresh.Select(part => part.StableId).SequenceEqual(ids))
                     { view.SetStatus(BuildWorksLocalization.Text("editor.replace_changed"), error: true); return; }
-                    if (ApplyDocumentEdit(() => document.ReplacePartWithSelection(target.StableId,
+                    if (ApplyDocumentEdit(() => keepTarget ? document.PositionPartWithSelection(target.StableId,
+                        transform.Translation, transform.Rotation) : document.ReplacePartWithSelection(target.StableId,
                         BuildWorksLocalization.Text("editor.replace_group"))))
-                        view.SetStatus(BuildWorksLocalization.Text("editor.replace_done", replacements.Length));
+                        view.SetStatus(BuildWorksLocalization.Text(keepTarget ? "editor.position_done" : "editor.replace_done", replacements.Length));
                 }, height: 450f, closed: () => RestoreReplacementPreview(expectedDocument), scenePreview: true);
         }
 
@@ -3000,7 +3014,8 @@ namespace OstrixMods.BuildWorks
             if (!scene.TrySync(document, out string error)) view.SetStatus(error, error: true);
         }
 
-        private void RequestCatalogReplacement(BlueprintEditorDocument expected, int revision, string targetId, BlueprintEditorDocument source)
+        private void RequestCatalogAlignment(BlueprintEditorDocument expected, int revision, string targetId,
+            BlueprintEditorDocument source, bool keepTarget)
         {
             BlueprintEditorPart target = SingleMissingTarget();
             if (source.Parts.Count == 0 || source.Parts.Any(part => part.ScaleIsAbsolute || !ResolveVisualSource(part.PrefabName)))
@@ -3016,6 +3031,15 @@ namespace OstrixMods.BuildWorks
             {
                 preview.InsertBlueprint(source, transform.Translation, transform.Rotation);
                 scene.ShowDuplicatePreview(preview.Parts.Where(part => preview.IsEffectivelyVisible(part.StableId)).ToArray());
+                if (keepTarget && target.Metadata?.Minimum != null)
+                {
+                    if (!scene.TryGetPositioningOffset(targetId, null, out Vector3 offset))
+                        throw new InvalidOperationException(BuildWorksLocalization.Text("editor.position_no_bounds"));
+                    transform.Translation += ToPoint(offset);
+                    preview = new BlueprintEditorDocument(null, source.Name, source.Category);
+                    preview.InsertBlueprint(source, transform.Translation, transform.Rotation);
+                    scene.ShowDuplicatePreview(preview.Parts.Where(part => preview.IsEffectivelyVisible(part.StableId)).ToArray());
+                }
             }
             catch (Exception exception)
             {
@@ -3024,14 +3048,21 @@ namespace OstrixMods.BuildWorks
                 return;
             }
             view.HideCatalog();
-            view.ShowConfirmation(BuildWorksLocalization.Text("editor.replace_title"),
-                BuildWorksLocalization.Text("editor.replace_confirm", target.PrefabName, source.Parts.Count, anchor.DisplayName), () =>
+            view.ShowConfirmation(BuildWorksLocalization.Text(keepTarget ? "editor.position_title" : "editor.replace_title"),
+                keepTarget ? PositioningMessage(target, source.Parts.Count) :
+                    BuildWorksLocalization.Text("editor.replace_confirm", target.PrefabName, source.Parts.Count, anchor.DisplayName), () =>
                 {
                     if (!Current()) { view.SetStatus(BuildWorksLocalization.Text("editor.replace_changed"), error: true); return; }
-                    if (ApplyDocumentEdit(() => document.ReplacePartWithBlueprint(targetId, source)))
-                        view.SetStatus(BuildWorksLocalization.Text("editor.replace_done", source.Parts.Count));
+                    if (ApplyDocumentEdit(() => keepTarget ? document.InsertBlueprint(source, transform.Translation, transform.Rotation) :
+                        document.ReplacePartWithBlueprint(targetId, source)))
+                        view.SetStatus(BuildWorksLocalization.Text(keepTarget ? "editor.position_done" : "editor.replace_done", source.Parts.Count));
                 }, height: 450f, closed: () => RestoreReplacementPreview(expected), scenePreview: true);
         }
+
+        private static string PositioningMessage(BlueprintEditorPart target, int count) =>
+            BuildWorksLocalization.Text("editor.position_confirm", target.PrefabName, count,
+                BuildWorksLocalization.Text(target.Metadata?.Minimum != null ?
+                    "editor.position_known" : "editor.position_unknown"));
 
         private void RequestCatalog()
         {

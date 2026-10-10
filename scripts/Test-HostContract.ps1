@@ -872,7 +872,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.122.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.123.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -3262,4 +3262,38 @@ $worldCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'Preci
 $worldCaptureCalls = ($worldCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($worldCaptureCalls -match 'BlueprintStorageCapture::TryCapture' -and $worldCaptureCalls -match 'CompositeBlueprintStore/ForeignPartData::FromGeometry') 'World selection does not preserve container snapshots.'
 
-Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.122 and Valheim Steam build 25185596.'
+$nativePlayer = $hostAssembly.MainModule.Types | Where-Object Name -eq 'Player'
+$nativeSnapOuter = @($nativePlayer.Methods | Where-Object Name -eq 'FindClosestSnapPoints')
+$nativeSnapInner = @($nativePlayer.Methods | Where-Object Name -eq 'FindClosestSnappoint')
+Assert-Contract ($nativeSnapOuter.Count -eq 1 -and $nativeSnapInner.Count -eq 1 -and
+    -not $nativeSnapOuter[0].IsStatic -and -not $nativeSnapInner[0].IsStatic -and
+    $nativeSnapOuter[0].Parameters.Count -eq 5 -and $nativeSnapInner[0].Parameters.Count -eq 5 -and
+    $nativeSnapOuter[0].Parameters[0].ParameterType.FullName -eq 'UnityEngine.Transform' -and
+    $nativeSnapInner[0].Parameters[0].ParameterType.FullName -eq 'UnityEngine.Vector3' -and
+    $nativeSnapInner[0].Parameters[3].ParameterType.FullName -eq 'UnityEngine.Transform&' -and
+    $nativeSnapInner[0].Parameters[4].ParameterType.FullName -eq 'System.Single&') 'Native snap selector signatures changed.'
+$innerCalls = @($nativeSnapOuter[0].Body.Instructions | Where-Object { [string]$_.Operand -match 'Player::FindClosestSnappoint\(' })
+Assert-Contract ($innerCalls.Count -eq 2 -and @($nativePlayer.Fields | Where-Object Name -eq 'm_tempSnapPoints2').Count -eq 1 -and
+    @($nativePlayer.Fields | Where-Object Name -eq 'm_manualSnapPoint').Count -eq 1) 'Native two-call/manual/target-list snap contract changed.'
+$snapSelector = $pluginTypes | Where-Object Name -eq 'BlueprintHammerSnapSearch'
+Assert-Contract ($null -ne $snapSelector) 'Compiled Hammer snap adapter missing.'
+$selectorCalls = @($snapSelector.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($selectorCalls -match 'BlueprintNearestPartIndex::FindNearestByDistance' -and
+    $selectorCalls -match 'BlueprintNearestPartIndex::.ctor' -and $selectorCalls -match 'Vector3::Distance' -and
+    $selectorCalls -match 'NativeSearch::Invoke' -and $selectorCalls -match 'Harmony::GetPatchInfo' -and
+    $selectorCalls -match 'get_Owners' -and @($snapSelector.Methods | Where-Object Name -eq 'Finalizer').Count -eq 1 -and
+    @($snapSelector.Fields | Where-Object { $_.Name -eq 'current' -and
+        @($_.CustomAttributes | Where-Object { $_.AttributeType.FullName -eq 'System.ThreadStaticAttribute' }).Count -eq 1 }).Count -eq 1) `
+    'Hammer snap index/fallback/foreign-patch/scoped cleanup contract missing.'
+$nativeUnityCore = [Mono.Cecil.AssemblyDefinition]::ReadAssembly((Join-Path $ValheimManagedDir 'UnityEngine.CoreModule.dll'))
+$nativeVector = $nativeUnityCore.MainModule.Types | Where-Object FullName -eq 'UnityEngine.Vector3'
+$nativeDistance = $nativeVector.Methods | Where-Object Name -eq 'Distance'
+$nativeDistanceCalls = @($nativeDistance.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($nativeDistanceCalls -match 'System.Math::Sqrt' -and
+    @($nativeDistance.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'sub' }).Count -eq 3 -and
+    @($nativeDistance.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'mul' }).Count -eq 3 -and
+    @($nativeDistance.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'add' }).Count -eq 2 -and
+    @($nativeDistance.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'conv.r4' }).Count -ge 1) `
+    'Native Vector3.Distance float/sqrt metric changed.'
+
+Write-Output 'PASS: current Valheim host contract matches BuildWorks 0.19.123 and Valheim Steam build 25185596.'

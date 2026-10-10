@@ -144,6 +144,14 @@ public static class RuntimeEditorAcceptance
 
     private static void BeginPlay()
     {
+        EnsureSnapTag();
+        EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        SessionState.SetBool(PendingRun, true);
+        EditorApplication.EnterPlaymode();
+    }
+
+    internal static void EnsureSnapTag()
+    {
         var tags = new SerializedObject(AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/TagManager.asset")[0]);
         SerializedProperty values = tags.FindProperty("tags");
         bool hasSnapTag = false;
@@ -155,9 +163,6 @@ public static class RuntimeEditorAcceptance
             values.GetArrayElementAtIndex(values.arraySize - 1).stringValue = "snappoint";
             tags.ApplyModifiedPropertiesWithoutUndo();
         }
-        EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-        SessionState.SetBool(PendingRun, true);
-        EditorApplication.EnterPlaymode();
     }
 
     private static IEnumerator CaptureRuntime()
@@ -625,6 +630,7 @@ public static class RuntimeEditorAcceptance
                 LargeGizmoAcceptance.Run(template, output);
                 TestExperimentalGeometry(template, fontTemplate);
                 WorldSnapPointAcceptance.Run(output);
+                HammerSnapSearchAcceptance.Run(output);
                 GizmoQueryAcceptance.Run(template, output);
                 HeavyBlueprintAcceptance.Run(output);
                 MaterialVariationAcceptance.RunPlacement(output);

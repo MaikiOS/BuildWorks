@@ -3,6 +3,51 @@ public class Player : Humanoid
 {
     public static Player m_localPlayer;
     public long GetPlayerID() => 17;
+    // Inert native search contract fixture; world target collection is supplied by the test.
+    private readonly System.Collections.Generic.List<Transform> m_tempSnapPoints1 = new System.Collections.Generic.List<Transform>();
+    private readonly System.Collections.Generic.List<Transform> m_tempSnapPoints2 = new System.Collections.Generic.List<Transform>();
+    private int m_manualSnapPoint = -1;
+    public readonly System.Collections.Generic.List<Transform> SnapTargets = new System.Collections.Generic.List<Transform>();
+    public int NativeSnapCalls;
+    public int ManualSnap { get => m_manualSnapPoint; set => m_manualSnapPoint = value; }
+    public System.Action BeforeSnapIteration;
+    public bool TestSnap(Transform ghost, float radius, out Transform a, out Transform b) =>
+        FindClosestSnapPoints(ghost, radius, out a, out b, null);
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private bool FindClosestSnapPoints(Transform ghost, float radius, out Transform a, out Transform b,
+        System.Collections.Generic.List<Piece> pieces)
+    {
+        m_tempSnapPoints1.Clear(); ghost.GetComponent<Piece>().GetSnapPoints(m_tempSnapPoints1);
+        m_tempSnapPoints2.Clear(); m_tempSnapPoints2.AddRange(SnapTargets);
+        a = null; b = null; float best = 9999999f;
+        if (m_manualSnapPoint >= 0)
+        {
+            if (!FindClosestSnappoint(m_tempSnapPoints1[m_manualSnapPoint].position, m_tempSnapPoints2,
+                radius, out Transform target, out _)) return false;
+            a = m_tempSnapPoints1[m_manualSnapPoint]; b = target; return true;
+        }
+        foreach (Transform source in m_tempSnapPoints1)
+        {
+            BeforeSnapIteration?.Invoke();
+            if (FindClosestSnappoint(source.position, m_tempSnapPoints2, radius, out Transform target, out float distance) && distance < best)
+            { best = distance; a = source; b = target; }
+        }
+        return a != null;
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private bool FindClosestSnappoint(Vector3 point, System.Collections.Generic.List<Transform> points,
+        float radius, out Transform closest, out float distance)
+    {
+        ++NativeSnapCalls; closest = null; distance = 999999f;
+        foreach (Transform target in points)
+        {
+            float candidate = Vector3.Distance(target.position, point);
+            if (!(candidate > radius) && candidate < distance) { closest = target; distance = candidate; }
+        }
+        return closest != null;
+    }
 }
 public class Humanoid : MonoBehaviour
 {

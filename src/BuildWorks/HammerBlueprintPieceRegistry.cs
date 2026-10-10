@@ -13,7 +13,7 @@ namespace OstrixMods.BuildWorks
 {
     internal sealed class HammerBlueprintPieceRegistry : IDisposable
     {
-        internal const string PrefabPrefix = "BuildWorks_Blueprint_";
+        internal const string PrefabPrefix = BlueprintHammerSnapSearch.PrefabPrefix;
         private static readonly FieldInfo AvailablePiecesField = typeof(PieceTable).GetField(
             "m_availablePiecesByCategory",
             BindingFlags.Instance | BindingFlags.NonPublic);

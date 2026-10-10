@@ -8,6 +8,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
     {
         internal static void Run()
         {
+            CheckRoundedDistances();
             Reject(() => new BlueprintNearestPartIndex(null));
             Reject(() => new BlueprintNearestPartIndex(Array.Empty<Point3>()));
             Reject(() => new BlueprintNearestPartIndex(new Point3[BlueprintEditorDocument.MaximumParts + 1]));
@@ -48,6 +49,37 @@ namespace OstrixMods.BuildWorks.GeometryTests
             var snapshot = new BlueprintNearestPartIndex(mutable);
             mutable[0] = new Point3(100, 0, 0);
             if (snapshot.FindNearest(new Point3()) != 0) throw new InvalidOperationException("Index borrowed mutable source.");
+        }
+
+        private static void CheckRoundedDistances()
+        {
+            var roundedTie = new[] { new Point3(1, 0.0003f, 0), new Point3(1, 0, 0) };
+            var tie = new BlueprintNearestPartIndex(roundedTie);
+            if (tie.FindNearest(new Point3()) != 1 || tie.FindNearestByDistance(new Point3(), 1, out float one) != 0 || one != 1)
+                throw new InvalidOperationException("Rounded sqrt tie was replaced by squared-distance order.");
+            foreach (float bad in new[] { -1f, float.NaN, float.PositiveInfinity })
+                Reject(() => tie.FindNearestByDistance(new Point3(), bad, out _));
+            var random = new Random(123);
+            foreach (int count in new[] { 1, 2, 127, 1024, 6265 })
+            {
+                var points = Enumerable.Range(0, count).Select(_ => Next(random)).Concat(roundedTie).Concat(
+                    new[] { new Point3(1e-30f, 0, 0), new Point3(float.MaxValue, 0, 0) }).ToArray();
+                var index = new BlueprintNearestPartIndex(points);
+                foreach (Point3 query in Enumerable.Range(0, 200).Select(_ => Next(random)).Concat(points.Take(10)).Concat(new[] { new Point3() }))
+                foreach (float radius in new[] { 0f, 0.5f, 1f, 100f, float.MaxValue })
+                {
+                    int expected = -1; float best = float.PositiveInfinity;
+                    for (int i = 0; i < points.Length; ++i)
+                    {
+                        float x = (float)points[i].X - (float)query.X, y = (float)points[i].Y - (float)query.Y,
+                            z = (float)points[i].Z - (float)query.Z;
+                        float distance = (float)Math.Sqrt(x * x + y * y + z * z);
+                        if (distance <= radius && distance < best) { expected = i; best = distance; }
+                    }
+                    if (index.FindNearestByDistance(query, radius, out float actual) != expected || actual != best)
+                        throw new InvalidOperationException("Rounded distance/radius/first target differs from native scan math.");
+                }
+            }
         }
 
         internal static int BruteForce(Point3[] parts, Point3 query)

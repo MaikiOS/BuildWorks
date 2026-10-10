@@ -1,3 +1,11 @@
+## 2026-10-10 — source0.19.123: exact Hammer snap search
+
+Geometry/Store, normal/QA0/0, Host25185596, localization930, QA isolation,
+Unity492 + Harmony17125x128 and correctness/Ponytail PASS. Ordered pair/manual
+indices/native fallback preserved. See docs/HAMMER_SNAP_CHECKPOINT_2026-10-10.md.
+InstalledQA.117 unchanged; no deploy/Valheim/saves/network. All12 refusals and
+512 limits remain. Next separate20000 custom-point capacity and4 full roundtrips.
+
 ## 2026-10-09 — source0.19.122: exact spatial capture dedup
 
 TrySaveWorldSelection uses a bounded spatial collector instead of scanning every

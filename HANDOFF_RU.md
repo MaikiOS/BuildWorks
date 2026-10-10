@@ -1,3 +1,11 @@
+## 2026-10-10 — исходники0.19.123: поиск привязок молотка
+
+Geometry/Store, normal/QA0/0, Host25185596, локализация930, QA isolation,
+Unity492 + Harmony17125x128 и correctness/Ponytail PASS. Пара/ручные индексы/
+native fallback сохранены. См. docs/HAMMER_SNAP_CHECKPOINT_2026-10-10_RU.md.
+Установлена прежняя QA.117; без установки/Valheim/saves/network. Все12 отказов
+и пределы512 прежние. Далее отдельные20000 custom points и полный цикл4 файлов.
+
 ## 2026-10-09 — исходники0.19.122: точный поиск дубликатов захвата
 
 TrySaveWorldSelection использует ограниченный пространственный сборщик вместо

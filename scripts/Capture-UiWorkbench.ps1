@@ -44,13 +44,21 @@ if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $geometryDll -PathType 
 }
 New-Item -ItemType Directory -Path $pluginsPath -Force | Out-Null
 Copy-Item -LiteralPath $geometryDll -Destination $pluginsPath -Force
+foreach ($dependency in @('0Harmony.dll', 'Mono.Cecil.dll', 'MonoMod.Utils.dll', 'MonoMod.RuntimeDetour.dll')) {
+    $dependencyPath = Join-Path (Split-Path -Parent $repositoryRoot) ('BepInEx\core\' + $dependency)
+    Copy-Item -LiteralPath $dependencyPath -Destination $pluginsPath -Force
+    if ((Get-FileHash -LiteralPath $dependencyPath).Hash -ne
+        (Get-FileHash -LiteralPath (Join-Path $pluginsPath $dependency)).Hash) {
+        throw "Workbench Harmony dependency copy mismatch: $dependency"
+    }
+}
 
 # Compile the actual editor implementation. No separate visual facsimile is accepted.
 $runtimeSources = Join-Path $projectPath 'Assets\Editor\RuntimeSources'
 New-Item -ItemType Directory -Path $runtimeSources -Force | Out-Null
 $runtimeFiles = @('NativePlacementMaterialPreview.cs', 'BlueprintMaterialVariation.cs', 'BlueprintEditorView.cs', 'BlueprintEditorCatalogView.cs', 'BlueprintEditorSkin.cs', 'BlueprintEditorInput.cs', 'BlueprintEditorController.cs',
     'BlueprintEditorScene.cs', 'BlueprintEditorMeshData.cs', 'BlueprintEditorIconLibrary.cs',
-    'TransformGizmoView.cs', 'PlacementGhostPreviewView.cs', 'BlueprintBatchedPreview.cs', 'BlueprintWorldSnapPoints.cs', 'BlueprintItemStandPreview.cs', 'BlueprintItemStandCapture.cs', 'BlueprintItemStandPlacement.cs', 'BlueprintStorageCapture.cs', 'BlueprintThumbnailRenderer.cs', 'BlueprintPlacementFrame.cs', 'CompositeBlueprintStore.cs', 'BlueprintPrefabMetadataCapture.cs', 'ExternalBlueprintLibrary.cs', 'BlueprintExchangeFormat.cs',
+    'TransformGizmoView.cs', 'PlacementGhostPreviewView.cs', 'BlueprintBatchedPreview.cs', 'BlueprintWorldSnapPoints.cs', 'BlueprintItemStandPreview.cs', 'BlueprintItemStandCapture.cs', 'BlueprintItemStandPlacement.cs', 'BlueprintStorageCapture.cs', 'BlueprintThumbnailRenderer.cs', 'BlueprintPlacementFrame.cs', 'BlueprintHammerSnapSearch.cs', 'CompositeBlueprintStore.cs', 'BlueprintPrefabMetadataCapture.cs', 'ExternalBlueprintLibrary.cs', 'BlueprintExchangeFormat.cs',
     'PrecisionPlacementHudView.cs', 'BlueprintResourceHudView.cs', 'WorldSelectionHighlight.cs', 'BuildWorksPlacementValidation.cs', 'BlueprintSignText.cs', 'BlueprintExchangeView.cs')
 $sourceProof = foreach ($name in $runtimeFiles) {
     $source = Join-Path $repositoryRoot ('src\BuildWorks\' + $name)

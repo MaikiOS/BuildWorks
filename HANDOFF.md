@@ -1,3 +1,17 @@
+## 2026-10-10 — installed QA0.19.142: empty native containers
+
+The reproduced empty/explicitly cleared Container construction rejection is fixed.
+Only exact root native Container with validated data and an empty default-loot
+list passes; archives/live inventories remain unchanged. Nonempty contents,
+default-loot prefabs and native placement/reload remain open. Normal/QA0/0,
+Host/localization961/isolation/control/protocol28/EditorBridge/Unity492 and both
+reviews passed. Code5fa37ee. Guarded install/hash check passed;137 protected
+files unchanged, Default clean. docs/EMPTY_CONTAINER_CHECKPOINT_2026-10-10.md;
+artifacts/checkpoint-0.19.142/{verification,installation}.json.
+The .141 input channel remains included but has no Valheim smoke proof yet.
+Next: TerrainRamp-1.0-Test → Modded → BW_QA_43d3719a; fresh state/frame,
+short look/movement, release/stop/focus/drag checks. Full goal remains active.
+
 ## 2026-10-10 — installed QA0.19.141: native control channel
 
 Code a80bb2159e7259b63dd9f4ced7305558974b499d. QA-only file mailbox drives bounded

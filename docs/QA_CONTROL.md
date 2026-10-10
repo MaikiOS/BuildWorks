@@ -71,5 +71,4 @@ The channel does not directly grant items, teleport, write ZDO, place objects or
 consume resources. Existing native cost/permission/network rules remain in force.
 Game reload and multiplayer need separate proof. Physical cursor wrap still needs
 its own check: virtual Mouse may not support the native warp command.
-Primary saves/other mods are untouched. The incomplete empty-Container change is
-separate in `artifacts/deferred-container-0.19.141`, excluded from this build.
+Primary saves/other mods are untouched. Installed QA .142 also includes the verified empty-container rejection fix; see [scope and proof](EMPTY_CONTAINER_CHECKPOINT_2026-10-10.md). Native channel/container smoke remains pending.

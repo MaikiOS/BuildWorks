@@ -1,3 +1,14 @@
+## 2026-10-10 — storage transfer audit, runtime .144 unchanged
+
+Six native Inventory/Container/Clone methods and two in-memory negative probes
+are pinned; HostContract25185596 passed, reviews PASSED/Ship. Native moves may
+partially mutate. Populated storage needs shared mount/contents reservations plus
+next-piece cost, postpayment transfer, observed-custody rollback and persisted
+server protocol. Runtime transfer remains unimplemented; I03/I05 stay open.
+See `docs/STORAGE_TRANSFER_AUDIT_2026-10-10_RU.md`,
+`specs/roadmap/storage-placement.md`, `artifacts/storage-transfer-audit-2026-10-10`.
+Installed .144 unchanged; Valheim closed, first channel/fixture24/25 smoke pending.
+
 ## 2026-10-10 — QA0.19.144 installed: contents fixtures
 
 Source9b40045 adds authored fixtures24/25 (empty/populated chest and mount),

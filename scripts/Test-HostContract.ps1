@@ -102,6 +102,13 @@ function Assert-Contract {
     }
 }
 
+function Get-NativeLayoutHash($method) {
+    $layout = ($method.Body.Instructions | ForEach-Object ToString) -join "`n"
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { return [BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($layout))).Replace('-', '') }
+    finally { $sha.Dispose() }
+}
+
 foreach ($iconName in $requiredEditorIcons) {
     $iconPath = Join-Path $editorIconRoot ($iconName + '.png')
     $image = $null
@@ -3254,6 +3261,46 @@ Assert-Contract ($itemSaveCalls -notmatch 'ZDO::|RPC|Object::Instantiate|Invento
 $nativeContainerSave = $containerType.Methods | Where-Object Name -eq 'Save'
 $nativeContainerSaveCalls = ($nativeContainerSave.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($nativeContainerSaveCalls -match 'ZDOVars::s_items' -and $nativeContainerSaveCalls -match 'ZDO::Set\(System.Int32,System.Byte\[\]\)') 'Native Container no longer persists its exact byte package.'
+# A future survival transfer must use exact empty cells, then acknowledge both inventories;
+# this native operation can partially mutate before false/exception and is not a transaction.
+$moveToCell = @($inventoryType.Methods | Where-Object { $_.Name -eq 'MoveItemToThis' -and $_.Parameters.Count -eq 5 })
+$addToCell = @($inventoryType.Methods | Where-Object { $_.Name -eq 'AddItem' -and $_.Parameters.Count -eq 5 -and
+    $_.Parameters[4].ParameterType.FullName -eq 'System.Boolean' })
+$inventoryChanged = @($inventoryType.Methods | Where-Object { $_.Name -eq 'Changed' -and $_.Parameters.Count -eq 2 })
+$containerChanged = @($containerType.Methods | Where-Object Name -eq 'OnContainerChanged')
+$itemCloneLayout = @($itemDataType.Methods | Where-Object Name -eq 'Clone')
+Assert-Contract ($moveToCell.Count -eq 1 -and $moveToCell[0].IsPublic -and
+    $moveToCell[0].FullName -eq 'System.Boolean Inventory::MoveItemToThis(Inventory,ItemDrop/ItemData,System.Int32,System.Int32,System.Int32)' -and
+    $addToCell.Count -eq 1 -and $addToCell[0].IsPrivate -and
+    $inventoryChanged.Count -eq 1 -and $inventoryChanged[0].IsPrivate -and
+    $containerChanged.Count -eq 1 -and $containerChanged[0].IsPrivate -and
+    $itemCloneLayout.Count -eq 1 -and $itemCloneLayout[0].IsPublic) 'Native positional inventory transfer signatures changed.'
+$moveToCell = $moveToCell[0]; $addToCell = $addToCell[0]
+$inventoryChanged = $inventoryChanged[0]; $containerChanged = $containerChanged[0]; $itemCloneLayout = $itemCloneLayout[0]
+$emptyCellClone = @($addToCell.Body.Instructions | Where-Object { [string]$_.Operand -match 'ItemDrop/ItemData::Clone\(' })
+$destinationAdd = @($addToCell.Body.Instructions | Where-Object { [string]$_.Operand -match 'List.*ItemDrop/ItemData.*::Add\(' })
+$sourceDebit = $addToCell.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'stfld' -and
+    [string]$_.Operand -match 'ItemDrop/ItemData::m_stack' } | Select-Object -Last 1
+$localPlayerFlag = @($addToCell.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'ldsfld' -and
+    [string]$_.Operand -match 'Player::m_localPlayerExists' })
+$destinationChanged = @($addToCell.Body.Instructions | Where-Object { [string]$_.Operand -match 'Inventory::Changed\(' })
+Assert-Contract ($emptyCellClone.Count -eq 1 -and $destinationAdd.Count -eq 1 -and
+    $localPlayerFlag.Count -eq 1 -and $destinationChanged.Count -eq 1 -and
+    $emptyCellClone[0].Offset -lt $destinationAdd[0].Offset -and $destinationAdd[0].Offset -lt $sourceDebit.Offset -and
+    $sourceDebit.Offset -lt $localPlayerFlag[0].Offset -and $localPlayerFlag[0].Offset -lt $destinationChanged[0].Offset -and
+    $localPlayerFlag[0].Next.OpCode.Name -in @('brfalse','brfalse.s') -and
+    $localPlayerFlag[0].Next.Operand.Offset -gt $destinationChanged[0].Offset) `
+    'Native empty-cell transfer copy/debit/callback order or local-player-only save boundary changed.'
+$containerChangedCalls = ($containerChanged.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+$inventoryChangedCalls = ($inventoryChanged.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+$cloneCalls = ($itemCloneLayout.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($containerChangedCalls -match 'Container::m_loading' -and $containerChangedCalls -match 'Container::IsOwner\(' -and
+    $containerChangedCalls -match 'Container::Save\(' -and $containerAwakeCalls -match 'Container::OnContainerChanged\(' -and
+    $containerAwakeCalls -match 'Inventory::m_onChanged' -and $inventoryChangedCalls -match 'Inventory::m_onChanged' -and
+    $inventoryChangedCalls -match 'Inventory::UpdateTotalWeight\(') 'Native container owner/loading/callback save chain changed.'
+Assert-Contract ($cloneCalls -match 'Object::MemberwiseClone\(' -and $cloneCalls -match 'ItemDrop/ItemData::m_customData' -and
+    $cloneCalls -match 'Dictionary.*::\.ctor\(' -and $cloneCalls -notmatch 'ItemDrop/ItemData::Load|Inventory::|ZDO::') `
+    'Native provided-item clone no longer preserves properties with an independent custom-data map.'
 $storageCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintStorageCapture' -and $_.Name -eq 'TryCapture' }
 $storageCalls = ($storageCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 foreach ($pattern in 'Player::GetPlayerID', 'PrivateArea::CheckAccess', 'Container::IsInUse', 'Container::GetInventory',
@@ -3296,13 +3343,28 @@ foreach ($entry in @(@($itemSave, 'DAA9052430B2B766A8F15E221AB0D24C63FD55A6723EE
         @($standAttachLayout, '0E107474A83CB6A695BCC5FEBD2792760CB85264CFFA0F2172EA9F1A62CCCAE2'),
         @($numItemsSave, 'EFCB67745DEF1986C47B3526000AC07C0114FDA19AF57F0DABCDE653A6DC456E'),
         @($inventoryLoadLayout, 'E0E6FF90F203C6FFE961DE66768CDEDF609B896945E637A8166B121911BEF935'),
-        @($prefabHashLayout, '8D6089461A9226DC1BDF23B87784C88F378A57F95C1FF6FFB6CCB85E731BF821'))) {
-    $layoutText = ($entry[0].Body.Instructions | ForEach-Object ToString) -join "`n"
-    $layoutSha = [Security.Cryptography.SHA256]::Create()
-    try { $layoutHash = [BitConverter]::ToString($layoutSha.ComputeHash([Text.Encoding]::UTF8.GetBytes($layoutText))).Replace('-', '') }
-    finally { $layoutSha.Dispose() }
-    Assert-Contract ($layoutHash -eq $entry[1]) "Native v109 serializer layout changed: $($entry[0].FullName)"
+        @($prefabHashLayout, '8D6089461A9226DC1BDF23B87784C88F378A57F95C1FF6FFB6CCB85E731BF821'),
+        @($moveToCell, 'A7F221EBB6B801A2EE8EE8607A952A3DC9624BFD3F702BC98C778E7DB01134B6'),
+        @($addToCell, '788DD46A71168FE42327FE69F22A32705EDCA5E53C992AAF45D49CD26A491A8D'),
+        @($inventoryChanged, '3418372BCABB4C4CB300ACBD8A36CB704AC0F5A7A3F2FC1709798C4050A8DE0E'),
+        @($containerChanged, '199FB6EE05F8AD394E5E9D1170F8B18D6EFF0442F2C92DD17E48FE06AE59B440'),
+        @($nativeContainerSave, '50BECD898BAE9E6988DB0D86792B5857C524281AB019E2C78D8DBCB6848D903B'),
+        @($itemCloneLayout, 'AB7409FF6E820D982A70170C29CFA9321141BC5FDAD23BFBB4912E300462ED71'))) {
+    Assert-Contract ((Get-NativeLayoutHash $entry[0]) -eq $entry[1]) "Native inventory/holder layout changed: $($entry[0].FullName)"
 }
+foreach ($entry in @(@($emptyCellClone[0], $addToCell),
+        @(($containerChanged.Body.Instructions | Where-Object { [string]$_.Operand -match 'Container::IsOwner\(' }), $containerChanged))) {
+    $instruction = $entry[0]; $method = $entry[1]
+    $originalOperand = $instruction.Operand
+    $originalHash = Get-NativeLayoutHash $method
+    try {
+        $instruction.Operand = $inventorySave
+        Assert-Contract ((Get-NativeLayoutHash $method) -cne $originalHash) 'Broken native copy/owner negative control was accepted.'
+    }
+    finally { $instruction.Operand = $originalOperand }
+    Assert-Contract ((Get-NativeLayoutHash $method) -ceq $originalHash) 'Native transfer negative control was not restored in memory.'
+}
+Write-Output 'PASS native storage transfer contract: exact signatures/copy/debit/local-player callback/owner-save chain and two in-memory negative controls; no transfers, native game execution or network/disk acknowledgement tested.'
 foreach ($primitive in 'System.Byte', 'System.Int32', 'System.UInt16', 'System.Int64', 'System.String') {
     $writer = $packageType.Methods | Where-Object { $_.Name -eq 'Write' -and $_.Parameters.Count -eq 1 -and $_.Parameters[0].ParameterType.FullName -eq $primitive }
     $writerCalls = @($writer.Body.Instructions | Where-Object { $_.OpCode.Name -in @('call', 'callvirt') } | ForEach-Object { [string]$_.Operand })

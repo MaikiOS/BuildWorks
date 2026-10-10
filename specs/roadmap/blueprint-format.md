@@ -1,5 +1,9 @@
 # Blueprint format and large-construction work
 
+Survival storage placement dependencies and native API limits:
+[storage-placement.md](storage-placement.md). The populated-container path remains
+unimplemented; read-only/native contract checks do not prove restoration.
+
 Current .114 format: native Store19 / portable JSON9 allow1–50000 parts; empty is invalid.
 Older native<=17 / portable<=7 retain min2;18/8 without metadata remain readable.
 Optional Part.metadata v1 records ID/name/type/host/prefabScale and paired local

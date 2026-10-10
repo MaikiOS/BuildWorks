@@ -948,3 +948,16 @@ editor.view.axis_pair	{0}{1} · {2} · Number: per selected axis
 editor.pointer_wrap_controls	Ctrl: reach panels
 editor.pointer_wrap_unavailable	Cursor warp is unavailable in this input backend. Numeric input remains available; cursor is free.
 editor.pointer_wrap_failed	Cursor warp was not acknowledged. Transform cancelled; cursor is free.
+
+exchange.format_plan	PlanBuild
+exchange.plan_help	PlanBuild .blueprint + full BuildWorks copy in a new named folder. Review losses before writing.
+exchange.plan_title	PlanBuild: review losses
+exchange.plan_confirm	Export with losses
+exchange.plan_warning	Only the .buildworks.json copy keeps all construction data. Scroll the review; Back changes the destination or format.
+exchange.plan_review	Folder: {0}\n{1}.blueprint — {2} prefab records with poses and absolute XYZ scale; {3} custom snap positions.\n{1}.buildworks.json — full original construction document, including contents and unknown source data.\n\nPlanBuild omits: groups ({4}), free supports and their placement frame ({5}), anchors ({6}), metadata and mod dependencies ({7}), source archives, complete attribution and usage terms ({8}), material seeds ({9}). IDs, labels, visibility/locks, primary transform frame and preview settings are not carried over. Positions remain in the document coordinate system.\nRequired prefab IDs remain, but missing models still need their mods. A prefab without ZNetView may not restore scale or persist in PlanBuild. World placement, support and resources follow the receiving mod; this export cannot guarantee them.
+exchange.plan_signs	These text overrides are omitted: only nonempty sign text without commas or semicolons is stable in the verified PlanBuild reader. Empty text cannot clear a prefab default. The full copy keeps every text override.
+exchange.plan_state	Object data omitted from PlanBuild, by prefab / format (includes containers, mounts, armor, unknown and administrative state). No raw ZDO or foreign extensions are emitted; the full copy retains this data.
+exchange.plan_identifier	A prefab ID contains ; , ( or starts with #; the PlanBuild reader would change it or skip the row. Nothing was exported.
+exchange.plan_changed	The blueprint or prefab scale changed after review. Press Back and review the export again. Nothing was written.
+exchange.plan_path	The bundle path exceeds this Unity Windows runtime limit (260 characters). Choose a shorter parent folder or bundle name; no files were written. Folder: {0}
+exchange.plan_cancelled	Unfinished PlanBuild export cancelled. No bundle was published.

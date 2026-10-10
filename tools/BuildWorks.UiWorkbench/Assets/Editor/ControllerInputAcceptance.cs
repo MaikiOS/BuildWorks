@@ -1734,6 +1734,67 @@ internal static class ControllerInputAcceptance
                     "ZIP export changed pinned size or multiplier");
                 NativeClick(view, null, "ExchangeClose"); yield return null;
                 Require(!view.HasModal, "Close button cannot dismiss result");
+                view.ShowExchange((parent, textFont, closed) => new BlueprintExchangeView(parent, textFont, store, prepared, closed)); yield return null;
+                exchange = Field<BlueprintExchangeView>(view, "exchangeView");
+                for (int i = 0; i < 300 && Field<Task<string[]>>(exchange, "listing") != null; ++i)
+                { Frame(controller, input, Vector2.zero); yield return null; }
+                string planName = "plan_" + Guid.NewGuid().ToString("N");
+                Field<TMP_InputField>(exchange, "fileName").SetTextWithoutNotify(planName);
+                NativeClick(view, null, "ExchangeFormat"); NativeClick(view, null, "ExchangeFormat"); yield return null;
+                Require(Field<bool>(exchange, "planBuild"), "Third format is not PlanBuild");
+                NativeClick(view, null, "ExchangeSubmit"); yield return null;
+                for (int i = 0; i < 300 && Field<Task<PlanBuildExport>>(exchange, "planInspection") != null; ++i)
+                { Frame(controller, input, Vector2.zero); yield return null; }
+                string planPath = Path.Combine(store.ExportDirectory, planName);
+                var planDetails = Field<TMP_Text>(exchange, "contentsDetails");
+                Require(Field<PlanBuildExport>(exchange, "planReview") != null && !Directory.Exists(planPath) &&
+                    planDetails.text.Contains(planName + ".buildworks.json") && planDetails.text.Contains(planName + ".blueprint") &&
+                    !Field<Button>(exchange, "storageChoice").gameObject.activeSelf &&
+                    planDetails.rectTransform.rect.height > ((RectTransform)planDetails.transform.parent).rect.height,
+                    "PlanBuild review wrote early, lost backup/loss paths, or cannot scroll");
+                NativeClick(view, null, "ExchangeContentsBack"); yield return null;
+                Require(Field<PlanBuildExport>(exchange, "planReview") == null && !Directory.Exists(planPath) &&
+                    Field<TMP_InputField>(exchange, "directory").interactable, "PlanBuild Back kept stale review or wrote files");
+                NativeClick(view, null, "ExchangeSubmit"); yield return null;
+                for (int i = 0; i < 300 && Field<Task<PlanBuildExport>>(exchange, "planInspection") != null; ++i)
+                { Frame(controller, input, Vector2.zero); yield return null; }
+                NativeClick(view, null, "ExchangeSubmit"); yield return null;
+                for (int i = 0; i < 300 && Field<Task<string>>(exchange, "planExport") != null; ++i)
+                { Frame(controller, input, Vector2.zero); yield return null; }
+                Require(!Field<bool>(exchange, "completed") && !Directory.Exists(planPath) &&
+                    Field<TMP_Text>(exchange, "message").text.Contains("260"), "Long bundle path did not refuse clearly before publishing");
+                NativeClick(view, null, "ExchangeContentsBack"); yield return null;
+                planName = "plan_" + Guid.NewGuid().ToString("N").Substring(0, 8);
+                planPath = Path.Combine(store.ExportDirectory, planName);
+                Field<TMP_InputField>(exchange, "fileName").SetTextWithoutNotify(planName);
+                NativeClick(view, null, "ExchangeSubmit"); yield return null;
+                for (int i = 0; i < 300 && Field<Task<PlanBuildExport>>(exchange, "planInspection") != null; ++i)
+                { Frame(controller, input, Vector2.zero); yield return null; }
+                NativeClick(view, null, "ExchangeSubmit"); yield return null;
+                for (int i = 0; i < 300 && Field<Task<string>>(exchange, "planExport") != null; ++i)
+                { Frame(controller, input, Vector2.zero); yield return null; }
+                Require(Field<bool>(exchange, "completed") && Field<string>(exchange, "resultPath") == planPath &&
+                    File.Exists(Path.Combine(planPath, planName + ".blueprint")),
+                    "PlanBuild UI failed to publish complete bundle: " + Field<TMP_Text>(exchange, "message").text);
+                byte[] planBackupBytes = File.ReadAllBytes(Path.Combine(planPath, planName + ".buildworks.json"));
+                var expectedPortable = prepared.ImportCopy();
+                expectedPortable.id = BlueprintExchangeFormat.Decode(System.Text.Encoding.UTF8.GetString(planBackupBytes)).id;
+                Require(planBackupBytes.SequenceEqual(BlueprintExchangeFormat.Encode(expectedPortable)),
+                    "PlanBuild full backup changed original construction data");
+                NativeClick(view, null, "ExchangeClose"); yield return null;
+                view.ShowExchange((parent, textFont, closed) => new BlueprintExchangeView(parent, textFont, store, prepared, closed)); yield return null;
+                exchange = Field<BlueprintExchangeView>(view, "exchangeView");
+                var closeReviewTask = store.ReviewPlanBuildExport(prepared);
+                for (int i = 0; i < 300 && !closeReviewTask.IsCompleted; ++i) yield return null;
+                var closeReview = closeReviewTask.GetAwaiter().GetResult();
+                var pendingExport = new TaskCompletionSource<string>();
+                Set(exchange, "planReview", closeReview); Set(exchange, "planExport", pendingExport.Task); exchange.Tick();
+                NativeClick(view, null, "ExchangeClose"); yield return null;
+                bool closeCancelled = false;
+                try { closeReview.TryWrite(prepared, _ => null, folder, "closed-export", out _, out _); }
+                catch (OperationCanceledException) { closeCancelled = true; }
+                pendingExport.SetCanceled();
+                Require(closeCancelled && !Directory.Exists(Path.Combine(folder, "closed-export")), "Closing a busy export did not cancel publication");
                 string report = "Editor: OK\nWorld: unsupported state\nPrefab scale: (0.25, 0.25, 0.25)";
                 var reportStore = new CompositeBlueprintStore(Path.Combine(folder, "report-only", "blueprints.json"));
                 view.ShowExchange((parent, textFont, closed) => new BlueprintExchangeView(parent, textFont, reportStore, prepared, closed, report: report)); yield return null;

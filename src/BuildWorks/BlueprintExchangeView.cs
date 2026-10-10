@@ -22,6 +22,9 @@ namespace OstrixMods.BuildWorks
         private TMP_Text contentsDetails;
         private Task<CompositeBlueprintStore.ContentsSummary> contentsInspection;
         private Task<CompositeBlueprintStore.ImportReview> importInspection;
+        private Task<PlanBuildExport> planInspection;
+        private Task<string> planExport;
+        private PlanBuildExport planReview;
         private CompositeBlueprintStore.ImportReview importReview;
         private CompositeBlueprintStore.ContentsSummary contentsSummary;
         private CompositeBlueprintStore.MissingPartsReview missingReview;
@@ -35,7 +38,7 @@ namespace OstrixMods.BuildWorks
         private string[] entries = Array.Empty<string>();
         private string selected, resultPath, currentDirectory;
         private int page;
-        private bool importing, archive, completed, disposed;
+        private bool importing, archive, planBuild, completed, disposed;
         internal bool IsOpen => root && root.activeInHierarchy && !disposed;
 
         internal BlueprintExchangeView(Transform parent, TMP_Text template, CompositeBlueprintStore library,
@@ -92,7 +95,13 @@ namespace OstrixMods.BuildWorks
                 fileName = Input("ExchangeFileName", 360, 404, 224, 120);
                 fileName.SetTextWithoutNotify(CompositeBlueprintStore.ExportName(source.name));
                 format = Button("ExchangeFormat", T("exchange.format_json"), 592, 404, 168, () =>
-                { archive = !archive; format.GetComponentInChildren<TMP_Text>().text = T(archive ? "exchange.format_zip" : "exchange.format_json"); });
+                {
+                    if (archive) { archive = false; planBuild = true; }
+                    else if (planBuild) planBuild = false;
+                    else archive = true;
+                    format.GetComponentInChildren<TMP_Text>().text = T(planBuild ? "exchange.format_plan" : archive ? "exchange.format_zip" : "exchange.format_json");
+                    panel.Find("ExchangeHelp").GetComponent<TMP_Text>().text = T(planBuild ? "exchange.plan_help" : "exchange.export_help");
+                });
             }
             message = Label("ExchangeMessage", "", 20, 446, 740, 70, 14);
             message.overflowMode = TextOverflowModes.Ellipsis;
@@ -159,13 +168,27 @@ namespace OstrixMods.BuildWorks
                 catch (Exception error) { if (reviewingContents) SetError(error); }
                 importInspection = null;
             }
-            primary.interactable = !completed && !importing && listing == null && !directory.gameObject.activeSelf &&
+            if (planInspection != null && planInspection.IsCompleted)
+            {
+                try { planReview = planInspection.GetAwaiter().GetResult(); if (reviewingContents && planBuild) RenderPlanReview(); }
+                catch (Exception error) { if (reviewingContents && planBuild) SetError(error); }
+                planInspection = null;
+            }
+            if (planExport != null && planExport.IsCompleted)
+            {
+                try { resultPath = planExport.GetAwaiter().GetResult(); completed = true; ShowResult(T("exchange.exported", resultPath)); }
+                catch (Exception error) { SetError(error); }
+                planExport = null;
+            }
+            bool busy = importing || planExport != null;
+            primary.interactable = !completed && !busy && listing == null && !directory.gameObject.activeSelf &&
                 (blueprint != null || selected != null) && (!reviewingContents ||
-                contentsSummary != null && missingReview != null && (!omitMissingParts || missingReview.CanOmit));
-            copyPath.interactable = !importing;
-            if (completed || importing)
+                (planBuild ? planReview != null : contentsSummary != null && missingReview != null && (!omitMissingParts || missingReview.CanOmit)));
+            copyPath.interactable = !busy;
+            if (completed || busy)
                 foreach (Selectable control in root.GetComponentsInChildren<Selectable>())
-                    control.interactable = control.name == "ExchangeClose" || control.name == "ExchangeCopyPath" && !importing;
+                    control.interactable = control.name == "ExchangeClose" || control.name == "ExchangeCopyPath" && !busy;
+            else if (contentsBack) contentsBack.interactable = true;
         }
 
         private void Browse(string path)
@@ -223,8 +246,15 @@ namespace OstrixMods.BuildWorks
 
         private void Submit()
         {
-            if (completed || importing || listing != null) return;
+            if (completed || importing || planExport != null || listing != null) return;
             if (!reviewingContents) { if (blueprint != null || selected != null) ReviewContents(); return; }
+            if (planBuild)
+            {
+                if (planReview == null) return;
+                try { planExport = store.ExportPlanBuild(planReview, blueprint, directory.text, fileName.text); message.text = T("exchange.loading"); }
+                catch (Exception error) { SetError(error); }
+                Tick(); return;
+            }
             if (contentsSummary == null || missingReview == null) return;
             if (blueprint == null)
             {
@@ -257,7 +287,7 @@ namespace OstrixMods.BuildWorks
 
         private void ReviewContents()
         {
-            reviewingContents = true; contentsSummary = null; importReview = null; missingReview = null;
+            reviewingContents = true; contentsSummary = null; importReview = null; missingReview = null; planReview = null;
             clearStorage = clearMounts = omitArmorState = omitMissingParts = false;
             SetFileControls(false); copyPath.gameObject.SetActive(false);
             if (!contentsPanel)
@@ -283,7 +313,8 @@ namespace OstrixMods.BuildWorks
                 { omitMissingParts = !omitMissingParts; RenderContents(); }, contentsPanel);
                 contentsBack = Button("ExchangeContentsBack", T("exchange.back"), 256, 530, 276, () =>
                 {
-                    reviewingContents = false; contentsPanel.gameObject.SetActive(false);
+                    reviewingContents = false; contentsInspection = null; importInspection = null; planInspection = null;
+                    planReview = null; contentsPanel.gameObject.SetActive(false);
                     contentsBack.gameObject.SetActive(false); copyPath.gameObject.SetActive(true);
                     SetFileControls(true); message.text = "";
                     primary.GetComponentInChildren<TMP_Text>().text = T(blueprint == null ? "exchange.import" : "exchange.export");
@@ -294,6 +325,15 @@ namespace OstrixMods.BuildWorks
             storageChoice.interactable = mountChoice.interactable = primary.interactable = false;
             primary.GetComponentInChildren<TMP_Text>().text = T(blueprint == null ? "exchange.confirm_import" : "exchange.confirm_export");
             message.text = T("exchange.loading");
+            if (planBuild)
+            {
+                storageChoice.gameObject.SetActive(false); mountChoice.gameObject.SetActive(false);
+                contentsDetails.text = "";
+                try { planInspection = store.ReviewPlanBuildExport(blueprint); }
+                catch (Exception error) { SetError(error); }
+                return;
+            }
+            storageChoice.gameObject.SetActive(true); mountChoice.gameObject.SetActive(true);
             if (blueprint != null)
             {
                 var supports = store.MaterialSeedSupportSnapshot(new[] { blueprint });
@@ -305,6 +345,27 @@ namespace OstrixMods.BuildWorks
                 int worldLevel = Game.m_worldLevel; // Capture on host thread; file worker never reads Unity/game state.
                 importInspection = Task.Run(() => CompositeBlueprintStore.ReviewImportFile(source, name => name.GetStableHashCode(), worldLevel));
             }
+        }
+
+        private void RenderPlanReview()
+        {
+            contentsPanel.Find("ExchangeContentsTitle").GetComponent<TMP_Text>().text = T("exchange.plan_title");
+            string target = Path.Combine(directory.text, fileName.text);
+            contentsDetails.text = T("exchange.plan_review", target, fileName.text, planReview.Parts, planReview.CustomSnaps,
+                planReview.Groups, planReview.Supports, planReview.Anchors, planReview.Metadata, planReview.Sources, planReview.MaterialSeeds);
+            if (planReview.OmittedSigns.Count > 0)
+                contentsDetails.text += "\n\n" + T("exchange.plan_signs") + "\n" +
+                    string.Join("\n", planReview.OmittedSigns.Select(entry => T("exchange.loss_source", entry.Key, entry.Value)));
+            if (planReview.OmittedState.Count > 0)
+                contentsDetails.text += "\n\n" + T("exchange.plan_state") + "\n" +
+                    string.Join("\n", planReview.OmittedState.Select(entry => T("exchange.loss_source", entry.Key, entry.Value)));
+            var viewport = (RectTransform)contentsDetails.transform.parent;
+            viewport.sizeDelta = new Vector2(716, 206);
+            contentsDetails.rectTransform.sizeDelta = new Vector2(700, Mathf.Max(206, contentsDetails.GetPreferredValues(contentsDetails.text, 700, 0).y));
+            viewport.GetComponent<ScrollRect>().verticalNormalizedPosition = 1;
+            contentsPanel.sizeDelta = new Vector2(740, 266);
+            primary.GetComponentInChildren<TMP_Text>().text = T("exchange.plan_confirm");
+            message.text = T("exchange.plan_warning");
         }
 
         private void RefreshMissing()
@@ -440,6 +501,7 @@ namespace OstrixMods.BuildWorks
         public void Dispose()
         {
             if (disposed) return; disposed = true;
+            planReview?.CancelWrite();
             root.SetActive(false); UnityEngine.Object.Destroy(root); skin.Dispose();
             if (EventSystem.current && previousFocus && previousFocus.activeInHierarchy)
                 EventSystem.current.SetSelectedGameObject(previousFocus);

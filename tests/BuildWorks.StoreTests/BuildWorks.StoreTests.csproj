@@ -14,6 +14,7 @@
     <Compile Include="..\..\src\BuildWorks\CompositeBlueprintStore.cs" Link="CompositeBlueprintStore.cs" />
     <Compile Include="..\..\src\BuildWorks\ExternalBlueprintLibrary.cs" Link="ExternalBlueprintLibrary.cs" />
     <Compile Include="..\..\src\BuildWorks\BlueprintExchangeFormat.cs" Link="BlueprintExchangeFormat.cs" />
+    <Compile Include="..\..\src\BuildWorks\PlanBuildExport.cs" Link="PlanBuildExport.cs" />
     <Reference Include="System.IO.Compression" />
   </ItemGroup>
 

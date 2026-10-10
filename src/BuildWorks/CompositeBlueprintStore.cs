@@ -466,10 +466,7 @@ namespace OstrixMods.BuildWorks
                 byte[] bytes = BlueprintExchangeFormat.Encode(prepared);
                 BlueprintExchangeFormat.Decode(new UTF8Encoding(false, true).GetString(bytes));
                 directory = ValidateExchangeDirectory(directory);
-                if (string.IsNullOrWhiteSpace(fileName) || fileName.Length > 120 || fileName != fileName.Trim() ||
-                    fileName.EndsWith(".", StringComparison.Ordinal) || fileName.Any(c => char.IsControl(c) || "<>:\"/\\|?*".Contains(c)) ||
-                    fileName == "." || fileName == "..")
-                    throw new InvalidDataException("$buildworks_exchange.invalid_name");
+                ValidateExportName(fileName);
                 string target = Path.Combine(directory, fileName + (archive ? ".zip" : ".buildworks.json"));
                 if (File.Exists(target)) throw new IOException(UserError("exchange.exists", target));
                 Directory.CreateDirectory(directory);
@@ -492,6 +489,38 @@ namespace OstrixMods.BuildWorks
                 catch (Exception exception) { Debug.LogWarning("BuildWorks export cleanup: " + exception.Message); }
             }
         }
+
+        internal static void ValidateExportName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name) || name.Length > 120 || name != name.Trim() ||
+                name.EndsWith(".", StringComparison.Ordinal) || name.Any(c => char.IsControl(c) || "<>:\"/\\|?*".Contains(c)) ||
+                name == "." || name == "..")
+                throw new InvalidDataException("$buildworks_exchange.invalid_name");
+        }
+
+        internal Task<PlanBuildExport> ReviewPlanBuildExport(Blueprint blueprint)
+        {
+            var copy = blueprint.ImportCopy();
+            var scales = PlanBuildScaleSnapshot(copy);
+            return Task.Run(() => PlanBuildExport.Review(copy, name => scales.TryGetValue(name, out var value) ? value : null));
+        }
+        private Dictionary<string, VectorData?> PlanBuildScaleSnapshot(Blueprint blueprint) =>
+            blueprint.parts.Where(part => !part.scaleIsAbsolute && !part.baseScale.HasValue)
+                .Select(part => part.prefabName).Distinct(StringComparer.Ordinal)
+                .ToDictionary(name => name, name => importPrefabScale?.Invoke(name), StringComparer.Ordinal);
+        internal Task<string> ExportPlanBuild(PlanBuildExport review, Blueprint blueprint, string directory, string name)
+        {
+            var copy = blueprint.ImportCopy();
+            var scales = PlanBuildScaleSnapshot(copy); // Snapshot host values before entering the file worker.
+            return Task.Run(() =>
+            {
+                if (!review.TryWrite(copy, id => scales.TryGetValue(id, out var value) ? value : null, directory, name, out string result, out string error))
+                    throw new IOException(error);
+                return result;
+            });
+        }
+        internal bool TryExportPlanBuild(PlanBuildExport review, Blueprint blueprint, string directory, string name,
+            out string exportedPath, out string error) => review.TryWrite(blueprint, importPrefabScale, directory, name, out exportedPath, out error);
 
         public IReadOnlyList<string> Categories() => data.categories;
 

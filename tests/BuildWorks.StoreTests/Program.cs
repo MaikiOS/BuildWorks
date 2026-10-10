@@ -23,7 +23,10 @@ namespace OstrixMods.BuildWorks.StoreTests
                     return ImportTimingChecks.RunCatalog(args[1], directory);
                 if (args.Length == 2 && args[0] == "--catalog-phases")
                     return ImportTimingChecks.RunCatalogPhases(args[1], directory);
+                if (args.Length == 2 && args[0] == "--planbuild-export")
+                { PlanBuildExportChecks.Run(args[1]); return 0; }
                 SourceEvidenceCacheChecks.Run();
+                PlanBuildExportChecks.Run(Path.Combine(directory, "planbuild-export"));
                 ValidationReadChecks.Run(Path.Combine(directory, "validation-reads"));
                 LargeSnapChecks.Run(Path.Combine(directory, "large-snap-bounds"));
                 VbuildDialectChecks.Run(Path.Combine(directory, "legacy-vbuild"));

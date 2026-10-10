@@ -59,7 +59,7 @@ New-Item -ItemType Directory -Path $runtimeSources -Force | Out-Null
 $runtimeFiles = @('NativePlacementMaterialPreview.cs', 'BlueprintMaterialVariation.cs', 'BlueprintEditorView.cs', 'BlueprintEditorCatalogView.cs', 'BlueprintEditorSkin.cs', 'BlueprintEditorInput.cs', 'BlueprintEditorController.cs',
     'BlueprintEditorScene.cs', 'BlueprintEditorMeshData.cs', 'BlueprintEditorIconLibrary.cs',
     'TransformGizmoView.cs', 'PlacementGhostPreviewView.cs', 'BlueprintBatchedPreview.cs', 'BlueprintWorldSnapPoints.cs', 'BlueprintItemStandPreview.cs', 'BlueprintItemStandCapture.cs', 'BlueprintItemStandPlacement.cs', 'BlueprintStorageCapture.cs', 'BlueprintThumbnailRenderer.cs', 'BlueprintPlacementFrame.cs', 'BlueprintHammerSnapSearch.cs', 'CompositeBlueprintStore.cs', 'BlueprintPrefabMetadataCapture.cs', 'ExternalBlueprintLibrary.cs', 'BlueprintExchangeFormat.cs',
-    'PrecisionPlacementHudView.cs', 'BlueprintResourceHudView.cs', 'WorldSelectionHighlight.cs', 'BuildWorksPlacementValidation.cs', 'BlueprintSignText.cs', 'BlueprintExchangeView.cs', 'VanillaMidpointSnapPoints.cs')
+    'PrecisionPlacementHudView.cs', 'BlueprintResourceHudView.cs', 'WorldSelectionHighlight.cs', 'BuildWorksPlacementValidation.cs', 'BlueprintSignText.cs', 'BlueprintExchangeView.cs', 'PlanBuildExport.cs', 'VanillaMidpointSnapPoints.cs')
 $sourceProof = foreach ($name in $runtimeFiles) {
     $source = Join-Path $repositoryRoot ('src\BuildWorks\' + $name)
     $destination = Join-Path $runtimeSources $name

@@ -1,3 +1,18 @@
+## 2026-10-10 — установленная QA0.19.140
+
+Код535ba3170c71b641d568a30db95a1a988fb758fc. Экспорт PlanBuild13 полей:
+явные потери, авторство источника и полная соседняя копия BuildWorks.
+Разбор/запись в фоне; stale source/basis, совпадение имени и длинный путь дают
+явный отказ. Закрытие/Escape отменяет до атомарной публикации; чужие расширения
+не обещаны. Normal/QA0/0, Store, Host25185596, localization960, isolation/preflight,
+Unity492, final pinned reader двух файлов/en-US/ru-RU и оба обзора PASSED/Ship.
+SHA сверены, Default чист;137 config/import/save файлов неизменны.
+Valheim не запускался; чужая стройка/reload/сеть не проверены. Протокол:
+PLANBUILD_EXPORT_CHECKPOINT_2026-10-10_RU.md; сценарий QA_0.19.140_RU.md;
+квитанции artifacts/checkpoint-0.19.140/verification.json и installation.json.
+Полная цель и прежние непринятые проверки .137 открыты.
+Быстрый канал управления настоящей игрой обсуждён, ещё не реализован.
+
 ## 2026-10-10 — установленная QA0.19.139
 
 Код a4e66c95ef294a7f1c120eacd7712a79b4b3ed33. EditorCatalogStatus проверяет каждый

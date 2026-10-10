@@ -1,3 +1,18 @@
+## 2026-10-10 — installed QA0.19.140
+
+Code535ba3170c71b641d568a30db95a1a988fb758fc. PlanBuild thirteen-field export
+with explicit losses, source attribution and a full adjacent BuildWorks copy.
+Background review/write; stale source/basis, collisions and long paths fail clearly;
+Close/Escape cancels before atomic publication. No foreign extensions promised.
+Normal/QA0/0, full Store, Host25185596, localization960, isolation/preflight,
+Unity492 and final pinned reader (two files, en-US/ru-RU) passed; both reviews Ship.
+Installed SHA pair checked, Default clean;137 config/import/save files unchanged.
+No Valheim launch or PlanBuild construction/reload/network proof. See
+PLANBUILD_EXPORT_CHECKPOINT_2026-10-10_RU.md, QA_0.19.140_RU.md and local
+artifacts/checkpoint-0.19.140/verification.json + installation.json.
+Full blueprint goal and previous unaccepted .137 checks remain open.
+Fast interactive game-control bridge discussed only, not implemented.
+
 ## 2026-10-10 — installed QA0.19.139
 
 Code a4e66c95ef294a7f1c120eacd7712a79b4b3ed33. EditorCatalogStatus checks each exact

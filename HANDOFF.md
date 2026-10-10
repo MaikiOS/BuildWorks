@@ -1,3 +1,15 @@
+## 2026-10-10 — QA0.19.144 installed: contents fixtures
+
+Source9b40045 adds authored fixtures24/25 (empty/populated chest and mount),
+plus independently receipted one-time materials/two ordinary swords. Previous
+cohorts and receipts remain unchanged. Automated checks/read-only reviews passed;
+DLL/fixture SHA match,137 existing config/import/save files unchanged, Default clean.
+Valheim not launched: native input, grants, layout/support, resource/item
+accounting/reload/network remain unproven. I05 and the full goal stay open.
+Next: Modded → BW_QA_43d3719a; fresh frame/turn/step/stop, then the new fixture.
+See `docs/CONTENTS_FIXTURES_CHECKPOINT_2026-10-10.md`,
+`docs/QA_0.19.144_RU.md`; evidence `artifacts/checkpoint-0.19.144`.
+
 ## 2026-10-10 — QA0.19.143 installed: placement contents choices
 
 Code ab3fa2b adds independent storage/mount choices on a detached recipe through

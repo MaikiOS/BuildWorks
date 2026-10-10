@@ -26,7 +26,8 @@ namespace OstrixMods.BuildWorks
             return result;
         }
 
-        internal static List<CompositeBlueprintStore.Blueprint> Load(string directory, string stagedPath = null, string stagedName = null)
+        internal static List<CompositeBlueprintStore.Blueprint> Load(string directory, string stagedPath = null, string stagedName = null,
+            Dictionary<string, CompositeBlueprintStore.Blueprint> validationReads = null)
         {
             var result = new List<CompositeBlueprintStore.Blueprint>();
             if (!Directory.Exists(directory)) return result;
@@ -46,12 +47,13 @@ namespace OstrixMods.BuildWorks
             foreach (string path in paths)
             {
                 if (result.Count >= MaximumFiles) break;
-                AppendFile(path, result, ref budget, path == stagedPath ? stagedName : null);
+                AppendFile(path, result, ref budget, path == stagedPath ? stagedName : null, validationReads);
             }
             return result;
         }
 
-        private static void AppendFile(string path, List<CompositeBlueprintStore.Blueprint> result, ref long budget, string sourceName = null)
+        private static void AppendFile(string path, List<CompositeBlueprintStore.Blueprint> result, ref long budget, string sourceName = null,
+            Dictionary<string, CompositeBlueprintStore.Blueprint> validationReads = null)
         {
             string extension = Path.GetExtension(path).ToLowerInvariant();
             if (extension != ".zip" && !Supported(path)) return;
@@ -74,7 +76,7 @@ namespace OstrixMods.BuildWorks
                             if (result.Count >= MaximumFiles) throw new InvalidDataException("$buildworks_import.library_limit");
                             string source = (sourceName ?? Path.GetFileName(path)) + "/" + entry.FullName;
                             using (Stream data = entry.Open())
-                                result.Add(Read(data, entry.Length, source, ref budget));
+                                result.Add(Read(data, entry.Length, source, ref budget, validationReads));
                             ZipArchiveEntry preview = zip.GetEntry(Path.ChangeExtension(entry.FullName, ".png"));
                             if (preview != null && preview.Length <= MaximumPreviewBytes && preview.Length <= budget)
                             {
@@ -91,7 +93,7 @@ namespace OstrixMods.BuildWorks
                     }
                 }
                 else using (Stream stream = File.OpenRead(path))
-                    result.Add(Read(stream, stream.Length, sourceName ?? Path.GetFileName(path), ref budget));
+                    result.Add(Read(stream, stream.Length, sourceName ?? Path.GetFileName(path), ref budget, validationReads));
             }
             catch (Exception exception) when (exception is IOException || exception is InvalidDataException || exception is UnauthorizedAccessException || exception is ArgumentException)
             {
@@ -133,7 +135,8 @@ namespace OstrixMods.BuildWorks
             name.EndsWith(".vbuild", StringComparison.OrdinalIgnoreCase) ||
             name.EndsWith(".buildworks.json", StringComparison.OrdinalIgnoreCase);
 
-        private static CompositeBlueprintStore.Blueprint Read(Stream stream, long length, string source, ref long budget)
+        private static CompositeBlueprintStore.Blueprint Read(Stream stream, long length, string source, ref long budget,
+            Dictionary<string, CompositeBlueprintStore.Blueprint> validationReads = null)
         {
             int limit = source.EndsWith(".buildworks.json", StringComparison.OrdinalIgnoreCase)
                 ? BlueprintExchangeFormat.MaximumBytes : MaximumFileBytes;
@@ -151,7 +154,19 @@ namespace OstrixMods.BuildWorks
                         if (bytes.Length + read > length) throw new InvalidDataException("$buildworks_import.file_limit");
                         bytes.Write(buffer, 0, read);
                     }
-                    return Parse(new UTF8Encoding(false, true).GetString(bytes.ToArray()), source);
+                    string text = new UTF8Encoding(false, true).GetString(bytes.ToArray());
+                    if (validationReads != null && validationReads.TryGetValue(source, out var cached) &&
+                        cached.sourceDocuments[0].text == text)
+                        return cached.ValidationReadCopy();
+                    var parsed = Parse(text, source);
+                    // One import worker only; exact text is already retained in foreign source evidence.
+                    if (validationReads != null && !source.EndsWith(".buildworks.json", StringComparison.OrdinalIgnoreCase) &&
+                        parsed.sourceDocuments?.Count == 1)
+                    {
+                        validationReads[source] = parsed;
+                        return parsed.ValidationReadCopy();
+                    }
+                    return parsed;
                 }
             }
             catch (Exception exception) when (exception is IOException || exception is InvalidDataException || exception is DecoderFallbackException)

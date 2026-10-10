@@ -19,6 +19,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             {
                 if ((args.Length == 2 || args.Length == 3) && args[0] == "--import-timings")
                     return ImportTimingChecks.Run(args[1], args.Length == 3 ? args[2] : null, directory);
+                ValidationReadChecks.Run(Path.Combine(directory, "validation-reads"));
                 LargeSnapChecks.Run(Path.Combine(directory, "large-snap-bounds"));
                 VbuildDialectChecks.Run(Path.Combine(directory, "legacy-vbuild"));
                 MaterialSeedChecks.Run(Path.Combine(directory, "material-seed"));

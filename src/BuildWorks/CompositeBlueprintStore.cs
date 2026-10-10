@@ -390,7 +390,8 @@ namespace OstrixMods.BuildWorks
                         throw new InvalidDataException("$buildworks_exchange.source_changed");
                     ValidateExchangeDirectory(ImportDirectory);
                     Directory.CreateDirectory(ImportDirectory);
-                    var catalog = ExternalBlueprintLibrary.Load(ImportDirectory);
+                    var validationReads = new Dictionary<string, Blueprint>(StringComparer.Ordinal);
+                    var catalog = ExternalBlueprintLibrary.Load(ImportDirectory, validationReads: validationReads);
                     string temporary = Path.Combine(ImportDirectory, Guid.NewGuid().ToString("N") + ".tmp.zip");
                     try
                     {
@@ -416,7 +417,7 @@ namespace OstrixMods.BuildWorks
                         if (catalog.Count + validated.Count > ExternalBlueprintLibrary.MaximumFiles)
                             throw new InvalidDataException("$buildworks_import.library_limit");
                         // Validate the exact future sort order and shared read budget, not just this ZIP in isolation.
-                        var candidate = ExternalBlueprintLibrary.Load(ImportDirectory, temporary, Path.GetFileName(target));
+                        var candidate = ExternalBlueprintLibrary.Load(ImportDirectory, temporary, Path.GetFileName(target), validationReads);
                         var validCopies = candidate.Where(document => document.importError == null)
                             .GroupBy(document => document.id).ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
                         if (candidate.Count != catalog.Count + validated.Count ||
@@ -1855,6 +1856,8 @@ namespace OstrixMods.BuildWorks
             // Transient read-only import diagnostics; not persisted library fields.
             internal byte[] importPreview;
             internal bool importAbsoluteScale;
+            // Parsed lists stay read-only within one validation worker; each read owns its optional preview.
+            internal Blueprint ValidationReadCopy() => (Blueprint)MemberwiseClone();
             internal Blueprint ImportCopy()
             {
                 var copy = (Blueprint)MemberwiseClone();

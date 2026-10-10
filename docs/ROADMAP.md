@@ -1,3 +1,18 @@
+## 2026-10-10 — installed QA0.19.136
+
+G/S then two axes selects XY/XZ/YZ (including reversed order), with mouse/numeric
+input and both buttons highlighted. The excluded axis stays unchanged. Repeating
+the primary switches local/world frame; a third selects one axis. Rotation stays
+single-axis. Code cdafadf. Geometry, normal/QA0/0, Host25185596, localization945,
+isolation/preflight, Unity492 at14:05:55.8691308UTC and correctness/Ponytail passed.
+verify unavailable. Store unchanged; last full run .135. Initial overlapping builds
+hit CS2012; sequential builds passed. Guarded installation only TerrainRamp-1.0-Test;
+both hashes match, Default clean,137 existing config/import/save files unchanged.
+No Valheim/world/network run. Manual: docs/QA_0.19.136_RU.md (scale bounds, XZ,
+Align retaining missing record). Accepted cases are not requested again.
+Continuous cursor remains pending; actual Input.mousePositionDelta exists but no
+public warp. Physical-drag-only capture is insufficient for keyboard G/S and UI.
+Goal remains active; document edits do not update the goal mechanism.
 ## 2026-10-10 — QA0.19.135: positioning and scale boundaries
 
 Code ba977c4. Separate Align action retains the missing record/marker. Recorded

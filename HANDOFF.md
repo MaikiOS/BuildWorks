@@ -1,3 +1,14 @@
+## 2026-10-10 — QA0.19.132 installed: import validation and accumulated fixes
+
+Code4e9b34e, diagnosticb9e6312. Full Store, normal/QA0/0, Host/localization933,
+isolation/preflight, Unity492 (12:19:54UTC), correctness PASSED and Ponytail Ship.
+On a copy of364 documents, mean worker remaining wait fell47.3%/41.3% for4/4096
+parts. Catalogue/models/thumbnails remain open. Geometry unchanged/not rerun.
+Evidence: docs/IMPORT_VALIDATION_CHECKPOINT_2026-10-10.md. Guarded deployment only
+to TerrainRamp-1.0-Test: both hashes match, Default clean,118 existing protected
+config/import/save files unchanged. No Valheim or network execution.
+Next: docs/QA_0.19.132_RU.md for axes, snap17/18, replacement pose, popup/filter,
+import and legacy22. Preserve .117 acceptance and supply receipts.
 ## 2026-10-10 — source0.19.131: popup and compact filters
 
 Tools stay inside the viewport above hints; filters use28/12/2 and content-sized

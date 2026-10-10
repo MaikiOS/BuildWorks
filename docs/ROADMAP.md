@@ -1,3 +1,20 @@
+## 2026-10-10 — QA0.19.143 installed: placement contents choices
+
+Code ab3fa2b adds independent storage/mount choices on a detached recipe through
+one catalog/F9/click gate. Strict placement validation and resource rules remain;
+saved source contents are preserved. Cancel, stale context and pending-task close
+are guarded, including same-frame Escape after self-disposal. Normal/QA0/0,
+localization972, Host Steam25185596, Store/isolation/EditorBridge, QA contracts,
+protocol28 and Unity492 passed; independent reviews PASSED/Ship. Previously stale
+Workbench runtime copies were refreshed from the tested canonical sources.
+Installation/SHA verified;137 protected config/import/save files unchanged,
+Default clean. See docs/PLACEMENT_CONTENTS_CHECKPOINT_2026-10-10.md and
+artifacts/checkpoint-0.19.143/{verification,installation}.json.
+I05 is partial: native modal/build/reload and a ready native contents fixture are
+pending; populated storage, ArmorStand and administrator restoration stay open.
+First QA-channel smoke remains pending: Modded → BW_QA_43d3719a, fresh state/frame,
+short look/step and stop. Valheim was not launched. Full goal remains active.
+
 ## 2026-10-10 — native QA input contract verified without launching Valheim
 
 Verifier checkpoint4f5f2ff reads actual PlayerController/ZInput assemblies and

@@ -1,3 +1,18 @@
+## 2026-10-10 — installed QA0.19.141: native control channel
+
+Code a80bb2159e7259b63dd9f4ced7305558974b499d. QA-only file mailbox drives bounded
+native InputSystem keyboard/mouse plus BuildWorks legacy/UGUI and returns state/frame.
+One-use nonce/ID, expiry, focus/physical-stop, device restoration and pending-gesture
+cancellation; no OS input, network service or direct world/cost bypass. Protocol28,
+normal/QA0/0, Host25185596, localization961, compiled isolation/control, preflight,
+Unity492 (native Button/Slider/ScrollRect abort) and both reviews PASSED/Ship.
+Installed SHA pair checked, Default clean;137 protected files unchanged at deployment.
+No game launch or native-input/focus/stop proof yet. See docs/QA_CONTROL.md and
+artifacts/checkpoint-0.19.141/{verification,installation}.json. Full goal and .137/.140
+game checks remain open. Empty-Container work deferred outside this build under
+artifacts/deferred-container-0.19.141. Next: owner loads BW_QA_43d3719a through
+TerrainRamp-1.0-Test -> Modded, then state/frame and short input smoke.
+
 ## 2026-10-10 — installed QA0.19.140
 
 Code535ba3170c71b641d568a30db95a1a988fb758fc. PlanBuild thirteen-field export

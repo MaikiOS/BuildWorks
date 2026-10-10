@@ -1,3 +1,19 @@
+## 2026-10-10 — установлена QA0.19.141: канал управления игрой
+
+Код a80bb2159e7259b63dd9f4ced7305558974b499d. Только QA DLL: ограниченные native
+InputSystem/legacy/UGUI команды через файлы, состояние и кадр. Одноразовые nonce/ID,
+expiry/focus/физическая остановка, возврат устройств и отмена незавершённых жестов;
+без ввода Windows, сетевой службы или прямого обхода строительства/стоимости.
+Protocol28, normal/QA0/0, Host25185596, localization961, compiled isolation/control,
+preflight, Unity492 с настоящими Button/Slider/ScrollRect и оба обзора PASSED/Ship.
+SHA пары сверены; Default чист,137 защищённых файлов неизменны при установке.
+Valheim этим этапом не запускался; native ввод/кадр/stop/focus ещё не доказаны.
+Инструкции docs/QA_CONTROL_RU.md; artifacts/checkpoint-0.19.141/{verification,installation}.json.
+Полная цель и игровые проверки .137/.140 открыты. Незавершённая правка пустых
+Container отдельно в artifacts/deferred-container-0.19.141, в сборку не включена.
+Далее Ostrix загружает BW_QA_43d3719a через TerrainRamp-1.0-Test -> Modded;
+агент проверяет состояние/кадр и короткий ввод.
+
 ## 2026-10-10 — установленная QA0.19.140
 
 Код535ba3170c71b641d568a30db95a1a988fb758fc. Экспорт PlanBuild13 полей:

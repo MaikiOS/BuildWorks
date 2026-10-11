@@ -280,6 +280,7 @@ namespace OstrixMods.BuildWorks
             internal byte[] Bytes;
             internal List<Blueprint> Documents;
             internal ContentsSummary Contents;
+            internal MissingPartsReview Missing;
             // Called by the host thread only, never by the file/preparation worker.
             internal Func<bool> IsHostCurrent;
         }
@@ -304,6 +305,14 @@ namespace OstrixMods.BuildWorks
             var scales = review.Documents.SelectMany(document => document.parts).Select(part => part.prefabName)
                 .Distinct(StringComparer.Ordinal).ToDictionary(name => name, name => importPrefabScale?.Invoke(name), StringComparer.Ordinal);
             var supports = MaterialSeedSupportSnapshot(review.Documents);
+            var missing = new MissingPartsReview
+            {
+                HostContext = context,
+                Known = importPrefabScale != null && (importHostContext == null || context != null)
+            };
+            if (missing.Known)
+                foreach (var entry in scales)
+                    if (!entry.Value.HasValue) missing.PrefabIds.Add(entry.Key);
             Func<bool> current = () => generation == importGeneration &&
                 ReferenceEquals(context, importHostContext?.Invoke()) && worldLevel == importWorldLevel?.Invoke();
             return Task.Run(() =>
@@ -313,12 +322,21 @@ namespace OstrixMods.BuildWorks
                     Source = review.Source,
                     Bytes = review.Bytes,
                     Contents = new ContentsSummary(),
+                    Missing = missing,
                     IsHostCurrent = current,
                     Documents = review.Documents.Select(document => ExternalBlueprintLibrary.PrepareForHost(document,
                         name => scales.TryGetValue(name, out var scale) ? scale : null, prefabHash, worldLevel, supports)).ToList()
                 };
+                var summaries = new Dictionary<Blueprint, ContentsSummary>();
                 foreach (Blueprint document in result.Documents)
-                    result.Contents.Add(InspectContents(document, prefabHash, supports));
+                {
+                    var summary = InspectContents(document, prefabHash, supports);
+                    summaries[document] = summary;
+                    result.Contents.Add(summary);
+                }
+                if (missing.Known)
+                    SummarizeMissing(missing, result.Documents, document => summaries.TryGetValue(document, out var summary)
+                        ? summary : InspectContents(document, prefabHash, supports));
                 return result;
             });
         }
@@ -599,6 +617,14 @@ namespace OstrixMods.BuildWorks
             foreach (string prefab in documents.SelectMany(document => document.parts).Select(part => part.prefabName).Distinct(StringComparer.Ordinal))
                 if (!importPrefabScale(prefab).HasValue) result.PrefabIds.Add(prefab);
             result.Known = true;
+            SummarizeMissing(result, documents, inspectRetainedContents
+                ? (Func<Blueprint, ContentsSummary>)(document => InspectContents(document, prefabHash, SupportsMaterialSeed)) : null);
+            return result;
+        }
+
+        private static void SummarizeMissing(MissingPartsReview result, IReadOnlyList<Blueprint> documents,
+            Func<Blueprint, ContentsSummary> inspectRetainedContents)
+        {
             foreach (Blueprint document in documents)
             {
                 int removed = 0;
@@ -613,9 +639,9 @@ namespace OstrixMods.BuildWorks
                 }
                 result.Parts += removed;
                 if (removed == document.parts.Count) ++result.EmptyDocuments;
-                else if (inspectRetainedContents) result.RetainedContents.Add(InspectContents(removed == 0 ? document : CopyWithoutMissing(document, result.PrefabIds), prefabHash, SupportsMaterialSeed));
+                else if (inspectRetainedContents != null)
+                    result.RetainedContents.Add(inspectRetainedContents(removed == 0 ? document : CopyWithoutMissing(document, result.PrefabIds)));
             }
-            return result;
         }
 
         private void ValidateMissingReview(IReadOnlyList<Blueprint> documents, MissingPartsReview expected, Func<string, int> prefabHash)

@@ -24,16 +24,33 @@ namespace OstrixMods.BuildWorks.StoreTests
             var store = new CompositeBlueprintStore(Path.Combine(directory, "library.json"));
             var unknown = store.InspectMissing(review.Documents, ForeignZdoChecks.Hash);
             Require(!unknown.Known && !unknown.CanOmit && review.Documents[0].parts.Count == 2, "Absent resolver guessed missing prefabs");
+            Require(!store.PrepareImportReview(review, ForeignZdoChecks.Hash).GetAwaiter().GetResult().Missing.Known,
+                "Background review invented availability without a resolver");
             object context = null;
             var installed = new HashSet<string>(StringComparer.Ordinal) { "woodwall", "world_tree" };
             store.ConfigureImportScale(name => installed.Contains(name) ? Unit : (CompositeBlueprintStore.VectorData?)null, () => context);
             Require(!store.InspectMissing(review.Documents, ForeignZdoChecks.Hash).Known, "Unloaded host guessed absent prefabs");
+            Require(!store.PrepareImportReview(review, ForeignZdoChecks.Hash).GetAwaiter().GetResult().Missing.Known,
+                "Background review guessed availability in an unloaded host");
             context = new object();
             var missing = store.InspectMissing(review.Documents, ForeignZdoChecks.Hash);
             Require(missing.Known && missing.CanOmit && missing.Parts == 1 && missing.PrefabIds.SetEquals(new[] { "qa_absent" }) &&
                 missing.RetainedContents.Unknown == 0 && review.Contents.Unknown == 1 &&
                 missing.Sources.Single().Key == "12-missing-choice.blueprint · qa_absent", "Missing review count/source/retained state wrong");
             Require(!Directory.Exists(store.ImportDirectory), "Availability review wrote a copy");
+            var preparedReview = store.PrepareImportReview(review, ForeignZdoChecks.Hash).GetAwaiter().GetResult();
+            var backgroundMissing = preparedReview.Missing;
+            Require(backgroundMissing.Known && ReferenceEquals(backgroundMissing.HostContext, missing.HostContext) &&
+                backgroundMissing.Parts == missing.Parts && backgroundMissing.EmptyDocuments == missing.EmptyDocuments &&
+                backgroundMissing.PrefabIds.SetEquals(missing.PrefabIds) && backgroundMissing.Sources.SequenceEqual(missing.Sources) &&
+                backgroundMissing.RetainedContents.Unknown == 0 && preparedReview.Contents.Unknown == 1 &&
+                review.Documents[0].parts.Count == 2, "Background missing/retained review differs from host review or mutates source");
+            var plain = CompositeBlueprintStore.CopyWithoutMissing(preparedReview.Documents[0], backgroundMissing.PrefabIds);
+            var repeated = store.PrepareImportReview(new CompositeBlueprintStore.ImportReview { Source = review.Source, Bytes = review.Bytes,
+                Documents = new System.Collections.Generic.List<CompositeBlueprintStore.Blueprint> { plain, plain } }, ForeignZdoChecks.Hash).GetAwaiter().GetResult();
+            Require(repeated.Documents.Count == 2 && ReferenceEquals(repeated.Documents[0], repeated.Documents[1]) &&
+                repeated.Missing.Known && repeated.Missing.Parts == 0 && repeated.Missing.RetainedContents.Unknown == repeated.Contents.Unknown,
+                "Repeated normalized document reference broke retained summary reuse");
             var validationOnly = store.InspectMissing(review.Documents,
                 _ => throw new InvalidOperationException("Missing validation parsed retained contents"), inspectRetainedContents: false);
             Require(validationOnly.Known == missing.Known && ReferenceEquals(validationOnly.HostContext, missing.HostContext) &&
@@ -44,7 +61,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(store.TryImportReviewed(review, false, false, ForeignZdoChecks.Hash, out string error), error); Wait(store);
             Require(ExternalBlueprintLibrary.LoadFile(store.ImportResultPath).Single().parts.Count == 2,
                 "Default import discarded a missing record");
-            Require(store.TryImportReviewed(review, false, false, ForeignZdoChecks.Hash, out error, omitMissing: missing), error); Wait(store);
+            Require(store.TryImportReviewed(review, false, false, ForeignZdoChecks.Hash, out error, omitMissing: backgroundMissing), error); Wait(store);
             var imported = ExternalBlueprintLibrary.LoadFile(store.ImportResultPath).Single();
             Require(imported.parts.Count == 1 && imported.parts[0].prefabName == "woodwall" &&
                 imported.parts[0].position.x == 1 && imported.parts[0].position.z == 3 &&
@@ -69,7 +86,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             }
             int before = Directory.GetFiles(store.ImportDirectory).Length;
             installed.Add("qa_absent");
-            Require(!store.TryImportReviewed(review, false, false, ForeignZdoChecks.Hash, out error, omitMissing: missing) &&
+            Require(!store.TryImportReviewed(review, false, false, ForeignZdoChecks.Hash, out error, omitMissing: backgroundMissing) &&
                 error.Contains("missing_changed") && Directory.GetFiles(store.ImportDirectory).Length == before, "Changed availability published stale removal");
             installed.Remove("qa_absent");
             context = new object();
@@ -89,6 +106,9 @@ namespace OstrixMods.BuildWorks.StoreTests
             }
             var mixed = CompositeBlueprintStore.ReviewImportFile(mixedPath, ForeignZdoChecks.Hash, 0);
             var emptyReview = store.InspectMissing(mixed.Documents, ForeignZdoChecks.Hash);
+            var backgroundEmpty = store.PrepareImportReview(mixed, ForeignZdoChecks.Hash).GetAwaiter().GetResult().Missing;
+            Require(backgroundEmpty.EmptyDocuments == 1 && !backgroundEmpty.CanOmit && backgroundEmpty.Parts == emptyReview.Parts &&
+                backgroundEmpty.Sources.SequenceEqual(emptyReview.Sources), "Background review accepted an all-missing ZIP member");
             Require(emptyReview.EmptyDocuments == 1 && !emptyReview.CanOmit &&
                 !store.TryImportReviewed(mixed, false, false, ForeignZdoChecks.Hash, out error, omitMissing: emptyReview) &&
                 error.Contains("missing_empty") && Directory.GetFiles(store.ImportDirectory).Length == before,

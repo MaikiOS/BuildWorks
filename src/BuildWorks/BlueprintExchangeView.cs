@@ -220,7 +220,7 @@ namespace OstrixMods.BuildWorks
                     if (reviewingContents)
                     {
                         if (review.IsHostCurrent?.Invoke() != true) message.text = T("placement.contents_stale");
-                        else { importReview = review; contentsSummary = review.Contents; RefreshMissing(); RenderContents(); }
+                        else { importReview = review; contentsSummary = review.Contents; missingReview = review.Missing; RenderContents(); }
                     }
                 }
                 catch (Exception error) { if (reviewingContents) SetError(error); }

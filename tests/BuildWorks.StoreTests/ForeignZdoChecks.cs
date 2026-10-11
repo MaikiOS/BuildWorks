@@ -205,6 +205,9 @@ namespace OstrixMods.BuildWorks.StoreTests
                     Require(prepared.Documents.Count == 2 && prepared.Documents.All(document => document.parts[0].materialSeed == 1234) &&
                         prepared.Contents.Unknown == 0 && ReferenceEquals(prepared.Bytes, review.Bytes) && raw.parts[0].materialSeed == null,
                         "Background normalization lost frozen host values or mutated the raw review");
+                    Require(prepared.Missing.Known && ReferenceEquals(prepared.Missing.HostContext, originalContext) &&
+                        prepared.Missing.Parts == 0 && prepared.Missing.RetainedContents.Unknown == 0,
+                        "Background missing review called a live host or lost its frozen context/material summary");
                     Require(!prepared.IsHostCurrent() && !store.TryImportReviewed(prepared, false, false, Hash, out string error) &&
                         error.Contains("contents_stale") && !Directory.Exists(store.ImportDirectory),
                         "Stale prepared review was accepted or wrote an import");

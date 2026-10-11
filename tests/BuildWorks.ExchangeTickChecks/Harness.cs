@@ -43,6 +43,7 @@ public sealed class ExchangeTickChecks
         {
             public Func<bool> IsHostCurrent;
             public ContentsSummary Contents = new ContentsSummary();
+            public MissingPartsReview Missing = new MissingPartsReview();
         }
     }
     private sealed class FakeStore
@@ -92,7 +93,7 @@ public sealed class ExchangeTickChecks
     private string selected = "input.blueprint", resultPath = null, result = null;
     private string[] entries = Array.Empty<string>();
     private object planReview = null;
-    private int renderedRows = 0, renderedContents = 0, shownResults = 0;
+    private int renderedRows = 0, renderedContents = 0, shownResults = 0, refreshedMissing = 0;
     private ExchangeTickChecks()
     {
         root.controls = new[] { primary, copyPath, contentsBack, new Selectable { name = "ExchangeClose" } };
@@ -102,7 +103,7 @@ public sealed class ExchangeTickChecks
     private void SetError(Exception error) { message.text = error.Message; }
     private void RenderRows() { renderedRows++; }
     private void RenderContents() { renderedContents++; }
-    private void RefreshMissing() { missingReview = new CompositeBlueprintStore.MissingPartsReview(); }
+    private void RefreshMissing() { refreshedMissing++; missingReview = new CompositeBlueprintStore.MissingPartsReview(); }
     private void RenderPlanReview() { }
     private void ShowResult(string text) { shownResults++; result = text; }
     private static void Assert(bool condition, string reason)
@@ -154,10 +155,12 @@ public sealed class ExchangeTickChecks
         pending.Tick();
         Assert(pending.store.PrepareCalls == 1 && pending.importPreparation != null && pending.contentsSummary == null &&
             !pending.primary.interactable && pending.contentsBack.interactable, "Both import stages must finish before confirmation");
-        pending.store.preparation.SetResult(new CompositeBlueprintStore.ImportReview { IsHostCurrent = () => true });
+        var prepared = new CompositeBlueprintStore.ImportReview { IsHostCurrent = () => true };
+        pending.store.preparation.SetResult(prepared);
         pending.Tick();
         Assert(pending.importPreparation == null && pending.contentsSummary != null && pending.renderedContents == 1 &&
-            pending.primary.interactable, "Current prepared review must publish once and enable confirmation");
+            pending.primary.interactable && ReferenceEquals(pending.missingReview, prepared.Missing) && pending.refreshedMissing == 0,
+            "Prepared missing snapshot must publish once without a host contents refresh");
 
         var changed = new ExchangeTickChecks { reviewingContents = true,
             importPreparation = Task.FromResult(new CompositeBlueprintStore.ImportReview { IsHostCurrent = () => false }) };

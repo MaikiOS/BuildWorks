@@ -19,9 +19,25 @@ for ($parent = [IO.DirectoryInfo]::new($directory); $null -ne $parent; $parent =
 }
 function Read-ControlJson([string] $name) {
     $path = Join-Path $directory $name
-    $file = Get-Item -LiteralPath $path
-    if ($file.Length -gt 32768 -or ($file.Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw "Invalid QA file: $name" }
-    [IO.File]::ReadAllText($path) | ConvertFrom-Json
+    for ($attempt = 0; $attempt -lt 5; $attempt++) {
+        try {
+            $file = [IO.FileInfo]::new($path)
+            if (-not $file.Exists) { throw [IO.FileNotFoundException]::new("QA file is not yet available: $name", $path) }
+            if ($file.Length -gt 32768 -or ($file.Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw "Invalid QA file: $name" }
+            # The game atomically replaces replies; reading must allow replacement of the open file.
+            $stream = [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Read,
+                ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+            try {
+                $reader = [IO.BinaryReader]::new($stream)
+                try { $bytes = $reader.ReadBytes(32769) } finally { $reader.Dispose() }
+                if ($bytes.Length -gt 32768) { throw "Invalid QA file: $name" }
+            } finally { $stream.Dispose() }
+            return ([Text.UTF8Encoding]::new($false, $true).GetString($bytes) | ConvertFrom-Json)
+        } catch [IO.IOException] {
+            if (($_.Exception.HResult -band 65535) -notin 2, 32, 33 -or $attempt -eq 4) { throw }
+            Start-Sleep -Milliseconds 10
+        }
+    }
 }
 $session = Read-ControlJson 'session.json'
 $process = Get-Process -Id $session.processId -ErrorAction Stop

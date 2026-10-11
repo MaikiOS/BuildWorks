@@ -59,13 +59,16 @@ try {
         Require-NativeInput $game $utils
         'PASS native host input contract: PlayerController movement/camera -> ZInput -> enabled InputSystem mouse/actions/current devices; broken-binding negative control rejected. Static evidence only.'
     } finally { if ($game) { $game.Dispose() }; if ($utils) { $utils.Dispose() } }
-    foreach ($name in 'BuildWorksQaControl','BuildWorksQaControlProtocol','BuildWorksQaInput','BuildWorksQaUiInput','BuildWorksQaUiCancellation') {
+    foreach ($name in 'BuildWorksQaControl','BuildWorksQaControlProtocol','BuildWorksQaInput','BuildWorksQaUiInput','BuildWorksQaUiCancellation','BuildWorksQaFilePublisher') {
         Require ($null -eq $normal.MainModule.GetType("OstrixMods.BuildWorks.$name")) "QA type leaked into normal build: $name"
         Require ($null -ne $qa.MainModule.GetType("OstrixMods.BuildWorks.$name")) "QA type absent: $name"
     }
     Require (@($normal.MainModule.AssemblyReferences | Where-Object Name -eq 'Unity.InputSystem').Count -eq 0) 'QA InputSystem dependency leaked into normal build.'
     $control = $qa.MainModule.GetType('OstrixMods.BuildWorks.BuildWorksQaControl')
     $inputType = $qa.MainModule.GetType('OstrixMods.BuildWorks.BuildWorksQaInput')
+    $publisher = $qa.MainModule.GetType('OstrixMods.BuildWorks.BuildWorksQaFilePublisher')
+    Require ($null -ne $publisher -and @($publisher.Fields | Where-Object Name -eq 'ReplaceForTest').Count -eq 0) 'Publisher fault injection leaked into the installed QA build.'
+    Require ((Calls $control 'Publish') -match 'BuildWorksQaFilePublisher::ReplaceObservation') 'QA response publication bypasses the bounded retry helper.'
     Require ((Calls $control 'Initialize') -match 'BuildWorksTestIsolation::get_ControlDirectory') 'Bridge directory is not rooted in QA isolation.'
     Require ((Calls $control 'Update') -match 'BuildWorksTestIsolation::RequireLoadedSession' -and
         (Calls $control 'Update') -match 'BuildWorksQaControlProtocol::Read') 'Input bypasses session or protocol validation.'

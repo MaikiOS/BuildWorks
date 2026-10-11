@@ -42,5 +42,6 @@ internal static class Program
         for (int i = 0; i < steps.Length; ++i) steps[i] = "{\"milliseconds\":2000}";
         Reject(Header + "\"action\":\"batch\",\"steps\":[" + string.Join(",", steps, 0, 6) + "]}");
         Console.WriteLine("PASS QA control protocol: " + checks + " assertions (state/batch, identity/replay/expiry, malformed/size/action/step/key/path/duration bounds). Not a game-input execution test.");
+        FilePublisherChecks.Run();
     }
 }

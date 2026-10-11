@@ -72,7 +72,12 @@ namespace OstrixMods.BuildWorks
                 using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                 { stream.Write(bytes, 0, bytes.Length); stream.Flush(true); }
                 PathFor(name);
-                if (File.Exists(path)) File.Replace(temporary, path, null);
+                if (File.Exists(path))
+                {
+                    int retries = BuildWorksQaFilePublisher.ReplaceObservation(temporary, path,
+                        () => { PathFor(name); PathFor(Path.GetFileName(temporary)); });
+                    if (retries > 0) Debug.LogWarning("BuildWorks QA observation publication recovered Windows1175 after " + retries + " retries: " + name);
+                }
                 else File.Move(temporary, path);
             }
             finally { if (File.Exists(temporary)) { BuildWorksTestIsolation.ValidateSavePath(temporary); File.Delete(temporary); } }

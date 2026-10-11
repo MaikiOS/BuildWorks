@@ -1,3 +1,23 @@
+## 2026-10-11 — QA0.19.146 installed: observation channel reliability
+
+Source91b2c14: bounded reader and Windows1175-only publication retry,
+5 attempts/up to40ms, path revalidation and diagnostics; input never replayed.
+Normal/QA0/0, protocol28/publisher tests,3×100 cycles at1/50ms,
+compiled control/native contract/isolation/localization973, deployment16+4/preflight
+and independent correctness/ponytail reviews passed. Pair SHA verified;154 current
+config/import/save files unchanged during deployment. Default clean; game not launched.
+Basic native smoke passed on .145; .146 native retry, drag/physical stop,
+construction/contents/reload/network remain open. See docs/QA_CHANNEL_SMOKE_2026-10-11_RU.md.
+Next launch only TerrainRamp-1.0-Test → Modded → BW_QA_43d3719a.
+## 2026-10-11 — first native QA channel smoke, installed .145 unchanged
+
+Real closed BW_QA_43d3719a: fresh frame/state, camera, walking, stop during
+movement and Escape→Continue mouse click observed. Fixed bounded PowerShell
+reply reads for Windows2/32/33 with share-delete and close-before-parse.
+Reader/control/protocol28 checks passed. Native IL confirms menu camera sway.
+Drag/physical stop/active focus loss and construction/reload/network remain open.
+See docs/QA_CHANNEL_SMOKE_2026-10-11_RU.md. Last observation was unfocused;
+no further input sent. Main worlds were not opened; no DLL redeployment.
 ## 2026-10-10 — QA0.19.145 installed: mounted-item reservation
 
 Source fc07cf3 protects held mount refs/properties/aggregate quantities from the

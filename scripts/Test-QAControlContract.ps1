@@ -13,6 +13,13 @@ function Calls($type, [string] $name) {
     Require ($methods.Count -eq 1 -and $methods[0].HasBody) "Missing QA method: $name"
     ($methods[0].Body.Instructions | ForEach-Object { [string] $_.Operand }) -join "`n"
 }
+function Require-SelectionAbort($sessionType) {
+    $abort = Calls $sessionType 'AbortQaInput'
+    $cancel = Calls $sessionType 'CancelBlueprintSelectionDrag'
+    Require ($abort -match 'CancelBlueprintSelectionDrag' -and $abort -match 'blueprintWorkspaceRightTracking' -and
+        $abort -match 'HideSelectionBox' -and $cancel -match 'blueprintSelectionDragging' -and
+        $cancel -match 'blueprintVolumeDragValid' -and $cancel -match 'HideSelectionBox') 'Abort leaves world volume-selection gestures.'
+}
 function Require-NativeInput($game, $utils) {
     $controller = $game.MainModule.GetType('PlayerController')
     $input = $utils.MainModule.GetType('ZInput')
@@ -85,9 +92,21 @@ try {
         (Calls $inputType 'Release') -match 'MakeCurrent' -and
         (Calls $inputType 'Release') -match 'set_inputOverride') 'Test devices or UI override are not restored.'
     Require ((Calls $inputType 'CancelUiPointers') -match 'BuildWorksQaUiCancellation::Cancel') 'Abort leaves native UI pointer gestures.'
-    $abort = Calls ($qa.MainModule.GetType('OstrixMods.BuildWorks.PrecisionPlacementSession')) 'AbortQaInput'
-    Require ($abort -match 'blueprintSelectionDragging' -and $abort -match 'blueprintWorkspaceRightTracking' -and
-        $abort -match 'HideSelectionBox') 'Abort leaves world volume-selection gestures.'
+    $sessionType = $qa.MainModule.GetType('OstrixMods.BuildWorks.PrecisionPlacementSession')
+    Require-SelectionAbort $sessionType
+    $cancelCall = @($sessionType.Methods | Where-Object Name -eq 'AbortQaInput')[0].Body.Instructions |
+        Where-Object { [string] $_.Operand -match '::CancelBlueprintSelectionDrag\(' } | Select-Object -First 1
+    Require ($null -ne $cancelCall) 'Selection abort negative control cannot locate the cancel call.'
+    $originalCode = $cancelCall.OpCode; $originalOperand = $cancelCall.Operand
+    try {
+        $cancelCall.OpCode = [Mono.Cecil.Cil.OpCodes]::Nop; $cancelCall.Operand = $null
+        $rejected = $false
+        try { Require-SelectionAbort $sessionType }
+        catch { if ($_.Exception.Message -cne 'Abort leaves world volume-selection gestures.') { throw }; $rejected = $true }
+        Require $rejected 'Selection abort contract accepted a disconnected cancellation path.'
+    } finally { $cancelCall.OpCode = $originalCode; $cancelCall.Operand = $originalOperand }
+    Require-SelectionAbort $sessionType
+    'PASS selection abort: real compiled helper chain; disconnected cancel call rejected in memory only.'
     $qaMethods = @($control.Methods) + @($inputType.Methods)
     Require (@($qaMethods | Where-Object IsPInvokeImpl).Count -eq 0) 'QA bridge gained OS-level control.'
     $allCalls = ($qaMethods | Where-Object HasBody | ForEach-Object {

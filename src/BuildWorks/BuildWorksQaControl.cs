@@ -240,12 +240,16 @@ namespace OstrixMods.BuildWorks
 
         private void Respond(long id, string status, string detail, string screenshot = null)
         {
+            var eventSystem = EventSystem.current;
+            var selected = eventSystem ? eventSystem.currentSelectedGameObject : null;
+            var module = eventSystem ? eventSystem.currentInputModule : null;
+            var currentNetwork = ZNet.instance;
             var reply = new Reply { nonce = nonce, id = id, status = status, detail = detail, screenshot = screenshot,
                 utc = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), frame = Time.frameCount, width = Screen.width,
                 height = Screen.height, focused = Application.isFocused, ready = SafeSession(),
-                world = ZNet.instance?.GetWorld()?.m_worldName,
-                selectedUi = EventSystem.current?.currentSelectedGameObject?.name,
-                uiModule = EventSystem.current?.currentInputModule?.GetType().FullName };
+                world = currentNetwork ? currentNetwork.GetWorld()?.m_worldName : null,
+                selectedUi = selected ? selected.name : null,
+                uiModule = module ? module.GetType().FullName : null };
             if (Player.m_localPlayer) reply.position = Player.m_localPlayer.transform.position;
             Camera camera = Camera.main;
             if (camera) { reply.cameraPosition = camera.transform.position; reply.cameraEuler = camera.transform.eulerAngles; }

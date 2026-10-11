@@ -1,3 +1,19 @@
+## 2026-10-11 — paused by Ostrix; .160 not deployed
+
+Installed QA remains .159. .160 adds QA-only contact observations; normal/QA
+builds0/0, Geometry/Host/loc989/isolation and Unity ContactOnly passed.
+Ponytail Ship; correctness review interrupted by pause after provenance finding.
+ContactOnly log/source proof paths separated and retested successfully. Early
+contact runs overwrote the shared full UI log/source proof: old492 screenshots/
+status are history, not a fresh .160 UI pass or matching current source proof.
+Guarded dry run passed;156 protected files snapshotted, actual deployment not run.
+Nine source/test files remain uncommitted in the Git mirror; this step is unfinished.
+Artifacts: artifacts/checkpoint-0.19.160 and artifacts/placement-contact.
+Resume: final read-only review → guarded deploy/hashes → fresh native session,
+second .159 cancellation balance first → one fixture24 contact observation → fix cause.
+Do not guess wider tolerances, change fixtures24/25, or reprovision resources.
+Current main-block order and remaining work: docs/LIVE_CHECKLIST_RU.md.
+Historical checkpoints follow; their version labels are not current installation.
 ## 2026-10-11 — .159: native QA, chest blocker
 
 Channel/folder/state and fixture24 import passed; four contents combinations/cancel work.

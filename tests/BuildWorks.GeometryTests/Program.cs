@@ -2260,6 +2260,11 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Equal(false, sections.HasPartAt(5, "wall"));
             Equal(false, sections.HasPartAt(7, "wall"));
             Equal(false, sections.HasOpaqueSections);
+            var snapTails = new BlueprintSourceDocument("blueprint", "tails.blueprint",
+                "\uFEFF#SnapPoints\r\n1;2;3;tail\r\n#Name:Test\n4;5;6;;more\n7;8;9\n#Terrain\n1;2;3;terrain\n#Pieces\nwall;0;0;0;1;0;0;0");
+            Equal(2, snapTails.IgnoredSnapPointRows);
+            Equal(false, snapTails.HasOpaqueSections);
+            Equal(0, new BlueprintSourceDocument("vbuild", "tails.vbuild", "#SnapPoints\n1;2;3;tail").IgnoredSnapPointRows);
             Equal(true, new BlueprintSourceDocument("blueprint", "future.blueprint", "#Future\nwall;opaque\n#Pieces\nwall;piece").HasOpaqueSections);
             Equal(true, new BlueprintSourceDocument("blueprint", "bom.blueprint", "\uFEFF\uFEFF#Pieces\nwall;piece").HasPartAt(2, "wall"));
             var longRow = new BlueprintSourceDocument("blueprint", "long.blueprint", "#Pieces\nwall;" + new string('x', 7 * 1024 * 1024));

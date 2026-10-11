@@ -421,6 +421,8 @@ namespace OstrixMods.BuildWorks
             string target = Path.Combine(directory.text, fileName.text);
             contentsDetails.text = T("exchange.plan_review", target, fileName.text, planReview.Parts, planReview.CustomSnaps,
                 planReview.Groups, planReview.Supports, planReview.Anchors, planReview.Metadata, planReview.Sources, planReview.MaterialSeeds);
+            if (planReview.IgnoredSnapPointRows > 0)
+                contentsDetails.text += "\n" + T("exchange.snap_trailing_fields", planReview.IgnoredSnapPointRows);
             if (planReview.OmittedSigns.Count > 0)
                 contentsDetails.text += "\n\n" + T("exchange.plan_signs") + "\n" +
                     string.Join("\n", planReview.OmittedSigns.Select(entry => T("exchange.loss_source", entry.Key, entry.Value)));
@@ -453,6 +455,8 @@ namespace OstrixMods.BuildWorks
             var effective = omitMissingParts && missingReview.CanOmit ? missingReview.RetainedContents : contentsSummary;
             contentsDetails.text = T("exchange.contents_counts", effective.Storages, effective.StoredItems,
                 effective.Mounts, effective.Unknown, effective.AlreadyCleared);
+            if (effective.IgnoredSnapPointRows > 0)
+                contentsDetails.text += "\n" + T("exchange.snap_trailing_fields", effective.IgnoredSnapPointRows);
             if (effective.ArmorStates > 0)
                 contentsDetails.text += "\n" + T("exchange.armor_losses", effective.ArmorStates) + "\n" +
                     string.Join("\n", effective.ArmorStateSources.Select(entry => T("exchange.loss_source", entry.Key, entry.Value)));

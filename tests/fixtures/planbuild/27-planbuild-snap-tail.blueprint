@@ -1,0 +1,9 @@
+#Name:QA154 Snap Fields
+#Creator:BuildWorks QA
+#Description:Owned fixture: only XYZ snap positions are understood; trailing fields remain source evidence.
+#Category:QA
+#SnapPoints
+1.25;0.5;-2.75;0;0.7071068;0;0.7071068
+-3;1;2;unknown;size;role;0;0;0;1;retained
+#Pieces
+woodwall;;0;0;0;0;0;0;1;"";1;1;1

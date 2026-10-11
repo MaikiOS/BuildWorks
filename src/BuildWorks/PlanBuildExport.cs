@@ -19,6 +19,7 @@ namespace OstrixMods.BuildWorks
         internal readonly SortedDictionary<string, int> OmittedSigns = new SortedDictionary<string, int>(StringComparer.Ordinal);
         internal readonly SortedDictionary<string, int> OmittedState = new SortedDictionary<string, int>(StringComparer.Ordinal);
         internal int Parts, Groups, Supports, Anchors, Metadata, Sources, MaterialSeeds, CustomSnaps;
+        internal int IgnoredSnapPointRows;
 
         private PlanBuildExport(byte[] nativeBytes, byte[] planBytes)
         { native = nativeBytes; plan = planBytes; }
@@ -49,11 +50,15 @@ namespace OstrixMods.BuildWorks
             var scales = new Dictionary<string, CompositeBlueprintStore.VectorData?>(StringComparer.Ordinal);
             var review = new PlanBuildExport(backup, null)
             {
-                Parts = document.parts.Count, Groups = document.groups.Count,
-                Supports = document.supports?.Count ?? 0, Anchors = document.anchors.Count,
-                Metadata = document.parts.Count(part => part.metadata != null), Sources = document.sourceDocuments?.Count ?? 0,
+                Parts = document.parts.Count,
+                Groups = document.groups.Count,
+                Supports = document.supports?.Count ?? 0,
+                Anchors = document.anchors.Count,
+                Metadata = document.parts.Count(part => part.metadata != null),
+                Sources = document.sourceDocuments?.Count ?? 0,
                 MaterialSeeds = document.parts.Count(part => part.materialSeed.HasValue),
-                CustomSnaps = document.customSnapPoints?.Count ?? 0
+                CustomSnaps = document.customSnapPoints?.Count ?? 0,
+                IgnoredSnapPointRows = document.sourceDocuments?.Sum(sourceDocument => sourceDocument.ToGeometry().IgnoredSnapPointRows) ?? 0
             };
             foreach (var part in document.parts)
             {

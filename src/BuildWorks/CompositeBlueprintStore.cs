@@ -579,6 +579,7 @@ namespace OstrixMods.BuildWorks
             internal int Storages, Mounts, Unknown, UnreadableStorages, UnreadableMounts, AlreadyCleared;
             internal long StoredItems;
             internal int ArmorStates;
+            internal int IgnoredSnapPointRows;
             internal readonly SortedDictionary<string, int> ArmorStateSources = new SortedDictionary<string, int>(StringComparer.Ordinal);
             internal int RemainingUnknown(bool omitArmorState) => Unknown - (omitArmorState ? ArmorStates : 0);
             internal bool CanClearStorage => Unknown == UnreadableMounts;
@@ -589,6 +590,7 @@ namespace OstrixMods.BuildWorks
                 Storages += other.Storages; StoredItems += other.StoredItems; Mounts += other.Mounts; Unknown += other.Unknown;
                 UnreadableStorages += other.UnreadableStorages; UnreadableMounts += other.UnreadableMounts;
                 AlreadyCleared += other.AlreadyCleared; ArmorStates += other.ArmorStates;
+                IgnoredSnapPointRows += other.IgnoredSnapPointRows;
                 foreach (var entry in other.ArmorStateSources)
                 {
                     ArmorStateSources.TryGetValue(entry.Key, out int count);
@@ -680,6 +682,7 @@ namespace OstrixMods.BuildWorks
                 throw new InvalidDataException(source?.importError ?? "$buildworks_import.format");
             var evidenceIndex = Geometry.BlueprintSourceDocument.Index(source.sourceDocuments?.Select(document => document.ToGeometry()));
             result.Unknown = evidenceIndex.Values.Count(document => document.HasOpaqueSections);
+            result.IgnoredSnapPointRows = evidenceIndex.Values.Sum(document => document.IgnoredSnapPointRows);
             foreach (Part part in source.parts)
             {
                 if (part.materialSeed.HasValue && supportsMaterialSeed?.Invoke(part.prefabName) != true) ++result.Unknown;

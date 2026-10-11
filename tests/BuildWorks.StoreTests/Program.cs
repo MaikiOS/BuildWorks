@@ -25,6 +25,9 @@ namespace OstrixMods.BuildWorks.StoreTests
                     return ImportTimingChecks.RunCatalogPhases(args[1], directory);
                 if (args.Length == 2 && args[0] == "--planbuild-export")
                 { PlanBuildExportChecks.Run(args[1]); return 0; }
+                if (args.Length == 1 && args[0] == "--planbuild-snap-tails")
+                { PlanBuildSnapTailChecks.Run(Path.Combine(directory, "snap-tails")); return 0; }
+                PlanBuildSnapTailChecks.Run(Path.Combine(directory, "snap-tails"));
                 SourceEvidenceCacheChecks.Run();
                 PlacementContentsFixtureChecks.Run();
                 PlanBuildExportChecks.Run(Path.Combine(directory, "planbuild-export"));
@@ -1194,6 +1197,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                                 }
                             }
                         }
+                        PlanBuildSnapTailChecks.CheckActual(entry.FullName, text, parsed);
                         ++total; if (parsed.importError == null) ++supported; else ++blocked;
                         if (parsed.name == "CoffeeTable") Require(parsed.importError == null && parsed.parts.Count == 4, "Actual CoffeeTable cannot be converted");
                         if (parsed.name == "WoodCouch1") Require(parsed.importError == null &&

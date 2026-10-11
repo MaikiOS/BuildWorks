@@ -239,8 +239,10 @@ namespace OstrixMods.BuildWorks
                     {
                         try
                         {
-                            string[] coordinates = line.Split(';');
-                            if (coordinates.Length != 3) throw new InvalidDataException("$buildworks_import.fields");
+                            string[] coordinates = line.Split(new[] { ';' }, 4);
+                            // PlanBuild reads only XYZ; retain unrecognized trailing fields in source evidence.
+                            if (coordinates.Length < 3 || vbuild && coordinates.Length != 3)
+                                throw new InvalidDataException("$buildworks_import.fields");
                             var point = new CompositeBlueprintStore.VectorData
                             { x = Number(coordinates[0]), y = Number(coordinates[1]), z = Number(coordinates[2]) };
                             if (Math.Abs(point.x) > 512 || Math.Abs(point.y) > 512 || Math.Abs(point.z) > 512)

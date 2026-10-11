@@ -37,6 +37,7 @@ namespace OstrixMods.BuildWorks.Geometry
                     .Replace("-", "").ToLowerInvariant();
             }
             bool pieces = format == "vbuild";
+            bool snapPoints = false;
             bool seenPieces = pieces;
             int placementHeaders = 0;
             int line = 1;
@@ -51,11 +52,13 @@ namespace OstrixMods.BuildWorks.Geometry
                 if (first < last && text[first] == '#')
                 {
                     if (last - first == 7 && string.CompareOrdinal(text, first, "#Pieces", 0, 7) == 0)
-                    { pieces = true; seenPieces = true; }
+                    { pieces = true; seenPieces = true; snapPoints = false; }
                     else if (!HeaderAt(text, first, last, "#Name:") && !HeaderAt(text, first, last, "#Category:") &&
                         !HeaderAt(text, first, last, "#Creator:") && !HeaderAt(text, first, last, "#Description:"))
                     {
                         pieces = false;
+                        snapPoints = format == "blueprint" && last - first == 11 &&
+                            string.CompareOrdinal(text, first, "#SnapPoints", 0, 11) == 0;
                         if (!(last - first == 8 && string.CompareOrdinal(text, first, "#Terrain", 0, 8) == 0) &&
                             !(last - first == 11 && string.CompareOrdinal(text, first, "#SnapPoints", 0, 11) == 0) &&
                             !(format == "blueprint" && !seenPieces &&
@@ -75,6 +78,12 @@ namespace OstrixMods.BuildWorks.Geometry
                             throw new ArgumentException("Too many source parts.", nameof(text));
                         partRows.Add(line, (text.Substring(first, separator - first), first, last - first));
                     }
+                }
+                else if (snapPoints && first < last)
+                {
+                    int separators = 0;
+                    for (int i = first; i < last; ++i)
+                        if (text[i] == ';' && ++separators == 3) { ++IgnoredSnapPointRows; break; }
                 }
                 start = end;
                 if (start < text.Length && text[start++] == '\r' && start < text.Length && text[start] == '\n') ++start;
@@ -110,6 +119,7 @@ namespace OstrixMods.BuildWorks.Geometry
         public string Text { get; }
         public int ByteCount { get; }
         public bool HasOpaqueSections { get; }
+        public int IgnoredSnapPointRows { get; }
 
         public bool HasPartAt(int line, string prefab)
         {

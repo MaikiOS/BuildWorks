@@ -28,8 +28,14 @@ namespace OstrixMods.BuildWorks.Geometry
             if (bytes.Length > MaximumBytes) throw new ArgumentException("Source is too large.", nameof(text));
             Format = format; Name = name; Text = text; ByteCount = bytes.Length;
             using (var hash = SHA256.Create())
-                Id = "source_" + BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(format + "\n" + name + "\n" + text)))
+            {
+                byte[] prefix = Encoding.UTF8.GetBytes(format + "\n" + name + "\n");
+                hash.TransformBlock(prefix, 0, prefix.Length, null, 0);
+                hash.TransformBlock(bytes, 0, bytes.Length, null, 0);
+                hash.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+                Id = "source_" + BitConverter.ToString(hash.Hash)
                     .Replace("-", "").ToLowerInvariant();
+            }
             bool pieces = format == "vbuild";
             bool seenPieces = pieces;
             int placementHeaders = 0;

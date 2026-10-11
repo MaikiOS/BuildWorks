@@ -85,6 +85,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Run("Invalid anchor values are rejected", InvalidAnchorValuesAreRejected);
             Run("Blueprint document deep copies source", BlueprintDocumentDeepCopiesSource);
             Run("Blueprint payload survives insertion and cached history", BlueprintPayloadSurvivesHistory);
+            Run("Source identity retains exact hash with bounded temporary memory", SourceIdentityUsesBoundedTemporaryMemory);
             Run("ItemStand authoring preserves contents in history and rejects opaque/locked edits", ItemStandContentsHistory);
             Run("Native Container payload preserves history and rejects invalid manifests/packages", NativeContainerState);
             Run("Native Container inspection reads all fields and refuses corrupt records without mutation", ContainerInventoryTests.Run);
@@ -2158,6 +2159,31 @@ namespace OstrixMods.BuildWorks.GeometryTests
             var unknown = EditorDocument(new BlueprintEditorPart("stand", "itemstand", "Stand", new Point3(), IdentityRotation(), foreignData: opaque));
             Equal(false, unknown.SetItemStandContents("stand", replacement)); Equal(opaque, unknown.Parts[0].ForeignData);
             Throws<ArgumentException>(() => document.SetItemStandContents("stand", opaque));
+        }
+
+        private static void SourceIdentityUsesBoundedTemporaryMemory()
+        {
+            foreach (var sample in new[] {
+                (Format: "blueprint", Name: "empty.blueprint", Text: ""),
+                (Format: "blueprint", Name: "fallback\uD800.blueprint", Text: "#Pieces\nwall;test"),
+                (Format: "vbuild", Name: "Чертёж 🏠.vbuild", Text: "\uFEFF#Name:Дом\r\nwall 0 0 0 1 0 0 0\r\n"),
+                (Format: "blueprint", Name: "large.blueprint", Text: "#Description:" + new string('x', 7 * 1024 * 1024)) })
+            {
+                string expected;
+                using (var hash = System.Security.Cryptography.SHA256.Create())
+                    expected = "source_" + BitConverter.ToString(hash.ComputeHash(System.Text.Encoding.UTF8.GetBytes(
+                        sample.Format + "\n" + sample.Name + "\n" + sample.Text))).Replace("-", "").ToLowerInvariant();
+                long before = GC.GetAllocatedBytesForCurrentThread();
+                var source = new BlueprintSourceDocument(sample.Format, sample.Name, sample.Text);
+                long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+                Equal(expected, source.Id);
+                Equal(sample.Text, source.Text);
+                Equal(System.Text.Encoding.UTF8.GetByteCount(sample.Text), source.ByteCount);
+                Console.WriteLine($"Source identity {source.ByteCount} UTF8 bytes: {allocated} allocated bytes");
+                Equal(true, allocated < source.ByteCount * 2L + 1024 * 1024);
+            }
+            Throws<ArgumentException>(() => new BlueprintSourceDocument("blueprint", "invalid.blueprint", "\uD800"));
+            Throws<ArgumentException>(() => new BlueprintSourceDocument("blueprint", "large.blueprint", new string('я', 5 * 1024 * 1024)));
         }
 
         private static void BlueprintPayloadSurvivesHistory()

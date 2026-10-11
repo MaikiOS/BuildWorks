@@ -1,3 +1,19 @@
+## 2026-10-11 — .158: Inventory106, QA установлена
+
+Код16afb62: Info-only .blueprint связан с исходной строкой; размеры настоящего
+обычного корневого Container передаются снимком с host thread.106/109 читаются
+строго, исходные bytes/float/source сохранены; clear-in-copy независим.
+Geometry red/green/strict, Store353/353 и202/209 (7 прежних отказов), normalQA0/0,
+Host Steam25185596/loc989/EditorBridge/isolation и обзоры PASSED/Ship.
+1654/1654 пакета106 на условной256grid — не приёмка prefab/строительства.
+Store22/portable11 прежние; readers≤157 typed106 не читают.
+Guarded dry-run/deploy .158: обе DLL совпадают,155 config/import/save файлов
+неизменны;Default чист. Агент игру не запускал. Непустой перенос/admin restore,
+native стройка/ресурсы/reload/сеть и полная цель открыты.
+Следующее: свежая QA state/folder/закрытие,24/25, затем свой файл29.
+См. LEGACY_STORAGE_CHECKPOINT_2026-10-11_RU.md и QA_0.19.158_RU.md.
+Ниже историческое состояние прежних контрольных точек.
+
 # BuildWorks — полный список требований и замечаний
 
 [Короткий живой список: сейчас / готово / осталось / проверки Ostrix](LIVE_CHECKLIST_RU.md).

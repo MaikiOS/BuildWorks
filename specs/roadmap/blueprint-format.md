@@ -1,3 +1,18 @@
+## 2026-10-11 — .158: Inventory106, QA deployed
+
+Source16afb62: source-bound Info-only .blueprint; actual ordinary root Container
+grid snapshotted on host thread. Strict106/109 reader keeps exact bytes/float/source;
+independent clear-in-copy. Geometry red/green/strict, Store353/353 and202/209
+(7 old refusals), normalQA0/0, Host Steam25185596/loc989/EditorBridge/isolation,
+correctness PASSED/Ponytail Ship.1654/1654 packets with synthetic256grid do not
+prove prefab dimensions or construction. Store22/portable11 unchanged; readers≤157
+reject typed106. Guarded dry-run/deploy .158: both DLL hashes match,155 existing
+config/import/save files unchanged,Default clean. No agent launch. Populated transfer,
+admin restore,native construction/resources/reload/network and full goal remain open.
+Next fresh QA state/folder/close,24/25,owned29. See
+../../docs/LEGACY_STORAGE_CHECKPOINT_2026-10-11.md and ../../docs/QA_0.19.158_RU.md.
+Earlier checkpoint history follows.
+
 **Deployment2026-10-11:** QA .157 installed/hash-verified;155 existing config/import/save files unchanged;native behavior not accepted. [Next](../../docs/QA_DEPLOY_2026-10-11.md). Earlier source state below.
 
 # Blueprint format and large-construction work

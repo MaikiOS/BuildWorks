@@ -2,6 +2,8 @@
 
 [Короткий живой список: сейчас / готово / осталось / проверки Ostrix](LIVE_CHECKLIST_RU.md).
 
+**Установка2026-10-11:** после штатного выхода Ostrix QA .157 установлена только в TerrainRamp-1.0-Test; guarded dry-run/deploy, оба SHA,155 config/import/save файлов неизменны, Default чист. Игру агент не запускал, native state/folder и24/25 открыты. [Доказательства](QA_DEPLOY_2026-10-11_RU.md). Ниже историческое состояние source-checkpoint до установки.
+
 .157 код3287e01: Info-only itemstand/h2/3 поля дополняются подтверждёнными defaults, затем прежний strict validator. Biome609 записей/16 файлов распознаны; foreign27905→27296, Unknown documents234→232. Store red/green/final,353/353 и202/209 (7 прежних отказов), normalQA0/0/Host/loc989/compiled isolation, оба PASSED/Ship. Plugin format clean, changed test lines0;141 baseline WHITESPACE сохранены. **Не установлено**, QA146/открытая игра неизменны. Native156fix/стройка/ресурсы/reload/сеть не приняты; legacy106 открыт. [Протокол](SHORT_HOLDER_CHECKPOINT_2026-10-11_RU.md).
 
 .156 код19b520b: реальный QA .146 выявил NRE Respond после удаления выбранной строки файлов; input остановлен, стройка не начиналась. Unity alive-checks и actual Reply/Respond red/green11, normalQA0/0/protocol28/publisher/client100/Host/control/isolation/loc989/format, оба Ship. **Не установлено**; игра остаётся открытой .146. [Доказательства и продолжение](QA_RESPOND_CHECKPOINT_2026-10-11_RU.md). Native исправление/24/25/reload/сеть открыты; цель активна.

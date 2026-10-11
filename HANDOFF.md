@@ -1,3 +1,12 @@
+## 2026-10-11 — QA .157 deployed
+
+Owner exited normally; no Valheim process confirmed. Guarded Deploy-TestBuild
+WhatIf/deploy only TerrainRamp-1.0-Test with existing token. Both DLL hashes match,
+155 existing config/import/save files unchanged;Default clean. No agent game launch.
+Next Modded/sameQA/fresh session/state/folder/parent/close, then24/25 with exact
+initial item properties/balance. Native construction/resources/reload/network
+and goal remain open. See docs/QA_DEPLOY_2026-10-11.md. Earlier source state follows.
+
 ## 2026-10-11 — .157: short PlanBuild holder Info
 
 Source3287e01: Info-only itemstand/h2/3 fields receive verified quality1/orientation0

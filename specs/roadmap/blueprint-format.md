@@ -1,3 +1,5 @@
+**Deployment2026-10-11:** QA .157 installed/hash-verified;155 existing config/import/save files unchanged;native behavior not accepted. [Next](../../docs/QA_DEPLOY_2026-10-11.md). Earlier source state below.
+
 # Blueprint format and large-construction work
 
 ## .157 — short Info without ZDO/chance

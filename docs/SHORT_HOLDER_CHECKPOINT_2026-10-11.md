@@ -1,3 +1,5 @@
+**Current2026-10-11:** QA .157 installed after normal game exit; both DLLs/155 existing config/import/save files verified, Default clean. No agent game launch or new native acceptance. [Deployment and next steps](QA_DEPLOY_2026-10-11.md). Earlier source/native observations below remain historical.
+
 # .157 — short PlanBuild holder recipes
 
 Source `3287e01`,2026-10-11. **Source/CPU verified; not installed.** Installed QA

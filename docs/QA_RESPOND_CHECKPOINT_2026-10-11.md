@@ -1,3 +1,5 @@
+**Current2026-10-11:** QA .157 installed after normal game exit; both DLLs/155 existing config/import/save files verified, Default clean. No agent game launch or new native acceptance. [Deployment and next steps](QA_DEPLOY_2026-10-11.md). Earlier source/native observations below remain historical.
+
 # .156 — QA replies after the selected UI object is destroyed
 
 Code **19b520b**, normal/QA built, **not installed**. The running game remains .146.

@@ -1,3 +1,17 @@
+## 2026-10-11 — .154 sources: PlanBuild snap rows with trailing fields, offline
+
+Code3a2c82b: read XYZ only; preserve complete trailing-field source and warn
+that its meaning/behavior is not restored. Strict vbuild/finite/±512/count
+guards remain. SHA-verified pinned reader confirms both actual rows en/ru.
+Biome353/353; second corpus202/209,7 previous refusals. Full Geometry/Store,
+normalQA0/0, Host25185596/loc989, isolation/EditorBridge/scopedformat and
+correctness/Ponytail Ship. **Not installed**, QA .146 unchanged.
+No Valheim/Unity/input/save changes/push. Unknown ZDO/vbuild ZDO scale/native
+warning/snap/build/reload/network remain open; full goal active.
+See docs/PLANBUILD_SNAP_TAIL_CHECKPOINT_2026-10-11.md,
+docs/QA_0.19.154_RU.md (owned fixture27) and artifacts/checkpoint-0.19.154/verification.json.
+Offline only while Ostrix works; do not repeat already accepted game cases.
+
 ## 2026-10-11 — .153 sources: initial missing review in worker, offline
 
 Code818b02f: the existing worker prepares missing/retained review from frozen

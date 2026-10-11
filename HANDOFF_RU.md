@@ -1,3 +1,17 @@
+## 2026-10-11 — исходники .154: расширенные строки привязок PlanBuild, offline
+
+Код3a2c82b: первые XYZ #SnapPoints допускают дополнительные архивные поля,
+поведение хвоста не восстановлено и явно обозначено в импорте/экспорте.
+Исходник сохраняется; vbuild/finite/±512/count guards прежние. Pinned PlanBuild
+reader SHA/две реальные строки en/ru проверены. Biome353/353, второй корпус202/209,
+7 прежних отказов; full Geometry/Store, normalQA0/0, Host25185596/loc989,
+isolation/EditorBridge/scopedformat и correctness/Ponytail Ship.
+**Не установлено**, QA .146. Без Valheim/Unity/input/сохранений/push.
+Unknown ZDO, vbuild ZDO scale, native warning/привязки/стройка/reload/сеть открыты.
+См. docs/PLANBUILD_SNAP_TAIL_CHECKPOINT_2026-10-11_RU.md,
+docs/QA_0.19.154_RU.md (готов собственный файл27) и artifacts/checkpoint-0.19.154/verification.json.
+Полная цель активна; пока Ostrix работает, только offline. Принятые случаи не повторять.
+
 ## 2026-10-11 — исходники .153: начальный missing-обзор в фоне, offline
 
 Код818b02f: тот же worker готовит missing/retained review из host-снимков;

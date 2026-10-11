@@ -1,5 +1,17 @@
 # Blueprint format and large-construction work
 
+## .154 — verified PlanBuild SnapPoints boundary
+
+Current schemas: native22 / portable11; .154 changes neither. Only XYZ is read
+from .blueprint snap rows; extra fields remain in source evidence with an
+explicit warning, without restored meaning/behavior. vbuild remains strict.
+Finite/range/count guards remain. PlanBuild export writes only XYZ; the native
+companion keeps full source. Biome353/353 parse, not native gameplay acceptance.
+See [evidence and limits](../../docs/PLANBUILD_SNAP_TAIL_CHECKPOINT_2026-10-11.md).
+
+## Earlier format checkpoints
+
+
 Survival storage placement dependencies and native API limits:
 [storage-placement.md](storage-placement.md). The populated-container path remains
 unimplemented; read-only/native contract checks do not prove restoration.

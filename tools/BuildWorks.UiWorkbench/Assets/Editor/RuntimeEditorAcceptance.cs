@@ -542,8 +542,7 @@ public static class RuntimeEditorAcceptance
                                 Require(index >= 0 && index < 7, "Import review layout source unavailable");
                                 ControllerInputAcceptance.NativeClick(view, uiCamera, "ExchangeEntry" + index); view.Tick();
                                 ControllerInputAcceptance.NativeClick(view, uiCamera, "ExchangeSubmit");
-                                for (int i = 0; i < 300 && Field<System.Threading.Tasks.Task<CompositeBlueprintStore.ImportReview>>(
-                                    exchange, "importInspection") != null; ++i)
+                                for (int i = 0; i < 300 && ControllerInputAcceptance.ImportPending(exchange); ++i)
                                 { view.Tick(); yield return null; }
                                 Require(Field<CompositeBlueprintStore.ContentsSummary>(exchange, "contentsSummary") != null,
                                     "Import screenshot missed completed inspection");

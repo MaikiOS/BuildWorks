@@ -280,6 +280,8 @@ namespace OstrixMods.BuildWorks
             internal byte[] Bytes;
             internal List<Blueprint> Documents;
             internal ContentsSummary Contents;
+            // Called by the host thread only, never by the file/preparation worker.
+            internal Func<bool> IsHostCurrent;
         }
 
         // Unity thread only; workers receive the resulting pure name lookup.
@@ -294,20 +296,31 @@ namespace OstrixMods.BuildWorks
             (importHostContext == null || importHostContext() != null) && importMaterialSeedSupport?.Invoke(name) == true;
 
         // Refine conservative file inspection with the current host before presenting choices.
-        internal ImportReview PrepareImportReview(ImportReview review, Func<string, int> prefabHash)
+        internal Task<ImportReview> PrepareImportReview(ImportReview review, Func<string, int> prefabHash)
         {
+            int generation = importGeneration;
+            object context = importHostContext?.Invoke();
+            int? worldLevel = importWorldLevel?.Invoke();
+            var scales = review.Documents.SelectMany(document => document.parts).Select(part => part.prefabName)
+                .Distinct(StringComparer.Ordinal).ToDictionary(name => name, name => importPrefabScale?.Invoke(name), StringComparer.Ordinal);
             var supports = MaterialSeedSupportSnapshot(review.Documents);
-            var result = new ImportReview
+            Func<bool> current = () => generation == importGeneration &&
+                ReferenceEquals(context, importHostContext?.Invoke()) && worldLevel == importWorldLevel?.Invoke();
+            return Task.Run(() =>
             {
-                Source = review.Source,
-                Bytes = review.Bytes,
-                Contents = new ContentsSummary(),
-                Documents = review.Documents.Select(document => ExternalBlueprintLibrary.PrepareForHost(document,
-                    importPrefabScale, prefabHash, importWorldLevel?.Invoke(), supports)).ToList()
-            };
-            foreach (Blueprint document in result.Documents)
-                result.Contents.Add(InspectContents(document, prefabHash, supports));
-            return result;
+                var result = new ImportReview
+                {
+                    Source = review.Source,
+                    Bytes = review.Bytes,
+                    Contents = new ContentsSummary(),
+                    IsHostCurrent = current,
+                    Documents = review.Documents.Select(document => ExternalBlueprintLibrary.PrepareForHost(document,
+                        name => scales.TryGetValue(name, out var scale) ? scale : null, prefabHash, worldLevel, supports)).ToList()
+                };
+                foreach (Blueprint document in result.Documents)
+                    result.Contents.Add(InspectContents(document, prefabHash, supports));
+                return result;
+            });
         }
 
         private static byte[] ReadImportBytes(string source)
@@ -374,10 +387,12 @@ namespace OstrixMods.BuildWorks
         {
             error = null;
             if (CatalogLoading) { error = UserError("exchange.loading"); return false; }
-            CatalogAll();
             try
             {
                 if (review == null) throw new InvalidDataException("$buildworks_import.format");
+                if (review.IsHostCurrent?.Invoke() == false)
+                    throw new InvalidDataException(UserError("placement.contents_stale"));
+                CatalogAll();
                 if (omitMissing != null) ValidateMissingReview(review.Documents, omitMissing, prefabHash);
                 var prepared = review.Documents.Select(document => ExternalBlueprintLibrary.PrepareForHost(document, importPrefabScale, importPrefabHash, importWorldLevel?.Invoke(), importMaterialSeedSupport)).ToArray();
                 if (prepared.Any(document => document.importError != null))

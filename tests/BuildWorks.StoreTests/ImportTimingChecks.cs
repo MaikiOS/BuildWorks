@@ -36,7 +36,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 var review = CompositeBlueprintStore.ReviewImportFile(source, ForeignZdoChecks.Hash, 0);
                 double read = clock.Elapsed.TotalMilliseconds;
                 clock.Restart();
-                review = store.PrepareImportReview(review, ForeignZdoChecks.Hash);
+                review = store.PrepareImportReview(review, ForeignZdoChecks.Hash).GetAwaiter().GetResult();
                 double prepare = clock.Elapsed.TotalMilliseconds;
                 clock.Restart();
                 store.InspectMissing(review.Documents, ForeignZdoChecks.Hash);

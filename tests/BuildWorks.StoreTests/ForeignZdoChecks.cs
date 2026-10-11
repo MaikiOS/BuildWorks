@@ -142,14 +142,14 @@ namespace OstrixMods.BuildWorks.StoreTests
             var raw = Parse(Packet(1234));
             var review = new CompositeBlueprintStore.ImportReview { Source = "source.blueprint", Bytes = new byte[] { 1, 2 },
                 Documents = new System.Collections.Generic.List<CompositeBlueprintStore.Blueprint> { raw } };
-            var prepared = store.PrepareImportReview(review, Hash);
+            var prepared = store.PrepareImportReview(review, Hash).GetAwaiter().GetResult();
             Require(prepared.Contents.Unknown == 0 && prepared.Documents[0].parts[0].materialSeed == 1234 &&
                 raw.parts[0].materialSeed == null && prepared.Source == review.Source && ReferenceEquals(prepared.Bytes, review.Bytes),
                 "Host review lost source or reported supported appearance unknown");
             var snapshot = store.MaterialSeedSupportSnapshot(prepared.Documents); support = false;
             Require(System.Threading.Tasks.Task.Run(() => CompositeBlueprintStore.InspectContents(prepared.Documents[0], Hash, snapshot)).Result.Unknown == 0 &&
                 CompositeBlueprintStore.InspectContents(prepared.Documents[0], Hash, store.SupportsMaterialSeed).Unknown == 1 &&
-                store.PrepareImportReview(review, Hash).Contents.Unknown > 0, "Material summary used a stale host or worker resolver");
+                store.PrepareImportReview(review, Hash).GetAwaiter().GetResult().Contents.Unknown > 0, "Material summary used a stale host or worker resolver");
             support = true; context = null;
             Require(!store.SupportsMaterialSeed("woodwall"), "Absent host context declared material support");
             context = new object();
@@ -158,7 +158,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             prepared.Documents[0].parts[0].sourceDocumentId = null; prepared.Documents[0].parts[0].sourceLine = 0;
             prepared.Documents[0].parts[0].foreignData = new CompositeBlueprintStore.ForeignPartData {
                 format = BlueprintForeignPartData.NativeContainerFormat, info = "5:2:0:0", zdo = "bQAAAAAA" };
-            var contentsReview = store.PrepareImportReview(prepared, Hash);
+            var contentsReview = store.PrepareImportReview(prepared, Hash).GetAwaiter().GetResult();
             Require(contentsReview.Contents.Storages == 1 && contentsReview.Contents.Unknown == 0 &&
                 contentsReview.Contents.CanClearStorage && contentsReview.Contents.CanClearMounts,
                 "Host review dropped the inspection hash or blocked contents choices for supported material");
@@ -166,6 +166,58 @@ namespace OstrixMods.BuildWorks.StoreTests
                 .parts[0].materialSeed == 1234, "Clearing storage lost independent material state");
             Console.WriteLine("PASS source-bound blueprint/vbuild material seeds: zero/Max, capability, strict types, sibling atomicity, provenance, portable and independent contents settings");
             Console.WriteLine("PASS host material review: conservative raw, supported/unsupported current host, source unchanged, pure worker snapshot and lost-context refusal");
+            BackgroundReview(Parse(Packet(1234)));
+        }
+
+        private static void BackgroundReview(CompositeBlueprintStore.Blueprint raw)
+        {
+            string directory = Path.Combine(Path.GetTempPath(), "BuildWorks-background-review-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            try
+            {
+                var store = new CompositeBlueprintStore(Path.Combine(directory, "library.json"));
+                int owner = Environment.CurrentManagedThreadId, scaleReads = 0, level = 0;
+                object context = new object(), originalContext = context;
+                Action host = () => Require(Environment.CurrentManagedThreadId == owner, "Worker accessed live host state");
+                store.ConfigureImportScale(_ => { host(); ++scaleReads; return new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 }; },
+                    () => { host(); return context; }, Hash, () => { host(); return level; }, _ => { host(); return true; });
+                var review = new CompositeBlueprintStore.ImportReview { Source = "source.blueprint", Bytes = new byte[] { 1, 2 },
+                    Documents = new System.Collections.Generic.List<CompositeBlueprintStore.Blueprint> { raw, raw } };
+                using (var entered = new System.Threading.ManualResetEventSlim())
+                using (var release = new System.Threading.ManualResetEventSlim())
+                {
+                    var pending = store.PrepareImportReview(review, name =>
+                    {
+                        entered.Set();
+                        Require(Environment.CurrentManagedThreadId != owner, "Preparation still ran on the caller thread");
+                        Require(release.Wait(10000), "Background review test release timeout");
+                        return Hash(name);
+                    });
+                    try
+                    {
+                        Require(entered.Wait(10000) && !pending.IsCompleted && scaleReads == 1,
+                            "Review did not return a pending worker or snapshotted the same prefab repeatedly");
+                        context = new object(); level = 1;
+                    }
+                    finally { release.Set(); }
+                    var prepared = pending.GetAwaiter().GetResult();
+                    Require(prepared.Documents.Count == 2 && prepared.Documents.All(document => document.parts[0].materialSeed == 1234) &&
+                        prepared.Contents.Unknown == 0 && ReferenceEquals(prepared.Bytes, review.Bytes) && raw.parts[0].materialSeed == null,
+                        "Background normalization lost frozen host values or mutated the raw review");
+                    Require(!prepared.IsHostCurrent() && !store.TryImportReviewed(prepared, false, false, Hash, out string error) &&
+                        error.Contains("contents_stale") && !Directory.Exists(store.ImportDirectory),
+                        "Stale prepared review was accepted or wrote an import");
+                    context = originalContext; level = 0;
+                    Require(prepared.IsHostCurrent(), "Unchanged captured host was rejected");
+                    level = 1;
+                    Require(!prepared.IsHostCurrent(), "World-level change was not detected");
+                    level = 0;
+                    store.ConfigureImportScale(_ => new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 }, () => context);
+                    Require(!prepared.IsHostCurrent(), "Resolver reconfiguration did not invalidate the pending review");
+                }
+                Console.WriteLine("PASS asynchronous import review: caller-only distinct prefab snapshot, held worker, unchanged source, context/world/resolver invalidation and no stale writes");
+            }
+            finally { Directory.Delete(directory, true); }
         }
         private static void PreparationScope()
         {

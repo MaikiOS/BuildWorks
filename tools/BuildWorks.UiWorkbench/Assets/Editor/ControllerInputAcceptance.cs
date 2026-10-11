@@ -20,6 +20,9 @@ internal static class ControllerInputAcceptance
     private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
     private static T Field<T>(object instance, string name) => (T)instance.GetType().GetField(name, Private).GetValue(instance);
     private static void Set(object instance, string name, object value) => instance.GetType().GetField(name, Private).SetValue(instance, value);
+    internal static bool ImportPending(object exchange) =>
+        Field<Task<CompositeBlueprintStore.ImportReview>>(exchange, "importInspection") != null ||
+        Field<Task<CompositeBlueprintStore.ImportReview>>(exchange, "importPreparation") != null;
     private static void Require(bool value, string reason) { if (!value) throw new InvalidOperationException("Input frames: " + reason); }
     private static Vector3 V(Point3 value) => new Vector3((float)value.X, (float)value.Y, (float)value.Z);
 
@@ -854,7 +857,7 @@ internal static class ControllerInputAcceptance
             for (int iteration = 0; iteration < 2; ++iteration)
             {
                 NativeClick(view, null, "ExchangeSubmit");
-                for (int frame = 0; frame < 300 && Field<Task<CompositeBlueprintStore.ImportReview>>(exchange, "importInspection") != null; ++frame)
+                for (int frame = 0; frame < 300 && ImportPending(exchange); ++frame)
                 { view.Tick(); yield return null; }
                 Require(Field<CompositeBlueprintStore.MissingPartsReview>(exchange, "missingReview").Parts == 1 &&
                     !Field<bool>(exchange, "omitMissingParts") && Field<Button>(exchange, "missingChoice").interactable &&
@@ -1671,15 +1674,25 @@ internal static class ControllerInputAcceptance
                 Require(chosen >= 0 && chosen < 7, "Supported source file unavailable in browser");
                 NativeClick(view, null, "ExchangeEntry" + chosen); Frame(controller, input, Vector2.zero); yield return null;
                 NativeClick(view, null, "ExchangeSubmit"); yield return null;
-                for (int i = 0; i < 300 && Field<Task<CompositeBlueprintStore.ImportReview>>(exchange, "importInspection") != null; ++i)
+                for (int i = 0; i < 300 && ImportPending(exchange); ++i)
                 { Frame(controller, input, Vector2.zero); yield return null; }
                 Require(Field<bool>(exchange, "reviewingContents") && !Directory.Exists(store.ImportDirectory),
                     "Import wrote before contents confirmation");
+                var discardedReview = Field<CompositeBlueprintStore.ImportReview>(exchange, "importReview");
+                var delayedReview = new TaskCompletionSource<CompositeBlueprintStore.ImportReview>();
+                Set(exchange, "importReview", null); Set(exchange, "contentsSummary", null);
+                Set(exchange, "importPreparation", delayedReview.Task);
+                Frame(controller, input, Vector2.zero); yield return null;
+                Require(!Field<Button>(exchange, "primary").interactable && Field<Button>(exchange, "contentsBack").interactable,
+                    "Pending host review allowed confirmation or blocked Back");
                 NativeClick(view, null, "ExchangeContentsBack"); yield return null;
+                delayedReview.SetResult(discardedReview); Frame(controller, input, Vector2.zero); yield return null;
                 Require(Field<TMP_InputField>(exchange, "directory").interactable && !Directory.Exists(store.ImportDirectory),
                     "Import Back changed library or did not restore browser");
+                Require(!ImportPending(exchange) && Field<CompositeBlueprintStore.ContentsSummary>(exchange, "contentsSummary") == null,
+                    "Back published the abandoned host review");
                 NativeClick(view, null, "ExchangeSubmit"); yield return null;
-                for (int i = 0; i < 300 && Field<Task<CompositeBlueprintStore.ImportReview>>(exchange, "importInspection") != null; ++i)
+                for (int i = 0; i < 300 && ImportPending(exchange); ++i)
                 { Frame(controller, input, Vector2.zero); yield return null; }
                 NativeClick(view, null, "ExchangeSubmit"); yield return null;
                 for (int i = 0; i < 300 && Field<bool>(exchange, "importing"); ++i)
@@ -1924,7 +1937,7 @@ internal static class ControllerInputAcceptance
                     { Frame(controller, input, Vector2.zero); yield return null; }
                     NativeClick(view, null, "ExchangeEntry0"); Frame(controller, input, Vector2.zero);
                     NativeClick(view, null, "ExchangeSubmit");
-                    for (int i = 0; i < 300 && Field<Task<CompositeBlueprintStore.ImportReview>>(exchange, "importInspection") != null; ++i)
+                    for (int i = 0; i < 300 && ImportPending(exchange); ++i)
                     { Frame(controller, input, Vector2.zero); yield return null; }
                     Require(Field<CompositeBlueprintStore.ContentsSummary>(exchange, "contentsSummary").Storages == 1 &&
                         Field<Button>(exchange, "storageChoice").interactable && Field<Button>(exchange, "mountChoice").interactable,
@@ -2017,7 +2030,7 @@ internal static class ControllerInputAcceptance
                 using (var fileLock = new FileStream(lockedPath, FileMode.Open, FileAccess.Read, FileShare.None))
                 {
                     NativeClick(view, null, "ExchangeSubmit");
-                    for (int i = 0; i < 300 && Field<Task<CompositeBlueprintStore.ImportReview>>(exchange, "importInspection") != null; ++i)
+                    for (int i = 0; i < 300 && ImportPending(exchange); ++i)
                     { Frame(controller, input, Vector2.zero); yield return null; }
                     Require(Field<TMP_Text>(exchange, "message").text.Length > 0 && !Field<bool>(exchange, "completed") &&
                         !Field<Button>(exchange, "primary").interactable && Field<Button>(exchange, "contentsBack").interactable,
@@ -2026,7 +2039,7 @@ internal static class ControllerInputAcceptance
                 NativeClick(view, null, "ExchangeContentsBack"); yield return null;
                 NativeClick(view, null, "ExchangeEntry" + chosen); Frame(controller, input, Vector2.zero); yield return null;
                 NativeClick(view, null, "ExchangeSubmit");
-                for (int i = 0; i < 300 && Field<Task<CompositeBlueprintStore.ImportReview>>(exchange, "importInspection") != null; ++i)
+                for (int i = 0; i < 300 && ImportPending(exchange); ++i)
                 { Frame(controller, input, Vector2.zero); yield return null; }
                 NativeClick(view, null, "ExchangeSubmit");
                 for (int i = 0; i < 300 && Field<bool>(exchange, "importing"); ++i)
@@ -2050,7 +2063,7 @@ internal static class ControllerInputAcceptance
                 for (int i = 0; i < chosen / 7; ++i) { NativeClick(view, null, "ExchangeNext"); yield return null; }
                 NativeClick(view, null, "ExchangeEntry" + chosen); Frame(controller, input, Vector2.zero); yield return null;
                 NativeClick(view, null, "ExchangeSubmit");
-                for (int i = 0; i < 300 && Field<Task<CompositeBlueprintStore.ImportReview>>(exchange, "importInspection") != null; ++i)
+                for (int i = 0; i < 300 && ImportPending(exchange); ++i)
                 { Frame(controller, input, Vector2.zero); yield return null; }
                 Require(Field<CompositeBlueprintStore.ContentsSummary>(exchange, "contentsSummary").ArmorStates == 1 &&
                     Field<Button>(exchange, "armorChoice").gameObject.activeSelf && !Field<bool>(exchange, "omitArmorState") &&
@@ -2061,7 +2074,7 @@ internal static class ControllerInputAcceptance
                     "Armor review wrote before confirmation");
                 NativeClick(view, null, "ExchangeContentsBack"); Frame(controller, input, Vector2.zero); yield return null;
                 NativeClick(view, null, "ExchangeSubmit");
-                for (int i = 0; i < 300 && Field<Task<CompositeBlueprintStore.ImportReview>>(exchange, "importInspection") != null; ++i)
+                for (int i = 0; i < 300 && ImportPending(exchange); ++i)
                 { Frame(controller, input, Vector2.zero); yield return null; }
                 Require(!Field<bool>(exchange, "omitArmorState"), "Back retained a stale destructive choice");
                 NativeClick(view, null, "ExchangeArmorChoice"); NativeClick(view, null, "ExchangeSubmit");

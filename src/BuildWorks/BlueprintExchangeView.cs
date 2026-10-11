@@ -22,6 +22,7 @@ namespace OstrixMods.BuildWorks
         private TMP_Text contentsDetails;
         private Task<CompositeBlueprintStore.ContentsSummary> contentsInspection;
         private Task<CompositeBlueprintStore.ImportReview> importInspection;
+        private Task<CompositeBlueprintStore.ImportReview> importPreparation;
         private Task<PlanBuildExport> planInspection;
         private Task<string> planExport;
         private PlanBuildExport planReview;
@@ -141,7 +142,8 @@ namespace OstrixMods.BuildWorks
             if (!IsOpen) return;
             var parent = (RectTransform)root.transform.parent;
             panel.localScale = Vector3.one * Mathf.Min(1, (parent.rect.width - 24) / 780, (parent.rect.height - 24) / 580);
-            if (place != null && (store.Revision != placementRevision || placementCurrent?.Invoke() == false))
+            if (place != null && (store.Revision != placementRevision || placementCurrent?.Invoke() == false) ||
+                reviewingContents && !importing && !completed && importReview?.IsHostCurrent?.Invoke() == false)
             {
                 foreach (Selectable control in root.GetComponentsInChildren<Selectable>())
                     control.interactable = control.name == "ExchangeClose" || control.name == "ExchangeContentsBack";
@@ -204,10 +206,24 @@ namespace OstrixMods.BuildWorks
                 try
                 {
                     var review = importInspection.GetAwaiter().GetResult();
-                    if (reviewingContents) { importReview = store.PrepareImportReview(review, name => name.GetStableHashCode()); contentsSummary = importReview.Contents; RefreshMissing(); RenderContents(); }
+                    if (reviewingContents) importPreparation = store.PrepareImportReview(review, name => name.GetStableHashCode());
                 }
                 catch (Exception error) { if (reviewingContents) SetError(error); }
                 importInspection = null;
+            }
+            if (importPreparation != null && importPreparation.IsCompleted)
+            {
+                try
+                {
+                    var review = importPreparation.GetAwaiter().GetResult();
+                    if (reviewingContents)
+                    {
+                        if (review.IsHostCurrent?.Invoke() != true) message.text = T("placement.contents_stale");
+                        else { importReview = review; contentsSummary = review.Contents; RefreshMissing(); RenderContents(); }
+                    }
+                }
+                catch (Exception error) { if (reviewingContents) SetError(error); }
+                importPreparation = null;
             }
             if (planInspection != null && planInspection.IsCompleted)
             {
@@ -363,7 +379,7 @@ namespace OstrixMods.BuildWorks
                 contentsBack = Button("ExchangeContentsBack", T("exchange.back"), 256, 530, 276, () =>
                 {
                     if (place != null) { Dispose(); return; }
-                    reviewingContents = false; contentsInspection = null; importInspection = null; planInspection = null;
+                    reviewingContents = false; contentsInspection = null; importInspection = null; importPreparation = null; planInspection = null;
                     planReview = null; contentsPanel.gameObject.SetActive(false);
                     contentsBack.gameObject.SetActive(false); copyPath.gameObject.SetActive(true);
                     SetFileControls(true); message.text = "";
@@ -554,6 +570,7 @@ namespace OstrixMods.BuildWorks
         public void Dispose()
         {
             if (disposed) return; disposed = true;
+            importInspection = null; importPreparation = null;
             planReview?.CancelWrite();
             root.SetActive(false); UnityEngine.Object.Destroy(root); skin.Dispose();
             if (EventSystem.current && previousFocus && previousFocus.activeInHierarchy)

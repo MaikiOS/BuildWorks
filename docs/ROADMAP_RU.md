@@ -1,3 +1,16 @@
+## 2026-10-11 — исходники .152: подтверждение импорта в worker, offline
+
+Код b2fae84: fresh host scale/material/metadata/world snapshots → существующий
+importTask; identity-return получает частную копию, metadata не разделяется.
+Missing validation без лишнего contents; ошибка worker сохраняется, повтор
+требует Back/нового обзора. Store353 (351/2), normalQA0/0, Host25185596/loc988,
+isolation/EditorBridge/scopedformat, actual Tick red/green и оба обзора Ship.
+**Не установлено**, QA .146; без Valheim/Unity/input/сохранений, Ostrix работает.
+CPU4096 не доказала ускорения; host-снимки/RefreshMissing/native latency/FPS/memory
+и полный путь стройка/reload/сеть открыты. См. docs/ASYNC_IMPORT_SUBMISSION_CHECKPOINT_2026-10-11_RU.md,
+объединённую docs/QA_0.19.151_RU.md и artifacts/checkpoint-0.19.152/verification.json.
+Полная цель активна, принятые проверки не повторять, push не выполнялся.
+
 ## 2026-10-11 — исходники .151: обзор импорта в фоне, offline
 
 Код0c6e966: host-снимки уникальных prefab/мира → worker PrepareForHost/contents;

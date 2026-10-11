@@ -1,3 +1,16 @@
+## 2026-10-11 — source .152: submission in existing worker, offline
+
+Code b2fae84: fresh host scale/material/metadata/world snapshots → existing
+importTask; identity preparation gets private copies, metadata does not alias.
+Missing validation skips unused contents; worker error persists and requires
+Back/fresh review. Store353 (351/2), normalQA0/0, Host25185596/loc988,
+isolation/EditorBridge/scopedformat, actual Tick red/green and both reviews Ship.
+**Not installed**, QA .146. No Valheim/Unity/input/save changes while Ostrix works.
+CPU4096 did not prove speed-up. Snapshots/RefreshMissing/native latency/FPS/memory
+and full placement/reload/network remain open. See docs/ASYNC_IMPORT_SUBMISSION_CHECKPOINT_2026-10-11.md,
+merged docs/QA_0.19.151_RU.md and artifacts/checkpoint-0.19.152/verification.json.
+Full goal active; no repeat of accepted checks, no push.
+
 ## 2026-10-11 — source .151: background import review, offline
 
 Code0c6e966: unique prefab/world host snapshots → worker PrepareForHost/contents;

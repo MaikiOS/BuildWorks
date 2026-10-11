@@ -38,8 +38,11 @@ namespace OstrixMods.BuildWorks
             if (Recorded || Error != null) return;
             try
             {
+                var sources = new HashSet<ItemDrop.ItemData>();
                 foreach (Input input in inputs)
                 {
+                    if (!sources.Add(input.Original))
+                        throw new InvalidOperationException("Repeated native inventory item reference before placement.");
                     int remaining = inventory.ContainsItem(input.Original) ? input.Original.m_stack : 0;
                     if (remaining < 0) throw new InvalidOperationException("Negative native inventory stack after placement.");
                     input.Paid = Math.Max(0, input.Before - remaining);

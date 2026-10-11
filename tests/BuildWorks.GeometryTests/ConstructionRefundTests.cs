@@ -42,6 +42,37 @@ internal static class ConstructionRefundTests
             ItemDrop.Drops[1].m_quality == 1 && ItemDrop.Drops[1].m_customData["key"] == "different",
             "Supplied item properties were repaired, merged or replaced");
 
+        var repeated = Item("wood", 10, 2, 14f, "owner", "custom");
+        var damagedInventory = new Inventory();
+        damagedInventory.Items.AddRange(new[] { repeated, repeated });
+        var duplicatePayment = new BlueprintConstructionRefund(damagedInventory, recipe);
+        repeated.m_stack -= 4;
+        duplicatePayment.Complete();
+        duplicatePayment.Complete();
+        duplicatePayment.RecordRemoval(true, true);
+        duplicatePayment.RecordNetworkRemoval(true);
+        int dropsBefore = ItemDrop.Drops.Count;
+        Require(!duplicatePayment.Recorded && duplicatePayment.Error != null &&
+            !duplicatePayment.TryRefund(default, true) && !duplicatePayment.TryRefund(default, true) &&
+            ItemDrop.Drops.Count == dropsBefore,
+            "A repeated source stack reference refunded the same debit twice");
+
+        var twinA = Item("wood", 10, 2, 14f, "owner", "custom");
+        var twinB = twinA.Clone();
+        var distinctInventory = new Inventory();
+        distinctInventory.Items.AddRange(new[] { twinA, twinB });
+        var distinctPayment = new BlueprintConstructionRefund(distinctInventory, recipe);
+        twinA.m_stack -= 4;
+        twinB.m_stack -= 2;
+        distinctPayment.Complete();
+        distinctPayment.RecordRemoval(true, true);
+        distinctPayment.RecordNetworkRemoval(true);
+        Require(distinctPayment.Recorded && distinctPayment.Error == null &&
+            distinctPayment.TryRefund(default, true) && distinctPayment.TryRefund(default, true) &&
+            ItemDrop.Drops.Count == dropsBefore + 2 &&
+            ItemDrop.Drops[dropsBefore].m_stack == 4 && ItemDrop.Drops[dropsBefore + 1].m_stack == 2,
+            "Separate equal-property stacks were merged or refunded more than once");
+
         wood.m_stack = 3;
         var incomplete = new BlueprintConstructionRefund(inventory, recipe);
         Require(!incomplete.TryRefund(default, true), "Unverified debit was refunded");
@@ -79,7 +110,7 @@ internal static class ConstructionRefundTests
             Require(!unconfirmed.TryRefund(default, true) && ItemDrop.Drops.Count == before,
                 "Uncertain/ordinary native destruction plus later fallback duplicated recipe drops");
         }
-        Console.WriteLine("PASS actual construction debit/refund: no-cost, stacks, item properties, idempotence, uncertain native failure; inert host doubles, no game proof");
+        Console.WriteLine("PASS actual construction debit/refund: no-cost, distinct/equal stacks, duplicate source refusal, item properties, idempotence, uncertain native failure; inert host doubles, no game proof");
     }
 
     private static ItemDrop.ItemData Item(string name, int count, int quality, float durability, string crafter, string custom) =>

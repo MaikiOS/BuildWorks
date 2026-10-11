@@ -880,7 +880,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.158.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.159.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -3266,6 +3266,10 @@ Assert-Contract ($inventorySave.IsPublic -and $inventorySave.Parameters.Count -e
     $inventorySaveCalls -notmatch 'ZDO::|RPC|Object::Instantiate|Inventory::Changed|Inventory::Load' -and
     @($inventorySave.Body.Instructions | Where-Object { $_.OpCode.Name -in @('stfld', 'stsfld') }).Count -eq 0) 'Native private Inventory.Save packet/version/count or side effects changed.'
 $itemDataType = ($hostAssembly.MainModule.Types | Where-Object Name -eq 'ItemDrop').NestedTypes | Where-Object Name -eq 'ItemData'
+Assert-Contract ($itemDataType.BaseType.FullName -eq 'System.Object' -and
+    @($itemDataType.Methods | Where-Object { $_.Name -in @('Equals', 'GetHashCode') }).Count -eq 0 -and
+    @($itemDataType.Interfaces | Where-Object { [string]$_.InterfaceType -match 'IEquatable' }).Count -eq 0) `
+    'ItemData identity semantics changed; construction debit and contents reservations require reference equality.'
 $itemSave = $itemDataType.Methods | Where-Object { $_.Name -eq 'Save' -and $_.Parameters.Count -eq 1 }
 $itemSaveCalls = ($itemSave.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 foreach ($field in 'm_durability', 'm_gridPos', 'm_worldLevel', 'm_quality', 'm_stack', 'm_variant', 'm_crafterID', 'm_crafterName', 'm_dropPrefab', 'm_customData') {

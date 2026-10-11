@@ -267,6 +267,10 @@ namespace OstrixMods.BuildWorks
                         if (fields.Length < basic || fields.Length > (vbuild ? 10 : 15) ||
                             (!vbuild && (fields.Length == 11 || fields.Length == 12)))
                             throw new InvalidDataException("$buildworks_import.fields");
+                        // PlanBuild accepts decimal commas in transforms; leave identifiers and object payloads exact.
+                        if (!vbuild)
+                            for (int index = 2; index < Math.Min(fields.Length, 13); ++index)
+                                if (index != 9) fields[index] = fields[index].Replace(',', '.');
                         string prefab = fields[0].Trim();
                         // Decode only the known sign adapter; every other object payload remains inert and part-bound.
                         string signText = !vbuild && prefab == "sign" ? BlueprintExchangeFormat.DecodeSignText(fields[9], allowLegacyLiteral: true) : null;

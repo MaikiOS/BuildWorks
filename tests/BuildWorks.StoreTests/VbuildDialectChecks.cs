@@ -12,6 +12,7 @@ namespace OstrixMods.BuildWorks.StoreTests
         internal static void Run(string directory)
         {
             Directory.CreateDirectory(directory);
+            PlanBuildDecimals(directory);
             NumericParity();
             const string row = "woodwall  .7071068  .7071068 3,25 -4,5 ";
             const string text = "\uFEFF#Name:QA Legacy Vbuild\r\n" + row + "\r\nwoodwall  1   -2 0 1\r\n";
@@ -67,9 +68,8 @@ namespace OstrixMods.BuildWorks.StoreTests
                 "woodwall 0 0 0 1 0 0 0 opaque 1 extra" })
                 Require(ExternalBlueprintLibrary.Parse(invalid, "invalid.vbuild").importError != null,
                     "Malformed legacy vbuild became usable: " + invalid);
-            Require(ExternalBlueprintLibrary.Parse("woodwall;0;0;0;1;3,25;0;0", "strict.vbuild").importError != null &&
-                ExternalBlueprintLibrary.Parse("#Pieces\nwoodwall;;3,25;0;0;0;0;0;1;\"\"", "strict.blueprint").importError != null,
-                "Legacy numeric convention leaked into another dialect");
+            Require(ExternalBlueprintLibrary.Parse("woodwall;0;0;0;1;3,25;0;0", "strict.vbuild").importError != null,
+                "Legacy numeric convention leaked into semicolon vbuild");
             string fixture = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
                 "../../../../..", "tests/fixtures/vbuild/22-legacy-zero-comma.vbuild"));
             var ready = ExternalBlueprintLibrary.LoadFile(fixture).Single();
@@ -79,9 +79,68 @@ namespace OstrixMods.BuildWorks.StoreTests
             Console.WriteLine("PASS legacy vbuild slots/comma decimals: invariant cultures, source-bound state, native/portable reopen and strict dialect boundaries");
         }
 
+        private static void PlanBuildDecimals(string directory)
+        {
+            const string row = "sign;;3,25;-4,5;0,125;0;0,7071068;0;0,7071068;Привет, мир;1,5;0,5;2,25";
+            const string text = "\uFEFF#Name:QA147 PlanBuild Comma\r\n#Pieces\r\n" + row + "\r\n";
+            string fixture = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+                "../../../../..", "tests/fixtures/planbuild/26-planbuild-decimal-comma.blueprint"));
+            Require(File.ReadAllBytes(fixture).SequenceEqual(Encoding.UTF8.GetBytes(text)) &&
+                ExternalBlueprintLibrary.LoadFile(fixture).Single().importError == null,
+                "Ready PlanBuild comma fixture differs from the tested BOM/CRLF source or fails actual file import");
+            var culture = CultureInfo.CurrentCulture;
+            try
+            {
+                foreach (string name in new[] { "en-US", "ru-RU" })
+                {
+                    CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(name);
+                    var parsed = ExternalBlueprintLibrary.Parse(text, "comma.blueprint");
+                    Require(parsed.importError == null && parsed.parts.Count == 1,
+                        "PlanBuild decimal comma transforms rejected: " + parsed.importError);
+                    var part = parsed.parts.Single();
+                    Require(part.position.x == 3.25f && part.position.y == -4.5f && part.position.z == .125f &&
+                        part.rotation.x == 0 && part.rotation.z == 0 && part.rotation.y > .7071f && part.rotation.w > .7071f &&
+                        part.scale.x == 1.5f && part.scale.y == .5f && part.scale.z == 2.25f &&
+                        part.scaleIsAbsolute && part.signText == "Привет, мир",
+                        "PlanBuild comma changed transform semantics or sign punctuation");
+                    var prepared = ExternalBlueprintLibrary.PrepareForHost(parsed,
+                        _ => new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 });
+                    string path = Path.Combine(directory, "planbuild-comma-" + name + ".json");
+                    var store = new CompositeBlueprintStore(path);
+                    Require(store.TryGetOrCreatePlacementCopy(prepared, out var saved, out string error), error);
+                    var reopened = new CompositeBlueprintStore(path).All().Single();
+                    var portable = BlueprintExchangeFormat.Decode(Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(saved)));
+                    foreach (var copy in new[] { reopened, portable })
+                        Require(copy.parts.Single().position.x == 3.25f && copy.parts[0].rotation.y == part.rotation.y &&
+                            copy.parts[0].baseScale.Value.x == 1.5f && copy.parts[0].baseScale.Value.y == .5f &&
+                            copy.parts[0].baseScale.Value.z == 2.25f && copy.parts[0].scale.x == 1 &&
+                            copy.parts[0].signText == "Привет, мир" && copy.parts[0].sourceLine == 3 &&
+                            copy.parts[0].sourceDocumentId == parsed.sourceDocuments.Single().id &&
+                            copy.sourceDocuments.Single().ToGeometry().Text == text,
+                            "PlanBuild comma save/portable reopen lost transforms, punctuation or exact BOM/CRLF source");
+                    Require(parsed.sourceDocuments.Single().text == text && parsed.parts[0].scaleIsAbsolute,
+                        "Preparing PlanBuild comma modified the original");
+                }
+            }
+            finally { CultureInfo.CurrentCulture = culture; }
+
+            var opaque = ExternalBlueprintLibrary.Parse("#Pieces\nwood,wall;;1,5;0;0;0;0;0;1;info,raw;1;1;1;zdo,raw;0,5", "opaque.blueprint");
+            Require(opaque.importError == null && opaque.parts.Single().prefabName == "wood,wall" &&
+                opaque.parts[0].foreignData.info == "info,raw" && opaque.parts[0].foreignData.zdo == "zdo,raw" &&
+                opaque.parts[0].foreignData.chance == "0,5", "Comma normalization changed unknown identifiers or object payloads");
+            foreach (string token in new[] { "", "1,2,3", "1,2.3", "NaN", "Infinity", "1e1000", "513,0" })
+            {
+                var refused = ExternalBlueprintLibrary.Parse("#Pieces\n" + row + "\n" + row.Replace("3,25", token), "bad.blueprint");
+                Require(refused.importError != null && refused.parts.Count == 0, "Malformed PlanBuild number accepted: " + token);
+            }
+            Require(ExternalBlueprintLibrary.Parse("#Pieces\n" + row + "\n#SnapPoints\n1,5;0;0", "snap.blueprint").importError != null,
+                "PlanBuild transform adapter changed the strict snap-point dialect");
+            Console.WriteLine("PASS PlanBuild comma transforms: en-US/ru-RU, position/rotation/scale, exact source and native/portable reopen; payloads and snap dialect unchanged");
+        }
+
         private static void NumericParity()
         {
-            foreach (string token in new[] { "0", "1", "-1", "-0", " 1 ", "+1", "1e0", "1.0", ".5", "1e-10", "-1.5e2" })
+            foreach (string token in new[] { "0", "1", "-1", "-0", " 1 ", "+1", "1e0", "1.0", ".5", "1e-10", "-1.5e2", "1,0", "-1,5" })
                 Check(token, false);
             foreach (string token in new[] { "", "0", "1", "-1", "-0", "+1", "1e0", "1,0", "-1,5" })
                 Check(token, true);
@@ -91,15 +150,15 @@ namespace OstrixMods.BuildWorks.StoreTests
                 var rejected = ExternalBlueprintLibrary.Parse(Row(token, legacy), legacy ? "numeric.vbuild" : "numeric.blueprint");
                 Require(rejected.importError != null && rejected.parts.Count == 0, "Invalid numeric token accepted: " + token);
             }
-            var comma = ExternalBlueprintLibrary.Parse(Row("1,0", false), "numeric.blueprint");
-            Require(comma.importError != null && comma.parts.Count == 0, "Blueprint dialect accepted legacy decimal comma");
+            var empty = ExternalBlueprintLibrary.Parse(Row("", false), "numeric.blueprint");
+            Require(empty.importError != null && empty.parts.Count == 0, "Blueprint dialect accepted legacy empty zero slot");
             Console.WriteLine("PASS imported numeric parity: exact float bits, signed zero/whitespace/exponents, legacy comma/empty, invalid/overflow refusal and exact source");
 
             void Check(string token, bool legacy)
             {
                 string text = Row(token, legacy);
                 var parsed = ExternalBlueprintLibrary.Parse(text, legacy ? "numeric.vbuild" : "numeric.blueprint");
-                float expected = legacy && token == "" ? 0 : float.Parse(legacy ? token.Replace(',', '.') : token,
+                float expected = legacy && token == "" ? 0 : float.Parse(token.Replace(',', '.'),
                     NumberStyles.Float, CultureInfo.InvariantCulture);
                 Require(parsed.importError == null && parsed.parts.Count == 1 &&
                     BitConverter.GetBytes(parsed.parts[0].position.x).SequenceEqual(BitConverter.GetBytes(expected)) &&

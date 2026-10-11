@@ -170,9 +170,42 @@ internal static class F9HudAcceptance
                 Require(Mathf.Abs(rise - 1f) < 0.001f, "F9 rise overshoot poisoned next absolute input");
                 riseInput.DeactivateInputField(true);
                 Require(!view.IsEditingAngle, "F9 completed numeric edit blocks Session input");
+                int applied = 0, rowClicked = -1, toggled = 0;
+                float bottom = -2;
+                view.ConfigureWorldSelection(() => ++toggled, (delta, top) => { if (!top) bottom += delta; },
+                    () => ++applied, row => rowClicked = row);
+                var rows = new (string, bool)[7];
+                for (int i = 0; i < rows.Length; ++i) rows[i] = ("Wall " + i, true);
+                view.SetWorldSelectionState(true, bottom, 20, "Loaded objects only", rows);
+                Show(view, GizmoMode.Move, selection: true);
+                Require(Button(view, "worldSelectionBottom").gameObject.activeInHierarchy &&
+                    !Button(view, "moveText").gameObject.activeInHierarchy, "Volume HUD overlaps old transform controls");
+                TMP_InputField bottomInput = BeginEdit(view, "worldSelectionBottom");
+                bottomInput.text = "5.5";
+                Require(view.IsEditingAngle && Mathf.Abs(bottom - 5.5f) < .001f && applied == 0,
+                    "Height editing leaked input or automatically scanned the world");
+                CancelEdit(bottomInput);
+                Require(!view.IsEditingAngle && Mathf.Abs(bottom + 2) < .001f, "Height cancel did not restore its value");
+                Click(Button(view, "worldSelectionRefresh"));
+                Require(applied == 1, "Volume refresh dispatch missing");
+                GameObject volumeControls = (GameObject)typeof(PrecisionPlacementHudView)
+                    .GetField("worldSelectionControls", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(view);
+                Click(volumeControls.transform.Find("SelectionNext").GetComponent<Button>());
+                var rowLabels = (TMP_Text[])typeof(PrecisionPlacementHudView)
+                    .GetField("worldSelectionRows", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(view);
+                Click(rowLabels[0].transform.parent.GetComponent<Button>());
+                Require(rowClicked == 6, "Paged row dispatch used the wrong record");
+                Click(Button(view, "worldSelectionMode"));
+                Require(toggled == 1, "Selection mode button did not dispatch");
+                view.SetWorldSelectionState(false, -2, 20, "", rows);
+                Require(!Button(view, "worldSelectionBottom").gameObject.activeInHierarchy,
+                    "Screen rectangle retained volume fields");
+                Show(view, GizmoMode.Move);
+                Require(!volumeControls.activeInHierarchy && Button(view, "moveText").gameObject.activeInHierarchy,
+                    "Leaving selection did not restore normal HUD");
                 return "Actual F9 HUD: single and whole-blueprint Array/Contour pointer dispatch, " +
                     "3x2 controls, pause/workspace restore; native ProcessDrag/ReleaseMouse + angle scroll, " +
-                    "TMP scale 400->20, clamped/invalid Escape restore, rise 101->1";
+                    "TMP scale 400->20, clamped/invalid Escape restore, rise 101->1; volume fields/cancel/explicit apply/paging/mode/restore";
             }
             finally
             {
@@ -183,11 +216,11 @@ internal static class F9HudAcceptance
         }
     }
 
-    private static void Show(PrecisionPlacementHudView view, GizmoMode mode, bool blueprint = false, float scale = 0f) =>
+    private static void Show(PrecisionPlacementHudView view, GizmoMode mode, bool blueprint = false, float scale = 0f, bool selection = false) =>
         view.ShowEditing(mode, GizmoAxis.None, true, false, "100%", 0, 0,
             RepeatDistributionMode.Pack, 3, 2, 0f, 0f, 0f, 0f, scale, false, true, true,
             "1 см", "1°", "ПО РАЗМЕРУ", blueprint ? "Fixture" : null,
-            blueprint ? 3 : 0, -1, blueprint, false, "day", false, false, 0,
+            blueprint ? 3 : 0, -1, blueprint, false, "day", false, selection, 0,
             "", "offset", "rotation");
 
     private static void Scroll(GameObject target) => ExecuteEvents.Execute(target,

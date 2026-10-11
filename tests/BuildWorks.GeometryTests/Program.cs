@@ -139,6 +139,8 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Run("Blueprint layout stays inside safe area", BlueprintLayoutStaysInsideSafeArea);
                 Run("Blueprint catalog reflows whole cards across resolutions and modes", BlueprintCatalogUsesWholePages);
 
+            Run("World volume bounds, manual decisions and atomic heavy selection", WorldSelectionVolumeChecks.Run);
+
             if (failures == 0)
             {
                 Console.WriteLine("All BuildWorks geometry tests passed.");

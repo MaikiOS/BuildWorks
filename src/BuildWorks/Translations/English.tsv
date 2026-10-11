@@ -974,3 +974,18 @@ placement.storage_on	[x] Place storage contents
 placement.storage_off	[ ] Place storage contents
 placement.mounts_on	[x] Place mounted items
 placement.mounts_off	[ ] Place mounted items
+selection.area_ray_failed	Look down onto the horizontal plane: the area corner must be within 512 m.
+selection.refresh_required	Set the area and click Refresh selection before saving or manual changes.
+selection.zone_limit	Zones unavailable or volume exceeds safe bounds. Previous selection retained.
+selection.limit	Limit: {0} parts. Reduce the volume; previous selection retained.
+selection.loaded_status	Selected: {1}. Unloaded zones: {0}. Only available objects are included.
+selection.plane	Area plane: Y={0:0.##} m; bottom/top are offsets from this plane.
+selection.area_hint	Drag LMB for area, then set bottom/top. [x] excludes; [ ] restores.
+selection.mode_volume	Mode: volume
+selection.mode_rectangle	Mode: screen rectangle
+selection.rectangle_hint	LMB/rectangle: visible parts; Ctrl: remove. Mode button returns to volume.
+selection.bottom	Bottom: {0:0.##} m
+selection.top	Top: {0:0.##} m
+selection.refresh	Refresh selection
+selection.page	{0}/{1} · Records: {2} · Click toggles inclusion
+selection.height_invalid	Bottom must not exceed top. Fix the heights and refresh selection.

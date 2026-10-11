@@ -58,7 +58,7 @@ foreach ($session in @($qaSession,$normalSession)) {
         -not [bool]($comparers[0].Body.Instructions | Where-Object { [string]$_.Operand -match '::TryPieceScreenPoint\(' })) `
         'Area selection must project each candidate once, never rescan renderer bounds inside its sort comparer.'
 }
-foreach ($name in @('SetBlueprintPieceSelected','TrySaveWorldSelection')) {
+foreach ($name in @('SetBlueprintPieceSelected','TrySaveWorldSelection','TryCommitBlueprintVolumeSelection')) {
     $qaMethod = $qaSession.Methods | Where-Object Name -eq $name
     $normalMethod = $normalSession.Methods | Where-Object Name -eq $name
     $instructions = @($qaMethod.Body.Instructions)
@@ -73,7 +73,8 @@ foreach ($name in @('SetBlueprintPieceSelected','TrySaveWorldSelection')) {
         "Large world selection/capture lost its QA-only loaded identity gate: $name"
     $write = $instructions | Where-Object { [string]$_.Operand -match $(if ($name -eq 'SetBlueprintPieceSelected') {
         'List`1<Piece>::Add\('
-    } else { 'CompositeBlueprintStore::TrySaveDocument\(' }) } | Select-Object -First 1
+    } elseif ($name -eq 'TryCommitBlueprintVolumeSelection') { 'List`1<Piece>::Clear\(' }
+    else { 'CompositeBlueprintStore::TrySaveDocument\(' }) } | Select-Object -First 1
     Require ($null -ne $write -and $gates[0].Offset -lt $write.Offset -and
         [bool]($qaMethod.Body.ExceptionHandlers | Where-Object {
             $_.TryStart.Offset -le $gates[0].Offset -and $_.TryEnd.Offset -gt $gates[0].Offset })) `

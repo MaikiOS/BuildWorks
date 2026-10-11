@@ -25,7 +25,7 @@ namespace OstrixMods.BuildWorks
     /// Owns world-side ghost editing, F9 input, blueprint expansion, native
     /// placement validation, sequential construction, and atomic cancellation.
     /// </summary>
-    internal sealed class PrecisionPlacementSession : IDisposable
+    internal sealed partial class PrecisionPlacementSession : IDisposable
     {
         private static readonly List<ZNetView> scaleEnabledPrefabs = new List<ZNetView>();
         private readonly NativePlacementMaterialPreview materialPreview = new NativePlacementMaterialPreview();
@@ -679,6 +679,8 @@ namespace OstrixMods.BuildWorks
                 ResetTransform,
                 DisablePrecision,
                 ConfirmEditor);
+            hud.ConfigureWorldSelection(ToggleBlueprintVolumeMode, AdjustBlueprintVolumeHeight,
+                () => RefreshBlueprintVolumeSelection(), ToggleBlueprintVolumeRow);
             HammerCatalogView.Configure(
                 blueprintStore,
                 blueprintPieceRegistry,
@@ -1126,7 +1128,11 @@ namespace OstrixMods.BuildWorks
             if (!GameplayInputAvailable(player))
             {
                 if (sessionMode == SessionMode.BlueprintEditor ||
-                    sessionMode == SessionMode.BlueprintWorldSelection) return;
+                    sessionMode == SessionMode.BlueprintWorldSelection)
+                {
+                    if (selectingBlueprint) CancelBlueprintSelectionDrag();
+                    return;
+                }
                 // Valheim temporarily blocks TakeInput during the hammer animation.
                 // Keep an armed series alive until native placement accepts input again.
                 if (state == PlacementState.Armed || state == PlacementState.Frozen) return;
@@ -3223,6 +3229,7 @@ namespace OstrixMods.BuildWorks
             Cancel();
             HammerCatalogView.Unconfigure(blueprintStore);
             blueprintPieceRegistry.Dispose();
+            blueprintVolumeView.Dispose();
             gizmo.Dispose();
             previews.Dispose();
             hud.Dispose();
@@ -3236,6 +3243,7 @@ namespace OstrixMods.BuildWorks
             Cancel(restoreCursor: false);
             HammerCatalogView.Unconfigure(blueprintStore);
             blueprintPieceRegistry.Dispose();
+            blueprintVolumeView.Dispose();
             gizmo.Dispose();
             previews.Dispose();
             hud.Dispose();
@@ -3608,6 +3616,9 @@ namespace OstrixMods.BuildWorks
                 SetBlueprintPieceHighlight(hovered, blueprintSelection.Contains(hovered));
             }
             if (!camera || freeViewFlyLooking) return;
+            if (blueprintSelectionDragging && !Input.GetMouseButton(0) && !Input.GetMouseButtonUp(0))
+                CancelBlueprintSelectionDrag();
+            if (blueprintVolumeMode) { HandleBlueprintVolumeInput(camera, mouse); return; }
             if (Input.GetMouseButtonDown(0) && !MouseOverEditorPanel(mouse))
             {
                 blueprintSelectionDragging = true;
@@ -5007,6 +5018,11 @@ namespace OstrixMods.BuildWorks
         {
             saved = null;
             PruneBlueprintSelection();
+            if (blueprintVolumeMode && (!blueprintVolumeReady || blueprintVolumeDirty || blueprintSelectionDragging))
+            {
+                error = BuildWorksLocalization.Text("selection.refresh_required");
+                return false;
+            }
             error = BuildWorksLocalization.Text(
                 "blueprint.select_part_count", CompositeBlueprintStore.EditorPartBudget);
             if (blueprintSelection.Count < 1 ||
@@ -5141,6 +5157,7 @@ namespace OstrixMods.BuildWorks
         {
             ClearBlueprintSelection();
             selectingBlueprint = true;
+            BeginBlueprintVolumeSelection();
             blueprintSelectionDragging = false;
             ClearLayout();
             alignmentTargetVisible = false;
@@ -5152,6 +5169,7 @@ namespace OstrixMods.BuildWorks
         private void EndBlueprintSelection(bool clearSelection)
         {
             selectingBlueprint = false;
+            ClearBlueprintVolumeSelection();
             blueprintSelectionDragging = false;
             Piece previousHover = blueprintHoverPiece;
             blueprintHoverPiece = null;
@@ -5169,8 +5187,15 @@ namespace OstrixMods.BuildWorks
 
         private void PruneBlueprintSelection()
         {
+            bool changed = false;
             for (int index = blueprintSelection.Count - 1; index >= 0; --index)
-                if (!blueprintSelection[index]) blueprintSelection.RemoveAt(index);
+                if (!blueprintSelection[index]) { blueprintSelection.RemoveAt(index); changed = true; }
+            if (changed && blueprintVolumeMode)
+            {
+                blueprintVolumeDirty = true;
+                blueprintVolumeStatus = BuildWorksLocalization.Text("selection.refresh_required");
+                UpdateBlueprintVolumeHud();
+            }
         }
 
         private bool ActivateBlueprint(CompositeBlueprintStore.Blueprint blueprint)
@@ -5779,7 +5804,7 @@ namespace OstrixMods.BuildWorks
         internal void AbortQaInput()
         {
             HammerCatalogView.CancelPlacementContents(); ClearContentsRecipe();
-            blueprintSelectionDragging = false;
+            CancelBlueprintSelectionDrag();
             blueprintWorkspaceRightTracking = blueprintWorkspaceRightDragged = false;
             hud?.HideSelectionBox();
             if (dragAxis != GizmoAxis.None || dragAnchorPoint >= 0) { CancelNewestStage(); FreezeEditor(); }

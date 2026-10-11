@@ -11,7 +11,7 @@ using UnityEngine.UI;
 
 namespace OstrixMods.BuildWorks
 {
-    internal sealed class PrecisionPlacementHudView : IDisposable
+    internal sealed partial class PrecisionPlacementHudView : IDisposable
     {
         private readonly Action<GizmoMode> selectMode;
         private readonly Action<GizmoAxis> selectConstraint;
@@ -89,7 +89,7 @@ namespace OstrixMods.BuildWorks
         private GameObject selectionBox;
         private RectTransform selectionBoxRect;
 
-        public bool IsEditingAngle =>
+        public bool IsEditingAngle => WorldSelectionEditing ||
             riseControl != null && riseControl.IsEditing ||
             repeatScaleControl != null && repeatScaleControl.IsEditing ||
             repeatTurnControl != null && repeatTurnControl.IsEditing ||
@@ -192,7 +192,10 @@ namespace OstrixMods.BuildWorks
                 return;
             }
             root.SetActive(true);
-            editorControls.SetActive(true);
+            editorControls.SetActive(!selectingBlueprint);
+            worldSelectionControls.SetActive(selectingBlueprint);
+            if (selectingBlueprint) worldSelectionSummary.text = BuildWorksLocalization.Text(
+                "hud.selection_summary", selectedBlueprintParts);
             workspaceControls.SetActive(false);
             pausedControls.SetActive(false);
             panel.sizeDelta = new Vector2(580f, 350f);
@@ -346,6 +349,7 @@ namespace OstrixMods.BuildWorks
             }
             root.SetActive(true);
             editorControls.SetActive(false);
+            worldSelectionControls?.SetActive(false);
             workspaceControls.SetActive(false);
             pausedControls.SetActive(paused);
             panel.sizeDelta = new Vector2(580f, paused ? 132f : 66f);
@@ -375,6 +379,7 @@ namespace OstrixMods.BuildWorks
             if (!EnsureCreated()) return;
             root.SetActive(true);
             editorControls.SetActive(false);
+            worldSelectionControls?.SetActive(false);
             workspaceControls.SetActive(false);
             pausedControls.SetActive(false);
             panel.sizeDelta = new Vector2(580f, 66f);
@@ -405,6 +410,7 @@ namespace OstrixMods.BuildWorks
             }
             root.SetActive(true);
             editorControls.SetActive(false);
+            worldSelectionControls?.SetActive(false);
             workspaceControls.SetActive(false);
             pausedControls.SetActive(false);
             panel.sizeDelta = new Vector2(580f, 58f);
@@ -425,6 +431,7 @@ namespace OstrixMods.BuildWorks
             if (!EnsureCreated()) return;
             root.SetActive(true);
             editorControls.SetActive(false);
+            worldSelectionControls?.SetActive(false);
             workspaceControls.SetActive(true);
             pausedControls.SetActive(false);
             panel.sizeDelta = new Vector2(580f, 98f);
@@ -473,6 +480,7 @@ namespace OstrixMods.BuildWorks
             }
             selectionBox = null;
             selectionBoxRect = null;
+            worldSelectionControls = null;
             workspaceControls = null;
             pausedControls = null;
             pauseReasonText = null;
@@ -550,6 +558,7 @@ namespace OstrixMods.BuildWorks
             Image buttonTemplate = hud.m_pieceIconPrefab
                 ? hud.m_pieceIconPrefab.GetComponentInChildren<Image>(true)
                 : null;
+            CreateWorldSelectionControls(buttonTemplate, fontTemplate);
             interfaceScaleText = CreateButton("InterfaceScale", root.transform,
                 new Vector2(500f, -4f), new Vector2(68f, 24f), buttonTemplate,
                 fontTemplate, CycleInterfaceScale);

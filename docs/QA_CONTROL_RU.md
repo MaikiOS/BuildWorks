@@ -26,7 +26,7 @@
 
 Автоматические проверки сами по себе не подтверждают native ввод; базовый игровой
 smoke теперь проведён отдельно. Текущая установка и SHA находятся в
-`artifacts/checkpoint-0.19.145/installation.json`. Проверка native-контракта:
+`artifacts/qa-channel-smoke-2026-10-11/installation-0.19.146.json`. Проверка native-контракта:
 `artifacts/checkpoint-0.19.142/native-input-contract.log`.
 Она проверяет наличие известных вызовов и bindings, но не полный поток данных.
 Ходьба, камера и один UI-клик наблюдались в Valheim. Drag, физическая остановка,

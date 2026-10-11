@@ -60,6 +60,10 @@ Normal/QA0/0, compiled control/native input contract, isolation и localization9
 прошли. Независимые correctness/ponytail обзоры: блокирующих замечаний нет.
 После завершения Valheim .146 установлена через Deploy-TestBuild; обе DLL сверены по SHA. Все154 текущих config/import/save файла неизменны, Default чист. Запуска после установки не было: тесты .NET не заменяют Unity/Mono. Код91b2c14; установка — artifacts/qa-channel-smoke-2026-10-11/installation-0.19.146.json. После нового Modded-запуска повторить только канал/ответы, не всю принятую серию.
 
+SocratiCode: проверен существующий индекс Default, collection codebase_fbb51d0bb614,
+green/26504 chunks/watch active. Переиндексация не запускалась. Граф не нашёл
+ссылок на bridge; реальные три вызова Publish проверены непосредственно в исходнике.
+
 ## Не проверено
 
 Физическая F12/вмешательство пользователя и возврат его управления, потеря

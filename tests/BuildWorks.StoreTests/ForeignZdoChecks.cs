@@ -26,6 +26,7 @@ namespace OstrixMods.BuildWorks.StoreTests
         }
         internal static void Run()
         {
+            HashedMounts();
             PreparationScope();
             MaterialSeeds();
             BackgroundSubmission();
@@ -89,6 +90,72 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(malformed.parts[0].foreignData != null, "Malformed state enabled construction");
             Console.WriteLine("PASS foreign typed conversion: ordinary survival rules, exact archived source, sign, full mount, unknown/malformed refusal");
         }
+        private static void HashedMounts()
+        {
+            string fixtureText = File.ReadAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+                "fixtures", "planbuild", "28-planbuild-hashed-mounts.blueprint"));
+            var fixture = Prepare(ExternalBlueprintLibrary.Parse(fixtureText, "28-planbuild-hashed-mounts.blueprint"));
+            Require(fixture.importError == null && fixture.parts.Count == 3 && CompositeBlueprintStore.InspectContents(fixture, Hash).Mounts == 2 &&
+                fixture.parts.Skip(1).All(part => BlueprintItemStandContents.TryRead(part.foreignData.ToGeometry(), Hash, out var item) &&
+                    item.Prefab == "AxeIron" && item.Quality == 1 && item.Variant == 0 && item.DurabilityHundredths == 2012),
+                "Owned hashed holder fixture failed");
+            string Packet(int item, bool unknown = false, bool sibling = false) => Package(w => {
+                w.Write(9 | (sibling ? 16 : 0)); w.Write((byte)1); w.Write(Hash("durability")); w.Write(20.125f);
+                w.Write((byte)(unknown ? 5 : 4));
+                foreach (var pair in new[] { ("item", item), ("quality", 3), ("variant", 2), ("type", 1) })
+                { w.Write(Hash(pair.Item1)); w.Write(pair.Item2); }
+                if (unknown) { w.Write(Hash("Unreviewed.m_field")); w.Write(1); }
+                if (sibling) { w.Write((byte)1); w.Write(Hash("item")); w.Write("AxeIron"); }
+            });
+            string Text(string packet, string info = "\"AxeIron:2:3:1\"") =>
+                "#Name:QA155 Hashed Mounts\n#Pieces\nitemstand;;0;0;0;0;0;0;1;" + info + ";1;1;1;" + packet +
+                "\nitemstandh;;1;0;0;0;0;0;1;" + info + ";1;1;1;" + packet;
+            string raw = Packet(Hash("AxeIron")), text = Text(raw);
+            var source = ExternalBlueprintLibrary.Parse(text, "hashed-mounts.blueprint");
+            var converted = Prepare(source);
+            Require(converted.importError == null && converted.parts.All(part =>
+                part.foreignData?.format == BlueprintForeignPartData.NativeItemStandFormat &&
+                BlueprintItemStandContents.TryRead(part.foreignData.ToGeometry(), Hash, out var item) &&
+                item.Prefab == "AxeIron" && item.Quality == 3 && item.Variant == 2 && item.DurabilityHundredths == 2012),
+                "Bound hashed holder item did not convert into exact native snapshot");
+            Require(source.parts.All(part => part.foreignData.zdo == raw) && converted.sourceDocuments.Single().text == text,
+                "Hashed item conversion changed source evidence");
+            var roundtrip = BlueprintExchangeFormat.Decode(Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(ExternalBlueprintLibrary.DetachedCopy(converted))));
+            Require(roundtrip.parts.All(part => BlueprintItemStandContents.TryRead(part.foreignData.ToGeometry(), Hash, out _)) &&
+                roundtrip.sourceDocuments.Single().text == text && CompositeBlueprintStore.InspectContents(roundtrip, Hash).Mounts == 2,
+                "Hashed item snapshot did not survive portable roundtrip");
+            var cleared = CompositeBlueprintStore.CopyWithContentsPolicy(roundtrip, false, true, Hash);
+            Require(cleared.parts.All(part => part.foreignData.contentsCleared) &&
+                roundtrip.parts.All(part => !part.foreignData.contentsCleared) && cleared.sourceDocuments.Single().text == text,
+                "Hashed holder exclusion changed original contents/source");
+            foreach (string badText in new[] {
+                Text(Packet(0)), Text(Packet(Hash("SwordIron"))), Text(Packet(Hash("AxeIron"), true)),
+                Text(Packet(Hash("AxeIron"), false, true)), Text(raw, "\"AxeIron:0:3:1\""),
+                Text(raw, "\"AxeIron:2:1:1\""), Text(raw, "\"AxeIron:2:3:0\""),
+                Text(raw, "\"AxeIron:2\""), Text(raw, "\"\""), Text(raw, "\"AxeIron:2:3:1:extra\"") })
+            {
+                var rejected = Prepare(ExternalBlueprintLibrary.Parse(badText, "mismatched.blueprint"));
+                Require(rejected.importError == null && rejected.parts.All(part => part.foreignData?.format == "blueprint"),
+                    "Unresolved/mismatched/unknown hashed item was silently consumed");
+            }
+            var rebound = ExternalBlueprintLibrary.Parse(text, "rebound.blueprint");
+            rebound.parts[0].foreignData.info = "\"SwordIron:2:3:1\"";
+            Require(Prepare(rebound).parts[0].foreignData?.format == "blueprint", "Unbound holder Info was trusted");
+            string folder = Path.Combine(Path.GetTempPath(), "BuildWorks-hashed-mounts-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(folder);
+            try
+            {
+                string path = Path.Combine(folder, "native.json");
+                var store = new CompositeBlueprintStore(path);
+                Require(store.TryGetOrCreatePlacementCopy(converted, out var copy, out var error), "Hashed holder native copy failed: " + error);
+                var reopened = new CompositeBlueprintStore(path).All().Single();
+                Require(reopened.parts.All(part => BlueprintItemStandContents.TryRead(part.foreignData.ToGeometry(), Hash, out _)) &&
+                    reopened.sourceDocuments.Single().text == text, "Hashed holders/source did not survive native reopen");
+            }
+            finally { Directory.Delete(folder, true); }
+            Console.WriteLine("PASS bound hashed holders: name/hash/metadata agreement, full snapshot, source/portable preservation, independent exclusion and atomic unknown refusal");
+        }
+
         private static CompositeBlueprintStore.Blueprint Prepare(CompositeBlueprintStore.Blueprint source) =>
             ExternalBlueprintLibrary.PrepareForHost(source, _ => new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 }, Hash, 0);
         private static void MaterialSeeds()

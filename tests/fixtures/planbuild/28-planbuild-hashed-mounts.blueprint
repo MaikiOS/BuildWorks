@@ -1,0 +1,7 @@
+#Name:QA155 Hashed Mounts
+#Creator:BuildWorks QA
+#Description:Owned fixture; typed item ID resolved only from matching Info; no third-party blueprint.
+#Pieces
+woodwall;;0;0;0;0;0;0;1;"";1;1;1
+itemstand;;0;1;0;0;0;0;1;"AxeIron:0:1:0";1;1;1;CQAAAAGxKGQEAAChQQS1K9y8RM+4aq0ltjYBAAAAw1jfaAAAAAD+DbVUAAAAAA==
+itemstandh;;1;1;0;0;0;0;1;"AxeIron:0:1:0";1;1;1;CQAAAAGxKGQEAAChQQS1K9y8RM+4aq0ltjYBAAAAw1jfaAAAAAD+DbVUAAAAAA==

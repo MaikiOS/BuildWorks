@@ -83,6 +83,17 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Require(BlueprintForeignZdo.TryRead(Convert.ToBase64String(outer), out var saved) &&
                 BlueprintItemStandContents.TryConvertLegacy(saved, Hash, null, out var unchanged, out _) &&
                 unchanged.Zdo == Convert.ToBase64String(original), "Native base item grid/world/custom insertion order changed");
+            byte[] hashed = Package(w => { w.Write(136); w.Write((byte)1); w.Write(Hash("item")); w.Write(100);
+                w.Write((byte)1); w.Write(Hash("itemData")); w.Write(original.Length); w.Write(original); });
+            Require(BlueprintForeignZdo.TryRead(Convert.ToBase64String(hashed), out var hashedState) &&
+                !BlueprintItemStandContents.TryConvertLegacy(hashedState, Hash, null, out _, out _) &&
+                BlueprintItemStandContents.TryConvertLegacy(hashedState, Hash, null, out var hashedNative, out var hashedUsed, "AxeIron:0:1:0") &&
+                hashedNative.Zdo == Convert.ToBase64String(original) && hashedUsed.Count == hashedState.Count,
+                "Bound hashed item changed native packet or guessed unresolved name");
+            foreach (string info in new[] { null, "", "Unknown:0:1:0", "AxeIron:0", "AxeIron:0:2:0", "AxeIron:1:1:0",
+                "AxeIron:0:1:1", "AxeIron:0:0:0", "AxeIron:0:1:0:extra", "Axe/Iron:0:1:0" })
+                Require(!BlueprintItemStandContents.TryConvertLegacy(hashedState, Hash, null, out _, out _, info),
+                    "Invalid or conflicting hashed item manifest accepted");
         }
         private static byte[] Package(Action<BinaryWriter> write)
         {

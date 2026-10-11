@@ -12,15 +12,33 @@ namespace OstrixMods.BuildWorks.Geometry
         // EWD legacy loose fields -> verified native record, never ZDO.Deserialize.
         // Caller must classify EVERY unconsumed outer field before enabling placement.
         public static bool TryConvertLegacy(BlueprintForeignZdo source, Func<string, int> hash, int? defaultWorldLevel,
-            out BlueprintForeignPartData converted, out HashSet<KeyValuePair<int, Type>> consumed)
+            out BlueprintForeignPartData converted, out HashSet<KeyValuePair<int, Type>> consumed) =>
+            TryConvertLegacy(source, hash, defaultWorldLevel, out converted, out consumed, null);
+
+        public static bool TryConvertLegacy(BlueprintForeignZdo source, Func<string, int> hash, int? defaultWorldLevel,
+            out BlueprintForeignPartData converted, out HashSet<KeyValuePair<int, Type>> consumed, string boundItemInfo)
         {
             converted = null; consumed = new HashSet<KeyValuePair<int, Type>>();
             if (source == null || hash == null) return false;
             var used = new HashSet<KeyValuePair<int, Type>>();
             try
             {
-                if (!source.TryGet<string>(hash("item"), out string prefab) || string.IsNullOrEmpty(prefab)) return false;
-                used.Add(new KeyValuePair<int, Type>(hash("item"), typeof(string)));
+                string[] info = null;
+                string prefab;
+                if (source.TryGet<string>(hash("item"), out prefab))
+                {
+                    if (string.IsNullOrEmpty(prefab)) return false;
+                    used.Add(new KeyValuePair<int, Type>(hash("item"), typeof(string)));
+                }
+                else
+                {
+                    if (!source.TryGet<int>(hash("item"), out int savedId) || savedId == 0 || boundItemInfo == null) return false;
+                    // Resolve only from the same source-bound PlanBuild Info, never a guessed hash/name table.
+                    var manifest = new BlueprintForeignPartData(BlueprintForeignPartData.NativeItemStandFormat, boundItemInfo, null, null);
+                    info = manifest.Info.Split(':'); prefab = info[0];
+                    if (hash(prefab) != savedId) return false;
+                    used.Add(new KeyValuePair<int, Type>(hash("item"), typeof(int)));
+                }
                 int prefabId = hash(prefab);
                 if (prefabId == 0) return false;
                 BlueprintContainerInventory.Item original = null;
@@ -52,6 +70,8 @@ namespace OstrixMods.BuildWorks.Geometry
                 }
                 if (quality < 1 || quality > ushort.MaxValue || stack != 1 || variant < 0 || orientation < 0 ||
                     world < 0 || world > byte.MaxValue || crafter == 0 && crafterName != "") return false;
+                if (info != null && (variant != int.Parse(info[1], CultureInfo.InvariantCulture) ||
+                    quality != int.Parse(info[2], CultureInfo.InvariantCulture) || orientation != int.Parse(info[3], CultureInfo.InvariantCulture))) return false;
                 var custom = new Dictionary<string, string>(StringComparer.Ordinal);
                 if (original != null) foreach (var pair in original.CustomData) custom.Add(pair.Key, pair.Value);
                 int count = Get("dataCount", 0);

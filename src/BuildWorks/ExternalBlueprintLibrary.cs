@@ -445,7 +445,14 @@ namespace OstrixMods.BuildWorks
             string text = part.signText;
             if (part.prefabName == "itemstand" || part.prefabName == "itemstandh")
             {
-                if (!Geometry.BlueprintItemStandContents.TryConvertLegacy(state, hash, worldLevel, out contents, out consumed)) return;
+                string boundItemInfo = null;
+                if (state.TryGet<int>(hash("item"), out _))
+                {
+                    if (original.info == null) return;
+                    try { boundItemInfo = BlueprintExchangeFormat.DecodeSignText(original.info); }
+                    catch (InvalidDataException) { return; }
+                }
+                if (!Geometry.BlueprintItemStandContents.TryConvertLegacy(state, hash, worldLevel, out contents, out consumed, boundItemInfo)) return;
             }
             else if (part.prefabName == "sign")
             {

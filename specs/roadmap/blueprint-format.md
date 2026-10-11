@@ -1,3 +1,14 @@
+## 2026-10-11 — .159: native QA, chest blocker
+
+Channel/folder/state and fixture24 import passed; four contents combinations/cancel work.
+Two empty builds stopped2/4 at chest NoRayHits, including a nearer placement.
+First cancel/collection: Wood42→38→42, two swords unchanged. Second cancel removed2;
+final collection/balance interrupted by Focus lost in native56, not replayed.
+Next: diagnose contact/bounds/gap/physics without weakening host checks.
+Contents/full costs/reload/network remain unproven; goal active.
+[Receipts, captures and continuation](../../docs/QA_NATIVE_159_2026-10-11.md).
+Historical checkpoints follow; earlier status text is retained as history.
+
 ## 2026-10-11 — .159: refund identity guard, QA deployed
 
 Sourceedf602f: duplicate source references block refund/rollback; distinct equal

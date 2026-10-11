@@ -1,3 +1,18 @@
+## 2026-10-11 — исходники .153: начальный missing-обзор в фоне, offline
+
+Код818b02f: тот же worker готовит missing/retained review из host-снимков;
+окно получает результат без повторного RefreshMissing. Без исключений повторно
+используется готовая contents-сводка, свежая проверка исключений перед записью
+сохранена. Unknown host/пустой ZIP member/повторные ссылки/сохранность источника
+проверены; actual Tick red/green, Store353 (351/2), normalQA0/0, Host25185596,
+loc988/isolation/EditorBridge/scopedformat и correctness/Ponytail Ship.
+**Не установлено**, QA .146 сверена неизменной. Без Valheim/Unity/input/сохранений.
+Общая задержка/FPS/память/native UI/стройка/reload/сеть открыты; другие пути
+RefreshMissing и host-снимки остаются. Полная цель активна, push не выполнялся.
+См. docs/ASYNC_MISSING_REVIEW_CHECKPOINT_2026-10-11_RU.md,
+docs/QA_0.19.151_RU.md и artifacts/checkpoint-0.19.153/verification.json.
+Пока Ostrix работает, продолжать только offline, принятые проверки не повторять.
+
 ## 2026-10-11 — исходники .152: подтверждение импорта в worker, offline
 
 Код b2fae84: fresh host scale/material/metadata/world snapshots → существующий

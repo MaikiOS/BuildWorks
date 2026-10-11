@@ -1,3 +1,18 @@
+## 2026-10-11 — .153 sources: initial missing review in worker, offline
+
+Code818b02f: the existing worker prepares missing/retained review from frozen
+host snapshots. Tick publishes it without another RefreshMissing; unchanged
+documents reuse contents summaries. Fresh omission validation remains before
+write. Unknown host/all-missing ZIP member/repeated refs/source preservation,
+actual Tick red/green, Store353 (351/2), normalQA0/0, Host25185596, loc988,
+isolation/EditorBridge/scopedformat and correctness/Ponytail Ship.
+**Not installed**; QA .146 hashes unchanged. No Valheim/Unity/input/save changes.
+Total latency/FPS/memory/native UI/build/reload/network remain open; other
+RefreshMissing paths and host snapshots remain. Full goal active; no push.
+See docs/ASYNC_MISSING_REVIEW_CHECKPOINT_2026-10-11.md,
+docs/QA_0.19.151_RU.md and artifacts/checkpoint-0.19.153/verification.json.
+Offline only while Ostrix works. Do not repeat already accepted game checks.
+
 ## 2026-10-11 — source .152: submission in existing worker, offline
 
 Code b2fae84: fresh host scale/material/metadata/world snapshots → existing

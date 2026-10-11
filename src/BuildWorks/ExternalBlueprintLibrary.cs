@@ -288,9 +288,14 @@ namespace OstrixMods.BuildWorks
                         {
                             try
                             {
+                                string itemInfo = BlueprintExchangeFormat.DecodeSignText(info);
+                                int itemFields = itemInfo?.Split(':').Length ?? 0;
+                                // PlanBuild's Info-only holder reader defaults omitted quality/orientation to 1/0.
+                                if (itemFields == 2) itemInfo += ":1:0";
+                                else if (itemFields == 3) itemInfo += ":0";
                                 foreign = CompositeBlueprintStore.ForeignPartData.FromGeometry(new Geometry.BlueprintForeignPartData(
                                     Geometry.BlueprintForeignPartData.NativeItemStandFormat,
-                                    BlueprintExchangeFormat.DecodeSignText(info), null, null));
+                                    itemInfo, null, null));
                             }
                             catch (Exception error) when (error is ArgumentException || error is InvalidDataException)
                             { /* Unknown holder dialect remains inert, with its exact original row retained. */ }

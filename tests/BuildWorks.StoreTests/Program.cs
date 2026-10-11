@@ -54,7 +54,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 ForeignSignText(Path.Combine(directory, "signs"));
                 ForeignSourcesRoundTrip(Path.Combine(directory, "sources.json"));
                 ForeignObjectRoundTrip(Path.Combine(directory, "foreign-objects.json"));
-                ForeignItemStandRecipes();
+                ForeignItemStandRecipes(Path.Combine(directory, "foreign-holder.json"));
                 ForeignZdoChecks.Run();
                 NativeItemStandRoundTrip(Path.Combine(directory, "native-holder.json"));
                 NativeContainerRoundTrip(Path.Combine(directory, "native-container.json"));
@@ -705,32 +705,62 @@ namespace OstrixMods.BuildWorks.StoreTests
             Console.WriteLine("PASS native ItemStand snapshot -> store/reopen/portable, exact dependencies, immutable copy, failed write and malformed package rejection");
         }
 
-        private static void ForeignItemStandRecipes()
+        private static void ForeignItemStandRecipes(string path)
         {
             string header = "#Name:Mounted\n#Pieces\nwoodwall;;0;0;0;0;0;0;1;\"\"\n";
             foreach (string holder in new[] { "itemstand", "itemstandh" })
-            foreach (string token in new[] { "\"ShieldIronTower:5:1:0\"", "ShieldIronTower:5:1:0" })
-            {
-                string source = header + holder + ";;1;0;0;0;0;0;1;" + token + ";1;1;1";
-                var parsed = ExternalBlueprintLibrary.Parse(source, "mounts.blueprint");
-                var data = parsed.parts[1].foreignData;
-                Require(parsed.importError == null && data.format == Geometry.BlueprintForeignPartData.NativeItemStandFormat &&
-                    data.info == "ShieldIronTower:5:1:0" && data.zdo == null && parsed.sourceDocuments[0].text == source,
-                    "Known foreign holder recipe did not convert or lost source evidence");
-                var converted = ExternalBlueprintLibrary.DetachedCopy(ExternalBlueprintLibrary.PrepareForHost(parsed, _ => UnitScale));
-                var roundTrip = BlueprintExchangeFormat.Decode(System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(converted)));
-                Require(roundTrip.parts[1].foreignData.info == data.info && roundTrip.sourceDocuments[0].text == source,
-                    "Native round-trip lost foreign mounted recipe");
-            }
+                foreach (var recipe in new[] {
+                Tuple.Create("ShieldIronTower:5", "ShieldIronTower:5:1:0"),
+                Tuple.Create("ShieldIronTower:5:3", "ShieldIronTower:5:3:0"),
+                Tuple.Create("ShieldIronTower:5:3:2", "ShieldIronTower:5:3:2") })
+                    foreach (string token in new[] { "\"" + recipe.Item1 + "\"", recipe.Item1 })
+                    {
+                        string source = header + holder + ";;1;0;0;0;0;0;1;" + token + ";1;1;1";
+                        var parsed = ExternalBlueprintLibrary.Parse(source, "mounts.blueprint");
+                        var data = parsed.parts[1].foreignData;
+                        Require(parsed.importError == null && data.format == Geometry.BlueprintForeignPartData.NativeItemStandFormat &&
+                            data.info == recipe.Item2 && data.zdo == null && parsed.sourceDocuments[0].text == source,
+                            "Known foreign holder recipe did not convert or lost source evidence");
+                        var converted = ExternalBlueprintLibrary.DetachedCopy(ExternalBlueprintLibrary.PrepareForHost(parsed, _ => UnitScale));
+                        var roundTrip = BlueprintExchangeFormat.Decode(System.Text.Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(converted)));
+                        Require(roundTrip.parts[1].foreignData.info == data.info && roundTrip.sourceDocuments[0].text == source,
+                            "Native round-trip lost foreign mounted recipe");
+                        var summary = CompositeBlueprintStore.InspectContents(converted, ForeignZdoChecks.Hash);
+                        Require(summary.Mounts == 1 && summary.Unknown == 0 && summary.CanClearMounts,
+                            "Recognized holder recipe still counted as unknown contents");
+                        var cleared = CompositeBlueprintStore.CopyWithContentsPolicy(converted, false, true, ForeignZdoChecks.Hash);
+                        Require(cleared.parts[1].foreignData.contentsCleared && !converted.parts[1].foreignData.contentsCleared &&
+                            cleared.parts[1].foreignData.info == recipe.Item2 && cleared.sourceDocuments[0].text == source &&
+                            CompositeBlueprintStore.InspectContents(cleared, ForeignZdoChecks.Hash).Mounts == 0,
+                            "Clearing recognized holder contents destroyed source or changed the original");
+                        var store = new CompositeBlueprintStore(path);
+                        Require(store.TrySaveDocument(converted.name, converted.category, converted.parts, converted.groups, converted.anchors,
+                            null, null, converted.supports, null, out var saved, out string error, sourceDocuments: converted.sourceDocuments), error);
+                        var reopened = new CompositeBlueprintStore(path).All().Single(item => item.id == saved.id);
+                        Require(reopened.parts[1].foreignData.info == recipe.Item2 && reopened.sourceDocuments[0].text == source,
+                            "Disk round-trip changed normalized holder recipe or exact original");
+                    }
             foreach (string row in new[] {
                 "itemstand;;1;0;0;0;0;0;1;\"SwordIron:0:1:0\";1;1;1;opaque",
                 "itemstand;;1;0;0;0;0;0;1;\"SwordIron:0:1:0\";1;1;1;;0.5",
+                "itemstand;;1;0;0;0;0;0;1;\"SwordIron:0\";1;1;1;opaque",
+                "itemstandh;;1;0;0;0;0;0;1;\"SwordIron:0:3\";1;1;1;;0.5",
+                "itemstand;;1;0;0;0;0;0;1;\"SwordIron\"",
+                "itemstand;;1;0;0;0;0;0;1;\"SwordIron:0:1:0:future\"",
+                "itemstand;;1;0;0;0;0;0;1;\"SwordIron:-1\"",
+                "itemstand;;1;0;0;0;0;0;1;\"SwordIron:2147483648\"",
+                "itemstand;;1;0;0;0;0;0;1;\"SwordIron:0:0\"",
+                "itemstand;;1;0;0;0;0;0;1;\"SwordIron:0:NaN\"",
+                "itemstand;;1;0;0;0;0;0;1;\"../SwordIron:0\"",
                 "itemstand;;1;0;0;0;0;0;1;\"future:shape\"",
                 "ArmorStand;;1;0;0;0;0;0;1;\"SwordIron:0:1:0\"" })
             {
                 var parsed = ExternalBlueprintLibrary.Parse(header + row, "opaque.blueprint");
                 Require(parsed.importError == null && parsed.parts[1].foreignData.format == "blueprint",
                     "Opaque/chance/armour payload incorrectly became an executable native holder recipe");
+                Require(parsed.sourceDocuments[0].text == header + row &&
+                    CompositeBlueprintStore.InspectContents(parsed, ForeignZdoChecks.Hash).Unknown > 0,
+                    "Rejected holder recipe lost evidence or unknown-state warning");
             }
             Console.WriteLine("PASS foreign vertical/horizontal holder recipes convert once; exact original, portable round-trip and unknown state preserved");
         }

@@ -1,5 +1,15 @@
 # Blueprint format and large-construction work
 
+## .155 — source-bound holder name and numeric item ID
+
+Native22/portable11 unchanged. Known typed-ZDO item:Int32 is resolved only from
+four-field Info of the same archived row, with exact name/hash/variant/quality/type
+agreement. Unknown siblings and other fields still block; no guessed name table.
+Existing string adapter/API and source archive remain. This combines known contracts,
+not proof of extended-row writing by pinned PlanBuild or arbitrary mod compatibility.
+No Biome result lift or native game acceptance. See
+[evidence and limits](../../docs/HASHED_HOLDER_CHECKPOINT_2026-10-11.md).
+
 ## .154 — verified PlanBuild SnapPoints boundary
 
 Current schemas: native22 / portable11; .154 changes neither. Only XYZ is read

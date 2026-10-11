@@ -1,3 +1,19 @@
+## 2026-10-11 — .155 sources: source-bound Info and numeric holder item ID, offline
+
+Code db9e508: typed item:Int32 requires same-row four-field Info and exact
+name/hash/variant/quality/type agreement. Unknown siblings/other fields still
+block. Old API/string path and full source retained. Full Geometry/Store,
+normalQA0/0, Host25185596/loc989, compiled isolation/scoped formats and both Ship.
+**Not installed**, QA .146. No game/Unity/input/saves/push.
+Biome353/353 and27905 foreign records unchanged: zero intitem among5450 holder rows.
+This combines known Info/typed-ZDO contracts, not proof of combined extended-row
+writing by pinned PlanBuild. Baseline .154 census:234/353 unknown documents,8 opaque,
+using unit prefab bases without actual host capability.
+See docs/HASHED_HOLDER_CHECKPOINT_2026-10-11.md, docs/QA_0.19.155_RU.md
+(owned fixture28) and artifacts/checkpoint-0.19.155/verification.json.
+Full goal remains active; native UI/resources/build/reload/network are open.
+Offline only while Ostrix works; do not repeat accepted game cases.
+
 ## 2026-10-11 — .154 sources: PlanBuild snap rows with trailing fields, offline
 
 Code3a2c82b: read XYZ only; preserve complete trailing-field source and warn

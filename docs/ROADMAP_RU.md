@@ -1,3 +1,19 @@
+## 2026-10-11 — исходники .155: связанный Info и числовой ID крепления, offline
+
+Код db9e508: typed item:Int32 распознаётся только по четырёхпольному Info той же
+строки, с точным name/hash/variant/quality/type. Unknown siblings/прочие поля
+по-прежнему блокируются; старый API/строковый путь и полный source сохранены.
+Full Geometry/Store, normalQA0/0, Host25185596/loc989, compiled isolation/scopedformat,
+correctness/Ponytail Ship. **Не установлено**, QA .146. Без игры/Unity/input/saves/push.
+Biome353/353 и27905 foreign records прежние: среди5450 holder rows intitem нет.
+Это комбинация известных Info/typed-ZDO контрактов, не доказательство расширенного
+writer pinned PlanBuild. CPU-аудит .154:234/353 документов с unknown-барьерами,
+8 с opaque sections; unit-prefab probe, не host acceptance.
+См. docs/HASHED_HOLDER_CHECKPOINT_2026-10-11_RU.md, docs/QA_0.19.155_RU.md
+(собственный файл28) и artifacts/checkpoint-0.19.155/verification.json.
+Полная цель активна; native UI/ресурсы/стройка/reload/сеть открыты. Пока Ostrix
+работает, только offline; принятые случаи не повторять.
+
 ## 2026-10-11 — исходники .154: расширенные строки привязок PlanBuild, offline
 
 Код3a2c82b: первые XYZ #SnapPoints допускают дополнительные архивные поля,

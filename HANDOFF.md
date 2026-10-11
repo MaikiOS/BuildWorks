@@ -1,3 +1,12 @@
+## 2026-10-11 — source .149: cache area-selection projection distance
+
+Code1bacb4f: one projection per candidate, same filters/order/removal/refusal/QA
+checks. Actual-method harness50000:4922980→50000 calls, not native speed proof.
+NormalQA0/0, Host25185596/localization973/isolation/EditorBridge and two Ship
+reviews.3 pre-existing WHITESPACE diagnostics retained with baseline evidence.
+P03 corrected: QA capture50000 since .126. Volume C01–C04 is still pending.
+**Not installed**, QA .146; no Valheim/Unity/input while Ostrix works.
+See docs/WORLD_SELECTION_CHECKPOINT_2026-10-11.md. Full goal retained.
 ## 2026-10-11 — source .148: source evidence temporary memory
 
 Code3a23969: identical SHA from existing UTF8 bytes, no second large copy.

@@ -1,3 +1,17 @@
+## 2026-10-11 — source .151: background import review, offline
+
+Code0c6e966: unique prefab/world host snapshots → worker PrepareForHost/contents;
+two stages, stale-before-write, Back/Close discard results. Fixed own-import
+catalogue and browser-after-Back freezes; actual Tick CPU harness red/green.
+Store353 (351/2), normalQA0/0, Host25185596/loc988, isolation/EditorBridge/scoped
+format and independent correctness/Ponytail Ship.
+**Not installed**, QA .146. No Valheim/Unity/input while Ostrix works.
+Total latency remains open: snapshots/RefreshMissing/fresh Submit preparation
+still use the host thread. Workbench not compiled/run. Full goal, placement,
+reload and network remain open. See docs/ASYNC_IMPORT_REVIEW_CHECKPOINT_2026-10-11.md,
+deferred docs/QA_0.19.151_RU.md and artifacts/checkpoint-0.19.151/verification.json.
+Do not repeat accepted native cases; merge .151 window steps with pending file26.
+
 ## 2026-10-11 — source .150: world area and height bounds, offline
 
 XZ area → bottom/top → explicit refresh; six paged rows, persistent manual

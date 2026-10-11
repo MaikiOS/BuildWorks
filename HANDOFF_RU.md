@@ -1,3 +1,17 @@
+## 2026-10-11 — исходники .151: обзор импорта в фоне, offline
+
+Код0c6e966: host-снимки уникальных prefab/мира → worker PrepareForHost/contents;
+две стадии, stale-before-write, Back/Close отбрасывают результат. Исправлены
+зависания при собственном обновлении каталога и после Back; настоящий Tick с
+CPU-подменами red/green. Store353 (351/2), normalQA0/0, Host25185596/loc988,
+isolation/EditorBridge/scopedformat и correctness/Ponytail Ship.
+**Не установлено**, QA .146. Valheim/Unity/input не запускались, Ostrix работает.
+Общая задержка открыта: snapshots/RefreshMissing/повторная подготовка при Submit
+ещё в игровом потоке; Workbench не компилировался/не запускался. Полная цель
+и стройка/reload/сеть открыты. См. docs/ASYNC_IMPORT_REVIEW_CHECKPOINT_2026-10-11_RU.md,
+отложенную docs/QA_0.19.151_RU.md и artifacts/checkpoint-0.19.151/verification.json.
+Принятые игровые случаи не повторять; новая очередь объединяет .151 с файлом26.
+
 ## 2026-10-11 — исходники .150: площадь и границы выделения, offline
 
 Площадь XZ → низ/верх → явный пересчёт; список по6 строк и ручные включения/

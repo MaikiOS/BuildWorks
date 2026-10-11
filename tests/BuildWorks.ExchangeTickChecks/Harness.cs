@@ -124,6 +124,17 @@ public sealed class ExchangeTickChecks
             success.resultPath == "result.zip" && success.result.Contains("exchange.imported"),
             "Own import generation change must reach ShowResult exactly once");
 
+        var importFailure = new ExchangeTickChecks { importing = true, reviewingContents = true,
+            contentsSummary = new CompositeBlueprintStore.ContentsSummary(), missingReview = new CompositeBlueprintStore.MissingPartsReview() };
+        importFailure.store.ImportError = "normalization failed";
+        importFailure.importReview = new CompositeBlueprintStore.ImportReview { IsHostCurrent = () => importFailure.store.Generation == 0 };
+        importFailure.Tick();
+        importFailure.Tick();
+        importFailure.Tick();
+        Assert(!importFailure.importing && !importFailure.completed && !importFailure.primary.interactable &&
+            importFailure.contentsBack.interactable && importFailure.message.text == "normalization failed" &&
+            importFailure.shownResults == 0, "Import failure must remain visible and require a fresh review via Back");
+
         var back = new ExchangeTickChecks { listing = Task.FromResult(new[] { "next.blueprint" }) };
         back.importReview = new CompositeBlueprintStore.ImportReview { IsHostCurrent = () => false };
         back.Tick();
@@ -159,7 +170,7 @@ public sealed class ExchangeTickChecks
         failed.Tick();
         Assert(failed.message.text == "worker failure" && failed.importPreparation == null && !failed.primary.interactable &&
             failed.contentsBack.interactable, "Worker failure must retain navigation and block confirmation");
-        Console.WriteLine("PASS actual exchange Tick: own import to result, browser after Back, stale confirmation, two stages and worker failure");
+        Console.WriteLine("PASS actual exchange Tick: own import to result/failure, browser after Back, stale confirmation, two stages and worker failure");
     }
 }
 internal static class StableHashStub

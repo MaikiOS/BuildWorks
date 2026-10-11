@@ -28,6 +28,7 @@ namespace OstrixMods.BuildWorks.StoreTests
         {
             PreparationScope();
             MaterialSeeds();
+            BackgroundSubmission();
             Require(Hash("item") == -1126421579 && Hash("health") == -883022132, "Host hash drift");
             string raw = Package(w => {
                 w.Write(9); w.Write((byte)2);
@@ -263,6 +264,85 @@ namespace OstrixMods.BuildWorks.StoreTests
                 "Ordinary state table was not lazy");
             Console.WriteLine("PASS ordinary ZDO table: one per preparation/review, independent hashes, unknown state and immutable source");
         }
+        private static void BackgroundSubmission()
+        {
+            string folder = Path.Combine(Path.GetTempPath(), "BuildWorks-submit-worker-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(folder);
+            try
+            {
+                string packet = Package(w => { w.Write(8); w.Write((byte)1); w.Write(Hash("RandMatSeed")); w.Write(1234); });
+                string source = Path.Combine(folder, "submit.blueprint");
+                File.WriteAllText(source, "#Pieces\nwoodwall;;0;0;0;0;0;0;1;\"\";2;.5;1.25;" + packet +
+                    "\nwoodwall;;1;0;0;0;0;0;1;\"\";2;.5;1.25");
+                var raw = CompositeBlueprintStore.ReviewImportFile(source, Hash, 0);
+                byte[] original = File.ReadAllBytes(source);
+                int owner = Environment.CurrentManagedThreadId, scaleReads = 0, supportReads = 0, metadataReads = 0, level = 0;
+                bool support = true, hold = true;
+                var scale = new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 };
+                var metadata = CompositeBlueprintStore.PrefabMetadata.FromGeometry(new BlueprintPrefabMetadata(1,
+                    "woodwall", "Snapshot wall", "Piece", "host-snapshot", new Point3(1, 1, 1),
+                    new Point3(-1, -1, -1), new Point3(1, 1, 1)));
+                void Host() => Require(Environment.CurrentManagedThreadId == owner, "Import worker called live host resolver");
+                using (var entered = new System.Threading.ManualResetEventSlim())
+                using (var release = new System.Threading.ManualResetEventSlim())
+                {
+                    var store = new CompositeBlueprintStore(Path.Combine(folder, "library.json"));
+                    store.ConfigureImportScale(_ => { Host(); scaleReads++; return scale; },
+                        prefabHash: name =>
+                        {
+                            if (hold)
+                            {
+                                Require(Environment.CurrentManagedThreadId != owner, "Submission normalized on caller thread");
+                                entered.Set();
+                                Require(release.Wait(10000), "Submission worker release timed out");
+                            }
+                            return Hash(name);
+                        }, worldLevel: () => { Host(); return level; },
+                        supportsMaterialSeed: _ => { Host(); supportReads++; return support; });
+                    store.ConfigurePrefabMetadata(_ => { Host(); metadataReads++; return metadata; });
+                    try
+                    {
+                        Require(store.TryImportReviewed(raw, false, false, Hash, out string error), error);
+                        Require(entered.Wait(10000) && store.CatalogLoading && !Directory.Exists(store.ImportDirectory) &&
+                            scaleReads == 1 && supportReads == 1 && metadataReads == 1,
+                            "Submission did not return with a held worker and one snapshot per unique prefab");
+                        metadata.name = "Changed after submit"; scale.x = 3; support = false; level = 1;
+                        hold = false; release.Set();
+                        Require(System.Threading.SpinWait.SpinUntil(() => { store.CatalogAll(); return !store.CatalogLoading; }, 10000) &&
+                            store.ImportError == null, store.ImportError ?? "Submission timeout");
+                        var result = ExternalBlueprintLibrary.LoadFile(store.ImportResultPath).Single();
+                        Require(result.parts[0].materialSeed == 1234 && result.parts[0].baseScale.Value.x == 2 &&
+                            result.parts.All(part => part.metadata.name == "Snapshot wall") &&
+                            !ReferenceEquals(result.parts[0].metadata, result.parts[1].metadata) &&
+                            raw.Documents[0].parts.All(part => part.metadata == null) && raw.Documents[0].parts[0].materialSeed == null &&
+                            File.ReadAllBytes(source).SequenceEqual(original), "Submission lost frozen values or mutated source/metadata");
+
+                        // Already-normalized documents take PrepareForHost's identity return path.
+                        string nativeSource = Path.Combine(folder, "normalized.buildworks.json");
+                        File.WriteAllBytes(nativeSource, BlueprintExchangeFormat.Encode(ExternalBlueprintLibrary.DetachedCopy(result)));
+                        var normalized = CompositeBlueprintStore.ReviewImportFile(nativeSource, Hash);
+                        metadata.name = "Fresh submission";
+                        Require(store.TryImportReviewed(normalized, false, false, Hash, out error), error);
+                        Require(System.Threading.SpinWait.SpinUntil(() => { store.CatalogAll(); return !store.CatalogLoading; }, 10000) &&
+                            store.ImportError == null, store.ImportError ?? "Normalized submission timeout");
+                        Require(ExternalBlueprintLibrary.LoadFile(store.ImportResultPath).Single().parts.All(part => part.metadata.name == "Fresh submission") &&
+                            normalized.Documents[0].parts.All(part => part.metadata.name == "Snapshot wall"),
+                            "Identity normalization mutated the review or reused stale metadata");
+                    }
+                    finally { hold = false; release.Set(); }
+                }
+                var invalid = new CompositeBlueprintStore(Path.Combine(folder, "invalid", "library.json"));
+                invalid.ConfigureImportScale(_ => new CompositeBlueprintStore.VectorData { x = 0, y = 1, z = 1 },
+                    prefabHash: Hash, worldLevel: () => 0, supportsMaterialSeed: _ => true);
+                Require(invalid.TryImportReviewed(raw, false, false, Hash, out string failure), failure);
+                Require(System.Threading.SpinWait.SpinUntil(() => { invalid.CatalogAll(); return !invalid.CatalogLoading; }, 10000) &&
+                    invalid.ImportError?.Contains("scale_range") == true && !Directory.Exists(invalid.ImportDirectory) &&
+                    File.ReadAllBytes(source).SequenceEqual(original), "Worker normalization failure published or changed source");
+                Console.WriteLine("PASS background submission: held worker, unique caller snapshots, mutable metadata isolation, source preservation and fresh normalized import");
+            }
+            finally { Directory.Delete(folder, true); }
+        }
+
         private static string Package(Action<BinaryWriter> write)
         {
             using (var stream = new MemoryStream()) using (var writer = new BinaryWriter(stream, Encoding.UTF8))

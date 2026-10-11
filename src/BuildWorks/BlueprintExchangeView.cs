@@ -181,6 +181,7 @@ namespace OstrixMods.BuildWorks
                     {
                         contentsBack.interactable = true;
                         RenderContents();
+                        importReview = null; contentsSummary = null; missingReview = null;
                         message.text = BuildWorksLocalization.ResolveUserText(store.ImportError);
                     }
                     else

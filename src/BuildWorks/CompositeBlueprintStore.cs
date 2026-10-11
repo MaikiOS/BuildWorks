@@ -195,15 +195,15 @@ namespace OstrixMods.BuildWorks
 
         internal void ConfigurePrefabMetadata(Func<string, PrefabMetadata> resolve) => prefabMetadata = resolve;
 
-        private void CaptureMetadata(IEnumerable<Part> parts)
+        private static void CaptureMetadata(IEnumerable<Part> parts, Func<string, PrefabMetadata> resolve)
         {
-            if (prefabMetadata == null) return;
+            if (resolve == null) return;
             var snapshot = new Dictionary<string, PrefabMetadata>(StringComparer.Ordinal);
             foreach (Part part in parts)
             {
                 if (part == null || string.IsNullOrWhiteSpace(part.prefabName)) continue;
                 if (!snapshot.TryGetValue(part.prefabName, out PrefabMetadata metadata))
-                    snapshot.Add(part.prefabName, metadata = prefabMetadata(part.prefabName));
+                    snapshot.Add(part.prefabName, metadata = resolve(part.prefabName));
                 if (metadata != null)
                 {
                     if (metadata.ToGeometry().PrefabId != part.prefabName) throw new ArgumentException("Prefab metadata identity mismatch.");
@@ -381,7 +381,7 @@ namespace OstrixMods.BuildWorks
             }
         }
 
-        // Called on the Unity thread: normalize against installed prefab bases before the file worker.
+        // Unity thread: freeze fresh host values. True starts work; CatalogAll/ImportError report its result.
         internal bool TryImportReviewed(ImportReview review, bool clearStorage, bool clearMounts,
             Func<string, int> prefabHash, out string error, bool omitArmorState = false, MissingPartsReview omitMissing = null)
         {
@@ -394,17 +394,31 @@ namespace OstrixMods.BuildWorks
                     throw new InvalidDataException(UserError("placement.contents_stale"));
                 CatalogAll();
                 if (omitMissing != null) ValidateMissingReview(review.Documents, omitMissing, prefabHash);
-                var prepared = review.Documents.Select(document => ExternalBlueprintLibrary.PrepareForHost(document, importPrefabScale, importPrefabHash, importWorldLevel?.Invoke(), importMaterialSeedSupport)).ToArray();
-                if (prepared.Any(document => document.importError != null))
-                    throw new InvalidDataException(prepared.First(document => document.importError != null).importError);
-                if (omitMissing != null)
-                    prepared = prepared.Select(document => CopyWithoutMissing(document, omitMissing.PrefabIds)).ToArray();
-                CaptureMetadata(prepared.SelectMany(document => document.parts));
+                var names = review.Documents.SelectMany(document => document.parts).Select(part => part.prefabName).Distinct(StringComparer.Ordinal).ToArray();
+                var scales = names.ToDictionary(name => name, name => importPrefabScale?.Invoke(name), StringComparer.Ordinal);
+                var supports = MaterialSeedSupportSnapshot(review.Documents);
+                var metadata = prefabMetadata == null ? null : names.ToDictionary(name => name, name => prefabMetadata(name)?.Copy(), StringComparer.Ordinal);
+                var hash = importPrefabHash;
+                int? worldLevel = importWorldLevel?.Invoke();
+                var missing = omitMissing == null ? null : new HashSet<string>(omitMissing.PrefabIds, StringComparer.Ordinal);
                 string target = Path.Combine(ImportDirectory, "import_" + Guid.NewGuid().ToString("N") + ".zip");
                 ImportError = null;
                 ImportResultPath = null;
                 importTask = Task.Run(() =>
                 {
+                    var prepared = review.Documents.Select(document =>
+                    {
+                        var copy = ExternalBlueprintLibrary.PrepareForHost(document,
+                            name => scales.TryGetValue(name, out var scale) ? scale : null, hash, worldLevel, supports);
+                        // PrepareForHost may return the input when it is already normalized.
+                        return ReferenceEquals(copy, document) ? copy.ImportCopy() : copy;
+                    }).ToArray();
+                    if (prepared.Any(document => document.importError != null))
+                        throw new InvalidDataException(prepared.First(document => document.importError != null).importError);
+                    if (missing != null)
+                        prepared = prepared.Select(document => CopyWithoutMissing(document, missing)).ToArray();
+                    CaptureMetadata(prepared.SelectMany(document => document.parts), metadata == null ? null :
+                        (Func<string, PrefabMetadata>)(name => metadata.TryGetValue(name, out var value) ? value : null));
                     if (!ReadImportBytes(review.Source).SequenceEqual(review.Bytes))
                         throw new InvalidDataException("$buildworks_exchange.source_changed");
                     ValidateExchangeDirectory(ImportDirectory);
@@ -477,7 +491,7 @@ namespace OstrixMods.BuildWorks
                         importPrefabScale, importPrefabHash, importWorldLevel?.Invoke(), importMaterialSeedSupport), omitMissing.PrefabIds);
                 }
                 blueprint = blueprint.ImportCopy();
-                CaptureMetadata(blueprint.parts);
+                CaptureMetadata(blueprint.parts, prefabMetadata);
                 Blueprint prepared = clearStorage || clearMounts || omitArmorState
                     ? CopyWithContentsPolicy(blueprint, clearStorage, clearMounts, prefabHash, omitArmorState)
                     : blueprint.IsExternal ? ExternalBlueprintLibrary.DetachedCopy(blueprint) : blueprint;
@@ -577,7 +591,8 @@ namespace OstrixMods.BuildWorks
         }
 
         // Unity thread only. Recipe availability is not prefab presence.
-        internal MissingPartsReview InspectMissing(IReadOnlyList<Blueprint> documents, Func<string, int> prefabHash)
+        internal MissingPartsReview InspectMissing(IReadOnlyList<Blueprint> documents, Func<string, int> prefabHash,
+            bool inspectRetainedContents = true)
         {
             var result = new MissingPartsReview { HostContext = importHostContext?.Invoke() };
             if (importPrefabScale == null || importHostContext != null && result.HostContext == null) return result;
@@ -598,14 +613,14 @@ namespace OstrixMods.BuildWorks
                 }
                 result.Parts += removed;
                 if (removed == document.parts.Count) ++result.EmptyDocuments;
-                else result.RetainedContents.Add(InspectContents(removed == 0 ? document : CopyWithoutMissing(document, result.PrefabIds), prefabHash, SupportsMaterialSeed));
+                else if (inspectRetainedContents) result.RetainedContents.Add(InspectContents(removed == 0 ? document : CopyWithoutMissing(document, result.PrefabIds), prefabHash, SupportsMaterialSeed));
             }
             return result;
         }
 
         private void ValidateMissingReview(IReadOnlyList<Blueprint> documents, MissingPartsReview expected, Func<string, int> prefabHash)
         {
-            MissingPartsReview current = InspectMissing(documents, prefabHash);
+            MissingPartsReview current = InspectMissing(documents, prefabHash, inspectRetainedContents: false);
             if (!current.Known) throw new InvalidDataException("$buildworks_exchange.missing_unavailable");
             if (!expected.Known || !ReferenceEquals(current.HostContext, expected.HostContext) ||
                 !current.PrefabIds.SetEquals(expected.PrefabIds) || current.Parts != expected.Parts)
@@ -1805,7 +1820,7 @@ namespace OstrixMods.BuildWorks
                 if (string.IsNullOrWhiteSpace(part.displayName))
                     part.displayName = part.prefabName;
             }
-            CaptureMetadata(result);
+            CaptureMetadata(result, prefabMetadata);
             return result;
         }
 

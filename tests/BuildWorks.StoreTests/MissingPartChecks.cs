@@ -34,6 +34,12 @@ namespace OstrixMods.BuildWorks.StoreTests
                 missing.RetainedContents.Unknown == 0 && review.Contents.Unknown == 1 &&
                 missing.Sources.Single().Key == "12-missing-choice.blueprint · qa_absent", "Missing review count/source/retained state wrong");
             Require(!Directory.Exists(store.ImportDirectory), "Availability review wrote a copy");
+            var validationOnly = store.InspectMissing(review.Documents,
+                _ => throw new InvalidOperationException("Missing validation parsed retained contents"), inspectRetainedContents: false);
+            Require(validationOnly.Known == missing.Known && ReferenceEquals(validationOnly.HostContext, missing.HostContext) &&
+                validationOnly.Parts == missing.Parts && validationOnly.EmptyDocuments == missing.EmptyDocuments &&
+                validationOnly.PrefabIds.SetEquals(missing.PrefabIds) && validationOnly.Sources.SequenceEqual(missing.Sources),
+                "Lightweight missing validation changed availability/counts/context/provenance");
 
             Require(store.TryImportReviewed(review, false, false, ForeignZdoChecks.Hash, out string error), error); Wait(store);
             Require(ExternalBlueprintLibrary.LoadFile(store.ImportResultPath).Single().parts.Count == 2,

@@ -1,3 +1,12 @@
+## 2026-10-11 — source .148: source evidence temporary memory
+
+Code3a23969: identical SHA from existing UTF8 bytes, no second large copy.
+7MiB constructor allocations29361576→7341440 in .NET10 (~75%). IDs/guards unchanged.
+Geometry/Store353(351/2), normalQA0/0, Host25185596/loc973/isolation/EditorBridge/
+scoped format and both reviews passed. End-to-end import delay remains open.
+**Not installed**, QA .146; includes .147. No game/Unity/input while Ostrix works.
+See docs/SOURCE_MEMORY_CHECKPOINT_2026-10-11.md. Full goal retained.
+
 ## 2026-10-11 — source .147: PlanBuild numeric commas, offline
 
 Code ca8c5f7: transform numeric columns only; exact source/signs/unknown payloads,

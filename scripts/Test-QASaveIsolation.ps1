@@ -51,6 +51,12 @@ foreach ($session in @($qaSession,$normalSession)) {
     Require ($select.ReturnType.FullName -eq 'System.Boolean' -and $null -ne $attempt -and
         $attempt.Next.OpCode.FlowControl.ToString() -eq 'Cond_Branch') `
         'Area selection must stop its current batch on refusal, not retry the QA safety gate for every remaining candidate.'
+    $comparers = @($area.Body.Instructions | Where-Object { $_.OpCode.Code.ToString() -eq 'Ldftn' } |
+        ForEach-Object { $_.Operand.Resolve() })
+    Require (@($area.Body.Instructions | Where-Object { [string]$_.Operand -match '::TryPieceScreenPoint\(' }).Count -eq 1 -and
+        $comparers.Count -eq 1 -and
+        -not [bool]($comparers[0].Body.Instructions | Where-Object { [string]$_.Operand -match '::TryPieceScreenPoint\(' })) `
+        'Area selection must project each candidate once, never rescan renderer bounds inside its sort comparer.'
 }
 foreach ($name in @('SetBlueprintPieceSelected','TrySaveWorldSelection')) {
     $qaMethod = $qaSession.Methods | Where-Object Name -eq $name

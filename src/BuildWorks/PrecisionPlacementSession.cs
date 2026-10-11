@@ -3651,7 +3651,8 @@ namespace OstrixMods.BuildWorks
                 camera.transform.position + camera.transform.forward * 48f,
                 128f,
                 nearbyPieces);
-            List<Piece> visible = new List<Piece>();
+            Vector2 center = area.center;
+            var visible = new List<(Piece piece, float distance)>();
             foreach (Piece piece in nearbyPieces)
             {
                 if (!IsBlueprintPieceSelectable(piece) ||
@@ -3660,18 +3661,11 @@ namespace OstrixMods.BuildWorks
                     !TryGetPlacedPieceAt(camera, screen, out Piece hit, out _) ||
                     hit != piece)
                     continue;
-                visible.Add(piece);
+                visible.Add((piece, (screen - center).sqrMagnitude));
             }
-            Vector2 center = area.center;
-            visible.Sort((left, right) =>
-            {
-                TryPieceScreenPoint(camera, left, out Vector2 leftScreen);
-                TryPieceScreenPoint(camera, right, out Vector2 rightScreen);
-                return (leftScreen - center).sqrMagnitude.CompareTo(
-                    (rightScreen - center).sqrMagnitude);
-            });
-            foreach (Piece piece in visible)
-                if (!SetBlueprintPieceSelected(piece, remove, toggle: false)) break;
+            visible.Sort((left, right) => left.distance.CompareTo(right.distance));
+            foreach (var candidate in visible)
+                if (!SetBlueprintPieceSelected(candidate.piece, remove, toggle: false)) break;
         }
 
         private bool IsBlueprintPieceSelectable(Piece piece)

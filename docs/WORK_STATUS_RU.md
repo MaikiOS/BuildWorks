@@ -2,6 +2,8 @@
 
 [Короткий живой список: сейчас / готово / осталось / проверки Ostrix](LIVE_CHECKLIST_RU.md).
 
+.157 код3287e01: Info-only itemstand/h2/3 поля дополняются подтверждёнными defaults, затем прежний strict validator. Biome609 записей/16 файлов распознаны; foreign27905→27296, Unknown documents234→232. Store red/green/final,353/353 и202/209 (7 прежних отказов), normalQA0/0/Host/loc989/compiled isolation, оба PASSED/Ship. Plugin format clean, changed test lines0;141 baseline WHITESPACE сохранены. **Не установлено**, QA146/открытая игра неизменны. Native156fix/стройка/ресурсы/reload/сеть не приняты; legacy106 открыт. [Протокол](SHORT_HOLDER_CHECKPOINT_2026-10-11_RU.md).
+
 .156 код19b520b: реальный QA .146 выявил NRE Respond после удаления выбранной строки файлов; input остановлен, стройка не начиналась. Unity alive-checks и actual Reply/Respond red/green11, normalQA0/0/protocol28/publisher/client100/Host/control/isolation/loc989/format, оба Ship. **Не установлено**; игра остаётся открытой .146. [Доказательства и продолжение](QA_RESPOND_CHECKPOINT_2026-10-11_RU.md). Native исправление/24/25/reload/сеть открыты; цель активна.
 
 .155 исходники/авто, код db9e508: связанный Info разрешает int item hash только при точном согласовании имени/атрибутов; старый API/строковый путь сохранены, unknown не обходится. Full Geometry/Store, normalQA0/0/Host/loc989/compiled isolation/format и два Ship. Biome353/353 и27905 foreign records прежние: intitem строк в нём0. **Не установлено**, QA .146; native/полный путь открыты. [Протокол](HASHED_HOLDER_CHECKPOINT_2026-10-11_RU.md).

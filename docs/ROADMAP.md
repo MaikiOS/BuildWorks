@@ -1,3 +1,16 @@
+## 2026-10-11 — .157: short PlanBuild holder Info
+
+Source3287e01: Info-only itemstand/h2/3 fields receive verified quality1/orientation0
+defaults followed by unchanged strict validation. Exact source retained. Store
+red/green/final; Biome353/353,609 records/16 docs; foreign27905→27296, Unknown docs
+234→232. Other corpus202/209,7 old refusals. NormalQA0/0/Host/loc989/compiled isolation
+and both reviews PASSED/Ship. Plugin format clean, changed test lines0;141 baseline
+WHITESPACE diagnostics remain on unchanged lines. **Not installed**; QA146/open
+game unchanged, no new input. Respond156 fix included, native acceptance pending.
+See docs/SHORT_HOLDER_CHECKPOINT_2026-10-11.md. Next: normal exit, guarded QA≥157
+deploy/Modded, state/folder, then24/25. Construction/resources/reload/network and
+full goal remain open; Inventory106 is not implemented.
+
 ## 2026-10-11 — .156: QA reply survives destroyed selected UI
 
 Code19b520b, normal/QA built, **not installed**; running game remains .146.

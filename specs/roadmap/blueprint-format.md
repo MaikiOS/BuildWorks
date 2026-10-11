@@ -1,5 +1,10 @@
 # Blueprint format and large-construction work
 
+## .157 — short Info without ZDO/chance
+
+Only .blueprint itemstand/itemstandh: name:variant → name:variant:1:0; name:variant:quality → name:variant:quality:0. Pinned PlanBuild defaults followed by unchanged strict validation. Exact source retained; other dialects/ZDO/chance not extended. Native22/portable11 unchanged, recipe rather than full item snapshot. Biome609 records/16 docs recognized; Unknown docs234→232 in unit prefab context. **Not installed; native behavior unverified**. [Evidence](../../docs/SHORT_HOLDER_CHECKPOINT_2026-10-11.md).
+
+
 .156 only changes QA observations of destroyed UI and the cancellation contract. Native22/portable11, converters and costs are unchanged. [Evidence](../../docs/QA_RESPOND_CHECKPOINT_2026-10-11.md). The .146 runtime failure is reproduced; .156 is not installed or accepted in Valheim.
 
 

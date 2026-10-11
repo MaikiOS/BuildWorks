@@ -1,3 +1,16 @@
+## 2026-10-11 — .157: короткие Info креплений PlanBuild
+
+Код3287e01: только Info-only itemstand/h с2/3 полями дополняется подтверждёнными
+defaults quality1/orientation0, затем строгая прежняя проверка. Источник сохранён.
+Store red/green/final; Biome353/353,609 записей/16 документов; foreign27905→27296,
+Unknown documents234→232. Второй корпус202/209,7 прежних отказов. NormalQA0/0,
+Host/loc989/compiled isolation и оба обзора PASSED/Ship. Plugin format clean,
+changed test lines0;141 baseline WHITESPACE остаются на неизменённых строках.
+**Не установлено**: QA146 неизменна, игра открыта, новых команд не было.
+Respond fix156 включён, native ещё не принят. См. docs/SHORT_HOLDER_CHECKPOINT_2026-10-11_RU.md.
+Следующее: штатный выход, guarded deploy QA≥157/Modded, state/folder, затем24/25.
+Native стройка/ресурсы/reload/сеть и общая цель открыты; legacy106 не реализован.
+
 ## 2026-10-11 — .156: исправлен ответ QA после уничтожения выбранного UI
 
 Код19b520b, normal/QA собраны; **не установлено**, открытая игра остаётся .146.

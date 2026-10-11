@@ -1,5 +1,10 @@
 # Формат чертежа и крупные постройки
 
+## .157 — короткий Info без ZDO/chance
+
+Только itemstand/itemstandh .blueprint: name:variant → name:variant:1:0; name:variant:quality → name:variant:quality:0. Defaults pinned PlanBuild; затем прежний строгий validator. Source document точный; остальные dialects/ZDO/chance не расширены. Native22/portable11 прежние, это recipe, не полный item snapshot. Biome609 записей/16 документов распознаны; Unknown documents234→232 при unit prefab context. **Не установлено, native поведение не принято**. [Доказательства](../../docs/SHORT_HOLDER_CHECKPOINT_2026-10-11_RU.md).
+
+
 .156 меняет только QA-наблюдение уничтоженного UI и проверку цепочки отмены; native22/portable11, адаптеры и стоимость прежние. [Доказательства](../../docs/QA_RESPOND_CHECKPOINT_2026-10-11_RU.md). В игре выявлен дефект .146; .156 не установлена и не принята в Valheim.
 
 

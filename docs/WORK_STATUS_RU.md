@@ -2,6 +2,8 @@
 
 [Короткий живой список: сейчас / готово / осталось / проверки Ostrix](LIVE_CHECKLIST_RU.md).
 
+.156 код19b520b: реальный QA .146 выявил NRE Respond после удаления выбранной строки файлов; input остановлен, стройка не начиналась. Unity alive-checks и actual Reply/Respond red/green11, normalQA0/0/protocol28/publisher/client100/Host/control/isolation/loc989/format, оба Ship. **Не установлено**; игра остаётся открытой .146. [Доказательства и продолжение](QA_RESPOND_CHECKPOINT_2026-10-11_RU.md). Native исправление/24/25/reload/сеть открыты; цель активна.
+
 .155 исходники/авто, код db9e508: связанный Info разрешает int item hash только при точном согласовании имени/атрибутов; старый API/строковый путь сохранены, unknown не обходится. Full Geometry/Store, normalQA0/0/Host/loc989/compiled isolation/format и два Ship. Biome353/353 и27905 foreign records прежние: intitem строк в нём0. **Не установлено**, QA .146; native/полный путь открыты. [Протокол](HASHED_HOLDER_CHECKPOINT_2026-10-11_RU.md).
 
 .154 исходники/авто, код3a2c82b: PlanBuild snap XYZ допускает архивируемый неинтерпретируемый хвост с явным предупреждением. Biome353/353, второй корпус202/209 (7 прежних отказов±512), full Geometry/Store, normalQA0/0/Host/loc989/isolation/EditorBridge/scopedformat и оба обзора Ship. Не установлено, QA .146; native/полный путь открыты. [Протокол](PLANBUILD_SNAP_TAIL_CHECKPOINT_2026-10-11_RU.md).
@@ -243,7 +245,7 @@ Geometry/Store/Host/QA isolation, normal/QA0/0, Unity492 + точные лока
 | Q03 | Большая строительная площадка вдали от спавна | Частично | Native .10564x64 м на отдельном QA участке;192x192 м ещё не подготовлена |
 | Q04 | Точные русские ручные сценарии: файл/состояние/действия/результат/ошибка | Частично | Scoped guides .106–.115, готовый14-replace-missing.buildworks.json и QA_0.19.114_RU с готовым13-recorded-bounds.buildworks.json: рамка/маркер/сохранение/reopen, без материалов и чужих модов. Полная матрица всех механик не готова |
 | Q05 | Survival/admin/missing/scale/sign/mount/storage/heavy/cancel/failure/reload/network | Частично | Automated subsets есть; вся native матрица не пройдена, admin/jobs ещё требуют реализации |
-| Q06 | Только реально доступное наблюдение/управление | Код/авто/установлено; игра открыта | По новой просьбе Ostrix QA.141 получила native InputSystem/legacy/UGUI + файл состояния/кадр; protocol28/Unity492/оба обзора прошли. Native ввод/stop/focus ещё не подтверждены в Valheim; основной Computer Use не используется. [Протокол](QA_CONTROL_RU.md) |
+| Q06 | Только реально доступное наблюдение/управление | Частично; native дефект .146, исходники .156 | Свежий мир/кадр/look/step/release и UI-клики подтверждены в .145/.146. Folder/state в .146 падают на уничтоженном UI; .156 red/green11 и общие авто/два Ship, не установлено. Stop-файл потреблён, terminal receipt отсутствует; дальнейший ввод не отправлялся. Drag/physical stop/focus-loss и native fix открыты. [Протокол](QA_RESPOND_CHECKPOINT_2026-10-11_RU.md) |
 | Q07 | Устойчивый стенд масштаба и привязок без ручных опор | Файл16/reload приняты .117;17/18 не приняты | Ostrix2026-10-10:16 совпадает с призраком, полы устойчивы; новая форма/позиция сохраняются после reload, повторной выдачи нет. Мировое соединение17/18 со смещением. Native байты/коллайдеры/сокеты калиброваны автоматически; это не приёмка соединения |
 
 ## Порядок продолжения

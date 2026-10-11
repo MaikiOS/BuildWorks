@@ -1,3 +1,19 @@
+## 2026-10-11 — .156: QA reply survives destroyed selected UI
+
+Code19b520b, normal/QA built, **not installed**; running game remains .146.
+Authorized native QA proved fresh world/frame, short look/step/release,
+inventory and Hammer/import clicks. test-fixtures folder click caused Respond
+NullReference on destroyed selected GameObject; stop.flag consumed without
+terminal receipt. Readonly state failed too. No replay or construction attempted.
+Game left open. Actual Reply/Respond red/green11 CPU cases, normalQA0/0,
+protocol28/publisher/client100/Host/control/isolation/loc989/format and both Ship.
+Stale abort contract now follows the existing .150 helper chain and rejects
+an in-memory disconnected call. Production selection code unchanged.
+Native22/portable11/conversion unchanged; Geometry/Store/EditorBridge not rerun.
+See docs/QA_RESPOND_CHECKPOINT_2026-10-11.md and checkpoint-0.19.156/verification.json.
+Next: normal exit, guarded QA≥.156 deployment, Modded, folder/state acceptance,
+then fixtures24/25. .156 native runtime unverified; full goal remains active.
+
 ## 2026-10-11 — .155 sources: source-bound Info and numeric holder item ID, offline
 
 Code db9e508: typed item:Int32 requires same-row four-field Info and exact

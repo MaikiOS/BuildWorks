@@ -1,3 +1,20 @@
+## 2026-10-11 — .156: исправлен ответ QA после уничтожения выбранного UI
+
+Код19b520b, normal/QA собраны; **не установлено**, открытая игра остаётся .146.
+Ostrix разрешил игровой QA: свежий мир/кадр, короткие look/step, отпускание,
+инвентарь и клики Hammer/import подтверждены. Переход test-fixtures вызвал
+NullReferenceException Respond на уничтоженном selected GameObject; stop.flag
+потреблён, terminal response отсутствует. Readonly state также падает. Ввод
+не повторялся; строительство не начиналось. Игра оставлена открытой.
+Actual Reply/Respond red/green11 CPU cases; normalQA0/0, protocol28/publisher,
+client100, Host/control/isolation/loc989/format и два обзора PASSED/Ship.
+Устаревшая проверка abort теперь следует существующей helper-chain .150,
+разрыв отклоняется in-memory negative control. Код выделения не менялся.
+Native22/portable11/конвертация прежние. Geometry/Store/EditorBridge не rerun.
+См. docs/QA_RESPOND_CHECKPOINT_2026-10-11_RU.md и checkpoint-0.19.156/verification.json.
+Следующее: штатное завершение старой игры, guarded deploy QA≥.156, Modded,
+повтор folder/state, затем файлы24/25. .156 runtime ещё не принят; полная цель активна.
+
 ## 2026-10-11 — исходники .155: связанный Info и числовой ID крепления, offline
 
 Код db9e508: typed item:Int32 распознаётся только по четырёхпольному Info той же

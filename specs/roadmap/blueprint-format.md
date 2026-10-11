@@ -1,5 +1,8 @@
 # Blueprint format and large-construction work
 
+.156 only changes QA observations of destroyed UI and the cancellation contract. Native22/portable11, converters and costs are unchanged. [Evidence](../../docs/QA_RESPOND_CHECKPOINT_2026-10-11.md). The .146 runtime failure is reproduced; .156 is not installed or accepted in Valheim.
+
+
 ## .155 — source-bound holder name and numeric item ID
 
 Native22/portable11 unchanged. Known typed-ZDO item:Int32 is resolved only from

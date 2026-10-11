@@ -1,3 +1,16 @@
+## 2026-10-11 — source .150: world area and height bounds, offline
+
+XZ area → bottom/top → explicit refresh; six paged rows, persistent manual
+include/exclude, inclusive origins, loaded-only/unloaded-zone count. Budget and
+QA session gate precede mutation; old screen rectangle remains. Fixed high-wall
+clicks and full50000-row rebuild during height drag. Geometry/actual-source
+harnesses, normalQA0/0, Host25185596/loc988/isolation/EditorBridge pass. Reviews
+and commits: artifacts/checkpoint-0.19.150/verification.json. Full goal stays open.
+**Not installed**, QA .146; no Valheim/Unity/input/save changes while Ostrix works.
+C01–C03 source/auto partial; C04 wire box is a proposal. Native capture/build/
+reload/network remain unverified. See docs/VOLUME_SELECTION_CHECKPOINT_2026-10-11.md
+and deferred docs/QA_0.19.150_RU.md. Do not repeat accepted checks.
+
 ## 2026-10-11 — source .149: cache area-selection projection distance
 
 Code1bacb4f: one projection per candidate, same filters/order/removal/refusal/QA

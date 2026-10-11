@@ -1,3 +1,16 @@
+## 2026-10-11 — исходники .150: площадь и границы выделения, offline
+
+Площадь XZ → низ/верх → явный пересчёт; список по6 строк и ручные включения/
+исключения, origin внутри границ, loaded-only/число незагруженных зон. Бюджет
+и QA guard до мутации. Старый screen rectangle сохранён. Исправлен клик высокой
+стены; height drag не пересобирает50000 строк. Geometry/actual-source harnesses,
+normalQA0/0, Host25185596/loc988/isolation/EditorBridge прошли. Обзоры и commits —
+в artifacts/checkpoint-0.19.150/verification.json. Полная цель не завершена.
+**Не установлено**, QA .146; по просьбе Ostrix без Valheim/Unity/input/сохранений.
+C01–C03 частично source/auto, C04 рамка только предложена; native capture/build/
+reload/network открыты. См. docs/VOLUME_SELECTION_CHECKPOINT_2026-10-11_RU.md
+и отложенную docs/QA_0.19.150_RU.md. Принятые проверки не повторять.
+
 ## 2026-10-11 — исходники .149: выделение рамкой без повторов проекции
 
 Код1bacb4f: расстояние кандидата вычисляется один раз; прежние фильтры,

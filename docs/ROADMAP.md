@@ -1,3 +1,13 @@
+## 2026-10-11 — .159: refund identity guard, QA deployed
+
+Sourceedf602f: duplicate source references block refund/rollback; distinct equal
+stacks remain independent. Geometry red/green/final, normalQA0/0, Host25185596,
+loc989/isolation/scoped format, correctness PASSED/Ponytail Ship.
+Guarded dry-run/deploy: both DLL hashes match,155 protected files unchanged,
+Default clean. Native/reload/network and populated transfer remain open; goal active.
+[Evidence and next step](REFUND_IDENTITY_CHECKPOINT_2026-10-11.md).
+Historical checkpoints follow; installed .159 includes .158 code.
+
 ## 2026-10-11 — .158: Inventory106, QA deployed
 
 Source16afb62: source-bound Info-only .blueprint; actual ordinary root Container

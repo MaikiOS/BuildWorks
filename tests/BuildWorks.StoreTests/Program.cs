@@ -58,6 +58,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 ForeignZdoChecks.Run();
                 NativeItemStandRoundTrip(Path.Combine(directory, "native-holder.json"));
                 NativeContainerRoundTrip(Path.Combine(directory, "native-container.json"));
+                LegacyStorageChecks.Run(Path.Combine(directory, "legacy-storage"));
                 ContentsPolicyRoundTrip(Path.Combine(directory, "contents-policy"));
                 ArmorStatePolicy(Path.Combine(directory, "armor-state-policy"));
                 ReviewedImportWorkflow(Path.Combine(directory, "reviewed-import"));

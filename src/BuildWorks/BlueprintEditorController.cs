@@ -3269,7 +3269,9 @@ namespace OstrixMods.BuildWorks
             {
                 GameObject prefab = ResolveVisualSource(name);
                 return prefab ? new CompositeBlueprintStore.VectorData(prefab.transform.localScale) : (CompositeBlueprintStore.VectorData?)null;
-            });
+            }, name => name.GetStableHashCode(), Game.m_worldLevel,
+                name => BlueprintMaterialState.Supports(ResolveVisualSource(name)),
+                name => BlueprintStorageCapture.PrefabGrid(ResolveVisualSource(name)));
 
         internal static void EditorCatalogStatus(CompositeBlueprintStore.Blueprint source,
             Func<string, bool> prefabAvailable, out string unavailable, out string warning)

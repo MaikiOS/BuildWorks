@@ -20,14 +20,23 @@ namespace OstrixMods.BuildWorks
         {
             if (!piece || data == null || data.Format != BlueprintForeignPartData.NativeContainerFormat ||
                 !BlueprintContainerInventory.TryRead(data, name => name.GetStableHashCode(), out var items) ||
-                !data.ContentsCleared && items.Count != 0 || piece.GetComponent<TombStone>() ||
-                piece.GetComponent<Corpse>() || piece.GetComponent<Incinerator>() ||
-                piece.GetComponent<ItemStand>() || piece.GetComponent<ArmorStand>()) return false;
-            Container[] containers = piece.GetComponentsInChildren<Container>(true);
-            return containers.Length == 1 && containers[0].gameObject == piece.gameObject &&
-                containers[0].GetType() == typeof(Container) && !containers[0].m_autoDestroyEmpty && !containers[0].m_wagon &&
+                !data.ContentsCleared && items.Count != 0) return false;
+            return PrefabGrid(piece.gameObject).HasValue;
+        }
+
+        internal static (int Width, int Height)? PrefabGrid(GameObject prefab)
+        {
+            if (!prefab || !prefab.GetComponent<Piece>() || prefab.GetComponent<TombStone>() ||
+                prefab.GetComponent<Corpse>() || prefab.GetComponent<Incinerator>() ||
+                prefab.GetComponent<ItemStand>() || prefab.GetComponent<ArmorStand>()) return null;
+            Container[] containers = prefab.GetComponentsInChildren<Container>(true);
+            if (containers.Length != 1 || containers[0].gameObject != prefab || containers[0].GetType() != typeof(Container) ||
+                containers[0].m_autoDestroyEmpty || containers[0].m_wagon ||
                 // shortcut: default-loot prefabs need a scoped pre-Awake policy before they can be constructed empty.
-                containers[0].m_defaultItems?.m_drops != null && containers[0].m_defaultItems.m_drops.Count == 0;
+                containers[0].m_defaultItems?.m_drops == null || containers[0].m_defaultItems.m_drops.Count != 0 ||
+                containers[0].m_width < 1 || containers[0].m_width > 256 || containers[0].m_height < 1 || containers[0].m_height > 256)
+                return null;
+            return (containers[0].m_width, containers[0].m_height);
         }
 
         internal static bool TryCapture(Piece piece, Player player, out BlueprintForeignPartData data)

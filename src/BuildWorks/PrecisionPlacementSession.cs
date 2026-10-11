@@ -648,7 +648,8 @@ namespace OstrixMods.BuildWorks
                 return prefab ? new CompositeBlueprintStore.VectorData(prefab.transform.localScale)
                     : (CompositeBlueprintStore.VectorData?)null;
             }, () => ZNetScene.instance, name => name.GetStableHashCode(), () => Game.m_worldLevel,
-                name => BlueprintMaterialState.Supports(ZNetScene.instance ? ZNetScene.instance.GetPrefab(name) : null));
+                name => BlueprintMaterialState.Supports(ZNetScene.instance ? ZNetScene.instance.GetPrefab(name) : null),
+                name => BlueprintStorageCapture.PrefabGrid(ZNetScene.instance ? ZNetScene.instance.GetPrefab(name) : null));
             blueprintStore.ConfigurePrefabMetadata(name => BlueprintPrefabMetadataCapture.Capture(
                 ZNetScene.instance ? ZNetScene.instance.GetPrefab(name) : null));
             blueprintPieceRegistry = new HammerBlueprintPieceRegistry(blueprintStore);

@@ -880,7 +880,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.157.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.158.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -3327,11 +3327,23 @@ Assert-Contract ($storageCalls -notmatch 'Container::Save|Container::Load|Invent
 Assert-Contract ($storageCalls -match 'BlueprintContainerInventory::TryRead') 'Container snapshot skips full inert record/dependency validation.'
 $emptyContainer = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintStorageCapture' -and $_.Name -eq 'CanPlaceWithoutContents' }
 $emptyContainerCalls = ($emptyContainer.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
-foreach ($pattern in 'BlueprintContainerInventory::TryRead', 'get_ContentsCleared', 'GetComponentsInChildren<Container>',
-    'Container::m_defaultItems', 'DropTable::m_drops', 'get_Count') {
+foreach ($pattern in 'BlueprintContainerInventory::TryRead', 'get_ContentsCleared', 'BlueprintStorageCapture::PrefabGrid') {
     Assert-Contract ($emptyContainerCalls -match $pattern) "Empty-container construction lacks gate: $pattern"
 }
 Assert-Contract ($emptyContainerCalls -notmatch 'GetDropListItems|(?<![A-Za-z])Inventory::|ZDO::|RPC|Object::Instantiate|Container::Load') 'Empty-container eligibility executes loot, inventory or world operations.'
+$prefabGrid = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintStorageCapture' -and $_.Name -eq 'PrefabGrid' }
+$prefabGridCalls = ($prefabGrid.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+foreach ($pattern in 'GetComponent<Piece>', 'GetComponent<TombStone>', 'GetComponent<Corpse>', 'GetComponent<Incinerator>',
+    'GetComponent<ItemStand>', 'GetComponent<ArmorStand>', 'GetComponentsInChildren<Container>', 'get_gameObject',
+    'GetType', 'Container::m_autoDestroyEmpty', 'Container::m_wagon', 'Container::m_defaultItems', 'DropTable::m_drops',
+    'get_Count', 'Container::m_width', 'Container::m_height') {
+    Assert-Contract ($prefabGridCalls -match $pattern) "Prefab container grid lacks eligibility gate: $pattern"
+}
+Assert-Contract ($prefabGridCalls -notmatch 'GetDropListItems|(?<![A-Za-z])Inventory::|ZDO::|RPC|Object::Instantiate|Container::Load|Container::Save|stfld') 'Prefab grid executes state or changes the prefab.'
+foreach ($field in 'm_width', 'm_height') {
+    $nativeGridField = $containerType.Fields | Where-Object Name -eq $field
+    Assert-Contract ($nativeGridField.IsPublic -and $nativeGridField.FieldType.FullName -eq 'System.Int32') "Native Container grid changed: $field"
+}
 foreach ($name in 'SelectSupplies','TryApply','ContinueAutomaticPlacement','OnNativePlacementFinished') {
     $method = $pluginMethods | Where-Object { $_.Name -eq $name -and $_.DeclaringType.Name -in @('BlueprintItemStandPlacement','PrecisionPlacementSession') }
     $calls = ($method.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
@@ -3358,6 +3370,11 @@ foreach ($entry in @(@($itemSave, 'DAA9052430B2B766A8F15E221AB0D24C63FD55A6723EE
         @($standAttachLayout, '0E107474A83CB6A695BCC5FEBD2792760CB85264CFFA0F2172EA9F1A62CCCAE2'),
         @($numItemsSave, 'EFCB67745DEF1986C47B3526000AC07C0114FDA19AF57F0DABCDE653A6DC456E'),
         @($inventoryLoadLayout, 'E0E6FF90F203C6FFE961DE66768CDEDF609B896945E637A8166B121911BEF935'),
+        @(($inventoryType.Methods | Where-Object Name -eq 'LoadOld'), '1A33375F234E0650DB11140173303220E957FB25A68275EB82E2848118482EE7'),
+        @(($packageType.Methods | Where-Object Name -eq 'ReadBool'), '99C0897070FC758C95897695FD521DE5D606B2B4C645410D01BD9D4FEADB9DFA'),
+        @(($packageType.Methods | Where-Object Name -eq 'ReadSingle'), 'A26CCB88BA6A99268C3C34E1BCB10546722A400C5B1E8F767C969C508C0A3499'),
+        @(($packageType.Methods | Where-Object Name -eq 'ReadString'), '60396F6EDEACF4733F0A5286A20EFBB85B472DD64AD3B47F1319D902967D6C0E'),
+        @(($packageType.Methods | Where-Object Name -eq 'ReadVector2i'), '643B0E2ED41A36A548F986294B27BFCEDF726BF1FFAECCD30FF8EC6E4A1FD184'),
         @($prefabHashLayout, '8D6089461A9226DC1BDF23B87784C88F378A57F95C1FF6FFB6CCB85E731BF821'),
         @(($player.Methods | Where-Object Name -eq 'ConsumeResources'), 'C3BE324204B7736C506C3C3774B7E8E2A118D6B6688FEBBBB3BF676F38689646'),
         @(($inventoryType.Methods | Where-Object { $_.Name -eq 'RemoveItem' -and $_.Parameters.Count -eq 4 }), '08D969317BA4AD9B43DFDF811968D8E6413DDB990F174B98F9A957E0F213C312'),

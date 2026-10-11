@@ -56,6 +56,7 @@ namespace OstrixMods.BuildWorks
         private Func<string, int> importPrefabHash;
         private Func<int> importWorldLevel;
         private Func<string, bool> importMaterialSeedSupport;
+        private Func<string, (int Width, int Height)?> importContainerGrid;
         private int? preparedWorldLevel;
         private Func<object> importHostContext;
         private object preparedHostContext;
@@ -87,13 +88,15 @@ namespace OstrixMods.BuildWorks
 
         // Called on the Unity thread only; prefabHash must be a pure stable string hash.
         internal void ConfigureImportScale(Func<string, VectorData?> resolve, Func<object> context = null,
-            Func<string, int> prefabHash = null, Func<int> worldLevel = null, Func<string, bool> supportsMaterialSeed = null)
+            Func<string, int> prefabHash = null, Func<int> worldLevel = null, Func<string, bool> supportsMaterialSeed = null,
+            Func<string, (int Width, int Height)?> containerGrid = null)
         {
             importPrefabScale = resolve;
             importHostContext = context;
             importPrefabHash = prefabHash;
             importWorldLevel = worldLevel;
             importMaterialSeedSupport = supportsMaterialSeed;
+            importContainerGrid = containerGrid;
             catalogSnapshot = null;
             preparedExternalBlueprints = null;
             ++importGeneration;
@@ -149,15 +152,16 @@ namespace OstrixMods.BuildWorks
                         var sources = externalBlueprints;
                         var materialSupport = scales.Keys.ToDictionary(name => name,
                             name => importMaterialSeedSupport?.Invoke(name) == true, StringComparer.Ordinal);
+                        var grids = ContainerGridSnapshot(sources);
                         var hash = importPrefabHash;
                         preparationGeneration = importGeneration;
                         preparationTask = Task.Run(() => sources.Select(source => ExternalBlueprintLibrary.PrepareForHost(
                             source, name => scales.TryGetValue(name, out var scale) ? scale : null, hash, worldLevel,
-                            name => materialSupport.TryGetValue(name, out bool supported) && supported)).ToList());
+                            name => materialSupport.TryGetValue(name, out bool supported) && supported, grids)).ToList());
                         return data.blueprints;
                     }
                 }
-                else preparedExternalBlueprints = externalBlueprints.Select(source => ExternalBlueprintLibrary.PrepareForHost(source, importPrefabScale, importPrefabHash, worldLevel, importMaterialSeedSupport)).ToList();
+                else preparedExternalBlueprints = externalBlueprints.Select(source => ExternalBlueprintLibrary.PrepareForHost(source, importPrefabScale, importPrefabHash, worldLevel, importMaterialSeedSupport, importContainerGrid)).ToList();
             }
             var result = new List<Blueprint>(data.blueprints);
             result.AddRange(preparedExternalBlueprints);
@@ -296,6 +300,14 @@ namespace OstrixMods.BuildWorks
         internal bool SupportsMaterialSeed(string name) =>
             (importHostContext == null || importHostContext() != null) && importMaterialSeedSupport?.Invoke(name) == true;
 
+        internal Func<string, (int Width, int Height)?> ContainerGridSnapshot(IEnumerable<Blueprint> documents)
+        {
+            var grids = documents.SelectMany(document => document.parts).Select(part => part.prefabName)
+                .Distinct(StringComparer.Ordinal).ToDictionary(name => name, name =>
+                    importHostContext == null || importHostContext() != null ? importContainerGrid?.Invoke(name) : null, StringComparer.Ordinal);
+            return name => grids.TryGetValue(name, out var grid) ? grid : null;
+        }
+
         // Refine conservative file inspection with the current host before presenting choices.
         internal Task<ImportReview> PrepareImportReview(ImportReview review, Func<string, int> prefabHash)
         {
@@ -305,6 +317,7 @@ namespace OstrixMods.BuildWorks
             var scales = review.Documents.SelectMany(document => document.parts).Select(part => part.prefabName)
                 .Distinct(StringComparer.Ordinal).ToDictionary(name => name, name => importPrefabScale?.Invoke(name), StringComparer.Ordinal);
             var supports = MaterialSeedSupportSnapshot(review.Documents);
+            var grids = ContainerGridSnapshot(review.Documents);
             var missing = new MissingPartsReview
             {
                 HostContext = context,
@@ -325,7 +338,7 @@ namespace OstrixMods.BuildWorks
                     Missing = missing,
                     IsHostCurrent = current,
                     Documents = review.Documents.Select(document => ExternalBlueprintLibrary.PrepareForHost(document,
-                        name => scales.TryGetValue(name, out var scale) ? scale : null, prefabHash, worldLevel, supports)).ToList()
+                        name => scales.TryGetValue(name, out var scale) ? scale : null, prefabHash, worldLevel, supports, grids)).ToList()
                 };
                 var summaries = new Dictionary<Blueprint, ContentsSummary>();
                 foreach (Blueprint document in result.Documents)
@@ -415,6 +428,7 @@ namespace OstrixMods.BuildWorks
                 var names = review.Documents.SelectMany(document => document.parts).Select(part => part.prefabName).Distinct(StringComparer.Ordinal).ToArray();
                 var scales = names.ToDictionary(name => name, name => importPrefabScale?.Invoke(name), StringComparer.Ordinal);
                 var supports = MaterialSeedSupportSnapshot(review.Documents);
+                var grids = ContainerGridSnapshot(review.Documents);
                 var metadata = prefabMetadata == null ? null : names.ToDictionary(name => name, name => prefabMetadata(name)?.Copy(), StringComparer.Ordinal);
                 var hash = importPrefabHash;
                 int? worldLevel = importWorldLevel?.Invoke();
@@ -427,7 +441,7 @@ namespace OstrixMods.BuildWorks
                     var prepared = review.Documents.Select(document =>
                     {
                         var copy = ExternalBlueprintLibrary.PrepareForHost(document,
-                            name => scales.TryGetValue(name, out var scale) ? scale : null, hash, worldLevel, supports);
+                            name => scales.TryGetValue(name, out var scale) ? scale : null, hash, worldLevel, supports, grids);
                         // PrepareForHost may return the input when it is already normalized.
                         return ReferenceEquals(copy, document) ? copy.ImportCopy() : copy;
                     }).ToArray();
@@ -506,7 +520,7 @@ namespace OstrixMods.BuildWorks
                 {
                     ValidateMissingReview(new[] { blueprint }, omitMissing, prefabHash);
                     blueprint = CopyWithoutMissing(ExternalBlueprintLibrary.PrepareForHost(blueprint,
-                        importPrefabScale, importPrefabHash, importWorldLevel?.Invoke(), importMaterialSeedSupport), omitMissing.PrefabIds);
+                        importPrefabScale, importPrefabHash, importWorldLevel?.Invoke(), importMaterialSeedSupport, importContainerGrid), omitMissing.PrefabIds);
                 }
                 blueprint = blueprint.ImportCopy();
                 CaptureMetadata(blueprint.parts, prefabMetadata);

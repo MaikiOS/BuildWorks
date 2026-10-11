@@ -89,6 +89,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Run("ItemStand authoring preserves contents in history and rejects opaque/locked edits", ItemStandContentsHistory);
             Run("Native Container payload preserves history and rejects invalid manifests/packages", NativeContainerState);
             Run("Native Container inspection reads all fields and refuses corrupt records without mutation", ContainerInventoryTests.Run);
+            Run("Legacy Inventory106 retains exact bytes and float fields without native loading", LegacyContainerInventoryTests.Run);
             Run("Native ItemStand inspection validates every property and holder metadata without executing it", ItemStandContentsTests.Run);
             Run("Intentional empty contents retain evidence and editor history without treating unknown as empty", ClearedContentsHistory);
             Run("Free supports have independent pose, scope and history", BlueprintSupportHistory);

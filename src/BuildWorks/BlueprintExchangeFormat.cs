@@ -49,6 +49,20 @@ namespace OstrixMods.BuildWorks
 
         internal static string DecodeSignText(string token, bool allowLegacyLiteral = false)
         {
+            string text = DecodeTextToken(token, allowLegacyLiteral);
+            if (!Geometry.BlueprintEditorPart.IsValidSignText(text))
+                throw new InvalidDataException("$buildworks_import.object_data");
+            return text;
+        }
+
+        internal static string DecodeInventoryInfo(string token)
+        {
+            if (token == null || token.Length > 32768) throw new InvalidDataException("$buildworks_import.object_data");
+            return DecodeTextToken(token, false);
+        }
+
+        private static string DecodeTextToken(string token, bool allowLegacyLiteral)
+        {
             if (token == "" || token == "\"\"" || token == "null") return null;
             string text = token;
             if (token.TrimStart().StartsWith("\"", StringComparison.Ordinal))
@@ -68,8 +82,6 @@ namespace OstrixMods.BuildWorks
                     text = token;
                 }
             }
-            if (!OstrixMods.BuildWorks.Geometry.BlueprintEditorPart.IsValidSignText(text))
-                throw new InvalidDataException("$buildworks_import.object_data");
             return text;
         }
 

@@ -346,7 +346,7 @@ namespace OstrixMods.BuildWorks
 
         internal static CompositeBlueprintStore.Blueprint PrepareForHost(CompositeBlueprintStore.Blueprint source,
             Func<string, CompositeBlueprintStore.VectorData?> resolvePrefabScale, Func<string, int> hash = null, int? worldLevel = null,
-            Func<string, bool> supportsMaterialSeed = null)
+            Func<string, bool> supportsMaterialSeed = null, Func<string, (int Width, int Height)?> containerGrid = null)
         {
             if (source == null || source.importError != null || !source.importAbsoluteScale && !source.parts.Any(part => part.scaleIsAbsolute) &&
                 (hash == null || !source.parts.Any(part => part.foreignData?.format == "blueprint" || part.foreignData?.format == "vbuild"))) return source;
@@ -377,7 +377,10 @@ namespace OstrixMods.BuildWorks
                         part.scaleIsAbsolute = false;
                     }
                     if (hash != null && part.sourceDocumentId != null && evidenceIndex.TryGetValue(part.sourceDocumentId, out var evidence))
+                    {
+                        ConvertLegacyStorage(part, evidence, hash, containerGrid);
                         ConvertKnownState(part, evidence, hash, worldLevel, supportsMaterialSeed, ref ordinaryStateFields);
+                    }
                 }
                 copy.importAbsoluteScale = false;
                 // Derived cache identity must not reuse pre-normalization thumbnails or another prefab revision.
@@ -387,6 +390,9 @@ namespace OstrixMods.BuildWorks
                 if (source.IsExternal && copy.parts.Any(part => part.materialSeed.HasValue))
                     copy.id = Identity(copy.id + "\nmaterial-seed-v1\n" + string.Join(",",
                         copy.parts.Select(part => part.materialSeed?.ToString(CultureInfo.InvariantCulture) ?? "null")));
+                if (source.IsExternal && copy.parts.Any(part => part.foreignData?.format == Geometry.BlueprintForeignPartData.NativeContainerFormat))
+                    copy.id = Identity(copy.id + "\ncontainer-manifest-v1\n" + string.Join("\n", copy.parts.Select(part =>
+                        part.foreignData?.format == Geometry.BlueprintForeignPartData.NativeContainerFormat ? part.foreignData.info : "null")));
             }
             catch (Exception error) when (error is InvalidDataException || error is ArgumentException)
             {
@@ -394,6 +400,28 @@ namespace OstrixMods.BuildWorks
                 copy.parts.Clear(); // Atomic conversion: never publish mixed absolute/relative scales.
             }
             return copy;
+        }
+
+        private static void ConvertLegacyStorage(CompositeBlueprintStore.Part part, Geometry.BlueprintSourceDocument evidence,
+            Func<string, int> hash, Func<string, (int Width, int Height)?> containerGrid)
+        {
+            var original = part.foreignData;
+            if (original?.format != "blueprint" || original.info == null || original.zdo != null || original.chance != null ||
+                evidence?.Format != "blueprint" || evidence.Id != part.sourceDocumentId ||
+                !evidence.HasPartAt(part.sourceLine, part.prefabName)) return;
+            string[] fields = evidence.PartRow(part.sourceLine)?.Split(';');
+            if (fields == null || fields.Length != 10 && fields.Length != 13 && fields.Length != 14 && fields.Length != 15 ||
+                fields[9] != original.info || fields.Length > 13 && HasData(fields[13]) ||
+                fields.Length > 14 && HasData(fields[14]) && fields[14] != "1") return;
+            var grid = containerGrid?.Invoke(part.prefabName);
+            if (!grid.HasValue) return;
+            try
+            {
+                if (Geometry.BlueprintContainerInventory.TryConvertLegacy106(BlueprintExchangeFormat.DecodeInventoryInfo(original.info),
+                    grid.Value.Width, grid.Value.Height, hash, out var contents))
+                    part.foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(contents);
+            }
+            catch (InvalidDataException) { } // Unknown/corrupt Info remains inert with its exact source row.
         }
 
         internal static bool CanOmitArmorStandState(CompositeBlueprintStore.Part part, Geometry.BlueprintSourceDocument evidence)

@@ -1,3 +1,13 @@
+## 2026-10-11 — source .147: PlanBuild numeric commas, offline
+
+Code ca8c5f7: transform numeric columns only; exact source/signs/unknown payloads,
+strict validation retained. Store/353 (351/2), normalQA0/0, Geometry/Host25185596,
+loc973/isolation/EditorBridge/channel/pinned reader and both reviews passed.
+Global format:15 pre-existing errors; changed C# passed. **Not installed**; QA .146.
+No game/Unity/input while Ostrix works. See docs/PLANBUILD_COMMA_CHECKPOINT_2026-10-11.md,
+owned deferred fixture26. Construction/reload/network/end-to-end speed remain open.
+Full goal retained.
+
 ## 2026-10-11 — QA0.19.146 installed: observation channel reliability
 
 Source91b2c14: bounded reader and Windows1175-only publication retry,

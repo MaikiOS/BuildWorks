@@ -1,3 +1,12 @@
+## 2026-10-12 — QA .166: guarded UI targets, offline
+
+Native QA now observes interactable controls and validates the selected target
+before input/release; unchanged controls retain stable IDs. Protocol43/UI40/text14,
+normal+QA clean, Host/loc989/Python4+3 passed; independent PASSED/Ponytail Ship.
+[Limits](docs/QA_UI_TARGETS_166.md). Not deployed: installed .165/Geometry hashes
+unchanged. No game/model/GPU run. Model click/text integration, target pages,
+data/resource snapshots and reload remain open; all12 full scenarios stay blocked.
+
 ## 2026-10-12 — whole local-model tasks; game testing paused
 
 Installed QA .165 unchanged. Local qwen3.5:4b chose every action for a small whole

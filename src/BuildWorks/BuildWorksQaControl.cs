@@ -24,9 +24,14 @@ namespace OstrixMods.BuildWorks
             public int frame, width, height;
             public bool focused, ready, inventoryVisible;
             public Vector3 position, cameraPosition, cameraEuler;
+            public BuildWorksQaUiTargets.Entry[] uiTargets;
+            public bool uiTargetsTruncated;
         }
 
         private readonly BuildWorksQaInput input = new BuildWorksQaInput();
+        private readonly BuildWorksQaUiTargets uiTargets = new BuildWorksQaUiTargets();
+        private BuildWorksQaUiTargets.Target uiTarget;
+        private bool uiReleased;
         private string directory, nonce;
         private long lastId, stopRevision;
         private float nextPoll, started, stepStarted;
@@ -126,6 +131,10 @@ namespace OstrixMods.BuildWorks
                 }
                 player = BuildWorksTestIsolation.RequireLoadedSession(); network = ZNet.instance;
                 if (!SafeSession()) throw new InvalidOperationException("Game must be focused in the isolated living QA session.");
+                uiTarget = request.steps[0].uiTarget == null ? null : uiTargets.Resolve(request.steps[0].uiTarget);
+                uiReleased = false;
+                if (uiTarget != null && request.steps[0].pointer)
+                { request.steps[0].x = uiTarget.entry.x; request.steps[0].y = uiTarget.entry.y; }
                 running = request; started = stepStarted = Time.realtimeSinceStartup; stepIndex = 0; stepFrame = releaseFrame = -1; stepFinished = false;
                 pointerStart = UnityEngine.Input.mousePosition;
                 input.Begin(gameObject);
@@ -161,6 +170,7 @@ namespace OstrixMods.BuildWorks
                     Finish(complete, "completed", "Input sequence finished; inspect the resulting state and screenshot."); return;
                 }
                 var step = running.steps[stepIndex];
+                if (uiTarget != null && !uiReleased) uiTargets.Require(uiTarget);
                 float elapsed = Time.realtimeSinceStartup - stepStarted;
                 if (elapsed * 1000 >= step.milliseconds && stepFrame >= 0 && Time.frameCount > stepFrame)
                 {
@@ -187,10 +197,15 @@ namespace OstrixMods.BuildWorks
                     if (step.pointer && (step.scroll != 0 || step.buttons != 0 &&
                         !BuildWorksQaInput.GetMouseButton(0) && !BuildWorksQaInput.GetMouseButton(1) && !BuildWorksQaInput.GetMouseButton(2)))
                         pointerStart = new Vector2(step.x * (Screen.width - 1), step.y * (Screen.height - 1));
-                    if (step.text != null) SetFocusedText(step.text);
+                    if (step.text != null)
+                    {
+                        if (uiTarget != null) uiTargets.RequireFocused(uiTarget);
+                        SetFocusedText(step.text);
+                    }
                 }
                 input.Feed(step, first, pointerStart, Mathf.Clamp01(elapsed * 1000 / step.milliseconds), Mathf.Min(Time.unscaledDeltaTime, 0.1f));
                 SubmitFocusedText(step, first);
+                if (uiTarget != null && first && (stepIndex == 1 || step.text != null)) uiReleased = true;
             }
             catch (Exception error) { Stop(error.GetBaseException().Message); }
         }
@@ -277,6 +292,8 @@ namespace OstrixMods.BuildWorks
                     reply.placementContact = BuildWorksTestPlacementDiagnostics.DescribeLastContact();
                     reply.placementStatus = Player.m_localPlayer.GetPlacementStatus().ToString();
                     reply.inventory = BuildWorksTestPlacementDiagnostics.DescribeInventory(Player.m_localPlayer);
+                    reply.uiTargets = uiTargets.Observe();
+                    reply.uiTargetsTruncated = uiTargets.Truncated;
                 }
                 catch (Exception error) { reply.inventory = "QA observation unavailable: " + error.GetType().Name; }
             }
@@ -288,6 +305,8 @@ namespace OstrixMods.BuildWorks
             // A local model may still be thinking when F12 or focus loss stops the host.
             ++stopRevision;
             var interrupted = running; long interruptedId = interrupted?.id ?? captureId; running = null;
+            uiTarget = null; uiReleased = false;
+            uiTargets.Clear();
             bool hadInput = BuildWorksQaInput.Active;
             try { if (hadInput) BuildWorksPlugin.AbortQaControlInput(); }
             catch (Exception error) { Debug.LogError("BuildWorks QA gesture cancellation failed: " + error.Message); }

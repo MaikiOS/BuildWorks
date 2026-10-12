@@ -38,6 +38,7 @@ namespace OstrixMods.BuildWorks
             [DataMember] public float lookY;
             [DataMember] public float scroll;
             [DataMember] public string text;
+            [DataMember] public string uiTarget;
         }
 
 #pragma warning restore CS0649
@@ -78,6 +79,19 @@ namespace OstrixMods.BuildWorks
                 duration += step.milliseconds;
             }
             if (duration > 10000) throw new InvalidDataException("QA batch exceeds 10 seconds.");
+            if (request.steps.Any(step => step.uiTarget != null))
+            {
+                var first = request.steps[0];
+                var release = request.steps.Length == 2 ? request.steps[1] : null;
+                bool click = first.pointer && first.buttons == 1 && first.text == null && (first.keys == null || first.keys.Length == 0);
+                bool text = !first.pointer && first.buttons == 0 && first.text != null &&
+                    (first.keys == null || first.keys.Length == 0 || first.keys.Length == 1 && first.keys[0] == "Return");
+                if (first.uiTarget == null || first.uiTarget.Length != 32 || first.uiTarget.Any(c => !Uri.IsHexDigit(c)) ||
+                    !request.stopRevision.HasValue || (!click && !text) || first.lookX != 0 || first.lookY != 0 || first.scroll != 0 ||
+                    release == null || release.uiTarget != null || release.pointer || release.buttons != 0 || release.text != null ||
+                    release.lookX != 0 || release.lookY != 0 || release.scroll != 0 || release.keys != null && release.keys.Length != 0)
+                    throw new InvalidDataException("Guarded QA UI input needs one target click/text and one neutral release with stopRevision.");
+            }
             return request;
         }
 

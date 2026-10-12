@@ -87,12 +87,21 @@ try {
         Require-NativeInput $game $utils
         'PASS native host input contract: PlayerController movement/camera -> ZInput -> enabled InputSystem mouse/actions/current devices; broken-binding negative control rejected. Static evidence only.'
     } finally { if ($game) { $game.Dispose() }; if ($utils) { $utils.Dispose() } }
-    foreach ($name in 'BuildWorksQaControl','BuildWorksQaControlProtocol','BuildWorksQaInput','BuildWorksQaUiInput','BuildWorksQaUiCancellation','BuildWorksQaFilePublisher','BuildWorksTestPlacementDiagnostics') {
+    foreach ($name in 'BuildWorksQaControl','BuildWorksQaControlProtocol','BuildWorksQaInput','BuildWorksQaUiInput','BuildWorksQaUiCancellation','BuildWorksQaFilePublisher','BuildWorksQaUiTargets','BuildWorksTestPlacementDiagnostics') {
         Require ($null -eq $normal.MainModule.GetType("OstrixMods.BuildWorks.$name")) "QA type leaked into normal build: $name"
         Require ($null -ne $qa.MainModule.GetType("OstrixMods.BuildWorks.$name")) "QA type absent: $name"
     }
     Require (@($normal.MainModule.AssemblyReferences | Where-Object Name -eq 'Unity.InputSystem').Count -eq 0) 'QA InputSystem dependency leaked into normal build.'
     $control = $qa.MainModule.GetType('OstrixMods.BuildWorks.BuildWorksQaControl')
+    $afterInput = Calls $control 'AfterInput'
+    Require ($afterInput -match 'BuildWorksQaUiTargets::Require\(' -and
+        $afterInput -match 'BuildWorksQaUiTargets::RequireFocused' -and
+        (Calls $control 'Update') -match 'BuildWorksQaUiTargets::Resolve' -and
+        (Calls $control 'Respond') -match 'BuildWorksQaUiTargets::Observe' -and
+        (Calls $control 'Stop') -match 'BuildWorksQaUiTargets::Clear') 'UI observer/dispatch/focus/held-input/stop guard disconnected.'
+    $uiTargets = $qa.MainModule.GetType('OstrixMods.BuildWorks.BuildWorksQaUiTargets')
+    Require ((Calls $uiTargets 'Hit') -match 'EventSystem::RaycastAll' -and
+        (Calls $uiTargets 'Describe') -match 'RectTransform::GetWorldCorners') 'UI targets bypass native raycast/geometry.'
     Require ((Calls $control 'AfterInput') -match 'BuildWorksQaControl::SubmitFocusedText') 'QA Return does not reach the text-submit bridge.'
     Require ((Calls $control 'SubmitFocusedText') -match 'ExecuteEvents::Execute' -and
         (Calls $control 'SubmitFocusedText') -match 'get_sendNavigationEvents') 'QA text submit bypasses native UI or its duplicate-submit guard.'

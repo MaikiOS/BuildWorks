@@ -27,6 +27,20 @@ internal static class Program
             throw new Exception("Stop revision was not retained."); ++checks;
         Reject(guarded); // Model decision predates an emergency stop, including an idle F12.
         Reject(batch.Replace("\"action\":", "\"stopRevision\":-1,\"action\":"));
+        string ui = Header + "\"action\":\"batch\",\"stopRevision\":0,\"steps\":[{\"milliseconds\":100,\"uiTarget\":\"0123456789abcdef0123456789abcdef\",\"pointer\":true,\"buttons\":1},{\"milliseconds\":300}]}";
+        if (Read(ui).steps[0].uiTarget.Length != 32) throw new Exception("UI target lost."); ++checks;
+        string text = ui.Replace("\"pointer\":true,\"buttons\":1", "\"text\":\"QA copy\",\"keys\":[\"Return\"]");
+        if (Read(text).steps[0].text != "QA copy") throw new Exception("Guarded text lost."); ++checks;
+        Reject(ui.Replace("\"stopRevision\":0,", ""));
+        Reject(ui.Replace("0123456789abcdef0123456789abcdef", "bad"));
+        Reject(ui.Replace("0123456789abcdef0123456789abcdef", "g123456789abcdef0123456789abcdef"));
+        Reject(ui.Replace("\"buttons\":1", "\"buttons\":2"));
+        Reject(ui.Replace("\"buttons\":1", "\"buttons\":1,\"keys\":[\"E\"]"));
+        Reject(ui.Replace("\"buttons\":1", "\"buttons\":1,\"lookX\":1"));
+        Reject(ui.Replace("{\"milliseconds\":300}", "{\"milliseconds\":300,\"buttons\":1}"));
+        Reject(ui.Replace("{\"milliseconds\":300}", "{\"milliseconds\":300,\"text\":\"extra\"}"));
+        Reject(ui.Replace("{\"milliseconds\":300}", "{\"milliseconds\":300,\"uiTarget\":\"0123456789abcdef0123456789abcdef\"}"));
+        Reject(text.Replace("Return", "E"));
         var timed = Read(batch);
         if (!BuildWorksQaControlProtocol.CanContinue(timed, 1500, 500)) throw new Exception("Valid held input stopped early."); ++checks;
         foreach (var clock in new[] { Tuple.Create(2001L, 0d), Tuple.Create(2001L, 500d), Tuple.Create(2001L, 1000d), Tuple.Create(1500L, 10000d), Tuple.Create(1500L, -1d) })
@@ -48,5 +62,6 @@ internal static class Program
         Reject(Header + "\"action\":\"batch\",\"steps\":[" + string.Join(",", steps, 0, 6) + "]}");
         Console.WriteLine("PASS QA control protocol: " + checks + " assertions (state/batch, identity/replay/expiry, malformed/size/action/step/key/path/duration bounds). Not a game-input execution test.");
         FilePublisherChecks.Run();
+        UiTargetsChecks.Run();
     }
 }

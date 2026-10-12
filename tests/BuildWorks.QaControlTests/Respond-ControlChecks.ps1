@@ -44,11 +44,25 @@ public class ZNet : UnityEngine.Object {
     public World world = new World();
     public World GetWorld() { RequireAlive(); return world; }
 }
-public class Player : UnityEngine.Object { public static Player m_localPlayer; public Transform transform = new Transform(); }
+public class Player : UnityEngine.Object { public static Player m_localPlayer; public Transform transform = new Transform(); public string GetPlacementStatus() => "Valid"; }
+public static class InventoryGui { public static bool IsVisible() => false; }
+public static class BuildWorksTestPlacementDiagnostics {
+    public static string DescribeLastSnap() => "snap";
+    public static string DescribeLastContact() => "contact";
+    public static string DescribeInventory(Player player) => "inventory";
+}
+public class BuildWorksQaUiTargets {
+    public class Entry { public string id; }
+    public bool Truncated => true;
+    public Entry[] Observe() => new[] { new Entry { id = "target" } };
+}
 public class QaReplyHarness {
     private string nonce = "0123456789abcdef0123456789abcdef";
+    private long stopRevision = 7;
+    private bool ready;
+    private readonly BuildWorksQaUiTargets uiTargets = new BuildWorksQaUiTargets();
     private int publications;
-    private bool SafeSession() { return false; }
+    private bool SafeSession() { return ready; }
     private void Publish(string path, byte[] bytes) { if (path != "response.json") throw new Exception("Wrong path."); ++publications; }
 __REPLY__
 __METHOD__
@@ -61,6 +75,13 @@ __METHOD__
         var module = new UnityEngine.Object();
         EventSystem.current.selected = selected; EventSystem.current.module = module;
         int count = 0;
+        host.ready = true;
+        host.Respond(320, "completed", "UI observation");
+        var observed = (Reply)JsonUtility.Last;
+        Require(observed.ready && observed.stopRevision == 7 && observed.uiTargets.Length == 1 &&
+            observed.uiTargets[0].id == "target" && observed.uiTargetsTruncated && observed.inventory == "inventory",
+            "UI targets not carried by actual Respond."); ++count;
+        host.ready = false;
         foreach (string status in new[] { "running", "completed", "aborted", "rejected", "uncertain" }) {
             host.Respond(321, status, "observed", "screenshot.png");
             var result = (Reply)JsonUtility.Last;

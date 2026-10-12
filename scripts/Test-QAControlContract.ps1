@@ -93,6 +93,9 @@ try {
     }
     Require (@($normal.MainModule.AssemblyReferences | Where-Object Name -eq 'Unity.InputSystem').Count -eq 0) 'QA InputSystem dependency leaked into normal build.'
     $control = $qa.MainModule.GetType('OstrixMods.BuildWorks.BuildWorksQaControl')
+    Require ((Calls $control 'AfterInput') -match 'BuildWorksQaControl::SubmitFocusedText') 'QA Return does not reach the text-submit bridge.'
+    Require ((Calls $control 'SubmitFocusedText') -match 'ExecuteEvents::Execute' -and
+        (Calls $control 'SubmitFocusedText') -match 'get_sendNavigationEvents') 'QA text submit bypasses native UI or its duplicate-submit guard.'
     $inputType = $qa.MainModule.GetType('OstrixMods.BuildWorks.BuildWorksQaInput')
     $publisher = $qa.MainModule.GetType('OstrixMods.BuildWorks.BuildWorksQaFilePublisher')
     $observations = $qa.MainModule.GetType('OstrixMods.BuildWorks.BuildWorksTestPlacementDiagnostics')

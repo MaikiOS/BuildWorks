@@ -1,3 +1,13 @@
+## 2026-10-12 — QA .165: native text-field submission
+
+.164 console reproduces missing Submit; teleport/protection are not confirmed.
+QA-only native submit fix:14 cases + disconnected-callback negative control,
+normal/QA0/0, Host/control/isolation/localization989/Python4, independent PASSED/Ship.
+After owner exit, guarded .165 deployment verifies both SHA and158 unchanged files.
+Next: console/ghost/god/goto runtime, then camera/movement.
+[Evidence](QA_TEXT_SUBMIT_165_RU.md); proposed goal section10 is in
+[GOAL_LOCAL_QA_AGENT_RU.md](GOAL_LOCAL_QA_AGENT_RU.md), not an API goal change.
+
 ## 2026-10-12 — local native UI loop verified in game
 
 Two inventory series pass (11.890/9.282s including model load). Stop.flag during

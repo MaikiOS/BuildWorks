@@ -190,8 +190,21 @@ namespace OstrixMods.BuildWorks
                     if (step.text != null) SetFocusedText(step.text);
                 }
                 input.Feed(step, first, pointerStart, Mathf.Clamp01(elapsed * 1000 / step.milliseconds), Mathf.Min(Time.unscaledDeltaTime, 0.1f));
+                SubmitFocusedText(step, first);
             }
             catch (Exception error) { Stop(error.GetBaseException().Message); }
+        }
+
+        private static void SubmitFocusedText(BuildWorksQaControlProtocol.Step step, bool first)
+        {
+            var events = EventSystem.current;
+            if (!first || Array.IndexOf(step.keys ?? Array.Empty<string>(), "Return") < 0 || !events || events.sendNavigationEvents) return;
+            GameObject selected = events.currentSelectedGameObject;
+            var field = selected ? selected.GetComponent<TMP_InputField>() : null;
+            if (!field || !field.isActiveAndEnabled || !field.isFocused || !field.interactable || field.readOnly ||
+                field.lineType == TMP_InputField.LineType.MultiLineNewline) return;
+            // GuiInputField disables navigation; virtual keys do not populate TMP's legacy Event.PopEvent queue.
+            ExecuteEvents.Execute(selected, new BaseEventData(events), ExecuteEvents.submitHandler);
         }
 
         private static void SetFocusedText(string text)

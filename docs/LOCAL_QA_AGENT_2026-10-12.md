@@ -1,5 +1,8 @@
 # Local QA agent — first pilot, 2026-10-12
 
+Update: two native UI series passed and stop.flag during inference prevented input.
+[Runtime evidence](LOCAL_QA_RUNTIME_2026-10-12.md). Preparation history follows.
+
 Ostrix clarified that the supplied review meant continuing local game-control
 preparation. Qwen3.5:4b and LiquidAI LFM2.5-VL-3B Q4_K_M were downloaded into
 existing Ollama. Qwen3.5 is selected for the bounded pilot. QA .164 installed,

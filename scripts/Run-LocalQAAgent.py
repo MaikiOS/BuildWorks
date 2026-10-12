@@ -64,7 +64,8 @@ def guard(state, nonce, revision, world, baseline):
         raise ValueError("Unknown QA UI module")
     if not isinstance(state.get("inventory"), str) or "unavailable" in state["inventory"]:
         raise ValueError("Native inventory observation is unavailable")
-    if state["inventory"] != baseline["inventory"]:
+    # The native diagnostic prefixes each snapshot with its changing capture frame.
+    if re.sub(r"^frame=[0-9]+ ", "", state["inventory"]) != re.sub(r"^frame=[0-9]+ ", "", baseline["inventory"]):
         raise ValueError("Inventory changed during the UI-only pilot")
     for position in (state.get("position"), baseline.get("position")):
         if not isinstance(position, dict) or any(type(position.get(axis)) not in (int, float) or
@@ -158,6 +159,7 @@ def run(model):
             alive()
             guard(current, nonce, revision, world, baseline)
             before_model = time.monotonic()
+            event("model_started", {"target": target})
             result = choose(model, image, current["inventoryVisible"], target)
             event("model", {"response": result, "seconds": time.monotonic() - before_model, "target": target})
             alive()
@@ -263,6 +265,11 @@ def self_test():
                      "position": {"x": 0, "y": 0, "z": 0},
                      "uiModule": "UnityEngine.EventSystems.StandaloneInputModule"}
             guard(state, "n", 7, "w", state)
+            with_frame = dict(state, inventory="frame=100 stacks=0")
+            guard(dict(with_frame, inventory="frame=101 stacks=0"), "n", 7, "w", with_frame)
+            for changed_inventory in ("frame=101 stacks=1\n0:Wood#123 count=1", "frame=101 stacks=0\nchanged"):
+                with self.assertRaises(ValueError):
+                    guard(dict(with_frame, inventory=changed_inventory), "n", 7, "w", with_frame)
             for changed in ({"stopRevision": 8}, {"nonce": "new"}, {"focused": False},
                             {"ready": False}, {"inventory": "changed"}, {"world": "main"},
                             {"status": "uncertain"}, {"uiModule": "Unknown"}, {"stopRevision": None},
@@ -313,6 +320,8 @@ def self_test():
                         calls.append("stop" if stop else action)
                         if stop:
                             return {"stop_requested": True}
+                        state["id"] += 1
+                        state["inventory"] = f"frame={state['id']} stacks=0"
                         if fault == "stopped" and after_model:
                             return dict(state, stopRevision=8)
                         if action == "batch":

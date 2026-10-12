@@ -1,3 +1,10 @@
+## 2026-10-12 — local native UI loop verified in game
+
+Two inventory series pass (11.890/9.282s including model load). Stop.flag during
+inference prevents batch; physical F12 still untested. Frame-only native summary
+comparison fixed, CPU4 pass. Player at spawn, empty inventory, no reissue/DLL change.
+Look/move/hammer/build/reload/network open. [Protocol](LOCAL_QA_RUNTIME_2026-10-12.md).
+
 ## 2026-10-12 — local pilot / installed QA .164
 
 Qwen3.5 4B/LFM3B downloaded. Pure vision2/6,2/6,0/6 not accepted; command

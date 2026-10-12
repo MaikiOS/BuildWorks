@@ -5,6 +5,7 @@ public class Container : MonoBehaviour
 {
     private ZNetView m_nview;
     public readonly Inventory Inventory = new Inventory();
+    public int m_width = 5, m_height = 2;
     public bool Denied, Busy, m_autoDestroyEmpty, m_checkGuardStone;
     public Vagon m_wagon;
     public DropTable m_defaultItems = new DropTable();

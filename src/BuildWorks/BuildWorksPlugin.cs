@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.159";
+        internal const string PluginVersion = "0.19.160";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -624,7 +624,14 @@ namespace OstrixMods.BuildWorks
                 int mask = (int)(water ? PlacementWaterRayMaskField : PlacementRayMaskField).GetValue(player);
                 float maximumDistance = (float)MaximumPlaceDistanceField.GetValue(player) + source.m_extraPlacementDistance;
                 if (!BuildWorksPlacementValidation.TryFindContact(ghost, bounds, mask,
-                    player.GetEyePoint(), maximumDistance, sides, out RaycastHit contact)) return false;
+                    player.GetEyePoint(), maximumDistance, sides, out RaycastHit contact))
+                {
+#if BUILDWORKS_TEST_STAND
+                    Debug.LogWarning(BuildWorksTestPlacementDiagnostics.Describe(ghost, bounds, mask,
+                        player.GetEyePoint(), maximumDistance, sides, nativeHit));
+#endif
+                    return false;
+                }
                 point = contact.point;
                 normal = contact.normal;
                 hitPiece = contact.collider.GetComponentInParent<Piece>();

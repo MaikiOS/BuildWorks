@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string] $UnityPath = 'C:\Program Files\Unity\Hub\Editor\6000.0.61f1\Editor\Unity.exe',
-    [string] $ProjectPath = ''
+    [string] $ProjectPath = '',
+    [switch] $ContactOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -19,12 +20,13 @@ if (-not (Test-Path -LiteralPath (Join-Path $ProjectPath 'ProjectSettings\Projec
 $geometryProject = Join-Path $repositoryRoot 'src\BuildWorks.Geometry\BuildWorks.Geometry.csproj'
 $geometryDll = Join-Path $repositoryRoot 'src\BuildWorks.Geometry\bin\Release\netstandard2.0\BuildWorks.Geometry.dll'
 $pluginsPath = Join-Path $projectPath 'Assets\Plugins'
-$logPath = Join-Path $repositoryRoot 'artifacts\unity-workbench-capture.log'
+$logPath = Join-Path $repositoryRoot $(if ($ContactOnly) { 'artifacts\placement-contact\unity.log' } else { 'artifacts\unity-workbench-capture.log' })
 $outputPath = Join-Path $repositoryRoot 'artifacts\ui-workbench'
 $startedAt = [DateTime]::UtcNow
-$statusPath = Join-Path $repositoryRoot 'artifacts\ui-runtime\verification-status.json'
+$statusPath = Join-Path $repositoryRoot $(if ($ContactOnly) { 'artifacts\placement-contact\verification-status.json' } else { 'artifacts\ui-runtime\verification-status.json' })
 New-Item -ItemType Directory -Path (Split-Path -Parent $statusPath) -Force | Out-Null
-@{ status = 'running_runtime_workbench'; startedAtUtc = $startedAt.ToString('o'); gameHostTested = $false } |
+$runningStatus = if ($ContactOnly) { 'running_placement_contact' } else { 'running_runtime_workbench' }
+@{ status = $runningStatus; startedAtUtc = $startedAt.ToString('o'); gameHostTested = $false } |
     ConvertTo-Json | Set-Content -LiteralPath $statusPath
 $requiredVersion = '6000.0.61f1'
 
@@ -58,8 +60,8 @@ $runtimeSources = Join-Path $projectPath 'Assets\Editor\RuntimeSources'
 New-Item -ItemType Directory -Path $runtimeSources -Force | Out-Null
 $runtimeFiles = @('BuildWorksQaUiCancellation.cs', 'NativePlacementMaterialPreview.cs', 'BlueprintMaterialVariation.cs', 'BlueprintEditorView.cs', 'BlueprintEditorCatalogView.cs', 'BlueprintEditorSkin.cs', 'BlueprintEditorInput.cs', 'BlueprintEditorController.cs',
     'BlueprintEditorScene.cs', 'BlueprintEditorMeshData.cs', 'BlueprintEditorIconLibrary.cs',
-    'TransformGizmoView.cs', 'PlacementGhostPreviewView.cs', 'BlueprintBatchedPreview.cs', 'BlueprintWorldSnapPoints.cs', 'BlueprintItemStandPreview.cs', 'BlueprintItemStandCapture.cs', 'BlueprintItemStandPlacement.cs', 'BlueprintStorageCapture.cs', 'BlueprintThumbnailRenderer.cs', 'BlueprintPlacementFrame.cs', 'BlueprintHammerSnapSearch.cs', 'CompositeBlueprintStore.cs', 'BlueprintPrefabMetadataCapture.cs', 'ExternalBlueprintLibrary.cs', 'BlueprintExchangeFormat.cs',
-    'PrecisionPlacementHudView.cs', 'WorldSelectionHud.cs', 'BlueprintResourceHudView.cs', 'WorldSelectionHighlight.cs', 'BuildWorksPlacementValidation.cs', 'BlueprintSignText.cs', 'BlueprintExchangeView.cs', 'PlanBuildExport.cs', 'VanillaMidpointSnapPoints.cs')
+    'TransformGizmoView.cs', 'PlacementGhostPreviewView.cs', 'BlueprintBatchedPreview.cs', 'BlueprintWorldSnapPoints.cs', 'BlueprintItemStandPreview.cs', 'BlueprintItemStandCapture.cs', 'BlueprintItemStandPlacement.cs', 'BlueprintStorageCapture.cs', 'BlueprintMaterialState.cs', 'BlueprintThumbnailRenderer.cs', 'BlueprintPlacementFrame.cs', 'BlueprintHammerSnapSearch.cs', 'CompositeBlueprintStore.cs', 'BlueprintPrefabMetadataCapture.cs', 'ExternalBlueprintLibrary.cs', 'BlueprintExchangeFormat.cs',
+    'PrecisionPlacementHudView.cs', 'WorldSelectionHud.cs', 'BlueprintResourceHudView.cs', 'WorldSelectionHighlight.cs', 'BuildWorksPlacementValidation.cs', 'BuildWorksTestPlacementDiagnostics.cs', 'BlueprintSignText.cs', 'BlueprintExchangeView.cs', 'PlanBuildExport.cs', 'VanillaMidpointSnapPoints.cs')
 $sourceProof = foreach ($name in $runtimeFiles) {
     $source = Join-Path $repositoryRoot ('src\BuildWorks\' + $name)
     $destination = Join-Path $runtimeSources $name
@@ -82,12 +84,13 @@ $iconDestination = Join-Path $projectPath 'Assets\Resources\BuildWorks\Icons'
 New-Item -ItemType Directory -Path $iconDestination -Force | Out-Null
 Get-ChildItem -LiteralPath (Join-Path $repositoryRoot 'src\BuildWorks\Assets\BlueprintEditorIcons') -Filter '*.png' |
     Copy-Item -Destination $iconDestination -Force
-New-Item -ItemType Directory -Path (Join-Path $repositoryRoot 'artifacts\ui-runtime') -Force | Out-Null
-$sourceProof | Set-Content -LiteralPath (Join-Path $repositoryRoot 'artifacts\ui-runtime\source-sha256.txt')
+$sourceProof | Set-Content -LiteralPath (Join-Path (Split-Path -Parent $statusPath) 'source-sha256.txt')
 
 New-Item -ItemType Directory -Path (Split-Path -Parent $logPath) -Force | Out-Null
-$arguments = "-batchmode -projectPath `"$projectPath`" " +
-    "-executeMethod RuntimeEditorAcceptance.CaptureAll -logFile `"$logPath`""
+$method = if ($ContactOnly) { 'PlacementContactAcceptance.Verify' } else { 'RuntimeEditorAcceptance.CaptureAll' }
+$graphics = if ($ContactOnly) { '-nographics ' } else { '' }
+$arguments = "-batchmode $graphics-projectPath `"$projectPath`" " +
+    "-executeMethod $method -logFile `"$logPath`""
 $process = Start-Process -FilePath $UnityPath -ArgumentList $arguments `
     -WindowStyle Hidden -PassThru
 while (-not $process.WaitForExit(1000)) {
@@ -98,14 +101,24 @@ while (-not $process.WaitForExit(1000)) {
 }
 if ($process.ExitCode -ne 0) {
     $existingStatus = Get-Content -LiteralPath $statusPath -Raw | ConvertFrom-Json
-    if ($existingStatus.status -eq 'running_runtime_workbench') {
-        @{ status = 'failed_runtime_workbench'; completedAtUtc = [DateTime]::UtcNow.ToString('o'); logPath = $logPath; gameHostTested = $false } |
+    if ($existingStatus.status -eq $runningStatus) {
+        @{ status = $(if ($ContactOnly) { 'failed_placement_contact' } else { 'failed_runtime_workbench' }); completedAtUtc = [DateTime]::UtcNow.ToString('o'); logPath = $logPath; gameHostTested = $false } |
             ConvertTo-Json | Set-Content -LiteralPath $statusPath
     }
     if (Test-Path -LiteralPath $logPath -PathType Leaf) {
         Get-Content -LiteralPath $logPath -Tail 120
     }
     throw "Unity UI Workbench failed with exit code $($process.ExitCode)"
+}
+
+if ($ContactOnly) {
+    if (-not (Select-String -LiteralPath $logPath -SimpleMatch 'BUILDWORKS_CONTACT_OK' -Quiet)) {
+        throw "Unity placement contact success marker is missing: $logPath"
+    }
+    @{ status = 'passed_placement_contact'; completedAtUtc = [DateTime]::UtcNow.ToString('o'); logPath = $logPath; gameHostTested = $false } |
+        ConvertTo-Json | Set-Content -LiteralPath $statusPath
+    Write-Host 'BuildWorks placement contact: Physics and diagnostic observation OK; Valheim not tested.'
+    return
 }
 
 $outputPath = Join-Path $repositoryRoot 'artifacts\ui-runtime'

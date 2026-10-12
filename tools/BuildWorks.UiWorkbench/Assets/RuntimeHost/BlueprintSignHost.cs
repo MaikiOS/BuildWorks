@@ -4,6 +4,8 @@ using UnityEngine;
 
 public sealed class ZNetView : MonoBehaviour
 {
+    public static bool m_useInitZDO;
+    public static ZDO m_initZDO;
     public bool Valid = true;
     public bool Owner = true;
     private readonly ZDO data = new ZDO();
@@ -13,6 +15,7 @@ public sealed class ZNetView : MonoBehaviour
 }
 public sealed class ZDO
 {
+    public ZDOID m_uid;
     public int Writes;
     public System.Action<int> AfterRead;
     public uint DataRevision => (uint)Writes;
@@ -34,6 +37,17 @@ public sealed class ZDO
     }
     public void Set(int key, int value) { ++Writes; integers[key] = value; }
     public void Set(int key, byte[] value) { ++Writes; bytes[key] = value; }
+}
+// Inert identity comparison only; no native user mapping, allocation or persistence.
+public struct ZDOID
+{
+    public ushort UserKey;
+    public uint ID;
+    public bool IsNone() => UserKey == 0 && ID == 0;
+    public static bool operator ==(ZDOID left, ZDOID right) => left.UserKey == right.UserKey && left.ID == right.ID;
+    public static bool operator !=(ZDOID left, ZDOID right) => !(left == right);
+    public override bool Equals(object other) => other is ZDOID value && this == value;
+    public override int GetHashCode() => UserKey.GetHashCode() ^ ID.GetHashCode();
 }
 public static class ZDOVars
 {

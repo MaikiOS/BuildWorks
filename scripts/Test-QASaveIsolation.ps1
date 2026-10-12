@@ -36,6 +36,18 @@ $normal = [Mono.Cecil.AssemblyDefinition]::ReadAssembly($normalPath)
 $typeName = 'OstrixMods.BuildWorks.BuildWorksTestIsolation'
 $type = $qa.MainModule.GetType($typeName)
 Require ($null -ne $type -and $null -eq $normal.MainModule.GetType($typeName)) 'QA isolation leaked into normal assembly or is missing from the QA build.'
+$diagnosticName = 'OstrixMods.BuildWorks.BuildWorksTestPlacementDiagnostics'
+$diagnostic = $qa.MainModule.GetType($diagnosticName)
+Require ($null -ne $diagnostic -and $null -eq $normal.MainModule.GetType($diagnosticName)) 'Contact diagnostics must exist only in QA.'
+$diagnosticMethod = $diagnostic.Methods | Where-Object Name -eq 'Describe'
+$diagnosticCalls = @($diagnosticMethod.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Require ($diagnosticCalls -match 'BuildWorksPlacementValidation::BuildProbe' -and
+    $diagnosticCalls -match 'Physics::RaycastNonAlloc' -and
+    $diagnosticCalls -notmatch 'SyncTransforms|::set_|::SetPosition|::TryPlace|::DropItem|::RemoveItem') 'Contact diagnostics must observe without moving, syncing physics, placing or transferring items.'
+$qaContact = $qa.MainModule.GetType('OstrixMods.BuildWorks.BuildWorksPlugin').Methods | Where-Object Name -eq 'ApplyBlueprintValidationContact'
+$normalContact = $normal.MainModule.GetType('OstrixMods.BuildWorks.BuildWorksPlugin').Methods | Where-Object Name -eq 'ApplyBlueprintValidationContact'
+Require ([bool]($qaContact.Body.Instructions | Where-Object { [string]$_.Operand -match 'BuildWorksTestPlacementDiagnostics::Describe' }) -and
+    -not [bool]($normalContact.Body.Instructions | Where-Object { [string]$_.Operand -match 'BuildWorksTestPlacementDiagnostics' })) 'QA contact diagnostic hook is missing or leaked into normal placement.'
 $editor = $qa.MainModule.GetType('OstrixMods.BuildWorks.BlueprintEditorController')
 $editorCalls = @(($editor.Methods | Where-Object Name -eq 'Open').Body.Instructions |
     ForEach-Object { [string]$_.Operand }) -join "`n"

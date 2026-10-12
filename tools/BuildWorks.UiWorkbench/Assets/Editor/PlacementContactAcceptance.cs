@@ -6,6 +6,20 @@ using Object = UnityEngine.Object;
 
 internal static class PlacementContactAcceptance
 {
+    public static void Verify()
+    {
+        try
+        {
+            Debug.Log("BUILDWORKS_CONTACT_OK " + Run());
+            UnityEditor.EditorApplication.Exit(0);
+        }
+        catch (Exception error)
+        {
+            Debug.LogException(error);
+            UnityEditor.EditorApplication.Exit(1);
+        }
+    }
+
     internal static string Run()
     {
         var owned = new List<GameObject>();
@@ -40,6 +54,21 @@ internal static class PlacementContactAcceptance
                 Mathf.Abs(hit.point.y) < .0001f, "Floor contact/normal is not under the frozen part");
             Require(!Contact(ghost, PlacementContactSides.Below, out _, origin + Vector3.up * 100, 5),
                 "Contact bypasses native eye distance");
+            ghost.transform.position += Vector3.up * .07f;
+            Require(!Contact(ghost, PlacementContactSides.Below, out _, eye), "Seven-centimetre fixture gap accepted");
+            Require(BuildWorksPlacementValidation.TryGetBounds(ghost, out Bounds gapBounds), "Missing gap bounds");
+            Vector3 beforeDiagnostic = ghost.transform.position;
+            string diagnosis = BuildWorksTestPlacementDiagnostics.Describe(ghost, gapBounds, 1, eye, 5,
+                PlacementContactSides.Below, false);
+            int gapStart = diagnosis.IndexOf(" gap=", StringComparison.Ordinal) + 5;
+            int gapEnd = diagnosis.IndexOf(' ', gapStart);
+            Require(gapStart >= 5 && gapEnd > gapStart &&
+                float.TryParse(diagnosis.Substring(gapStart, gapEnd - gapStart),
+                    System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float measuredGap) &&
+                Mathf.Abs(measuredGap - .07f) < .001f && diagnosis.Contains("collider=ContactFloor") &&
+                ghost.transform.position == beforeDiagnostic &&
+                !Contact(ghost, PlacementContactSides.Below, out _, eye),
+                "Diagnostic failed to observe actual floor gap or changed the placement decision");
             ghost.transform.position = origin + Vector3.up * 3;
             Require(!Contact(ghost, PlacementContactSides.Below, out _, eye),
                 "Unsupported part guesses the distant ground as contact");

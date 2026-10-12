@@ -10,6 +10,13 @@ After exit: guarded .163 install, same world, persisted4 objects/balance,
 nearby/direct snap. Contents/attributes/cancellation/network remain open.
 [Evidence](PASSIVE_SNAP_163_2026-10-12.md).
 
+While the live process awaits exit, F05/F06 corpus inventory was verified:
+562 files in two unchanged archives, exact member SHA/name/creator manifests;
+493 files declare creators,69 `.vbuild` files have no creator header.
+DvergrLibrary is an empty directory, not a third tested corpus. Redistribution
+permission remains unconfirmed and Thunderstore pages could not be fetched.
+No gameplay or binary changed. [Corpus register](EXTERNAL_CORPUS_REGISTER.md).
+
 ## 2026-10-12 — .162 deployed; snap and complete fixture24 remain open
 
 The live session really loaded .161: stale .160 came from PluginVersion;

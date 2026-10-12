@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <LangVersion>latest</LangVersion>
+    <ValheimManagedDir Condition="'$(ValheimManagedDir)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed</ValheimManagedDir>
+    <ContactSourcePath Condition="'$(ContactSourcePath)' == ''">../../artifacts/placement-contact-cpu/BuildWorksPlacementValidation.cs</ContactSourcePath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(ContactSourcePath)" Link="BuildWorksPlacementValidation.cs" />
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(ValheimManagedDir)/UnityEngine.CoreModule.dll</HintPath></Reference>
+    <Reference Include="System.Numerics" />
+  </ItemGroup>
+</Project>

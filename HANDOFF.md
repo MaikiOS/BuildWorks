@@ -1,3 +1,15 @@
+## 2026-10-12 — .161 source contact correction; runtime pending
+
+Per-collider Box/Mesh contact, WearNTear support envelope and directional ray
+boundary replace renderer-only contact for supported shapes. Thin penetration
+and mixed collider regressions were reproduced and fixed. CPU62, normal/QA0/0,
+Host/loc989/isolation and independent source review PASSED. Real Physics fixture
+compiled offline only; not executed. Installed QA remains .160. No deployment,
+Valheim/Unity/GPU launch while Ostrix works in Nuke. Next: ContactOnly Physics,
+then guarded QA deployment, full24/costs/cancel/reload. Full goal remains active.
+[Source evidence and pending gates](docs/COLLIDER_CONTACT_161_2026-10-12.md).
+Earlier entries below are history; no repeat of the .160 diagnostic is required.
+
 ## 2026-10-12 — .160 native: refusal measured, visible refund verified
 
 One TEST24 attempt built floor/wall2/4, then chest NoRayHits. A real floor hit

@@ -880,7 +880,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.160.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.161.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
@@ -995,10 +995,32 @@ foreach ($contactRequirement in @('activeBlueprint', 'allowNativeGhostUpdate', '
 Assert-Contract ($contactPrepareOperands -notmatch 'ContextStillValid') `
     'Inactive invalid-contact ghost must still be revalidated on retry.'
 $contactGeometry = $pluginTypes | Where-Object Name -eq 'BuildWorksPlacementValidation'
-$contactSearch = $contactGeometry.Methods | Where-Object Name -eq 'TryFindContact'
+$nativeWearSetup = $hostAssembly.MainModule.GetType('WearNTear').Methods | Where-Object Name -eq 'SetupColliders'
+Assert-Contract ((Get-NativeLayoutHash $nativeWearSetup) -eq '8A99C4811FC2286E20BDB211390B02D224D36A9D68D826FC4BC4F516AF829143') `
+    'Native WearNTear collider/support envelope changed; review the geometry and .15m contact context before shipping.'
+$contactDispatch = $contactGeometry.Methods | Where-Object Name -eq 'TryFindContact'
+$contactDispatchOperands = @($contactDispatch.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+foreach ($contactRequirement in @('GetComponent<WearNTear>', 'GetComponentsInChildren<UnityEngine.Collider>',
+    'Collider::get_enabled', 'Collider::get_isTrigger', 'TryGetColliderBounds', 'FindShapeContact')) {
+    Assert-Contract ($contactDispatchOperands -match [regex]::Escape($contactRequirement)) `
+        "Collider contact dispatch lost a shape/native-support requirement: $contactRequirement"
+}
+Assert-Contract ([bool]($contactDispatch.Body.Instructions | Where-Object {
+    $_.OpCode.Name -eq 'ldc.r4' -and [Math]::Abs([double]$_.Operand - 0.15) -lt 0.00001
+})) 'WearNTear contact envelope no longer matches the current native .15m per side.'
+$contactBounds = $contactGeometry.Methods | Where-Object Name -eq 'TryGetColliderBounds'
+$contactBoundsOperands = @($contactBounds.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+foreach ($contactRequirement in @('BoxCollider::get_center', 'BoxCollider::get_size', 'Transform::get_lossyScale',
+    'Transform::TransformPoint', 'Transform::get_rotation', 'MeshCollider::get_sharedMesh', 'Mesh::get_bounds')) {
+    Assert-Contract ($contactBoundsOperands -match [regex]::Escape($contactRequirement)) `
+        "Collider bounds lost inactive/pose geometry requirement: $contactRequirement"
+}
+Assert-Contract ($contactBoundsOperands -notmatch 'Collider::get_bounds|SyncTransforms|::set_|::SetActive') `
+    'Contact geometry must not use stale/empty native collider bounds or activate/move the ghost.'
+$contactSearch = $contactGeometry.Methods | Where-Object Name -eq 'FindShapeContact'
 $contactSearchOperands = @($contactSearch.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 foreach ($contactRequirement in @('Physics::RaycastNonAlloc', 'Physics::RaycastAll', 'Transform::IsChildOf',
-    'Collider::get_attachedRigidbody', 'Vector3::Distance', 'ContactTolerance')) {
+    'Collider::get_attachedRigidbody', 'Vector3::Distance', 'Quaternion::Inverse', 'TryShapeBoundary')) {
     Assert-Contract ($contactSearchOperands -match [regex]::Escape($contactRequirement)) `
         "Actual contact probes lost a surface/range/self exclusion: $contactRequirement"
 }

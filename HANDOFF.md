@@ -1,3 +1,15 @@
+## 2026-10-12 — .160 native: refusal measured, visible refund verified
+
+One TEST24 attempt built floor/wall2/4, then chest NoRayHits. A real floor hit
+within range had renderer gap5.34cm versus BuildWorks tolerance2.38cm.
+Native PieceRayTest has no1% renderer rule; shared contact correction remains.
+Second .159 cancellation and new .160 cancellation: Wood42+50, two swords,
+no reprovisioning. Full build, item properties/reload/network remain unproven.
+Ostrix exited to work in Nuke: source/CPU work only, no Valheim/Unity/GPU launches.
+Next entry follows correction/checks; do not repeat this diagnostic attempt.
+[Native .160 evidence](docs/QA_NATIVE_160_2026-10-12.md).
+History follows; waiting for the first .160 observation is no longer current.
+
 ## 2026-10-12 — .160: contact diagnostics deployed, native pending
 
 Source db59dd6: QA-only refusal observations, placement/costs/rights unchanged.

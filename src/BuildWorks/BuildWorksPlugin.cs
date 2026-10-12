@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.160";
+        internal const string PluginVersion = "0.19.162";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -584,11 +584,18 @@ namespace OstrixMods.BuildWorks
             ref Transform targetSnap,
             Piece aimedPiece)
         {
-            return instance?.session?.ApplyPassiveAutoJoin(
+#if BUILDWORKS_TEST_STAND
+            BuildWorksTestPlacementDiagnostics.BeginSnap(sourceSnap, targetSnap, aimedPiece);
+#endif
+            bool accepted = instance?.session?.ApplyPassiveAutoJoin(
                 player,
                 ref sourceSnap,
                 ref targetSnap,
                 aimedPiece) ?? true;
+#if BUILDWORKS_TEST_STAND
+            BuildWorksTestPlacementDiagnostics.EndSnap(sourceSnap, targetSnap, accepted);
+#endif
+            return accepted;
         }
 
         private static void ApplyPrecisionValidationPoint(Player player, ref Vector3 point)
@@ -634,6 +641,9 @@ namespace OstrixMods.BuildWorks
                 }
                 point = contact.point;
                 normal = contact.normal;
+#if BUILDWORKS_TEST_STAND
+                BuildWorksTestPlacementDiagnostics.RecordContact(ghost, source, contact, sides);
+#endif
                 hitPiece = contact.collider.GetComponentInParent<Piece>();
                 heightmap = contact.collider.GetComponent<Heightmap>();
                 if (contact.collider.gameObject.layer == LayerMask.NameToLayer("Water"))

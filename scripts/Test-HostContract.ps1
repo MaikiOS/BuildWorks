@@ -880,8 +880,13 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.161.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.162.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
+$pluginIdentity = $plugin.MainModule.Types | Where-Object Name -eq 'BuildWorksPlugin'
+$loaderIdentity = $pluginIdentity.CustomAttributes | Where-Object { $_.AttributeType.Name -eq 'BepInPlugin' }
+Assert-Contract ($null -ne $loaderIdentity -and
+    [string]$loaderIdentity.ConstructorArguments[2].Value -eq $plugin.Name.Version.ToString(3)) `
+    'BepInEx/QA version does not match the compiled assembly version.'
 $pluginResourceNames = @($plugin.MainModule.Resources | ForEach-Object Name)
 foreach ($iconName in $requiredEditorIcons) {
     $resourceName = 'OstrixMods.BuildWorks.Assets.BlueprintEditorIcons.' +

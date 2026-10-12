@@ -8,6 +8,12 @@ Add-Type -Path (Join-Path $profile 'BepInEx/core/Mono.Cecil.dll')
 $normal = [Mono.Cecil.AssemblyDefinition]::ReadAssembly((Join-Path $root 'artifacts/bin/BuildWorks.dll'))
 $qa = [Mono.Cecil.AssemblyDefinition]::ReadAssembly((Join-Path $root 'artifacts/test-stand-bin/BuildWorks.dll'))
 function Require([bool] $condition, [string] $message) { if (-not $condition) { throw $message } }
+function Require-LoaderVersion($assembly) {
+    $pluginType = $assembly.MainModule.GetType('OstrixMods.BuildWorks.BuildWorksPlugin')
+    $identity = $pluginType.CustomAttributes | Where-Object { $_.AttributeType.Name -eq 'BepInPlugin' }
+    Require ($null -ne $identity -and [string]$identity.ConstructorArguments[2].Value -eq
+        $assembly.Name.Version.ToString(3)) 'Loader/QA version differs from assembly.'
+}
 function Calls($type, [string] $name) {
     $methods = @($type.Methods | Where-Object Name -eq $name)
     Require ($methods.Count -eq 1 -and $methods[0].HasBody) "Missing QA method: $name"
@@ -41,6 +47,21 @@ function Require-NativeInput($game, $utils) {
         (Calls $input 'OnActionCanceled') -match 'ButtonDef::Release') 'Native actions do not reach button press/release state.'
 }
 try {
+    Require-LoaderVersion $normal
+    Require-LoaderVersion $qa
+    $versionAttribute = $qa.MainModule.GetType('OstrixMods.BuildWorks.BuildWorksPlugin').CustomAttributes |
+        Where-Object { $_.AttributeType.Name -eq 'BepInPlugin' }
+    $originalVersion = $versionAttribute.ConstructorArguments[2]
+    try {
+        $versionAttribute.ConstructorArguments[2] = [Mono.Cecil.CustomAttributeArgument]::new(
+            $originalVersion.Type, '0.19.160')
+        $rejected = $false
+        try { Require-LoaderVersion $qa }
+        catch { if ($_.Exception.Message -cne 'Loader/QA version differs from assembly.') { throw }; $rejected = $true }
+        Require $rejected 'Loader-version regression accepted the stale .160 attribute.'
+    } finally { $versionAttribute.ConstructorArguments[2] = $originalVersion }
+    Require-LoaderVersion $qa
+    'PASS loader/QA version matches both assemblies; stale .160 in-memory negative control rejected.'
     # Inspect the real host assemblies, not Workbench stubs or our own input aliases.
     [xml] $project = Get-Content -LiteralPath (Join-Path $root 'src/BuildWorks/BuildWorks.csproj') -Raw
     $managedNode = $project.SelectSingleNode('/Project/PropertyGroup/ValheimManagedDir')
@@ -66,7 +87,7 @@ try {
         Require-NativeInput $game $utils
         'PASS native host input contract: PlayerController movement/camera -> ZInput -> enabled InputSystem mouse/actions/current devices; broken-binding negative control rejected. Static evidence only.'
     } finally { if ($game) { $game.Dispose() }; if ($utils) { $utils.Dispose() } }
-    foreach ($name in 'BuildWorksQaControl','BuildWorksQaControlProtocol','BuildWorksQaInput','BuildWorksQaUiInput','BuildWorksQaUiCancellation','BuildWorksQaFilePublisher') {
+    foreach ($name in 'BuildWorksQaControl','BuildWorksQaControlProtocol','BuildWorksQaInput','BuildWorksQaUiInput','BuildWorksQaUiCancellation','BuildWorksQaFilePublisher','BuildWorksTestPlacementDiagnostics') {
         Require ($null -eq $normal.MainModule.GetType("OstrixMods.BuildWorks.$name")) "QA type leaked into normal build: $name"
         Require ($null -ne $qa.MainModule.GetType("OstrixMods.BuildWorks.$name")) "QA type absent: $name"
     }
@@ -74,6 +95,18 @@ try {
     $control = $qa.MainModule.GetType('OstrixMods.BuildWorks.BuildWorksQaControl')
     $inputType = $qa.MainModule.GetType('OstrixMods.BuildWorks.BuildWorksQaInput')
     $publisher = $qa.MainModule.GetType('OstrixMods.BuildWorks.BuildWorksQaFilePublisher')
+    $observations = $qa.MainModule.GetType('OstrixMods.BuildWorks.BuildWorksTestPlacementDiagnostics')
+    $observationReply = Calls $control 'Respond'
+    foreach ($name in 'DescribeLastSnap','DescribeLastContact','DescribeInventory') {
+        Require ($observationReply -match "BuildWorksTestPlacementDiagnostics::$name") "QA reply is missing observation: $name"
+    }
+    Require ((Calls $control 'ResetSession') -match 'BuildWorksTestPlacementDiagnostics::Reset') 'QA observations survive a session reset.'
+    $qaPlugin = $qa.MainModule.GetType('OstrixMods.BuildWorks.BuildWorksPlugin')
+    $snapTrace = Calls $qaPlugin 'ApplyPassiveAutoJoinFromNativeSnap'
+    Require ($snapTrace -match 'BuildWorksTestPlacementDiagnostics::BeginSnap' -and
+        $snapTrace -match 'BuildWorksTestPlacementDiagnostics::EndSnap' -and
+        $snapTrace -match 'PrecisionPlacementSession::ApplyPassiveAutoJoin') 'QA snap observation bypasses the real session decision.'
+    Require ((Calls $qaPlugin 'ApplyBlueprintValidationContact') -match 'BuildWorksTestPlacementDiagnostics::RecordContact') 'QA contact observation is disconnected.'
     Require ($null -ne $publisher -and @($publisher.Fields | Where-Object Name -eq 'ReplaceForTest').Count -eq 0) 'Publisher fault injection leaked into the installed QA build.'
     Require ((Calls $control 'Publish') -match 'BuildWorksQaFilePublisher::ReplaceObservation') 'QA response publication bypasses the bounded retry helper.'
     Require ((Calls $control 'Initialize') -match 'BuildWorksTestIsolation::get_ControlDirectory') 'Bridge directory is not rooted in QA isolation.'
@@ -107,12 +140,15 @@ try {
     } finally { $cancelCall.OpCode = $originalCode; $cancelCall.Operand = $originalOperand }
     Require-SelectionAbort $sessionType
     'PASS selection abort: real compiled helper chain; disconnected cancel call rejected in memory only.'
-    $qaMethods = @($control.Methods) + @($inputType.Methods)
+    $qaMethods = @($control.Methods) + @($inputType.Methods) + @($observations.Methods)
     Require (@($qaMethods | Where-Object IsPInvokeImpl).Count -eq 0) 'QA bridge gained OS-level control.'
     $allCalls = ($qaMethods | Where-Object HasBody | ForEach-Object {
         $_.Body.Instructions | ForEach-Object { [string] $_.Operand }
     }) -join "`n"
-    Require ($allCalls -notmatch 'Player::TeleportTo|Inventory::AddItem|ConsumeResources|ZDO::Set|TryPlacePiece|HttpListener|System.Net.Sockets|Process::Start') 'QA bridge gained a world/cost bypass, launcher or network service.'
+    Require ($allCalls -notmatch 'Player::TeleportTo|Inventory::AddItem|Inventory::RemoveItem|Inventory::MoveItem|ItemDrop::DropItem|ConsumeResources|ZDO::Set|TryPlacePiece|HttpListener|System.Net.Sockets|Process::Start') 'QA bridge gained a world/cost bypass, launcher or network service.'
+    # Worst-case JSON escaping is six ASCII bytes per observed name character.
+    $maximumInventoryBytes = 64 * ((32 + 3) * 6 + 64)
+    Require ($maximumInventoryBytes + 8192 -lt 32768) 'Bounded observation budget exceeds the mailbox reader limit.'
     $bridgeOwn = @($qa.MainModule.Types | Where-Object { $_.FullName -notmatch 'BuildWorksQa' } | ForEach-Object { $_.Methods } |
         Where-Object HasBody | ForEach-Object { $_.Body.Instructions } | Where-Object { [string] $_.Operand -match 'BuildWorksQaInput::' })
     Require ($bridgeOwn.Count -gt 20) 'BuildWorks legacy input callsites are not connected to QA input.'

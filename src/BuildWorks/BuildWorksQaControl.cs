@@ -19,6 +19,7 @@ namespace OstrixMods.BuildWorks
         [Serializable] private sealed class Reply
         {
             public string nonce, status, detail, screenshot, world, selectedUi, uiModule;
+            public string snap, placementContact, placementStatus, inventory;
             public long id, utc;
             public int frame, width, height;
             public bool focused, ready;
@@ -51,6 +52,7 @@ namespace OstrixMods.BuildWorks
         internal void ResetSession()
         {
             Stop("QA session reset.");
+            BuildWorksTestPlacementDiagnostics.Reset();
             nonce = Guid.NewGuid().ToString("N"); lastId = 0; player = null; network = null;
             Publish("session.json", System.Text.Encoding.UTF8.GetBytes(JsonUtility.ToJson(new Session {
                 nonce = nonce, processId = System.Diagnostics.Process.GetCurrentProcess().Id, versionBuild = BuildWorksPlugin.PluginVersion })));
@@ -253,6 +255,17 @@ namespace OstrixMods.BuildWorks
             if (Player.m_localPlayer) reply.position = Player.m_localPlayer.transform.position;
             Camera camera = Camera.main;
             if (camera) { reply.cameraPosition = camera.transform.position; reply.cameraEuler = camera.transform.eulerAngles; }
+            if (reply.ready)
+            {
+                try
+                {
+                    reply.snap = BuildWorksTestPlacementDiagnostics.DescribeLastSnap();
+                    reply.placementContact = BuildWorksTestPlacementDiagnostics.DescribeLastContact();
+                    reply.placementStatus = Player.m_localPlayer.GetPlacementStatus().ToString();
+                    reply.inventory = BuildWorksTestPlacementDiagnostics.DescribeInventory(Player.m_localPlayer);
+                }
+                catch (Exception error) { reply.inventory = "QA observation unavailable: " + error.GetType().Name; }
+            }
             Publish("response.json", System.Text.Encoding.UTF8.GetBytes(JsonUtility.ToJson(reply, true)));
         }
 

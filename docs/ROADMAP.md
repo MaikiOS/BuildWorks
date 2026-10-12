@@ -1,3 +1,20 @@
+## 2026-10-12 — .162 deployed; snap and complete fixture24 remain open
+
+The live session really loaded .161: stale .160 came from PluginVersion;
+the live stack trace MVID matched installed .161. .162 fixes that label and
+adds a version guard with an in-memory stale-version negative control.
+On .161, fixture24 with contents off stopped after two pieces with Invalid.
+Old tables were present nearby; the exact Invalid cause remains unproven.
+After cancellation Ostrix collected drops and dismantled tables; that attempt's
+isolated refund was not proven. No input was replayed after the safety abort.
+.162 adds QA-only snap/contact/native-status/inventory observations. Snap
+decisions, costs and permissions are unchanged; the reported defect is open.
+normal/QA 0/0, Host/control/isolation/loc989 and independent PASSED/Ship review.
+Guarded deployment, both hashes and158 unchanged QA files verified; Default clean.
+Next: existing QA world through Modded, fresh channel/balance, snap without build,
+then one fixture24 in clear space. Full4/4/reload/contents/network remain open.
+[Evidence and next steps](QA_SNAP_CONTACT_162_2026-10-12.md).
+
 ## 2026-10-12 — QA .161 installed; native build/reload next
 
 Current-source ContactOnly Physics passed after a sandbox-start crash was archived.

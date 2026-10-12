@@ -1,3 +1,11 @@
+## 2026-10-12 — whole-corpus file roundtrip
+
+Biome353/353 and 2v2t202/209 pass copy/native reopen/portable/reimport with all
+part fields/source and unchanged archive SHA. Seven source Y range refusals
+remain; no offsets applied. Store build0/0, independent PASSED/Ship.
+Inert CPU/unit-prefab evidence only; QA .163/runtime code unchanged.
+[Protocol](CORPUS_ROUNDTRIP_2026-10-12.md).
+
 ## 2026-10-12 — local vision measurement script prepared
 
 Three archived QA frames have pinned hashes and observed labels. Six CPU tests

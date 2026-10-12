@@ -17,6 +17,8 @@ namespace OstrixMods.BuildWorks.StoreTests
             Directory.CreateDirectory(directory);
             try
             {
+                if (args.Length == 2 && args[0] == "--roundtrip-corpus")
+                { CorpusRoundTripChecks.Run(args[1], directory); return 0; }
                 if ((args.Length == 2 || args.Length == 3) && args[0] == "--import-timings")
                     return ImportTimingChecks.Run(args[1], args.Length == 3 ? args[2] : null, directory);
                 if (args.Length == 2 && args[0] == "--catalog-timings")

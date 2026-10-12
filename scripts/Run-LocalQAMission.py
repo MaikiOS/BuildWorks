@@ -1,6 +1,7 @@
 """Run a human-authored QA task; the local model chooses every action, without Codex input."""
 import argparse
 import base64
+import hashlib
 import importlib.util
 import json
 import math
@@ -56,9 +57,12 @@ def task_contract(task):
         raise ValueError("UI actions require explicit task-scoped ui_policy")
     selectors = set()
     for rule in rules:
-        if (type(rule) is not dict or set(rule) != {"scope", "name", "kind", "actions", "texts"} or
+        if (type(rule) is not dict or set(rule) != {"scope", "name", "kind", "actions", "texts", "labels"} or
                 type(rule["scope"]) is not str or not agent.re.fullmatch(r"BuildWorks[A-Za-z0-9_]{1,70}", rule["scope"]) or
                 any(type(rule[k]) is not str or not agent.re.fullmatch(r"[A-Za-z0-9_-]{1,80}", rule[k]) for k in ("name", "kind")) or
+                type(rule["labels"]) is not list or not 1 <= len(rule["labels"]) <= 16 or
+                any(type(label) is not str or len(label) > 80 for label in rule["labels"]) or
+                len(set(rule["labels"])) != len(rule["labels"]) or
                 type(rule["actions"]) is not list or not rule["actions"] or
                 any(type(a) is not str or a not in ui_actions for a in rule["actions"]) or len(set(rule["actions"])) != len(rule["actions"]) or
                 type(rule["texts"]) is not list or len(rule["texts"]) > 32 or bool(rule["texts"]) != ("text" in rule["actions"])):
@@ -86,9 +90,22 @@ def task_contract(task):
             not number(limits["max_seconds"], 10, 600) or not number(limits["max_distance"], 0.15, 8)):
         raise ValueError("Invalid mission limits")
     criteria = task["success"]
-    if not isinstance(criteria, dict) or not criteria or set(criteria) - {"inventory_opened", "inventory_closed", "inventory_unchanged", "yaw_change", "ui_values"}:
+    if not isinstance(criteria, dict) or not criteria or set(criteria) - {"inventory_opened", "inventory_closed", "inventory_unchanged", "yaw_change", "ui_values", "blueprint_files"}:
         raise ValueError("Unsupported success criterion; no unverified success")
     for key, value in criteria.items():
+        if key == "blueprint_files":
+            if type(value) is not list or not 1 <= len(value) <= 2:
+                raise ValueError("Invalid blueprint file criteria")
+            for wanted in value:
+                if (type(wanted) is not dict or set(wanted) != {"path", "name", "prefabs"} or
+                        type(wanted["path"]) is not str or not agent.re.fullmatch(r"blueprints\.json|exports/[A-Za-z0-9_-]{1,80}\.buildworks\.json", wanted["path"]) or
+                        type(wanted["name"]) is not str or not 1 <= len(wanted["name"]) <= 80 or
+                        type(wanted["prefabs"]) is not list or not 1 <= len(wanted["prefabs"]) <= 128 or
+                        any(type(p) is not str or not 1 <= len(p) <= 80 for p in wanted["prefabs"])):
+                    raise ValueError("Invalid exact blueprint file/name/prefabs")
+            if len({(wanted["path"], wanted["name"]) for wanted in value}) != len(value):
+                raise ValueError("Duplicate blueprint file criterion")
+            continue
         if key == "yaw_change":
             if not isinstance(value, list) or len(value) != 2 or not all(number(v, -90, 90) for v in value) or value[0] > value[1]:
                 raise ValueError("Invalid yaw criterion")
@@ -103,6 +120,11 @@ def task_contract(task):
         elif value is not True:
             raise ValueError("Boolean criteria must be true")
     return task
+
+
+def ui_rule(task, target, action):
+    return next((r for r in task.get("ui_policy", []) if action in r["actions"] and
+                 all(r[k] == target[k] for k in ("scope", "name", "kind")) and target["label"] in r["labels"]), None)
 
 
 def action_contract(raw, task, state):
@@ -127,8 +149,7 @@ def action_contract(raw, task, state):
         step = {"milliseconds": 100, "keys": [args["key"]]}
     elif action in ("click", "text"):
         target = ui_target(state, args["target"])
-        rule = next((r for r in task.get("ui_policy", []) if action in r["actions"] and
-                     all(r[k] == target[k] for k in ("scope", "name", "kind"))), None)
+        rule = ui_rule(task, target, action)
         if rule is None:
             raise ValueError("UI target/action is not permitted by the task")
         if action == "click":
@@ -186,11 +207,40 @@ def inventory(state):
     return agent.re.sub(r"^frame=[0-9]+ ", "", state["inventory"])
 
 
+def require_new_file_targets(task, states):
+    evidence = criteria(task, states).get("blueprint_files")
+    if evidence and any(item.get("matched_records", 0) != 0 or
+                        item["path"] != "blueprints.json" and "sha256" in item for item in evidence["observed"]):
+        raise ValueError("Copy/export target already exists before the mission; choose a new run name")
+    return evidence
+
+
 def criteria(task, states):
     first, last = states[0], states[-1]
     yaw = (last["cameraEuler"]["y"] - first["cameraEuler"]["y"] + 180) % 360 - 180
     result = {}
     for key, target in task["success"].items():
+        if key == "blueprint_files":
+            actual = []
+            for wanted in target:
+                path = agent.ROOT.parent.parent / "TerrainRamp-1.0-Test/BepInEx/config/BuildWorks" / wanted["path"]
+                item = {"path": wanted["path"], "passed": False}
+                try:
+                    raw = agent.read_bytes(path, 2 * 1024 * 1024)
+                    document = json.loads(raw, object_pairs_hook=agent.probe.unique_object)
+                    records = document.get("blueprints", []) if wanted["path"] == "blueprints.json" else [document.get("blueprint")]
+                    matches = [record for record in records if type(record) is dict and record.get("name") == wanted["name"]]
+                    item["matched_records"] = len(matches)
+                    item["sha256"] = hashlib.sha256(raw).hexdigest()
+                    item["passed"] = (len(matches) == 1 and type(matches[0].get("id")) is str and bool(matches[0]["id"]) and
+                                      type(matches[0].get("parts")) is list and
+                                      sorted(p.get("prefabName", "") for p in matches[0]["parts"] if type(p) is dict) == sorted(wanted["prefabs"]) and
+                                      all(type(p) is dict for p in matches[0]["parts"]))
+                except FileNotFoundError:
+                    item["pending"] = "File not created"
+                actual.append(item)
+            result[key] = {"passed": all(item["passed"] for item in actual), "observed": actual, "target": target}
+            continue
         if key == "ui_values":
             entries = ui_entries(last)
             actual = []
@@ -220,6 +270,17 @@ def observe_guard(state, baseline, task):
 
 
 def choose(model, task, state, image, history):
+    schema = response_schema(task)
+    for branch in list(schema["oneOf"]):
+        action = branch["properties"]["action"]["enum"][0]
+        if action not in ("click", "text"):
+            continue
+        ids = [entry["id"] for entry in ui_entries(state) if ui_rule(task, entry, action) and
+               (action != "text" or entry["focused"] and entry["writable"])]
+        if ids:
+            branch["properties"]["args"]["properties"]["target"] = {"type": "string", "enum": ids}
+        else:
+            schema["oneOf"].remove(branch)
     prompt = ("You are the local Valheim QA agent. Execute the WHOLE human task yourself. "
               "Select the next action from allowed_actions; there are no preset stages. "
               "Return one JSON object with action,args,reason, no extra text. "
@@ -229,16 +290,16 @@ def choose(model, task, state, image, history):
               "For a level 20-degree right turn use yaw_degrees=20,pitch_degrees=0. move args={key:W/A/S/D,milliseconds}; "
               "observe/finish/stop use args={}. A press includes release. "
               "click args={target:<id from CURRENT.uiTargets>}; text args={target,value,submit}. "
-              "Only ui_policy controls and exact text/submit pairs are authorized. Text requires focused+writable. "
+              "Only ui_policy controls with an exact permitted label and exact text/submit pairs are authorized. Text requires focused+writable. "
               "Never use screen coordinates or type console commands. Missing/truncated targets are not permission to guess. "
               "Look/move only with closed inventory and selectedUi empty. "
               "Observe your last result before selecting another action. "
               "If unsafe or outside policy select stop. If all success checks pass, finish; "
               "do not repeat completed parts. Never claim an unobserved outcome.\nTASK=" + json.dumps(task, ensure_ascii=False) +
               "\nCURRENT=" + json.dumps(state, ensure_ascii=False) + "\nRECENT=" + json.dumps(history[-6:], ensure_ascii=False))
-    return agent.probe.api("generate", {"model": model, "prompt": prompt, "format": response_schema(task),
+    return agent.probe.api("generate", {"model": model, "prompt": prompt, "format": schema,
                            "images": [base64.b64encode(image).decode("ascii")], "stream": False,
-                           "think": False, "keep_alive": "5m", "options": {"temperature": 0, "num_predict": 256, "num_ctx": 6144}})
+                           "think": False, "keep_alive": "5m", "options": {"temperature": 0, "num_predict": 256, "num_ctx": 16384}})
 
 
 def run(task_path, model):
@@ -287,6 +348,7 @@ def run(task_path, model):
         states, history = [baseline], []
         report["session"] = session
         event("baseline", baseline)
+        event("file_baseline", require_new_file_targets(task, states))
         image = agent.screenshot(directory, baseline, output / "baseline.png")
         if model not in [item["name"] for item in agent.probe.api("tags")["models"]]:
             raise ValueError("Model not installed; no automatic download")

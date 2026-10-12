@@ -12,6 +12,8 @@ if ($replyStart -lt 0 -or $replyEnd -lt 0 -or $methodStart -lt 0 -or $methodEnd 
 # Execute the actual method with Unity destroyed-object semantics, without loading Unity or the game.
 $harness = @'
 using System;
+using System.IO;
+using System.Runtime.Serialization.Json;
 using UnityEngine;
 using UnityEngine.EventSystems;
 namespace UnityEngine {
@@ -22,7 +24,7 @@ namespace UnityEngine {
         protected void RequireAlive() { if (!alive) throw new NullReferenceException("Destroyed Unity object accessed."); }
         public string name { get { RequireAlive(); return label; } }
     }
-    public struct Vector3 { public float x, y, z; }
+    [Serializable] public struct Vector3 { public float x, y, z; }
     public class Transform { public Vector3 position, eulerAngles; }
     public class Camera : Object { public static Camera main; public Transform transform = new Transform(); }
     public static class Application { public static bool isFocused = true; }
@@ -52,9 +54,9 @@ public static class BuildWorksTestPlacementDiagnostics {
     public static string DescribeInventory(Player player) => "inventory";
 }
 public class BuildWorksQaUiTargets {
-    public class Entry { public string id; }
+    [Serializable] public class Entry { public string id, label, value; }
     public bool Truncated => true;
-    public Entry[] Observe() => new[] { new Entry { id = "target" } };
+    public Entry[] Observe() => new[] { new Entry { id = "target", label = "Импорт \"проверка\"", value = "C:\\QA\\чертёж.json" } };
 }
 public class QaReplyHarness {
     private string nonce = "0123456789abcdef0123456789abcdef";
@@ -62,8 +64,9 @@ public class QaReplyHarness {
     private bool ready;
     private readonly BuildWorksQaUiTargets uiTargets = new BuildWorksQaUiTargets();
     private int publications;
+    private Reply published;
     private bool SafeSession() { return ready; }
-    private void Publish(string path, byte[] bytes) { if (path != "response.json") throw new Exception("Wrong path."); ++publications; }
+    private void Publish(string path, byte[] bytes) { if (path != "response.json") throw new Exception("Wrong path."); using (var stream = new MemoryStream(bytes)) published = (Reply)new DataContractJsonSerializer(typeof(Reply)).ReadObject(stream); ++publications; }
 __REPLY__
 __METHOD__
     private static void Require(bool condition, string reason) { if (!condition) throw new Exception(reason); }
@@ -77,14 +80,15 @@ __METHOD__
         int count = 0;
         host.ready = true;
         host.Respond(320, "completed", "UI observation");
-        var observed = (Reply)JsonUtility.Last;
+        var observed = host.published;
         Require(observed.ready && observed.stopRevision == 7 && observed.uiTargets.Length == 1 &&
-            observed.uiTargets[0].id == "target" && observed.uiTargetsTruncated && observed.inventory == "inventory",
-            "UI targets not carried by actual Respond."); ++count;
+            observed.uiTargets[0].id == "target" && observed.uiTargets[0].label == "Импорт \"проверка\"" &&
+            observed.uiTargets[0].value == "C:\\QA\\чертёж.json" && observed.uiTargetsTruncated && observed.inventory == "inventory",
+            "UI targets not carried by actual serialized Respond bytes."); ++count;
         host.ready = false;
         foreach (string status in new[] { "running", "completed", "aborted", "rejected", "uncertain" }) {
             host.Respond(321, status, "observed", "screenshot.png");
-            var result = (Reply)JsonUtility.Last;
+            var result = host.published;
             Require(result.id == 321 && result.nonce == host.nonce && result.status == status &&
                 result.detail == "observed" && result.screenshot == "screenshot.png" && result.selectedUi == "Import entry" &&
                 result.uiModule == module.GetType().FullName && result.world == "BW_QA_test" && !result.ready &&
@@ -92,26 +96,26 @@ __METHOD__
         }
         selected.alive = false;
         host.Respond(322, "completed", "folder recreated", "screenshot.png");
-        Require(((Reply)JsonUtility.Last).selectedUi == null && ((Reply)JsonUtility.Last).id == 322,
+        Require((host.published).selectedUi == null && (host.published).id == 322,
             "Destroyed selected UI prevented completion receipt."); ++count;
         module.alive = false;
         host.Respond(323, "aborted", "released");
-        Require(((Reply)JsonUtility.Last).uiModule == null && ((Reply)JsonUtility.Last).screenshot == null,
+        Require((host.published).uiModule == null && (host.published).screenshot == null,
             "Destroyed UI module prevented stop receipt."); ++count;
         EventSystem.current.alive = false;
         host.Respond(324, "uncertain", "capture failure");
-        Require(((Reply)JsonUtility.Last).selectedUi == null && ((Reply)JsonUtility.Last).uiModule == null,
+        Require((host.published).selectedUi == null && (host.published).uiModule == null,
             "Destroyed EventSystem prevented failure receipt."); ++count;
         ZNet.instance.alive = false; Player.m_localPlayer.alive = false; Camera.main.alive = false;
         host.Respond(325, "completed", "unloaded");
-        Require(((Reply)JsonUtility.Last).world == null, "Destroyed network accessed."); ++count;
+        Require((host.published).world == null, "Destroyed network accessed."); ++count;
         EventSystem.current = null; ZNet.instance = null; Player.m_localPlayer = null; Camera.main = null;
         host.Respond(326, "completed", "absent");
-        Require(((Reply)JsonUtility.Last).selectedUi == null && ((Reply)JsonUtility.Last).uiModule == null &&
-            ((Reply)JsonUtility.Last).world == null, "Absent scene references refused."); ++count;
+        Require((host.published).selectedUi == null && (host.published).uiModule == null &&
+            (host.published).world == null, "Absent scene references refused."); ++count;
         ZNet.instance = new ZNet { world = null };
         host.Respond(327, "completed", "world absent");
-        Require(((Reply)JsonUtility.Last).world == null, "Absent world refused."); ++count;
+        Require((host.published).world == null, "Absent world refused."); ++count;
         Require(host.publications == count, "Missing or duplicate receipt.");
         return count;
     }
@@ -120,4 +124,4 @@ __METHOD__
 $harness = $harness.Replace('__REPLY__', $source.Substring($replyStart, $replyEnd - $replyStart)).Replace('__METHOD__', $source.Substring($methodStart, $methodEnd - $methodStart))
 Add-Type -TypeDefinition $harness
 $count = [QaReplyHarness]::Run()
-"PASS actual Respond: $count live/destroyed/absent UI/network observations; exact request identity/status and one publication; CPU Unity-object shim, no native runtime."
+"PASS actual Respond: $count live/destroyed/absent UI/network observations; exact request identity/status and one publication; real JSON round trip including UI array/Unicode/quotes/path; CPU Unity-object shim, no native runtime."

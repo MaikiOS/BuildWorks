@@ -1,3 +1,9 @@
+## 2026-10-12 — QA .169 installed; local model discontinued, manual acceptance
+
+Ostrix stopped work on the model tester. [Manual checklist](docs/MANUAL_QA_169_RU.md):11 checks,18 local fixtures, no repetition of accepted cases. Prioritize world auto-snap and external Forest Hut through construction/reload, then editor/formats/missing/empty chest/capture. Missing supplies are explicit; populated inventories/admin/persistent project/fogv11/heavy/network are not ready. .169 is installed; no new deployment needed.
+
+Valheim confirms uiTargets serialization/priority. Model issued3 E presses then a prohibited Repair click was rejected; library/inventory unchanged, mission failed. UTF-8/context/output constraints pass10 CPU tests/review; final ID schema not live-tested. No further inference/input. [Evidence](docs/QA_MODEL_UI_169.md). Overall goal remains incomplete.
+
 ## 2026-10-12 — QA .167: model UI policy and action log, offline
 
 Whole-task model runner now supports exact authorized UI clicks/text, revalidates

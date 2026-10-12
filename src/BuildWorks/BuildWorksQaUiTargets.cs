@@ -43,7 +43,8 @@ namespace OstrixMods.BuildWorks
             int bytes = 0;
             var events = EventSystem.current;
             if (!events || !events.isActiveAndEnabled || Screen.width < 2 || Screen.height < 2) return result.ToArray();
-            foreach (var control in Selectable.allSelectablesArray)
+            // Native piece icons must not exhaust the page before the task's BuildWorks controls.
+            foreach (var control in Selectable.allSelectablesArray.OrderByDescending(control => control && Scope(control.transform).Length != 0))
             {
                 Entry entry = Describe(control, out string label, out string value);
                 if (entry == null || !Hit(events, control, entry)) continue;

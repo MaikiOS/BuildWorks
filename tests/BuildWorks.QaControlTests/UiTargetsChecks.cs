@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using OstrixMods.BuildWorks;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -87,6 +88,13 @@ internal static class UiTargetsChecks
         EventSystem.current = new EventSystem { hit = scoped.gameObject };
         var scopedEntry = observer.Observe()[0];
         if (scopedEntry.name != scoped.name || scopedEntry.scope != "BuildWorksExchange") throw new Exception("UI name/scope missing."); ++checks;
+        ((RectTransform)scoped.transform).offset = 80;
+        Selectable.allSelectablesArray = many.Concat(new[] { scoped }).ToArray();
+        EventSystem.current = new EventSystem { eachOwn = true };
+        if (observer.Observe()[0].scope != "BuildWorksExchange" || !observer.Truncated) throw new Exception("Native controls exhausted the page before BuildWorks."); ++checks;
+        Selectable.allSelectablesArray = new Selectable[] { scoped };
+        EventSystem.current = new EventSystem { hit = scoped.gameObject };
+        scopedEntry = observer.Observe()[0];
         var scopedTarget = observer.Resolve(scopedEntry.id);
         scoped.transform.parent.name = "BuildWorks_BlueprintEditorView"; Reject(() => observer.Require(scopedTarget));
         scopedTarget = observer.Resolve(observer.Observe()[0].id);

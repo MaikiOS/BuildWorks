@@ -9,6 +9,7 @@ param(
     [ValidateRange(1, 25)][int] $WaitSeconds = 15
 )
 $ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 Set-StrictMode -Version Latest
 $profiles = Split-Path (Split-Path ([IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))))
 $config = Join-Path $profiles 'TerrainRamp-1.0-Test/BepInEx/config/BuildWorks'

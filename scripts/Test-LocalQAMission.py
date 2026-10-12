@@ -30,7 +30,7 @@ def state():
 
 def ui_task():
     rule = {"scope": "BuildWorksExchange", "name": "ExchangeDirectory", "kind": "TMP_InputField",
-            "actions": ["click", "text"], "texts": [{"value": "QA approved path", "submit": False}]}
+            "labels": [""], "actions": ["click", "text"], "texts": [{"value": "QA approved path", "submit": False}]}
     return dict(TASK, id="ui-contract-test", allowed_actions=["click", "text", "finish", "stop"], allowed_keys=[],
                 ui_policy=[rule], success={"inventory_unchanged": True, "ui_values": [
                     {k: rule[k] for k in ("scope", "name", "kind")} | {"value": "QA approved path"}]})
@@ -43,6 +43,64 @@ def ui_state():
 
 
 class MissionTests(unittest.TestCase):
+    @unittest.skipUnless(hasattr(subprocess, "CREATE_NO_WINDOW"), "Windows native pipe encoding")
+    def test_hidden_powershell_utf8(self):
+        source = (mission.agent.ROOT / "scripts/Invoke-QAControl.ps1").read_text(encoding="utf-8-sig")
+        setting = next(line for line in source.splitlines() if line.startswith("[Console]::OutputEncoding ="))
+        result = subprocess.run(["pwsh.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-Command",
+                                 setting + "; Write-Output 'РЕМОНТ ⋯ СОХРАНИТЬ КАК…'"], capture_output=True,
+                                creationflags=subprocess.CREATE_NO_WINDOW, timeout=10, check=True)
+        self.assertEqual(result.stdout.decode("utf-8").strip(), "РЕМОНТ ⋯ СОХРАНИТЬ КАК…")
+
+    def test_whole_ui_task_context(self):
+        with patch.object(mission.agent.probe, "api", return_value={}) as call:
+            mission.choose("test", ui_task(), ui_state(), b"PNG", [])
+        payload = call.call_args.args[1]
+        self.assertGreaterEqual(payload["options"]["num_ctx"], 9167 + payload["options"]["num_predict"])
+
+    def test_model_only_offers_current_permitted_ui(self):
+        for label, focused in (("", False), ("", True), ("РЕМОНТ", True)):
+            observed = ui_state()
+            observed["uiTargets"][0].update(label=label, focused=focused)
+            with patch.object(mission.agent.probe, "api", return_value={}) as call:
+                mission.choose("test", ui_task(), observed, b"PNG", [])
+            branches = {b["properties"]["action"]["enum"][0]: b for b in call.call_args.args[1]["format"]["oneOf"]}
+            self.assertEqual("click" in branches, label == "")
+            self.assertEqual("text" in branches, label == "" and focused)
+            if "click" in branches:
+                self.assertEqual(branches["click"]["properties"]["args"]["properties"]["target"]["enum"], ["c" * 32])
+
+    def test_blueprint_file_evidence(self):
+        wanted = {"path": "blueprints.json", "name": "QA_copy", "prefabs": ["woodwall", "woodwall"]}
+        task = dict(TASK, success={"blueprint_files": [wanted]})
+        mission.task_contract(task)
+        with self.assertRaises(ValueError):
+            mission.task_contract(dict(TASK, success={"blueprint_files": [wanted, wanted]}))
+        for path in ("../blueprints.json", "exports/../blueprints.json", "C:/secret.json"):
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                mission.task_contract(dict(TASK, success={"blueprint_files": [dict(wanted, path=path)]}))
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "Default/BuildWorks"; root.mkdir(parents=True)
+            folder = root.parent.parent / "TerrainRamp-1.0-Test/BepInEx/config/BuildWorks"; folder.mkdir(parents=True)
+            path = folder / "blueprints.json"
+            record = {"id": "new-id", "name": "QA_copy", "parts": [{"prefabName": "woodwall"}] * 2}
+            with patch.object(mission.agent, "ROOT", root):
+                self.assertFalse(mission.criteria(task, [state()])["blueprint_files"]["passed"])
+                mission.require_new_file_targets(task, [state()])
+                path.write_text(json.dumps({"blueprints": [record]}), encoding="utf-8")
+                result = mission.criteria(task, [state()])["blueprint_files"]
+                self.assertTrue(result["passed"]); self.assertEqual(len(result["observed"][0]["sha256"]), 64)
+                with self.assertRaises(ValueError): mission.require_new_file_targets(task, [state()])
+                for records in ([record, record], [dict(record, parts=[{"prefabName": "wrong"}])], [dict(record, id="")]):
+                    path.write_text(json.dumps({"blueprints": records}), encoding="utf-8")
+                    self.assertFalse(mission.criteria(task, [state()])["blueprint_files"]["passed"])
+                export = folder / "exports/QA_copy.buildworks.json"; export.parent.mkdir()
+                export.write_text(json.dumps({"blueprint": record}), encoding="utf-8")
+                export_task = dict(TASK, success={"blueprint_files": [dict(wanted, path="exports/QA_copy.buildworks.json")]})
+                mission.task_contract(export_task)
+                self.assertTrue(mission.criteria(export_task, [state()])["blueprint_files"]["passed"])
+                with self.assertRaises(ValueError): mission.require_new_file_targets(export_task, [state()])
+
     def test_ui_policy_steps_criteria_and_boundaries(self):
         task, observed = ui_task(), ui_state()
         mission.task_contract(task)
@@ -75,7 +133,7 @@ class MissionTests(unittest.TestCase):
                        decision("text", target="c" * 32, value="QA approved path", submit=1)):
             with self.subTest(action=action), self.assertRaises(ValueError):
                 mission.action_contract(action, task, observed)
-        for key, value in (("scope", "Console"), ("name", "Different"), ("kind", "Button"), ("writable", False), ("focused", False)):
+        for key, value in (("label", "Удалить"), ("scope", "Console"), ("name", "Different"), ("kind", "Button"), ("writable", False), ("focused", False)):
             bad = json.loads(json.dumps(observed)); bad["uiTargets"][0][key] = value
             with self.subTest(key=key), self.assertRaises(ValueError):
                 mission.action_contract(decision("text", target="c" * 32, value="QA approved path", submit=False), task, bad)
@@ -83,8 +141,11 @@ class MissionTests(unittest.TestCase):
         with self.assertRaises(ValueError): mission.ui_target(duplicate, "c" * 32)
         missing = state()
         with self.assertRaises(ValueError): mission.ui_target(missing, "c" * 32)
-        for mutation in ("no_policy", "console", "duplicate", "unused_action", "overlong", "bool_submit", "wrong_kind", "wildcard", "criterion"):
+        for mutation in ("no_policy", "console", "duplicate", "unused_action", "overlong", "bool_submit", "wrong_kind", "wildcard", "criterion", "labels", "label_long", "label_type"):
             bad = json.loads(json.dumps(task))
+            if mutation == "labels": del bad["ui_policy"][0]["labels"]
+            if mutation == "label_long": bad["ui_policy"][0]["labels"] = ["x" * 81]
+            if mutation == "label_type": bad["ui_policy"][0]["labels"] = [False]
             if mutation == "no_policy": del bad["ui_policy"]
             if mutation == "console": bad["ui_policy"][0]["scope"] = "Console"
             if mutation == "duplicate": bad["ui_policy"] *= 2

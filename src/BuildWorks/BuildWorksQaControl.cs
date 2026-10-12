@@ -2,6 +2,7 @@
 using System;
 using System.Collections;
 using System.IO;
+using System.Runtime.Serialization.Json;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -297,7 +298,11 @@ namespace OstrixMods.BuildWorks
                 }
                 catch (Exception error) { reply.inventory = "QA observation unavailable: " + error.GetType().Name; }
             }
-            Publish("response.json", System.Text.Encoding.UTF8.GetBytes(JsonUtility.ToJson(reply, true)));
+            using (var stream = new MemoryStream())
+            {
+                new DataContractJsonSerializer(typeof(Reply)).WriteObject(stream, reply);
+                Publish("response.json", stream.ToArray());
+            }
         }
 
         internal void Stop(string reason)

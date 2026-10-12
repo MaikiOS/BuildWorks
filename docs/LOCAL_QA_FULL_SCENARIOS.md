@@ -26,12 +26,14 @@ Reload needs a durable checkpoint and a newly authorized session, not nonce reus
 The present mission runner only proves small whole inventory/camera tasks:
 16.312s and19.844s, yaw20.204°/20.074°, unchanged inventory. Earlier malformed
 model actions were rejected and retained. All12 full scenarios are correctly
-reported blocked until safe UI actions, full document/object/item observations,
-evidence evaluation and reload resume exist. Admin/project/network cases also
+reported blocked. [.167 model UI permissions/logging](QA_MODEL_UI_167.md) pass
+offline checks but are not deployed or proven live. Target paging, full document/
+object/item observations, resource ledger, full executor, evidence evaluation
+and reload resume remain open. Admin/project/network cases also
 require their product features or separately authorized environment. No fallback
 to the small pilot can establish full-scenario completion.
 
 Third-party blueprints/provenance and extracted lab resources remain local;
 they are not redistributed. Existing saves and supply receipts are preserved.
-Offline package CPU3 passed; mission CPU4 and pilot CPU5 are separate checks.
+Offline package CPU3 passed; mission CPU6 and pilot CPU5 are separate checks.
 The absent verify helper and untested full runtime remain explicit limitations.

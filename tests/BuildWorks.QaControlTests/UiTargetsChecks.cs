@@ -53,7 +53,7 @@ internal static class UiTargetsChecks
         Selectable.allSelectablesArray = new Selectable[] { field };
         EventSystem.current = new EventSystem { hit = field.gameObject };
         var entry = observer.Observe()[0]; var original = observer.Resolve(entry.id);
-        if (!entry.writable || entry.value.Length != 128) throw new Exception("Field metadata not bounded/writable."); ++checks;
+        if (!entry.writable || entry.value.Length != 128 || !entry.valueTruncated) throw new Exception("Field metadata not bounded/writable/truncated."); ++checks;
         Reject(() => observer.RequireFocused(original));
         field.isFocused = true; EventSystem.current.currentSelectedGameObject = field.gameObject;
         observer.RequireFocused(original); ++checks;
@@ -81,6 +81,18 @@ internal static class UiTargetsChecks
         JsonUtility.length = 5000;
         if (observer.Observe().Length != 2 || !observer.Truncated) throw new Exception("UI byte budget missing."); ++checks;
         JsonUtility.length = 100;
+        var scoped = Button();
+        scoped.transform.parent = new Transform { name = "BuildWorksExchange" };
+        Selectable.allSelectablesArray = new Selectable[] { scoped };
+        EventSystem.current = new EventSystem { hit = scoped.gameObject };
+        var scopedEntry = observer.Observe()[0];
+        if (scopedEntry.name != scoped.name || scopedEntry.scope != "BuildWorksExchange") throw new Exception("UI name/scope missing."); ++checks;
+        var scopedTarget = observer.Resolve(scopedEntry.id);
+        scoped.transform.parent.name = "BuildWorks_BlueprintEditorView"; Reject(() => observer.Require(scopedTarget));
+        scopedTarget = observer.Resolve(observer.Observe()[0].id);
+        scoped.name = "AnotherControl"; Reject(() => observer.Require(scopedTarget));
+        scoped.name = new string('x', 81);
+        if (observer.Observe().Length != 0) throw new Exception("Truncated control name exposed an ambiguous policy target."); ++checks;
         Console.WriteLine("PASS QA UI targets: " + checks + " production observer/guard assertions. Inert UI; real host execution unverified.");
     }
 }
@@ -108,7 +120,7 @@ namespace UnityEngine
         public T GetComponentInParent<T>() where T : class => canvas as T;
         public T GetComponentInChildren<T>() where T : class => child as T;
     }
-    public class Transform : Object { }
+    public class Transform : Object { public string name; public Transform parent; }
     public class RectTransform : Transform
     {
         public float offset;

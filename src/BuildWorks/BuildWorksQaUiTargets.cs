@@ -15,9 +15,9 @@ namespace OstrixMods.BuildWorks
     {
         [Serializable] internal sealed class Entry
         {
-            public string id, kind, label, value;
+            public string id, kind, name, scope, label, value;
             public float x, y, left, bottom, right, top;
-            public bool writable, focused;
+            public bool writable, focused, valueTruncated;
         }
 
         internal sealed class Target
@@ -79,7 +79,7 @@ namespace OstrixMods.BuildWorks
 
         private static bool Same(Target target, Entry current, string label, string value) =>
             target.width == Screen.width && target.height == Screen.height && label == target.label && value == target.value &&
-            current.kind == target.entry.kind && current.writable == target.entry.writable &&
+            current.kind == target.entry.kind && current.name == target.entry.name && current.scope == target.entry.scope && current.writable == target.entry.writable &&
             current.left == target.entry.left && current.bottom == target.entry.bottom &&
             current.right == target.entry.right && current.top == target.entry.top;
 
@@ -103,6 +103,7 @@ namespace OstrixMods.BuildWorks
         {
             label = value = "";
             if (!control || !control.isActiveAndEnabled || !control.IsInteractable()) return null;
+            if ((control.name ?? "").Length > 80) return null;
             var rect = control.transform as RectTransform;
             var canvas = control.GetComponentInParent<Canvas>();
             if (!rect || !canvas || !canvas.isActiveAndEnabled) return null;
@@ -131,12 +132,22 @@ namespace OstrixMods.BuildWorks
             else if (control is TMP_Dropdown tmpDropdown) value = tmpDropdown.value.ToString(CultureInfo.InvariantCulture);
             bool writable = tmp && !tmp.readOnly || field && !field.readOnly;
             bool focused = tmp && tmp.isFocused || field && field.isFocused;
-            return new Entry { kind = control.GetType().Name, label = Bounded(label, 80), value = Bounded(value, 128),
-                writable = writable, focused = focused, x = x / (Screen.width - 1), y = y / (Screen.height - 1),
+            return new Entry { kind = control.GetType().Name, name = control.name ?? "", scope = Scope(control.transform),
+                label = Bounded(label, 80), value = Bounded(value, 128),
+                writable = writable, focused = focused, valueTruncated = value != null && value.Length > 128,
+                x = x / (Screen.width - 1), y = y / (Screen.height - 1),
                 left = left, bottom = bottom, right = right, top = top };
         }
 
         private static string Bounded(string text, int length) => string.IsNullOrEmpty(text) ? "" : text.Substring(0, Math.Min(text.Length, length));
+
+        private static string Scope(Transform node)
+        {
+            for (int depth = 0; node && depth < 64; ++depth, node = node.parent)
+                if (node.name != null && node.name.StartsWith("BuildWorks", StringComparison.Ordinal))
+                    return node.name.Length <= 80 ? node.name : "";
+            return "";
+        }
     }
 }
 #endif

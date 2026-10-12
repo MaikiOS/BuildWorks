@@ -1,3 +1,14 @@
+## 2026-10-12 — QA .167: model UI policy and action log, offline
+
+Whole-task model runner now supports exact authorized UI clicks/text, revalidates
+the same observed ID, and journals dispatch before native execution. UI criteria
+reject truncated lists/values and duplicate selectors. CPU mission6/15 mocked
+loops, scenarios3, protocol43/UI44/publisher, normal+QA clean, Host/loc989/isolation
+pass; independent correctness PASSED/Ponytail Ship. Installed .165 hashes unchanged;
+no game/model/GPU/deployment. All12 full tasks stay blocked pending target pages,
+document/world/item snapshots, resource ledger, full executor and reload.
+[Evidence](QA_MODEL_UI_167.md). Game tests remain paused by Ostrix.
+
 ## 2026-10-12 — QA .166: guarded UI targets, offline
 
 Native QA now observes interactable controls and validates the selected target

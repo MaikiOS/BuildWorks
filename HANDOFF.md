@@ -1,3 +1,19 @@
+## 2026-10-12 — whole local-model tasks; game testing paused
+
+Installed QA .165 unchanged. Local qwen3.5:4b chose every action for a small whole
+task twice:16.312s/19.844s, yaw20.204°/20.074°, inventory unchanged. Two earlier
+malformed actions rejected before camera input and retained. CPU mission4/pilot5,
+independent correctness/Ponytail PASSED/Ship. Owner requested full scenarios:
+12 whole tasks,49 evidence milestones,29 hashed inputs and logging contract;
+offline CPU3/PASSED/Ship. These plans are not a full executor: safe UI, world/item
+snapshots, cost evidence and reload resume remain missing; readiness is blocked.
+Owner paused live tests; no new inference/input until authorized. Lock absent,
+Stop queued/flag gone; previous game process50348 ended. Next work is offline
+implementation of the full executor, without narrowing the BuildWorks objective.
+Goal API currently blocked; agent cannot resume it by changing documents.
+[Scenario package](docs/LOCAL_QA_FULL_SCENARIOS.md). [Live attempts](docs/LOCAL_QA_MISSION_2026-10-12_RU.md).
+
+
 ## 2026-10-12 — .163 installed; fast game-control research
 
 Guarded TerrainRamp-1.0-Test deployment complete: both SHA values match,158

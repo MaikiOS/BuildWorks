@@ -1,0 +1,239 @@
+{
+  "version": 1,
+  "id": "buildworks-full-qa-v1",
+  "title": "Полные игровые сценарии BuildWorks для локальной модели",
+  "execution": "paused_until_owner_authorizes_game_tests",
+  "policy": [
+    "Получай сценарий целиком. Сам составляй и меняй план действий по свежим кадрам и проверяемому состоянию. Codex не выбирает за тебя каждое нажатие.",
+    "Только TerrainRamp-1.0-Test, запуск Modded, существующие изолированные QA-мир и персонаж. Перед вводом сверяй DLL, token/world, nonce, focus, stopRevision и отсутствие других игроков.",
+    "Используй существующую QA-площадку; не выравнивай землю заново, не трогай основные миры, исходные библиотеки и другие моды. Работай со своими копиями с уникальным run_id.",
+    "Проверяй god/защиту в новой сессии, обычную стоимость и отсутствие nocost/debug. Предметы не выдавай, могилы не восстанавливай и квитанции наборов не сбрасывай без отдельного разрешённого setup с точным бюджетом.",
+    "Все изменения инвентаря, строительство и возврат требуют доказанного учёта. При расхождении останови зависимые сценарии; не добывай материалы вручную и не восполняй разницу бесплатной выдачей.",
+    "После неизвестного исхода команды не повторяй её автоматически. Потеря фокуса, F12, вмешательство человека, смерть, смена мира/сессии или выход за область прекращают ввод и отпускают кнопки.",
+    "Старые принятые Ostrix случаи не повторяй отдельно. Их использование как зависимости полного нового пути отмечай явно; новые результаты относятся к точной версии и набору данных.",
+    "Не подменяй критерии успеха словами модели, отправкой ввода, чтением файла, миниатюрой или одним кадром. Неподтверждённый пункт остаётся unverified; недоступная функция или данные дают blocked.",
+    "Штатный выход и reload — граница разрешения и двухфазный checkpoint. После нового nonce сначала сверяй сохранённый checkpoint и запрос владельца; не продолжай старую очередь ввода.",
+    "Не устанавливай моды, не меняй настройки Windows, разрешение экрана, сервер и профили автоматически. Проверки сети/другого разрешения ждут подготовленной владельцем среды.",
+    "Логируй решение и его краткую причину до действия, затем квитанцию и наблюдение. Не сохраняй скрытые рассуждения, секреты и данные основных сохранений.",
+    "Полный сценарий завершён только когда все его контрольные точки доказаны. Не заменяй его пилотом инвентаря/камеры. При блокере сообщи конкретную возможность или данные, которых не хватает."
+  ],
+  "logging": {
+    "events": "events.jsonl",
+    "status": "status.json",
+    "report": "report.json",
+    "screenshots": "frames/<event_id>.png",
+    "checkpoint": "checkpoint-before-reload.json",
+    "event_fields": ["utc", "run_id", "scenario_id", "milestone_id", "event_id", "kind", "session_nonce", "decision", "reason", "action", "args", "before", "receipt", "after", "evidence_paths", "seconds", "status", "error"],
+    "statuses": ["prepared", "running", "waiting_owner_reload", "completed", "failed", "blocked", "unverified", "aborted"],
+    "rules": [
+      "Append-only: нельзя переписывать неудачные попытки. Не начатый шаг не называется пройденным.",
+      "Каждый опасный шаг получает уникальный ID и снимок до/после; unknown outcome запрещает replay.",
+      "В отчёте каждой контрольной точки: ожидаемое, наблюдаемое, ссылки на native/file/frame evidence, итог и причина.",
+      "Перед/после операции с предметами: полные свойства экземпляров, количества всех ресурсов, содержимое конкретных сундуков/креплений и объекты мира.",
+      "Перед reload: версия/SHA, идентичность QA-мира/персонажа, трансформации объектов, данные чертежа, инвентарь/содержимое и квитанции выдачи. После reload сравнить независимо.",
+      "Игровые логи/кадры остаются локальными artifacts, не публикуются и не попадают в Git."
+    ]
+  },
+  "fixtures": {
+    "supported": "tests/fixtures/player-exchange/16-supported-snap.blueprint",
+    "snap_a": "tests/fixtures/player-exchange/17-supported-snap-a.blueprint",
+    "snap_b": "tests/fixtures/player-exchange/18-supported-snap-b.blueprint",
+    "sign": "tests/fixtures/player-exchange/02-sign.blueprint",
+    "opaque": "tests/fixtures/player-exchange/03-opaque.blueprint",
+    "lamp": "tests/fixtures/player-exchange/06-lamp.blueprint",
+    "lava": "tests/fixtures/lava-scale/08-lava-scale.blueprint",
+    "pinned_scale": "tests/fixtures/pinned-scale/09-pinned-scale.blueprint",
+    "source_position": "tests/fixtures/placement-headers/15-source-position.blueprint",
+    "decimal_comma": "tests/fixtures/planbuild/26-planbuild-decimal-comma.blueprint",
+    "snap_tail": "tests/fixtures/planbuild/27-planbuild-snap-tail.blueprint",
+    "legacy": "tests/fixtures/vbuild/22-legacy-zero-comma.vbuild",
+    "hashed_mounts": "tests/fixtures/planbuild/28-planbuild-hashed-mounts.blueprint",
+    "storage106": "tests/fixtures/planbuild/29-planbuild-storage106.blueprint",
+    "missing_choice": "tests/fixtures/missing-policy/12-missing-choice.blueprint",
+    "replacement": "tests/fixtures/replacement/14-replace-missing.buildworks.json",
+    "unknown_preview": "tests/fixtures/metadata/19-unknown-preview.buildworks.json",
+    "tree": "tests/fixtures/metadata/20-tree-filters.buildworks.json",
+    "room": "tests/fixtures/metadata/21-camera-room.buildworks.json",
+    "empty": "tests/fixtures/contents/24-contents-empty.buildworks.json",
+    "populated": "tests/fixtures/contents/25-contents-populated.buildworks.json",
+    "armor": "tests/fixtures/armor-state/10-armor-state.blueprint",
+    "heavy": "tests/fixtures/player-exchange/07-heavy-editor.blueprint",
+    "all_missing": "tests/fixtures/agent-suite/30-all-missing.blueprint",
+    "heavy_supported": "tests/fixtures/agent-suite/31-heavy-supported.blueprint",
+    "invalid_json": "tests/fixtures/agent-suite/32-invalid-json.buildworks.json",
+    "external_table": "artifacts/external-blueprints/BiomeBlueprints-1.0.3/smoke/hs_ashlands_madzobuild_coffeetable.blueprint",
+    "external_provenance": "artifacts/external-blueprints/BiomeBlueprints-1.0.3/provenance.json",
+    "fog_handoff": "artifacts/fog-ghost-study/wall-11/HANDOFF_BUILDWORKS_RU.md"
+  },
+  "scenarios": [
+    {
+      "id": "S01", "title": "Импорт → редактор → строительство → сохранение мира",
+      "objective": "Доведи внешнюю постройку и поддержанный стенд до реально построенных, устойчивых и сохранённых объектов с обычной стоимостью. Проверь форму, содержимое и баланс после перезапуска, не останавливайся на миниатюре.",
+      "depends_on": [], "fixtures": ["external_table", "external_provenance", "supported"],
+      "required_capabilities": ["full_scenario_executor", "safe_ui_targets", "file_dialog", "blueprint_snapshot", "world_objects", "resource_ledger", "reload_checkpoint"],
+      "limits": {"seconds": 1800, "actions": 500},
+      "setup": ["Сверить сохранённое авторство Madzobuild/OverDrive и local-testing-only условия; не распространять исходник.", "Существующий TEST24 и старые стенды не разбирать. Выбрать свободное место у QA-станций.", "До старта составить точный бюджет из prefab-рецептов и сравнить с инвентарём: после прошлой серии FineWood/Nails отсутствовали. При нехватке подготовить запрос отдельного QA-набора, не выдавать его молча."],
+      "milestones": [
+        {"id":"import", "task":"Через «Импорт файла» открыть external_table, прочитать обзор, сохранить данные и «Подтвердить импорт». Найти созданную карточку; повторить с supported, если нужной карточки ещё нет.", "expect":"Правильные prefab, число/трансформации, происхождение и предупреждения; источники не изменены. Намеренный импорт создаёт копию, самопроизвольных копий нет.", "evidence":["source_sha_before_after","import_review","blueprint_snapshot","frame"]},
+        {"id":"edit", "task":"«РЕДАКТИРОВАТЬ» → «СОХРАНИТЬ КАК…» с уникальным именем запуска. Изменить одну деталь на известную величину, сохранить и повторно открыть копию.", "expect":"Исходник сохранён; изменена только выбранная запись, форма/масштаб/опоры сохраняются. Принятый Save As используется как зависимость полного пути.", "evidence":["blueprint_before_after","reopened_document","frame"]},
+        {"id":"build", "task":"Открыть копию из молотка, проверить призрак и стоимость. Отключить содержимое, если оно есть. Построить ровно один экземпляр на подходящей опоре.", "expect":"Призрак и результат совпадают по позициям/поворотам/масштабу, полный состав устойчив. Ровно ожидаемые ресурсы списаны один раз; неподдерживаемое содержимое не восстановлено.", "evidence":["ghost_transforms","placed_objects","resource_ledger","stability_observation","frame"]},
+        {"id":"reload", "task":"Сохранить checkpoint, отпустить ввод и запросить штатный перезапуск того же QA-мира. После разрешённого возвращения сравнить мир, чертёж и баланс.", "expect":"Та же форма и состав, нет повторной выдачи, бесплатных предметов и повторного списания. Успех без reload запрещён.", "evidence":["checkpoint_before_reload","new_session_identity","world_objects_after_reload","inventory_identity","supply_receipts"]}
+      ]
+    },
+    {
+      "id": "S02", "title": "Форматы, масштаб, надписи и экспорт",
+      "objective": "Проверь всю цепочку конвертации на разных форматах: обзор → редактор → экспорт выбранного формата → повторное чтение → контрольное размещение подходящих частей. Отдели сохранённые поля от восстановленного поведения.",
+      "depends_on": [], "fixtures": ["decimal_comma", "legacy", "lamp", "lava", "pinned_scale", "source_position", "snap_tail", "opaque", "storage106", "hashed_mounts"],
+      "required_capabilities": ["full_scenario_executor", "safe_ui_targets", "file_dialog", "blueprint_snapshot", "file_roundtrip", "world_objects", "resource_ledger"],
+      "limits": {"seconds": 2400, "actions": 700},
+      "setup": ["Для каждого файла своя копия/имя результата; сырой архив неизвестных полей не считать поддержанным поведением.", "Специальные ArmorStand/данные хранилищ без готового игрового восстановления допускают честный blocked для соответствующего поведения, а не успех всей серии."],
+      "milestones": [
+        {"id":"matrix", "task":"Импортировать каждый файл, сохранить обзор возможностей/потерь/зависимостей. Открыть в редакторе и сверить детали с исходными записями.", "expect":"Decimal comma не меняет 3,25/-4,5/0,125, кватернион, масштаб1,5/0,5/2,25 и «Привет, мир». Legacy vbuild имеет честный результат/отказ; неизвестные данные архивированы с версией/источником.", "evidence":["source_records","import_review","blueprint_snapshot","frame"]},
+        {"id":"scale", "task":"Проверить lamp/lava/pinned_scale/source_position на preview и безопасном призраке; сопоставить prefab localScale и сохранённый относительный масштаб, pivot/оси и вложенные трансформации.", "expect":"Нет гигантской лампы или произвольного уменьшения всего дома. Положение источника не превращается в смещение постройки в мире. Неизвестный prefab остаётся неизвестным.", "evidence":["prefab_scale","source_transform","editor_transform","ghost_transform","frame"]},
+        {"id":"export", "task":"«Экспорт файла»: проверить выбор имени, папки, BuildWorks JSON и поддержанных сторонних вариантов; читать предупреждения и подтверждать только явно указанную потерю данных в копии.", "expect":"У результата точный читаемый путь; исходник не изменён. Native формат сохраняет нужные данные. Сторонний содержит только свой контракт; наши расширения не объявлены читаемыми чужим модом.", "evidence":["export_review","export_paths","source_sha_before_after","parsed_export"]},
+        {"id":"reimport", "task":"Повторно открыть экспортированные файлы, сверить надпись/масштаб/опоры/архив. На подходящей опоре разместить контрольную табличку и лампу с обычной стоимостью, если prefab доступны.", "expect":"Текст и форма соответствуют данным; утраты ровно заявленные. Для storage106/hashed_mounts «ОЧИСТИТЬ В КОПИИ» убирает активное содержимое копии, не исходника, и оно не возрождается при чтении.", "evidence":["reimport_snapshot","world_objects","resource_ledger","original_archive_bytes","frame"]}
+      ]
+    },
+    {
+      "id": "S03", "title": "Редактор: преобразования, опоры, камера и каталог",
+      "objective": "Отредактируй сложную копию, сохрани её и доведи до пригодного к размещению чертежа. Проверь изменения новых инструментов в одном рабочем цикле, сохрани группы и оригинал.",
+      "depends_on": [], "fixtures": ["supported", "tree", "room"],
+      "required_capabilities": ["full_scenario_executor", "safe_ui_targets", "file_dialog", "editor_interaction", "blueprint_snapshot", "cursor_wrap_observation"],
+      "limits": {"seconds": 1800, "actions": 600},
+      "setup": ["Использовать копии с именем запуска. Save As, камера и фильтр уже приняты в базовых случаях; здесь проверить только новые сочетания и сохранение результата полного сценария."],
+      "milestones": [
+        {"id":"transform", "task":"Отключить «Сохранять пропорции». S→X: выйти мышью за1000% и подтвердить; проверить минимум1%. Затем S→X→Z и G→X→Z мышью и числом. Проверить отмену, Undo/Redo.", "expect":"Предел фиксируется без точного попадания, Y не меняется при XZ, одна операция — один Undo. Вращение не обязано поддерживать пару осей.", "evidence":["document_transforms","undo_redo_snapshots","frame"]},
+        {"id":"cursor", "task":"В активной операции провести курсор через края viewport, проверить продолжение, Ctrl для выхода на панель и Esc. Потерю фокуса испытывать только в отдельно разрешённой фазе остановки.", "expect":"Нет скачка, застрявшего курсора и скрытого изменения после отмены. Недоступный backend даёт честный отказ, не фиктивный проход.", "evidence":["cursor_positions","interaction_state","document_before_after","frame"]},
+        {"id":"anchors", "task":"Создать свободную опору, переместить её гизмой без здания. Отдельно назначить центр преобразования и опору размещения; сохранить пользовательскую привязку. Найти отсутствующие записи фильтром, проверить компактность и Space у панели подсказок.", "expect":"Опоры независимы от деталей и A/B; группы не разорваны. Меню не закрыто подсказками, фильтр меняет список без потери состава.", "evidence":["anchor_and_snap_records","group_tree_before_after","ui_rectangles","frame"]},
+        {"id":"persist", "task":"В room использовать внутреннюю камеру для установки предмета. Сохранить/открыть все рабочие копии, проверить каталог молотка/редактора, скрытие/возврат и удаление только собственной тестовой копии.", "expect":"Все подтверждённые преобразования/опоры/состав сохранены, ввод возвращён игре, оригиналы существуют. Внешний источник не удаляется действием скрытия.", "evidence":["reopened_document","catalog_ids","source_sha_before_after","input_release","frame"]}
+      ]
+    },
+    {
+      "id": "S04", "title": "Отсутствующая деталь → совмещение/замена → пригодный чертёж",
+      "objective": "Открой неполный чертёж, сохрани неизвестную запись и её положение, совмести замену из нескольких своих деталей, затем осознанно удали или замени маркер и сохрани пригодный результат.",
+      "depends_on": [], "fixtures": ["missing_choice", "replacement", "unknown_preview", "all_missing"],
+      "required_capabilities": ["full_scenario_executor", "safe_ui_targets", "file_dialog", "editor_interaction", "blueprint_snapshot", "missing_policy_verification", "world_objects", "resource_ledger"],
+      "limits": {"seconds": 1800, "actions": 500},
+      "setup": ["Не устанавливать отсутствующие моды. Использовать намеренно неизвестные QA-prefab из файлов; создать отдельные keep/omit копии.", "Размер unknown без metadata не выдумывать; bbox известного replacement использовать только согласно записанным bounds/pivot."],
+      "milestones": [
+        {"id":"keep", "task":"Импортировать с сохранением отсутствующей записи. Проверить предупреждение в обоих каталогах, неполную миниатюру и возможность «РЕДАКТИРОВАТЬ».", "expect":"Все доступные детали видны. Неизвестная отдельная запись сохраняет ID/положение/поворот/масштаб и происхождение; условный размер честно отмечен.", "evidence":["missing_records","catalog_warning","preview_frame","source_sha_before_after"]},
+        {"id":"position", "task":"В replacement выбрать QA missing target и две стены. «СОВМЕСТИТЬ С ОТСУТСТВУЮЩЕЙ»: осмотреть preview, отменить, повторить и применить; вручную довести, Undo/Redo.", "expect":"Известный центр bounds совмещён с центром замены; неизвестная поверхность не угадывается. При совмещении рамка и запись остаются; размеры стен сами не подгоняются.", "evidence":["known_bounds_centres","replacement_transforms","undo_redo_snapshots","frame"]},
+        {"id":"resolve", "task":"Сохранить/открыть копию с ориентиром. Затем проверить явную замену с удалением записи и отдельный импорт без неизвестных деталей; проверить отмену решения. Для all_missing выбрать исключение неизвестных.", "expect":"Запись исчезает только после явного действия; исходник сохранён. All_missing после исключения даёт0 деталей: конвертация в пустую постройку запрещена, карточка не создаётся.", "evidence":["reopened_document","explicit_omission_review","record_ids","frame"]},
+        {"id":"place", "task":"Подготовить resolved-копию к размещению и построить с ресурсами, если все оставшиеся prefab поддержаны.", "expect":"На месте ориентира находятся выбранные стены в сохранённой позиции; невидимой подстановки по похожему имени нет. Отсутствие модов/деталей не скрывается от пользователя.", "evidence":["ghost_and_world_transforms","resource_ledger","resolved_document","frame"]}
+      ]
+    },
+    {
+      "id": "S05", "title": "Захват постройки из мира → редактирование → новая постройка",
+      "objective": "Возьми доступный стенд в мире объёмным выделением, отрегулируй высоты и ручной состав, сохрани чертёж, измени копию и построй её отдельно без изменения исходной постройки.",
+      "depends_on": ["S01"], "fixtures": ["supported"],
+      "required_capabilities": ["full_scenario_executor", "safe_ui_targets", "world_selection", "loaded_zone_observation", "blueprint_snapshot", "world_objects", "resource_ledger", "reload_checkpoint"],
+      "limits": {"seconds": 1800, "actions": 500},
+      "setup": ["Использовать свой стенд S01; не захватывать/удалять чужие станции. Полностью загрузить необходимую область. Правило текущего продукта — origin внутри объёма, не любое пересечение модели."],
+      "milestones": [
+        {"id":"volume", "task":"Молоток → «ЗАХВАТИТЬ ИЗ МИРА». Выделить площадь сверху, отрегулировать «Низ»/«Верх» и нажать «Обновить выделение». До обновления попробовать сохранить; проверить пересекающие границу детали.", "expect":"Виден состав и границы, устаревший выбор не сохраняется. Результат соответствует документированному origin-правилу, незагруженная область явно обозначена.", "evidence":["selection_volume","world_origins","loaded_zones","ui_state","frame"]},
+        {"id":"manual", "task":"Исключить одну деталь строкой, изменить высоты/обновить, вернуть её; добавить видимую деталь снаружи кликом. Проверить неверный диапазон высот и отмену.", "expect":"Ручные решения сохраняются при обновлении, отказ не очищает прежний выбор; мир/ресурсы не изменены, подсветка исчезает после отмены.", "evidence":["selection_ids_before_after","world_snapshot","inventory_identity","input_release","frame"]},
+        {"id":"capture", "task":"Повторить корректное выделение и «СОХРАНИТЬ». Открыть новую карточку, сравнить состав, изменить одну деталь и сохранить отдельную копию.", "expect":"Захвачены доступные поддержанные данные/metadata; новые записи не копируют старые сетевые ID как идентичность новых объектов. Исходный стенд сохранён.", "evidence":["captured_document","source_world_snapshot","new_record_ids","frame"]},
+        {"id":"rebuild", "task":"Построить изменённую копию отдельно, сверить ресурсы/геометрию и сохранить checkpoint для разрешённого reload.", "expect":"Исходная и новая постройки независимы; новый состав/масштаб соответствует редактору и сохраняется после reload без повторной выдачи.", "evidence":["placed_objects","resource_ledger","checkpoint_before_reload","world_objects_after_reload"]}
+      ]
+    },
+    {
+      "id": "S06", "title": "Привязки редактора и мира на повёрнутых объектах",
+      "objective": "Сопоставь editor snap и автоматическую мировую привязку A/B с относительным поворотом90°, пользовательскими точками и масштабом. Найди воспроизводимый сбой, а не случайно удачное соединение.",
+      "depends_on": [], "fixtures": ["snap_a", "snap_b", "supported", "snap_tail"],
+      "required_capabilities": ["full_scenario_executor", "safe_ui_targets", "editor_interaction", "blueprint_snapshot", "snap_frames", "world_objects", "resource_ledger", "reload_checkpoint"],
+      "limits": {"seconds": 1500, "actions": 450},
+      "setup": ["Новая серия оправдана сообщением Ostrix о плохом автоматическом world snap; редактор в прежних случаях работал. Не считать старую предварительную приёмку17/18 полной мировой проверкой."],
+      "milestones": [
+        {"id":"frames", "task":"Открыть A/B, зафиксировать локальные точки/повороты и сохранённые пользовательские опоры. Проверить соединение в редакторе, сохранить копии без случайного изменения оригинала.", "expect":"Известны конкретные source/target snap frames и ожидаемая transform; точки не смешаны с углами общего bbox или временными A/B.", "evidence":["document_snap_frames","expected_transform","editor_snap","frame"]},
+        {"id":"automatic", "task":"Построить A, повернуть B относительно A на90° и навести без ручной коррекции. Записать поведение auto snap и выбранную пару; затем проверить штатное переключение точек.", "expect":"Призрак соединяется выбранными совместимыми точками в их системе координат. Ошибка при пустом aimedPiece/fallback не маскируется ручным подбором.", "evidence":["native_snap_receipts","source_target_frames","ghost_transform","frame_sequence"]},
+        {"id":"commit", "task":"При доказанном совпадении установить B, повторить контроль с нестандартным масштабом supported и пользовательской точкой.", "expect":"Выбранные точки совпадают в мировых координатах с допуском0,01м; preview и установленная transform одинаковы. Сохраняются native validation и обычная стоимость.", "evidence":["snap_distance","ghost_and_placed_transform","resource_ledger","frame"]},
+        {"id":"persist", "task":"Сохранить checkpoint и после разрешённого reload сравнить позы и доступность сохранённых точек.", "expect":"Нет сдвига/повторной выдачи; отдельно записан результат каждого режима automatic/cycle/user point, не общий успех по одному удачному клику.", "evidence":["checkpoint_before_reload","world_objects_after_reload","persisted_snap_records"]}
+      ]
+    },
+    {
+      "id": "S07", "title": "Предметы, сундуки и крепления с обычной стоимостью",
+      "objective": "Проверь независимые настройки содержимого, строительство с собственным предметом, его свойства, снятие/возврат и сохранение. Не восстанавливай архивное состояние вместо свойств предоставленного предмета.",
+      "depends_on": [], "fixtures": ["empty", "populated", "hashed_mounts", "storage106", "armor"],
+      "required_capabilities": ["full_scenario_executor", "safe_ui_targets", "file_dialog", "blueprint_snapshot", "inventory_identity", "container_contents", "mount_contents", "world_objects", "resource_ledger", "reload_checkpoint"],
+      "limits": {"seconds": 2400, "actions": 700},
+      "setup": ["Только отдельный новый стенд: прежний TEST24 оставить до завершения его reload-проверки. До начала учесть два имеющихся меча полностью; не выдавать дополнительные.", "Стоимость конструкции TEST24 в проверенном случае14Wood/4FineWood/1BronzeNails. Сверить текущие рецепты; FineWood/Nails могут отсутствовать — требуется отдельный согласованный setup, не обход цены.", "Непустые сундуки/ArmorStand пока не объявлены реализованными: заранее прочитать текущую границу поддержки и зафиксировать честный отказ либо blocked до готовности функции."],
+      "milestones": [
+        {"id":"choices", "task":"В импорте/экспорте независимо выбрать «СОХРАНИТЬ»/«ОЧИСТИТЬ В КОПИИ» для хранилищ и креплений. В «Перед размещением: содержимое» проверить четыре сочетания двух галочек, закрытие и отмену.", "expect":"Настройки независимы; отмена не строит/не списывает. Отключение размещения не очищает исходный чертёж. Если окно открыто запрошенным ЛКМ, его подтверждение не получает повторный ЛКМ.", "evidence":["checkbox_values","source_archive_before_after","inventory_identity","native_ui_outcome","frame"]},
+        {"id":"empty", "task":"На empty построить пустые сундук/крепление с обеими галочками off. Реально открыть сундук и осмотреть крепление.", "expect":"Четыре устойчивых объекта; точная стоимость, два меча остаются, сундук и крепление пусты. Прежний проход .165 служит исходным фактом, не доказательством новой серии.", "evidence":["placed_objects","open_container_snapshot","mount_contents","resource_ledger","frame"]},
+        {"id":"provided", "task":"На новом варианте включить только крепления и передать свой меч. Снять его штатно, сравнить все свойства, при необходимости повесить обратно; проверить настенное/напольное крепления отдельно.", "expect":"Ровно один предоставленный предмет списан/возвращён; его качество/прочность/custom attributes сохранены. Нет бесплатного ремонта, архивного улучшения или копии предмета.", "evidence":["inventory_identity_before_after","mounted_item_identity","resource_ledger","frame"]},
+        {"id":"storage", "task":"Для populated включить хранилища, проверить текущее поддержанное поведение или честный отказ до расходов. Выключить содержимое и проверить пустую копию. Storage106/hashed mounts: экспорт/повторное чтение без очистки оригинала.", "expect":"При неподдерживаемом восстановлении нет частичной стройки/расходов. Поддержанный ресурсный перенос требует реальные предоставленные предметы, не архивные бесплатные. Неизвестный архив не объявлен восстановленным.", "evidence":["support_boundary","container_contents","source_archive_bytes","parsed_export","resource_ledger"]},
+        {"id":"reload_refund", "task":"Сохранить состояние заполненных поддержанных объектов до reload; после разрешённого возвращения снять предметы и разобрать только собственные новые тестовые детали, собрать возврат.", "expect":"После reload содержимое/атрибуты и баланс совпадают, выдача не повторена; итоговый возврат соответствует реальному расходу, нет потерь и дубликатов.", "evidence":["checkpoint_before_reload","container_and_mount_after_reload","item_identity_after_return","final_resource_ledger"]}
+      ]
+    },
+    {
+      "id": "S08", "title": "Отмена, нехватка ресурсов и сбои без потерь",
+      "objective": "Пройди отмену до списания, прерывание после частичного результата и остановку QA-исполнителя. Докажи, что предметы/ресурсы не теряются и не дублируются, а неопределённая команда не повторяется.",
+      "depends_on": ["S07"], "fixtures": ["empty", "populated", "invalid_json"],
+      "required_capabilities": ["full_scenario_executor", "safe_ui_targets", "world_objects", "resource_ledger", "inventory_identity", "controlled_failure", "input_release", "recovery_checkpoint"],
+      "limits": {"seconds": 1500, "actions": 450},
+      "setup": ["Только заранее подготовленный собственный вариант с известной нехваткой/поддерживаемой точкой отказа; не повреждать мир/мод/исходный файл для провокации сбоя.", "Не начинать ресурсный сбой, пока штатный проход S07 и точный баланс не доказаны. Повторное обнуление QA-квитанций запрещено."],
+      "milestones": [
+        {"id":"before_cost", "task":"Открыть invalid_json: дождаться читаемого отказа, вернуться и открыть корректный файл. Отменить импорт, обзор содержимого, preview и размещение до первого списания. Затем открыть новый корректный сценарий.", "expect":"Повреждённый JSON отклонён без карточки/зависшего окна. Нет новых world objects/расходов/позднего окна после отмены; исходный чертёж и ввод сохранены.", "evidence":["ui_cancellation","world_before_after","resource_ledger","source_sha_before_after","frame"]},
+        {"id":"partial", "task":"Использовать подготовленный допустимый вариант нехватки/прерывания. Зафиксировать фактически построенные детали, расходы и штатную отмену без blind retry.", "expect":"Ресурсы возвращаются согласно подтверждённым расходам, непотраченные не выдаются. Призрачный проект с колышком не считать существующим, пока эта функция не реализована.", "evidence":["failure_point","placed_objects","partial_resource_ledger","refund_ledger","frame"]},
+        {"id":"stop", "task":"В отдельно разрешённой фазе проверить F12/потерю фокуса/смену stopRevision во время безопасного действия; неизвестный исход воспроизводить контролируемым тестовым каналом без повторного строительства.", "expect":"Ввод прекращается и отпускается, оставшаяся очередь не исполняется. При unknown отчёт содержит последнее известное состояние, команда не отправляется второй раз.", "evidence":["stop_revision","native_receipts","input_release","event_log","frame"]},
+        {"id":"recover", "task":"После нового явного разрешения проверить новый свежий сеанс и восстановление ручного ввода; сверить окончательный мир/инвентарь и закрыть отчёт.", "expect":"Старая очередь/ID не возобновлены, ресурсы/предметы учтены точно, зависимые тесты при расхождении заблокированы.", "evidence":["new_authorization","fresh_session","final_world_snapshot","final_resource_ledger"]}
+      ]
+    },
+    {
+      "id": "S09", "title": "Администратор, состояние объектов и детали без рецепта",
+      "objective": "Сравни обычную стройку с административным восстановлением, проверь серверные права и запрет бесплатного восстановления обычному игроку. Отдельно проверь мировые объекты без рецепта и назначенную администратором цену.",
+      "depends_on": ["S07"], "fixtures": ["populated", "armor", "storage106"],
+      "required_capabilities": ["full_scenario_executor", "safe_ui_targets", "admin_restore_feature", "server_authorization", "inventory_identity", "container_contents", "world_objects", "resource_ledger", "non_recipe_fixture"],
+      "limits": {"seconds": 1800, "actions": 500},
+      "setup": ["Нужны реализованный admin restore и отдельные разрешённые локальная/admin и обычная роли. Наличие QA god не доказывает серверные административные полномочия.", "Для дерева/объекта без рецепта подготовить собственный точный prefab fixture и цену из поддержанного админского интерфейса; не удалять живой лес ради теста."],
+      "milestones": [
+        {"id":"normal", "task":"Обычной ролью открыть архив объектов, строить по рецепту/предоставленным предметам и попытаться запросить административное восстановление через поддержанный UI.", "expect":"Обычная роль платит; сервер отклоняет admin restore. Надпись/состав/настройки конструкции отделены от износа, топлива, инвентаря и административных свойств.", "evidence":["server_permission_receipt","object_state_boundary","inventory_identity","resource_ledger","frame"]},
+        {"id":"admin", "task":"После подтверждённой смены роли выбрать отдельный режим полного восстановления. Восстановить разрешённое состояние/содержимое и сравнить с архивом.", "expect":"Безресурсный режим/полные атрибуты доступны только после серверной проверки, новые объекты получают новую сетевую идентичность. Неподдерживаемые данные отмечены, не угаданы.", "evidence":["server_permission_receipt","restored_object_state","new_network_ids","archived_state","frame"]},
+        {"id":"world_prefab", "task":"Проверить дерево/деталь без рецепта: запрет обычной роли без цены, разрешение admin, затем обычное строительство по явно назначенной цене.", "expect":"Нет выдачи админских возможностей клиентом; цена списывается один раз. Неизвестный prefab не заменяется похожим именем.", "evidence":["recipe_policy","server_permission_receipts","world_objects","resource_ledger","frame"]},
+        {"id":"persist", "task":"Сохранить контрольные snapshots и после разрешённого reload/переподключения проверить права и состояние.", "expect":"Админские свойства не возвращаются обычной роли, состояние поддержанных новых объектов сохраняется, бесплатных копий нет.", "evidence":["role_after_reconnect","object_state_after_reload","final_inventory_identity"]}
+      ]
+    },
+    {
+      "id": "S10", "title": "Тяжёлая цепочка, прогресс, отмена и интерфейс",
+      "objective": "Измерь полный путь тяжёлого чертежа от чтения до строительства и сохранения, включая UI-прогресс, отмену и влияние локальной модели. Не выдавай скорость импорта за производительность всей цепочки.",
+      "depends_on": ["S01", "S08"], "fixtures": ["heavy", "heavy_supported"],
+      "required_capabilities": ["full_scenario_executor", "safe_ui_targets", "file_dialog", "blueprint_snapshot", "performance_metrics", "controlled_failure", "world_objects", "resource_ledger", "reload_checkpoint", "heavy_fixture_setup"],
+      "limits": {"seconds": 3600, "actions": 900},
+      "setup": ["heavy содержит1025 стен и служит editor/import нагрузкой. Heavy_supported —1024 детали:256 повторов принятого стенда16 с опорами, сетка16x16 шаг6м. Устойчивость1024 деталей ещё не подтверждена: до массовой стройки проверить несколько ячеек, свободный загруженный footprint около96x96м внутри прежней192x192м площадки и точный бюджет. Вне готовой области остановиться, землю не менять.", "Не отключать лимиты байтов, конечности чисел, переполнений и памяти. QA-обход количества деталей только в изолированной сборке, не на сервере обычного игрока.", "Разрешения экрана/окон подготовить отдельно владельцем; не менять рабочий стол во время его работы."],
+      "milestones": [
+        {"id":"read_catalog", "task":"Замерить чтение/конвертацию heavy, первый и повторный каталог, миниатюру. Отдельно отменить большую подготовку и открыть другой файл.", "expect":"Прогресс и причина отказа видимы, отменённая операция не открывает старый обзор позднее; нет самопроизвольных карточек. Неполная миниатюра честно показывает известное/неизвестное.", "evidence":["stage_timings","memory_and_fps","operation_ids","catalog_ids","frame_sequence"]},
+        {"id":"editor", "task":"Открыть heavy, выбрать/изменить группу, Undo/Redo, сохранить/открыть. Замерить отклик дерева/камеры/гизм и память с локальной моделью и без неё в одинаковых условиях.", "expect":"Нет потерь состава/групп, форма сохранена; зафиксированы числа времени/FPS/памяти, а не субъективное «быстро».", "evidence":["document_before_after","stage_timings","memory_and_fps","model_load_timings","frame"]},
+        {"id":"world", "task":"На подготовленном устойчивом тяжёлом стенде замерить призрак, snap, размещение с обычной стоимостью и сохранение; отмену выполнять только в согласованной безопасной точке.", "expect":"Preview совпадает с полным результатом, стоимость точная, ограничения QA не дают прав игроку. Нет OOM/зависшей очереди/незаметной частичной стройки.", "evidence":["ghost_and_world_counts","stage_timings","memory_and_fps","resource_ledger","frame"]},
+        {"id":"reload_ui", "task":"После разрешённого reload сравнить тяжёлый стенд и баланс. На подготовленных разрешениях проверить пути/закрытие/прогресс, описание над миниатюрой и Space/фильтр.", "expect":"Объекты и состояние сохранены, выдача не повторена; UI читаем и не перекрыт подсказками. Порог планового строительства — отдельная будущая продуктовая настройка.", "evidence":["checkpoint_before_reload","world_objects_after_reload","ui_rectangles","resolution_frames","final_resource_ledger"]}
+      ]
+    },
+    {
+      "id": "S11", "title": "Строительный проект и утверждённый туманный призрак v11",
+      "objective": "Когда функция интегрирована, проверь полный жизненный цикл проекта: непрочная/нефизическая незавершённая форма, колышек, внесение ресурсов, завершение, отмена/возврат и reload. Сравни внешний вид с утверждённым v11.",
+      "depends_on": ["S07", "S08"], "fixtures": ["supported", "fog_handoff"],
+      "required_capabilities": ["full_scenario_executor", "safe_ui_targets", "construction_project_feature", "fog_v11_integration", "project_state", "world_objects", "resource_ledger", "reload_checkpoint"],
+      "limits": {"seconds": 2400, "actions": 700},
+      "setup": ["Сначала прочитать fog_handoff и текущий код. Unity-лаборатория v11 не считается подключением к игре. До наличия строительного проекта сценарий blocked_product_feature, не failed_visual.", "Не начинать интеграцию EarthWorks/терраформирование в рамках проверки; сохранить только согласованную границу будущего взаимодействия."],
+      "milestones": [
+        {"id":"create", "task":"При нехватке ресурсов создать разрешённый проект по чертежу и осмотреть колышек/незавершённые части.", "expect":"Незавершённые части узнаваемы и текстурированы, пропускают свет; у них нет физического препятствия и обычного взаимодействия. Есть состояние проекта, а не уже построенный бесплатный дом.", "evidence":["project_state","collider_and_interaction_state","reference_v11_frames","world_frame"]},
+        {"id":"walk", "task":"Пройти сквозь призрак, снять последовательность до/внутри/после, осмотреть снаружи/изнутри в закреплённой камере/свете.", "expect":"Тело слегка искажает поверхность, раздвигает её светлым прозрачным туманом с завихрениями; после выхода туман и форма плавно возвращаются как v11. Нет самовольного redesign.", "evidence":["reference_v11_frames","world_frame_sequence","collision_observation","timings"]},
+        {"id":"fund", "task":"Проверить доступ к колышку с молотком и без него, внести точно известную часть материалов, завершить проект с остатком.", "expect":"Правила стоимости и server state сохранены; появляются только оплаченные реальные детали, призрак соответствующих частей исчезает. Нет бесплатного ремонта/предметов.", "evidence":["project_state_transitions","server_receipts","resource_ledger","world_objects","frame"]},
+        {"id":"cancel_reload", "task":"Отдельно отменить проект без расходов и с частичными расходами; проверить выпадение ровно оплаченного возврата. Для ещё одного проекта проверить reload на незавершённой и завершённой стадиях.", "expect":"Пустая отмена убирает колышек без выдачи; оплаченная возвращает только фактические ресурсы. Состояние/вклад сохраняются после reload, дубликатов нет.", "evidence":["project_state_transitions","refund_ledger","checkpoint_before_reload","project_after_reload","final_resource_ledger"]}
+      ]
+    },
+    {
+      "id": "S12", "title": "Сеть: строительство, ресурсы, повторное подключение и права",
+      "objective": "На отдельной разрешённой сети с главным сервером и удалённым клиентом проверь один и тот же полный путь построения, предметы/ресурсы, наблюдение обеих сторон, переподключение и серверный restart.",
+      "depends_on": ["S01", "S07", "S08"], "fixtures": ["supported", "empty", "populated"],
+      "required_capabilities": ["full_scenario_executor", "safe_ui_targets", "authorized_network_harness", "remote_client", "server_authorization", "network_object_snapshots", "inventory_identity", "resource_ledger", "reload_checkpoint"],
+      "limits": {"seconds": 3600, "actions": 900},
+      "setup": ["Нужны отдельно подготовленные сервер/второй клиент и разрешение владельца. Нынешний QA-канал разрешает только закрытый Local: этот guard не ослаблять ради сетевого теста.", "Никаких публичных серверов, посторонних игроков и копирования основных сохранений. Сетевая оснастка должна сохранять server-authoritative права/стоимость."],
+      "milestones": [
+        {"id":"connect", "task":"Сверить версии/SHA, роли и разрешённые миры сервера/клиента; зафиксировать начальные snapshots обоих инвентарей.", "expect":"Нет несовместимых версий и полученных клиентом административных полномочий. Без подтверждённой сетевой оснастки немедленно blocked.", "evidence":["peer_versions","server_roles","world_identity","both_inventory_snapshots"]},
+        {"id":"build", "task":"Клиентом построить изменённый supported, затем поддержанный предметный вариант empty. Сервером и другим клиентом наблюдать результат; проверить отказ без ресурсов/прав.", "expect":"Одинаковые transform/scale/содержимое, одна серверная стоимость и один предмет. Отказ не создаёт бесплатных/частичных копий; старые network IDs не становятся новыми объектами.", "evidence":["server_receipts","both_world_snapshots","network_ids","both_resource_ledgers","frames"]},
+        {"id":"reconnect", "task":"Штатно переподключить клиента, затем в согласованной фазе перезапустить тестовый сервер. Сверить состояние и предметы обеих сторон.", "expect":"Постройка/масштаб/состояние сохраняются, расход/выдача не повторяются; сервер остаётся источником разрешений.", "evidence":["checkpoint_before_reload","server_restart_receipt","both_world_snapshots_after","both_inventory_snapshots_after"]},
+        {"id":"refund", "task":"Снять предмет и разобрать только свои новые детали через штатные серверные действия; проверить итоговый возврат на всех сторонах.", "expect":"Единый фактический результат без потери/дублирования предметов и ресурсов. Локальный успех не подменяет сетевую приёмку.", "evidence":["server_refund_receipts","both_final_resource_ledgers","both_item_identities","frames"]}
+      ]
+    }
+  ]
+}

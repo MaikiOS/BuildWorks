@@ -10,3 +10,5 @@ tools/BuildWorks.UiWorkbench/Assets/LocalVanillaPreview/
 release/package/
 release/*.zip
 PUBLISH_CHECKLIST.md
+__pycache__/
+*.py[cod]

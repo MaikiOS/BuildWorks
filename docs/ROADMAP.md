@@ -1,3 +1,22 @@
+## 2026-10-12 — complete scenario package; live tests paused
+
+12 whole local-model tasks/49 evidence milestones/29 hashed files prepared offline;
+CPU3/PASSED/Ship. Small whole mission completed twice16.312s/19.844s; CPU4+5.
+Full execution remains blocked by missing safe UI/object/item evidence/reload
+support, not replaced with inventory/camera success. Owner paused game testing;
+no further model/input until authorized. Next: implement full task execution offline.
+[Package](LOCAL_QA_FULL_SCENARIOS.md). [Runtime evidence](LOCAL_QA_MISSION_2026-10-12_RU.md).
+
+## 2026-10-12 — local motion and native TEST24 .165
+
+Native Submit/ghost/god/goto confirmed. Local camera-walk completed12.765s including
+load: yaw+3.008°, forward0.622m,15 stacks unchanged. CPU5/red-green/PASSED/Ship.
+Codex separately used the channel for catalog/independent content toggles and
+build4/4:14Wood/4FineWood/1Nails, two swords retained, chest opened empty.
+Next: reload new stand near2560/41/124 and Wood30+11/FineWood0/Nails0; no DLL change.
+Full autonomous hammer/build, FPS/F12/network open. Goal API still paused.
+[Evidence](LOCAL_QA_MOTION_2026-10-12.md).
+
 ## 2026-10-12 — QA .165: native text-field submission
 
 .164 console reproduces missing Submit; teleport/protection are not confirmed.

@@ -241,7 +241,8 @@ namespace OstrixMods.BuildWorks
             bool busy = importing || planExport != null || placementPreparation != null;
             primary.interactable = !completed && !busy && listing == null && !directory.gameObject.activeSelf &&
                 (blueprint != null || selected != null) && (!reviewingContents ||
-                (planBuild ? planReview != null : contentsSummary != null && missingReview != null && (!omitMissingParts || missingReview.CanOmit)));
+                (planBuild ? planReview != null : contentsSummary != null && missingReview != null &&
+                (blueprint != null || missingReview.EmptyDocuments == 0) && (!omitMissingParts || missingReview.CanOmit)));
             copyPath.interactable = !busy;
             if (completed || busy)
                 foreach (Selectable control in root.GetComponentsInChildren<Selectable>())
@@ -493,7 +494,8 @@ namespace OstrixMods.BuildWorks
             skin.Apply(armorChoice, active: omitArmorState);
             skin.Apply(missingChoice, active: omitMissingParts);
             skin.Apply(storageChoice, active: clearStorage); skin.Apply(mountChoice, active: clearMounts);
-            message.text = place != null ? T("placement.contents_policy") : missingReview.EmptyDocuments > 0 ? T("exchange.missing_empty") :
+            message.text = place != null ? T("placement.contents_policy") : missingReview.EmptyDocuments > 0
+                ? T(blueprint == null ? "exchange.missing_import_empty" : "exchange.missing_empty") :
                 omitMissingParts ? T("exchange.missing_warning", missingReview.Parts, remainingUnknown, omitArmorState ? effective.ArmorStates : 0) :
                 omitArmorState ? T("exchange.armor_warning", effective.ArmorStates, remainingUnknown) :
                 T(contentsSummary.Unknown != 0 ? "exchange.contents_unknown" :

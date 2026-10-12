@@ -427,6 +427,9 @@ namespace OstrixMods.BuildWorks
                 if (omitMissing != null) ValidateMissingReview(review.Documents, omitMissing, prefabHash);
                 var names = review.Documents.SelectMany(document => document.parts).Select(part => part.prefabName).Distinct(StringComparer.Ordinal).ToArray();
                 var scales = names.ToDictionary(name => name, name => importPrefabScale?.Invoke(name), StringComparer.Ordinal);
+                if (omitMissing == null && importPrefabScale != null && (importHostContext == null || importHostContext() != null) &&
+                    review.Documents.Any(document => document.parts.All(part => !scales[part.prefabName].HasValue)))
+                    throw new InvalidDataException("$buildworks_exchange.missing_import_empty");
                 var supports = MaterialSeedSupportSnapshot(review.Documents);
                 var grids = ContainerGridSnapshot(review.Documents);
                 var metadata = prefabMetadata == null ? null : names.ToDictionary(name => name, name => prefabMetadata(name)?.Copy(), StringComparer.Ordinal);

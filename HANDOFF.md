@@ -1,3 +1,9 @@
+## 2026-10-12 — .170: refuse all-missing import, source only
+
+Default keep-missing now refuses a whole import before writing if any document has no available prefabs, including mixed ZIPs. UI blocks confirmation; partial missing records and backup export remain supported. Red/green Store and actual Tick, full Store, normal/QA0/0, Host/loc990, correctness PASSED/Ponytail Ship. [Evidence](docs/MISSING_IMPORT_170.md).
+
+Installed .169/hash unchanged; no game/model/deployment. [Manual .169 checklist](docs/MANUAL_QA_169_RU.md) skips this reproduced failure. World auto-snap was not changed without a new proven cause. Populated storage/admin/persistent project/stake/fogv11/heavy/network remain open. Overall goal remains incomplete.
+
 ## 2026-10-12 — QA .169 installed; local model discontinued, manual acceptance
 
 Ostrix stopped work on the model tester. [Manual checklist](docs/MANUAL_QA_169_RU.md):11 checks,18 local fixtures, no repetition of accepted cases. Prioritize world auto-snap and external Forest Hut through construction/reload, then editor/formats/missing/empty chest/capture. Missing supplies are explicit; populated inventories/admin/persistent project/fogv11/heavy/network are not ready. .169 is installed; no new deployment needed.

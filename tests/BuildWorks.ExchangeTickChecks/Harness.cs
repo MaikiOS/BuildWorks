@@ -38,7 +38,7 @@ public sealed class ExchangeTickChecks
     {
         internal sealed class Blueprint { public string importSource = "result.zip", importError = null; }
         internal sealed class ContentsSummary { }
-        internal sealed class MissingPartsReview { public bool CanOmit = true; }
+        internal sealed class MissingPartsReview { public bool CanOmit = true; public int EmptyDocuments = 0; }
         internal sealed class ImportReview
         {
             public Func<bool> IsHostCurrent;
@@ -173,7 +173,16 @@ public sealed class ExchangeTickChecks
         failed.Tick();
         Assert(failed.message.text == "worker failure" && failed.importPreparation == null && !failed.primary.interactable &&
             failed.contentsBack.interactable, "Worker failure must retain navigation and block confirmation");
-        Console.WriteLine("PASS actual exchange Tick: own import to result/failure, browser after Back, stale confirmation, two stages and worker failure");
+        var empty = new ExchangeTickChecks { reviewingContents = true,
+            contentsSummary = new CompositeBlueprintStore.ContentsSummary(),
+            missingReview = new CompositeBlueprintStore.MissingPartsReview { CanOmit = false, EmptyDocuments = 1 } };
+        empty.Tick();
+        Assert(!empty.primary.interactable && empty.contentsBack.interactable && empty.root.controls.Last().interactable,
+            "All-missing import must block confirmation while preserving Back/Close");
+        empty.blueprint = new CompositeBlueprintStore.Blueprint();
+        empty.Tick();
+        Assert(empty.primary.interactable, "Existing all-missing blueprint must remain exportable for backup");
+        Console.WriteLine("PASS actual exchange Tick: own import to result/failure, browser after Back, stale confirmation, two stages, worker failure and all-missing import/export boundary");
     }
 }
 internal static class StableHashStub

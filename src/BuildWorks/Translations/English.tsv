@@ -822,6 +822,7 @@ exchange.missing_losses	Missing parts: {0}. Source and prefab IDs below; supplyi
 exchange.missing_unavailable	Prefab registry is unavailable. Presence is unknown; records are kept and omission is disabled.
 exchange.missing_changed	Prefab availability changed. Review the updated list and confirm again; no copy was written.
 exchange.missing_empty	Omission would empty at least one blueprint. A copy without missing parts is unavailable until its prefab mod is installed.
+exchange.missing_import_empty	At least one blueprint has no available parts. The entire import is refused. Install its required mods or select another source file; the original is preserved.
 exchange.missing_warning	Copy omits {0} missing parts and equipment/pose from {2} armor stands. Exact source stays unchanged. Other unknown records: {1}; construction rules still apply.
 exchange.confirm_export	Confirm export
 exchange.confirm_import	Confirm import

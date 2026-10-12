@@ -109,6 +109,26 @@ namespace OstrixMods.BuildWorks.StoreTests
             var backgroundEmpty = store.PrepareImportReview(mixed, ForeignZdoChecks.Hash).GetAwaiter().GetResult().Missing;
             Require(backgroundEmpty.EmptyDocuments == 1 && !backgroundEmpty.CanOmit && backgroundEmpty.Parts == emptyReview.Parts &&
                 backgroundEmpty.Sources.SequenceEqual(emptyReview.Sources), "Background review accepted an all-missing ZIP member");
+            byte[] mixedBytes = File.ReadAllBytes(mixedPath);
+            string previousResult = store.ImportResultPath;
+            bool acceptedEmpty = store.TryImportReviewed(mixed, false, false, ForeignZdoChecks.Hash, out error);
+            if (acceptedEmpty) Wait(store);
+            Require(!acceptedEmpty &&
+                error.Contains("missing_import_empty") && !store.CatalogLoading && store.ImportResultPath == previousResult &&
+                Directory.GetFiles(store.ImportDirectory).Length == before && File.ReadAllBytes(mixedPath).SequenceEqual(mixedBytes),
+                "Default keep-missing import published a ZIP member with no available parts");
+            string absentPath = Path.Combine(directory, "all-missing.blueprint");
+            File.WriteAllText(absentPath, "#Pieces\nqa_absent;;0;0;0;0;0;0;1;\"\";1;1;1");
+            var absentReview = CompositeBlueprintStore.ReviewImportFile(absentPath, ForeignZdoChecks.Hash, 0);
+            Require(!store.TryImportReviewed(absentReview, false, false, ForeignZdoChecks.Hash, out error) &&
+                error.Contains("missing_import_empty") && !store.CatalogLoading && Directory.GetFiles(store.ImportDirectory).Length == before,
+                "Default keep-missing import accepted a standalone blueprint with no available parts");
+            var absentPrepared = ExternalBlueprintLibrary.PrepareForHost(absentReview.Documents.Single(),
+                name => installed.Contains(name) ? Unit : (CompositeBlueprintStore.VectorData?)null);
+            Require(store.TryExportFile(absentPrepared, directory, "missing-backup", false,
+                out string backup, out error, prefabHash: ForeignZdoChecks.Hash) &&
+                ExternalBlueprintLibrary.LoadFile(backup).Single().parts.Single().prefabName == "qa_absent",
+                "Import refusal blocked a lossless export backup of an existing missing record: " + error);
             Require(emptyReview.EmptyDocuments == 1 && !emptyReview.CanOmit &&
                 !store.TryImportReviewed(mixed, false, false, ForeignZdoChecks.Hash, out error, omitMissing: emptyReview) &&
                 error.Contains("missing_empty") && Directory.GetFiles(store.ImportDirectory).Length == before,

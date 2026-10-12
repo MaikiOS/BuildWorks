@@ -1,3 +1,15 @@
+## 2026-10-12 — .163 installed; fast game-control research
+
+Guarded TerrainRamp-1.0-Test deployment complete: both SHA values match,158
+config/import/save files and QA token unchanged; Default clean. Game closed,
+.163 runtime untested. Final .162 log: respawn15:00:19, cause unproven; previous
+balance is pre-death, grave/TEST24 reload persistence remain open. Next launch:
+.163 loader/fresh session, actual same-world state, four objects/empty chest
+without reissue, then new snap cases. Ostrix requested control-tool research:
+NitroGen/Airtest/DXcam/PyDirectInput reviewed, local feedback executor recommended.
+No external tools installed or game launched.
+[Deployment](QA_DEPLOY_163_2026-10-12.md). [Research](GAME_CONTROL_RESEARCH_2026-10-12.md).
+
 ## 2026-10-12 — full empty24 on .162; snap .163 source checks passed
 
 Live .162: TEST24 built4/4, chest opened empty, debit14Wood/4FineWood/1Nail,

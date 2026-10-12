@@ -1,3 +1,15 @@
+## 2026-10-12 — .160: contact diagnostics deployed, native pending
+
+Source db59dd6: QA-only refusal observations, placement/costs/rights unchanged.
+normal/QA0/0, Geometry/Unity ContactOnly, Host25185596/loc989/isolation,
+correctness PASSED/Ponytail Ship. Guarded deploy/both DLL hashes passed;
+156 config/import/save files unchanged, Default clean. .160 does not itself
+fix NoRayHits. Next: fresh QA session, second .159 cancellation balance,
+one fixture24 contact observation, then fix actual cause and prove build/reload.
+Do not modify24/25 or reprovision. Full goal remains active.
+[Evidence and continuation](../../docs/CONTACT_DIAGNOSTICS_160_2026-10-12.md).
+Historical checkpoints follow;11 October pause ended, installed QA is .160.
+
 ## 2026-10-11 — .159: native QA, chest blocker
 
 Channel/folder/state and fixture24 import passed; four contents combinations/cancel work.

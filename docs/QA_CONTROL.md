@@ -1,5 +1,9 @@
 # Native Valheim control channel — QA0.19.141
 
+Current2026-10-12: QA .164 installed, stopRevision guards local decisions across
+idle F12/focus loss; native inventory observation added. Local inventory pilot
+prepared, first runtime pending. [Protocol](LOCAL_QA_AGENT_2026-10-12.md).
+
 [Русский](QA_CONTROL_RU.md)
 
 The bridge is compiled only into the QA BuildWorks DLL. It applies bounded native

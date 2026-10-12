@@ -22,6 +22,7 @@ namespace OstrixMods.BuildWorks
             [DataMember(IsRequired = true)] public string action;
             [DataMember] public bool capture;
             [DataMember] public Step[] steps;
+            [DataMember] public long? stopRevision;
         }
 
         [DataContract]
@@ -40,7 +41,7 @@ namespace OstrixMods.BuildWorks
         }
 
 #pragma warning restore CS0649
-        internal static Request Read(byte[] bytes, string nonce, long lastId, long nowUtc)
+        internal static Request Read(byte[] bytes, string nonce, long lastId, long nowUtc, long stopRevision = 0)
         {
             if (bytes == null || bytes.Length == 0 || bytes.Length > MaximumBytes)
                 throw new InvalidDataException("QA request size must be 1..32768 bytes.");
@@ -53,6 +54,8 @@ namespace OstrixMods.BuildWorks
                 throw new InvalidDataException("QA version, session, ID or expiry is invalid.");
             if (request.action != "batch" && request.action != "state" && request.action != "stop")
                 throw new InvalidDataException("Unknown QA action.");
+            if (request.action == "batch" && request.stopRevision.HasValue && request.stopRevision.Value != stopRevision)
+                throw new InvalidDataException("QA input was stopped after this decision; do not resume automatically.");
             if (request.action != "batch")
             {
                 if (request.steps != null && request.steps.Length != 0) throw new InvalidDataException("Only batch accepts steps.");

@@ -22,6 +22,11 @@ internal static class Program
         if (Read(state).id != 2) throw new Exception("State command changed identity."); ++checks;
         string batch = Header + "\"action\":\"batch\",\"capture\":true,\"steps\":[{\"milliseconds\":2000,\"keys\":[\"W\",\"LeftShift\"],\"buttons\":1,\"pointer\":true,\"x\":0.4,\"y\":0.6}]}";
         if (!Read(batch).capture || Read(batch).steps[0].keys[1] != "LeftShift") throw new Exception("Input batch corrupted."); ++checks;
+        string guarded = batch.Replace("\"action\":", "\"stopRevision\":7,\"action\":");
+        if (BuildWorksQaControlProtocol.Read(Encoding.UTF8.GetBytes(guarded), nonce, 1, 1000, 7).stopRevision != 7)
+            throw new Exception("Stop revision was not retained."); ++checks;
+        Reject(guarded); // Model decision predates an emergency stop, including an idle F12.
+        Reject(batch.Replace("\"action\":", "\"stopRevision\":-1,\"action\":"));
         var timed = Read(batch);
         if (!BuildWorksQaControlProtocol.CanContinue(timed, 1500, 500)) throw new Exception("Valid held input stopped early."); ++checks;
         foreach (var clock in new[] { Tuple.Create(2001L, 0d), Tuple.Create(2001L, 500d), Tuple.Create(2001L, 1000d), Tuple.Create(1500L, 10000d), Tuple.Create(1500L, -1d) })

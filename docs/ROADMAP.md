@@ -1,3 +1,11 @@
+## 2026-10-12 — local pilot / installed QA .164
+
+Qwen3.5 4B/LFM3B downloaded. Pure vision2/6,2/6,0/6 not accepted; command
+selection with native UI state6/6. Local inventory loop rechecks model decisions
+and latches F12 through stopRevision. CPU4/protocol31+publisher/builds0/0,
+Host/localization989/isolation, PASSED/Ship. Deployment preserves166 files.
+Runtime/hammer/snap/build/reload/network open. [Protocol](LOCAL_QA_AGENT_2026-10-12.md).
+
 ## 2026-10-12 — whole-corpus file roundtrip
 
 Biome353/353 and 2v2t202/209 pass copy/native reopen/portable/reimport with all

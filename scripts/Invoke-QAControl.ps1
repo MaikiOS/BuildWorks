@@ -4,6 +4,8 @@ param(
     [string] $StepsJson,
     [switch] $Capture,
     [switch] $Stop,
+    [ValidatePattern('^[0-9a-f]{32}$')][string] $SessionNonce,
+    [Nullable[long]] $StopRevision,
     [ValidateRange(1, 25)][int] $WaitSeconds = 15
 )
 $ErrorActionPreference = 'Stop'
@@ -40,6 +42,7 @@ function Read-ControlJson([string] $name) {
     }
 }
 $session = Read-ControlJson 'session.json'
+if ($SessionNonce -and $session.nonce -cne $SessionNonce) { throw 'QA session changed; do not resume automatically.' }
 $process = Get-Process -Id $session.processId -ErrorAction Stop
 if ($process.ProcessName -ine 'valheim' -or $session.version -ne 1 -or $session.nonce -notmatch '^[0-9a-f]{32}$') {
     throw 'QA bridge session is not attached to a live Valheim process.'
@@ -55,6 +58,7 @@ if ($Stop) {
 $id = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
 $request = [ordered]@{ version = 1; nonce = $session.nonce; id = $id; expiresUtc = $id + 15000; action = $Action; capture = [bool]$Capture }
 if ($Action -eq 'batch') {
+    if ($null -ne $StopRevision) { $request.stopRevision = [long] $StopRevision }
     if (-not $StepsJson) { throw 'batch requires -StepsJson, a JSON array of bounded input steps.' }
     $request.steps = @($StepsJson | ConvertFrom-Json)
 } elseif ($StepsJson) { throw 'state does not accept input steps.' }

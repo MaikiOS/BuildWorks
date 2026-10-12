@@ -1,8 +1,8 @@
 # Prepared local vision probe for Valheim frames
 
-Prepared only: CPU self-tests and archived-frame preflight passed. No real model
-inference, game input/launch, speed/accuracy/FPS or autonomy proof. Installed QA
-.163 unchanged. [Detailed Russian protocol](QA_VISION_PROBE_2026-10-12_RU.md).
+Update: all three models measured; pure vision failed. Qwen3.5 command decisions
+with recorded native UI state pass6/6. Local pilot prepared, QA .164 installed;
+runtime/FPS untested. [Results](LOCAL_QA_AGENT_2026-10-12.md). Original protocol below.
 
 `scripts/Measure-QAVision.py` uses Python standard library. Default makes no API
 call. Three SHA-pinned local .162 screenshots (native19/22/23) have visually

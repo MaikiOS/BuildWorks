@@ -1,5 +1,9 @@
 # Fast Valheim control: research 2026-10-12
 
+**Follow-up:** Qwen3.5/LFM3B downloaded/measured, local pilot prepared,
+QA .164 installed. [Current protocol](LOCAL_QA_AGENT_2026-10-12.md).
+Research history before installation follows.
+
 Ostrix requested tools for faster game control. No tools installed, game launched
 or local performance measured. [Russian detailed report](GAME_CONTROL_RESEARCH_2026-10-12_RU.md).
 

@@ -20,15 +20,15 @@ namespace OstrixMods.BuildWorks
         {
             public string nonce, status, detail, screenshot, world, selectedUi, uiModule;
             public string snap, placementContact, placementStatus, inventory;
-            public long id, utc;
+            public long id, utc, stopRevision;
             public int frame, width, height;
-            public bool focused, ready;
+            public bool focused, ready, inventoryVisible;
             public Vector3 position, cameraPosition, cameraEuler;
         }
 
         private readonly BuildWorksQaInput input = new BuildWorksQaInput();
         private string directory, nonce;
-        private long lastId;
+        private long lastId, stopRevision;
         private float nextPoll, started, stepStarted;
         private int stepIndex, stepFrame;
         private bool stepFinished;
@@ -113,7 +113,7 @@ namespace OstrixMods.BuildWorks
                     bytes = buffer.ToArray();
                 }
                 File.Delete(path); // Consumed before any input; never replay after an uncertain result.
-                var request = BuildWorksQaControlProtocol.Read(bytes, nonce, lastId, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+                var request = BuildWorksQaControlProtocol.Read(bytes, nonce, lastId, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), stopRevision);
                 lastId = request.id;
                 foreach (var step in request.steps ?? Array.Empty<BuildWorksQaControlProtocol.Step>())
                     foreach (string key in step.keys ?? Array.Empty<string>()) BuildWorksQaInput.ParseKey(key);
@@ -247,7 +247,8 @@ namespace OstrixMods.BuildWorks
             var module = eventSystem ? eventSystem.currentInputModule : null;
             var currentNetwork = ZNet.instance;
             var reply = new Reply { nonce = nonce, id = id, status = status, detail = detail, screenshot = screenshot,
-                utc = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), frame = Time.frameCount, width = Screen.width,
+                utc = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), stopRevision = stopRevision,
+                inventoryVisible = InventoryGui.IsVisible(), frame = Time.frameCount, width = Screen.width,
                 height = Screen.height, focused = Application.isFocused, ready = SafeSession(),
                 world = currentNetwork ? currentNetwork.GetWorld()?.m_worldName : null,
                 selectedUi = selected ? selected.name : null,
@@ -271,6 +272,8 @@ namespace OstrixMods.BuildWorks
 
         internal void Stop(string reason)
         {
+            // A local model may still be thinking when F12 or focus loss stops the host.
+            ++stopRevision;
             var interrupted = running; long interruptedId = interrupted?.id ?? captureId; running = null;
             bool hadInput = BuildWorksQaInput.Active;
             try { if (hadInput) BuildWorksPlugin.AbortQaControlInput(); }

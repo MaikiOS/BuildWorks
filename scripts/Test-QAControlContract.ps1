@@ -116,6 +116,11 @@ try {
         Require ((Calls $control $name) -match 'BuildWorksQaControl::Stop') "Missing release lifecycle: $name"
     }
     Require ((Calls $control 'Stop') -match 'BuildWorksQaInput::Release') 'Stop does not release input.'
+    $revisionStores = @($control.Methods | Where-Object Name -eq 'Stop' | ForEach-Object { $_.Body.Instructions } |
+        Where-Object { $_.OpCode.Code -eq [Mono.Cecil.Cil.Code]::Stfld -and $_.Operand.Name -eq 'stopRevision' })
+    Require ($revisionStores.Count -eq 1) 'Idle emergency stop does not invalidate local model decisions.'
+    Require ($observationReply -match 'BuildWorksQaControl::stopRevision' -and
+        $observationReply -match 'InventoryGui::IsVisible') 'Local agent lacks authoritative stop/inventory observations.'
     Require ((Calls $control 'Stop') -match 'BuildWorksPlugin::AbortQaControlInput') 'Emergency stop leaves active editor/world gestures.'
     Require ((Calls $control 'WithinDeadline') -match 'BuildWorksQaControlProtocol::CanContinue') 'UTC expiry/elapsed deadline is not revalidated.'
     Require ((Calls $control 'AfterInput') -match 'BuildWorksTestIsolation::RequireLoadedSession' -and

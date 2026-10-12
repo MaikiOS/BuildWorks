@@ -116,7 +116,7 @@ def main(argv=None):
                 started = time.perf_counter()
                 payload = {"model": args.model, "prompt": PROMPT, "format": SCHEMA,
                            "images": [base64.b64encode(frame(case)).decode("ascii")],
-                           "stream": False, "keep_alive": "60s",
+                           "stream": False, "keep_alive": "60s", "think": False,
                            "options": {"temperature": 0, "num_predict": 128, "num_ctx": 4096}}
                 result = api("generate", payload)
                 elapsed = time.perf_counter() - started
@@ -191,6 +191,7 @@ def self_test():
                     if route == "ps":
                         return {"models": []}
                     self.assertEqual(route, "generate")
+                    self.assertIs(payload["think"], False)
                     self.assertNotIn("expected", payload)
                     self.assertEqual(payload["images"], [base64.b64encode(b"mock frame").decode("ascii")])
                     if fail:

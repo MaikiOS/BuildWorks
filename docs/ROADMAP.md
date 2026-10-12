@@ -1,3 +1,15 @@
+## 2026-10-12 — full empty24 on .162; snap .163 source checks passed
+
+Live .162: TEST24 built4/4, chest opened empty, debit14Wood/4FineWood/1Nail,
+two swords retained. Stand kept for reload. snap11 proved native pair0.394m
+veto without aimedPiece; snap13 confirmed selected live points coincide.
+.163 preserves native fallback/wheel, inclusive0.5m/first sqrt tie.
+Red/green55, normal/QA0/0, Host/control/isolation/loc989, correctness PASSED/
+Ponytail Ship. **Installed .162; .163 not yet deployed or tested in game.**
+After exit: guarded .163 install, same world, persisted4 objects/balance,
+nearby/direct snap. Contents/attributes/cancellation/network remain open.
+[Evidence](PASSIVE_SNAP_163_2026-10-12.md).
+
 ## 2026-10-12 — .162 deployed; snap and complete fixture24 remain open
 
 The live session really loaded .161: stale .160 came from PluginVersion;

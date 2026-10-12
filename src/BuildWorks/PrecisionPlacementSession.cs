@@ -2479,17 +2479,18 @@ namespace OstrixMods.BuildWorks
 
             if ((int)ManualSnapPointField.GetValue(player) < 0)
             {
+                // Keep native snapping and wheel rotation when the aimed piece has no pair.
                 if (!aimedPiece || aimedPiece.transform == ghost.transform ||
                     aimedPiece.transform.IsChildOf(ghost.transform))
                 {
-                    return false;
+                    return true;
                 }
 
                 sourceNativeSnapPoints.Clear();
                 nativeSnapPoints.Clear();
                 ghost.GetComponent<Piece>()?.GetSnapPoints(sourceNativeSnapPoints);
                 aimedPiece.GetSnapPoints(nativeSnapPoints);
-                float bestDistance = 0.5f * 0.5f;
+                float bestDistance = float.PositiveInfinity;
                 Transform bestSource = null;
                 Transform bestTarget = null;
                 foreach (Transform source in sourceNativeSnapPoints)
@@ -2498,8 +2499,8 @@ namespace OstrixMods.BuildWorks
                     foreach (Transform target in nativeSnapPoints)
                     {
                         if (!target) continue;
-                        float distance = (target.position - source.position).sqrMagnitude;
-                        if (distance >= bestDistance) continue;
+                        float distance = Vector3.Distance(target.position, source.position);
+                        if (distance > 0.5f || !(distance < bestDistance)) continue;
                         bestDistance = distance;
                         bestSource = source;
                         bestTarget = target;
@@ -2512,7 +2513,7 @@ namespace OstrixMods.BuildWorks
                 }
                 else
                 {
-                    return false;
+                    return true;
                 }
             }
 

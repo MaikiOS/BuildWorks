@@ -880,7 +880,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.162.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.163.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginIdentity = $plugin.MainModule.Types | Where-Object Name -eq 'BuildWorksPlugin'
 $loaderIdentity = $pluginIdentity.CustomAttributes | Where-Object { $_.AttributeType.Name -eq 'BepInPlugin' }
@@ -2560,17 +2560,20 @@ Assert-Contract ($passiveAutoJoin.Parameters.Count -eq 4 -and
     $sessionSource -match 'private bool autoAlignmentEnabled = true;' -and
     $sessionSource -match 'ManualSnapPointField\.GetValue\(player\) < 0' -and
     $sessionSource -match
-        'if \(!aimedPiece \|\| aimedPiece\.transform == ghost\.transform[\s\S]*?return false;' -and
+        'if \(!aimedPiece \|\| aimedPiece\.transform == ghost\.transform[\s\S]*?return true;' -and
     $sessionSource -match
-        'if \(bestSource && bestTarget\)[\s\S]*?else\s*\{\s*return false;\s*\}' -and
+        'if \(bestSource && bestTarget\)[\s\S]*?else\s*\{\s*return true;\s*\}' -and
+    $sessionSource -match 'if \(distance > 0\.5f \|\| !\(distance < bestDistance\)\) continue;' -and
     $sessionSource -match 'blueprintPieceRegistry\.TryGetBlueprint\(selected, out _\)' -and
     $blueprintFrameSource -match '=> blueprint \? ghost : target \* ghost;' -and
     $passiveAutoJoinOperands -match 'Player::get_AlternativePlacementActive' -and
     $passiveAutoJoinOperands -match 'Piece::GetSnapPoints' -and
+    $passiveAutoJoinOperands -match 'Vector3::Distance' -and
     $passiveAutoJoinOperands -match 'Transform::IsChildOf' -and
     $passiveAutoJoinOperands -match 'BlueprintPlacementFrame::AutoJoinRotation' -and
     $passiveAutoJoinOperands -match 'Transform::set_rotation') `
-    'Passive auto-join no longer rejects foreign fallback targets in automatic wheel rotation.'
+    'Passive auto-join no longer preserves native fallback/wheel rotation or inclusive ordered distance selection.'
+& (Join-Path $PSScriptRoot 'Test-PassiveAutoJoin.ps1')
 $meshEdges = $pluginMethods | Where-Object Name -eq 'GetMeshFeatureEdges'
 $meshEdgeOperands = @($meshEdges.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($meshEdgeOperands -match 'AnchorAdjustment::ExtractFeatureEdges' -and

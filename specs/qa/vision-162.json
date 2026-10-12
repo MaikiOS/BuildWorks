@@ -1,0 +1,20 @@
+[
+  {
+    "id": "hammer-blueprint",
+    "image": "artifacts/checkpoint-0.19.162/native19.png",
+    "sha256": "b3b28597de3e160dced48fe86199a9cee40b5f21fc6f4325c23712530db5ed82",
+    "expected": {"view": "world", "hammer_selected": true, "blueprint_selected": true, "empty_container_grid": false}
+  },
+  {
+    "id": "closed-chest",
+    "image": "artifacts/checkpoint-0.19.162/native22.png",
+    "sha256": "a9c674bd47ba54bf50a6f469e341b7d25e4c0f0a06b3000528dc81dd35812646",
+    "expected": {"view": "world", "hammer_selected": false, "blueprint_selected": false, "empty_container_grid": false}
+  },
+  {
+    "id": "open-empty-chest",
+    "image": "artifacts/checkpoint-0.19.162/native23.png",
+    "sha256": "67938bbcb619c0cc88bb38d91d99e8c401d330c7a393d216514b477110d4a1ec",
+    "expected": {"view": "container_ui", "hammer_selected": false, "blueprint_selected": false, "empty_container_grid": true}
+  }
+]

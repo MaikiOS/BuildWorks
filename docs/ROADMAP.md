@@ -1,3 +1,12 @@
+## 2026-10-12 — local vision measurement script prepared
+
+Three archived QA frames have pinned hashes and observed labels. Six CPU tests
+and preflight passed without model/API execution. Strict JSON, full response
+latency and stop-on-error are prepared; real inference, speed, accuracy, FPS and
+autonomous control remain untested. Installed QA .163 is unchanged; its runtime,
+reload and the rest of the goal remain open.
+[Protocol](QA_VISION_PROBE_2026-10-12.md).
+
 ## 2026-10-12 — .163 installed; fast game-control research
 
 Guarded TerrainRamp-1.0-Test deployment complete: both SHA values match,158

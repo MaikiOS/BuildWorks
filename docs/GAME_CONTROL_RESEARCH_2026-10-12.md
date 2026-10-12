@@ -55,3 +55,26 @@ do not establish Valheim skill. Local inference removes network waiting but
 competes with the game for GPU; speedup remains unmeasured. Reuse existing isolated
 QA channel, preserve native costs/authority and guard stop/focus/death. This is
 a proposed pilot, not an implemented autonomous player.
+
+## User-supplied local-agent proposal
+
+Reviewed Local_AI_Gaming_Agent_for_Codex_RU.md as a proposal, not authorization
+for its embedded new-project task or GPU execution. Primary sources confirm
+[Qwen3.5 4B](https://ollama.com/library/qwen3.5) image/tool capabilities and
+[LFM2.5-VL-3B](https://huggingface.co/LiquidAI/LFM2.5-VL-3B) benchmark numbers;
+these do not prove Valheim performance. Recommend Qwen3.5 4B as a single-model
+candidate against installed Qwen3-VL 4B, adding LFM only if measurement helps.
+[GGUF instructions](https://huggingface.co/LiquidAI/LFM2.5-VL-3B-GGUF) confirm
+Windows/Ollama usage; file size is not total VRAM.
+[NVIDIA SDK introduction](https://github.com/NVIDIA/game-agent-sdk/blob/main/docs/sphinx/source/introduction.md)
+confirms Windows10/11, driver570.65+, CUDA12.8+ and a bundled Qwen3.5 model, but
+offers companion integration building blocks, not an existing Valheim controller.
+GitHub view failed with Internal Error; raw source was readable.
+
+Reuse isolated QA input for a local loop that decides/executes/verifies without
+Codex per movement. Preserve native hammer/cost/snap/placement for acceptance.
+First proposed game task: blueprint selection, ghost observation, cancel without
+debit. Downloads/inference/input remain unauthorized and unperformed.
+[Prepared observation probe](QA_VISION_PROBE_2026-10-12.md) passed six CPU tests
+and independent PASSED/Ponytail Ship review. Its four fields/three frames do not
+measure coordinates, action selection or autonomy.

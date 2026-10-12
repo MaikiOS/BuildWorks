@@ -1,3 +1,9 @@
+## 2026-10-12 — .170 deployed; priority returned to core features
+
+Guarded .170 deployment to TerrainRamp-1.0-Test passed: installed version0.19.170.0, both SHA hashes match,158 config/BuildWorks files unchanged. No game/model/save changes. [Manual .170](docs/MANUAL_QA_170_RU.md); [next work and delays, Russian](docs/NEXT_STEPS_170_RU.md).
+
+Live checklist, including its final core blocks, updated. Next code: shared resource/item reservations and own-item storage transfer with exact properties/accounting/rollback; a concrete main-path failure from manual feedback takes priority. World auto-snap, external house through reload, full storage/admin/project/v11/heavy/network remain open. Local-agent development is discontinued. Goal API returns blocked; document updates do not change it.
+
 ## 2026-10-12 — .170: refuse all-missing import, source only
 
 Default keep-missing now refuses a whole import before writing if any document has no available prefabs, including mixed ZIPs. UI blocks confirmation; partial missing records and backup export remain supported. Red/green Store and actual Tick, full Store, normal/QA0/0, Host/loc990, correctness PASSED/Ponytail Ship. [Evidence](docs/MISSING_IMPORT_170.md).

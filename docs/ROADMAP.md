@@ -1,3 +1,12 @@
+## 2026-10-12 — QA .161 installed; native build/reload next
+
+Current-source ContactOnly Physics passed after a sandbox-start crash was archived.
+Host/loc989/isolation passed; guarded install and both hashes independently verified.
+All156 config/import/save files and their timestamps unchanged; Default clean.
+No Valheim launch. Next: TerrainRamp-1.0-Test Modded, existing QA world, fresh
+channel/balance, already imported24 contents off, full4/4/costs/cancel/reload.
+[Deployment evidence](QA_DEPLOY_161_2026-10-12.md). Earlier source-only/pause entries are history.
+
 ## 2026-10-12 — .161 source contact correction; runtime pending
 
 Per-collider Box/Mesh contact, WearNTear support envelope and directional ray

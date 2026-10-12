@@ -50,3 +50,23 @@ then one already imported TEST24, contents off, clear location. Diagnose any
 refusal before correction; prove full4/4/costs/cancel/reload subsequently.
 Do not replay aborted input or repeat accepted editor tests without cause.
 .162 has not run in Valheim; A05/I03/A09 are not closed by deployment.
+
+## Additional offline reproduction
+
+`artifacts/snap-contract-0.19.162/Reproduce.ps1` extracts the unchanged
+ApplyPassiveAutoJoin method and compiles it with inert host substitutes.
+Six cases: exact0.5m vetoed,0.499m accepted; valid supplied pair with no aimed
+piece or a different aimed piece vetoed; manual pair and alignment-disabled
+controls accepted. This executes the real branch, not real Unity transforms,
+quaternions, native translation or physics. Initial fixture CS0649 was fixed
+with an explicit null initialization; the next run completed successfully.
+
+Current assembly_valheim SHA25A0A107… FindClosestSnappoint uses Vector3.Distance,
+`bgt.s` for radius and `bge.un.s` for best candidate: inclusive0.5m and first tie.
+BuildWorks squared-distance `>=0.25` excludes that boundary. Squared ordering
+also does not prove parity for rounded sqrt ties. Existing HammerSnapSearchAcceptance
+tests the large-blueprint index, not ApplyPassiveAutoJoin reranking.
+No production correction yet; installed .162 unchanged for live diagnosis.
+The complaint's cause remains unproven. Native IL/results/source SHA are archived
+beside the script. SocratiCode green26622; this turn's symbol lookup returned no
+result, so actual method/caller were read directly. No reindex.

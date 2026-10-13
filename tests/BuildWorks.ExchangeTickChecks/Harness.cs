@@ -6,12 +6,13 @@ using System.Threading.Tasks;
 // Executes the actual Tick method with CPU substitutes for UI, tasks and the store.
 public sealed class ExchangeTickChecks
 {
-    private sealed class Selectable
+    private class Selectable
     {
         public string name;
         public bool interactable = true;
         public static implicit operator bool(Selectable value) { return value != null; }
     }
+    private sealed class Scrollbar : Selectable { }
     private sealed class Vector3
     {
         public static readonly Vector3 one = new Vector3();
@@ -118,6 +119,8 @@ public sealed class ExchangeTickChecks
     private void RenderPlanReview() { }
     private void ShowResult(string text) { shownResults++; result = text; }
     private void UpdateImportProgress() { }
+    private bool ImportCategoryIsValid() => true;
+    private void UpdateCategoryControls(bool busy) { }
     private void ShowSavedCatalogFailure(string error)
     { completed = catalogRetry = true; resultPath = store.ImportResultPath; ShowResult("saved: " + error); }
     private static void Assert(bool condition, string reason)
@@ -221,6 +224,12 @@ public sealed class ExchangeTickChecks
         Assert(replaced.completed && replaced.store.Calls == 0 && replaced.message.text == "exchange.operation_changed",
             "Old view consumed another operation's result");
         Console.WriteLine("PASS actual exchange Tick: success callback after Dispose once, committed refresh error and operation replacement.");
+        var scrolling = new ExchangeTickChecks { importing = true };
+        scrolling.store.CatalogLoading = true;
+        var scrollbar = new Scrollbar { name = "ExchangeContentsScrollbar" };
+        scrolling.root.controls = scrolling.root.controls.Concat(new Selectable[] { scrollbar }).ToArray();
+        scrolling.Tick();
+        Assert(scrollbar.interactable && !scrolling.primary.interactable, "Busy import blocked read-only report scrolling or enabled writes");
     }
 }
 internal static class StableHashStub

@@ -1,6 +1,6 @@
 # Blueprint library lifecycle — owner decisions, 2026-10-13
 
-Status: designed; not implemented by the catalog reset. The current store still
+Status: the broad lifecycle remains designed; QA181 implements source/common existing/new category choice before import. The current store still
 merges all files under imports. Server storage/access control, batch UI and
 automatic share-file saving do not exist yet.
 
@@ -37,8 +37,10 @@ proposal retained only in the owner's canonical source tree.
 ## Уточнение Ostrix — 2026-10-13: личная и серверная библиотеки
 
 Этот раздел задаёт новый целевой сценарий. Он имеет приоритет над ранним
-описанием ниже; автоматические переносимые файлы, выбор категории при импорте,
-групповые операции и серверная библиотека ещё не реализованы.
+описанием ниже; автоматические переносимые файлы, групповые операции и серверная
+библиотека ещё не реализованы. В .181 добавлен выбор исходных/общей существующей
+или новой категории до импорта; автоматические проверки описаны в живом списке,
+установка и игровая приёмка отмечаются отдельно.
 
 - Каталог содержит созданные игроком чертежи, явно подтверждённые импорты и
   доступную ему серверную библиотеку. Скачанная папка с исходниками и набор

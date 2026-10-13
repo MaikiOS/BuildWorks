@@ -1016,3 +1016,12 @@ exchange.result_missing	The imported copy was not found in the catalogue. Check 
 exchange.operation_changed	The import operation changed. This window will not open another operation's result.
 exchange.selected_result	Imported blueprints: {0}. Selected: {1}.
 exchange.archive_destination	The first blueprint will be selected after import: {0}. All archive blueprints are retained.
+exchange.invalid_category	Enter a category: 1–24 characters, without control characters or < >.
+exchange.category	Category
+exchange.category_original	Keep original, or type a new category
+exchange.category_choose	Choose
+exchange.category_reset	Original
+exchange.category_picker	Choose a category
+exchange.category_search	Search existing categories
+exchange.category_page	Page {0}/{1}; categories: {2}
+exchange.category_all	Category «{0}» applies to all blueprints ({1}).

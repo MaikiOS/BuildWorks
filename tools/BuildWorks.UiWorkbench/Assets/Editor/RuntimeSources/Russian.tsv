@@ -1016,3 +1016,12 @@ exchange.result_missing	Импортированная копия не найд�
 exchange.operation_changed	Операция импорта сменилась. Это окно не будет открывать результат другой операции.
 exchange.selected_result	Импортировано чертежей: {0}. Выбран: {1}.
 exchange.archive_destination	После импорта будет выбран первый чертёж: {0}. Все чертежи архива сохранятся.
+exchange.invalid_category	Введите категорию: 1–24 символа, без управляющих символов и < >.
+exchange.category	Категория
+exchange.category_original	Сохранить исходные или ввести новую
+exchange.category_choose	Выбрать
+exchange.category_reset	Исходные
+exchange.category_picker	Выбор категории
+exchange.category_search	Поиск существующей категории
+exchange.category_page	Страница {0}/{1}; категорий: {2}
+exchange.category_all	Категория «{0}» будет назначена всем чертежам ({1}).

@@ -422,13 +422,16 @@ namespace OstrixMods.BuildWorks
 
         // Unity thread: freeze fresh host values. True starts work; CatalogAll/ImportError report its result.
         internal bool TryImportReviewed(ImportReview review, bool clearStorage, bool clearMounts,
-            Func<string, int> prefabHash, out string error, bool omitArmorState = false, MissingPartsReview omitMissing = null)
+            Func<string, int> prefabHash, out string error, bool omitArmorState = false, MissingPartsReview omitMissing = null,
+            string importCategory = null)
         {
             error = null;
             if (CatalogLoading) { error = UserError("exchange.loading"); return false; }
             try
             {
                 if (review == null) throw new InvalidDataException("$buildworks_import.format");
+                if (!TryNormalizeImportCategory(importCategory, out string category))
+                    throw new InvalidDataException("$buildworks_exchange.invalid_category");
                 if (review.IsHostCurrent?.Invoke() == false)
                     throw new InvalidDataException(UserError("placement.contents_stale"));
                 CatalogAll();
@@ -483,6 +486,7 @@ namespace OstrixMods.BuildWorks
                             for (int i = 0; i < prepared.Length; ++i)
                             {
                                 var copy = CopyWithContentsPolicy(prepared[i], clearStorage, clearMounts, prefabHash, omitArmorState);
+                                if (category != null) copy.category = category;
                                 string name = "document_" + i + ".buildworks.json";
                                 WriteEntry(name, BlueprintExchangeFormat.Encode(copy));
                                 if (!clearStorage && !clearMounts && !omitArmorState && omitMissing == null && ExternalBlueprintLibrary.ValidPreview(prepared[i].importPreview))
@@ -1592,6 +1596,13 @@ namespace OstrixMods.BuildWorks
             return string.Equals(normalized, LegacyDefaultCategory, StringComparison.Ordinal)
                 ? DefaultCategory
                 : normalized;
+        }
+
+        internal static bool TryNormalizeImportCategory(string value, out string normalized)
+        {
+            normalized = value == null ? null : NormalizeCategory(value);
+            return normalized == null || normalized.Length >= 1 && normalized.Length <= 24 &&
+                !normalized.Any(c => char.IsControl(c) || c == '<' || c == '>');
         }
 
         private static string UserError(string key, string detail = null) =>

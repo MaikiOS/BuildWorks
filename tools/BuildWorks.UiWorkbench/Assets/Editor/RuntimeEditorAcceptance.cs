@@ -345,7 +345,7 @@ public static class RuntimeEditorAcceptance
                     scene.SetViewport(view.ViewportScreenRect());
                     Call(controller, "FrameAll");
                     foreach (string state in new[] { "select", "transform", "scale-xyz-ru", "array", "contour", "catalog",
-                        "outliner", "outliner-filter-ru", "outliner-fields-ru", "outliner-empty-ru", "interior-camera-ru", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "catalog-managed-ru", "catalog-hidden-ru", "delete-confirm-ru", "hide-confirm-ru", "save-metadata", "save-as", "save-as-ru", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru", "exchange-armor", "exchange-armor-ru", "exchange-missing", "exchange-missing-ru", "replace-tools", "replace-confirm", "replace-confirm-ru", "replace-entry-ru", "replace-help-ru" })
+                        "outliner", "outliner-filter-ru", "outliner-fields-ru", "outliner-empty-ru", "interior-camera-ru", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "catalog-managed-ru", "catalog-hidden-ru", "delete-confirm-ru", "hide-confirm-ru", "save-metadata", "save-as", "save-as-ru", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru", "exchange-import-category-ru", "exchange-import-category-picker-ru", "exchange-armor", "exchange-armor-ru", "exchange-missing", "exchange-missing-ru", "replace-tools", "replace-confirm", "replace-confirm-ru", "replace-entry-ru", "replace-help-ru" })
                     {
                         Require(Screen.width == width && Screen.height == height,
                             "GameView changed before " + state + ": " + Screen.width + "x" + Screen.height);
@@ -535,7 +535,8 @@ public static class RuntimeEditorAcceptance
                                         "Missing screenshot missed independent explicit omission choices");
                                 }
                             }
-                            else if (state.StartsWith("exchange-import-review", StringComparison.Ordinal))
+                            else if (state.StartsWith("exchange-import-review", StringComparison.Ordinal) ||
+                                state.StartsWith("exchange-import-category", StringComparison.Ordinal))
                             {
                                 var exchange = Field<BlueprintExchangeView>(view, "exchangeView");
                                 int index = Array.IndexOf(Field<string[]>(exchange, "entries"), Path.Combine(folder, "Дом.buildworks.json"));
@@ -546,6 +547,18 @@ public static class RuntimeEditorAcceptance
                                 { view.Tick(); yield return null; }
                                 Require(Field<CompositeBlueprintStore.ContentsSummary>(exchange, "contentsSummary") != null,
                                     "Import screenshot missed completed inspection");
+                                if (state == "exchange-import-category-ru")
+                                    Field<TMP_InputField>(exchange, "categoryInput").text = "ТЕСТОВЫЙ РАЗДЕЛ 181";
+                                else if (state == "exchange-import-category-picker-ru")
+                                {
+                                    for (int i = 1; i <= 8; ++i)
+                                    {
+                                        string category = "ТЕСТОВАЯ КАТЕГОРИЯ " + i;
+                                        if (!layoutStore.Categories().Contains(category))
+                                            Require(layoutStore.TryAddCategory(category, out string categoryError), categoryError);
+                                    }
+                                    ControllerInputAcceptance.NativeClick(view, uiCamera, "ExchangeCategoryChoose"); yield return null;
+                                }
                             }
                         }
                         else if (state == "replace-tools" || state == "replace-entry-ru" || state == "replace-help-ru")

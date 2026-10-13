@@ -26,6 +26,13 @@ namespace OstrixMods.BuildWorks
         private string importOperationPath;
         private float operationStarted;
         private bool catalogRetry;
+        private RectTransform categoryRow, categoryPicker, categoryRows;
+        private TMP_InputField categoryInput, categorySearch;
+        private TMP_Text categoryPageLabel;
+        private Button categoryPrevious, categoryNext;
+        private string[] categoryChoices = Array.Empty<string>();
+        private int categoryPage;
+        private bool categoryOverride;
         private RectTransform contentsPanel;
         private Button contentsBack, storageChoice, mountChoice, armorChoice, missingChoice;
         private TMP_Text contentsDetails;
@@ -164,7 +171,7 @@ namespace OstrixMods.BuildWorks
                 reviewingContents && !importing && !completed && importReview?.IsHostCurrent?.Invoke() == false)
             {
                 foreach (Selectable control in root.GetComponentsInChildren<Selectable>())
-                    control.interactable = control.name == "ExchangeClose" || control.name == "ExchangeContentsBack";
+                    control.interactable = control is Scrollbar || control.name == "ExchangeClose" || control.name == "ExchangeContentsBack";
                 message.text = T("placement.contents_stale"); return;
             }
             if (placementPreparation != null && placementPreparation.IsCompleted)
@@ -290,17 +297,19 @@ namespace OstrixMods.BuildWorks
                 planExport = null;
             }
             bool busy = importing || planExport != null || placementPreparation != null;
-            primary.interactable = catalogRetry && !busy || !completed && !busy && listing == null && !directory.gameObject.activeSelf &&
+            primary.interactable = catalogRetry && !busy || !completed && !busy && ImportCategoryIsValid() && listing == null && !directory.gameObject.activeSelf &&
                 (blueprint != null || selected != null) && (!reviewingContents ||
                 (planBuild ? planReview != null : contentsSummary != null && missingReview != null &&
                 (blueprint != null || missingReview.EmptyDocuments == 0) && (!omitMissingParts || missingReview.CanOmit)));
             copyPath.interactable = !busy;
             if (completed || busy)
                 foreach (Selectable control in root.GetComponentsInChildren<Selectable>())
-                    control.interactable = control.name == "ExchangeClose" || control.name == "ExchangeCopyPath" && !busy ||
+                    control.interactable = control is Scrollbar || control.name == "ExchangeClose" || control.name == "ExchangeCopyPath" && !busy ||
                         control.name == "ExchangeSubmit" && catalogRetry && !busy;
             else if (contentsBack) contentsBack.interactable = true;
+            UpdateCategoryControls(busy);
             UpdateImportProgress();
+            if (!busy && reviewingContents && !ImportCategoryIsValid()) message.text = T("exchange.invalid_category");
         }
 
         private void UpdateImportProgress()
@@ -407,8 +416,9 @@ namespace OstrixMods.BuildWorks
             if (blueprint == null)
             {
                 if (selected == null) return;
+                CloseCategoryPicker();
                 if (!store.TryImportReviewed(importReview, clearStorage, clearMounts, name => name.GetStableHashCode(), out string startError,
-                    omitArmorState, omitMissingParts ? missingReview : null))
+                    omitArmorState, omitMissingParts ? missingReview : null, categoryOverride ? categoryInput.text : null))
                 { RefreshMissing(); RenderContents(); message.text = BuildWorksLocalization.ResolveUserText(startError); return; }
                 importing = true; importOperationPath = store.ImportOperationPath;
                 operationStarted = Time.realtimeSinceStartup; message.text = T("exchange.loading");
@@ -453,6 +463,15 @@ namespace OstrixMods.BuildWorks
                 contentsDetails.alignment = TextAlignmentOptions.TopLeft;
                 scroll.viewport = viewport; scroll.content = contentsDetails.rectTransform; scroll.horizontal = false;
                 scroll.movementType = ScrollRect.MovementType.Clamped; scroll.scrollSensitivity = 132;
+                var barRect = Rect("ExchangeContentsScrollbar", viewport, 0, 0, 8, 0);
+                barRect.anchorMin = new Vector2(1, 0); barRect.anchorMax = Vector2.one;
+                barRect.pivot = new Vector2(1, .5f); barRect.anchoredPosition = Vector2.zero;
+                barRect.gameObject.AddComponent<Image>().color = new Color(.08f, .08f, .07f, 1);
+                var handle = Rect("ExchangeContentsHandle", barRect, 0, 0, 8, 22);
+                var handleImage = handle.gameObject.AddComponent<Image>(); handleImage.color = new Color(.7f, .58f, .32f, 1);
+                var scrollbar = barRect.gameObject.AddComponent<Scrollbar>(); scrollbar.direction = Scrollbar.Direction.BottomToTop;
+                scrollbar.handleRect = handle; scrollbar.targetGraphic = handleImage;
+                scroll.verticalScrollbar = scrollbar; scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
                 storageChoice = Button("ExchangeStorageChoice", "", 12, 152, 716, () =>
                 { clearStorage = !clearStorage; RenderContents(); }, contentsPanel);
                 mountChoice = Button("ExchangeMountChoice", "", 12, 194, 716, () =>
@@ -465,6 +484,7 @@ namespace OstrixMods.BuildWorks
                 {
                     if (place != null) { Dispose(); return; }
                     reviewingContents = false; contentsInspection = null; importInspection = null; importPreparation = null; planInspection = null;
+                    CloseCategoryPicker();
                     planReview = null; contentsPanel.gameObject.SetActive(false);
                     contentsBack.gameObject.SetActive(false); copyPath.gameObject.SetActive(true);
                     SetFileControls(true); message.text = "";
@@ -472,6 +492,7 @@ namespace OstrixMods.BuildWorks
                 });
             }
             contentsPanel.gameObject.SetActive(true); contentsBack.gameObject.SetActive(true);
+            if (blueprint == null) PrepareCategoryRow();
             armorChoice.gameObject.SetActive(false); missingChoice.gameObject.SetActive(false);
             storageChoice.interactable = mountChoice.interactable = primary.interactable = false;
             primary.GetComponentInChildren<TMP_Text>().text = T(place != null ? "placement.contents_confirm" : blueprint == null ? "exchange.confirm_import" : "exchange.confirm_export");
@@ -534,11 +555,14 @@ namespace OstrixMods.BuildWorks
 
         private void RenderContents()
         {
-            if (missingReview == null) return;
+            if (missingReview == null || contentsSummary == null) return;
             if (missingReview.Known && missingReview.Parts == 0) omitMissingParts = false;
             var effective = omitMissingParts && missingReview.CanOmit ? missingReview.RetainedContents : contentsSummary;
             contentsDetails.text = T("exchange.contents_counts", effective.Storages, effective.StoredItems,
                 effective.Mounts, effective.Unknown, effective.AlreadyCleared);
+            if (blueprint == null && categoryOverride &&
+                CompositeBlueprintStore.TryNormalizeImportCategory(categoryInput.text, out string category))
+                contentsDetails.text += "\n" + T("exchange.category_all", category, importReview.Documents.Count);
             if (blueprint == null && importReview?.Documents.Count > 1)
                 contentsDetails.text += "\n" + T("exchange.archive_destination", importReview.Documents[0].name);
             if (effective.IgnoredSnapPointRows > 0)
@@ -568,12 +592,14 @@ namespace OstrixMods.BuildWorks
             missingChoice.GetComponentInChildren<TMP_Text>().text = T(omitMissingParts ? "exchange.missing_omit" : "exchange.missing_keep");
             var choices = new[] { storageChoice, mountChoice, armorChoice, missingChoice }.Where(button => button.gameObject.activeSelf).ToArray();
             float contentsHeight = place == null ? 266 : 330;
-            float detailsHeight = contentsHeight - 48 - choices.Length * 34 - 12;
+            float contentTop = categoryRow && categoryRow.gameObject.activeSelf ? 82 : 48;
+            float detailsHeight = contentsHeight - contentTop - choices.Length * 34 - 12;
             var viewport = (RectTransform)contentsDetails.transform.parent;
+            viewport.anchoredPosition = new Vector2(12, -contentTop);
             viewport.sizeDelta = new Vector2(716, detailsHeight);
             contentsDetails.rectTransform.sizeDelta = new Vector2(700, Mathf.Max(detailsHeight, contentsDetails.GetPreferredValues(contentsDetails.text, 700, 0).y));
             for (int i = 0; i < choices.Length; ++i)
-                ((RectTransform)choices[i].transform).anchoredPosition = new Vector2(12, -(48 + detailsHeight + 6 + i * 34));
+                ((RectTransform)choices[i].transform).anchoredPosition = new Vector2(12, -(contentTop + detailsHeight + 6 + i * 34));
             contentsPanel.sizeDelta = new Vector2(740, contentsHeight);
             armorChoice.GetComponentInChildren<TMP_Text>().text = T(omitArmorState ? "exchange.armor_omit" : "exchange.armor_keep");
             skin.Apply(armorChoice, active: omitArmorState);
@@ -585,6 +611,89 @@ namespace OstrixMods.BuildWorks
                 omitArmorState ? T("exchange.armor_warning", effective.ArmorStates, remainingUnknown) :
                 T(contentsSummary.Unknown != 0 ? "exchange.contents_unknown" :
                 blueprint == null ? "exchange.import_copy" : "exchange.contents_copy");
+        }
+
+        private bool ImportCategoryIsValid() => !categoryOverride ||
+            CompositeBlueprintStore.TryNormalizeImportCategory(categoryInput.text, out _);
+
+        private void UpdateCategoryControls(bool busy)
+        {
+            if (!categoryRow || !categoryRow.gameObject.activeInHierarchy) return;
+            bool ready = !completed && !busy && reviewingContents && contentsSummary != null && missingReview != null;
+            foreach (Selectable control in categoryRow.GetComponentsInChildren<Selectable>()) control.interactable = ready;
+        }
+
+        private void PrepareCategoryRow()
+        {
+            if (!categoryRow)
+            {
+                categoryRow = Rect("ExchangeCategoryRow", contentsPanel, 12, 48, 716, 30);
+                Label("ExchangeCategoryLabel", T("exchange.category"), 0, 0, 90, 30, 14, categoryRow);
+                categoryInput = Input("ExchangeCategoryInput", 92, 0, 404, 24, parent: categoryRow);
+                categoryInput.placeholder = Label("ExchangeCategoryPlaceholder", T("exchange.category_original"),
+                    0, 0, 388, 26, 14, categoryInput.textViewport);
+                categoryInput.onValueChanged.AddListener(_ =>
+                { categoryOverride = true; if (missingReview != null) RenderContents(); Tick(); });
+                Button("ExchangeCategoryChoose", T("exchange.category_choose"), 502, 0, 112, OpenCategoryPicker, categoryRow);
+                Button("ExchangeCategoryOriginal", T("exchange.category_reset"), 620, 0, 96, () =>
+                { categoryOverride = false; categoryInput.SetTextWithoutNotify(""); RenderContents(); Tick(); }, categoryRow);
+            }
+            categoryOverride = false; categoryInput.SetTextWithoutNotify(""); CloseCategoryPicker();
+        }
+
+        private void OpenCategoryPicker()
+        {
+            try
+            {
+                categoryChoices = store.Categories().Concat(store.CatalogAll().Select(item => item.category))
+                    .Concat(importReview?.Documents.Select(item => item.category) ?? Array.Empty<string>())
+                    .Where(item => !string.IsNullOrWhiteSpace(item)).Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(item => item, StringComparer.OrdinalIgnoreCase).ToArray();
+            }
+            catch (Exception error) { SetError(error); return; }
+            if (!categoryPicker)
+            {
+                categoryPicker = Rect("ExchangeCategoryPicker", panel, 20, 174, 740, 266);
+                skin.Apply(categoryPicker.gameObject.AddComponent<Image>(), BlueprintEditorSkin.Surface.Panel);
+                Label("ExchangeCategoryTitle", T("exchange.category_picker"), 12, 8, 590, 30, 20, categoryPicker);
+                Button("ExchangeCategoryPickerClose", T("editor.view.cancel"), 620, 8, 108, CloseCategoryPicker, categoryPicker);
+                categorySearch = Input("ExchangeCategorySearch", 12, 48, 716, 64, parent: categoryPicker);
+                categorySearch.placeholder = Label("ExchangeCategorySearchHint", T("exchange.category_search"),
+                    0, 0, 700, 26, 14, categorySearch.textViewport);
+                categorySearch.onValueChanged.AddListener(_ => { categoryPage = 0; RenderCategoryChoices(); });
+                categoryRows = Rect("ExchangeCategoryRows", categoryPicker, 12, 84, 716, 128);
+                categoryPrevious = Button("ExchangeCategoryPrevious", "←", 12, 226, 80, () =>
+                { --categoryPage; RenderCategoryChoices(); }, categoryPicker);
+                categoryNext = Button("ExchangeCategoryNext", "→", 648, 226, 80, () =>
+                { ++categoryPage; RenderCategoryChoices(); }, categoryPicker);
+                categoryPageLabel = Label("ExchangeCategoryPage", "", 102, 226, 536, 30, 14, categoryPicker);
+            }
+            categorySearch.SetTextWithoutNotify(""); categoryPage = 0;
+            categoryPicker.gameObject.SetActive(true); categoryPicker.SetAsLastSibling();
+            contentsPanel.gameObject.SetActive(false); RenderCategoryChoices();
+        }
+
+        private void RenderCategoryChoices()
+        {
+            for (int i = categoryRows.childCount - 1; i >= 0; --i)
+            { categoryRows.GetChild(i).gameObject.SetActive(false); UnityEngine.Object.Destroy(categoryRows.GetChild(i).gameObject); }
+            var filtered = categoryChoices.Where(item => item.IndexOf(categorySearch.text, StringComparison.OrdinalIgnoreCase) >= 0).ToArray();
+            int pages = Math.Max(1, (filtered.Length + 3) / 4);
+            categoryPage = Mathf.Clamp(categoryPage, 0, pages - 1);
+            for (int i = categoryPage * 4; i < Math.Min(filtered.Length, (categoryPage + 1) * 4); ++i)
+            {
+                string name = filtered[i];
+                Button("ExchangeCategoryOption" + i, name, 0, (i % 4) * 32, 716, () =>
+                { categoryOverride = true; categoryInput.SetTextWithoutNotify(name); CloseCategoryPicker(); RenderContents(); Tick(); }, categoryRows);
+            }
+            categoryPrevious.interactable = categoryPage > 0; categoryNext.interactable = categoryPage + 1 < pages;
+            categoryPageLabel.text = T("exchange.category_page", categoryPage + 1, pages, filtered.Length);
+        }
+
+        private void CloseCategoryPicker()
+        {
+            if (categoryPicker) categoryPicker.gameObject.SetActive(false);
+            if (contentsPanel) contentsPanel.gameObject.SetActive(reviewingContents);
         }
 
         private void SetFileControls(bool visible)
@@ -651,9 +760,9 @@ namespace OstrixMods.BuildWorks
             label.overflowMode = TextOverflowModes.Ellipsis;
             return button;
         }
-        private TMP_InputField Input(string name, float x, float y, float width, int limit, float height = 30)
+        private TMP_InputField Input(string name, float x, float y, float width, int limit, float height = 30, Transform parent = null)
         {
-            var rect = Rect(name, panel, x, y, width, height); rect.gameObject.AddComponent<Image>();
+            var rect = Rect(name, parent ?? panel, x, y, width, height); rect.gameObject.AddComponent<Image>();
             var input = rect.gameObject.AddComponent<TMP_InputField>(); skin.Apply(input, input: true);
             var viewport = Rect(name + "Viewport", rect, 8, 2, width - 16, height - 4); viewport.gameObject.AddComponent<RectMask2D>();
             var text = Label(name + "Text", "", 0, 0, width - 16, height - 4, 14, viewport);

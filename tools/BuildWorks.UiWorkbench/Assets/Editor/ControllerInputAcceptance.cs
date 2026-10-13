@@ -1790,6 +1790,7 @@ internal static class ControllerInputAcceptance
                     Field<TMP_Text>(exchange, "message").text.Contains(BuildWorksLocalization.Text("exchange.stage_2")) &&
                     !Field<TMP_Text>(exchange, "message").isTextOverflowing,
                     "Actual pending task has no readable phase progress");
+                Field<TMP_InputField>(exchange, "categoryInput").text = "discarded category";
                 NativeClick(view, null, "ExchangeContentsBack"); yield return null;
                 delayedReview.SetResult(discardedReview); Frame(controller, input, Vector2.zero); yield return null;
                 Require(Field<TMP_InputField>(exchange, "directory").interactable && !Directory.Exists(store.ImportDirectory),
@@ -1799,6 +1800,25 @@ internal static class ControllerInputAcceptance
                 NativeClick(view, null, "ExchangeSubmit"); yield return null;
                 for (int i = 0; i < 300 && ImportPending(exchange); ++i)
                 { Frame(controller, input, Vector2.zero); yield return null; }
+                Require(!Field<bool>(exchange, "categoryOverride") && Field<TMP_InputField>(exchange, "categoryInput").text == "",
+                    "Back/new review retained an abandoned category");
+                NativeClick(view, null, "ExchangeCategoryChoose"); yield return null;
+                Require(Field<RectTransform>(exchange, "categoryPicker").gameObject.activeSelf &&
+                    !Field<RectTransform>(exchange, "contentsPanel").gameObject.activeSelf, "Category picker did not own its review surface");
+                Field<TMP_InputField>(exchange, "categorySearch").text = "OTHER";
+                Frame(controller, input, Vector2.zero); yield return null;
+                NativeClick(view, null, "ExchangeCategoryOption0"); yield return null;
+                Require(Field<bool>(exchange, "categoryOverride") && Field<TMP_InputField>(exchange, "categoryInput").text == "OTHER" &&
+                    !Field<RectTransform>(exchange, "categoryPicker").gameObject.activeSelf, "Existing category choice failed");
+                NativeClick(view, null, "ExchangeCategoryOriginal"); yield return null;
+                Require(!Field<bool>(exchange, "categoryOverride"), "Source-category reset failed");
+                Field<TMP_InputField>(exchange, "categoryInput").text = "<bad>";
+                Require(!Field<Button>(exchange, "primary").interactable &&
+                    Field<TMP_Text>(exchange, "message").text == BuildWorksLocalization.Text("exchange.invalid_category"),
+                    "Invalid typed category was not explained/refused");
+                Field<TMP_InputField>(exchange, "categoryInput").text = "qa import181";
+                Require(Field<Button>(exchange, "primary").interactable &&
+                    Field<TMP_Text>(exchange, "contentsDetails").text.Contains("QA IMPORT181"), "Common category is not shown before confirmation");
                 NativeClick(view, null, "ExchangeSubmit"); yield return null;
                 for (int i = 0; i < 300 && Field<bool>(exchange, "importing"); ++i)
                 { Frame(controller, input, Vector2.zero); yield return null; }
@@ -1813,6 +1833,7 @@ internal static class ControllerInputAcceptance
                 Require(File.Exists(importedPath), "Persistent result path is not the copied file");
                 var prepared = store.CatalogAll().First(item => item.importSource.StartsWith(Path.GetFileName(importedPath) + "/", StringComparison.Ordinal));
                 var selectedResult = Field<BlueprintEditorCatalogItem>(view, "catalogPreviewItem");
+                Require(prepared.category == "QA IMPORT181", "Typed category did not reach published card");
                 Require(selectedResult.Blueprint.id == prepared.id && selectedResult.Blueprint.importSource == prepared.importSource &&
                     Field<int>(view, "catalogPage") > 0 && Field<TMP_InputField>(view, "catalogSearch").text == "" &&
                     Field<Transform>(view, "catalogGrid").Find("Catalog_" + prepared.id) &&

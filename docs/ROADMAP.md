@@ -1,3 +1,10 @@
+## 2026-10-13 — QA .181 deployed: pre-import categories
+
+Source categories, searchable/paged existing choice, new typed category and explicit common ZIP category implemented. Validation precedes worker; source/review remain intact; result opens correct category/page. Long report has a visible read-only scrollbar. [Evidence](IMPORT_CATEGORIES_181.md), [manual queue](MANUAL_QA_181.md).
+
+normal/QA0/0, Store/Localization runtime/EditorBridge/WorldLayout/actual Tick/Host/loc1022 and exact-source final Unity51620:18:42Z pass; correctness PASSED/Ponytail Ship. New Russian states4 resolutions/3 scales,1280x720/140 inspected. Same135 inherited WHITESPACE, no new diagnostics; verify absent. Installed0.19.181.0/both SHA verified, all103 configs/token/receipts unchanged; catalog0/0. Prepared ZIP34 stays outside game catalog. No Valheim/model/input/saves run.
+
+Next automatic portable Share files after save with separate retry, then batch exchange/server library/personal transfer. Full goal remains open; game acceptance pending when convenient. Fresh goal API active; older blocked entries are history.
 ## 2026-10-13 — QA .180 deployed: import lifecycle; catalog remains empty
 
 Phase/time progress, close-and-select by published ID+source/page, dirty-editor preservation and post-commit read-only catalogue recovery are implemented. [Evidence/limits](IMPORT_FLOW_180.md), [manual queue](MANUAL_QA_180.md). No conversion speedup claimed.

@@ -12,11 +12,20 @@ namespace OstrixMods.BuildWorks
     // One file workflow for the editor and Hammer; no external picker dependency.
     internal sealed class BlueprintExchangeView : IDisposable
     {
+        private static readonly string[] ImportStageKeys = {
+            "exchange.stage_1", "exchange.stage_2", "exchange.stage_3", "exchange.stage_4", "exchange.stage_5",
+            "exchange.stage_6", "exchange.stage_7", "exchange.stage_8", "exchange.stage_9"
+        };
         private readonly GameObject root;
         private readonly RectTransform panel, rows;
         private readonly TMP_Text font, message, pageLabel, folderLabel;
         private readonly TMP_InputField directory, fileName;
         private readonly Button primary, copyPath, format, editPath, cancelPath;
+        private readonly RectTransform progress, progressFill;
+        private readonly Action<CompositeBlueprintStore.Blueprint[]> importCompleted;
+        private string importOperationPath;
+        private float operationStarted;
+        private bool catalogRetry;
         private RectTransform contentsPanel;
         private Button contentsBack, storageChoice, mountChoice, armorChoice, missingChoice;
         private TMP_Text contentsDetails;
@@ -48,9 +57,11 @@ namespace OstrixMods.BuildWorks
 
         internal BlueprintExchangeView(Transform parent, TMP_Text template, CompositeBlueprintStore library,
             CompositeBlueprintStore.Blueprint source, Action closed, bool frontCanvas = false, string report = null,
-            Func<CompositeBlueprintStore.Blueprint, string> place = null, Func<bool> placementCurrent = null)
+            Func<CompositeBlueprintStore.Blueprint, string> place = null, Func<bool> placementCurrent = null,
+            Action<CompositeBlueprintStore.Blueprint[]> imported = null)
         {
             store = library; blueprint = source; font = template; finished = closed;
+            importCompleted = imported;
             this.place = place; this.placementCurrent = placementCurrent; placementRevision = store.Revision;
             previousFocus = EventSystem.current ? EventSystem.current.currentSelectedGameObject : null;
             var rect = Rect("BuildWorksExchange", parent, 0, 0, 0, 0);
@@ -112,6 +123,13 @@ namespace OstrixMods.BuildWorks
             }
             message = Label("ExchangeMessage", "", 20, 446, 740, 70, 14);
             message.overflowMode = TextOverflowModes.Ellipsis;
+            progress = Rect("ExchangeProgress", panel, 20, 520, 740, 5);
+            progress.gameObject.AddComponent<Image>().color = new Color(.15f, .17f, .17f, 1);
+            progressFill = Rect("ExchangeProgressFill", progress, 0, 0, 0, 0);
+            progressFill.anchorMin = Vector2.zero; progressFill.anchorMax = Vector2.one;
+            progressFill.offsetMin = progressFill.offsetMax = Vector2.zero;
+            progressFill.gameObject.AddComponent<Image>().color = new Color(1f, .78f, .32f, 1);
+            progress.gameObject.SetActive(false);
             primary = Button("ExchangeSubmit", T(source == null ? "exchange.import" : "exchange.export"), 548, 530, 212, Submit);
             copyPath = Button("ExchangeCopyPath", T("exchange.copy_path"), 256, 530, 276,
                 () => GUIUtility.systemCopyBuffer = resultPath ?? selected ?? directory.text);
@@ -173,16 +191,39 @@ namespace OstrixMods.BuildWorks
             }
             if (importing)
             {
-                store.CatalogAll();
+                if (store.ImportOperationPath != importOperationPath)
+                {
+                    importing = false; completed = true;
+                    message.text = T("exchange.operation_changed");
+                    UpdateImportProgress();
+                    return;
+                }
+                try { store.CatalogAll(); }
+                catch (Exception error)
+                {
+                    importing = false;
+                    if (store.ImportResultPath == importOperationPath)
+                        ShowSavedCatalogFailure(BuildWorksLocalization.ResolveUserText(error.Message));
+                    else { importReview = null; contentsSummary = null; missingReview = null; SetError(error); }
+                    UpdateImportProgress();
+                    return;
+                }
                 if (!store.CatalogLoading)
                 {
                     importing = false;
                     if (store.ImportError != null)
                     {
-                        contentsBack.interactable = true;
-                        RenderContents();
-                        importReview = null; contentsSummary = null; missingReview = null;
-                        message.text = BuildWorksLocalization.ResolveUserText(store.ImportError);
+                        if (store.ImportResultPath == importOperationPath)
+                        {
+                            ShowSavedCatalogFailure(BuildWorksLocalization.ResolveUserText(store.ImportError));
+                        }
+                        else
+                        {
+                            contentsBack.interactable = true;
+                            RenderContents();
+                            importReview = null; contentsSummary = null; missingReview = null;
+                            message.text = BuildWorksLocalization.ResolveUserText(store.ImportError);
+                        }
                     }
                     else
                     {
@@ -190,8 +231,18 @@ namespace OstrixMods.BuildWorks
                         string name = Path.GetFileName(resultPath);
                         var imported = store.CatalogAll().Where(item => item.importSource == name ||
                             (item.importSource ?? "").StartsWith(name + "/", StringComparison.Ordinal)).ToArray();
+                        if (imported.Length == 0)
+                        { ShowSavedCatalogFailure(T("exchange.result_missing")); UpdateImportProgress(); return; }
                         string[] errors = imported.Where(item => item.importError != null)
                             .Select(item => BuildWorksLocalization.ResolveUserText(item.importError)).Distinct().ToArray();
+                        if (imported.Length > 0 && importCompleted != null)
+                        {
+                            // document_0 is the explicitly stated initial destination for a multi-document archive.
+                            imported = imported.OrderBy(item => item.importSource == name + "/document_0.buildworks.json" ? 0 : 1).ToArray();
+                            Dispose();
+                            importCompleted(imported);
+                            return;
+                        }
                         ShowResult(T("exchange.imported", resultPath) + (errors.Length == 0 ? "" : "\n" + string.Join("\n", errors)));
                     }
                 }
@@ -239,15 +290,37 @@ namespace OstrixMods.BuildWorks
                 planExport = null;
             }
             bool busy = importing || planExport != null || placementPreparation != null;
-            primary.interactable = !completed && !busy && listing == null && !directory.gameObject.activeSelf &&
+            primary.interactable = catalogRetry && !busy || !completed && !busy && listing == null && !directory.gameObject.activeSelf &&
                 (blueprint != null || selected != null) && (!reviewingContents ||
                 (planBuild ? planReview != null : contentsSummary != null && missingReview != null &&
                 (blueprint != null || missingReview.EmptyDocuments == 0) && (!omitMissingParts || missingReview.CanOmit)));
             copyPath.interactable = !busy;
             if (completed || busy)
                 foreach (Selectable control in root.GetComponentsInChildren<Selectable>())
-                    control.interactable = control.name == "ExchangeClose" || control.name == "ExchangeCopyPath" && !busy;
+                    control.interactable = control.name == "ExchangeClose" || control.name == "ExchangeCopyPath" && !busy ||
+                        control.name == "ExchangeSubmit" && catalogRetry && !busy;
             else if (contentsBack) contentsBack.interactable = true;
+            UpdateImportProgress();
+        }
+
+        private void UpdateImportProgress()
+        {
+            int stage = importing ? (int)store.ImportProgress : importPreparation != null ? 2 : importInspection != null ? 1 : 0;
+            progress.gameObject.SetActive(stage > 0 && !completed);
+            panel.Find("ExchangeClose").GetComponentInChildren<TMP_Text>().text = T(importing ? "exchange.background" : "editor.view.close");
+            if (stage == 0 || completed) return;
+            progressFill.anchorMax = new Vector2(Mathf.Clamp01(stage / 9f), 1f);
+            message.text = T("exchange.progress", stage, 9, T(ImportStageKeys[stage - 1]),
+                Mathf.Max(0, (int)(Time.realtimeSinceStartup - operationStarted)));
+        }
+
+        private void ShowSavedCatalogFailure(string error)
+        {
+            completed = catalogRetry = true; resultPath = store.ImportResultPath;
+            contentsBack.interactable = false;
+            primary.GetComponentInChildren<TMP_Text>().text = T("exchange.retry_catalog");
+            ShowResult(T("exchange.saved_catalog_failed", resultPath, error));
+            primary.interactable = copyPath.interactable = true;
         }
 
         private void Browse(string path)
@@ -305,6 +378,14 @@ namespace OstrixMods.BuildWorks
 
         private void Submit()
         {
+            if (catalogRetry && !importing)
+            {
+                if (!store.RetryImportCatalog(importOperationPath, out string refreshError))
+                { message.text = BuildWorksLocalization.ResolveUserText(refreshError); return; }
+                catalogRetry = completed = false; importing = true;
+                operationStarted = Time.realtimeSinceStartup;
+                Tick(); return;
+            }
             if (completed || importing || planExport != null || placementPreparation != null || listing != null) return;
             if (place != null)
             {
@@ -326,10 +407,11 @@ namespace OstrixMods.BuildWorks
             if (blueprint == null)
             {
                 if (selected == null) return;
-                if (!store.TryImportReviewed(importReview, clearStorage, clearMounts, name => name.GetStableHashCode(), out string error,
+                if (!store.TryImportReviewed(importReview, clearStorage, clearMounts, name => name.GetStableHashCode(), out string startError,
                     omitArmorState, omitMissingParts ? missingReview : null))
-                { RefreshMissing(); RenderContents(); message.text = BuildWorksLocalization.ResolveUserText(error); return; }
-                importing = true; message.text = T("exchange.loading");
+                { RefreshMissing(); RenderContents(); message.text = BuildWorksLocalization.ResolveUserText(startError); return; }
+                importing = true; importOperationPath = store.ImportOperationPath;
+                operationStarted = Time.realtimeSinceStartup; message.text = T("exchange.loading");
             }
             else
             {
@@ -354,6 +436,7 @@ namespace OstrixMods.BuildWorks
 
         private void ReviewContents()
         {
+            operationStarted = Time.realtimeSinceStartup;
             reviewingContents = true; contentsSummary = null; importReview = null; missingReview = null; planReview = null;
             clearStorage = clearMounts = omitArmorState = omitMissingParts = false;
             SetFileControls(false); copyPath.gameObject.SetActive(false);
@@ -456,6 +539,8 @@ namespace OstrixMods.BuildWorks
             var effective = omitMissingParts && missingReview.CanOmit ? missingReview.RetainedContents : contentsSummary;
             contentsDetails.text = T("exchange.contents_counts", effective.Storages, effective.StoredItems,
                 effective.Mounts, effective.Unknown, effective.AlreadyCleared);
+            if (blueprint == null && importReview?.Documents.Count > 1)
+                contentsDetails.text += "\n" + T("exchange.archive_destination", importReview.Documents[0].name);
             if (effective.IgnoredSnapPointRows > 0)
                 contentsDetails.text += "\n" + T("exchange.snap_trailing_fields", effective.IgnoredSnapPointRows);
             if (effective.ArmorStates > 0)
@@ -520,10 +605,15 @@ namespace OstrixMods.BuildWorks
             if (contentsPanel) contentsPanel.gameObject.SetActive(false);
             if (contentsBack) contentsBack.gameObject.SetActive(false);
             copyPath.gameObject.SetActive(true);
-            var viewport = Rect("ExchangeResult", panel, 20, 174, 740, 342);
-            viewport.gameObject.AddComponent<Image>().color = new Color(.05f, .055f, .055f, 1);
-            viewport.gameObject.AddComponent<RectMask2D>();
-            var scroll = viewport.gameObject.AddComponent<ScrollRect>();
+            var viewport = panel.Find("ExchangeResult") as RectTransform;
+            if (!viewport)
+            {
+                viewport = Rect("ExchangeResult", panel, 20, 174, 740, 342);
+                viewport.gameObject.AddComponent<Image>().color = new Color(.05f, .055f, .055f, 1);
+                viewport.gameObject.AddComponent<RectMask2D>();
+                viewport.gameObject.AddComponent<ScrollRect>();
+            }
+            var scroll = viewport.GetComponent<ScrollRect>();
             message.rectTransform.SetParent(viewport, false); message.text = value;
             message.alignment = TextAlignmentOptions.TopLeft;
             message.overflowMode = TextOverflowModes.Overflow;

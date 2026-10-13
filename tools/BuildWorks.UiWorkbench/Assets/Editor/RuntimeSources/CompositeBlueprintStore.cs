@@ -6,6 +6,7 @@ using System.Linq;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using BepInEx;
 using UnityEngine;
@@ -47,6 +48,11 @@ namespace OstrixMods.BuildWorks
         private HashSet<string> hiddenSourceSnapshot;
         private IReadOnlyList<Blueprint> preparedExternalBlueprints;
         private Task<List<Blueprint>> importTask;
+        internal enum ImportStage { None, Reading, Preparing, Converting, ReadingLibrary, Writing, CheckingArchive, CheckingLibrary, RefreshingCatalog, Complete }
+        private int importProgress;
+        internal ImportStage ImportProgress => (ImportStage)Volatile.Read(ref importProgress);
+        internal string ImportOperationPath { get; private set; }
+        private void ReportImportStage(ImportStage stage) => Volatile.Write(ref importProgress, (int)stage);
         private readonly bool backgroundImports;
         private Task<List<Blueprint>> preparationTask;
         private int importGeneration;
@@ -113,6 +119,7 @@ namespace OstrixMods.BuildWorks
                 try { externalBlueprints = importTask.GetAwaiter().GetResult(); ImportError = null; }
                 catch (Exception exception) { ImportError = exception.Message; }
                 importTask = null;
+                if (ImportOperationPath != null) ReportImportStage(ImportStage.RefreshingCatalog);
                 externalBlueprints = externalBlueprints ?? new List<Blueprint>();
                 catalogSnapshot = null;
                 preparedExternalBlueprints = null;
@@ -167,6 +174,7 @@ namespace OstrixMods.BuildWorks
             result.AddRange(preparedExternalBlueprints);
             fullCatalogSnapshot = result;
             catalogSnapshot = result.Where(blueprint => !IsHidden(blueprint)).ToArray();
+            if (ImportOperationPath != null && ImportError == null) ReportImportStage(ImportStage.Complete);
             return includeHidden ? fullCatalogSnapshot : catalogSnapshot;
         }
 
@@ -439,6 +447,8 @@ namespace OstrixMods.BuildWorks
                 string target = Path.Combine(ImportDirectory, "import_" + Guid.NewGuid().ToString("N") + ".zip");
                 ImportError = null;
                 ImportResultPath = null;
+                ImportOperationPath = target;
+                ReportImportStage(ImportStage.Converting);
                 importTask = Task.Run(() =>
                 {
                     var prepared = review.Documents.Select(document =>
@@ -458,11 +468,13 @@ namespace OstrixMods.BuildWorks
                         throw new InvalidDataException("$buildworks_exchange.source_changed");
                     ValidateExchangeDirectory(ImportDirectory);
                     Directory.CreateDirectory(ImportDirectory);
+                    ReportImportStage(ImportStage.ReadingLibrary);
                     var validationReads = new Dictionary<string, Blueprint>(StringComparer.Ordinal);
                     var catalog = ExternalBlueprintLibrary.Load(ImportDirectory, validationReads: validationReads);
                     string temporary = Path.Combine(ImportDirectory, Guid.NewGuid().ToString("N") + ".tmp.zip");
                     try
                     {
+                        ReportImportStage(ImportStage.Writing);
                         using (var output = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                         using (var zip = new ZipArchive(output, ZipArchiveMode.Create))
                         {
@@ -479,12 +491,14 @@ namespace OstrixMods.BuildWorks
                             void WriteEntry(string name, byte[] data)
                             { using (var entry = zip.CreateEntry(name).Open()) entry.Write(data, 0, data.Length); }
                         }
+                        ReportImportStage(ImportStage.CheckingArchive);
                         var validated = ExternalBlueprintLibrary.LoadFile(temporary, Path.GetFileName(target));
                         if (validated.Count != prepared.Length || validated.Any(document => document.importError != null))
                             throw new InvalidDataException("$buildworks_import.format");
                         if (catalog.Count + validated.Count > ExternalBlueprintLibrary.MaximumFiles)
                             throw new InvalidDataException("$buildworks_import.library_limit");
                         // Validate the exact future sort order and shared read budget, not just this ZIP in isolation.
+                        ReportImportStage(ImportStage.CheckingLibrary);
                         var candidate = ExternalBlueprintLibrary.Load(ImportDirectory, temporary, Path.GetFileName(target), validationReads);
                         var validCopies = candidate.Where(document => document.importError == null)
                             .GroupBy(document => document.id).ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
@@ -505,6 +519,19 @@ namespace OstrixMods.BuildWorks
                 return true;
             }
             catch (Exception exception) { error = exception.Message; return false; }
+        }
+
+        internal bool RetryImportCatalog(string operationPath, out string error)
+        {
+            error = null;
+            if (CatalogLoading) { error = UserError("exchange.loading"); return false; }
+            if (operationPath == null || operationPath != ImportOperationPath || ImportResultPath != operationPath ||
+                !File.Exists(operationPath))
+            { error = UserError("exchange.result_missing"); return false; }
+            ImportError = null;
+            ReportImportStage(ImportStage.ReadingLibrary);
+            importTask = Task.Run(() => ExternalBlueprintLibrary.Load(ImportDirectory));
+            return true;
         }
 
         internal bool TryExportFile(Blueprint blueprint, out string exportedPath, out string error) =>

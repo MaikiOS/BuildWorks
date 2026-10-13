@@ -1,3 +1,10 @@
+## 2026-10-13 — QA .180 deployed: import lifecycle; catalog remains empty
+
+Phase/time progress, close-and-select by published ID+source/page, dirty-editor preservation and post-commit read-only catalogue recovery are implemented. [Evidence/limits](IMPORT_FLOW_180.md), [manual queue](MANUAL_QA_180.md). No conversion speedup claimed.
+
+normal/QA0/0, Geometry/Store/Localization runtime/EditorBridge/WorldLayout/actual Tick/Host/loc1013 and final Unity49219:21:50Z passed; correctness PASSED/Ponytail Ship. Formatter retains the same135 normalized WHITESPACE diagnostics as .179; no new findings. verify skill absent; direct checks used. Installed0.19.180.0/both SHA verified; all103 config/token/receipt files unchanged. Zero personal blueprints/import files; no automatic reseeding, Valheim/input/world changes.
+
+A separate local Blueprints-for-import folder holds576 source files+28 old ZIPs with provenance; Ostrix chooses imports. Added confirmed personal player-to-player transfer to the server design, separate from admin-only shared-library publication. Not implemented yet. Next categories/autosaved share file, then batch operations and server library/transfer. Full contents/v11/selection/network goal remains incomplete; goal API blocked/no resume. Earlier .180 failures below are historical; final exact-source UI passed.
 ## 2026-10-13 — clean QA catalog; personal/server library contract
 
 Ostrix explicitly requested a fresh TerrainRamp-1.0-Test catalog. Archived20 personal blueprints,28 import ZIPs and thumbnails:88 files SHA-verified in artifacts/catalog-reset-20261013-214543. The new v22 library and imports are empty. Source fixtures/exports/test-fixtures/tokens/provision receipts/worlds/saves were preserved. Do not automatically repopulate cards.

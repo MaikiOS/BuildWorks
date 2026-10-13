@@ -32,6 +32,7 @@ public sealed class ExchangeTickChecks
         public T[] GetComponentsInChildren<T>() { return controls.Cast<T>().ToArray(); }
     }
     private sealed class Text { public string text = ""; }
+
     private sealed class GameObject { public bool activeSelf = false; }
     private sealed class Input { public GameObject gameObject = new GameObject(); }
     private static class CompositeBlueprintStore
@@ -50,11 +51,17 @@ public sealed class ExchangeTickChecks
     {
         public int Revision = 0, Generation = 0, Calls = 0, PrepareCalls = 0;
         public bool CatalogLoading = true;
-        public string ImportError = null, ImportResultPath = "result.zip";
+        public string ImportError = null, ImportResultPath = "result.zip", ImportOperationPath = "result.zip";
+        public int Writes;
+        public Exception CatalogException = null;
+        public bool TryImportReviewed(CompositeBlueprintStore.ImportReview review, bool storage, bool mounts,
+            Func<string, int> hash, out string error, bool armor, CompositeBlueprintStore.MissingPartsReview missing)
+        { error = null; ++Writes; return true; }
         public TaskCompletionSource<CompositeBlueprintStore.ImportReview> preparation =
             new TaskCompletionSource<CompositeBlueprintStore.ImportReview>();
         public CompositeBlueprintStore.Blueprint[] CatalogAll()
         {
+            if (CatalogException != null) throw CatalogException;
             if (++Calls == 1) Generation++;
             if (Calls >= 2) CatalogLoading = false;
             return new[] { new CompositeBlueprintStore.Blueprint() };
@@ -72,7 +79,7 @@ public sealed class ExchangeTickChecks
     private readonly RectTransform panel = new RectTransform();
     private readonly Text message = new Text();
     private readonly Input directory = new Input();
-    private readonly Selectable primary = new Selectable { name = "ExchangePrimary" };
+    private readonly Selectable primary = new Selectable { name = "ExchangeSubmit" };
     private readonly Selectable copyPath = new Selectable { name = "ExchangeCopyPath" };
     private readonly Selectable contentsBack = new Selectable { name = "ExchangeContentsBack" };
     private Func<CompositeBlueprintStore.Blueprint, string> place = null;
@@ -89,6 +96,10 @@ public sealed class ExchangeTickChecks
     private CompositeBlueprintStore.ContentsSummary contentsSummary = null;
     private CompositeBlueprintStore.MissingPartsReview missingReview = null;
     private bool importing = false, completed = false, reviewingContents = false, planBuild = false, omitMissingParts = false;
+    private bool catalogRetry = false;
+
+    private string importOperationPath = "result.zip";
+    private Action<CompositeBlueprintStore.Blueprint[]> importCompleted;
     private bool IsOpen = true;
     private string selected = "input.blueprint", resultPath = null, result = null;
     private string[] entries = Array.Empty<string>();
@@ -106,6 +117,9 @@ public sealed class ExchangeTickChecks
     private void RefreshMissing() { refreshedMissing++; missingReview = new CompositeBlueprintStore.MissingPartsReview(); }
     private void RenderPlanReview() { }
     private void ShowResult(string text) { shownResults++; result = text; }
+    private void UpdateImportProgress() { }
+    private void ShowSavedCatalogFailure(string error)
+    { completed = catalogRetry = true; resultPath = store.ImportResultPath; ShowResult("saved: " + error); }
     private static void Assert(bool condition, string reason)
     {
         if (!condition) throw new InvalidOperationException(reason);
@@ -128,6 +142,7 @@ public sealed class ExchangeTickChecks
         var importFailure = new ExchangeTickChecks { importing = true, reviewingContents = true,
             contentsSummary = new CompositeBlueprintStore.ContentsSummary(), missingReview = new CompositeBlueprintStore.MissingPartsReview() };
         importFailure.store.ImportError = "normalization failed";
+        importFailure.store.ImportResultPath = null;
         importFailure.importReview = new CompositeBlueprintStore.ImportReview { IsHostCurrent = () => importFailure.store.Generation == 0 };
         importFailure.Tick();
         importFailure.Tick();
@@ -183,6 +198,29 @@ public sealed class ExchangeTickChecks
         empty.Tick();
         Assert(empty.primary.interactable, "Existing all-missing blueprint must remain exportable for backup");
         Console.WriteLine("PASS actual exchange Tick: own import to result/failure, browser after Back, stale confirmation, two stages, worker failure and all-missing import/export boundary");
+        int callbacks = 0;
+        var automatic = new ExchangeTickChecks { importing = true, reviewingContents = true };
+        automatic.importCompleted = items => { Assert(!automatic.IsOpen && items.Length == 1, "Callback ran before close"); ++callbacks; };
+        automatic.Tick(); automatic.Tick(); automatic.Tick();
+        Assert(callbacks == 1 && automatic.shownResults == 0 && !automatic.IsOpen, "Success did not auto-close exactly once");
+        var saved = new ExchangeTickChecks { importing = true, reviewingContents = true };
+        saved.store.ImportError = "catalogue failed after save";
+        saved.Tick(); saved.Tick();
+        Assert(saved.completed && saved.catalogRetry && saved.primary.interactable && !saved.contentsBack.interactable &&
+            saved.resultPath == "result.zip" && saved.store.Writes == 0,
+            "Post-commit failure must offer catalogue refresh without another import");
+        var snapshotFailure = new ExchangeTickChecks { importing = true, reviewingContents = true };
+        snapshotFailure.store.CatalogException = new IOException("host snapshot failed");
+        snapshotFailure.Tick();
+        Assert(snapshotFailure.completed && snapshotFailure.catalogRetry && snapshotFailure.shownResults == 1 &&
+            !snapshotFailure.importing && snapshotFailure.store.Writes == 0,
+            "Main-thread catalogue snapshot error escaped or offered another write after commit");
+        var replaced = new ExchangeTickChecks { importing = true, reviewingContents = true };
+        replaced.store.ImportOperationPath = "another.zip";
+        replaced.Tick();
+        Assert(replaced.completed && replaced.store.Calls == 0 && replaced.message.text == "exchange.operation_changed",
+            "Old view consumed another operation's result");
+        Console.WriteLine("PASS actual exchange Tick: success callback after Dispose once, committed refresh error and operation replacement.");
     }
 }
 internal static class StableHashStub

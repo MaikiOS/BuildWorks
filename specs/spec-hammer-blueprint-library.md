@@ -20,6 +20,10 @@ automatic share-file saving do not exist yet.
   shared entries. Players may read authorized entries and save personal copies.
   Enforce listing and file reads on the server. Personal saves are not auto-published.
   Library access never grants free construction or administrative restoration.
+- Player-to-player sharing is separate: choose recipient, accept/decline, fresh
+  personal identity and provenance; no implicit publication or construction.
+  Server validates sender/recipient access, size/rate/duplicate limits. Admin-only
+  blueprints cannot bypass recipient permissions through sharing.
 - Implement local import lifecycle first, then category/share files, batch exchange,
   and separate bounded server-library operations. Existing contents/resource/v11/
   selection/network requirements remain part of the full goal.
@@ -71,6 +75,14 @@ proposal retained only in the owner's canonical source tree.
   её файл также нельзя получить без прав. Административные чертежи восстановления
   сервера отделены от общедоступных. Права доступа к файлу не дают бесплатной
   стройки или восстановления административного состояния.
+- Ostrix отдельно подтвердил обмен личными чертежами между игроками.
+  «Передать игроку» выбирает получателя; получатель видит автора, название,
+  состав/зависимости и принимает или отклоняет копию. Принятие создаёт личную
+  запись с новым ID и сохранённым происхождением, не публикует общий чертёж
+  и не начинает строительство. Сервер проверяет полномочия отправителя,
+  доступ получателя и ограничения размера/частоты/повторов. Закрытый
+  административный чертёж нельзя передать игроку через обход видимости.
+  Вне игры остаётся передача готового файла через «Поделиться».
 - Точки подключения: `CompositeBlueprintStore.TrySaveDocument/TryUpdateDocument`,
   `BlueprintExchangeFormat`, review импорта в `BlueprintExchangeView`.
   Серверного хранилища и протокола общей библиотеки в текущем коде нет.

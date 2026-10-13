@@ -49,6 +49,8 @@ namespace OstrixMods.BuildWorks
         private CompositeBlueprintStore.Blueprint sourceBlueprint;
         private CompositeBlueprintStore.Blueprint previewTemplate;
         private bool catalogImportPending;
+        private CompositeBlueprintStore.Blueprint pendingImportedBlueprint;
+        private int pendingImportedCount, pendingImportedFrame;
         private EditorState state;
         private CursorLockMode previousCursorLock;
         private bool previousCursorVisible;
@@ -383,7 +385,7 @@ namespace OstrixMods.BuildWorks
             HideGameCanvases(view.RootCanvas);
             scene.EnsureWorldCamerasExcludeEditorLayer();
             view.Tick();
-            if (!view.HasCatalog) replacementCatalogSelected = null;
+            if (!view.HasCatalog) { replacementCatalogSelected = null; pendingImportedBlueprint = null; }
             view.SetSelectionBox(selectionStart, input.MousePosition, false);
             RefreshContextHints();
             Rect viewport = view.ViewportScreenRect();
@@ -420,6 +422,14 @@ namespace OstrixMods.BuildWorks
             }
             if (view.HasCatalog)
             {
+                if (pendingImportedBlueprint != null && Time.frameCount > pendingImportedFrame)
+                {
+                    var target = pendingImportedBlueprint;
+                    pendingImportedBlueprint = null; catalogImportPending = false;
+                    bool selected = view.ShowImportedCatalog(catalogItems(), target);
+                    view.SetStatus(BuildWorksLocalization.Text(selected ? "exchange.selected_result" : "exchange.result_missing",
+                        pendingImportedCount, target.name), error: !selected);
+                }
                 if (catalogImportPending)
                 {
                     store.CatalogAll();
@@ -694,7 +704,12 @@ namespace OstrixMods.BuildWorks
             view.CatalogPartSelected += BeginPartPlacement;
             view.CatalogManageRequested += ManageCatalogBlueprint;
             view.ItemContentsRequested += RequestItemContents;
-            view.CatalogImportRequested += () => view.ShowExchange((parent, font, closed) => new BlueprintExchangeView(parent, font, store, null, closed), () =>
+            view.CatalogImportRequested += () => view.ShowExchange((parent, font, closed) => new BlueprintExchangeView(parent, font, store, null, closed,
+                imported: imported =>
+                {
+                    if (!IsEditing || !view.HasCatalog || imported.Length == 0) return;
+                    pendingImportedBlueprint = imported[0]; pendingImportedCount = imported.Length; pendingImportedFrame = Time.frameCount;
+                }), () =>
             {
                 catalogImportPending = true;
             });
@@ -4421,6 +4436,7 @@ namespace OstrixMods.BuildWorks
         private void Cleanup()
         {
             if (state == EditorState.Closed) return;
+            pendingImportedBlueprint = null; pendingImportedCount = 0;
             blockWorldInputThroughFrame = Math.Max(
                 blockWorldInputThroughFrame, Time.frameCount);
             state = EditorState.Closing;

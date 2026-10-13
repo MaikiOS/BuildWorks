@@ -34,6 +34,7 @@ namespace OstrixMods.BuildWorks
         private BlueprintCatalogLayout catalogLayout;
         private bool catalogBlueprintMode, catalogQuick, catalogDetails = true, catalogStateInitialized, catalogAttachmentMode;
         private int catalogPage, catalogPageCount = 1;
+        private string catalogNavigationId, catalogNavigationSource;
         private readonly HashSet<string> catalogFavorites = new HashSet<string>(StringComparer.Ordinal);
         private readonly List<string> catalogRecent = new List<string>();
         private readonly CatalogFilters catalogPartFilters = new CatalogFilters(), catalogBlueprintFilters = new CatalogFilters();
@@ -162,6 +163,25 @@ namespace OstrixMods.BuildWorks
             OpenCatalog(items);
         }
 
+        internal bool ShowImportedCatalog(IReadOnlyList<BlueprintEditorCatalogItem> items, CompositeBlueprintStore.Blueprint target)
+        {
+            if (target == null || items == null || !items.Any(item => item.Blueprint?.id == target.id &&
+                item.Blueprint.importSource == target.importSource)) return false;
+            catalogAttachmentMode = false; catalogBlueprintMode = true;
+            var filter = catalogBlueprintFilters;
+            filter.Query = ""; filter.Section = "category:" + target.category;
+            filter.Family = filter.Material = filter.Source = filter.Station = filter.Kind = null;
+            filter.Page = 0;
+            catalogNavigationId = target.id; catalogNavigationSource = target.importSource;
+            OpenCatalog(items);
+            Transform card = catalogGrid.Find("Catalog_" + target.id);
+            if (card && EventSystem.current) EventSystem.current.SetSelectedGameObject(card.gameObject);
+            return true;
+        }
+
+        private static bool SameCatalogItem(BlueprintEditorCatalogItem a, BlueprintEditorCatalogItem b) =>
+            a != null && b != null && a.PrefabName == b.PrefabName && a.Blueprint?.importSource == b.Blueprint?.importSource;
+
         internal void ShowItemStandCatalog(IReadOnlyList<BlueprintEditorCatalogItem> items)
         {
             catalogAttachmentMode = true;
@@ -206,7 +226,17 @@ namespace OstrixMods.BuildWorks
                  Matches("#" + (item.Index + 1), f.Query))).ToList();
             if (f.Section == "recent") filtered.Sort((a, b) => catalogRecent.IndexOf(a.PrefabName).CompareTo(catalogRecent.IndexOf(b.PrefabName)));
             catalogPageCount = Math.Max(1, (filtered.Count + catalogLayout.PageSize - 1) / catalogLayout.PageSize);
+            if (catalogNavigationId != null)
+            {
+                int index = filtered.FindIndex(item => item.Blueprint?.id == catalogNavigationId &&
+                    item.Blueprint.importSource == catalogNavigationSource);
+                if (index >= 0) { f.Page = index / catalogLayout.PageSize; catalogPreviewItem = filtered[index]; }
+                catalogNavigationId = catalogNavigationSource = null;
+            }
             catalogPage = f.Page = Mathf.Clamp(f.Page, 0, catalogPageCount - 1);
+            var visible = filtered.Skip(catalogPage * catalogLayout.PageSize).Take(catalogLayout.PageSize).ToArray();
+            var selected = visible.FirstOrDefault(item => SameCatalogItem(item, catalogPreviewItem)) ?? visible.FirstOrDefault();
+            catalogPreviewItem = selected;
             foreach (BlueprintEditorCatalogItem item in filtered.Skip(catalogPage * catalogLayout.PageSize).Take(catalogLayout.PageSize)) AddCatalogCard(item);
             catalogEmpty.gameObject.SetActive(filtered.Count == 0);
             catalogPageText.text = (catalogPage + 1) + " / " + catalogPageCount;
@@ -223,7 +253,7 @@ namespace OstrixMods.BuildWorks
             SetSelected(catalogDetailsButton, catalogDetails && catalogLayout.Details.Width > 0);
             SetButtonLabel(catalogMaterialButton, f.Material == null ? CatalogText("all_materials") : BuildWorksLocalization.CatalogLabel(f.Material));
             SetButtonLabel(catalogSourceButton, f.Source == null ? CatalogText("all_sources") : BuildWorksLocalization.CatalogLabel(f.Source));
-            RebuildCatalogNavigation(); RebuildCatalogContext(); PreviewCatalogItem(filtered.FirstOrDefault());
+            RebuildCatalogNavigation(); RebuildCatalogContext(); PreviewCatalogItem(selected);
         }
         private void AddCatalogCard(BlueprintEditorCatalogItem item)
         {
@@ -238,6 +268,7 @@ namespace OstrixMods.BuildWorks
                 CatalogPartSelected?.Invoke(captured, true);
             });
             LayoutElement element = button.GetComponent<LayoutElement>(); element.minHeight = element.preferredHeight = 152;
+            SetSelected(button, SameCatalogItem(item, catalogPreviewItem));
             TMP_Text name = button.GetComponentInChildren<TMP_Text>(); name.enableAutoSizing = false; name.fontSize = 14;
             if (!string.IsNullOrEmpty(item.UnavailableReason) || !string.IsNullOrEmpty(item.WarningReason)) name.text = "[!] " + item.DisplayName;
             name.textWrappingMode = TextWrappingModes.Normal; name.alignment = TextAlignmentOptions.TopLeft;

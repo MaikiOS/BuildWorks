@@ -999,3 +999,20 @@ availability.missing	{0}: prefab is not loaded. Check the required mod and game 
 availability.other_tool	{0}: prefab is loaded but is not a build piece in the current tool. Open it in the editor to change its composition; it is not unlocked automatically.
 availability.native_blocked	{0}: the current tool contains this piece, but the game does not currently allow it. Check its recipe and mod settings. This check does not spend materials.
 availability.unsupported	{0}: this object is not supported as an ordinary blueprint build piece. Its saved record is retained.
+exchange.progress	Stage {0}/{1}: {2}\nElapsed: {3} s. Stage durations differ.
+exchange.stage_1	Reading and checking the file
+exchange.stage_2	Checking parts and dependencies
+exchange.stage_3	Converting blueprints
+exchange.stage_4	Checking the existing library
+exchange.stage_5	Saving a separate copy
+exchange.stage_6	Checking the saved archive
+exchange.stage_7	Checking the combined library
+exchange.stage_8	Updating the catalogue
+exchange.stage_9	Catalogue ready
+exchange.background	BACKGROUND
+exchange.retry_catalog	Refresh catalogue
+exchange.saved_catalog_failed	Copy saved: {0}\nCatalogue refresh failed: {1}\nChoose Refresh catalogue. The file will not be written again.
+exchange.result_missing	The imported copy was not found in the catalogue. Check its saved path and refresh the catalogue.
+exchange.operation_changed	The import operation changed. This window will not open another operation's result.
+exchange.selected_result	Imported blueprints: {0}. Selected: {1}.
+exchange.archive_destination	The first blueprint will be selected after import: {0}. All archive blueprints are retained.

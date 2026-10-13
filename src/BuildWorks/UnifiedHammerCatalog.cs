@@ -1135,6 +1135,9 @@ namespace OstrixMods.BuildWorks
         private static Action blueprintCreateAction;
         private static Action blueprintWorldSelectionAction;
         private static CompositeBlueprintStore.Blueprint selectedBlueprint;
+        private static CompositeBlueprintStore.Blueprint pendingImportedBlueprint;
+        private static int pendingImportedCount;
+        private static bool importedSelectionPending;
         private static CompositeBlueprintStore.Blueprint contextBlueprint;
         private static GameObject contextMenu;
         private static readonly List<Button> ContextButtons = new List<Button>();
@@ -1197,6 +1200,7 @@ namespace OstrixMods.BuildWorks
         {
             blueprintStore = store;
             blueprintRegistry = registry;
+            pendingImportedBlueprint = null; importedSelectionPending = false;
             blueprintAction = action;
             blueprintCreateAction = createAction;
             blueprintWorldSelectionAction = worldSelectionAction;
@@ -1234,6 +1238,23 @@ namespace OstrixMods.BuildWorks
                     exchangeView.Tick();
                     if (Input.GetKeyDown(KeyCode.Escape)) { exchangeView?.Dispose(); exchangeView = null; }
                     return;
+                }
+            }
+            if (pendingImportedBlueprint != null && Time.frameCount > exchangeClosedFrame)
+            {
+                var target = pendingImportedBlueprint;
+                pendingImportedBlueprint = null;
+                if (hud && player && !player.IsDead() && Hud.IsPieceSelectionVisible())
+                {
+                    selectedBlueprint = target; importedSelectionPending = true;
+                    blueprintImportPending = false; showHiddenBlueprints = false; showResources = false;
+                    blueprintCategory = target.category; blueprintPage = 0;
+                    PieceTable table = PrecisionPlacementSession.GetBuildPieceTable(player);
+                    HammerCatalogOrganizer.SetSearch("", player);
+                    HammerCatalogOrganizer.SetSourceFilter(table, UnifiedHammerCatalog.BlueprintCategory, HammerCatalogOrganizer.AllSource, player);
+                    HammerCatalogOrganizer.OpenBlueprints(table, player);
+                    ShowStatus(BuildWorksLocalization.Text("exchange.selected_result", pendingImportedCount, target.name));
+                    Invalidate();
                 }
             }
             if (HammerCatalogOrganizer.NativeBuildUiActive)
@@ -2312,6 +2333,7 @@ namespace OstrixMods.BuildWorks
             Canvas canvas = hud && hud.m_pieceSelectionWindow ? hud.m_pieceSelectionWindow.GetComponentInParent<Canvas>() : null;
             if (!canvas || blueprintStore == null) return;
             exchangeView?.Dispose();
+            var expectedStore = blueprintStore;
             placementExchange = false;
             exchangeView = new BlueprintExchangeView(canvas.transform,
                 hud.m_pieceDescription ? hud.m_pieceDescription : hud.m_buildSelection, blueprintStore, blueprint, () =>
@@ -2319,7 +2341,11 @@ namespace OstrixMods.BuildWorks
                     exchangeView = null; exchangeClosedFrame = Time.frameCount;
                     if (blueprint == null) blueprintImportPending = true;
                     Invalidate();
-                }, frontCanvas: true, report: report);
+                }, frontCanvas: true, report: report, imported: imported =>
+                {
+                    if (!ReferenceEquals(blueprintStore, expectedStore) || imported.Length == 0) return;
+                    pendingImportedBlueprint = imported[0]; pendingImportedCount = imported.Length;
+                });
         }
 
         internal static bool ShowPlacementContents(CompositeBlueprintStore.Blueprint blueprint,
@@ -2466,6 +2492,14 @@ namespace OstrixMods.BuildWorks
             }
             int pageCount = Math.Max(1, (filtered.Count + blueprintsPerPage - 1) /
                 blueprintsPerPage);
+            if (importedSelectionPending)
+            {
+                int index = filtered.FindIndex(item => item.id == selectedBlueprint?.id &&
+                    item.importSource == selectedBlueprint.importSource);
+                if (index >= 0) { selectedBlueprint = filtered[index]; blueprintPage = index / blueprintsPerPage; }
+                else ShowStatus(BuildWorksLocalization.Text("exchange.result_missing"));
+                importedSelectionPending = false;
+            }
             blueprintPage = Mathf.Clamp(blueprintPage, 0, pageCount - 1);
             if (selectedBlueprint == null || !filtered.Contains(selectedBlueprint))
                 selectedBlueprint = filtered.Count > 0 ? filtered[0] : null;

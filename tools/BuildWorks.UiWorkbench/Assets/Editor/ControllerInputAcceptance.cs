@@ -934,13 +934,22 @@ internal static class ControllerInputAcceptance
             }
             context = new object();
             NativeClick(view, null, "ExchangeSubmit"); yield return null;
+            view.Tick();
             Require(!Field<bool>(exchange, "importing") && !Directory.Exists(store.ImportDirectory) &&
                 Field<TMP_Text>(exchange, "message").text == BuildWorksLocalization.Text("placement.contents_stale"),
                 "Stale-context confirmation published a copy or hid its refusal");
-            NativeClick(view, null, "ExchangeContentsBack"); yield return null;
+            NativeClick(view, null, "ExchangeContentsBack"); view.Tick(); yield return null;
             NativeClick(view, null, "ExchangeSubmit");
             for (int frame = 0; frame < 300 && ImportPending(exchange); ++frame)
             { view.Tick(); yield return null; }
+            Require(Field<bool>(exchange, "reviewingContents") && Field<CompositeBlueprintStore.MissingPartsReview>(exchange, "missingReview")?.Parts == 1 &&
+                Field<Button>(exchange, "missingChoice").gameObject.activeInHierarchy,
+                "Fresh missing review did not recover: review=" + Field<bool>(exchange, "reviewingContents") +
+                "; pending=" + ImportPending(exchange) +
+                "; importing=" + Field<bool>(exchange, "importing") + "; completed=" + Field<bool>(exchange, "completed") +
+                "; primary=" + Field<Button>(exchange, "primary").interactable +
+                "; missing=" + Field<CompositeBlueprintStore.MissingPartsReview>(exchange, "missingReview")?.Parts +
+                "; message=" + Field<TMP_Text>(exchange, "message").text);
             NativeClick(view, null, "ExchangeMissingChoice"); yield return null;
             NativeClick(view, null, "ExchangeSubmit");
             for (int frame = 0; frame < 300 && Field<bool>(exchange, "importing"); ++frame)
@@ -1690,14 +1699,35 @@ internal static class ControllerInputAcceptance
         var input = new InputFrames();
         try
         {
+            IReadOnlyList<BlueprintEditorCatalogItem> Catalogue()
+            {
+                var published = store.CatalogAll();
+                string category = published.FirstOrDefault()?.category ?? "OTHER";
+                var items = new List<BlueprintEditorCatalogItem> {
+                    new BlueprintEditorCatalogItem("wall", "Wall", null, "building", "wood", "Test", 0) };
+                for (int i = 0; i < 120; ++i)
+                {
+                    var decoy = new CompositeBlueprintStore.Blueprint { id = "decoy" + i, name = "Atlas", category = category };
+                    items.Add(new BlueprintEditorCatalogItem(decoy.id, decoy.name, null, category, "wood", "Test", i + 1, decoy));
+                }
+                foreach (var result in published)
+                    items.Add(new BlueprintEditorCatalogItem(result.id, result.name, null, result.category, "wood", "Test", items.Count, result));
+                return items;
+            }
             using (var controller = new BlueprintEditorController(store, template, font, _ => source, name => name,
-                () => new[] { new BlueprintEditorCatalogItem("wall", "Wall", null, "building", "wood", "Test", 0) },
+                Catalogue,
                 error => { throw new InvalidOperationException(error); }, editorInput: input))
             {
                 Require(controller.OpenNew(out string error), error);
+                var draft = controller.Document;
+                Require(draft.AddPart(new BlueprintEditorPart("draft", "wall", "Draft wall", new Point3(8, 2, 3),
+                    new Rotation3(0, 0, 0, 1))), "Dirty import draft setup failed");
+                draft.SelectOnly("draft");
+                int draftRevision = draft.RevisionToken, draftHistory = Field<IList>(draft, "undo").Count;
                 var view = Field<BlueprintEditorView>(controller, "view");
                 Call(controller, "RequestCatalog"); yield return null;
                 NativeClick(view, null, "CatalogBlueprintsMode"); yield return null;
+                Field<TMP_InputField>(view, "catalogSearch").text = "incompatible-search";
                 NativeClick(view, null, "CatalogImport"); yield return null;
                 Require(view.HasModal, "Catalog import did not open shared file browser");
                 for (int i = 0; i < 300 && Field<Task<string[]>>(Field<BlueprintExchangeView>(view, "exchangeView"), "listing") != null; ++i)
@@ -1756,6 +1786,10 @@ internal static class ControllerInputAcceptance
                 Frame(controller, input, Vector2.zero); yield return null;
                 Require(!Field<Button>(exchange, "primary").interactable && Field<Button>(exchange, "contentsBack").interactable,
                     "Pending host review allowed confirmation or blocked Back");
+                Require(Field<RectTransform>(exchange, "progress").gameObject.activeSelf &&
+                    Field<TMP_Text>(exchange, "message").text.Contains(BuildWorksLocalization.Text("exchange.stage_2")) &&
+                    !Field<TMP_Text>(exchange, "message").isTextOverflowing,
+                    "Actual pending task has no readable phase progress");
                 NativeClick(view, null, "ExchangeContentsBack"); yield return null;
                 delayedReview.SetResult(discardedReview); Frame(controller, input, Vector2.zero); yield return null;
                 Require(Field<TMP_InputField>(exchange, "directory").interactable && !Directory.Exists(store.ImportDirectory),
@@ -1768,15 +1802,22 @@ internal static class ControllerInputAcceptance
                 NativeClick(view, null, "ExchangeSubmit"); yield return null;
                 for (int i = 0; i < 300 && Field<bool>(exchange, "importing"); ++i)
                 { Frame(controller, input, Vector2.zero); yield return null; }
-                Require(Field<bool>(exchange, "completed") && view.HasModal && controller.Document.Parts.Count == 0 &&
-                    File.ReadAllText(sourcePath) == text, "Import result disappeared, modified document or original: " +
-                    Field<TMP_Text>(exchange, "message").text + "; review=" + Field<bool>(exchange, "reviewingContents") +
+                for (int i = 0; i < 3; ++i) { Frame(controller, input, Vector2.zero); yield return null; }
+                Require(Field<bool>(exchange, "completed") && !view.HasModal && view.HasCatalog &&
+                    ReferenceEquals(controller.Document, draft) && draft.IsDirty && draft.RevisionToken == draftRevision &&
+                    Field<IList>(draft, "undo").Count == draftHistory && draft.Selection.SequenceEqual(new[] { "draft" }) &&
+                    draft.Parts.Single().Position.X == 8 && File.ReadAllText(sourcePath) == text,
+                    "Import failed to auto-close, or modified dirty draft/original: review=" + Field<bool>(exchange, "reviewingContents") +
                     "; importing=" + Field<bool>(exchange, "importing"));
                 string importedPath = Field<string>(exchange, "resultPath");
                 Require(File.Exists(importedPath), "Persistent result path is not the copied file");
-                Frame(controller, input, Vector2.zero, 0, KeyCode.Escape); Frame(controller, input, Vector2.zero); yield return null;
-                Require(!view.HasModal && view.HasCatalog, "Escape closed catalogue instead of exchange dialog");
                 var prepared = store.CatalogAll().First(item => item.importSource.StartsWith(Path.GetFileName(importedPath) + "/", StringComparison.Ordinal));
+                var selectedResult = Field<BlueprintEditorCatalogItem>(view, "catalogPreviewItem");
+                Require(selectedResult.Blueprint.id == prepared.id && selectedResult.Blueprint.importSource == prepared.importSource &&
+                    Field<int>(view, "catalogPage") > 0 && Field<TMP_InputField>(view, "catalogSearch").text == "" &&
+                    Field<Transform>(view, "catalogGrid").Find("Catalog_" + prepared.id) &&
+                    EventSystem.current.currentSelectedGameObject == Field<Transform>(view, "catalogGrid").Find("Catalog_" + prepared.id).gameObject,
+                    "Imported same-name result was not selected on its actual page after clearing an obstructing search");
                 Require(prepared.parts[0].baseScale.HasValue && prepared.parts[0].baseScale.Value.ToVector3() == Vector3.one &&
                     prepared.parts[0].scale.ToVector3() == Vector3.one && !prepared.parts[0].scaleIsAbsolute &&
                     prepared.parts[0].RootScale(source.transform.localScale) == Vector3.one,

@@ -187,7 +187,7 @@ namespace OstrixMods.BuildWorks.Geometry
         }
 
         // BinaryWriter strings use a canonical 7-bit UTF-8 byte length. Bound it before allocating.
-        internal static string ReadString(BinaryReader reader)
+        internal static string ReadString(BinaryReader reader, int maximumBytes = int.MaxValue)
         {
             uint length = 0;
             for (int shift = 0; shift < 35; shift += 7)
@@ -196,7 +196,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 if (shift == 28 && part > 7) throw new InvalidDataException("Invalid string length.");
                 length |= (uint)(part & 127) << shift;
                 if ((part & 128) != 0) continue;
-                if (shift > 0 && part == 0 || length > reader.BaseStream.Length - reader.BaseStream.Position)
+                if (shift > 0 && part == 0 || length > maximumBytes || length > reader.BaseStream.Length - reader.BaseStream.Position)
                     throw new InvalidDataException("Invalid string length.");
                 byte[] bytes = reader.ReadBytes((int)length);
                 return new UTF8Encoding(false, true).GetString(bytes);

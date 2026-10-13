@@ -1,6 +1,6 @@
 # Survival storage placement — implementation contract
 
-Status: shared reservation .171, local native transfer .172, write-ahead evidence .173 same-session inverse return .174 and marker-bound explicit recovery .175 implemented in sources, 2026-10-13. Installed QA .175 still
+Status: shared reservation .171, local native transfer .172, write-ahead evidence .173 same-session inverse return .174 and marker-bound explicit recovery .175 and canonical Local inventory readback .176 implemented in sources, 2026-10-13. Installed QA .176 still
 blocks populated storage unless its contents are explicitly omitted from the
 temporary placement recipe. This document does not enable restoration or replace
 the full BuildWorks goal. Keep archived source state unchanged.
@@ -17,6 +17,8 @@ In .172 the local primitive checks actual prefab grid/quest/equip/ownership and 
 .173 adds a versioned/checksummed/ordered write-ahead journal, complete preflight byte budget, actual before/after state evidence and unresolved-target cancellation hold. It never replays/refunds/rebinds: all files require reconciliation, even local terminal records. Durable recovery/compensation, native saves/server ack and world placement integration remain open. See docs/CONTENT_JOURNAL_173.md.
 
 .175 uses WAL3 plus a persistent target operation marker, not saved native UID/revision: ZDO.Load remaps/resets those fields. Marker Set follows flushed preparation and waits boundedly for native cache/capture before any item attempt. Explicit recovery binds exact current manifests/raw/cells/fresh ItemData; old/uncertain/unmarked evidence stays held. No game reload, disk/server receipt, construction refund or populated placement is claimed. See docs/CONTENT_RECOVERY_175.md.
+
+.176 binds completed journal custody to canonical Local profile46/Player33/Inventory109 readback with independent SHA-512/framing/identity/exact byte checks. No save is requested, no world/server/cloud/fresh-save/full-player proof is inferred, and no holds/markers/journals are retired. See docs/CONTENT_PROFILE_176.md. Separate Container pending-state must begin only after recorded native construction debit; ItemStand state must not be reused. CompleteNativePlacement/supply release/refund still require durable two-sided settlement.
 
 ## Required behavior
 

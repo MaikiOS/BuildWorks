@@ -880,7 +880,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.175.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.176.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginIdentity = $plugin.MainModule.Types | Where-Object Name -eq 'BuildWorksPlugin'
 $loaderIdentity = $pluginIdentity.CustomAttributes | Where-Object { $_.AttributeType.Name -eq 'BepInPlugin' }
@@ -3448,7 +3448,9 @@ Assert-Contract ($removalCalls -match '::TryCapture' -and $removalCalls -match '
     $removalCalls -match 'Piece::GetCreator' -and $removalCalls -match 'ZNetView::IsOwner' -and
     $removalCalls -notmatch 'Container::Save|Inventory::Load|ZDO::Set|RPC|DropAllItems|Destroy') 'Empty-storage cancellation guard must stay read-only.'
 $storageCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintStorageCapture' -and $_.Name -eq 'TryCapture' }
-$storageCalls = ($storageCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+$inventorySnapshot = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintStorageCapture' -and $_.Name -eq 'TrySnapshotInventory' }
+$storageCalls = (@($storageCapture.Body.Instructions) + @($inventorySnapshot.Body.Instructions) | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ((($storageCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n") -match '::TrySnapshotInventory') 'Container capture must use the shared bounded native snapshot.'
 foreach ($pattern in 'Player::GetPlayerID', 'PrivateArea::CheckAccess', 'Container::IsInUse', 'Container::GetInventory',
     'Inventory::GetAllItems', 'Inventory::GetWidth', 'Inventory::GetHeight', 'Inventory::Save', 'ZDO::GetByteArray', 'ZDO::get_DataRevision',
     'ZDOVars::s_items', 'ZDOVars::s_addedDefaultItems', 'ZDO::GetBool', 'GetComponentsInChildren<Container>') {
@@ -3456,6 +3458,22 @@ foreach ($pattern in 'Player::GetPlayerID', 'PrivateArea::CheckAccess', 'Contain
 }
 Assert-Contract ($storageCalls -notmatch 'Container::Save|Container::Load|Inventory::Load|ZDO::Set|RPC|Object::Instantiate|ItemDrop/ItemData::Load') 'Container snapshot mutates, restores or executes live state.'
 Assert-Contract ($storageCalls -match 'BlueprintContainerInventory::TryRead') 'Container snapshot skips full inert record/dependency validation.'
+$profileType = $hostAssembly.MainModule.Types | Where-Object Name -eq 'PlayerProfile'
+foreach ($entry in @(@(($profileType.Methods | Where-Object Name -eq 'SavePlayerToDisk'), '9ABD17CF7780C312C479207B5273419D060BE7C84061DC938E1991F1AA0FED68'),
+        @(($profileType.Methods | Where-Object Name -eq 'GetPath'), '48ED45B9C17740FB81DF61B2C27FAE258D29E61AAA73E5F3BB527CA2D31354FA'),
+        @((($hostAssembly.MainModule.Types | Where-Object Name -eq 'Player').Methods | Where-Object { $_.Name -eq 'Save' -and $_.Parameters.Count -eq 1 }), 'EE28695FB669E517485F8C1382166A91A85B097790D4D8EE663EC86ABDD2565C'),
+        @((($hostAssembly.MainModule.Types | Where-Object Name -eq 'ZPackage').Methods | Where-Object Name -eq 'GenerateHash'), 'CBA20AF2027558EB886A8CB8C7BB1C177882F220EA4DA66E5003CF0822D9BFD2'))) {
+    Assert-Contract ((Get-NativeLayoutHash $entry[0]) -eq $entry[1]) "Native canonical-profile contract changed: $($entry[0].FullName)"
+}
+$profileAdapter = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintStoragePlayerProfile' }
+$profileCalls = ($profileAdapter.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($profileCalls -match 'NativePlayerProfileReadback::TryVerify' -and $profileCalls -match '::TrySnapshotInventory' -and
+    $profileCalls -match 'PlayerProfile::m_fileSource' -and $profileCalls -match 'PlayerProfile::GetPath' -and
+    $profileCalls -notmatch 'Inventory::Load|PlayerProfile::Save|Game::SavePlayerProfile|Inventory::Move|ZDO::Set|RPC|DropItem|Destroy') 'Profile evidence must read canonical Local data without saves, restore or custody mutation.'
+$playerReadback = $transferType.Methods | Where-Object Name -eq 'PlayerReadbackCustodyValid'
+$playerReadbackCalls = ($playerReadback.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($playerReadbackCalls -match '::get_CompleteInMemory' -and $playerReadbackCalls -match '::InventoryDigest' -and
+    $playerReadbackCalls -match 'BlueprintStorageTransferJournal::Read' -and $playerReadbackCalls -match '::DestinationReady') 'Player evidence must remain bound to exact completed journal custody.'
 $emptyContainer = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintStorageCapture' -and $_.Name -eq 'CanPlaceWithoutContents' }
 $emptyContainerCalls = ($emptyContainer.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 foreach ($pattern in 'BlueprintContainerInventory::TryRead', 'get_ContentsCleared', 'BlueprintStorageCapture::PrefabGrid') {

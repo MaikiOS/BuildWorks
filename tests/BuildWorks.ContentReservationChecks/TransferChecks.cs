@@ -222,6 +222,7 @@ namespace ReservationChecks
                     "one false/exception/context/failure case produced unreadable or replayable evidence");
             ReturnChecks.Run();
             RecoveryChecks.Run();
+            ProfileChecks.Run();
             Console.WriteLine("PASS " + assertions + " transfer assertions: actual adapter, inert native/capture services; bool/exception custody, no replay, own properties, equip, payment/context guards. No game/native API/server/disk proof.");
         }
     }

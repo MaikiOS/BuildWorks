@@ -72,6 +72,8 @@ namespace ReservationChecks
         internal static int m_worldLevel;
         internal static Game instance = new Game();
         internal bool ShuttingDown;
+        internal PlayerProfile Profile;
+        internal PlayerProfile GetPlayerProfile() => Profile;
         internal bool IsShuttingDown() => ShuttingDown;
     }
     internal static class Debug { internal static void LogWarning(string _) { } }

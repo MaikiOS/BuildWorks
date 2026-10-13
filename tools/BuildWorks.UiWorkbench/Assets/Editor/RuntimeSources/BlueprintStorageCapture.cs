@@ -97,13 +97,29 @@ namespace OstrixMods.BuildWorks
                 byte[] raw = zdo.GetByteArray(ZDOVars.s_items, null);
                 if (raw != null && (raw.Length < 6 || raw.Length > BlueprintForeignPartData.MaximumContainerBytes)) return false;
                 raw = raw == null ? null : (byte[])raw.Clone();
+                // A new, initialized empty native chest may legitimately have no s_items yet.
+                if (raw == null && (inventory.GetAllItems().Count != 0 || !zdo.GetBool(ZDOVars.s_addedDefaultItems, false))) return false;
+                if (!TrySnapshotInventory(inventory, out var snapshot)) return false;
+                byte[] canonical = Convert.FromBase64String(snapshot.Zdo);
+                if (raw != null && !canonical.SequenceEqual(raw) || zdo.DataRevision != revision || container.IsInUse()) return false;
+                data = snapshot;
+                return true;
+            }
+            catch (Exception error) when (error is ArgumentException || error is OverflowException || error is TargetInvocationException)
+            { return false; }
+        }
+
+        // Shared bounded native serialization for a container or the player's current inventory.
+        internal static bool TrySnapshotInventory(Inventory inventory, out BlueprintForeignPartData data)
+        {
+            data = null;
+            if (inventory == null) return false;
+            try
+            {
                 int width = inventory.GetWidth(), height = inventory.GetHeight();
                 List<ItemDrop.ItemData> items = inventory.GetAllItems();
                 if (items == null || width < 1 || height < 1 || width > 256 || height > 256 ||
                     items.Count > 4096 || items.Count > width * height) return false;
-                // A new, initialized empty native chest may legitimately have no s_items yet.
-                // Missing bytes are not otherwise proof of an empty inventory.
-                if (raw == null && (items.Count != 0 || !zdo.GetBool(ZDOVars.s_addedDefaultItems, false))) return false;
                 var prefabs = new SortedSet<string>(StringComparer.Ordinal);
                 var cells = new HashSet<int>();
                 long units = 0, serializationBudget = 6;
@@ -141,12 +157,9 @@ namespace OstrixMods.BuildWorks
                 var package = new ZPackage();
                 inventory.Save(package); // Only writes this new private package.
                 byte[] canonical = package.GetArray();
-                if (raw != null && !canonical.SequenceEqual(raw) || zdo.DataRevision != revision || container.IsInUse()) return false;
-                raw = raw ?? canonical;
-                var snapshot = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, info, Convert.ToBase64String(raw), null);
+                var snapshot = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, info, Convert.ToBase64String(canonical), null);
                 if (!BlueprintContainerInventory.TryRead(snapshot, name => name.GetStableHashCode(), out _)) return false;
-                data = snapshot;
-                return true;
+                data = snapshot; return true;
             }
             catch (Exception error) when (error is ArgumentException || error is OverflowException || error is TargetInvocationException)
             { return false; }

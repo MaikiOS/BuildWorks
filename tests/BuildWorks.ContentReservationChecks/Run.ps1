@@ -20,6 +20,10 @@ $captureHash = (Get-FileHash -LiteralPath $capturePath).Hash
 $journalPath = (Resolve-Path -LiteralPath $JournalSourcePath).Path
 $journal = [IO.File]::ReadAllText($journalPath)
 $journalHash = (Get-FileHash -LiteralPath $journalPath).Hash
+$profilePath = Join-Path $root 'src/BuildWorks/BlueprintStoragePlayerProfile.cs'
+$profileSource = [IO.File]::ReadAllText($profilePath)
+$profileHash = (Get-FileHash -LiteralPath $profilePath).Hash
+$profileParserHash = (Get-FileHash -LiteralPath (Join-Path $root 'src/BuildWorks.Geometry/NativePlayerProfileReadback.cs')).Hash
 @{ status = 'not_passed'; sourceSHA256 = $sourceHash; previewSHA256 = $previewHash; transferSHA256 = $transferHash; captureSHA256 = $captureHash; journalSHA256 = $journalHash; nativeTransferTested = $false; gameTested = $false } |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'verification-status.json') -Encoding utf8
 function Segment([string]$from, [string]$until) {
@@ -48,6 +52,8 @@ $generated = "using System; using System.Collections.Generic; using System.Globa
     [Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText((Join-Path $output 'StorageJournalSource.cs'),
     $journal.Replace('namespace OstrixMods.BuildWorks', 'namespace ReservationChecks'), [Text.UTF8Encoding]::new($false))
+[IO.File]::WriteAllText((Join-Path $output 'StorageProfileSource.cs'),
+    $profileSource.Replace('namespace OstrixMods.BuildWorks', 'namespace ReservationChecks'), [Text.UTF8Encoding]::new($false))
 $captureStart = $capture.IndexOf('        private static readonly FieldInfo ContainerView', [StringComparison]::Ordinal)
 $captureEnd = $capture.IndexOf('        // Only construction compatibility', [StringComparison]::Ordinal)
 if ($captureStart -lt 0 -or $captureEnd -le $captureStart) { throw 'Capture cancellation guard boundary missing.' }
@@ -58,6 +64,7 @@ if ($captureStart -lt 0 -or $captureEnd -le $captureStart) { throw 'Capture canc
 if ($LASTEXITCODE -ne 0) { throw 'Reservation CPU harness build failed.' }
 & (Join-Path $PSScriptRoot 'bin/Release/net472/BuildWorks.ContentReservationChecks.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Reservation CPU checks failed. Native transfer is not exercised.' }
-@{ status = 'passed_cpu_host_substitutes'; sourceSHA256 = $sourceHash; previewSHA256 = $previewHash; transferSHA256 = $transferHash; captureSHA256 = $captureHash; journalSHA256 = $journalHash;
+@{ status = 'passed_cpu_host_substitutes'; sourceSHA256 = $sourceHash; previewSHA256 = $previewHash; transferSHA256 = $transferHash; captureSHA256 = $captureHash; journalSHA256 = $journalHash; profileAdapterSHA256 = $profileHash; profileParserSHA256 = $profileParserHash;
+    canonicalLocalProfileParserTested = $true; livePlayerProfileReadbackTested = $false;
     journalIOTested = $true; explicitExactRecoveryTestedWithHostSubstitutes = $true; durableRecoveryImplemented = $false; populatedPlacementEnabled = $false; nativeTransferTested = $false; gameTested = $false } |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'verification-status.json') -Encoding utf8

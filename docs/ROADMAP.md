@@ -1,3 +1,8 @@
+## 2026-10-13 — QA .176 deployed: canonical Local inventory readback
+
+Completed transfer custody now binds an independent canonical `.fch` integrity/player/exact Inventory109 comparison. Current profile46/Player33, bounded parsing and one Local handle only; no save/restore/hold release/new-save freshness/full Player.Load/world/server proof. [Scope and evidence .176](CONTENT_PROFILE_176.md).
+
+CPU51 new/240 transfer/271 return/114 recovery/36 IO/31 reserve; full Geometry, normal/QA0/0, Host with4 additional native fingerprints/localization990 and headless Unity passed; correctness PASSED/Ponytail Ship. Installed version0.19.176.0 and both hashes verified; all158 config/token/provision files unchanged. [Manual .176](MANUAL_QA_176_RU.md) retains18 fixtures, prioritizes world auto-snap17/18 and Forest Hut, avoids accepted repeats. Populated placement disabled. Next: authoritative persisted-world receipt, settlement/release and separate post-payment Container pending-state. No game/model/input/user saves executed. Full goal incomplete; latest API status blocked, resume unavailable, authorized development continues.
 ## 2026-10-13 — QA .175 deployed: persistent identity and explicit reconciliation
 
 Native inspection found ZDO UID/revision are remapped/reset on world load; v1/v2 cannot authorize restart rebind. WAL3 flush precedes owned marker.Set; bounded cache wait performs no item attempt. Explicit recovery requires the persistent operation marker/full current manifests/raw/capture and fresh ItemData/cells, then reuses the inverse mover. Legacy/unmarked/uncertain evidence and orphan markers stay held; no archive reconstruction/replay/refund/hold release. [Limits](CONTENT_RECOVERY_175.md).

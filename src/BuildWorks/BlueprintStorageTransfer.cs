@@ -61,6 +61,20 @@ namespace OstrixMods.BuildWorks
         internal IReadOnlyList<Entry> Entries => entries;
         internal bool CompleteInMemory => !cancelling && JournalError == null && entries.All(entry => entry.State == Result.Transferred);
 
+        internal bool TryPreparePlayerReadback(out BlueprintStoragePlayerProfile expectation, out string reason) =>
+            BlueprintStoragePlayerProfile.TryCapture(player, OperationId, PlayerReadbackCustodyValid, out expectation, out reason);
+
+        private bool PlayerReadbackCustodyValid()
+        {
+            if (!CompleteInMemory || !ContextValid() || !DestinationReady() || journal == null) return false;
+            var saved = BlueprintStorageTransferJournal.Read(journal.Path);
+            if (saved.Schema != 3 || saved.Prepared.Operation != OperationId || saved.InFlight.HasValue ||
+                saved.Observations.Count != entries.Count || saved.Observations.Any(value => value.State != (int)Result.Transferred)) return false;
+            var last = saved.Observations.Last();
+            return InventoryDigest(source) == last.SourceManifest && InventoryDigest(destination) == last.DestinationManifest &&
+                BytesDigest(zdo.GetByteArray(ZDOVars.s_items, null)) == last.ZdoHash && ContextValid();
+        }
+
         private BlueprintStorageTransfer(Guid operationId, Player player, Piece piece, Container container,
             ZNetView view, List<Entry> entries, IEnumerable<BlueprintItemStandPlacement.Supply> otherSupplies, bool returning = false, Guid marker = default(Guid))
         {

@@ -21,6 +21,7 @@ namespace OstrixMods.BuildWorks
         internal string Error { get; private set; }
         private bool removalConfirmed, networkRemovalQueued;
         internal bool NetworkRemovalQueued => networkRemovalQueued;
+        internal bool IsFor(Inventory source) => ReferenceEquals(inventory, source);
 
         internal BlueprintConstructionRefund(Inventory inventory, Piece.Requirement[] requirements)
         {

@@ -1,0 +1,126 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
+using OstrixMods.BuildWorks.Geometry;
+
+namespace ReservationChecks
+{
+    internal struct Vector2i { internal int x, y; internal Vector2i(int x, int y) { this.x = x; this.y = y; } }
+    internal struct Vector3 { }
+    internal sealed class Transform { internal Vector3 position = new Vector3(); }
+    internal sealed class GameObject : Obj
+    {
+        internal readonly Transform transform = new Transform();
+        internal Piece Piece;
+        internal Container Container;
+        internal T GetComponent<T>() where T : class => typeof(T) == typeof(Piece) ? Piece as T : Container as T;
+    }
+    internal sealed partial class Piece
+    {
+        internal GameObject gameObject;
+        internal Transform transform => gameObject.transform;
+        internal long Creator = 100;
+        internal long GetCreator() => Creator;
+    }
+    internal sealed partial class Player
+    {
+        internal static Player m_localPlayer;
+        internal static bool m_localPlayerExists = true;
+        internal readonly HashSet<ItemDrop.ItemData> Queue = new HashSet<ItemDrop.ItemData>();
+        internal ItemDrop.ItemData Equipped;
+        internal Action BeforeUnequip;
+        internal long GetPlayerID() => 100;
+        internal bool IsEquipActionQueued(ItemDrop.ItemData item) => Queue.Contains(item);
+        internal bool IsItemEquiped(ItemDrop.ItemData item) => ReferenceEquals(Equipped, item);
+        internal void RemoveEquipAction(ItemDrop.ItemData item) => Queue.Remove(item);
+        internal void UnequipItem(ItemDrop.ItemData item, bool _) { BeforeUnequip?.Invoke(); item.m_equipped = false; if (Equipped == item) Equipped = null; }
+    }
+    internal sealed partial class Inventory
+    {
+        internal int Width = 8, Height = 8, MoveCalls;
+        internal Action Changed, BeforeMove, AfterCredit, AfterSave;
+        internal bool NoChange, ReturnFalse;
+        internal int? PartialAmount;
+        internal int GetWidth() => Width;
+        internal int GetHeight() => Height;
+        internal ItemDrop.ItemData GetItemAt(int x, int y) => Items.FirstOrDefault(item => item.m_gridPos.x == x && item.m_gridPos.y == y);
+        internal bool MoveItemToThis(Inventory from, ItemDrop.ItemData item, int amount, int x, int y)
+        {
+            MoveCalls++; BeforeMove?.Invoke();
+            if (NoChange) return !ReturnFalse;
+            int moved = PartialAmount ?? amount;
+            var copy = item.Clone(); copy.m_stack = moved; copy.m_gridPos = new Vector2i(x, y);
+            Items.Add(copy); item.m_stack -= moved; AfterCredit?.Invoke();
+            if (Player.m_localPlayerExists) Changed?.Invoke();
+            AfterSave?.Invoke();
+            if (item.m_stack == 0) from.Items.Remove(item);
+            from.Changed?.Invoke(); return !ReturnFalse;
+        }
+        internal byte[] SaveBytes()
+        {
+            using (var stream = new MemoryStream())
+            using (var writer = new BinaryWriter(stream, Encoding.UTF8, true))
+            {
+                writer.Write(109); writer.Write((ushort)Items.Count);
+                foreach (var item in Items) Program.WriteItem(writer, item);
+                writer.Flush(); return stream.ToArray();
+            }
+        }
+    }
+    internal struct ZDOID { internal long Id; internal bool IsNone() => Id == 0; }
+    internal sealed class ZDO { internal ZDOID m_uid = new ZDOID { Id = 1 }; internal uint DataRevision; internal byte[] Raw; }
+    internal sealed class ZNetView : Obj
+    {
+        internal readonly ZDO Data = new ZDO(); internal bool Valid = true, Owner = true;
+        internal bool IsValid() => Valid; internal bool IsOwner() => Owner; internal ZDO GetZDO() => Data;
+    }
+    internal sealed class World { internal long m_uid = 1; }
+    internal sealed class ZNet : Obj { internal static ZNet instance = new ZNet(); internal readonly World World = new World(); internal World GetWorld() => World; }
+    internal sealed class ZDOMan { internal static ZDOMan instance = new ZDOMan(); }
+    internal static class InventoryGui { internal static bool Visible; internal static bool IsVisible() => Visible; }
+    internal static class PrivateArea { internal static bool Allowed = true; internal static bool CheckAccess(Vector3 _, float radius, bool flash, bool ward) => Allowed; }
+    internal sealed class Container : Obj
+    {
+        private ZNetView m_nview = new ZNetView();
+        private bool m_loading;
+        private uint m_lastRevision;
+        internal readonly Inventory Inventory;
+        internal bool Allowed = true, InUse, Supported = true, CaptureAllowed = true;
+        internal ZNetView View => m_nview;
+        internal Container(int width) { Inventory = new Inventory { Width = width, Height = 1 }; Inventory.Changed = Save; Save(); }
+        internal Inventory GetInventory() => Inventory;
+        internal bool IsInUse() => InUse;
+        private bool CheckAccess(long _) => Allowed;
+        internal void SetLoading(bool value) => m_loading = value;
+        internal void ReplaceView() => m_nview = new ZNetView();
+        internal void MakeRevisionStale() => m_lastRevision--;
+        private void Save()
+        {
+            if (m_loading || !m_nview.IsOwner()) return;
+            m_nview.Data.Raw = Inventory.SaveBytes(); m_nview.Data.DataRevision++; m_lastRevision = m_nview.Data.DataRevision;
+        }
+    }
+    internal static partial class BlueprintStorageCapture
+    {
+        internal static (int Width, int Height)? PrefabGrid(GameObject placed) => placed?.Container?.Supported == true
+            ? (placed.Container.Inventory.Width, placed.Container.Inventory.Height) : ((int, int)?)null;
+        internal static bool TryCapture(Piece piece, Player player, out BlueprintForeignPartData data)
+        {
+            data = null; var container = piece.gameObject.Container; var inventory = container.Inventory;
+            if (!container.CaptureAllowed || container.View.Data.Raw == null || !inventory.SaveBytes().SequenceEqual(container.View.Data.Raw)) return false;
+            string info = inventory.Width + ":" + inventory.Height + ":" + inventory.Items.Count + ":" + inventory.Items.Sum(item => item.m_stack);
+            if (inventory.Items.Count > 0) info += "|" + string.Join("|", inventory.Items.Select(item => item.m_dropPrefab.name).Distinct().OrderBy(name => name, StringComparer.Ordinal));
+            data = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, info, Convert.ToBase64String(container.View.Data.Raw), null);
+            return BlueprintContainerInventory.TryRead(data, name => name.GetStableHashCode(), out _);
+        }
+    }
+    internal sealed class BlueprintConstructionRefund
+    {
+        private readonly Inventory source;
+        internal bool Recorded = true; internal string Error;
+        internal BlueprintConstructionRefund(Inventory source) { this.source = source; }
+        internal bool IsFor(Inventory value) => ReferenceEquals(source, value);
+    }
+}

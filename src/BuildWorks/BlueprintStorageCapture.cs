@@ -14,6 +14,32 @@ namespace OstrixMods.BuildWorks
     {
         private static readonly FieldInfo ContainerView = typeof(Container).GetField("m_nview", BindingFlags.Instance | BindingFlags.NonPublic);
         private static readonly MethodInfo ContainerAccess = typeof(Container).GetMethod("CheckAccess", BindingFlags.Instance | BindingFlags.NonPublic);
+        private static readonly FieldInfo ContainerLoading = typeof(Container).GetField("m_loading", BindingFlags.Instance | BindingFlags.NonPublic);
+
+        // Cancellation must never enter native DropAllItems for a filled or unverified chest.
+        internal static bool CanRemoveEmpty(GameObject placed, Player player)
+        {
+            try
+            {
+                Piece piece = placed ? placed.GetComponent<Piece>() : null;
+                Container container = placed ? placed.GetComponent<Container>() : null;
+                var view = container ? ContainerView?.GetValue(container) as ZNetView : null;
+                if (!piece || !player || player != Player.m_localPlayer || !Player.m_localPlayerExists ||
+                    !Game.instance || Game.instance.IsShuttingDown() || InventoryGui.IsVisible() ||
+                    piece.GetCreator() != player.GetPlayerID() || !view || !view.IsValid() || !view.IsOwner() ||
+                    view.GetZDO() == null || view.GetZDO().m_uid.IsNone() || ContainerLoading == null ||
+                    (bool)ContainerLoading.GetValue(container) || !PrefabGrid(placed).HasValue ||
+                    !PrivateArea.CheckAccess(piece.transform.position, 0f, false, false) ||
+                    container.GetInventory() == null || container.GetInventory().GetAllItems().Count != 0) return false;
+                ZDO zdo = view.GetZDO();
+                return TryCapture(piece, player, out var state) &&
+                    BlueprintContainerInventory.TryRead(state, name => name.GetStableHashCode(), out var items) && items.Count == 0 &&
+                    ReferenceEquals(ContainerView.GetValue(container), view) && view.IsValid() && view.IsOwner() &&
+                    ReferenceEquals(view.GetZDO(), zdo) && !container.IsInUse() &&
+                    !(bool)ContainerLoading.GetValue(container) && container.GetInventory().GetAllItems().Count == 0;
+            }
+            catch (Exception) { return false; }
+        }
 
         // Only construction compatibility; do not load, clear or alter a live inventory.
         internal static bool CanPlaceWithoutContents(Piece piece, BlueprintForeignPartData data)

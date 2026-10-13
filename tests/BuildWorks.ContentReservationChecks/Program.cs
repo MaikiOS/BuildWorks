@@ -12,13 +12,15 @@ namespace ReservationChecks
     internal sealed class Prefab : Obj { internal string name; }
     internal static class ItemDrop
     {
-        internal sealed class Shared { internal string m_name; internal int m_maxStackSize = 50; }
+        internal sealed class Shared { internal string m_name; internal int m_maxStackSize = 50; internal bool m_questItem; }
         internal sealed class ItemData
         {
             internal Shared m_shared;
             internal Prefab m_dropPrefab;
             internal int m_stack, m_quality = 1, m_variant, m_worldLevel;
             internal float m_durability = 5;
+            internal Vector2i m_gridPos;
+            internal bool m_equipped;
             internal string Custom = "own";
             internal ItemData Clone() => (ItemData)MemberwiseClone();
             internal void Save(ZPackage package) => Program.WriteItem(package.Writer, this);
@@ -33,21 +35,21 @@ namespace ReservationChecks
         internal void Write(byte value) => Writer.Write(value);
         internal byte[] GetArray() { Writer.Flush(); return stream.ToArray(); }
     }
-    internal sealed class Inventory
+    internal sealed partial class Inventory
     {
         internal readonly List<ItemDrop.ItemData> Items = new List<ItemDrop.ItemData>();
         internal List<ItemDrop.ItemData> GetAllItems() => Items;
         internal bool ContainsItem(ItemDrop.ItemData item) => Items.Contains(item);
     }
-    internal sealed class Player : Obj
+    internal sealed partial class Player : Obj
     {
-        internal readonly Inventory Inventory = new Inventory();
+        internal Inventory Inventory = new Inventory();
         internal CraftingStation Station;
         internal Inventory GetInventory() => Inventory;
         internal CraftingStation GetCurrentCraftingStation() => Station;
     }
     internal sealed class CraftingStation : Obj { internal bool m_upgrader; }
-    internal sealed class Piece : Obj
+    internal sealed partial class Piece : Obj
     {
         internal sealed class Requirement
         {
@@ -65,7 +67,13 @@ namespace ReservationChecks
         internal readonly HashSet<string> Keys = new HashSet<string>();
         internal bool GetGlobalKey(string key) => Keys.Contains(key);
     }
-    internal static class Game { internal static int m_worldLevel; }
+    internal sealed class Game : Obj
+    {
+        internal static int m_worldLevel;
+        internal static Game instance = new Game();
+        internal bool ShuttingDown;
+        internal bool IsShuttingDown() => ShuttingDown;
+    }
     internal static class Debug { internal static void LogWarning(string _) { } }
     internal struct TransformSnapshot { internal BlueprintForeignPartData ItemStandContents; }
     internal static class Hashes
@@ -90,13 +98,13 @@ namespace ReservationChecks
         private static int assertions;
         private static void Check(bool condition, string reason)
         { assertions++; if (!condition) throw new InvalidOperationException(reason); }
-        private static ItemDrop.ItemData Item(string name, int amount, string custom = "own") => new ItemDrop.ItemData {
+        internal static ItemDrop.ItemData Item(string name, int amount, string custom = "own") => new ItemDrop.ItemData {
             m_dropPrefab = new Prefab { name = name }, m_shared = new ItemDrop.Shared { m_name = name }, m_stack = amount, Custom = custom };
 
         internal static void WriteItem(BinaryWriter writer, ItemDrop.ItemData item)
         {
-            writer.Write((int)(item.m_durability * 100)); writer.Write((byte)0); writer.Write((byte)0); writer.Write((byte)item.m_worldLevel);
-            int flags = 64 | 128 | (item.m_quality != 1 ? 4 : 0) | (item.m_stack != 1 ? 8 : 0) | (item.m_variant != 0 ? 16 : 0);
+            writer.Write((int)(item.m_durability * 100)); writer.Write((byte)item.m_gridPos.x); writer.Write((byte)item.m_gridPos.y); writer.Write((byte)item.m_worldLevel);
+            int flags = 64 | 128 | (item.m_equipped ? 2 : 0) | (item.m_quality != 1 ? 4 : 0) | (item.m_stack != 1 ? 8 : 0) | (item.m_variant != 0 ? 16 : 0);
             writer.Write((byte)flags);
             if (item.m_quality != 1) writer.Write((ushort)item.m_quality);
             if (item.m_stack != 1) writer.Write((ushort)item.m_stack);
@@ -104,7 +112,7 @@ namespace ReservationChecks
             writer.Write(item.m_dropPrefab.name.GetStableHashCode());
             writer.Write((byte)1); writer.Write("property"); writer.Write(item.Custom); writer.Write((byte)0);
         }
-        private static BlueprintForeignPartData Container(int width, params ItemDrop.ItemData[] demands)
+        internal static BlueprintForeignPartData Container(int width, params ItemDrop.ItemData[] demands)
         {
             using (var stream = new MemoryStream())
             using (var writer = new BinaryWriter(stream, Encoding.UTF8, true))
@@ -210,7 +218,8 @@ namespace ReservationChecks
                     new BlueprintItemStandPlacement.Reservation(wood, int.MaxValue, held.Items[0].Snapshot),
                     new BlueprintItemStandPlacement.Reservation(wood, 1, held.Items[0].Snapshot) });
                 Check(!BlueprintItemStandPlacement.SuppliesAvailable(player, new List<BlueprintItemStandPlacement.Supply> { overflow }), "reservation overflow accepted");
-                Console.WriteLine("PASS " + assertions + " content reservation assertions: actual selectors/payment checks and native-record decoder with inert host/serializer; no game, transfers or custody tested.");
+                TransferChecks.Run();
+                Console.WriteLine("PASS " + assertions + " content reservation assertions: actual selectors/payment checks and native-record decoder with inert host/serializer; reservation subset only; no native game execution.");
                 return 0;
             }
             catch (Exception error) { Console.Error.WriteLine(error); return 1; }

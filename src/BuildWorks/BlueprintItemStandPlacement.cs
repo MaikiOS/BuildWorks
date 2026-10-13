@@ -236,6 +236,8 @@ namespace OstrixMods.BuildWorks
 
         internal static bool CanRollback(GameObject placed, bool forceDestroy = false)
         {
+            if (placed && placed.GetComponent<Container>())
+                return BlueprintStorageCapture.CanRemoveEmpty(placed, Player.m_localPlayer);
             ItemStand stand = placed ? placed.GetComponent<ItemStand>() : null;
             if (!stand) return true;
             var view = StandView?.GetValue(stand) as ZNetView;
@@ -287,11 +289,16 @@ namespace OstrixMods.BuildWorks
             return true;
         }
 
-        private static string SnapshotItem(ItemDrop.ItemData item)
+        internal static string SnapshotItem(ItemDrop.ItemData item, bool transferProperties = false)
         {
             // Validate the complete supplied native record before consuming the real inventory object.
             ItemDrop.ItemData copy = item.Clone();
             copy.m_stack = 1;
+            if (transferProperties)
+            {
+                copy.m_gridPos = new Vector2i(0, 0);
+                copy.m_equipped = false;
+            }
             var package = new ZPackage();
             package.Write((byte)109);
             copy.Save(package);

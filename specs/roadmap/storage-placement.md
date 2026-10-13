@@ -1,6 +1,6 @@
 # Survival storage placement — implementation contract
 
-Status: shared N-item reservation implemented in .171 sources, 2026-10-13. Installed QA .170 still
+Status: shared reservation .171 and local native transfer foundation .172 implemented in sources, 2026-10-13. Installed QA .170 still
 blocks populated storage unless its contents are explicitly omitted from the
 temporary placement recipe. This document does not enable restoration or replace
 the full BuildWorks goal. Keep archived source state unchanged.
@@ -12,7 +12,7 @@ In .171, container demands use decoded prefab/quantity, exact own-item bindings,
 immutable quantity/property snapshots, recorded-cell/max-stack limits and shared
 next-piece payment checks. Container supplies carry no mounted appearance.
 See `docs/CONTENT_RESERVATION_171_RU.md`. This source checkpoint is not deployed.
-Actual prefab grid/quest/equip checks, transfer/custody/persistence/server ack remain open.
+In .172 the local primitive checks actual prefab grid/quest/equip/ownership and observes both inventories after a single native move, including false/exception. Both rollback paths retain filled/unverified storage. See docs/CONTENT_TRANSFER_172.md. The primitive is not connected to world placement; durable custody/return/compensation, player/target persistence, server ack and integration remain open.
 
 ## Required behavior
 

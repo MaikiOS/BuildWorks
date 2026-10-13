@@ -8,6 +8,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../artifacts/content-reservations/ReservationSource.cs" Link="ReservationSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/StorageTransferSource.cs" Link="StorageTransferSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/StorageRemovalSource.cs" Link="StorageRemovalSource.cs" />
     <ProjectReference Include="../../src/BuildWorks.Geometry/BuildWorks.Geometry.csproj" />
   </ItemGroup>
 </Project>

@@ -4,13 +4,14 @@ using UnityEngine;
 public class Container : MonoBehaviour
 {
     private ZNetView m_nview;
+    private bool m_loading = false;
     public readonly Inventory Inventory = new Inventory();
     public int m_width = 5, m_height = 2;
     public bool Denied, Busy, m_autoDestroyEmpty, m_checkGuardStone;
     public Vagon m_wagon;
     public DropTable m_defaultItems = new DropTable();
     private bool CheckAccess(long playerId) => !Denied;
-    public bool IsInUse() => Busy;
+    public bool IsInUse() => Busy || m_loading;
     public Inventory GetInventory() => Inventory;
 }
 public class Vagon : MonoBehaviour { }

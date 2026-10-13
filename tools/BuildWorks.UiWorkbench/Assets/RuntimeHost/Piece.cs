@@ -5,6 +5,7 @@ using UnityEngine;
 // in native snap fixtures; the actual editor implementation remains unchanged.
 public sealed class Piece : MonoBehaviour
 {
+    public long GetCreator() => 17;
     public string m_name;
     public Requirement[] m_resources = System.Array.Empty<Requirement>();
     public GlobalKeys FreeKey = GlobalKeys.NoBuildCost;
@@ -85,10 +86,18 @@ public class ItemDrop : MonoBehaviour
     public class SharedData
     {
         public string m_name = "$wood";
-        public int m_maxQuality = 1;
+        public int m_maxQuality = 1, m_maxStackSize = 50;
         public int m_variants = 1;
         public float m_scaleByQuality;
         public ItemData.ItemType m_itemType;
         public List<ItemStand.OrientationSettings> m_itemStandOffsets = new List<ItemStand.OrientationSettings>();
     }
+}
+
+// Native integer grid position, with conversion for older isolated fixtures.
+public struct Vector2i
+{
+    public int x, y;
+    public Vector2i(int x, int y) { this.x = x; this.y = y; }
+    public static implicit operator Vector2Int(Vector2i value) => new Vector2Int(value.x, value.y);
 }

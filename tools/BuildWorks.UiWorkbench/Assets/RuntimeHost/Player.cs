@@ -2,6 +2,7 @@ using UnityEngine;
 public class Player : Humanoid
 {
     public static Player m_localPlayer;
+    public static bool m_localPlayerExists = true;
     public CraftingStation Station;
     public CraftingStation GetCurrentCraftingStation() => Station;
     public long GetPlayerID() => 17;

@@ -9,6 +9,11 @@ using Object = UnityEngine.Object;
 
 internal static class StorageCaptureAcceptance
 {
+    public static void Verify()
+    {
+        try { Debug.Log("BUILDWORKS_STORAGE_CAPTURE_OK " + Run()); UnityEditor.EditorApplication.Exit(0); }
+        catch (Exception error) { Debug.LogException(error); UnityEditor.EditorApplication.Exit(1); }
+    }
     private static void Require(bool value, string message)
     { if (!value) throw new InvalidOperationException("Storage capture: " + message); }
 
@@ -19,10 +24,12 @@ internal static class StorageCaptureAcceptance
         var playerRoot = new GameObject("InertCapturePlayer");
         var itemRoot = new GameObject("StorageFixtureWood");
         ObjectDB previous = ObjectDB.instance;
+        Player previousPlayer = Player.m_localPlayer;
         try
         {
             var piece = root.AddComponent<Piece>();
             var player = playerRoot.AddComponent<Player>();
+            Player.m_localPlayer = player;
             Require(BlueprintStorageCapture.TryCapture(piece, player, out var none) && none == null, "ordinary Piece rejected");
             var nested = new GameObject("NestedStorage"); nested.transform.SetParent(root.transform);
             nested.AddComponent<Container>();
@@ -103,6 +110,15 @@ internal static class StorageCaptureAcceptance
             Require(BlueprintStorageCapture.TryCapture(piece, player, out var emptyState) && emptyState.Info == "5:2:0:0" &&
                 zdo.Writes == writes && emptyState.Zdo == Convert.ToBase64String(empty), "known empty state not preserved");
             Require(BlueprintItemStandPlacement.CanRestore(piece, emptyState), "verified empty container blocks construction");
+            zdo.m_uid = new ZDOID { ID = 1 };
+            Require(BlueprintItemStandPlacement.CanRollback(root) && BlueprintItemStandPlacement.CanRollback(root, true), "verified empty cancellation refused");
+            container.Inventory.Items.Add(item);
+            Require(!BlueprintItemStandPlacement.CanRollback(root) && !BlueprintItemStandPlacement.CanRollback(root, true), "filled cancellation entered native drop/destruction");
+            container.Inventory.Items.Clear(); container.Inventory.Snapshot = new byte[] { 0 };
+            Require(!BlueprintItemStandPlacement.CanRollback(root, true), "unsynced empty cancellation accepted");
+            container.Inventory.Snapshot = empty; view.Owner = false;
+            Require(!BlueprintItemStandPlacement.CanRollback(root, true), "foreign empty cancellation accepted");
+            view.Owner = true;
             var supplies = new System.Collections.Generic.List<BlueprintItemStandPlacement.Supply>();
             Require(BlueprintItemStandPlacement.SelectSupplies(player, new[] { emptyState, withoutContents, emptyState }, supplies) &&
                 supplies.Count == 3 && supplies.TrueForAll(value => value == null), "empty containers require mounted items or lose plan indices");
@@ -127,7 +143,7 @@ internal static class StorageCaptureAcceptance
         }
         finally
         {
-            ObjectDB.instance = previous; PrivateArea.Allowed = true;
+            ObjectDB.instance = previous; Player.m_localPlayer = previousPlayer; PrivateArea.Allowed = true;
             Object.DestroyImmediate(root); Object.DestroyImmediate(network); Object.DestroyImmediate(playerRoot); Object.DestroyImmediate(itemRoot);
         }
     }

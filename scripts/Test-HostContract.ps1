@@ -880,7 +880,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.171.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.172.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginIdentity = $plugin.MainModule.Types | Where-Object Name -eq 'BuildWorksPlugin'
 $loaderIdentity = $pluginIdentity.CustomAttributes | Where-Object { $_.AttributeType.Name -eq 'BepInPlugin' }
@@ -3359,6 +3359,42 @@ Assert-Contract ($containerChangedCalls -match 'Container::m_loading' -and $cont
 Assert-Contract ($cloneCalls -match 'Object::MemberwiseClone\(' -and $cloneCalls -match 'ItemDrop/ItemData::m_customData' -and
     $cloneCalls -match 'Dictionary.*::\.ctor\(' -and $cloneCalls -notmatch 'ItemDrop/ItemData::Load|Inventory::|ZDO::') `
     'Native provided-item clone no longer preserves properties with an independent custom-data map.'
+# Postpayment container transfer is deliberately gated off in world placement.
+# Validate both the host APIs and the compiled local primitive; a true native bool is not custody proof.
+foreach ($field in @(@('m_loading', 'System.Boolean'), @('m_lastRevision', 'System.UInt32'))) {
+    $member = @($containerType.Fields | Where-Object Name -eq $field[0])
+    Assert-Contract ($member.Count -eq 1 -and $member[0].IsPrivate -and $member[0].FieldType.FullName -eq $field[1]) "Container transfer metadata changed: $($field[0])"
+}
+$humanoidType = $hostAssembly.MainModule.Types | Where-Object Name -eq 'Humanoid'
+foreach ($api in @(@($player, 'RemoveEquipAction', 1, 'System.Void'), @($player, 'IsEquipActionQueued', 1, 'System.Boolean'),
+        @($humanoidType, 'IsItemEquiped', 1, 'System.Boolean'), @($humanoidType, 'UnequipItem', 2, 'System.Void'))) {
+    $method = @($api[0].Methods | Where-Object { $_.Name -eq $api[1] -and $_.Parameters.Count -eq $api[2] })
+    Assert-Contract ($method.Count -eq 1 -and $method[0].IsPublic -and -not $method[0].IsStatic -and
+        $method[0].ReturnType.FullName -eq $api[3] -and $method[0].Parameters[0].ParameterType.FullName -eq 'ItemDrop/ItemData') "Native equip transfer API changed: $($api[1])"
+}
+$inventoryGuiType = $hostAssembly.MainModule.Types | Where-Object Name -eq 'InventoryGui'
+$visible = @($inventoryGuiType.Methods | Where-Object { $_.Name -eq 'IsVisible' -and $_.Parameters.Count -eq 0 })
+Assert-Contract ($visible.Count -eq 1 -and $visible[0].IsPublic -and $visible[0].IsStatic -and
+    $visible[0].ReturnType.FullName -eq 'System.Boolean') 'Native inventory UI visibility gate changed.'
+$transferType = $pluginTypes | Where-Object Name -eq 'BlueprintStorageTransfer'
+Assert-Contract ($null -ne $transferType) 'Compiled container transfer primitive is missing.'
+$move = $transferType.Methods | Where-Object Name -eq 'MoveNext'
+$moveCalls = ($move.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+foreach ($pattern in '::ContextValid', '::DeliveredItemsIntact', '::RemainingAvailable', '::Counts', '::SameCounts',
+        '(Player|Humanoid)::RemoveEquipAction', 'Humanoid::UnequipItem', 'Inventory::MoveItemToThis', 'BlueprintStorageCapture::TryCapture',
+        'Entry::SourceAfter', 'Entry::DestinationAfter', 'Entry::LocalSaveConfirmed') {
+    Assert-Contract ($moveCalls -match $pattern) "Container transfer observation/gate missing: $pattern"
+}
+Assert-Contract (@($move.Body.Instructions | Where-Object { [string]$_.Operand -match 'Inventory::MoveItemToThis' }).Count -eq 1 -and
+    $move.Body.ExceptionHandlers.Count -ge 2 -and $moveCalls -notmatch 'Container::Save|Inventory::Load|ZDO::Set|ItemData::Load|RPC|ItemDrop::DropItem') 'Container transfer gained replay/archive load or lost exception observations.'
+$rollback = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintItemStandPlacement' -and $_.Name -eq 'CanRollback' }
+$rollbackCalls = ($rollback.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($rollbackCalls -match 'GetComponent<Container>' -and $rollbackCalls -match 'BlueprintStorageCapture::CanRemoveEmpty') 'Both normal and forced rollback must refuse filled/unverified storage.'
+$removal = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintStorageCapture' -and $_.Name -eq 'CanRemoveEmpty' }
+$removalCalls = ($removal.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($removalCalls -match '::TryCapture' -and $removalCalls -match 'Inventory::GetAllItems' -and
+    $removalCalls -match 'Piece::GetCreator' -and $removalCalls -match 'ZNetView::IsOwner' -and
+    $removalCalls -notmatch 'Container::Save|Inventory::Load|ZDO::Set|RPC|DropAllItems|Destroy') 'Empty-storage cancellation guard must stay read-only.'
 $storageCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintStorageCapture' -and $_.Name -eq 'TryCapture' }
 $storageCalls = ($storageCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 foreach ($pattern in 'Player::GetPlayerID', 'PrivateArea::CheckAccess', 'Container::IsInUse', 'Container::GetInventory',
@@ -3507,4 +3543,14 @@ try {
 }
 finally { $nativeInputSystem.Dispose() }
 
-Write-Output "PASS: current Valheim host contract matches BuildWorks $($plugin.Name.Version) and Valheim Steam build 25185596."
+$steamBuild = 'unavailable'
+$steamManifest = Join-Path ([IO.Path]::GetFullPath((Join-Path $ValheimManagedDir '../../../..'))) 'appmanifest_892970.acf'
+if (Test-Path -LiteralPath $steamManifest -PathType Leaf) {
+    $manifest = Get-Item -LiteralPath $steamManifest
+    Assert-Contract ($manifest.Length -le 1MB) 'Steam manifest exceeds the metadata read limit.'
+    $buildIds = [regex]::Matches([IO.File]::ReadAllText($steamManifest), '"buildid"\s+"([0-9]+)"')
+    Assert-Contract ($buildIds.Count -eq 1) 'Steam manifest does not provide one buildid.'
+    $steamBuild = $buildIds[0].Groups[1].Value
+}
+$hostSha = (Get-FileHash -LiteralPath $hostPath -Algorithm SHA256).Hash
+Write-Output "PASS: current Valheim host contract matches BuildWorks $($plugin.Name.Version); Steam manifest build $steamBuild; assembly_valheim SHA256 $hostSha."

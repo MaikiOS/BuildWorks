@@ -15,6 +15,7 @@ public class Localization
 }
 public static class InventoryGui
 {
+    public static bool IsVisible() => false;
     public static int Calls;
     public static bool SetupRequirement(Transform root, Piece.Requirement req, Player player,
         bool craft, int quality, int craftMultiplier)

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public static class Game { public static int m_worldLevel; }
+public class Game { public static int m_worldLevel; public static Game instance = new Game(); public bool IsShuttingDown() => false; public static bool operator !(Game value) => value == null; }
 
 namespace BepInEx
 {

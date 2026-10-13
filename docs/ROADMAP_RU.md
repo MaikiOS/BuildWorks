@@ -1,3 +1,9 @@
+## 2026-10-13 — QA .174 установлена; цель active
+
+Внутренний возврат действительно переданных вещей текущей сессии использует их текущие свойства, отдельные свободные ячейки и дочерний журнал v2. Родитель замораживается, повторы запрещены, legacy v1 сохраняется под удержанием. Возврат не разрешает удаление target или возврат строительной цены. CPU271 return/203 transfer (включая41 проверку подготовки fixtures)/36 journal IO/31 reserve, отрицательная копия, normal/QA0/0, Host25730771/loc990 и headless Unity compile/contact/read-only capture прошли. Correctness PASSED/Ponytail Ship. [Границы .174](CONTENT_RETURN_174_RU.md).
+
+Guarded deployment в TerrainRamp-1.0-Test прошёл: version0.19.174.0; BuildWorks SHA 08511EDA96FD3B512ACD052DEE6731919CE32C4A4D4199202312EF6355239EB0; Geometry EC2315A128CA4AF1B19DD5BE69A93B69F18BB3F558F018C6C36A17D0E22C0261. Все158 файлов config/BuildWorks неизменны; token и квитанции сохранены. [Ручной список .174](MANUAL_QA_174_RU.md):18 прежних файлов, сначала auto-snap17/18 и Forest Hut; принятого не повторять. Полный populated placement, сохранение игрока/мира и server ack ещё не готовы. Игру, модель, ввод и saves не запускали. Последний get_goal вернул active; документ отдельно от API, ручная очередь не останавливает разработку/проверенные установки.
+
 ## 2026-10-13 — QA .173 установлена, ручная серия обновлена
 
 Guarded Deploy-TestBuild.ps1 в TerrainRamp-1.0-Test с прежним token прошёл: version0.19.173.0, BuildWorks SHA CFCB1464C06950F15AB56FC183258F158A55482CDBA1A1F66C4753143E68ED09; Geometry EC2315A128CA4AF1B19DD5BE69A93B69F18BB3F558F018C6C36A17D0E22C0261. Все158 файлов config/BuildWorks до/после неизменны, квитанции/QA-идентичность сохранены. Игра/сохранения не запускались. [Ручная серия .173](MANUAL_QA_173_RU.md) использует прежние18 файлов, сначала auto-snap17/18 и Forest Hut; принятое не повторяется. Полный перенос наполненных хранилищ всё ещё выключен; внутренний журнал не является игровой готовностью.

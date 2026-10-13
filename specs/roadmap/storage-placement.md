@@ -1,6 +1,6 @@
 # Survival storage placement — implementation contract
 
-Status: shared reservation .171, local native transfer .172 and write-ahead evidence .173 implemented in sources, 2026-10-13. Installed QA .170 still
+Status: shared reservation .171, local native transfer .172, write-ahead evidence .173 and same-session inverse return .174 implemented in sources, 2026-10-13. Installed QA .174 still
 blocks populated storage unless its contents are explicitly omitted from the
 temporary placement recipe. This document does not enable restoration or replace
 the full BuildWorks goal. Keep archived source state unchanged.
@@ -89,6 +89,8 @@ Native inventory UI also checks quest items and unequips/removes queued equip
 actions. The adapter must preserve these restrictions and handling; raw inventory
 transfer does not perform them. Equipment must not be duplicated or left bound
 to the player after moving.
+
+.174 adds a same-session inverse return of exact delivered references into pre-reserved empty player cells, using current provided attributes and a v2 parent/direction journal. A deterministic CreateNew child claim freezes forward continuation; both operations remain held even after local success. V1 remains readable/held and cannot authorize return. No restart rebind, player/world persistence or server acknowledgement is claimed. See docs/CONTENT_RETURN_174.md.
 
 ## Implementation dependencies and rollback
 

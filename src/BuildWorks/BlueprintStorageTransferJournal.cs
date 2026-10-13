@@ -11,8 +11,10 @@ namespace OstrixMods.BuildWorks
     internal sealed class BlueprintStorageTransferJournal : IDisposable
     {
         private const int MaximumBytes = 16 * 1024 * 1024;
-        private static readonly byte[] Magic = Encoding.ASCII.GetBytes("BWSTJ1\r\n");
+        private static readonly byte[] Magic = Encoding.ASCII.GetBytes("BWSTJ2\r\n");
+        private static readonly byte[] LegacyMagic = Encoding.ASCII.GetBytes("BWSTJ1\r\n");
         private static readonly Encoding Utf8 = new UTF8Encoding(false, true);
+        internal enum Direction { ToContainer, ToPlayer }
         internal sealed class Item
         {
             internal string Prefab, SourceSnapshot, Properties;
@@ -21,6 +23,8 @@ namespace OstrixMods.BuildWorks
         internal sealed class Plan
         {
             internal Guid Operation;
+            internal Guid Parent;
+            internal Direction Route;
             internal long World, Player, TargetUser;
             internal uint TargetId;
             internal int Width, Height;
@@ -50,6 +54,7 @@ namespace OstrixMods.BuildWorks
         }
         internal sealed class Snapshot
         {
+            internal int Schema;
             internal Plan Prepared;
             internal readonly List<Observation> Observations = new List<Observation>();
             internal int? InFlight;
@@ -94,6 +99,42 @@ namespace OstrixMods.BuildWorks
             return false;
         }
 
+        internal static Guid ReturnOperationId(Guid parent)
+        {
+            using (var hash = SHA256.Create())
+            {
+                byte[] digest = hash.ComputeHash(Encoding.ASCII.GetBytes("BuildWorks-return:" + parent.ToString("N")));
+                var bytes = new byte[16]; Array.Copy(digest, bytes, bytes.Length); return new Guid(bytes);
+            }
+        }
+
+        internal static bool CanStartReturn(Guid parent, long world, long player, long user, uint id)
+        {
+            if (!Directory.Exists(Root)) return false;
+            CheckParents(System.IO.Path.GetFullPath(Root));
+            string[] paths = Directory.EnumerateFileSystemEntries(Root).Take(129).ToArray();
+            if (paths.Length > 127) return false;
+            bool found = false;
+            foreach (string path in paths)
+            {
+                Snapshot record;
+                try { record = Read(path, preparedOnly: true); } catch (Exception) { return false; }
+                Plan plan = record.Prepared;
+                if (plan.World != world || plan.TargetUser != user || plan.TargetId != id) continue;
+                if (record.Schema != 2 || plan.Operation != parent || plan.Player != player || plan.Route != Direction.ToContainer) return false;
+                found = true;
+            }
+            return found;
+        }
+
+        internal static bool HasReturnEvidence(Guid parent)
+        {
+            try { File.GetAttributes(System.IO.Path.Combine(Root, ReturnOperationId(parent).ToString("N") + ".bwtransfer")); return true; }
+            catch (FileNotFoundException) { return false; }
+            catch (DirectoryNotFoundException) { return false; }
+            catch (Exception) { return true; }
+        }
+
         internal static BlueprintStorageTransferJournal Begin(string directory, Plan plan)
         {
             Validate(plan);
@@ -106,6 +147,7 @@ namespace OstrixMods.BuildWorks
             byte[] prepared = Encode(writer =>
             {
                 writer.Write(plan.Operation.ToByteArray()); writer.Write(plan.World); writer.Write(plan.Player);
+                writer.Write((byte)plan.Route); writer.Write(plan.Parent.ToByteArray());
                 writer.Write(plan.TargetUser); writer.Write(plan.TargetId); writer.Write(plan.Width); writer.Write(plan.Height);
                 writer.Write(plan.Creator); writer.Write(plan.PrefabHash); writer.Write(plan.PieceName);
                 writer.Write(plan.Paid.Length);
@@ -130,7 +172,7 @@ namespace OstrixMods.BuildWorks
         {
             if (attempt == null || attempt.Index != next || pending != null || next >= count)
                 throw new InvalidOperationException("Journal move order changed.");
-            ValidateAttempt(prepared.Items[next], attempt);
+            ValidateAttempt(prepared.Items[next], attempt, prepared.Route);
             byte[] payload = Encode(writer => WriteAttempt(writer, attempt));
             Append(2, payload);
             using (var memory = new MemoryStream(payload, false))
@@ -141,7 +183,7 @@ namespace OstrixMods.BuildWorks
         {
             if (observation == null || observation.Index != next || next >= count || observation.Attempted != (pending != null) ||
                 observation.State < 1 || observation.State > 3) throw new InvalidOperationException("Journal observation order changed.");
-            ValidateObservation(prepared.Items[next], pending, observation);
+            ValidateObservation(prepared.Items[next], pending, observation, prepared.Route);
             Append(3, Encode(writer => WriteObservation(writer, observation)));
             pending = null; next++;
             if (observation.State != 2 || next == count)
@@ -151,7 +193,7 @@ namespace OstrixMods.BuildWorks
         private void Append(byte kind, byte[] payload)
         {
             if (stopped) throw new InvalidOperationException("Transfer journal is stopped.");
-            byte[] body = Encode(writer => { writer.Write(1); writer.Write(operation.ToByteArray()); writer.Write(sequence); writer.Write(kind); writer.Write(previousHash); writer.Write(payload); });
+            byte[] body = Encode(writer => { writer.Write(2); writer.Write(operation.ToByteArray()); writer.Write(sequence); writer.Write(kind); writer.Write(previousHash); writer.Write(payload); });
             if (body.Length > MaximumBytes || stream.Length + body.Length + 36 > MaximumBytes)
                 throw new InvalidDataException("Transfer journal exceeds its byte budget.");
             try
@@ -171,9 +213,11 @@ namespace OstrixMods.BuildWorks
             using (var reader = new BinaryReader(file, Utf8, true))
             {
                 long length = file.Length;
-                if (length < Magic.Length + 36 || length > MaximumBytes || !reader.ReadBytes(Magic.Length).SequenceEqual(Magic))
+                byte[] magic = reader.ReadBytes(Magic.Length);
+                if (length < Magic.Length + 36 || length > MaximumBytes || !magic.SequenceEqual(Magic) && !magic.SequenceEqual(LegacyMagic))
                     throw new InvalidDataException("Unknown or incomplete transfer journal.");
-                var result = new Snapshot(); int sequence = 0; byte[] previous = new byte[32]; Guid operation = Guid.Empty;
+                int schema = magic[5] - '0';
+                var result = new Snapshot { Schema = schema }; int sequence = 0; byte[] previous = new byte[32]; Guid operation = Guid.Empty;
                 while (file.Position < length)
                 {
                     if (length - file.Position < 36) throw new InvalidDataException("Partial transfer journal frame.");
@@ -186,7 +230,7 @@ namespace OstrixMods.BuildWorks
                     using (var packet = new MemoryStream(body, false))
                     using (var fields = new BinaryReader(packet, Utf8))
                     {
-                        if (fields.ReadInt32() != 1) throw new InvalidDataException("Unknown transfer journal schema.");
+                        if (fields.ReadInt32() != schema) throw new InvalidDataException("Unknown transfer journal schema.");
                         Guid frameOperation = new Guid(fields.ReadBytes(16));
                         if (operation == Guid.Empty) operation = frameOperation;
                         if (frameOperation == Guid.Empty || frameOperation != operation || fields.ReadInt32() != sequence++)
@@ -196,8 +240,9 @@ namespace OstrixMods.BuildWorks
                         previous = expected;
                         if (kind == 1 && result.Prepared == null && sequence == 1)
                         {
-                            var plan = new Plan { Operation = new Guid(fields.ReadBytes(16)), World = fields.ReadInt64(), Player = fields.ReadInt64(),
-                                TargetUser = fields.ReadInt64(), TargetId = fields.ReadUInt32(), Width = fields.ReadInt32(), Height = fields.ReadInt32() };
+                            var plan = new Plan { Operation = new Guid(fields.ReadBytes(16)), World = fields.ReadInt64(), Player = fields.ReadInt64() };
+                            if (schema >= 2) { plan.Route = (Direction)fields.ReadByte(); plan.Parent = new Guid(fields.ReadBytes(16)); }
+                            plan.TargetUser = fields.ReadInt64(); plan.TargetId = fields.ReadUInt32(); plan.Width = fields.ReadInt32(); plan.Height = fields.ReadInt32();
                             plan.Creator = fields.ReadInt64(); plan.PrefabHash = fields.ReadInt32(); plan.PieceName = fields.ReadString();
                             int paidCount = fields.ReadInt32();
                             if (paidCount < 0 || paidCount > 4096) throw new InvalidDataException("Invalid construction payment count.");
@@ -220,7 +265,7 @@ namespace OstrixMods.BuildWorks
                         {
                             Attempt attempt = ReadAttempt(fields);
                             if (attempt.Index != result.Observations.Count) throw new InvalidDataException("Invalid transfer attempt order.");
-                            ValidateAttempt(result.Prepared.Items[attempt.Index], attempt);
+                            ValidateAttempt(result.Prepared.Items[attempt.Index], attempt, result.Prepared.Route);
                             result.InFlight = attempt.Index; result.Pending = attempt;
                         }
                         else if (kind == 3 && result.Prepared != null && result.Observations.Count < result.Prepared.Items.Length &&
@@ -229,7 +274,7 @@ namespace OstrixMods.BuildWorks
                             Observation observed = ReadObservation(fields);
                             if (observed.Index != result.Observations.Count || observed.Attempted != result.InFlight.HasValue ||
                                 observed.State < 1 || observed.State > 3) throw new InvalidDataException("Invalid transfer observation order.");
-                            ValidateObservation(result.Prepared.Items[observed.Index], result.Pending, observed);
+                            ValidateObservation(result.Prepared.Items[observed.Index], result.Pending, observed, result.Prepared.Route);
                             result.Observations.Add(observed); result.InFlight = null; result.Pending = null;
                         }
                         else if (kind == 4 && result.Prepared != null && result.InFlight == null && result.Observations.Count > 0)
@@ -251,7 +296,10 @@ namespace OstrixMods.BuildWorks
 
         private static void Validate(Plan plan)
         {
-            if (plan == null || plan.Operation == Guid.Empty || plan.World == 0 || plan.Player == 0 || plan.TargetUser == 0 || plan.TargetId == 0 ||
+            if (plan == null || plan.Paid == null || plan.Operation == Guid.Empty || plan.World == 0 || plan.Player == 0 || plan.TargetUser == 0 || plan.TargetId == 0 ||
+                plan.Route != Direction.ToContainer && plan.Route != Direction.ToPlayer ||
+                plan.Route == Direction.ToContainer && plan.Parent != Guid.Empty ||
+                plan.Route == Direction.ToPlayer && (plan.Parent == Guid.Empty || plan.Operation != ReturnOperationId(plan.Parent) || plan.Paid.Length != 0) ||
                 plan.Creator != plan.Player || plan.PrefabHash == 0 || string.IsNullOrEmpty(plan.PieceName) || plan.PieceName.Length > 4096 || plan.Paid == null || plan.Paid.Length > 4096 ||
                 plan.Width < 1 || plan.Width > 256 || plan.Height < 1 || plan.Height > 256 || plan.Items == null ||
                 plan.Items.Length < 1 || plan.Items.Length > 4096 || plan.Items.Length > plan.Width * plan.Height)
@@ -271,6 +319,8 @@ namespace OstrixMods.BuildWorks
                     item.X < 0 || item.X >= plan.Width || item.Y < 0 || item.Y >= plan.Height || !cells.Add(item.Y * plan.Width + item.X) ||
                     string.IsNullOrEmpty(item.SourceSnapshot) || string.IsNullOrEmpty(item.Properties))
                     throw new InvalidDataException("Invalid transfer journal item.");
+                if (plan.Route == Direction.ToPlayer && item.SourceQuantity != item.Amount)
+                    throw new InvalidDataException("Return must bind the entire known native source stack.");
                 long source = Utf8.GetByteCount(item.SourceSnapshot), properties = Utf8.GetByteCount(item.Properties);
                 // Preparation + every attempt + both observed properties + bounded error/hashes/framing/terminal.
                 budget += Utf8.GetByteCount(item.Prefab) + 2 * source + 2 * properties + 2 * Math.Max(properties, 80) + 8192;
@@ -278,21 +328,23 @@ namespace OstrixMods.BuildWorks
             }
         }
 
-        private static void ValidateAttempt(Item item, Attempt attempt)
+        private static void ValidateAttempt(Item item, Attempt attempt, Direction route)
         {
             if (attempt.SourceBefore < item.Amount || attempt.SourceBefore > ushort.MaxValue || !attempt.EmptyCell ||
+                route == Direction.ToPlayer && (attempt.SourceBefore != item.SourceQuantity || attempt.Queued || attempt.Equipped) ||
                 attempt.SourceX != item.SourceX || attempt.SourceY != item.SourceY || attempt.SourceSnapshot != item.SourceSnapshot ||
                 attempt.Properties != item.Properties || attempt.Revision != attempt.ContainerRevision ||
                 !Digest(attempt.SourceManifest) || !Digest(attempt.DestinationManifest) || !(Digest(attempt.ZdoHash) || attempt.ZdoHash == "missing"))
                 throw new InvalidDataException("Invalid transfer attempt evidence.");
         }
-        private static void ValidateObservation(Item item, Attempt attempt, Observation observed)
+        private static void ValidateObservation(Item item, Attempt attempt, Observation observed, Direction route)
         {
             int propertyBudget = Math.Max(Utf8.GetByteCount(item.Properties), 80);
             if (Utf8.GetByteCount(observed.SourceProperties ?? "") > propertyBudget || Utf8.GetByteCount(observed.DestinationProperties ?? "") > propertyBudget ||
                 Utf8.GetByteCount(observed.Error ?? "") > 4096) throw new InvalidDataException("Transfer observations exceed reserved evidence space.");
             if (observed.State != 2) return;
             if (!observed.Attempted || !observed.BeforeObserved || !observed.LocalSave || attempt == null ||
+                route == Direction.ToPlayer && (observed.SourceBefore != item.Amount || observed.SourceAfter != 0 || observed.SourcePresent) ||
                 observed.SourceBefore != attempt.SourceBefore || observed.SourceX != attempt.SourceX || observed.SourceY != attempt.SourceY ||
                 observed.QueuedBefore != attempt.Queued || observed.EquippedBefore != attempt.Equipped ||
                 observed.SourceAfter != observed.SourceBefore - item.Amount || observed.SourceObjectStack != observed.SourceAfter ||

@@ -880,7 +880,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.173.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.174.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginIdentity = $plugin.MainModule.Types | Where-Object Name -eq 'BuildWorksPlugin'
 $loaderIdentity = $pluginIdentity.CustomAttributes | Where-Object { $_.AttributeType.Name -eq 'BepInPlugin' }
@@ -3399,6 +3399,12 @@ Assert-Contract ($beforeJournal.Count -eq 1 -and $beforeJournal[0].Offset -lt $u
     $unequipTransfer[0].Offset -lt $nativeTransfer[0].Offset -and $moveCalls -match 'BlueprintStorageTransferJournal::Observed' -and
     $moveCalls -match '::get_JournalError|::set_JournalError') 'Write-ahead journal must precede unequip/native mutation and failures must stop transfer.'
 $journalType = $pluginTypes | Where-Object Name -eq 'BlueprintStorageTransferJournal'
+$returnBegin = $transferType.Methods | Where-Object Name -eq 'TryBeginReturn'
+$returnCalls = ($returnBegin.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($returnCalls -match '::ReturnOperationId' -and $returnCalls -match '::CanStartReturn' -and
+    $returnCalls -match 'BlueprintStorageTransferJournal::Read' -and $returnCalls -match '::cancelling' -and
+    $returnCalls -match 'BlueprintStorageTransferJournal::Begin' -and $moveCalls -match '::ReceiverItemsIntact' -and
+    $moveCalls -match '::cancelling' -and $returnCalls -notmatch 'Inventory::MoveItem|ItemData::Load|RPC|DropItem') 'Return must bind current evidence, freeze its parent and reuse the observed native mover.'
 $journalCalls = ($journalType.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($journalCalls -match 'FileStream::Flush\(System.Boolean\)' -and $journalCalls -match 'SHA256::Create' -and
     $journalCalls -match '::CheckParents' -and $journalCalls -notmatch 'File::Delete|Inventory::|ZDO::Set|RPC|DropItem') 'Persisted evidence must flush and validate without replay, deletion or world mutation.'

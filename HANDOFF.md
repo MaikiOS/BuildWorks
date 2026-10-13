@@ -1,3 +1,9 @@
+## 2026-10-13 — QA .174 deployed; goal active
+
+Same-session inverse return uses exact delivered references/current provided attributes, pre-reserved empty player cells and a v2 parent/direction journal. Parent freezes; no replay, repair, merge or drop. Legacy v1 is readable/held. Local return does not release target destruction/construction-price refund. CPU271 return/203 transfer (including41 fixture setup assertions)/36 journal IO/31 reserve, negative copy, normal/QA0/0, Host25730771/localization990 and headless Unity compile/contact/read-only capture passed; correctness PASSED/Ponytail Ship. [Limits](docs/CONTENT_RETURN_174.md).
+
+Guarded deployment to TerrainRamp-1.0-Test: version0.19.174.0, BuildWorks SHA 08511EDA96FD3B512ACD052DEE6731919CE32C4A4D4199202312EF6355239EB0; Geometry EC2315A128CA4AF1B19DD5BE69A93B69F18BB3F558F018C6C36A17D0E22C0261. All158 config/BuildWorks files unchanged; token/provision receipts retained. [Manual .174](docs/MANUAL_QA_174_RU.md) keeps18 fixtures and pending auto-snap17/18/Forest Hut first. No repeat of accepted cases. Populated placement, player/world persistence and server ack remain incomplete. No game/model/input/save execution. Latest get_goal returned active; document and API status are separate, pending user tests do not stop safe development/deployment.
+
 ## 2026-10-13 — QA .173 deployed, manual queue updated
 
 Guarded deployment to TerrainRamp-1.0-Test with existing token passed: version0.19.173.0, BuildWorks SHA CFCB1464C06950F15AB56FC183258F158A55482CDBA1A1F66C4753143E68ED09; Geometry EC2315A128CA4AF1B19DD5BE69A93B69F18BB3F558F018C6C36A17D0E22C0261. All158 config/BuildWorks files unchanged; identity/provision receipts preserved. No game/saves launched. [Manual .173](docs/MANUAL_QA_173_RU.md) keeps18 fixtures, prioritizes auto-snap17/18 and Forest Hut, avoids repeating accepted cases. Populated-storage placement remains disabled; internal journal is not full runtime readiness.

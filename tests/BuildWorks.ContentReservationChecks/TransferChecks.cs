@@ -8,7 +8,7 @@ namespace ReservationChecks
     {
         private static int assertions;
         private static void Check(bool value, string reason) { assertions++; if (!value) throw new InvalidOperationException("Transfer: " + reason); }
-        private sealed class Frame
+        internal sealed class Frame
         {
             internal static readonly List<Frame> Created = new List<Frame>();
             internal readonly Player Player = new Player();
@@ -220,6 +220,7 @@ namespace ReservationChecks
             foreach (Frame frame in Frame.Created)
                 if (frame.SavedJournalPath != null) Check(BlueprintStorageTransferJournal.Read(frame.SavedJournalPath).RequiresReconciliation,
                     "one false/exception/context/failure case produced unreadable or replayable evidence");
+            ReturnChecks.Run();
             Console.WriteLine("PASS " + assertions + " transfer assertions: actual adapter, inert native/capture services; bool/exception custody, no replay, own properties, equip, payment/context guards. No game/native API/server/disk proof.");
         }
     }

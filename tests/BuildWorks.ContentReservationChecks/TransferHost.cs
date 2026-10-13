@@ -108,6 +108,7 @@ namespace ReservationChecks
     }
     internal static partial class BlueprintStorageCapture
     {
+        internal static Action Captured;
         internal static (int Width, int Height)? PrefabGrid(GameObject placed) => placed?.Container?.Supported == true
             ? (placed.Container.Inventory.Width, placed.Container.Inventory.Height) : ((int, int)?)null;
         internal static bool TryCapture(Piece piece, Player player, out BlueprintForeignPartData data)
@@ -117,7 +118,9 @@ namespace ReservationChecks
             string info = inventory.Width + ":" + inventory.Height + ":" + inventory.Items.Count + ":" + inventory.Items.Sum(item => item.m_stack);
             if (inventory.Items.Count > 0) info += "|" + string.Join("|", inventory.Items.Select(item => item.m_dropPrefab.name).Distinct().OrderBy(name => name, StringComparer.Ordinal));
             data = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, info, Convert.ToBase64String(container.View.Data.Raw), null);
-            return BlueprintContainerInventory.TryRead(data, name => name.GetStableHashCode(), out _);
+            bool valid = BlueprintContainerInventory.TryRead(data, name => name.GetStableHashCode(), out _);
+            if (valid) Captured?.Invoke();
+            return valid;
         }
     }
     internal sealed class BlueprintConstructionRefund

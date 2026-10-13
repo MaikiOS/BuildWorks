@@ -15,6 +15,8 @@ namespace OstrixMods.BuildWorks
         private static readonly FieldInfo ContainerView = typeof(Container).GetField("m_nview", BindingFlags.Instance | BindingFlags.NonPublic);
         private static readonly MethodInfo ContainerAccess = typeof(Container).GetMethod("CheckAccess", BindingFlags.Instance | BindingFlags.NonPublic);
         private static readonly FieldInfo ContainerLoading = typeof(Container).GetField("m_loading", BindingFlags.Instance | BindingFlags.NonPublic);
+        internal static readonly int TransferMarkerKey = "ostrix_buildworks_storage_transfer_v1".GetStableHashCode();
+        internal static string TransferMarker(ZDO zdo) => zdo?.GetString(TransferMarkerKey, null);
 
         // Cancellation must never enter native DropAllItems for a filled or unverified chest.
         internal static bool CanRemoveEmpty(GameObject placed, Player player)
@@ -32,8 +34,10 @@ namespace OstrixMods.BuildWorks
                     !PrivateArea.CheckAccess(piece.transform.position, 0f, false, false) ||
                     container.GetInventory() == null || container.GetInventory().GetAllItems().Count != 0) return false;
                 ZDO zdo = view.GetZDO();
+                // Includes an orphan marker whose journal is unavailable. Never infer permission to destroy it.
+                if (!string.IsNullOrEmpty(TransferMarker(zdo))) return false;
                 if (!ZNet.instance || ZNet.instance.GetWorld() == null || BlueprintStorageTransferJournal.HasUnresolved(
-                    ZNet.instance.GetWorld().m_uid, zdo.m_uid.UserID, zdo.m_uid.ID)) return false;
+                    ZNet.instance.GetWorld().m_uid, TransferMarker(zdo))) return false;
                 return TryCapture(piece, player, out var state) &&
                     BlueprintContainerInventory.TryRead(state, name => name.GetStableHashCode(), out var items) && items.Count == 0 &&
                     ReferenceEquals(ContainerView.GetValue(container), view) && view.IsValid() && view.IsOwner() &&

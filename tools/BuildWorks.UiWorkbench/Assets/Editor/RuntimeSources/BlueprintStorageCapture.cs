@@ -14,20 +14,61 @@ namespace OstrixMods.BuildWorks
     {
         private static readonly FieldInfo ContainerView = typeof(Container).GetField("m_nview", BindingFlags.Instance | BindingFlags.NonPublic);
         private static readonly MethodInfo ContainerAccess = typeof(Container).GetMethod("CheckAccess", BindingFlags.Instance | BindingFlags.NonPublic);
+        private static readonly FieldInfo ContainerLoading = typeof(Container).GetField("m_loading", BindingFlags.Instance | BindingFlags.NonPublic);
+        internal static readonly int TransferMarkerKey = "ostrix_buildworks_storage_transfer_v1".GetStableHashCode();
+        internal static string TransferMarker(ZDO zdo) => zdo?.GetString(TransferMarkerKey, null);
+
+        // Cancellation must never enter native DropAllItems for a filled or unverified chest.
+        internal static bool CanRemoveEmpty(GameObject placed, Player player)
+        {
+            try
+            {
+                Piece piece = placed ? placed.GetComponent<Piece>() : null;
+                Container container = placed ? placed.GetComponent<Container>() : null;
+                var view = container ? ContainerView?.GetValue(container) as ZNetView : null;
+                if (!piece || !player || player != Player.m_localPlayer || !Player.m_localPlayerExists ||
+                    !Game.instance || Game.instance.IsShuttingDown() || InventoryGui.IsVisible() ||
+                    piece.GetCreator() != player.GetPlayerID() || !view || !view.IsValid() || !view.IsOwner() ||
+                    view.GetZDO() == null || view.GetZDO().m_uid.IsNone() || ContainerLoading == null ||
+                    (bool)ContainerLoading.GetValue(container) || !PrefabGrid(placed).HasValue ||
+                    !PrivateArea.CheckAccess(piece.transform.position, 0f, false, false) ||
+                    container.GetInventory() == null || container.GetInventory().GetAllItems().Count != 0) return false;
+                ZDO zdo = view.GetZDO();
+                // Includes an orphan marker whose journal is unavailable. Never infer permission to destroy it.
+                if (!string.IsNullOrEmpty(TransferMarker(zdo))) return false;
+                if (!ZNet.instance || ZNet.instance.GetWorld() == null || BlueprintStorageTransferJournal.HasUnresolved(
+                    ZNet.instance.GetWorld().m_uid, TransferMarker(zdo))) return false;
+                return TryCapture(piece, player, out var state) &&
+                    BlueprintContainerInventory.TryRead(state, name => name.GetStableHashCode(), out var items) && items.Count == 0 &&
+                    ReferenceEquals(ContainerView.GetValue(container), view) && view.IsValid() && view.IsOwner() &&
+                    ReferenceEquals(view.GetZDO(), zdo) && !container.IsInUse() &&
+                    !(bool)ContainerLoading.GetValue(container) && container.GetInventory().GetAllItems().Count == 0;
+            }
+            catch (Exception) { return false; }
+        }
 
         // Only construction compatibility; do not load, clear or alter a live inventory.
         internal static bool CanPlaceWithoutContents(Piece piece, BlueprintForeignPartData data)
         {
             if (!piece || data == null || data.Format != BlueprintForeignPartData.NativeContainerFormat ||
                 !BlueprintContainerInventory.TryRead(data, name => name.GetStableHashCode(), out var items) ||
-                !data.ContentsCleared && items.Count != 0 || piece.GetComponent<TombStone>() ||
-                piece.GetComponent<Corpse>() || piece.GetComponent<Incinerator>() ||
-                piece.GetComponent<ItemStand>() || piece.GetComponent<ArmorStand>()) return false;
-            Container[] containers = piece.GetComponentsInChildren<Container>(true);
-            return containers.Length == 1 && containers[0].gameObject == piece.gameObject &&
-                containers[0].GetType() == typeof(Container) && !containers[0].m_autoDestroyEmpty && !containers[0].m_wagon &&
+                !data.ContentsCleared && items.Count != 0) return false;
+            return PrefabGrid(piece.gameObject).HasValue;
+        }
+
+        internal static (int Width, int Height)? PrefabGrid(GameObject prefab)
+        {
+            if (!prefab || !prefab.GetComponent<Piece>() || prefab.GetComponent<TombStone>() ||
+                prefab.GetComponent<Corpse>() || prefab.GetComponent<Incinerator>() ||
+                prefab.GetComponent<ItemStand>() || prefab.GetComponent<ArmorStand>()) return null;
+            Container[] containers = prefab.GetComponentsInChildren<Container>(true);
+            if (containers.Length != 1 || containers[0].gameObject != prefab || containers[0].GetType() != typeof(Container) ||
+                containers[0].m_autoDestroyEmpty || containers[0].m_wagon ||
                 // shortcut: default-loot prefabs need a scoped pre-Awake policy before they can be constructed empty.
-                containers[0].m_defaultItems?.m_drops != null && containers[0].m_defaultItems.m_drops.Count == 0;
+                containers[0].m_defaultItems?.m_drops == null || containers[0].m_defaultItems.m_drops.Count != 0 ||
+                containers[0].m_width < 1 || containers[0].m_width > 256 || containers[0].m_height < 1 || containers[0].m_height > 256)
+                return null;
+            return (containers[0].m_width, containers[0].m_height);
         }
 
         internal static bool TryCapture(Piece piece, Player player, out BlueprintForeignPartData data)

@@ -46,10 +46,10 @@ namespace ReservationChecks
                 Check(BlueprintItemStandPlacement.SelectSupplies(Player, new[] { Recipe }, supplies), "fixture reservation failed");
                 Supply = supplies[0]; Held.Add(Supply); Payment = new BlueprintConstructionRefund(Player.Inventory);
             }
-            internal bool Begin()
+            internal bool Begin(bool synchronizeMarker = true)
             {
                 bool ready = BlueprintStorageTransfer.TryBegin(Operation, Player, Placed, Recipe, Supply, Payment, Held, out Transfer, out Error);
-                if (ready) SavedJournalPath = Transfer.JournalPath;
+                if (ready) { SavedJournalPath = Transfer.JournalPath; if (synchronizeMarker) { Placed.Container.SyncCacheForTest(); Transfer.MoveNext(); } }
                 return ready;
             }
         }
@@ -71,7 +71,7 @@ namespace ReservationChecks
             Check(persisted.Terminal && persisted.Observations.Count == 1 && persisted.Observations[0].SourceAfter == 1 &&
                 persisted.Observations[0].DestinationAfter == 2 && persisted.Observations[0].DestinationProperties == moved.ProvidedProperties &&
                 persisted.RequiresReconciliation && persisted.InFlight == null, "exact custody observation/terminal was not persisted");
-            Check(BlueprintStorageTransferJournal.HasUnresolved(1, 99, 1) && !BlueprintStorageTransferJournal.HasUnresolved(2, 99, 1),
+            Check(BlueprintStorageTransferJournal.HasUnresolved(1) && !BlueprintStorageTransferJournal.HasUnresolved(2),
                 "unresolved target guard lost world identity");
             normal.Journal.Dispose();
             JournalChecks.Run(normal.Transfer.JournalPath);
@@ -221,6 +221,7 @@ namespace ReservationChecks
                 if (frame.SavedJournalPath != null) Check(BlueprintStorageTransferJournal.Read(frame.SavedJournalPath).RequiresReconciliation,
                     "one false/exception/context/failure case produced unreadable or replayable evidence");
             ReturnChecks.Run();
+            RecoveryChecks.Run();
             Console.WriteLine("PASS " + assertions + " transfer assertions: actual adapter, inert native/capture services; bool/exception custody, no replay, own properties, equip, payment/context guards. No game/native API/server/disk proof.");
         }
     }

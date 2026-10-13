@@ -70,9 +70,13 @@ namespace ReservationChecks
             }
         }
     }
-    internal struct ZDOID { internal long Id; internal long UserID => 99; internal uint ID => (uint)Id; internal bool IsNone() => Id == 0; }
+    internal struct ZDOID { internal long Id, User; internal long UserID => User == 0 ? 99 : User; internal uint ID => (uint)Id; internal bool IsNone() => Id == 0; }
     internal static class ZDOVars { internal const int s_items = 1; }
     internal sealed class ZDO { internal ZDOID m_uid = new ZDOID { Id = 1 }; internal uint DataRevision; internal byte[] Raw;
+        internal readonly Dictionary<int, string> Strings = new Dictionary<int, string>();
+        internal Action BeforeSet, AfterSet;
+        internal string GetString(int key, string fallback) => Strings.TryGetValue(key, out string value) ? value : fallback;
+        internal void Set(int key, string value) { BeforeSet?.Invoke(); if (GetString(key, null) != value) { Strings[key] = value; DataRevision++; } AfterSet?.Invoke(); }
         internal int GetPrefab() => 123; internal byte[] GetByteArray(int key, byte[] fallback) => Raw ?? fallback; }
     internal sealed class ZNetView : Obj
     {
@@ -100,6 +104,12 @@ namespace ReservationChecks
         internal void ReplaceView() => m_nview = new ZNetView();
         internal void MakeRevisionStale() => m_lastRevision--;
         internal void SaveForTest() => Save();
+        internal void SyncCacheForTest() => m_lastRevision = m_nview.Data.DataRevision;
+        internal void LoadForTest(string marker)
+        {
+            m_nview.Data.DataRevision = 0; m_lastRevision = 0; m_nview.Data.Raw = Inventory.SaveBytes();
+            if (marker != null) m_nview.Data.Strings[BlueprintStorageCapture.TransferMarkerKey] = marker;
+        }
         private void Save()
         {
             if (m_loading || !m_nview.IsOwner()) return;

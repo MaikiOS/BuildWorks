@@ -11,7 +11,8 @@ namespace OstrixMods.BuildWorks
     internal sealed class BlueprintStorageTransferJournal : IDisposable
     {
         private const int MaximumBytes = 16 * 1024 * 1024;
-        private static readonly byte[] Magic = Encoding.ASCII.GetBytes("BWSTJ2\r\n");
+        private static readonly byte[] Magic = Encoding.ASCII.GetBytes("BWSTJ3\r\n");
+        private static readonly byte[] LegacyMagic2 = Encoding.ASCII.GetBytes("BWSTJ2\r\n");
         private static readonly byte[] LegacyMagic = Encoding.ASCII.GetBytes("BWSTJ1\r\n");
         private static readonly Encoding Utf8 = new UTF8Encoding(false, true);
         internal enum Direction { ToContainer, ToPlayer }
@@ -33,6 +34,7 @@ namespace OstrixMods.BuildWorks
             internal string PieceName;
             internal Item[] Items;
             internal Payment[] Paid = Array.Empty<Payment>();
+            internal Guid TargetMarker => Route == Direction.ToContainer ? Operation : Parent;
         }
         internal sealed class Payment { internal string Prefab, Properties; internal int Before, Paid, X, Y; }
         internal sealed class Attempt
@@ -79,7 +81,7 @@ namespace OstrixMods.BuildWorks
 
         internal static string Root => System.IO.Path.Combine(BepInEx.Paths.ConfigPath, "BuildWorks", "Transfers");
 
-        internal static bool HasUnresolved(long world, long user, uint id)
+        internal static bool HasUnresolved(long world, string marker = null)
         {
             try { if ((File.GetAttributes(Root) & FileAttributes.Directory) == 0) return true; }
             catch (DirectoryNotFoundException) { return false; }
@@ -92,7 +94,9 @@ namespace OstrixMods.BuildWorks
                 try
                 {
                     Snapshot record = Read(path, preparedOnly: true);
-                    if (record.Prepared.World == world && record.Prepared.TargetUser == user && record.Prepared.TargetId == id) return true;
+                    // Native IDs are remapped on world load. Unmarked/legacy targets cannot be distinguished safely.
+                    if (record.Prepared.World == world && (record.Schema < 3 || string.IsNullOrEmpty(marker) ||
+                        record.Prepared.TargetMarker.ToString("N") == marker)) return true;
                 }
                 catch (Exception) { return true; } // Corrupt/unknown evidence cannot authorize destructive cleanup.
             }
@@ -108,9 +112,9 @@ namespace OstrixMods.BuildWorks
             }
         }
 
-        internal static bool CanStartReturn(Guid parent, long world, long player, long user, uint id)
+        internal static bool CanStartReturn(Guid parent, long world, long player, Guid marker)
         {
-            if (!Directory.Exists(Root)) return false;
+            if (marker != parent || !Directory.Exists(Root)) return false;
             CheckParents(System.IO.Path.GetFullPath(Root));
             string[] paths = Directory.EnumerateFileSystemEntries(Root).Take(129).ToArray();
             if (paths.Length > 127) return false;
@@ -120,8 +124,10 @@ namespace OstrixMods.BuildWorks
                 Snapshot record;
                 try { record = Read(path, preparedOnly: true); } catch (Exception) { return false; }
                 Plan plan = record.Prepared;
-                if (plan.World != world || plan.TargetUser != user || plan.TargetId != id) continue;
-                if (record.Schema != 2 || plan.Operation != parent || plan.Player != player || plan.Route != Direction.ToContainer) return false;
+                if (plan.World != world) continue;
+                if (record.Schema < 3) return false;
+                if (plan.TargetMarker != marker) continue;
+                if (plan.Operation != parent || plan.Player != player || plan.Route != Direction.ToContainer) return false;
                 found = true;
             }
             return found;
@@ -193,7 +199,7 @@ namespace OstrixMods.BuildWorks
         private void Append(byte kind, byte[] payload)
         {
             if (stopped) throw new InvalidOperationException("Transfer journal is stopped.");
-            byte[] body = Encode(writer => { writer.Write(2); writer.Write(operation.ToByteArray()); writer.Write(sequence); writer.Write(kind); writer.Write(previousHash); writer.Write(payload); });
+            byte[] body = Encode(writer => { writer.Write(3); writer.Write(operation.ToByteArray()); writer.Write(sequence); writer.Write(kind); writer.Write(previousHash); writer.Write(payload); });
             if (body.Length > MaximumBytes || stream.Length + body.Length + 36 > MaximumBytes)
                 throw new InvalidDataException("Transfer journal exceeds its byte budget.");
             try
@@ -214,7 +220,7 @@ namespace OstrixMods.BuildWorks
             {
                 long length = file.Length;
                 byte[] magic = reader.ReadBytes(Magic.Length);
-                if (length < Magic.Length + 36 || length > MaximumBytes || !magic.SequenceEqual(Magic) && !magic.SequenceEqual(LegacyMagic))
+                if (length < Magic.Length + 36 || length > MaximumBytes || !magic.SequenceEqual(Magic) && !magic.SequenceEqual(LegacyMagic2) && !magic.SequenceEqual(LegacyMagic))
                     throw new InvalidDataException("Unknown or incomplete transfer journal.");
                 int schema = magic[5] - '0';
                 var result = new Snapshot { Schema = schema }; int sequence = 0; byte[] previous = new byte[32]; Guid operation = Guid.Empty;

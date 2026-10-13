@@ -880,7 +880,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.174.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.175.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginIdentity = $plugin.MainModule.Types | Where-Object Name -eq 'BuildWorksPlugin'
 $loaderIdentity = $pluginIdentity.CustomAttributes | Where-Object { $_.AttributeType.Name -eq 'BepInPlugin' }
@@ -3401,17 +3401,43 @@ Assert-Contract ($beforeJournal.Count -eq 1 -and $beforeJournal[0].Offset -lt $u
 $journalType = $pluginTypes | Where-Object Name -eq 'BlueprintStorageTransferJournal'
 $returnBegin = $transferType.Methods | Where-Object Name -eq 'TryBeginReturn'
 $returnCalls = ($returnBegin.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+$returnShared = $transferType.Methods | Where-Object Name -eq 'BeginReturn'
+$returnSharedCalls = ($returnShared.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($returnCalls -match '::ReturnOperationId' -and $returnCalls -match '::CanStartReturn' -and
     $returnCalls -match 'BlueprintStorageTransferJournal::Read' -and $returnCalls -match '::cancelling' -and
-    $returnCalls -match 'BlueprintStorageTransferJournal::Begin' -and $moveCalls -match '::ReceiverItemsIntact' -and
+    $returnCalls -match '::BeginReturn' -and $returnSharedCalls -match 'BlueprintStorageTransferJournal::Begin' -and $returnSharedCalls -match '::cancelling' -and
+    $moveCalls -match '::ReceiverItemsIntact' -and
     $moveCalls -match '::cancelling' -and $returnCalls -notmatch 'Inventory::MoveItem|ItemData::Load|RPC|DropItem') 'Return must bind current evidence, freeze its parent and reuse the observed native mover.'
+$recoveryRead = $transferType.Methods | Where-Object Name -eq 'ReadRecovery'
+$recoveryCalls = ($recoveryRead.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+$recoveryMatch = $transferType.Methods | Where-Object Name -eq 'MatchesRecovery'
+$recoveryMatchCalls = ($recoveryMatch.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($recoveryCalls -match '::TransferMarker' -and $recoveryCalls -match '::CanStartReturn' -and $recoveryCalls -match '::MatchesRecovery' -and
+    $recoveryCalls -notmatch 'ZDO::Set|Inventory::Move|Inventory::Load|RPC|DropItem' -and
+    $recoveryMatchCalls -match '::InventoryDigest' -and $recoveryMatchCalls -match '::BytesDigest' -and $recoveryMatchCalls -notmatch 'Observation::Revision') 'Recovery must bind the persistent marker/current full state, never old revision or mutating replay.'
+$prepare = $transferType.Methods | Where-Object Name -eq 'TryBegin'
+$prepareJournal = @($prepare.Body.Instructions | Where-Object { [string]$_.Operand -match 'BlueprintStorageTransferJournal::Begin' })
+$prepareMarker = @($prepare.Body.Instructions | Where-Object { [string]$_.Operand -match 'ZDO::Set\(System.Int32,System.String\)' })
+Assert-Contract ($prepareJournal.Count -eq 1 -and $prepareMarker.Count -eq 1 -and $prepareJournal[0].Offset -lt $prepareMarker[0].Offset -and
+    $moveCalls -match '::waitingForMarker' -and $moveCalls -match 'Stopwatch::GetTimestamp') 'Persistent marker must follow WAL preparation and wait boundedly for native cache synchronization.'
 $journalCalls = ($journalType.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($journalCalls -match 'FileStream::Flush\(System.Boolean\)' -and $journalCalls -match 'SHA256::Create' -and
     $journalCalls -match '::CheckParents' -and $journalCalls -notmatch 'File::Delete|Inventory::|ZDO::Set|RPC|DropItem') 'Persisted evidence must flush and validate without replay, deletion or world mutation.'
 $nativeId = $hostAssembly.MainModule.Types | Where-Object Name -eq 'ZDOID'
 foreach ($property in @(@('UserID','System.Int64'), @('ID','System.UInt32'))) {
     $member = @($nativeId.Properties | Where-Object Name -eq $property[0])
-    Assert-Contract ($member.Count -eq 1 -and $member[0].GetMethod.IsPublic -and $member[0].PropertyType.FullName -eq $property[1]) 'Persistent target identity must use UserID/ID, not transient UserKey.'
+    Assert-Contract ($member.Count -eq 1 -and $member[0].GetMethod.IsPublic -and $member[0].PropertyType.FullName -eq $property[1]) 'Session UID diagnostics must use resolved UserID/ID; restart identity uses the persistent operation marker.'
+}
+$nativeZdo = $hostAssembly.MainModule.Types | Where-Object Name -eq 'ZDO'
+$nativeZdoExtra = $hostAssembly.MainModule.Types | Where-Object Name -eq 'ZDOExtraData'
+foreach ($entry in @(@(($nativeZdo.Methods | Where-Object Name -eq 'Save'), 'D0B1C9D4C16E6FF5D21AA04B37DDD95B8744A55A0D9A45F1D97376EA3E5A57F9'),
+        @(($nativeZdo.Methods | Where-Object Name -eq 'Load'), '89E0096EE970E61426FDCAFB0606C602B9F3B40831C77DAA4B33A5A0C3E2D121'),
+        @(($nativeZdo.Methods | Where-Object { $_.Name -eq 'Set' -and $_.Parameters.Count -eq 2 -and $_.Parameters[0].ParameterType.FullName -eq 'System.Int32' -and $_.Parameters[1].ParameterType.FullName -eq 'System.String' }), '5AB27031232D58248CAF1903E53252E1DACC2A01F88D627D429D3AFF17F5A998'),
+        @(($nativeZdo.Methods | Where-Object { $_.Name -eq 'GetString' -and $_.Parameters.Count -eq 2 -and $_.Parameters[0].ParameterType.FullName -eq 'System.Int32' -and $_.Parameters[1].ParameterType.FullName -eq 'System.String' }), '5911E65B99DDD609D923A3F0B2D7C8890C7FAACBEF91DC4826D004ADC6B7129F'),
+        @(($nativeZdoExtra.Methods | Where-Object Name -eq 'PrepareSave'), 'FA2B8D3BEE7F1A75F2F1FC5265A99B7E18D7079294C3AB3D32CEB4B30E619B30'),
+        @(($containerType.Methods | Where-Object Name -eq 'CheckForChanges'), 'E27229CAD43E40597CFA39C3A9A1C8216D71A5101ADA47DE1971AFC14CBB422A'),
+        @(($containerType.Methods | Where-Object Name -eq 'Load'), 'E42C0B1DBC05A9CAA58BCAFD3CA75E9DBA6A907318C9D2AA026A0A03118D9C5D'))) {
+    Assert-Contract ((Get-NativeLayoutHash $entry[0]) -eq $entry[1]) "Native marker/reload contract changed: $($entry[0].FullName)"
 }
 $rollback = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintItemStandPlacement' -and $_.Name -eq 'CanRollback' }
 $rollbackCalls = ($rollback.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"

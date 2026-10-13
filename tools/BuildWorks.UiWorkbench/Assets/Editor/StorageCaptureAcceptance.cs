@@ -112,6 +112,11 @@ internal static class StorageCaptureAcceptance
             Require(BlueprintItemStandPlacement.CanRestore(piece, emptyState), "verified empty container blocks construction");
             zdo.m_uid = new ZDOID { ID = 1 };
             Require(BlueprintItemStandPlacement.CanRollback(root) && BlueprintItemStandPlacement.CanRollback(root, true), "verified empty cancellation refused");
+            zdo.Set(BlueprintStorageCapture.TransferMarkerKey, Guid.NewGuid().ToString("N")); writes = zdo.Writes;
+            Require(BlueprintStorageCapture.TryCapture(piece, player, out var markedState) && markedState.Zdo == emptyState.Zdo &&
+                !BlueprintItemStandPlacement.CanRollback(root) && !BlueprintItemStandPlacement.CanRollback(root, true) && zdo.Writes == writes,
+                "orphan transfer marker was copied into blueprint contents or destructive cancellation was allowed");
+            zdo.Set(BlueprintStorageCapture.TransferMarkerKey, (string)null); writes = zdo.Writes;
             container.Inventory.Items.Add(item);
             Require(!BlueprintItemStandPlacement.CanRollback(root) && !BlueprintItemStandPlacement.CanRollback(root, true), "filled cancellation entered native drop/destruction");
             container.Inventory.Items.Clear(); container.Inventory.Snapshot = new byte[] { 0 };

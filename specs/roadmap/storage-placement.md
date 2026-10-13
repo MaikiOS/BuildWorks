@@ -1,6 +1,6 @@
 # Survival storage placement — implementation contract
 
-Status: shared reservation .171, local native transfer .172, write-ahead evidence .173 and same-session inverse return .174 implemented in sources, 2026-10-13. Installed QA .174 still
+Status: shared reservation .171, local native transfer .172, write-ahead evidence .173 same-session inverse return .174 and marker-bound explicit recovery .175 implemented in sources, 2026-10-13. Installed QA .175 still
 blocks populated storage unless its contents are explicitly omitted from the
 temporary placement recipe. This document does not enable restoration or replace
 the full BuildWorks goal. Keep archived source state unchanged.
@@ -15,6 +15,8 @@ See `docs/CONTENT_RESERVATION_171_RU.md`. This source checkpoint is not deployed
 In .172 the local primitive checks actual prefab grid/quest/equip/ownership and observes both inventories after a single native move, including false/exception. Both rollback paths retain filled/unverified storage. See docs/CONTENT_TRANSFER_172.md. The primitive is not connected to world placement; durable custody/return/compensation, player/target persistence, server ack and integration remain open.
 
 .173 adds a versioned/checksummed/ordered write-ahead journal, complete preflight byte budget, actual before/after state evidence and unresolved-target cancellation hold. It never replays/refunds/rebinds: all files require reconciliation, even local terminal records. Durable recovery/compensation, native saves/server ack and world placement integration remain open. See docs/CONTENT_JOURNAL_173.md.
+
+.175 uses WAL3 plus a persistent target operation marker, not saved native UID/revision: ZDO.Load remaps/resets those fields. Marker Set follows flushed preparation and waits boundedly for native cache/capture before any item attempt. Explicit recovery binds exact current manifests/raw/cells/fresh ItemData; old/uncertain/unmarked evidence stays held. No game reload, disk/server receipt, construction refund or populated placement is claimed. See docs/CONTENT_RECOVERY_175.md.
 
 ## Required behavior
 

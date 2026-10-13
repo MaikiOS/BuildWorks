@@ -25,7 +25,7 @@ namespace ReservationChecks
             Check(frame.Transfer.MoveNext() == BlueprintStorageTransfer.Result.Unchanged && !frame.Transfer.CompleteInMemory, "parent was not frozen");
             Check(!frame.Transfer.TryBeginReturn(out _, out _), "second child permitted");
             var record = BlueprintStorageTransferJournal.Read(result.JournalPath);
-            Check(record.Schema == 2 && record.Prepared.Parent == frame.Operation && record.Prepared.Route == BlueprintStorageTransferJournal.Direction.ToPlayer &&
+            Check(record.Schema == 3 && record.Prepared.Parent == frame.Operation && record.Prepared.Route == BlueprintStorageTransferJournal.Direction.ToPlayer &&
                 record.Prepared.Operation == BlueprintStorageTransferJournal.ReturnOperationId(frame.Operation) && record.Prepared.Paid.Length == 0,
                 "inverse direction/identity/payment evidence wrong");
             return result;
@@ -57,7 +57,7 @@ namespace ReservationChecks
                 Check(normal.Item.m_stack == 1 && returned.m_stack == 2 && returned.m_durability == 1.25f && returned.Custom == "current-damaged" &&
                     !ReferenceEquals(returned, item) && !ReferenceEquals(returned, normal.Item) && !normal.Placed.Container.Inventory.Items.Any(),
                     "return merged, repaired, lost or reconstructed the wrong item");
-                Check(BlueprintStorageTransferJournal.HasUnresolved(1, 99, 1) && !BlueprintStorageCapture.CanRemoveEmpty(normal.Placed, normal.Player),
+                Check(BlueprintStorageTransferJournal.HasUnresolved(1) && !BlueprintStorageCapture.CanRemoveEmpty(normal.Placed, normal.Player),
                     "local return released destructive cleanup/refund");
                 Check(BlueprintStorageTransferJournal.Read(inverse.JournalPath).RequiresReconciliation, "return claimed durable completion");
                 inverse.MoveNext(); Check(normal.Player.Inventory.MoveCalls == 1, "return replayed");
@@ -173,8 +173,8 @@ namespace ReservationChecks
             WriteLegacy(legacy.Transfer.JournalPath);
             var old = BlueprintStorageTransferJournal.Read(legacy.Transfer.JournalPath);
             Check(old.Schema == 1 && old.Prepared.Parent == Guid.Empty && old.Prepared.Route == BlueprintStorageTransferJournal.Direction.ToContainer &&
-                old.Terminal && old.RequiresReconciliation && BlueprintStorageTransferJournal.HasUnresolved(1, 99, 1) &&
-                !BlueprintStorageTransferJournal.CanStartReturn(legacy.Operation, 1, 100, 99, 1), "legacy v1 journal not retained safely");
+                old.Terminal && old.RequiresReconciliation && BlueprintStorageTransferJournal.HasUnresolved(1) &&
+                !BlueprintStorageTransferJournal.CanStartReturn(legacy.Operation, 1, 100, legacy.Operation), "legacy v1 journal not retained safely");
             Console.WriteLine("PASS " + assertions + " return assertions: actual inverse adapter/journal, inert native host; current attributes, empty-cell custody, refusal, no replay, legacy v1 retained. No live game/save/server proof.");
         }
 
@@ -188,7 +188,7 @@ namespace ReservationChecks
             using (var writer = new BinaryWriter(output))
             using (var hash = SHA256.Create())
             {
-                writer.Write(Encoding.ASCII.GetBytes("BWSTJ2\r\n"));
+                writer.Write(Encoding.ASCII.GetBytes("BWSTJ3\r\n"));
                 for (int offset = 8; offset < bytes.Length;)
                 {
                     int size = BitConverter.ToInt32(bytes, offset); var body = new byte[size]; Array.Copy(bytes, offset + 4, body, 0, size);
@@ -203,22 +203,22 @@ namespace ReservationChecks
         }
 
         // Produce the exact older wire layout, including recalculated frame hashes and chain.
-        private static void WriteLegacy(string path)
+        internal static void WriteLegacy(string path, int schema = 1)
         {
             byte[] bytes = File.ReadAllBytes(path), previous = new byte[32];
             using (var output = new MemoryStream())
             using (var writer = new BinaryWriter(output))
             using (var hash = SHA256.Create())
             {
-                writer.Write(Encoding.ASCII.GetBytes("BWSTJ1\r\n"));
+                writer.Write(Encoding.ASCII.GetBytes("BWSTJ" + schema + "\r\n"));
                 for (int offset = 8; offset < bytes.Length;)
                 {
                     int size = BitConverter.ToInt32(bytes, offset); var body = new byte[size]; Array.Copy(bytes, offset + 4, body, 0, size);
-                    if (body[24] == 1)
+                    if (body[24] == 1 && schema == 1)
                     {
                         var old = new byte[size - 17]; Array.Copy(body, old, 89); Array.Copy(body, 106, old, 89, body.Length - 106); body = old;
                     }
-                    Array.Copy(BitConverter.GetBytes(1), body, 4); Array.Copy(previous, 0, body, 25, 32);
+                    Array.Copy(BitConverter.GetBytes(schema), body, 4); Array.Copy(previous, 0, body, 25, 32);
                     previous = hash.ComputeHash(body); writer.Write(body.Length); writer.Write(body); writer.Write(previous); offset += 4 + size + 32;
                 }
                 writer.Flush(); File.WriteAllBytes(path, output.ToArray());

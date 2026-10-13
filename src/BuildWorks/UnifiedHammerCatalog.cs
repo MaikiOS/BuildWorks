@@ -585,41 +585,28 @@ namespace OstrixMods.BuildWorks
             return false;
         }
 
-        public static bool ContainsAvailable(PieceTable table, Piece piece)
-        {
-            if (!table || !piece) return false;
-            foreach (KeyValuePair<long, List<Piece>> entry in AllLists)
-                if ((int)(entry.Key >> 32) == table.GetInstanceID() &&
-                    entry.Value.Contains(piece)) return true;
-            return false;
-        }
-
         public static string AvailabilitySignature(PieceTable table)
         {
-            if (!table) return "0:0:0";
+            if (!table || table.m_availablePieces == null) return "0:0:0";
             int count = 0;
             long sum = 0;
             int xor = 0;
-            foreach (KeyValuePair<long, List<Piece>> entry in AllLists)
+            foreach (Piece piece in table.m_availablePieces)
             {
-                if ((int)(entry.Key >> 32) != table.GetInstanceID()) continue;
-                foreach (Piece piece in entry.Value)
-                {
-                    if (!piece || piece.gameObject.name.StartsWith(
-                        HammerBlueprintPieceRegistry.PrefabPrefix,
-                        StringComparison.Ordinal)) continue;
-                    int id = piece.GetInstanceID();
-                    ++count;
-                    sum += id;
-                    xor ^= id;
-                }
+                if (!piece || piece.gameObject.name.StartsWith(
+                    HammerBlueprintPieceRegistry.PrefabPrefix,
+                    StringComparison.Ordinal)) continue;
+                int id = piece.GetInstanceID();
+                ++count;
+                sum += id;
+                xor ^= id;
             }
             return count + ":" + sum + ":" + xor;
         }
 
         public static bool EnsureVisible(PieceTable table, Piece piece)
         {
-            if (!table || !piece) return false;
+            if (!PrecisionPlacementSession.IsBuildPieceAvailable(table, piece)) return false;
             foreach (KeyValuePair<long, List<Piece>> entry in AllLists)
             {
                 if ((int)(entry.Key >> 32) != table.GetInstanceID()) continue;
@@ -650,7 +637,12 @@ namespace OstrixMods.BuildWorks
                 ApplyPage(visible, full, page);
                 return true;
             }
-            return false;
+            // A native eligibility refresh may precede the next indexed catalogue rebuild.
+            List<Piece> current = PrecisionPlacementSession.AvailableBuildPieces(table, piece.m_category);
+            if (current == null) return false;
+            if (NativeCatalogActive) return current.Contains(piece);
+            if (!current.Contains(piece)) current.Add(piece);
+            return true;
         }
 
         public static PageInfo GetPageInfo(PieceTable table, Piece.PieceCategory category)
@@ -2396,7 +2388,24 @@ namespace OstrixMods.BuildWorks
                     string.Join(", ", parts.Select(part => part.scaleIsAbsolute ? "absolute " + part.scale.ToVector3().ToString("R") :
                         (part.baseScale.HasValue ? part.baseScale.Value.ToVector3().ToString("R") : "prefab") + " × " +
                         part.scale.ToVector3().ToString("R")).Distinct().Take(8)));
+                PieceTable table = PrecisionPlacementSession.GetBuildPieceTable(player);
+                Piece tablePiece = (table?.m_pieces ?? new List<GameObject>()).Where(entry => entry &&
+                    string.Equals(entry.name.Replace("(Clone)", string.Empty).Trim(), parts.Key, StringComparison.Ordinal))
+                    .Select(entry => entry.GetComponent<Piece>()).FirstOrDefault(candidate => candidate);
+                report.AppendLine("Native availability | " + parts.Key + " | physical=" + (registered != null) +
+                    " | table=" + (table ? table.name : "none") + " | inTable=" + (tablePiece != null) +
+                    " | enabled=" + (tablePiece ? tablePiece.m_enabled.ToString() : "unknown") +
+                    " | recipeKnown=" + (tablePiece && player ? player.IsRecipeKnown(tablePiece.m_name).ToString() : "unknown") +
+                    " | nativeAvailable=" + PrecisionPlacementSession.IsBuildPieceAvailable(table, tablePiece));
+                if (tablePiece)
+                    report.AppendLine("Native recipe | " + parts.Key + " | name=" + tablePiece.m_name +
+                        " | station=" + (tablePiece.m_craftingStation ? tablePiece.m_craftingStation.m_name : "none") +
+                        " | resources=" + string.Join(", ", (tablePiece.m_resources ?? Array.Empty<Piece.Requirement>())
+                            .Where(requirement => requirement != null).Select(requirement =>
+                                (requirement.m_resItem ? requirement.m_resItem.gameObject.name : "missing") + ":" + requirement.m_amount)));
+                if (!piece) report.AppendLine(PrecisionPlacementSession.BuildPieceUnavailableReason(player, parts.Key));
             }
+            Debug.Log("BuildWorks blueprint diagnostics\n" + report);
             ShowExchange(blueprint, report.ToString());
         }
 

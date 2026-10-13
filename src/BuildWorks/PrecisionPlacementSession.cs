@@ -5493,6 +5493,7 @@ namespace OstrixMods.BuildWorks
             { missingPrefab = BuildWorksLocalization.ResolveUserText(budgetError); return false; }
             var unavailable = new HashSet<string>(StringComparer.Ordinal);
             var resolved = new Dictionary<string, Piece>(StringComparer.Ordinal);
+            var resolutionErrors = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (CompositeBlueprintStore.Part part in blueprint.parts)
             {
                 if (part.scaleIsAbsolute)
@@ -5504,10 +5505,12 @@ namespace OstrixMods.BuildWorks
                 {
                     TryResolveBuildPiece(player, part.prefabName, out piece);
                     resolved[part.prefabName] = piece;
+                    if (!piece) resolutionErrors[part.prefabName] = BuildPieceUnavailableReason(player, part.prefabName);
                 }
                 if (!piece || !SupportsBlueprintWorkspacePiece(piece))
                 {
-                    unavailable.Add(part.prefabName);
+                    unavailable.Add(!piece ? resolutionErrors[part.prefabName] :
+                        BuildWorksLocalization.Text("availability.unsupported", part.prefabName));
                     continue;
                 }
                 Vector3 relativeScale;
@@ -5733,14 +5736,21 @@ namespace OstrixMods.BuildWorks
         }
 
         internal static bool IsBuildPieceAvailable(PieceTable table, Piece piece)
+            => table && piece && table.m_availablePieces != null && table.m_availablePieces.Contains(piece);
+
+        internal static string BuildPieceUnavailableReason(Player player, string prefabName)
         {
-            if (!table || !piece || AvailablePiecesField == null) return false;
-            if (HammerCatalogOrganizer.ContainsAvailable(table, piece)) return true;
-            List<List<Piece>> available = AvailableBuildPieces(table);
-            if (available == null) return false;
-            foreach (List<Piece> category in available)
-                if (category != null && category.Contains(piece)) return true;
-            return false;
+            PieceTable table = GetBuildPieceTable(player);
+            if (!table || table.m_pieces == null) return BuildWorksLocalization.Text("availability.no_tool", prefabName);
+            foreach (GameObject entry in table.m_pieces)
+            {
+                Piece candidate = entry ? entry.GetComponent<Piece>() : null;
+                if (candidate && string.Equals(PrefabName(candidate), prefabName, StringComparison.Ordinal))
+                    return BuildWorksLocalization.Text("availability.native_blocked", prefabName);
+            }
+            GameObject registered = ZNetScene.instance ? ZNetScene.instance.GetPrefab(prefabName) : null;
+            return BuildWorksLocalization.Text(!registered ? "availability.missing" :
+                registered.GetComponent<Piece>() ? "availability.other_tool" : "availability.unsupported", prefabName);
         }
 
         internal static List<List<Piece>> AvailableBuildPieces(PieceTable table) =>

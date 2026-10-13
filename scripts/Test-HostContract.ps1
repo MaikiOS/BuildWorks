@@ -880,7 +880,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.178.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.179.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginIdentity = $plugin.MainModule.Types | Where-Object Name -eq 'BuildWorksPlugin'
 $loaderIdentity = $pluginIdentity.CustomAttributes | Where-Object { $_.AttributeType.Name -eq 'BepInPlugin' }
@@ -2024,10 +2024,10 @@ $isBuildPieceAvailableOperands = @(
     $isBuildPieceAvailable.Body.Instructions | ForEach-Object { [string]$_.Operand }
 ) -join "`n"
 Assert-Contract ($isBuildPieceAvailableOperands -match
-    'HammerCatalogOrganizer::ContainsAvailable' -and
-    $isBuildPieceAvailableOperands -match 'PrecisionPlacementSession::AvailablePiecesField' -and
-    $isBuildPieceAvailableOperands -match 'System.Collections.Generic.List`1<Piece>::Contains') `
-    'Blueprint availability no longer scans every unlocked Hammer category.'
+    'PieceTable::m_availablePieces' -and
+    $isBuildPieceAvailableOperands -match 'System.Collections.Generic.HashSet`1<Piece>::Contains' -and
+    $isBuildPieceAvailableOperands -notmatch 'ContainsAvailable|AvailablePiecesField|AvailableBuildPieces') `
+    'Blueprint availability must use the complete native eligibility set, not mutable UI category caches.'
 $resolveBlueprintPieces = $pluginMethods | Where-Object Name -eq 'TryResolveBlueprintPieces'
 $resolveBlueprintPiecesOperands = @(
     $resolveBlueprintPieces.Body.Instructions | ForEach-Object { [string]$_.Operand }

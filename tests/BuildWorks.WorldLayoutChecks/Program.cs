@@ -41,6 +41,7 @@ internal static class Program
             vectorType = append.GetParameters()[0].ParameterType;
             rotationType = append.GetParameters()[1].ParameterType;
             pieceType = sessionType.GetField("selectedPiece", Instance).FieldType;
+            TestNativeBuildAvailability(asm);
             TestNativeMaterialVariation(asm);
             TestNativeMaterialState(asm);
             TestMaterialPreviewFailure(asm);
@@ -74,6 +75,53 @@ internal static class Program
         {
             foreach (GameObject fixture in fixtureObjects)
                 if (fixture) UnityEngine.Object.DestroyImmediate(fixture);
+        }
+    }
+
+    private static void TestNativeBuildAvailability(Assembly plugin)
+    {
+        Type tableType = pieceType.Assembly.GetType("PieceTable", true);
+        Type organizer = plugin.GetType("OstrixMods.BuildWorks.HammerCatalogOrganizer", true);
+        MethodInfo available = sessionType.GetMethod("IsBuildPieceAvailable", BindingFlags.Static | BindingFlags.NonPublic);
+        MethodInfo signature = organizer.GetMethod("AvailabilitySignature", BindingFlags.Static | BindingFlags.Public);
+        var root = new GameObject("Inert availability table"); root.SetActive(false);
+        var roof = new GameObject("wood_wall_roof"); roof.SetActive(false);
+        Component table = null;
+        var allLists = (IDictionary)organizer.GetField("AllLists", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+        long key = 0;
+        try
+        {
+            table = root.AddComponent(tableType);
+            object piece = roof.AddComponent(pieceType);
+            Set(table, "m_pieces", new System.Collections.Generic.List<GameObject> { roof });
+            object nativeSet = Get(table, "m_availablePieces");
+            nativeSet.GetType().GetMethod("Add").Invoke(nativeSet, new[] { piece });
+            Require((bool)available.Invoke(null, new[] { (object)table, piece }),
+                "Native complete available set was hidden by empty/stale category caches");
+            IList categories = (IList)Get(table, "m_availablePiecesByCategory");
+            IList visible = (IList)Activator.CreateInstance(typeof(System.Collections.Generic.List<>).MakeGenericType(pieceType));
+            categories.Add(visible);
+            Require((bool)organizer.GetMethod("EnsureVisible", BindingFlags.Static | BindingFlags.Public)
+                .Invoke(null, new[] { (object)table, piece }) && visible.Contains(piece),
+                "An eligible native piece could not become visible before catalogue cache refresh");
+            string before = (string)signature.Invoke(null, new object[] { table });
+            key = (long)table.GetInstanceID() << 32;
+            IList cached = (IList)Activator.CreateInstance(typeof(System.Collections.Generic.List<>).MakeGenericType(pieceType));
+            cached.Add(piece); allLists.Add(key, cached);
+            nativeSet.GetType().GetMethod("Remove").Invoke(nativeSet, new[] { piece });
+            Require(!(bool)available.Invoke(null, new[] { (object)table, piece }),
+                "Stale category cache authorized a piece removed from native availability");
+            Require((string)signature.Invoke(null, new object[] { table }) != before,
+                "Registry signature ignored native availability change while category cache stayed stale");
+            Require(!(bool)organizer.GetMethod("EnsureVisible", BindingFlags.Static | BindingFlags.Public)
+                .Invoke(null, new[] { (object)table, piece }) && visible.Count == 1,
+                "EnsureVisible exposed a no-longer-available piece or changed UI after refusal");
+            Console.WriteLine("PASS actual native PieceTable: complete set survives stale/empty UI lists; stale cache cannot grant access; signature tracks eligibility; unavailable visibility denied. Inert data only.");
+        }
+        finally
+        {
+            allLists.Remove(key);
+            UnityEngine.Object.DestroyImmediate(roof); UnityEngine.Object.DestroyImmediate(root);
         }
     }
 

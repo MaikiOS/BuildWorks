@@ -1,3 +1,10 @@
+## 2026-10-13 — QA .179 deployed: complete native availability
+
+Reproduced and fixed denial of a native-eligible piece when UI category caches are empty/stale. Eligibility and registry signature now consume PieceTable.m_availablePieces; stale categories cannot grant availability. Exact prefab/current-tool membership and native costs remain. [Evidence/limits](HAMMER_AVAILABILITY_179_RU.md), [short Forest Hut queue](MANUAL_QA_179_RU.md).
+
+normal/QA0/0, Geometry/Store/Localization runtime/EditorBridge, actual native WorldLayout red→green, Host/localization996, full Unity492 and correctness/Ponytail passed. Formatter still fails WHITESPACE; normalized paths/line offsets match baseline, no new diagnostics. Installed0.19.179.0/both SHA verified; all190 config/token/provision files unchanged. No Valheim/model/input/user saves run.
+
+Forest Hut remains unproven: current-MVID metadata proves four wood_wall_roof26degree Pieces at capture, not current table/recipe eligibility. Check blueprint logs physical/table/enabled/recipe/native availability/resources/station. Ordinary page filtering was already accounted for by old AllLists; do not claim it as the exact cause. Next implementation: measured import progress/navigation to selected result; a fresh concrete house failure retains priority. Fresh goal API status active; full objective incomplete. Prior accepted cases need no repeat; .178 copy acceptance remains queued.
 ## 2026-10-13 — QA .178 deployed: copy alignment
 
 Confirmed semantics: originals stay in place; new copies align at the missing marker. Align retains missing, replace removes only missing. Fresh IDs/group pivots, one Undo/Redo, copied local axes and catalogue primary-later/absent paths verified. [Evidence/limits](MISSING_COPY_178_RU.md), [short manual queue and ready fixture](MANUAL_QA_178_RU.md).

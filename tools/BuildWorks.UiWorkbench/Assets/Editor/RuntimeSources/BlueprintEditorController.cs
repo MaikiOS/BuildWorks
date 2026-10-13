@@ -3071,7 +3071,7 @@ namespace OstrixMods.BuildWorks
         private void RequestMissingAlignment(bool keepTarget)
         {
             if (!IsEditing || keyboardPreview || IsGizmoDragging || placementItem != null || view.HasModal) return;
-            if (!keepTarget && document.Groups.Count >= BlueprintEditorDocument.MaximumGroups)
+            if (document.Groups.Count >= BlueprintEditorDocument.MaximumGroups)
             { view.SetStatus(BuildWorksLocalization.Text("editor.replace_limit"), error: true); return; }
             if (!TryMissingReplacement(out BlueprintEditorPart target, out BlueprintEditorPart[] replacements))
             {
@@ -3099,15 +3099,21 @@ namespace OstrixMods.BuildWorks
             var transform = BlueprintEditorDocument.ReplacementTransform(target, replacements[0]);
             try
             {
-                scene.PreviewTransform(document, ids, ToVector(transform.Translation), ToQuaternion(transform.Rotation),
-                    Vector3.zero, Vector3.one, Quaternion.identity);
+                void PreviewCopies()
+                {
+                    var preview = CopyDocument(document);
+                    bool changed = keepTarget ? preview.PositionPartWithSelection(target.StableId, transform.Translation, transform.Rotation) :
+                        preview.ReplacePartWithSelection(target.StableId, BuildWorksLocalization.Text("editor.replace_group"));
+                    if (!changed) throw new InvalidOperationException(BuildWorksLocalization.Text("editor.replace_changed"));
+                    scene.ShowDuplicatePreview(NewParts(preview));
+                }
+                PreviewCopies();
                 if (keepTarget && target.Metadata?.Minimum != null)
                 {
-                    if (!scene.TryGetPositioningOffset(target.StableId, ids, out Vector3 offset))
+                    if (!scene.TryGetPositioningOffset(target.StableId, null, out Vector3 offset))
                         throw new InvalidOperationException(BuildWorksLocalization.Text("editor.position_no_bounds"));
                     transform.Translation += ToPoint(offset);
-                    scene.PreviewTransform(document, ids, ToVector(transform.Translation), ToQuaternion(transform.Rotation),
-                        Vector3.zero, Vector3.one, Quaternion.identity);
+                    PreviewCopies();
                 }
             }
             catch (Exception exception)
@@ -3184,7 +3190,7 @@ namespace OstrixMods.BuildWorks
                     BuildWorksLocalization.Text("editor.replace_confirm", target.PrefabName, source.Parts.Count, anchor.DisplayName), () =>
                 {
                     if (!Current()) { view.SetStatus(BuildWorksLocalization.Text("editor.replace_changed"), error: true); return; }
-                    if (ApplyDocumentEdit(() => keepTarget ? document.InsertBlueprint(source, transform.Translation, transform.Rotation) :
+                    if (ApplyDocumentEdit(() => keepTarget ? document.PositionPartWithBlueprint(targetId, source, transform.Translation, transform.Rotation) :
                         document.ReplacePartWithBlueprint(targetId, source)))
                         view.SetStatus(BuildWorksLocalization.Text(keepTarget ? "editor.position_done" : "editor.replace_done", source.Parts.Count));
                 }, height: 450f, closed: () => RestoreReplacementPreview(expected), scenePreview: true);

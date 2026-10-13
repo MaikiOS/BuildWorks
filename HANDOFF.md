@@ -1,3 +1,10 @@
+## 2026-10-13 — QA .178 deployed: copy alignment
+
+Confirmed semantics: originals stay in place; new copies align at the missing marker. Align retains missing, replace removes only missing. Fresh IDs/group pivots, one Undo/Redo, copied local axes and catalogue primary-later/absent paths verified. [Evidence/limits](MISSING_COPY_178_RU.md), [short manual queue and ready fixture](MANUAL_QA_178_RU.md).
+
+Geometry, full Store, normal/QA0/0, Host/localization991, Localization runtime, EditorBridge, WorldLayout and actual full Unity492 passed. Correctness PASSED/Ponytail Ship. Whole dotnet format still fails WHITESPACE; normalized diagnostics exactly match all136 baseline b06036f lines, no new findings. Installed0.19.178.0/both hashes verified; all190 config/token/provision files unchanged. No Valheim/input/model/user saves launched. Game acceptance remains pending.
+
+Next: separate Forest Hut wood_wall_roof physical-prefab/Hammer/recipe availability without aliases or cost bypass, then measured import-to-selected-card flow. Signs/mounts, readable filter, selection rectangle/editable volume, persistent stake/v11 project, complete safe contents/admin/network remain open. Goal API blocked/resume unavailable; full objective incomplete, authorized work continues.
 ## 2026-10-13 — QA .177 deployed: manual-feedback fixes
 
 Ostrix accepted tested auto17/18 and scale. Fixed two-axis plane highlight, retained unacknowledged-warp preview/control-click separation, concrete catalogue resolver reason and file-level malformed-document errors. Store, normal/QA0/0, Host/localization991, final Unity492 and correctness/Ponytail passed. A real toolbar-click blocker was fixed before deployment; initial Ship withdrawn. Version0.19.177.0/both hashes verified;190 config/token/provision files unchanged. [Evidence/limits](docs/MANUAL_FIXES_177_RU.md), [short manual queue](docs/MANUAL_QA_177_RU.md).

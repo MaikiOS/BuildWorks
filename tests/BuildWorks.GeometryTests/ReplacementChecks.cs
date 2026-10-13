@@ -10,15 +10,19 @@ namespace OstrixMods.BuildWorks.GeometryTests
         {
             var identity = new Rotation3(0, 0, 0, 1);
             var evidence = new BlueprintSourceDocument("blueprint", "missing.blueprint",
-                "#Pieces\nMissing;;4;5;6;0;0;0;1;\"\";1;1;1");
+                "#Pieces\nMissing;;4;5;6;0;0;0;1;\"\";1;1;1\nwall;;-3;4;2;0;0;0;1;\"\";1;1;1");
             var metadata = new BlueprintPrefabMetadata(1, "Missing", "Unknown", "Piece", "fixture",
                 new Point3(2, 1, 3), new Point3(-1, 0, -1), new Point3(1, 2, 1));
+            var wallMetadata = new BlueprintPrefabMetadata(1, "wall", "Recorded wall", "Piece", "fixture", new Point3(1, 1, 1));
+            var foreign = new BlueprintForeignPartData("blueprint", "opaque", null, null);
             var document = new BlueprintEditorDocument(null, "Replace", "OTHER", new[] {
                 new BlueprintEditorPart("m", "Missing", "Unknown", new Point3(4, 5, 6), identity, "g",
                     scale: new Point3(2, .5, 3), sourceDocumentId: evidence.Id, sourceLine: 2, metadata: metadata),
                 new BlueprintEditorPart("b", "beam", "Beam", new Point3(7, 8, 9), new Rotation3(0, 1, 0, 0), "h",
                     scale: new Point3(.5, 2, 1), baseScale: new Point3(3, 1, 2)),
-                new BlueprintEditorPart("a", "wall", "Wall", new Point3(-3, 4, 2), identity)
+                new BlueprintEditorPart("a", "wall", "Wall", new Point3(-3, 4, 2), identity,
+                    signText: "Исходная надпись", sourceDocumentId: evidence.Id, sourceLine: 3,
+                    foreignData: foreign, metadata: wallMetadata, materialSeed: 42)
             }, new[] { new BlueprintEditorGroup("g", "Target", pivotPartId: "m"),
                 new BlueprintEditorGroup("h", "Own assembly", pivotPartId: "b") }, primaryPartId: "m",
                 sourceCustomSnapPoints: new[] { new Point3(1, 2, 3) },
@@ -27,18 +31,28 @@ namespace OstrixMods.BuildWorks.GeometryTests
             document.SelectOnly("m"); document.ToggleSelection("h"); document.ToggleSelection("a");
             Check(document.ReplacePartWithSelection("m", "Replacement"), "Replacement refused");
             string root = document.ActiveNodeId;
-            Check(document.Parts.Count == 2 && document.Groups.Count == 3 &&
+            var copies = document.Parts.Where(part => part.StableId != "a" && part.StableId != "b").ToArray();
+            var beam = copies.Single(part => part.PrefabName == "beam");
+            var wall = copies.Single(part => part.PrefabName == "wall");
+            Check(document.Parts.Count == 4 && document.Groups.Count == 4 &&
                 document.Groups.Single(group => group.StableId == root).ParentGroupId == "g" &&
-                document.Groups.Single(group => group.StableId == "h").ParentGroupId == root &&
-                document.Groups.Single(group => group.StableId == "g").PivotPartId == "b" && document.PrimaryPartId == "b",
+                document.Groups.Single(group => group.StableId == "h").ParentGroupId == null &&
+                document.Groups.Single(group => group.StableId == beam.ParentGroupId).ParentGroupId == root &&
+                document.Groups.Single(group => group.StableId == beam.ParentGroupId).PivotPartId == beam.StableId &&
+                document.Groups.Single(group => group.StableId == root).PivotPartId == beam.StableId &&
+                document.Groups.Single(group => group.StableId == "g").PivotPartId == beam.StableId && document.PrimaryPartId == beam.StableId,
                 "Replacement did not retain/reparent hierarchy or repair primary/pivot links");
-            var beam = document.Parts.Single(part => part.StableId == "b");
             Check(beam.Position.X == 4 && beam.Position.Y == 5 && beam.Position.Z == 6 && Math.Abs(beam.Rotation.W) == 1 &&
                 beam.Scale.Y == 2 && beam.BaseScale.Value.X == 3,
                 "Replacement did not align the chosen origin/rotation while retaining its own scale");
-            var wall = document.Parts.Single(part => part.StableId == "a");
             Check(wall.Position.X == 14 && wall.Position.Y == 1 && wall.Position.Z == 13 && Math.Abs(wall.Rotation.Y) == 1,
                 "Replacement changed the assembly's relative pose");
+            Check(document.Parts.Single(part => part.StableId == "b").Position.X == 7 &&
+                document.Parts.Single(part => part.StableId == "b").Rotation.Y == 1 &&
+                document.Parts.Single(part => part.StableId == "a").Position.X == -3 &&
+                wall.SignText == "Исходная надпись" && wall.SourceDocumentId == evidence.Id && wall.SourceLine == 3 &&
+                wall.ForeignData == foreign && wall.Metadata == wallMetadata && wall.MaterialSeed == 42,
+                "Copy replacement changed original poses or lost exact saved data");
             Check(document.PlacementSupportId == "s" && document.Supports[0].Position.X == 4 &&
                 document.CustomSnapPoints[0].Z == 3 && document.Sources[0].Text == evidence.Text,
                 "Replacement damaged independent support/snap/source data");
@@ -46,20 +60,25 @@ namespace OstrixMods.BuildWorks.GeometryTests
                 document.Parts[0].Metadata == metadata && document.Parts[0].SourceDocumentId == evidence.Id &&
                 document.Groups[0].PivotPartId == "m" && document.Groups[1].ParentGroupId == null && !document.CanUndo,
                 "One Undo did not restore the full missing record and hierarchy");
-            Check(document.Redo() && document.Parts.Count == 2, "Redo failed");
+            Check(document.Redo() && document.Parts.Count == 4 && document.Parts.Any(part => part.StableId == beam.StableId), "Redo failed or changed copy IDs");
             Check(document.Undo(), "Restore positioning fixture");
             Check(document.PositionPartWithSelection("m", new Point3(1, 2, 3), identity), "Positioning refused");
-            Check(document.Parts.Count == 3 && document.Groups.Count == 2 && document.PrimaryPartId == "m" &&
+            copies = document.Parts.Where(part => part.StableId != "m" && part.StableId != "a" && part.StableId != "b").ToArray();
+            Check(document.Parts.Count == 5 && document.Groups.Count == 4 && document.PrimaryPartId == "m" &&
                 document.Parts[0].Position.X == 4 && document.Parts[0].Metadata == metadata &&
                 document.Groups[0].PivotPartId == "m" && document.Groups[1].ParentGroupId == null &&
-                document.Parts.Single(part => part.StableId == "b").Position.X == 8 &&
-                document.Parts.Single(part => part.StableId == "a").Position.X == -2 &&
-                document.Selection.SequenceEqual(new[] { "h", "a" }) && document.ActiveNodeId == "a" &&
+                copies.Single(part => part.PrefabName == "beam").Position.X == 8 &&
+                copies.Single(part => part.PrefabName == "wall").Position.X == -2 &&
+                document.Parts.Single(part => part.StableId == "b").Position.X == 7 &&
+                document.Parts.Single(part => part.StableId == "a").Position.X == -3 &&
+                document.Selection.SequenceEqual(new[] { document.ActiveNodeId }) &&
+                document.Groups.Single(group => group.StableId == document.ActiveNodeId).PivotPartId == copies[0].StableId &&
                 document.Supports[0].Position.X == 4 && document.Sources[0].Text == evidence.Text,
                 "Positioning deleted/reparented the target or damaged relative pose, selection or evidence");
             Check(document.Undo() && document.Parts[1].Position.X == 7 && document.Selection.Contains("m") &&
                 !document.CanUndo, "Positioning Undo was not atomic");
-            Check(document.Redo() && document.Parts.Count == 3 && document.Parts[1].Position.X == 8,
+            Check(document.Redo() && document.Parts.Count == 5 && document.Parts[1].Position.X == 7 &&
+                document.Parts.Any(part => part.StableId == copies[0].StableId),
                 "Positioning Redo lost target or pose");
 
             // The source primary is deliberately not its first row; use its origin, never a bounds centre.
@@ -100,7 +119,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             simple.SelectOnly("m"); int revision = simple.RevisionToken;
             Check(!simple.ReplacePartWithSelection("m", "Replace") && simple.RevisionToken == revision, "Empty replacement changed history");
             simple.ToggleSelection("a");
-            Check(simple.ReplacePartWithSelection("m", "Replace") && simple.Parts.Count == 1 && simple.Undo(), "One-to-one or Undo failed");
+            Check(simple.ReplacePartWithSelection("m", "Replace") && simple.Parts.Count == 2 && simple.Undo(), "One-to-one or Undo failed");
             simple.SetLocked("a", true); revision = simple.RevisionToken;
             Check(!simple.ReplacePartWithSelection("m", "Replace") && simple.RevisionToken == revision, "Locked part partially replaced");
 
@@ -111,9 +130,10 @@ namespace OstrixMods.BuildWorks.GeometryTests
             try { full.ReplacePartWithSelection("m", "Replace"); } catch (InvalidOperationException) { refused = true; }
             Check(refused && full.Parts.Count == 2 && full.Groups.Count == BlueprintEditorDocument.MaximumGroups &&
                 full.RevisionToken == revision, "Group budget failed non-atomically");
-            Check(full.PositionPartWithSelection("m", new Point3(2, 0, 0), identity) &&
-                full.Groups.Count == BlueprintEditorDocument.MaximumGroups && full.Parts.Count == 2,
-                "Positioning incorrectly needs an extra group");
+            refused = false;
+            try { full.PositionPartWithSelection("m", new Point3(2, 0, 0), identity); } catch (InvalidOperationException) { refused = true; }
+            Check(refused && full.RevisionToken == revision && full.Parts.Count == 2,
+                "Copy positioning exceeded the group budget or partially committed");
 
             var emptied = new BlueprintEditorDocument(null, "Primary", "OTHER", new[] {
                 new BlueprintEditorPart("m", "Missing", "Missing", new Point3(), identity),
@@ -121,8 +141,10 @@ namespace OstrixMods.BuildWorks.GeometryTests
                 new[] { new BlueprintEditorGroup("old", "Old primary", pivotPartId: "a") }, primaryGroupId: "old");
             emptied.SelectOnly("m"); emptied.ToggleSelection("a");
             Check(emptied.ReplacePartWithSelection("m", "Replace") &&
-                emptied.PrimaryGroupId == emptied.ActiveNodeId && emptied.Groups[0].PivotPartId == null,
-                "Empty primary group was left as a save-blocking reference");
+                emptied.PrimaryGroupId == "old" && emptied.Groups[0].PivotPartId == "a" &&
+                emptied.Parts.Single(part => part.StableId == "a").ParentGroupId == "old" &&
+                emptied.Parts.Single(part => part.StableId == "a").Position.X == 1,
+                "Copy replacement moved the original or damaged its primary group");
             Check(emptied.Undo() && emptied.PrimaryGroupId == "old" && emptied.Groups[0].PivotPartId == "a",
                 "Undo did not restore the emptied primary group link");
 
@@ -133,9 +155,11 @@ namespace OstrixMods.BuildWorks.GeometryTests
                 new[] { new BlueprintEditorGroup("own", "Own assembly") });
             heavy.SelectOnly("m"); heavy.ToggleSelection("own");
             var elapsed = System.Diagnostics.Stopwatch.StartNew();
-            Check(heavy.ReplacePartWithSelection("m", "Replace") && heavy.Parts.Count == 49999 && heavy.Undo(),
-                "Heavy grouped replacement or full Undo failed");
-            Console.WriteLine("PASS 50000-record grouped replacement + Undo: " + elapsed.ElapsedMilliseconds + " ms (geometry only)");
+            revision = heavy.RevisionToken; refused = false;
+            try { heavy.ReplacePartWithSelection("m", "Replace"); } catch (InvalidOperationException) { refused = true; }
+            Check(refused && heavy.Parts.Count == 50000 && heavy.RevisionToken == revision && !heavy.CanUndo,
+                "Heavy grouped copy overflow did not refuse atomically");
+            Console.WriteLine("PASS 50000-record grouped copy overflow: " + elapsed.ElapsedMilliseconds + " ms (geometry only)");
             var one = new BlueprintEditorDocument(null, "One", "OTHER", new[] {
                 new BlueprintEditorPart("single", "wall", "Wall", new Point3(2, 0, 0), identity) });
             var singleTarget = new BlueprintEditorDocument(null, "Single target", "OTHER", new[] {
@@ -153,6 +177,32 @@ namespace OstrixMods.BuildWorks.GeometryTests
             try { heavy.ReplacePartWithBlueprint("m", source); } catch (InvalidOperationException) { refused = true; }
             Check(refused && heavy.RevisionToken == revision && heavy.Parts.Count == 50000,
                 "Catalogue over-budget replacement changed history or records");
+
+            var nested = new BlueprintEditorDocument(null, "Nested copy", "OTHER", new[] {
+                new BlueprintEditorPart("m", "Missing", "Missing", new Point3(4, 5, 6), new Rotation3(.2, .3, .4, .5)),
+                new BlueprintEditorPart("a", "wall", "Wall", new Point3(1, 0, 0), identity, "inner")
+            }, new[] { new BlueprintEditorGroup("outer", "Outer", pivotPartId: "a"),
+                new BlueprintEditorGroup("inner", "Inner", parentGroupId: "outer", pivotPartId: "a") });
+            nested.SelectOnly("m"); nested.ToggleSelection("outer");
+            Check(nested.ReplacePartWithSelection("m", "Copies") && nested.Parts.Count == 2 && nested.Groups.Count == 5,
+                "Nested selected group did not copy");
+            var nestedCopy = nested.Parts.Single(part => part.StableId != "a");
+            var innerCopy = nested.Groups.Single(group => group.StableId == nestedCopy.ParentGroupId);
+            var outerCopy = nested.Groups.Single(group => group.StableId == innerCopy.ParentGroupId);
+            Check(innerCopy.PivotPartId == nestedCopy.StableId && outerCopy.PivotPartId == nestedCopy.StableId &&
+                outerCopy.ParentGroupId == nested.ActiveNodeId && nested.Groups[1].ParentGroupId == "outer" &&
+                nested.Groups[0].PivotPartId == "a" && nested.Parts.Single(part => part.StableId == "a").Position.X == 1 &&
+                nested.Undo() && !nested.CanUndo && nested.Redo() && nested.Parts.Any(part => part.StableId == nestedCopy.StableId),
+                "Nested copy remap, originals or one-step history failed");
+
+            var medium = new BlueprintEditorDocument(null, "Within copy budget", "OTHER",
+                heavyParts.Take(20000).Concat(new[] { new BlueprintEditorPart("m", "Missing", "Missing", new Point3(), identity) }),
+                new[] { new BlueprintEditorGroup("own", "Own assembly") });
+            medium.SelectOnly("m"); medium.ToggleSelection("own");
+            Check(medium.ReplacePartWithSelection("m", "Copies") && medium.Parts.Count == 40000 &&
+                medium.Parts.Any(part => part.StableId == "p19999" && part.Position.X == 19999) &&
+                medium.Undo() && medium.Parts.Count == 20001 && !medium.CanUndo,
+                "Large in-budget copy did not preserve originals or undo atomically");
         }
         private static void Check(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
     }

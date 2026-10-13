@@ -1,6 +1,6 @@
 # Missing alignment: confirmed copy semantics
 
-Confirmed by Ostrix on2026-10-13: selected source walls remain at their original positions; new copies align near the missing marker. Implement next, not claimed shipped in .177.
+Confirmed by Ostrix on2026-10-13: selected source walls remain at their original positions; new copies align near the missing marker. Implemented/tested and deployed in .178; game acceptance pending. See docs/MISSING_COPY_178_RU.md.
 
 Reuse detached selected-subtree insertion, not live DuplicateSelection followed by another transform (two history commits). Preserve selected part data, source provenance, nested group/pivot relationships with fresh IDs. Align keeps missing; align-and-replace removes only missing and retargets its references. Original IDs/poses/groups remain intact. One confirmed operation makes one Undo; preview/cancel create no live records. Reject copy budget overflow atomically.
 

@@ -402,22 +402,27 @@ internal static class ControllerInputAcceptance
             document.ToggleSelection("a"); document.ToggleSelection("b"); Call(controller, "Bind", (object)null);
             Require(view.MissingReplacementAvailable, "Explicit one-to-many selection not available");
             int positioningRevision = document.RevisionToken;
-            Bounds positionedBounds = default, committedBounds = default;
+            Bounds committedBounds = default;
+            Require(scene.TryGetBounds(new[] { "a", "b" }, out Bounds originalBounds), "Original bounds missing");
             NativeClick(view, null, "InspectorPositionMissing"); yield return null;
             Require(view.HasModal && document.RevisionToken == positioningRevision &&
-                scene.TryGetBounds(new[] { "a", "b" }, out positionedBounds) &&
-                Vector3.Distance(positionedBounds.center, new Vector3(2, 1, 0)) < .001f &&
+                Field<IList>(scene, "duplicatePreviews").Count == 2 &&
+                scene.TryGetPositioningOffset("missing", null, out Vector3 selectedResidual) && selectedResidual.magnitude < .001f &&
+                scene.TryGetBounds(new[] { "a", "b" }, out Bounds unchangedBounds) && unchangedBounds == originalBounds &&
                 Field<TMP_Text>(view, "modalMessage").text.Contains(BuildWorksLocalization.Text("editor.position_known")),
-                "Positioning preview aligned origins instead of recorded scaled bounds centres");
+                "Copy preview failed bounds alignment or moved originals");
             NativeClick(view, null, Field<Button>(view, "dialogCancelButton")); yield return null;
             Require(document.RevisionToken == positioningRevision && scene.TryGetBounds(new[] { "a", "b" }, out Bounds restoredBounds) &&
-                Vector3.Distance(restoredBounds.center, positionedBounds.center) > .1f,
+                restoredBounds == originalBounds && Field<IList>(scene, "duplicatePreviews").Count == 0,
                 "Positioning cancel changed history or failed to restore visuals");
             NativeClick(view, null, "InspectorPositionMissing"); yield return null;
             NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
-            Require(document.Parts.Count == 3 && document.PrimaryPartId == "missing" && document.Groups.Count == 1 &&
-                !document.Selection.Contains("missing") && scene.TryGetBounds(new[] { "a", "b" }, out committedBounds) &&
-                Vector3.Distance(committedBounds.center, positionedBounds.center) < .001f &&
+            string[] copyIds = document.Parts.Where(part => part.StableId != "a" && part.StableId != "b" && part.StableId != "missing")
+                .Select(part => part.StableId).ToArray();
+            Require(document.Parts.Count == 5 && document.PrimaryPartId == "missing" && document.Groups.Count == 2 &&
+                !document.Selection.Contains("missing") && scene.TryGetBounds(copyIds, out committedBounds) &&
+                Vector3.Distance(committedBounds.center, new Vector3(2, 1, 0)) < .001f &&
+                scene.TryGetBounds(new[] { "a", "b" }, out unchangedBounds) && unchangedBounds == originalBounds &&
                 Field<Button>(view, "positionMissingButton").gameObject.activeSelf &&
                 document.Parts.Single(part => part.StableId == "a").Scale.X == 2,
                 "Positioning commit lost marker, own scale, hierarchy or preview pose");
@@ -425,8 +430,8 @@ internal static class ControllerInputAcceptance
             Require(document.Parts.Count == 3 && document.Selection.Contains("missing") &&
                 document.Parts.Single(part => part.StableId == "a").Position.X == 3, "Positioning one Undo failed");
             NativeClick(view, null, Field<Button>(view, "redoButton")); yield return null;
-            Require(scene.TryGetBounds(new[] { "a", "b" }, out committedBounds) &&
-                Vector3.Distance(committedBounds.center, positionedBounds.center) < .001f, "Positioning Redo failed");
+            Require(scene.TryGetBounds(copyIds, out committedBounds) &&
+                Vector3.Distance(committedBounds.center, new Vector3(2, 1, 0)) < .001f, "Positioning Redo failed or changed IDs");
             NativeClick(view, null, Field<Button>(view, "undoButton")); yield return null;
             document.SelectOnly("missing"); Call(controller, "Bind", (object)null);
             NativeClick(view, null, "InspectorPositionMissing"); yield return null;
@@ -446,7 +451,9 @@ internal static class ControllerInputAcceptance
             Require(view.HasModal && document.Parts.Count == 3 && document.RevisionToken == revision,
                 "Tools action removed the missing row before confirmation");
             var visuals = Field<IDictionary>(scene, "visuals");
-            Require(root.transform.InverseTransformPoint(Field<GameObject>(visuals["a"], "Root").transform.position).magnitude < .001f &&
+            Require(Field<IList>(scene, "duplicatePreviews").Count == 2 &&
+                root.transform.InverseTransformPoint(Field<GameObject>(Field<IList>(scene, "duplicatePreviews")[0], "Root").transform.position).magnitude < .001f &&
+                Vector3.Distance(root.transform.InverseTransformPoint(Field<GameObject>(visuals["a"], "Root").transform.position), new Vector3(3, 2, 1)) < .001f &&
                 document.Parts.Single(part => part.StableId == "a").Position.X == 3,
                 "Selected replacement preview failed to align or mutated the document");
             NativeClick(view, null, Field<Button>(view, "dialogCancelButton")); yield return null;
@@ -463,9 +470,11 @@ internal static class ControllerInputAcceptance
             Call(controller, "RequestMissingReplacement"); yield return null;
             Require(view.HasModal, "Fresh replacement confirmation did not open");
             NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
-            Require(document.Parts.Count == 2 && document.PrimaryPartId == "a" && document.PlacementSupportId == "s" &&
-                document.Sources[0].Text == evidence.Text && document.Groups.Single(group => group.StableId == "g").PivotPartId == "a" &&
-                V(document.Parts[0].Position).magnitude < .001f && document.Parts[0].Scale.X == 2, "Confirmed replacement lost aligned pose/source/support/pivot");
+            var copiedAnchor = document.Parts.Single(part => part.StableId == document.PrimaryPartId);
+            Require(document.Parts.Count == 4 && document.PrimaryPartId != "a" && document.PlacementSupportId == "s" &&
+                document.Sources[0].Text == evidence.Text && document.Groups.Single(group => group.StableId == "g").PivotPartId == copiedAnchor.StableId &&
+                V(copiedAnchor.Position).magnitude < .001f && copiedAnchor.Scale.X == 2 &&
+                document.Parts.Single(part => part.StableId == "a").Position.X == 3, "Confirmed copy replacement lost original/pose/source/support/pivot");
             Require(!Field<Button>(view, "replaceMissingButton").gameObject.activeSelf,
                 "Replacement entry remains after the last missing part was replaced");
             NativeClick(view, null, Field<Button>(view, "undoButton")); yield return null;
@@ -474,13 +483,14 @@ internal static class ControllerInputAcceptance
             Require(Field<Button>(view, "replaceMissingButton").gameObject.activeSelf,
                 "Undo did not restore visible replacement entry");
             NativeClick(view, null, Field<Button>(view, "redoButton")); yield return null;
-            Require(document.Parts.Count == 2 && document.Groups.Count == 2, "Native Redo failed");
+            Require(document.Parts.Count == 4 && document.Groups.Count == 2, "Native Redo failed");
             NativeClick(view, null, "Save"); yield return null;
             NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
             Require(!document.IsDirty, "Replacement Save failed"); controller.Close(true);
         }
         var reopened = new CompositeBlueprintStore(path).All().Single();
-        Require(reopened.parts.Count == 2 && reopened.parts[0].position.ToVector3().magnitude < .001f && reopened.parts[0].scale.x == 2 &&
+        Require(reopened.parts.Count == 4 && reopened.parts.Single(part => part.stableId == reopened.primaryPartId).position.ToVector3().magnitude < .001f &&
+            reopened.parts.Single(part => part.stableId == reopened.primaryPartId).scale.x == 2 && reopened.parts.Single(part => part.stableId == "a").position.x == 3 &&
             reopened.groups.Count == 2 && reopened.placementSupportId == "s" && reopened.sourceDocuments[0].text == evidence.Text,
             "Replacement disk reopen lost structure or original evidence");
         File.WriteAllText(Path.Combine(output, "replacement-check.txt"),
@@ -507,9 +517,10 @@ internal static class ControllerInputAcceptance
                     position = new CompositeBlueprintStore.VectorData(new Vector3(-1, 0, 0)), rotation = new CompositeBlueprintStore.QuaternionData(Quaternion.identity) }
             }, Array.Empty<CompositeBlueprintStore.Group>(), Array.Empty<CompositeBlueprintStore.VectorData>(), "m", null,
                 Array.Empty<CompositeBlueprintStore.Support>(), null, out var saved, out string error), error);
+            var input = new InputFrames();
             using (var controller = new BlueprintEditorController(store, template, font,
                 name => name == "woodwall" ? wall : null, name => name,
-                () => Array.Empty<BlueprintEditorCatalogItem>(), message => { throw new InvalidOperationException(message); }))
+                () => Array.Empty<BlueprintEditorCatalogItem>(), message => { throw new InvalidOperationException(message); }, editorInput: input))
             {
                 Require(controller.OpenExisting(saved, out error), error); yield return null;
                 var document = controller.Document;
@@ -522,19 +533,49 @@ internal static class ControllerInputAcceptance
                     known ? "editor.position_known" : "editor.position_unknown")), "Positioning did not disclose bounds certainty");
                 Vector3 expectedCentre = origin + rotation * new Vector3(2, 1, 0);
                 if (known)
-                    Require(scene.TryGetBounds(new[] { "a", "b" }, out Bounds bounds) &&
-                        Vector3.Distance(bounds.center, expectedCentre) < .001f, "Rotated pinned envelope centre did not align");
+                    Require(scene.TryGetPositioningOffset("m", null, out Vector3 residual) && residual.magnitude < .001f,
+                        "Rotated pinned envelope copy centre did not align");
                 document.SelectOnly("a");
                 NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
                 Require(document.RevisionToken == revision && document.Parts[1].Position.X == -3, "Stale positioning selection committed");
                 document.SelectOnly("m"); document.ToggleSelection("a"); document.ToggleSelection("b"); Call(controller, "Bind", (object)null);
                 NativeClick(view, null, "InspectorPositionMissing"); yield return null;
                 NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
-                Vector3 ownPosition = V(document.Parts[1].Position);
-                Rotation3 ownRotation = document.Parts[1].Rotation;
-                Require(document.Parts.Count == 3 && document.PrimaryPartId == "m" && V(document.Parts[0].Position) == origin &&
+                string[] copiedIds = document.Parts.Where(part => part.StableId != "a" && part.StableId != "b" && part.StableId != "m")
+                    .Select(part => part.StableId).ToArray();
+                var copiedAnchor = document.Parts.Single(part => part.StableId == document.Groups.Single(group => group.StableId == document.ActiveNodeId).PivotPartId);
+                Vector3 ownPosition = V(copiedAnchor.Position);
+                Rotation3 ownRotation = copiedAnchor.Rotation;
+                Require(document.Parts.Count == 5 && document.PrimaryPartId == "m" && V(document.Parts[0].Position) == origin &&
+                    document.Parts[1].Position.X == -3 && document.Parts[2].Position.X == -1 &&
                     Quaternion.Angle(new Quaternion((float)ownRotation.X, (float)ownRotation.Y, (float)ownRotation.Z, (float)ownRotation.W), rotation) < .01f &&
                     (known || Vector3.Distance(ownPosition, origin) < .001f), "Positioning changed target or unknown-origin alignment");
+                CheckAlignedCopyAxes(controller, input, rotation, copiedIds);
+                Require(document.Undo() && document.Parts.Count == 3, "Copy alignment requires more than one Undo");
+                foreach (bool explicitPrimary in new[] { false, true })
+                {
+                    document.SelectOnly("m"); Call(controller, "Bind", (object)null);
+                    var source = new BlueprintEditorDocument(null, "Catalogue axes", "OTHER", new[] {
+                        new BlueprintEditorPart("other", "woodwall", "Other", new Point3(2, 0, 0), new Rotation3(.2, .3, .1, .8)),
+                        new BlueprintEditorPart("anchor", "woodwall", "Anchor", new Point3(4, 1, 0), new Rotation3(.4, .2, .3, .7))
+                    }, primaryPartId: explicitPrimary ? "anchor" : null);
+                    Call(controller, "RequestCatalogAlignment", document, document.RevisionToken, "m", source, true); yield return null;
+                    Require(view.HasModal, "Catalogue copy positioning preview absent");
+                    NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+                    string[] catalogueCopies = document.Parts.Where(part => part.StableId != "m" && part.StableId != "a" && part.StableId != "b")
+                        .Select(part => part.StableId).ToArray();
+                    Require(catalogueCopies.Length == 2, "Catalogue positioning lost copies");
+                    CheckAlignedCopyAxes(controller, input, rotation, catalogueCopies);
+                    Require(source.Parts[0].Position.X == 2 && !source.CanUndo && document.Undo() && document.Parts.Count == 3,
+                        "Catalogue alignment modified source or needed more than one Undo");
+                }
+                Require(document.Redo() && document.Undo(), "Catalogue copy history failed");
+                document.SelectOnly("m"); document.ToggleSelection("a"); document.ToggleSelection("b"); Call(controller, "Bind", (object)null);
+                NativeClick(view, null, "InspectorPositionMissing"); yield return null;
+                NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+                copiedIds = document.Parts.Where(part => part.StableId != "m" && part.StableId != "a" && part.StableId != "b").Select(part => part.StableId).ToArray();
+                copiedAnchor = document.Parts.Single(part => part.StableId == document.Groups.Single(group => group.StableId == document.ActiveNodeId).PivotPartId);
+                ownPosition = V(copiedAnchor.Position);
                 NativeClick(view, null, "Save"); yield return null;
                 NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
                 Require(!document.IsDirty, "Positioning save failed");
@@ -542,17 +583,42 @@ internal static class ControllerInputAcceptance
                 var reopened = new CompositeBlueprintStore(path).All().Single();
                 Require(controller.OpenExisting(reopened, out error), error); yield return null;
                 scene = Field<BlueprintEditorScene>(controller, "scene");
-                Require(controller.Document.Parts.Count == 3 && controller.Document.PrimaryPartId == "m" &&
-                    Vector3.Distance(V(controller.Document.Parts[1].Position), ownPosition) < .001f &&
+                Require(controller.Document.Parts.Count == 5 && controller.Document.PrimaryPartId == "m" &&
+                    Vector3.Distance(V(controller.Document.Parts.Single(part => part.StableId == copiedAnchor.StableId).Position), ownPosition) < .001f &&
                     (controller.Document.Parts[0].Metadata?.Minimum != null) == known,
                     "Positioning reopen lost marker, certainty or own pose");
-                if (known) Require(scene.TryGetBounds(new[] { "a", "b" }, out Bounds bounds) &&
+                if (known) Require(scene.TryGetBounds(copiedIds, out Bounds bounds) &&
                     Vector3.Distance(bounds.center, expectedCentre) < .001f, "Reopened positioning bounds changed");
                 controller.Close(true);
             }
         }
         File.WriteAllText(Path.Combine(output, "positioning-check.txt"),
             "PASS rotated XYZ, pinned basis and off-origin recorded envelope centre; unknown origin/rotation with honest warning; stale selection refusal; native Save/reopen retains missing and own pose. No Valheim proof.");
+    }
+
+    private static void CheckAlignedCopyAxes(BlueprintEditorController controller, InputFrames input, Quaternion expectedRotation, string[] copiedIds)
+    {
+        var document = controller.Document;
+        var view = Field<BlueprintEditorView>(controller, "view");
+        var anchor = (BlueprintEditorPart)Call(controller, "SelectedPrimaryPart");
+        Require(anchor != null && copiedIds.Contains(anchor.StableId) && Quaternion.Angle(new Quaternion(
+            (float)anchor.Rotation.X, (float)anchor.Rotation.Y, (float)anchor.Rotation.Z, (float)anchor.Rotation.W), expectedRotation) < .01f,
+            "Aligned group has no copied primary or wrong local orientation");
+        var originals = document.Parts.Where(part => !copiedIds.Contains(part.StableId)).ToDictionary(part => part.StableId, part => part.Position);
+        var positions = copiedIds.ToDictionary(id => id, id => document.Parts.Single(part => part.StableId == id).Position);
+        Set(controller, "transformFrame", Enum.Parse(Field<object>(controller, "transformFrame").GetType(), "Local"));
+        Set(controller, "localSpace", true);
+        Vector2 mouse = view.ViewportScreenRect().center;
+        Frame(controller, input, mouse); Frame(controller, input, mouse, 0, KeyCode.G); Frame(controller, input, mouse);
+        Frame(controller, input, mouse, 0, KeyCode.X); TextFrame(controller, input, mouse, "1");
+        Vector3 delta = expectedRotation * Vector3.right;
+        Require(Field<bool>(controller, "keyboardValid") && Vector3.Distance(Field<Vector3>(controller, "dragTranslation"), delta) < .001f,
+            "G X uses an axis different from the aligned anchor");
+        Frame(controller, input, mouse, 0, KeyCode.Return); Frame(controller, input, mouse);
+        Require(copiedIds.All(id => Vector3.Distance(V(document.Parts.Single(part => part.StableId == id).Position), V(positions[id]) + delta) < .001f) &&
+            originals.All(pair => document.Parts.Single(part => part.StableId == pair.Key).Position.Equals(pair.Value)) && document.Undo(),
+            "Local G moved originals/marker or did not have one Undo");
+        Call(controller, "Bind", (object)null);
     }
 
     internal static IEnumerable<object> RunOutlinerFilters(TMP_Text font, string output)

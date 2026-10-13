@@ -879,12 +879,12 @@ editor.replace_title	REPLACE MISSING PART
 editor.replace_catalog	Open catalogue
 catalog.thumbnail_pending	Image not available yet\nSee card details
 catalog.thumbnail_markers	A red frame shows recorded missing-part bounds; a small red marker shows only its position, with unknown size.
-editor.replace_steps	Select one missing record and open the catalogue. The chosen part or blueprint appears at its pose for confirmation.\nTo use your existing parts, select the missing row, then Ctrl-select your available parts or their group. Choose Replace missing. The first own part anchors the assembly; the others move with it.\nOwn sizes stay unchanged. Unknown model surfaces may not match; refine with the gizmo afterwards. Hidden/locked parts and selecting both a parent and its child are not allowed. Cancel changes nothing.
-editor.replace_hint	Select one missing record for a catalogue replacement preview at its pose. Or Ctrl-add your available parts/group: the first part anchors the whole replacement. Own sizes remain unchanged.
-editor.replace_confirm	Replace missing record: {0}\nReplacement parts: {1}.\nReplacement anchor: {2}\nIts origin and full rotation match the record. Own sizes and relative poses are preserved. Unknown model surfaces are not guessed.\nInspect the result on the left. Independent supports and source evidence are retained. Cancel leaves the blueprint unchanged; one Undo restores the record.
+editor.replace_steps	Select a missing record and open the catalogue to preview a new replacement.\nOr Ctrl-add available parts or their group: copies appear at the record, originals stay in place. The first own part supplies the origin and rotation.\nOwn sizes and relative layout stay unchanged. Confirm removes only the missing record. Cancel changes nothing; one Undo reverts the entire operation.
+editor.replace_hint	Use the catalogue for a new replacement, or Ctrl-add available parts/group: copies are created and originals stay in place.
+editor.replace_confirm	Replace missing record: {0}\nNew copies: {1}.\nCopy anchor: {2}\nIts origin and full rotation match the record. Own sizes and relative layout are preserved; unknown surfaces are not guessed.\nInspect the preview. Originals stay in place; only the missing record is removed. Independent supports and source evidence are retained. Cancel changes nothing; one Undo reverts the operation.
 editor.replace_changed	Selection, document or available prefabs changed. Review replacement again.
 editor.replace_group	Replacement
-editor.replace_done	Missing record replaced with {0} selected parts. One Undo restores it.
+editor.replace_done	Created {0} copies. Missing record removed; originals retained. One Undo reverts the operation.
 editor.replace_limit	Replacement needs one group slot. Remove or ungroup an unused group first.
 editor.save_as	SAVE AS…
 editor.save_as_help	Create a separate blueprint with a new ID. The original stays unchanged. Ctrl+Shift+S.
@@ -935,13 +935,13 @@ qa.large_selection_blocked	Large selection requires the isolated BuildWorks QA w
 editor.replace_catalog_help	Replacement mode: click a part or blueprint to preview it at the missing record
 editor.replace_source_missing	Choose an available part or a blueprint without missing parts for replacement. This source is still incomplete.
 editor.position_title	ALIGN TO MISSING
-editor.position_hint	Move your parts to a missing record and keep its marker. Ctrl-select your parts/group, or select only the record and open the catalogue.
-editor.position_steps	Select one missing record and open the catalogue, or Ctrl-add your own parts/group. Aligns the recorded envelope centre with your visible parts and uses the first own part for orientation. Own sizes and relative layout are preserved. Unknown dimensions use only the recorded origin. The missing record remains: adjust your parts with the gizmo, then delete it separately. Cancel changes nothing.
-editor.position_confirm	Missing record: {0}\nOwn parts: {1}\n{2}\nOwn sizes and relative layout are preserved; the unknown model shape is not reconstructed. Inspect the preview on the left. The record and marker will remain for manual adjustment. Delete the record separately when finished. Cancel changes nothing; one Undo reverts positioning.
-editor.position_known	The recorded envelope centre and visible own parts centre are aligned; the first own part supplies orientation.
+editor.position_hint	Create copies at a missing record while keeping its marker and originals. Ctrl-add parts/group, or select only the record and open the catalogue.
+editor.position_steps	Select a missing record and open the catalogue, or Ctrl-add own parts/group. Creates copies; originals stay in place. Aligns the visible copy centre with the recorded envelope and uses the first own part or catalogue blueprint anchor for orientation. Sizes and relative layout stay unchanged. Unknown dimensions use the recorded origin. The marker stays for gizmo adjustment and separate deletion. Cancel changes nothing.
+editor.position_confirm	Missing record: {0}\nNew copies: {1}\n{2}\nSizes and relative layout are preserved; the unknown shape is not reconstructed. Inspect the preview. Originals stay in place. The marker remains for adjustment and separate deletion. Cancel changes nothing; one Undo removes the copies.
+editor.position_known	The visible copy centre matches the recorded envelope centre. The first own part or catalogue blueprint anchor supplies orientation.
 editor.position_unknown	Model dimensions are unknown: only the recorded origin and rotation are aligned. The marker does not represent real dimensions.
 editor.position_no_bounds	Could not determine the visible bounds of your parts. Positioning cancelled.
-editor.position_done	Aligned parts: {0}. The missing record remains for adjustment and separate deletion.
+editor.position_done	Created and aligned {0} copies. Originals and missing record retained.
 editor.position_catalog_help	Alignment mode: choose a part or blueprint. The missing record will remain.
 editor.replace_short	REPLACE
 editor.position_short	ALIGN

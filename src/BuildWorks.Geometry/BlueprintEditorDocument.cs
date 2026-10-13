@@ -1062,44 +1062,33 @@ namespace OstrixMods.BuildWorks.Geometry
                 replacements.Add(part);
             }
             if (replacements.Count == 0) return false;
-            if (!keepTarget && groups.Count >= MaximumGroups) throw new InvalidOperationException("Maximum group count reached.");
             var transform = keepTarget ? (Translation: translation, Rotation: rotation.Normalized()) :
                 ReplacementTransform(target, replacements[0]);
-            var poses = new List<(Point3 Position, Rotation3 Rotation, Point3 Scale)>(replacements.Count);
-            foreach (BlueprintEditorPart part in replacements)
-                poses.Add(TransformPart(part, transform.Translation, transform.Rotation,
-                    new Point3(), new Point3(1, 1, 1), new Rotation3(0, 0, 0, 1)));
-            if (keepTarget)
-                return Commit(() =>
-                {
-                    for (int i = 0; i < replacements.Count; i++)
-                    {
-                        replacements[i].Position = poses[i].Position;
-                        replacements[i].Rotation = poses[i].Rotation;
-                    }
-                    selection.Remove(targetId);
-                    ActiveNodeId = selection[selection.Count - 1];
-                });
-            string rootId = Guid.NewGuid().ToString("N");
-            string firstId = replacements[0].StableId;
-            var replacementGroup = new BlueprintEditorGroup(rootId, groupName,
-                parentGroupId: target.ParentGroupId, pivotPartId: firstId);
-            return Commit(() =>
+            var copiedGroups = new List<BlueprintEditorGroup>();
+            var copiedGroupIds = new HashSet<string>(StringComparer.Ordinal);
+            var copiedPartIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (BlueprintEditorPart part in replacements) copiedPartIds.Add(part.StableId);
+            foreach (BlueprintEditorGroup group in groups)
+                if (selectedIds.Contains(group.StableId) || HasSelectedAncestor(group.ParentGroupId, selectedIds))
+                    copiedGroupIds.Add(group.StableId);
+            foreach (BlueprintEditorGroup group in groups)
             {
-                groups.Add(replacementGroup);
-                for (int i = 0; i < replacements.Count; i++)
-                {
-                    replacements[i].Position = poses[i].Position;
-                    replacements[i].Rotation = poses[i].Rotation;
-                }
-                foreach (BlueprintEditorPart part in selectedParts.Values)
-                    if (part != target) part.ParentGroupId = rootId;
-                foreach (BlueprintEditorGroup group in groups)
-                    if (selectedIds.Contains(group.StableId)) group.ParentGroupId = rootId;
-                parts.Remove(target);
-                RetargetReplacementReferences(targetId, firstId, rootId);
-                SelectOnly(rootId);
-            });
+                if (!copiedGroupIds.Contains(group.StableId)) continue;
+                copiedGroups.Add(new BlueprintEditorGroup(group.StableId, group.Name, group.Visible, group.Locked,
+                    group.ParentGroupId != null && copiedGroupIds.Contains(group.ParentGroupId) ? group.ParentGroupId : null,
+                    group.PivotPartId != null && copiedPartIds.Contains(group.PivotPartId) ? group.PivotPartId : null));
+            }
+            var copiedParts = new List<BlueprintEditorPart>(replacements.Count);
+            foreach (BlueprintEditorPart part in replacements)
+            {
+                BlueprintEditorPart copy = part.Clone();
+                if (copy.ParentGroupId != null && !copiedGroupIds.Contains(copy.ParentGroupId)) copy.ParentGroupId = null;
+                copiedParts.Add(copy);
+            }
+            // Free supports and snap points belong to the document, not this selected subtree.
+            var source = new BlueprintEditorDocument(null, groupName ?? replacements[0].DisplayName, Category,
+                copiedParts, copiedGroups, primaryPartId: replacements[0].StableId, sourceDocuments: sources);
+            return InsertBlueprint(source, transform.Translation, transform.Rotation, keepTarget ? null : target);
         }
 
         public bool InsertBlueprint(BlueprintEditorDocument source, Point3 position, Rotation3 rotation)
@@ -1116,6 +1105,15 @@ namespace OstrixMods.BuildWorks.Geometry
             return InsertBlueprint(source, transform.Translation, transform.Rotation, target);
         }
 
+        public bool PositionPartWithBlueprint(string targetId, BlueprintEditorDocument source, Point3 translation, Rotation3 rotation)
+        {
+            if (source == null) throw new ArgumentNullException(nameof(source));
+            BlueprintEditorPart target = FindPart(targetId);
+            if (target == null || ActiveSupportId != null || !IsEffectivelyVisible(targetId) ||
+                IsEffectivelyLocked(targetId) || source.parts.Count == 0) return false;
+            return InsertBlueprint(source, translation, rotation, null, source.PrimaryPartId ?? source.parts[0].StableId);
+        }
+
         private void RetargetReplacementReferences(string targetId, string firstId, string rootId)
         {
             if (PrimaryPartId == targetId) PrimaryPartId = firstId;
@@ -1130,7 +1128,7 @@ namespace OstrixMods.BuildWorks.Geometry
         }
 
         private bool InsertBlueprint(BlueprintEditorDocument source, Point3 position, Rotation3 rotation,
-            BlueprintEditorPart replacementTarget)
+            BlueprintEditorPart replacementTarget, string anchorPartId = null)
         {
             if (source == null) throw new ArgumentNullException(nameof(source));
             BlueprintEditorPart.Validate(position, nameof(position));
@@ -1150,7 +1148,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 partIds.Add(part.StableId, Guid.NewGuid().ToString("N"));
             var newGroups = new List<BlueprintEditorGroup>
             { new BlueprintEditorGroup(rootId, source.Name, parentGroupId: replacementTarget?.ParentGroupId, pivotPartId:
-                source.PrimaryPartId != null ? partIds[source.PrimaryPartId] :
+                anchorPartId != null ? partIds[anchorPartId] : source.PrimaryPartId != null ? partIds[source.PrimaryPartId] :
                     replacementTarget != null ? partIds[source.parts[0].StableId] : null) };
             foreach (BlueprintEditorGroup group in source.groups)
                 newGroups.Add(new BlueprintEditorGroup(groupIds[group.StableId], group.Name,

@@ -1,6 +1,6 @@
 # .173 — write-ahead transfer evidence (source only)
 
-Installed QA remains .170. Populated placement is still blocked; the journal is connected to the .172 local primitive, which world placement does not call yet.
+QA .173 was deployed later on2026-10-13 with verified version/two hashes and158 unchanged config files; see [manual .173](MANUAL_QA_173_RU.md). Populated placement is still blocked; the journal is connected to the .172 local primitive, which world placement does not call yet.
 
 Each operation uses CreateNew and an exclusive retained writer. Preparation is written/read back before readiness. Attempt is flushed before unequip/queue/native mutation; observations and a local terminal follow. Any persistence error stops later moves. No overwrite, deletion or automatic replay/refund/rebind.
 
@@ -12,4 +12,4 @@ Unresolved records retain a target against both cancellation paths even if empty
 
 Evidence: actual file IO36 including separate process/read after writer close, truncation/checksum/order/identity/size and contradictory success rejection,100x32KiB budget and near-limit ASCII/CJK case; actual transfer with inert native/capture services162 and reservations31; missing write-ahead/name-budget mutants fail then clean passes. Normal/QA0/0, full Geometry suite with actual ledger clone export, Host manifest25730771/hash and localization990 pass. Headless Unity actual-source compile/contact and capture/cancel are separate evidence, no visuals/game. Correctness PASSED/Ponytail Ship after resolved blockers. No verify skill. Logs artifacts/checkpoint-0.19.173; receipt includes five source hashes and false native/game/full-recovery flags.
 
-Next: persisted reconciliation and exact return/compensation, ambiguous stack handling, player/target save and server authority/ack, idempotent resolution; then dedicated postpayment Container placement, pause/cancel/UI/game fixtures. Persistent project/stake/fogv11 remain open. No game/model/deploy/saves changed; manual .170 unchanged, no populated-storage manual test ready. Overall goal incomplete.
+Next: persisted reconciliation and exact return/compensation, ambiguous stack handling, player/target save and server authority/ack, idempotent resolution; then dedicated postpayment Container placement, pause/cancel/UI/game fixtures. Persistent project/stake/fogv11 remain open. No game/model/saves changed; guarded .173 deployment is recorded separately, no populated-storage manual test ready. Overall goal incomplete.

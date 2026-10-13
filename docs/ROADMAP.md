@@ -1,3 +1,9 @@
+## 2026-10-13 — QA .173 deployed, manual queue updated
+
+Guarded deployment to TerrainRamp-1.0-Test with existing token passed: version0.19.173.0, BuildWorks SHA CFCB1464C06950F15AB56FC183258F158A55482CDBA1A1F66C4753143E68ED09; Geometry EC2315A128CA4AF1B19DD5BE69A93B69F18BB3F558F018C6C36A17D0E22C0261. All158 config/BuildWorks files unchanged; identity/provision receipts preserved. No game/saves launched. [Manual .173](MANUAL_QA_173_RU.md) keeps18 fixtures, prioritizes auto-snap17/18 and Forest Hut, avoids repeating accepted cases. Populated-storage placement remains disabled; internal journal is not full runtime readiness.
+
+Goal API retains its earlier blocked state; no resume method is exposed, and these steps did not toggle it. This does not block source work or verified deployment. Keep document state separate; do not delay a safe checked QA update solely because the next feature is incomplete.
+
 ## 2026-10-13 — .173: write-ahead evidence and unresolved-target hold, source only
 
 The .172 local primitive now persists preparation/Attempt before native mutation, observations/local terminal afterwards, using CreateNew/Flush, SHA chain/semantic checks and full-operation budget before start. Own source/target properties/counts/grid/flags/revisions and separate construction debits are recorded. Exact destination is rechecked; unresolved files retain even an empty target. Actual IO36 including fresh process, transfer162/reservation31, two negative controls, Geometry, normal/QA0/0, Host manifest25730771/localization990; correctness PASSED/Ponytail Ship. [Evidence](CONTENT_JOURNAL_173.md).

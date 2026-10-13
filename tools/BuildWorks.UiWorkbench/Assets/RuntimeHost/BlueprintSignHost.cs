@@ -41,6 +41,7 @@ public sealed class ZDO
 // Inert identity comparison only; no native user mapping, allocation or persistence.
 public struct ZDOID
 {
+    public long UserID => UserKey;
     public ushort UserKey;
     public uint ID;
     public bool IsNone() => UserKey == 0 && ID == 0;

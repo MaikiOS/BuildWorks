@@ -10,6 +10,7 @@ namespace ReservationChecks
         private static void Check(bool value, string reason) { assertions++; if (!value) throw new InvalidOperationException("Transfer: " + reason); }
         private sealed class Frame
         {
+            internal static readonly List<Frame> Created = new List<Frame>();
             internal readonly Player Player = new Player();
             internal readonly GameObject Placed = new GameObject();
             internal readonly ItemDrop.ItemData Item;
@@ -20,8 +21,14 @@ namespace ReservationChecks
             internal readonly BlueprintConstructionRefund Payment;
             internal BlueprintStorageTransfer Transfer;
             internal string Error;
+            internal string SavedJournalPath;
+            internal readonly Guid Operation = Guid.NewGuid();
+            internal BlueprintStorageTransferJournal Journal => (BlueprintStorageTransferJournal)typeof(BlueprintStorageTransfer)
+                .GetField("journal", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(Transfer);
             internal Frame(int sourceAmount = 3, int requested = 2, bool second = false)
             {
+                Created.Add(this);
+                BepInEx.Paths.ConfigPath = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "artifacts/tj", Guid.NewGuid().ToString("N").Substring(0, 8));
                 Game.instance = new Game(); ZNet.instance = new ZNet(); ZDOMan.instance = new ZDOMan();
                 ReservationChecks.Player.m_localPlayer = Player; ReservationChecks.Player.m_localPlayerExists = true; InventoryGui.Visible = false; PrivateArea.Allowed = true;
                 Placed.Piece = new Piece { gameObject = Placed }; Placed.Container = new Container(3);
@@ -39,7 +46,12 @@ namespace ReservationChecks
                 Check(BlueprintItemStandPlacement.SelectSupplies(Player, new[] { Recipe }, supplies), "fixture reservation failed");
                 Supply = supplies[0]; Held.Add(Supply); Payment = new BlueprintConstructionRefund(Player.Inventory);
             }
-            internal bool Begin() => BlueprintStorageTransfer.TryBegin(Guid.NewGuid(), Player, Placed, Recipe, Supply, Payment, Held, out Transfer, out Error);
+            internal bool Begin()
+            {
+                bool ready = BlueprintStorageTransfer.TryBegin(Operation, Player, Placed, Recipe, Supply, Payment, Held, out Transfer, out Error);
+                if (ready) SavedJournalPath = Transfer.JournalPath;
+                return ready;
+            }
         }
         internal static void Run()
         {
@@ -49,8 +61,20 @@ namespace ReservationChecks
                 new BlueprintItemStandPlacement.Reservation(normal.Item, 2, BlueprintItemStandPlacement.SnapshotItem(normal.Item)) });
             normal.Held[0] = normal.Supply;
             Check(normal.Begin(), normal.Error);
+            normal.Player.BeforeUnequip = () => { var pending = BlueprintStorageTransferJournal.Read(normal.Transfer.JournalPath);
+                Check(pending.InFlight == 0 && pending.Pending.Equipped && pending.Pending.Queued && pending.Pending.SourceBefore == 3 &&
+                    pending.Prepared.Player == 100 && pending.Prepared.TargetUser == 99 && pending.Prepared.TargetId == 1 && pending.RequiresReconciliation,
+                    "write-ahead attempt was not readable before native unequip"); };
             Check(normal.Transfer.MoveNext() == BlueprintStorageTransfer.Result.Transferred && normal.Transfer.CompleteInMemory, "normal native-style move failed");
             var moved = normal.Transfer.Entries[0];
+            var persisted = BlueprintStorageTransferJournal.Read(normal.Transfer.JournalPath);
+            Check(persisted.Terminal && persisted.Observations.Count == 1 && persisted.Observations[0].SourceAfter == 1 &&
+                persisted.Observations[0].DestinationAfter == 2 && persisted.Observations[0].DestinationProperties == moved.ProvidedProperties &&
+                persisted.RequiresReconciliation && persisted.InFlight == null, "exact custody observation/terminal was not persisted");
+            Check(BlueprintStorageTransferJournal.HasUnresolved(1, 99, 1) && !BlueprintStorageTransferJournal.HasUnresolved(2, 99, 1),
+                "unresolved target guard lost world identity");
+            normal.Journal.Dispose();
+            JournalChecks.Run(normal.Transfer.JournalPath);
             Check(normal.Item.m_stack == 1 && moved.DestinationAfter == 2 && moved.DestinationItem.m_quality == 2 &&
                 moved.DestinationItem.m_durability == 7.53f && moved.DestinationItem.Custom == "provided" &&
                 moved.DestinationItem.m_gridPos.x == 0 && moved.QueuedBefore && moved.EquippedBefore &&
@@ -101,6 +125,14 @@ namespace ReservationChecks
             var repaired = new Frame(); Check(repaired.Begin(), repaired.Error);
             repaired.Placed.Container.Inventory.AfterCredit = () => repaired.Placed.Container.Inventory.Items[0].m_durability = 999;
             Check(repaired.Transfer.MoveNext() == BlueprintStorageTransfer.Result.Uncertain, "unexpected repair accepted");
+            var enlarged = new Frame(); Check(enlarged.Begin(), enlarged.Error);
+            enlarged.Placed.Container.Inventory.AfterCredit = () => enlarged.Placed.Container.Inventory.Items[0].Custom = new string('x', 2000);
+            Check(enlarged.Transfer.MoveNext() == BlueprintStorageTransfer.Result.Uncertain && enlarged.Transfer.JournalError == null,
+                "unexpected large mutation exhausted reserved journal space");
+            var enlargedEvidence = BlueprintStorageTransferJournal.Read(enlarged.Transfer.JournalPath);
+            Check(enlargedEvidence.Observations[0].DestinationProperties.StartsWith("sha256:") &&
+                enlargedEvidence.Prepared.Items[0].Properties == enlarged.Transfer.Entries[0].ProvidedProperties && enlargedEvidence.Observations[0].State == 3,
+                "oversized unexpected properties were presented as full preserved or exact success");
 
             foreach (string fault in new[] { "owner", "world", "revision", "save", "extra-debit" })
             {
@@ -108,7 +140,7 @@ namespace ReservationChecks
                 if (fault == "owner") broken.Placed.Container.Inventory.AfterCredit = () => broken.Placed.Container.View.Owner = false;
                 if (fault == "world") broken.Placed.Container.Inventory.AfterCredit = () => ZNet.instance = new ZNet();
                 if (fault == "revision") broken.Placed.Container.Inventory.AfterSave = () => broken.Placed.Container.MakeRevisionStale();
-                if (fault == "save") broken.Placed.Container.CaptureAllowed = false;
+                if (fault == "save") broken.Placed.Container.Inventory.AfterSave = () => broken.Placed.Container.CaptureAllowed = false;
                 if (fault == "extra-debit") broken.Placed.Container.Inventory.AfterCredit = () => broken.Item.m_stack--;
                 Check(broken.Transfer.MoveNext() == BlueprintStorageTransfer.Result.Uncertain && !broken.Transfer.CompleteInMemory, "unverified " + fault + " accepted");
             }
@@ -134,6 +166,15 @@ namespace ReservationChecks
             var stale = new Frame(); Check(stale.Begin(), stale.Error); stale.Item.Custom = "changed";
             Check(stale.Transfer.MoveNext() == BlueprintStorageTransfer.Result.Unchanged && stale.Placed.Container.Inventory.MoveCalls == 0,
                 "changed source properties transferred");
+            foreach (string changedTarget in new[] { "extra", "revision", "raw" })
+            {
+                var changed = new Frame(); Check(changed.Begin(), changed.Error);
+                if (changedTarget == "extra") { var extra = Program.Item("Stone", 1); extra.m_gridPos = new Vector2i(2, 0); changed.Placed.Container.Inventory.Items.Add(extra); changed.Placed.Container.SaveForTest(); }
+                if (changedTarget == "revision") changed.Placed.Container.View.Data.DataRevision++;
+                if (changedTarget == "raw") changed.Placed.Container.View.Data.Raw = new byte[] { 0 };
+                Check(changed.Transfer.MoveNext() == BlueprintStorageTransfer.Result.Unchanged && changed.Placed.Container.Inventory.MoveCalls == 0 && changed.Item.m_stack == 3,
+                    "changed or stale target mutated inventory: " + changedTarget);
+            }
             var beforeMove = new Frame(); Check(beforeMove.Begin(), beforeMove.Error);
             beforeMove.Placed.Container.Inventory.BeforeMove = () => throw new InvalidOperationException("before native mutation");
             Check(beforeMove.Transfer.MoveNext() == BlueprintStorageTransfer.Result.Unchanged && beforeMove.Item.m_stack == 3 &&
@@ -157,6 +198,28 @@ namespace ReservationChecks
             Check(!BlueprintStorageCapture.CanRemoveEmpty(removal.Placed, removal.Player), "unsynced empty chest allowed for destructive fallback");
             removal.Placed.Container.CaptureAllowed = true; removal.Placed.Container.View.Owner = false;
             Check(!BlueprintStorageCapture.CanRemoveEmpty(removal.Placed, removal.Player), "foreign owner allowed to remove chest");
+            var beforeFailure = new Frame(); Check(beforeFailure.Begin(), beforeFailure.Error); beforeFailure.Journal.Dispose();
+            Check(beforeFailure.Transfer.MoveNext() == BlueprintStorageTransfer.Result.Uncertain && beforeFailure.Transfer.JournalError != null &&
+                beforeFailure.Placed.Container.Inventory.MoveCalls == 0 && beforeFailure.Item.m_stack == 3 && !beforeFailure.Transfer.Entries[0].Attempted,
+                "journal write failure before native call consumed items");
+            var oversizedSource = new Frame(); oversizedSource.Item.m_stack = ushort.MaxValue + 1;
+            Check(!oversizedSource.Begin() && oversizedSource.Placed.Container.Inventory.MoveCalls == 0, "unserializable native source count was accepted");
+            var afterFailure = new Frame(); Check(afterFailure.Begin(), afterFailure.Error);
+            afterFailure.Placed.Container.Inventory.AfterSave = () => afterFailure.Journal.Dispose();
+            Check(afterFailure.Transfer.MoveNext() == BlueprintStorageTransfer.Result.Uncertain && afterFailure.Transfer.JournalError != null &&
+                afterFailure.Item.m_stack == 1 && afterFailure.Placed.Container.Inventory.Items.Count == 1, "observation write failure hid custody");
+            var interrupted = BlueprintStorageTransferJournal.Read(afterFailure.Transfer.JournalPath);
+            Check(interrupted.InFlight == 0 && interrupted.Observations.Count == 0 && interrupted.RequiresReconciliation && !interrupted.Terminal,
+                "interrupted write was treated as completed or replayable");
+            afterFailure.Transfer.MoveNext(); Check(afterFailure.Placed.Container.Inventory.MoveCalls == 1, "journal failure replayed native move");
+            afterFailure.Placed.Container.Inventory.Items.Clear(); afterFailure.Placed.Container.SaveForTest();
+            Check(!BlueprintStorageCapture.CanRemoveEmpty(afterFailure.Placed, afterFailure.Player), "empty target with unresolved journal could be destroyed");
+            var identity = new Frame(); Check(identity.Begin(), identity.Error); var first = identity.Transfer;
+            Check(!identity.Begin() && identity.Item.m_stack == 3 && identity.Placed.Container.Inventory.MoveCalls == 0,
+                "existing operation/target was prepared again"); first.Dispose();
+            foreach (Frame frame in Frame.Created)
+                if (frame.SavedJournalPath != null) Check(BlueprintStorageTransferJournal.Read(frame.SavedJournalPath).RequiresReconciliation,
+                    "one false/exception/context/failure case produced unreadable or replayable evidence");
             Console.WriteLine("PASS " + assertions + " transfer assertions: actual adapter, inert native/capture services; bool/exception custody, no replay, own properties, equip, payment/context guards. No game/native API/server/disk proof.");
         }
     }

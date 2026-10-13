@@ -1,6 +1,6 @@
 # Survival storage placement — implementation contract
 
-Status: shared reservation .171 and local native transfer foundation .172 implemented in sources, 2026-10-13. Installed QA .170 still
+Status: shared reservation .171, local native transfer .172 and write-ahead evidence .173 implemented in sources, 2026-10-13. Installed QA .170 still
 blocks populated storage unless its contents are explicitly omitted from the
 temporary placement recipe. This document does not enable restoration or replace
 the full BuildWorks goal. Keep archived source state unchanged.
@@ -13,6 +13,8 @@ immutable quantity/property snapshots, recorded-cell/max-stack limits and shared
 next-piece payment checks. Container supplies carry no mounted appearance.
 See `docs/CONTENT_RESERVATION_171_RU.md`. This source checkpoint is not deployed.
 In .172 the local primitive checks actual prefab grid/quest/equip/ownership and observes both inventories after a single native move, including false/exception. Both rollback paths retain filled/unverified storage. See docs/CONTENT_TRANSFER_172.md. The primitive is not connected to world placement; durable custody/return/compensation, player/target persistence, server ack and integration remain open.
+
+.173 adds a versioned/checksummed/ordered write-ahead journal, complete preflight byte budget, actual before/after state evidence and unresolved-target cancellation hold. It never replays/refunds/rebinds: all files require reconciliation, even local terminal records. Durable recovery/compensation, native saves/server ack and world placement integration remain open. See docs/CONTENT_JOURNAL_173.md.
 
 ## Required behavior
 
@@ -36,10 +38,10 @@ In .172 the local primitive checks actual prefab grid/quest/equip/ownership and 
 ## Existing integration points
 
 `PrecisionPlacementSession` builds a part-aligned plan and calls
-`BlueprintItemStandPlacement.SelectSupplies` before preview. Each current
-`Supply` binds one mounted item. `PlacementGhostPreviewView` uses its `Contents`
+`BlueprintItemStandPlacement.SelectSupplies` before preview. A part-aligned
+`Supply` binds either a mounted item or immutable N-item container reservations. `PlacementGhostPreviewView` uses its `Contents`
 to display that provided item's native appearance. Retain this behavior while
-adding N-item container reservations; do not turn a container into a fake stand.
+using N-item container reservations; do not turn a container into a fake stand.
 
 `BuildWorksPlugin` wraps native `Player.UpdatePlacement` with construction-payment
 capture/completion. `OnNativePlacementFinished` defers mounted-item application
@@ -58,7 +60,7 @@ requires a new explicit preparation; it must not silently restore archived state
 
 ## Verified native API and limits
 
-Current Steam host25185596, inspected with Cecil:
+Current inspected Steam manifest25730771; native transfer fingerprints unchanged. The older printed25185596 was a fixed label, not manifest evidence (see docs/CONTENT_TRANSFER_172.md).
 
 `bool Inventory.MoveItemToThis(Inventory fromInventory, ItemDrop.ItemData item, int amount, int x, int y)`
 

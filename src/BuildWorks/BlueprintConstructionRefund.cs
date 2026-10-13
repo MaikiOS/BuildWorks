@@ -22,6 +22,11 @@ namespace OstrixMods.BuildWorks
         private bool removalConfirmed, networkRemovalQueued;
         internal bool NetworkRemovalQueued => networkRemovalQueued;
         internal bool IsFor(Inventory source) => ReferenceEquals(inventory, source);
+        internal (ItemDrop.ItemData Item, int Before, int Paid)[] DescribePaid()
+        {
+            if (!Recorded || Error != null) throw new InvalidOperationException("Construction debit is not verified.");
+            return inputs.Where(input => input.Paid > 0).Select(input => (input.Copy.Clone(), input.Before, input.Paid)).ToArray();
+        }
 
         internal BlueprintConstructionRefund(Inventory inventory, Piece.Requirement[] requirements)
         {

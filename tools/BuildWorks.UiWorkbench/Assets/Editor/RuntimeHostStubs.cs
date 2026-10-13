@@ -38,3 +38,7 @@ namespace OstrixMods.BuildWorks
         }
     }
 }
+
+// Inert world identity used only by journal cancellation checks.
+public class World { public long m_uid = 1; }
+public class ZNet { public static ZNet instance = new ZNet(); private readonly World world = new World(); public World GetWorld() => world; public static bool operator !(ZNet value) => value == null; }

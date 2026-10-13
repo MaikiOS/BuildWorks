@@ -137,8 +137,13 @@ namespace ReservationChecks
         private static Piece Cost(ItemDrop.ItemData item, int amount) => new Piece { m_resources = new[] {
             new Piece.Requirement { m_resItem = new ItemDrop.Drop { m_itemData = item }, Amount = amount } } };
 
-        private static int Main()
+        private static int Main(string[] args)
         {
+            if (args.Length == 2 && args[0] == "--read-journal")
+            {
+                try { var journal = BlueprintStorageTransferJournal.Read(args[1]); Console.WriteLine(journal.Prepared.Operation.ToString("N")); return journal.RequiresReconciliation ? 0 : 2; }
+                catch (Exception error) { Console.Error.WriteLine(error.Message); return 1; }
+            }
             try
             {
                 var player = new Player(); var wood = Item("Wood", 10); player.Inventory.Items.Add(wood);

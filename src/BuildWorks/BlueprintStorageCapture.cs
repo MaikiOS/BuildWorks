@@ -32,6 +32,8 @@ namespace OstrixMods.BuildWorks
                     !PrivateArea.CheckAccess(piece.transform.position, 0f, false, false) ||
                     container.GetInventory() == null || container.GetInventory().GetAllItems().Count != 0) return false;
                 ZDO zdo = view.GetZDO();
+                if (!ZNet.instance || ZNet.instance.GetWorld() == null || BlueprintStorageTransferJournal.HasUnresolved(
+                    ZNet.instance.GetWorld().m_uid, zdo.m_uid.UserID, zdo.m_uid.ID)) return false;
                 return TryCapture(piece, player, out var state) &&
                     BlueprintContainerInventory.TryRead(state, name => name.GetStableHashCode(), out var items) && items.Count == 0 &&
                     ReferenceEquals(ContainerView.GetValue(container), view) && view.IsValid() && view.IsOwner() &&

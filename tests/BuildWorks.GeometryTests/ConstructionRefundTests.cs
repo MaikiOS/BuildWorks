@@ -26,6 +26,11 @@ internal static class ConstructionRefundTests
         inventory.Items.Remove(otherWood);
         unrelated.m_stack = 1;
         payment.Complete();
+        var described = payment.DescribePaid();
+        Require(described.Length == 2 && described[0].Before == 10 && described[0].Paid == 4 && described[1].Paid == 3 &&
+            described[0].Item.m_quality == 2 && described[0].Item.m_durability == 14f, "Debit evidence changed provided properties or amounts");
+        described[0].Item.m_customData["key"] = "mutated exported copy";
+        Require(payment.DescribePaid()[0].Item.m_customData["key"] == "custom", "Exported debit evidence aliases the refund snapshot");
         wood.m_stack = 0;
         wood.m_customData["key"] = "changed after debit";
         payment.Complete();

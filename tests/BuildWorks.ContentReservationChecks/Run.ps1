@@ -1,7 +1,8 @@
 param(
     [string]$SourcePath = (Join-Path $PSScriptRoot '../../src/BuildWorks/BlueprintItemStandPlacement.cs'),
     [string]$PreviewSourcePath = (Join-Path $PSScriptRoot '../../src/BuildWorks/PlacementGhostPreviewView.cs'),
-    [string]$TransferSourcePath = (Join-Path $PSScriptRoot '../../src/BuildWorks/BlueprintStorageTransfer.cs')
+    [string]$TransferSourcePath = (Join-Path $PSScriptRoot '../../src/BuildWorks/BlueprintStorageTransfer.cs'),
+    [string]$JournalSourcePath = (Join-Path $PSScriptRoot '../../src/BuildWorks/BlueprintStorageTransferJournal.cs')
 )
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -16,7 +17,10 @@ $transferHash = (Get-FileHash -LiteralPath $TransferSourcePath).Hash
 $capturePath = Join-Path $root 'src/BuildWorks/BlueprintStorageCapture.cs'
 $capture = [IO.File]::ReadAllText($capturePath)
 $captureHash = (Get-FileHash -LiteralPath $capturePath).Hash
-@{ status = 'not_passed'; sourceSHA256 = $sourceHash; previewSHA256 = $previewHash; transferSHA256 = $transferHash; captureSHA256 = $captureHash; nativeTransferTested = $false; gameTested = $false } |
+$journalPath = (Resolve-Path -LiteralPath $JournalSourcePath).Path
+$journal = [IO.File]::ReadAllText($journalPath)
+$journalHash = (Get-FileHash -LiteralPath $journalPath).Hash
+@{ status = 'not_passed'; sourceSHA256 = $sourceHash; previewSHA256 = $previewHash; transferSHA256 = $transferHash; captureSHA256 = $captureHash; journalSHA256 = $journalHash; nativeTransferTested = $false; gameTested = $false } |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'verification-status.json') -Encoding utf8
 function Segment([string]$from, [string]$until) {
     $start = $source.IndexOf($from, [StringComparison]::Ordinal)
@@ -42,6 +46,8 @@ $generated = "using System; using System.Collections.Generic; using System.Globa
 [IO.File]::WriteAllText((Join-Path $output 'StorageTransferSource.cs'),
     $transferSource.Replace('using UnityEngine;', '').Replace('namespace OstrixMods.BuildWorks', 'namespace ReservationChecks'),
     [Text.UTF8Encoding]::new($false))
+[IO.File]::WriteAllText((Join-Path $output 'StorageJournalSource.cs'),
+    $journal.Replace('namespace OstrixMods.BuildWorks', 'namespace ReservationChecks'), [Text.UTF8Encoding]::new($false))
 $captureStart = $capture.IndexOf('        private static readonly FieldInfo ContainerView', [StringComparison]::Ordinal)
 $captureEnd = $capture.IndexOf('        // Only construction compatibility', [StringComparison]::Ordinal)
 if ($captureStart -lt 0 -or $captureEnd -le $captureStart) { throw 'Capture cancellation guard boundary missing.' }
@@ -52,6 +58,6 @@ if ($captureStart -lt 0 -or $captureEnd -le $captureStart) { throw 'Capture canc
 if ($LASTEXITCODE -ne 0) { throw 'Reservation CPU harness build failed.' }
 & (Join-Path $PSScriptRoot 'bin/Release/net472/BuildWorks.ContentReservationChecks.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Reservation CPU checks failed. Native transfer is not exercised.' }
-@{ status = 'passed_cpu_host_substitutes'; sourceSHA256 = $sourceHash; previewSHA256 = $previewHash; transferSHA256 = $transferHash; captureSHA256 = $captureHash;
-    populatedPlacementEnabled = $false; nativeTransferTested = $false; gameTested = $false } |
+@{ status = 'passed_cpu_host_substitutes'; sourceSHA256 = $sourceHash; previewSHA256 = $previewHash; transferSHA256 = $transferHash; captureSHA256 = $captureHash; journalSHA256 = $journalHash;
+    journalIOTested = $true; durableRecoveryImplemented = $false; populatedPlacementEnabled = $false; nativeTransferTested = $false; gameTested = $false } |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'verification-status.json') -Encoding utf8

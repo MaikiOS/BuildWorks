@@ -1,3 +1,9 @@
+## 2026-10-13 — .173: write-ahead evidence and unresolved-target hold, source only
+
+The .172 local primitive now persists preparation/Attempt before native mutation, observations/local terminal afterwards, using CreateNew/Flush, SHA chain/semantic checks and full-operation budget before start. Own source/target properties/counts/grid/flags/revisions and separate construction debits are recorded. Exact destination is rechecked; unresolved files retain even an empty target. Actual IO36 including fresh process, transfer162/reservation31, two negative controls, Geometry, normal/QA0/0, Host manifest25730771/localization990; correctness PASSED/Ponytail Ship. [Evidence](docs/CONTENT_JOURNAL_173.md).
+
+Not installed; .170/hash/manual queue unchanged. Read always requires reconciliation and never replays or refunds. Native source/target saves, server ack, recovery/compensation executor and Container placement remain open. Unexpected enlarged post-mutation attributes are explicitly SHA-only/Uncertain; initial provided properties stay complete. No game/model/saves changed. Full goal incomplete; document does not change goal API.
+
 ## 2026-10-13 — .172: local provided-item transfer foundation, source only
 
 Shared reservation .171 now has a positional native transfer primitive with actual grid/quest/equip/creator/owner/world/access checks. Both inventories are observed after false/exception; uncertain operations are not replayed. Supplied properties are preserved. Both cancellation paths retain filled/unverified storage. CPU104+31/negative, normal/QA0/0, Host manifest25730771/SHA, loc990/isolation, headless Unity contact and actual capture/cancellation, correctness PASSED/Ponytail Ship. [Evidence](docs/CONTENT_TRANSFER_172.md).

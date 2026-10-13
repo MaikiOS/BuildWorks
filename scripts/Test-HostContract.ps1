@@ -880,7 +880,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.172.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.173.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginIdentity = $plugin.MainModule.Types | Where-Object Name -eq 'BuildWorksPlugin'
 $loaderIdentity = $pluginIdentity.CustomAttributes | Where-Object { $_.AttributeType.Name -eq 'BepInPlugin' }
@@ -3387,6 +3387,26 @@ foreach ($pattern in '::ContextValid', '::DeliveredItemsIntact', '::RemainingAva
 }
 Assert-Contract (@($move.Body.Instructions | Where-Object { [string]$_.Operand -match 'Inventory::MoveItemToThis' }).Count -eq 1 -and
     $move.Body.ExceptionHandlers.Count -ge 2 -and $moveCalls -notmatch 'Container::Save|Inventory::Load|ZDO::Set|ItemData::Load|RPC|ItemDrop::DropItem') 'Container transfer gained replay/archive load or lost exception observations.'
+$destinationReady = $transferType.Methods | Where-Object Name -eq 'DestinationReady'
+$destinationReadyCalls = ($destinationReady.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($moveCalls -match '::DestinationReady' -and $destinationReadyCalls -match '::DeliveredItemsIntact' -and
+    $destinationReadyCalls -match 'BlueprintStorageCapture::TryCapture' -and $destinationReadyCalls -match 'ZDO::get_DataRevision' -and
+    $destinationReadyCalls -match 'Inventory::GetAllItems') 'Transfer must validate exact live/saved destination before any mutation.'
+$beforeJournal = @($move.Body.Instructions | Where-Object { [string]$_.Operand -match 'BlueprintStorageTransferJournal::BeforeMove' })
+$unequipTransfer = @($move.Body.Instructions | Where-Object { [string]$_.Operand -match 'Humanoid::UnequipItem' })
+$nativeTransfer = @($move.Body.Instructions | Where-Object { [string]$_.Operand -match 'Inventory::MoveItemToThis' })
+Assert-Contract ($beforeJournal.Count -eq 1 -and $beforeJournal[0].Offset -lt $unequipTransfer[0].Offset -and
+    $unequipTransfer[0].Offset -lt $nativeTransfer[0].Offset -and $moveCalls -match 'BlueprintStorageTransferJournal::Observed' -and
+    $moveCalls -match '::get_JournalError|::set_JournalError') 'Write-ahead journal must precede unequip/native mutation and failures must stop transfer.'
+$journalType = $pluginTypes | Where-Object Name -eq 'BlueprintStorageTransferJournal'
+$journalCalls = ($journalType.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($journalCalls -match 'FileStream::Flush\(System.Boolean\)' -and $journalCalls -match 'SHA256::Create' -and
+    $journalCalls -match '::CheckParents' -and $journalCalls -notmatch 'File::Delete|Inventory::|ZDO::Set|RPC|DropItem') 'Persisted evidence must flush and validate without replay, deletion or world mutation.'
+$nativeId = $hostAssembly.MainModule.Types | Where-Object Name -eq 'ZDOID'
+foreach ($property in @(@('UserID','System.Int64'), @('ID','System.UInt32'))) {
+    $member = @($nativeId.Properties | Where-Object Name -eq $property[0])
+    Assert-Contract ($member.Count -eq 1 -and $member[0].GetMethod.IsPublic -and $member[0].PropertyType.FullName -eq $property[1]) 'Persistent target identity must use UserID/ID, not transient UserKey.'
+}
 $rollback = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintItemStandPlacement' -and $_.Name -eq 'CanRollback' }
 $rollbackCalls = ($rollback.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($rollbackCalls -match 'GetComponent<Container>' -and $rollbackCalls -match 'BlueprintStorageCapture::CanRemoveEmpty') 'Both normal and forced rollback must refuse filled/unverified storage.'

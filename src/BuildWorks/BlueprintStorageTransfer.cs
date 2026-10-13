@@ -8,7 +8,7 @@ using UnityEngine;
 namespace OstrixMods.BuildWorks
 {
     // Local native transfer primitive. World placement stays blocked until durable recovery/server acknowledgement exists.
-    internal sealed class BlueprintStorageTransfer
+    internal sealed class BlueprintStorageTransfer : IDisposable
     {
         private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
         private static readonly FieldInfo ViewField = typeof(Container).GetField("m_nview", Private);
@@ -45,9 +45,12 @@ namespace OstrixMods.BuildWorks
         private readonly long worldId;
         private readonly IReadOnlyList<Entry> entries;
         private readonly IReadOnlyList<BlueprintItemStandPlacement.Supply> otherSupplies;
+        private BlueprintStorageTransferJournal journal;
+        internal string JournalPath => journal?.Path;
+        internal string JournalError { get; private set; }
         internal readonly Guid OperationId;
         internal IReadOnlyList<Entry> Entries => entries;
-        internal bool CompleteInMemory => entries.All(entry => entry.State == Result.Transferred);
+        internal bool CompleteInMemory => JournalError == null && entries.All(entry => entry.State == Result.Transferred);
 
         private BlueprintStorageTransfer(Guid operationId, Player player, Piece piece, Container container,
             ZNetView view, List<Entry> entries, IEnumerable<BlueprintItemStandPlacement.Supply> otherSupplies)
@@ -102,6 +105,18 @@ namespace OstrixMods.BuildWorks
                     heldSupplies.Where(value => value != null && !ReferenceEquals(value, supply)));
                 if (!candidate.ContextValid() || !candidate.RemainingAvailable() || !BlueprintStorageCapture.TryCapture(piece, player, out _))
                     throw new InvalidOperationException("Native container state or access could not be verified.");
+                if (BlueprintStorageTransferJournal.HasUnresolved(candidate.worldId, candidate.targetId.UserID, candidate.targetId.ID))
+                    throw new InvalidOperationException("Target container already has unresolved transfer evidence.");
+                candidate.journal = BlueprintStorageTransferJournal.Begin(BlueprintStorageTransferJournal.Root, new BlueprintStorageTransferJournal.Plan {
+                    Operation = operationId, World = candidate.worldId, Player = player.GetPlayerID(), Creator = piece.GetCreator(),
+                    TargetUser = candidate.targetId.UserID, TargetId = candidate.targetId.ID, Width = grid.Value.Width, Height = grid.Value.Height,
+                    PieceName = piece.gameObject.name, PrefabHash = candidate.zdo.GetPrefab(),
+                    Paid = payment.DescribePaid().Select(debit => new BlueprintStorageTransferJournal.Payment {
+                        Prefab = debit.Item.m_dropPrefab.name, Properties = BlueprintItemStandPlacement.SnapshotItem(debit.Item),
+                        Before = debit.Before, Paid = debit.Paid, X = debit.Item.m_gridPos.x, Y = debit.Item.m_gridPos.y }).ToArray(),
+                    Items = entries.Select(entry => new BlueprintStorageTransferJournal.Item { Prefab = entry.Input.Item.m_dropPrefab.name,
+                        SourceX = entry.Input.Item.m_gridPos.x, SourceY = entry.Input.Item.m_gridPos.y, SourceQuantity = entry.Input.Item.m_stack,
+                        Amount = entry.Input.Amount, X = entry.X, Y = entry.Y, SourceSnapshot = entry.Input.Snapshot, Properties = entry.ProvidedProperties }).ToArray() });
                 transfer = candidate; return true;
             }
             catch (Exception exception) { error = exception.Message; return false; }
@@ -129,7 +144,7 @@ namespace OstrixMods.BuildWorks
             var result = new Dictionary<ItemDrop.ItemData, int>();
             foreach (var item in items)
             {
-                if (item == null || item.m_stack < 0) throw new InvalidOperationException("Invalid live inventory quantity.");
+                if (item == null || item.m_stack < 0 || item.m_stack > ushort.MaxValue) throw new InvalidOperationException("Invalid live inventory quantity.");
                 result.Add(item, item.m_stack);
             }
             return result;
@@ -149,6 +164,10 @@ namespace OstrixMods.BuildWorks
             entry.DestinationItem.m_stack == entry.Input.Amount && !entry.DestinationItem.m_equipped &&
             BlueprintItemStandPlacement.SnapshotItem(entry.DestinationItem, true) == entry.ProvidedProperties);
 
+        private bool DestinationReady() => DeliveredItemsIntact() &&
+            destination.GetAllItems().Count == entries.Count(entry => entry.State == Result.Transferred) &&
+            (uint)RevisionField.GetValue(container) == zdo.DataRevision && BlueprintStorageCapture.TryCapture(piece, player, out _);
+
         private bool RemainingAvailable(Entry completed = null)
         {
             var pending = entries.Where(entry => entry.State == Result.Ready && !ReferenceEquals(entry, completed)).Select(entry => entry.Input).ToList();
@@ -159,6 +178,7 @@ namespace OstrixMods.BuildWorks
 
         internal Result MoveNext()
         {
+            if (JournalError != null) return Result.Uncertain;
             Entry blocked = entries.FirstOrDefault(entry => entry.State == Result.Unchanged || entry.State == Result.Uncertain);
             if (blocked != null) return blocked.State;
             Entry entry = entries.FirstOrDefault(value => value.State == Result.Ready);
@@ -168,7 +188,7 @@ namespace OstrixMods.BuildWorks
             bool moveCalled = false;
             try
             {
-                if (!ContextValid() || !DeliveredItemsIntact() || !RemainingAvailable() || !source.ContainsItem(entry.Input.Item) || entry.Input.Item.m_shared.m_questItem ||
+                if (!ContextValid() || !DestinationReady() || !RemainingAvailable() || !source.ContainsItem(entry.Input.Item) || entry.Input.Item.m_shared.m_questItem ||
                     entry.Input.Item.m_stack < entry.Input.Amount ||
                     BlueprintItemStandPlacement.SnapshotItem(entry.Input.Item) != entry.Input.Snapshot ||
                     destination.GetItemAt(entry.X, entry.Y) != null)
@@ -179,10 +199,19 @@ namespace OstrixMods.BuildWorks
                 revision = zdo.DataRevision;
                 entry.QueuedBefore = player.IsEquipActionQueued(entry.Input.Item);
                 entry.EquippedBefore = player.IsItemEquiped(entry.Input.Item) || entry.Input.Item.m_equipped;
+                try
+                {
+                    journal.BeforeMove(new BlueprintStorageTransferJournal.Attempt { Index = entries.ToList().IndexOf(entry), SourceBefore = entry.SourceBefore,
+                        SourceX = entry.Input.Item.m_gridPos.x, SourceY = entry.Input.Item.m_gridPos.y, Queued = entry.QueuedBefore, Equipped = entry.EquippedBefore,
+                        EmptyCell = destination.GetItemAt(entry.X, entry.Y) == null, Revision = revision, ContainerRevision = (uint)RevisionField.GetValue(container),
+                        SourceSnapshot = BlueprintItemStandPlacement.SnapshotItem(entry.Input.Item), Properties = entry.ProvidedProperties,
+                        SourceManifest = InventoryDigest(source), DestinationManifest = InventoryDigest(destination), ZdoHash = BytesDigest(zdo.GetByteArray(ZDOVars.s_items, null)) });
+                }
+                catch (Exception error) { JournalError = error.Message; throw; }
                 entry.Attempted = true; // Never repeat native calls after false or an exception.
                 player.RemoveEquipAction(entry.Input.Item);
                 player.UnequipItem(entry.Input.Item, false);
-                if (!ContextValid() || player.IsEquipActionQueued(entry.Input.Item) || player.IsItemEquiped(entry.Input.Item) ||
+                if (!ContextValid() || !DestinationReady() || zdo.DataRevision != revision || player.IsEquipActionQueued(entry.Input.Item) || player.IsItemEquiped(entry.Input.Item) ||
                     entry.Input.Item.m_equipped || entry.Input.Item.m_stack != entry.SourceBefore ||
                     !source.ContainsItem(entry.Input.Item) || destination.GetItemAt(entry.X, entry.Y) != null ||
                     BlueprintItemStandPlacement.SnapshotItem(entry.Input.Item, true) != entry.ProvidedProperties)
@@ -227,7 +256,67 @@ namespace OstrixMods.BuildWorks
                 }
             }
             catch (Exception exception) { entry.Error = entry.Error ?? exception.Message; entry.State = Result.Uncertain; }
+            if (JournalError != null) return Result.Uncertain;
+            try
+            {
+                var observed = new BlueprintStorageTransferJournal.Observation { Index = entries.ToList().IndexOf(entry), State = (int)entry.State,
+                    SourceBefore = entry.SourceBefore, SourceAfter = entry.SourceAfter, DestinationAfter = entry.DestinationAfter, SourceObjectStack = entry.Input.Item.m_stack,
+                    Attempted = entry.Attempted, BeforeObserved = entry.BeforeObserved, SourcePresent = entry.SourcePresentAfter, LocalSave = entry.LocalSaveConfirmed,
+                    QueuedBefore = entry.QueuedBefore, EquippedBefore = entry.EquippedBefore, QueuedAfter = entry.QueuedAfter, EquippedAfter = entry.EquippedAfter,
+                    NativeReturn = entry.NativeReturn, Error = entry.Error, SourceX = entry.Input.Item.m_gridPos.x, SourceY = entry.Input.Item.m_gridPos.y };
+                // Evidence collection may fail too. Preserve the known custody observations and mark the rest unknown.
+                try
+                {
+                    observed.SourceProperties = EvidenceProperties(entry.Input.Item, entry.ProvidedProperties, observed);
+                    observed.DestinationProperties = entry.DestinationItem == null ? null : EvidenceProperties(entry.DestinationItem, entry.ProvidedProperties, observed);
+                    observed.SourceManifest = InventoryDigest(source); observed.DestinationManifest = InventoryDigest(destination);
+                    observed.Revision = zdo.DataRevision; observed.ContainerRevision = (uint)RevisionField.GetValue(container);
+                    observed.ZdoHash = BytesDigest(zdo.GetByteArray(ZDOVars.s_items, null));
+                }
+                catch (Exception error) { observed.State = (int)Result.Uncertain; observed.Error = observed.Error ?? error.Message; entry.State = Result.Uncertain; }
+                observed.Error = ErrorText(observed.Error);
+                entry.State = (Result)observed.State;
+                journal.Observed(observed);
+            }
+            catch (Exception error) { JournalError = error.Message; return Result.Uncertain; }
             return entry.State;
         }
+
+        private static string BytesDigest(byte[] bytes, int maximum = BlueprintForeignPartData.MaximumContainerBytes)
+        {
+            if (bytes == null) return "missing";
+            if (bytes.Length > maximum) throw new InvalidOperationException("Inventory evidence exceeds the native byte budget.");
+            using (var hash = System.Security.Cryptography.SHA256.Create()) return BitConverter.ToString(hash.ComputeHash(bytes)).Replace("-", "");
+        }
+        private static string ErrorText(string text)
+        {
+            if (text == null || text.Length <= 1024) return text;
+            int count = char.IsHighSurrogate(text[1023]) ? 1023 : 1024;
+            return text.Substring(0, count);
+        }
+        private static string EvidenceProperties(ItemDrop.ItemData item, string expected, BlueprintStorageTransferJournal.Observation observed)
+        {
+            string properties = BlueprintItemStandPlacement.SnapshotItem(item, true);
+            if (System.Text.Encoding.UTF8.GetByteCount(properties) <= Math.Max(System.Text.Encoding.UTF8.GetByteCount(expected), 80)) return properties;
+            observed.State = (int)Result.Uncertain;
+            observed.Error = "Unexpected oversized properties: only their SHA256 is retained in this observation; initial provided properties remain in preparation.";
+            return "sha256:" + BytesDigest(System.Text.Encoding.UTF8.GetBytes(properties), 8 * 1024 * 1024);
+        }
+        private static string InventoryDigest(Inventory inventory)
+        {
+            var items = Counts(inventory); long budget = 0;
+            using (var hash = System.Security.Cryptography.SHA256.Create())
+            {
+                foreach (var item in items.OrderBy(value => value.Key.m_gridPos.y).ThenBy(value => value.Key.m_gridPos.x))
+                {
+                    byte[] bytes = System.Text.Encoding.UTF8.GetBytes(item.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) + ":" + BlueprintItemStandPlacement.SnapshotItem(item.Key) + "\n");
+                    budget += bytes.Length;
+                    if (budget > 8 * 1024 * 1024) throw new InvalidOperationException("Inventory manifest exceeds its evidence budget.");
+                    hash.TransformBlock(bytes, 0, bytes.Length, bytes, 0);
+                }
+                hash.TransformFinalBlock(Array.Empty<byte>(), 0, 0); return BitConverter.ToString(hash.Hash).Replace("-", "");
+            }
+        }
+        public void Dispose() { JournalError = JournalError ?? "Transfer journal closed; reconciliation is required before reuse."; journal?.Dispose(); }
     }
 }

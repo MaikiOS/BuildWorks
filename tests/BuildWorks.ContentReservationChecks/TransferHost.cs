@@ -12,6 +12,7 @@ namespace ReservationChecks
     internal sealed class Transform { internal Vector3 position = new Vector3(); }
     internal sealed class GameObject : Obj
     {
+        internal string name = "piece_chest_wood";
         internal readonly Transform transform = new Transform();
         internal Piece Piece;
         internal Container Container;
@@ -69,8 +70,10 @@ namespace ReservationChecks
             }
         }
     }
-    internal struct ZDOID { internal long Id; internal bool IsNone() => Id == 0; }
-    internal sealed class ZDO { internal ZDOID m_uid = new ZDOID { Id = 1 }; internal uint DataRevision; internal byte[] Raw; }
+    internal struct ZDOID { internal long Id; internal long UserID => 99; internal uint ID => (uint)Id; internal bool IsNone() => Id == 0; }
+    internal static class ZDOVars { internal const int s_items = 1; }
+    internal sealed class ZDO { internal ZDOID m_uid = new ZDOID { Id = 1 }; internal uint DataRevision; internal byte[] Raw;
+        internal int GetPrefab() => 123; internal byte[] GetByteArray(int key, byte[] fallback) => Raw ?? fallback; }
     internal sealed class ZNetView : Obj
     {
         internal readonly ZDO Data = new ZDO(); internal bool Valid = true, Owner = true;
@@ -96,6 +99,7 @@ namespace ReservationChecks
         internal void SetLoading(bool value) => m_loading = value;
         internal void ReplaceView() => m_nview = new ZNetView();
         internal void MakeRevisionStale() => m_lastRevision--;
+        internal void SaveForTest() => Save();
         private void Save()
         {
             if (m_loading || !m_nview.IsOwner()) return;
@@ -122,5 +126,7 @@ namespace ReservationChecks
         internal bool Recorded = true; internal string Error;
         internal BlueprintConstructionRefund(Inventory source) { this.source = source; }
         internal bool IsFor(Inventory value) => ReferenceEquals(source, value);
+        internal (ItemDrop.ItemData Item, int Before, int Paid)[] DescribePaid() => Array.Empty<(ItemDrop.ItemData, int, int)>();
     }
 }
+namespace BepInEx { internal static class Paths { internal static string ConfigPath; } }

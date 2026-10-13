@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OstrixMods.BuildWorks.Geometry;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -57,7 +58,8 @@ namespace OstrixMods.BuildWorks
             }
             if (supplier && supplies == null)
             {
-                BlueprintItemStandPlacement.SelectSupplies(supplier, plan.Select(pose => pose.ItemStandContents), liveSupplies);
+                BlueprintItemStandPlacement.SelectSupplies(supplier, plan.Select(pose =>
+                    pose.ItemStandContents?.Format == BlueprintForeignPartData.NativeContainerFormat ? null : pose.ItemStandContents), liveSupplies);
                 supplies = liveSupplies;
             }
             if (supplies != null && supplies.Count != plan.Count)

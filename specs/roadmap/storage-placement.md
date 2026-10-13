@@ -1,6 +1,6 @@
 # Survival storage placement — implementation contract
 
-Status: mounted-item reservation subset and native API checks, 2026-10-10. Installed QA .145 still
+Status: shared N-item reservation implemented in .171 sources, 2026-10-13. Installed QA .170 still
 blocks populated storage unless its contents are explicitly omitted from the
 temporary placement recipe. This document does not enable restoration or replace
 the full BuildWorks goal. Keep archived source state unchanged.
@@ -8,7 +8,11 @@ the full BuildWorks goal. Keep archived source state unchanged.
 .145 implements the mounted-item subset: aggregate exact bindings, ordered
 next-piece native payment preflight, and postpayment availability checks.
 `docs/MOUNT_RESERVATION_CHECKPOINT_2026-10-10_RU.md` records its tests and limits.
-N-item container allocation/transfer/custody/persistence/server ack remain open.
+In .171, container demands use decoded prefab/quantity, exact own-item bindings,
+immutable quantity/property snapshots, recorded-cell/max-stack limits and shared
+next-piece payment checks. Container supplies carry no mounted appearance.
+See `docs/CONTENT_RESERVATION_171_RU.md`. This source checkpoint is not deployed.
+Actual prefab grid/quest/equip checks, transfer/custody/persistence/server ack remain open.
 
 ## Required behavior
 

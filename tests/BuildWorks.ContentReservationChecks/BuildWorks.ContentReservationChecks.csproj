@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../artifacts/content-reservations/ReservationSource.cs" Link="ReservationSource.cs" />
+    <ProjectReference Include="../../src/BuildWorks.Geometry/BuildWorks.Geometry.csproj" />
+  </ItemGroup>
+</Project>

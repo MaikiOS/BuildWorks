@@ -880,7 +880,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.170.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.171.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginIdentity = $plugin.MainModule.Types | Where-Object Name -eq 'BuildWorksPlugin'
 $loaderIdentity = $pluginIdentity.CustomAttributes | Where-Object { $_.AttributeType.Name -eq 'BepInPlugin' }
@@ -3215,10 +3215,19 @@ Assert-Contract ($nativePlacementOrder[$spendIndex - 3].OpCode.Name -eq 'ldc.i4.
     $nativePlacementOrder[$spendIndex - 1].OpCode.Name -eq 'ldc.i4.1') 'Native construction payment arguments changed; reservation expects quality0/all qualities/multiplier1.'
 $supplyGate = $mountMethods | Where-Object Name -eq 'SuppliesAvailable'
 $supplyGateCalls = ($supplyGate.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
-foreach ($pattern in 'BlueprintItemStandPlacement::IsAvailable', 'Inventory::GetAllItems', 'Player::GetCurrentCraftingStation',
+foreach ($pattern in 'BlueprintItemStandPlacement::SnapshotItem', 'Inventory::ContainsItem', 'Supply::Items',
+        'Reservation::Amount', 'Reservation::Snapshot', 'Inventory::GetAllItems', 'Player::GetCurrentCraftingStation',
         'Piece::FreeBuildKey', 'ZoneSystem::GetGlobalKey', 'Piece/Requirement::GetAmount', '::m_upgraderResource', '::m_worldLevel') {
     Assert-Contract ($supplyGateCalls -match $pattern) "Supply reservation omits native payment gate: $pattern"
 }
+Assert-Contract (@($supplyGate.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'add.ovf' }).Count -gt 0) `
+    'Shared contents quantities must reject integer overflow.'
+$containerReservation = $mountMethods | Where-Object Name -eq 'ReserveContainer'
+$containerReservationCalls = ($containerReservation.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($containerReservationCalls -match 'BlueprintContainerInventory::TryRead' -and
+    $containerReservationCalls -match 'BlueprintItemStandPlacement::SnapshotItem' -and
+    $containerReservationCalls -notmatch 'Inventory::(?:AddItem|RemoveItem|Load)|Container::|ZNetView::|ZDO::Set|RPC') `
+    'Container reservation must decode demands and snapshot provided properties without moving items or changing world state.'
 foreach ($name in 'ShouldBlockNativePlacement','ContinueAutomaticPlacement') {
     $method = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'PrecisionPlacementSession' -and $_.Name -eq $name }
     $calls = ($method.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"

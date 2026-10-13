@@ -1,3 +1,9 @@
+## 2026-10-13 — .171: shared N-item reservation, source only
+
+Existing Supply now owns immutable exact refs/quantities/provided-property snapshots for containers and mounts; native next-price and postpayment guards are retained. Recorded grid/max-stack, partial refusal, shared Wood, properties and overflow checked. CPU31/two negative probes, normal/QA0/0, Host/loc990, correctness PASSED/Ponytail Ship. Per-frame preview skips container reservations. [Evidence](docs/CONTENT_RESERVATION_171.md).
+
+Installed .170/hash unchanged; no game/Unity/model/deployment. Populated Container placement remains blocked. Next code: actual postpayment transfer, native grid/quest/equip/ownership, custody/rollback, then persisted operations/server ack. Manual .170 remains current; no new storage test ready. Overall goal incomplete; document does not change blocked goal API status.
+
 ## 2026-10-12 — .170 deployed; priority returned to core features
 
 Guarded .170 deployment to TerrainRamp-1.0-Test passed: installed version0.19.170.0, both SHA hashes match,158 config/BuildWorks files unchanged. No game/model/save changes. [Manual .170](docs/MANUAL_QA_170_RU.md); [next work and delays, Russian](docs/NEXT_STEPS_170_RU.md).

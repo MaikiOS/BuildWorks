@@ -1,0 +1,42 @@
+param(
+    [string]$SourcePath = (Join-Path $PSScriptRoot '../../src/BuildWorks/BlueprintItemStandPlacement.cs'),
+    [string]$PreviewSourcePath = (Join-Path $PSScriptRoot '../../src/BuildWorks/PlacementGhostPreviewView.cs')
+)
+$ErrorActionPreference = 'Stop'
+$root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+$output = Join-Path $root 'artifacts/content-reservations'
+New-Item -ItemType Directory -Path $output -Force | Out-Null
+$source = [IO.File]::ReadAllText((Resolve-Path -LiteralPath $SourcePath))
+$sourceHash = (Get-FileHash -LiteralPath $SourcePath).Hash
+$preview = [IO.File]::ReadAllText((Resolve-Path -LiteralPath $PreviewSourcePath))
+$previewHash = (Get-FileHash -LiteralPath $PreviewSourcePath).Hash
+@{ status = 'not_passed'; sourceSHA256 = $sourceHash; previewSHA256 = $previewHash; nativeTransferTested = $false; gameTested = $false } |
+    ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'verification-status.json') -Encoding utf8
+function Segment([string]$from, [string]$until) {
+    $start = $source.IndexOf($from, [StringComparison]::Ordinal)
+    if ($start -lt 0) { throw "Reservation source boundary missing: $from" }
+    $end = $source.IndexOf($until, $start, [StringComparison]::Ordinal)
+    if ($end -le $start) { throw "Reservation source boundary missing: $until" }
+    $source.Substring($start, $end - $start)
+}
+$methods = (Segment '        internal sealed class Reservation' '        internal static bool CanRestore') +
+    (Segment '        internal static bool NeedsSupply' '        internal static bool TryApply')
+if ($source -notmatch 'return BlueprintStorageCapture.CanPlaceWithoutContents\(piece, data\);') {
+    throw 'Populated storage placement guard changed; the reservation test does not verify transfers.'
+}
+$prefix = 'plan.Select(pose =>'
+$start = $preview.IndexOf($prefix, [StringComparison]::Ordinal)
+if ($start -lt 0) { throw 'Preview selection boundary missing.' }
+$start += $prefix.Length
+$end = $preview.IndexOf('), liveSupplies', $start, [StringComparison]::Ordinal)
+if ($end -le $start) { throw 'Preview selection end missing.' }
+$selector = $preview.Substring($start, $end - $start)
+$generated = "using System; using System.Collections.Generic; using System.Globalization; using OstrixMods.BuildWorks.Geometry;`nnamespace ReservationChecks { internal static class BlueprintItemStandPlacement {`n" + $methods + "`n} internal static class PreviewSelector { internal static BlueprintForeignPartData Select(TransformSnapshot pose) => " + $selector + "; } }"
+[IO.File]::WriteAllText((Join-Path $output 'ReservationSource.cs'), $generated, [Text.UTF8Encoding]::new($false))
+& dotnet build (Join-Path $PSScriptRoot 'BuildWorks.ContentReservationChecks.csproj') -c Release --nologo
+if ($LASTEXITCODE -ne 0) { throw 'Reservation CPU harness build failed.' }
+& (Join-Path $PSScriptRoot 'bin/Release/net472/BuildWorks.ContentReservationChecks.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Reservation CPU checks failed. Native transfer is not exercised.' }
+@{ status = 'passed_cpu_host_substitutes'; sourceSHA256 = $sourceHash; previewSHA256 = $previewHash;
+    populatedPlacementEnabled = $false; nativeTransferTested = $false; gameTested = $false } |
+    ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'verification-status.json') -Encoding utf8

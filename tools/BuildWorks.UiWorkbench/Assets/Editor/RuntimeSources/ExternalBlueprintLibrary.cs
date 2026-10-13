@@ -239,14 +239,16 @@ namespace OstrixMods.BuildWorks
                     {
                         try
                         {
-                            string[] coordinates = line.Split(';');
-                            if (coordinates.Length != 3) throw new InvalidDataException("$buildworks_import.fields");
+                            string[] coordinates = line.Split(new[] { ';' }, 4);
+                            // PlanBuild reads only XYZ; retain unrecognized trailing fields in source evidence.
+                            if (coordinates.Length < 3 || vbuild && coordinates.Length != 3)
+                                throw new InvalidDataException("$buildworks_import.document_invalid");
                             var point = new CompositeBlueprintStore.VectorData
                             { x = Number(coordinates[0]), y = Number(coordinates[1]), z = Number(coordinates[2]) };
                             if (Math.Abs(point.x) > 512 || Math.Abs(point.y) > 512 || Math.Abs(point.z) > 512)
                                 throw new InvalidDataException("$buildworks_import.transform");
                             if (blueprint.customSnapPoints == null) blueprint.customSnapPoints = new List<CompositeBlueprintStore.VectorData>();
-                            if (blueprint.customSnapPoints.Count >= CompositeBlueprintStore.MaximumCustomSnapPoints) throw new InvalidDataException("$buildworks_import.fields");
+                            if (blueprint.customSnapPoints.Count >= CompositeBlueprintStore.MaximumCustomSnapPoints) throw new InvalidDataException("$buildworks_import.document_invalid");
                             blueprint.customSnapPoints.Add(point);
                         }
                         catch (Exception exception) when (exception is InvalidDataException || exception is FormatException || exception is OverflowException)
@@ -266,7 +268,11 @@ namespace OstrixMods.BuildWorks
                         int basic = vbuild ? 8 : 10;
                         if (fields.Length < basic || fields.Length > (vbuild ? 10 : 15) ||
                             (!vbuild && (fields.Length == 11 || fields.Length == 12)))
-                            throw new InvalidDataException("$buildworks_import.fields");
+                            throw new InvalidDataException("$buildworks_import.document_invalid");
+                        // PlanBuild accepts decimal commas in transforms; leave identifiers and object payloads exact.
+                        if (!vbuild)
+                            for (int index = 2; index < Math.Min(fields.Length, 13); ++index)
+                                if (index != 9) fields[index] = fields[index].Replace(',', '.');
                         string prefab = fields[0].Trim();
                         // Decode only the known sign adapter; every other object payload remains inert and part-bound.
                         string signText = !vbuild && prefab == "sign" ? BlueprintExchangeFormat.DecodeSignText(fields[9], allowLegacyLiteral: true) : null;
@@ -282,15 +288,20 @@ namespace OstrixMods.BuildWorks
                         {
                             try
                             {
+                                string itemInfo = BlueprintExchangeFormat.DecodeSignText(info);
+                                int itemFields = itemInfo?.Split(':').Length ?? 0;
+                                // PlanBuild's Info-only holder reader defaults omitted quality/orientation to 1/0.
+                                if (itemFields == 2) itemInfo += ":1:0";
+                                else if (itemFields == 3) itemInfo += ":0";
                                 foreign = CompositeBlueprintStore.ForeignPartData.FromGeometry(new Geometry.BlueprintForeignPartData(
                                     Geometry.BlueprintForeignPartData.NativeItemStandFormat,
-                                    BlueprintExchangeFormat.DecodeSignText(info), null, null));
+                                    itemInfo, null, null));
                             }
                             catch (Exception error) when (error is ArgumentException || error is InvalidDataException)
                             { /* Unknown holder dialect remains inert, with its exact original row retained. */ }
                         }
                         if (prefab.Length == 0 || prefab.Length > 128 || prefab.Any(c => char.IsControl(c) || c == '/' || c == '\\'))
-                            throw new InvalidDataException("$buildworks_import.fields");
+                            throw new InvalidDataException("$buildworks_import.document_invalid");
                         int p = vbuild ? 5 : 2, q = vbuild ? 1 : 5;
                         var part = new CompositeBlueprintStore.Part
                         {
@@ -335,7 +346,7 @@ namespace OstrixMods.BuildWorks
 
         internal static CompositeBlueprintStore.Blueprint PrepareForHost(CompositeBlueprintStore.Blueprint source,
             Func<string, CompositeBlueprintStore.VectorData?> resolvePrefabScale, Func<string, int> hash = null, int? worldLevel = null,
-            Func<string, bool> supportsMaterialSeed = null)
+            Func<string, bool> supportsMaterialSeed = null, Func<string, (int Width, int Height)?> containerGrid = null)
         {
             if (source == null || source.importError != null || !source.importAbsoluteScale && !source.parts.Any(part => part.scaleIsAbsolute) &&
                 (hash == null || !source.parts.Any(part => part.foreignData?.format == "blueprint" || part.foreignData?.format == "vbuild"))) return source;
@@ -366,7 +377,10 @@ namespace OstrixMods.BuildWorks
                         part.scaleIsAbsolute = false;
                     }
                     if (hash != null && part.sourceDocumentId != null && evidenceIndex.TryGetValue(part.sourceDocumentId, out var evidence))
+                    {
+                        ConvertLegacyStorage(part, evidence, hash, containerGrid);
                         ConvertKnownState(part, evidence, hash, worldLevel, supportsMaterialSeed, ref ordinaryStateFields);
+                    }
                 }
                 copy.importAbsoluteScale = false;
                 // Derived cache identity must not reuse pre-normalization thumbnails or another prefab revision.
@@ -376,6 +390,9 @@ namespace OstrixMods.BuildWorks
                 if (source.IsExternal && copy.parts.Any(part => part.materialSeed.HasValue))
                     copy.id = Identity(copy.id + "\nmaterial-seed-v1\n" + string.Join(",",
                         copy.parts.Select(part => part.materialSeed?.ToString(CultureInfo.InvariantCulture) ?? "null")));
+                if (source.IsExternal && copy.parts.Any(part => part.foreignData?.format == Geometry.BlueprintForeignPartData.NativeContainerFormat))
+                    copy.id = Identity(copy.id + "\ncontainer-manifest-v1\n" + string.Join("\n", copy.parts.Select(part =>
+                        part.foreignData?.format == Geometry.BlueprintForeignPartData.NativeContainerFormat ? part.foreignData.info : "null")));
             }
             catch (Exception error) when (error is InvalidDataException || error is ArgumentException)
             {
@@ -383,6 +400,28 @@ namespace OstrixMods.BuildWorks
                 copy.parts.Clear(); // Atomic conversion: never publish mixed absolute/relative scales.
             }
             return copy;
+        }
+
+        private static void ConvertLegacyStorage(CompositeBlueprintStore.Part part, Geometry.BlueprintSourceDocument evidence,
+            Func<string, int> hash, Func<string, (int Width, int Height)?> containerGrid)
+        {
+            var original = part.foreignData;
+            if (original?.format != "blueprint" || original.info == null || original.zdo != null || original.chance != null ||
+                evidence?.Format != "blueprint" || evidence.Id != part.sourceDocumentId ||
+                !evidence.HasPartAt(part.sourceLine, part.prefabName)) return;
+            string[] fields = evidence.PartRow(part.sourceLine)?.Split(';');
+            if (fields == null || fields.Length != 10 && fields.Length != 13 && fields.Length != 14 && fields.Length != 15 ||
+                fields[9] != original.info || fields.Length > 13 && HasData(fields[13]) ||
+                fields.Length > 14 && HasData(fields[14]) && fields[14] != "1") return;
+            var grid = containerGrid?.Invoke(part.prefabName);
+            if (!grid.HasValue) return;
+            try
+            {
+                if (Geometry.BlueprintContainerInventory.TryConvertLegacy106(BlueprintExchangeFormat.DecodeInventoryInfo(original.info),
+                    grid.Value.Width, grid.Value.Height, hash, out var contents))
+                    part.foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(contents);
+            }
+            catch (InvalidDataException) { } // Unknown/corrupt Info remains inert with its exact source row.
         }
 
         internal static bool CanOmitArmorStandState(CompositeBlueprintStore.Part part, Geometry.BlueprintSourceDocument evidence)
@@ -439,7 +478,14 @@ namespace OstrixMods.BuildWorks
             string text = part.signText;
             if (part.prefabName == "itemstand" || part.prefabName == "itemstandh")
             {
-                if (!Geometry.BlueprintItemStandContents.TryConvertLegacy(state, hash, worldLevel, out contents, out consumed)) return;
+                string boundItemInfo = null;
+                if (state.TryGet<int>(hash("item"), out _))
+                {
+                    if (original.info == null) return;
+                    try { boundItemInfo = BlueprintExchangeFormat.DecodeSignText(original.info); }
+                    catch (InvalidDataException) { return; }
+                }
+                if (!Geometry.BlueprintItemStandContents.TryConvertLegacy(state, hash, worldLevel, out contents, out consumed, boundItemInfo)) return;
             }
             else if (part.prefabName == "sign")
             {
@@ -498,7 +544,7 @@ namespace OstrixMods.BuildWorks
         internal static CompositeBlueprintStore.Blueprint DetachedCopy(CompositeBlueprintStore.Blueprint source)
         {
             if (source == null || !source.IsExternal || source.importError != null)
-                throw new InvalidDataException("$buildworks_import.fields");
+                throw new InvalidDataException("$buildworks_import.document_invalid");
             if (source.importAbsoluteScale) throw new InvalidDataException("$buildworks_import.scale_pending");
             var result = new CompositeBlueprintStore.Blueprint
             {
@@ -554,7 +600,7 @@ namespace OstrixMods.BuildWorks
                     sourceLine = part.sourceLine,
                     foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(part.foreignData?.ToGeometry())
                 });
-            if (!CompositeBlueprintStore.Valid(result)) throw new InvalidDataException("$buildworks_import.fields");
+            if (!CompositeBlueprintStore.Valid(result)) throw new InvalidDataException("$buildworks_import.document_invalid");
             return result;
         }
 

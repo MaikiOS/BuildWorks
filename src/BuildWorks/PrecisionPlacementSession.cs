@@ -1238,6 +1238,9 @@ namespace OstrixMods.BuildWorks
             }
             if (!player || (!edit && !blueprintPieceRegistry.TryGetPiece(blueprint, out _)))
             {
+                if (player && !edit && !TryResolveBlueprintPieces(player, recipe ?? blueprint,
+                    out _, out string reason, forContentsReview: true) && !string.IsNullOrEmpty(reason))
+                    return BuildWorksLocalization.Text("placement.hammer_piece_missing", reason);
                 return BuildWorksLocalization.Text("placement.blueprint_unavailable");
             }
             if (recipe != null) ApproveContents(blueprint, recipe);

@@ -178,7 +178,7 @@ internal static class F9HudAcceptance
                 for (int i = 0; i < rows.Length; ++i) rows[i] = ("Wall " + i, true);
                 view.SetWorldSelectionState(true, bottom, 20, "Loaded objects only", rows);
                 Show(view, GizmoMode.Move, selection: true);
-                Require(Button(view, "worldSelectionBottom").gameObject.activeInHierarchy &&
+                Require(Text(view, "worldSelectionBottom").gameObject.activeInHierarchy &&
                     !Button(view, "moveText").gameObject.activeInHierarchy, "Volume HUD overlaps old transform controls");
                 TMP_InputField bottomInput = BeginEdit(view, "worldSelectionBottom");
                 bottomInput.text = "5.5";
@@ -198,7 +198,7 @@ internal static class F9HudAcceptance
                 Click(Button(view, "worldSelectionMode"));
                 Require(toggled == 1, "Selection mode button did not dispatch");
                 view.SetWorldSelectionState(false, -2, 20, "", rows);
-                Require(!Button(view, "worldSelectionBottom").gameObject.activeInHierarchy,
+                Require(!Text(view, "worldSelectionBottom").gameObject.activeInHierarchy,
                     "Screen rectangle retained volume fields");
                 Show(view, GizmoMode.Move);
                 Require(!volumeControls.activeInHierarchy && Button(view, "moveText").gameObject.activeInHierarchy,

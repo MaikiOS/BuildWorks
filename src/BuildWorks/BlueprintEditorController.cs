@@ -1177,7 +1177,7 @@ namespace OstrixMods.BuildWorks
         {
             Vector2 mouse = input.MousePosition;
             bool inside = viewport.Contains(mouse);
-            if ((!IsGizmoDragging || keyboardPreview) && !cameraDragging && !rightCameraTracking &&
+            if ((!IsGizmoDragging || keyboardPreview) && (!CanWrapTransformPointer || input.GetMouseButtonDown(0)) && !cameraDragging && !rightCameraTracking &&
                 view.IsViewportControlHit(mouse))
             {
                 selectionPending = false;
@@ -1434,9 +1434,15 @@ namespace OstrixMods.BuildWorks
                 target.y = viewport.yMin + 12f + Mathf.Repeat(mouse.y - viewport.yMax + 4f, height);
             if (target == mouse) return;
             // The top edge may contain viewport buttons; land just beyond them, never on a control.
-            for (int step = 0; step < 8 && view.IsViewportControlHit(target); ++step)
+            int landingSteps = Mathf.CeilToInt(Vector2.Distance(target, viewport.center) / 16f) + 1;
+            for (int step = 0; step < landingSteps && view.IsViewportControlHit(target); ++step)
                 target = Vector2.MoveTowards(target, viewport.center, 16f);
-            if (view.IsViewportControlHit(target)) return;
+            if (view.IsViewportControlHit(target))
+            {
+                pointerWrapUnavailable = true;
+                view.SetStatus(BuildWorksLocalization.Text("editor.pointer_wrap_unavailable"));
+                return;
+            }
             if (!input.TryWarpMousePosition(target))
             {
                 pointerWrapUnavailable = true;
@@ -1466,9 +1472,12 @@ namespace OstrixMods.BuildWorks
             else if (keyboardPreview && keyboardValid &&
                 (input.GetKeyDown(KeyCode.Return) || input.GetKeyDown(KeyCode.KeypadEnter)) ||
                 !keyboardPreview && input.GetMouseButtonUp(0)) CommitGizmoDrag();
-            else if ((pointerWarpWait += Mathf.Max(0f, input.UnscaledDeltaTime)) >= .25f)
+            else if (!pointerWrapUnavailable && (pointerWarpWait += Mathf.Max(0f, input.UnscaledDeltaTime)) >= .25f)
             {
-                CancelGizmoDrag();
+                // Never erase an approved preview because a native warp acknowledgement was missed.
+                // Keyboard input rebases from the current physical cursor; a held physical drag waits for release/Esc.
+                pointerWrapUnavailable = true;
+                if (keyboardPreview) RebaseKeyboardPreview(mouse);
                 view.SetStatus(BuildWorksLocalization.Text("editor.pointer_wrap_failed"));
             }
             return false;
@@ -2516,7 +2525,10 @@ namespace OstrixMods.BuildWorks
                     orientation,
                     localSpace,
                     dragHandle,
-                    dragAxis,
+                    keyboardPreview && dragHandle == GizmoHandleKind.MovePlane && keyboardSecondAxis != GizmoAxis.None
+                        ? dragAxis != GizmoAxis.X && keyboardSecondAxis != GizmoAxis.X ? GizmoAxis.X
+                        : dragAxis != GizmoAxis.Y && keyboardSecondAxis != GizmoAxis.Y ? GizmoAxis.Y : GizmoAxis.Z
+                        : dragAxis,
                     gizmoAnchors,
                     keyboardPreview && keyboardSurface ? keyboardHoveredSource >= 0 ? keyboardHoveredSource :
                         keyboardSourceIndex >= 0 ? keyboardSourceIndex : keyboardAutoSource :

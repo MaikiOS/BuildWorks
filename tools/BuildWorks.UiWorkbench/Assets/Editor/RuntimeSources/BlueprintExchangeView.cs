@@ -22,6 +22,7 @@ namespace OstrixMods.BuildWorks
         private TMP_Text contentsDetails;
         private Task<CompositeBlueprintStore.ContentsSummary> contentsInspection;
         private Task<CompositeBlueprintStore.ImportReview> importInspection;
+        private Task<CompositeBlueprintStore.ImportReview> importPreparation;
         private Task<PlanBuildExport> planInspection;
         private Task<string> planExport;
         private PlanBuildExport planReview;
@@ -141,7 +142,8 @@ namespace OstrixMods.BuildWorks
             if (!IsOpen) return;
             var parent = (RectTransform)root.transform.parent;
             panel.localScale = Vector3.one * Mathf.Min(1, (parent.rect.width - 24) / 780, (parent.rect.height - 24) / 580);
-            if (place != null && (store.Revision != placementRevision || placementCurrent?.Invoke() == false))
+            if (place != null && (store.Revision != placementRevision || placementCurrent?.Invoke() == false) ||
+                reviewingContents && !importing && !completed && importReview?.IsHostCurrent?.Invoke() == false)
             {
                 foreach (Selectable control in root.GetComponentsInChildren<Selectable>())
                     control.interactable = control.name == "ExchangeClose" || control.name == "ExchangeContentsBack";
@@ -179,6 +181,7 @@ namespace OstrixMods.BuildWorks
                     {
                         contentsBack.interactable = true;
                         RenderContents();
+                        importReview = null; contentsSummary = null; missingReview = null;
                         message.text = BuildWorksLocalization.ResolveUserText(store.ImportError);
                     }
                     else
@@ -204,10 +207,24 @@ namespace OstrixMods.BuildWorks
                 try
                 {
                     var review = importInspection.GetAwaiter().GetResult();
-                    if (reviewingContents) { importReview = store.PrepareImportReview(review, name => name.GetStableHashCode()); contentsSummary = importReview.Contents; RefreshMissing(); RenderContents(); }
+                    if (reviewingContents) importPreparation = store.PrepareImportReview(review, name => name.GetStableHashCode());
                 }
                 catch (Exception error) { if (reviewingContents) SetError(error); }
                 importInspection = null;
+            }
+            if (importPreparation != null && importPreparation.IsCompleted)
+            {
+                try
+                {
+                    var review = importPreparation.GetAwaiter().GetResult();
+                    if (reviewingContents)
+                    {
+                        if (review.IsHostCurrent?.Invoke() != true) message.text = T("placement.contents_stale");
+                        else { importReview = review; contentsSummary = review.Contents; missingReview = review.Missing; RenderContents(); }
+                    }
+                }
+                catch (Exception error) { if (reviewingContents) SetError(error); }
+                importPreparation = null;
             }
             if (planInspection != null && planInspection.IsCompleted)
             {
@@ -224,7 +241,8 @@ namespace OstrixMods.BuildWorks
             bool busy = importing || planExport != null || placementPreparation != null;
             primary.interactable = !completed && !busy && listing == null && !directory.gameObject.activeSelf &&
                 (blueprint != null || selected != null) && (!reviewingContents ||
-                (planBuild ? planReview != null : contentsSummary != null && missingReview != null && (!omitMissingParts || missingReview.CanOmit)));
+                (planBuild ? planReview != null : contentsSummary != null && missingReview != null &&
+                (blueprint != null || missingReview.EmptyDocuments == 0) && (!omitMissingParts || missingReview.CanOmit)));
             copyPath.interactable = !busy;
             if (completed || busy)
                 foreach (Selectable control in root.GetComponentsInChildren<Selectable>())
@@ -363,7 +381,7 @@ namespace OstrixMods.BuildWorks
                 contentsBack = Button("ExchangeContentsBack", T("exchange.back"), 256, 530, 276, () =>
                 {
                     if (place != null) { Dispose(); return; }
-                    reviewingContents = false; contentsInspection = null; importInspection = null; planInspection = null;
+                    reviewingContents = false; contentsInspection = null; importInspection = null; importPreparation = null; planInspection = null;
                     planReview = null; contentsPanel.gameObject.SetActive(false);
                     contentsBack.gameObject.SetActive(false); copyPath.gameObject.SetActive(true);
                     SetFileControls(true); message.text = "";
@@ -404,6 +422,8 @@ namespace OstrixMods.BuildWorks
             string target = Path.Combine(directory.text, fileName.text);
             contentsDetails.text = T("exchange.plan_review", target, fileName.text, planReview.Parts, planReview.CustomSnaps,
                 planReview.Groups, planReview.Supports, planReview.Anchors, planReview.Metadata, planReview.Sources, planReview.MaterialSeeds);
+            if (planReview.IgnoredSnapPointRows > 0)
+                contentsDetails.text += "\n" + T("exchange.snap_trailing_fields", planReview.IgnoredSnapPointRows);
             if (planReview.OmittedSigns.Count > 0)
                 contentsDetails.text += "\n\n" + T("exchange.plan_signs") + "\n" +
                     string.Join("\n", planReview.OmittedSigns.Select(entry => T("exchange.loss_source", entry.Key, entry.Value)));
@@ -436,6 +456,8 @@ namespace OstrixMods.BuildWorks
             var effective = omitMissingParts && missingReview.CanOmit ? missingReview.RetainedContents : contentsSummary;
             contentsDetails.text = T("exchange.contents_counts", effective.Storages, effective.StoredItems,
                 effective.Mounts, effective.Unknown, effective.AlreadyCleared);
+            if (effective.IgnoredSnapPointRows > 0)
+                contentsDetails.text += "\n" + T("exchange.snap_trailing_fields", effective.IgnoredSnapPointRows);
             if (effective.ArmorStates > 0)
                 contentsDetails.text += "\n" + T("exchange.armor_losses", effective.ArmorStates) + "\n" +
                     string.Join("\n", effective.ArmorStateSources.Select(entry => T("exchange.loss_source", entry.Key, entry.Value)));
@@ -472,7 +494,8 @@ namespace OstrixMods.BuildWorks
             skin.Apply(armorChoice, active: omitArmorState);
             skin.Apply(missingChoice, active: omitMissingParts);
             skin.Apply(storageChoice, active: clearStorage); skin.Apply(mountChoice, active: clearMounts);
-            message.text = place != null ? T("placement.contents_policy") : missingReview.EmptyDocuments > 0 ? T("exchange.missing_empty") :
+            message.text = place != null ? T("placement.contents_policy") : missingReview.EmptyDocuments > 0
+                ? T(blueprint == null ? "exchange.missing_import_empty" : "exchange.missing_empty") :
                 omitMissingParts ? T("exchange.missing_warning", missingReview.Parts, remainingUnknown, omitArmorState ? effective.ArmorStates : 0) :
                 omitArmorState ? T("exchange.armor_warning", effective.ArmorStates, remainingUnknown) :
                 T(contentsSummary.Unknown != 0 ? "exchange.contents_unknown" :
@@ -554,6 +577,7 @@ namespace OstrixMods.BuildWorks
         public void Dispose()
         {
             if (disposed) return; disposed = true;
+            importInspection = null; importPreparation = null;
             planReview?.CancelWrite();
             root.SetActive(false); UnityEngine.Object.Destroy(root); skin.Dispose();
             if (EventSystem.current && previousFocus && previousFocus.activeInHierarchy)

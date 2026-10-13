@@ -17,12 +17,24 @@ namespace OstrixMods.BuildWorks
         private static readonly FieldInfo Orientations = typeof(ItemStand).GetField("m_orientationSettings", Private);
         private static readonly MethodInfo UpdateAttach = typeof(ItemStand).GetMethod("UpdateAttach", Private);
 
+        internal sealed class Reservation
+        {
+            internal readonly ItemDrop.ItemData Item;
+            internal readonly int Amount;
+            internal readonly string Snapshot;
+            internal Reservation(ItemDrop.ItemData item, int amount, string snapshot)
+            { Item = item; Amount = amount; Snapshot = snapshot; }
+        }
+
         internal sealed class Supply
         {
             internal readonly ItemDrop.ItemData Item;
             internal readonly BlueprintForeignPartData Contents;
+            internal readonly IReadOnlyList<Reservation> Items;
             internal Supply(ItemDrop.ItemData item, BlueprintForeignPartData contents)
-            { Item = item; Contents = contents; }
+            { Item = item; Contents = contents; Items = Array.AsReadOnly(new[] { new Reservation(item, 1, contents.Zdo) }); }
+            internal Supply(List<Reservation> items)
+            { Items = Array.AsReadOnly(items.ToArray()); }
         }
 
         internal static bool SelectSupplies(Player player, IEnumerable<BlueprintForeignPartData> contents,
@@ -37,19 +49,27 @@ namespace OstrixMods.BuildWorks
                 Supply supply = null;
                 if (NeedsSupply(data))
                 {
-                    ItemDrop.ItemData item = FindItem(player, data, reserved, snapshots);
-                    if (item == null) complete = false;
+                    if (data.Format == BlueprintForeignPartData.NativeContainerFormat)
+                    {
+                        supply = ReserveContainer(player, data, reserved, snapshots);
+                        if (supply == null) complete = false;
+                    }
                     else
                     {
-                        reserved.TryGetValue(item, out int count);
-                        reserved[item] = count + 1;
-                        string info = item.m_dropPrefab.name + ":" + item.m_variant.ToString(CultureInfo.InvariantCulture) + ":" +
-                            item.m_quality.ToString(CultureInfo.InvariantCulture) + ":" + data.Info.Split(':')[3];
-                        Supply previous = index < result.Count ? result[index] : null;
-                        supply = previous != null && ReferenceEquals(previous.Item, item) &&
-                            previous.Contents.Info == info && previous.Contents.Zdo == snapshots[item] ? previous :
-                            new Supply(item, new BlueprintForeignPartData(
-                                BlueprintForeignPartData.NativeItemStandFormat, info, snapshots[item], null));
+                        ItemDrop.ItemData item = FindItem(player, data, reserved, snapshots);
+                        if (item == null) complete = false;
+                        else
+                        {
+                            reserved.TryGetValue(item, out int count);
+                            reserved[item] = checked(count + 1);
+                            string info = item.m_dropPrefab.name + ":" + item.m_variant.ToString(CultureInfo.InvariantCulture) + ":" +
+                                item.m_quality.ToString(CultureInfo.InvariantCulture) + ":" + data.Info.Split(':')[3];
+                            Supply previous = index < result.Count ? result[index] : null;
+                            supply = previous != null && ReferenceEquals(previous.Item, item) && previous.Contents != null &&
+                                previous.Contents.Info == info && previous.Contents.Zdo == snapshots[item] ? previous :
+                                new Supply(item, new BlueprintForeignPartData(
+                                    BlueprintForeignPartData.NativeItemStandFormat, info, snapshots[item], null));
+                        }
                     }
                 }
                 if (index < result.Count) result[index] = supply;
@@ -62,8 +82,16 @@ namespace OstrixMods.BuildWorks
 
         internal static bool IsAvailable(Player player, Supply supply)
         {
-            if (!player || supply == null || !player.GetInventory().ContainsItem(supply.Item)) return false;
-            try { return Matches(supply.Item, supply.Contents) && SnapshotItem(supply.Item) == supply.Contents.Zdo; }
+            if (!player || supply == null) return false;
+            try
+            {
+                if (supply.Item != null && !Matches(supply.Item, supply.Contents)) return false;
+                foreach (Reservation reservation in supply.Items)
+                    if (!player.GetInventory().ContainsItem(reservation.Item) || reservation.Amount < 1 ||
+                        reservation.Item.m_stack < reservation.Amount || SnapshotItem(reservation.Item) != reservation.Snapshot)
+                        return false;
+                return true;
+            }
             catch (Exception error) when (error is ArgumentException || error is InvalidOperationException || error is NullReferenceException)
             { return false; }
         }
@@ -79,15 +107,19 @@ namespace OstrixMods.BuildWorks
                 foreach (Supply supply in supplies)
                 {
                     if (supply == null) continue;
-                    if (!snapshots.TryGetValue(supply.Item, out string snapshot))
+                    foreach (Reservation reservation in supply.Items)
                     {
-                        if (!IsAvailable(player, supply)) return false;
-                        snapshots.Add(supply.Item, snapshot = supply.Contents.Zdo);
+                        if (!snapshots.TryGetValue(reservation.Item, out string snapshot))
+                        {
+                            if (!player.GetInventory().ContainsItem(reservation.Item)) return false;
+                            snapshots.Add(reservation.Item, snapshot = SnapshotItem(reservation.Item));
+                        }
+                        if (snapshot != reservation.Snapshot || reservation.Amount < 1) return false;
+                        reserved.TryGetValue(reservation.Item, out int count);
+                        int total = checked(count + reservation.Amount);
+                        if (total > reservation.Item.m_stack) return false;
+                        reserved[reservation.Item] = total;
                     }
-                    if (snapshot != supply.Contents.Zdo) return false;
-                    reserved.TryGetValue(supply.Item, out int count);
-                    reserved[supply.Item] = checked(count + 1);
-                    if (count + 1 > supply.Item.m_stack) return false;
                 }
                 if (reserved.Count == 0 || !payingPiece) return true;
                 if (!ZoneSystem.instance) return false;
@@ -130,6 +162,48 @@ namespace OstrixMods.BuildWorks
             { return false; }
         }
 
+        private static Supply ReserveContainer(Player player, BlueprintForeignPartData data,
+            Dictionary<ItemDrop.ItemData, int> reserved, Dictionary<ItemDrop.ItemData, string> snapshots)
+        {
+            if (!player || !BlueprintContainerInventory.TryRead(data, name => name.GetStableHashCode(), out var demands)) return null;
+            string[] grid = data.Info.Split('|')[0].Split(':');
+            int cells = checked(int.Parse(grid[0], CultureInfo.InvariantCulture) * int.Parse(grid[1], CultureInfo.InvariantCulture));
+            var amounts = new Dictionary<ItemDrop.ItemData, int>();
+            foreach (var demand in demands)
+            {
+                int needed = demand.Stack;
+                foreach (ItemDrop.ItemData item in player.GetInventory().GetAllItems())
+                {
+                    if (item?.m_shared == null || !item.m_dropPrefab || item.m_dropPrefab.name != demand.Prefab ||
+                        item.m_stack < 1 || item.m_shared.m_maxStackSize < 1) continue;
+                    reserved.TryGetValue(item, out int held);
+                    amounts.TryGetValue(item, out int amount);
+                    int available = Math.Min(item.m_stack - held - amount, item.m_shared.m_maxStackSize - amount);
+                    if (available <= 0) continue;
+                    if (amount == 0 && amounts.Count == cells) continue;
+                    if (!snapshots.ContainsKey(item))
+                    {
+                        try { snapshots[item] = SnapshotItem(item); }
+                        catch (Exception error) when (error is ArgumentException || error is InvalidOperationException || error is NullReferenceException)
+                        { continue; }
+                    }
+                    int take = Math.Min(needed, available);
+                    amounts[item] = checked(amount + take);
+                    needed -= take;
+                    if (needed == 0) break;
+                }
+                if (needed != 0) return null;
+            }
+            var items = new List<Reservation>();
+            foreach (var entry in amounts)
+            {
+                reserved.TryGetValue(entry.Key, out int held);
+                reserved[entry.Key] = checked(held + entry.Value);
+                items.Add(new Reservation(entry.Key, entry.Value, snapshots[entry.Key]));
+            }
+            return new Supply(items);
+        }
+
         internal static bool CanRestore(Piece piece, BlueprintForeignPartData data)
         {
             if (data == null) return true;
@@ -162,6 +236,8 @@ namespace OstrixMods.BuildWorks
 
         internal static bool CanRollback(GameObject placed, bool forceDestroy = false)
         {
+            if (placed && placed.GetComponent<Container>())
+                return BlueprintStorageCapture.CanRemoveEmpty(placed, Player.m_localPlayer);
             ItemStand stand = placed ? placed.GetComponent<ItemStand>() : null;
             if (!stand) return true;
             var view = StandView?.GetValue(stand) as ZNetView;
@@ -213,11 +289,16 @@ namespace OstrixMods.BuildWorks
             return true;
         }
 
-        private static string SnapshotItem(ItemDrop.ItemData item)
+        internal static string SnapshotItem(ItemDrop.ItemData item, bool transferProperties = false)
         {
             // Validate the complete supplied native record before consuming the real inventory object.
             ItemDrop.ItemData copy = item.Clone();
             copy.m_stack = 1;
+            if (transferProperties)
+            {
+                copy.m_gridPos = new Vector2i(0, 0);
+                copy.m_equipped = false;
+            }
             var package = new ZPackage();
             package.Write((byte)109);
             copy.Save(package);

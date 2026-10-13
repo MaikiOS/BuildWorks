@@ -100,7 +100,7 @@ namespace OstrixMods.BuildWorks
             {
                 reader.MoveToContent();
                 ValidateNode(reader, expected, requireFields, allowSupportFields, allowSourceFields, allowForeignFields, allowContentsFields, allowAbsoluteScaleFields, allowPlacementImportFields, allowBaseScaleFields, allowMetadataFields, allowMaterialSeedFields, allowHiddenSources);
-                if (reader.MoveToContent() != XmlNodeType.None) throw new InvalidDataException("$buildworks_import.fields");
+                if (reader.MoveToContent() != XmlNodeType.None) throw new InvalidDataException("$buildworks_import.document_invalid");
             }
         }
 
@@ -145,16 +145,16 @@ namespace OstrixMods.BuildWorks
                 if (envelope.version < 8 && envelope.blueprint?.parts?.Count == 1)
                     throw new InvalidDataException("$buildworks_import.part_limit");
                 if (envelope.version < 11 && envelope.blueprint?.customSnapPoints?.Count > 512)
-                    throw new InvalidDataException("$buildworks_import.fields");
+                    throw new InvalidDataException("$buildworks_import.document_invalid");
                 ValidateBlueprint(envelope.blueprint);
                 if (envelope.requiredPrefabIds == null ||
                     !envelope.requiredPrefabIds.SequenceEqual(Prefabs(envelope.blueprint), StringComparer.Ordinal))
-                    throw new InvalidDataException("$buildworks_import.fields");
+                    throw new InvalidDataException("$buildworks_import.document_invalid");
                 return envelope.blueprint;
             }
             catch (Exception exception) when (exception is SerializationException || exception is XmlException ||
                 exception is ArgumentException || exception is FormatException || exception is OverflowException)
-            { throw new InvalidDataException("$buildworks_import.fields", exception); }
+            { throw new InvalidDataException("$buildworks_import.document_invalid", exception); }
         }
 
         private static List<string> Prefabs(CompositeBlueprintStore.Blueprint blueprint) => blueprint.parts
@@ -176,7 +176,7 @@ namespace OstrixMods.BuildWorks
                     !SafeLabel(group.name, 128)) || float.IsNaN(blueprint.previewYaw) || float.IsInfinity(blueprint.previewYaw) ||
                     float.IsNaN(blueprint.previewPitch) || blueprint.previewPitch < -80 || blueprint.previewPitch > 80 ||
                     float.IsNaN(blueprint.previewZoom) || blueprint.previewZoom < .5f || blueprint.previewZoom > 3)
-                throw new InvalidDataException("$buildworks_import.fields");
+                throw new InvalidDataException("$buildworks_import.document_invalid");
         }
 
         private static bool SafeLabel(string value, int limit) => !string.IsNullOrWhiteSpace(value) &&
@@ -189,13 +189,13 @@ namespace OstrixMods.BuildWorks
             string kind = reader.GetAttribute("type");
             if (kind == "null")
             {
-                if (expected.IsValueType && Nullable.GetUnderlyingType(expected) == null) throw new InvalidDataException("$buildworks_import.fields");
+                if (expected.IsValueType && Nullable.GetUnderlyingType(expected) == null) throw new InvalidDataException("$buildworks_import.document_invalid");
                 reader.Skip(); return;
             }
             expected = Nullable.GetUnderlyingType(expected) ?? expected;
             if (expected.IsGenericType && expected.GetGenericTypeDefinition() == typeof(List<>))
             {
-                if (kind != "array") throw new InvalidDataException("$buildworks_import.fields");
+                if (kind != "array") throw new InvalidDataException("$buildworks_import.document_invalid");
                 Type item = expected.GetGenericArguments()[0];
                 int count = 0, limit = customSnapPoints ? CompositeBlueprintStore.MaximumCustomSnapPoints :
                     item == typeof(CompositeBlueprintStore.Part) || item == typeof(string)
@@ -205,7 +205,7 @@ namespace OstrixMods.BuildWorks
                 reader.ReadStartElement();
                 while (reader.MoveToContent() == XmlNodeType.Element)
                 {
-                    if (reader.LocalName != "item" || ++count > limit) throw new InvalidDataException("$buildworks_import.fields");
+                    if (reader.LocalName != "item" || ++count > limit) throw new InvalidDataException("$buildworks_import.document_invalid");
                     ValidateNode(reader, item, requireFields, allowSupportFields, allowSourceFields, allowForeignFields, allowContentsFields, allowAbsoluteScaleFields, allowPlacementImportFields, allowBaseScaleFields, allowMetadataFields, allowMaterialSeedFields, allowHiddenSources);
                 }
                 reader.ReadEndElement();
@@ -214,17 +214,17 @@ namespace OstrixMods.BuildWorks
             if (!Fields.TryGetValue(expected, out Dictionary<string, Type> fields))
             {
                 string scalarKind = expected == typeof(string) ? "string" : expected == typeof(bool) ? "boolean" : "number";
-                if (kind != scalarKind) throw new InvalidDataException("$buildworks_import.fields");
+                if (kind != scalarKind) throw new InvalidDataException("$buildworks_import.document_invalid");
                 string value = reader.ReadElementContentAsString();
                 if (value.Length > (sourceText ? Geometry.BlueprintSourceDocument.MaximumBytes :
                     inventoryPackage ? Geometry.BlueprintForeignPartData.MaximumContainerBase64 : 32768))
-                    throw new InvalidDataException("$buildworks_import.fields");
+                    throw new InvalidDataException("$buildworks_import.document_invalid");
                 return;
             }
-            if (kind != "object") throw new InvalidDataException("$buildworks_import.fields");
+            if (kind != "object") throw new InvalidDataException("$buildworks_import.document_invalid");
             if (reader.IsEmptyElement)
             {
-                if (requireFields && RequiredFields[expected].Length != 0) throw new InvalidDataException("$buildworks_import.fields");
+                if (requireFields && RequiredFields[expected].Length != 0) throw new InvalidDataException("$buildworks_import.document_invalid");
                 reader.Read(); return;
             }
             var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -244,14 +244,14 @@ namespace OstrixMods.BuildWorks
                     !allowMetadataFields && expected == typeof(CompositeBlueprintStore.Part) && reader.LocalName == "metadata" ||
                     !allowMaterialSeedFields && expected == typeof(CompositeBlueprintStore.Part) && reader.LocalName == "materialSeed" ||
                     !allowHiddenSources && expected == typeof(CompositeBlueprintStore.LibraryData) && reader.LocalName == "hiddenSources")
-                    throw new InvalidDataException("$buildworks_import.fields");
+                    throw new InvalidDataException("$buildworks_import.document_invalid");
                 bool textField = expected == typeof(CompositeBlueprintStore.SourceDocument) && reader.LocalName == "text";
                 bool packageField = expected == typeof(CompositeBlueprintStore.ForeignPartData) && reader.LocalName == "zdo";
                 bool snapField = expected == typeof(CompositeBlueprintStore.Blueprint) && reader.LocalName == "customSnapPoints";
                 ValidateNode(reader, field, requireFields, allowSupportFields, allowSourceFields, allowForeignFields, allowContentsFields, allowAbsoluteScaleFields, allowPlacementImportFields, allowBaseScaleFields, allowMetadataFields, allowMaterialSeedFields, allowHiddenSources, textField, packageField, snapField);
             }
             if (requireFields && RequiredFields[expected].Any(name => !seen.Contains(name)))
-                throw new InvalidDataException("$buildworks_import.fields");
+                throw new InvalidDataException("$buildworks_import.document_invalid");
             reader.ReadEndElement();
         }
     }

@@ -34,6 +34,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 PlacementContentsFixtureChecks.Run();
                 PlanBuildExportChecks.Run(Path.Combine(directory, "planbuild-export"));
                 ValidationReadChecks.Run(Path.Combine(directory, "validation-reads"));
+                ImportErrorChecks.Run();
                 LargeSnapChecks.Run(Path.Combine(directory, "large-snap-bounds"));
                 VbuildDialectChecks.Run(Path.Combine(directory, "legacy-vbuild"));
                 MaterialSeedChecks.Run(Path.Combine(directory, "material-seed"));

@@ -822,6 +822,7 @@ exchange.missing_losses	Missing parts: {0}. Source and prefab IDs below; supplyi
 exchange.missing_unavailable	Prefab registry is unavailable. Presence is unknown; records are kept and omission is disabled.
 exchange.missing_changed	Prefab availability changed. Review the updated list and confirm again; no copy was written.
 exchange.missing_empty	Omission would empty at least one blueprint. A copy without missing parts is unavailable until its prefab mod is installed.
+exchange.missing_import_empty	At least one blueprint has no available parts. The entire import is refused. Install its required mods or select another source file; the original is preserved.
 exchange.missing_warning	Copy omits {0} missing parts and equipment/pose from {2} armor stands. Exact source stays unchanged. Other unknown records: {1}; construction rules still apply.
 exchange.confirm_export	Confirm export
 exchange.confirm_import	Confirm import
@@ -948,7 +949,7 @@ editor.view.axis_pair	{0}{1} · {2} · Number: per selected axis
 
 editor.pointer_wrap_controls	Ctrl: reach panels
 editor.pointer_wrap_unavailable	Cursor warp is unavailable in this input backend. Numeric input remains available; cursor is free.
-editor.pointer_wrap_failed	Cursor warp was not acknowledged. Transform cancelled; cursor is free.
+editor.pointer_wrap_failed	Cursor warp was not acknowledged. Preview retained: confirm or cancel; precise input remains available.
 
 exchange.format_plan	PlanBuild
 exchange.plan_help	PlanBuild .blueprint + full BuildWorks copy in a new named folder. Review losses before writing.
@@ -974,3 +975,22 @@ placement.storage_on	[x] Place storage contents
 placement.storage_off	[ ] Place storage contents
 placement.mounts_on	[x] Place mounted items
 placement.mounts_off	[ ] Place mounted items
+selection.area_ray_failed	Look down onto the horizontal plane: the area corner must be within 512 m.
+selection.refresh_required	Set the area and click Refresh selection before saving or manual changes.
+selection.zone_limit	Zones unavailable or volume exceeds safe bounds. Previous selection retained.
+selection.limit	Limit: {0} parts. Reduce the volume; previous selection retained.
+selection.loaded_status	Selected: {1}. Unloaded zones: {0}. Only available objects are included.
+selection.plane	Area plane: Y={0:0.##} m; bottom/top are offsets from this plane.
+selection.area_hint	Drag LMB for area, then set bottom/top. [x] excludes; [ ] restores.
+selection.mode_volume	Mode: volume
+selection.mode_rectangle	Mode: screen rectangle
+selection.rectangle_hint	LMB/rectangle: visible parts; Ctrl: remove. Mode button returns to volume.
+selection.bottom	Bottom: {0:0.##} m
+selection.top	Top: {0:0.##} m
+selection.refresh	Refresh selection
+selection.page	{0}/{1} · Records: {2} · Click toggles inclusion
+selection.height_invalid	Bottom must not exceed top. Fix the heights and refresh selection.
+
+exchange.snap_trailing_fields	Snap points: additional fields in {0} rows are unused. Only X/Y/Z are transferred; original rows are preserved. The meaning and behavior of additional fields are not restored.
+
+import.document_invalid	Blueprint file is malformed or has an unsupported structure. Choose another file.

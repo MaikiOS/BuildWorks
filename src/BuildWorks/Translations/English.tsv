@@ -949,7 +949,7 @@ editor.view.axis_pair	{0}{1} · {2} · Number: per selected axis
 
 editor.pointer_wrap_controls	Ctrl: reach panels
 editor.pointer_wrap_unavailable	Cursor warp is unavailable in this input backend. Numeric input remains available; cursor is free.
-editor.pointer_wrap_failed	Cursor warp was not acknowledged. Transform cancelled; cursor is free.
+editor.pointer_wrap_failed	Cursor warp was not acknowledged. Preview retained: confirm or cancel; precise input remains available.
 
 exchange.format_plan	PlanBuild
 exchange.plan_help	PlanBuild .blueprint + full BuildWorks copy in a new named folder. Review losses before writing.
@@ -992,3 +992,5 @@ selection.page	{0}/{1} · Records: {2} · Click toggles inclusion
 selection.height_invalid	Bottom must not exceed top. Fix the heights and refresh selection.
 
 exchange.snap_trailing_fields	Snap points: additional fields in {0} rows are unused. Only X/Y/Z are transferred; original rows are preserved. The meaning and behavior of additional fields are not restored.
+
+import.document_invalid	Blueprint file is malformed or has an unsupported structure. Choose another file.

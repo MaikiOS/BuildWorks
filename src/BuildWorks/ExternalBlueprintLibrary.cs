@@ -242,13 +242,13 @@ namespace OstrixMods.BuildWorks
                             string[] coordinates = line.Split(new[] { ';' }, 4);
                             // PlanBuild reads only XYZ; retain unrecognized trailing fields in source evidence.
                             if (coordinates.Length < 3 || vbuild && coordinates.Length != 3)
-                                throw new InvalidDataException("$buildworks_import.fields");
+                                throw new InvalidDataException("$buildworks_import.document_invalid");
                             var point = new CompositeBlueprintStore.VectorData
                             { x = Number(coordinates[0]), y = Number(coordinates[1]), z = Number(coordinates[2]) };
                             if (Math.Abs(point.x) > 512 || Math.Abs(point.y) > 512 || Math.Abs(point.z) > 512)
                                 throw new InvalidDataException("$buildworks_import.transform");
                             if (blueprint.customSnapPoints == null) blueprint.customSnapPoints = new List<CompositeBlueprintStore.VectorData>();
-                            if (blueprint.customSnapPoints.Count >= CompositeBlueprintStore.MaximumCustomSnapPoints) throw new InvalidDataException("$buildworks_import.fields");
+                            if (blueprint.customSnapPoints.Count >= CompositeBlueprintStore.MaximumCustomSnapPoints) throw new InvalidDataException("$buildworks_import.document_invalid");
                             blueprint.customSnapPoints.Add(point);
                         }
                         catch (Exception exception) when (exception is InvalidDataException || exception is FormatException || exception is OverflowException)
@@ -268,7 +268,7 @@ namespace OstrixMods.BuildWorks
                         int basic = vbuild ? 8 : 10;
                         if (fields.Length < basic || fields.Length > (vbuild ? 10 : 15) ||
                             (!vbuild && (fields.Length == 11 || fields.Length == 12)))
-                            throw new InvalidDataException("$buildworks_import.fields");
+                            throw new InvalidDataException("$buildworks_import.document_invalid");
                         // PlanBuild accepts decimal commas in transforms; leave identifiers and object payloads exact.
                         if (!vbuild)
                             for (int index = 2; index < Math.Min(fields.Length, 13); ++index)
@@ -301,7 +301,7 @@ namespace OstrixMods.BuildWorks
                             { /* Unknown holder dialect remains inert, with its exact original row retained. */ }
                         }
                         if (prefab.Length == 0 || prefab.Length > 128 || prefab.Any(c => char.IsControl(c) || c == '/' || c == '\\'))
-                            throw new InvalidDataException("$buildworks_import.fields");
+                            throw new InvalidDataException("$buildworks_import.document_invalid");
                         int p = vbuild ? 5 : 2, q = vbuild ? 1 : 5;
                         var part = new CompositeBlueprintStore.Part
                         {
@@ -544,7 +544,7 @@ namespace OstrixMods.BuildWorks
         internal static CompositeBlueprintStore.Blueprint DetachedCopy(CompositeBlueprintStore.Blueprint source)
         {
             if (source == null || !source.IsExternal || source.importError != null)
-                throw new InvalidDataException("$buildworks_import.fields");
+                throw new InvalidDataException("$buildworks_import.document_invalid");
             if (source.importAbsoluteScale) throw new InvalidDataException("$buildworks_import.scale_pending");
             var result = new CompositeBlueprintStore.Blueprint
             {
@@ -600,7 +600,7 @@ namespace OstrixMods.BuildWorks
                     sourceLine = part.sourceLine,
                     foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(part.foreignData?.ToGeometry())
                 });
-            if (!CompositeBlueprintStore.Valid(result)) throw new InvalidDataException("$buildworks_import.fields");
+            if (!CompositeBlueprintStore.Valid(result)) throw new InvalidDataException("$buildworks_import.document_invalid");
             return result;
         }
 

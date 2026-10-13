@@ -869,8 +869,13 @@ internal static class ControllerInputAcceptance
             context = new object();
             NativeClick(view, null, "ExchangeSubmit"); yield return null;
             Require(!Field<bool>(exchange, "importing") && !Directory.Exists(store.ImportDirectory) &&
-                Field<TMP_Text>(exchange, "message").text == BuildWorksLocalization.Text("exchange.missing_changed"),
+                Field<TMP_Text>(exchange, "message").text == BuildWorksLocalization.Text("placement.contents_stale"),
                 "Stale-context confirmation published a copy or hid its refusal");
+            NativeClick(view, null, "ExchangeContentsBack"); yield return null;
+            NativeClick(view, null, "ExchangeSubmit");
+            for (int frame = 0; frame < 300 && ImportPending(exchange); ++frame)
+            { view.Tick(); yield return null; }
+            NativeClick(view, null, "ExchangeMissingChoice"); yield return null;
             NativeClick(view, null, "ExchangeSubmit");
             for (int frame = 0; frame < 300 && Field<bool>(exchange, "importing"); ++frame)
             { view.Tick(); yield return null; }
@@ -2787,6 +2792,27 @@ internal static class ControllerInputAcceptance
                 "Wrapping cancellation changed document/history or left pointer offset");
         }
 
+        foreach (string buttonName in new[] { "ViewportFocus", "ViewportSectionButton1" })
+        foreach (bool control in new[] { false, true })
+        foreach (KeyCode mode in new[] { KeyCode.G, KeyCode.R, KeyCode.S })
+        {
+            Frame(controller, input, start, 0, mode); yield return null;
+            Frame(controller, input, start, 0, KeyCode.X); yield return null;
+            var button = view.RootCanvas.GetComponentsInChildren<Button>(true).Single(value => value.name == buttonName);
+            var rect = (RectTransform)button.transform;
+            Vector2 buttonMouse = RectTransformUtility.WorldToScreenPoint(uiCamera, rect.TransformPoint(rect.rect.center));
+            Require(view.IsViewportControlHit(buttonMouse), "Toolbar fixture is outside its control hit region");
+            Frame(controller, input, buttonMouse, 1, control ? new[] { KeyCode.LeftControl } : Array.Empty<KeyCode>()); yield return null;
+            Require(Field<bool>(controller, "keyboardPreview") && Field<IList>(doc, "undo").Count == history &&
+                Part().Scale.Equals(originalScale) && Part().Position.Equals(originalPosition),
+                "Toolbar mouse-down implicitly committed a transform");
+            NativeClick(view, uiCamera, buttonName); yield return null;
+            Require(Field<IList>(doc, "undo").Count == history && Part().Scale.Equals(originalScale) && Part().Position.Equals(originalPosition),
+                "Toolbar click applied model changes");
+            NativeClick(view, uiCamera, buttonName); yield return null; // Restore focus/settings before cancelling preview.
+            Frame(controller, input, start, 0, KeyCode.Escape); yield return null;
+        }
+
         input.WarpTargets.Clear();
         Frame(controller, input, start, 0, KeyCode.S); yield return null;
         Frame(controller, input, edge, 0, KeyCode.LeftControl); yield return null;
@@ -2804,14 +2830,22 @@ internal static class ControllerInputAcceptance
         {
             Frame(controller, input, start, 0, KeyCode.S); yield return null;
             Frame(controller, input, edge); yield return null;
+            float retainedPreview = Field<float>(controller, "dragScale");
             input.HasFocus = !focusLoss;
             for (int i = 0; i < (focusLoss ? 1 : 9); ++i)
             { Frame(controller, input, edge); yield return null; }
             input.HasFocus = true;
+            if (!focusLoss)
+            {
+                Require(Field<bool>(controller, "keyboardPreview") && !Field<bool>(controller, "pointerWarpPending") &&
+                    Field<bool>(controller, "pointerWrapUnavailable") && Field<float>(controller, "dragScale") == retainedPreview,
+                    "Unacknowledged warp erased the current keyboard preview");
+                Frame(controller, input, edge, 0, KeyCode.Escape); yield return null;
+            }
             Require(!Field<bool>(controller, "keyboardPreview") && !Field<bool>(controller, "pointerWarpPending") &&
                 Part().Scale.Equals(originalScale) && Field<IList>(doc, "undo").Count == history &&
                 Cursor.lockState == CursorLockMode.None && Cursor.visible,
-                "Unacknowledged warp or focus loss kept transform/cursor or changed data");
+                "Focus loss or explicit cancellation kept transform/cursor or changed data");
         }
 
         Frame(controller, input, start, 0, KeyCode.S); yield return null;
@@ -2841,14 +2875,34 @@ internal static class ControllerInputAcceptance
         Set(controller, "transformFrame", Enum.Parse(savedFrame.GetType(), "View"));
         Set(controller, "localSpace", true); Set(controller, "gizmoFamily", GizmoFamily.Combined);
         Call(controller, "SetActiveTool", BlueprintEditorTool.Transform); Call(controller, "UpdateTransformContext");
+        foreach (bool local in new[] { false, true })
+        foreach (var pair in new[] { new[] { KeyCode.X, KeyCode.Y }, new[] { KeyCode.X, KeyCode.Z }, new[] { KeyCode.Y, KeyCode.Z } })
+        {
+            Set(controller, "localSpace", local);
+            Frame(controller, input, start, 0, KeyCode.G); yield return null;
+            Frame(controller, input, start, 0, pair[0]); yield return null;
+            Frame(controller, input, start, 0, pair[1]); yield return null;
+            var planes = Field<LineRenderer[]>(Field<TransformGizmoView>(scene, "gizmo"), "movePlanes");
+            int expectedNormal = !pair.Contains(KeyCode.X) ? 0 : !pair.Contains(KeyCode.Y) ? 1 : 2;
+            for (int axis = 0; axis < 3; axis++)
+                Require((Mathf.Abs(planes[axis].startColor.r - 1f) < .004f &&
+                    Mathf.Abs(planes[axis].startColor.g - .78f) < .004f && Mathf.Abs(planes[axis].startColor.b - .32f) < .004f) == (axis == expectedNormal),
+                    "Keyboard pair highlights a different plane: " + pair[0] + pair[1] + " local=" + local +
+                    " plane=" + axis + " color=" + planes[axis].startColor + " handle=" + Field<GizmoHandleKind>(controller, "dragHandle") +
+                    " first=" + Field<GizmoAxis>(controller, "dragAxis") + " second=" + Field<GizmoAxis>(controller, "keyboardSecondAxis"));
+            Frame(controller, input, start, 0, KeyCode.Escape); yield return null;
+        }
+        Set(controller, "localSpace", true);
         foreach (KeyCode mode in new[] { KeyCode.G, KeyCode.R })
+        foreach (Vector2 border in new[] { edge, new Vector2(edge.x, viewport.yMin - 8),
+            new Vector2(viewport.xMin - 8, viewport.center.y), new Vector2(viewport.xMax + 8, viewport.center.y),
+            new Vector2(viewport.xMin + 2, viewport.yMin + 2), new Vector2(viewport.xMax - 2, viewport.yMax - 2) })
         {
             input.WarpTargets.Clear();
             Frame(controller, input, start, 0, mode); yield return null;
             Frame(controller, input, start, 0, KeyCode.X); yield return null;
             Frame(controller, input, start, 0, KeyCode.Z); yield return null;
-            Vector2 rightEdge = new Vector2(viewport.xMax - 2, viewport.center.y);
-            Frame(controller, input, rightEdge); yield return null;
+            Frame(controller, input, border); yield return null;
             Require(input.WarpTargets.Count == 1, "G/R mouse preview did not wrap");
             Vector3 beforeTranslation = Field<Vector3>(controller, "dragTranslation");
             Quaternion beforeRotation = Field<Quaternion>(controller, "dragRotation");

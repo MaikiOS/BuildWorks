@@ -1,3 +1,10 @@
+## 2026-10-13 — clean QA catalog; personal/server library contract
+
+Ostrix explicitly requested a fresh TerrainRamp-1.0-Test catalog. Archived20 personal blueprints,28 import ZIPs and thumbnails:88 files SHA-verified in artifacts/catalog-reset-20261013-214543. The new v22 library and imports are empty. Source fixtures/exports/test-fixtures/tokens/provision receipts/worlds/saves were preserved. Do not automatically repopulate cards.
+
+The [revised library contract](../specs/spec-hammer-blueprint-library.md) requires explicit imports/creation, import categories, automatic portable share files, batch import/export and a separately authorized server library. Ostrix approved two access tiers (players/admins); only administrators publish/update shared entries. Server-side file access must be enforced. These features are designed, not implemented.
+
+Installed QA remains .179. WIP .180 Store/Tick pass, but full Unity fails twice at RunMissingExchange: ExchangeMissingChoice is absent after stale rejection/Back/fresh review. Exact cause unproven. No .180 code checkpoint or deployment. Preserve failure logs in artifacts/checkpoint-0.19.180 and fix without weakening the test. Next: pass UI import lifecycle, then categories/automatic share and batch operations; original contents/v11/network requirements remain open. A new manual queue must start from the clean catalog and link source folders. Latest goal API returned blocked; the tool cannot resume it. Full goal remains incomplete; document updates do not update that API.
 ## 2026-10-13 — QA .179 deployed: complete native availability
 
 Reproduced and fixed denial of a native-eligible piece when UI category caches are empty/stale. Eligibility and registry signature now consume PieceTable.m_availablePieces; stale categories cannot grant availability. Exact prefab/current-tool membership and native costs remain. [Evidence/limits](HAMMER_AVAILABILITY_179_RU.md), [short Forest Hut queue](MANUAL_QA_179_RU.md).

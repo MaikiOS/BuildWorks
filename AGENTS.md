@@ -24,6 +24,12 @@ current work order. Work one bounded stage at a time.
 
 ## Visible progress
 
+Ostrix requested a clean QA catalog on 2026-10-13. Do not repopulate it with bulk
+libraries or automatic test blueprints. Fixture folders stay separate; cards must
+come from explicit imports or user creation. Preserve the catalog-reset backup;
+do not reset provisioning, tokens, worlds or saves to recreate removed cards.
+
+
 Maintain `docs/LIVE_CHECKLIST_RU.md` for Ostrix. Update its current action at meaningful
 step starts, after verification, and when direction changes. Separate source/test
 completion, deployment and user game acceptance; mark only evidenced results.

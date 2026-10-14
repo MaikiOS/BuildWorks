@@ -15,7 +15,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const int MaximumBytes = 32 * 1024 * 1024;
         private const string FormatName = "buildworks-blueprint";
-        private const int Version = 11;
+        internal const int Version = 12;
 
         [DataContract]
         private sealed class Envelope
@@ -29,7 +29,7 @@ namespace OstrixMods.BuildWorks
         private static readonly Dictionary<Type, Dictionary<string, Type>> Fields =
             new[] { typeof(Envelope), typeof(CompositeBlueprintStore.Blueprint), typeof(CompositeBlueprintStore.Part),
                 typeof(CompositeBlueprintStore.Group), typeof(CompositeBlueprintStore.Support),
-                typeof(CompositeBlueprintStore.SourceDocument), typeof(CompositeBlueprintStore.ForeignPartData), typeof(CompositeBlueprintStore.PrefabMetadata),
+                typeof(CompositeBlueprintStore.SourceDocument), typeof(CompositeBlueprintStore.ForeignPartData), typeof(CompositeBlueprintStore.PrefabMetadata), typeof(CompositeBlueprintStore.LibraryOrigin),
                 typeof(CompositeBlueprintStore.VectorData), typeof(CompositeBlueprintStore.QuaternionData),
                 typeof(CompositeBlueprintStore.LibraryData) }
                 .ToDictionary(type => type, type => type.GetFields(BindingFlags.Instance | BindingFlags.Public)
@@ -44,8 +44,8 @@ namespace OstrixMods.BuildWorks
 
         internal static void ValidateLibraryJson(string text, bool requireFields, bool allowSupportFields, bool allowSourceFields,
             bool allowForeignFields, bool allowContentsFields, bool allowAbsoluteScaleFields, bool allowPlacementImportFields,
-            bool allowBaseScaleFields, bool allowMetadataFields = true, bool allowMaterialSeedFields = true, bool allowHiddenSources = true) => ValidateStructure(
-            Encoding.UTF8.GetBytes(text), typeof(CompositeBlueprintStore.LibraryData), requireFields, allowSupportFields, allowSourceFields, allowForeignFields, allowContentsFields, allowAbsoluteScaleFields, allowPlacementImportFields, allowBaseScaleFields, allowMetadataFields, allowMaterialSeedFields, allowHiddenSources);
+            bool allowBaseScaleFields, bool allowMetadataFields = true, bool allowMaterialSeedFields = true, bool allowHiddenSources = true, bool allowLibraryOriginFields = true) => ValidateStructure(
+            Encoding.UTF8.GetBytes(text), typeof(CompositeBlueprintStore.LibraryData), requireFields, allowSupportFields, allowSourceFields, allowForeignFields, allowContentsFields, allowAbsoluteScaleFields, allowPlacementImportFields, allowBaseScaleFields, allowMetadataFields, allowMaterialSeedFields, allowHiddenSources, allowLibraryOriginFields);
 
         internal static string DecodeSignText(string token, bool allowLegacyLiteral = false)
         {
@@ -86,7 +86,7 @@ namespace OstrixMods.BuildWorks
         }
 
         private static void ValidateStructure(byte[] bytes, Type expected, bool requireFields = true, bool allowSupportFields = true,
-            bool allowSourceFields = true, bool allowForeignFields = true, bool allowContentsFields = true, bool allowAbsoluteScaleFields = true, bool allowPlacementImportFields = false, bool allowBaseScaleFields = true, bool allowMetadataFields = true, bool allowMaterialSeedFields = true, bool allowHiddenSources = true)
+            bool allowSourceFields = true, bool allowForeignFields = true, bool allowContentsFields = true, bool allowAbsoluteScaleFields = true, bool allowPlacementImportFields = false, bool allowBaseScaleFields = true, bool allowMetadataFields = true, bool allowMaterialSeedFields = true, bool allowHiddenSources = true, bool allowLibraryOriginFields = true)
         {
             using (XmlDictionaryReader reader = JsonReaderWriterFactory.CreateJsonReader(bytes,
                 new XmlDictionaryReaderQuotas
@@ -99,7 +99,7 @@ namespace OstrixMods.BuildWorks
                 }))
             {
                 reader.MoveToContent();
-                ValidateNode(reader, expected, requireFields, allowSupportFields, allowSourceFields, allowForeignFields, allowContentsFields, allowAbsoluteScaleFields, allowPlacementImportFields, allowBaseScaleFields, allowMetadataFields, allowMaterialSeedFields, allowHiddenSources);
+                ValidateNode(reader, expected, requireFields, allowSupportFields, allowSourceFields, allowForeignFields, allowContentsFields, allowAbsoluteScaleFields, allowPlacementImportFields, allowBaseScaleFields, allowMetadataFields, allowMaterialSeedFields, allowHiddenSources, allowLibraryOriginFields);
                 if (reader.MoveToContent() != XmlNodeType.None) throw new InvalidDataException("$buildworks_import.document_invalid");
             }
         }
@@ -121,8 +121,11 @@ namespace OstrixMods.BuildWorks
             }
         }
 
-        internal static CompositeBlueprintStore.Blueprint Decode(string text)
+        internal static CompositeBlueprintStore.Blueprint Decode(string text) => DecodeWithVersion(text, out _);
+
+        internal static CompositeBlueprintStore.Blueprint DecodeWithVersion(string text, out int formatVersion)
         {
+            formatVersion = 0;
             if (text == null || Encoding.UTF8.GetByteCount(text) > MaximumBytes)
                 throw new InvalidDataException("$buildworks_import.file_limit");
             byte[] bytes = new UTF8Encoding(false, true).GetBytes(text.TrimStart('\uFEFF'));
@@ -139,7 +142,7 @@ namespace OstrixMods.BuildWorks
                         allowSourceFields: envelope.version >= 3, allowForeignFields: envelope.version >= 4,
                         allowContentsFields: envelope.version >= 5, allowAbsoluteScaleFields: envelope.version >= 6,
                         allowBaseScaleFields: envelope.version >= 7, allowMetadataFields: envelope.version >= 9,
-                        allowMaterialSeedFields: envelope.version >= 10);
+                        allowMaterialSeedFields: envelope.version >= 10, allowLibraryOriginFields: envelope.version >= 12);
                 if (envelope.blueprint != null)
                     envelope.blueprint.supports = envelope.blueprint.supports ?? new List<CompositeBlueprintStore.Support>();
                 if (envelope.version < 8 && envelope.blueprint?.parts?.Count == 1)
@@ -150,6 +153,7 @@ namespace OstrixMods.BuildWorks
                 if (envelope.requiredPrefabIds == null ||
                     !envelope.requiredPrefabIds.SequenceEqual(Prefabs(envelope.blueprint), StringComparer.Ordinal))
                     throw new InvalidDataException("$buildworks_import.document_invalid");
+                formatVersion = envelope.version;
                 return envelope.blueprint;
             }
             catch (Exception exception) when (exception is SerializationException || exception is XmlException ||
@@ -184,7 +188,7 @@ namespace OstrixMods.BuildWorks
 
         // Reject unknown and duplicate fields rather than silently converting a newer document with data loss.
         private static void ValidateNode(XmlReader reader, Type expected, bool requireFields, bool allowSupportFields,
-            bool allowSourceFields, bool allowForeignFields, bool allowContentsFields, bool allowAbsoluteScaleFields, bool allowPlacementImportFields, bool allowBaseScaleFields, bool allowMetadataFields, bool allowMaterialSeedFields, bool allowHiddenSources, bool sourceText = false, bool inventoryPackage = false, bool customSnapPoints = false)
+            bool allowSourceFields, bool allowForeignFields, bool allowContentsFields, bool allowAbsoluteScaleFields, bool allowPlacementImportFields, bool allowBaseScaleFields, bool allowMetadataFields, bool allowMaterialSeedFields, bool allowHiddenSources, bool allowLibraryOriginFields, bool sourceText = false, bool inventoryPackage = false, bool customSnapPoints = false)
         {
             string kind = reader.GetAttribute("type");
             if (kind == "null")
@@ -198,6 +202,7 @@ namespace OstrixMods.BuildWorks
                 if (kind != "array") throw new InvalidDataException("$buildworks_import.document_invalid");
                 Type item = expected.GetGenericArguments()[0];
                 int count = 0, limit = customSnapPoints ? CompositeBlueprintStore.MaximumCustomSnapPoints :
+                    item == typeof(CompositeBlueprintStore.LibraryOrigin) ? CompositeBlueprintStore.MaximumLibraryOrigins :
                     item == typeof(CompositeBlueprintStore.Part) || item == typeof(string)
                     ? CompositeBlueprintStore.MaximumParts : item == typeof(CompositeBlueprintStore.Group) ||
                         item == typeof(CompositeBlueprintStore.Support) || item == typeof(CompositeBlueprintStore.SourceDocument) ? 64 : 512;
@@ -206,7 +211,7 @@ namespace OstrixMods.BuildWorks
                 while (reader.MoveToContent() == XmlNodeType.Element)
                 {
                     if (reader.LocalName != "item" || ++count > limit) throw new InvalidDataException("$buildworks_import.document_invalid");
-                    ValidateNode(reader, item, requireFields, allowSupportFields, allowSourceFields, allowForeignFields, allowContentsFields, allowAbsoluteScaleFields, allowPlacementImportFields, allowBaseScaleFields, allowMetadataFields, allowMaterialSeedFields, allowHiddenSources);
+                    ValidateNode(reader, item, requireFields, allowSupportFields, allowSourceFields, allowForeignFields, allowContentsFields, allowAbsoluteScaleFields, allowPlacementImportFields, allowBaseScaleFields, allowMetadataFields, allowMaterialSeedFields, allowHiddenSources, allowLibraryOriginFields);
                 }
                 reader.ReadEndElement();
                 return;
@@ -243,12 +248,13 @@ namespace OstrixMods.BuildWorks
                     !allowBaseScaleFields && expected == typeof(CompositeBlueprintStore.Part) && reader.LocalName == "baseScale" ||
                     !allowMetadataFields && expected == typeof(CompositeBlueprintStore.Part) && reader.LocalName == "metadata" ||
                     !allowMaterialSeedFields && expected == typeof(CompositeBlueprintStore.Part) && reader.LocalName == "materialSeed" ||
-                    !allowHiddenSources && expected == typeof(CompositeBlueprintStore.LibraryData) && reader.LocalName == "hiddenSources")
+                    !allowHiddenSources && expected == typeof(CompositeBlueprintStore.LibraryData) && reader.LocalName == "hiddenSources" ||
+                    !allowLibraryOriginFields && expected == typeof(CompositeBlueprintStore.Blueprint) && reader.LocalName == "libraryOrigins")
                     throw new InvalidDataException("$buildworks_import.document_invalid");
                 bool textField = expected == typeof(CompositeBlueprintStore.SourceDocument) && reader.LocalName == "text";
                 bool packageField = expected == typeof(CompositeBlueprintStore.ForeignPartData) && reader.LocalName == "zdo";
                 bool snapField = expected == typeof(CompositeBlueprintStore.Blueprint) && reader.LocalName == "customSnapPoints";
-                ValidateNode(reader, field, requireFields, allowSupportFields, allowSourceFields, allowForeignFields, allowContentsFields, allowAbsoluteScaleFields, allowPlacementImportFields, allowBaseScaleFields, allowMetadataFields, allowMaterialSeedFields, allowHiddenSources, textField, packageField, snapField);
+                ValidateNode(reader, field, requireFields, allowSupportFields, allowSourceFields, allowForeignFields, allowContentsFields, allowAbsoluteScaleFields, allowPlacementImportFields, allowBaseScaleFields, allowMetadataFields, allowMaterialSeedFields, allowHiddenSources, allowLibraryOriginFields, textField, packageField, snapField);
             }
             if (requireFields && RequiredFields[expected].Any(name => !seen.Contains(name)))
                 throw new InvalidDataException("$buildworks_import.document_invalid");

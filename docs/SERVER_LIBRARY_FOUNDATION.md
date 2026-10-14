@@ -21,7 +21,15 @@ Core requires an already authenticated principal supplied by the server caller. 
 
 Current Valheim ZRoutedRpc.RPC_RoutedRPC deserializes sender from its payload without binding it to the incoming ZRpc. Routed sender UID therefore cannot establish admin authority. Native Kick/Ban callbacks use socket.GetHostName and the admin-list policy; the IL was inspected. Runtime registers direct typed ZRpc callbacks without replacing the existing Valheim handshake. Inert tests do not prove a live connection.
 
-Storage uses separate `<id>.bwserver.zip` files with exactly `access.json` and `blueprint.buildworks.json`: metadata version1, ID/revision/access/publisher/editor/time/SHA. Temporary files are excluded. Portable documents retain the existing format; construction cost, restore rights and world/network identity are unchanged.
+Storage uses separate `<id>.bwserver.zip` files with exactly `access.json` and `blueprint.buildworks.json`: metadata version1, ID/revision/access/publisher/editor/time/SHA. Temporary files are excluded. Native23/portable12 add optional libraryOrigins; construction cost, restore rights and world/network identity are unchanged. Previous native22/portable11 remain readable; old builds cannot read the new format.
+
+LibraryOrigin v1 records the observed server, world UID, server entry ID/revision, visibility at receipt, publishing account, SHA of original bytes and their portable format version. It is informational, not authority or signed attestation. The publishing account does not replace the external model's author/terms retained in SourceDocument.
+
+TrySaveAcceptedCopy creates a fresh personal ID without changing the source. Its game UI caller is not connected yet. The caller must derive origin from a verified client read-result SHA and exact bytes before host prefab preparation, using DecodeWithVersion; transient placementImportId is not provenance. At most16 records are retained, with explicit over-limit refusal and no silent truncation. A matching receipt refreshes the informational record.
+
+Deep copies/update/actual-controller Save As/native/share/JSON/ZIP/reload/external DetachedCopy and locked-write rollback are tested. PlanBuild explicitly warns about omitted provenance and retains full data in the adjacent native file. Malformed/unknown/duplicate/future fields, ID/version/bounds are refused. Accept UI and origin merging when inserting another document's parts remain open.
+
+Full Store, normal/QA0/0, Host Steam25730771, loc1057/runtime localization and correctness PASSED/Ponytail Ship pass. Exact-source Unity588 at2026-10-14T13:37:16Z verifies Save As and PlanBuild warning;39 source hashes match. Previous .183 UI evidence is preserved in artifacts/server-library-wip/previous-ui-183 and its checkpoint status/hash/log. Installed .183 is unchanged; this does not prove a live server journey.
 
 Bounds:512 entries,128 MiB aggregate stored and unpacked bytes,100000 aggregate parts,32 MiB portable document,4096 metadata bytes. Remaining unpacked budget is checked before reading a member; physical size is checked on the opened FileStream. Corruption fails loading as a whole, without publishing a partial public cache. Changed files are refused before read/update/delete. Automatic watching of manual filesystem edits is not implemented.
 

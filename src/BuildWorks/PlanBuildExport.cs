@@ -18,7 +18,7 @@ namespace OstrixMods.BuildWorks
         private bool cancelled;
         internal readonly SortedDictionary<string, int> OmittedSigns = new SortedDictionary<string, int>(StringComparer.Ordinal);
         internal readonly SortedDictionary<string, int> OmittedState = new SortedDictionary<string, int>(StringComparer.Ordinal);
-        internal int Parts, Groups, Supports, Anchors, Metadata, Sources, MaterialSeeds, CustomSnaps;
+        internal int Parts, Groups, Supports, Anchors, Metadata, Sources, MaterialSeeds, CustomSnaps, LibraryOrigins;
         internal int IgnoredSnapPointRows;
 
         private PlanBuildExport(byte[] nativeBytes, byte[] planBytes)
@@ -56,6 +56,7 @@ namespace OstrixMods.BuildWorks
                 Anchors = document.anchors.Count,
                 Metadata = document.parts.Count(part => part.metadata != null),
                 Sources = document.sourceDocuments?.Count ?? 0,
+                LibraryOrigins = document.libraryOrigins?.Count ?? 0,
                 MaterialSeeds = document.parts.Count(part => part.materialSeed.HasValue),
                 CustomSnaps = document.customSnapPoints?.Count ?? 0,
                 IgnoredSnapPointRows = document.sourceDocuments?.Sum(sourceDocument => sourceDocument.ToGeometry().IgnoredSnapPointRows) ?? 0

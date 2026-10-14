@@ -35,7 +35,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(!portable.Contains("placementImportId") && first.placementImportId == source.id &&
                 BlueprintExchangeFormat.Decode(portable).parts.Count == 2, "Portable export leaked local placement cache identity");
             string invalidOld = Path.Combine(directory, "old-with-cache.json");
-            File.WriteAllText(invalidOld, File.ReadAllText(path).Replace(",\"hiddenSources\":[]", "").Replace("\"version\":22", "\"version\":15"));
+            File.WriteAllText(invalidOld, File.ReadAllText(path).Replace(",\"hiddenSources\":[]", "").Replace("\"version\":23", "\"version\":15"));
             Require(new CompositeBlueprintStore(invalidOld).All().Count == 0, "Old native schema accepted placement cache field");
             Require(ReferenceEquals(source, store.CatalogAll().Single(x => x.IsExternal)) && scaleReads == 1,
                 "Native save reconverted external library");

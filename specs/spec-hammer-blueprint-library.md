@@ -1,3 +1,11 @@
+## 2026-10-14 — .184 WIP: происхождение целого документа, native23/portable12
+
+Сохраняемая история LibraryOrigin v1: наблюдаемый сервер/мир, ID/ревизия серверной записи, видимость при получении, публикатор, SHA и версия исходного формата. Это справочная история, не серверные права/подпись. TrySaveAcceptedCopy создаёт новый личный ID, сохраняет данные/историю и исходник. Clone/update/настоящий controller Save As/share/ZIP/reload/external DetachedCopy проверены. Лимит16 не обрезается молча; malformed/future/unknown/duplicate поля и атомарные отказы проверены. PlanBuild предупреждает о пропуске истории; полный файл сохраняется рядом. Прежние native22/portable11 читаются, старые сборки новый формат не прочитают.
+
+normal/QA0/0, полный Store, Host Steam25730771, loc1057/runtime loc, correctness PASSED/Ponytail Ship и exact-source Unity588 прошли. Unity2026-10-14T13:37:16Z/39 source hashes; старые UI-доказательства .183 сохранены отдельно в artifacts/server-library-wip/previous-ui-183 и checkpoint .183. Formatter135 прежних/0 новых. Evidence: artifacts/server-library-wip/origin-*.
+
+**Игровой серверный интерфейс/приём личной копии ещё не подключены.** UI должен строить origin из проверенных точных read-result bytes/SHA до подготовки под host prefab. Не использовать transient placementImportId. Объединение происхождения при вставке частей другого документа тоже открыто. Следом один серверный источник обоих каталогов, admin-кнопки, принятие копии; после этого установка/host+remote/reconnect/restart. .184 WIP не устанавливать до готового сценария. Установленная .183 и ручная очередь группового обмена остаются актуальны; игру, модель, ввод, миры и saves не запускали. Полная цель ACTIVE и не завершена. История ниже.
+
 ## Verified checkpoint .183 — 2026-10-14
 
 Batch import/export is implemented, automatically checked and deployed: common/per-document/original category, document exclusion, explicit skip report and one atomic publication. Batch export is full internal BuildWorks ZIP. Server library and in-game player transfer remain designed. See docs/BATCH_EXCHANGE_183.md and docs/MANUAL_QA_183.md. Earlier unimplemented status statements below are historical.

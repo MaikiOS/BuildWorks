@@ -101,7 +101,9 @@ internal static class ControllerInputAcceptance
         var support = new CompositeBlueprintStore.Support { stableId = "s", name = "Support",
             rotation = new CompositeBlueprintStore.QuaternionData { w = 1 } };
         var preview = new CompositeBlueprintStore.Blueprint { previewYaw = 67, previewPitch = 23, previewZoom = 1.3f,
-            placementImportId = "original-import" };
+            placementImportId = "original-import",
+            libraryOrigins = new List<CompositeBlueprintStore.LibraryOrigin> { new CompositeBlueprintStore.LibraryOrigin(
+                "server.test", 71, Guid.NewGuid().ToString("N"), 3, 0, "Steam_admin", new string('A', 64), 12) } };
         Require(store.TrySaveDocument("Original", "OTHER", new[] { part },
             new[] { new CompositeBlueprintStore.Group { stableId = "g", name = "Group", pivotPartId = "wall" } },
             Array.Empty<CompositeBlueprintStore.VectorData>(), "wall", null, new[] { support }, "s",
@@ -144,7 +146,9 @@ internal static class ControllerInputAcceptance
                 copy.parts[0].displayName == "Edited wall" && copy.parts[0].scale.y == .5f && copy.parts[0].materialSeed == 0 &&
                 copy.groups[0].pivotPartId == "wall" && copy.placementSupportId == "s" && copy.customSnapPoints[0].x == 3 &&
                 copy.sourceDocuments[0].text == evidence.Text && copy.previewYaw == 67 && copy.previewPitch == 23 &&
-                copy.previewZoom == 1.3f && copy.placementImportId == null,
+                copy.previewZoom == 1.3f && copy.placementImportId == null && copy.libraryOrigins.Count == 1 &&
+                copy.libraryOrigins[0].server == "server.test" && copy.libraryOrigins[0].revision == 3 &&
+                !ReferenceEquals(copy.libraryOrigins[0], original.libraryOrigins[0]),
                 "Save As lost supported data, reused import identity or overwrote original");
             Require(controller.Document.Rename("wall", "Updated copy"), "Cannot edit saved copy");
             Call(controller, "Bind", (object)null);
@@ -2027,6 +2031,9 @@ internal static class ControllerInputAcceptance
                     "ZIP export changed pinned size or multiplier");
                 NativeClick(view, null, "ExchangeClose"); yield return null;
                 Require(!view.HasModal, "Close button cannot dismiss result");
+                prepared = prepared.ImportCopy();
+                prepared.libraryOrigins = new List<CompositeBlueprintStore.LibraryOrigin> { new CompositeBlueprintStore.LibraryOrigin(
+                    "server.test", 71, Guid.NewGuid().ToString("N"), 3, 0, "Steam_admin", new string('A', 64), 12) };
                 view.ShowExchange((parent, textFont, closed) => new BlueprintExchangeView(parent, textFont, store, prepared, closed)); yield return null;
                 exchange = Field<BlueprintExchangeView>(view, "exchangeView");
                 for (int i = 0; i < 300 && Field<Task<string[]>>(exchange, "listing") != null; ++i)
@@ -2040,6 +2047,8 @@ internal static class ControllerInputAcceptance
                 { Frame(controller, input, Vector2.zero); yield return null; }
                 string planPath = Path.Combine(store.ExportDirectory, planName);
                 var planDetails = Field<TMP_Text>(exchange, "contentsDetails");
+                Require(planDetails.text.Contains(BuildWorksLocalization.Text("exchange.plan_origins", 1)),
+                    "PlanBuild review silently omitted library provenance");
                 Require(Field<PlanBuildExport>(exchange, "planReview") != null && !Directory.Exists(planPath) &&
                     planDetails.text.Contains(planName + ".buildworks.json") && planDetails.text.Contains(planName + ".blueprint") &&
                     !Field<Button>(exchange, "storageChoice").gameObject.activeSelf &&

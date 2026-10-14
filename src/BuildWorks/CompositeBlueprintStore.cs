@@ -35,7 +35,8 @@ namespace OstrixMods.BuildWorks
         internal const string DefaultCategory = "OTHER";
         private const string LegacyDefaultCategory = "ПРОЧЕЕ";
         private const string LocalizationPrefix = "$buildworks_";
-        private const int FormatVersion = 22;
+        private const int FormatVersion = 23;
+        internal const int MaximumLibraryOrigins = 16;
         private const int MaximumBlueprints = 32;
         private const int MaximumCategories = 12;
         private const int MaximumAnchors = 512;
@@ -1258,7 +1259,8 @@ namespace OstrixMods.BuildWorks
                 previewPitch = previewTemplate?.previewPitch ?? 30f,
                 previewZoom = previewTemplate?.previewZoom ?? 1f,
                 sourceDocuments = CloneSources(sourceDocuments ?? previewTemplate?.sourceDocuments),
-                placementImportId = previewTemplate?.placementImportId
+                placementImportId = previewTemplate?.placementImportId,
+                libraryOrigins = CloneLibraryOrigins(previewTemplate?.libraryOrigins)
             };
             if (!Valid(blueprint)) { blueprint = null; error = UserError("store.verify_data_failed"); return false; }
             if (addCategory) data.categories.Add(category);
@@ -1708,7 +1710,8 @@ namespace OstrixMods.BuildWorks
                     allowForeignFields: loaded.version >= 13, allowContentsFields: loaded.version >= 14,
                     allowAbsoluteScaleFields: loaded.version >= 15, allowPlacementImportFields: loaded.version >= 16,
                     allowBaseScaleFields: loaded.version >= 17, allowMetadataFields: loaded.version >= 19,
-                    allowMaterialSeedFields: loaded.version >= 20, allowHiddenSources: loaded.version >= 21);
+                    allowMaterialSeedFields: loaded.version >= 20, allowHiddenSources: loaded.version >= 21,
+                    allowLibraryOriginFields: loaded.version >= 23);
                 loaded.blueprints = loaded.blueprints ?? new List<Blueprint>();
                 loaded.categories = loaded.categories ?? new List<string>();
                 loaded.hiddenSources = loaded.hiddenSources ?? new List<string>();
@@ -1936,7 +1939,7 @@ namespace OstrixMods.BuildWorks
                 blueprint.anchors.Count > MaximumAnchors || blueprint.groups == null ||
                 blueprint.groups.Count > MaximumGroups ||
                 !ValidDocument(blueprint.parts, blueprint.groups, blueprint.supports) ||
-                !ValidSources(blueprint.parts, blueprint.sourceDocuments) ||
+                !ValidSources(blueprint.parts, blueprint.sourceDocuments) || !ValidLibraryOrigins(blueprint.libraryOrigins) ||
                 !ValidPlacementSupport(blueprint.supports, blueprint.placementSupportId) ||
                 !ValidCustomSnapPoints(blueprint.customSnapPoints) ||
                 !ValidPrimaryPart(blueprint.parts, blueprint.primaryPartId) ||
@@ -1959,6 +1962,45 @@ namespace OstrixMods.BuildWorks
 
         internal static List<SourceDocument> CloneSources(IReadOnlyList<SourceDocument> sources) => sources?.Select(source =>
             source?.Copy()).ToList();
+
+        internal static List<LibraryOrigin> CloneLibraryOrigins(IReadOnlyList<LibraryOrigin> origins) => origins?.Select(origin => origin?.Copy()).ToList();
+
+        internal static bool ValidLibraryOrigins(IReadOnlyList<LibraryOrigin> origins)
+        {
+            if (origins == null) return true;
+            if (origins.Count > MaximumLibraryOrigins) return false;
+            var seen = new HashSet<(string, long, string, long, string)>();
+            foreach (var origin in origins)
+                if (origin == null || origin.version != 1 || origin.worldUid == 0 || origin.revision < 1 || origin.access < 0 || origin.access > 1 ||
+                    origin.formatVersion < 1 || origin.formatVersion > BlueprintExchangeFormat.Version ||
+                    !Guid.TryParseExact(origin.documentId, "N", out Guid identity) || origin.documentId != identity.ToString("N") || origin.sha256 == null || origin.sha256.Length != 64 ||
+                    origin.sha256.Any(c => !Uri.IsHexDigit(c)) || origin.sha256 != origin.sha256.ToUpperInvariant() ||
+                    !OriginLabel(origin.server) || !OriginLabel(origin.publisher) ||
+                    !seen.Add((origin.server, origin.worldUid, origin.documentId, origin.revision, origin.sha256))) return false;
+            return true;
+        }
+        private static bool OriginLabel(string value) => !string.IsNullOrWhiteSpace(value) && value.Length <= 256 && value == value.Trim() &&
+            !value.Any(c => char.IsControl(c) || c == '<' || c == '>');
+
+        internal bool TrySaveAcceptedCopy(Blueprint source, LibraryOrigin origin, out Blueprint copy, out string error)
+        {
+            copy = null;
+            if (source == null || source.IsExternal || !Valid(source) || !ValidLibraryOrigins(new[] { origin }))
+            { error = UserError("store.invalid_composition"); return false; }
+            var template = source.ImportCopy();
+            template.libraryOrigins = template.libraryOrigins ?? new List<LibraryOrigin>();
+            int match = template.libraryOrigins.FindIndex(existing => existing.server == origin.server && existing.worldUid == origin.worldUid &&
+                existing.documentId == origin.documentId && existing.revision == origin.revision && existing.sha256 == origin.sha256);
+            if (match >= 0) template.libraryOrigins[match] = origin.Copy();
+            else
+            {
+                if (template.libraryOrigins.Count >= MaximumLibraryOrigins) { error = UserError("server.origin_limit"); return false; }
+                template.libraryOrigins.Add(origin.Copy());
+            }
+            if (!ValidLibraryOrigins(template.libraryOrigins)) { error = UserError("store.invalid_composition"); return false; }
+            return TrySaveDocument(source.name, source.category, source.parts, source.groups, source.anchors, source.primaryPartId, source.primaryGroupId,
+                source.supports, source.placementSupportId, out copy, out error, source.customSnapPoints, template, source.sourceDocuments);
+        }
 
         internal static bool ValidSources(IReadOnlyList<Part> parts, IReadOnlyList<SourceDocument> sources)
         {
@@ -2300,6 +2342,7 @@ namespace OstrixMods.BuildWorks
                 var copy = (Blueprint)MemberwiseClone();
                 copy.parts = CloneParts(parts);
                 copy.sourceDocuments = CloneSources(sourceDocuments);
+                copy.libraryOrigins = CloneLibraryOrigins(libraryOrigins);
                 return copy;
             }
             public string importSource;
@@ -2340,6 +2383,29 @@ namespace OstrixMods.BuildWorks
             public List<SourceDocument> sourceDocuments;
             [DataMember(Order = 16, EmitDefaultValue = false)]
             public string placementImportId;
+            [DataMember(Order = 17, EmitDefaultValue = false)]
+            public List<LibraryOrigin> libraryOrigins;
+        }
+
+        // Informational provenance only. Serialized metadata never establishes server authority.
+        [DataContract]
+        internal sealed class LibraryOrigin
+        {
+            [DataMember(Order = 0)] public int version = 1;
+            [DataMember(Order = 1)] public string server;
+            [DataMember(Order = 2)] public long worldUid;
+            [DataMember(Order = 3)] public string documentId;
+            [DataMember(Order = 4)] public long revision;
+            [DataMember(Order = 5)] public int access;
+            [DataMember(Order = 6)] public string publisher;
+            [DataMember(Order = 7)] public string sha256;
+            [DataMember(Order = 8)] public int formatVersion;
+            internal LibraryOrigin(string server, long worldUid, string documentId, long revision, int access, string publisher, string sha256, int formatVersion)
+            {
+                this.server = server; this.worldUid = worldUid; this.documentId = documentId; this.revision = revision;
+                this.access = access; this.publisher = publisher; this.sha256 = sha256; this.formatVersion = formatVersion;
+            }
+            internal LibraryOrigin Copy() => (LibraryOrigin)MemberwiseClone();
         }
 
         [DataContract]

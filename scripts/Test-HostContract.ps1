@@ -1992,7 +1992,7 @@ Assert-Contract ($updateDocumentMethods.Count -eq 5 -and
         @($_.Parameters | Where-Object Name -eq 'placementSupportId').Count -eq 1
     }).Count -eq 1) `
     'Blueprint frame update overload or a compatibility overload is missing.'
-Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion = 22' -and
+Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion = 23' -and
     $blueprintStoreSource -match 'loaded\.version < 6' -and
     $blueprintStoreSource -match 'ValidScale\(part\.scale\)' -and
     $blueprintStoreSource -match 'if \(loaded\.version < 4\)' -and

@@ -1296,7 +1296,7 @@ public static class RuntimeEditorAcceptance
         Require(reloaded.All().Count == 1, "Actual disk library roundtrip");
         Require(Mathf.Abs(reloaded.All()[0].parts[0].scale.x - expected) < 0.0001f, "Store discarded scale");
         CheckReopenedCopy(controller, reloaded, expected);
-        Require(File.ReadAllText(path).Contains("\"version\":22"), "Controller did not write format22");
+        Require(File.ReadAllText(path).Contains("\"version\":23"), "Controller did not write format23");
         checks.Add("Controller save -> disk format21 -> new store -> OpenExisting retains scale, rotated root-owned support and placement reference; transient support focus absent");
     }
 

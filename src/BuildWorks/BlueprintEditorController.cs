@@ -4139,7 +4139,8 @@ namespace OstrixMods.BuildWorks
                         {
                             previewYaw = template.previewYaw,
                             previewPitch = template.previewPitch,
-                            previewZoom = template.previewZoom
+                            previewZoom = template.previewZoom,
+                            libraryOrigins = CompositeBlueprintStore.CloneLibraryOrigins(template.libraryOrigins)
                         };
                     success = store.TrySaveDocument(
                         copyName ?? document.Name,

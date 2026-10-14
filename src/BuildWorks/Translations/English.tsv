@@ -1058,3 +1058,5 @@ server.conflict	The server blueprint revision changed. Refresh before retrying.
 server.invalid	Invalid server blueprint library data.
 server.unauthenticated	No authenticated server connection.
 server.unavailable	Server blueprint unavailable or access denied.
+server.origin_limit	Cannot save this copy: the document already contains 16 library origin records. No history was removed.
+exchange.plan_origins	Library provenance records: {0}. PlanBuild does not store them; the full adjacent BuildWorks file retains them.

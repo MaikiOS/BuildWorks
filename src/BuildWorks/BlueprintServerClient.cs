@@ -41,11 +41,13 @@ namespace OstrixMods.BuildWorks
         internal bool Ready => !disposed && session != Guid.Empty;
         internal bool IsAdministrator { get; private set; }
         internal bool Busy => active != null;
+        internal long WorldUid => world;
+        internal string ServerIdentity { get; }
         internal float Progress => active == null ? 0 : active.Upload != null ? (float)active.Offset / active.Upload.Length :
             active.Incoming != null ? (float)active.Incoming.Received / active.Received.Bytes : 0;
 
-        internal BlueprintServerClient(long world, Action<byte[]> send)
-        { if (world == 0 || send == null) throw new ArgumentException(); this.world = world; this.send = send; }
+        internal BlueprintServerClient(long world, Action<byte[]> send, string serverIdentity = null)
+        { if (world == 0 || send == null) throw new ArgumentException(); this.world = world; this.send = send; ServerIdentity = serverIdentity; }
         internal Task<Result> List(int offset = 0) => Begin(new P.Message { Kind = P.Command.List, Offset = offset });
         internal Task<Result> Read(P.Item item)
         {

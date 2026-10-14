@@ -723,6 +723,14 @@ namespace OstrixMods.BuildWorks
                 if (blueprint == null) { view.SetStatus(BuildWorksLocalization.Text("catalog.choose_blueprint")); return; }
                 view.ShowExchange((parent, font, closed) => BlueprintExchangeView.ForShareFile(parent, font, store, blueprint, closed));
             };
+            view.CatalogServerRequested += blueprint => view.ShowExchange((parent, font, closed) =>
+                BlueprintExchangeView.ForServer(parent, font, store, blueprint, () => (BlueprintServerClient)BuildWorksPlugin.ServerLibraryClient, closed,
+                    accepted: imported =>
+                    {
+                        if (!IsEditing || !view.HasCatalog || imported.Length == 0) return;
+                        catalogImportPending = true;
+                        pendingImportedBlueprint = imported[0]; pendingImportedCount = imported.Length; pendingImportedFrame = Time.frameCount;
+                    }));
             view.InspectorSubmitted += ApplyInspector;
             view.RenameSubmitted += (id, name) => ApplyDocumentEdit(() =>
                 document.Rename(id, name));

@@ -15,7 +15,7 @@ using Object = UnityEngine.Object;
 
 // The only substituted boundary is physical input. Every gesture enters actual Update/LateUpdate;
 // UI clicks are resolved by the actual GraphicRaycaster before native pointer handlers run.
-internal static class ControllerInputAcceptance
+internal static partial class ControllerInputAcceptance
 {
     private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
     private static T Field<T>(object instance, string name) => (T)instance.GetType().GetField(name, Private).GetValue(instance);

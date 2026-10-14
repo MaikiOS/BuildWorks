@@ -1060,3 +1060,45 @@ server.unauthenticated	No authenticated server connection.
 server.unavailable	Server blueprint unavailable or access denied.
 server.origin_limit	Cannot save this copy: the document already contains 16 library origin records. No history was removed.
 exchange.plan_origins	Library provenance records: {0}. PlanBuild does not store them; the full adjacent BuildWorks file retains them.
+server.tab	Server
+server.library	Server library
+server.help	Save a personal copy to use a blueprint. Saving does not start construction.
+server.choose	Select a server blueprint. Its file is checked before you confirm a personal copy.
+server.no_connection	No server connection. BuildWorks must be installed on the server; you can close this window.
+server.refresh	Refresh
+server.delete	Delete from server
+server.delete_review	Delete “{0}”, revision {1}, from the server library? Personal copies and built objects remain.
+server.publish	Publish selected local
+server.update	Update selected server
+server.cancel	Cancel preparation
+server.receive	Get a personal copy…
+server.preparing	Checking and preparing the document…
+server.copy_review	Review the document, then confirm saving your personal copy.
+server.copy_details	{0}\nParts: {1}; missing: {2}.\nStorages: {3}; stored items: {4}; mounted items: {5}.\nUnknown/unsupported states: {6}. Saved data does not guarantee restored behavior.\n\nMissing records and contents stay in the copy. Construction and contents placement follow their own permissions and costs.
+server.publication_review	Confirm the server operation. Nothing has been published yet.
+server.update_review	Use the saved local “{0}” to update server “{1}”, revision {2}. The chosen visibility will apply. Your local document remains unchanged.
+server.publish_review	Publish the saved local “{0}” as a new server entry with the chosen visibility. Your local document remains unchanged; construction does not start.
+server.empty	No server blueprints are available to you.
+server.ready	Choose a blueprint or refresh the list.
+server.operation_done	Server operation confirmed.
+server.waiting	Waiting for server — {0}%
+server.saved	Personal copy saved: {0}
+server.saved_details	The new personal blueprint has its own ID and source provenance. Close this window to find it in your catalog. No world objects or resources were changed.
+server.check_result	Waiting stopped. The server may have committed the operation; refresh the list before repeating it.
+server.busy	An operation is still running. Wait briefly, then refresh the list.
+server.cancelled	Preparation cancelled. No personal copy was saved.
+server.failed	The server operation failed. Refresh the list before repeating a change.
+server.timeout	No server response. Check that BuildWorks is installed on the server; refresh the list before repeating a publication.
+server.row	{0} parts · revision {1}
+server.details	{0}\nCategory: {1}\nPublished by: {2}\nRevision: {3}\nParts: {4}\nBytes: {5}\nAccess: {6}
+server.players	All players
+server.administrators	Administrators only
+server.local_choose	To publish, first select a saved local blueprint in the catalog.
+server.local_selected	Saved local blueprint for publication: {0}
+server.page	Page {0} / {1}
+server.save_copy	Save personal copy
+server.confirm	Confirm server operation
+server.local_changed	The local library changed. Close this window and select the saved blueprint again.
+server.host_not_ready	The world's prefab catalog is not ready. Refresh and receive the blueprint after the world finishes loading.
+server.no_available_parts	No parts are available in this world. Install the required mods before saving a converted copy.
+server.stop_waiting	Stop waiting

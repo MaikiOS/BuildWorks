@@ -7,5 +7,6 @@ namespace OstrixMods.BuildWorks
         internal sealed class DockSetting { public int Value; }
         internal static readonly DockSetting EditorHudDock = new DockSetting();
         internal static readonly DockSetting InterfaceScalePercent = new DockSetting { Value = 80 };
+        internal static object ServerLibraryClient;
     }
 }

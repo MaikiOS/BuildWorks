@@ -1,3 +1,9 @@
+## 2026-10-14 — .184 WIP: shared server panel verified; .183 installed
+
+One editor/Hammer modal provides paged selection, exact SHA/format verification and reviewed personal-copy acceptance. Administrators publish saved documents, select visibility, update revisions and confirm deletion. Cancellation does not promise rollback of a sent mutation; dirty editor draft/history remain intact. Normal/proper QA0/0, full Store, current HostContract,1099 localization/runtime tokens, independent PASSED/Ponytail Ship and exact-source Unity612 pass (24 new Russian images across4 resolutions/3 scales). See SERVER_LIBRARY_PANEL.md and artifacts/server-library-wip/server-ui-*.
+
+**.184 remains uninstalled:** document-insertion provenance/Undo/Redo/save integration is open, then deployment and live host+remote/reconnect/restart. Installed .183 hashes and103 config/token/receipt files are unchanged. MANUAL_QA_183.md and Batch-183 remain the manual queue. No game/model/input/world/save actions. Full goal ACTIVE and incomplete; historical stages follow.
+
 # Server library — verified foundation, .184 WIP
 
 **English** | [Русский](SERVER_LIBRARY_FOUNDATION_RU.md)

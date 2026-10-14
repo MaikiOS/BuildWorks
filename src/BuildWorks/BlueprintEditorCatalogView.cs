@@ -26,8 +26,9 @@ namespace OstrixMods.BuildWorks
         internal event Action CatalogImportRequested;
         internal event Action<CompositeBlueprintStore.Blueprint> CatalogExportRequested;
         internal event Action<CompositeBlueprintStore.Blueprint> CatalogShareRequested;
+        internal event Action<CompositeBlueprintStore.Blueprint> CatalogServerRequested;
         internal event Action<CompositeBlueprintStore.Blueprint> CatalogManageRequested;
-        private Button catalogImportButton, catalogExportButton, catalogShareButton;
+        private Button catalogImportButton, catalogExportButton, catalogShareButton, catalogServerButton;
         private TMP_InputField catalogSearch, catalogPageInput;
         private TMP_Text catalogPageText, catalogBreadcrumb, catalogEmpty;
         private Button catalogPartsModeButton, catalogBlueprintsModeButton, catalogAtlasButton, catalogQuickButton,
@@ -116,6 +117,8 @@ namespace OstrixMods.BuildWorks
                 () => CatalogExportRequested?.Invoke(catalogPreviewItem?.Blueprint));
             catalogShareButton = CreateButton("CatalogShare", catalogPanel, T("share.action"), 106,
                 () => CatalogShareRequested?.Invoke(catalogPreviewItem?.Blueprint));
+            catalogServerButton = CreateButton("CatalogServer", catalogPanel, T("server.tab"), 72,
+                () => CatalogServerRequested?.Invoke(catalogPreviewItem?.Blueprint));
             AddTooltip(inputRect, CatalogText("page_help"));
             catalog.SetActive(false);
         }
@@ -153,13 +156,15 @@ namespace OstrixMods.BuildWorks
             SetBottomLeft((RectTransform)catalogPageText.transform, 54, 8, 88, 30);
             SetBottomLeft((RectTransform)catalogNextPage.transform, 148, 8, 36, 30);
             SetBottomLeft((RectTransform)catalogPageInput.transform, 198, 8, 48, 30);
-            catalogPageInput.gameObject.SetActive(!catalogBlueprintMode || catalogLayout.Width >= 620);
+            catalogPageInput.gameObject.SetActive(!catalogBlueprintMode || catalogLayout.Width >= 800);
+            SetBottomLeft((RectTransform)catalogServerButton.transform, (float)catalogLayout.Width - 430, 8, 72, 30);
             SetBottomLeft((RectTransform)catalogImportButton.transform, (float)catalogLayout.Width - 346, 8, 106, 30);
             SetBottomLeft((RectTransform)catalogShareButton.transform, (float)catalogLayout.Width - 232, 8, 106, 30);
             SetBottomLeft((RectTransform)catalogExportButton.transform, (float)catalogLayout.Width - 118, 8, 106, 30);
             catalogImportButton.gameObject.SetActive(catalogBlueprintMode);
             catalogExportButton.gameObject.SetActive(catalogBlueprintMode);
             catalogShareButton.gameObject.SetActive(catalogBlueprintMode);
+            catalogServerButton.gameObject.SetActive(catalogBlueprintMode);
         }
 
         internal void ShowCatalog(IReadOnlyList<BlueprintEditorCatalogItem> items)

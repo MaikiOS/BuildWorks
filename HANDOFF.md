@@ -1,3 +1,9 @@
+## 2026-10-14 — .184 WIP: shared server panel verified; .183 installed
+
+One editor/Hammer modal provides paged selection, exact SHA/format verification and reviewed personal-copy acceptance. Administrators publish saved documents, select visibility, update revisions and confirm deletion. Cancellation does not promise rollback of a sent mutation; dirty editor draft/history remain intact. Normal/proper QA0/0, full Store, current HostContract,1099 localization/runtime tokens, independent PASSED/Ponytail Ship and exact-source Unity612 pass (24 new Russian images across4 resolutions/3 scales). See docs/SERVER_LIBRARY_PANEL.md and artifacts/server-library-wip/server-ui-*.
+
+**.184 remains uninstalled:** document-insertion provenance/Undo/Redo/save integration is open, then deployment and live host+remote/reconnect/restart. Installed .183 hashes and103 config/token/receipt files are unchanged. MANUAL_QA_183.md and Batch-183 remain the manual queue. No game/model/input/world/save actions. Full goal ACTIVE and incomplete; historical stages follow.
+
 ## 2026-10-14 — .184 WIP: whole-document provenance, native23/portable12
 
 LibraryOrigin v1 persists observed server/world, server entry ID/revision, visibility at receipt, publishing account, source-byte SHA and original portable version. Informational only, not authority/signature. TrySaveAcceptedCopy creates a fresh personal ID while retaining data/history/source. Clone/update/actual-controller Save As/share/ZIP/reload/external DetachedCopy are verified. The16-record limit refuses explicitly without truncation; strict malformed/future/unknown/duplicate fields and atomic failure are tested. PlanBuild warns about omitted origin and keeps a full adjacent native file. Previous native22/portable11 remain readable; older builds cannot read the new format.

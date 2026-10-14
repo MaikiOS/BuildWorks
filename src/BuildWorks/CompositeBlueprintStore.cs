@@ -777,6 +777,16 @@ namespace OstrixMods.BuildWorks
             return bytes;
         }
 
+        internal Task<byte[]> PrepareServerPublication(Blueprint source)
+        {
+            if (source == null) throw new ArgumentNullException(nameof(source));
+            var snapshot = source.ImportCopy();
+            var metadata = snapshot.parts.Select(part => part.prefabName).Distinct(StringComparer.Ordinal)
+                .ToDictionary(name => name, name => prefabMetadata?.Invoke(name)?.Copy(), StringComparer.Ordinal);
+            return Task.Run(() => PrepareExportDocument(snapshot, false, false, null, false, null,
+                name => metadata.TryGetValue(name, out var value) ? value : null));
+        }
+
         internal Task<string> ExportBatch(IEnumerable<Blueprint> selected, string directory, string fileName,
             bool clearStorage, bool clearMounts, Func<string, int> prefabHash, bool omitArmorState = false,
             CancellationToken cancellation = default)

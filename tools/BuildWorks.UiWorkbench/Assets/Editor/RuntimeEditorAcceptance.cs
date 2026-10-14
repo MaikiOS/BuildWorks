@@ -344,9 +344,10 @@ public static class RuntimeEditorAcceptance
                     Canvas.ForceUpdateCanvases();
                     scene.SetViewport(view.ViewportScreenRect());
                     Call(controller, "FrameAll");
-                    foreach (string state in new[] { "select", "transform", "scale-xyz-ru", "array", "contour", "catalog",
+                    foreach (string state in new[] { "server-list-ru", "server-review-ru", "select", "transform", "scale-xyz-ru", "array", "contour", "catalog",
                         "outliner", "outliner-filter-ru", "outliner-fields-ru", "outliner-empty-ru", "interior-camera-ru", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "catalog-managed-ru", "catalog-hidden-ru", "delete-confirm-ru", "hide-confirm-ru", "save-metadata", "save-as", "save-as-ru", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "share-ru", "share-error-ru", "batch-select-ru", "batch-review-ru", "batch-picker-ru", "batch-export-ru", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru", "exchange-import-category-ru", "exchange-import-category-picker-ru", "exchange-armor", "exchange-armor-ru", "exchange-missing", "exchange-missing-ru", "replace-tools", "replace-confirm", "replace-confirm-ru", "replace-entry-ru", "replace-help-ru" })
                     {
+                        ControllerInputAcceptance.ServerLayoutFixture serverFixture = null;
                         Require(Screen.width == width && Screen.height == height,
                             "GameView changed before " + state + ": " + Screen.width + "x" + Screen.height);
                         view.HideCatalog();
@@ -365,7 +366,30 @@ public static class RuntimeEditorAcceptance
                             state == "contour" ? BlueprintEditorTool.Contour :
                             state == "select" ? BlueprintEditorTool.Select : BlueprintEditorTool.Transform;
                         Call(controller, "SetActiveTool", tool);
-                        if (state == "outliner-filter-ru" || state == "outliner-fields-ru" || state == "outliner-empty-ru")
+                        if (state.StartsWith("server-", StringComparison.Ordinal))
+                        {
+                            BuildWorksLocalization.RussianLanguage = true;
+                            serverFixture = new ControllerInputAcceptance.ServerLayoutFixture(source["woodwall"], output);
+                            for (int i = 0; i < 600 && serverFixture.Pending; ++i) { serverFixture.Tick(); yield return null; }
+                            Require(!serverFixture.Pending, "Server layout initialization timed out");
+                            var fixture = serverFixture;
+                            view.ShowExchange((parent, textFont, closed) => BlueprintExchangeView.ForServer(parent, textFont, fixture.Store, fixture.Source, () => fixture.Client, closed));
+                            yield return null;
+                            var exchange = Field<BlueprintExchangeView>(view, "exchangeView");
+                            for (int i = 0; i < 300 && Field<object>(exchange, "serverTask") != null; ++i) { fixture.Tick(); view.Tick(); yield return null; }
+                            yield return null;
+                            Require(Field<int>(exchange, "serverTotal") == 14, "Server layout page did not arrive");
+                            ControllerInputAcceptance.NativeClick(view, uiCamera, "ServerEntry0"); yield return null;
+                            if (state == "server-review-ru")
+                            {
+                                ControllerInputAcceptance.NativeClick(view, uiCamera, "ServerAccept"); yield return null;
+                                for (int i = 0; i < 600 && (Field<object>(exchange, "serverTask") != null || Field<object>(exchange, "serverDecode") != null || Field<object>(exchange, "serverHostPreparation") != null); ++i)
+                                { fixture.Tick(); view.Tick(); yield return null; }
+                                Require(Field<Button>(exchange, "serverAccept").interactable && Field<object>(exchange, "serverPrepared") != null,
+                                    "Server copy review is not ready at target resolution");
+                            }
+                        }
+                        else if (state == "outliner-filter-ru" || state == "outliner-fields-ru" || state == "outliner-empty-ru")
                         {
                             BuildWorksLocalization.RussianLanguage = true;
                             Call(view, "RefreshOutlinerFilter");
@@ -679,6 +703,7 @@ public static class RuntimeEditorAcceptance
                         view.RootCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
                         if (state == "replace-tools") ControllerInputAcceptance.NativeClick(view, uiCamera, "ToolsEntry0");
                         if (state.StartsWith("exchange")) ControllerInputAcceptance.NativeClick(view, uiCamera, "ExchangeClose");
+                        if (serverFixture != null) { ControllerInputAcceptance.NativeClick(view, uiCamera, "ExchangeClose"); serverFixture.Dispose(); }
                         if (state == "scale-xyz-ru") Field<Button>(view, "inspectorProportionsButton").onClick.Invoke();
                         if (state == "replace-tools" || state == "replace-entry-ru" || state == "replace-help-ru")
                         {
@@ -733,6 +758,8 @@ public static class RuntimeEditorAcceptance
                     yield return null;
                     foreach (object step in ControllerInputAcceptance.RunSinglePart(template, fontTemplate, source["woodwall"], output)) yield return step;
                     foreach (object step in ControllerInputAcceptance.RunSaveAs(template, fontTemplate, source["woodwall"], output)) yield return step;
+                    foreach (object step in ControllerInputAcceptance.RunServerLibrary(template, fontTemplate, source["woodwall"], output)) yield return step;
+                    checks.Add("Server library actual modal/controller: catalog entry, prepare/cancel/publish/list, denied mutation on current role, public personal copy with verified provenance, no auto-build, dirty draft preserved. In-process endpoint; no live sockets/game proof.");
                     foreach (object step in ControllerInputAcceptance.RunShareFile(template, fontTemplate, source["woodwall"], output)) yield return step;
                     foreach (object step in ControllerInputAcceptance.RunBatchExchange(template, fontTemplate, source["woodwall"], output)) yield return step;
                     checks.Add("Batch actual UI: multi-file selection and malformed report, per-document category, one commit/results/navigation, native+external full ZIP export, immutable sources and dirty draft/history.");
@@ -819,11 +846,15 @@ public static class RuntimeEditorAcceptance
                 "Text has no supported material: " + text.name);
             Require(text.textInfo.characterCount > 0, "Text generated no characters: " + text.name);
             bool cardCaption = text.name == "Label" && text.transform.parent.name.StartsWith("Catalog_", StringComparison.Ordinal);
+            bool serverCaption = text.name.StartsWith("ServerEntry", StringComparison.Ordinal) && text.name.EndsWith("Label", StringComparison.Ordinal);
+            if (serverCaption)
+                Require(text.overflowMode == TextOverflowModes.Ellipsis && text.maxVisibleLines == 1 && text.textWrappingMode == TextWrappingModes.NoWrap,
+                    "Long server entry lacks bounded single-line ellipsis; full name is shown on selection");
             if (cardCaption)
                 Require(text.overflowMode == TextOverflowModes.Ellipsis && text.maxVisibleLines <= 3 &&
                     text.transform.parent.GetComponent<BlueprintEditorHoverTarget>(),
                     "Long catalogue name lacks bounded ellipsis and full card hover");
-            if (text.GetComponentInParent<Button>() && !cardCaption)
+            if (text.GetComponentInParent<Button>() && !cardCaption && !serverCaption)
                 Require(!text.isTextOverflowing, "Button text overflows: " + text.text);
             if (text.name == "ContourInfo" || text.name == "ArrayInfo")
                 Require(!text.isTextOverflowing, "Tool instructions overflow: " + text.name);

@@ -64,7 +64,7 @@ namespace OstrixMods.BuildWorks
                     if (Player.m_localPlayer)
                     {
                         if (Client == null) Client = new BlueprintServerClient(world, bytes =>
-                        { if (!Context()) throw new IOException("Server context changed."); endpoint.Receive(local, bytes, now); });
+                        { if (!Context()) throw new IOException("Server context changed."); endpoint.Receive(local, bytes, now); }, "local-host");
                     }
                     else if (Client != null) { Client.Dispose(); Client = null; endpoint.Disconnect(local); }
                     Client?.Tick(time);
@@ -84,7 +84,7 @@ namespace OstrixMods.BuildWorks
                             {
                                 if (!Context() || !ReferenceEquals(connection, CurrentServerConnection())) throw new IOException("Server connection changed.");
                                 Send(connection, RequestRpc, bytes);
-                            });
+                            }, connection.GetSocket().GetHostName());
                         }
                     }
                     Client?.Tick(time);

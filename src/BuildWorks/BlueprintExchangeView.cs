@@ -199,6 +199,7 @@ namespace OstrixMods.BuildWorks
         internal void Tick()
         {
             if (!IsOpen) return;
+            if (serverMode) { TickServer(); return; }
             TickBatch();
             var parent = (RectTransform)root.transform.parent;
             panel.localScale = Vector3.one * Mathf.Min(1, (parent.rect.width - 24) / 780, (parent.rect.height - 24) / 580);
@@ -837,6 +838,7 @@ namespace OstrixMods.BuildWorks
         public void Dispose()
         {
             if (disposed) return; disposed = true;
+            if (serverMode) DisposeServerOperation();
             batchCancellation?.Cancel(); batchCancellation?.Dispose();
             importInspection = null; importPreparation = null;
             planReview?.CancelWrite();

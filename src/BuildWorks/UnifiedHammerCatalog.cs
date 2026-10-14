@@ -2213,6 +2213,9 @@ namespace OstrixMods.BuildWorks
             AddRailButton(hud, rail, BuildWorksLocalization.Text("exchange.import"), y, 27f,
                 Accent(HammerCatalogOrganizer.BlueprintsGroup), false, ImportBlueprintFile, width: width);
             y -= 32f;
+            AddRailButton(hud, rail, BuildWorksLocalization.Text("server.library"), y, 27f,
+                Accent(HammerCatalogOrganizer.BlueprintsGroup), false, () => ShowExchange(selectedBlueprint, server: true), width: width);
+            y -= 32f;
             AddRailButton(hud, rail, BuildWorksLocalization.Text("editor.catalog.hidden") + "  " +
                 blueprintStore.CatalogAll(true).Count(blueprintStore.IsHidden), y, 27f,
                 Accent(HammerCatalogOrganizer.BlueprintsGroup), showHiddenBlueprints, () =>
@@ -2334,7 +2337,7 @@ namespace OstrixMods.BuildWorks
             ShowExchange(blueprint);
         }
 
-        private static void ShowExchange(CompositeBlueprintStore.Blueprint blueprint, string report = null, bool share = false)
+        private static void ShowExchange(CompositeBlueprintStore.Blueprint blueprint, string report = null, bool share = false, bool server = false)
         {
             Hud hud = Hud.instance;
             Canvas canvas = hud && hud.m_pieceSelectionWindow ? hud.m_pieceSelectionWindow.GetComponentInParent<Canvas>() : null;
@@ -2345,10 +2348,21 @@ namespace OstrixMods.BuildWorks
             Action closed = () =>
                 {
                     exchangeView = null; exchangeClosedFrame = Time.frameCount;
-                    if (blueprint == null) blueprintImportPending = true;
+                    if (blueprint == null && !server) blueprintImportPending = true;
                     Invalidate();
                 };
             TMP_Text font = hud.m_pieceDescription ? hud.m_pieceDescription : hud.m_buildSelection;
+            if (server)
+            {
+                exchangeView = BlueprintExchangeView.ForServer(canvas.transform, font, blueprintStore, blueprint, () => BuildWorksPlugin.ServerLibraryClient,
+                    closed, accepted: imported =>
+                    {
+                        if (!ReferenceEquals(blueprintStore, expectedStore) || imported.Length == 0) return;
+                        blueprintImportPending = true;
+                        pendingImportedBlueprint = imported[0]; pendingImportedCount = imported.Length;
+                    }, frontCanvas: true);
+                return;
+            }
             if (share)
             {
                 exchangeView = BlueprintExchangeView.ForShareFile(canvas.transform, font, blueprintStore, blueprint, closed, frontCanvas: true);

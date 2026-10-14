@@ -89,6 +89,12 @@ namespace OstrixMods.BuildWorks.StoreTests
                 Require(!store.TrySaveAcceptedCopy(decoded, receipt, out _, out error), "Locked native commit unexpectedly succeeded");
             Require(store.All().Count == countBeforeFailure && beforeFailure.SequenceEqual(File.ReadAllBytes(path)), "Failed acceptance left a card or changed durable data");
             Require(Encoding.UTF8.GetString(original) == Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(source)), "Source bytes changed after acceptance");
+            int owner = Environment.CurrentManagedThreadId;
+            store.ConfigurePrefabMetadata(_ => { Require(Environment.CurrentManagedThreadId == owner, "Publication called native metadata on worker"); return null; });
+            var publicationSource = source.ImportCopy(); publicationSource.parts[0].displayName = "Frozen publication";
+            var publication = store.PrepareServerPublication(publicationSource); publicationSource.parts[0].displayName = "Changed caller";
+            Require(BlueprintExchangeFormat.Decode(Encoding.UTF8.GetString(publication.GetAwaiter().GetResult())).parts[0].displayName == "Frozen publication",
+                "Server publication aliased mutable source or ran native metadata on worker");
             Console.WriteLine("PASS library origin native23/portable12: fresh accepted ID, immutable/copy/update/share/reload/batch/external persistence, source unchanged, explicit foreign omission, strict versions/fields/count/duplicates and atomic over-limit refusal. Informational only; not authorization or live server/UI proof.");
         }
         private static byte[] UnsafeEncode(B.Blueprint document)

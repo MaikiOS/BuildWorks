@@ -55,11 +55,37 @@ namespace OstrixMods.BuildWorks
         private long markerStarted;
         private bool cancelling;
         private BlueprintStorageTransferJournal journal;
+        private readonly int ownerThread = System.Threading.Thread.CurrentThread.ManagedThreadId;
+        private bool persistenceRequested;
+        private BlueprintStoragePersistence persistence;
         internal string JournalPath => journal?.Path;
         internal string JournalError { get; private set; }
         internal readonly Guid OperationId;
         internal IReadOnlyList<Entry> Entries => entries;
         internal bool CompleteInMemory => !cancelling && JournalError == null && entries.All(entry => entry.State == Result.Transferred);
+        internal bool PersistenceCustodyValid => System.Threading.Thread.CurrentThread.ManagedThreadId == ownerThread && PlayerReadbackCustodyValid();
+
+        internal bool TryBeginPersistence(out BlueprintStoragePersistence verification, out string reason)
+        {
+            verification = null; reason = null;
+            if (System.Threading.Thread.CurrentThread.ManagedThreadId != ownerThread || persistenceRequested)
+            { reason = "Persistence must start once on the transfer's owning thread."; return false; }
+            persistenceRequested = true;
+            return BlueprintStoragePersistence.TryBegin(this, out persistence, out reason) && (verification = persistence) != null;
+        }
+
+        internal bool TryRecordPersistence(uint before, uint generation, NativePlayerProfileReadback.Evidence profile,
+            NativeWorldStorageReadback.Evidence world, out string reason)
+        {
+            reason = null;
+            try
+            {
+                if (!PersistenceCustodyValid) throw new InvalidOperationException("Transfer custody changed before recording persistence.");
+                journal.RecordPersistence(before, generation, profile, world);
+                return true;
+            }
+            catch (Exception error) { reason = error.Message; return false; }
+        }
 
         internal bool TryPreparePlayerReadback(out BlueprintStoragePlayerProfile expectation, out string reason) =>
             BlueprintStoragePlayerProfile.TryCapture(player, OperationId, PlayerReadbackCustodyValid, out expectation, out reason);
@@ -80,7 +106,7 @@ namespace OstrixMods.BuildWorks
         {
             if (!CompleteInMemory || !ContextValid() || !DestinationReady() || journal == null) return false;
             var saved = BlueprintStorageTransferJournal.Read(journal.Path);
-            if (saved.Schema != 3 || saved.Prepared.Operation != OperationId || saved.InFlight.HasValue ||
+            if (saved.Schema < 3 || saved.Prepared.Operation != OperationId || saved.InFlight.HasValue ||
                 saved.Observations.Count != entries.Count || saved.Observations.Any(value => value.State != (int)Result.Transferred)) return false;
             var last = saved.Observations.Last();
             return InventoryDigest(source) == last.SourceManifest && InventoryDigest(destination) == last.DestinationManifest &&
@@ -119,7 +145,7 @@ namespace OstrixMods.BuildWorks
                     throw new InvalidOperationException("Return requires a verified same-session transfer and current container access.");
                 var persisted = BlueprintStorageTransferJournal.Read(JournalPath);
                 var delivered = entries.Where(entry => entry.State == Result.Transferred).ToArray();
-                if (persisted.Schema != 3 || persisted.Prepared.Operation != OperationId || persisted.Prepared.Route != BlueprintStorageTransferJournal.Direction.ToContainer ||
+                if (persisted.Schema < 3 || persisted.Prepared.Operation != OperationId || persisted.Prepared.Route != BlueprintStorageTransferJournal.Direction.ToContainer ||
                     persisted.Prepared.World != worldId || persisted.Prepared.Player != player.GetPlayerID() ||
                     persisted.Prepared.TargetUser != targetId.UserID || persisted.Prepared.TargetId != targetId.ID ||
                     persisted.Prepared.Creator != piece.GetCreator() || persisted.Prepared.PrefabHash != zdo.GetPrefab() ||
@@ -161,7 +187,7 @@ namespace OstrixMods.BuildWorks
                 System.IO.Path.GetFileName(path))) throw new InvalidOperationException("Recovery journal is outside the active transfer directory.");
             persisted = BlueprintStorageTransferJournal.Read(path);
             var plan = persisted.Prepared;
-            if (persisted.Schema != 3 || plan.Route != BlueprintStorageTransferJournal.Direction.ToContainer || persisted.InFlight.HasValue ||
+            if (persisted.Schema < 3 || plan.Route != BlueprintStorageTransferJournal.Direction.ToContainer || persisted.InFlight.HasValue ||
                 persisted.Observations.Count == 0 || persisted.Observations.Any(value => value.State != (int)Result.Transferred))
                 throw new InvalidOperationException("Recovery requires a fully observed forward prefix; legacy, pending or uncertain evidence stays held.");
             Piece piece = placed ? placed.GetComponent<Piece>() : null;
@@ -559,6 +585,6 @@ namespace OstrixMods.BuildWorks
                 hash.TransformFinalBlock(Array.Empty<byte>(), 0, 0); return BitConverter.ToString(hash.Hash).Replace("-", "");
             }
         }
-        public void Dispose() { JournalError = JournalError ?? "Transfer journal closed; reconciliation is required before reuse."; journal?.Dispose(); }
+        public void Dispose() { persistence?.Cancel(); JournalError = JournalError ?? "Transfer journal closed; reconciliation is required before reuse."; journal?.Dispose(); }
     }
 }

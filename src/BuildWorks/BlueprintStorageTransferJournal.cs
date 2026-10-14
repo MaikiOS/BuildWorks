@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using OstrixMods.BuildWorks.Geometry;
 
 namespace OstrixMods.BuildWorks
 {
@@ -11,7 +12,8 @@ namespace OstrixMods.BuildWorks
     internal sealed class BlueprintStorageTransferJournal : IDisposable
     {
         private const int MaximumBytes = 16 * 1024 * 1024;
-        private static readonly byte[] Magic = Encoding.ASCII.GetBytes("BWSTJ3\r\n");
+        private static readonly byte[] Magic = Encoding.ASCII.GetBytes("BWSTJ4\r\n");
+        private static readonly byte[] LegacyMagic3 = Encoding.ASCII.GetBytes("BWSTJ3\r\n");
         private static readonly byte[] LegacyMagic2 = Encoding.ASCII.GetBytes("BWSTJ2\r\n");
         private static readonly byte[] LegacyMagic = Encoding.ASCII.GetBytes("BWSTJ1\r\n");
         private static readonly Encoding Utf8 = new UTF8Encoding(false, true);
@@ -62,13 +64,23 @@ namespace OstrixMods.BuildWorks
             internal int? InFlight;
             internal Attempt Pending;
             internal bool Terminal;
+            internal Persistence SavedPair;
             // Even fully observed local moves need source/target persistence and server reconciliation.
             internal bool RequiresReconciliation => true;
+        }
+        internal sealed class Persistence
+        {
+            internal uint BeforeGeneration, Generation;
+            internal long World, Player;
+            internal Guid Marker;
+            internal string ProfileHash, PlayerInventoryHash, WorldInventoryHash;
         }
 
         private readonly FileStream stream;
         private int sequence, next;
         private bool stopped;
+        private bool complete, pairRecorded;
+        private string lastZdoHash;
         private Plan prepared;
         private Attempt pending;
         private readonly int count;
@@ -192,14 +204,48 @@ namespace OstrixMods.BuildWorks
             ValidateObservation(prepared.Items[next], pending, observation, prepared.Route);
             Append(3, Encode(writer => WriteObservation(writer, observation)));
             pending = null; next++;
+            lastZdoHash = observation.ZdoHash;
             if (observation.State != 2 || next == count)
-            { Append(4, Encode(writer => writer.Write(next == count && observation.State == 2))); stopped = true; }
+            { bool success = next == count && observation.State == 2; Append(4, Encode(writer => writer.Write(success))); stopped = true; complete = success; }
         }
 
-        private void Append(byte kind, byte[] payload)
+        internal void RecordPersistence(uint before, uint generation, NativePlayerProfileReadback.Evidence profile, NativeWorldStorageReadback.Evidence world)
         {
-            if (stopped) throw new InvalidOperationException("Transfer journal is stopped.");
-            byte[] body = Encode(writer => { writer.Write(3); writer.Write(operation.ToByteArray()); writer.Write(sequence); writer.Write(kind); writer.Write(previousHash); writer.Write(payload); });
+            if (!complete || pairRecorded || profile == null || world == null)
+                throw new InvalidOperationException("Paired persistence requires one completed local transfer and two readback receipts.");
+            var pair = new Persistence
+            {
+                BeforeGeneration = before,
+                Generation = generation,
+                World = world.World,
+                Player = profile.Player,
+                Marker = world.Operation,
+                ProfileHash = profile.ProfileHash,
+                PlayerInventoryHash = profile.InventoryHash,
+                WorldInventoryHash = world.InventorySha256
+            };
+            ValidatePersistence(prepared, lastZdoHash, pair);
+            Append(5, Encode(writer =>
+            {
+                writer.Write(pair.BeforeGeneration); writer.Write(pair.Generation); writer.Write(pair.World); writer.Write(pair.Player);
+                writer.Write(pair.Marker.ToByteArray()); writer.Write(pair.ProfileHash); writer.Write(pair.PlayerInventoryHash); writer.Write(pair.WorldInventoryHash);
+            }), afterComplete: true);
+            pairRecorded = true;
+        }
+
+        private static void ValidatePersistence(Plan plan, string zdoHash, Persistence pair)
+        {
+            if (pair.BeforeGeneration == 0 || pair.BeforeGeneration == uint.MaxValue || pair.Generation != pair.BeforeGeneration + 1 ||
+                pair.World != plan.World || pair.Player != plan.Player || pair.Marker != plan.TargetMarker ||
+                pair.ProfileHash == null || pair.ProfileHash.Length != 128 || pair.ProfileHash.Any(c => !Uri.IsHexDigit(c)) ||
+                !Digest(pair.PlayerInventoryHash) || !Digest(pair.WorldInventoryHash) || pair.WorldInventoryHash != zdoHash)
+                throw new InvalidDataException("Paired persistence identity, generation or inventory evidence differs from the transfer.");
+        }
+
+        private void Append(byte kind, byte[] payload, bool afterComplete = false)
+        {
+            if (stopped && !(afterComplete && complete && !pairRecorded)) throw new InvalidOperationException("Transfer journal is stopped.");
+            byte[] body = Encode(writer => { writer.Write(4); writer.Write(operation.ToByteArray()); writer.Write(sequence); writer.Write(kind); writer.Write(previousHash); writer.Write(payload); });
             if (body.Length > MaximumBytes || stream.Length + body.Length + 36 > MaximumBytes)
                 throw new InvalidDataException("Transfer journal exceeds its byte budget.");
             try
@@ -209,7 +255,7 @@ namespace OstrixMods.BuildWorks
                 { byte[] digest = hash.ComputeHash(body); writer.Write(body.Length); writer.Write(body); writer.Write(digest); writer.Flush(); stream.Flush(true); previousHash = digest; }
                 sequence++;
             }
-            catch { stopped = true; throw; }
+            catch { complete = false; stopped = true; throw; }
         }
 
         internal static Snapshot Read(string path, bool preparedOnly = false)
@@ -220,7 +266,7 @@ namespace OstrixMods.BuildWorks
             {
                 long length = file.Length;
                 byte[] magic = reader.ReadBytes(Magic.Length);
-                if (length < Magic.Length + 36 || length > MaximumBytes || !magic.SequenceEqual(Magic) && !magic.SequenceEqual(LegacyMagic2) && !magic.SequenceEqual(LegacyMagic))
+                if (length < Magic.Length + 36 || length > MaximumBytes || !magic.SequenceEqual(Magic) && !magic.SequenceEqual(LegacyMagic3) && !magic.SequenceEqual(LegacyMagic2) && !magic.SequenceEqual(LegacyMagic))
                     throw new InvalidDataException("Unknown or incomplete transfer journal.");
                 int schema = magic[5] - '0';
                 var result = new Snapshot { Schema = schema }; int sequence = 0; byte[] previous = new byte[32]; Guid operation = Guid.Empty;
@@ -228,7 +274,7 @@ namespace OstrixMods.BuildWorks
                 {
                     if (length - file.Position < 36) throw new InvalidDataException("Partial transfer journal frame.");
                     int size = reader.ReadInt32();
-                    if (size < 57 || size > MaximumBytes || size > length - file.Position - 32 || sequence > 8193 || result.Terminal)
+                    if (size < 57 || size > MaximumBytes || size > length - file.Position - 32 || sequence > 8194)
                         throw new InvalidDataException("Invalid transfer journal frame length.");
                     byte[] body = reader.ReadBytes(size), expected = reader.ReadBytes(32);
                     using (var hash = SHA256.Create())
@@ -242,6 +288,8 @@ namespace OstrixMods.BuildWorks
                         if (frameOperation == Guid.Empty || frameOperation != operation || fields.ReadInt32() != sequence++)
                             throw new InvalidDataException("Transfer journal identity/sequence mismatch.");
                         byte kind = fields.ReadByte();
+                        if (result.Terminal && (schema < 4 || kind != 5 || result.SavedPair != null))
+                            throw new InvalidDataException("Unexpected record after completed local transfer.");
                         if (!fields.ReadBytes(32).SequenceEqual(previous)) throw new InvalidDataException("Transfer journal chain mismatch.");
                         previous = expected;
                         if (kind == 1 && result.Prepared == null && sequence == 1)
@@ -290,6 +338,22 @@ namespace OstrixMods.BuildWorks
                                 !completed && result.Observations.Last().State == 2) throw new InvalidDataException("Invalid local terminal record.");
                             result.Terminal = true;
                         }
+                        else if (schema == 4 && kind == 5 && result.Terminal && result.InFlight == null && result.SavedPair == null &&
+                            result.Observations.Count == result.Prepared.Items.Length && result.Observations.All(value => value.State == 2))
+                        {
+                            var pair = new Persistence
+                            {
+                                BeforeGeneration = fields.ReadUInt32(),
+                                Generation = fields.ReadUInt32(),
+                                World = fields.ReadInt64(),
+                                Player = fields.ReadInt64(),
+                                Marker = new Guid(fields.ReadBytes(16)),
+                                ProfileHash = fields.ReadString(),
+                                PlayerInventoryHash = fields.ReadString(),
+                                WorldInventoryHash = fields.ReadString()
+                            };
+                            ValidatePersistence(result.Prepared, result.Observations.Last().ZdoHash, pair); result.SavedPair = pair;
+                        }
                         else throw new InvalidDataException("Unknown or reordered transfer journal record.");
                         if (packet.Position != packet.Length) throw new InvalidDataException("Unexpected transfer journal fields.");
                         if (preparedOnly && result.Prepared != null) return result;
@@ -311,7 +375,7 @@ namespace OstrixMods.BuildWorks
                 plan.Items.Length < 1 || plan.Items.Length > 4096 || plan.Items.Length > plan.Width * plan.Height)
                 throw new InvalidDataException("Invalid transfer journal plan.");
             var cells = new HashSet<int>();
-            long budget = 1024 + Utf8.GetByteCount(plan.PieceName);
+            long budget = 2048 + Utf8.GetByteCount(plan.PieceName);
             foreach (Payment paid in plan.Paid)
             {
                 if (paid == null || string.IsNullOrEmpty(paid.Prefab) || string.IsNullOrEmpty(paid.Properties) || paid.Paid < 1 || paid.Before > ushort.MaxValue || paid.Before < paid.Paid ||
@@ -406,6 +470,6 @@ namespace OstrixMods.BuildWorks
                 if ((File.Exists(current) || Directory.Exists(current)) && (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
                     throw new IOException("Transfer journal cannot follow a reparse point.");
         }
-        public void Dispose() { stopped = true; stream.Dispose(); }
+        public void Dispose() { complete = false; stopped = true; stream.Dispose(); }
     }
 }

@@ -880,7 +880,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.185.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.186.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $serverAuthority = $plugin.MainModule.GetType('OstrixMods.BuildWorks.BlueprintServerAuthority')
 Assert-Contract ($null -ne $serverAuthority) 'Compiled server blueprint authority adapter is missing.'
@@ -3516,11 +3516,30 @@ foreach ($entry in @(@(($profileType.Methods | Where-Object Name -eq 'SavePlayer
         @((($hostAssembly.MainModule.Types | Where-Object Name -eq 'ZPackage').Methods | Where-Object Name -eq 'GenerateHash'), 'CBA20AF2027558EB886A8CB8C7BB1C177882F220EA4DA66E5003CF0822D9BFD2'))) {
     Assert-Contract ((Get-NativeLayoutHash $entry[0]) -eq $entry[1]) "Native canonical-profile contract changed: $($entry[0].FullName)"
 }
-$profileAdapter = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintStoragePlayerProfile' }
+$profileAdapter = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintStoragePlayerProfile' -and $_.Name -ne 'TrySaveAndVerify' }
 $profileCalls = ($profileAdapter.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($profileCalls -match 'NativePlayerProfileReadback::TryVerify' -and $profileCalls -match '::TrySnapshotInventory' -and
     $profileCalls -match 'PlayerProfile::m_fileSource' -and $profileCalls -match 'PlayerProfile::GetPath' -and
     $profileCalls -notmatch 'Inventory::Load|PlayerProfile::Save|Game::SavePlayerProfile|Inventory::Move|ZDO::Set|RPC|DropItem|Destroy') 'Profile evidence must read canonical Local data without saves, restore or custody mutation.'
+$profileSave = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintStoragePlayerProfile' -and $_.Name -eq 'TrySaveAndVerify' }
+$profileSaveCalls = ($profileSave.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($profileSaveCalls -match 'Player::Save' -and $profileSaveCalls -match 'Game::SavePlayerProfile' -and
+    $profileSaveCalls -match 'BlueprintStorageProfileWrite::Begin' -and $profileSaveCalls -match '::get_Completed' -and
+    $profileSaveCalls -notmatch 'm_customData|Inventory::Load|Inventory::Move|ZDO::Set|RPC|DropItem|Destroy') 'Fresh profile save must observe native write/replacement without modifying player metadata or custody.'
+$nativeWriter = $utilsAssembly.MainModule.Types | Where-Object Name -eq 'FileWriter'
+$writerSource = @($nativeWriter.Properties | Where-Object Name -eq 'm_fileSource')
+$writerFinish = $nativeWriter.Methods | Where-Object Name -eq 'Finish'
+$writerFinishCalls = ($writerFinish.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($writerSource.Count -eq 1 -and $writerSource[0].GetMethod.IsPublic -and
+    @($nativeWriter.Fields | Where-Object { $_.Name -eq 'm_path' -and $_.FieldType.FullName -eq 'System.String' }).Count -eq 1 -and
+    $writerFinish.IsPublic -and $writerFinishCalls -match 'FileStream::Flush\(System.Boolean\)') 'Native Local profile writer must expose source as a property, exact path and flushing Finish.'
+$nativeReplace = ($utilsAssembly.MainModule.Types | Where-Object Name -eq 'FileHelpers').Methods | Where-Object { $_.Name -eq 'ReplaceOldFile' -and $_.Parameters.Count -eq 5 }
+Assert-Contract ($nativeReplace.IsPublic -and $nativeReplace.IsStatic -and
+    $nativeReplace.Parameters[4].ParameterType.FullName -eq 'FileHelpers/FileSource') 'Native profile replacement signature changed.'
+$observerMethods = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintStorageProfileWrite' }
+$observerCalls = ($observerMethods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($observerCalls -match 'FileWriter::get_m_fileSource' -and $observerCalls -match 'FileWriter::get_Status' -and
+    $observerCalls -notmatch 'File::Write|File::Move|File::Delete|m_customData|Inventory::|ZDO::Set') 'Save observer must only observe the current native writer and replacement.'
 $playerReadback = $transferType.Methods | Where-Object Name -eq 'PlayerReadbackCustodyValid'
 $playerReadbackCalls = ($playerReadback.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($playerReadbackCalls -match '::get_CompleteInMemory' -and $playerReadbackCalls -match '::InventoryDigest' -and

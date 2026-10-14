@@ -94,6 +94,14 @@ namespace ReservationChecks
     {
         internal static ZNet instance = new ZNet(); internal World World = new World();
         internal bool Server = true, Saving;
+        internal bool Dedicated;
+        internal static bool Open;
+        internal readonly List<object> Peers = new List<object>();
+        internal Action SaveAction;
+        internal bool IsDedicated() => Dedicated;
+        internal static bool IsOpenServer() => Open;
+        internal List<object> GetPeers() => Peers;
+        internal void Save(bool sync, bool saveOtherPlayerProfiles, bool waitForNextFrame) { SaveAction?.Invoke(); }
         internal World GetWorld() => World;
         internal bool IsServer() => Server;
         internal bool IsSaving() => Saving;
@@ -102,12 +110,15 @@ namespace ReservationChecks
     {
         internal static uint Generation = 7;
         internal static string Suffix = "";
+        internal static SaveSystemSessionFlags Flags;
+        internal static bool HasSessionFlag(SaveSystemSessionFlags flag) => (Flags & flag) != 0;
         internal static uint GetSaveNumber() => Generation;
         internal static string MainFwl2FileName() => "_main." + Generation + ".fwl2" + Suffix;
         internal static string MainChunksFileName() => "_main." + Generation + ".chunks" + Suffix;
         internal static string MainOKFileName() => "_main." + Generation + ".ok" + Suffix;
         internal static string MainDb2FileName() => "_main." + Generation + ".db2" + Suffix;
     }
+    [Flags] internal enum SaveSystemSessionFlags { DontSaveCharacter = 1, DontSaveWorld = 2 }
     internal sealed class ZDOMan { internal static ZDOMan instance = new ZDOMan(); }
     internal static class InventoryGui { internal static bool Visible; internal static bool IsVisible() => Visible; }
     internal static class PrivateArea { internal static bool Allowed = true; internal static bool CheckAccess(Vector3 _, float radius, bool flash, bool ward) => Allowed; }

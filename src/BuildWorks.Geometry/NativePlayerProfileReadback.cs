@@ -22,6 +22,14 @@ namespace OstrixMods.BuildWorks.Geometry
 
         public static bool TryVerify(Stream file, long player, string name, BlueprintForeignPartData expected,
             Func<string, int> prefabHash, out Evidence evidence, out string reason)
+            => Verify(file, player, name, expected, prefabHash, null, out evidence, out reason);
+
+        public static bool TryVerifyPlayerData(Stream file, long player, string name, BlueprintForeignPartData expected,
+            Func<string, int> prefabHash, byte[] playerData, out Evidence evidence, out string reason)
+            => Verify(file, player, name, expected, prefabHash, playerData ?? Array.Empty<byte>(), out evidence, out reason);
+
+        private static bool Verify(Stream file, long player, string name, BlueprintForeignPartData expected,
+            Func<string, int> prefabHash, byte[] playerData, out Evidence evidence, out string reason)
         {
             evidence = null; reason = null;
             try
@@ -78,6 +86,15 @@ namespace OstrixMods.BuildWorks.Geometry
                     ReadString(reader); ReadBool(reader); reader.ReadInt64();
                     if (!ReadBool(reader)) throw new InvalidDataException("Profile has no player data.");
                     int playerBytes = ReadCount(reader, MaximumProfileBytes, 1);
+                    if (playerData != null)
+                    {
+                        if (playerData.Length != playerBytes || playerData.Length < 4)
+                            throw new InvalidDataException("Canonical player data differs from the fresh save request.");
+                        long begin = stream.Position;
+                        for (int i = 0; i < playerData.Length; ++i)
+                            if (reader.ReadByte() != playerData[i]) throw new InvalidDataException("Canonical player data differs from the fresh save request.");
+                        stream.Position = begin;
+                    }
                     if (playerBytes != stream.Length - stream.Position || reader.ReadInt32() != 33)
                         throw new InvalidDataException("Invalid player-data framing or unsupported version.");
                     for (int i = 0; i < 4; i++) ReadFinite(reader);

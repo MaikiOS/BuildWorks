@@ -73,6 +73,8 @@ namespace ReservationChecks
         internal static Game instance = new Game();
         internal bool ShuttingDown;
         internal PlayerProfile Profile;
+        internal Action SaveAction;
+        internal void SavePlayerProfile(bool setLogoutPoint, bool isFromRpc) { SaveAction?.Invoke(); }
         internal PlayerProfile GetPlayerProfile() => Profile;
         internal bool IsShuttingDown() => ShuttingDown;
     }

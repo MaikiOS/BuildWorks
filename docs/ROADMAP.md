@@ -1,3 +1,11 @@
+## 2026-10-14 — .186 installed: paired Local character/world save evidence
+
+The same completed transfer now binds a fresh Local character write and exactly the next world generation in WAL4. Scoped read-only FileWriter.Finish/ReplaceOldFile observation checks the owning thread, exact Local paths, CloseSucceeded, full Player.Save bytes and canonical SHA. No player custom data is changed. Failure, stale temporary files, cancellation or changed custody retain reconciliation; WAL1–3 remain readable.
+
+221 paired assertions, the remaining storage suites, full Geometry, normal/QA0/0, Host186/localization1100 and independent correctness PASSED/Ponytail Ship pass.125 whitespace diagnostics match unchanged baseline lines; none are new. Guarded installation after CIM/WhatIf verified both hashes and111 unchanged previous config/save files; catalogue0/imports0. No native game save/reload or remote acknowledgement was executed.
+
+Next: complete QA transfer→save→reload comparison, partial-state reconciliation, remote acknowledgement/settlement and populated Container integration. Manual184/Batch-183 remain available. Persistent project/v11, selection and the full goal remain incomplete. Evidence/limits: docs/STORAGE_PAIRED_PERSISTENCE_186.md. Full goal ACTIVE.
+
 ## 2026-10-14 — .185 WIP: current world generation and custody binding
 
 Source now captures exact Local host/world/source/UID/native generation filenames and completed item/journal custody on the owning thread. A detached filesystem worker reads pinned generation bytes; acceptance rechecks cancellation and current context. Read|Delete sharing allows native generation retirement while denying writers. Return-child operations preserve the parent storage marker.

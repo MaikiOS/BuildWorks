@@ -5,6 +5,7 @@
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
+    <ProfileRoot Condition="'$(ProfileRoot)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..\'))</ProfileRoot>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../artifacts/content-reservations/ReservationSource.cs" Link="ReservationSource.cs" />
@@ -13,6 +14,9 @@
     <Compile Include="../../artifacts/content-reservations/StorageRemovalSource.cs" Link="StorageRemovalSource.cs" />
     <Compile Include="../../artifacts/content-reservations/StorageProfileSource.cs" Link="StorageProfileSource.cs" />
     <Compile Include="../../artifacts/content-reservations/StorageWorldSource.cs" Link="StorageWorldSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/StoragePersistenceSource.cs" Link="StoragePersistenceSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/StorageProfileWriteSource.cs" Link="StorageProfileWriteSource.cs" />
+    <Reference Include="0Harmony"><HintPath>$(ProfileRoot)/BepInEx/core/0Harmony.dll</HintPath></Reference>
     <ProjectReference Include="../../src/BuildWorks.Geometry/BuildWorks.Geometry.csproj" />
   </ItemGroup>
 </Project>

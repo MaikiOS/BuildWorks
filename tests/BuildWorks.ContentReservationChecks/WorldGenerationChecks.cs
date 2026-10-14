@@ -17,16 +17,16 @@ namespace ReservationChecks
             using (var memory = new MemoryStream())
             { using (var writer = new BinaryWriter(memory, Encoding.UTF8, true)) write(writer); return memory.ToArray(); }
         }
-        private static void WriteWorld(TransferChecks.Frame frame, string root)
+        internal static void WriteWorld(TransferChecks.Frame frame, string root, uint generation = 7)
         {
             Guid marker = frame.Operation;
             byte[] payload = Bytes(w => { w.Write(41); w.Write("QA"); w.Write("seed"); w.Write(10); w.Write(1L); w.Write(1); w.Write(true); w.Write(0); w.Write(0); });
-            File.WriteAllBytes(Path.Combine(root, "_main.7.fwl2"), Bytes(w => { w.Write(payload.Length); w.Write(payload); }));
-            File.WriteAllBytes(Path.Combine(root, "_main.7.chunks"), Bytes(w => { w.Write((short)41); w.Write(1); w.Write(1); w.Write((ushort)258); w.Write((byte)3); w.Write(7u); w.Write(1); }));
-            File.WriteAllBytes(Path.Combine(root, "_main.7.ok"), BitConverter.GetBytes(41));
-            File.WriteAllBytes(Path.Combine(root, "_main.7.db2"), Bytes(w => { w.Write(41); w.Write(123d); }));
+            File.WriteAllBytes(Path.Combine(root, "_main." + generation + ".fwl2"), Bytes(w => { w.Write(payload.Length); w.Write(payload); }));
+            File.WriteAllBytes(Path.Combine(root, "_main." + generation + ".chunks"), Bytes(w => { w.Write((short)41); w.Write(1); w.Write(1); w.Write((ushort)258); w.Write((byte)3); w.Write(generation); w.Write(1); }));
+            File.WriteAllBytes(Path.Combine(root, "_main." + generation + ".ok"), BitConverter.GetBytes(41));
+            File.WriteAllBytes(Path.Combine(root, "_main." + generation + ".db2"), Bytes(w => { w.Write(41); w.Write(123d); }));
             byte[] inventory = frame.Placed.Container.View.Data.Raw;
-            File.WriteAllBytes(Path.Combine(root, "01_02__3_7.chunk"), Bytes(w => {
+            File.WriteAllBytes(Path.Combine(root, "01_02__3_" + generation + ".chunk"), Bytes(w => {
                 w.Write((short)41); w.Write(1); w.Write((ushort)(256 | 32 | 64 | 128));
                 w.Write(0f); w.Write(0f); w.Write(0f); w.Write(123);
                 w.Write((byte)1); w.Write(ZDOVars.s_creator); w.Write(100L);

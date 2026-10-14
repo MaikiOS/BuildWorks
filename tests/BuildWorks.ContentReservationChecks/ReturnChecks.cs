@@ -25,7 +25,7 @@ namespace ReservationChecks
             Check(frame.Transfer.MoveNext() == BlueprintStorageTransfer.Result.Unchanged && !frame.Transfer.CompleteInMemory, "parent was not frozen");
             Check(!frame.Transfer.TryBeginReturn(out _, out _), "second child permitted");
             var record = BlueprintStorageTransferJournal.Read(result.JournalPath);
-            Check(record.Schema == 3 && record.Prepared.Parent == frame.Operation && record.Prepared.Route == BlueprintStorageTransferJournal.Direction.ToPlayer &&
+            Check(record.Schema == 4 && record.Prepared.Parent == frame.Operation && record.Prepared.Route == BlueprintStorageTransferJournal.Direction.ToPlayer &&
                 record.Prepared.Operation == BlueprintStorageTransferJournal.ReturnOperationId(frame.Operation) && record.Prepared.Paid.Length == 0,
                 "inverse direction/identity/payment evidence wrong");
             return result;
@@ -188,7 +188,7 @@ namespace ReservationChecks
             using (var writer = new BinaryWriter(output))
             using (var hash = SHA256.Create())
             {
-                writer.Write(Encoding.ASCII.GetBytes("BWSTJ3\r\n"));
+                writer.Write(Encoding.ASCII.GetBytes("BWSTJ4\r\n"));
                 for (int offset = 8; offset < bytes.Length;)
                 {
                     int size = BitConverter.ToInt32(bytes, offset); var body = new byte[size]; Array.Copy(bytes, offset + 4, body, 0, size);

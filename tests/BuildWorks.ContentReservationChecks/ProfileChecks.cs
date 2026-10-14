@@ -8,12 +8,13 @@ using OstrixMods.BuildWorks.Geometry;
 
 namespace ReservationChecks
 {
-    internal static class FileHelpers { internal enum FileSource { Auto = 1, Local = 2, Cloud = 4, Legacy = 8 } }
+    internal static partial class FileHelpers { internal enum FileSource { Auto = 1, Local = 2, Cloud = 4, Legacy = 8 } }
     internal sealed class PlayerProfile
     {
         internal FileHelpers.FileSource m_fileSource = FileHelpers.FileSource.Local;
         internal string Filename = "test", Name = "QA", Path;
         internal long Id = 100;
+        internal static Action SavingFinished;
         internal string GetPath() => Path;
         internal string GetFilename() => Filename;
         internal string GetName() => Name;
@@ -28,7 +29,7 @@ namespace ReservationChecks
         {
             internal byte[] Payload;
             internal readonly Dictionary<string, int> Offset = new Dictionary<string, int>();
-            internal Fixture(byte[] inventory)
+            internal Fixture(byte[] inventory, byte[] playerData = null)
             {
                 using (var stream = new MemoryStream())
                 using (var writer = new BinaryWriter(stream, new UTF8Encoding(false, true)))
@@ -55,6 +56,7 @@ namespace ReservationChecks
                     for (int i = 0; i < 4; i++) writer.Write(10f);
                     mark("guardian"); writer.Write(""); writer.Write(0f); mark("inventory"); writer.Write(inventory);
                     writer.Write(new byte[] { 90, 91, 92 }); // Deliberately opaque tail, no full Player.Load claim.
+                    if (playerData != null) { stream.Position = begin; writer.Write(playerData); stream.SetLength(stream.Position); }
                     int end = (int)stream.Position; stream.Position = Offset["playerLength"]; writer.Write(end - begin);
                     writer.Flush(); Payload = stream.ToArray();
                 }
@@ -71,6 +73,12 @@ namespace ReservationChecks
             { var result = (byte[])Payload.Clone(); Array.Copy(BitConverter.GetBytes(value), 0, result, Offset[key], 4); return File(result); }
             internal byte[] ChangedByte(string key, byte value)
             { var result = (byte[])Payload.Clone(); result[Offset[key]] = value; return File(result); }
+        }
+        internal static byte[] FileFor(Player player)
+        {
+            BlueprintStorageCapture.TrySnapshotInventory(player.GetInventory(), out var data);
+            var package = new ZPackage(); player.Save(package);
+            return new Fixture(Convert.FromBase64String(data.Zdo), package.GetArray()).File();
         }
         private static bool Verify(byte[] file, BlueprintForeignPartData expected, out NativePlayerProfileReadback.Evidence evidence)
         {

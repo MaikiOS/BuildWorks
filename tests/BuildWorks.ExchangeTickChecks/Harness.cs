@@ -96,7 +96,7 @@ public sealed class ExchangeTickChecks
     private CompositeBlueprintStore.ImportReview importReview = null;
     private CompositeBlueprintStore.ContentsSummary contentsSummary = null;
     private CompositeBlueprintStore.MissingPartsReview missingReview = null;
-    private bool importing = false, completed = false, reviewingContents = false, planBuild = false, omitMissingParts = false;
+    private bool sharing = false, importing = false, completed = false, reviewingContents = false, planBuild = false, omitMissingParts = false;
     private bool catalogRetry = false;
 
     private string importOperationPath = "result.zip";

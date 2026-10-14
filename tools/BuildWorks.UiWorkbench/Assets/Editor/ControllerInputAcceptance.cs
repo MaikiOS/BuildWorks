@@ -188,6 +188,63 @@ internal static class ControllerInputAcceptance
         }
     }
 
+    internal static IEnumerable<object> RunShareFile(Camera template, TMP_Text font, GameObject wall, string output)
+    {
+        string folder = Path.Combine(output, "share-ui-" + Guid.NewGuid().ToString("N"));
+        var store = new CompositeBlueprintStore(Path.Combine(folder, "library.json"));
+        var part = new CompositeBlueprintStore.Part { stableId = "wall", prefabName = "woodwall", displayName = "Saved wall",
+            rotation = new CompositeBlueprintStore.QuaternionData { w = 1 }, scale = new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 } };
+        Require(store.TrySave("Share", new[] { part }, Array.Empty<CompositeBlueprintStore.VectorData>(), out var saved, out string error), error);
+        IReadOnlyList<BlueprintEditorCatalogItem> Items() => store.All().Select((item, i) => new BlueprintEditorCatalogItem(
+            "blueprint_" + item.id, item.name, null, item.category, "Blueprints", "Mine", i, item)).ToArray();
+        using (var controller = new BlueprintEditorController(store, template, font, _ => wall, name => name, Items,
+            message => { throw new InvalidOperationException(message); }))
+        {
+            Require(controller.OpenExisting(saved, out error), error); yield return null;
+            var view = Field<BlueprintEditorView>(controller, "view");
+            Require(controller.Document.Rename("wall", "Unsaved wall"), "Cannot prepare share draft");
+            Call(controller, "Bind", (object)null);
+            int revision = controller.Document.RevisionToken, history = Field<IList>(controller.Document, "undo").Count;
+            byte[] original = File.ReadAllBytes(Path.Combine(folder, "library.json"));
+            view.ShowCatalog(Items()); yield return null;
+            NativeClick(view, null, "CatalogBlueprintsMode"); yield return null;
+            NativeClick(view, null, "CatalogShare"); yield return null;
+            var exchange = Field<BlueprintExchangeView>(view, "exchangeView");
+            string file = Field<string>(exchange, "resultPath");
+            NativeClick(view, null, "ExchangeCopyPath"); yield return null;
+            Require(GUIUtility.systemCopyBuffer == file && File.Exists(file) &&
+                BlueprintExchangeFormat.Decode(File.ReadAllText(file)).parts[0].displayName == "Saved wall" &&
+                controller.Document.IsDirty && controller.Document.RevisionToken == revision &&
+                Field<IList>(controller.Document, "undo").Count == history && original.SequenceEqual(File.ReadAllBytes(Path.Combine(folder, "library.json"))),
+                "Share modified draft/history/library or shared unsaved content");
+            NativeClick(view, null, "ExchangeClose"); yield return null;
+            File.Delete(file); Directory.CreateDirectory(file);
+            NativeClick(view, null, "CatalogShare"); yield return null;
+            exchange = Field<BlueprintExchangeView>(view, "exchangeView");
+            Require(!Field<Button>(exchange, "copyPath").interactable && Field<Button>(exchange, "primary").interactable,
+                "Failed share lacks safe retry or exposes invalid copy path");
+            Directory.Delete(file);
+            NativeClick(view, null, "ExchangeSubmit"); yield return null;
+            Require(File.Exists(file) && store.All().Count == 1 && Field<Button>(exchange, "copyPath").interactable,
+                "Share retry saved another card or failed to recover");
+            NativeClick(view, null, "ExchangeClose"); yield return null;
+            NativeClick(view, null, "CatalogClose"); yield return null;
+            string backup = Path.Combine(folder, "share-backup");
+            Directory.Move(store.ShareDirectory, backup); File.WriteAllText(store.ShareDirectory, "block generated copies");
+            NativeClick(view, null, "SaveAs"); yield return null;
+            Field<TMP_InputField>(view, "saveMetadataName").SetTextWithoutNotify("Committed copy");
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            string committedId = controller.Document.SourceBlueprintId;
+            Require(store.All().Count == 2 && !controller.Document.IsDirty && view.HasModal &&
+                Field<TMP_Text>(view, "modalTitle").text == BuildWorksLocalization.Text("share.action"),
+                "Derived copy failure rolled back successful Save As or lost warning");
+            File.Delete(store.ShareDirectory); Directory.Move(backup, store.ShareDirectory);
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            Require(store.All().Count == 2 && controller.Document.SourceBlueprintId == committedId && !view.HasModal &&
+                File.Exists(Path.Combine(store.ShareDirectory, committedId + ".buildworks.json")), "Postcommit retry duplicated Save As");
+        }
+    }
+
     internal static IEnumerable<object> RunCatalogManagement(Camera template, TMP_Text font, GameObject wall, string output)
     {
         string directory = Path.Combine(output, "catalog-management-" + Guid.NewGuid().ToString("N"));

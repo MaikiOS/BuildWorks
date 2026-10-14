@@ -2310,6 +2310,7 @@ namespace OstrixMods.BuildWorks
                             ShowStatus(error);
                             return;
                         }
+                        ShowShareWarning();
                         blueprintCategory = CompositeBlueprintStore.DefaultCategory;
                         selectedBlueprint = null;
                         Invalidate();
@@ -2320,6 +2321,12 @@ namespace OstrixMods.BuildWorks
             scroll.content.sizeDelta = new Vector2(width + 14, -y);
         }
 
+        private static void ShowShareWarning()
+        {
+            string warning = BlueprintExchangeView.ShareWarning(blueprintStore);
+            if (!string.IsNullOrEmpty(warning)) ShowExchange(null, warning);
+        }
+
         private static void ImportBlueprintFile() => ShowExchange(null);
 
         private static void ExportBlueprintFile(CompositeBlueprintStore.Blueprint blueprint)
@@ -2327,7 +2334,7 @@ namespace OstrixMods.BuildWorks
             ShowExchange(blueprint);
         }
 
-        private static void ShowExchange(CompositeBlueprintStore.Blueprint blueprint, string report = null)
+        private static void ShowExchange(CompositeBlueprintStore.Blueprint blueprint, string report = null, bool share = false)
         {
             Hud hud = Hud.instance;
             Canvas canvas = hud && hud.m_pieceSelectionWindow ? hud.m_pieceSelectionWindow.GetComponentInParent<Canvas>() : null;
@@ -2335,13 +2342,20 @@ namespace OstrixMods.BuildWorks
             exchangeView?.Dispose();
             var expectedStore = blueprintStore;
             placementExchange = false;
-            exchangeView = new BlueprintExchangeView(canvas.transform,
-                hud.m_pieceDescription ? hud.m_pieceDescription : hud.m_buildSelection, blueprintStore, blueprint, () =>
+            Action closed = () =>
                 {
                     exchangeView = null; exchangeClosedFrame = Time.frameCount;
                     if (blueprint == null) blueprintImportPending = true;
                     Invalidate();
-                }, frontCanvas: true, report: report, imported: imported =>
+                };
+            TMP_Text font = hud.m_pieceDescription ? hud.m_pieceDescription : hud.m_buildSelection;
+            if (share)
+            {
+                exchangeView = BlueprintExchangeView.ForShareFile(canvas.transform, font, blueprintStore, blueprint, closed, frontCanvas: true);
+                return;
+            }
+            exchangeView = new BlueprintExchangeView(canvas.transform, font, blueprintStore, blueprint, closed,
+                frontCanvas: true, report: report, imported: imported =>
                 {
                     if (!ReferenceEquals(blueprintStore, expectedStore) || imported.Length == 0) return;
                     pendingImportedBlueprint = imported[0]; pendingImportedCount = imported.Length;
@@ -2641,7 +2655,7 @@ namespace OstrixMods.BuildWorks
         {
             if (contextMenu) UnityEngine.Object.Destroy(contextMenu);
             ContextButtons.Clear();
-            float menuHeight = deleteConfirmationId == blueprint.id ? 330f : 290f;
+            float menuHeight = deleteConfirmationId == blueprint.id ? 360f : 320f;
             GameObject menu = AddPanel(parent, "BlueprintContextMenu",
                 Vector2.zero,
                 new Vector2(244f, menuHeight), new Color(0.08f, 0.04f, 0.02f, 0.98f));
@@ -2672,6 +2686,9 @@ namespace OstrixMods.BuildWorks
             y -= 30f;
             AddContextAction(hud, menu.transform, BuildWorksLocalization.Text("exchange.export"), y, width,
                 () => { contextBlueprint = null; ExportBlueprintFile(blueprint); });
+            y -= 30f;
+            AddContextAction(hud, menu.transform, BuildWorksLocalization.Text("share.action"), y, width,
+                () => { contextBlueprint = null; ShowExchange(blueprint, share: true); });
             if (blueprint.IsExternal)
             {
                 y -= 30f;
@@ -2696,6 +2713,7 @@ namespace OstrixMods.BuildWorks
                     {
                         if (!blueprintStore.TryRename(blueprint, value, out string error))
                             ShowStatus(error);
+                        else ShowShareWarning();
                         contextBlueprint = null;
                         Invalidate();
                     }), BuildWorksLocalization.Text("catalog.prompt.blueprint_name"), 48));
@@ -2779,7 +2797,7 @@ namespace OstrixMods.BuildWorks
                 new Vector2(width - 32f, Mathf.Min(104f, height * 0.20f)), blueprint.id, hud);
 
             const float actionHeight = 28f;
-            int actionCount = deleteConfirmationId == blueprint.id ? 10 : 9;
+            int actionCount = deleteConfirmationId == blueprint.id ? 11 : 10;
             float actionTop = Mathf.Min(184f, 86f + height * 0.20f);
             actionTop = Mathf.Min(actionTop, Mathf.Max(0, height - 28));
             Transform inspectorParent = parent;
@@ -2814,6 +2832,9 @@ namespace OstrixMods.BuildWorks
             AddActionButton(hud, parent, BuildWorksLocalization.Text("exchange.export"), y, buttonWidth,
                 () => ExportBlueprintFile(blueprint));
             y -= actionHeight;
+            AddActionButton(hud, parent, BuildWorksLocalization.Text("share.action"), y, buttonWidth,
+                () => ShowExchange(blueprint, share: true));
+            y -= actionHeight;
             AddActionButton(hud, parent, BuildWorksLocalization.Text("exchange.diagnostics"), y, buttonWidth,
                 () => ShowBlueprintDiagnostics(player, blueprint));
             y -= actionHeight;
@@ -2847,6 +2868,7 @@ namespace OstrixMods.BuildWorks
                         {
                             if (!blueprintStore.TryRename(blueprint, value, out string error))
                                 ShowStatus(error);
+                            else ShowShareWarning();
                             Invalidate();
                         }),
                     BuildWorksLocalization.Text("catalog.prompt.blueprint_name"),
@@ -3118,6 +3140,7 @@ namespace OstrixMods.BuildWorks
             string next = categories[(index + 1 + categories.Count) % categories.Count];
             if (!blueprintStore.TrySetCategory(blueprint, next, out string error))
                 ShowStatus(error);
+            else ShowShareWarning();
             Invalidate();
         }
 
@@ -3274,6 +3297,7 @@ namespace OstrixMods.BuildWorks
             ClosePreview();
             if (!blueprintRegistry.RefreshThumbnail(blueprint, out error))
                 ShowStatus(error ?? BuildWorksLocalization.Text("catalog.preview.save_failed"));
+            ShowShareWarning();
             Invalidate();
         }
 
@@ -3303,6 +3327,7 @@ namespace OstrixMods.BuildWorks
             if (!success)
             {
                 ShowStatus(error);
+                ShowShareWarning();
                 deleteConfirmationId = null;
                 Invalidate();
                 return;

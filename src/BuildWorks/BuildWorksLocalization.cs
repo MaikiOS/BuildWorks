@@ -24,6 +24,7 @@ namespace OstrixMods.BuildWorks
             LoadCatalog(RussianResource);
         internal static string Token(string key) => "$" + RuntimeKey(key);
 
+
         private static string RuntimeKey(string key) =>
             TokenPrefix + key.Replace('.', '_');
 

@@ -345,7 +345,7 @@ public static class RuntimeEditorAcceptance
                     scene.SetViewport(view.ViewportScreenRect());
                     Call(controller, "FrameAll");
                     foreach (string state in new[] { "select", "transform", "scale-xyz-ru", "array", "contour", "catalog",
-                        "outliner", "outliner-filter-ru", "outliner-fields-ru", "outliner-empty-ru", "interior-camera-ru", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "catalog-managed-ru", "catalog-hidden-ru", "delete-confirm-ru", "hide-confirm-ru", "save-metadata", "save-as", "save-as-ru", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru", "exchange-import-category-ru", "exchange-import-category-picker-ru", "exchange-armor", "exchange-armor-ru", "exchange-missing", "exchange-missing-ru", "replace-tools", "replace-confirm", "replace-confirm-ru", "replace-entry-ru", "replace-help-ru" })
+                        "outliner", "outliner-filter-ru", "outliner-fields-ru", "outliner-empty-ru", "interior-camera-ru", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "catalog-managed-ru", "catalog-hidden-ru", "delete-confirm-ru", "hide-confirm-ru", "save-metadata", "save-as", "save-as-ru", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "share-ru", "share-error-ru", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru", "exchange-import-category-ru", "exchange-import-category-picker-ru", "exchange-armor", "exchange-armor-ru", "exchange-missing", "exchange-missing-ru", "replace-tools", "replace-confirm", "replace-confirm-ru", "replace-entry-ru", "replace-help-ru" })
                     {
                         Require(Screen.width == width && Screen.height == height,
                             "GameView changed before " + state + ": " + Screen.width + "x" + Screen.height);
@@ -462,6 +462,20 @@ public static class RuntimeEditorAcceptance
                         {
                             BuildWorksLocalization.RussianLanguage = state.EndsWith("-ru", StringComparison.Ordinal);
                             view.ShowSaveMetadata("Новая копия", "Дома", new[] { "Дома", "Декор" }, (_, __) => { }, saveCopy: true);
+                        }
+                        else if (state.StartsWith("share", StringComparison.Ordinal))
+                        {
+                            BuildWorksLocalization.RussianLanguage = true;
+                            var shared = store.All()[0];
+                            string targetFile = Path.Combine(store.ShareDirectory, shared.id + ".buildworks.json");
+                            if (Directory.Exists(targetFile)) Directory.Delete(targetFile);
+                            if (state == "share-error-ru")
+                            {
+                                if (File.Exists(targetFile)) File.Delete(targetFile);
+                                Directory.CreateDirectory(targetFile);
+                            }
+                            view.ShowExchange((parent, textFont, closed) => BlueprintExchangeView.ForShareFile(parent, textFont, store, shared, closed));
+                            yield return null; view.Tick();
                         }
                         else if (state.StartsWith("exchange"))
                         {
@@ -671,6 +685,8 @@ public static class RuntimeEditorAcceptance
                     yield return null;
                     foreach (object step in ControllerInputAcceptance.RunSinglePart(template, fontTemplate, source["woodwall"], output)) yield return step;
                     foreach (object step in ControllerInputAcceptance.RunSaveAs(template, fontTemplate, source["woodwall"], output)) yield return step;
+                    foreach (object step in ControllerInputAcceptance.RunShareFile(template, fontTemplate, source["woodwall"], output)) yield return step;
+                    checks.Add("Share: saved version and copyable file, dirty draft/history unchanged, conflict/retry, committed Save As file-only retry without duplicate. No network/game proof.");
                     foreach (object step in ControllerInputAcceptance.RunCatalogManagement(template, fontTemplate, source["woodwall"], output)) yield return step;
                     checks.Add("Catalogue management: actual owned delete/hide/cancel/unavailable restore/write refusal; open draft Undo/Redo/close prompt/new ID Save/reload; source immutable. No game proof.");
                     checks.Add("Save As native UI preserves original, supported data and copy identity through cancel, failure, retry and reopen");

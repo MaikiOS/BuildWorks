@@ -70,6 +70,10 @@ namespace OstrixMods.BuildWorks
         internal bool CatalogLoading => importTask != null || preparationTask != null;
         internal string ImportError { get; private set; }
         internal string ImportResultPath { get; private set; }
+        private readonly Dictionary<string, (string Path, string Error)> shareFailures = new Dictionary<string, (string Path, string Error)>(StringComparer.Ordinal);
+        internal string ShareError => shareFailures.Values.Select(value => value.Error).FirstOrDefault();
+        internal string ShareErrorPath => shareFailures.Values.Select(value => value.Path).FirstOrDefault();
+        internal int ShareErrorCount => shareFailures.Count;
         private string writeBlockReason;
 
         public CompositeBlueprintStore()
@@ -250,6 +254,114 @@ namespace OstrixMods.BuildWorks
         internal string ExchangeDirectory => Path.GetDirectoryName(path);
         internal string ImportDirectory => Path.Combine(ExchangeDirectory, "imports");
         internal string ExportDirectory => Path.Combine(ExchangeDirectory, "exports");
+        internal string ShareDirectory => Path.Combine(ExchangeDirectory, "share");
+
+        internal bool TryPrepareShareFile(Blueprint blueprint, out string target, out string error)
+        {
+            target = null; error = null;
+            try
+            {
+                var owned = blueprint?.IsExternal == true
+                    ? CatalogAll().FirstOrDefault(item => item.id == blueprint.id && item.importSource == blueprint.importSource)
+                    : data.blueprints.FirstOrDefault(item => ReferenceEquals(item, blueprint));
+                if (owned == null) throw new InvalidDataException("$buildworks_store.blueprint_missing");
+                if (owned.importError != null) throw new InvalidDataException(owned.importError);
+                if (owned.importAbsoluteScale) throw new InvalidDataException("$buildworks_import.scale_pending");
+                return TryWriteShareFile(owned, out target, out error);
+            }
+            catch (Exception exception) { error = exception.Message; return false; }
+        }
+
+        private string ManagedSharePath(string id)
+        {
+            if (!Guid.TryParseExact(id, "N", out _) && !IsExternalShareId(id))
+                throw new InvalidDataException("$buildworks_import.document_invalid");
+            string directory = ValidateExchangeDirectory(ShareDirectory);
+            if (File.Exists(directory)) throw new IOException(UserError("share.conflict", directory));
+            return Path.Combine(directory, id.ToLowerInvariant() + ".buildworks.json");
+        }
+
+        private static bool IsExternalShareId(string id) => id != null && id.Length == 73 &&
+            id.StartsWith("external_", StringComparison.Ordinal) && id.Skip(9).All(c =>
+                c >= '0' && c <= '9' || c >= 'a' && c <= 'f');
+
+        private static string PortableShareId(string id) => IsExternalShareId(id) ? id.Substring(9, 32) : id;
+
+        private byte[] ExistingShareBytes(string target, string id)
+        {
+            ValidateExchangeDirectory(Path.GetDirectoryName(target));
+            if (!File.Exists(target))
+            {
+                if (Directory.Exists(target)) throw new IOException(UserError("share.conflict", target));
+                return null;
+            }
+            byte[] bytes = ReadImportBytes(target); // Reparse-point and bounded-read guards also apply to generated files.
+            var previous = BlueprintExchangeFormat.Decode(new UTF8Encoding(false, true).GetString(bytes));
+            if (!string.Equals(previous.id, PortableShareId(id), StringComparison.OrdinalIgnoreCase))
+                throw new IOException(UserError("share.conflict", target));
+            return bytes;
+        }
+
+        private bool TryWriteShareFile(Blueprint blueprint, out string target, out string error)
+        {
+            target = null; error = null; string temporary = null;
+            try
+            {
+                target = ManagedSharePath(blueprint.id);
+                var snapshot = blueprint.ImportCopy();
+                snapshot.importSource = null; // A portable snapshot retains stable IDs; insertion/import supplies new identities.
+                snapshot.id = PortableShareId(blueprint.id); // The native format requires a GUID, not the transient external catalogue ID.
+                byte[] bytes = BlueprintExchangeFormat.Encode(snapshot);
+                BlueprintExchangeFormat.Decode(new UTF8Encoding(false, true).GetString(bytes));
+                byte[] previous = ExistingShareBytes(target, blueprint.id);
+                if (previous != null && previous.SequenceEqual(bytes)) { shareFailures.Remove(blueprint.id); return true; }
+                Directory.CreateDirectory(ShareDirectory);
+                ValidateExchangeDirectory(ShareDirectory);
+                temporary = Path.Combine(ShareDirectory, Guid.NewGuid().ToString("N") + ".tmp");
+                using (var output = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                { output.Write(bytes, 0, bytes.Length); output.Flush(true); }
+                previous = ExistingShareBytes(target, blueprint.id);
+                if (previous == null) File.Move(temporary, target);
+                else File.Replace(temporary, target, null, true);
+                shareFailures.Remove(blueprint.id);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                error = exception.Message;
+                if (!blueprint.IsExternal) shareFailures[blueprint.id] = (target ?? ShareDirectory, error);
+                return false;
+            }
+            finally
+            {
+                try { if (temporary != null && File.Exists(temporary)) File.Delete(temporary); }
+                catch (Exception exception) { Debug.LogWarning("BuildWorks share cleanup: " + exception.Message); }
+            }
+        }
+
+        private void UpdateShareCopies(IEnumerable<Blueprint> blueprints)
+        {
+            foreach (Blueprint blueprint in blueprints ?? Array.Empty<Blueprint>()) TryWriteShareFile(blueprint, out _, out _);
+        }
+
+        internal bool TryRepairShareFiles(out string error)
+        {
+            UpdateShareCopies(data.blueprints.Where(blueprint => shareFailures.ContainsKey(blueprint.id)).ToArray());
+            error = ShareError;
+            return ShareErrorCount == 0;
+        }
+
+        private bool TryRemoveShareFile(string id, out string error)
+        {
+            error = null;
+            try
+            {
+                string target = ManagedSharePath(id);
+                if (ExistingShareBytes(target, id) != null) File.Delete(target);
+                return true;
+            }
+            catch (Exception exception) { error = exception.Message; return false; }
+        }
 
         internal static string ValidateExchangeDirectory(string directory)
         {
@@ -984,7 +1096,6 @@ namespace OstrixMods.BuildWorks
             try
             {
                 Save();
-                return true;
             }
             catch (Exception exception)
             {
@@ -994,6 +1105,8 @@ namespace OstrixMods.BuildWorks
                 error = exception.Message;
                 return false;
             }
+            UpdateShareCopies(new[] { blueprint }); // The primary commit is complete; copy failure must never roll it back.
+            return true;
         }
 
         public bool TryRename(Blueprint blueprint, string name, out string error)
@@ -1007,16 +1120,20 @@ namespace OstrixMods.BuildWorks
             }
             string previous = blueprint.name;
             blueprint.name = name;
-            return TryCommit(() => blueprint.name = previous, out error);
+            return TryCommit(() => blueprint.name = previous, out error, new[] { blueprint });
         }
 
         public bool TryDelete(Blueprint blueprint, out string error)
         {
             error = null;
             if (!CanWrite(blueprint, out error)) return false;
+            if (!TryRemoveShareFile(blueprint.id, out error)) return false;
             int index = data.blueprints.IndexOf(blueprint);
             data.blueprints.RemoveAt(index);
-            return TryCommit(() => data.blueprints.Insert(index, blueprint), out error);
+            bool deleted = TryCommit(() => data.blueprints.Insert(index, blueprint), out error);
+            if (!deleted) UpdateShareCopies(new[] { blueprint });
+            else shareFailures.Remove(blueprint.id);
+            return deleted;
         }
 
         public bool TrySetCategory(Blueprint blueprint, string category, out string error)
@@ -1030,7 +1147,7 @@ namespace OstrixMods.BuildWorks
             }
             string previous = blueprint.category;
             blueprint.category = category;
-            return TryCommit(() => blueprint.category = previous, out error);
+            return TryCommit(() => blueprint.category = previous, out error, new[] { blueprint });
         }
 
         public bool TryAddCategory(string category, out string error)
@@ -1090,7 +1207,7 @@ namespace OstrixMods.BuildWorks
             {
                 data.categories.Insert(index, category);
                 foreach (Blueprint blueprint in moved) blueprint.category = category;
-            }, out error);
+            }, out error, moved);
         }
 
         public bool TrySetPreview(
@@ -1118,7 +1235,7 @@ namespace OstrixMods.BuildWorks
                 blueprint.previewYaw = previousYaw;
                 blueprint.previewPitch = previousPitch;
                 blueprint.previewZoom = previousZoom;
-            }, out error);
+            }, out error, new[] { blueprint });
         }
 
         public bool TryUpdateParts(
@@ -1325,7 +1442,7 @@ namespace OstrixMods.BuildWorks
                 blueprint.primaryGroupId = previousPrimaryGroupId;
                 blueprint.prefabName = previousPrefabName;
                 if (addCategory) data.categories.Remove(category);
-            }, out error);
+            }, out error, new[] { blueprint });
         }
 
         internal static List<Part> CloneParts(IReadOnlyList<Part> parts)
@@ -1574,13 +1691,11 @@ namespace OstrixMods.BuildWorks
             return false;
         }
 
-        private bool TryCommit(Action rollback, out string error)
+        private bool TryCommit(Action rollback, out string error, IEnumerable<Blueprint> sharedChanges = null)
         {
             try
             {
                 Save();
-                error = null;
-                return true;
             }
             catch (Exception exception)
             {
@@ -1588,6 +1703,9 @@ namespace OstrixMods.BuildWorks
                 error = exception.Message;
                 return false;
             }
+            UpdateShareCopies(sharedChanges);
+            error = null;
+            return true;
         }
 
         private static string NormalizeCategory(string value)

@@ -718,6 +718,11 @@ namespace OstrixMods.BuildWorks
                 if (blueprint == null) { view.SetStatus(BuildWorksLocalization.Text("catalog.choose_blueprint")); return; }
                 view.ShowExchange((parent, font, closed) => new BlueprintExchangeView(parent, font, store, blueprint, closed));
             };
+            view.CatalogShareRequested += blueprint =>
+            {
+                if (blueprint == null) { view.SetStatus(BuildWorksLocalization.Text("catalog.choose_blueprint")); return; }
+                view.ShowExchange((parent, font, closed) => BlueprintExchangeView.ForShareFile(parent, font, store, blueprint, closed));
+            };
             view.InspectorSubmitted += ApplyInspector;
             view.RenameSubmitted += (id, name) => ApplyDocumentEdit(() =>
                 document.Rename(id, name));
@@ -4059,7 +4064,7 @@ namespace OstrixMods.BuildWorks
                 string error;
                 bool success = blueprint.IsExternal ? store.TrySetHidden(blueprint, !restore, out error) :
                     store.TryDelete(blueprint, out error);
-                if (!success) { view.ShowError(action, error, canRetry: false); return; }
+                if (!success) { view.ShowError(action, BuildWorksLocalization.ResolveUserText(error) + "\n" + BlueprintExchangeView.ShareWarning(store), canRetry: false); return; }
                 if (!blueprint.IsExternal && sourceBlueprint?.id == blueprint.id)
                 {
                     sourceBlueprint = null;
@@ -4169,6 +4174,7 @@ namespace OstrixMods.BuildWorks
                         BuildWorksLocalization.Text("editor.save_error_title"), error);
                     return false;
                 }
+                string shareWarning = BlueprintExchangeView.ShareWarning(store);
                 sourceBlueprint = savedBlueprint;
                 previewTemplate = savedBlueprint;
                 document.AdoptSavedIdentity(
@@ -4187,7 +4193,19 @@ namespace OstrixMods.BuildWorks
                     view.SetStatus(BuildWorksLocalization.Text(
                         "editor.library_refresh_failed"), error: true);
                 }
-                if (closeAfterSave) Cleanup();
+                if (!string.IsNullOrEmpty(shareWarning))
+                {
+                    // The document is already committed. Retry must never create another Save As copy.
+                    retrySave = () =>
+                    {
+                        if (!store.TryRepairShareFiles(out string shareError))
+                        { view.ShowError(BuildWorksLocalization.Text("share.action"), BuildWorksLocalization.ResolveUserText(shareError)); return; }
+                        Bind(BuildWorksLocalization.Text("editor.blueprint_saved"));
+                        if (closeAfterSave) Cleanup();
+                    };
+                    view.ShowError(BuildWorksLocalization.Text("share.action"), shareWarning);
+                }
+                else if (closeAfterSave) Cleanup();
                 return true;
             }
             catch (Exception exception)

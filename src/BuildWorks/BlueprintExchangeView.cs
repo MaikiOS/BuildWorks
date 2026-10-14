@@ -60,6 +60,39 @@ namespace OstrixMods.BuildWorks
         private string selected, resultPath, currentDirectory;
         private int page;
         private bool importing, archive, planBuild, completed, disposed;
+        private bool sharing;
+        private CompositeBlueprintStore.Blueprint sharedBlueprint;
+
+        internal static string ShareWarning(CompositeBlueprintStore store) => store.ShareError == null ? "" :
+            T("share.partial", store.ShareErrorCount, store.ShareErrorPath, BuildWorksLocalization.ResolveUserText(store.ShareError));
+
+        internal static BlueprintExchangeView ForShareFile(Transform parent, TMP_Text font,
+            CompositeBlueprintStore store, CompositeBlueprintStore.Blueprint blueprint, Action closed, bool frontCanvas = false)
+        {
+            var view = new BlueprintExchangeView(parent, font, store, blueprint, closed, frontCanvas, report: "");
+            view.sharing = true; view.sharedBlueprint = blueprint;
+            view.PrepareShareFile();
+            return view;
+        }
+
+        private void PrepareShareFile()
+        {
+            bool ready = store.TryPrepareShareFile(sharedBlueprint, out resultPath, out string error);
+            panel.Find("ExchangeTitle").GetComponent<TMP_Text>().text = T("share.action");
+            panel.Find("ExchangeHelp").GetComponent<TMP_Text>().text = T("share.help");
+            copyPath.GetComponentInChildren<TMP_Text>().text = T("exchange.copy_path");
+            copyPath.interactable = ready;
+            primary.GetComponentInChildren<TMP_Text>().text = T(ready ? "share.open_folder" : "share.retry");
+            ShowResult(ready ? T("share.ready", sharedBlueprint.name, resultPath) :
+                T("share.failed", resultPath ?? store.ShareDirectory, BuildWorksLocalization.ResolveUserText(error)));
+            foreach (Transform child in panel)
+                if (child.name != "ExchangeTitle" && child.name != "ExchangeClose" && child.name != "ExchangeHelp" &&
+                    child.name != "ExchangeResult" && child.name != "ExchangeSubmit" && child.name != "ExchangeCopyPath")
+                    child.gameObject.SetActive(false);
+            var result = (RectTransform)panel.Find("ExchangeResult");
+            result.anchoredPosition = new Vector2(20, -102); result.sizeDelta = new Vector2(740, 414);
+            Tick();
+        }
         internal bool IsOpen => root && root.activeInHierarchy && !disposed;
 
         internal BlueprintExchangeView(Transform parent, TMP_Text template, CompositeBlueprintStore library,
@@ -297,6 +330,7 @@ namespace OstrixMods.BuildWorks
                 planExport = null;
             }
             bool busy = importing || planExport != null || placementPreparation != null;
+            if (sharing) { primary.interactable = true; return; }
             primary.interactable = catalogRetry && !busy || !completed && !busy && ImportCategoryIsValid() && listing == null && !directory.gameObject.activeSelf &&
                 (blueprint != null || selected != null) && (!reviewingContents ||
                 (planBuild ? planReview != null : contentsSummary != null && missingReview != null &&
@@ -387,6 +421,12 @@ namespace OstrixMods.BuildWorks
 
         private void Submit()
         {
+            if (sharing)
+            {
+                if (!copyPath.interactable) PrepareShareFile();
+                else Application.OpenURL(new Uri(Path.GetDirectoryName(resultPath)).AbsoluteUri);
+                return;
+            }
             if (catalogRetry && !importing)
             {
                 if (!store.RetryImportCatalog(importOperationPath, out string refreshError))

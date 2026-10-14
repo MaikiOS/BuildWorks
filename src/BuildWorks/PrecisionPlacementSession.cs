@@ -1234,6 +1234,8 @@ namespace OstrixMods.BuildWorks
                         return error;
                     blueprint = imported;
                     RefreshBlueprintEditorLibrary();
+                    string shareWarning = BlueprintExchangeView.ShareWarning(blueprintStore);
+                    if (!string.IsNullOrEmpty(shareWarning)) ShowStatus(player, shareWarning);
                 }
             }
             if (!player || (!edit && !blueprintPieceRegistry.TryGetPiece(blueprint, out _)))
@@ -5016,7 +5018,7 @@ namespace OstrixMods.BuildWorks
             ShowStatus(Player.m_localPlayer, BuildWorksLocalization.Text(
                 "blueprint.world_saved",
                 saved.name,
-                BuildWorksLocalization.BlueprintCategoryLabel(saved.category)));
+                BuildWorksLocalization.BlueprintCategoryLabel(saved.category)) + "\n" + BlueprintExchangeView.ShareWarning(blueprintStore));
         }
 
         private bool TrySaveWorldSelection(out CompositeBlueprintStore.Blueprint saved, out string error)
@@ -6409,7 +6411,7 @@ namespace OstrixMods.BuildWorks
             Finish();
             blueprintPieceRegistry.Update(player);
             ShowStatus(player, BuildWorksLocalization.Text(
-                "editor.saved", blueprintName));
+                "editor.saved", blueprintName) + "\n" + BlueprintExchangeView.ShareWarning(blueprintStore));
         }
 
         private bool TrySaveBlueprintWorkspace(

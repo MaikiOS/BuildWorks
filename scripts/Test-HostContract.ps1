@@ -880,7 +880,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.181.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.182.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $pluginIdentity = $plugin.MainModule.Types | Where-Object Name -eq 'BuildWorksPlugin'
 $loaderIdentity = $pluginIdentity.CustomAttributes | Where-Object { $_.AttributeType.Name -eq 'BepInPlugin' }
@@ -2423,7 +2423,7 @@ Assert-Contract ($catalogSource -match
     $catalogSource -match 'new Vector2\(16f, y\)') `
     'Blueprint inspector no longer keeps a responsive width and safe inner padding.'
 Assert-Contract ($catalogSource -match 'const float actionHeight = 28f' -and
-    $catalogSource -match 'int actionCount = deleteConfirmationId == blueprint.id \? 10 : 9' -and
+    $catalogSource -match 'int actionCount = deleteConfirmationId == blueprint.id \? 11 : 10' -and
     $catalogSource -match 'BlueprintActionsViewport' -and
     $catalogSource -match 'viewport.AddComponent<RectMask2D>' -and
     $catalogSource -match 'viewport.AddComponent<ScrollRect>' -and

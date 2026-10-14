@@ -1,3 +1,10 @@
+## 2026-10-14 — QA .182 deployed: automatic portable file and Share
+
+Owned saves update full `config/BuildWorks/share/<id>.buildworks.json`. Share in editor and Hammer gives the saved file, copyable full path and open-folder action without another card; open drafts remain intact. A derived failure never rolls back the primary commit; failed files remain tracked by ID and retry only repairs files, never repeats Save As. [Evidence](SHARE_FILES_182.md), [manual queue](MANUAL_QA_182.md).
+
+normal/QA0/0, Store/Geometry/Localization runtime/EditorBridge/actual WorldLayout/actual Tick/Host/loc1030/deployment guards and final Unity54008:37:18Z pass. Correctness PASSED/Ponytail Ship;135 inherited WHITESPACE, no new diagnostics. Both installed SHA verified,103 config/token/provision files unchanged; catalog0/0. No game/model/input/saves executed. Valheim acceptance remains pending.
+
+Next batch import/export. Server library and in-game personal player transfer remain planned. Full contents/v11/selection/heavy/admin/network goal remains open; goal API active. Older paused/blocked entries below are historical.
 ## 2026-10-13 — QA .181 deployed: pre-import categories
 
 Source categories, searchable/paged existing choice, new typed category and explicit common ZIP category implemented. Validation precedes worker; source/review remain intact; result opens correct category/page. Long report has a visible read-only scrollbar. [Evidence](IMPORT_CATEGORIES_181.md), [manual queue](MANUAL_QA_181.md).

@@ -37,6 +37,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 ImportErrorChecks.Run();
                 ImportCatalogRecoveryChecks.Run(Path.Combine(directory, "import-catalogue-recovery"));
                 ImportCategoryChecks.Run(Path.Combine(directory, "import-category"));
+                ShareFileChecks.Run(Path.Combine(directory, "share-files"));
                 LargeSnapChecks.Run(Path.Combine(directory, "large-snap-bounds"));
                 VbuildDialectChecks.Run(Path.Combine(directory, "legacy-vbuild"));
                 MaterialSeedChecks.Run(Path.Combine(directory, "material-seed"));

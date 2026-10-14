@@ -1,3 +1,6 @@
+## Implemented checkpoint 2026-10-14
+
+.181 adds pre-import categories; .182 implements/deploys automatic full JSON share files and Share in both catalogs. The primary library stays authoritative; share is outside scanned imports and retry never repeats Save As. Batch operations, server library and in-game player transfers remain unimplemented. Game acceptance is separate. Older statements below about missing auto files are historical. See docs/SHARE_FILES_182.md and its complete Russian duplicate.
 # Blueprint library lifecycle — owner decisions, 2026-10-13
 
 Status: the broad lifecycle remains designed; QA181 implements source/common existing/new category choice before import. The current store still

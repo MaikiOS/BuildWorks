@@ -1025,3 +1025,11 @@ exchange.category_picker	Choose a category
 exchange.category_search	Search existing categories
 exchange.category_page	Page {0}/{1}; categories: {2}
 exchange.category_all	Category «{0}» applies to all blueprints ({1}).
+share.action	Share
+share.help	Share the saved version. Save editor changes first. This file does not publish a server blueprint.
+share.open_folder	Open folder
+share.retry	Retry file
+share.ready	Ready to share: {0}\n{1}\nSend this file to another player; they can import their own copy.
+share.failed	Could not prepare the file.\n{0}\n{1}\nThe blueprint remains saved. Retry only prepares the file.
+share.partial	{0} share files could not be updated.\n{1}\n{2}\nUse Share for each changed blueprint to retry without saving a duplicate.
+share.conflict	Cannot replace a foreign or invalid share file: {0}

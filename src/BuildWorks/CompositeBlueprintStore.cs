@@ -36,7 +36,7 @@ namespace OstrixMods.BuildWorks
         private const string LegacyDefaultCategory = "ПРОЧЕЕ";
         private const string LocalizationPrefix = "$buildworks_";
         private const int FormatVersion = 23;
-        internal const int MaximumLibraryOrigins = 16;
+        internal const int MaximumLibraryOrigins = Geometry.BlueprintLibraryOrigin.MaximumCount;
         private const int MaximumBlueprints = 32;
         private const int MaximumCategories = 12;
         private const int MaximumAnchors = 512;
@@ -1175,10 +1175,14 @@ namespace OstrixMods.BuildWorks
             IReadOnlyList<VectorData> anchors, string primaryPartId, string primaryGroupId,
             IReadOnlyList<Support> supports, string placementSupportId,
             out Blueprint blueprint, out string error, IReadOnlyList<VectorData> customSnapPoints = null,
-            Blueprint previewTemplate = null, IReadOnlyList<SourceDocument> sourceDocuments = null)
+            Blueprint previewTemplate = null, IReadOnlyList<SourceDocument> sourceDocuments = null,
+            IReadOnlyList<LibraryOrigin> libraryOrigins = null)
         {
             blueprint = null;
             error = null;
+            libraryOrigins = libraryOrigins ?? previewTemplate?.libraryOrigins;
+            if (!ValidLibraryOrigins(libraryOrigins))
+            { error = UserError("store.invalid_composition"); return false; }
             name = (name ?? string.Empty).Trim();
             category = NormalizeCategory(category);
             primaryPartId = string.IsNullOrWhiteSpace(primaryPartId) ? null : primaryPartId.Trim();
@@ -1270,7 +1274,7 @@ namespace OstrixMods.BuildWorks
                 previewZoom = previewTemplate?.previewZoom ?? 1f,
                 sourceDocuments = CloneSources(sourceDocuments ?? previewTemplate?.sourceDocuments),
                 placementImportId = previewTemplate?.placementImportId,
-                libraryOrigins = CloneLibraryOrigins(previewTemplate?.libraryOrigins)
+                libraryOrigins = CloneLibraryOrigins(libraryOrigins)
             };
             if (!Valid(blueprint)) { blueprint = null; error = UserError("store.verify_data_failed"); return false; }
             if (addCategory) data.categories.Add(category);
@@ -1513,7 +1517,7 @@ namespace OstrixMods.BuildWorks
             IReadOnlyList<Group> groups, IReadOnlyList<VectorData> anchors, string primaryPartId,
             string primaryGroupId, IReadOnlyList<Support> supports, string placementSupportId,
             out string error, IReadOnlyList<VectorData> customSnapPoints = null,
-            IReadOnlyList<SourceDocument> sourceDocuments = null)
+            IReadOnlyList<SourceDocument> sourceDocuments = null, IReadOnlyList<LibraryOrigin> libraryOrigins = null)
         {
             error = null;
             name = (name ?? string.Empty).Trim();
@@ -1522,6 +1526,9 @@ namespace OstrixMods.BuildWorks
             primaryGroupId = string.IsNullOrWhiteSpace(primaryGroupId) ? null : primaryGroupId.Trim();
             customSnapPoints = customSnapPoints ?? blueprint?.customSnapPoints;
             sourceDocuments = sourceDocuments ?? blueprint?.sourceDocuments;
+            libraryOrigins = libraryOrigins ?? blueprint?.libraryOrigins;
+            if (!ValidLibraryOrigins(libraryOrigins))
+            { error = UserError("store.invalid_composition"); return false; }
             if (!ValidSources(parts, sourceDocuments))
             { error = UserError("store.invalid_composition"); return false; }
             if (!CanWrite(blueprint, out error) || parts == null || groups == null ||
@@ -1586,6 +1593,7 @@ namespace OstrixMods.BuildWorks
             List<VectorData> previousCustomSnapPoints = blueprint.customSnapPoints;
             List<Support> previousSupports = blueprint.supports;
             List<SourceDocument> previousSources = blueprint.sourceDocuments;
+            List<LibraryOrigin> previousOrigins = blueprint.libraryOrigins;
             string previousPlacementImportId = blueprint.placementImportId;
             string previousPlacementSupportId = blueprint.placementSupportId;
             string previousName = blueprint.name;
@@ -1602,6 +1610,7 @@ namespace OstrixMods.BuildWorks
             blueprint.customSnapPoints = customSnapPoints == null ? null : new List<VectorData>(customSnapPoints);
             blueprint.supports = CloneSupports(supports);
             blueprint.sourceDocuments = CloneSources(sourceDocuments);
+            blueprint.libraryOrigins = CloneLibraryOrigins(libraryOrigins);
             // An edited copy must not replace the external original on the next placement.
             blueprint.placementImportId = null;
             blueprint.placementSupportId = placementSupportId;
@@ -1616,6 +1625,7 @@ namespace OstrixMods.BuildWorks
                 blueprint.customSnapPoints = previousCustomSnapPoints;
                 blueprint.supports = previousSupports;
                 blueprint.sourceDocuments = previousSources;
+                blueprint.libraryOrigins = previousOrigins;
                 blueprint.placementImportId = previousPlacementImportId;
                 blueprint.placementSupportId = previousPlacementSupportId;
                 blueprint.name = previousName;
@@ -2416,6 +2426,13 @@ namespace OstrixMods.BuildWorks
                 this.access = access; this.publisher = publisher; this.sha256 = sha256; this.formatVersion = formatVersion;
             }
             internal LibraryOrigin Copy() => (LibraryOrigin)MemberwiseClone();
+            internal Geometry.BlueprintLibraryOrigin ToGeometry()
+            {
+                if (formatVersion > BlueprintExchangeFormat.Version) throw new ArgumentException("Unsupported library origin format.");
+                return new Geometry.BlueprintLibraryOrigin(server, worldUid, documentId, revision, access, publisher, sha256, formatVersion, version);
+            }
+            internal static LibraryOrigin FromGeometry(Geometry.BlueprintLibraryOrigin origin) => new LibraryOrigin(
+                origin.Server, origin.WorldUid, origin.DocumentId, origin.Revision, origin.Access, origin.Publisher, origin.Sha256, origin.FormatVersion);
         }
 
         [DataContract]

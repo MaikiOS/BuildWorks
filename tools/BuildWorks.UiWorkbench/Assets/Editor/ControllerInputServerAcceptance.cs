@@ -127,6 +127,59 @@ internal static partial class ControllerInputAcceptance
         BuildWorksPlugin.ServerLibraryClient = null;
     }
 
+    internal static IEnumerable<object> RunOriginMerge(Camera camera, TMP_Text font, GameObject wall, string output)
+    {
+        string path = Path.Combine(output, "origin-controller-" + Guid.NewGuid().ToString("N"), "library.json");
+        var store = new CompositeBlueprintStore(path); object context = new object();
+        store.ConfigureImportScale(name => name == "woodwall" ? new CompositeBlueprintStore.VectorData(wall.transform.localScale) : (CompositeBlueprintStore.VectorData?)null,
+            () => context, name => name.GetStableHashCode());
+        var part = new CompositeBlueprintStore.Part { stableId = "a", prefabName = "woodwall", displayName = "Wall",
+            rotation = new CompositeBlueprintStore.QuaternionData { w = 1 }, scale = new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 },
+            baseScale = new CompositeBlueprintStore.VectorData(wall.transform.localScale) };
+        var a = new CompositeBlueprintStore.LibraryOrigin("server", 71, "0123456789abcdef0123456789abcdef", 1, 0, "admin", new string('A', 64), 12);
+        var b = new CompositeBlueprintStore.LibraryOrigin("server", 71, a.documentId, 2, 0, "admin", new string('B', 64), 12);
+        Require(store.TrySaveDocument("Original", "QA", new[] { part }, Array.Empty<CompositeBlueprintStore.Group>(), Array.Empty<CompositeBlueprintStore.VectorData>(),
+            "a", null, null, null, out var original, out string error, libraryOrigins: new[] { a }), error);
+        var input = new InputFrames();
+        using (var controller = new BlueprintEditorController(store, camera, font, name => name == "woodwall" ? wall : null,
+            name => name, () => Array.Empty<BlueprintEditorCatalogItem>(), message => { throw new InvalidOperationException(message); }, editorInput: input))
+        {
+            Require(controller.OpenExisting(original, out error), error); yield return null;
+            var view = Field<BlueprintEditorView>(controller, "view");
+            var incoming = original.ImportCopy(); incoming.libraryOrigins = new List<CompositeBlueprintStore.LibraryOrigin> { b };
+            var inserted = (BlueprintEditorDocument)typeof(BlueprintEditorController).GetMethod("DocumentFromBlueprint", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)
+                .Invoke(null, new object[] { incoming });
+            incoming.libraryOrigins[0].publisher = "changed caller";
+            Require(inserted.LibraryOrigins[0].Publisher == "admin", "Opening insertion aliased mutable DTO");
+            Require((bool)Call(controller, "ApplyDocumentEdit", new Func<bool>(() => controller.Document.InsertBlueprint(inserted, new Point3(3, 0, 0), new Rotation3(0, 0, 0, 1))), false),
+                "Actual editor insertion failed"); yield return null;
+            NativeClick(view, null, "Save"); yield return null;
+            Require(view.HasModal, "Save did not request metadata confirmation");
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            Require(!view.HasModal && original.parts.Count == 2 && new CompositeBlueprintStore(path).All().Single().libraryOrigins.Count == 2,
+                "Actual Save did not persist inserted parts and origins");
+            NativeClick(view, null, Field<Button>(view, "undoButton")); yield return null;
+            NativeClick(view, null, "Save"); yield return null;
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            Require(original.parts.Count == 1 && original.libraryOrigins.Count == 1 && new CompositeBlueprintStore(path).All().Single().libraryOrigins.Count == 1,
+                "Actual Save -> Undo -> Save kept cancelled origins");
+            NativeClick(view, null, Field<Button>(view, "redoButton")); yield return null;
+            NativeClick(view, null, "SaveAs"); yield return null;
+            Field<TMP_InputField>(view, "saveMetadataName").SetTextWithoutNotify("Merged copy");
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            var copy = store.All().Single(item => item.id != original.id);
+            Require(copy.parts.Count == 2 && copy.libraryOrigins.Count == 2 && original.parts.Count == 1 && original.libraryOrigins.Count == 1 &&
+                !ReferenceEquals(copy.libraryOrigins[0], original.libraryOrigins[0]) && controller.Document.SourceBlueprintId == copy.id,
+                "Actual Save As copied stale template history or changed original");
+            Require(BlueprintExchangeFormat.Decode(File.ReadAllText(Path.Combine(store.ShareDirectory, copy.id + ".buildworks.json"))).libraryOrigins.Count == 2,
+                "Actual saved share document lost merged origins");
+            controller.Close(true);
+            Require(controller.OpenExisting(new CompositeBlueprintStore(path).All().Single(item => item.id == copy.id), out error) && controller.Document.LibraryOrigins.Count == 2,
+                "Actual controller reopen lost merged history");
+            controller.Close(true);
+        }
+    }
+
     internal sealed class ServerLayoutFixture : IDisposable
     {
         internal readonly CompositeBlueprintStore Store;

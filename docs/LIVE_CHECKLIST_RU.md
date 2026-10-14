@@ -1,10 +1,10 @@
 # BuildWorks — живой список работ
 
-Обновлено:2026-10-14. Установлена QA **0.19.183** в **TerrainRamp-1.0-Test**. Каталог пустой; чертежи выбираешь и импортируешь ты. [Папка исходников](<C:/Users/nfspr/AppData/Roaming/Thunderstore Mod Manager/DataFolder/Valheim/profiles/Default/BuildWorks/artifacts/Blueprints-for-import>), [групповой набор Batch-183](<C:/Users/nfspr/AppData/Roaming/Thunderstore Mod Manager/DataFolder/Valheim/profiles/Default/BuildWorks/artifacts/Blueprints-for-import/BuildWorks-tests/Batch-183>), [ручная очередь .183](MANUAL_QA_183_RU.md).
+Обновлено:2026-10-14. Установлена QA **0.19.184** в **TerrainRamp-1.0-Test**. Каталог пустой; чертежи выбираешь и импортируешь ты. [Папка исходников](<C:/Users/nfspr/AppData/Roaming/Thunderstore Mod Manager/DataFolder/Valheim/profiles/Default/BuildWorks/artifacts/Blueprints-for-import>), [групповой набор Batch-183](<C:/Users/nfspr/AppData/Roaming/Thunderstore Mod Manager/DataFolder/Valheim/profiles/Default/BuildWorks/artifacts/Blueprints-for-import/BuildWorks-tests/Batch-183>), [ручная очередь .184](MANUAL_QA_184_RU.md).
 
 ## Сейчас
 
-**Сейчас: общий серверный экран проверен в исходниках редактора и молотка.** Normal/QA0/0, полный Store, Host, loc1099/runtime loc, независимый PASSED/Ponytail Ship и финальный exact-source Unity612 прошли;24 новых русских кадра списка/обзора на4 разрешениях при100/120/140%. Подтверждены лабораторные публикация/update/delete, отзыв роли, принятие личной копии и сохранность dirty draft/Undo. **Следом — происхождение вставок в Undo/Redo и Save; .184 WIP ещё не установлена, живой сети не было.** Установленная .183/обе SHA/103 config/token/квитанции сверены, неизменны. [Этап и границы](SERVER_LIBRARY_PANEL_RU.md). Ручная очередь [MANUAL_QA_183_RU.md](MANUAL_QA_183_RU.md), Batch-183 из верхней ссылки. Полная цель active, остальные блоки открыты.
+**Сейчас: .184 проверена автоматически и установлена.** Общий серверный экран плюс происхождение вставок, Undo/Redo, Save/Save As/Update: Geometry/Store/actual EditorBridge/normal/QA/Host/loc1100/runtime loc/review и exact-source Unity612 прошли. Обе установленные SHA сверены;103 config/token/квитанции неизменны; каталог0/0. **Ручная приёмка/живая сеть открыты:** [MANUAL_QA_184_RU.md](MANUAL_QA_184_RU.md), групповой Batch-183 из верхней ссылки. Следующий основной блок — содержимое хранилищ: согласовать reserve/transfer/journal/settlement с native placement и save/server ack, без потери/дублирования вещей. Туманv11/постоянный проект и объёмное выделение остаются открыты. Полная цель ACTIVE, не завершена; игру/модель/ввод не запускал.
 
 ### История разработки .181
 
@@ -372,8 +372,9 @@ Geometry, полный Store, normal/QA0/0, Host/loc991, Localization runtime, E
 - [x] .184 WIP, исходники: worker preparation + host commit; world UID/localhost/dedicated; прямой ограниченный RPC, клиент, отмена/таймаут/очистка/защита от старых запросов. Actual-source инертные и сквозные CPU-проверки прошли; это не живая сеть.
 - [x] .184 WIP, native23/portable12: происхождение целого документа и backend принятия отдельной копии; clone/update/Save As/share/batch/reload, source unchanged, строгие версии/поля/лимит16 и атомарный отказ. Полный Store/normal/QA/Host/loc1057/review и Unity588 с настоящим контроллером прошли. Это не подключение получения копии в игре.
 - [x] .184 WIP, исходники: единый серверный экран обоих каталогов, admin publication/access/update/delete, SHA-проверенное получение и принятие личной копии; normal/QA/Store/Host/loc1099/review и Unity612 прошли. [Границы](SERVER_LIBRARY_PANEL_RU.md).
-- [ ] Объединение происхождения вставок с Undo/Redo, Save/Save As/Update и rollback. Целые документы сохраняются, вставки ещё не завершены.
-- [ ] Установка законченного .184 сценария; живая общая библиотека host+remote, отзыв прав/reconnect/restart. Лабораторный endpoint не доказывает сеть.
+- [x] .184: immutable происхождение вставок, атомарный merge/conflict/limit16, Undo/Redo, явные Save/Save As/Update/null/empty/rollback. Geometry/Store/EditorBridge/Unity612/review прошли; установлено. Это не подтверждение живой сети.
+- [x] .184 установлена guarded script; обе SHA и103 config/token/квитанции сверены, каталог0/0.
+- [ ] Ручная серверная библиотека .184 по MANUAL_QA_184_RU.md; живая host+remote, отзыв прав/reconnect/restart. Лабораторный endpoint не доказывает сеть.
 - [ ] Личная передача между игроками с принятием копии и проверкой сервера.
 
 Основные блоки содержимого/проектv11/выделение/тяжёлая цепочка/админ/сеть из полной цели остаются открыты. get_goal 2026-10-14 вернул active после возобновления; предыдущие paused/blocked — история. Цель не завершена; документация отдельно от API. Игру/модель/ввод не запускать без разрешения.

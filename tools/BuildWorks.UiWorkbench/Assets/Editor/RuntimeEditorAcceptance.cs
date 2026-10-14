@@ -759,6 +759,8 @@ public static class RuntimeEditorAcceptance
                     foreach (object step in ControllerInputAcceptance.RunSinglePart(template, fontTemplate, source["woodwall"], output)) yield return step;
                     foreach (object step in ControllerInputAcceptance.RunSaveAs(template, fontTemplate, source["woodwall"], output)) yield return step;
                     foreach (object step in ControllerInputAcceptance.RunServerLibrary(template, fontTemplate, source["woodwall"], output)) yield return step;
+                    foreach (object step in ControllerInputAcceptance.RunOriginMerge(template, fontTemplate, source["woodwall"], output)) yield return step;
+                    checks.Add("Origin merge: actual editor Save -> Undo insertion -> Save -> Redo -> Save As -> share/reopen; parts and provenance move together, original retained. No live server proof.");
                     checks.Add("Server library actual modal/controller: catalog entry, prepare/cancel/publish/list, denied mutation on current role, public personal copy with verified provenance, no auto-build, dirty draft preserved. In-process endpoint; no live sockets/game proof.");
                     foreach (object step in ControllerInputAcceptance.RunShareFile(template, fontTemplate, source["woodwall"], output)) yield return step;
                     foreach (object step in ControllerInputAcceptance.RunBatchExchange(template, fontTemplate, source["woodwall"], output)) yield return step;

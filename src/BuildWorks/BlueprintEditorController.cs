@@ -2384,7 +2384,7 @@ namespace OstrixMods.BuildWorks
             var copy = new BlueprintEditorDocument(source.SourceBlueprintId, source.Name,
                 source.Category, source.Parts, source.Groups, source.PrimaryPartId,
                 source.PrimaryGroupId, source.CustomSnapPoints, source.Supports,
-                source.PlacementSupportId, source.Sources);
+                source.PlacementSupportId, source.Sources, source.LibraryOrigins);
             foreach (string id in source.Selection) copy.ToggleSelection(id);
             copy.SelectSupport(source.ActiveSupportId);
             return copy;
@@ -2941,7 +2941,7 @@ namespace OstrixMods.BuildWorks
             {
                 logError("BuildWorks blueprint editor command failed: " + exception);
                 view.SetStatus(exception.Message == BlueprintEditorDocument.NonUniformScaleShearError
-                    ? BuildWorksLocalization.Text("editor.scale.shear") : exception.Message, error: true);
+                    ? BuildWorksLocalization.Text("editor.scale.shear") : OriginError(exception.Message), error: true);
             }
             return false;
         }
@@ -3145,7 +3145,7 @@ namespace OstrixMods.BuildWorks
                 }
             }
             catch (Exception exception)
-            { RestoreReplacementPreview(expectedDocument); view.SetStatus(exception.Message, error: true); return; }
+            { RestoreReplacementPreview(expectedDocument); view.SetStatus(OriginError(exception.Message), error: true); return; }
             string firstName = replacements[0].DisplayName;
             if (firstName.Length > 64) firstName = firstName.Substring(0, 64) + "…";
             view.ShowConfirmation(BuildWorksLocalization.Text(keepTarget ? "editor.position_title" : "editor.replace_title"),
@@ -3209,7 +3209,7 @@ namespace OstrixMods.BuildWorks
             catch (Exception exception)
             {
                 scene.ClearDuplicatePreview();
-                view.SetStatus(exception.Message, error: true);
+                view.SetStatus(OriginError(exception.Message), error: true);
                 return;
             }
             view.HideCatalog();
@@ -3389,7 +3389,8 @@ namespace OstrixMods.BuildWorks
                 source.customSnapPoints?.Select(point => ToPoint(point.ToVector3())),
                 source.supports?.Select(support => new BlueprintEditorSupport(support.stableId, support.name,
                     ToPoint(support.position.ToVector3()), ToRotation(support.rotation.ToQuaternion()))),
-                source.placementSupportId, source.sourceDocuments?.Select(evidence => evidence.ToGeometry()));
+                source.placementSupportId, source.sourceDocuments?.Select(evidence => evidence.ToGeometry()),
+                source.libraryOrigins?.Select(origin => origin.ToGeometry()));
         }
 
         private void ApplyInspector(
@@ -3464,7 +3465,7 @@ namespace OstrixMods.BuildWorks
                 {
                     scene.ClearBlueprintPlacementPreview();
                     scene.HidePlacementTarget();
-                    view.SetStatus(exception.Message, error: true);
+                    view.SetStatus(OriginError(exception.Message), error: true);
                     return;
                 }
             }
@@ -4161,7 +4162,7 @@ namespace OstrixMods.BuildWorks
                         supports,
                         document.PlacementSupportId,
                         out savedBlueprint,
-                        out error, customPoints, template, BuildStoreSources());
+                        out error, customPoints, template, BuildStoreSources(), BuildStoreLibraryOrigins());
                 }
                 else
                     success = store.TryUpdateDocument(
@@ -4175,7 +4176,7 @@ namespace OstrixMods.BuildWorks
                         document.PrimaryGroupId,
                         supports,
                         document.PlacementSupportId,
-                        out error, customPoints, BuildStoreSources());
+                        out error, customPoints, BuildStoreSources(), BuildStoreLibraryOrigins());
                 if (!success)
                 {
                     state = EditorState.Editing;
@@ -4261,6 +4262,13 @@ namespace OstrixMods.BuildWorks
 
         private List<CompositeBlueprintStore.SourceDocument> BuildStoreSources() => document.Sources
             .Select(CompositeBlueprintStore.SourceDocument.FromGeometry).ToList();
+
+        private List<CompositeBlueprintStore.LibraryOrigin> BuildStoreLibraryOrigins() => document.LibraryOrigins
+            .Select(CompositeBlueprintStore.LibraryOrigin.FromGeometry).ToList();
+
+        private static string OriginError(string message) => message == BlueprintLibraryOrigin.LimitError
+            ? BuildWorksLocalization.Text("server.origin_limit") : message == BlueprintLibraryOrigin.ConflictError
+            ? BuildWorksLocalization.Text("server.origin_conflict") : message;
 
         private List<CompositeBlueprintStore.Support> BuildStoreSupports() => document.Supports
             .Select(support => new CompositeBlueprintStore.Support

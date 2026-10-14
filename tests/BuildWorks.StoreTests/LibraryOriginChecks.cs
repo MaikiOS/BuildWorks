@@ -96,6 +96,39 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(BlueprintExchangeFormat.Decode(Encoding.UTF8.GetString(publication.GetAwaiter().GetResult())).parts[0].displayName == "Frozen publication",
                 "Server publication aliased mutable source or ran native metadata on worker");
             Console.WriteLine("PASS library origin native23/portable12: fresh accepted ID, immutable/copy/update/share/reload/batch/external persistence, source unchanged, explicit foreign omission, strict versions/fields/count/duplicates and atomic over-limit refusal. Informational only; not authorization or live server/UI proof.");
+            MergePersistence(Path.Combine(folder, "merge"));
+        }
+        private static void MergePersistence(string folder)
+        {
+            Directory.CreateDirectory(folder); string path = Path.Combine(folder, "library.json"); var store = new B(path);
+            var a = new B.LibraryOrigin("server", 71, "0123456789abcdef0123456789abcdef", 1, 0, "admin", new string('A', 64), 12);
+            var b = new B.LibraryOrigin("server", 71, a.documentId, 2, 0, "admin", new string('B', 64), 12);
+            var part = new Geometry.BlueprintEditorPart("a", "woodwall", "Wall", new Geometry.Point3(), new Geometry.Rotation3(0, 0, 0, 1));
+            var document = new Geometry.BlueprintEditorDocument(null, "Destination", "QA", new[] { part }, sourceLibraryOrigins: new[] { a.ToGeometry() });
+            var incoming = new Geometry.BlueprintEditorDocument(null, "Incoming", "QA", new[] { part }, sourceLibraryOrigins: new[] { b.ToGeometry() });
+            a.publisher = "changed caller";
+            Require(document.LibraryOrigins[0].Publisher == "admin", "Mutable DTO changed immutable document/history");
+            Require(store.TrySaveDocument("Destination", "QA", new[] { Part("a", 0) }, Array.Empty<B.Group>(), Array.Empty<B.VectorData>(), "a", null,
+                null, null, out var saved, out string error, libraryOrigins: Origins()), error);
+            Require(document.InsertBlueprint(incoming, new Geometry.Point3(2, 0, 0), new Geometry.Rotation3(0, 0, 0, 1)), "Merge failed");
+            Require(Update(Origins()) && new B(path).All().Single().libraryOrigins.Count == 2, error);
+            document.MarkClean(); Require(document.Undo() && Update(Origins()) && new B(path).All().Single().libraryOrigins.Count == 1,
+                "Save -> Undo insertion -> Save retained origins from cancelled insertion");
+            Require(document.Redo() && Update(Origins()) && saved.libraryOrigins.Count == 2, "Redo/save lost merged history");
+            byte[] bytes = File.ReadAllBytes(path); var previous = saved.libraryOrigins;
+            using (var locked = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+                Require(!Update(Array.Empty<B.LibraryOrigin>()), "Locked origin update succeeded");
+            Require(ReferenceEquals(saved.libraryOrigins, previous) && bytes.SequenceEqual(File.ReadAllBytes(path)), "Failed update lost origin list or durable bytes");
+            Require(store.TrySaveDocument("Empty copy", "QA", saved.parts, saved.groups, saved.anchors, saved.primaryPartId, saved.primaryGroupId,
+                saved.supports, saved.placementSupportId, out var emptyCopy, out error, previewTemplate: saved, libraryOrigins: Array.Empty<B.LibraryOrigin>()) && emptyCopy.libraryOrigins.Count == 0,
+                "Explicit empty Save As origin list fell back to stale template");
+            Require(Update(null) && saved.libraryOrigins.Count == 2, "Legacy update caller cleared origins");
+            Require(Update(Array.Empty<B.LibraryOrigin>()) && saved.libraryOrigins.Count == 0 && new B(path).All().Single(item => item.id == saved.id).libraryOrigins.Count == 0,
+                "Explicit empty update failed to clear origins");
+            Console.WriteLine("PASS library origin merge persistence: immutable DTO boundary, save/Undo/save/Redo, explicit empty vs legacy null, Save As override and exact failed-update rollback.");
+            System.Collections.Generic.List<B.LibraryOrigin> Origins() => document.LibraryOrigins.Select(B.LibraryOrigin.FromGeometry).ToList();
+            bool Update(System.Collections.Generic.IReadOnlyList<B.LibraryOrigin> origins) => store.TryUpdateDocument(saved, saved.name, saved.category,
+                saved.parts, saved.groups, saved.anchors, saved.primaryPartId, saved.primaryGroupId, saved.supports, saved.placementSupportId, out error, libraryOrigins: origins);
         }
         private static byte[] UnsafeEncode(B.Blueprint document)
         {

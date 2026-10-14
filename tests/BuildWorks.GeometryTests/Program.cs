@@ -134,6 +134,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Run("Blueprint adopts saved identity without dirtying", BlueprintAdoptsSavedIdentity);
             Run("Blueprint metadata edit is atomic", BlueprintMetadataEditIsAtomic);
             Run("Explicit one-to-many replacement preserves poses, hierarchy, evidence and one Undo", ReplacementChecks.Run);
+            Run("Library origin insertion is immutable, bounded and atomic with Undo/Redo", LibraryOriginMergeChecks.Run);
             Run("Blueprint inspector edit is atomic", BlueprintInspectorEditIsAtomic);
             Run("Blueprint collection views cannot mutate document", BlueprintCollectionViewsCannotMutateDocument);
             Run("Blueprint limits and history are bounded", BlueprintLimitsAndHistoryAreBounded);

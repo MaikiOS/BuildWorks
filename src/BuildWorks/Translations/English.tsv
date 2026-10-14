@@ -1102,3 +1102,4 @@ server.local_changed	The local library changed. Close this window and select the
 server.host_not_ready	The world's prefab catalog is not ready. Refresh and receive the blueprint after the world finishes loading.
 server.no_available_parts	No parts are available in this world. Install the required mods before saving a converted copy.
 server.stop_waiting	Stop waiting
+server.origin_conflict	The inserted blueprint has conflicting origin records. Nothing was inserted.

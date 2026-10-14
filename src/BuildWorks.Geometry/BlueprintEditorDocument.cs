@@ -244,6 +244,7 @@ namespace OstrixMods.BuildWorks.Geometry
             public List<Point3> CustomSnapPoints;
             public List<BlueprintEditorSupport> Supports;
             public List<BlueprintSourceDocument> Sources;
+            public List<BlueprintLibraryOrigin> LibraryOrigins;
             public string PlacementSupportId;
             public string ActiveSupportId;
             public List<string> Selection;
@@ -259,6 +260,8 @@ namespace OstrixMods.BuildWorks.Geometry
         private readonly List<BlueprintEditorSupport> supports = new List<BlueprintEditorSupport>();
         private readonly List<BlueprintSourceDocument> sources = new List<BlueprintSourceDocument>();
         private readonly ReadOnlyCollection<BlueprintSourceDocument> sourcesView;
+        private readonly List<BlueprintLibraryOrigin> libraryOrigins = new List<BlueprintLibraryOrigin>();
+        private readonly ReadOnlyCollection<BlueprintLibraryOrigin> libraryOriginsView;
         private readonly ReadOnlyCollection<BlueprintEditorSupport> supportsView;
         private readonly ReadOnlyCollection<Point3> customSnapPointsView;
         private readonly Dictionary<string, BlueprintEditorPart> partIndex = new Dictionary<string, BlueprintEditorPart>(StringComparer.Ordinal);
@@ -288,7 +291,8 @@ namespace OstrixMods.BuildWorks.Geometry
             IEnumerable<Point3> sourceCustomSnapPoints = null,
             IEnumerable<BlueprintEditorSupport> sourceSupports = null,
             string placementSupportId = null,
-            IEnumerable<BlueprintSourceDocument> sourceDocuments = null)
+            IEnumerable<BlueprintSourceDocument> sourceDocuments = null,
+            IEnumerable<BlueprintLibraryOrigin> sourceLibraryOrigins = null)
         {
             partsView = parts.AsReadOnly();
             groupsView = groups.AsReadOnly();
@@ -296,6 +300,13 @@ namespace OstrixMods.BuildWorks.Geometry
             customSnapPointsView = customSnapPoints.AsReadOnly();
             supportsView = supports.AsReadOnly();
             sourcesView = sources.AsReadOnly();
+            libraryOriginsView = libraryOrigins.AsReadOnly();
+            if (sourceLibraryOrigins != null)
+                foreach (var origin in sourceLibraryOrigins)
+                {
+                    if (libraryOrigins.Count == BlueprintLibraryOrigin.MaximumCount) throw new InvalidOperationException(BlueprintLibraryOrigin.LimitError);
+                    libraryOrigins.Add(origin);
+                }
             if (sourceDocuments != null) sources.AddRange(sourceDocuments);
             if (sourceSupports != null)
                 foreach (BlueprintEditorSupport support in sourceSupports)
@@ -344,6 +355,7 @@ namespace OstrixMods.BuildWorks.Geometry
         public IReadOnlyList<Point3> CustomSnapPoints => customSnapPointsView;
         public IReadOnlyList<BlueprintEditorSupport> Supports => supportsView;
         public IReadOnlyList<BlueprintSourceDocument> Sources => sourcesView;
+        public IReadOnlyList<BlueprintLibraryOrigin> LibraryOrigins => libraryOriginsView;
         public string PlacementSupportId { get; private set; }
         // Support-edit scope is separate from retained geometry selection.
         public string ActiveSupportId { get; private set; }
@@ -1134,6 +1146,7 @@ namespace OstrixMods.BuildWorks.Geometry
             BlueprintEditorPart.Validate(position, nameof(position));
             Rotation3 orientation = rotation.Normalized();
             if (source.parts.Count == 0) return false;
+            var mergedOrigins = BlueprintLibraryOrigin.Merge(libraryOrigins, source.libraryOrigins);
             if (parts.Count + source.parts.Count - (replacementTarget == null ? 0 : 1) > MaximumParts ||
                 groups.Count + source.groups.Count + 1 > MaximumGroups ||
                 customSnapPoints.Count + source.customSnapPoints.Count > MaximumCustomSnapPoints ||
@@ -1165,6 +1178,8 @@ namespace OstrixMods.BuildWorks.Geometry
             return Commit(() =>
             {
                 groups.AddRange(newGroups);
+                libraryOrigins.Clear();
+                libraryOrigins.AddRange(mergedOrigins);
                 parts.AddRange(newParts);
                 if (replacementTarget != null)
                 {
@@ -1563,6 +1578,7 @@ namespace OstrixMods.BuildWorks.Geometry
 
         private void ValidateDocument()
         {
+            BlueprintLibraryOrigin.Validate(libraryOrigins);
             Dictionary<string, BlueprintSourceDocument> sourceIndex = BlueprintSourceDocument.Index(sources);
             foreach (BlueprintEditorPart part in parts)
                 if (part.SourceDocumentId != null && (!sourceIndex.TryGetValue(part.SourceDocumentId, out var evidence) ||
@@ -1748,6 +1764,7 @@ namespace OstrixMods.BuildWorks.Geometry
             CustomSnapPoints = new List<Point3>(customSnapPoints),
             Supports = CopySupports(),
             Sources = new List<BlueprintSourceDocument>(sources),
+            LibraryOrigins = new List<BlueprintLibraryOrigin>(libraryOrigins),
             PlacementSupportId = PlacementSupportId,
             ActiveSupportId = ActiveSupportId,
             Selection = new List<string>(selection),
@@ -1767,6 +1784,8 @@ namespace OstrixMods.BuildWorks.Geometry
             customSnapPoints.Clear();
             sources.Clear();
             sources.AddRange(state.Sources);
+            libraryOrigins.Clear();
+            libraryOrigins.AddRange(state.LibraryOrigins);
             customSnapPoints.AddRange(state.CustomSnapPoints);
             supports.Clear();
             foreach (BlueprintEditorSupport support in state.Supports) supports.Add(support.Clone());
@@ -1789,6 +1808,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 state.PrimaryPartId != PrimaryPartId || state.PrimaryGroupId != PrimaryGroupId ||
                 state.CustomSnapPoints.Count != customSnapPoints.Count ||
                 state.Sources.Count != sources.Count ||
+                state.LibraryOrigins.Count != libraryOrigins.Count ||
                 state.Supports.Count != supports.Count || state.PlacementSupportId != PlacementSupportId ||
                 state.ActiveSupportId != ActiveSupportId)
                 return false;
@@ -1822,6 +1842,8 @@ namespace OstrixMods.BuildWorks.Geometry
                 if (!Same(state.CustomSnapPoints[index], customSnapPoints[index])) return false;
             for (int index = 0; index < sources.Count; ++index)
                 if (state.Sources[index].Id != sources[index].Id) return false;
+            for (int index = 0; index < libraryOrigins.Count; ++index)
+                if (!state.LibraryOrigins[index].SameValue(libraryOrigins[index])) return false;
             for (int index = 0; index < supports.Count; ++index)
             {
                 BlueprintEditorSupport left = state.Supports[index], right = supports[index];

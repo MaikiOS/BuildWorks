@@ -73,7 +73,8 @@ internal static class Program
             baseScale: part.BaseScale, materialSeed: part.MaterialSeed));
         var payload = new BlueprintEditorDocument(null, "Copy", "OTHER", payloadParts,
             sourceCustomSnapPoints: new[] { new Point3(7,8,9) }, sourceSupports: document.Supports,
-            placementSupportId: document.PlacementSupportId, sourceDocuments: new[] { evidence });
+            placementSupportId: document.PlacementSupportId, sourceDocuments: new[] { evidence },
+            sourceLibraryOrigins: new[] { new BlueprintLibraryOrigin("server", 71, "0123456789abcdef0123456789abcdef", 2, 0, "admin", new string('A', 64), 12) });
         payload.SelectOnly("a"); payload.SelectSupport("support");
         var copied = (BlueprintEditorDocument)controllerType.GetMethod("CopyDocument", BindingFlags.NonPublic | BindingFlags.Static)
             .Invoke(null, new object[] { payload });
@@ -95,9 +96,10 @@ internal static class Program
         object supportData = controllerType.GetMethod("BuildStoreSupports", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(controller, null);
         parts = controllerType.GetMethod("BuildStoreParts", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(controller, null);
         object sourceData = controllerType.GetMethod("BuildStoreSources", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(controller, null);
-        MethodInfo supportSave = storeType.GetMethods().Single(m => m.Name == "TrySaveDocument" && m.GetParameters().Length == 14);
+        object originData = controllerType.GetMethod("BuildStoreLibraryOrigins", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(controller, null);
+        MethodInfo supportSave = storeType.GetMethods().Single(m => m.Name == "TrySaveDocument" && m.GetParameters().Length == 15);
         object[] supportCall = { "Support bridge", "OTHER", parts, call[3], call[4], null, null,
-            supportData, payload.PlacementSupportId, null, null, null, null, sourceData };
+            supportData, payload.PlacementSupportId, null, null, null, null, sourceData, originData };
         Require((bool)supportSave.Invoke(store, supportCall), "Store rejected support bridge: " + supportCall[10]);
         object reloadedStore = Activator.CreateInstance(storeType, BindingFlags.NonPublic | BindingFlags.Instance,
             null, new object[] { pathOut }, null);
@@ -111,6 +113,9 @@ internal static class Program
             reloaded.Parts[0].Position.X == 0 && reloaded.Parts[0].SignText == "Дом\nOstrix",
             "Controller support disk roundtrip lost pose/default, moved geometry or persisted transient focus");
         Console.WriteLine("PASS actual Controller.BuildStoreSupports -> disk -> DocumentFromBlueprint preserves root pose/default without transient focus");
+        Require(copied.LibraryOrigins.Count == 1 && reloaded.LibraryOrigins.Count == 1 &&
+            reloaded.LibraryOrigins[0].SameValue(payload.LibraryOrigins[0]), "Actual controller copy/save/reopen lost provenance");
+        Console.WriteLine("PASS actual Controller.CopyDocument/BuildStoreLibraryOrigins -> native save -> reopen preserves provenance");
         Require(reloaded.Sources[0].Text == evidence.Text && reloaded.Sources[0].Id == evidence.Id &&
             reloaded.Parts[0].SourceDocumentId == evidence.Id && reloaded.Parts[0].SourceLine == 2,
             "Actual Controller source/part bridge discarded original bytes or row binding");

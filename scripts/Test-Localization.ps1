@@ -86,6 +86,7 @@ $sourceText = ($sourceFiles | ForEach-Object { [IO.File]::ReadAllText($_.FullNam
 $nonLocalizationDottedLiterals = @(
     'blueprints.json',
     'manifest.tsv',
+    'access.json', 'blueprint.buildworks.json',
     'buildworks-qa-root.txt',
     'qa-identities.txt',
     'qa-supplies.txt',

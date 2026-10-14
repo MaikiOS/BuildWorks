@@ -1,3 +1,11 @@
+## 2026-10-14 — .184 WIP server foundation verified; installed .183 unchanged
+
+Added ServerBlueprintLibrary storage (per-call metadata/file ACL, admin-only changes, revision CAS, unchanged-file guard, bounded exact two-member ZIP, atomic replace/temp cleanup, reload) and actual BlueprintServerAuthority direct peer/RPC/socket binding with native IsAdmin. Core receives a server-authenticated principal, never request role/name. Current native routed sender is payload data, so do not use ZRoutedRpc sender UID for ACL. Actual host API/IL verified; inert source harness tests forged UID/principal and revocation, not live network.
+
+normal/QA0/0, full Store, authority harness, Host Steam25730771,loc1055/runtime localization pass; independent PASSED/Ponytail Ship; formatter135 inherited/0 new. Evidence artifacts/server-library-wip, docs/SERVER_LIBRARY_FOUNDATION.md + RU. New built binaries in artifacts/bin and test-stand-bin are .184 WIP: DO NOT deploy yet. Installed .183 remains verified; catalog0/0 and103 config files unchanged, no game/input/network/saves run. Manual queue .183 remains valid.
+
+RPC registration, localhost, server catalog/admin buttons/personal accepted copies are not connected. Next split heavy preparation from host authenticated commit, bind server world UID, bounded direct peer RPC with lifecycle/rate/chunks/cancel/replay, then both catalogs. No server UI/runtime acceptance claimed; full goal ACTIVE and incomplete.
+
 ## 2026-10-14 — .183 verified/deployed; full goal ACTIVE and incomplete
 
 Batch import/export in existing exchange UI: frozen document ordinals, common/per-document/original categories/exclusions, explicit bad-file/whole-ZIP skip, one atomic publication with exact originals/manifest. Export saved native/external selected docs as full BuildWorks ZIP; dirty draft/history retained. Shared128MiB unpacked budget,64MiB raw/prepared output and existing entries/parts/library protection; cancellation during staging cleans temporary files, after commit keeps success. Metadata callbacks host-thread only. No foreign batch compatibility/server transfer claimed.

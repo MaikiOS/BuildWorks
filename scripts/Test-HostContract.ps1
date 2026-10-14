@@ -880,8 +880,26 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.183.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.184.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
+$serverAuthority = $plugin.MainModule.GetType('OstrixMods.BuildWorks.BlueprintServerAuthority')
+Assert-Contract ($null -ne $serverAuthority) 'Compiled server blueprint authority adapter is missing.'
+$resolveAuthority = $serverAuthority.Methods | Where-Object Name -eq 'TryResolve'
+$adminAuthority = $serverAuthority.Methods | Where-Object Name -eq 'IsAdministrator'
+$resolveCalls = @($resolveAuthority.Body.Instructions | ForEach-Object { [string]$_.Operand })
+$adminCalls = @($adminAuthority.Body.Instructions | ForEach-Object { [string]$_.Operand })
+foreach ($call in 'ZNet::IsServer()', 'ZNet::GetPeers()', 'ZRpc::IsConnected()', 'ZRpc::GetSocket()',
+    'ZNetPeer::IsReady()', 'ISocket::IsConnected()', 'ISocket::GetHostName()', 'ZNetPeer::m_rpc', 'ZNetPeer::m_socket') {
+    Assert-Contract (@($resolveCalls | Where-Object { $_.Contains($call) }).Count -gt 0) `
+        "Server identity must use the current direct connection API: $call"
+}
+Assert-Contract (@($adminCalls | Where-Object { $_.Contains('ZNet::IsAdmin(System.String)') }).Count -eq 1) `
+    'Server blueprint rights must use native IsAdmin for the socket principal.'
+$nativeAdmin = $hostAssembly.MainModule.GetType('ZNet').Methods | Where-Object { $_.Name -eq 'IsAdmin' -and $_.Parameters.Count -eq 1 }
+Assert-Contract ($nativeAdmin.IsPublic -and -not $nativeAdmin.IsStatic -and
+    @($nativeAdmin.Body.Instructions | Where-Object { [string]$_.Operand -match 'ZNet::ListContainsId' }).Count -eq 1) `
+    'Native IsAdmin no longer delegates to the server admin-list identity policy.'
+Write-Output 'PASS server blueprint authority API: compiled direct peer/socket binding and native admin-list policy; no real network authentication executed.'
 $pluginIdentity = $plugin.MainModule.Types | Where-Object Name -eq 'BuildWorksPlugin'
 $loaderIdentity = $pluginIdentity.CustomAttributes | Where-Object { $_.AttributeType.Name -eq 'BepInPlugin' }
 Assert-Contract ($null -ne $loaderIdentity -and

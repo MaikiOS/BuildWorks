@@ -1051,3 +1051,10 @@ exchange.batch_original	Src
 exchange.batch_cancelled	Group cancelled before publication.
 exchange.batch_empty	No documents selected. Open Documents and categories.
 exchange.batch_page	Page {0}/{1}; documents: {2}
+server.admin_required	Only a server administrator may change the shared blueprint library.
+server.capacity	Server blueprint library size or count limit exceeded.
+server.changed	The server blueprint file changed outside the library. Reload and inspect it before retrying.
+server.conflict	The server blueprint revision changed. Refresh before retrying.
+server.invalid	Invalid server blueprint library data.
+server.unauthenticated	No authenticated server connection.
+server.unavailable	Server blueprint unavailable or access denied.

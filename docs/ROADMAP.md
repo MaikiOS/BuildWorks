@@ -1,3 +1,9 @@
+## 2026-10-14 — server foundation .184 WIP; installed build remains .183
+
+Separate ServerBlueprintLibrary and BlueprintServerAuthority: current metadata/file ACL, admin-only mutations, revision CAS, atomic write/cleanup and direct peer/RPC/socket binding with native IsAdmin. Full Store/actual-source inert authority harness, normal/QA0/0, Host/loc1055/runtime localization pass; correctness PASSED/Ponytail Ship. Formatter135 inherited/0 new. [Boundaries/next slice](SERVER_LIBRARY_FOUNDATION.md).
+
+**RPC/UI/localhost are not connected; .184 is not deployed.** Installed .183 and manual batch queue remain current. Inert tests do not prove real authentication/network/game support. Next worker preparation/host commit, bounded direct peer RPC and one server source in both catalogs, then live host/remote acceptance. Full goal active and incomplete.
+
 ## 2026-10-14 — QA .183 deployed: batch import and export
 
 Multi-file selection, individual ZIP documents, common/per-document/original categories and exclusions; explicit invalid-file skips. One atomic group preserves exact originals/manifest; full BuildWorks ZIP exports selected saved native/external cards without creating cards. Dirty draft/Undo remain intact. [Evidence](BATCH_EXCHANGE_183.md), [manual steps/source folders](MANUAL_QA_183.md).

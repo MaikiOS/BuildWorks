@@ -1,3 +1,9 @@
+## 2026-10-14 — серверное ядро .184 WIP; установлена .183
+
+ServerBlueprintLibrary и BlueprintServerAuthority реализованы как отдельный слой: текущие ACL списка/файла, admin-only mutations, revision CAS, атомарное сохранение/cleanup и direct peer/RPC/socket binding с native IsAdmin. Полный Store/actual-source authority harness, normal/QA0/0, Host/loc1055/runtime loc прошли; correctness PASSED/Ponytail Ship. Formatter135 прежних/0 новых. [Границы и следующий срез](SERVER_LIBRARY_FOUNDATION_RU.md).
+
+**RPC/UI/localhost ещё не подключены, .184 не установлена.** Установленная .183 и ручная очередь группового импорта сохраняются. Настоящая аутентификация/сеть/игровая серверная поддержка не подтверждены инертным harness. Следом worker preparation/host commit, прямые ограниченные peer RPC и общий серверный источник обоих каталогов; после этого настоящие host+remote проверки. Полная цель active и не завершена.
+
 ## 2026-10-14 — QA .183 установлена: групповой импорт и экспорт
 
 Выбор нескольких файлов, отдельные документы ZIP, общая/индивидуальная/исходная категория и исключение документов; явный список пропущенных повреждённых файлов. Одна атомарная группа с точными исходниками/manifest; полный BuildWorks ZIP экспортирует выбранные сохранённые native/external карточки без создания новых. Черновик/Undo сохраняются. [Доказательства](BATCH_EXCHANGE_183_RU.md), [ручные шаги и папка Batch-183](MANUAL_QA_183_RU.md).

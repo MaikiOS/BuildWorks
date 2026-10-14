@@ -31,6 +31,8 @@ namespace OstrixMods.BuildWorks
         private static BuildWorksPlugin instance;
         private Harmony harmony;
         private PrecisionPlacementSession session;
+        private BlueprintServerRuntime serverLibrary;
+        internal static BlueprintServerClient ServerLibraryClient => instance?.serverLibrary?.Client;
 #if BUILDWORKS_TEST_STAND
         private BuildWorksQaControl qaControl;
 #endif
@@ -68,6 +70,8 @@ namespace OstrixMods.BuildWorks
             }
 #endif
             instance = this;
+            serverLibrary = new BlueprintServerRuntime(Paths.ConfigPath,
+                exception => Logger.LogError("BuildWorks server library: " + exception));
             TogglePrecisionKey = Config.Bind(
                 "Controls",
                 "TogglePrecisionPlacement",
@@ -251,6 +255,7 @@ namespace OstrixMods.BuildWorks
 
         private void Update()
         {
+            serverLibrary?.Tick(ZNet.instance, Time.realtimeSinceStartupAsDouble);
             if (!Player.m_localPlayer)
             {
                 DisposeBlueprintEditor();
@@ -334,10 +339,19 @@ namespace OstrixMods.BuildWorks
             instance?.session?.AbortQaInput();
         }
 
-        private void OnDisable() { if (qaControl) qaControl.enabled = false; }
 #endif
+        private void OnDisable()
+        {
+            serverLibrary?.Suspend();
+#if BUILDWORKS_TEST_STAND
+            if (qaControl) qaControl.enabled = false;
+#endif
+        }
+
         private void OnDestroy()
         {
+            serverLibrary?.Dispose();
+            serverLibrary = null;
 #if BUILDWORKS_TEST_STAND
             qaControl?.Stop("Plugin destroyed.");
             BuildWorksTestYard.RestoreDaylight();

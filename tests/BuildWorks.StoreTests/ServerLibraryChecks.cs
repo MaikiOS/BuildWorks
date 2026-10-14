@@ -3,6 +3,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Text;
+using System.Threading;
 
 namespace OstrixMods.BuildWorks.StoreTests
 {
@@ -107,7 +108,79 @@ namespace OstrixMods.BuildWorks.StoreTests
                 var corrupt = new ServerBlueprintLibrary(invalidFolder, _ => true);
                 Error(() => corrupt.List("admin")); Error(() => corrupt.List("player"));
             }
+            SplitOperations(folder + "-split", original);
+            ServerProtocolChecks.Run();
+            ServerEndpointChecks.Run(folder + "-endpoint", original);
+            ServerClientChecks.Run(folder + "-client", original);
+            ServerRuntimeChecks.Run(folder + "-runtime", original);
             Console.WriteLine("PASS server library storage: current ACL/list+file denial, admin-only mutation, revisions/revocation/atomic cleanup, reload, defensive copies, shared capacity, changed/corrupt/future/duplicate archive refusal. No authentication/RPC/UI/game proof.");
+        }
+
+        private static void SplitOperations(string folder, byte[] original)
+        {
+            int owner = Environment.CurrentManagedThreadId, authorityCalls = 0; bool admin = true;
+            var library = new ServerBlueprintLibrary(folder, principal =>
+            {
+                Require(Environment.CurrentManagedThreadId == owner, "Worker invoked native authority callback");
+                ++authorityCalls; return principal == "admin" && admin;
+            });
+            library.InitializeAsync().GetAwaiter().GetResult();
+            Require(authorityCalls == 0 && !Directory.Exists(folder), "Warmup touched native authority or wrote files");
+            byte[] submitted = (byte[])original.Clone();
+            var preparing = library.PreparePublish("admin", submitted, ServerBlueprintLibrary.Access.Players);
+            submitted[0] ^= 1;
+            ServerBlueprintLibrary.Info first;
+            using (var prepared = preparing.GetAwaiter().GetResult())
+            {
+                Require(library.List("player").Count == 0 && Directory.GetFiles(folder, "*.tmp.zip").Length == 1,
+                    "Preparation published before host commit");
+                first = library.CommitPublish("admin", prepared);
+                Error(() => library.CommitPublish("admin", prepared));
+            }
+            Require(library.Read("player", first.Id, 1).SequenceEqual(original) && Directory.GetFiles(folder, "*.tmp.zip").Length == 0,
+                "Submit snapshot/repeated commit/temporary ownership failed");
+            using (var prepared = library.PreparePublish("admin", original, ServerBlueprintLibrary.Access.Administrators).GetAwaiter().GetResult())
+            {
+                admin = false; Denied(() => library.CommitPublish("admin", prepared)); admin = true;
+            }
+            using (var stop = new CancellationTokenSource())
+            using (var prepared = library.PreparePublish("admin", original, ServerBlueprintLibrary.Access.Players).GetAwaiter().GetResult())
+            {
+                stop.Cancel(); Cancelled(() => library.CommitPublish("admin", prepared, stop.Token));
+            }
+            using (var prepared = library.PreparePublish("admin", original, ServerBlueprintLibrary.Access.Players).GetAwaiter().GetResult())
+            {
+                using (var append = new FileStream(prepared.Temporary, FileMode.Append)) append.WriteByte(1);
+                Error(() => library.CommitPublish("admin", prepared));
+            }
+            using (var a = library.PreparePublish("admin", original, ServerBlueprintLibrary.Access.Administrators, first.Id, 1).GetAwaiter().GetResult())
+            using (var b = library.PreparePublish("admin", original, ServerBlueprintLibrary.Access.Players, first.Id, 1).GetAwaiter().GetResult())
+            {
+                first = library.CommitPublish("admin", a);
+                Error(() => library.CommitPublish("admin", b));
+            }
+            var restricted = library.PrepareRead("admin", first.Id, 2).GetAwaiter().GetResult();
+            admin = false; Error(() => library.CompleteRead("admin", restricted)); admin = true;
+            Require(library.CompleteRead("admin", restricted).SequenceEqual(original), "Re-authorized prepared read changed bytes");
+            Error(() => library.CompleteRead("admin", restricted));
+            var stale = library.PrepareRead("admin", first.Id, 2).GetAwaiter().GetResult();
+            library.Publish("admin", original, ServerBlueprintLibrary.Access.Players, first.Id, 2);
+            Error(() => library.CompleteRead("admin", stale));
+            using (var stop = new CancellationTokenSource())
+            {
+                stop.Cancel();
+                Cancelled(() => library.PrepareRead("admin", first.Id, 3, stop.Token));
+                Cancelled(() => library.PreparePublish("admin", original, ServerBlueprintLibrary.Access.Players, cancellation: stop.Token));
+            }
+            Require(library.List("player").Count == 1 && Directory.GetFiles(folder, "*.tmp.zip").Length == 0,
+                "Split cancellation/stale/revoked operations leaked data or staging");
+            Console.WriteLine("PASS server prepare/commit: no worker authority, immutable submission, no precommit publication, revoked/cancelled/changed staging refusal, competing revisions and one-use/current-ACL reads");
+        }
+
+        private static void Cancelled(Action action)
+        {
+            try { action(); } catch (OperationCanceledException) { return; }
+            throw new Exception("Expected cancelled server-library operation");
         }
 
         private static byte[] Document(string name)

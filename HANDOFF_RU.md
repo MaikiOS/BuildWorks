@@ -1,3 +1,13 @@
+## 2026-10-14 — .184 WIP: прямой серверный транспорт подключён, установлена .183
+
+PrepareRead/PreparePublish работают без Unity callbacks на worker; CompleteRead/CommitPublish повторно проверяют текущие права/ревизию/одноразовое владение на host-thread. Подключены bounded protocol, endpoint, client и direct ZRpc runtime: world UID, dedicated tick до local-player gate, localhost, ordered chunks/SHA, rate/quota, timeout/cancel, disconnect/reconnect, nonce и ответы повторных mutation-запросов. OnDisable/Suspend и OnDestroy освобождают callbacks; незавершённая очистка сохраняет свой резерв до завершения. Нативный raw ZPackage(byte[]) проверен, Write(byte[]) с дополнительной длиной не используется.
+
+normal/QA0/0, полный Store, actual-source authority/runtime, сквозной client/endpoint, Host Steam25730771, loc1055/runtime localization прошли; correctness PASSED/Ponytail Ship. Formatter135 прежних/0 новых; изменённые source/tests чистые. Evidence: artifacts/server-library-wip (*transport* / runtime-lifecycle-final.log). Прежний Unity588 относится к .183: нового UI ещё нет.
+
+**Не реализованы:** серверный источник обоих каталогов, admin-кнопки публикации/видимости/изменения/удаления, принятие личной копии с сохраняемым происхождением и передача между игроками. Живых RPC/socket/host+remote/restart проверок не было. **.184 WIP не устанавливать до готового пользовательского сценария.** Установленная .183/обе SHA/103 config/token/квитанции сверены и неизменны. Ручная очередь docs/MANUAL_QA_183_RU.md и папка artifacts/Blueprints-for-import/BuildWorks-tests/Batch-183 актуальны. Игру/модель/ввод/worlds/saves не запускали. Полная цель ACTIVE, не завершена.
+
+Следующий шаг: один серверный интерфейс редактора/молотка и принятие отдельной личной копии. Не применять transient placementImportId как происхождение и не подделывать SourceDocument. История предыдущих этапов ниже.
+
 ## 2026-10-13 — QA .173 установлена, ручная серия обновлена
 
 Guarded Deploy-TestBuild.ps1 в TerrainRamp-1.0-Test с прежним token прошёл: version0.19.173.0, BuildWorks SHA CFCB1464C06950F15AB56FC183258F158A55482CDBA1A1F66C4753143E68ED09; Geometry EC2315A128CA4AF1B19DD5BE69A93B69F18BB3F558F018C6C36A17D0E22C0261. Все158 файлов config/BuildWorks до/после неизменны, квитанции/QA-идентичность сохранены. Игра/сохранения не запускались. [Ручная серия .173](docs/MANUAL_QA_173_RU.md) использует прежние18 файлов, сначала auto-snap17/18 и Forest Hut; принятое не повторяется. Полный перенос наполненных хранилищ всё ещё выключен; внутренний журнал не является игровой готовностью.

@@ -1,3 +1,13 @@
+## 2026-10-14 — .184 WIP: direct server transport connected; installed .183 unchanged
+
+PrepareRead/PreparePublish perform worker preparation without Unity callbacks; host-thread CompleteRead/CommitPublish recheck current authority, revision and one-use ownership. Bounded protocol/endpoint/client/direct ZRpc runtime are connected: world UID, dedicated tick before local-player gate, localhost, ordered chunks/SHA, rate/quota, cancellation/timeout, disconnect/reconnect, session nonce and mutation answer receipts. Disable/Suspend and Destroy release callbacks; retired workers retain their reservation until cleanup finishes. Native raw ZPackage(byte[]) framing is pinned; length-prefixed Write(byte[]) is not used.
+
+normal/QA0/0, full Store, actual-source authority/runtime, end-to-end client/endpoint, Host Steam25730771, loc1055/runtime localization pass; correctness PASSED/Ponytail Ship. Formatter135 inherited/0 new; changed source/tests clean. Evidence: artifacts/server-library-wip (*transport* / runtime-lifecycle-final.log). Prior Unity588 belongs to installed .183; no new UI yet.
+
+**Not implemented:** both catalog server entries, admin publication/access/update/delete controls, accepted personal-copy durable provenance and player-to-player transfers. No live socket/RPC/host+remote/restart proof. **Do not deploy .184 WIP before the user journey is ready.** Installed .183/both hashes/103 config/token/receipt files verified unchanged. Manual queue docs/MANUAL_QA_183_RU.md and artifacts/Blueprints-for-import/BuildWorks-tests/Batch-183 remain current. No game/model/input/world/save execution. Full goal ACTIVE and incomplete.
+
+Next: shared server UI and accepted personal copies. Do not use transient placementImportId as durable origin or fabricate a foreign SourceDocument. Earlier-stage history follows.
+
 ## 2026-10-14 — .184 WIP server foundation verified; installed .183 unchanged
 
 Added ServerBlueprintLibrary storage (per-call metadata/file ACL, admin-only changes, revision CAS, unchanged-file guard, bounded exact two-member ZIP, atomic replace/temp cleanup, reload) and actual BlueprintServerAuthority direct peer/RPC/socket binding with native IsAdmin. Core receives a server-authenticated principal, never request role/name. Current native routed sender is payload data, so do not use ZRoutedRpc sender UID for ACL. Actual host API/IL verified; inert source harness tests forged UID/principal and revocation, not live network.

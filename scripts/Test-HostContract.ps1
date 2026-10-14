@@ -900,6 +900,39 @@ Assert-Contract ($nativeAdmin.IsPublic -and -not $nativeAdmin.IsStatic -and
     @($nativeAdmin.Body.Instructions | Where-Object { [string]$_.Operand -match 'ZNet::ListContainsId' }).Count -eq 1) `
     'Native IsAdmin no longer delegates to the server admin-list identity policy.'
 Write-Output 'PASS server blueprint authority API: compiled direct peer/socket binding and native admin-list policy; no real network authentication executed.'
+$serverRuntime = $plugin.MainModule.GetType('OstrixMods.BuildWorks.BlueprintServerRuntime')
+Assert-Contract ($null -ne $serverRuntime) 'Compiled direct server library runtime is missing.'
+$runtimeTick = $serverRuntime.Methods | Where-Object Name -eq 'Tick'
+$runtimeSend = $serverRuntime.Methods | Where-Object Name -eq 'Send'
+$runtimeCalls = @($serverRuntime.Methods | Where-Object HasBody | ForEach-Object { $_.Body.Instructions | ForEach-Object { [string]$_.Operand } })
+foreach ($call in 'ZRpc::Register<ZPackage>', 'ZRpc::Unregister(System.String)', 'ZNet::GetWorldUID()',
+    'ZNet::GetServerPeer()', 'ZNet::GetServerRPC()', 'ZNet::LocalPlayerIsAdminOrHost()', 'ZPackage::Size()', 'ZPackage::GetArray()') {
+    Assert-Contract (@($runtimeCalls | Where-Object { $_.Contains($call) }).Count -gt 0) "Direct server runtime host API changed: $call"
+}
+Assert-Contract (@($runtimeCalls | Where-Object { $_ -match 'ZRoutedRpc' }).Count -eq 0) 'Server library must not trust a routed sender.'
+$sendCalls = @($runtimeSend.Body.Instructions | ForEach-Object { [string]$_.Operand })
+Assert-Contract (@($sendCalls | Where-Object { $_.Contains('ZPackage::.ctor(System.Byte[])') }).Count -eq 1 -and
+    @($sendCalls | Where-Object { $_.Contains('ZPackage::Write(System.Byte[])') }).Count -eq 0 -and
+    @($sendCalls | Where-Object { $_.Contains('ZRpc::Invoke(System.String,System.Object[])') }).Count -eq 1) `
+    'Server protocol frames must use raw ZPackage construction, without an extra byte-array length prefix.'
+$packageType = $hostAssembly.MainModule.GetType('ZPackage')
+$rawPackage = $packageType.Methods | Where-Object { $_.Name -eq '.ctor' -and $_.Parameters.Count -eq 1 -and $_.Parameters[0].ParameterType.FullName -eq 'System.Byte[]' }
+$rawCalls = @($rawPackage.Body.Instructions | ForEach-Object { [string]$_.Operand })
+Assert-Contract ($rawPackage.IsPublic -and @($rawCalls | Where-Object { $_.Contains('System.IO.Stream::Write(System.Byte[],System.Int32,System.Int32)') }).Count -eq 1 -and
+    @($rawCalls | Where-Object { $_.Contains('System.IO.BinaryWriter::Write(System.Int32)') }).Count -eq 0) `
+    'Native byte-array package constructor no longer preserves the raw frame.'
+$pluginUpdate = $plugin.MainModule.GetType('OstrixMods.BuildWorks.BuildWorksPlugin').Methods | Where-Object Name -eq 'Update'
+$serverTickCall = $pluginUpdate.Body.Instructions | Where-Object { $_.Operand -is [Mono.Cecil.MethodReference] -and [string]$_.Operand -match 'BlueprintServerRuntime::Tick' } | Select-Object -First 1
+$playerGate = $pluginUpdate.Body.Instructions | Where-Object { $_.Operand -is [Mono.Cecil.FieldReference] -and [string]$_.Operand -match 'Player::m_localPlayer' } | Select-Object -First 1
+Assert-Contract ($null -ne $serverTickCall -and $null -ne $playerGate -and $serverTickCall.Offset -lt $playerGate.Offset) `
+    'Dedicated server library tick must precede the local-player early return.'
+Write-Output 'PASS direct server library runtime API: raw package framing, typed peer RPC, world/local-host boundary and dedicated tick order. Inert checks only; live network remains unverified.'
+$pluginLifecycle = $plugin.MainModule.GetType('OstrixMods.BuildWorks.BuildWorksPlugin')
+foreach ($entry in @(@('OnDisable', 'Suspend'), @('OnDestroy', 'Dispose'))) {
+    $cleanup = $pluginLifecycle.Methods | Where-Object Name -eq $entry[0]
+    Assert-Contract (@($cleanup.Body.Instructions | Where-Object { $_.Operand -is [Mono.Cecil.MethodReference] -and [string]$_.Operand -match ('BlueprintServerRuntime::' + $entry[1]) }).Count -eq 1) `
+        "Plugin $($entry[0]) must release owned server callbacks and operations."
+}
 $pluginIdentity = $plugin.MainModule.Types | Where-Object Name -eq 'BuildWorksPlugin'
 $loaderIdentity = $pluginIdentity.CustomAttributes | Where-Object { $_.AttributeType.Name -eq 'BepInPlugin' }
 Assert-Contract ($null -ne $loaderIdentity -and

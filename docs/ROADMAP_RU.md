@@ -1,3 +1,13 @@
+## 2026-10-14 — .184 WIP: прямой серверный транспорт подключён, установлена .183
+
+PrepareRead/PreparePublish работают без Unity callbacks на worker; CompleteRead/CommitPublish повторно проверяют текущие права/ревизию/одноразовое владение на host-thread. Подключены bounded protocol, endpoint, client и direct ZRpc runtime: world UID, dedicated tick до local-player gate, localhost, ordered chunks/SHA, rate/quota, timeout/cancel, disconnect/reconnect, nonce и ответы повторных mutation-запросов. OnDisable/Suspend и OnDestroy освобождают callbacks; незавершённая очистка сохраняет свой резерв до завершения. Нативный raw ZPackage(byte[]) проверен, Write(byte[]) с дополнительной длиной не используется.
+
+normal/QA0/0, полный Store, actual-source authority/runtime, сквозной client/endpoint, Host Steam25730771, loc1055/runtime localization прошли; correctness PASSED/Ponytail Ship. Formatter135 прежних/0 новых; изменённые source/tests чистые. Evidence: artifacts/server-library-wip (*transport* / runtime-lifecycle-final.log). Прежний Unity588 относится к .183: нового UI ещё нет.
+
+**Не реализованы:** серверный источник обоих каталогов, admin-кнопки публикации/видимости/изменения/удаления, принятие личной копии с сохраняемым происхождением и передача между игроками. Живых RPC/socket/host+remote/restart проверок не было. **.184 WIP не устанавливать до готового пользовательского сценария.** Установленная .183/обе SHA/103 config/token/квитанции сверены и неизменны. Ручная очередь docs/MANUAL_QA_183_RU.md и папка artifacts/Blueprints-for-import/BuildWorks-tests/Batch-183 актуальны. Игру/модель/ввод/worlds/saves не запускали. Полная цель ACTIVE, не завершена.
+
+Следующий шаг: один серверный интерфейс редактора/молотка и принятие отдельной личной копии. Не применять transient placementImportId как происхождение и не подделывать SourceDocument. История предыдущих этапов ниже.
+
 ## 2026-10-14 — серверное ядро .184 WIP; установлена .183
 
 ServerBlueprintLibrary и BlueprintServerAuthority реализованы как отдельный слой: текущие ACL списка/файла, admin-only mutations, revision CAS, атомарное сохранение/cleanup и direct peer/RPC/socket binding с native IsAdmin. Полный Store/actual-source authority harness, normal/QA0/0, Host/loc1055/runtime loc прошли; correctness PASSED/Ponytail Ship. Formatter135 прежних/0 новых. [Границы и следующий срез](SERVER_LIBRARY_FOUNDATION_RU.md).

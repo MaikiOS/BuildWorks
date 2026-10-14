@@ -20,6 +20,11 @@
     <Compile Include="..\..\src\BuildWorks\BlueprintExchangeFormat.cs" Link="BlueprintExchangeFormat.cs" />
     <Compile Include="..\..\src\BuildWorks\PlanBuildExport.cs" Link="PlanBuildExport.cs" />
     <Compile Include="..\..\src\BuildWorks\ServerBlueprintLibrary.cs" Link="ServerBlueprintLibrary.cs" />
+    <Compile Include="..\..\src\BuildWorks\BlueprintServerProtocol.cs" Link="BlueprintServerProtocol.cs" />
+    <Compile Include="..\..\src\BuildWorks\BlueprintServerEndpoint.cs" Link="BlueprintServerEndpoint.cs" />
+    <Compile Include="..\..\src\BuildWorks\BlueprintServerClient.cs" Link="BlueprintServerClient.cs" />
+    <Compile Include="..\..\src\BuildWorks\BlueprintServerRuntime.cs" Link="BlueprintServerRuntime.cs" />
+    <Compile Include="..\..\src\BuildWorks\BlueprintServerAuthority.cs" Link="BlueprintServerAuthority.cs" />
     <Reference Include="System.IO.Compression" />
   </ItemGroup>
 

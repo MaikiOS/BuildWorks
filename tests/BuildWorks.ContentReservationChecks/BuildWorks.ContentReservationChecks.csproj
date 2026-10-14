@@ -12,6 +12,7 @@
     <Compile Include="../../artifacts/content-reservations/StorageJournalSource.cs" Link="StorageJournalSource.cs" />
     <Compile Include="../../artifacts/content-reservations/StorageRemovalSource.cs" Link="StorageRemovalSource.cs" />
     <Compile Include="../../artifacts/content-reservations/StorageProfileSource.cs" Link="StorageProfileSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/StorageWorldSource.cs" Link="StorageWorldSource.cs" />
     <ProjectReference Include="../../src/BuildWorks.Geometry/BuildWorks.Geometry.csproj" />
   </ItemGroup>
 </Project>

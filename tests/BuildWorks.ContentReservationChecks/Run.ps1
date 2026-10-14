@@ -54,6 +54,11 @@ $generated = "using System; using System.Collections.Generic; using System.Globa
     $journal.Replace('namespace OstrixMods.BuildWorks', 'namespace ReservationChecks'), [Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText((Join-Path $output 'StorageProfileSource.cs'),
     $profileSource.Replace('namespace OstrixMods.BuildWorks', 'namespace ReservationChecks'), [Text.UTF8Encoding]::new($false))
+$worldPath = Join-Path $root 'src/BuildWorks/BlueprintStorageWorldGeneration.cs'
+$worldSource = [IO.File]::ReadAllText($worldPath)
+$worldHash = (Get-FileHash -LiteralPath $worldPath).Hash
+[IO.File]::WriteAllText((Join-Path $output 'StorageWorldSource.cs'),
+    $worldSource.Replace('namespace OstrixMods.BuildWorks', 'namespace ReservationChecks'), [Text.UTF8Encoding]::new($false))
 $captureStart = $capture.IndexOf('        private static readonly FieldInfo ContainerView', [StringComparison]::Ordinal)
 $captureEnd = $capture.IndexOf('        // Only construction compatibility', [StringComparison]::Ordinal)
 if ($captureStart -lt 0 -or $captureEnd -le $captureStart) { throw 'Capture cancellation guard boundary missing.' }
@@ -65,6 +70,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Reservation CPU harness build failed.' }
 & (Join-Path $PSScriptRoot 'bin/Release/net472/BuildWorks.ContentReservationChecks.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Reservation CPU checks failed. Native transfer is not exercised.' }
 @{ status = 'passed_cpu_host_substitutes'; sourceSHA256 = $sourceHash; previewSHA256 = $previewHash; transferSHA256 = $transferHash; captureSHA256 = $captureHash; journalSHA256 = $journalHash; profileAdapterSHA256 = $profileHash; profileParserSHA256 = $profileParserHash;
+    worldGenerationAdapterSHA256 = $worldHash; worldGenerationAdapterTestedWithHostSubstitutes = $true;
     canonicalLocalProfileParserTested = $true; livePlayerProfileReadbackTested = $false;
     journalIOTested = $true; explicitExactRecoveryTestedWithHostSubstitutes = $true; durableRecoveryImplemented = $false; populatedPlacementEnabled = $false; nativeTransferTested = $false; gameTested = $false } |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'verification-status.json') -Encoding utf8

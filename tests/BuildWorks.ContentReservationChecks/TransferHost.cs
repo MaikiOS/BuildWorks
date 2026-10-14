@@ -71,7 +71,7 @@ namespace ReservationChecks
         }
     }
     internal struct ZDOID { internal long Id, User; internal long UserID => User == 0 ? 99 : User; internal uint ID => (uint)Id; internal bool IsNone() => Id == 0; }
-    internal static class ZDOVars { internal const int s_items = 1; }
+    internal static class ZDOVars { internal const int s_items = 1, s_creator = 2; }
     internal sealed class ZDO { internal ZDOID m_uid = new ZDOID { Id = 1 }; internal uint DataRevision; internal byte[] Raw;
         internal readonly Dictionary<int, string> Strings = new Dictionary<int, string>();
         internal Action BeforeSet, AfterSet;
@@ -83,8 +83,31 @@ namespace ReservationChecks
         internal readonly ZDO Data = new ZDO(); internal bool Valid = true, Owner = true;
         internal bool IsValid() => Valid; internal bool IsOwner() => Owner; internal ZDO GetZDO() => Data;
     }
-    internal sealed class World { internal long m_uid = 1; }
-    internal sealed class ZNet : Obj { internal static ZNet instance = new ZNet(); internal readonly World World = new World(); internal World GetWorld() => World; }
+    internal sealed class World
+    {
+        internal long m_uid = 1;
+        internal FileHelpers.FileSource m_fileSource = FileHelpers.FileSource.Local;
+        internal string Directory;
+        internal string GetSaveDirectory(FileHelpers.FileSource _) => Directory;
+    }
+    internal sealed class ZNet : Obj
+    {
+        internal static ZNet instance = new ZNet(); internal World World = new World();
+        internal bool Server = true, Saving;
+        internal World GetWorld() => World;
+        internal bool IsServer() => Server;
+        internal bool IsSaving() => Saving;
+    }
+    internal static class SaveSystem
+    {
+        internal static uint Generation = 7;
+        internal static string Suffix = "";
+        internal static uint GetSaveNumber() => Generation;
+        internal static string MainFwl2FileName() => "_main." + Generation + ".fwl2" + Suffix;
+        internal static string MainChunksFileName() => "_main." + Generation + ".chunks" + Suffix;
+        internal static string MainOKFileName() => "_main." + Generation + ".ok" + Suffix;
+        internal static string MainDb2FileName() => "_main." + Generation + ".db2" + Suffix;
+    }
     internal sealed class ZDOMan { internal static ZDOMan instance = new ZDOMan(); }
     internal static class InventoryGui { internal static bool Visible; internal static bool IsVisible() => Visible; }
     internal static class PrivateArea { internal static bool Allowed = true; internal static bool CheckAccess(Vector3 _, float radius, bool flash, bool ward) => Allowed; }

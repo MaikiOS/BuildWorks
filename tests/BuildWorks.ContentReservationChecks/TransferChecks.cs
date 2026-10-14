@@ -223,6 +223,7 @@ namespace ReservationChecks
             ReturnChecks.Run();
             RecoveryChecks.Run();
             ProfileChecks.Run();
+            WorldGenerationChecks.Run();
             Console.WriteLine("PASS " + assertions + " transfer assertions: actual adapter, inert native/capture services; bool/exception custody, no replay, own properties, equip, payment/context guards. No game/native API/server/disk proof.");
         }
     }

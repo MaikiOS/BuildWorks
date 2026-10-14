@@ -64,6 +64,18 @@ namespace OstrixMods.BuildWorks
         internal bool TryPreparePlayerReadback(out BlueprintStoragePlayerProfile expectation, out string reason) =>
             BlueprintStoragePlayerProfile.TryCapture(player, OperationId, PlayerReadbackCustodyValid, out expectation, out reason);
 
+        internal bool TryPrepareWorldReadback(out BlueprintStorageWorldGeneration expectation, out string reason)
+        {
+            expectation = null; reason = null;
+            try
+            {
+                if (!PlayerReadbackCustodyValid()) throw new InvalidOperationException("Exact completed transfer custody is required before world readback.");
+                return BlueprintStorageWorldGeneration.TryCapture(OperationId, Guid.ParseExact(targetMarker, "N"), zdo.GetPrefab(), piece.GetCreator(),
+                    zdo.GetByteArray(ZDOVars.s_items, null), PlayerReadbackCustodyValid, out expectation, out reason);
+            }
+            catch (Exception error) { reason = error.Message; return false; }
+        }
+
         private bool PlayerReadbackCustodyValid()
         {
             if (!CompleteInMemory || !ContextValid() || !DestinationReady() || journal == null) return false;

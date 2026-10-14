@@ -1,3 +1,11 @@
+## 2026-10-14 — .185 WIP: поколение мира и владение предметами
+
+Готова исходная привязка чтения к текущим native Local файлам поколения: exact host/world/source/UID/имена, worker без Unity API, повторная проверка владения/журнала/отмены на игровом потоке. FileShare.Read|Delete не мешает штатной очистке старого поколения и запрещает concurrent writer. Дочерняя операция возврата сохраняет родительскую метку.
+
+92 generation/worker/custody assertions, полный Geometry, normal/QA0/0, Host185, localization1100, formatter новых файлов и независимый correctness PASSED/Ponytail Ship прошли. Тесты используют временные файлы и подменённый host; не настоящий game save/reload. Sandbox File.Move отказал UnauthorizedAccessException; тот же fixture-only тест с разрешённым запуском вне sandbox прошёл. Одна whitespace строка исправлена.
+
+Установлена .185 штатным скриптом: обе SHA совпали,111 прежних config/save файлов неизменны, каталог0/imports0. Игровая приёмка185 не выполнена; gameplay callers отсутствуют, содержимое хранилищ не включено; server ack/парное world-player доказательство/завершение журнала/возврат/reload/сеть открыты. Далее парное сохранение и reconciliation, затем безопасное подключение Container. Ручная очередь .184 и Batch-183 актуальна. Полная цель active/incomplete. Протокол: docs/STORAGE_WORLD_READBACK_185_RU.md, artifacts/storage-world-readback/binding-*.log.
+
 # BuildWorks — живой список работ
 
 Обновлено:2026-10-14. Установлена QA **0.19.184** в **TerrainRamp-1.0-Test**. Каталог пустой; чертежи выбираешь и импортируешь ты. [Папка исходников](<C:/Users/nfspr/AppData/Roaming/Thunderstore Mod Manager/DataFolder/Valheim/profiles/Default/BuildWorks/artifacts/Blueprints-for-import>), [групповой набор Batch-183](<C:/Users/nfspr/AppData/Roaming/Thunderstore Mod Manager/DataFolder/Valheim/profiles/Default/BuildWorks/artifacts/Blueprints-for-import/BuildWorks-tests/Batch-183>), [ручная очередь .184](MANUAL_QA_184_RU.md).

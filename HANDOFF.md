@@ -1,3 +1,11 @@
+## 2026-10-14 — .185 WIP: current world generation and custody binding
+
+Source now captures exact Local host/world/source/UID/native generation filenames and completed item/journal custody on the owning thread. A detached filesystem worker reads pinned generation bytes; acceptance rechecks cancellation and current context. Read|Delete sharing allows native generation retirement while denying writers. Return-child operations preserve the parent storage marker.
+
+92 generation/worker/custody assertions, full Geometry, normal/proper QA0/0, Host185, localization1100, new-file formatting and independent correctness PASSED/Ponytail Ship pass. Real temporary filesystem, substituted native host; no game save/reload proof. Sandbox denied File.Move; approved fixture-only retry passed. One whitespace line was fixed and verified.
+
+QA .185 is deployed by the guarded script: both hashes verified,111 prior config/save files unchanged, catalogue0/imports0. No185 in-game acceptance; no gameplay callers and does not enable filled storage placement. Paired world/player durable evidence, remote receipt, settlement, return/cancel/reload/network remain open. Next: paired-save reconciliation before Container integration. Manual184/Batch-183 remain available. Full goal active/incomplete. Evidence: docs/STORAGE_WORLD_READBACK_185.md, artifacts/storage-world-readback/binding-*.log.
+
 ## 2026-10-14 — .185 WIP: bounded saved-storage byte verification
 
 Added a world41 reader for world UID, mapped chunks, unique operation marker, prefab/creator/Persistent and exact native109 inventory bytes. Wrong/truncated/duplicate data and cancellation refuse.345 CPU assertions pass;10001 records allocate773728B under .NET10, not a Valheim benchmark. Large irrelevant text/arrays are skipped; one scratch buffer checks typed keys.

@@ -1,3 +1,11 @@
+## 2026-10-14 — .187 installed: complete native storage QA scenario prepared
+
+Explicit QA-only fixture: one paid native wood chest, own Wood2 partial transfer, .186 paired persistence, then a separate read-only check after actual logout/re-entry. A flushed one-shot receipt precedes mutation; focus/F12/session/deadline cancel continuation. Idle editor/placement guards prevent scale/material contamination. Normal builds exclude the capability. No grants, replay, refunds or settlement.
+
+Normal/QA0/0, Host187/localization1100,18 compiled receipt cases/full isolation, input43/publisher/UI45, formatter0 and independent PASSED/Ship pass. Guarded deployment verified both hashes and111 unchanged existing config/save files; catalogue0/imports0. No game was launched. The23-step local GABS script is ready, not executed; direct PlacePiece/ConsumeResources do not prove TryPlacePiece or the full imported-building path.
+
+Next: owner loads the existing QA world through Thunderstore Modded; run the prepared native save/reload scenario, inspect exact results, then partial-state reconciliation/server acknowledgement/settlement. Manual184/Batch-183, imported-building acceptance, v11/project, selection and the full goal remain open. docs/MANUAL_QA_187_RU.md and docs/STORAGE_NATIVE_QA_187.md. Goal ACTIVE.
+
 ## 2026-10-14 — .186 installed: paired Local character/world save evidence
 
 The same completed transfer now binds a fresh Local character write and exactly the next world generation in WAL4. Scoped read-only FileWriter.Finish/ReplaceOldFile observation checks the owning thread, exact Local paths, CloseSucceeded, full Player.Save bytes and canonical SHA. No player custom data is changed. Failure, stale temporary files, cancellation or changed custody retain reconciliation; WAL1–3 remain readable.

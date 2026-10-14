@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.186";
+        internal const string PluginVersion = "0.19.187";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -333,6 +333,12 @@ namespace OstrixMods.BuildWorks
         }
 
 #if BUILDWORKS_TEST_STAND
+        internal static void RequireQaStorageIdle()
+        {
+            if (!instance || instance.blueprintEditor?.IsOpen == true || instance.session == null || !instance.session.QaStorageIdle)
+                throw new InvalidOperationException("Close the blueprint editor and exit precision/blueprint placement before storage QA.");
+        }
+
         internal static void AbortQaControlInput()
         {
             instance?.blueprintEditor?.CancelInputInteraction();

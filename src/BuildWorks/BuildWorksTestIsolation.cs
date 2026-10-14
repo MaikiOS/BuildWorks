@@ -269,6 +269,9 @@ namespace OstrixMods.BuildWorks
 
         internal static string FixtureDirectory => Path.Combine(Directory.GetParent(root).Parent.FullName, "test-fixtures");
         internal static string ControlDirectory => Path.Combine(root, "qa-control");
+        internal static string StorageReceiptPath => Path.Combine(root, "qa-storage-persistence.txt");
+        internal static string StorageDetailsPath => Path.Combine(root, "qa-storage-persistence-details.txt");
+        internal static string StorageLogPath => Path.Combine(root, "qa-storage-persistence-log.txt");
         internal static string SupplyReceiptPath => Path.Combine(root, "qa-supplies.txt");
         internal static string SupportedSnapSupplyReceiptPath => Path.Combine(root, "qa-supported-snap-supplies.txt");
         internal static string ContentsSupplyReceiptPath => Path.Combine(root, "qa-contents-supplies.txt");

@@ -46,6 +46,27 @@ namespace OstrixMods.BuildWorks
         private long captureId;
         private int releaseFrame = -1;
 
+        public string StartStoragePersistenceTest()
+        {
+            if (running != null || capture != null) throw new InvalidOperationException("Finish the input request first.");
+            player = BuildWorksTestIsolation.RequireLoadedSession(); network = ZNet.instance;
+            if (!SafeSession()) throw new InvalidOperationException("Focused isolated QA session required.");
+            var storage = GetComponent<BuildWorksTestStorage>() ?? gameObject.AddComponent<BuildWorksTestStorage>();
+            return storage.Begin(reload: false);
+        }
+
+        public string CheckStoragePersistenceReload()
+        {
+            if (running != null || capture != null) throw new InvalidOperationException("Finish the input request first.");
+            player = BuildWorksTestIsolation.RequireLoadedSession(); network = ZNet.instance;
+            if (!SafeSession()) throw new InvalidOperationException("Focused isolated QA session required.");
+            var storage = GetComponent<BuildWorksTestStorage>() ?? gameObject.AddComponent<BuildWorksTestStorage>();
+            return storage.Begin(reload: true);
+        }
+
+        public string StoragePersistenceStatus() => GetComponent<BuildWorksTestStorage>()?.Status ?? "idle";
+        public bool StoragePersistenceBusy() => GetComponent<BuildWorksTestStorage>()?.Busy ?? false;
+
         internal void Initialize()
         {
             directory = BuildWorksTestIsolation.ControlDirectory;
@@ -307,6 +328,8 @@ namespace OstrixMods.BuildWorks
 
         internal void Stop(string reason)
         {
+            try { GetComponent<BuildWorksTestStorage>()?.Cancel(reason); }
+            catch (Exception error) { Debug.LogError("Storage QA cancellation failed; continuing input release: " + error.Message); }
             // A local model may still be thinking when F12 or focus loss stops the host.
             ++stopRevision;
             var interrupted = running; long interruptedId = interrupted?.id ?? captureId; running = null;

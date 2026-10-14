@@ -36,6 +36,24 @@ $normal = [Mono.Cecil.AssemblyDefinition]::ReadAssembly($normalPath)
 $typeName = 'OstrixMods.BuildWorks.BuildWorksTestIsolation'
 $type = $qa.MainModule.GetType($typeName)
 Require ($null -ne $type -and $null -eq $normal.MainModule.GetType($typeName)) 'QA isolation leaked into normal assembly or is missing from the QA build.'
+foreach($name in @('BuildWorksTestStorage','BuildWorksTestStorageReceipt')) {
+    Require ($null -ne $qa.MainModule.GetType('OstrixMods.BuildWorks.'+$name) -and $null -eq $normal.MainModule.GetType('OstrixMods.BuildWorks.'+$name)) 'Storage QA capability leaked into normal assembly or is missing.'
+}
+$storageQa = $qa.MainModule.GetType('OstrixMods.BuildWorks.BuildWorksTestStorage')
+$storageTransferIterator = ($storageQa.NestedTypes | Where-Object Name -like '<Transfer>*').Methods | Where-Object Name -eq 'MoveNext'
+$storageInstructions = @($storageTransferIterator.Body.Instructions)
+$storageOnce = @($storageInstructions | Where-Object {[string]$_.Operand -match 'BuildWorksTestIsolation::BeginOnce'})
+$storagePlace = @($storageInstructions | Where-Object {[string]$_.Operand -match 'Player::PlacePiece'})
+$storagePay = @($storageInstructions | Where-Object {[string]$_.Operand -match 'Player::ConsumeResources'})
+$storageBegin = @($storageInstructions | Where-Object {[string]$_.Operand -match 'BlueprintStorageTransfer::TryBegin\('})
+Require ($storageOnce.Count -eq 1 -and $storagePlace.Count -eq 1 -and $storagePay.Count -eq 1 -and $storageBegin.Count -eq 1 -and
+    $storageOnce[0].Offset -lt $storagePlace[0].Offset -and $storagePlace[0].Offset -lt $storagePay[0].Offset -and
+    $storagePay[0].Offset -lt $storageBegin[0].Offset) 'Storage QA must write its one-shot receipt before native creation, charge once, then begin the transfer.'
+$storageReloadIterator = ($storageQa.NestedTypes | Where-Object Name -like '<Reload>*').Methods | Where-Object Name -eq 'MoveNext'
+$storageReloadCalls = @($storageReloadIterator.Body.Instructions | ForEach-Object {[string]$_.Operand}) -join "`n"
+Require ($storageReloadCalls -match 'BlueprintStorageTransfer::InspectRecovery' -and $storageReloadCalls -match 'BlueprintStoragePlayerProfile::TryVerify' -and
+    $storageReloadCalls -match 'BlueprintStorageWorldGeneration::TryFinish' -and
+    $storageReloadCalls -notmatch 'Player::PlacePiece|ConsumeResources|Inventory::AddItem|Inventory::Load|::TryBeginPersistence|::TryBeginRecoveredReturn|ZDO::Set|::Destroy|File::Delete') 'Storage QA reload must inspect native memory/files without creation, transfer, restore or cleanup.'
 $diagnosticName = 'OstrixMods.BuildWorks.BuildWorksTestPlacementDiagnostics'
 $diagnostic = $qa.MainModule.GetType($diagnosticName)
 Require ($null -ne $diagnostic -and $null -eq $normal.MainModule.GetType($diagnosticName)) 'Contact diagnostics must exist only in QA.'
@@ -495,6 +513,26 @@ foreach ($numbers in @(@(10,10),@(10,12),@(10,9),@(0,0))) {
     Require $refused 'Uncommitted or ambiguous native world save was acknowledged.'
     $stationCases++
 }
+$storageType = $assembly.GetType('OstrixMods.BuildWorks.BuildWorksTestStorageReceipt',$true)
+$storageParser = $storageType.GetMethod('ParseReloadDetails',$flags)
+$storageOperation = [guid]::NewGuid()
+$storageLines = [string[]]@('native-storage-persistence-v1',$storageOperation.ToString('N'),'1','2','10','20','-12.5','40','-99','20','10')
+function StorageDetails([string[]]$lines, [int]$process=10, [int]$instance=21) {
+    $storageParser.Invoke($null,[object[]]@($lines,$storageOperation,[long]1,[long]2,$process,$instance))
+}
+$details = StorageDetails $storageLines
+Require ($details.Item1 -eq -12.5 -and $details.Item4 -eq 20 -and $details.Item5 -eq 10) 'Storage reload details were not preserved.'
+StorageDetails $storageLines 11 20 | Out-Null
+Refuses { StorageDetails $storageLines 10 20 } 'Same live Player instance was reported as a reload.'
+$storageCases = 3
+foreach($case in @(@(0,'future'),@(1,([guid]::NewGuid().ToString('N'))),@(2,'99'),@(3,'99'),@(4,'0'),@(5,'0'),@(6,'NaN'),@(7,'Infinity'),@(8,'1000001'),@(9,'12'),@(9,'10001'),@(10,'0'),@(10,'101'),@(10,'broken'))) {
+    $bad = [string[]]$storageLines.Clone(); $bad[[int]$case[0]] = $case[1]
+    Refuses { StorageDetails $bad } 'Invalid storage QA reload receipt accepted.'
+    $storageCases++
+}
+Refuses { StorageDetails ($storageLines[0..9]) } 'Truncated storage QA reload receipt accepted.'
+$storageCases++
+Write-Output "PASS $storageCases storage QA reload receipt cases; pure compiled parser only, no game save/load."
 $yardType = $assembly.GetType($yardName,$true)
 $nearLocation = $yardType.GetMethod('NearLocation',$flags)
 foreach ($case in @(@(0,0,0,$true),@(36,36,0,$true),@(-36,-36,0,$true),@(37,0,0,$false),
@@ -515,6 +553,6 @@ foreach ($values in @(@(32,35,30),@(35,66,30),@(40,35,30),@([single]::NaN,40,30)
     Refuses { $plane.Invoke($null,@([single]$values[0],[single]$values[1],[single]$values[2])) } 'Unsafe QA yard plane accepted.'
     $yardCases++
 }
-@{status='passed_paths_receipts_stacks_ground_yard_save_ack_and_compiled_contract_only';persistedCases=$persistedChecks;identityCases=$identityChecks;onceCases=$onceChecks;batchCases=$batchChecks;stationCases=$stationCases;yardCases=$yardCases;locationCases=$locationCases;qaSha256=(Get-FileHash $qaPath).Hash;normalSha256=(Get-FileHash $normalPath).Hash;gameHostTested=$false;saveFilesModified=$false;fixtures=$output} |
+@{status='passed_paths_receipts_stacks_ground_yard_save_ack_and_compiled_contract_only';persistedCases=$persistedChecks;identityCases=$identityChecks;onceCases=$onceChecks;batchCases=$batchChecks;stationCases=$stationCases;yardCases=$yardCases;locationCases=$locationCases;storageReceiptCases=$storageCases;qaSha256=(Get-FileHash $qaPath).Hash;normalSha256=(Get-FileHash $normalPath).Hash;gameHostTested=$false;saveFilesModified=$false;fixtures=$output} |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'verification.json')
 "PASS: QA-only assemblies; $persistedChecks persisted-slot, $identityChecks identity, $onceChecks one-shot, $batchChecks stack, $stationCases ground/save-ack, $yardCases yard plane, $locationCases location cases; native wiring only. No native grants/saves or game execution."

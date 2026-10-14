@@ -109,6 +109,14 @@ namespace OstrixMods.BuildWorks
             throw new InvalidOperationException("No clear loaded naturally flat site for QA stations near the player; no terrain was modified.");
         }
 
+        internal static Vector3 FindStorageSite(Player player, Piece prefab)
+        {
+            BuildWorksTestIsolation.RequireLoadedSession();
+            int terrain = LayerMask.NameToLayer("terrain");
+            if (terrain < 0) throw new InvalidOperationException("Native terrain layer is missing.");
+            return FindSite(player, Footprint(prefab), new List<Bounds>(), ~(1 << terrain), 10f);
+        }
+
         private static Piece ResolveStation(Piece piece)
         {
             CraftingStation required = piece.m_craftingStation;

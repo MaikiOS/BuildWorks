@@ -5818,6 +5818,8 @@ namespace OstrixMods.BuildWorks
         }
 
 #if BUILDWORKS_TEST_STAND
+        internal bool QaStorageIdle => state == PlacementState.Inactive && sessionMode == SessionMode.None;
+
         internal void AbortQaInput()
         {
             HammerCatalogView.CancelPlacementContents(); ClearContentsRecipe();

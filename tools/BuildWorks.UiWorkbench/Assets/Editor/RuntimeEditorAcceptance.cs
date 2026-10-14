@@ -345,7 +345,7 @@ public static class RuntimeEditorAcceptance
                     scene.SetViewport(view.ViewportScreenRect());
                     Call(controller, "FrameAll");
                     foreach (string state in new[] { "select", "transform", "scale-xyz-ru", "array", "contour", "catalog",
-                        "outliner", "outliner-filter-ru", "outliner-fields-ru", "outliner-empty-ru", "interior-camera-ru", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "catalog-managed-ru", "catalog-hidden-ru", "delete-confirm-ru", "hide-confirm-ru", "save-metadata", "save-as", "save-as-ru", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "share-ru", "share-error-ru", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru", "exchange-import-category-ru", "exchange-import-category-picker-ru", "exchange-armor", "exchange-armor-ru", "exchange-missing", "exchange-missing-ru", "replace-tools", "replace-confirm", "replace-confirm-ru", "replace-entry-ru", "replace-help-ru" })
+                        "outliner", "outliner-filter-ru", "outliner-fields-ru", "outliner-empty-ru", "interior-camera-ru", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "catalog-managed-ru", "catalog-hidden-ru", "delete-confirm-ru", "hide-confirm-ru", "save-metadata", "save-as", "save-as-ru", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "share-ru", "share-error-ru", "batch-select-ru", "batch-review-ru", "batch-picker-ru", "batch-export-ru", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru", "exchange-import-category-ru", "exchange-import-category-picker-ru", "exchange-armor", "exchange-armor-ru", "exchange-missing", "exchange-missing-ru", "replace-tools", "replace-confirm", "replace-confirm-ru", "replace-entry-ru", "replace-help-ru" })
                     {
                         Require(Screen.width == width && Screen.height == height,
                             "GameView changed before " + state + ": " + Screen.width + "x" + Screen.height);
@@ -462,6 +462,54 @@ public static class RuntimeEditorAcceptance
                         {
                             BuildWorksLocalization.RussianLanguage = state.EndsWith("-ru", StringComparison.Ordinal);
                             view.ShowSaveMetadata("Новая копия", "Дома", new[] { "Дома", "Декор" }, (_, __) => { }, saveCopy: true);
+                        }
+                        else if (state.StartsWith("batch", StringComparison.Ordinal))
+                        {
+                            BuildWorksLocalization.RussianLanguage = true;
+                            string folder = Path.Combine(output, "batch-layout-" + Guid.NewGuid().ToString("N"));
+                            Directory.CreateDirectory(folder);
+                            var batchStore = new CompositeBlueprintStore(Path.Combine(folder, "library.json"));
+                            batchStore.ConfigureImportScale(_ => new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 });
+                            var parts = store.All()[0].parts;
+                            Require(batchStore.TrySave("Маленький дом", parts, Array.Empty<CompositeBlueprintStore.VectorData>(), out var first, out string batchError), batchError);
+                            Require(batchStore.TrySave("Стена с опорой", parts, Array.Empty<CompositeBlueprintStore.VectorData>(), out _, out batchError), batchError);
+                            string a = Path.Combine(folder, "Дом.blueprint"), b = Path.Combine(folder, "Стена.blueprint");
+                            File.WriteAllText(a, "#Name:Дом\n#Category:Дома\n#Pieces\nwoodwall;;0;0;0;0;0;0;1;\"\";1;1;1");
+                            File.WriteAllText(b, File.ReadAllText(a).Replace("Дом", "Стена"));
+                            File.WriteAllText(Path.Combine(folder, "Ошибка.blueprint"), "broken source");
+                            bool exporting = state == "batch-export-ru";
+                            view.ShowExchange((parent, textFont, closed) => new BlueprintExchangeView(parent, textFont, batchStore,
+                                exporting ? first : null, closed));
+                            var exchange = Field<BlueprintExchangeView>(view, "exchangeView");
+                            for (int i = 0; i < 600 && Field<System.Threading.Tasks.Task<string[]>>(exchange, "listing") != null; ++i)
+                            { view.Tick(); yield return null; }
+                            ControllerInputAcceptance.NativeClick(view, uiCamera, "ExchangeBatchToggle"); yield return null;
+                            if (exporting)
+                            {
+                                ControllerInputAcceptance.NativeClick(view, uiCamera, "ExchangeBatchExport1");
+                                Field<TMP_InputField>(exchange, "fileName").SetTextWithoutNotify("Полный набор");
+                            }
+                            else
+                                foreach (string file in new[] { a, b, Path.Combine(folder, "Ошибка.blueprint") })
+                                {
+                                    int index = Array.IndexOf(Field<string[]>(exchange, "entries"), file);
+                                    Require(index >= 0 && index < 7, "Batch layout source not on first page");
+                                    ControllerInputAcceptance.NativeClick(view, uiCamera, "ExchangeEntry" + index); yield return null;
+                                }
+                            view.Tick();
+                            if (state != "batch-select-ru")
+                            {
+                                ControllerInputAcceptance.NativeClick(view, uiCamera, "ExchangeSubmit");
+                                for (int i = 0; i < 600 && ControllerInputAcceptance.ImportPending(exchange); ++i)
+                                { view.Tick(); yield return null; }
+                                Require(Field<CompositeBlueprintStore.ContentsSummary>(exchange, "contentsSummary") != null, "Batch layout review not ready");
+                                if (state == "batch-picker-ru")
+                                {
+                                    ControllerInputAcceptance.NativeClick(view, uiCamera, "ExchangeBatchDocuments"); yield return null;
+                                    var category = view.RootCanvas.GetComponentsInChildren<TMP_InputField>().Single(input => input.name == "ExchangeBatchCategory1");
+                                    category.SetTextWithoutNotify("МОИ ТЕСТОВЫЕ СТЕНЫ"); category.onEndEdit.Invoke(category.text);
+                                }
+                            }
                         }
                         else if (state.StartsWith("share", StringComparison.Ordinal))
                         {
@@ -686,6 +734,8 @@ public static class RuntimeEditorAcceptance
                     foreach (object step in ControllerInputAcceptance.RunSinglePart(template, fontTemplate, source["woodwall"], output)) yield return step;
                     foreach (object step in ControllerInputAcceptance.RunSaveAs(template, fontTemplate, source["woodwall"], output)) yield return step;
                     foreach (object step in ControllerInputAcceptance.RunShareFile(template, fontTemplate, source["woodwall"], output)) yield return step;
+                    foreach (object step in ControllerInputAcceptance.RunBatchExchange(template, fontTemplate, source["woodwall"], output)) yield return step;
+                    checks.Add("Batch actual UI: multi-file selection and malformed report, per-document category, one commit/results/navigation, native+external full ZIP export, immutable sources and dirty draft/history.");
                     checks.Add("Share: saved version and copyable file, dirty draft/history unchanged, conflict/retry, committed Save As file-only retry without duplicate. No network/game proof.");
                     foreach (object step in ControllerInputAcceptance.RunCatalogManagement(template, fontTemplate, source["woodwall"], output)) yield return step;
                     checks.Add("Catalogue management: actual owned delete/hide/cancel/unavailable restore/write refusal; open draft Undo/Redo/close prompt/new ID Save/reload; source immutable. No game proof.");

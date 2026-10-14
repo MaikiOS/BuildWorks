@@ -1033,3 +1033,21 @@ share.ready	Ready to share: {0}\n{1}\nSend this file to another player; they can
 share.failed	Could not prepare the file.\n{0}\n{1}\nThe blueprint remains saved. Retry only prepares the file.
 share.partial	{0} share files could not be updated.\n{1}\n{2}\nUse Share for each changed blueprint to retry without saving a duplicate.
 share.conflict	Cannot replace a foreign or invalid share file: {0}
+exchange.batch_choose	Choose group
+exchange.batch_single	Single file
+exchange.batch_limit	Select 1 to 32 files or blueprints; group source bytes must not exceed 64 MiB.
+exchange.batch_selected	Selected: {0}. Click files to mark them; confirm to review the whole group.
+exchange.batch_catalog	Open catalog
+exchange.batch_done	Imported: {0} [{1}]
+exchange.batch_skipped	Skipped file: {0} — {1}
+exchange.batch_atomic	One atomic group: closing before commit cancels the remaining work. A published archive remains saved.
+exchange.batch_destination	After import the catalog will select: {0}.
+exchange.batch_document	{0} · {1} parts · category: {2}
+exchange.batch_documents	Documents and categories
+exchange.batch_apply	Apply selection
+exchange.batch_categories_help	Uncheck documents to skip. An empty category inherits the common/original value; Src restores the source category.
+exchange.batch_inherit	Common / original
+exchange.batch_original	Src
+exchange.batch_cancelled	Group cancelled before publication.
+exchange.batch_empty	No documents selected. Open Documents and categories.
+exchange.batch_page	Page {0}/{1}; documents: {2}

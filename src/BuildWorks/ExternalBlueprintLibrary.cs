@@ -15,13 +15,19 @@ namespace OstrixMods.BuildWorks
     {
         internal const int MaximumFileBytes = 8 * 1024 * 1024;
         internal const int MaximumFiles = 2000;
-        private const long MaximumTotalBytes = 128L * 1024 * 1024;
+        internal const long MaximumTotalBytes = 128L * 1024 * 1024;
         internal const int MaximumPreviewBytes = 4 * 1024 * 1024;
 
         internal static List<CompositeBlueprintStore.Blueprint> LoadFile(string path, string sourceName = null)
         {
-            var result = new List<CompositeBlueprintStore.Blueprint>();
             long budget = MaximumTotalBytes;
+            return LoadFile(path, ref budget, sourceName);
+        }
+
+        internal static List<CompositeBlueprintStore.Blueprint> LoadFile(string path, ref long budget, string sourceName = null)
+        {
+            if (budget < 0 || budget > MaximumTotalBytes) throw new InvalidDataException("$buildworks_import.file_limit");
+            var result = new List<CompositeBlueprintStore.Blueprint>();
             AppendFile(Path.GetFullPath(path), result, ref budget, sourceName);
             return result;
         }

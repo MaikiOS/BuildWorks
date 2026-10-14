@@ -1,3 +1,7 @@
+## Verified checkpoint .183 — 2026-10-14
+
+Batch import/export is implemented, automatically checked and deployed: common/per-document/original category, document exclusion, explicit skip report and one atomic publication. Batch export is full internal BuildWorks ZIP. Server library and in-game player transfer remain designed. See docs/BATCH_EXCHANGE_183.md and docs/MANUAL_QA_183.md. Earlier unimplemented status statements below are historical.
+
 ## Implemented checkpoint 2026-10-14
 
 .181 adds pre-import categories; .182 implements/deploys automatic full JSON share files and Share in both catalogs. The primary library stays authoritative; share is outside scanned imports and retry never repeats Save As. Batch operations, server library and in-game player transfers remain unimplemented. Game acceptance is separate. Older statements below about missing auto files are historical. See docs/SHARE_FILES_182.md and its complete Russian duplicate.

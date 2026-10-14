@@ -1,3 +1,11 @@
+## 2026-10-14 — .183 verified/deployed; full goal ACTIVE and incomplete
+
+Batch import/export in existing exchange UI: frozen document ordinals, common/per-document/original categories/exclusions, explicit bad-file/whole-ZIP skip, one atomic publication with exact originals/manifest. Export saved native/external selected docs as full BuildWorks ZIP; dirty draft/history retained. Shared128MiB unpacked budget,64MiB raw/prepared output and existing entries/parts/library protection; cancellation during staging cleans temporary files, after commit keeps success. Metadata callbacks host-thread only. No foreign batch compatibility/server transfer claimed.
+
+normal/QA0/0, full Store/Geometry/Localization runtime/EditorBridge/actual WorldLayout/actual Tick/Host Steam25730771/loc1048 and exact-source Unity588 pass; correctness core/UI PASSED, Ponytail Ship. Same135 inherited WHITESPACE,0 new. Installed0.19.183.0, both hashes verified;103 config/token/receipt files unchanged; catalog0/0. Evidence artifacts/checkpoint-0.19.183, docs/BATCH_EXCHANGE_183.md and Russian duplicate. Manual queue docs/MANUAL_QA_183_RU.md; local Batch-183 sources remain outside game catalog. No Valheim/model/input/saves run.
+
+Next: server library players/admin publication and accepted player copies. Full native contents/v11/selection/heavy/admin/network goal remains open. Never repopulate clean catalog automatically. Older statuses below are historical.
+
 ## 2026-10-14 — .182 verified/deployed; full goal ACTIVE and incomplete
 
 Automatic full portable share file after owned save/update/rename/category/preview, ownership-checked delete with primary rollback repair; Share in editor/Hammer reuses exchange result view. Saved version only; dirty draft intact, no native card for external Share. External full hash filename with compatible GUID projection, original sourceDocuments/internal links retained. Per-native-ID failures survive unrelated success; TryRepairShareFiles repairs derived files only; committed Save As adopts identity/MarkClean before warning/retry. Tracking is session-local, no migration/journal/bulk reseeding. Share can repair after restart.

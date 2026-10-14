@@ -114,6 +114,10 @@ public sealed class ExchangeTickChecks
     private void Dispose() { IsOpen = false; }
     private void SetError(Exception error) { message.text = error.Message; }
     private void RenderRows() { renderedRows++; }
+    private bool batchMode = false;
+    private void TickBatch() { }
+    private void UpdateBatchControls(bool busy) { }
+    private string BatchResultSummary(CompositeBlueprintStore.Blueprint[] imported) { return ""; }
     private void RenderContents() { renderedContents++; }
     private void RefreshMissing() { refreshedMissing++; missingReview = new CompositeBlueprintStore.MissingPartsReview(); }
     private void RenderPlanReview() { }

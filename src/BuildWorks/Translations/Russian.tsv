@@ -1033,3 +1033,21 @@ share.ready	Готов к передаче: {0}\n{1}\nПередай этот ф
 share.failed	Не удалось подготовить файл.\n{0}\n{1}\nЧертёж сохранён. Повтор создаёт только файл для передачи.
 share.partial	Не удалось обновить файлов для передачи: {0}.\n{1}\n{2}\nНажми «Поделиться» для изменённых чертежей: файл обновится без новой карточки.
 share.conflict	Нельзя заменить чужой или повреждённый файл для передачи: {0}
+exchange.batch_choose	Выбор группы
+exchange.batch_single	Один файл
+exchange.batch_limit	Выбери от 1 до 32 файлов или чертежей; общий размер исходников — до 64 МиБ.
+exchange.batch_selected	Выбрано: {0}. Нажимай файлы для отметки; затем открой обзор всей группы.
+exchange.batch_catalog	В каталог
+exchange.batch_done	Импортирован: {0} [{1}]
+exchange.batch_skipped	Пропущен файл: {0} — {1}
+exchange.batch_atomic	Группа записывается целиком. Закрытие до записи отменяет работу. Уже опубликованный архив остаётся сохранённым.
+exchange.batch_destination	После импорта каталог выберет: {0}.
+exchange.batch_document	{0} · {1} дет. · категория: {2}
+exchange.batch_documents	Документы и категории
+exchange.batch_apply	Применить выбор
+exchange.batch_categories_help	Сними отметку, чтобы пропустить документ. Пустая категория — общая/исходная; «Исх.» возвращает исходную.
+exchange.batch_inherit	Общая / исходная
+exchange.batch_original	Исх.
+exchange.batch_cancelled	Группа отменена до публикации.
+exchange.batch_empty	Документы не выбраны. Открой «Документы и категории».
+exchange.batch_page	Страница {0}/{1}; документов: {2}

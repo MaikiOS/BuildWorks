@@ -1,3 +1,11 @@
+## 2026-10-14 — QA .183 deployed: batch import and export
+
+Multi-file selection, individual ZIP documents, common/per-document/original categories and exclusions; explicit invalid-file skips. One atomic group preserves exact originals/manifest; full BuildWorks ZIP exports selected saved native/external cards without creating cards. Dirty draft/Undo remain intact. [Evidence](BATCH_EXCHANGE_183.md), [manual steps/source folders](MANUAL_QA_183.md).
+
+normal/QA0/0, full Store/Geometry/Localization runtime/EditorBridge/actual WorldLayout/actual Tick/Host/loc1048 and exact-source Unity588 pass; core/UI correctness PASSED/Ponytail Ship. During-write cancellation in both directions, four contents combinations, shared unpacked budget and ordinal categories checked. Formatter retains135 inherited WHITESPACE,0 new. Installed0.19.183.0/both SHA matched,103 config/token/receipt files unchanged; catalog0/0. No game/model/input/saves run.
+
+Manual acceptance when convenient. Next: player/admin server library and accepted personal copies. Native contents, persistent v11 projects, selection/heavy-chain performance, admin/network remain open. Full goal active and incomplete.
+
 ## 2026-10-14 — QA .182 deployed: automatic portable file and Share
 
 Owned saves update full `config/BuildWorks/share/<id>.buildworks.json`. Share in editor and Hammer gives the saved file, copyable full path and open-folder action without another card; open drafts remain intact. A derived failure never rolls back the primary commit; failed files remain tracked by ID and retry only repairs files, never repeats Save As. [Evidence](SHARE_FILES_182.md), [manual queue](MANUAL_QA_182.md).

@@ -188,6 +188,96 @@ internal static class ControllerInputAcceptance
         }
     }
 
+    internal static IEnumerable<object> RunBatchExchange(Camera template, TMP_Text font, GameObject wall, string output)
+    {
+        string folder = Path.Combine(output, "batch-ui-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(folder);
+        string a = Path.Combine(folder, "a.blueprint"), b = Path.Combine(folder, "b.blueprint");
+        File.WriteAllText(a, "#Name:One\n#Category:FIRST\n#Pieces\nwoodwall;;0;0;0;0;0;0;1;\"\";1;1;1");
+        File.WriteAllText(b, File.ReadAllText(a).Replace("One", "Two").Replace("FIRST", "SECOND"));
+        File.WriteAllText(Path.Combine(folder, "bad.blueprint"), "broken source");
+        byte[] beforeA = File.ReadAllBytes(a), beforeB = File.ReadAllBytes(b);
+        var store = new CompositeBlueprintStore(Path.Combine(folder, "library.json"));
+        store.ConfigureImportScale(_ => new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 });
+        var part = new CompositeBlueprintStore.Part { stableId = "wall", prefabName = "woodwall", displayName = "Owned wall",
+            rotation = new CompositeBlueprintStore.QuaternionData { w = 1 }, scale = new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 } };
+        Require(store.TrySave("Owned", new[] { part }, Array.Empty<CompositeBlueprintStore.VectorData>(), out var owned, out string error), error);
+        IReadOnlyList<BlueprintEditorCatalogItem> Items() => store.CatalogAll().Select((item, i) => new BlueprintEditorCatalogItem(
+            "blueprint_" + item.id, item.name, null, item.category, "Blueprints", "Mine", i, item)).ToArray();
+        var input = new InputFrames();
+        using (var controller = new BlueprintEditorController(store, template, font, _ => wall, name => name, Items,
+            message => { throw new InvalidOperationException(message); }, editorInput: input))
+        {
+            Require(controller.OpenExisting(owned, out error), error); yield return null;
+            Require(controller.Document.Rename("wall", "Draft wall"), "Batch draft setup failed");
+            var view = Field<BlueprintEditorView>(controller, "view"); Call(controller, "Bind", (object)null);
+            int revision = controller.Document.RevisionToken, history = Field<IList>(controller.Document, "undo").Count;
+            view.ShowCatalog(Items()); yield return null;
+            NativeClick(view, null, "CatalogBlueprintsMode"); yield return null;
+            NativeClick(view, null, "CatalogImport"); yield return null;
+            var exchange = Field<BlueprintExchangeView>(view, "exchangeView");
+            for (int i = 0; i < 600 && Field<Task<string[]>>(exchange, "listing") != null; ++i) { Frame(controller, input, Vector2.zero); yield return null; }
+            NativeClick(view, null, "ExchangeBatchToggle"); yield return null;
+            foreach (string path in new[] { a, b, Path.Combine(folder, "bad.blueprint") })
+            {
+                int index = Array.IndexOf(Field<string[]>(exchange, "entries"), path);
+                Require(index >= 0, "Batch file missing from browser");
+                NativeClick(view, null, "ExchangeEntry" + index); yield return null;
+            }
+            Frame(controller, input, Vector2.zero);
+            Require(Field<Button>(exchange, "primary").IsInteractable(), "Batch review button stayed disabled after selection");
+            NativeClick(view, null, "ExchangeSubmit"); yield return null;
+            for (int i = 0; i < 600 && Field<CompositeBlueprintStore.ContentsSummary>(exchange, "contentsSummary") == null; ++i)
+            { Frame(controller, input, Vector2.zero); yield return null; }
+            Require(Field<CompositeBlueprintStore.ImportReview>(exchange, "importReview") != null,
+                "Batch review not ready: mode=" + Field<bool>(exchange, "batchMode") + " open=" + exchange.IsOpen +
+                " review=" + Field<bool>(exchange, "reviewingContents") + " raw=" + Field<Task<CompositeBlueprintStore.ImportReview>>(exchange, "importInspection")?.Status +
+                " preparation=" + Field<Task<CompositeBlueprintStore.ImportReview>>(exchange, "importPreparation")?.Status +
+                " message=" + Field<TMP_Text>(exchange, "message").text);
+            Require(Field<CompositeBlueprintStore.ImportReview>(exchange, "importReview").Documents.Count == 2 &&
+                Field<TMP_Text>(exchange, "contentsDetails").text.Contains("bad.blueprint"), "Batch review did not expose malformed file and ready documents");
+            Field<TMP_InputField>(exchange, "categoryInput").text = "GROUP COMMON";
+            NativeClick(view, null, "ExchangeBatchDocuments"); yield return null;
+            Require(!Field<Button>(exchange, "primary").interactable, "Hidden review could submit under document picker");
+            var category = view.RootCanvas.GetComponentsInChildren<TMP_InputField>().Single(input => input.name == "ExchangeBatchCategory1");
+            category.SetTextWithoutNotify("GROUP OVERRIDE"); category.onEndEdit.Invoke(category.text);
+            NativeClick(view, null, "ExchangeBatchPickerClose"); yield return null;
+            for (int i = 0; i < 600 && Field<CompositeBlueprintStore.ContentsSummary>(exchange, "contentsSummary") == null; ++i)
+            { Frame(controller, input, Vector2.zero); yield return null; }
+            NativeClick(view, null, "ExchangeSubmit"); yield return null;
+            for (int i = 0; i < 1200 && !Field<bool>(exchange, "completed"); ++i) { Frame(controller, input, Vector2.zero); yield return null; }
+            Require(Field<bool>(exchange, "completed") && view.HasModal && store.CatalogAll().Count == 3 &&
+                store.CatalogAll().Single(item => item.name == "Two").category == "GROUP OVERRIDE" &&
+                Field<TMP_Text>(exchange, "message").text.Contains("bad.blueprint"), "Batch commit/result/per-document category failed");
+            NativeClick(view, null, "ExchangeSubmit"); yield return null;
+            Require(!view.HasModal && controller.Document.IsDirty && controller.Document.RevisionToken == revision &&
+                Field<IList>(controller.Document, "undo").Count == history, "Batch result/navigation replaced dirty draft or history");
+
+            view.HideCatalog();
+            view.ShowExchange((parent, textFont, closed) => new BlueprintExchangeView(parent, textFont, store, owned, closed)); yield return null;
+            exchange = Field<BlueprintExchangeView>(view, "exchangeView");
+            for (int i = 0; i < 600 && Field<Task<string[]>>(exchange, "listing") != null; ++i) { Frame(controller, input, Vector2.zero); yield return null; }
+            NativeClick(view, null, "ExchangeBatchToggle"); yield return null;
+            var choices = Field<CompositeBlueprintStore.Blueprint[]>(exchange, "batchExportChoices");
+            for (int i = 0; i < choices.Length; ++i)
+                if (choices[i].id != owned.id) { NativeClick(view, null, "ExchangeBatchExport" + i); yield return null; }
+            Field<TMP_InputField>(exchange, "fileName").SetTextWithoutNotify("full-group");
+            Frame(controller, input, Vector2.zero);
+            Require(Field<Button>(exchange, "primary").IsInteractable(), "Batch review button stayed disabled after selection");
+            NativeClick(view, null, "ExchangeSubmit"); yield return null;
+            for (int i = 0; i < 600 && Field<CompositeBlueprintStore.ContentsSummary>(exchange, "contentsSummary") == null; ++i)
+            { Frame(controller, input, Vector2.zero); yield return null; }
+            Require(Field<CompositeBlueprintStore.ImportReview>(exchange, "importReview").Documents.Count == 3, "Group export reviewed only initial card");
+            NativeClick(view, null, "ExchangeSubmit"); yield return null;
+            for (int i = 0; i < 1200 && !Field<bool>(exchange, "completed"); ++i) { Frame(controller, input, Vector2.zero); yield return null; }
+            string result = Field<string>(exchange, "resultPath");
+            Require(File.Exists(result) && ExternalBlueprintLibrary.LoadFile(result).Count == 3 &&
+                store.All().Count == 1 && beforeA.SequenceEqual(File.ReadAllBytes(a)) && beforeB.SequenceEqual(File.ReadAllBytes(b)),
+                "Group export failed/no native+external data/source mutation/card leak");
+            NativeClick(view, null, "ExchangeClose"); yield return null;
+            Require(controller.Document.IsDirty && controller.Document.RevisionToken == revision, "Export changed draft");
+        }
+    }
+
     internal static IEnumerable<object> RunShareFile(Camera template, TMP_Text font, GameObject wall, string output)
     {
         string folder = Path.Combine(output, "share-ui-" + Guid.NewGuid().ToString("N"));

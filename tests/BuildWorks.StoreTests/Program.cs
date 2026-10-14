@@ -27,6 +27,8 @@ namespace OstrixMods.BuildWorks.StoreTests
                     return ImportTimingChecks.RunCatalogPhases(args[1], directory);
                 if (args.Length == 2 && args[0] == "--planbuild-export")
                 { PlanBuildExportChecks.Run(args[1]); return 0; }
+                if (args.Length == 1 && args[0] == "--batch-exchange")
+                { BatchExchangeChecks.Run(Path.Combine(directory, "batch-exchange")); return 0; }
                 if (args.Length == 1 && args[0] == "--planbuild-snap-tails")
                 { PlanBuildSnapTailChecks.Run(Path.Combine(directory, "snap-tails")); return 0; }
                 PlanBuildSnapTailChecks.Run(Path.Combine(directory, "snap-tails"));
@@ -38,6 +40,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 ImportCatalogRecoveryChecks.Run(Path.Combine(directory, "import-catalogue-recovery"));
                 ImportCategoryChecks.Run(Path.Combine(directory, "import-category"));
                 ShareFileChecks.Run(Path.Combine(directory, "share-files"));
+                BatchExchangeChecks.Run(Path.Combine(directory, "batch-exchange"));
                 LargeSnapChecks.Run(Path.Combine(directory, "large-snap-bounds"));
                 VbuildDialectChecks.Run(Path.Combine(directory, "legacy-vbuild"));
                 MaterialSeedChecks.Run(Path.Combine(directory, "material-seed"));

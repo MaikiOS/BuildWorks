@@ -405,8 +405,66 @@ namespace OstrixMods.BuildWorks
             internal List<Blueprint> Documents;
             internal ContentsSummary Contents;
             internal MissingPartsReview Missing;
+            internal List<ImportSource> Sources;
+            internal List<(string Source, string Error)> FileErrors;
             // Called by the host thread only, never by the file/preparation worker.
             internal Func<bool> IsHostCurrent;
+        }
+
+        internal sealed class ImportSource
+        {
+            internal string Path;
+            internal byte[] Bytes;
+        }
+
+        internal const int MaximumBatchFiles = 32;
+        internal const long MaximumBatchBytes = 64L * 1024 * 1024;
+        private static string ManifestLabel(string value) => (value ?? "").Replace("\\", "\\\\").Replace("\t", "\\t").Replace("\r", "\\r").Replace("\n", "\\n");
+
+        internal static ImportReview ReviewImportFiles(IEnumerable<string> paths, Func<string, int> prefabHash, int? worldLevel = null,
+            long uncompressedBudget = ExternalBlueprintLibrary.MaximumTotalBytes)
+        {
+            // Tests may lower the shared budget; callers cannot raise the production bound.
+            if (uncompressedBudget < 0 || uncompressedBudget > ExternalBlueprintLibrary.MaximumTotalBytes)
+                throw new InvalidDataException("$buildworks_import.file_limit");
+            var selected = paths.Select(value => Path.GetFullPath(value)).Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(MaximumBatchFiles + 1).ToArray();
+            if (selected.Length == 0 || selected.Length > MaximumBatchFiles)
+                throw new InvalidDataException("$buildworks_exchange.batch_limit");
+            var result = new ImportReview
+            {
+                Source = "BuildWorks-batch.zip",
+                Documents = new List<Blueprint>(),
+                Contents = new ContentsSummary(),
+                Sources = new List<ImportSource>(),
+                FileErrors = new List<(string, string)>()
+            };
+            long bytes = 0; int parts = 0;
+            foreach (string source in selected)
+            {
+                // Bound the whole group, not only each individual file/archive.
+                long length;
+                try { length = new FileInfo(source).Length; }
+                catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+                { result.FileErrors.Add((source, exception.Message)); continue; }
+                if (length < 0 || length > MaximumBatchBytes - bytes)
+                    throw new InvalidDataException("$buildworks_import.file_limit");
+                bytes += length;
+                ImportReview review;
+                try { review = ReviewImportFile(source, ref uncompressedBudget, prefabHash, worldLevel); }
+                catch (Exception exception) when (exception is IOException || exception is InvalidDataException || exception is UnauthorizedAccessException || exception is ArgumentException)
+                { result.FileErrors.Add((source, exception.Message)); continue; }
+                bytes += review.Bytes.LongLength - length;
+                parts = checked(parts + review.Documents.Sum(document => document.parts.Count));
+                if (bytes > MaximumBatchBytes || parts > MaximumLibraryParts ||
+                    result.Documents.Count + review.Documents.Count + selected.Length + 1 +
+                    result.Documents.Count(document => ExternalBlueprintLibrary.ValidPreview(document.importPreview)) +
+                    review.Documents.Count(document => ExternalBlueprintLibrary.ValidPreview(document.importPreview)) > ExternalBlueprintLibrary.MaximumFiles)
+                    throw new InvalidDataException("$buildworks_import.library_limit");
+                result.Sources.Add(new ImportSource { Path = source, Bytes = review.Bytes });
+                result.Documents.AddRange(review.Documents); result.Contents.Add(review.Contents);
+            }
+            return result;
         }
 
         // Unity thread only; workers receive the resulting pure name lookup.
@@ -454,6 +512,8 @@ namespace OstrixMods.BuildWorks
                 {
                     Source = review.Source,
                     Bytes = review.Bytes,
+                    Sources = review.Sources,
+                    FileErrors = review.FileErrors,
                     Contents = new ContentsSummary(),
                     Missing = missing,
                     IsHostCurrent = current,
@@ -496,6 +556,12 @@ namespace OstrixMods.BuildWorks
         // Pure file inspection: no library writes and no Unity prefab access.
         internal static ImportReview ReviewImportFile(string source, Func<string, int> prefabHash, int? worldLevel = null)
         {
+            long budget = ExternalBlueprintLibrary.MaximumTotalBytes;
+            return ReviewImportFile(source, ref budget, prefabHash, worldLevel);
+        }
+
+        private static ImportReview ReviewImportFile(string source, ref long budget, Func<string, int> prefabHash, int? worldLevel)
+        {
             source = Path.GetFullPath((source ?? "").Trim().Trim('"'));
             byte[] bytes = ReadImportBytes(source);
             string folder = Path.Combine(Path.GetTempPath(), "BuildWorks-review-" + Guid.NewGuid().ToString("N"));
@@ -504,7 +570,7 @@ namespace OstrixMods.BuildWorks
             try
             {
                 File.WriteAllBytes(temporary, bytes);
-                var documents = ExternalBlueprintLibrary.LoadFile(temporary);
+                var documents = ExternalBlueprintLibrary.LoadFile(temporary, ref budget);
                 if (documents.Count == 0) throw new InvalidDataException("$buildworks_import.format");
                 if (2 + documents.Count + documents.Count(document => ExternalBlueprintLibrary.ValidPreview(document.importPreview)) >
                     ExternalBlueprintLibrary.MaximumFiles)
@@ -535,15 +601,25 @@ namespace OstrixMods.BuildWorks
         // Unity thread: freeze fresh host values. True starts work; CatalogAll/ImportError report its result.
         internal bool TryImportReviewed(ImportReview review, bool clearStorage, bool clearMounts,
             Func<string, int> prefabHash, out string error, bool omitArmorState = false, MissingPartsReview omitMissing = null,
-            string importCategory = null)
+            string importCategory = null, IReadOnlyDictionary<int, string> documentCategories = null,
+            CancellationToken cancellation = default)
         {
             error = null;
             if (CatalogLoading) { error = UserError("exchange.loading"); return false; }
             try
             {
                 if (review == null) throw new InvalidDataException("$buildworks_import.format");
+                if (review.Documents == null || review.Documents.Count == 0) throw new InvalidDataException("$buildworks_import.format");
                 if (!TryNormalizeImportCategory(importCategory, out string category))
                     throw new InvalidDataException("$buildworks_exchange.invalid_category");
+                var overrides = new Dictionary<int, string>();
+                foreach (var entry in documentCategories ?? new Dictionary<int, string>())
+                {
+                    if (entry.Key < 0 || entry.Key >= review.Documents.Count || !TryNormalizeImportCategory(entry.Value, out string value))
+                        throw new InvalidDataException("$buildworks_exchange.invalid_category");
+                    overrides.Add(entry.Key, value);
+                }
+                cancellation.ThrowIfCancellationRequested();
                 if (review.IsHostCurrent?.Invoke() == false)
                     throw new InvalidDataException(UserError("placement.contents_stale"));
                 CatalogAll();
@@ -566,6 +642,7 @@ namespace OstrixMods.BuildWorks
                 ReportImportStage(ImportStage.Converting);
                 importTask = Task.Run(() =>
                 {
+                    cancellation.ThrowIfCancellationRequested();
                     var prepared = review.Documents.Select(document =>
                     {
                         var copy = ExternalBlueprintLibrary.PrepareForHost(document,
@@ -579,8 +656,10 @@ namespace OstrixMods.BuildWorks
                         prepared = prepared.Select(document => CopyWithoutMissing(document, missing)).ToArray();
                     CaptureMetadata(prepared.SelectMany(document => document.parts), metadata == null ? null :
                         (Func<string, PrefabMetadata>)(name => metadata.TryGetValue(name, out var value) ? value : null));
-                    if (!ReadImportBytes(review.Source).SequenceEqual(review.Bytes))
-                        throw new InvalidDataException("$buildworks_exchange.source_changed");
+                    foreach (var source in review.Sources ?? new List<ImportSource> { new ImportSource { Path = review.Source, Bytes = review.Bytes } })
+                        if (!ReadImportBytes(source.Path).SequenceEqual(source.Bytes))
+                            throw new InvalidDataException("$buildworks_exchange.source_changed");
+                    cancellation.ThrowIfCancellationRequested();
                     ValidateExchangeDirectory(ImportDirectory);
                     Directory.CreateDirectory(ImportDirectory);
                     ReportImportStage(ImportStage.ReadingLibrary);
@@ -593,19 +672,40 @@ namespace OstrixMods.BuildWorks
                         using (var output = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                         using (var zip = new ZipArchive(output, ZipArchiveMode.Create))
                         {
-                            WriteEntry("original/source.bin", review.Bytes); // Inert exact original, never parsed as a second blueprint.
-                            WriteEntry("original/name.txt", Encoding.UTF8.GetBytes(Path.GetFileName(review.Source)));
+                            long stagedBytes = 0;
+                            if (review.Sources == null)
+                            {
+                                WriteEntry("original/source.bin", review.Bytes); // Inert exact original, never parsed as a second blueprint.
+                                WriteEntry("original/name.txt", Encoding.UTF8.GetBytes(Path.GetFileName(review.Source)));
+                            }
+                            else
+                            {
+                                var manifest = new StringBuilder("BuildWorks batch originals\t1\nentry\tfilename\n");
+                                for (int sourceIndex = 0; sourceIndex < review.Sources.Count; ++sourceIndex)
+                                {
+                                    string entry = "original/source_" + sourceIndex + ".bin";
+                                    WriteEntry(entry, review.Sources[sourceIndex].Bytes);
+                                    manifest.Append(entry).Append('\t').Append(ManifestLabel(Path.GetFileName(review.Sources[sourceIndex].Path))).Append('\n');
+                                }
+                                WriteEntry("original/manifest.tsv", Encoding.UTF8.GetBytes(manifest.ToString()));
+                            }
                             for (int i = 0; i < prepared.Length; ++i)
                             {
                                 var copy = CopyWithContentsPolicy(prepared[i], clearStorage, clearMounts, prefabHash, omitArmorState);
-                                if (category != null) copy.category = category;
+                                string assigned = overrides.TryGetValue(i, out string specific) ? specific : category;
+                                if (assigned != null) copy.category = assigned;
                                 string name = "document_" + i + ".buildworks.json";
                                 WriteEntry(name, BlueprintExchangeFormat.Encode(copy));
                                 if (!clearStorage && !clearMounts && !omitArmorState && omitMissing == null && ExternalBlueprintLibrary.ValidPreview(prepared[i].importPreview))
                                     WriteEntry(Path.ChangeExtension(name, ".png"), prepared[i].importPreview);
                             }
                             void WriteEntry(string name, byte[] data)
-                            { using (var entry = zip.CreateEntry(name).Open()) entry.Write(data, 0, data.Length); }
+                            {
+                                cancellation.ThrowIfCancellationRequested();
+                                stagedBytes = checked(stagedBytes + data.LongLength);
+                                if (stagedBytes > 128L * 1024 * 1024) throw new InvalidDataException("$buildworks_import.file_limit");
+                                using (var entry = zip.CreateEntry(name).Open()) entry.Write(data, 0, data.Length);
+                            }
                         }
                         ReportImportStage(ImportStage.CheckingArchive);
                         var validated = ExternalBlueprintLibrary.LoadFile(temporary, Path.GetFileName(target));
@@ -622,6 +722,7 @@ namespace OstrixMods.BuildWorks
                             catalog.Where(document => document.importError == null).Concat(validated).GroupBy(document => document.id)
                                 .Any(group => !validCopies.TryGetValue(group.Key, out int count) || count < group.Count()))
                             throw new InvalidDataException("$buildworks_import.library_limit");
+                        cancellation.ThrowIfCancellationRequested();
                         File.Move(temporary, target); // The whole reviewed archive becomes visible at once; never overwrite.
                         ImportResultPath = target;
                         return candidate;
@@ -653,6 +754,89 @@ namespace OstrixMods.BuildWorks
         internal bool TryExportFile(Blueprint blueprint, out string exportedPath, out string error) =>
             TryExportFile(blueprint, ExportDirectory, "blueprint_" + Guid.NewGuid().ToString("N"), false, out exportedPath, out error);
 
+        private byte[] PrepareExportDocument(Blueprint blueprint, bool clearStorage, bool clearMounts,
+            Func<string, int> prefabHash, bool omitArmorState, MissingPartsReview omitMissing,
+            Func<string, PrefabMetadata> metadataSnapshot = null)
+        {
+            if (blueprint == null || !string.IsNullOrEmpty(blueprint.importError))
+                throw new InvalidDataException(blueprint?.importError ?? "$buildworks_import.format");
+            if (omitMissing != null)
+            {
+                ValidateMissingReview(new[] { blueprint }, omitMissing, prefabHash);
+                blueprint = CopyWithoutMissing(ExternalBlueprintLibrary.PrepareForHost(blueprint,
+                    importPrefabScale, importPrefabHash, importWorldLevel?.Invoke(), importMaterialSeedSupport, importContainerGrid), omitMissing.PrefabIds);
+            }
+            blueprint = blueprint.ImportCopy();
+            CaptureMetadata(blueprint.parts, metadataSnapshot ?? prefabMetadata);
+            Blueprint prepared = clearStorage || clearMounts || omitArmorState
+                ? CopyWithContentsPolicy(blueprint, clearStorage, clearMounts, prefabHash, omitArmorState)
+                : blueprint.IsExternal ? ExternalBlueprintLibrary.DetachedCopy(blueprint) : blueprint;
+            byte[] bytes = BlueprintExchangeFormat.Encode(prepared);
+            BlueprintExchangeFormat.Decode(new UTF8Encoding(false, true).GetString(bytes));
+            return bytes;
+        }
+
+        internal Task<string> ExportBatch(IEnumerable<Blueprint> selected, string directory, string fileName,
+            bool clearStorage, bool clearMounts, Func<string, int> prefabHash, bool omitArmorState = false,
+            CancellationToken cancellation = default)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            var originals = selected.Take(MaximumBatchFiles + 1).ToArray();
+            if (originals.Length == 0 || originals.Length > MaximumBatchFiles || originals.Any(document => document == null) || originals.Distinct().Count() != originals.Length)
+                throw new InvalidDataException("$buildworks_exchange.batch_limit");
+            if (originals.Sum(document => (long)document.parts.Count) > MaximumLibraryParts)
+                throw new InvalidDataException("$buildworks_import.library_limit");
+            directory = ValidateExchangeDirectory(directory); ValidateExportName(fileName);
+            string target = Path.Combine(directory, fileName + ".zip");
+            if (File.Exists(target) || Directory.Exists(target)) throw new IOException(UserError("exchange.exists", target));
+            originals = originals.Select(document => document.ImportCopy()).ToArray();
+            var metadata = originals.SelectMany(document => document.parts).Select(part => part.prefabName).Distinct(StringComparer.Ordinal)
+                .ToDictionary(name => name, name => prefabMetadata?.Invoke(name)?.Copy(), StringComparer.Ordinal);
+            return Task.Run(() =>
+            {
+                string temporary = null;
+                try
+                {
+                    var manifest = new StringBuilder("BuildWorks blueprint batch\t1\nentry\tid\tname\tcategory\tparts\n");
+                    var documents = new List<byte[]>(); long total = 0;
+                    foreach (Blueprint original in originals)
+                    {
+                        cancellation.ThrowIfCancellationRequested();
+                        byte[] bytes = PrepareExportDocument(original, clearStorage, clearMounts, prefabHash, omitArmorState, null,
+                            name => metadata.TryGetValue(name, out var value) ? value : null);
+                        total = checked(total + bytes.LongLength);
+                        if (total > MaximumBatchBytes) throw new InvalidDataException("$buildworks_import.file_limit");
+                        var copy = BlueprintExchangeFormat.Decode(new UTF8Encoding(false, true).GetString(bytes));
+                        manifest.Append("document_").Append(documents.Count).Append(".buildworks.json\t").Append(copy.id).Append('\t')
+                            .Append(ManifestLabel(copy.name)).Append('\t').Append(ManifestLabel(copy.category)).Append('\t').Append(copy.parts.Count).Append('\n');
+                        documents.Add(bytes);
+                    }
+                    byte[] manifestBytes = Encoding.UTF8.GetBytes(manifest.ToString());
+                    cancellation.ThrowIfCancellationRequested();
+                    ValidateExchangeDirectory(directory); Directory.CreateDirectory(directory);
+                    temporary = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".tmp.zip");
+                    using (var output = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                    using (var zip = new ZipArchive(output, ZipArchiveMode.Create))
+                    {
+                        for (int i = 0; i < documents.Count; ++i)
+                        {
+                            cancellation.ThrowIfCancellationRequested();
+                            using (var entry = zip.CreateEntry("document_" + i + ".buildworks.json").Open())
+                                entry.Write(documents[i], 0, documents[i].Length);
+                        }
+                        using (var entry = zip.CreateEntry("manifest.tsv").Open()) entry.Write(manifestBytes, 0, manifestBytes.Length);
+                    }
+                    var validated = ExternalBlueprintLibrary.LoadFile(temporary);
+                    if (validated.Count != documents.Count || validated.Any(document => document.importError != null))
+                        throw new InvalidDataException("$buildworks_import.format");
+                    cancellation.ThrowIfCancellationRequested(); ValidateExchangeDirectory(directory);
+                    File.Move(temporary, target);
+                    return target;
+                }
+                finally { if (temporary != null && File.Exists(temporary)) File.Delete(temporary); }
+            });
+        }
+
         internal bool TryExportFile(Blueprint blueprint, string directory, string fileName, bool archive,
             out string exportedPath, out string error, bool clearStorage = false, bool clearMounts = false,
             Func<string, int> prefabHash = null, bool omitArmorState = false, MissingPartsReview omitMissing = null)
@@ -660,21 +844,7 @@ namespace OstrixMods.BuildWorks
             exportedPath = null; error = null; string temporary = null;
             try
             {
-                if (blueprint == null || !string.IsNullOrEmpty(blueprint.importError))
-                    throw new InvalidDataException(blueprint?.importError ?? "$buildworks_import.format");
-                if (omitMissing != null)
-                {
-                    ValidateMissingReview(new[] { blueprint }, omitMissing, prefabHash);
-                    blueprint = CopyWithoutMissing(ExternalBlueprintLibrary.PrepareForHost(blueprint,
-                        importPrefabScale, importPrefabHash, importWorldLevel?.Invoke(), importMaterialSeedSupport, importContainerGrid), omitMissing.PrefabIds);
-                }
-                blueprint = blueprint.ImportCopy();
-                CaptureMetadata(blueprint.parts, prefabMetadata);
-                Blueprint prepared = clearStorage || clearMounts || omitArmorState
-                    ? CopyWithContentsPolicy(blueprint, clearStorage, clearMounts, prefabHash, omitArmorState)
-                    : blueprint.IsExternal ? ExternalBlueprintLibrary.DetachedCopy(blueprint) : blueprint;
-                byte[] bytes = BlueprintExchangeFormat.Encode(prepared);
-                BlueprintExchangeFormat.Decode(new UTF8Encoding(false, true).GetString(bytes));
+                byte[] bytes = PrepareExportDocument(blueprint, clearStorage, clearMounts, prefabHash, omitArmorState, omitMissing);
                 directory = ValidateExchangeDirectory(directory);
                 ValidateExportName(fileName);
                 string target = Path.Combine(directory, fileName + (archive ? ".zip" : ".buildworks.json"));

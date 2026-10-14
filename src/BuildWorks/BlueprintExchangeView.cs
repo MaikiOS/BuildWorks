@@ -10,7 +10,7 @@ using UnityEngine.UI;
 namespace OstrixMods.BuildWorks
 {
     // One file workflow for the editor and Hammer; no external picker dependency.
-    internal sealed class BlueprintExchangeView : IDisposable
+    internal sealed partial class BlueprintExchangeView : IDisposable
     {
         private static readonly string[] ImportStageKeys = {
             "exchange.stage_1", "exchange.stage_2", "exchange.stage_3", "exchange.stage_4", "exchange.stage_5",
@@ -146,7 +146,7 @@ namespace OstrixMods.BuildWorks
             rows.gameObject.AddComponent<Image>().color = new Color(.05f, .055f, .055f, 1);
             Button("ExchangePrevious", "<", 20, 404, 38, () => { if (page > 0) { --page; RenderRows(); } });
             pageLabel = Label("ExchangePage", "", 64, 404, 110, 32, 14);
-            Button("ExchangeNext", ">", 178, 404, 38, () => { if ((page + 1) * 7 < entries.Length) { ++page; RenderRows(); } });
+            Button("ExchangeNext", ">", 178, 404, 38, () => { if ((page + 1) * 7 < (batchMode && blueprint != null ? batchExportChoices.Length : entries.Length)) { ++page; RenderRows(); } });
             if (source != null)
             {
                 Label("ExchangeNameLabel", T("exchange.filename"), 226, 404, 134, 32, 14);
@@ -187,6 +187,7 @@ namespace OstrixMods.BuildWorks
                 Tick(); return;
             }
             if (report != null) { ShowReport(report); return; }
+            CreateBatchToggle();
             string initial = Directory.Exists(store.ExchangeDirectory) ? store.ExchangeDirectory : Directory.GetParent(store.ExchangeDirectory).FullName;
             if (source != null)
                 try { initial = CompositeBlueprintStore.ValidateExchangeDirectory(store.ExportDirectory); Directory.CreateDirectory(initial); }
@@ -198,6 +199,7 @@ namespace OstrixMods.BuildWorks
         internal void Tick()
         {
             if (!IsOpen) return;
+            TickBatch();
             var parent = (RectTransform)root.transform.parent;
             panel.localScale = Vector3.one * Mathf.Min(1, (parent.rect.width - 24) / 780, (parent.rect.height - 24) / 580);
             if (place != null && (store.Revision != placementRevision || placementCurrent?.Invoke() == false) ||
@@ -275,7 +277,7 @@ namespace OstrixMods.BuildWorks
                         { ShowSavedCatalogFailure(T("exchange.result_missing")); UpdateImportProgress(); return; }
                         string[] errors = imported.Where(item => item.importError != null)
                             .Select(item => BuildWorksLocalization.ResolveUserText(item.importError)).Distinct().ToArray();
-                        if (imported.Length > 0 && importCompleted != null)
+                        if (imported.Length > 0 && importCompleted != null && !batchMode)
                         {
                             // document_0 is the explicitly stated initial destination for a multi-document archive.
                             imported = imported.OrderBy(item => item.importSource == name + "/document_0.buildworks.json" ? 0 : 1).ToArray();
@@ -283,7 +285,7 @@ namespace OstrixMods.BuildWorks
                             importCompleted(imported);
                             return;
                         }
-                        ShowResult(T("exchange.imported", resultPath) + (errors.Length == 0 ? "" : "\n" + string.Join("\n", errors)));
+                        ShowResult(T("exchange.imported", resultPath) + (errors.Length == 0 ? "" : "\n" + string.Join("\n", errors)) + BatchResultSummary(imported));
                     }
                 }
             }
@@ -344,13 +346,15 @@ namespace OstrixMods.BuildWorks
             UpdateCategoryControls(busy);
             UpdateImportProgress();
             if (!busy && reviewingContents && !ImportCategoryIsValid()) message.text = T("exchange.invalid_category");
+            UpdateBatchControls(busy);
         }
 
         private void UpdateImportProgress()
         {
             int stage = importing ? (int)store.ImportProgress : importPreparation != null ? 2 : importInspection != null ? 1 : 0;
             progress.gameObject.SetActive(stage > 0 && !completed);
-            panel.Find("ExchangeClose").GetComponentInChildren<TMP_Text>().text = T(importing ? "exchange.background" : "editor.view.close");
+            panel.Find("ExchangeClose").GetComponentInChildren<TMP_Text>().text = T(batchMode && (importing || planExport != null)
+                ? "editor.view.cancel" : importing ? "exchange.background" : "editor.view.close");
             if (stage == 0 || completed) return;
             progressFill.anchorMax = new Vector2(Mathf.Clamp01(stage / 9f), 1f);
             message.text = T("exchange.progress", stage, 9, T(ImportStageKeys[stage - 1]),
@@ -402,25 +406,28 @@ namespace OstrixMods.BuildWorks
 
         private void RenderRows()
         {
+            if (batchMode && blueprint != null) { RenderBatchExportRows(); return; }
             for (int i = rows.childCount - 1; i >= 0; --i)
             { rows.GetChild(i).gameObject.SetActive(false); UnityEngine.Object.Destroy(rows.GetChild(i).gameObject); }
             pageLabel.text = (page + 1) + " / " + Math.Max(1, (entries.Length + 6) / 7);
             for (int i = page * 7; i < Math.Min(entries.Length, (page + 1) * 7); ++i)
             {
                 string path = entries[i]; bool folder = Directory.Exists(path);
-                var button = Button("ExchangeEntry" + i, (folder ? T("exchange.folder") + " " : "") + Path.GetFileName(path),
+                var button = Button("ExchangeEntry" + i, (folder ? T("exchange.folder") + " " : batchMode ? batchFiles.Contains(path) ? "[x] " : "[ ] " : "") + Path.GetFileName(path),
                     0, (i % 7) * 32, 740, () =>
                     {
                         if (folder) Browse(path);
+                        else if (batchMode) { ToggleBatchFile(path); RenderRows(); Tick(); }
                         else { selected = path; message.text = path; RenderRows(); }
                     }, rows);
                 button.interactable = !completed && !importing && (folder || blueprint == null);
-                if (selected == path) skin.Apply(button, active: true);
+                if (selected == path || batchFiles.Contains(path)) skin.Apply(button, active: true);
             }
         }
 
         private void Submit()
         {
+            if (SubmitBatch()) return;
             if (sharing)
             {
                 if (!copyPath.interactable) PrepareShareFile();
@@ -458,7 +465,9 @@ namespace OstrixMods.BuildWorks
                 if (selected == null) return;
                 CloseCategoryPicker();
                 if (!store.TryImportReviewed(importReview, clearStorage, clearMounts, name => name.GetStableHashCode(), out string startError,
-                    omitArmorState, omitMissingParts ? missingReview : null, categoryOverride ? categoryInput.text : null))
+                    omitArmorState, omitMissingParts ? missingReview : null, categoryOverride ? categoryInput.text : null,
+                    batchMode ? BatchCategoryOverrides() : null,
+                    batchCancellation?.Token ?? default))
                 { RefreshMissing(); RenderContents(); message.text = BuildWorksLocalization.ResolveUserText(startError); return; }
                 importing = true; importOperationPath = store.ImportOperationPath;
                 operationStarted = Time.realtimeSinceStartup; message.text = T("exchange.loading");
@@ -549,6 +558,11 @@ namespace OstrixMods.BuildWorks
             storageChoice.gameObject.SetActive(true); mountChoice.gameObject.SetActive(true);
             if (blueprint != null)
             {
+                if (batchMode)
+                {
+                    importPreparation = store.PrepareImportReview(batchRawReview, name => name.GetStableHashCode());
+                    return;
+                }
                 var supports = store.MaterialSeedSupportSnapshot(new[] { blueprint });
                 contentsInspection = Task.Run(() => CompositeBlueprintStore.InspectContents(blueprint, name => name.GetStableHashCode(), supports));
             }
@@ -556,7 +570,10 @@ namespace OstrixMods.BuildWorks
             {
                 string source = selected;
                 int worldLevel = Game.m_worldLevel; // Capture on host thread; file worker never reads Unity/game state.
-                importInspection = Task.Run(() => CompositeBlueprintStore.ReviewImportFile(source, name => name.GetStableHashCode(), worldLevel));
+                string[] selectedFiles = batchFiles.OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray();
+                importInspection = Task.Run(() => batchMode
+                    ? CompositeBlueprintStore.ReviewImportFiles(selectedFiles, name => name.GetStableHashCode(), worldLevel)
+                    : CompositeBlueprintStore.ReviewImportFile(source, name => name.GetStableHashCode(), worldLevel));
             }
         }
 
@@ -614,6 +631,7 @@ namespace OstrixMods.BuildWorks
             else if (missingReview.Parts > 0)
                 contentsDetails.text += "\n" + T("exchange.missing_losses", missingReview.Parts) + "\n" +
                     string.Join("\n", missingReview.Sources.Select(entry => T("exchange.loss_source", entry.Key, entry.Value)));
+            AppendBatchReview();
             int remainingUnknown = effective.RemainingUnknown(omitArmorState);
             storageChoice.interactable = remainingUnknown == effective.UnreadableMounts && effective.Storages > 0;
             mountChoice.interactable = remainingUnknown == effective.UnreadableStorages && effective.Mounts > 0;
@@ -628,6 +646,7 @@ namespace OstrixMods.BuildWorks
             armorChoice.interactable = effective.ArmorStates > 0;
             if (!armorChoice.interactable) omitArmorState = false;
             missingChoice.gameObject.SetActive(place == null && missingReview.Known && missingReview.Parts > 0);
+            if (batchMode && blueprint != null) { missingChoice.gameObject.SetActive(false); omitMissingParts = false; }
             missingChoice.interactable = missingReview.CanOmit || omitMissingParts;
             missingChoice.GetComponentInChildren<TMP_Text>().text = T(omitMissingParts ? "exchange.missing_omit" : "exchange.missing_keep");
             var choices = new[] { storageChoice, mountChoice, armorChoice, missingChoice }.Where(button => button.gameObject.activeSelf).ToArray();
@@ -653,8 +672,9 @@ namespace OstrixMods.BuildWorks
                 blueprint == null ? "exchange.import_copy" : "exchange.contents_copy");
         }
 
-        private bool ImportCategoryIsValid() => !categoryOverride ||
-            CompositeBlueprintStore.TryNormalizeImportCategory(categoryInput.text, out _);
+        private bool ImportCategoryIsValid() => (!categoryOverride ||
+            CompositeBlueprintStore.TryNormalizeImportCategory(categoryInput.text, out _)) &&
+            (!batchMode || batchCategories.Where(entry => batchIncluded.Contains(entry.Key)).All(entry => CompositeBlueprintStore.TryNormalizeImportCategory(entry.Value, out _)));
 
         private void UpdateCategoryControls(bool busy)
         {
@@ -740,8 +760,8 @@ namespace OstrixMods.BuildWorks
         {
             foreach (Transform child in panel)
                 if (child.name == "ExchangeEntries" || child.name == "ExchangePrevious" || child.name == "ExchangeNext" ||
-                    child.name == "ExchangePage" || child.name == "ExchangeNameLabel" || child.name == "ExchangeFileName" || child.name == "ExchangeFormat")
-                    child.gameObject.SetActive(visible);
+                    child.name == "ExchangePage" || child.name == "ExchangeNameLabel" || child.name == "ExchangeFileName" || child.name == "ExchangeFormat" || child.name == "ExchangeBatchToggle")
+                    child.gameObject.SetActive(visible && (child.name != "ExchangeNameLabel" || !batchToggle));
             // The reviewed destination and format stay fixed until Back.
             foreach (string name in new[] { "ExchangeDirectory", "ExchangeEditPath", "ExchangeCancelPath", "ExchangeUp", "ExchangeGo", "ExchangeHome",
                 "ExchangeDownloads", "ExchangeDocuments", "ExchangeDesktop" })
@@ -816,12 +836,18 @@ namespace OstrixMods.BuildWorks
         public void Dispose()
         {
             if (disposed) return; disposed = true;
+            batchCancellation?.Cancel(); batchCancellation?.Dispose();
             importInspection = null; importPreparation = null;
             planReview?.CancelWrite();
             root.SetActive(false); UnityEngine.Object.Destroy(root); skin.Dispose();
             if (EventSystem.current && previousFocus && previousFocus.activeInHierarchy)
                 EventSystem.current.SetSelectedGameObject(previousFocus);
             finished?.Invoke();
+            if (batchImported != null)
+            {
+                var receipt = batchImported; batchImported = null;
+                importCompleted?.Invoke(receipt);
+            }
         }
     }
 }

@@ -10,6 +10,7 @@ internal static class PlacementContactAcceptance
     {
         try
         {
+            NativeStorageSerializationAcceptance.Run();
             Debug.Log("BUILDWORKS_CONTACT_OK " + Run());
             UnityEditor.EditorApplication.Exit(0);
         }

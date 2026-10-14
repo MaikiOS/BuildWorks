@@ -1,3 +1,11 @@
+## 2026-10-14 — .185 WIP: bounded saved-storage byte verification
+
+Added a world41 reader for world UID, mapped chunks, unique operation marker, prefab/creator/Persistent and exact native109 inventory bytes. Wrong/truncated/duplicate data and cancellation refuse.345 CPU assertions pass;10001 records allocate773728B under .NET10, not a Valheim benchmark. Large irrelevant text/arrays are skipped; one scratch buffer checks typed keys.
+
+Normal/proper QA0/0, HostContract185,1100 localization keys, new-reader formatting0 and independent correctness PASSED/Ponytail Ship pass. Isolated Unity2026-10-14T15:56:33.2759975Z feeds82bytes from the actual installed ZDO.Save to the reader. This is serializer compatibility, not full world-save proof.
+
+**QA .184 remains installed; .185 is not deployed.** No gameplay call uses the new reader. Canonical current-generation binding, current item custody, server acknowledgement and terminal journal settlement remain open; filled storage placement stays disabled. Manual184/Batch-183 remain pending. Evidence: docs/STORAGE_WORLD_READBACK_185.md and artifacts/storage-world-readback/*. Full goal active and incomplete.
+
 ## 2026-10-14 — .184 installed: server panel and insertion provenance
 
 Immutable editor provenance now travels through insertion/Undo/Redo and explicit Save/Save As/Update. Stable union deduplicates exact records; same-key conflict and16-origin overflow refuse before mutating parts. Explicit empty lists clear cancelled insertion history, legacy null callers preserve it; failed update restores previous references and bytes.

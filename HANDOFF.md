@@ -1,4 +1,10 @@
-## Current checkpoint — QA .189, Valheim1.0.20, 2026-10-15
+## Native game QA .189 — 2026-10-15
+
+QA isolation and bridge are confirmed. Existing Forest Hut: four explicit catalogue replacements, Cancel/Undo/Redo, save/reopen, visible ghost and first-house ordinary construction passed. 28 TryPlacePiece/28 ConsumeResources with no exceptions, Wood64→6 (58), all28 native TRS matched (position error ≤0.000013m). Actual reload remains pending. A later second-house start elsewhere awaits owner input clarification; no new input/reload is being sent. The full goal remains incomplete.
+
+[docs/FOREST_HUT_NATIVE_QA_189](docs/FOREST_HUT_NATIVE_QA_189.md)
+
+## Earlier compatibility checkpoint — QA .189, Valheim1.0.20, 2026-10-15
 
 Steam updated the host after .188 deployment. QA refused before changing save roots, so ordinary saves appeared; Codex restored no saves and sent no game input in TerrainRamp_Lab. The owner exited. .189 checks current storage-root semantics and supports Inventory110, profile47/player34 and world42 with retained chunks41 while preserving older formats and rejecting unknown/corrupt/mismatched data.
 

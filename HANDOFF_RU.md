@@ -1,3 +1,7 @@
+## Native .193 завершён в ограниченном объёме — 2026-10-15
+
+Thunderstore Modded → точный BW_QA_43d3719a. 6 auto случаев woodwall/identity,Y180,X180/2 камеры: пары равны, зазор0, yaw45 сохранён. 2 реальных платных клика через TryPlacePiece/cheated=false, Wood60→58→56; второй ghost совпал. Настоящий logout/enter: обе TRS и весь инвентарь совпали; ZDOID штатно меняется в текущем ZDO.Load. [Отчёт/ошибки сценария](docs/WORLD_SNAP_193_RU.md). .193 установленная без новых code-правок. Q/E/F9 XYZ/сеть открыты. 3 QA-опоры и2 оплаченные стены оставлены, каталог не пополнялся. God/ghost=false, игра штатно закрыта, собственный временный HTTP GABS остановлен. Next: native надпись02/автомиграция Forest Hut35, затем наполненные объекты. API goal ACTIVE; прежние принятые проверки не повторять.
+
 ## .193 проверена и установлена — 2026-10-15
 
 Обычный мировой snap сохраняет native пару/поворот игрока; полное XYZ остаётся явным инструментом F9. Составной/editor путь сохранён, пять compiled precision методов неизменны. Red→green95, Unity244, normal/QA0/0, Geometry/Store, Host/control/isolation/loc1103, Workbench624 и независимые PASSED/Ship. QA .193 установлена штатно, обе SHA совпали,104 защищённых файла неизменны. [Отчёт](docs/WORLD_SNAP_193_RU.md). Native приёмка ещё открыта; Ostrix разрешил самостоятельный QA-запуск через Thunderstore Modded. Цель ACTIVE.

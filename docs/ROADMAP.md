@@ -1,3 +1,7 @@
+## Limited native .193 run — 2026-10-15
+
+6 automatic woodwall cases retained native pairs/player rotation, gap0. Two paid clicks, Wood60→58→56, second ghost matched placement; both wall TRS and full inventory retained through real logout/reload. [Evidence and limits](WORLD_SNAP_193.md). Q/E, F9 XYZ and network remain open. Normal QA quit, protections restored, temporary channel stopped. Next: native signs/automigrated Forest Hut, then filled objects. Goal ACTIVE.
+
 ## Verified and installed .193 — 2026-10-15
 
 Ordinary world snap retains native pair/player rotation; explicit F9 XYZ, composite and editor paths preserved. Five compiled precision methods unchanged. Red→green95, Unity244, normal/QA0/0, Geometry/Store, Host/control/isolation/loc1103, Workbench624 and independent PASSED/Ship. Guarded QA .193 installed, both hashes match,104 protected files unchanged. [Evidence](WORLD_SNAP_193.md). Native acceptance open; Ostrix authorized independent QA launch through Thunderstore Modded. Full goal ACTIVE.

@@ -1,3 +1,7 @@
+## Limited native .193 run completed — 2026-10-15
+
+Thunderstore Modded, exact BW_QA_43d3719a identity. 6 auto woodwall cases retained native pairs/yaw45, gap0; 2 real paid clicks via TryPlacePiece/cheated=false, Wood60→58→56, second ghost matched. Real logout/enter retained both TRS and entire inventory; current ZDO.Load remaps IDs. [Evidence/failed diagnostic attempts](docs/WORLD_SNAP_193.md). Installed .193 unchanged. Q/E/F9 XYZ/network open. 3 QA targets and2 paid walls retained; catalog untouched. God/ghost false, normal game quit, own temporary HTTP GABS stopped. Next: native sign02/automigrated Forest Hut35, then filled objects. API goal ACTIVE; avoid repeating accepted tests.
+
 ## Verified and installed .193 — 2026-10-15
 
 Ordinary world snap retains native pair/player rotation; explicit F9 XYZ, composite and editor paths preserved. Five compiled precision methods unchanged. Red→green95, Unity244, normal/QA0/0, Geometry/Store, Host/control/isolation/loc1103, Workbench624 and independent PASSED/Ship. Guarded QA .193 installed, both hashes match,104 protected files unchanged. [Evidence](docs/WORLD_SNAP_193.md). Native acceptance open; Ostrix authorized independent QA launch through Thunderstore Modded. Full goal ACTIVE.

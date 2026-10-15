@@ -20,6 +20,7 @@ namespace OstrixMods.BuildWorks
         internal readonly SortedDictionary<string, int> OmittedState = new SortedDictionary<string, int>(StringComparer.Ordinal);
         internal int Parts, Groups, Supports, Anchors, Metadata, Sources, MaterialSeeds, CustomSnaps, LibraryOrigins;
         internal int IgnoredSnapPointRows;
+        internal int PrefabMigrations;
 
         private PlanBuildExport(byte[] nativeBytes, byte[] planBytes)
         { native = nativeBytes; plan = planBytes; }
@@ -57,6 +58,7 @@ namespace OstrixMods.BuildWorks
                 Metadata = document.parts.Count(part => part.metadata != null),
                 Sources = document.sourceDocuments?.Count ?? 0,
                 LibraryOrigins = document.libraryOrigins?.Count ?? 0,
+                PrefabMigrations = document.parts.Count(part => part.originalPrefabName != null),
                 MaterialSeeds = document.parts.Count(part => part.materialSeed.HasValue),
                 CustomSnaps = document.customSnapPoints?.Count ?? 0,
                 IgnoredSnapPointRows = document.sourceDocuments?.Sum(sourceDocument => sourceDocument.ToGeometry().IgnoredSnapPointRows) ?? 0

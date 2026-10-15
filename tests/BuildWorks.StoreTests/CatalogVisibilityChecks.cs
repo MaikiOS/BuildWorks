@@ -52,16 +52,16 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(zipBytes.SequenceEqual(File.ReadAllBytes(zipPath)) && sourceBytes.SequenceEqual(File.ReadAllBytes(sourcePath)),
                 "Source file or ZIP was modified");
             string json = File.ReadAllText(path);
-            string legacy = json.Replace(",\"hiddenSources\":[]", "").Replace("\"version\":23", "\"version\":20");
+            string legacy = json.Replace(",\"hiddenSources\":[]", "").Replace("\"version\":24", "\"version\":20");
             string oldPath = Path.Combine(directory, "legacy.json");
             File.WriteAllText(oldPath, legacy);
             var old = new CompositeBlueprintStore(oldPath);
-            Require(old.TryAddCategory("Legacy", out error) && File.ReadAllText(oldPath).Contains("\"version\":23"), error);
+            Require(old.TryAddCategory("Legacy", out error) && File.ReadAllText(oldPath).Contains("\"version\":24"), error);
             foreach (string invalid in new[] { "[\"same\",\"same\"]", "[\"\"]", "[null]", "[\" \" ]",
                 "[" + string.Join(",", Enumerable.Range(0, ExternalBlueprintLibrary.MaximumFiles + 1).Select(i => "\"s" + i + "\"")) + "]" })
                 Refuse(oldPath, json.Replace("\"hiddenSources\":[]", "\"hiddenSources\":" + invalid));
-            Refuse(oldPath, json.Replace("\"version\":23", "\"version\":20"));
-            Refuse(oldPath, json.Replace("\"version\":23", "\"version\":24"));
+            Refuse(oldPath, json.Replace("\"version\":24", "\"version\":20"));
+            Refuse(oldPath, json.Replace("\"version\":24", "\"version\":25"));
             Console.WriteLine("PASS catalogue visibility: source/ZIP immutable, copy independent, host identity/reload/cache, restore/write rollback, owned delete, native21 migration/guards, portable10 unchanged");
         }
 

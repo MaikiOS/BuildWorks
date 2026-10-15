@@ -129,6 +129,33 @@ internal static class Program
         Console.WriteLine("PASS actual Controller copy/build/save/reopen retains part-bound opaque holder/object state");
             Console.WriteLine("PASS actual Controller sources/row references -> store -> disk -> reopen retains content evidence");
 
+        var migrationEvidence = new BlueprintSourceDocument("blueprint", "LegacyRoof.blueprint",
+            "#Pieces\nwood_wall_roof;;0;0;0;0;0;0;1;\"\"\nwoodwall;;2;0;0;0;0;0;1;\"\"\n");
+        var migrationDocument = new BlueprintEditorDocument(null, "Migration", "OTHER", new[] {
+            new BlueprintEditorPart("roof", BlueprintPrefabMigration.CurrentRoof, "Roof", new Point3(), new Rotation3(0,0,0,1),
+                baseScale: new Point3(1,1,1), sourceDocumentId: migrationEvidence.Id, sourceLine: 2,
+                originalPrefabName: BlueprintPrefabMigration.OldRoof), Part("wall",2) }, sourceDocuments: new[] { migrationEvidence });
+        var migrationCopy = (BlueprintEditorDocument)controllerType.GetMethod("CopyDocument", BindingFlags.NonPublic | BindingFlags.Static)
+            .Invoke(null, new object[] { migrationDocument });
+        Require(migrationCopy.Parts[0].OriginalPrefabName == BlueprintPrefabMigration.OldRoof, "Controller copy lost migration");
+        controllerType.GetField("document", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(controller, migrationCopy);
+        var migrationCall = (object[])supportCall.Clone(); migrationCall[0] = "Migration bridge";
+        migrationCall[2] = controllerType.GetMethod("BuildStoreParts", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(controller, null);
+        migrationCall[7] = controllerType.GetMethod("BuildStoreSupports", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(controller, null);
+        migrationCall[8] = null;
+        migrationCall[13] = controllerType.GetMethod("BuildStoreSources", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(controller, null);
+        migrationCall[14] = controllerType.GetMethod("BuildStoreLibraryOrigins", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(controller, null);
+        Require((bool)supportSave.Invoke(store, migrationCall), "Migration bridge save failed: " + migrationCall[10]);
+        var migrationStore = Activator.CreateInstance(storeType, BindingFlags.NonPublic | BindingFlags.Instance, null, new object[] { pathOut }, null);
+        var migrationRecords = (IList)storeType.GetMethod("All").Invoke(migrationStore, null);
+        var migrationReopened = (BlueprintEditorDocument)controllerType.GetMethod("DocumentFromBlueprint", BindingFlags.NonPublic | BindingFlags.Static)
+            .Invoke(null, new[] { migrationRecords[migrationRecords.Count - 1] });
+        Require(migrationReopened.Parts[0].OriginalPrefabName == BlueprintPrefabMigration.OldRoof &&
+            migrationReopened.Parts[0].PrefabName == BlueprintPrefabMigration.CurrentRoof && migrationReopened.Sources[0].Text == migrationEvidence.Text &&
+            migrationReopened.Parts[0].SourceLine == 2 && migrationReopened.Parts[0].SourceDocumentId == migrationEvidence.Id,
+            "Actual controller save/reopen lost migration/source");
+        Console.WriteLine("PASS actual Controller copy/build/save/disk/reopen preserves effective and original prefab IDs plus exact source");
+
         var grouped = new BlueprintEditorDocument(null, "Group", "OTHER", new[] { Part("a",0), Part("b",2) });
         grouped.SelectOnly("a"); grouped.ToggleSelection("b"); grouped.CreateGroup("g", "Group");
         grouped.DuplicateSelection(new Point3(10,0,0));

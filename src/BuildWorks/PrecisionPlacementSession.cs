@@ -649,7 +649,8 @@ namespace OstrixMods.BuildWorks
                     : (CompositeBlueprintStore.VectorData?)null;
             }, () => ZNetScene.instance, name => name.GetStableHashCode(), () => Game.m_worldLevel,
                 name => BlueprintMaterialState.Supports(ZNetScene.instance ? ZNetScene.instance.GetPrefab(name) : null),
-                name => BlueprintStorageCapture.PrefabGrid(ZNetScene.instance ? ZNetScene.instance.GetPrefab(name) : null));
+                name => BlueprintStorageCapture.PrefabGrid(ZNetScene.instance ? ZNetScene.instance.GetPrefab(name) : null),
+                BlueprintNativePrefabMigration.CanMigrateRoof);
             blueprintStore.ConfigurePrefabMetadata(name => BlueprintPrefabMetadataCapture.Capture(
                 ZNetScene.instance ? ZNetScene.instance.GetPrefab(name) : null));
             blueprintPieceRegistry = new HammerBlueprintPieceRegistry(blueprintStore);
@@ -6480,6 +6481,7 @@ namespace OstrixMods.BuildWorks
                     materialSeed = workspacePart.SourceData?.materialSeed,
                     sourceDocumentId = workspacePart.SourceData?.sourceDocumentId,
                     sourceLine = workspacePart.SourceData?.sourceLine ?? 0,
+                    originalPrefabName = workspacePart.SourceData?.originalPrefabName,
                     foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(workspacePart.SourceData?.foreignData?.ToGeometry())
                 });
                 var snaps = new List<Point3>(workspacePart.SnapLocal.Count);

@@ -3381,7 +3381,7 @@ namespace OstrixMods.BuildWorks
                     ToPoint(part.position.ToVector3()), ToRotation(part.rotation.ToQuaternion()), part.parentGroupId,
                     part.editorVisible, part.editorLocked, ToPoint(part.scale.ToVector3()), part.signText,
                     part.sourceDocumentId, part.sourceLine, part.foreignData?.ToGeometry(), part.scaleIsAbsolute,
-                    part.baseScale.HasValue ? ToPoint(part.baseScale.Value.ToVector3()) : (Point3?)null, part.metadata?.ToGeometry(), part.materialSeed));
+                    part.baseScale.HasValue ? ToPoint(part.baseScale.Value.ToVector3()) : (Point3?)null, part.metadata?.ToGeometry(), part.materialSeed, part.originalPrefabName));
             return new BlueprintEditorDocument(source.id, source.name,
                 source.category ?? CompositeBlueprintStore.DefaultCategory, parts, groups,
                 source.primaryPartId, source.primaryGroupId,
@@ -4251,6 +4251,7 @@ namespace OstrixMods.BuildWorks
                     signText = part.SignText,
                     sourceDocumentId = part.SourceDocumentId,
                     sourceLine = part.SourceLine,
+                    originalPrefabName = part.OriginalPrefabName,
                     foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(part.ForeignData),
                     metadata = CompositeBlueprintStore.PrefabMetadata.FromGeometry(part.Metadata),
                     materialSeed = part.MaterialSeed

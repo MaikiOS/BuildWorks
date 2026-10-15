@@ -1103,3 +1103,6 @@ server.host_not_ready	The world's prefab catalog is not ready. Refresh and recei
 server.no_available_parts	No parts are available in this world. Install the required mods before saving a converted copy.
 server.stop_waiting	Stop waiting
 server.origin_conflict	The inserted blueprint has conflicting origin records. Nothing was inserted.
+
+exchange.prefab_migration	Legacy part replacement: {0} — {1} parts. Original ID retained; construction follows the current part rules.
+exchange.plan_migrations	Part migration records: {0}. The foreign file contains current IDs; original IDs and migration history remain in the adjacent full BuildWorks file only.

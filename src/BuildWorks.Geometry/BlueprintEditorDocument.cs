@@ -23,7 +23,8 @@ namespace OstrixMods.BuildWorks.Geometry
             bool scaleIsAbsolute = false,
             Point3? baseScale = null,
             BlueprintPrefabMetadata metadata = null,
-            int? materialSeed = null)
+            int? materialSeed = null,
+            string originalPrefabName = null)
         {
             StableId = Required(stableId, nameof(stableId));
             PrefabName = Required(prefabName, nameof(prefabName));
@@ -47,6 +48,10 @@ namespace OstrixMods.BuildWorks.Geometry
                 throw new ArgumentException("Invalid source reference.");
             SourceDocumentId = sourceDocumentId;
             SourceLine = sourceLine;
+            if (!BlueprintPrefabMigration.IsRecordedPair(originalPrefabName, prefabName) ||
+                originalPrefabName != null && sourceDocumentId == null)
+                throw new ArgumentException("Invalid prefab migration provenance.");
+            OriginalPrefabName = originalPrefabName;
             ForeignData = foreignData;
             if (metadata != null && metadata.PrefabId != PrefabName) throw new ArgumentException("Prefab metadata identity mismatch.");
             Metadata = metadata;
@@ -72,6 +77,7 @@ namespace OstrixMods.BuildWorks.Geometry
         public string SignText { get; }
         public string SourceDocumentId { get; }
         public int SourceLine { get; }
+        public string OriginalPrefabName { get; }
         public BlueprintForeignPartData ForeignData { get; internal set; }
         public static bool IsValidSignText(string value)
         {
@@ -92,7 +98,7 @@ namespace OstrixMods.BuildWorks.Geometry
             Visible,
             Locked,
             Scale,
-            SignText, SourceDocumentId, SourceLine, ForeignData, ScaleIsAbsolute, BaseScale, Metadata, MaterialSeed);
+            SignText, SourceDocumentId, SourceLine, ForeignData, ScaleIsAbsolute, BaseScale, Metadata, MaterialSeed, OriginalPrefabName);
 
         public Point3 ResolveScale(Point3 prefabScale)
         {
@@ -1016,7 +1022,7 @@ namespace OstrixMods.BuildWorks.Geometry
                     parentId,
                     part.Visible,
                     part.Locked,
-                    part.Scale, part.SignText, part.SourceDocumentId, part.SourceLine, part.ForeignData, part.ScaleIsAbsolute, part.BaseScale, part.Metadata, part.MaterialSeed));
+                    part.Scale, part.SignText, part.SourceDocumentId, part.SourceLine, part.ForeignData, part.ScaleIsAbsolute, part.BaseScale, part.Metadata, part.MaterialSeed, part.OriginalPrefabName));
                 if (rootIds.Contains(part.StableId)) copiedRoots.Add(copyId);
             }
             return Commit(() =>
@@ -1174,7 +1180,7 @@ namespace OstrixMods.BuildWorks.Geometry
                     part.PrefabName, part.DisplayName, position + orientation.Rotate(part.Position),
                     Multiply(orientation, part.Rotation).Normalized(),
                     part.ParentGroupId == null ? rootId : groupIds[part.ParentGroupId],
-                    part.Visible, part.Locked, part.Scale, part.SignText, part.SourceDocumentId, part.SourceLine, part.ForeignData, part.ScaleIsAbsolute, part.BaseScale, part.Metadata, part.MaterialSeed));
+                    part.Visible, part.Locked, part.Scale, part.SignText, part.SourceDocumentId, part.SourceLine, part.ForeignData, part.ScaleIsAbsolute, part.BaseScale, part.Metadata, part.MaterialSeed, part.OriginalPrefabName));
             return Commit(() =>
             {
                 groups.AddRange(newGroups);
@@ -1482,7 +1488,7 @@ namespace OstrixMods.BuildWorks.Geometry
                             sample.Position + stepY * logicalY +
                                 turn.Rotate((source.Position - pivot) * sample.UniformScale),
                             Multiply(turn, source.Rotation).Normalized(), source.ParentGroupId,
-                            source.Visible, source.Locked, copyScale, source.SignText, source.SourceDocumentId, source.SourceLine, source.ForeignData, source.ScaleIsAbsolute, source.BaseScale, source.Metadata, source.MaterialSeed));
+                            source.Visible, source.Locked, copyScale, source.SignText, source.SourceDocumentId, source.SourceLine, source.ForeignData, source.ScaleIsAbsolute, source.BaseScale, source.Metadata, source.MaterialSeed, source.OriginalPrefabName));
                     }
                 }
             }
@@ -1570,7 +1576,7 @@ namespace OstrixMods.BuildWorks.Geometry
                         source.ParentGroupId,
                         source.Visible,
                         source.Locked,
-                        copyScale, source.SignText, source.SourceDocumentId, source.SourceLine, source.ForeignData, source.ScaleIsAbsolute, source.BaseScale, source.Metadata, source.MaterialSeed));
+                        copyScale, source.SignText, source.SourceDocumentId, source.SourceLine, source.ForeignData, source.ScaleIsAbsolute, source.BaseScale, source.Metadata, source.MaterialSeed, source.OriginalPrefabName));
                 }
             }
             return copies;
@@ -1582,7 +1588,7 @@ namespace OstrixMods.BuildWorks.Geometry
             Dictionary<string, BlueprintSourceDocument> sourceIndex = BlueprintSourceDocument.Index(sources);
             foreach (BlueprintEditorPart part in parts)
                 if (part.SourceDocumentId != null && (!sourceIndex.TryGetValue(part.SourceDocumentId, out var evidence) ||
-                    !evidence.HasPartAt(part.SourceLine, part.PrefabName)))
+                    !evidence.HasPartAt(part.SourceLine, part.OriginalPrefabName ?? part.PrefabName)))
                     throw new ArgumentException("Missing or incorrect source reference.");
             if (customSnapPoints.Count > MaximumCustomSnapPoints) throw new InvalidOperationException("Maximum custom snap points reached.");
             foreach (Point3 point in customSnapPoints) BlueprintEditorPart.Validate(point, nameof(CustomSnapPoints));
@@ -1819,7 +1825,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 if (left.StableId != right.StableId || left.PrefabName != right.PrefabName ||
                     left.DisplayName != right.DisplayName || left.ParentGroupId != right.ParentGroupId ||
                     left.Visible != right.Visible || left.Locked != right.Locked || left.SignText != right.SignText ||
-                    left.SourceDocumentId != right.SourceDocumentId || left.SourceLine != right.SourceLine || left.ForeignData != right.ForeignData ||
+                    left.SourceDocumentId != right.SourceDocumentId || left.SourceLine != right.SourceLine || left.OriginalPrefabName != right.OriginalPrefabName || left.ForeignData != right.ForeignData ||
                     !Same(left.Position, right.Position) || !Same(left.Rotation, right.Rotation) ||
                     !Same(left.Scale, right.Scale) || left.ScaleIsAbsolute != right.ScaleIsAbsolute ||
                     left.Metadata != right.Metadata || left.MaterialSeed != right.MaterialSeed || left.BaseScale.HasValue != right.BaseScale.HasValue ||

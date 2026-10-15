@@ -350,6 +350,28 @@ namespace OstrixMods.BuildWorks
             return blueprint;
         }
 
+        internal static CompositeBlueprintStore.Blueprint MigrateLegacyRoof(CompositeBlueprintStore.Blueprint source, bool verifiedHost)
+        {
+            if (!verifiedHost || source == null || source.importError != null) return source;
+            var evidence = Geometry.BlueprintSourceDocument.Index(source.sourceDocuments?.Select(document => document.ToGeometry()));
+            bool Eligible(CompositeBlueprintStore.Part part) => part.prefabName == Geometry.BlueprintPrefabMigration.OldRoof &&
+                part.originalPrefabName == null && !part.scaleIsAbsolute && part.foreignData == null && !part.materialSeed.HasValue &&
+                part.sourceDocumentId != null && evidence.TryGetValue(part.sourceDocumentId, out var document) &&
+                document.HasPartAt(part.sourceLine, part.prefabName);
+            if (!source.parts.Any(Eligible)) return source;
+            var copy = source.ImportCopy();
+            foreach (var part in copy.parts.Where(Eligible))
+            {
+                part.originalPrefabName = part.prefabName;
+                part.prefabName = Geometry.BlueprintPrefabMigration.CurrentRoof;
+                part.metadata = null; // Commit captures metadata from the effective native prefab.
+            }
+            copy.prefabName = (copy.parts.FirstOrDefault(part => part.stableId == copy.primaryPartId) ?? copy.parts[0]).prefabName;
+            copy.importPreview = null;
+            copy.id = Identity(source.id + "\nnative-roof-migration-v1");
+            return copy;
+        }
+
         internal static CompositeBlueprintStore.Blueprint PrepareForHost(CompositeBlueprintStore.Blueprint source,
             Func<string, CompositeBlueprintStore.VectorData?> resolvePrefabScale, Func<string, int> hash = null, int? worldLevel = null,
             Func<string, bool> supportsMaterialSeed = null, Func<string, (int Width, int Height)?> containerGrid = null)
@@ -605,6 +627,7 @@ namespace OstrixMods.BuildWorks
                     signText = part.signText,
                     sourceDocumentId = part.sourceDocumentId,
                     sourceLine = part.sourceLine,
+                    originalPrefabName = part.originalPrefabName,
                     foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(part.foreignData?.ToGeometry())
                 });
             if (!CompositeBlueprintStore.Valid(result)) throw new InvalidDataException("$buildworks_import.document_invalid");

@@ -585,6 +585,7 @@ namespace OstrixMods.BuildWorks
             contentsDetails.text = T("exchange.plan_review", target, fileName.text, planReview.Parts, planReview.CustomSnaps,
                 planReview.Groups, planReview.Supports, planReview.Anchors, planReview.Metadata, planReview.Sources, planReview.MaterialSeeds);
             if (planReview.LibraryOrigins > 0) contentsDetails.text += "\n" + T("exchange.plan_origins", planReview.LibraryOrigins);
+            if (planReview.PrefabMigrations > 0) contentsDetails.text += "\n" + T("exchange.plan_migrations", planReview.PrefabMigrations);
             if (planReview.IgnoredSnapPointRows > 0)
                 contentsDetails.text += "\n" + T("exchange.snap_trailing_fields", planReview.IgnoredSnapPointRows);
             if (planReview.OmittedSigns.Count > 0)
@@ -619,6 +620,10 @@ namespace OstrixMods.BuildWorks
             var effective = omitMissingParts && missingReview.CanOmit ? missingReview.RetainedContents : contentsSummary;
             contentsDetails.text = T("exchange.contents_counts", effective.Storages, effective.StoredItems,
                 effective.Mounts, effective.Unknown, effective.AlreadyCleared);
+            if (blueprint == null && importReview != null)
+                foreach (var replacement in importReview.Documents.SelectMany(document => document.parts)
+                    .Where(part => part.originalPrefabName != null).GroupBy(part => part.originalPrefabName + " → " + part.prefabName))
+                    contentsDetails.text += "\n" + T("exchange.prefab_migration", replacement.Key, replacement.Count());
             if (blueprint == null && categoryOverride &&
                 CompositeBlueprintStore.TryNormalizeImportCategory(categoryInput.text, out string category))
                 contentsDetails.text += "\n" + T("exchange.category_all", category, importReview.Documents.Count);

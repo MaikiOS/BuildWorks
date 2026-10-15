@@ -30,7 +30,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             var decoded = BlueprintExchangeFormat.Decode(text);
             Require(decoded.parts[0].metadata.minimum.Value.x == 1 && decoded.parts[0].metadata.prefabScale.y == .5f,
                 "Portable metadata roundtrip lost local bounds/root scale");
-            Refuse(() => BlueprintExchangeFormat.Decode(text.Replace("\"version\":12", "\"version\":8")));
+            Refuse(() => BlueprintExchangeFormat.Decode(text.Replace("\"version\":13", "\"version\":8")));
             Refuse(() => BlueprintExchangeFormat.Decode(text.Replace("\"kind\":\"Piece\"", "\"kind\":\"Piece\",\"unknown\":1")));
             Refuse(() => BlueprintExchangeFormat.Decode(text.Replace("\"prefabId\":\"woodwall\"", "\"prefabId\":\"other\"")));
             var detached = ExternalBlueprintLibrary.DetachedCopy(ExternalBlueprintLibrary.Parse(text, "metadata.buildworks.json"));
@@ -67,7 +67,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 review.Documents[0].parts[0].metadata == null, "Reviewed import did not capture without mutating review");
             var noMeta = CompositeBlueprintStore.CloneParts(saved.parts); foreach (var part in noMeta) part.metadata = null;
             var old = saved.ImportCopy(); old.parts = noMeta;
-            Require(BlueprintExchangeFormat.Decode(Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(old)).Replace("\"version\":12", "\"version\":8")).parts.Count == 2,
+            Require(BlueprintExchangeFormat.Decode(Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(old)).Replace("\"version\":13", "\"version\":8")).parts.Count == 2,
                 "Legacy portable8 without metadata stopped loading");
             Geometry(snapshot);
             string fixture = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,

@@ -11,7 +11,7 @@ using UnityEngine;
 public static class PrefabMigrationEvidence
 {
     const string Root = @"C:\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\StreamingAssets\SoftRef";
-    [Serializable] public class Report { public string utc, manifestSha256, geometryLimit; public List<Bundle> bundles = new(); public List<Prefab> prefabs = new(); }
+    [Serializable] public class Report { public string utc, manifestSha256, geometryLimit; public bool productionGeometryPredicate; public List<Bundle> bundles = new(); public List<Prefab> prefabs = new(); }
     [Serializable] public class Bundle { public string name, sha256; public long bytes; }
     [Serializable] public class Prefab { public string name, asset; public List<Node> nodes = new(); }
     [Serializable] public class Node
@@ -53,6 +53,7 @@ public static class PrefabMigrationEvidence
                 report.bundles.Add(new Bundle { name = name, bytes = new FileInfo(path).Length, sha256 = FileHash(path) });
                 return bundle;
             }
+            var prototypes = new List<GameObject>();
             foreach (string name in new[] { "wood_wall_roof", "wood_wall_roof_a" })
             {
                 string asset = "Assets/GameElements/Pieces/" + name + ".prefab";
@@ -61,6 +62,7 @@ public static class PrefabMigrationEvidence
                 string bundleName = lines[row - 1].Trim().Substring(8);
                 var prefab = Load(bundleName).LoadAsset<GameObject>(asset);
                 if (!prefab) throw new IOException("Missing prefab " + asset);
+                prototypes.Add(prefab);
                 var evidence = new Prefab { name = name, asset = asset };
                 void Walk(Transform node, string path)
                 {
@@ -110,6 +112,8 @@ public static class PrefabMigrationEvidence
                 }
                 Walk(prefab.transform, "root"); report.prefabs.Add(evidence);
             }
+            report.productionGeometryPredicate = OstrixMods.BuildWorks.BlueprintPrefabMigrationGeometry.Matches(prototypes[0], prototypes[1]);
+            if (!report.productionGeometryPredicate) throw new InvalidOperationException("Production prefab geometry predicate refused current native pair");
             File.WriteAllText(Path.Combine(output, "geometry.json"), JsonUtility.ToJson(report, true));
             Debug.Log("PASS read-only prefab geometry evidence: " + output);
             foreach (var bundle in loaded.Values.Reverse()) bundle.Unload(true);

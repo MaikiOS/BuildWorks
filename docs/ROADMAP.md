@@ -1,3 +1,8 @@
+## Verified .191, deployment pending other-profile exit — 2026-10-15
+
+One explicit import rule wood_wall_roof→wood_wall_roof_a now records original ID/source row (native24/portable13), checks current prototypes/target recipe and reports migration before import/foreign export. Geometry/Store, normal+QA0/0, Host/isolation/localization1102, new-file formatter, actual Controller DLL copy/save/reopen, independent PASSED/Ship and Workbench624 pass. The production geometry predicate passed installed native assets. [Evidence](PREFAB_MIGRATION_191.md).
+
+**Installed .190; .191 is NOT deployed.** Owner is playing Default-Compat-Test, verified from PID49684 preloader path; leave that game/profile untouched. Deploy-TestBuild currently blocks any Valheim process; deploy after ordinary exit. Native automatic conversion/construction/reload remains open. [Manual import](MANUAL_QA_191_RU.md) needs no materials; next Codex game case is the automatically migrated Forest Hut with prepared supplies. Full goal active/incomplete.
 ## Prefab migration evidence — 2026-10-15, installed .190 unchanged
 
 Current resources explicitly mark wood_wall_roof→wood_wall_roof_a. Read-only Unity/nographics found24 matching recorded TRS/mesh/material/LOD/BoxCollider/snap nodes;10 negative controls passed. Independent correctness PASSED/Ponytail Ship apply to this diagnostic checkpoint only. Native costs/support/eligibility, serialized migration provenance and automatic import/construction/reload remain open; automatic migration is not enabled. Blind renaming would break ValidSources. [Evidence and next step](PREFAB_MIGRATION_EVIDENCE_RU.md).

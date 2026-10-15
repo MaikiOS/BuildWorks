@@ -345,7 +345,7 @@ public static class RuntimeEditorAcceptance
                     scene.SetViewport(view.ViewportScreenRect());
                     Call(controller, "FrameAll");
                     foreach (string state in new[] { "server-list-ru", "server-review-ru", "select", "transform", "scale-xyz-ru", "array", "contour", "catalog",
-                        "outliner", "outliner-filter-ru", "outliner-fields-ru", "outliner-empty-ru", "interior-camera-ru", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "catalog-managed-ru", "catalog-hidden-ru", "delete-confirm-ru", "hide-confirm-ru", "save-metadata", "save-as", "save-as-ru", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "share-ru", "share-error-ru", "batch-select-ru", "batch-review-ru", "batch-picker-ru", "batch-export-ru", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru", "exchange-import-category-ru", "exchange-import-category-picker-ru", "exchange-armor", "exchange-armor-ru", "exchange-missing", "exchange-missing-ru", "replace-tools", "replace-confirm", "replace-confirm-ru", "replace-entry-ru", "replace-help-ru" })
+                        "outliner", "outliner-filter-ru", "outliner-fields-ru", "outliner-empty-ru", "interior-camera-ru", "settings", "catalog-blueprints", "catalog-materials", "catalog-quick", "catalog-crafting", "catalog-managed-ru", "catalog-hidden-ru", "delete-confirm-ru", "hide-confirm-ru", "save-metadata", "save-as", "save-as-ru", "supports", "exchange-import", "exchange-import-ru", "exchange-import-path-ru", "exchange-export", "share-ru", "share-error-ru", "batch-select-ru", "batch-review-ru", "batch-picker-ru", "batch-export-ru", "exchange-contents", "exchange-contents-ru", "exchange-import-review", "exchange-import-review-ru", "exchange-import-migration-ru", "exchange-import-category-ru", "exchange-import-category-picker-ru", "exchange-armor", "exchange-armor-ru", "exchange-missing", "exchange-missing-ru", "replace-tools", "replace-confirm", "replace-confirm-ru", "replace-entry-ru", "replace-help-ru" })
                     {
                         ControllerInputAcceptance.ServerLayoutFixture serverFixture = null;
                         Require(Screen.width == width && Screen.height == height,
@@ -554,6 +554,14 @@ public static class RuntimeEditorAcceptance
                             string folder = Path.Combine(output, "exchange-layout"); Directory.CreateDirectory(folder);
                             var layoutStore = new CompositeBlueprintStore(Path.Combine(folder, "library.json"));
                             var blueprint = store.All()[0];
+                            if (state == "exchange-import-migration-ru")
+                            {
+                                var unit = new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 };
+                                layoutStore.ConfigureImportScale(_ => unit, prefabHash: name => name.GetHashCode(), worldLevel: () => 0, migrateLegacyRoof: () => true);
+                                string roof = "wood_wall_roof;;0;0;0;0;0;0;1;\"\";1;1;1\n";
+                                blueprint = ExternalBlueprintLibrary.DetachedCopy(ExternalBlueprintLibrary.PrepareForHost(
+                                    ExternalBlueprintLibrary.Parse("#Name:Замена старой крыши\n#Pieces\n" + roof + roof + roof + roof, "migration.blueprint"), _ => unit));
+                            }
                             if (state.StartsWith("exchange-missing", StringComparison.Ordinal))
                             {
                                 var unit = new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 };
@@ -622,7 +630,7 @@ public static class RuntimeEditorAcceptance
                                 }
                             }
                             else if (state.StartsWith("exchange-import-review", StringComparison.Ordinal) ||
-                                state.StartsWith("exchange-import-category", StringComparison.Ordinal))
+                                state.StartsWith("exchange-import-category", StringComparison.Ordinal) || state == "exchange-import-migration-ru")
                             {
                                 var exchange = Field<BlueprintExchangeView>(view, "exchangeView");
                                 int index = Array.IndexOf(Field<string[]>(exchange, "entries"), Path.Combine(folder, "Дом.buildworks.json"));
@@ -633,6 +641,9 @@ public static class RuntimeEditorAcceptance
                                 { view.Tick(); yield return null; }
                                 Require(Field<CompositeBlueprintStore.ContentsSummary>(exchange, "contentsSummary") != null,
                                     "Import screenshot missed completed inspection");
+                                if (state == "exchange-import-migration-ru")
+                                    Require(Field<TMP_Text>(exchange, "contentsDetails").text.Contains("wood_wall_roof → wood_wall_roof_a") &&
+                                        Field<TMP_Text>(exchange, "contentsDetails").text.Contains("4 шт."), "Import UI lost replacement IDs/count");
                                 if (state == "exchange-import-category-ru")
                                     Field<TMP_InputField>(exchange, "categoryInput").text = "ТЕСТОВЫЙ РАЗДЕЛ 181";
                                 else if (state == "exchange-import-category-picker-ru")
@@ -1329,7 +1340,7 @@ public static class RuntimeEditorAcceptance
         Require(reloaded.All().Count == 1, "Actual disk library roundtrip");
         Require(Mathf.Abs(reloaded.All()[0].parts[0].scale.x - expected) < 0.0001f, "Store discarded scale");
         CheckReopenedCopy(controller, reloaded, expected);
-        Require(File.ReadAllText(path).Contains("\"version\":23"), "Controller did not write format23");
+        Require(File.ReadAllText(path).Contains("\"version\":24"), "Controller did not write format24");
         checks.Add("Controller save -> disk format21 -> new store -> OpenExisting retains scale, rotated root-owned support and placement reference; transient support focus absent");
     }
 

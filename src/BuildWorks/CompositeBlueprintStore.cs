@@ -35,7 +35,7 @@ namespace OstrixMods.BuildWorks
         internal const string DefaultCategory = "OTHER";
         private const string LegacyDefaultCategory = "ПРОЧЕЕ";
         private const string LocalizationPrefix = "$buildworks_";
-        private const int FormatVersion = 23;
+        private const int FormatVersion = 24;
         internal const int MaximumLibraryOrigins = Geometry.BlueprintLibraryOrigin.MaximumCount;
         private const int MaximumBlueprints = 32;
         private const int MaximumCategories = 12;
@@ -64,6 +64,7 @@ namespace OstrixMods.BuildWorks
         private Func<int> importWorldLevel;
         private Func<string, bool> importMaterialSeedSupport;
         private Func<string, (int Width, int Height)?> importContainerGrid;
+        private Func<bool> canMigrateLegacyRoof;
         private int? preparedWorldLevel;
         private Func<object> importHostContext;
         private object preparedHostContext;
@@ -100,7 +101,7 @@ namespace OstrixMods.BuildWorks
         // Called on the Unity thread only; prefabHash must be a pure stable string hash.
         internal void ConfigureImportScale(Func<string, VectorData?> resolve, Func<object> context = null,
             Func<string, int> prefabHash = null, Func<int> worldLevel = null, Func<string, bool> supportsMaterialSeed = null,
-            Func<string, (int Width, int Height)?> containerGrid = null)
+            Func<string, (int Width, int Height)?> containerGrid = null, Func<bool> migrateLegacyRoof = null)
         {
             importPrefabScale = resolve;
             importHostContext = context;
@@ -108,6 +109,7 @@ namespace OstrixMods.BuildWorks
             importWorldLevel = worldLevel;
             importMaterialSeedSupport = supportsMaterialSeed;
             importContainerGrid = containerGrid;
+            canMigrateLegacyRoof = migrateLegacyRoof;
             catalogSnapshot = null;
             preparedExternalBlueprints = null;
             ++importGeneration;
@@ -406,6 +408,7 @@ namespace OstrixMods.BuildWorks
             internal List<Blueprint> Documents;
             internal ContentsSummary Contents;
             internal MissingPartsReview Missing;
+            internal bool LegacyRoofMigrated;
             internal List<ImportSource> Sources;
             internal List<(string Source, string Error)> FileErrors;
             // Called by the host thread only, never by the file/preparation worker.
@@ -493,6 +496,8 @@ namespace OstrixMods.BuildWorks
             int generation = importGeneration;
             object context = importHostContext?.Invoke();
             int? worldLevel = importWorldLevel?.Invoke();
+            bool migrateRoof = review.Documents.SelectMany(document => document.parts)
+                .Any(part => part.prefabName == Geometry.BlueprintPrefabMigration.OldRoof) && canMigrateLegacyRoof?.Invoke() == true;
             var scales = review.Documents.SelectMany(document => document.parts).Select(part => part.prefabName)
                 .Distinct(StringComparer.Ordinal).ToDictionary(name => name, name => importPrefabScale?.Invoke(name), StringComparer.Ordinal);
             var supports = MaterialSeedSupportSnapshot(review.Documents);
@@ -517,9 +522,11 @@ namespace OstrixMods.BuildWorks
                     FileErrors = review.FileErrors,
                     Contents = new ContentsSummary(),
                     Missing = missing,
+                    LegacyRoofMigrated = migrateRoof,
                     IsHostCurrent = current,
-                    Documents = review.Documents.Select(document => ExternalBlueprintLibrary.PrepareForHost(document,
-                        name => scales.TryGetValue(name, out var scale) ? scale : null, prefabHash, worldLevel, supports, grids)).ToList()
+                    Documents = review.Documents.Select(document => ExternalBlueprintLibrary.MigrateLegacyRoof(
+                        ExternalBlueprintLibrary.PrepareForHost(document,
+                            name => scales.TryGetValue(name, out var scale) ? scale : null, prefabHash, worldLevel, supports, grids), migrateRoof)).ToList()
                 };
                 var summaries = new Dictionary<Blueprint, ContentsSummary>();
                 foreach (Blueprint document in result.Documents)
@@ -622,6 +629,8 @@ namespace OstrixMods.BuildWorks
                 }
                 cancellation.ThrowIfCancellationRequested();
                 if (review.IsHostCurrent?.Invoke() == false)
+                    throw new InvalidDataException(UserError("placement.contents_stale"));
+                if (review.LegacyRoofMigrated && canMigrateLegacyRoof?.Invoke() != true)
                     throw new InvalidDataException(UserError("placement.contents_stale"));
                 CatalogAll();
                 if (omitMissing != null) ValidateMissingReview(review.Documents, omitMissing, prefabHash);
@@ -1445,6 +1454,7 @@ namespace OstrixMods.BuildWorks
                     prepared[index].editorLocked = blueprint.parts[index].editorLocked;
                     prepared[index].sourceDocumentId = blueprint.parts[index].sourceDocumentId;
                     prepared[index].sourceLine = blueprint.parts[index].sourceLine;
+                    prepared[index].originalPrefabName = blueprint.parts[index].originalPrefabName;
                     prepared[index].baseScale = prepared[index].baseScale ?? blueprint.parts[index].baseScale;
                     prepared[index].metadata = prepared[index].metadata ?? PrefabMetadata.FromGeometry(blueprint.parts[index].metadata?.ToGeometry());
                     prepared[index].materialSeed = prepared[index].materialSeed ?? blueprint.parts[index].materialSeed;
@@ -1666,6 +1676,7 @@ namespace OstrixMods.BuildWorks
                     signText = part.signText,
                     sourceDocumentId = part.sourceDocumentId,
                     sourceLine = part.sourceLine,
+                    originalPrefabName = part.originalPrefabName,
                     foreignData = CloneForeignData(part.foreignData)
                 });
             }
@@ -1731,7 +1742,7 @@ namespace OstrixMods.BuildWorks
                     allowAbsoluteScaleFields: loaded.version >= 15, allowPlacementImportFields: loaded.version >= 16,
                     allowBaseScaleFields: loaded.version >= 17, allowMetadataFields: loaded.version >= 19,
                     allowMaterialSeedFields: loaded.version >= 20, allowHiddenSources: loaded.version >= 21,
-                    allowLibraryOriginFields: loaded.version >= 23);
+                    allowLibraryOriginFields: loaded.version >= 23, allowPrefabMigrationFields: loaded.version >= 24);
                 loaded.blueprints = loaded.blueprints ?? new List<Blueprint>();
                 loaded.categories = loaded.categories ?? new List<string>();
                 loaded.hiddenSources = loaded.hiddenSources ?? new List<string>();
@@ -2031,10 +2042,11 @@ namespace OstrixMods.BuildWorks
                 foreach (Part part in parts)
                 {
                     if (part == null) return false;
+                    if (!Geometry.BlueprintPrefabMigration.IsRecordedPair(part.originalPrefabName, part.prefabName)) return false;
                     if (part.sourceDocumentId == null)
-                    { if (part.sourceLine != 0) return false; }
+                    { if (part.sourceLine != 0 || part.originalPrefabName != null) return false; }
                     else if (!index.TryGetValue(part.sourceDocumentId, out var evidence) ||
-                        !evidence.HasPartAt(part.sourceLine, part.prefabName)) return false;
+                        !evidence.HasPartAt(part.sourceLine, part.originalPrefabName ?? part.prefabName)) return false;
                 }
                 return true;
             }
@@ -2560,6 +2572,8 @@ namespace OstrixMods.BuildWorks
             public PrefabMetadata metadata;
             [DataMember(Order = 16, EmitDefaultValue = false)]
             public int? materialSeed;
+            [DataMember(Order = 17, EmitDefaultValue = false)]
+            public string originalPrefabName;
 
             internal Vector3 RootScale(Vector3 prefabScale)
             {

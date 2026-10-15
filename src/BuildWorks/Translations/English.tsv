@@ -875,16 +875,16 @@ editor.scale.tooltip	On: changing one axis scales all axes proportionally. Off: 
 editor.scale.shear	Cannot scale this selection independently: rotated parts would be skewed. Keep proportions, change the Local/World axes or scale the parts separately. No changes were made.
 editor.catalog_cost_unknown	Full construction cost and required stations are unknown. This blueprint can be edited; world placement is checked separately.
 blueprint.capture_parent_frame	Cannot capture {0} exactly: its parent changes scale or shears the object.
-editor.replace_title	REPLACE MISSING PART
+editor.replace_title	REPLACE SELECTED PART
 editor.replace_catalog	Open catalogue
 catalog.thumbnail_pending	Image not available yet\nSee card details
 catalog.thumbnail_markers	A red frame shows recorded missing-part bounds; a small red marker shows only its position, with unknown size.
-editor.replace_steps	Select a missing record and open the catalogue to preview a new replacement.\nOr Ctrl-add available parts or their group: copies appear at the record, originals stay in place. The first own part supplies the origin and rotation.\nOwn sizes and relative layout stay unchanged. Confirm removes only the missing record. Cancel changes nothing; one Undo reverts the entire operation.
-editor.replace_hint	Use the catalogue for a new replacement, or Ctrl-add available parts/group: copies are created and originals stay in place.
-editor.replace_confirm	Replace missing record: {0}\nNew copies: {1}.\nCopy anchor: {2}\nIts origin and full rotation match the record. Own sizes and relative layout are preserved; unknown surfaces are not guessed.\nInspect the preview. Originals stay in place; only the missing record is removed. Independent supports and source evidence are retained. Cancel changes nothing; one Undo reverts the operation.
+editor.replace_steps	Select one part or missing record and open the catalogue to preview its replacement.\nFor a missing record, Ctrl-add available parts or their group: copies appear at the record, originals stay in place. The first own part supplies the origin and rotation.\nSizes and relative layout stay unchanged. Confirm removes only the selected part or record. Cancel changes nothing; one Undo reverts the operation.
+editor.replace_hint	Select one part and open the catalogue for replacement. For a missing record, Ctrl-add available parts/group: copies are created and originals stay in place.
+editor.replace_confirm	Replace selected part or record: {0}\nNew copies: {1}.\nCopy anchor: {2}\nIts origin and full rotation match the selected part. Sizes and relative layout are preserved; unknown surfaces are not guessed.\nInspect the preview. Only the selected part or record is removed; parts used for copying stay in place. Independent supports and source evidence are retained. Cancel changes nothing; one Undo reverts the operation.
 editor.replace_changed	Selection, document or available prefabs changed. Review replacement again.
 editor.replace_group	Replacement
-editor.replace_done	Created {0} copies. Missing record removed; originals retained. One Undo reverts the operation.
+editor.replace_done	Created {0} copies. Selected part or record removed; parts used for copying retained. One Undo reverts the operation.
 editor.replace_limit	Replacement needs one group slot. Remove or ungroup an unused group first.
 editor.save_as	SAVE AS…
 editor.save_as_help	Create a separate blueprint with a new ID. The original stays unchanged. Ctrl+Shift+S.
@@ -932,17 +932,17 @@ editor.camera.speed	Interior speed, m/s
 editor.camera.help	RMB: look; WASD move, Q/E down/up, Shift faster. Wheel: speed. With a piece selected, RMB+LMB places from center. Release RMB for the pointer. The button above restores the overview.
 editor.camera.active	Inside building · RMB: fly · Camera: return
 qa.large_selection_blocked	Large selection requires the isolated BuildWorks QA world. Safety check failed: {0}.
-editor.replace_catalog_help	Replacement mode: click a part or blueprint to preview it at the missing record
+editor.replace_catalog_help	Replacement mode: choose a part or blueprint to preview it at the selected part
 editor.replace_source_missing	Choose an available part or a blueprint without missing parts for replacement. This source is still incomplete.
-editor.position_title	ALIGN TO MISSING
-editor.position_hint	Create copies at a missing record while keeping its marker and originals. Ctrl-add parts/group, or select only the record and open the catalogue.
-editor.position_steps	Select a missing record and open the catalogue, or Ctrl-add own parts/group. Creates copies; originals stay in place. Aligns the visible copy centre with the recorded envelope and uses the first own part or catalogue blueprint anchor for orientation. Sizes and relative layout stay unchanged. Unknown dimensions use the recorded origin. The marker stays for gizmo adjustment and separate deletion. Cancel changes nothing.
-editor.position_confirm	Missing record: {0}\nNew copies: {1}\n{2}\nSizes and relative layout are preserved; the unknown shape is not reconstructed. Inspect the preview. Originals stay in place. The marker remains for adjustment and separate deletion. Cancel changes nothing; one Undo removes the copies.
+editor.position_title	ALIGN TO SELECTED PART
+editor.position_hint	Create copies at the selected part or record, keeping it and the originals. Select one part and open the catalogue; for a missing record, Ctrl-add parts/group.
+editor.position_steps	Select one part or record and open the catalogue. For a missing record, Ctrl-add own parts/group. Creates copies; originals stay in place. Aligns the visible copy centre with the recorded bounds and uses the first own part or catalogue blueprint anchor for orientation. Sizes and relative layout stay unchanged. Unknown dimensions use the recorded origin. The selected part or record stays for gizmo adjustment and separate deletion. Cancel changes nothing.
+editor.position_confirm	Selected part or record: {0}\nNew copies: {1}\n{2}\nSizes and relative layout are preserved; the unknown shape is not reconstructed. Inspect the preview. Originals and the selected part or record remain for adjustment and separate deletion. Cancel changes nothing; one Undo removes the copies.
 editor.position_known	The visible copy centre matches the recorded envelope centre. The first own part or catalogue blueprint anchor supplies orientation.
 editor.position_unknown	Model dimensions are unknown: only the recorded origin and rotation are aligned. The marker does not represent real dimensions.
 editor.position_no_bounds	Could not determine the visible bounds of your parts. Positioning cancelled.
-editor.position_done	Created and aligned {0} copies. Originals and missing record retained.
-editor.position_catalog_help	Alignment mode: choose a part or blueprint. The missing record will remain.
+editor.position_done	Created and aligned {0} copies. Originals and selected part or record retained.
+editor.position_catalog_help	Alignment mode: choose a part or blueprint. The selected part or record will remain.
 editor.replace_short	REPLACE
 editor.position_short	ALIGN
 editor.view.axis_pair	{0}{1} · {2} · Number: per selected axis

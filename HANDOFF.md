@@ -1,9 +1,10 @@
-## Current checkpoint — owner-requested pause 2026-10-14, QA .187
+## Current checkpoint — resumed 2026-10-15, QA .188
 
-Development is stopped for today at Ostrix's request. Installed .187 version/SHA and the empty catalogue/imports were rechecked. The .187 chest scenario is prepared, not executed in Valheim; populated construction remains disabled. **First after resuming: Forest Hut import → edit/separate copy → ghost → ordinary paid construction → actual reload.** Further bridge or item-transfer implementation must not replace that acceptance path. The new channel has not yet proved the final native placement input.
+Native .187 QA passed 96 Forest Hut import/edit/Undo/Redo/Save As/reopen steps for 28 parts and a 15-degree door. Placement stopped before the ghost: four loaded wood_wall_roof records are absent from all 609 current Hammer entries. No construction debit occurred; Wood64 remained. Automatic prefab equivalence is unverified.
 
-Current concise queue and whole-goal status: [live checklist](docs/LIVE_CHECKLIST_RU.md). Entries below are historical evidence, not current installed versions or goal states. Manual .183/.184 remain applicable on .187; do not repeat accepted cases without cause.
+.188 extends the existing catalogue Replace/Align workflow to one selected loaded part. Normal/QA builds0/0, Geometry/Localization/Store/EditorBridge/WorldLayout/Host, localization1100 and final Unity Workbench612 passed; independent reviews PASSED/Ship. Formatter135 findings affect unchanged baseline lines. Guarded .188 installation verified both DLL hashes and107 unchanged existing QA config files. Native .188 execution is pending.
 
+Continue with the existing QA187 Forest Hut copy: explicitly choose replacements for four obsolete records, then ghost → ordinary paid construction → actual reload. The whole goal, populated construction, stake/v11 and multiplayer remain open. [Evidence](docs/EDITOR_CATALOG_REPLACEMENT_188.md). [Live checklist](docs/LIVE_CHECKLIST_RU.md). The history below is not current status.
 ## 2026-10-14 — .187 installed: complete native storage QA scenario prepared
 
 Explicit QA-only fixture: one paid native wood chest, own Wood2 partial transfer, .186 paired persistence, then a separate read-only check after actual logout/re-entry. A flushed one-shot receipt precedes mutation; focus/F12/session/deadline cancel continuation. Idle editor/placement guards prevent scale/material contamination. Normal builds exclude the capability. No grants, replay, refunds or settlement.

@@ -1630,6 +1630,7 @@ namespace OstrixMods.BuildWorks
         internal event Action MissingReplacementRequested;
         internal event Action MissingPositioningRequested;
         internal bool MissingReplacementAvailable { get; set; }
+        internal bool CatalogReplacementAvailable { get; set; }
         internal event Action SupportCreated;
         internal event Action<bool> ItemContentsRequested;
         internal event Action<string> SupportSelected;
@@ -2167,7 +2168,7 @@ namespace OstrixMods.BuildWorks
                     "ToolsEntry6" => SupportCentreId != null,
                     "ToolsItem0" => ItemStandEditable,
                     "ToolsItem1" => ItemStandEditable && ItemStandHasContents,
-                    "ToolsReplaceMissing" => missingPrefabNodes.Count > 0,
+                    "ToolsReplaceMissing" => missingPrefabNodes.Count > 0 || CatalogReplacementAvailable,
                     _ => boundDocument?.EditablePartSelectionCount > 0
                 };
                 if (match) SetTopLeft((RectTransform)entry.transform, 12f, 82f + row++ * 36f, 286f, 32f);
@@ -3355,7 +3356,7 @@ namespace OstrixMods.BuildWorks
 
         private void BindInspector(BlueprintEditorDocument document)
         {
-            bool hasMissing = missingPrefabNodes.Count > 0;
+            bool hasMissing = missingPrefabNodes.Count > 0 || CatalogReplacementAvailable;
             bool missingEntryChanged = replaceMissingButton.gameObject.activeSelf != hasMissing;
             SetButtonLabel(replaceMissingButton, T("editor.replace_short"));
             replaceMissingButton.gameObject.SetActive(hasMissing);

@@ -3106,15 +3106,15 @@ namespace OstrixMods.BuildWorks
                 view.ShowConfirmation(BuildWorksLocalization.Text(keepTarget ? "editor.position_title" : "editor.replace_title"),
                     BuildWorksLocalization.Text(keepTarget ? "editor.position_steps" : "editor.replace_steps"), () =>
                     {
-                        BlueprintEditorPart missing = SingleMissingTarget();
-                        if (missing == null) { view.SetStatus(BuildWorksLocalization.Text("editor.replace_changed"), error: true); return; }
+                        BlueprintEditorPart selected = SingleReplacementTarget();
+                        if (selected == null) { view.SetStatus(BuildWorksLocalization.Text("editor.replace_changed"), error: true); return; }
                         var expected = document;
                         int expectedRevision = document.RevisionToken;
                         RequestCatalog();
                         if (view.HasCatalog)
                         {
                             view.SetCatalogReplacement(true, keepTarget);
-                            replacementCatalogSelected = source => RequestCatalogAlignment(expected, expectedRevision, missing.StableId, source, keepTarget);
+                            replacementCatalogSelected = source => RequestCatalogAlignment(expected, expectedRevision, selected.StableId, source, keepTarget);
                         }
                     },
                     height: 500f, acceptLabel: BuildWorksLocalization.Text("editor.replace_catalog"));
@@ -3164,12 +3164,11 @@ namespace OstrixMods.BuildWorks
                 }, height: 450f, closed: () => RestoreReplacementPreview(expectedDocument), scenePreview: true);
         }
 
-        private BlueprintEditorPart SingleMissingTarget()
+        private BlueprintEditorPart SingleReplacementTarget()
         {
             if (document == null || document.ActiveSupportId != null || document.Selection.Count != 1) return null;
             var part = document.Parts.FirstOrDefault(p => p.StableId == document.Selection[0]);
-            return part != null && document.IsEffectivelyVisible(part.StableId) && !document.IsEffectivelyLocked(part.StableId) &&
-                (part.ScaleIsAbsolute || !ResolveVisualSource(part.PrefabName)) ? part : null;
+            return part != null && document.IsEffectivelyVisible(part.StableId) && !document.IsEffectivelyLocked(part.StableId) ? part : null;
         }
 
         private void RestoreReplacementPreview(BlueprintEditorDocument expected)
@@ -3182,11 +3181,11 @@ namespace OstrixMods.BuildWorks
         private void RequestCatalogAlignment(BlueprintEditorDocument expected, int revision, string targetId,
             BlueprintEditorDocument source, bool keepTarget)
         {
-            BlueprintEditorPart target = SingleMissingTarget();
+            BlueprintEditorPart target = SingleReplacementTarget();
             if (source.Parts.Count == 0 || source.Parts.Any(part => part.ScaleIsAbsolute || !ResolveVisualSource(part.PrefabName)))
             { view.SetStatus(BuildWorksLocalization.Text("editor.replace_source_missing"), error: true); return; }
             bool Current() => ReferenceEquals(document, expected) && document.RevisionToken == revision &&
-                SingleMissingTarget()?.StableId == targetId && source.Parts.Count > 0 &&
+                SingleReplacementTarget()?.StableId == targetId && source.Parts.Count > 0 &&
                 source.Parts.All(part => !part.ScaleIsAbsolute && ResolveVisualSource(part.PrefabName));
             if (!Current()) { view.SetStatus(BuildWorksLocalization.Text("editor.replace_changed"), error: true); return; }
             var anchor = source.Parts.FirstOrDefault(part => part.StableId == source.PrimaryPartId) ?? source.Parts[0];
@@ -4368,6 +4367,7 @@ namespace OstrixMods.BuildWorks
                 : (Vector3?)null;
             view.SupportCentreId = transformSupportPivotId;
             view.MissingReplacementAvailable = TryMissingReplacement(out _, out _);
+            view.CatalogReplacementAvailable = SingleReplacementTarget() != null;
             BlueprintEditorPart standPart = EditableItemStand(document.ActiveNodeId, out _);
             view.ItemStandEditable = standPart != null && document.Selection.Count == 1;
             view.ItemStandHasContents = standPart?.ForeignData != null && !standPart.ForeignData.ContentsCleared;

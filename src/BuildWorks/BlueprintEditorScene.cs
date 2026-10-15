@@ -990,7 +990,7 @@ namespace OstrixMods.BuildWorks
             out Vector3 offset)
         {
             offset = Vector3.zero;
-            if (!visuals.TryGetValue(targetId, out VisualNode target) || !target.Placeholder ||
+            if (!visuals.TryGetValue(targetId, out VisualNode target) ||
                 target.Metadata?.Minimum == null || !TryBounds(target, out Bounds targetBounds)) return false;
             Bounds sourceBounds = default;
             bool found = false;

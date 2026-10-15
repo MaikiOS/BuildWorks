@@ -431,6 +431,8 @@ internal static partial class ControllerInputAcceptance
                 metadata = CompositeBlueprintStore.PrefabMetadata.FromGeometry(new BlueprintPrefabMetadata(1, "qa_absent", "Recorded", "piece", "QA",
                     new Point3(1, 1, 1), new Point3(0, 0, -1), new Point3(2, 2, 1))) },
             new CompositeBlueprintStore.Part { stableId = "a", prefabName = "woodwall", displayName = "Own wall",
+                metadata = CompositeBlueprintStore.PrefabMetadata.FromGeometry(new BlueprintPrefabMetadata(1, "woodwall", "Own wall", "piece", "QA",
+                    new Point3(1, 1, 1), new Point3(0, 0, -1), new Point3(2, 2, 1))),
                 position = new CompositeBlueprintStore.VectorData { x = 3, y = 2, z = 1 },
                 rotation = new CompositeBlueprintStore.QuaternionData(Quaternion.Euler(0, 45, 0)),
                 scale = new CompositeBlueprintStore.VectorData { x = 2, y = .5f, z = 1 }, baseScale = new CompositeBlueprintStore.VectorData(wall.transform.localScale) },
@@ -470,6 +472,86 @@ internal static partial class ControllerInputAcceptance
             Require(controller.OpenExisting(saved, out error), error); yield return null;
             var document = controller.Document;
             var view = Field<BlueprintEditorView>(controller, "view");
+            document.SelectOnly("a"); Call(controller, "Bind", (object)null);
+            Require(view.CatalogReplacementAvailable && !view.MissingReplacementAvailable,
+                "A loaded single part cannot open catalogue replacement");
+            int loadedRevision = document.RevisionToken;
+            NativeClick(view, null, "InspectorReplaceMissing"); yield return null;
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            NativeClick(view, null, "Catalog_woodwall"); yield return null;
+            Require(view.HasModal && document.RevisionToken == loadedRevision,
+                "Loaded-part replacement skipped preview or changed the document");
+            NativeClick(view, null, Field<Button>(view, "dialogCancelButton")); yield return null;
+            Require(document.RevisionToken == loadedRevision && document.Parts.Any(part => part.StableId == "a"),
+                "Loaded-part replacement cancellation removed its target");
+            view.ShowToolsMenu(new Vector2(Screen.width * .5f, Screen.height * .5f), false); yield return null;
+            NativeClick(view, null, "ToolsReplaceMissing"); yield return null;
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            NativeClick(view, null, "Catalog_woodwall"); yield return null;
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            string loadedCopyId = document.Parts.Single(part => part.StableId != "a" && part.StableId != "b" && part.StableId != "missing").StableId;
+            var loadedCopy = document.Parts.Single(part => part.StableId == loadedCopyId);
+            Require(document.Parts.Count == 3 && !document.Parts.Any(part => part.StableId == "a") &&
+                V(loadedCopy.Position) == new Vector3(3, 2, 1) &&
+                Quaternion.Angle(new Quaternion((float)loadedCopy.Rotation.X, (float)loadedCopy.Rotation.Y,
+                    (float)loadedCopy.Rotation.Z, (float)loadedCopy.Rotation.W), Quaternion.Euler(0, 45, 0)) < .01f &&
+                document.Parts.Any(part => part.StableId == "missing") && document.Parts.Any(part => part.StableId == "b"),
+                "Loaded-part replacement lost pose or removed unrelated parts");
+            NativeClick(view, null, "Save"); yield return null;
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            var loadedDisk = new CompositeBlueprintStore(path).All().Single();
+            Require(loadedDisk.parts.Count == 3 && loadedDisk.primaryPartId == "missing" &&
+                loadedDisk.parts.Single(part => part.stableId == loadedCopyId).position.ToVector3() == new Vector3(3, 2, 1),
+                "Loaded-part replacement Save/reopen lost target pose or identity");
+            NativeClick(view, null, Field<Button>(view, "undoButton")); yield return null;
+            Require(document.Parts.Any(part => part.StableId == "a") && document.Selection.Single() == "a",
+                "Loaded-part replacement was not one Undo");
+            NativeClick(view, null, Field<Button>(view, "redoButton")); yield return null;
+            Require(document.Parts.Any(part => part.StableId == loadedCopyId) && !document.Parts.Any(part => part.StableId == "a"),
+                "Loaded-part replacement Redo changed identity");
+            NativeClick(view, null, Field<Button>(view, "undoButton")); yield return null;
+            document.ClearSelection(); Call(controller, "Bind", (object)null);
+            int emptyRevision = document.RevisionToken;
+            NativeClick(view, null, "InspectorReplaceMissing"); yield return null;
+            Require(view.HasModal && !view.CatalogReplacementAvailable,
+                "Visible replacement entry gives no selection help for an empty selection");
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            Require(!view.HasCatalog && document.RevisionToken == emptyRevision && document.Parts.Count == 3,
+                "Empty selection opened replacement or changed history");
+            document.SelectOnly("a"); document.ToggleSelection("b"); Call(controller, "Bind", (object)null);
+            Call(controller, "RequestMissingReplacement"); yield return null;
+            Require(view.HasModal && !view.CatalogReplacementAvailable,
+                "Ordinary multi-selection was treated as an unambiguous replacement target");
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            Require(!view.HasCatalog && document.Parts.Count == 3, "Ambiguous selection opened replacement");
+            document.SelectOnly("a"); document.SetLocked("a", true); Call(controller, "Bind", (object)null);
+            Call(controller, "RequestMissingReplacement"); yield return null;
+            Require(view.HasModal && !view.CatalogReplacementAvailable, "Locked loaded part accepted replacement");
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            Require(!view.HasCatalog && document.Parts.Any(part => part.StableId == "a"), "Locked target opened replacement");
+            document.Undo(); document.SelectOnly("a"); document.SetVisibility("a", false); Call(controller, "Bind", (object)null);
+            Call(controller, "RequestMissingReplacement"); yield return null;
+            Require(view.HasModal && !view.CatalogReplacementAvailable, "Hidden loaded part accepted replacement");
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            Require(!view.HasCatalog && document.Parts.Any(part => part.StableId == "a"), "Hidden target opened replacement");
+            document.Undo();
+            document.SelectOnly("a"); Call(controller, "Bind", (object)null);
+            int alignmentRevision = document.RevisionToken;
+            var loadedScene = Field<BlueprintEditorScene>(controller, "scene");
+            Require(loadedScene.TryGetBounds(new[] { "a" }, out Bounds loadedBounds), "Loaded target bounds unavailable");
+            NativeClick(view, null, "InspectorPositionMissing"); yield return null;
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            NativeClick(view, null, "Catalog_woodwall"); yield return null;
+            Require(view.HasModal && document.RevisionToken == alignmentRevision,
+                "Loaded-part alignment mutated before confirmation");
+            NativeClick(view, null, Field<Button>(view, "dialogPrimaryButton")); yield return null;
+            string alignedLoadedId = document.Parts.Single(part => part.StableId != "a" && part.StableId != "b" && part.StableId != "missing").StableId;
+            Require(document.Parts.Count == 4 && document.Parts.Any(part => part.StableId == "a") &&
+                loadedScene.TryGetBounds(new[] { alignedLoadedId }, out Bounds alignedBounds) &&
+                Vector3.Distance(loadedBounds.center, alignedBounds.center) < .001f,
+                "Loaded-part alignment removed its target or misplaced its copy");
+            NativeClick(view, null, Field<Button>(view, "undoButton")); yield return null;
+            Require(document.Parts.Count == 3, "Loaded-part alignment was not one Undo");
             document.SelectOnly("missing"); Call(controller, "Bind", (object)null);
             Require(!view.MissingReplacementAvailable, "Replacement enabled without any chosen own part");
             int initialRevision = document.RevisionToken;
@@ -626,8 +708,9 @@ internal static partial class ControllerInputAcceptance
                 document.Sources[0].Text == evidence.Text && document.Groups.Single(group => group.StableId == "g").PivotPartId == copiedAnchor.StableId &&
                 V(copiedAnchor.Position).magnitude < .001f && copiedAnchor.Scale.X == 2 &&
                 document.Parts.Single(part => part.StableId == "a").Position.X == 3, "Confirmed copy replacement lost original/pose/source/support/pivot");
-            Require(!Field<Button>(view, "replaceMissingButton").gameObject.activeSelf,
-                "Replacement entry remains after the last missing part was replaced");
+            document.SelectOnly(copiedAnchor.StableId); Call(controller, "Bind", (object)null);
+            Require(Field<Button>(view, "replaceMissingButton").gameObject.activeSelf && view.CatalogReplacementAvailable,
+                "Loaded replacement cannot be replaced again through the catalogue");
             NativeClick(view, null, Field<Button>(view, "undoButton")); yield return null;
             Require(document.Parts.Count == 3 && document.PrimaryPartId == "missing" && document.Groups.Count == 1,
                 "One native Undo did not restore missing row and hierarchy");

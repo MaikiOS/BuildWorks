@@ -1,3 +1,8 @@
+## Verified checkpoint .190 — 2026-10-15
+
+Reject conflicting native itemData/loose ItemStand fields while preserving exact source bytes. Read cheated only for native110, not109. Retain the editor catalog resolver's Hammer-unavailability reason. Geometry red→green, Store, normal/QA0/0, Host/isolation/localization and independent PASSED/Ship passed. Verify helper unavailable; direct review/tests used. Three targeted whitespace diagnostics are unchanged baseline.
+
+Guarded QA0.19.190.0 installed after owner exit; both hashes match and117 previous QA files are unchanged. Native warning acceptance remains open. [Evidence](CONVERTER_SNAPSHOT_190.md), [test35](MANUAL_QA_190_RU.md). Next: verified old→new prefab migrations, no guessed aliases. Full goal remains active/incomplete.
 ## Native game QA .189 — 2026-10-15
 
 The Forest Hut case after four explicit replacements passed through actual logout/reload:28/28 native placements/payments without exceptions, Wood64→6 (58), all28 TRS survived. Across reload, position/scale unchanged, quaternion delta ≤4.4e-8; full inventory matched. Native ZDO.Load reassigns IDs;28 unique current records verified. The later second-house input was manual, owner-confirmed. Temporary god/ghost are off, input released, source unchanged. Goal API ACTIVE; full module incomplete. Next in goal order: remaining converters/corpora, incomplete blueprints and metadata/replacements, then items/rights, persistent project/v11 and selection.

@@ -27,6 +27,7 @@ namespace OstrixMods.BuildWorks.StoreTests
         internal static void Run()
         {
             HashedMounts();
+            ConflictingNativeSnapshots();
             PreparationScope();
             MaterialSeeds();
             BackgroundSubmission();
@@ -156,6 +157,45 @@ namespace OstrixMods.BuildWorks.StoreTests
             Console.WriteLine("PASS bound hashed holders: name/hash/metadata agreement, full snapshot, source/portable preservation, independent exclusion and atomic unknown refusal");
         }
 
+        private static void ConflictingNativeSnapshots()
+        {
+            foreach (byte version in new byte[] { 109, 110 })
+            {
+                byte[] item = Convert.FromBase64String(Package(w => {
+                    w.Write(version); w.Write(1234); w.Write((byte)0); w.Write((byte)0); w.Write((byte)0);
+                    w.Write((byte)68); w.Write((ushort)2); w.Write(Hash("AxeIron")); w.Write((byte)0);
+                }));
+                foreach (int quality in new[] { 2, 3 })
+                {
+                    string raw = Package(w => {
+                        w.Write(136); w.Write((byte)2); w.Write(Hash("item")); w.Write(Hash("AxeIron"));
+                        w.Write(Hash("quality")); w.Write(quality);
+                        w.Write((byte)1); w.Write(Hash("itemData")); w.Write(item.Length); w.Write(item);
+                    });
+                    string text = "#Pieces\nitemstand;;0;0;0;0;0;0;1;\"AxeIron:0:" + quality + ":0\";1;1;1;" + raw;
+                    var source = ExternalBlueprintLibrary.Parse(text, "snapshot-conflict.blueprint");
+                    var converted = Prepare(source);
+                    Require(converted.importError == null && converted.parts.Count == 1 &&
+                        source.parts[0].foreignData.zdo == raw && converted.sourceDocuments.Single().text == text,
+                        "Snapshot agreement check changed source records or transforms");
+                    if (quality == 2)
+                        Require(converted.parts[0].foreignData?.format == BlueprintForeignPartData.NativeItemStandFormat &&
+                            converted.parts[0].foreignData.zdo == Convert.ToBase64String(item), "Matching snapshot changed bytes/version");
+                    else
+                    {
+                        Require(converted.parts[0].foreignData?.format == "blueprint" &&
+                            converted.parts[0].foreignData.zdo == raw && CompositeBlueprintStore.InspectContents(converted, Hash).Unknown == 1,
+                            "Conflicting snapshot was reported as supported contents");
+                        var reopened = BlueprintExchangeFormat.Decode(Encoding.UTF8.GetString(
+                            BlueprintExchangeFormat.Encode(ExternalBlueprintLibrary.DetachedCopy(converted))));
+                        Require(reopened.parts[0].foreignData.zdo == raw && reopened.sourceDocuments.Single().text == text &&
+                            CompositeBlueprintStore.InspectContents(reopened, Hash).Unknown == 1,
+                            "Conflicting snapshot/source lost its unknown status during portable roundtrip");
+                    }
+                }
+            }
+            Console.WriteLine("PASS native snapshot conflicts: matching109/110 bytes retained, conflicting bound Info/loose fields inert, unknown review and portable source preserved");
+        }
         private static CompositeBlueprintStore.Blueprint Prepare(CompositeBlueprintStore.Blueprint source) =>
             ExternalBlueprintLibrary.PrepareForHost(source, _ => new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 }, Hash, 0);
         private static void MaterialSeeds()

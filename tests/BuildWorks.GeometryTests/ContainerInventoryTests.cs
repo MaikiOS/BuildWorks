@@ -39,7 +39,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             var first = items[0]; var second = items[1];
             Require(first.SourceVersion == 109 && first.Prefab == "AxeIron" && first.Stack == 12 && first.Quality == 3 && first.Variant == 2 &&
                 first.X == 4 && first.Y == 1 && first.WorldLevel == 3 && first.DurabilityHundredths == 12505 &&
-                first.PickedUp && first.Equipped && first.Cheated && first.CrafterId == -123 && first.CrafterName == "Острикс 🪓" &&
+                first.PickedUp && first.Equipped && !first.Cheated && first.CrafterId == -123 && first.CrafterName == "Острикс 🪓" &&
                 first.CustomData.Count == 2 && first.CustomData["мод:данные"] == "exact\0payload\r\n🪵");
             Require(second.Prefab == "Wood" && second.Stack == 1 && second.Quality == 1 && second.Variant == 0 &&
                 second.CrafterId == 0 && second.CrafterName == "" && second.CustomData.Count == 0 && !second.Cheated && !second.Equipped);

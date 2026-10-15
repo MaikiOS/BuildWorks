@@ -820,6 +820,8 @@ namespace OstrixMods.BuildWorks
                 List<Piece> blueprintParts = null;
                 bool resolved = string.IsNullOrEmpty(unavailable) && TryResolveBlueprintPieces(
                     player, blueprint, out blueprintParts, out missing, forEditor: true);
+                if (!resolved && !string.IsNullOrEmpty(missing))
+                    warning = string.IsNullOrEmpty(warning) ? missing : warning + "\n" + missing;
                 var costs = (resolved ? HammerBlueprintPieceRegistry.ResourceCosts(blueprintParts) : Array.Empty<HammerBlueprintPieceRegistry.ResourceInfo>())
                     .Select(x => new BlueprintEditorCatalogResource(x.Name, x.Icon, x.Amount)).ToList();
                 string requiredStations = null; Sprite requiredIcon = null;

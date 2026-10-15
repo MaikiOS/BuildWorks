@@ -185,7 +185,7 @@ namespace OstrixMods.BuildWorks.Geometry
             int extraFlags = reader.ReadByte();
             if ((extraFlags & ~1) != 0) throw new InvalidDataException("Unknown native item flags.");
             return new Item(prefab, durability, x, y, worldLevel, flags, quality, stack, variant,
-                crafterId, crafterName, customData, (extraFlags & 1) != 0, sourceVersion: version);
+                crafterId, crafterName, customData, version >= 110 && (extraFlags & 1) != 0, sourceVersion: version);
         }
 
         // BinaryWriter strings use a canonical 7-bit UTF-8 byte length. Bound it before allocating.

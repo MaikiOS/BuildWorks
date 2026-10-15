@@ -51,6 +51,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Reject(Package(w => { w.Write(16); w.Write((byte)1); w.Write(1); w.Write(new byte[] { 128, 0 }); }));
             Reject(Package(w => { w.Write(512); w.Write((byte)2); }));
             LegacyItem();
+            NativeSnapshotConflicts();
         }
         private static void LegacyItem()
         {
@@ -102,6 +103,55 @@ namespace OstrixMods.BuildWorks.GeometryTests
                 "AxeIron:0:1:1", "AxeIron:0:0:0", "AxeIron:0:1:0:extra", "Axe/Iron:0:1:0" })
                 Require(!BlueprintItemStandContents.TryConvertLegacy(hashedState, Hash, null, out _, out _, info),
                     "Invalid or conflicting hashed item manifest accepted");
+        }
+        private static void NativeSnapshotConflicts()
+        {
+            int Hash(string text) => text == "AxeIron" ? 100 : text.GetHashCode();
+            foreach (byte version in new byte[] { 109, 110 })
+            {
+                byte[] item = ItemStandContentsTests.Packet(hash: 100); item[0] = version;
+                foreach (bool hashed in new[] { false, true })
+                {
+                    string Packet(string changed = null)
+                    {
+                        var ints = new System.Collections.Generic.Dictionary<string, int>
+                        { ["quality"] = 3, ["stack"] = 1, ["variant"] = 2, ["worldLevel"] = 3,
+                            ["pickedUp"] = 1, ["cheated"] = version >= 110 ? 1 : 0, ["type"] = 1, ["dataCount"] = 1 };
+                        if (changed != null && ints.ContainsKey(changed)) ints[changed] = ints[changed] == 1 ? 0 : ints[changed] + 1;
+                        var strings = new System.Collections.Generic.Dictionary<string, string>
+                        { ["crafterName"] = "Острикс 🪓", ["data_0"] = "mod:key0", ["data__0"] = "exact\0payload\r\n🪵" };
+                        if (changed == "crafterName") strings[changed] = "Other";
+                        if (changed == "customValue") strings["data__0"] = "changed";
+                        if (changed == "customKey") strings["data_0"] = "new:key";
+                        if (hashed) ints["item"] = 100; else strings["item"] = "AxeIron";
+                        return Convert.ToBase64String(Package(w => {
+                            w.Write(217);
+                            w.Write((byte)1); w.Write(Hash("durability")); w.Write(changed == "durability" ? 120f : 125.05f);
+                            w.Write((byte)ints.Count); foreach (var pair in ints) { w.Write(Hash(pair.Key)); w.Write(pair.Value); }
+                            w.Write((byte)1); w.Write(Hash("crafterID")); w.Write(changed == "crafterID" ? -122L : -123L);
+                            w.Write((byte)strings.Count); foreach (var pair in strings) { w.Write(Hash(pair.Key)); w.Write(pair.Value); }
+                            w.Write((byte)1); w.Write(Hash("itemData")); w.Write(item.Length); w.Write(item);
+                        }));
+                    }
+                    string bound = hashed ? "AxeIron:2:3:1" : null;
+                    string identical = Packet();
+                    Require(BlueprintForeignZdo.TryRead(identical, out var matching) &&
+                        BlueprintItemStandContents.TryConvertLegacy(matching, Hash, 99, out var preserved, out var used, bound) &&
+                        preserved.Zdo == Convert.ToBase64String(item) && used.Count == matching.Count,
+                        "Matching loose fields changed native snapshot bytes");
+                    foreach (string field in new[] { "quality", "variant", "worldLevel", "pickedUp", "cheated", "durability", "dataCount",
+                        "crafterID", "crafterName", "customValue", "customKey" })
+                    {
+                        string raw = Packet(field);
+                        Require(BlueprintForeignZdo.TryRead(raw, out var conflict), "Conflicting field fixture malformed: " + field);
+                        string info = hashed && field == "quality" ? "AxeIron:2:4:1" : bound;
+                        Require(!BlueprintItemStandContents.TryConvertLegacy(conflict, Hash, 99, out var result, out var consumed, info) &&
+                            result == null && consumed.Count == 0 && conflict.TryGet<byte[]>(Hash("itemData"), out var retained) &&
+                            Convert.ToBase64String(retained) == Convert.ToBase64String(item),
+                            "Conflicting loose " + field + " overwrote native item snapshot v" + version + ", hashed=" + hashed);
+                    }
+                }
+            }
         }
         private static byte[] Package(Action<BinaryWriter> write)
         {

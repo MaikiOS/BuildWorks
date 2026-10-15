@@ -42,9 +42,11 @@ namespace OstrixMods.BuildWorks.Geometry
                 int prefabId = hash(prefab);
                 if (prefabId == 0) return false;
                 BlueprintContainerInventory.Item original = null;
+                byte[] originalPacket = null;
                 if (source.HasHash(hash("itemData")))
                 {
                     if (!source.TryGet<byte[]>(hash("itemData"), out var packet)) return false;
+                    originalPacket = packet;
                     using (var input = new MemoryStream(packet, false))
                     using (var reader = new BinaryReader(input, new UTF8Encoding(false, true)))
                     {
@@ -69,6 +71,10 @@ namespace OstrixMods.BuildWorks.Geometry
                     if (saved < 0 || saved >= 2147483648f) return false;
                     durability = (int)saved;
                 }
+                // Native LoadFromZDO reads itemData only. Conflicting loose representations stay inert.
+                if (original != null && (quality != original.Quality || stack != original.Stack || variant != original.Variant ||
+                    world != original.WorldLevel || crafter != original.CrafterId || crafterName != original.CrafterName ||
+                    pickedUp != original.PickedUp || cheated != original.Cheated || durability != original.DurabilityHundredths)) return false;
                 if (quality < 1 || quality > ushort.MaxValue || stack != 1 || variant < 0 || orientation < 0 ||
                     world < 0 || world > byte.MaxValue || crafter == 0 && crafterName != "") return false;
                 if (info != null && (variant != int.Parse(info[1], CultureInfo.InvariantCulture) ||
@@ -77,6 +83,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 if (original != null) foreach (var pair in original.CustomData) custom.Add(pair.Key, pair.Value);
                 int count = Get("dataCount", 0);
                 if (count < 0 || count > 4096) return false;
+                if (original != null && source.HasHash(hash("dataCount")) && count != original.CustomData.Count) return false;
                 var looseKeys = new HashSet<string>(StringComparer.Ordinal);
                 for (int index = 0; index < count; ++index)
                 {
@@ -84,13 +91,15 @@ namespace OstrixMods.BuildWorks.Geometry
                     string key = Get("data_" + suffix, ""), value = Get("data__" + suffix, "");
                     if (key == "") { if (value != "") return false; continue; }
                     if (!looseKeys.Add(key)) return false;
+                    if (original != null && (!original.CustomData.TryGetValue(key, out string saved) || saved != value)) return false;
                     custom[key] = value;
                 }
+                if (original != null && source.HasHash(hash("dataCount")) && looseKeys.Count != original.CustomData.Count) return false;
                 if (custom.Count > 32767) return false;
                 using (var output = new MemoryStream())
                 using (var writer = new BinaryWriter(output, new UTF8Encoding(false, true)))
                 {
-                    writer.Write((byte)(original?.SourceVersion ?? 109)); writer.Write(durability);
+                    writer.Write((byte)(original?.SourceVersion ?? (cheated ? 110 : 109))); writer.Write(durability);
                     writer.Write((byte)(original?.X ?? 0)); writer.Write((byte)(original?.Y ?? 0)); writer.Write((byte)world);
                     int flags = 64 | (pickedUp ? 1 : 0) | (original?.Equipped == true ? 2 : 0) |
                         (quality != 1 ? 4 : 0) | (variant != 0 ? 16 : 0) | (crafter != 0 ? 32 : 0) | (custom.Count != 0 ? 128 : 0);
@@ -110,7 +119,7 @@ namespace OstrixMods.BuildWorks.Geometry
                     writer.Write((byte)(cheated ? 1 : 0)); writer.Flush();
                     var result = new BlueprintForeignPartData(BlueprintForeignPartData.NativeItemStandFormat,
                         prefab + ":" + variant.ToString(CultureInfo.InvariantCulture) + ":" + quality.ToString(CultureInfo.InvariantCulture) +
-                        ":" + orientation.ToString(CultureInfo.InvariantCulture), Convert.ToBase64String(output.ToArray()), null);
+                        ":" + orientation.ToString(CultureInfo.InvariantCulture), Convert.ToBase64String(originalPacket ?? output.ToArray()), null);
                     if (!TryRead(result, hash, out _)) return false;
                     converted = result; consumed = used; return true;
                 }

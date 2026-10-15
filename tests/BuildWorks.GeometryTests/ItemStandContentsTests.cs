@@ -45,7 +45,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Require(BlueprintItemStandContents.TryRead(source, _ => -101, out var item));
             Require(item.Prefab == "SwordIron" && item.Stack == 1 && item.Quality == 3 && item.Variant == 2 &&
                 item.DurabilityHundredths == 12505 && item.X == 254 && item.Y == 255 && item.WorldLevel == 3 &&
-                item.PickedUp && item.Equipped && item.Cheated && item.CrafterId == -123 && item.CrafterName == "Острикс 🪓" &&
+                item.PickedUp && item.Equipped && !item.Cheated && item.CrafterId == -123 && item.CrafterName == "Острикс 🪓" &&
                 item.CustomData["mod:key0"] == "exact\0payload\r\n🪵");
             bool immutable = false;
             try { ((IDictionary<string, string>)item.CustomData).Clear(); } catch (NotSupportedException) { immutable = true; }

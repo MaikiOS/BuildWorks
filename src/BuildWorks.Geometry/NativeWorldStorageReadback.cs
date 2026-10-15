@@ -8,7 +8,7 @@ using System.Threading;
 
 namespace OstrixMods.BuildWorks.Geometry
 {
-    // Read-only structural evidence for one committed world41 generation.
+    // Read-only structural evidence for one committed world41/42 generation.
     // Does not load game state, authorize a refund or prove a two-file transaction.
     public static class NativeWorldStorageReadback
     {
@@ -18,6 +18,7 @@ namespace OstrixMods.BuildWorks.Geometry
         public const int MaximumObjects = 4000000;
         public const int MaximumChunks = 65536;
         private static readonly Encoding Utf8 = new UTF8Encoding(false, true);
+        internal static bool SupportedVersion(int version) => version == 41 || version == 42;
         public sealed class Expectation
         {
             public long World { get; }
@@ -30,7 +31,8 @@ namespace OstrixMods.BuildWorks.Geometry
             public Expectation(long world, Guid operation, int prefab, long creator, int creatorKey, int markerKey, int itemsKey, byte[] inventory)
             {
                 if (world == 0 || operation == Guid.Empty || prefab == 0 || creator == 0 || creatorKey == markerKey || markerKey == itemsKey || creatorKey == itemsKey ||
-                    inventory == null || inventory.Length < 6 || inventory.Length > 1024 * 1024 || BitConverter.ToInt32(inventory, 0) != 109)
+                    inventory == null || inventory.Length < 6 || inventory.Length > 1024 * 1024 ||
+                    BitConverter.ToInt32(inventory, 0) != 109 && BitConverter.ToInt32(inventory, 0) != 110)
                     throw new ArgumentException("Invalid saved-storage expectation.");
                 World = world; Operation = operation; Prefab = prefab; Creator = creator;
                 CreatorKey = creatorKey; MarkerKey = markerKey; ItemsKey = itemsKey; Inventory = (byte[])inventory.Clone();
@@ -39,6 +41,7 @@ namespace OstrixMods.BuildWorks.Geometry
         }
         public sealed class Evidence
         {
+            public int FormatVersion { get; }
             public long World { get; }
             public Guid Operation { get; }
             public int Chunks { get; }
@@ -46,8 +49,9 @@ namespace OstrixMods.BuildWorks.Geometry
             public string Chunk { get; }
             public long ObjectOffset { get; }
             public string InventorySha256 { get; }
-            internal Evidence(Expectation expected, int chunks, int objects, string chunk, long offset)
+            internal Evidence(Expectation expected, int version, int chunks, int objects, string chunk, long offset)
             {
+                FormatVersion = version;
                 World = expected.World; Operation = expected.Operation; Chunks = chunks; Objects = objects; Chunk = chunk; ObjectOffset = offset;
                 using (var hash = SHA256.Create()) InventorySha256 = BitConverter.ToString(hash.ComputeHash(expected.Inventory)).Replace("-", "");
             }
@@ -65,11 +69,16 @@ namespace OstrixMods.BuildWorks.Geometry
             {
                 if (expected == null || openChunk == null) throw new InvalidDataException("Missing saved-storage context.");
                 cancellation.ThrowIfCancellationRequested();
+                int version;
                 using (var ok = Reader(completion, 4))
-                { if (ok.ReadInt32() != 41) throw new InvalidDataException("Unsupported world completion version."); End(ok); }
+                {
+                    version = ok.ReadInt32();
+                    if (!SupportedVersion(version)) throw new InvalidDataException("Unsupported world completion version.");
+                    End(ok);
+                }
                 using (var meta = Reader(metadata, MaximumMetadataBytes))
                 {
-                    if (meta.ReadInt32() != metadata.Length - 4 || meta.ReadInt32() != 41)
+                    if (meta.ReadInt32() != metadata.Length - 4 || meta.ReadInt32() != version)
                         throw new InvalidDataException("Invalid world metadata framing/version.");
                     Text(meta); Text(meta); meta.ReadInt32();
                     if (meta.ReadInt64() != expected.World) throw new InvalidDataException("Different saved world UID.");
@@ -84,20 +93,20 @@ namespace OstrixMods.BuildWorks.Geometry
                 var chunks = new List<ChunkInfo>();
                 using (var map = Reader(mapping, MaximumMetadataBytes))
                 {
-                    if (map.ReadUInt16() != 41) throw new InvalidDataException("Unsupported chunk mapping version.");
+                    if (map.ReadUInt16() != version) throw new InvalidDataException("Unsupported chunk mapping version.");
                     int declared = map.ReadInt32(), count = Count(map, MaximumChunks, 11);
                     if (declared < 0 || declared > MaximumObjects) throw new InvalidDataException("World object budget exceeded.");
                     var seen = new HashSet<(ushort, byte)>(); long actual = 0;
                     for (int i = 0; i < count; ++i)
                     {
-                        ushort chunk = map.ReadUInt16(); byte size = map.ReadByte(); uint version = map.ReadUInt32(); int objects = map.ReadInt32();
-                        if (!seen.Add((chunk, size)) || version == 0 || objects < 0 || (actual += objects) > MaximumObjects)
+                        ushort chunk = map.ReadUInt16(); byte size = map.ReadByte(); uint generation = map.ReadUInt32(); int objects = map.ReadInt32();
+                        if (!seen.Add((chunk, size)) || generation == 0 || objects < 0 || (actual += objects) > MaximumObjects)
                             throw new InvalidDataException("Invalid or duplicate chunk mapping.");
                         chunks.Add(new ChunkInfo
                         {
                             Name = (chunk >> 8).ToString("x2", CultureInfo.InvariantCulture) + "_" +
                             (chunk & 255).ToString("x2", CultureInfo.InvariantCulture) + "__" + size.ToString(CultureInfo.InvariantCulture) + "_" +
-                            version.ToString(CultureInfo.InvariantCulture) + ".chunk",
+                            generation.ToString(CultureInfo.InvariantCulture) + ".chunk",
                             Count = objects
                         });
                     }
@@ -116,7 +125,7 @@ namespace OstrixMods.BuildWorks.Geometry
                     {
                         bytes = checked(bytes + stream.Length);
                         if (bytes > MaximumWorldBytes) throw new InvalidDataException("World readback byte budget exceeded.");
-                        if (reader.ReadUInt16() != 41 || Count(reader, MaximumObjects, 10) != chunk.Count)
+                        if (!SupportedVersion(reader.ReadUInt16()) || Count(reader, MaximumObjects, 10) != chunk.Count)
                             throw new InvalidDataException("Chunk header differs from committed mapping.");
                         for (int i = 0; i < chunk.Count; ++i)
                         {
@@ -130,7 +139,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 }
                 if (matches != 1) throw new InvalidDataException("Saved operation marker not found.");
                 cancellation.ThrowIfCancellationRequested();
-                evidence = new Evidence(expected, chunks.Count, totalObjects, foundChunk, foundOffset); return true;
+                evidence = new Evidence(expected, version, chunks.Count, totalObjects, foundChunk, foundOffset); return true;
             }
             catch (Exception error) when (error is IOException || error is InvalidDataException || error is UnauthorizedAccessException ||
                 error is ArgumentException || error is OverflowException || error is OperationCanceledException)

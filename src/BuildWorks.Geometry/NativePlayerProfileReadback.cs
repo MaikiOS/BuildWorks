@@ -38,8 +38,8 @@ namespace OstrixMods.BuildWorks.Geometry
                     !BlueprintContainerInventory.TryRead(expected, prefabHash, out _))
                     throw new InvalidDataException("Invalid expected live inventory.");
                 byte[] inventory = Convert.FromBase64String(expected.Zdo);
-                if (inventory.Length < 6 || BitConverter.ToInt32(inventory, 0) != 109)
-                    throw new InvalidDataException("Only native inventory 109 is covered.");
+                if (inventory.Length < 6 || BitConverter.ToInt32(inventory, 0) != 109 && BitConverter.ToInt32(inventory, 0) != 110)
+                    throw new InvalidDataException("Only native inventories 109 and 110 are covered.");
                 if (file == null || !file.CanRead || !file.CanSeek || file.Position != 0 ||
                     file.Length < 72 || file.Length > MaximumProfileBytes)
                     throw new InvalidDataException("Profile file exceeds the supported framing or budget.");
@@ -62,8 +62,9 @@ namespace OstrixMods.BuildWorks.Geometry
                 using (var stream = new MemoryStream(payload, false))
                 using (var reader = new BinaryReader(stream, new UTF8Encoding(false, true)))
                 {
-                    if (reader.ReadInt32() != 46 || reader.ReadInt32() != 205 || reader.ReadInt32() != 10)
-                        throw new InvalidDataException("Only native profile 46 is covered.");
+                    int profileVersion = reader.ReadInt32();
+                    if (profileVersion != 46 && profileVersion != 47 || reader.ReadInt32() != 205 || reader.ReadInt32() != 10)
+                        throw new InvalidDataException("Only native profiles 46 and 47 are covered.");
                     for (int group = 0; group < 10; group++)
                     {
                         Skip(reader, 205 * 4);
@@ -95,7 +96,10 @@ namespace OstrixMods.BuildWorks.Geometry
                             if (reader.ReadByte() != playerData[i]) throw new InvalidDataException("Canonical player data differs from the fresh save request.");
                         stream.Position = begin;
                     }
-                    if (playerBytes != stream.Length - stream.Position || reader.ReadInt32() != 33)
+                    if (playerBytes != stream.Length - stream.Position)
+                        throw new InvalidDataException("Invalid player-data framing.");
+                    int playerVersion = reader.ReadInt32();
+                    if (playerVersion != 33 && playerVersion != 34)
                         throw new InvalidDataException("Invalid player-data framing or unsupported version.");
                     for (int i = 0; i < 4; i++) ReadFinite(reader);
                     ReadString(reader); ReadFinite(reader);

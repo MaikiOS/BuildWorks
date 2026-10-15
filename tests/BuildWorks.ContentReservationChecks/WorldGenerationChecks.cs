@@ -17,17 +17,17 @@ namespace ReservationChecks
             using (var memory = new MemoryStream())
             { using (var writer = new BinaryWriter(memory, Encoding.UTF8, true)) write(writer); return memory.ToArray(); }
         }
-        internal static void WriteWorld(TransferChecks.Frame frame, string root, uint generation = 7)
+        internal static void WriteWorld(TransferChecks.Frame frame, string root, uint generation = 7, int formatVersion = 41, int? chunkVersion = null)
         {
             Guid marker = frame.Operation;
-            byte[] payload = Bytes(w => { w.Write(41); w.Write("QA"); w.Write("seed"); w.Write(10); w.Write(1L); w.Write(1); w.Write(true); w.Write(0); w.Write(0); });
+            byte[] payload = Bytes(w => { w.Write(formatVersion); w.Write("QA"); w.Write("seed"); w.Write(10); w.Write(1L); w.Write(1); w.Write(true); w.Write(0); w.Write(0); });
             File.WriteAllBytes(Path.Combine(root, "_main." + generation + ".fwl2"), Bytes(w => { w.Write(payload.Length); w.Write(payload); }));
-            File.WriteAllBytes(Path.Combine(root, "_main." + generation + ".chunks"), Bytes(w => { w.Write((short)41); w.Write(1); w.Write(1); w.Write((ushort)258); w.Write((byte)3); w.Write(generation); w.Write(1); }));
-            File.WriteAllBytes(Path.Combine(root, "_main." + generation + ".ok"), BitConverter.GetBytes(41));
-            File.WriteAllBytes(Path.Combine(root, "_main." + generation + ".db2"), Bytes(w => { w.Write(41); w.Write(123d); }));
+            File.WriteAllBytes(Path.Combine(root, "_main." + generation + ".chunks"), Bytes(w => { w.Write((short)formatVersion); w.Write(1); w.Write(1); w.Write((ushort)258); w.Write((byte)3); w.Write(generation); w.Write(1); }));
+            File.WriteAllBytes(Path.Combine(root, "_main." + generation + ".ok"), BitConverter.GetBytes(formatVersion));
+            File.WriteAllBytes(Path.Combine(root, "_main." + generation + ".db2"), Bytes(w => { w.Write(formatVersion); w.Write(123d); }));
             byte[] inventory = frame.Placed.Container.View.Data.Raw;
             File.WriteAllBytes(Path.Combine(root, "01_02__3_" + generation + ".chunk"), Bytes(w => {
-                w.Write((short)41); w.Write(1); w.Write((ushort)(256 | 32 | 64 | 128));
+                w.Write((short)(chunkVersion ?? formatVersion)); w.Write(1); w.Write((ushort)(256 | 32 | 64 | 128));
                 w.Write(0f); w.Write(0f); w.Write(0f); w.Write(123);
                 w.Write((byte)1); w.Write(ZDOVars.s_creator); w.Write(100L);
                 w.Write((byte)1); w.Write(BlueprintStorageCapture.TransferMarkerKey); w.Write(marker.ToString("N"));
@@ -62,6 +62,13 @@ namespace ReservationChecks
                 Check(binding.Operation == frame.Operation && binding.Generation == 7 && binding.TryFinish(out var evidence, out _) &&
                     evidence.Operation == frame.Operation && evidence.World == 1, "Exact completed world evidence missing");
                 Check(!binding.TryStart(CancellationToken.None, out _), "Worker started twice");
+                WriteWorld(frame, root, formatVersion: 42);
+                binding = Read(frame);
+                Check(binding.TryFinish(out var currentEvidence, out _) && currentEvidence.FormatVersion == 42,
+                    "Native file adapter rejects supported world42");
+                WriteWorld(frame, root, formatVersion: 42, chunkVersion: 41);
+                binding = Read(frame); Check(binding.TryFinish(out _, out _), "Retained world41 chunk rejected");
+                WriteWorld(frame, root);
                 Check(BlueprintStorageTransferJournal.Read(frame.Transfer.JournalPath).RequiresReconciliation, "Readback settled journal");
                 foreach (var source in new[] { FileHelpers.FileSource.Auto, FileHelpers.FileSource.Cloud, FileHelpers.FileSource.Legacy })
                 {
@@ -101,6 +108,8 @@ namespace ReservationChecks
                     File.Move(path + ".new", path);
                 }
                 string database = Path.Combine(root, "_main.7.db2"); File.WriteAllBytes(database, Bytes(w => { w.Write(42); w.Write(123d); }));
+                binding = Read(frame); Check(!binding.TryFinish(out _, out _), "Mixed DB2/committed format versions accepted");
+                File.WriteAllBytes(database, Bytes(w => { w.Write(43); w.Write(123d); }));
                 binding = Read(frame); Check(!binding.TryFinish(out _, out _), "Future DB2 accepted");
                 File.WriteAllBytes(database, Bytes(w => { w.Write(41); w.Write(double.NaN); })); binding = Read(frame); Check(!binding.TryFinish(out _, out _), "Nonfinite DB2 accepted"); WriteWorld(frame, root);
                 string chunk = Path.Combine(root, "01_02__3_7.chunk"); File.Move(chunk, chunk + ".old"); binding = Read(frame); Check(!binding.TryFinish(out _, out _), "Missing mapped chunk accepted"); File.Move(chunk + ".old", chunk);

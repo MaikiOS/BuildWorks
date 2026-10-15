@@ -27,12 +27,15 @@ namespace OstrixMods.BuildWorks.Geometry
                 using (var database = Open(root, prefix + ".db2"))
                 using (var header = new BinaryReader(database, System.Text.Encoding.UTF8, true))
                 {
-                    if (database.Length < 12 || database.Length > NativeWorldStorageReadback.MaximumWorldBytes || header.ReadInt32() != 41)
+                    if (database.Length < 12 || database.Length > NativeWorldStorageReadback.MaximumWorldBytes)
                         throw new InvalidDataException("Invalid committed DB2 header or budget.");
+                    int version = header.ReadInt32();
+                    if (!NativeWorldStorageReadback.SupportedVersion(version)) throw new InvalidDataException("Unsupported DB2 version.");
                     double time = header.ReadDouble();
                     if (double.IsNaN(time) || double.IsInfinity(time)) throw new InvalidDataException("Invalid DB2 world time.");
                     if (!NativeWorldStorageReadback.TryVerify(metadata, mapping, completion,
                         name => Open(root, name), expected, out var result, out reason, cancellation)) return false;
+                    if (result.FormatVersion != version) throw new InvalidDataException("DB2 and committed generation versions differ.");
                     CheckRoot(root);
                     cancellation.ThrowIfCancellationRequested();
                     evidence = result; return true;

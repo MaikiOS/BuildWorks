@@ -129,8 +129,8 @@ foreach ($name in @('CloudStorageSupported','CloudStorageSupportedAndEnabled','B
     Require ($strings -contains $name) "QA isolation omits native guard: $name"
 }
 $managed = 'C:/Program Files (x86)/Steam/steamapps/common/Valheim/valheim_Data/Managed'
-foreach ($entry in @(@('assembly_valheim.dll','25A0A107DCE4D834C44C2B72D0EAFD5CB7793933BDA81816ACCFA1EA9543DACE'),
-    @('assembly_utils.dll','6BE2AFEB97B5B26FD3176E1B8584C07E57AD48DDCD6E8E5E79E32BEE943827C1'))) {
+foreach ($entry in @(@('assembly_valheim.dll','94998885B103D6E5F5480123EAEE0A093E82AF2DDEEEE37536C15BF555F24F3A'),
+    @('assembly_utils.dll','771D59CBF3EF704007267E8EAF89AAC231C172B052BD93F9C273A18381BD6D59'))) {
     Require ($strings -contains $entry[1] -and (Get-FileHash -LiteralPath (Join-Path $managed $entry[0])).Hash -eq $entry[1]) 'QA native save contract fingerprint changed.'
 }
 $allCalls = ($type.Methods | Where-Object HasBody | ForEach-Object { $_.Body.Instructions | ForEach-Object { [string]$_.Operand } }) -join "`n"

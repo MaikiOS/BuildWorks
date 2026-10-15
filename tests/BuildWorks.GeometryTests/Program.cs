@@ -2134,7 +2134,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             foreach (string info in new[] { "0:2:0:0", "257:2:0:0", "5:2:0:1", "5:2:1:0|Wood", "1:1:2:2|Wood",
                 "5:2:2:12|Wood|AxeIron", "5:2:2:12|Wood|Wood", "5:2:2:12", "5:2:2:12|../Wood", "5:2:0:0|Wood" })
                 Throws<ArgumentException>(() => new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, info, Package(2), null));
-            foreach (string package in new[] { "not-base64", "AAAA", Package(2) + " ", Package(1), Package(2).Replace("bQ", "bg"),
+            foreach (string package in new[] { "not-base64", "AAAA", Package(2) + " ", Package(1), Package(2).Replace("bQ", "bw"),
                 Package(0, 7), Package(2, BlueprintForeignPartData.MaximumContainerBytes + 1) })
                 Throws<ArgumentException>(() => new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, "5:2:2:12|Wood", package, null));
             Throws<ArgumentException>(() => new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, "5:2:0:0", null, null));

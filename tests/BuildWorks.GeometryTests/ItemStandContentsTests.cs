@@ -34,6 +34,14 @@ namespace OstrixMods.BuildWorks.GeometryTests
                 new BlueprintForeignPartData(BlueprintForeignPartData.NativeItemStandFormat, info,
                     Convert.ToBase64String(bytes), null, cleared);
             var source = State(Packet());
+            byte[] currentPacket = Packet(); currentPacket[0] = 110;
+            var currentSource = State(currentPacket);
+            Require(BlueprintItemStandContents.TryRead(currentSource, _ => -101, out var current) &&
+                current.SourceVersion == 110 && current.Prefab == "SwordIron" && current.Quality == 3 &&
+                current.Variant == 2 && current.DurabilityHundredths == 12505 && current.Cheated &&
+                currentSource.Zdo == Convert.ToBase64String(currentPacket));
+            currentPacket[0] = 111;
+            Require(!BlueprintItemStandContents.TryRead(State(currentPacket), _ => -101, out _));
             Require(BlueprintItemStandContents.TryRead(source, _ => -101, out var item));
             Require(item.Prefab == "SwordIron" && item.Stack == 1 && item.Quality == 3 && item.Variant == 2 &&
                 item.DurabilityHundredths == 12505 && item.X == 254 && item.Y == 255 && item.WorldLevel == 3 &&
@@ -57,7 +65,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             for (int length = 3; length < Packet().Length; ++length)
                 Require(!BlueprintItemStandContents.TryRead(State(Packet().Take(length).ToArray()), _ => -101, out var partial) && partial == null);
             foreach (Action<byte[]> corrupt in new Action<byte[]>[] {
-                bytes => bytes[0] = 110, bytes => bytes[8] &= 191, // Version / missing prefab flag.
+                bytes => bytes[0] = 111, bytes => bytes[8] &= 191, // Unsupported future version / missing prefab flag.
                 bytes => bytes[bytes.Length - 1] = 2, bytes => bytes[9] = 0, // Future flags / zero quality.
                 bytes => bytes[24] = 255 }) // Malformed crafter UTF-8.
             {

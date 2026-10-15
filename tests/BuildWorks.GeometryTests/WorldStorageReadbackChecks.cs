@@ -17,8 +17,20 @@ namespace OstrixMods.BuildWorks.GeometryTests
         {
             var fixture = new Fixture();
             Check(fixture.Verify(out var evidence) && evidence.World == 71 && evidence.Operation == Operation &&
+                evidence.FormatVersion == 41 &&
                 evidence.Chunks == 1 && evidence.Objects == 1 && evidence.Chunk == "01_02__3_1.chunk" && evidence.ObjectOffset == 6 &&
                 evidence.InventorySha256.Length == 64, "Exact world/chunk identity evidence missing");
+            byte[] currentInventory = (byte[])Inventory.Clone(); currentInventory[0] = 110;
+            var current = new Fixture { Chunk = Chunk(inventory: currentInventory), Ok = BitConverter.GetBytes(42) };
+            current.Meta[4] = 42; current.Map[0] = 42; current.Chunk[0] = 42;
+            Check(current.Verify(out var currentEvidence, Expect(currentInventory)) && currentEvidence.FormatVersion == 42,
+                "World42/inventory110 structural evidence rejected");
+            current.Chunk[0] = 41;
+            Check(current.Verify(out _, Expect(currentInventory)), "Retained immutable world41 chunk rejected by world42 generation");
+            current.Meta[4] = 41;
+            Check(!current.Verify(out _, Expect(currentInventory)), "Mixed committed metadata/completion versions accepted");
+            current.Meta[4] = 42; current.Map[0] = 41;
+            Check(!current.Verify(out _, Expect(currentInventory)), "Mixed committed mapping/completion versions accepted");
             var expectedBytes = (byte[])Inventory.Clone();
             var frozen = Expect(expectedBytes); expectedBytes[4] = 1;
             Check(fixture.Verify(out _, frozen), "Expected native bytes aliased caller");
@@ -57,10 +69,10 @@ namespace OstrixMods.BuildWorks.GeometryTests
                 Check(!fixture.Verify(out _), "Trailing " + field + " accepted");
                 member.SetValue(fixture, valid);
             }
-            fixture.Ok = BitConverter.GetBytes(42); Check(!fixture.Verify(out _), "Future completion accepted");
-            fixture = new Fixture(); fixture.Meta[4] = 42; Check(!fixture.Verify(out _), "Future world metadata accepted");
-            fixture = new Fixture(); fixture.Map[0] = 42; Check(!fixture.Verify(out _), "Future mapping accepted");
-            fixture = new Fixture(); fixture.Chunk[0] = 42; Check(!fixture.Verify(out _), "Future chunk accepted");
+            fixture.Ok = BitConverter.GetBytes(43); Check(!fixture.Verify(out _), "Future completion accepted");
+            fixture = new Fixture(); fixture.Meta[4] = 43; Check(!fixture.Verify(out _), "Future world metadata accepted");
+            fixture = new Fixture(); fixture.Map[0] = 43; Check(!fixture.Verify(out _), "Future mapping accepted");
+            fixture = new Fixture(); fixture.Chunk[0] = 43; Check(!fixture.Verify(out _), "Future chunk accepted");
             fixture = new Fixture();
             using (var cancel = new CancellationTokenSource())
             {

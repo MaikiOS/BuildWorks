@@ -880,7 +880,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.188.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.189.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $serverAuthority = $plugin.MainModule.GetType('OstrixMods.BuildWorks.BlueprintServerAuthority')
 Assert-Contract ($null -ne $serverAuthority) 'Compiled server blueprint authority adapter is missing.'
@@ -3350,7 +3350,7 @@ Assert-Contract ($containerAccess.IsPrivate -and $containerAccess.Parameters.Cou
 $inventorySave = $inventoryType.Methods | Where-Object Name -eq 'Save'
 $inventorySaveCalls = ($inventorySave.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($inventorySave.IsPublic -and $inventorySave.Parameters.Count -eq 1 -and
-    @($inventorySave.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'ldc.i4.s' -and [int]$_.Operand -eq 109 }).Count -eq 1 -and
+    @($inventorySave.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'ldc.i4.s' -and [int]$_.Operand -eq 110 }).Count -eq 1 -and
     $inventorySaveCalls -match 'ZPackage::Write\(System.Int32\)' -and $inventorySaveCalls -match 'ZPackage::Write\(System.UInt16\)' -and
     $inventorySaveCalls -match 'ItemDrop/ItemData::Save\(ZPackage\)' -and
     $inventorySaveCalls -notmatch 'ZDO::|RPC|Object::Instantiate|Inventory::Changed|Inventory::Load' -and
@@ -3510,9 +3510,9 @@ foreach ($pattern in 'Player::GetPlayerID', 'PrivateArea::CheckAccess', 'Contain
 Assert-Contract ($storageCalls -notmatch 'Container::Save|Container::Load|Inventory::Load|ZDO::Set|RPC|Object::Instantiate|ItemDrop/ItemData::Load') 'Container snapshot mutates, restores or executes live state.'
 Assert-Contract ($storageCalls -match 'BlueprintContainerInventory::TryRead') 'Container snapshot skips full inert record/dependency validation.'
 $profileType = $hostAssembly.MainModule.Types | Where-Object Name -eq 'PlayerProfile'
-foreach ($entry in @(@(($profileType.Methods | Where-Object Name -eq 'SavePlayerToDisk'), '9ABD17CF7780C312C479207B5273419D060BE7C84061DC938E1991F1AA0FED68'),
+foreach ($entry in @(@(($profileType.Methods | Where-Object Name -eq 'SavePlayerToDisk'), '817B5007558E60B21D52418B2963669DB2E2A959EF79EB7EBBA119D0FF5824DB'),
         @(($profileType.Methods | Where-Object Name -eq 'GetPath'), '48ED45B9C17740FB81DF61B2C27FAE258D29E61AAA73E5F3BB527CA2D31354FA'),
-        @((($hostAssembly.MainModule.Types | Where-Object Name -eq 'Player').Methods | Where-Object { $_.Name -eq 'Save' -and $_.Parameters.Count -eq 1 }), 'EE28695FB669E517485F8C1382166A91A85B097790D4D8EE663EC86ABDD2565C'),
+        @((($hostAssembly.MainModule.Types | Where-Object Name -eq 'Player').Methods | Where-Object { $_.Name -eq 'Save' -and $_.Parameters.Count -eq 1 }), 'FA7F189A3414903FAE720CFFC442B3266A1CDE38C957A27DEB7D88DEA19E60E2'),
         @((($hostAssembly.MainModule.Types | Where-Object Name -eq 'ZPackage').Methods | Where-Object Name -eq 'GenerateHash'), 'CBA20AF2027558EB886A8CB8C7BB1C177882F220EA4DA66E5003CF0822D9BFD2'))) {
     Assert-Contract ((Get-NativeLayoutHash $entry[0]) -eq $entry[1]) "Native canonical-profile contract changed: $($entry[0].FullName)"
 }
@@ -3583,9 +3583,9 @@ foreach ($entry in @(@($itemSave, 'DAA9052430B2B766A8F15E221AB0D24C63FD55A6723EE
         @(($standType.Methods | Where-Object Name -eq 'Interact'), 'CFC7C1C57E2591E62CC01FE461664BB8E2DC9AAD9B5F822990279EF25D8BFD52'),
         @(($standType.Methods | Where-Object Name -eq 'DestroyAttachment'), '61403E7D10E8BA39FFAC1A5934BA9D6E33B97245D908CC17F3BB9B3C8372991B'),
         @(($standType.Methods | Where-Object Name -eq 'RPC_DestroyAttachment'), '6F7557FD696A8DEF565913F3967AB29152274BD0E563A31BFD1F6817D9930645'),
-        @($standItemSaveLayout, 'C56B9EAD97EB6B2C53595D38E6CA97E1EDF7507921DF86D2F88A09F74977BB79'),
+        @($standItemSaveLayout, '2AA920721B18F2C92DF93A183B8B4A2CF822516700DF8384208D31365DFADFB7'),
         @($nativeItemLoad, '63E24A305F38DB26E0D0AEEA4922D5421799DA1AB162641999F1541BF85C9475'),
-        @($standItemLoadLayout, '2E5AEE4DF444FCAA4463BA7D37B58A567C4BD38F4EFAFD05DAD596BD6839FD89'),
+        @($standItemLoadLayout, '4115D3B4262E05B05634A1117801E96E4A9162CAA176B0CB7D1A227DC46EA8FA'),
         @($standAttachLayout, '0E107474A83CB6A695BCC5FEBD2792760CB85264CFFA0F2172EA9F1A62CCCAE2'),
         @($numItemsSave, 'EFCB67745DEF1986C47B3526000AC07C0114FDA19AF57F0DABCDE653A6DC456E'),
         @($inventoryLoadLayout, 'E0E6FF90F203C6FFE961DE66768CDEDF609B896945E637A8166B121911BEF935'),

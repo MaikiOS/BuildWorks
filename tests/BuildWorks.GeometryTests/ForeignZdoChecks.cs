@@ -83,6 +83,14 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Require(BlueprintForeignZdo.TryRead(Convert.ToBase64String(outer), out var saved) &&
                 BlueprintItemStandContents.TryConvertLegacy(saved, Hash, null, out var unchanged, out _) &&
                 unchanged.Zdo == Convert.ToBase64String(original), "Native base item grid/world/custom insertion order changed");
+            byte[] currentOriginal = (byte[])original.Clone(); currentOriginal[0] = 110;
+            byte[] currentOuter = Package(w => { w.Write(144); w.Write((byte)1); w.Write(Hash("item")); w.Write("AxeIron");
+                w.Write((byte)1); w.Write(Hash("itemData")); w.Write(currentOriginal.Length); w.Write(currentOriginal); });
+            Require(BlueprintForeignZdo.TryRead(Convert.ToBase64String(currentOuter), out var currentSaved) &&
+                BlueprintItemStandContents.TryConvertLegacy(currentSaved, Hash, null, out var currentUnchanged, out _) &&
+                currentUnchanged.Zdo == Convert.ToBase64String(currentOriginal) &&
+                BlueprintItemStandContents.TryRead(currentUnchanged, Hash, out var currentItem) && currentItem.SourceVersion == 110,
+                "Native item110 conversion silently downgraded the source version or altered bytes");
             byte[] hashed = Package(w => { w.Write(136); w.Write((byte)1); w.Write(Hash("item")); w.Write(100);
                 w.Write((byte)1); w.Write(Hash("itemData")); w.Write(original.Length); w.Write(original); });
             Require(BlueprintForeignZdo.TryRead(Convert.ToBase64String(hashed), out var hashedState) &&

@@ -16,10 +16,28 @@ namespace OstrixMods.BuildWorks.GeometryTests
                 new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, info, Convert.ToBase64String(bytes), null);
             void Require(bool value) { if (!value) throw new InvalidOperationException("Native container inspection failed."); }
             byte[] packet = Packet();
+            byte[] currentPacket = Packet(); currentPacket[0] = 110;
+            var currentSource = State(currentPacket);
+            Require(BlueprintContainerInventory.TryRead(currentSource, Hash, out var current) &&
+                current[0].SourceVersion == 110 && current[0].Stack == 12 && current[0].Quality == 3 &&
+                current[0].DurabilityHundredths == 12505 && current[0].Cheated && current[0].CrafterId == -123 &&
+                current[0].CustomData["мод:данные"] == "exact\0payload\r\n🪵" && current[1].Stack == 1 && !current[1].Cheated &&
+                currentSource.Zdo == Convert.ToBase64String(currentPacket));
+            for (int length = 0; length < currentPacket.Length; length++)
+            {
+                bool rejected;
+                try { rejected = !BlueprintContainerInventory.TryRead(State(currentPacket.Take(length).ToArray()), Hash, out _); }
+                catch (ArgumentException) { rejected = true; }
+                Require(rejected);
+            }
+            byte[] future = (byte[])currentPacket.Clone(); future[0] = 111;
+            bool futureRejected = false;
+            try { State(future); } catch (ArgumentException) { futureRejected = true; }
+            Require(futureRejected);
             var source = State(packet);
             Require(BlueprintContainerInventory.TryRead(source, Hash, out var items) && items.Count == 2);
             var first = items[0]; var second = items[1];
-            Require(first.Prefab == "AxeIron" && first.Stack == 12 && first.Quality == 3 && first.Variant == 2 &&
+            Require(first.SourceVersion == 109 && first.Prefab == "AxeIron" && first.Stack == 12 && first.Quality == 3 && first.Variant == 2 &&
                 first.X == 4 && first.Y == 1 && first.WorldLevel == 3 && first.DurabilityHundredths == 12505 &&
                 first.PickedUp && first.Equipped && first.Cheated && first.CrafterId == -123 && first.CrafterName == "Острикс 🪓" &&
                 first.CustomData.Count == 2 && first.CustomData["мод:данные"] == "exact\0payload\r\n🪵");

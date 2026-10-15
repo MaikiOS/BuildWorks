@@ -8,7 +8,7 @@ using System.Text;
 
 namespace OstrixMods.BuildWorks.Geometry
 {
-    // Read the verified native v106/v109 layouts without Inventory.Load, prefabs or scripts.
+    // Read the verified native v106/v109/v110 layouts without Inventory.Load, prefabs or scripts.
     // The original payload remains authoritative; inspection never rewrites its bytes.
     public static class BlueprintContainerInventory
     {
@@ -16,10 +16,11 @@ namespace OstrixMods.BuildWorks.Geometry
         {
             internal Item(string prefab, int durability, int x, int y, int worldLevel, int flags,
                 int quality, int stack, int variant, long crafterId, string crafterName,
-                Dictionary<string, string> customData, bool cheated, float? legacyDurability = null)
+                Dictionary<string, string> customData, bool cheated, float? legacyDurability = null, int sourceVersion = 109)
             {
                 Prefab = prefab; DurabilityHundredths = legacyDurability.HasValue ? null : (int?)durability;
-                LegacyDurability = legacyDurability; X = x; Y = y; WorldLevel = worldLevel;
+                LegacyDurability = legacyDurability; SourceVersion = legacyDurability.HasValue ? 106 : sourceVersion;
+                X = x; Y = y; WorldLevel = worldLevel;
                 PickedUp = (flags & 1) != 0; Equipped = (flags & 2) != 0;
                 Quality = quality; Stack = stack; Variant = variant; CrafterId = crafterId;
                 CrafterName = crafterName; CustomData = new ReadOnlyDictionary<string, string>(customData); Cheated = cheated;
@@ -27,7 +28,7 @@ namespace OstrixMods.BuildWorks.Geometry
             public string Prefab { get; }
             public int? DurabilityHundredths { get; }
             public float? LegacyDurability { get; }
-            public int SourceVersion => LegacyDurability.HasValue ? 106 : 109;
+            public int SourceVersion { get; }
             public int X { get; }
             public int Y { get; }
             public int WorldLevel { get; }
@@ -62,14 +63,15 @@ namespace OstrixMods.BuildWorks.Geometry
                 using (var reader = new BinaryReader(stream, new UTF8Encoding(false, true)))
                 {
                     int version = reader.ReadInt32();
-                    if (version != 106 && version != 109 || (version == 106 ? reader.ReadInt32() : reader.ReadUInt16()) != count) return false;
+                    if (version != 106 && version != 109 && version != 110 ||
+                        (version == 106 ? reader.ReadInt32() : reader.ReadUInt16()) != count) return false;
                     var result = new List<Item>(count);
                     var cells = new HashSet<int>();
                     var usedNames = new HashSet<string>(StringComparer.Ordinal);
                     long total = 0;
                     for (int index = 0; index < count; ++index)
                     {
-                        Item item = version == 106 ? ReadLegacyItem(reader) : ReadItem(reader, names);
+                        Item item = version == 106 ? ReadLegacyItem(reader) : ReadItem(reader, names, version);
                         if (!names.TryGetValue(prefabHash(item.Prefab), out string name) || name != item.Prefab ||
                             item.X < 0 || item.Y < 0 || item.X >= width || item.Y >= height || !cells.Add(item.Y * width + item.X)) return false;
                         total += item.Stack; usedNames.Add(item.Prefab);
@@ -147,7 +149,7 @@ namespace OstrixMods.BuildWorks.Geometry
         }
 
         // ItemStand and Inventory use the same native ItemData.Save record, with different envelopes.
-        internal static Item ReadItem(BinaryReader reader, Dictionary<int, string> names)
+        internal static Item ReadItem(BinaryReader reader, Dictionary<int, string> names, int version = 109)
         {
             int durability = reader.ReadInt32(), x = reader.ReadByte(), y = reader.ReadByte();
             int worldLevel = reader.ReadByte(), flags = reader.ReadByte();
@@ -183,7 +185,7 @@ namespace OstrixMods.BuildWorks.Geometry
             int extraFlags = reader.ReadByte();
             if ((extraFlags & ~1) != 0) throw new InvalidDataException("Unknown native item flags.");
             return new Item(prefab, durability, x, y, worldLevel, flags, quality, stack, variant,
-                crafterId, crafterName, customData, (extraFlags & 1) != 0);
+                crafterId, crafterName, customData, (extraFlags & 1) != 0, sourceVersion: version);
         }
 
         // BinaryWriter strings use a canonical 7-bit UTF-8 byte length. Bound it before allocating.

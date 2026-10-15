@@ -6,7 +6,7 @@ using System.Text;
 
 namespace OstrixMods.BuildWorks.Geometry
 {
-    // Full read-only native v109 item package. A null package is a legacy/authoring recipe, not a snapshot.
+    // Full read-only native v109/v110 item package. A null package is a legacy/authoring recipe, not a snapshot.
     public static class BlueprintItemStandContents
     {
         // EWD legacy loose fields -> verified native record, never ZDO.Deserialize.
@@ -48,8 +48,9 @@ namespace OstrixMods.BuildWorks.Geometry
                     using (var input = new MemoryStream(packet, false))
                     using (var reader = new BinaryReader(input, new UTF8Encoding(false, true)))
                     {
-                        if (reader.ReadByte() != 109) return false;
-                        original = BlueprintContainerInventory.ReadItem(reader, new Dictionary<int, string> { [prefabId] = prefab });
+                        int version = reader.ReadByte();
+                        if (version != 109 && version != 110) return false;
+                        original = BlueprintContainerInventory.ReadItem(reader, new Dictionary<int, string> { [prefabId] = prefab }, version);
                         if (input.Position != input.Length) return false;
                     }
                     used.Add(new KeyValuePair<int, Type>(hash("itemData"), typeof(byte[])));
@@ -89,7 +90,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 using (var output = new MemoryStream())
                 using (var writer = new BinaryWriter(output, new UTF8Encoding(false, true)))
                 {
-                    writer.Write((byte)109); writer.Write(durability);
+                    writer.Write((byte)(original?.SourceVersion ?? 109)); writer.Write(durability);
                     writer.Write((byte)(original?.X ?? 0)); writer.Write((byte)(original?.Y ?? 0)); writer.Write((byte)world);
                     int flags = 64 | (pickedUp ? 1 : 0) | (original?.Equipped == true ? 2 : 0) |
                         (quality != 1 ? 4 : 0) | (variant != 0 ? 16 : 0) | (crafter != 0 ? 32 : 0) | (custom.Count != 0 ? 128 : 0);
@@ -139,8 +140,9 @@ namespace OstrixMods.BuildWorks.Geometry
                 using (var stream = new MemoryStream(Convert.FromBase64String(data.Zdo), false))
                 using (var reader = new BinaryReader(stream, new UTF8Encoding(false, true)))
                 {
-                    if (reader.ReadByte() != 109) return false;
-                    var parsed = BlueprintContainerInventory.ReadItem(reader, new Dictionary<int, string> { [hash] = fields[0] });
+                    int version = reader.ReadByte();
+                    if (version != 109 && version != 110) return false;
+                    var parsed = BlueprintContainerInventory.ReadItem(reader, new Dictionary<int, string> { [hash] = fields[0] }, version);
                     if (stream.Position != stream.Length || parsed.Stack != 1 ||
                         parsed.Quality != int.Parse(fields[2], CultureInfo.InvariantCulture) ||
                         parsed.Variant != int.Parse(fields[1], CultureInfo.InvariantCulture)) return false;

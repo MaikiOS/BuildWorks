@@ -73,7 +73,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 bool legacy = bytes.Length >= 8 && bytes[0] == 106;
                 int header = legacy ? 8 : 6, recordMinimum = legacy ? 44 : 13;
                 if (bytes.Length > MaximumContainerBytes || bytes.Length < header + slots * recordMinimum ||
-                    bytes[0] != (legacy ? 106 : 109) || bytes[1] != 0 || bytes[2] != 0 || bytes[3] != 0 ||
+                    bytes[0] != 106 && bytes[0] != 109 && bytes[0] != 110 || bytes[1] != 0 || bytes[2] != 0 || bytes[3] != 0 ||
                     (legacy ? bytes[4] | bytes[5] << 8 | bytes[6] << 16 | bytes[7] << 24 : bytes[4] | bytes[5] << 8) != slots ||
                     slots == 0 && bytes.Length != header ||
                     Convert.ToBase64String(bytes) != zdo)

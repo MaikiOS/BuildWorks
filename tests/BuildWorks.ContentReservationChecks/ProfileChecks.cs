@@ -91,6 +91,15 @@ namespace ReservationChecks
             Check(frame.Begin() && frame.Transfer.MoveNext() == BlueprintStorageTransfer.Result.Transferred, "transfer setup");
             Check(BlueprintStorageCapture.TrySnapshotInventory(frame.Player.GetInventory(), out var expected), "snapshot setup");
             var fixture = new Fixture(Convert.FromBase64String(expected.Zdo)); byte[] valid = fixture.File();
+            byte[] currentInventory = Convert.FromBase64String(expected.Zdo); currentInventory[0] = 110;
+            var currentExpected = new BlueprintForeignPartData(expected.Format, expected.Info, Convert.ToBase64String(currentInventory), null);
+            var currentFixture = new Fixture(currentInventory); currentFixture.Payload[0] = 47;
+            Array.Copy(BitConverter.GetBytes(34), 0, currentFixture.Payload, currentFixture.Offset["playerVersion"], 4);
+            Check(Verify(currentFixture.File(), currentExpected, out _) && !Verify(currentFixture.File(), expected, out _),
+                "profile47/player34/inventory110 or exact provided inventory identity lost");
+            byte[] future = (byte[])currentFixture.Payload.Clone(); future[0] = 48;
+            Check(!Verify(currentFixture.File(future), currentExpected, out _), "future profile48 accepted");
+            Check(!Verify(currentFixture.Changed("playerVersion", 35), currentExpected, out _), "future player35 accepted");
             Check(Verify(valid, expected, out var evidence) && evidence.Player == 100 && evidence.ProfileHash.Length == 128 &&
                 evidence.InventoryHash.Length == 64 && evidence.InventoryBytes == Convert.FromBase64String(expected.Zdo).Length, "exact profile not verified");
             foreach (int length in new[] { 0, 1, 3, 4, 71, 72, valid.Length - 65, valid.Length - 64, valid.Length - 1 })

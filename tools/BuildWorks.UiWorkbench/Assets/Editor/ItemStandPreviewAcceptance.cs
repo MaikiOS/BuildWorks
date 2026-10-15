@@ -329,9 +329,15 @@ internal static class ItemStandPreviewAcceptance
         };
         Require(!BlueprintItemStandCapture.TryCapture(piece, out _), "rebound native view accepted");
         typeof(ItemStand).GetField("m_nview", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(stand, view);
+        byte[] currentPackage = (byte[])package.Clone(); currentPackage[0] = 110;
+        zdo.Set(ZDOVars.s_itemData, currentPackage); writes = zdo.Writes;
+        Require(BlueprintItemStandCapture.TryCapture(piece, out var currentCapture) && zdo.Writes == writes &&
+            currentCapture.Zdo == Convert.ToBase64String(currentPackage) &&
+            BlueprintItemStandContents.TryRead(currentCapture, _ => hash, out var currentItem) && currentItem.SourceVersion == 110,
+            "native item110 snapshot lost exact bytes/version or changed network data");
         package[1] = 77;
         Require(captured.Zdo == encoded, "snapshot aliases live native bytes");
-        package[0] = 110; // Unknown version, not merely another valid durability value.
+        package[0] = 111; // Unknown future version, not merely another valid durability value.
         foreach (byte[] invalid in new[] { new byte[2], new byte[24577], new byte[] { 0, 1, 2 },
             ItemPackage(item.name, 2, 2), ItemPackage("OtherFixture", 3, 2), package })
         {

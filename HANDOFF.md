@@ -1,3 +1,7 @@
+## World snapping audit (.192) — 2026-10-15
+
+Current native IL, installed handlers and editor compared. Real Unity reproduces hidden symmetric-beam root-frame dependence; post-rotation ranking differences do not imply detached live sockets. [Evidence and limits](docs/WORLD_SNAP_AUDIT_192.md). Audit only: no product change, DLL, deployment or game input. Next: define an unambiguous ordinary auto-join rule while preserving intentional XYZ alignment. Goal ACTIVE.
+
 ## Verified and installed .192 — 2026-10-15
 
 Sign previews now reach editor, thumbnails and small/heavy ghosts. Geometry/TRS/SDF/UGC/ownership, template churn red→green, fixture pixel diff0, actual editor scene and both thumbnail cache variants pass. Normal/QA0/0, Geometry/Store, Host/isolation/localization1103, final-source Workbench624 and independent PASSED/Ship pass. [Evidence limits](docs/SIGN_PREVIEW_192.md).

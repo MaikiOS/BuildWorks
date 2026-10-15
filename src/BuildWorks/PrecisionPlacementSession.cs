@@ -2485,6 +2485,14 @@ namespace OstrixMods.BuildWorks
                 return true;
             }
 
+            // Ordinary pieces keep the native pair and player rotation. A symmetric
+            // beam's hidden root frame must not silently turn the next wall.
+            if (blueprintPieceRegistry == null ||
+                !blueprintPieceRegistry.TryGetBlueprint(selected, out _))
+            {
+                return true;
+            }
+
             if ((int)ManualSnapPointField.GetValue(player) < 0)
             {
                 // Keep native snapping and wheel rotation when the aimed piece has no pair.
@@ -2525,17 +2533,6 @@ namespace OstrixMods.BuildWorks
                 }
             }
 
-            Piece targetPiece = targetSnap.GetComponentInParent<Piece>();
-            if (!targetPiece ||
-                !sourceSnap.IsChildOf(ghost.transform) ||
-                targetSnap.IsChildOf(ghost.transform))
-            {
-                return true;
-            }
-
-            ghost.transform.rotation = BlueprintPlacementFrame.AutoJoinRotation(
-                targetPiece.transform.rotation, ghost.transform.rotation,
-                blueprintPieceRegistry != null && blueprintPieceRegistry.TryGetBlueprint(selected, out _));
             return true;
         }
 

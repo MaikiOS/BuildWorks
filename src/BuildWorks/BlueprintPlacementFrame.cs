@@ -46,9 +46,6 @@ namespace OstrixMods.BuildWorks
                 yield return ToLocal(point.ToVector3(), origin, orientation);
         }
 
-        internal static Quaternion AutoJoinRotation(Quaternion target, Quaternion ghost, bool blueprint)
-            => blueprint ? ghost : target * ghost;
-
         internal static IReadOnlyList<Vector3> NativeSnapPoints(
             CompositeBlueprintStore.Blueprint blueprint,
             IReadOnlyList<Piece> pieces)

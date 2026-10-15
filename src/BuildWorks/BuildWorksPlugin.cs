@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.192";
+        internal const string PluginVersion = "0.19.193";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -840,8 +840,8 @@ namespace OstrixMods.BuildWorks
                         "Current Valheim UpdatePlacementGhost validation layout is unsupported.");
                 }
 
-                // Restrict automatic snapping to the piece under the crosshair, then
-                // rotate into its axes before Valheim positions and validates the pair.
+                // Composite blueprints prefer a pair on the aimed piece; ordinary
+                // pieces retain native point selection and rotation.
                 int passiveAutoJoinInjection = closestSnapCall + 2;
                 CodeInstruction passivePlayer = new CodeInstruction(OpCodes.Ldarg_0);
                 passivePlayer.labels.AddRange(code[passiveAutoJoinInjection].labels);

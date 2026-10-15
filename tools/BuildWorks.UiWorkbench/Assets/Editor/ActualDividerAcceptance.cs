@@ -647,13 +647,9 @@ public static class ActualDividerAcceptance
                 Vector3.Distance(origin + orientation * point, native[index]) < .00001f).All(equal => equal),
                 "Hammer adds false envelope corners despite native sockets: " + blueprint.name);
 
-            Quaternion target = Quaternion.Euler(0, 30, 0), wheel = Quaternion.Euler(0, 15, 0);
-            Require(Quaternion.Angle(BlueprintPlacementFrame.AutoJoinRotation(target, wheel, true), wheel) < .001f,
-                "Composite Hammer rotation is multiplied by a target part rotation");
-            Require(Quaternion.Angle(BlueprintPlacementFrame.AutoJoinRotation(target, wheel, false), target * wheel) < .001f,
-                "Ordinary piece auto-alignment changed");
-            Quaternion support = Quaternion.Euler(13, -48, 21), xyzTarget = Quaternion.Euler(-17, 29, 38);
-            Quaternion frame = BlueprintPlacementFrame.AutoJoinRotation(xyzTarget, wheel, true);
+            Quaternion wheel = Quaternion.Euler(0, 15, 0);
+            Quaternion support = Quaternion.Euler(13, -48, 21);
+            Quaternion frame = wheel;
             BlueprintPlacementFrame.ToRootPose(new Vector3(4, 2, -1), frame,
                 new Vector3(.4f, -.2f, .7f), support, 1.3f, out Vector3 supportedOrigin, out Quaternion supportedRotation);
             Require(Quaternion.Angle(supportedRotation * support, wheel) < .001f &&

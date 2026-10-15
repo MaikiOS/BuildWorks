@@ -880,7 +880,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.192.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.193.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $serverAuthority = $plugin.MainModule.GetType('OstrixMods.BuildWorks.BlueprintServerAuthority')
 Assert-Contract ($null -ne $serverAuthority) 'Compiled server blueprint authority adapter is missing.'
@@ -2617,14 +2617,14 @@ Assert-Contract ($passiveAutoJoin.Parameters.Count -eq 4 -and
         'if \(bestSource && bestTarget\)[\s\S]*?else\s*\{\s*return true;\s*\}' -and
     $sessionSource -match 'if \(distance > 0\.5f \|\| !\(distance < bestDistance\)\) continue;' -and
     $sessionSource -match 'blueprintPieceRegistry\.TryGetBlueprint\(selected, out _\)' -and
-    $blueprintFrameSource -match '=> blueprint \? ghost : target \* ghost;' -and
     $passiveAutoJoinOperands -match 'Player::get_AlternativePlacementActive' -and
     $passiveAutoJoinOperands -match 'Piece::GetSnapPoints' -and
     $passiveAutoJoinOperands -match 'Vector3::Distance' -and
     $passiveAutoJoinOperands -match 'Transform::IsChildOf' -and
-    $passiveAutoJoinOperands -match 'BlueprintPlacementFrame::AutoJoinRotation' -and
-    $passiveAutoJoinOperands -match 'Transform::set_rotation') `
-    'Passive auto-join no longer preserves native fallback/wheel rotation or inclusive ordered distance selection.'
+    $passiveAutoJoinOperands -match 'HammerBlueprintPieceRegistry::TryGetBlueprint' -and
+    $passiveAutoJoinOperands -notmatch 'Transform::set_rotation' -and
+    $passiveAutoJoinOperands -notmatch 'AutoJoinRotation') `
+    'Passive auto-join must preserve ordinary native pair/rotation and composite inclusive ordered distance selection.'
 & (Join-Path $PSScriptRoot 'Test-PassiveAutoJoin.ps1')
 $meshEdges = $pluginMethods | Where-Object Name -eq 'GetMeshFeatureEdges'
 $meshEdgeOperands = @($meshEdges.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"

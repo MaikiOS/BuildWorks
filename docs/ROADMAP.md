@@ -1,3 +1,7 @@
+## Verified and installed .193 — 2026-10-15
+
+Ordinary world snap retains native pair/player rotation; explicit F9 XYZ, composite and editor paths preserved. Five compiled precision methods unchanged. Red→green95, Unity244, normal/QA0/0, Geometry/Store, Host/control/isolation/loc1103, Workbench624 and independent PASSED/Ship. Guarded QA .193 installed, both hashes match,104 protected files unchanged. [Evidence](WORLD_SNAP_193.md). Native acceptance open; Ostrix authorized independent QA launch through Thunderstore Modded. Full goal ACTIVE.
+
 ## World snapping audit (.192) — 2026-10-15
 
 Current native IL, installed handlers and editor compared. Real Unity reproduces hidden symmetric-beam root-frame dependence; post-rotation ranking differences do not imply detached live sockets. [Evidence and limits](WORLD_SNAP_AUDIT_192.md). Audit only: no product change, DLL, deployment or game input. Next: define an unambiguous ordinary auto-join rule while preserving intentional XYZ alignment. Goal ACTIVE.

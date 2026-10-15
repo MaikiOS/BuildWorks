@@ -63,12 +63,22 @@ public static class Cases {
             Target=new Transform{parent=NativePiece.transform,position=new Vector3(.1f,0,0)};
             NativePiece.points.Add(Target);NativePiece.transform.rotation=7;AimedPiece.transform.rotation=13;ghost.transform.rotation=5;
             Player=new Player{Ghost=ghost,Selected=GhostPiece};Player.m_localPlayer=Player;
+            Session.blueprintPieceRegistry=new Registry{IsBlueprint=true};
             BlueprintPlacementFrame.Calls=0;
         }
         internal Transform Aim(float x,float y=0){var t=new Transform{parent=AimedPiece.transform,position=new Vector3(x,y,0)};AimedPiece.points.Add(t);return t;}
         internal bool Apply(Piece aimed){return Session.ApplyPassiveAutoJoin(Player,ref Source,ref Target,aimed);}
     }
     public static string Run(){
+        foreach(int manual in new[]{-1,0})foreach(int targetRotation in new[]{0,7,90,180,270}){
+            var s=new Setup();s.Session.blueprintPieceRegistry.IsBlueprint=false;s.Player.Manual=manual;
+            s.AimedPiece.transform.rotation=targetRotation;s.NativePiece.transform.rotation=targetRotation;
+            s.Aim(0);var source=s.Source;var target=s.Target;
+            Require(s.Apply(s.AimedPiece),"ordinary native pair vetoed");
+            Require(s.Source==source&&s.Target==target,"ordinary native pair replaced by aimed-piece search");
+            Require(s.Player.Ghost.transform.rotation==5,"ordinary native wheel rotation inherited hidden target frame");
+            Require(s.AimedPiece.Reads==0&&s.GhostPiece.Reads==0,"ordinary snap performed a second point scan");
+        }
         foreach(float radius in new[]{.499f,.5f}){
             var s=new Setup();var candidate=s.Aim(radius);
             Require(s.Apply(s.AimedPiece),"valid aimed pair vetoed at "+radius);
@@ -107,14 +117,14 @@ public static class Cases {
             var beforeTarget=s.Target;
             Require(s.Apply(s.AimedPiece),"guard vetoed supplied native result "+guard);
             Require(s.Target==beforeTarget&&s.AimedPiece.Reads==0,"guard performed automatic rerank "+guard);
-            Require(BlueprintPlacementFrame.Calls==(guard==0?1:0),"guard changed rotation call policy "+guard);
+            Require(BlueprintPlacementFrame.Calls==0&&s.Player.Ghost.transform.rotation==5,"guard changed native rotation "+guard);
         }
         {
             var s=new Setup();s.Session.blueprintPieceRegistry=new Registry{IsBlueprint=true};
             s.Aim(.25f);
-            Require(s.Apply(s.AimedPiece)&&BlueprintPlacementFrame.Blueprint&&s.Player.Ghost.transform.rotation==5,"composite did not retain rotation branch");
+            Require(s.Apply(s.AimedPiece)&&s.Player.Ghost.transform.rotation==5&&BlueprintPlacementFrame.Calls==0,"composite changed wheel rotation");
         }
-        return "PASS "+assertions+" assertions: actual session method, inclusive radius/sqrt ties, native fallback, aimed preference, null/invalid/guards/composite branch. Inert host only; no native translation, quaternion math, physics or game proof.";
+        return "PASS "+assertions+" assertions: actual session method, ordinary native pair/rotation preserved across hidden frames and manual/auto, composite inclusive radius/sqrt ties, native fallback, null/invalid/guards. Inert host only; no native translation, quaternion math, physics or game proof.";
     }
 }
 }

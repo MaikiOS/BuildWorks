@@ -1,3 +1,6 @@
+## Prefab migration evidence — 2026-10-15, installed .190 unchanged
+
+Current resources explicitly mark wood_wall_roof→wood_wall_roof_a. Read-only Unity/nographics found24 matching recorded TRS/mesh/material/LOD/BoxCollider/snap nodes;10 negative controls passed. Independent correctness PASSED/Ponytail Ship apply to this diagnostic checkpoint only. Native costs/support/eligibility, serialized migration provenance and automatic import/construction/reload remain open; automatic migration is not enabled. Blind renaming would break ValidSources. [Evidence and next step](docs/PREFAB_MIGRATION_EVIDENCE_RU.md).
 ## Verified checkpoint .190 — 2026-10-15
 
 Reject conflicting native itemData/loose ItemStand fields while preserving exact source bytes. Read cheated only for native110, not109. Retain the editor catalog resolver's Hammer-unavailability reason. Geometry red→green, Store, normal/QA0/0, Host/isolation/localization and independent PASSED/Ship passed. Verify helper unavailable; direct review/tests used. Three targeted whitespace diagnostics are unchanged baseline.

@@ -1,8 +1,8 @@
 ## Native game QA .189 — 2026-10-15
 
-QA isolation and bridge are confirmed. Existing Forest Hut: four explicit catalogue replacements, Cancel/Undo/Redo, save/reopen, visible ghost and first-house ordinary construction passed. 28 TryPlacePiece/28 ConsumeResources with no exceptions, Wood64→6 (58), all28 native TRS matched (position error ≤0.000013m). Actual reload remains pending. A later second-house start elsewhere awaits owner input clarification; no new input/reload is being sent. The full goal remains incomplete.
+The Forest Hut case after four explicit replacements passed through actual logout/reload:28/28 native placements/payments without exceptions, Wood64→6 (58), all28 TRS survived. Across reload, position/scale unchanged, quaternion delta ≤4.4e-8; full inventory matched. Native ZDO.Load reassigns IDs;28 unique current records verified. The later second-house input was manual, owner-confirmed. Temporary god/ghost are off, input released, source unchanged. Goal API ACTIVE; full module incomplete. Next in goal order: remaining converters/corpora, incomplete blueprints and metadata/replacements, then items/rights, persistent project/v11 and selection.
 
-[FOREST_HUT_NATIVE_QA_189](FOREST_HUT_NATIVE_QA_189.md)
+[Report](FOREST_HUT_NATIVE_QA_189.md)
 
 ## Earlier compatibility checkpoint — QA .189, Valheim1.0.20, 2026-10-15
 

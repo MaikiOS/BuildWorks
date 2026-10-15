@@ -39,6 +39,15 @@ namespace OstrixMods.BuildWorks
         private readonly Queue<PendingThumbnail> pending = new Queue<PendingThumbnail>();
         private readonly HashSet<string> queued = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> incomplete = new HashSet<string>(StringComparer.Ordinal);
+        private bool textAllowed = BlueprintSignPreview.Allowed;
+
+        private void RefreshTextPermission()
+        {
+            bool allowed = BlueprintSignPreview.Allowed;
+            if (allowed == textAllowed) return;
+            Dispose();
+            textAllowed = allowed;
+        }
 
         private static Type ResolveImageConversionType()
         {
@@ -79,12 +88,16 @@ namespace OstrixMods.BuildWorks
 
         internal Sprite GetCached(CompositeBlueprintStore.Blueprint blueprint)
         {
+            RefreshTextPermission();
             if (blueprint == null || string.IsNullOrWhiteSpace(blueprint.id)) return null;
             if (sprites.TryGetValue(blueprint.id, out Sprite cached)) return cached;
             if (failures.Contains(blueprint.id)) return null;
-            Sprite loaded = Load(blueprint.id, blueprint.importPreview);
+            // Imported images may show stale or unfiltered text. Render saved signs ourselves.
+            bool hasSign = blueprint.parts != null && blueprint.parts.Exists(part => part.signText != null);
+            byte[] importedPreview = hasSign ? null : blueprint.importPreview;
+            Sprite loaded = Load(blueprint.id, importedPreview);
             if (loaded) sprites[blueprint.id] = loaded;
-            else if (blueprint.importPreview != null) failures.Add(blueprint.id);
+            else if (importedPreview != null) failures.Add(blueprint.id);
             return loaded;
         }
 
@@ -123,15 +136,14 @@ namespace OstrixMods.BuildWorks
             incomplete.Remove(blueprintId);
             queued.Remove(blueprintId);
             RemovePending(blueprintId);
-            string path = ThumbnailPath(blueprintId);
-            try
+            foreach (bool allowed in new[] { false, true })
             {
-                if (File.Exists(path)) File.Delete(path);
-            }
-            catch (Exception exception)
-            {
-                Debug.LogWarning("BuildWorks could not remove blueprint thumbnail: " +
-                    exception.Message);
+                string path = ThumbnailPathFor(blueprintId, allowed);
+                try { if (File.Exists(path)) File.Delete(path); }
+                catch (Exception exception)
+                {
+                    Debug.LogWarning("BuildWorks could not remove blueprint thumbnail: " + exception.Message);
+                }
             }
         }
 
@@ -158,6 +170,7 @@ namespace OstrixMods.BuildWorks
             CompositeBlueprintStore.Blueprint blueprint,
             IReadOnlyList<Piece> pieces, out string error)
         {
+            RefreshTextPermission();
             error = null;
             if (blueprint == null || blueprint.parts == null || pieces == null ||
                 blueprint.parts.Count != pieces.Count || CompositeBlueprintStore.InteractiveError(blueprint.parts.Count) != null) return null;
@@ -298,9 +311,11 @@ namespace OstrixMods.BuildWorks
             }
         }
 
-        private string ThumbnailPath(string blueprintId) => Path.Combine(
+        private string ThumbnailPath(string blueprintId) => ThumbnailPathFor(blueprintId, textAllowed);
+
+        private string ThumbnailPathFor(string blueprintId, bool allowed) => Path.Combine(
             directory,
-            Path.GetFileName(blueprintId) + "-contents-v3.png");
+            Path.GetFileName(blueprintId) + "-contents-v4-ugc" + (allowed ? "1" : "0") + ".png");
 
         private bool PrepareResolutionCache(CompositeBlueprintStore.Blueprint blueprint, IReadOnlyList<Piece> pieces)
         {
@@ -332,6 +347,7 @@ namespace OstrixMods.BuildWorks
                         "Part_" + index, ThumbnailLayer, part.materialSeed);
                     visual.transform.SetParent(root.transform, false);
                     BlueprintItemStandPreview.TryAdd(piece.gameObject, visual, part.foreignData?.ToGeometry(), out string warning);
+                    BlueprintSignPreview.Add(piece.gameObject, visual, part.signText);
                     if (warning != null) throw new InvalidOperationException(warning);
                     scale = part.RootScale(piece.transform.localScale);
                 }

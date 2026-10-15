@@ -1,4 +1,8 @@
-## Verified .191, deployment pending other-profile exit — 2026-10-15
+## Verified and installed .192 — 2026-10-15
+
+Sign previews now consume saved text in all four visual paths; nested TRS/SDF, UGC/ownership/cache invalidation, regression red→green and fixture pixel diff0 pass. Final Workbench624, normal/QA0/0, Geometry/Store, Host/isolation/localization1103 and independent reviews pass. Guarded QA .192 installed; hashes match,104 protected data files unchanged. Includes .191 migration. [Evidence](SIGN_PREVIEW_192.md). Native font/UGC/construction/reload remains open; full goal incomplete.
+
+## Verified .191, deployment was pending other-profile exit — 2026-10-15
 
 One explicit import rule wood_wall_roof→wood_wall_roof_a now records original ID/source row (native24/portable13), checks current prototypes/target recipe and reports migration before import/foreign export. Geometry/Store, normal+QA0/0, Host/isolation/localization1102, new-file formatter, actual Controller DLL copy/save/reopen, independent PASSED/Ship and Workbench624 pass. The production geometry predicate passed installed native assets. [Evidence](PREFAB_MIGRATION_191.md).
 

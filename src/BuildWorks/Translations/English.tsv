@@ -1,4 +1,5 @@
 # Stable key<TAB>English fallback
+blueprint.sign_preview_unavailable	Sign text preview is unavailable: the native font or text widget is missing. Saved text is preserved.
 adaptive_gable.name	BuildWorks: adaptive gable panel
 adaptive_gable.description	An original adjustable panel for complex roof slopes.
 catalog.category.blueprints	BLUEPRINTS

@@ -1,4 +1,10 @@
-## .191 проверена, установка ожидает выхода из другого профиля — 2026-10-15
+## .192 проверена и установлена — 2026-10-15
+
+Надписи подключены к четырём renderer-only превью. Геометрия/TRS/SDF/UGC/очистка, регрессия шаблонов red→green, пиксели TMP fixture(diff0), оба кеша и actual Scene прошли; normal/QA0/0, Geometry/Store, Host/isolation/localization1103, Workbench624, независимые PASSED/Ship. [Доказательства](docs/SIGN_PREVIEW_192_RU.md).
+
+QA0.19.192.0 установлена штатно после завершения Valheim; SHA совпали,104 прежних файла данных/QA saves/token неизменны. Другие профили не трогались, игра не запускалась. .191 входит в .192. Далее native надпись02 и автозамена35/Forest Hut; стройку/reload выполняет Codex с подготовленным снабжением. [Ручная серия](docs/MANUAL_QA_192_RU.md). Новый шрифт/UGC/стройка в Valheim ещё не приняты. Full goal ACTIVE/incomplete; старые статусы ниже исторические.
+
+## .191 проверена, установка ожидала выхода из другого профиля — 2026-10-15
 
 Реализовано одно подтверждённое правило импорта wood_wall_roof→wood_wall_roof_a с текущей проверкой прототипов/рецепта, исходным ID/строкой (native24/portable13), списком замен и предупреждением PlanBuild. Geometry/Store, normal+QA0/0, Host/isolation/localization1102, formatter новых классов, actual Controller DLL copy/save/reopen, независимые PASSED/Ship и Workbench624 прошли; production geometry predicate прошёл текущие native assets. [Доказательства](docs/PREFAB_MIGRATION_191_RU.md).
 

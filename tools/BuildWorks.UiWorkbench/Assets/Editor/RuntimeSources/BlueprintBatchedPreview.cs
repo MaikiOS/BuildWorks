@@ -16,6 +16,7 @@ namespace OstrixMods.BuildWorks
             internal int Submesh;
             internal Matrix4x4 Local;
             internal bool Attachment;
+            internal bool SignText;
             internal Renderer Renderer;
         }
 
@@ -34,8 +35,12 @@ namespace OstrixMods.BuildWorks
             internal bool PropertiesPrepared;
         }
 
-        private readonly Dictionary<(GameObject, string, string, bool), Template> templates =
-            new Dictionary<(GameObject, string, string, bool), Template>();
+        private readonly Dictionary<(GameObject, string, string, bool, string, bool), Template> templates =
+            new Dictionary<(GameObject, string, string, bool, string, bool), Template>();
+        private readonly HashSet<(GameObject, string, string, bool, string, bool)> activeTemplates =
+            new HashSet<(GameObject, string, string, bool, string, bool)>();
+        private readonly List<(GameObject, string, string, bool, string, bool)> expiredTemplates =
+            new List<(GameObject, string, string, bool, string, bool)>();
         private readonly Dictionary<(Mesh, Material, int, BlueprintMaterialVariation.Values), Batch> batches =
             new Dictionary<(Mesh, Material, int, BlueprintMaterialVariation.Values), Batch>();
         private readonly Dictionary<(Template, int), Dictionary<Renderer, BlueprintMaterialVariation.Values>> variants =
@@ -43,6 +48,7 @@ namespace OstrixMods.BuildWorks
         private readonly HashSet<(Template, int)> activeVariants = new HashSet<(Template, int)>();
         private readonly List<(Template, int)> expiredVariants = new List<(Template, int)>();
         private readonly List<Vector4> instanceVectors = new List<Vector4>(1023);
+        private readonly MaterialPropertyBlock signProperties = new MaterialPropertyBlock();
         private Template[] parts = Array.Empty<Template>();
         private Dictionary<Renderer, BlueprintMaterialVariation.Values>[] partValues =
             Array.Empty<Dictionary<Renderer, BlueprintMaterialVariation.Values>>();
@@ -64,26 +70,40 @@ namespace OstrixMods.BuildWorks
                 partValues = new Dictionary<Renderer, BlueprintMaterialVariation.Values>[plan.Count];
             }
             activeVariants.Clear();
+            activeTemplates.Clear();
+            bool textAllowed = BlueprintSignPreview.Allowed;
             for (int index = 0; index < plan.Count; ++index)
             {
                 if (!pieces[index]) return;
                 var data = supplies == null ? plan[index].ItemStandContents : supplies[index]?.Contents;
-                if (plan[index].MaterialSeed.HasValue && templates.TryGetValue(
-                    (pieces[index].gameObject, data?.Format, data?.Info, data?.ContentsCleared ?? false), out Template template))
+                var key = (pieces[index].gameObject, data?.Format, data?.Info, data?.ContentsCleared ?? false,
+                    plan[index].SignText, plan[index].SignText != null && textAllowed);
+                activeTemplates.Add(key);
+                if (plan[index].MaterialSeed.HasValue && templates.TryGetValue(key, out Template template))
                     activeVariants.Add((template, plan[index].MaterialSeed.Value));
+            }
+            expiredTemplates.Clear();
+            foreach (var key in templates.Keys)
+                if (!activeTemplates.Contains(key)) expiredTemplates.Add(key);
+            foreach (var key in expiredTemplates)
+            {
+                GameObject retired = templates[key].Visual;
+                if (retired) { retired.SetActive(false); UnityEngine.Object.Destroy(retired); }
+                templates.Remove(key);
             }
             expiredVariants.Clear();
             foreach (var key in variants.Keys)
                 if (!activeVariants.Contains(key)) expiredVariants.Add(key);
             foreach (var key in expiredVariants) variants.Remove(key);
-            if (expiredVariants.Count > 0) batches.Clear();
+            if (expiredVariants.Count > 0 || expiredTemplates.Count > 0) batches.Clear();
             int created = 0, createdVariants = 0;
             for (int index = 0; index < plan.Count; ++index)
             {
                 if (!pieces[index]) return;
                 GameObject source = pieces[index].gameObject;
                 BlueprintForeignPartData data = supplies == null ? plan[index].ItemStandContents : supplies[index]?.Contents;
-                var key = (source, data?.Format, data?.Info, data?.ContentsCleared ?? false);
+                var key = (source, data?.Format, data?.Info, data?.ContentsCleared ?? false, plan[index].SignText,
+                    plan[index].SignText != null && textAllowed);
                 if (!templates.TryGetValue(key, out Template template))
                 {
                     // Spread expensive unique-prefab preparation across frames.
@@ -95,6 +115,7 @@ namespace OstrixMods.BuildWorks
                     try
                     {
                         BlueprintItemStandPreview.TryAdd(source, visual, data, out string warning, out GameObject content);
+                        GameObject signText = BlueprintSignPreview.Add(source, visual, plan[index].SignText);
                         if (warning != null) throw new ArgumentException(warning);
                         foreach (MeshFilter filter in visual.GetComponentsInChildren<MeshFilter>(true))
                         {
@@ -112,7 +133,8 @@ namespace OstrixMods.BuildWorks
                                     Submesh = Math.Min(slot, filter.sharedMesh.subMeshCount - 1),
                                     Renderer = renderer,
                                     Local = visual.transform.worldToLocalMatrix * filter.transform.localToWorldMatrix,
-                                    Attachment = content && filter.transform.IsChildOf(content.transform)
+                                    Attachment = content && filter.transform.IsChildOf(content.transform) || signText && filter.transform.IsChildOf(signText.transform),
+                                    SignText = signText && filter.transform.IsChildOf(signText.transform)
                                 });
                             }
                         }
@@ -153,6 +175,7 @@ namespace OstrixMods.BuildWorks
             int hiddenIndex, Matrix4x4 root, Camera camera = null, bool attachmentsOnly = false)
         {
             if (!Ready || plan.Count != parts.Length) return;
+            bool textAllowed = BlueprintSignPreview.Allowed;
             foreach (Batch batch in batches.Values) { batch.Count = 0; batch.PropertiesPrepared = false; }
             for (int index = 0; index < plan.Count; ++index)
             {
@@ -161,8 +184,20 @@ namespace OstrixMods.BuildWorks
                     Vector3.Scale(parts[index].Scale, pose.Scale));
                 foreach (DrawPart draw in parts[index].Parts)
                 {
+                    if (draw.SignText && !textAllowed) continue;
                     // The native ghost supplies the holder, not its saved item.
                     if ((attachmentsOnly || index == hiddenIndex) && !draw.Attachment) continue;
+                    if (draw.SignText)
+                    {
+                        // Different world scales need different SDF factors, but share the glyph mesh.
+                        Matrix4x4 matrix = part * draw.Local;
+                        draw.Renderer.SetPropertyBlock(properties);
+                        draw.Renderer.GetPropertyBlock(signProperties);
+                        BlueprintSignPreview.ApplyScale(draw.Renderer, signProperties, matrix.GetColumn(1).magnitude);
+                        Graphics.DrawMesh(draw.Mesh, matrix, draw.Material, layer, camera,
+                            draw.Submesh, signProperties, ShadowCastingMode.Off, false, null, LightProbeUsage.Off);
+                        continue;
+                    }
                     BlueprintMaterialVariation.Values values = null;
                     // Supplied mount contents retain their own appearance, like the small preview.
                     if (!draw.Attachment) partValues[index]?.TryGetValue(draw.Renderer, out values);
@@ -229,6 +264,8 @@ namespace OstrixMods.BuildWorks
             foreach (Template template in templates.Values)
                 if (template.Visual) UnityEngine.Object.Destroy(template.Visual);
             templates.Clear();
+            activeTemplates.Clear();
+            expiredTemplates.Clear();
             batches.Clear();
             variants.Clear();
             activeVariants.Clear();

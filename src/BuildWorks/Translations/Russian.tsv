@@ -1,4 +1,5 @@
 # Stable key<TAB>Russian translation
+blueprint.sign_preview_unavailable	Надпись не показана: недоступен игровой шрифт или текстовый виджет. Содержимое чертежа не изменено.
 adaptive_gable.name	BuildWorks: адаптивная фронтонная панель
 adaptive_gable.description	Оригинальная изменяемая панель для сложных скатов.
 catalog.category.blueprints	ЧЕРТЕЖИ

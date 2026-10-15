@@ -29,7 +29,9 @@ namespace OstrixMods.BuildWorks
     {
         private readonly List<GameObject> instances = new List<GameObject>();
         private readonly List<GameObject> instanceSources = new List<GameObject>();
-        private readonly List<(string, string, bool, bool, int?)> instanceContents = new List<(string, string, bool, bool, int?)>();
+        private readonly List<(string, string, bool, bool, int?, string, bool)> instanceContents = new List<(string, string, bool, bool, int?, string, bool)>();
+        private TMPro.TextMeshProUGUI nativeSignWidget;
+        private bool nativeSignWidgetEnabled;
         private readonly List<BlueprintItemStandPlacement.Supply> liveSupplies = new List<BlueprintItemStandPlacement.Supply>();
         private readonly MaterialPropertyBlock ghostProperties = new MaterialPropertyBlock();
         private GameObject source;
@@ -76,6 +78,7 @@ namespace OstrixMods.BuildWorks
                     batched.Prepare(plan, pieces, placementGhost.layer, supplies);
                     batched.Draw(plan, ghostProperties, placementGhost.layer,
                         hiddenIndex, root ?? Matrix4x4.identity, attachmentsOnly: attachmentsOnly);
+                    SuppressNativeSign(placementGhost, plan, hiddenIndex);
                 }
                 catch (Exception error) when (error is ArgumentException || error is UnityException)
                 { HeavyError = error.Message; }
@@ -86,6 +89,8 @@ namespace OstrixMods.BuildWorks
             if (ghostRenderer) ghostRenderer.GetPropertyBlock(ghostProperties);
 
             bool hideOne = hiddenIndex >= 0 && hiddenIndex < plan.Count;
+            SuppressNativeSign(placementGhost, plan, hiddenIndex);
+            bool textAllowed = BlueprintSignPreview.Allowed;
             int count = plan.Count;
             while (instances.Count < count)
             {
@@ -104,7 +109,7 @@ namespace OstrixMods.BuildWorks
                 int planIndex = index;
                 var data = supplies == null ? plan[planIndex].ItemStandContents : supplies[planIndex]?.Contents;
                 var contentKey = (data?.Format, data?.Info, data?.ContentsCleared ?? false, planIndex == hiddenIndex,
-                    plan[planIndex].MaterialSeed);
+                    plan[planIndex].MaterialSeed, plan[planIndex].SignText, textAllowed);
                 GameObject visualSource = pieces != null && pieces.Count == plan.Count &&
                     pieces[planIndex]
                     ? pieces[planIndex].gameObject
@@ -133,10 +138,17 @@ namespace OstrixMods.BuildWorks
                         foreach (Renderer renderer in instances[index].GetComponentsInChildren<Renderer>(true))
                             renderer.enabled = false;
                     BlueprintItemStandPreview.TryAdd(visualSource, instances[index], data, out string warning, out GameObject content);
+                    GameObject signText;
+                    try { signText = BlueprintSignPreview.Add(visualSource, instances[index], plan[planIndex].SignText); }
+                    catch (Exception error) when (error is ArgumentException || error is UnityException)
+                    { instanceSources[index] = null; Hide(); HeavyError = error.Message; return; }
                     if (warning != null)
                     { HeavyError = warning; instanceSources[index] = null; }
                     if (content && hideOne)
                         foreach (Renderer renderer in content.GetComponentsInChildren<Renderer>(true))
+                            renderer.SetPropertyBlock(ghostProperties);
+                    if (signText && hideOne)
+                        foreach (Renderer renderer in signText.GetComponentsInChildren<Renderer>(true))
                             renderer.SetPropertyBlock(ghostProperties);
                 }
                 GameObject preview = instances[index];
@@ -150,6 +162,7 @@ namespace OstrixMods.BuildWorks
 
         public void Hide()
         {
+            RestoreNativeSign();
             foreach (GameObject instance in instances)
             {
                 if (instance) instance.SetActive(false);
@@ -158,6 +171,7 @@ namespace OstrixMods.BuildWorks
 
         public void Clear()
         {
+            RestoreNativeSign();
             foreach (GameObject instance in instances)
             {
                 if (instance)
@@ -176,6 +190,24 @@ namespace OstrixMods.BuildWorks
         }
 
         public void Dispose() => Clear();
+
+        private void SuppressNativeSign(GameObject ghost, IReadOnlyList<PrecisionPlacementSession.TransformSnapshot> plan, int hiddenIndex)
+        {
+            var widget = hiddenIndex >= 0 && hiddenIndex < plan.Count && plan[hiddenIndex].SignText != null
+                ? ghost.GetComponent<Sign>()?.m_textWidget : null;
+            if (widget == nativeSignWidget) return;
+            RestoreNativeSign();
+            if (!widget) return;
+            nativeSignWidget = widget;
+            nativeSignWidgetEnabled = widget.enabled;
+            widget.enabled = false;
+        }
+
+        private void RestoreNativeSign()
+        {
+            if (nativeSignWidget) nativeSignWidget.enabled = nativeSignWidgetEnabled;
+            nativeSignWidget = null;
+        }
 
         private static GameObject CreatePreview(
             GameObject visualSource,

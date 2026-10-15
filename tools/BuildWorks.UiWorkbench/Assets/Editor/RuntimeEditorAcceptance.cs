@@ -47,7 +47,9 @@ public static class RuntimeEditorAcceptance
         {
             if (state != PlayModeStateChange.EnteredPlayMode || !SessionState.GetBool(PendingRun, false)) return;
             SessionState.SetBool(PendingRun, false);
-            run = CaptureRuntime();
+            bool signsOnly = SessionState.GetBool("BuildWorks.SignAcceptance.Pending", false);
+            SessionState.SetBool("BuildWorks.SignAcceptance.Pending", false);
+            run = signsOnly ? SignPreviewAcceptance.Run().GetEnumerator() : CaptureRuntime();
             EditorApplication.update += Advance;
         };
     }
@@ -136,6 +138,12 @@ public static class RuntimeEditorAcceptance
         BeginPlay();
     }
 
+    public static void VerifySignPreviews()
+    {
+        SessionState.SetBool("BuildWorks.SignAcceptance.Pending", true);
+        BeginPlay();
+    }
+
     private static void AfterTmpImport(string packageName)
     {
         AssetDatabase.importPackageCompleted -= AfterTmpImport;
@@ -189,6 +197,7 @@ public static class RuntimeEditorAcceptance
             checks.Add(WorldSelectionHighlightAcceptance.Run());
             checks.Add(PlacementContactAcceptance.Run());
             TestSignPayload();
+            foreach (object step in SignPreviewAcceptance.Run()) yield return step;
             TestPlacementSupportFrame();
             TestImportedAxes(template, fontTemplate, output);
             TestPinnedScaleBasis(template, fontTemplate, output);

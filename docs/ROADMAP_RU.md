@@ -1,4 +1,8 @@
-## .191 проверена, установка ожидает выхода из другого профиля — 2026-10-15
+## .192 проверена и установлена — 2026-10-15
+
+Сохранённые надписи подключены к четырём превью; вложенные TRS/SDF, UGC/очистка/кеши, регрессия red→green и пиксели тестового TMP (diff0) проверены. Workbench624 на окончательных исходниках, normal/QA0/0, Geometry/Store, Host/isolation/localization1103 и независимое чтение прошли. QA .192 установлена штатно, обе SHA совпали,104 защищённых файла данных неизменны. .191 входит в .192. [Доказательства](SIGN_PREVIEW_192_RU.md). Native шрифт/UGC/стройка/reload ещё открыты; полная цель не завершена.
+
+## .191 проверена, установка ожидала выхода из другого профиля — 2026-10-15
 
 Реализовано одно подтверждённое правило импорта wood_wall_roof→wood_wall_roof_a с текущей проверкой прототипов/рецепта, исходным ID/строкой (native24/portable13), списком замен и предупреждением PlanBuild. Geometry/Store, normal+QA0/0, Host/isolation/localization1102, formatter новых классов, actual Controller DLL copy/save/reopen, независимые PASSED/Ship и Workbench624 прошли; production geometry predicate прошёл текущие native assets. [Доказательства](PREFAB_MIGRATION_191_RU.md).
 

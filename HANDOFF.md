@@ -1,4 +1,10 @@
-## Verified .191, deployment pending other-profile exit — 2026-10-15
+## Verified and installed .192 — 2026-10-15
+
+Sign previews now reach editor, thumbnails and small/heavy ghosts. Geometry/TRS/SDF/UGC/ownership, template churn red→green, fixture pixel diff0, actual editor scene and both thumbnail cache variants pass. Normal/QA0/0, Geometry/Store, Host/isolation/localization1103, final-source Workbench624 and independent PASSED/Ship pass. [Evidence limits](docs/SIGN_PREVIEW_192.md).
+
+Guarded QA0.19.192.0 installed in TerrainRamp-1.0-Test after Valheim exited: both hashes match,104 existing data/QA save/token files unchanged. Other profiles untouched; no game launch. Includes .191 migration. Next: native sign02 and automatic migration35/Forest Hut; Codex prepares payment/reload supplies. Native font/live UGC/game construction/reload remain open. Full goal ACTIVE/incomplete. Older entries below are historical.
+
+## Verified .191, deployment was pending other-profile exit — 2026-10-15
 
 One explicit import rule wood_wall_roof→wood_wall_roof_a now records original ID/source row (native24/portable13), checks current prototypes/target recipe and reports migration before import/foreign export. Geometry/Store, normal+QA0/0, Host/isolation/localization1102, new-file formatter, actual Controller DLL copy/save/reopen, independent PASSED/Ship and Workbench624 pass. The production geometry predicate passed installed native assets. [Evidence](docs/PREFAB_MIGRATION_191.md).
 

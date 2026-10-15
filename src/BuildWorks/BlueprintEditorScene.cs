@@ -127,6 +127,8 @@ namespace OstrixMods.BuildWorks
             public BlueprintForeignPartData ForeignData;
             public BlueprintPrefabMetadata Metadata;
             public int? MaterialSeed;
+            public string SignText;
+            public bool SignTextAllowed;
             public string ContentWarning;
             public bool Placeholder;
             public bool Locked;
@@ -573,7 +575,8 @@ namespace OstrixMods.BuildWorks
                     if (!visuals.TryGetValue(part.StableId, out VisualNode visual) ||
                         visual.PrefabName != part.PrefabName || visual.Placeholder != placeholder ||
                         !ReferenceEquals(visual.ForeignData, part.ForeignData) || !ReferenceEquals(visual.Metadata, part.Metadata) ||
-                        visual.MaterialSeed != part.MaterialSeed)
+                        visual.MaterialSeed != part.MaterialSeed || visual.SignText != part.SignText ||
+                        part.SignText != null && visual.SignTextAllowed != BlueprintSignPreview.Allowed)
                     {
                         visual = CreateVisual(part, source, cacheMaterials: true);
                         visual.Root.SetActive(false);
@@ -1111,7 +1114,8 @@ namespace OstrixMods.BuildWorks
                     if (visual == null || visual.PrefabName != part.PrefabName ||
                         visual.Placeholder != !source ||
                         !ReferenceEquals(visual.ForeignData, part.ForeignData) || !ReferenceEquals(visual.Metadata, part.Metadata) ||
-                        visual.MaterialSeed != part.MaterialSeed)
+                        visual.MaterialSeed != part.MaterialSeed || visual.SignText != part.SignText ||
+                        part.SignText != null && visual.SignTextAllowed != BlueprintSignPreview.Allowed)
                     {
                         VisualNode replacement = CreateVisual(part, source, selectable: false);
                         DestroyVisual(visual);
@@ -2198,6 +2202,8 @@ namespace OstrixMods.BuildWorks
                 ForeignData = part.ForeignData,
                 Metadata = part.Metadata,
                 MaterialSeed = part.MaterialSeed,
+                SignText = part.SignText,
+                SignTextAllowed = BlueprintSignPreview.Allowed,
                 Placeholder = !source
             };
             try
@@ -2211,6 +2217,12 @@ namespace OstrixMods.BuildWorks
                 if (source) result.Root.transform.localScale = source.transform.localScale;
                 if (source) BlueprintItemStandPreview.TryAdd(source, result.Root,
                     part.ForeignData, out result.ContentWarning);
+                if (source)
+                {
+                    try { BlueprintSignPreview.Add(source, result.Root, part.SignText); }
+                    catch (Exception error) when (error is ArgumentException || error is UnityException)
+                    { result.ContentWarning = string.IsNullOrEmpty(result.ContentWarning) ? error.Message : result.ContentWarning + "\n" + error.Message; }
+                }
                 result.BaseScale = result.Root.transform.localScale;
                 if (source) result.NativeSnapCount = CaptureSnapPoints(
                     source.transform, result.SnapLocal,

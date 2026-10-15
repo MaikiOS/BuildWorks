@@ -56,6 +56,7 @@ public static class ZDOVars
 }
 public sealed class Sign : MonoBehaviour
 {
+    public TMPro.TextMeshProUGUI m_textWidget;
     public string m_defaultText = "Default";
     public int m_characterLimit = 50;
     private bool m_isViewable = true;
@@ -67,6 +68,11 @@ public sealed class Sign : MonoBehaviour
         if (Throw) throw new System.InvalidOperationException("Test sign failure");
         if (!Denied) GetComponent<ZNetView>().GetZDO().Set(ZDOVars.s_text, text);
     }
+}
+public static class CensorShittyWords
+{
+    // Contract stub only. The installed native filter is not executed in this laboratory.
+    public static void Filter(string input, out string output) => output = input?.Replace("QA_FILTER_WORD", "***");
 }
 namespace Splatform
 {

@@ -1,3 +1,9 @@
+## .197: limited native batch exchange verified — 2026-10-16
+
+Cancellation6→6, categorized import6→10, export with intentional ZIP Walls exclusion, reimport10→13, normal logout/world reentry retained13. Exact three-document field parity except fresh unique IDs/requested category; Floor/Walls opened in the actual editor. A later explicit external Walls placement selection created one personal copy: final14, auto-file retained. Sources/prior archives/legacy WAL unchanged. Most actions used runtime handlers, some selection collections directly, and selected actual UI clicks; not full manual acceptance. Process restart/unsaved draft/network/storage remain open. [Evidence and limits](docs/BATCH_NATIVE_197.md).
+
+QA .197/SHA32780B01…6882F3 unchanged. Game closed, protections restored, own helper stopped, endpoint absent. Next remains durable paired-transfer completion/crash/replay/return before production filled placement. Full goal ACTIVE/incomplete.
+
 ## .197: exact first-load inventory comparison — 2026-10-16
 
 Verified and installed QA0.19.197.0;131 protected files unchanged at install. v5 retains exact paired native inventory bytes/hash and source session/Player. New fallback requires a different Player, exact current canonical Local profile inventory and direct native Load fields. Legacy v4 is unchanged and held.

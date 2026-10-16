@@ -18,7 +18,8 @@ foreach($entry in $manifest){
     if((Get-FileHash -LiteralPath $path).Hash -cne $entry.sha256){throw ('Approved v11 source differs: '+$entry.name)}
     Copy-Item -LiteralPath (Join-Path $ported $entry.name) -Destination (Join-Path $runtime $entry.name)
 }
-foreach($name in @('BlueprintFogAssets.cs','BlueprintFogSimulation.cs','BlueprintEditorMeshData.cs','BlueprintFogContactMesh.cs','BlueprintFogSource.cs','BlueprintFogVisual.cs','BlueprintFogChannels.cs')){
+Copy-Item -LiteralPath (Join-Path $ported 'FogVolumePair.cginc') -Destination (Join-Path $runtime 'FogVolumePair.cginc')
+foreach($name in @('BlueprintFogAssets.cs','BlueprintFogSimulation.cs','BlueprintEditorMeshData.cs','BlueprintFogContactMesh.cs','BlueprintFogSource.cs','BlueprintFogVisual.cs','BlueprintFogChannels.cs','BlueprintFogVolume.cs')){
     Copy-Item -LiteralPath (Join-Path $root ('src/BuildWorks/'+$name)) -Destination (Join-Path $project ('Assets/Editor/RuntimeSources/'+$name))
 }
 $proof=Join-Path $output 'verification.json'

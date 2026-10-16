@@ -11,6 +11,8 @@ namespace OstrixMods.BuildWorks
         private GameObject visual;
         private BlueprintFogSource source;
         private BlueprintFogSimulation simulation;
+        private BlueprintFogChannels channelPool;
+        private string channelOwner;
         private readonly List<Material> surfaces = new List<Material>();
         private Material volume;
         private readonly Vector4[] trail = new Vector4[24];
@@ -21,9 +23,11 @@ namespace OstrixMods.BuildWorks
         internal GameObject Root => visual;
         internal BlueprintFogSource Source => source;
         internal BlueprintFogSimulation Simulation => simulation;
+        internal Bounds VolumeBounds => new Bounds(Origin + (source.Minimum + source.Maximum) * .5f, source.Maximum - source.Minimum);
 
         internal BlueprintFogVisual(BlueprintFogAssets assets, GameObject prefab, Vector3 position,
-            Quaternion rotation, Vector3 relativeScale, int? materialSeed, Vector3 origin, Vector3 actor, Vector2 capsule)
+            Quaternion rotation, Vector3 relativeScale, int? materialSeed, Vector3 origin, Vector3 actor, Vector2 capsule,
+            BlueprintFogChannels channels = null, string owner = null)
         {
             if (assets == null || !prefab) throw new ArgumentException("Fog prefab/assets missing.");
             try
@@ -38,8 +42,17 @@ namespace OstrixMods.BuildWorks
                 maximum = source.Maximum + new Vector3(1.2f, .6f, 1);
                 Vector3 localActor = LocalActor(actor, out bool nearby);
                 body = capsule;
-                simulation = new BlueprintFogSimulation(assets, source.Shape, source.Pigment, source.Noise,
+                BlueprintFogSimulation Create() => new BlueprintFogSimulation(assets, source.Shape, source.Pigment, source.Noise,
                     minimum, maximum, source.Minimum, source.Maximum, localActor, 37);
+                if (channels == null) simulation = Create();
+                else
+                {
+                    bool created = false;
+                    if (!channels.TryAcquire(owner, () => { created = true; return Create(); }, out var channel))
+                        throw new InvalidOperationException("Fog active owner budget is full; existing matter retained.");
+                    if (!created) throw new InvalidOperationException("Fog owner already has a visual.");
+                    simulation = channel; channelPool = channels; channelOwner = owner;
+                }
                 simulation.AdvanceTo(0, localActor, capsule, nearby);
                 foreach (BlueprintFogSource.Part part in source.Parts)
                 {
@@ -94,9 +107,7 @@ namespace OstrixMods.BuildWorks
                 throw new InvalidOperationException("Fog v11 requires a live perspective mono camera.");
             if ((camera.depthTextureMode & DepthTextureMode.Depth) == 0)
                 throw new InvalidOperationException("Fog camera must request depth before rendering.");
-            volume.SetVector("_VolumeMin", source.Minimum); volume.SetVector("_VolumeMax", source.Maximum);
-            volume.SetVector("_WakeMin", minimum); volume.SetVector("_WakeMax", maximum);
-            volume.SetTexture("_Wake", simulation.Smoke); volume.SetFloat("_WakeEnabled", 1);
+            BindVolume(volume, "");
             volume.SetVector("_CameraRight", camera.transform.right); volume.SetVector("_CameraUp", camera.transform.up);
             volume.SetVector("_CameraForward", camera.transform.forward);
             volume.SetVector("_FogCameraOrigin", camera.transform.position);
@@ -105,6 +116,25 @@ namespace OstrixMods.BuildWorks
             volume.SetVector("_BeamDirection", beamDirection.normalized); volume.SetFloat("_BeamStrength", beamStrength);
             volume.SetFloat("_BeamAttenuation", 1);
             Graphics.Blit(image, target, volume);
+        }
+
+        internal void BindVolume(Material material, string suffix)
+        {
+            if (simulation == null || !simulation.Smoke || source == null) throw new ObjectDisposedException(nameof(BlueprintFogVisual));
+            material.SetTexture("_Shape" + suffix, source.Shape); material.SetTexture("_Albedo" + suffix, source.Pigment);
+            material.SetTexture("_Noise" + suffix, source.Noise); material.SetTexture("_Wake" + suffix, simulation.Smoke);
+            material.SetTexture("_MatterFlow" + suffix, simulation.Surface);
+            material.SetVector("_VolumeMin" + suffix, source.Minimum); material.SetVector("_VolumeMax" + suffix, source.Maximum);
+            material.SetVector("_WakeMin" + suffix, minimum); material.SetVector("_WakeMax" + suffix, maximum);
+            material.SetVector("_MatterMin" + suffix, minimum); material.SetVector("_MatterMax" + suffix, maximum);
+            material.SetVector("_FogOrigin" + suffix, Origin); material.SetVector("_Body" + suffix, body);
+            material.SetFloat("_Clock" + suffix, time); material.SetFloat("_Density" + suffix, .85f); material.SetFloat("_Flow" + suffix, .12f);
+            if (suffix.Length == 0)
+            {
+                material.SetVectorArray("_Trail", trail); material.SetFloat("_MatterEnabled", 1);
+                material.SetFloat("_Accumulated", 1); material.SetFloat("_WakeEnabled", 1);
+            }
+            else material.SetVector("_ActorB", trail[0]);
         }
 
         private void Bind()
@@ -133,7 +163,9 @@ namespace OstrixMods.BuildWorks
         public void Dispose()
         {
             if (visual) visual.SetActive(false);
-            simulation?.Dispose(); simulation = null;
+            if (channelPool != null) { channelPool.Remove(channelOwner, simulation); channelPool = null; }
+            else simulation?.Dispose();
+            simulation = null;
             foreach (Material material in surfaces) if (material) UnityEngine.Object.DestroyImmediate(material);
             surfaces.Clear();
             if (volume) UnityEngine.Object.DestroyImmediate(volume); volume = null;

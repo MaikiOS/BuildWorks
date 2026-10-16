@@ -9,6 +9,9 @@ namespace OstrixMods.BuildWorks
     {
         private BlueprintFogAssets assets;
         private BlueprintFogVisual visual;
+        private BlueprintFogVisual second;
+        private BlueprintFogChannels channels;
+        private BlueprintFogVolume volume;
         private Player player;
         private ZNet network;
         private CapsuleCollider capsule;
@@ -19,10 +22,13 @@ namespace OstrixMods.BuildWorks
         public int Tick => visual?.Simulation?.Tick ?? 0;
         public Vector3 Origin => visual?.Origin ?? Vector3.zero;
         public bool Active => visual != null;
+        public int ActiveOwners => channels?.Count ?? (visual == null ? 0 : 1);
+        public bool SkipVolume { get; set; }
+        public bool SkipSimulation { get; set; }
         public string Failure { get; private set; }
         public Bounds PrefabBounds { get; private set; }
 
-        internal void Initialize(Player owner)
+        internal void Initialize(Player owner, bool pair = false)
         {
             player = BuildWorksTestIsolation.RequireLoadedSession(); network = ZNet.instance;
             if (owner != player) throw new InvalidOperationException("Fog QA player changed.");
@@ -34,6 +40,7 @@ namespace OstrixMods.BuildWorks
             try
             {
                 assets = BlueprintFogAssets.LoadEmbedded();
+                if (pair) { channels = new BlueprintFogChannels(); volume = new BlueprintFogVolume(assets); }
                 Vector3 position = player.transform.position + Vector3.right * 3;
                 if (!BlueprintPrefabMetadataCapture.TryGetLocalVisualBounds(prefab, out Bounds prefabBounds, true))
                     throw new InvalidOperationException("Fog QA wall bounds missing.");
@@ -44,7 +51,15 @@ namespace OstrixMods.BuildWorks
                 Vector3 origin = position + rotation * Vector3.Scale(prefabBounds.center, prefab.transform.localScale) - Vector3.up * 1.3f;
                 Bounds bounds = capsule.bounds;
                 visual = new BlueprintFogVisual(assets, prefab, position, rotation, Vector3.one,
-                    null, origin, bounds.center, new Vector2(Mathf.Max(bounds.extents.x, bounds.extents.z), bounds.extents.y));
+                    null, origin, bounds.center, new Vector2(Mathf.Max(bounds.extents.x, bounds.extents.z), bounds.extents.y), channels, "QA-wall-A");
+                if (pair)
+                {
+                    Vector3 centre = origin + Vector3.up * 1.3f, scale = new Vector3(1.15f, .9f, 1.1f);
+                    Vector3 secondPosition = centre - Vector3.Scale(Vector3.Scale(prefabBounds.center, prefab.transform.localScale), scale);
+                    second = new BlueprintFogVisual(assets, prefab, secondPosition, Quaternion.identity, scale,
+                        null, origin + new Vector3(.35f, 0, .2f), bounds.center,
+                        new Vector2(Mathf.Max(bounds.extents.x, bounds.extents.z), bounds.extents.y), channels, "QA-wall-B");
+                }
             }
             catch { Cleanup(); throw; }
         }
@@ -55,23 +70,27 @@ namespace OstrixMods.BuildWorks
             if (!player || player != Player.m_localPlayer || !network || network != ZNet.instance ||
                 player.IsDead() || !Game.instance || Game.instance.IsShuttingDown())
             { Destroy(this); return; }
+            if (SkipSimulation) return;
             try
             {
                 clock += Mathf.Min(Time.deltaTime, BlueprintFogSimulation.Step * 8);
                 Bounds bounds = capsule.bounds;
                 visual.AdvanceTo(clock, bounds.center, new Vector2(Mathf.Max(bounds.extents.x, bounds.extents.z), bounds.extents.y), true);
+                second?.AdvanceTo(clock, bounds.center, new Vector2(Mathf.Max(bounds.extents.x, bounds.extents.z), bounds.extents.y), true);
             }
             catch (Exception error) { Fail(error); }
         }
 
         private void OnRenderImage(RenderTexture source, RenderTexture target)
         {
-            if (visual == null) { Graphics.Blit(source, target); return; }
+            if (visual == null || SkipVolume) { Graphics.Blit(source, target); return; }
             try
             {
                 Light sun = RenderSettings.sun;
                 Vector3 direction = sun ? sun.transform.forward : Vector3.down;
-                visual.RenderVolume(view, source, target, visual.Origin - direction * 8,
+                if (volume != null) volume.Render(view, source, target, visual, second, visual.Origin - direction * 8,
+                    direction, sun ? Mathf.Max(0, sun.intensity) * 1.6f : 0);
+                else visual.RenderVolume(view, source, target, visual.Origin - direction * 8,
                     direction, sun ? Mathf.Max(0, sun.intensity) * 1.6f : 0);
                 ++RenderFrames;
             }
@@ -82,6 +101,8 @@ namespace OstrixMods.BuildWorks
         { Failure = error.Message; Debug.LogError("BuildWorks fog QA stopped: " + Failure); enabled = false; }
         public float SampleSurfaceDamage() => SampleAlpha(visual?.Simulation?.Surface);
         public float SampleSmokeDensity() => SampleAlpha(visual?.Simulation?.Smoke);
+        public float SampleSecondSurfaceDamage() => SampleAlpha(second?.Simulation?.Surface);
+        public float SampleSecondSmokeDensity() => SampleAlpha(second?.Simulation?.Smoke);
         private static float SampleAlpha(RenderTexture field)
         {
             if (!field) throw new InvalidOperationException("Fog QA field missing.");
@@ -105,7 +126,8 @@ namespace OstrixMods.BuildWorks
         private void OnDestroy() => Cleanup();
         private void Cleanup()
         {
-            visual?.Dispose(); visual = null; assets?.Dispose(); assets = null;
+            visual?.Dispose(); visual = null; second?.Dispose(); second = null;
+            volume?.Dispose(); volume = null; channels?.Dispose(); channels = null; assets?.Dispose(); assets = null;
             if (view && view.depthTextureMode == ownedDepth) view.depthTextureMode = oldDepth;
         }
     }

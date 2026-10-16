@@ -34,15 +34,16 @@ namespace OstrixMods.BuildWorks
             if (creating) throw new InvalidOperationException("Fog channel factory must not mutate its pool.");
             if (!channels.TryGetValue(owner, out BlueprintFogSimulation channel)) return true;
             if (!channel.TryGetRecovered()) return false;
-            Remove(owner); return true;
+            Remove(owner, channel); return true;
         }
 
         // Only the construction owner decides that a built/removed part no longer needs its visual.
-        internal void Remove(string owner)
+        internal void Remove(string owner, BlueprintFogSimulation expected = null)
         {
-            if (disposed) throw new ObjectDisposedException(nameof(BlueprintFogChannels));
+            if (disposed) return;
             if (creating) throw new InvalidOperationException("Fog channel factory must not mutate its pool.");
             if (!channels.TryGetValue(owner, out BlueprintFogSimulation channel)) return;
+            if (expected != null && !ReferenceEquals(expected, channel)) return;
             channels.Remove(owner); channel.Dispose();
         }
 

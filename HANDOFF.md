@@ -1,3 +1,9 @@
+## .203: combined v11 volume verified in Valheim — 2026-10-16
+
+Installed QA0.19.203.0 SHA71337687…5851C;143 prior QA files unchanged at final deployment. One volume pass combines two independent owners at each world position before integration. Unity A/B order, single baseline, negative sequential Blit, rotation/scale/separate origins, opaque depth, translation,12m bound, owner reuse/cleanup passed. Frozen270/18, visual6/2, Linear0; normal/QA0/0, contracts and independent PASSED/Ship. [Evidence and limits](docs/FOG_VOLUME_203.md).
+
+Native two woodwalls: both damage0→1→1→0, standing/recovery/cleanup; visible14 inventory entries/Wood9 and legacy WAL unchanged. Explicit light branching fixed the observed14 FPS: final scene121 FPS idle/90 contact at3440×1440. These are observations, not a controlled GPU benchmark or whole-house readiness. Two field sets93.75MiB; next bounded active regions for a house, persistent project/stake/board/material continuation/cancel/refund/reload/server. Owner appearance acceptance open. Game closed, protections restored, owned helper stopped; full goal ACTIVE.
+
 ## .202: two independent fog owners — 2026-10-16
 
 Installed QA0.19.202.0 SHA402D489C…849754;143 files unchanged at deployment. Bounded two-source transport/return/ledger, no eviction, release only after smoke+surface recover. Unity6 standalone field comparisons/2149 overlapping voxels, A-only/removal/stale reply/smoke-only/surface-only/factory re-entry/Dispose pass; baseline270/18, visual6/2, Linear color0. Normal/QA0/0, contracts and independent PASSED/Ship. [Evidence and limits](docs/FOG_CHANNELS_202.md).

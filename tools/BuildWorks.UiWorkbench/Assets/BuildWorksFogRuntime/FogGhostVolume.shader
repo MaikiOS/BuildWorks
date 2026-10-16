@@ -10,6 +10,7 @@ Shader "Hidden/BuildWorks/FogGhostVolumeRuntime"
             #pragma vertex vert_img
             #pragma fragment frag
             #pragma target 4.0
+            #pragma multi_compile_local __ BUILDWORKS_FOG_TWO_SOURCES
             #include "UnityCG.cginc"
             #include "GhostMatter.cginc"
             sampler2D _MainTex;
@@ -94,8 +95,12 @@ Shader "Hidden/BuildWorks/FogGhostVolumeRuntime"
                 }
                 return exp(-opticalDepth);
             }
+            #include "FogVolumePair.cginc"
             fixed4 frag(v2f_img i) : SV_Target
             {
+#if defined(BUILDWORKS_FOG_TWO_SOURCES)
+                return FogPairFragment(i);
+#endif
                 float4 background = tex2D(_MainTex, i.uv);
                 float2 ndc = i.uv * 2 - 1;
                 float3 ray = normalize(_CameraForward + _CameraRight * ndc.x * _Aspect * _TanHalfFov + _CameraUp * ndc.y * _TanHalfFov);

@@ -34,7 +34,7 @@ public static class FogRuntimeAssetBuild
         string output = Path.Combine(root, "artifacts", outputFolder);
         string source = Path.Combine(root, "src/BuildWorks/Assets/FogGhostRuntime");
         Directory.CreateDirectory(output);
-        foreach (string name in new[] { "AccumulatedSmoke.compute", "FogGhostVolume.shader", "TexturedGhost.shader", "GhostMatter.cginc" })
+        foreach (string name in new[] { "AccumulatedSmoke.compute", "FogGhostVolume.shader", "TexturedGhost.shader", "GhostMatter.cginc", "FogVolumePair.cginc" })
             if (Hash(Path.Combine(source, name)) != Hash(Path.Combine(Application.dataPath, "BuildWorksFogRuntime", name)))
                 throw new InvalidDataException("Approved v11 source differs: " + name);
         var build = new AssetBundleBuild {

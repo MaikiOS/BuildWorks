@@ -1,10 +1,10 @@
 [CmdletBinding()]
-param([string]$UnityPath='C:\Program Files\Unity\Hub\Editor\6000.0.61f1\Editor\Unity.exe',[switch]$MeshOnly,[switch]$VisualOnly,[switch]$ColorOnly,[switch]$ChannelsOnly)
+param([string]$UnityPath='C:\Program Files\Unity\Hub\Editor\6000.0.61f1\Editor\Unity.exe',[switch]$MeshOnly,[switch]$VisualOnly,[switch]$ColorOnly,[switch]$ChannelsOnly,[switch]$PairOnly)
 $ErrorActionPreference='Stop'
 $root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $project=Join-Path $root 'tools/BuildWorks.UiWorkbench'
-if(@($MeshOnly,$VisualOnly,$ColorOnly,$ChannelsOnly|Where-Object{$_}).Count -gt 1){throw 'Choose one fog check mode.'}
-$output=Join-Path $root $(if($ChannelsOnly){'artifacts/fog-runtime-channels'}elseif($ColorOnly){'artifacts/fog-color-check'}elseif($VisualOnly){'artifacts/fog-runtime-visual'}elseif($MeshOnly){'artifacts/fog-runtime-mesh'}else{'artifacts/fog-runtime-simulation'})
+if(@($MeshOnly,$VisualOnly,$ColorOnly,$ChannelsOnly,$PairOnly|Where-Object{$_}).Count -gt 1){throw 'Choose one fog check mode.'}
+$output=Join-Path $root $(if($PairOnly){'artifacts/fog-runtime-pair'}elseif($ChannelsOnly){'artifacts/fog-runtime-channels'}elseif($ColorOnly){'artifacts/fog-color-check'}elseif($VisualOnly){'artifacts/fog-runtime-visual'}elseif($MeshOnly){'artifacts/fog-runtime-mesh'}else{'artifacts/fog-runtime-simulation'})
 if ((Get-Item -LiteralPath $UnityPath).VersionInfo.ProductVersion -notlike '6000.0.61f1*') { throw 'Fog reference check requires Unity6000.0.61f1.' }
 if (Get-CimInstance Win32_Process -Filter "Name = 'Unity.exe'" | Where-Object { $_.CommandLine -like ('*'+$project+'*') }) { throw 'Workbench already open; do not replace its session.' }
 $reference=Join-Path $project 'Assets/FogRuntimeReference/FogMatterSimulation.cs'
@@ -14,7 +14,7 @@ if($hash -cne '7576245AB043F81F739F5232DD361D9BB56EBBEC9F49D0B30247AD0C01D87150'
 $frozenCompute=Join-Path $project 'Assets/FogGhostLab/AccumulatedSmoke.compute'
 $approved=Join-Path $root 'src/BuildWorks/Assets/FogGhostV11/AccumulatedSmoke.compute'
 if((Get-FileHash -LiteralPath $frozenCompute).Hash -cne (Get-FileHash -LiteralPath $approved).Hash){throw 'Frozen compute reference differs.'}
-foreach($name in @('BlueprintFogAssets.cs','BlueprintFogSimulation.cs','BlueprintEditorMeshData.cs','BlueprintFogContactMesh.cs','BlueprintFogSource.cs','BlueprintFogVisual.cs','BlueprintFogChannels.cs')){
+foreach($name in @('BlueprintFogAssets.cs','BlueprintFogSimulation.cs','BlueprintEditorMeshData.cs','BlueprintFogContactMesh.cs','BlueprintFogSource.cs','BlueprintFogVisual.cs','BlueprintFogChannels.cs','BlueprintFogVolume.cs')){
     $source=Join-Path $root ('src/BuildWorks/'+$name)
     $dest=Join-Path $project ('Assets/Editor/RuntimeSources/'+$name)
     Copy-Item -LiteralPath $source -Destination $dest
@@ -22,9 +22,9 @@ foreach($name in @('BlueprintFogAssets.cs','BlueprintFogSimulation.cs','Blueprin
 }
 New-Item -ItemType Directory -Path $output -Force|Out-Null
 $started=[datetime]::UtcNow
-$method=if($ChannelsOnly){'FogRuntimeChannelsCheck.Run'}elseif($ColorOnly){'FogRuntimeColorCheck.Run'}elseif($VisualOnly){'FogRuntimeVisualCheck.Run'}elseif($MeshOnly){'FogRuntimeMeshCheck.Run'}else{'FogRuntimeSimulationCheck.Run'}
+$method=if($PairOnly){'FogRuntimePairCheck.Run'}elseif($ChannelsOnly){'FogRuntimeChannelsCheck.Run'}elseif($ColorOnly){'FogRuntimeColorCheck.Run'}elseif($VisualOnly){'FogRuntimeVisualCheck.Run'}elseif($MeshOnly){'FogRuntimeMeshCheck.Run'}else{'FogRuntimeSimulationCheck.Run'}
 $settings=Join-Path $project 'ProjectSettings/ProjectSettings.asset'
-$settingsBytes=if($ColorOnly){[IO.File]::ReadAllBytes($settings)}else{$null}
+$settingsBytes=if($ColorOnly -or $PairOnly){[IO.File]::ReadAllBytes($settings)}else{$null}
 try {
     $process=Start-Process -FilePath $UnityPath -ArgumentList @('-batchmode','-force-d3d11','-projectPath',('"'+$project+'"'),'-executeMethod',$method,'-quit','-logFile',('"'+(Join-Path $output 'unity.log')+'"')) -WindowStyle Hidden -PassThru
     while(!$process.WaitForExit(1000)){
@@ -35,7 +35,7 @@ try {
 $proof=Join-Path $output 'verification.json'
 if(!(Test-Path -LiteralPath $proof) -or (Get-Item -LiteralPath $proof).LastWriteTimeUtc -lt $started){throw 'Fresh fog simulation proof missing.'}
 $result=Get-Content -LiteralPath $proof -Raw|ConvertFrom-Json
-if(!$result.passed -or ($ChannelsOnly -and ($result.capacity -ne 2 -or $result.independentFieldComparisons -ne 6 -or $result.overlappingVoxels -le 0 -or !$result.inactiveOwnerUnchanged -or !$result.staleRecoveryRejected -or !$result.noEviction -or !$result.removalIsolated -or !$result.recoveredReleased -or !$result.emptySlotClean -or !$result.duplicateTransportRejected -or !$result.smokeOnlyRetained -or !$result.surfaceOnlyRetained -or !$result.factoryReentryRejected -or !$result.factoryDisposeRejected)) -or ($ColorOnly -and ($result.hostColorSpace -cne 'Linear' -or !$result.gammaHostRejected -or !$result.gammaMismatchReproduced -or $result.linearBundleDelta -ge .005)) -or ($VisualOnly -and ($result.colorSpace -cne 'Gamma' -or !$result.shapeEqual -or !$result.pigmentEqual -or !$result.noiseEqual -or $result.frames.Count -ne 6)) -or ($MeshOnly -and ($result.cases -ne 3 -or $result.checkedVertices -le 6)) -or (!$MeshOnly -and !$VisualOnly -and !$ColorOnly -and !$ChannelsOnly -and ($result.ticks -ne 270 -or $result.exactFieldComparisons -ne 18 -or !$result.released -or !$result.invalidInputsRejected))){throw 'Fog verification evidence incomplete.'}
+if(!$result.passed -or ($PairOnly -and ($result.frames -ne 4 -or !$result.orderIndependent -or !$result.singleExact -or !$result.sequentialNegative -or !$result.removalIsolated -or !$result.pooledVisualGuards -or !$result.spanRejected -or !$result.opaqueDepthExact -or !$result.reusedOwnerRetained -or $result.colorSpace -cne 'Linear')) -or ($ChannelsOnly -and ($result.capacity -ne 2 -or $result.independentFieldComparisons -ne 6 -or $result.overlappingVoxels -le 0 -or !$result.inactiveOwnerUnchanged -or !$result.staleRecoveryRejected -or !$result.noEviction -or !$result.removalIsolated -or !$result.recoveredReleased -or !$result.emptySlotClean -or !$result.duplicateTransportRejected -or !$result.smokeOnlyRetained -or !$result.surfaceOnlyRetained -or !$result.factoryReentryRejected -or !$result.factoryDisposeRejected)) -or ($ColorOnly -and ($result.hostColorSpace -cne 'Linear' -or !$result.gammaHostRejected -or !$result.gammaMismatchReproduced -or $result.linearBundleDelta -ge .005)) -or ($VisualOnly -and ($result.colorSpace -cne 'Gamma' -or !$result.shapeEqual -or !$result.pigmentEqual -or !$result.noiseEqual -or $result.frames.Count -ne 6)) -or ($MeshOnly -and ($result.cases -ne 3 -or $result.checkedVertices -le 6)) -or (!$MeshOnly -and !$VisualOnly -and !$ColorOnly -and !$ChannelsOnly -and !$PairOnly -and ($result.ticks -ne 270 -or $result.exactFieldComparisons -ne 18 -or !$result.released -or !$result.invalidInputsRejected))){throw 'Fog verification evidence incomplete.'}
 $bundle=if($VisualOnly){'artifacts/fog-runtime-assets-gamma/buildworks-fog-v11'}else{'src/BuildWorks/Assets/FogGhostRuntime/buildworks-fog-v11'}
 @{ runtimeSha=(Get-FileHash -LiteralPath (Join-Path $root 'src/BuildWorks/BlueprintFogSimulation.cs')).Hash; referenceSha=$hash; bundleSha=(Get-FileHash -LiteralPath (Join-Path $root $bundle)).Hash; completedAtUtc=[datetime]::UtcNow.ToString('o') }|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $output 'sources.json')
 $result|ConvertTo-Json

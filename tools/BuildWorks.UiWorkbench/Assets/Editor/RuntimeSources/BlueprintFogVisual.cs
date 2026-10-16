@@ -27,7 +27,7 @@ namespace OstrixMods.BuildWorks
 
         internal BlueprintFogVisual(BlueprintFogAssets assets, GameObject prefab, Vector3 position,
             Quaternion rotation, Vector3 relativeScale, int? materialSeed, Vector3 origin, Vector3 actor, Vector2 capsule,
-            BlueprintFogChannels channels = null, string owner = null)
+            BlueprintFogChannels channels = null, string owner = null, bool compactRegion = false)
         {
             if (assets == null || !prefab) throw new ArgumentException("Fog prefab/assets missing.");
             try
@@ -37,18 +37,20 @@ namespace OstrixMods.BuildWorks
                 visual.transform.SetPositionAndRotation(position, rotation);
                 visual.transform.localScale = Vector3.Scale(prefab.transform.localScale, relativeScale);
                 Origin = origin;
-                source = new BlueprintFogSource(visual, Origin);
+                source = new BlueprintFogSource(visual, Origin, compactRegion);
                 minimum = source.Minimum - new Vector3(1.2f, 0, 1);
                 maximum = source.Maximum + new Vector3(1.2f, .6f, 1);
                 Vector3 localActor = LocalActor(actor, out bool nearby);
                 body = capsule;
+                Vector3Int? grid = compactRegion ? BlueprintFogSimulation.CompactGrid(minimum, maximum) : (Vector3Int?)null;
+                long reservedBytes = grid.HasValue ? (long)grid.Value.x * grid.Value.y * grid.Value.z * 80 : BlueprintFogSimulation.FieldBytes;
                 BlueprintFogSimulation Create() => new BlueprintFogSimulation(assets, source.Shape, source.Pigment, source.Noise,
-                    minimum, maximum, source.Minimum, source.Maximum, localActor, 37);
+                    minimum, maximum, source.Minimum, source.Maximum, localActor, 37, grid);
                 if (channels == null) simulation = Create();
                 else
                 {
                     bool created = false;
-                    if (!channels.TryAcquire(owner, () => { created = true; return Create(); }, out var channel))
+                    if (!channels.TryAcquire(owner, reservedBytes, () => { created = true; return Create(); }, out var channel))
                         throw new InvalidOperationException("Fog active owner budget is full; existing matter retained.");
                     if (!created) throw new InvalidOperationException("Fog owner already has a visual.");
                     simulation = channel; channelPool = channels; channelOwner = owner;

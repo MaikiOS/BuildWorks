@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace OstrixMods.BuildWorks
 {
-    // shortcut: bounded one-wall source volume; replace with owned local regions before whole-house rendering.
+    // shortcut: one complete part per source; large parts still need spatial clipping before whole-house rendering.
     internal sealed class BlueprintFogSource : IDisposable
     {
         internal sealed class Part
@@ -21,9 +21,9 @@ namespace OstrixMods.BuildWorks
         internal Texture3D Pigment { get; private set; }
         internal Texture3D Noise { get; private set; }
         internal int Occupied { get; private set; }
-        private const int Nx = 144, Ny = 112, Nz = 120;
+        private readonly int Nx = 144, Ny = 112, Nz = 120;
 
-        internal BlueprintFogSource(GameObject visual, Vector3 origin)
+        internal BlueprintFogSource(GameObject visual, Vector3 origin, bool compact = false)
         {
             if (!visual || !Finite(origin)) throw new ArgumentException("Missing fog visual or local origin.");
             try
@@ -46,6 +46,29 @@ namespace OstrixMods.BuildWorks
                     Parts.Add(new Part { Filter = filter, Renderer = renderer, Original = mesh, Data = data, ToMetres = matrix });
                 }
                 if (Parts.Count == 0) throw new InvalidOperationException("Fog source has no visible supported surface.");
+                if (compact)
+                {
+                    Vector3 low = Vector3.one * float.PositiveInfinity, high = Vector3.one * float.NegativeInfinity;
+                    foreach (Part part in Parts) foreach (int[] indices in part.Data.Submeshes) foreach (int index in indices)
+                    {
+                        Vector3 point = part.ToMetres.MultiplyPoint3x4(part.Data.Positions[index]);
+                        if (!Finite(point)) throw new InvalidOperationException("Fog source transform overflow.");
+                        low = Vector3.Min(low, point); high = Vector3.Max(high, point);
+                    }
+                    if (!Finite(low) || !Finite(high)) throw new InvalidOperationException("Fog source has no indexed surface.");
+                    if (low.x < -60 || low.y < -60 || low.z < -60 || high.x > 60 || high.y > 60 || high.z > 60)
+                        throw new InvalidOperationException("Fog part requires spatial clipping before local source allocation.");
+                    Vector3 voxel = new Vector3(4.8f / 144, 4.5f / 112, 3.4f / 120);
+                    Minimum = low - voxel * 3;
+                    Vector3 size = high - Minimum + voxel * 3;
+                    Nx = Mathf.Max(8, Mathf.CeilToInt(size.x / voxel.x - .0001f));
+                    Ny = Mathf.Max(8, Mathf.CeilToInt(size.y / voxel.y - .0001f));
+                    Nz = Mathf.Max(8, Mathf.CeilToInt(size.z / voxel.z - .0001f));
+                    Maximum = Minimum + Vector3.Scale(new Vector3(Nx, Ny, Nz), voxel);
+                    if (Nx > 256 || Ny > 256 || Nz > 256 || (long)Nx * Ny * Nz > 144L * 112 * 120 ||
+                        Minimum.x < -64 || Minimum.y < -64 || Minimum.z < -64 || Maximum.x > 64 || Maximum.y > 64 || Maximum.z > 64)
+                        throw new InvalidOperationException("Fog part exceeds its compact source budget; spatial clipping is required.");
+                }
                 Bake(); Noise = CreateNoise();
                 int denseVertices = 0;
                 foreach (Part part in Parts)
@@ -136,14 +159,14 @@ namespace OstrixMods.BuildWorks
             catch { if (copy) UnityEngine.Object.DestroyImmediate(copy); throw; }
             finally { RenderTexture.active = previous; RenderTexture.ReleaseTemporary(target); }
         }
-        private static float[] Filter(float[] source, int stride, bool dilate)
+        private float[] Filter(float[] source, int stride, bool dilate)
         {
             var result = new float[source.Length];
             for (int z = 1; z < Nz - 1; ++z) for (int y = 1; y < Ny - 1; ++y) for (int x = 1; x < Nx - 1; ++x)
             { int i = x + Nx * (y + Ny * z); result[i] = dilate ? Mathf.Max(source[i], Mathf.Max(source[i - stride], source[i + stride])) : source[i - stride] * .25f + source[i] * .5f + source[i + stride] * .25f; }
             return result;
         }
-        private static Color[] SpreadColor(Color[] source, int stride)
+        private Color[] SpreadColor(Color[] source, int stride)
         {
             var result = (Color[])source.Clone();
             for (int z = 1; z < Nz - 1; ++z) for (int y = 1; y < Ny - 1; ++y) for (int x = 1; x < Nx - 1; ++x)

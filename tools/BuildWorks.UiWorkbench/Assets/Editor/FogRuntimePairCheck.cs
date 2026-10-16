@@ -132,7 +132,7 @@ public static class FogRuntimePairCheck
         try { a.RenderVolume(camera, image, intermediate, Beam, Vector3.right, 2); b.RenderVolume(camera, intermediate, target, Beam, Vector3.right, 2); }
         finally { RenderTexture.ReleaseTemporary(intermediate); }
     }
-    private static Color[] Capture(Camera camera, FogRenderProbe probe, Action<RenderTexture, RenderTexture> render, string output, string name)
+    internal static Color[] Capture(Camera camera, FogRenderProbe probe, Action<RenderTexture, RenderTexture> render, string output, string name)
     {
         var target = RenderTexture.GetTemporary(384, 216, 24, RenderTextureFormat.ARGBHalf); var old = camera.targetTexture; var active = RenderTexture.active;
         Texture2D read = null, preview = null; int before = probe.Frames;
@@ -154,7 +154,7 @@ public static class FogRuntimePairCheck
         for (int layer = 0; layer < request.layerCount; ++layer) { var data = request.GetData<float>(layer); count += data.Length; for (int i = 3; i < data.Length; i += 4) { Require(Finite(data[i]), "Nonfinite field"); max = Mathf.Max(max, data[i]); } }
         Require(count == field.width * field.height * field.volumeDepth * 4, "Incomplete pair field"); return max;
     }
-    private static double Delta(Color[] a, Color[] b)
+    internal static double Delta(Color[] a, Color[] b)
     { Require(a.Length == b.Length, "Image dimensions differ"); double sum = 0; for (int i = 0; i < a.Length; ++i) sum += Math.Abs(a[i].r - b[i].r) + Math.Abs(a[i].g - b[i].g) + Math.Abs(a[i].b - b[i].b); return sum / (a.Length * 3); }
     private static bool Finite(float v) => !float.IsNaN(v) && !float.IsInfinity(v);
     private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }

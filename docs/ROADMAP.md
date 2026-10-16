@@ -1,3 +1,9 @@
+## .205: compact visual and three owners — 2026-10-16
+
+Installed QA0.19.205.0 SHAF1C9831B…41C93;143 prior files retain SHA/UTCmtime. Whole-part geometry-derived source retains physical voxel spacing; factory follows field reservation. GPU3wall/floor/rotated-beam owners/420ticks/20.57MiB fields: concurrent holes, independent pigment, removal/neighbor matter/recovery/cleanup passed. Linear3wall frames: global0.001359<0.005, foreground0.00984<0.03, empty-negative0.07736>0.03. Pair4/visual6+2/source-byte/compact300/channels6+2149, normal/QA0/0, contracts/loc1104, independent PASSED/Ship. [Evidence and limits](FOG_OWNERS_205.md).
+
+Native .205 not tested; game closed. Common renderer still accepts two sources; compact source contains whole part without spatial clipping.93.75MiB caps per-pool fields, not total client memory. Next common multi-source volume → existing28-part Forest Hut → durable project/stake/board/material continuation/cancel/refund/reload/server. Large parts/seams/multiple players/total performance open; no new manual house test ready, goal ACTIVE.
+
 ## .204: compact v11 fields — 2026-10-16
 
 Installed QA0.19.204.0 SHA893FDD29…17849;143 prior files retain SHA/UTCmtime. Optional compact allocation preserves physical voxel detail and bounds allocation/dispatch. GPU32×40×36/ten fields/3,686,400bytes versus49,152,000 for a smaller region;300ticks/contact-standing/return0/0/mixed budget/independent owner/invalid/release passed. Frozen270/18 exact, channels6/2149, pair4 retained; normal/QA0/0, contracts/loc1104, correctness PASSED/Ponytail Ship. [Evidence and limits](FOG_COMPACT_204.md).

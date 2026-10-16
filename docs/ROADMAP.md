@@ -1,3 +1,8 @@
+## .201: v11 color fixed and verified in Valheim — 2026-10-16
+
+Installed QA0.19.201.0, SHA F8829697…6C3022;143 files unchanged at deployment. Pale appearance was caused by a Gamma shader bundle in Linear/HDR/Deferred. Rebuilt Linear bundle uses unchanged sources: direct-source RGB delta0 versus0.0487058 for the wrong bundle. Native wall wood color/transparency, damage0→1→1→0, smoke2.98046875 and cleanup passed; visible14 items/Wood9 and legacy WAL unchanged. Normal/QA0/0, contracts, Unity comparisons and independent PASSED/Ship passed. [Evidence and limits](FOG_COLOR_201.md).
+
+Next multiple rotated sources with correct density ownership/bounded memory, then persistent unfinished house/stake/board/material continuation/cancel-refund/reload/server. House/board remain incomplete; user appearance acceptance open. Game closed, protections restored, helper stopped, full goal ACTIVE.
 ## .200: first native v11 wall — 2026-10-16
 
 Installed QA0.19.200.0 SHA98F6F932…53EDF3;143 files unchanged at deployment. Native renderer-only woodwall/original texture, actual capsule/movement: damage0→1→1 standing→0 after exit, smoke3.3828125 and cleanup passed. Unity source-byte parity,6 frames/2 translations, mesh/subdivision and270/18 simulation checks passed; normal/QA0/0, Host/control/isolation/loc1104, independent PASSED/Ship. [Evidence and limits](FOG_RENDER_200.md).

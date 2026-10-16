@@ -16,6 +16,7 @@ public static class FogRuntimeVisualCheck
 
     public static void Run()
     {
+        Require(QualitySettings.activeColorSpace == ColorSpace.Gamma, "Approved v11 visual comparison requires its original Gamma space");
         string root = Path.GetFullPath(Path.Combine(Application.dataPath, "../../.."));
         string output = Path.Combine(root, "artifacts/fog-runtime-visual"); Directory.CreateDirectory(output);
         string scene = "Assets/FogGhostLab/FogWallStudy.unity";
@@ -42,7 +43,7 @@ public static class FogRuntimeVisualCheck
         var translated = new List<Frame>();
         try
         {
-            using (var assets = new BlueprintFogAssets(File.ReadAllBytes(Path.Combine(root, "src/BuildWorks/Assets/FogGhostRuntime/buildworks-fog-v11"))))
+            using (var assets = new BlueprintFogAssets(File.ReadAllBytes(Path.Combine(root, "artifacts/fog-runtime-assets-gamma/buildworks-fog-v11"))))
             {
                 visual = new BlueprintFogVisual(assets, originalSolid, Vector3.zero, Quaternion.identity, Vector3.one, null,
                     Vector3.zero, actor.position, body);
@@ -103,7 +104,7 @@ public static class FogRuntimeVisualCheck
                 }
                 Require(translated.All(frame => frame.meanRgbDelta < .005), "Distant world coordinates broke origin invariance");
                 var report = new Report { passed = true, gameHostTested = false, ownerVisualAcceptance = false,
-                    unity = Application.unityVersion, graphics = SystemInfo.graphicsDeviceType.ToString(), frames = frames.ToArray(),
+                    unity = Application.unityVersion, graphics = SystemInfo.graphicsDeviceType.ToString(), colorSpace = QualitySettings.activeColorSpace.ToString(), frames = frames.ToArray(),
                     shapeEqual = shapeEqual, pigmentEqual = pigmentEqual, noiseEqual = noiseEqual,
                     cameraPosition = baseCameraPosition, translatedCameraPosition = camera.transform.position,
                     cameraRotation = camera.transform.rotation, fov = camera.fieldOfView,
@@ -141,7 +142,7 @@ public static class FogRuntimeVisualCheck
     [Serializable] private sealed class Report
     {
         public bool passed, gameHostTested, ownerVisualAcceptance, shapeEqual, pigmentEqual, noiseEqual;
-        public string unity, graphics; public Frame[] frames; public Vector3 cameraPosition; public Quaternion cameraRotation;
+        public string unity, graphics, colorSpace; public Frame[] frames; public Vector3 cameraPosition; public Quaternion cameraRotation;
         public Frame[] translatedFrames; public Vector3 translation, translatedCameraPosition;
         public float fov; public int width, height;
     }

@@ -16,6 +16,8 @@ namespace OstrixMods.BuildWorks
 
         internal static BlueprintFogAssets LoadEmbedded()
         {
+            if (QualitySettings.activeColorSpace != ColorSpace.Linear)
+                throw new NotSupportedException("BuildWorks embedded fog shaders require Valheim's Linear color space.");
             using (var stream = typeof(BlueprintFogAssets).Assembly.GetManifestResourceStream(ResourceName))
             {
                 if (stream == null || stream.Length <= 0 || stream.Length > 16 * 1024 * 1024)

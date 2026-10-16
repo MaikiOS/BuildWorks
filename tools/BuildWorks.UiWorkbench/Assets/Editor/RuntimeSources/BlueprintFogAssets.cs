@@ -40,8 +40,8 @@ namespace OstrixMods.BuildWorks
                     throw new InvalidDataException("Fog v11 bundle contains unexpected assets.");
                 Surface = bundle.LoadAsset<Shader>(expected[2]); Volume = bundle.LoadAsset<Shader>(expected[1]);
                 Solver = bundle.LoadAsset<ComputeShader>(expected[0]);
-                if (!Surface || Surface.name != "BuildWorks/Study/TexturedGhost" || !Surface.isSupported ||
-                    !Volume || Volume.name != "Hidden/BuildWorks/FogGhostVolume" || !Volume.isSupported || !Solver)
+                if (!Surface || Surface.name != "BuildWorks/Fog/TexturedGhost" || !Surface.isSupported ||
+                    !Volume || Volume.name != "Hidden/BuildWorks/FogGhostVolumeRuntime" || !Volume.isSupported || !Solver)
                     throw new NotSupportedException("Fog v11 shaders are unavailable on this graphics device.");
                 foreach (string kernel in Kernels)
                 {

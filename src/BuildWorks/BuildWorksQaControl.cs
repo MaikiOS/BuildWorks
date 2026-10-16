@@ -45,6 +45,25 @@ namespace OstrixMods.BuildWorks
         private Coroutine capture;
         private long captureId;
         private int releaseFrame = -1;
+        private BuildWorksTestFog fog;
+
+        public string StartFogVisual()
+        {
+            player = BuildWorksTestIsolation.RequireLoadedSession(); network = ZNet.instance;
+            if (running != null || capture != null || !SafeSession()) throw new InvalidOperationException("Focused idle isolated QA session required.");
+            Camera camera = Camera.main;
+            if (!camera) throw new InvalidOperationException("Native QA camera missing.");
+            CloseFogVisual(); fog = camera.gameObject.AddComponent<BuildWorksTestFog>();
+            try { fog.Initialize(player); return "fog-v11-native-visual-active"; }
+            catch { CloseFogVisual(); throw; }
+        }
+
+        public string CloseFogVisual()
+        {
+            BuildWorksTestFog retired = fog; fog = null;
+            if (retired) DestroyImmediate(retired);
+            return "fog-v11-native-visual-closed";
+        }
 
         public string StartStoragePersistenceTest()
         {
@@ -368,6 +387,8 @@ namespace OstrixMods.BuildWorks
 
         internal void Stop(string reason)
         {
+            try { CloseFogVisual(); }
+            catch (Exception error) { Debug.LogError("Fog QA cleanup failed; continuing input release: " + error.Message); }
             try { GetComponent<BuildWorksTestStorage>()?.Cancel(reason); }
             catch (Exception error) { Debug.LogError("Storage QA cancellation failed; continuing input release: " + error.Message); }
             // A local model may still be thinking when F12 or focus loss stops the host.

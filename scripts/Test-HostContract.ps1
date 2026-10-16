@@ -919,14 +919,14 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.199.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.200.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $fogResource = @($plugin.MainModule.Resources | Where-Object Name -eq 'BuildWorks.FogGhostV11')
 Assert-Contract ($fogResource.Count -eq 1 -and $fogResource[0] -is [Mono.Cecil.EmbeddedResource]) 'Compiled v11 fog resource is missing or duplicated.'
 $fogHash = [Security.Cryptography.SHA256]::Create()
 try { $embeddedFogHash = [BitConverter]::ToString($fogHash.ComputeHash($fogResource[0].GetResourceData())).Replace('-', '') }
 finally { $fogHash.Dispose() }
-Assert-Contract ($embeddedFogHash -ceq (Get-FileHash -LiteralPath (Join-Path $projectRoot 'src/BuildWorks/Assets/FogGhostV11/buildworks-fog-v11')).Hash) 'Compiled fog resource differs from the verified bundle.'
+Assert-Contract ($embeddedFogHash -ceq (Get-FileHash -LiteralPath (Join-Path $projectRoot 'src/BuildWorks/Assets/FogGhostRuntime/buildworks-fog-v11')).Hash) 'Compiled fog resource differs from the verified bundle.'
 $serverAuthority = $plugin.MainModule.GetType('OstrixMods.BuildWorks.BlueprintServerAuthority')
 Assert-Contract ($null -ne $serverAuthority) 'Compiled server blueprint authority adapter is missing.'
 $resolveAuthority = $serverAuthority.Methods | Where-Object Name -eq 'TryResolve'

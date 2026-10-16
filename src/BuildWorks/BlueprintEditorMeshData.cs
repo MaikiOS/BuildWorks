@@ -10,6 +10,106 @@ namespace OstrixMods.BuildWorks
     // No collider or changes to the source mesh/buffer targets are needed.
     internal static class BlueprintEditorMeshData
     {
+        internal sealed class SurfaceData
+        {
+            internal Vector3[] Positions, Normals;
+            internal Vector4[] Tangents;
+            internal Vector2[] UV;
+            internal int[][] Submeshes;
+        }
+
+        internal static bool TryReadSurface(Mesh mesh, out SurfaceData data, out string error)
+        {
+            data = null; error = null;
+            try
+            {
+                if (!mesh || mesh.vertexCount == 0 || mesh.vertexCount > 250000 || mesh.subMeshCount > 256)
+                    throw new InvalidOperationException("Fog source mesh exceeds its read budget or is empty.");
+                var result = new SurfaceData { Submeshes = new int[mesh.subMeshCount][] };
+                if (mesh.isReadable)
+                {
+                    result.Positions = mesh.vertices; result.Normals = mesh.normals;
+                    result.Tangents = mesh.tangents; result.UV = mesh.uv;
+                }
+                else
+                {
+                    var streams = new Dictionary<int, byte[]>();
+                    Vector4[] positions = Attribute(mesh, VertexAttribute.Position, 3, streams);
+                    Vector4[] normals = Attribute(mesh, VertexAttribute.Normal, 3, streams);
+                    result.Tangents = Attribute(mesh, VertexAttribute.Tangent, 4, streams);
+                    Vector4[] uv = Attribute(mesh, VertexAttribute.TexCoord0, 2, streams);
+                    result.Positions = new Vector3[mesh.vertexCount]; result.Normals = new Vector3[mesh.vertexCount];
+                    result.UV = new Vector2[mesh.vertexCount];
+                    for (int i = 0; i < mesh.vertexCount; ++i)
+                    { result.Positions[i] = positions[i]; result.Normals[i] = normals[i]; result.UV[i] = uv[i]; }
+                }
+                if (result.Positions.Length != mesh.vertexCount || result.Normals.Length != mesh.vertexCount ||
+                    result.Tangents.Length != mesh.vertexCount || result.UV.Length != mesh.vertexCount)
+                    throw new InvalidOperationException("Fog source needs original positions, normals, tangents and UV0.");
+                for (int i = 0; i < mesh.vertexCount; ++i)
+                {
+                    Vector3 p = result.Positions[i], n = result.Normals[i]; Vector4 t = result.Tangents[i]; Vector2 uv = result.UV[i];
+                    if (!Finite(p.x) || !Finite(p.y) || !Finite(p.z) || !Finite(n.x) || !Finite(n.y) || !Finite(n.z) ||
+                        !Finite(t.x) || !Finite(t.y) || !Finite(t.z) || !Finite(t.w) || !Finite(uv.x) || !Finite(uv.y))
+                        throw new InvalidOperationException("Fog source contains a non-finite surface attribute.");
+                }
+                byte[] indexBytes = null; int indexSize = mesh.indexFormat == IndexFormat.UInt16 ? 2 : 4;
+                if (!mesh.isReadable)
+                    using (GraphicsBuffer buffer = mesh.GetIndexBuffer()) indexBytes = BoundedBuffer(buffer);
+                int totalIndices = 0;
+                for (int submesh = 0; submesh < mesh.subMeshCount; ++submesh)
+                {
+                    SubMeshDescriptor descriptor = mesh.GetSubMesh(submesh);
+                    totalIndices = checked(totalIndices + descriptor.indexCount);
+                    if (descriptor.topology != MeshTopology.Triangles || descriptor.indexCount % 3 != 0 || totalIndices > 1500000)
+                        throw new InvalidOperationException("Fog source needs bounded complete triangles for every material slot.");
+                    int[] indices = mesh.isReadable ? mesh.GetTriangles(submesh) : new int[descriptor.indexCount];
+                    for (int i = 0; i < indices.Length; ++i)
+                    {
+                        if (!mesh.isReadable)
+                        {
+                            int offset = checked((descriptor.indexStart + i) * indexSize);
+                            indices[i] = checked((indexSize == 2 ? BitConverter.ToUInt16(indexBytes, offset)
+                                : checked((int)BitConverter.ToUInt32(indexBytes, offset))) + descriptor.baseVertex);
+                        }
+                        if (indices[i] < 0 || indices[i] >= mesh.vertexCount)
+                            throw new InvalidOperationException("Fog triangle index is outside its vertex buffer.");
+                    }
+                    result.Submeshes[submesh] = indices;
+                }
+                if (totalIndices == 0) throw new InvalidOperationException("Fog source has no surface triangles.");
+                data = result; return true;
+            }
+            catch (Exception exception)
+            { error = (mesh ? mesh.name : "Missing mesh") + ": " + exception.Message; return false; }
+        }
+
+        private static Vector4[] Attribute(Mesh mesh, VertexAttribute attribute, int dimensions, Dictionary<int, byte[]> streams)
+        {
+            if (!mesh.HasVertexAttribute(attribute) || mesh.GetVertexAttributeDimension(attribute) < dimensions)
+                throw new InvalidOperationException("Fog source missing attribute: " + attribute);
+            int stream = mesh.GetVertexAttributeStream(attribute);
+            if (!streams.TryGetValue(stream, out byte[] bytes))
+            {
+                using (GraphicsBuffer buffer = mesh.GetVertexBuffer(stream)) bytes = BoundedBuffer(buffer);
+                streams.Add(stream, bytes);
+            }
+            int stride = mesh.GetVertexBufferStride(stream), offset = mesh.GetVertexAttributeOffset(attribute);
+            VertexAttributeFormat format = mesh.GetVertexAttributeFormat(attribute); int size = ComponentSize(format);
+            var result = new Vector4[mesh.vertexCount];
+            for (int i = 0; i < result.Length; ++i)
+                for (int axis = 0; axis < dimensions; ++axis)
+                    result[i][axis] = ReadComponent(bytes, checked(i * stride + offset + axis * size), format);
+            return result;
+        }
+
+        private static byte[] BoundedBuffer(GraphicsBuffer buffer)
+        {
+            if (buffer == null || !buffer.IsValid() || (long)buffer.count * buffer.stride > 64 * 1024 * 1024)
+                throw new InvalidOperationException("Fog source buffer is unavailable or exceeds its read budget.");
+            return ReadBuffer(buffer);
+        }
+
         internal static bool TryRead(
             Mesh mesh, out Vector3[] vertices, out int[] triangles, out string error)
         {

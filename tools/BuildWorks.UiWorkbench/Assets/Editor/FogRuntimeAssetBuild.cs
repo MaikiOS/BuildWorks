@@ -13,7 +13,7 @@ public static class FogRuntimeAssetBuild
     {
         string root = Path.GetFullPath(Path.Combine(Application.dataPath, "../../.."));
         string output = Path.Combine(root, "artifacts/fog-runtime-assets");
-        string source = Path.Combine(root, "src/BuildWorks/Assets/FogGhostV11");
+        string source = Path.Combine(root, "src/BuildWorks/Assets/FogGhostRuntime");
         Directory.CreateDirectory(output);
         foreach (string name in new[] { "AccumulatedSmoke.compute", "FogGhostVolume.shader", "TexturedGhost.shader", "GhostMatter.cginc" })
             if (Hash(Path.Combine(source, name)) != Hash(Path.Combine(Application.dataPath, "BuildWorksFogRuntime", name)))

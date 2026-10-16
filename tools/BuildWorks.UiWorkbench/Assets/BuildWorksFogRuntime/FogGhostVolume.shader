@@ -1,4 +1,4 @@
-Shader "Hidden/BuildWorks/FogGhostVolume"
+Shader "Hidden/BuildWorks/FogGhostVolumeRuntime"
 {
     Properties { _MainTex ("Scene", 2D) = "white" {} _Shape ("Building density", 3D) = "black" {} _Albedo ("Original building colour", 3D) = "gray" {} _Noise ("Cloud noise", 3D) = "gray" {} _Wake ("Transported matter density", 3D) = "black" {} _MatterFlow ("Shared matter transport", 3D) = "black" {} }
     SubShader
@@ -19,6 +19,7 @@ Shader "Hidden/BuildWorks/FogGhostVolume"
             float _WakeEnabled;
             float3 _VolumeMin, _VolumeMax, _CameraRight, _CameraUp, _CameraForward;
             float _Aspect, _TanHalfFov, _Density;
+            float3 _FogCameraOrigin;
             float3 _BeamOrigin, _BeamDirection;
             float _BeamStrength, _BeamAttenuation;
 
@@ -32,10 +33,10 @@ Shader "Hidden/BuildWorks/FogGhostVolume"
                     float shape = tex3Dlod(_Shape, float4(uv, 0)).r;
                     if (shape >= .002)
                     {
-                        uv = (p - GhostDrift(p) - _VolumeMin) / (_VolumeMax - _VolumeMin);
+                        uv = (p - GhostDrift(p + _FogOrigin) - _VolumeMin) / (_VolumeMax - _VolumeMin);
                         shape = tex3Dlod(_Shape, float4(saturate(uv), 0)).r;
-                        float remaining = _Accumulated > .5 ? 1-GhostTransport(p).w : (1-GhostClear(p))*(1-GhostTransport(p).w*.85);
-                        building = shape * (.45 + GhostNoise(p) * .55) * remaining * _Density;
+                        float remaining = _Accumulated > .5 ? 1-GhostTransport(p + _FogOrigin).w : (1-GhostClear(p + _FogOrigin))*(1-GhostTransport(p + _FogOrigin).w*.85);
+                        building = shape * (.45 + GhostNoise(p + _FogOrigin) * .55) * remaining * _Density;
                     }
                 }
                 float wake = 0, wakeLight = 1;
@@ -48,7 +49,7 @@ Shader "Hidden/BuildWorks/FogGhostVolume"
                         float4 shade = tex3Dlod(_Wake, float4(wakeUV - _BeamDirection * .04, 0));
                         wake = (_Accumulated > .5 ? smoke.a : smoke.r) * _Density;
                         wakeLight = exp(_Accumulated > .5 ? -shade.a*.28 : -shade.r*.7);
-                        float3 sourceUV = (p - GhostTransport(p).xyz - _VolumeMin) / (_VolumeMax - _VolumeMin);
+                        float3 sourceUV = (p - GhostTransport(p + _FogOrigin).xyz - _VolumeMin) / (_VolumeMax - _VolumeMin);
                         pigment = lerp(pigment, tex3Dlod(_Albedo, float4(saturate(sourceUV), 0)).rgb, .45);
                         if (_Accumulated > .5)
                         {
@@ -98,7 +99,7 @@ Shader "Hidden/BuildWorks/FogGhostVolume"
                 float4 background = tex2D(_MainTex, i.uv);
                 float2 ndc = i.uv * 2 - 1;
                 float3 ray = normalize(_CameraForward + _CameraRight * ndc.x * _Aspect * _TanHalfFov + _CameraUp * ndc.y * _TanHalfFov);
-                float3 origin = _WorldSpaceCameraPos;
+                float3 origin = _FogCameraOrigin - _FogOrigin;
                 float3 safeRay = lerp(-1, 1, step(0, ray)) * max(abs(ray), .00001);
                 float3 t0 = (_VolumeMin - float3(3, 0, 1) - origin) / safeRay;
                 float3 t1 = (_VolumeMax + float3(4, 1, 1) - origin) / safeRay;

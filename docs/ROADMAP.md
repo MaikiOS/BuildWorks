@@ -1,3 +1,8 @@
+## .200: first native v11 wall — 2026-10-16
+
+Installed QA0.19.200.0 SHA98F6F932…53EDF3;143 files unchanged at deployment. Native renderer-only woodwall/original texture, actual capsule/movement: damage0→1→1 standing→0 after exit, smoke3.3828125 and cleanup passed. Unity source-byte parity,6 frames/2 translations, mesh/subdivision and270/18 simulation checks passed; normal/QA0/0, Host/control/isolation/loc1104, independent PASSED/Ship. [Evidence and limits](FOG_RENDER_200.md).
+
+Native appearance is brighter than approved lab: color/lighting acceptance remains open. Next native material/HDR/image-effect order, multiple rotated sources/bounded memory, then persistent project/board/material continuation/safe cancellation/reload/server. No ordinary construction integration yet; house/board incomplete. Final clear-area probe retained visible14 items/Wood9; early pickups/entry durability difference separately documented, not full inventory preservation proof. Game closed/protections restored/helper stopped/full goal ACTIVE.
 ## .199: runtime v11 computation matches frozen reference — 2026-10-16
 
 Installed QA0.19.199.0, SHA A18E73EB…0B891;143 prior QA files unchanged at deployment. BlueprintFogSimulation ports seven compute stages into bounded local metres with owned GPU resources/fixed-step catch-up. Unity270 ticks/18 byte-exact complete Smoke/Flow/Surface comparisons; fractional/eight-step/standing/return/emit=false/invalid/disposal passed. Normal/QA0/0, Host/control/isolation/localization1104, independent PASSED/Ship. [Evidence and limits](FOG_SIMULATION_199.md).

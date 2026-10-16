@@ -1,4 +1,4 @@
-Shader "BuildWorks/Study/TexturedGhost"
+Shader "BuildWorks/Fog/TexturedGhost"
 {
     Properties
     {

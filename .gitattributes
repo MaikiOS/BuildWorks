@@ -2,3 +2,4 @@
 src/BuildWorks/Assets/FogGhostV11/* -text
 src/BuildWorks/Assets/FogGhostV11/*.json text eol=lf
 tools/BuildWorks.UiWorkbench/Assets/BuildWorksFogRuntime/* -text
+tools/BuildWorks.UiWorkbench/Assets/FogRuntimeReference/FogMatterSimulation.cs -text

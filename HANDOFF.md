@@ -1,3 +1,9 @@
+## .199: runtime v11 computation matches frozen reference — 2026-10-16
+
+Installed QA0.19.199.0, SHA A18E73EB…0B891;143 prior QA files unchanged at deployment. BlueprintFogSimulation ports seven compute stages into bounded local metres with owned GPU resources/fixed-step catch-up. Unity270 ticks/18 byte-exact complete Smoke/Flow/Surface comparisons; fractional/eight-step/standing/return/emit=false/invalid/disposal passed. Normal/QA0/0, Host/control/isolation/localization1104, independent PASSED/Ship. [Evidence and limits](docs/FOG_SIMULATION_199.md).
+
+One wall without native rendering; .199 game execution/house/board/network remain open. Next: native meshes/textures/local frame/body passage and approved-look comparison, then multiple-source ownership and a persistent project/board. Do not allocate46.9MiB per piece or equate XYZ bins with mixed-density ownership. Game closed, full goal ACTIVE; no new manual check yet.
+
 ## .198: first v11 asset integration verified in Valheim — 2026-10-16
 
 Installed QA0.19.198.0; SHA EA2BECDD…21D50,143 existing files unchanged at deployment. Four own source files match the approved snapshot;49,591-byte bundle contains only two shaders and one compute, no game models/textures. Normal/QA0/0, Host/control/isolation/localization1104, independent correctness PASSED/Ponytail Ship. Unity6000.0.61f1 and actual Valheim6000.0.75f1 verified loading, seven kernel layouts, GPU ClearLedger and repeated loading. This does NOT prove full simulation or house rendering. [Evidence and limits](docs/FOG_ASSETS_198.md).

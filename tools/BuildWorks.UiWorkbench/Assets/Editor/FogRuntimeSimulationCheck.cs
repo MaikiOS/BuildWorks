@@ -38,9 +38,9 @@ public static class FogRuntimeSimulationCheck
             shape.SetPixelData(density, 0); shape.Apply();
             pigment.SetPixels(Enumerable.Range(0, 16 * 16 * 16).Select(i => new Color(.25f + i % 16 * .02f, .2f, .1f, 1)).ToArray());
             pigment.Apply();
-            using (var assets = new BlueprintFogAssets(File.ReadAllBytes(Path.Combine(root, "src/BuildWorks/Assets/FogGhostV11/buildworks-fog-v11"))))
+            using (var assets = new BlueprintFogAssets(File.ReadAllBytes(Path.Combine(root, "src/BuildWorks/Assets/FogGhostRuntime/buildworks-fog-v11"))))
             {
-                referenceSolver = UnityEngine.Object.Instantiate(assets.Solver);
+                referenceSolver = UnityEngine.Object.Instantiate(AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/FogGhostLab/AccumulatedSmoke.compute"));
                 var reference = host.AddComponent<Frozen>();
                 reference.solver = referenceSolver; reference.shape = shape; reference.pigment = pigment; reference.noise = noise;
                 reference.minimum = minimum; reference.maximum = maximum; reference.restMinimum = restMin; reference.restMaximum = restMax;

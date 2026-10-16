@@ -18,7 +18,9 @@ foreach($entry in $manifest){
     if((Get-FileHash -LiteralPath $path).Hash -cne $entry.sha256){throw ('Approved v11 source differs: '+$entry.name)}
     Copy-Item -LiteralPath (Join-Path $ported $entry.name) -Destination (Join-Path $runtime $entry.name)
 }
-Copy-Item -LiteralPath (Join-Path $root 'src/BuildWorks/BlueprintFogAssets.cs') -Destination (Join-Path $project 'Assets/Editor/RuntimeSources/BlueprintFogAssets.cs')
+foreach($name in @('BlueprintFogAssets.cs','BlueprintFogSimulation.cs','BlueprintEditorMeshData.cs','BlueprintFogContactMesh.cs','BlueprintFogSource.cs','BlueprintFogVisual.cs','BlueprintFogChannels.cs')){
+    Copy-Item -LiteralPath (Join-Path $root ('src/BuildWorks/'+$name)) -Destination (Join-Path $project ('Assets/Editor/RuntimeSources/'+$name))
+}
 $proof=Join-Path $output 'verification.json'
 $settings=Join-Path $project 'ProjectSettings/ProjectSettings.asset'
 $settingsBytes=[IO.File]::ReadAllBytes($settings)

@@ -22,6 +22,9 @@ namespace OstrixMods.BuildWorks
         private float inputTime;
         private Vector3 previous, inputPosition;
         private bool disposed;
+        private AsyncGPUReadbackRequest recoveryRequest;
+        private bool recoveryPending, observedRecovery;
+        private int emissionRevision, requestedRevision, observedRevision;
         internal RenderTexture Smoke => colour[current];
         internal RenderTexture Flow => velocity[current];
         internal RenderTexture Surface => surface[current];
@@ -61,7 +64,7 @@ namespace OstrixMods.BuildWorks
                 state = new ComputeBuffer(1, sizeof(uint));
                 foreach (int kernel in new[] { clearLedger, flow, ledger }) solver.SetBuffer(kernel, "_AwayMass", away);
                 foreach (int kernel in new[] { clearLedger, flow }) solver.SetBuffer(kernel, "_PeakAway", peak);
-                foreach (int kernel in new[] { clearLedger, restore }) solver.SetBuffer(kernel, "_SurfaceState", state);
+                foreach (int kernel in new[] { clearLedger, ledger, restore }) solver.SetBuffer(kernel, "_SurfaceState", state);
                 solver.SetInt("_ResetLedger", 1); solver.Dispatch(clearLedger, 16, 1, 1); solver.SetInt("_ResetLedger", 0);
                 predictedColour = Allocate("Predicted smoke"); predictedOrigin = Allocate("Predicted origins");
                 for (int index = 0; index < 2; ++index)
@@ -87,6 +90,7 @@ namespace OstrixMods.BuildWorks
             int target = Mathf.FloorToInt(time / Step + .0001f);
             // Reject an unbounded catch-up rather than stalling the game or silently resetting visible matter.
             if (target - tick > 8) throw new ArgumentException("Fog advance exceeds eight fixed steps; caller must bound elapsed time.");
+            if (emit && target > tick) ++emissionRevision;
             solver.SetVector("_Body", body); solver.SetFloat("_Emit", emit ? 1 : 0);
             while (tick < target)
             {
@@ -115,6 +119,26 @@ namespace OstrixMods.BuildWorks
             inputTime = time; inputPosition = actor;
         }
 
+        internal bool TryGetRecovered()
+        {
+            if (disposed) throw new ObjectDisposedException(nameof(BlueprintFogSimulation));
+            if (recoveryPending && recoveryRequest.done)
+            {
+                recoveryPending = false;
+                if (recoveryRequest.hasError) throw new InvalidOperationException("Fog recovery readback failed; retain its owner.");
+                var flags = recoveryRequest.GetData<uint>();
+                if (flags.Length != 1) throw new InvalidOperationException("Incomplete fog recovery state.");
+                observedRecovery = flags[0] == 0; observedRevision = requestedRevision;
+            }
+            if (observedRecovery && observedRevision == emissionRevision) return true;
+            if (!recoveryPending)
+            {
+                requestedRevision = emissionRevision;
+                recoveryRequest = AsyncGPUReadback.Request(state); recoveryPending = true;
+            }
+            return false;
+        }
+
         private void Dispatch(int kernel) => solver.Dispatch(kernel, Nx / 8, Ny / 8, Nz / 4);
 
         private static RenderTexture Allocate(string label)
@@ -132,6 +156,7 @@ namespace OstrixMods.BuildWorks
         {
             if (disposed) return;
             disposed = true;
+            if (recoveryPending) { recoveryRequest.WaitForCompletion(); recoveryPending = false; }
             Release(ref predictedColour); Release(ref predictedOrigin);
             foreach (RenderTexture[] pair in new[] { colour, velocity, origin, surface })
                 for (int index = 0; index < pair.Length; ++index) Release(ref pair[index]);

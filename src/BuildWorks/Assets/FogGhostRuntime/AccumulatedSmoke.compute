@@ -63,6 +63,7 @@ void AccumulateLedger(uint3 id : SV_DispatchThreadID)
 {
     float mass = _ReadColour[id].a;
     if (mass < .001) return;
+    InterlockedOr(_SurfaceState[0],2);
     float3 p = lerp(_Minimum,_Maximum,(id+.5)/Resolution);
     float3 source = _ReadOrigin[id].xyz/mass;
     uint2 bin = SourceBin(source);

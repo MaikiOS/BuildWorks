@@ -1,3 +1,8 @@
+## .202: two independent fog owners — 2026-10-16
+
+Installed QA0.19.202.0 SHA402D489C…849754;143 files unchanged at deployment. Bounded two-source transport/return/ledger, no eviction, release only after smoke+surface recover. Unity6 standalone field comparisons/2149 overlapping voxels, A-only/removal/stale reply/smoke-only/surface-only/factory re-entry/Dispose pass; baseline270/18, visual6/2, Linear color0. Normal/QA0/0, contracts and independent PASSED/Ship. [Evidence and limits](docs/FOG_CHANNELS_202.md).
+
+Transport foundation only, not multiple-piece renderer or whole-house admission. Two field sets cost93.75MiB excluding other resources; do not multiply per house piece or silently drop unrestored matter. Next one volume integration pass, bounded active-region admission/native multiple pieces, then persistent project/board/material continuation/cancel-refund/reload/server. .202 not run in Valheim; game closed; full goal ACTIVE.
 ## .201: v11 color fixed and verified in Valheim — 2026-10-16
 
 Installed QA0.19.201.0, SHA F8829697…6C3022;143 files unchanged at deployment. Pale appearance was caused by a Gamma shader bundle in Linear/HDR/Deferred. Rebuilt Linear bundle uses unchanged sources: direct-source RGB delta0 versus0.0487058 for the wrong bundle. Native wall wood color/transparency, damage0→1→1→0, smoke2.98046875 and cleanup passed; visible14 items/Wood9 and legacy WAL unchanged. Normal/QA0/0, contracts, Unity comparisons and independent PASSED/Ship passed. [Evidence and limits](docs/FOG_COLOR_201.md).

@@ -1,3 +1,9 @@
+## .196: storage recovery refusal identified — 2026-10-16
+
+Verified and installed QA0.19.196.0;131 protected files unchanged. Full .187 chest fixture ran once on .195:10 Wood paid,2 provided Wood transferred and paired persistence verified; reload refused. Read-only .196 isolated the changed player inventory manifest. Native Save→Load→Save truncation1887→1886→1885 in Hammer durability is proven; other serialized inventory fields/rows match. Whole-profile hash equality is not claimed. [Evidence and limits](docs/STORAGE_RECOVERY_196.md).
+
+Diagnostics only; recovery is NOT fixed. Retain WAL/receipt/chest and Wood1; never repeat the old mutating start. Next: exact loaded-state/native projection checks, recovery/return/settlement and production filled placement. Automated checks and independent PASSED/Ship pass. Full goal ACTIVE/incomplete.
+
 ## .195: exact house reload confirmed — 2026-10-16
 
 Verified and installed QA0.19.195.0;127 protected files unchanged at deployment. Actual Valheim: existing own QA194 Forest Hut, one real LMB at yaw225,28 native placements/debits with zero exceptions, Wood58→0, NoCostCheat=false. Normal logout/enter retained28 unique objects with exact position/quaternion/scale differences0 and identical full inventory; no repeated grant. Old .194 house untouched. [Evidence and limits](docs/ROTATION_PERSISTENCE_195.md).

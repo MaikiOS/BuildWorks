@@ -50,6 +50,9 @@ namespace ReservationChecks
             int files = Directory.GetFiles(BlueprintStorageTransferJournal.Root).Length;
             Check(BlueprintStorageTransfer.InspectRecovery(fixture.Path, fixture.Player, fixture.Placed, out var detail) == BlueprintStorageTransfer.RecoveryState.NeedsReconciliation &&
                 !string.IsNullOrEmpty(detail), "classifier accepted " + reason);
+            if (reason == "source-quantity" || reason == "source-properties")
+                Check(detail.EndsWith("Player inventory manifest changed.", StringComparison.Ordinal),
+                    "recovery did not identify the changed player manifest");
             Check(!BlueprintStorageTransfer.TryBeginRecoveredReturn(fixture.Path, fixture.Player, fixture.Placed, out _, out _) &&
                 fixture.Player.Inventory.MoveCalls == 0 && Directory.GetFiles(BlueprintStorageTransferJournal.Root).Length == files,
                 "denial moved items or created child: " + reason);

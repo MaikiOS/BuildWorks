@@ -218,22 +218,35 @@ namespace OstrixMods.BuildWorks
             }
             var binding = new BlueprintStorageTransfer(plan.Operation, player, piece, container, view, delivered,
                 Array.Empty<BlueprintItemStandPlacement.Supply>()) { markerRequired = true };
-            if (!binding.MatchesRecovery(persisted)) throw new InvalidOperationException("Current inventories do not match the recorded custody; nothing will be moved.");
+            if (!binding.MatchesRecovery(persisted, out string mismatch))
+                throw new InvalidOperationException("Current inventories do not match the recorded custody; nothing will be moved. " + mismatch);
             var occupied = ReceiverCells(binding.source);
             if (checked(binding.source.GetWidth() * binding.source.GetHeight()) - occupied.Count < delivered.Count)
                 throw new InvalidOperationException("Recovery return needs separate empty player cells; nothing is merged or dropped.");
             return binding;
         }
 
-        private bool MatchesRecovery(BlueprintStorageTransferJournal.Snapshot persisted)
+        private bool MatchesRecovery(BlueprintStorageTransferJournal.Snapshot persisted, out string mismatch)
         {
             var last = persisted.Observations.Last();
-            return ContextValid() && !returning && BlueprintStorageCapture.TryCapture(piece, player, out _) &&
-                container.GetInventory().GetAllItems().Count == entries.Count &&
-                (uint)RevisionField.GetValue(container) == zdo.DataRevision &&
-                InventoryDigest(source) == last.SourceManifest && InventoryDigest(destination) == last.DestinationManifest &&
-                BytesDigest(zdo.GetByteArray(ZDOVars.s_items, null)) == last.ZdoHash && ContextValid() &&
-                (uint)RevisionField.GetValue(container) == zdo.DataRevision;
+            mismatch = "Recovery context changed.";
+            if (!ContextValid() || returning) return false;
+            mismatch = "Container inventory differs from its native serialized state.";
+            if (!BlueprintStorageCapture.TryCapture(piece, player, out _)) return false;
+            mismatch = "Container item count changed.";
+            if (container.GetInventory().GetAllItems().Count != entries.Count) return false;
+            mismatch = "Container revision is stale.";
+            if ((uint)RevisionField.GetValue(container) != zdo.DataRevision) return false;
+            mismatch = "Player inventory manifest changed.";
+            if (InventoryDigest(source) != last.SourceManifest) return false;
+            mismatch = "Container inventory manifest changed.";
+            if (InventoryDigest(destination) != last.DestinationManifest) return false;
+            mismatch = "Container native bytes changed.";
+            if (BytesDigest(zdo.GetByteArray(ZDOVars.s_items, null)) != last.ZdoHash) return false;
+            mismatch = "Recovery context or container revision changed during observation.";
+            if (!ContextValid() || (uint)RevisionField.GetValue(container) != zdo.DataRevision) return false;
+            mismatch = null;
+            return true;
         }
 
         private BlueprintStorageTransfer BeginReturn(BlueprintStorageTransferJournal.Snapshot persisted, Entry[] delivered, bool recovered)
@@ -265,7 +278,7 @@ namespace OstrixMods.BuildWorks
             }
             var candidate = new BlueprintStorageTransfer(operationId, player, piece, container, view, returns,
                 Array.Empty<BlueprintItemStandPlacement.Supply>(), returning: true, marker: OperationId);
-            if (!candidate.ContextValid() || !candidate.DestinationReady() || !candidate.RemainingAvailable() || recovered && !MatchesRecovery(persisted))
+            if (!candidate.ContextValid() || !candidate.DestinationReady() || !candidate.RemainingAvailable() || recovered && !MatchesRecovery(persisted, out _))
                 throw new InvalidOperationException("Return inventories changed while preparing.");
             cancelling = true; // Even a partial/uncertain child Prepare must never allow forward continuation.
             candidate.journal = BlueprintStorageTransferJournal.Begin(BlueprintStorageTransferJournal.Root, new BlueprintStorageTransferJournal.Plan {

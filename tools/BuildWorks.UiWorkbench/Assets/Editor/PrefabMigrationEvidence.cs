@@ -24,10 +24,12 @@ public static class PrefabMigrationEvidence
     }
     static string Hash(byte[] bytes) { using var sha = SHA256.Create(); return BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-", ""); }
     static string FileHash(string path) { using var input = File.OpenRead(path); using var sha = SHA256.Create(); return BitConverter.ToString(sha.ComputeHash(input)).Replace("-", ""); }
-    public static void Run()
+    public static void Run() => Run("prefab-migration-191");
+    public static void Run194() => Run("prefab-migration-194");
+    private static void Run(string outputFolder)
     {
         var loaded = new Dictionary<string, AssetBundle>();
-        string output = Path.GetFullPath(Path.Combine(Application.dataPath, "../../../artifacts/prefab-migration-191"));
+        string output = Path.GetFullPath(Path.Combine(Application.dataPath, "../../../artifacts", outputFolder));
         Directory.CreateDirectory(output);
         try
         {

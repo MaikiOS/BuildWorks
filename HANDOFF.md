@@ -1,3 +1,7 @@
+## .194: migration works; exact reload remains open — 2026-10-16
+
+Verified guarded QA deployment;123 files unchanged at install. Native review showed4 automatic roof replacements. QA194 Forest Hut passed editor/Save As/28 paid placements, Wood58→0. Reload retained28 parts, positions/scales and inventory, but10 rotations lost0.5 degrees. Full reload NOT passed. Current native WriteSmallRotation truncation confirmed. Next: exact rotation persistence, then populated objects. [Evidence and limits](docs/PREFAB_MIGRATION_194.md). Goal ACTIVE, incomplete.
+
 ## Limited native .193 run completed — 2026-10-15
 
 Thunderstore Modded, exact BW_QA_43d3719a identity. 6 auto woodwall cases retained native pairs/yaw45, gap0; 2 real paid clicks via TryPlacePiece/cheated=false, Wood60→58→56, second ghost matched. Real logout/enter retained both TRS and entire inventory; current ZDO.Load remaps IDs. [Evidence/failed diagnostic attempts](docs/WORLD_SNAP_193.md). Installed .193 unchanged. Q/E/F9 XYZ/network open. 3 QA targets and2 paid walls retained; catalog untouched. God/ghost false, normal game quit, own temporary HTTP GABS stopped. Next: native sign02/automigrated Forest Hut35, then filled objects. API goal ACTIVE; avoid repeating accepted tests.

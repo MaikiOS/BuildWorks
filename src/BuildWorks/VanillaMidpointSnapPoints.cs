@@ -84,6 +84,9 @@ namespace OstrixMods.BuildWorks
         public static bool IsGenerated(Transform point) =>
             point && point.name.StartsWith(NamePrefix, StringComparison.Ordinal);
 
+        internal static bool IsOwned(Transform point) =>
+            IsGenerated(point) && Created.Contains(point.gameObject);
+
         private static int FindPoint(IReadOnlyList<Point3> points, Point3 target)
         {
             for (int index = 0; index < points.Count; ++index)

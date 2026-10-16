@@ -1,3 +1,7 @@
+## .194: migration works; exact reload remains open — 2026-10-16
+
+Verified guarded QA deployment;123 files unchanged at install. Native review showed4 automatic roof replacements. QA194 Forest Hut passed editor/Save As/28 paid placements, Wood58→0. Reload retained28 parts, positions/scales and inventory, but10 rotations lost0.5 degrees. Full reload NOT passed. Current native WriteSmallRotation truncation confirmed. Next: exact rotation persistence, then populated objects. [Evidence and limits](PREFAB_MIGRATION_194.md). Goal ACTIVE, incomplete.
+
 ## Limited native .193 run — 2026-10-15
 
 6 automatic woodwall cases retained native pairs/player rotation, gap0. Two paid clicks, Wood60→58→56, second ghost matched placement; both wall TRS and full inventory retained through real logout/reload. [Evidence and limits](WORLD_SNAP_193.md). Q/E, F9 XYZ and network remain open. Normal QA quit, protections restored, temporary channel stopped. Next: native signs/automigrated Forest Hut, then filled objects. Goal ACTIVE.

@@ -57,6 +57,12 @@ namespace OstrixMods.BuildWorks
             var nodes = new Dictionary<string, Transform>(StringComparer.Ordinal);
             foreach (Transform node in root.GetComponentsInChildren<Transform>(true))
             {
+                // GetSnapPoints can decorate a cached prototype before import review.
+                if (VanillaMidpointSnapPoints.IsOwned(node))
+                {
+                    if (node.parent != root || node.childCount != 0 || node.GetComponents<Component>().Length != 1) return null;
+                    continue;
+                }
                 string path = Path(root, node);
                 if (path == note)
                 {

@@ -23,6 +23,11 @@ namespace OstrixMods.BuildWorks
         internal GameObject Root => visual;
         internal BlueprintFogSource Source => source;
         internal BlueprintFogSimulation Simulation => simulation;
+        internal Vector3 FieldMinimum => minimum;
+        internal Vector3 FieldMaximum => maximum;
+        internal Vector4 ActorRadius => new Vector4(trail[0].x, trail[0].y, trail[0].z, body.x);
+        internal float BodyHalfHeight => body.y;
+        internal float Clock => time;
         internal Bounds VolumeBounds => new Bounds(Origin + (source.Minimum + source.Maximum) * .5f, source.Maximum - source.Minimum);
 
         internal BlueprintFogVisual(BlueprintFogAssets assets, GameObject prefab, Vector3 position,

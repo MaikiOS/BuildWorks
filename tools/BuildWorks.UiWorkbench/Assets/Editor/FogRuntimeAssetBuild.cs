@@ -34,7 +34,7 @@ public static class FogRuntimeAssetBuild
         string output = Path.Combine(root, "artifacts", outputFolder);
         string source = Path.Combine(root, "src/BuildWorks/Assets/FogGhostRuntime");
         Directory.CreateDirectory(output);
-        foreach (string name in new[] { "AccumulatedSmoke.compute", "FogGhostVolume.shader", "TexturedGhost.shader", "GhostMatter.cginc", "FogVolumePair.cginc" })
+        foreach (string name in new[] { "AccumulatedSmoke.compute", "FogGhostVolume.shader", "TexturedGhost.shader", "GhostMatter.cginc", "FogVolumePair.cginc", "FogVolumeAtlas.cginc" })
             if (Hash(Path.Combine(source, name)) != Hash(Path.Combine(Application.dataPath, "BuildWorksFogRuntime", name)))
                 throw new InvalidDataException("Approved v11 source differs: " + name);
         var build = new AssetBundleBuild {
@@ -64,10 +64,10 @@ public static class FogRuntimeAssetBuild
         if (!rejected) throw new InvalidOperationException("Empty resource was accepted.");
         File.WriteAllText(Path.Combine(output, "verification.json"), JsonUtility.ToJson(new Report {
             passed = true, unity = Application.unityVersion, graphics = SystemInfo.graphicsDeviceType.ToString(), colorSpace = QualitySettings.activeColorSpace.ToString(),
-            sha256 = Hash(path), bytes = new FileInfo(path).Length, assets = 3, kernels = 7,
+            sha256 = Hash(path), bytes = new FileInfo(path).Length, assets = 3, kernels = 8,
             ledgerResetAndReload = true, emptyRejected = rejected, gameHostTested = false
         }, true));
-        Debug.Log("BuildWorks approved fog v11 bundle: build/load/7 kernels/GPU ledger/reload/empty rejection PASSED");
+        Debug.Log("BuildWorks approved fog v11 bundle: build/load/8 kernels/GPU ledger/reload/empty rejection PASSED");
     }
 
     internal static void CheckLedger(ComputeShader solver)

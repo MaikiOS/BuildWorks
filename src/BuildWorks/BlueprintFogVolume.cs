@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace OstrixMods.BuildWorks
@@ -7,11 +8,30 @@ namespace OstrixMods.BuildWorks
     internal sealed class BlueprintFogVolume : IDisposable
     {
         private Material material;
+        private readonly BlueprintFogAssets assets;
+        private BlueprintFogAtlas atlas;
+        internal long AtlasBytes => atlas?.Bytes ?? 0;
         internal BlueprintFogVolume(BlueprintFogAssets assets)
         {
             if (assets == null || !assets.Volume) throw new ArgumentException("Fog volume shader missing.");
+            this.assets = assets;
             material = new Material(assets.Volume) { name = "BuildWorks fog pair volume", hideFlags = HideFlags.HideAndDontSave };
             material.EnableKeyword("BUILDWORKS_FOG_TWO_SOURCES");
+        }
+
+        internal void RenderMany(Camera camera, RenderTexture image, RenderTexture target, IReadOnlyList<BlueprintFogVisual> owners,
+            Vector3 beamOrigin, Vector3 beamDirection, float beamStrength)
+        {
+            if (!material) throw new ObjectDisposedException(nameof(BlueprintFogVolume));
+            if (owners == null) throw new ArgumentException("Fog owner list missing.");
+            if (owners.Count <= 2)
+            {
+                atlas?.Dispose(); atlas = null;
+                if (owners.Count == 0) { Graphics.Blit(image, target); return; }
+                Render(camera, image, target, owners[0], owners.Count == 2 ? owners[1] : null, beamOrigin, beamDirection, beamStrength); return;
+            }
+            if (atlas == null) atlas = new BlueprintFogAtlas(assets);
+            atlas.Render(camera, image, target, owners, beamOrigin, beamDirection, beamStrength);
         }
 
         internal void Render(Camera camera, RenderTexture image, RenderTexture target,
@@ -35,6 +55,6 @@ namespace OstrixMods.BuildWorks
         }
 
         public void Dispose()
-        { if (material) UnityEngine.Object.DestroyImmediate(material); material = null; }
+        { atlas?.Dispose(); atlas = null; if (material) UnityEngine.Object.DestroyImmediate(material); material = null; }
     }
 }

@@ -109,7 +109,7 @@ namespace OstrixMods.BuildWorks
                     peak.GetData(values); foreach (uint value in values) if (value != 0) throw new InvalidDataException("Fog peak ledger differs.");
                     surface.GetData(values, 0, 0, 1); if (values[0] != 0) throw new InvalidDataException("Fog surface ledger differs.");
                 }
-            return "fog-v11-3-assets-7-kernels-gpu-ledger-and-reload-verified";
+            return "fog-v11-3-assets-" + BlueprintFogAssets.Kernels.Length + "-kernels-gpu-ledger-and-reload-verified";
         }
 
         public string CheckLoadedStorageInventory(string info, string bytes)

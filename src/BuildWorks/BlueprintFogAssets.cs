@@ -8,7 +8,7 @@ namespace OstrixMods.BuildWorks
     internal sealed class BlueprintFogAssets : IDisposable
     {
         internal const string ResourceName = "BuildWorks.FogGhostV11";
-        internal static readonly string[] Kernels = { "Clear", "AdvanceVelocity", "AdvanceMatter", "CorrectMatter", "ClearLedger", "AccumulateLedger", "UpdateSurface" };
+        internal static readonly string[] Kernels = { "Clear", "AdvanceVelocity", "AdvanceMatter", "CorrectMatter", "ClearLedger", "AccumulateLedger", "UpdateSurface", "PackVolume" };
         private AssetBundle bundle;
         internal Shader Surface { get; private set; }
         internal Shader Volume { get; private set; }

@@ -1,3 +1,9 @@
+## .206: common multi-source v11 volume — 2026-10-16
+
+Installed QA0.19.206.0 SHAB1691BB1…042FC;143 prior files retain SHA/UTCmtime. GPU3 independent owners/4frames: packing/borders/order, existing pair path, removal, opaque depth, translation and cleanup passed. Atlas13.27MiB in addition to simulation/source/mesh memory. Frozen270/18, pair4, visual6+2 and color Linear0 passed; normal/QA0/0, contracts/loc1104, independent PASSED/Ship. [Evidence and limits](docs/FOG_ATLAS_206.md).
+
+Native .206 not tested; game closed.128MiB caps the current atlas, with two sets possible during Resize.32 owners tested only for layout, not house rendering. Next existing28-part Forest Hut → durable project/stake/board/material continuation/cancel-refund/reload/server. House/board not connected; no new manual unfinished-house test ready. Full goal ACTIVE.
+
 ## .205: compact visual and three owners — 2026-10-16
 
 Installed QA0.19.205.0 SHAF1C9831B…41C93;143 prior files retain SHA/UTCmtime. Whole-part geometry-derived source retains physical voxel spacing; factory follows field reservation. GPU3wall/floor/rotated-beam owners/420ticks/20.57MiB fields: concurrent holes, independent pigment, removal/neighbor matter/recovery/cleanup passed. Linear3wall frames: global0.001359<0.005, foreground0.00984<0.03, empty-negative0.07736>0.03. Pair4/visual6+2/source-byte/compact300/channels6+2149, normal/QA0/0, contracts/loc1104, independent PASSED/Ship. [Evidence and limits](docs/FOG_OWNERS_205.md).

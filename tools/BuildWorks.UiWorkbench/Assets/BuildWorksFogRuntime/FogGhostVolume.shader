@@ -10,7 +10,7 @@ Shader "Hidden/BuildWorks/FogGhostVolumeRuntime"
             #pragma vertex vert_img
             #pragma fragment frag
             #pragma target 4.0
-            #pragma multi_compile_local __ BUILDWORKS_FOG_TWO_SOURCES
+            #pragma multi_compile_local __ BUILDWORKS_FOG_TWO_SOURCES BUILDWORKS_FOG_ATLAS
             #include "UnityCG.cginc"
             #include "GhostMatter.cginc"
             sampler2D _MainTex;
@@ -96,8 +96,12 @@ Shader "Hidden/BuildWorks/FogGhostVolumeRuntime"
                 return exp(-opticalDepth);
             }
             #include "FogVolumePair.cginc"
+            #include "FogVolumeAtlas.cginc"
             fixed4 frag(v2f_img i) : SV_Target
             {
+#if defined(BUILDWORKS_FOG_ATLAS)
+                return FogAtlasFragment(i);
+#endif
 #if defined(BUILDWORKS_FOG_TWO_SOURCES)
                 return FogPairFragment(i);
 #endif

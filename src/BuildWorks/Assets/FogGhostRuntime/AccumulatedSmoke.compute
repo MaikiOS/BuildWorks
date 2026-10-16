@@ -5,6 +5,7 @@
 #pragma kernel ClearLedger
 #pragma kernel AccumulateLedger
 #pragma kernel UpdateSurface
+#pragma kernel PackVolume
 #pragma multi_compile_local __ BUILDWORKS_FOG_COMPACT_GRID
 
 Texture3D<float4> _ReadColour, _ReadVelocity, _ReadOrigin, _Velocity;
@@ -31,6 +32,25 @@ float3 _GridResolution;
 static const float3 Resolution = float3(96,80,80);
 #endif
 static const uint LedgerSize = 32;
+
+Texture3D<float> _PackShape;
+Texture3D<float4> _PackSmoke, _PackSurface;
+RWTexture3D<float> _PackedShape;
+RWTexture3D<float4> _PackedSmoke, _PackedSurface;
+float3 _PackShapeSize, _PackFieldSize, _PackSize, _PackOffset;
+
+[numthreads(8,8,4)]
+void PackVolume(uint3 id : SV_DispatchThreadID)
+{
+    if (any(id >= (uint3)_PackSize)) return;
+    int3 cell = (int3)id - 1;
+    uint3 target = id + (uint3)_PackOffset;
+    int3 shape = clamp(cell, 0, (int3)_PackShapeSize - 1);
+    int3 field = clamp(cell, 0, (int3)_PackFieldSize - 1);
+    _PackedShape[target] = _PackShape.Load(int4(shape,0));
+    _PackedSmoke[target] = _PackSmoke.Load(int4(field,0));
+    _PackedSurface[target] = _PackSurface.Load(int4(field,0));
+}
 
 float3 UV(float3 p) { return (p - _Minimum) / (_Maximum - _Minimum); }
 float3 RestUV(float3 p) { return (p-_RestMin)/(_RestMax-_RestMin); }

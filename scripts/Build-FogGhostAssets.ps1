@@ -19,7 +19,8 @@ foreach($entry in $manifest){
     Copy-Item -LiteralPath (Join-Path $ported $entry.name) -Destination (Join-Path $runtime $entry.name)
 }
 Copy-Item -LiteralPath (Join-Path $ported 'FogVolumePair.cginc') -Destination (Join-Path $runtime 'FogVolumePair.cginc')
-foreach($name in @('BlueprintFogAssets.cs','BlueprintFogSimulation.cs','BlueprintEditorMeshData.cs','BlueprintFogContactMesh.cs','BlueprintFogSource.cs','BlueprintFogVisual.cs','BlueprintFogChannels.cs','BlueprintFogVolume.cs')){
+Copy-Item -LiteralPath (Join-Path $ported 'FogVolumeAtlas.cginc') -Destination (Join-Path $runtime 'FogVolumeAtlas.cginc')
+foreach($name in @('BlueprintFogAssets.cs','BlueprintFogSimulation.cs','BlueprintEditorMeshData.cs','BlueprintFogContactMesh.cs','BlueprintFogSource.cs','BlueprintFogVisual.cs','BlueprintFogChannels.cs','BlueprintFogVolume.cs','BlueprintFogAtlas.cs')){
     Copy-Item -LiteralPath (Join-Path $root ('src/BuildWorks/'+$name)) -Destination (Join-Path $project ('Assets/Editor/RuntimeSources/'+$name))
 }
 $proof=Join-Path $output 'verification.json'
@@ -35,6 +36,6 @@ try {
 if(!(Test-Path -LiteralPath $proof) -or (Get-Item -LiteralPath $proof).LastWriteTimeUtc -lt $started){throw 'Fresh fog asset proof missing.'}
 $result=Get-Content -LiteralPath $proof -Raw|ConvertFrom-Json
 $bundle=Join-Path $output 'buildworks-fog-v11'
-if(!$result.passed -or $result.colorSpace -cne $(if($GammaReference){'Gamma'}else{'Linear'}) -or $result.assets -ne 3 -or $result.kernels -ne 7 -or (Get-FileHash -LiteralPath $bundle).Hash -cne $result.sha256){throw 'Fog bundle evidence differs.'}
+if(!$result.passed -or $result.colorSpace -cne $(if($GammaReference){'Gamma'}else{'Linear'}) -or $result.assets -ne 3 -or $result.kernels -ne 8 -or (Get-FileHash -LiteralPath $bundle).Hash -cne $result.sha256){throw 'Fog bundle evidence differs.'}
 if(!$GammaReference){Copy-Item -LiteralPath $bundle -Destination (Join-Path $ported 'buildworks-fog-v11')}
 $result|ConvertTo-Json

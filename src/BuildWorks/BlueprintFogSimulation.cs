@@ -11,6 +11,8 @@ namespace OstrixMods.BuildWorks
         internal const int Nx = 96, Ny = 80, Nz = 80;
         internal const float Step = 1f / 30;
         internal const long FieldBytes = (long)Nx * Ny * Nz * 8 * 10;
+        internal Vector3Int GridSize { get; private set; }
+        internal long AllocatedFieldBytes => (long)GridSize.x * GridSize.y * GridSize.z * 8 * 10;
         private readonly RenderTexture[] colour = new RenderTexture[2], velocity = new RenderTexture[2],
             origin = new RenderTexture[2], surface = new RenderTexture[2];
         private RenderTexture predictedColour, predictedOrigin;
@@ -32,7 +34,7 @@ namespace OstrixMods.BuildWorks
 
         internal BlueprintFogSimulation(BlueprintFogAssets assets, Texture3D shape, Texture3D pigment,
             Texture3D noise, Vector3 minimum, Vector3 maximum, Vector3 restMinimum, Vector3 restMaximum,
-            Vector3 actor, float seed)
+            Vector3 actor, float seed, Vector3Int? gridSize = null)
         {
             Validate(actor); Validate(minimum); Validate(maximum); Validate(restMinimum); Validate(restMaximum);
             if (assets == null || !assets.Solver || !shape || !pigment || !noise || !Finite(seed))
@@ -42,12 +44,20 @@ namespace OstrixMods.BuildWorks
                     minimum[axis] > restMinimum[axis] || maximum[axis] < restMaximum[axis] ||
                     Mathf.Abs(minimum[axis]) > 64 || Mathf.Abs(maximum[axis]) > 64)
                     throw new ArgumentException("Fog simulation requires bounded local coordinates enclosing the rest shape.");
+            GridSize = gridSize ?? new Vector3Int(Nx, Ny, Nz);
+            ValidateGrid(GridSize, maximum - minimum, gridSize.HasValue);
             if (!SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.ARGBHalf))
                 throw new NotSupportedException("Fog simulation half-float fields unavailable.");
             try
             {
                 solver = UnityEngine.Object.Instantiate(assets.Solver);
                 solver.hideFlags = HideFlags.HideAndDontSave;
+                if (gridSize.HasValue)
+                {
+                    solver.EnableKeyword("BUILDWORKS_FOG_COMPACT_GRID");
+                    solver.SetVector("_GridResolution", new Vector4(GridSize.x, GridSize.y, GridSize.z, 0));
+                }
+                else solver.DisableKeyword("BUILDWORKS_FOG_COMPACT_GRID");
                 clear = solver.FindKernel("Clear"); flow = solver.FindKernel("AdvanceVelocity");
                 matter = solver.FindKernel("AdvanceMatter"); correct = solver.FindKernel("CorrectMatter");
                 clearLedger = solver.FindKernel("ClearLedger"); ledger = solver.FindKernel("AccumulateLedger");
@@ -139,12 +149,33 @@ namespace OstrixMods.BuildWorks
             return false;
         }
 
-        private void Dispatch(int kernel) => solver.Dispatch(kernel, Nx / 8, Ny / 8, Nz / 4);
-
-        private static RenderTexture Allocate(string label)
+        // Preserve the approved physical voxel spacing when allocating a smaller local region.
+        internal static Vector3Int CompactGrid(Vector3 minimum, Vector3 maximum)
         {
-            var field = new RenderTexture(Nx, Ny, 0, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear) {
-                name = "BuildWorks fog " + label, dimension = TextureDimension.Tex3D, volumeDepth = Nz,
+            Validate(minimum); Validate(maximum);
+            Vector3 size = maximum - minimum;
+            int Round(float value, int group) => Mathf.CeilToInt(value / group - .00001f) * group;
+            var grid = new Vector3Int(Mathf.Max(8, Round(size.x / .075f, 8)),
+                Mathf.Max(8, Round(size.y / .06375f, 8)), Mathf.Max(4, Round(size.z / .0675f, 4)));
+            ValidateGrid(grid, size, true); return grid;
+        }
+
+        private static void ValidateGrid(Vector3Int grid, Vector3 size, bool compact)
+        {
+            if (size.x <= 0 || size.y <= 0 || size.z <= 0 || grid.x < 8 || grid.y < 8 || grid.z < 4 ||
+                grid.x > 256 || grid.y > 256 || grid.z > 256 || grid.x % 8 != 0 || grid.y % 8 != 0 || grid.z % 4 != 0 ||
+                (long)grid.x * grid.y * grid.z > (long)Nx * Ny * Nz)
+                throw new ArgumentException("Fog grid exceeds its bounded allocation/dispatch budget.");
+            if (compact && (size.x / grid.x > .07501f || size.y / grid.y > .06376f || size.z / grid.z > .06751f))
+                throw new ArgumentException("Fog compact grid cannot reduce the approved voxel detail.");
+        }
+
+        private void Dispatch(int kernel) => solver.Dispatch(kernel, GridSize.x / 8, GridSize.y / 8, GridSize.z / 4);
+
+        private RenderTexture Allocate(string label)
+        {
+            var field = new RenderTexture(GridSize.x, GridSize.y, 0, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear) {
+                name = "BuildWorks fog " + label, dimension = TextureDimension.Tex3D, volumeDepth = GridSize.z,
                 enableRandomWrite = true, wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear,
                 hideFlags = HideFlags.HideAndDontSave
             };

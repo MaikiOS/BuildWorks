@@ -5,6 +5,7 @@
 #pragma kernel ClearLedger
 #pragma kernel AccumulateLedger
 #pragma kernel UpdateSurface
+#pragma multi_compile_local __ BUILDWORKS_FOG_COMPACT_GRID
 
 Texture3D<float4> _ReadColour, _ReadVelocity, _ReadOrigin, _Velocity;
 Texture3D<float4> _PredictedColour, _PredictedOrigin;
@@ -23,7 +24,12 @@ float3 _RestMin, _RestMax;
 float2 _Body;
 float _Dt, _Clock, _Seed, _Emit;
 int _ResetLedger;
+#if defined(BUILDWORKS_FOG_COMPACT_GRID)
+float3 _GridResolution;
+#define Resolution _GridResolution
+#else
 static const float3 Resolution = float3(96,80,80);
+#endif
 static const uint LedgerSize = 32;
 
 float3 UV(float3 p) { return (p - _Minimum) / (_Maximum - _Minimum); }
@@ -63,6 +69,7 @@ void AccumulateLedger(uint3 id : SV_DispatchThreadID)
 {
     float mass = _ReadColour[id].a;
     if (mass < .001) return;
+    InterlockedOr(_SurfaceState[0],2);
     float3 p = lerp(_Minimum,_Maximum,(id+.5)/Resolution);
     float3 source = _ReadOrigin[id].xyz/mass;
     uint2 bin = SourceBin(source);

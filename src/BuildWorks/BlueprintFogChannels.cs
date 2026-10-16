@@ -10,7 +10,10 @@ namespace OstrixMods.BuildWorks
         private readonly Dictionary<string, BlueprintFogSimulation> channels = new Dictionary<string, BlueprintFogSimulation>(StringComparer.Ordinal);
         private bool disposed, creating;
         internal int Count => channels.Count;
-        internal long FieldBytes => Count * BlueprintFogSimulation.FieldBytes;
+        internal long FieldBytes
+        {
+            get { long bytes = 0; foreach (BlueprintFogSimulation channel in channels.Values) bytes += channel.AllocatedFieldBytes; return bytes; }
+        }
 
         internal bool TryAcquire(string owner, Func<BlueprintFogSimulation> create, out BlueprintFogSimulation channel)
         {

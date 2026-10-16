@@ -28,6 +28,10 @@ $profileWriteHash = (Get-FileHash -LiteralPath $profileWritePath).Hash
 [IO.File]::WriteAllText((Join-Path $output 'StorageProfileWriteSource.cs'),
     [IO.File]::ReadAllText($profileWritePath).Replace('namespace OstrixMods.BuildWorks', 'namespace ReservationChecks'), [Text.UTF8Encoding]::new($false))
 $profileParserHash = (Get-FileHash -LiteralPath (Join-Path $root 'src/BuildWorks.Geometry/NativePlayerProfileReadback.cs')).Hash
+$loadedPath = Join-Path $root 'src/BuildWorks/BlueprintStorageLoadedInventory.cs'
+$loadedHash = (Get-FileHash -LiteralPath $loadedPath).Hash
+[IO.File]::WriteAllText((Join-Path $output 'StorageLoadedSource.cs'),
+    [IO.File]::ReadAllText($loadedPath).Replace('namespace OstrixMods.BuildWorks', 'namespace ReservationChecks'), [Text.UTF8Encoding]::new($false))
 @{ status = 'not_passed'; sourceSHA256 = $sourceHash; previewSHA256 = $previewHash; transferSHA256 = $transferHash; captureSHA256 = $captureHash; journalSHA256 = $journalHash; nativeTransferTested = $false; gameTested = $false } |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'verification-status.json') -Encoding utf8
 function Segment([string]$from, [string]$until) {
@@ -78,7 +82,7 @@ if ($captureStart -lt 0 -or $captureEnd -le $captureStart) { throw 'Capture canc
 if ($LASTEXITCODE -ne 0) { throw 'Reservation CPU harness build failed.' }
 & (Join-Path $PSScriptRoot 'bin/Release/net472/BuildWorks.ContentReservationChecks.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Reservation CPU checks failed. Native transfer is not exercised.' }
-@{ status = 'passed_cpu_host_substitutes'; sourceSHA256 = $sourceHash; previewSHA256 = $previewHash; transferSHA256 = $transferHash; captureSHA256 = $captureHash; journalSHA256 = $journalHash; profileAdapterSHA256 = $profileHash; profileParserSHA256 = $profileParserHash;
+@{ status = 'passed_cpu_host_substitutes'; sourceSHA256 = $sourceHash; previewSHA256 = $previewHash; transferSHA256 = $transferHash; captureSHA256 = $captureHash; journalSHA256 = $journalHash; profileAdapterSHA256 = $profileHash; profileParserSHA256 = $profileParserHash; loadedInventorySHA256 = $loadedHash;
     worldGenerationAdapterSHA256 = $worldHash; worldGenerationAdapterTestedWithHostSubstitutes = $true;
     pairedPersistenceSHA256 = $persistenceHash; pairedPersistenceHostSubstitutes = $true; profileWriteObserverSHA256 = $profileWriteHash;
     canonicalLocalProfileParserTested = $true; livePlayerProfileReadbackTested = $false;

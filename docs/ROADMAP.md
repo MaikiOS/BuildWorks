@@ -1,3 +1,9 @@
+## .197: exact first-load inventory comparison — 2026-10-16
+
+Verified and installed QA0.19.197.0;131 protected files unchanged at install. v5 retains exact paired native inventory bytes/hash and source session/Player. New fallback requires a different Player, exact current canonical Local profile inventory and direct native Load fields. Legacy v4 is unchanged and held.
+
+Actual Mono exposed missing Single rounding; explicit float cast/IL guard fixed it. Native14-item read-only comparison passed; wrong expected durability refused; inventory/Wood1 and legacy WAL unchanged. Normal/QA0/0,Content24/222,Geometry/Store/Host/control/isolation/loc1104 and independent PASSED/Ship pass. [Evidence/limits](STORAGE_FIRST_LOAD_197.md). Normal game exit, protections restored, own helper stopped. Fresh v5 native operation, durable settlement/return and production filled placement remain open. Next: justified completion after paired persistence with crash/replay checks. Full goal ACTIVE/incomplete.
+
 ## .196: storage recovery refusal identified — 2026-10-16
 
 Verified and installed QA0.19.196.0;131 protected files unchanged. Full .187 chest fixture ran once on .195:10 Wood paid,2 provided Wood transferred and paired persistence verified; reload refused. Read-only .196 isolated the changed player inventory manifest. Native Save→Load→Save truncation1887→1886→1885 in Hammer durability is proven; other serialized inventory fields/rows match. Whole-profile hash equality is not claimed. [Evidence and limits](STORAGE_RECOVERY_196.md).

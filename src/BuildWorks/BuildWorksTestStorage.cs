@@ -184,7 +184,7 @@ namespace OstrixMods.BuildWorks
                 details.Before - details.Cost - 2)
                 throw new InvalidOperationException("Reloaded quantities or paired receipt differ.");
             Func<bool> custody = () => BlueprintStorageTransfer.InspectRecovery(JournalPath, player, target.gameObject, out _) == BlueprintStorageTransfer.RecoveryState.ExactDelivered;
-            if (!BlueprintStoragePlayerProfile.TryCapture(player, operation, custody, out var profile, out reason) || !profile.TryVerify(out var profileEvidence, out reason) ||
+            if (!BlueprintStoragePlayerProfile.TryVerifyLoaded(player, saved.SavedPair, custody, out var profileEvidence, out reason) ||
                 profileEvidence.InventoryHash != saved.SavedPair.PlayerInventoryHash)
                 throw new InvalidOperationException(reason ?? "Reloaded canonical character inventory differs.");
             ZDO zdo = target.GetComponent<ZNetView>().GetZDO();

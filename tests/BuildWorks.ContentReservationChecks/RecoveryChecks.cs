@@ -70,7 +70,7 @@ namespace ReservationChecks
                 using (inverse)
                 {
                     var record = BlueprintStorageTransferJournal.Read(inverse.JournalPath);
-                    Check(record.Schema == 4 && record.Prepared.TargetUser == 1 && record.Prepared.TargetId == 77 &&
+                    Check(record.Schema == 5 && record.Prepared.TargetUser == 1 && record.Prepared.TargetId == 77 &&
                         record.Prepared.TargetMarker == loaded.Original.Operation && record.Prepared.Parent == loaded.Original.Operation,
                         "recovery used the old native UID instead of marker/current UID");
                     Check(inverse.MoveNext() == BlueprintStorageTransfer.Result.Transferred && inverse.CompleteInMemory, "recovered return failed");
@@ -139,7 +139,7 @@ namespace ReservationChecks
         {
             var waiting = new TransferChecks.Frame();
             waiting.Placed.Container.View.Data.BeforeSet = () => Check(BlueprintStorageTransferJournal.Read(System.IO.Path.Combine(BlueprintStorageTransferJournal.Root,
-                waiting.Operation.ToString("N") + ".bwtransfer")).Schema == 4, "marker preceded flushed preparation");
+                waiting.Operation.ToString("N") + ".bwtransfer")).Schema == 5, "marker preceded flushed preparation");
             Check(waiting.Begin(synchronizeMarker: false), waiting.Error);
             Check(waiting.Transfer.MoveNext() == BlueprintStorageTransfer.Result.Ready && waiting.Placed.Container.Inventory.MoveCalls == 0 &&
                 !waiting.Transfer.Entries[0].Attempted && !BlueprintStorageTransferJournal.Read(waiting.Transfer.JournalPath).InFlight.HasValue, "marker wait attempted native move");

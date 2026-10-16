@@ -919,7 +919,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.196.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.197.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $serverAuthority = $plugin.MainModule.GetType('OstrixMods.BuildWorks.BlueprintServerAuthority')
 Assert-Contract ($null -ne $serverAuthority) 'Compiled server blueprint authority adapter is missing.'
@@ -3514,7 +3514,20 @@ Assert-Contract ($prepareJournal.Count -eq 1 -and $prepareMarker.Count -eq 1 -an
     $moveCalls -match '::waitingForMarker' -and $moveCalls -match 'Stopwatch::GetTimestamp') 'Persistent marker must follow WAL preparation and wait boundedly for native cache synchronization.'
 $journalCalls = ($journalType.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($journalCalls -match 'FileStream::Flush\(System.Boolean\)' -and $journalCalls -match 'SHA256::Create' -and
-    $journalCalls -match '::CheckParents' -and $journalCalls -notmatch 'File::Delete|Inventory::|ZDO::Set|RPC|DropItem') 'Persisted evidence must flush and validate without replay, deletion or world mutation.'
+    $journalCalls -match '::CheckParents' -and $journalCalls -notmatch 'File::Delete|\bInventory::|ZDO::Set|RPC|DropItem') 'Persisted evidence must flush and validate without replay, deletion or world mutation.'
+$loadedInventory = $plugin.MainModule.GetType('OstrixMods.BuildWorks.BlueprintStorageLoadedInventory')
+Assert-Contract ($null -ne $loadedInventory) 'Exact loaded inventory comparison is missing.'
+$loadedCalls = ($loadedInventory.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($loadedCalls -match 'BlueprintContainerInventory::TryRead' -and $loadedCalls -match 'ItemData::m_durability' -and
+    $loadedCalls -match 'ItemData::m_cheated' -and $loadedCalls -match 'ItemData::m_crafterID' -and
+    $loadedCalls -notmatch '\bInventory::Save|\bInventory::Load|ItemData::Save|ZDO::Set|DropItem|MoveItem') 'Loaded comparison must read exact native fields without reserialization or mutation.'
+$loadedMatch = $loadedInventory.Methods | Where-Object Name -eq 'Matches'
+$loadDurabilityProduct = @($loadedMatch.Body.Instructions | Where-Object {
+    $_.OpCode.Code -eq 'Mul' -and $_.Previous.OpCode.Code -eq 'Ldc_R4' -and [single]$_.Previous.Operand -eq [single]0.01
+})
+Assert-Contract ($loadDurabilityProduct.Count -eq 1 -and $loadDurabilityProduct[0].Next.OpCode.Code -eq 'Conv_R4') 'Loaded durability must round to native Single before comparison on Mono.'
+Assert-Contract ($journalCalls -match '::ValidatePlayerInventory' -and $journalCalls -match 'Persistence::PlayerInventory' -and
+    $journalCalls -match 'Persistence::SourceSession') 'Paired reload evidence must retain validated inventory bytes and source session.'
 $nativeId = $hostAssembly.MainModule.Types | Where-Object Name -eq 'ZDOID'
 foreach ($property in @(@('UserID','System.Int64'), @('ID','System.UInt32'))) {
     $member = @($nativeId.Properties | Where-Object Name -eq $property[0])

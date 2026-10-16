@@ -35,11 +35,16 @@ namespace ReservationChecks
             internal readonly PlayerProfile Profile;
             internal BlueprintStoragePersistence Verification;
             internal int ProfileSaves, WorldSaves;
-            internal Rig()
+            internal Rig(bool durabilityBoundary = false)
             {
                 Directory.CreateDirectory(Root); SaveSystem.Generation = 7; SaveSystem.Flags = 0; ZNet.Open = false;
                 ZNet.instance.World.Directory = Root;
                 Profile = new PlayerProfile { Path = Path.Combine(Root, "test.fch") }; Game.instance.Profile = Profile;
+                if (durabilityBoundary)
+                {
+                    var hammer = Program.Item("Hammer", 1); hammer.m_gridPos = new Vector2i(1, 0); hammer.m_durability = 18.879f;
+                    Frame.Player.Inventory.Items.Add(hammer);
+                }
                 Check(Frame.Begin() && Frame.Transfer.MoveNext() == BlueprintStorageTransfer.Result.Transferred, Frame.Error ?? "transfer setup");
                 File.WriteAllBytes(Profile.Path, ProfileChecks.FileFor(Frame.Player));
                 Check(Frame.Transfer.TryPreparePlayerReadback(out var prior, out _) && prior.TryVerify(out _, out _), "old file is not a valid matching-inventory control");
@@ -75,16 +80,18 @@ namespace ReservationChecks
 
         internal static void Run()
         {
-            using (var rig = new Rig())
+            using (var rig = new Rig(durabilityBoundary: true))
             {
                 rig.Frame.Player.m_customData["BuildWorks.StorageSaveProof"] = "previous-owned-value";
                 Check(rig.Begin(), "exact save refused");
                 Check(rig.Finish() == BlueprintStoragePersistence.Result.Verified, rig.Verification.Reason);
                 var saved = BlueprintStorageTransferJournal.Read(rig.Frame.Transfer.JournalPath);
-                Check(saved.Schema == 4 && saved.Terminal && saved.SavedPair != null && saved.SavedPair.BeforeGeneration == 7 &&
+                Check(saved.Schema == 5 && saved.Terminal && saved.SavedPair != null && saved.SavedPair.BeforeGeneration == 7 &&
                     saved.SavedPair.Generation == 8 && saved.SavedPair.Player == 100 && saved.SavedPair.World == 1 &&
                     saved.SavedPair.Marker == rig.Frame.Operation && saved.SavedPair.ProfileHash.Length == 128 &&
-                    saved.SavedPair.WorldInventoryHash == saved.Observations.Last().ZdoHash, "paired WAL evidence missing");
+                    saved.SavedPair.WorldInventoryHash == saved.Observations.Last().ZdoHash && saved.SavedPair.PlayerInventory != null &&
+                    saved.SavedPair.SourceSession == BlueprintStoragePlayerProfile.ProcessSession &&
+                    saved.SavedPair.SourcePlayerInstance == rig.Frame.Player.GetInstanceID(), "paired WAL evidence missing");
                 Check(saved.RequiresReconciliation && !BlueprintStorageCapture.CanRemoveEmpty(rig.Frame.Placed, rig.Frame.Player), "pair authorized settlement or destructive cleanup");
                 Check(rig.Frame.Player.m_customData["BuildWorks.StorageSaveProof"] == "previous-owned-value", "prior player metadata overwritten");
                 Check(File.ReadAllBytes(rig.Profile.Path).SequenceEqual(ProfileChecks.FileFor(rig.Frame.Player)), "saved player metadata changed by verification");
@@ -110,14 +117,20 @@ namespace ReservationChecks
                 foreach (int field in new[] { 57, 61, 65, 73, 81, 99, 228, 293 })
                 {
                     var changed = (byte[])body.Clone(); changed[field] ^= 1;
+                    if (field == 99 || field == 228 || field == 293) changed[field] = (byte)(body[field] == (byte)'0' ? '1' : '0');
                     using (var output = new MemoryStream())
                     using (var writer = new BinaryWriter(output))
                     using (var hash = SHA256.Create())
                     { writer.Write(bytes.Take(pairOffset).ToArray()); writer.Write(changed.Length); writer.Write(changed); writer.Write(hash.ComputeHash(changed)); File.WriteAllBytes(copy, output.ToArray()); }
                     refused = false; try { BlueprintStorageTransferJournal.Read(copy); } catch (InvalidDataException) { refused = true; }
-                    // A changed well-formed profile or player hash is retained evidence, not a signed/authenticated receipt.
-                    Check(field == 99 || field == 228 ? !refused : refused, "checksummed pair field validation " + field);
+                    // Profile hash is not a signature; inventory hash must match its retained exact bytes.
+                    Check(field == 99 ? !refused : refused, "checksummed pair field validation " + field);
                 }
+                File.WriteAllBytes(copy, bytes); ReturnChecks.WriteLegacy(copy, 4);
+                var legacy4 = BlueprintStorageTransferJournal.Read(copy);
+                Check(legacy4.Schema == 4 && legacy4.SavedPair != null && legacy4.SavedPair.PlayerInventory == null &&
+                    legacy4.RequiresReconciliation, "legacy v4 inferred a native projection or released custody");
+                LoadedInventoryChecks.Run(rig.Frame, saved.SavedPair, rig.Profile.Path);
             }
             foreach (string fault in new[] { "open-failed", "close-failed", "already-finished", "double-finish", "wrong-path", "no-writer", "replace-throw", "replace-no-move" })
             using (var rig = new Rig())

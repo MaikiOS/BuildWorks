@@ -25,7 +25,7 @@ namespace ReservationChecks
             Check(frame.Transfer.MoveNext() == BlueprintStorageTransfer.Result.Unchanged && !frame.Transfer.CompleteInMemory, "parent was not frozen");
             Check(!frame.Transfer.TryBeginReturn(out _, out _), "second child permitted");
             var record = BlueprintStorageTransferJournal.Read(result.JournalPath);
-            Check(record.Schema == 4 && record.Prepared.Parent == frame.Operation && record.Prepared.Route == BlueprintStorageTransferJournal.Direction.ToPlayer &&
+            Check(record.Schema == 5 && record.Prepared.Parent == frame.Operation && record.Prepared.Route == BlueprintStorageTransferJournal.Direction.ToPlayer &&
                 record.Prepared.Operation == BlueprintStorageTransferJournal.ReturnOperationId(frame.Operation) && record.Prepared.Paid.Length == 0,
                 "inverse direction/identity/payment evidence wrong");
             return result;
@@ -188,7 +188,7 @@ namespace ReservationChecks
             using (var writer = new BinaryWriter(output))
             using (var hash = SHA256.Create())
             {
-                writer.Write(Encoding.ASCII.GetBytes("BWSTJ4\r\n"));
+                writer.Write(bytes.Take(8).ToArray());
                 for (int offset = 8; offset < bytes.Length;)
                 {
                     int size = BitConverter.ToInt32(bytes, offset); var body = new byte[size]; Array.Copy(bytes, offset + 4, body, 0, size);
@@ -217,6 +217,12 @@ namespace ReservationChecks
                     if (body[24] == 1 && schema == 1)
                     {
                         var old = new byte[size - 17]; Array.Copy(body, old, 89); Array.Copy(body, 106, old, 89, body.Length - 106); body = old;
+                    }
+                    if (body[24] == 5 && schema == 4)
+                    {
+                        using (var pair = new MemoryStream(body, false))
+                        using (var fields = new BinaryReader(pair))
+                        { pair.Position = 97; fields.ReadString(); fields.ReadString(); fields.ReadString(); body = body.Take((int)pair.Position).ToArray(); }
                     }
                     Array.Copy(BitConverter.GetBytes(schema), body, 4); Array.Copy(previous, 0, body, 25, 32);
                     previous = hash.ComputeHash(body); writer.Write(body.Length); writer.Write(body); writer.Write(previous); offset += 4 + size + 32;

@@ -64,7 +64,7 @@ namespace ReservationChecks
             using (var stream = new MemoryStream())
             using (var writer = new BinaryWriter(stream, Encoding.UTF8, true))
             {
-                writer.Write(109); writer.Write((ushort)Items.Count);
+                writer.Write(110); writer.Write((ushort)Items.Count);
                 foreach (var item in Items) Program.WriteItem(writer, item);
                 writer.Flush(); return stream.ToArray();
             }

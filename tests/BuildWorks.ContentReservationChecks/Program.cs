@@ -8,11 +8,11 @@ using OstrixMods.BuildWorks.Geometry;
 namespace ReservationChecks
 {
     // Inert host substitutes. These do not invoke Unity, native Inventory or a world.
-    internal class Obj { public static implicit operator bool(Obj value) => value != null; }
+    internal class Obj { public static implicit operator bool(Obj value) => value != null; internal int GetInstanceID() => GetHashCode(); }
     internal sealed class Prefab : Obj { internal string name; }
     internal static class ItemDrop
     {
-        internal sealed class Shared { internal string m_name; internal int m_maxStackSize = 50; internal bool m_questItem; }
+        internal sealed class Shared { internal string m_name; internal int m_maxStackSize = 50, m_maxQuality = 5, m_variants = 4; internal bool m_questItem; }
         internal sealed class ItemData
         {
             internal Shared m_shared;
@@ -21,8 +21,12 @@ namespace ReservationChecks
             internal float m_durability = 5;
             internal Vector2i m_gridPos;
             internal bool m_equipped;
-            internal string Custom = "own";
-            internal ItemData Clone() => (ItemData)MemberwiseClone();
+            internal bool m_pickedUp, m_cheated;
+            internal long m_crafterID;
+            internal string m_crafterName = "";
+            internal Dictionary<string, string> m_customData = new Dictionary<string, string> { ["property"] = "own" };
+            internal string Custom { get => m_customData["property"]; set => m_customData["property"] = value; }
+            internal ItemData Clone() { var copy = (ItemData)MemberwiseClone(); copy.m_customData = new Dictionary<string, string>(m_customData); return copy; }
             internal void Save(ZPackage package) => Program.WriteItem(package.Writer, this);
         }
         internal sealed class Drop : Obj { internal ItemData m_itemData; }
@@ -108,13 +112,15 @@ namespace ReservationChecks
         internal static void WriteItem(BinaryWriter writer, ItemDrop.ItemData item)
         {
             writer.Write((int)(item.m_durability * 100)); writer.Write((byte)item.m_gridPos.x); writer.Write((byte)item.m_gridPos.y); writer.Write((byte)item.m_worldLevel);
-            int flags = 64 | 128 | (item.m_equipped ? 2 : 0) | (item.m_quality != 1 ? 4 : 0) | (item.m_stack != 1 ? 8 : 0) | (item.m_variant != 0 ? 16 : 0);
+            int flags = 64 | (item.m_customData.Count != 0 ? 128 : 0) | (item.m_pickedUp ? 1 : 0) | (item.m_equipped ? 2 : 0) | (item.m_quality != 1 ? 4 : 0) | (item.m_stack != 1 ? 8 : 0) | (item.m_variant != 0 ? 16 : 0) | (item.m_crafterID != 0 ? 32 : 0);
             writer.Write((byte)flags);
             if (item.m_quality != 1) writer.Write((ushort)item.m_quality);
             if (item.m_stack != 1) writer.Write((ushort)item.m_stack);
             if (item.m_variant != 0) writer.Write(item.m_variant);
+            if (item.m_crafterID != 0) { writer.Write(item.m_crafterID); writer.Write(item.m_crafterName); }
             writer.Write(item.m_dropPrefab.name.GetStableHashCode());
-            writer.Write((byte)1); writer.Write("property"); writer.Write(item.Custom); writer.Write((byte)0);
+            if (item.m_customData.Count != 0) { writer.Write((byte)item.m_customData.Count); foreach (var pair in item.m_customData) { writer.Write(pair.Key); writer.Write(pair.Value); } }
+            writer.Write((byte)(item.m_cheated ? 1 : 0));
         }
         internal static BlueprintForeignPartData Container(int width, params ItemDrop.ItemData[] demands)
         {

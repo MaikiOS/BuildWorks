@@ -12,12 +12,13 @@ namespace OstrixMods.BuildWorks.Geometry
         public const int MaximumProfileBytes = 32 * 1024 * 1024;
         public sealed class Evidence
         {
-            internal Evidence(long player, string profileHash, string inventoryHash, int inventoryBytes)
-            { Player = player; ProfileHash = profileHash; InventoryHash = inventoryHash; InventoryBytes = inventoryBytes; }
+            internal Evidence(long player, string profileHash, string inventoryHash, int inventoryBytes, BlueprintForeignPartData inventory)
+            { Player = player; ProfileHash = profileHash; InventoryHash = inventoryHash; InventoryBytes = inventoryBytes; Inventory = inventory; }
             public long Player { get; }
             public string ProfileHash { get; }
             public string InventoryHash { get; }
             public int InventoryBytes { get; }
+            public BlueprintForeignPartData Inventory { get; }
         }
 
         public static bool TryVerify(Stream file, long player, string name, BlueprintForeignPartData expected,
@@ -111,7 +112,7 @@ namespace OstrixMods.BuildWorks.Geometry
                     // Player's remaining tail is deliberately opaque: no claim of complete Player.Load validity.
                 }
                 using (var hash = SHA256.Create())
-                    evidence = new Evidence(player, Hex(checksum), Hex(hash.ComputeHash(inventory)), inventory.Length);
+                    evidence = new Evidence(player, Hex(checksum), Hex(hash.ComputeHash(inventory)), inventory.Length, expected);
                 return true;
             }
             catch (Exception error) when (error is IOException || error is InvalidDataException || error is ArgumentException || error is FormatException || error is OverflowException)

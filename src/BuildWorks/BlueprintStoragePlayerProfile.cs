@@ -8,6 +8,7 @@ namespace OstrixMods.BuildWorks
     // Local native save/readback evidence only. Never releases holds or authorizes a refund.
     internal sealed class BlueprintStoragePlayerProfile
     {
+        internal static readonly Guid ProcessSession = Guid.NewGuid();
         private readonly Player player;
         private readonly Game game;
         private readonly PlayerProfile profile;
@@ -89,6 +90,40 @@ namespace OstrixMods.BuildWorks
 
         internal bool TryVerify(out NativePlayerProfileReadback.Evidence evidence, out string reason)
             => TryRead(path, out evidence, out reason);
+
+        internal static bool TryVerifyLoaded(Player player, BlueprintStorageTransferJournal.Persistence saved,
+            Func<bool> context, out NativePlayerProfileReadback.Evidence evidence, out string reason)
+        {
+            evidence = null; reason = null;
+            try
+            {
+                var game = Game.instance;
+                var profile = game ? game.GetPlayerProfile() : null;
+                var inventory = player ? player.GetInventory() : null;
+                string path = profile?.GetPath(), filename = profile?.GetFilename(), name = profile?.GetName();
+                bool Valid() => player && player == Player.m_localPlayer && Player.m_localPlayerExists && game &&
+                    Game.instance == game && !game.IsShuttingDown() && ReferenceEquals(game.GetPlayerProfile(), profile) &&
+                    profile != null && profile.m_fileSource == FileHelpers.FileSource.Local &&
+                    player.GetPlayerID() == saved.Player && profile.GetPlayerID() == saved.Player &&
+                    profile.GetPath() == path && profile.GetFilename() == filename && profile.GetName() == name &&
+                    !string.IsNullOrWhiteSpace(filename) && !string.IsNullOrWhiteSpace(name) && Path.IsPathRooted(path) &&
+                    Path.GetFileName(path) == filename + ".fch" && ReferenceEquals(player.GetInventory(), inventory) &&
+                    context() && BlueprintStorageLoadedInventory.Matches(inventory, saved.PlayerInventory);
+                if (saved?.PlayerInventory == null || context == null ||
+                    saved.SourceSession == ProcessSession && saved.SourcePlayerInstance == player.GetInstanceID() || !Valid())
+                    throw new InvalidOperationException("Loaded inventory is not the exact native projection of the paired save.");
+                using (var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+                {
+                    if (!NativePlayerProfileReadback.TryVerify(file, saved.Player, name, saved.PlayerInventory,
+                        prefab => prefab.GetStableHashCode(), out var current, out reason) ||
+                        current.InventoryHash != saved.PlayerInventoryHash || !Valid())
+                        throw new InvalidOperationException(reason ?? "Canonical profile inventory or loaded custody changed.");
+                    evidence = current;
+                }
+                return true;
+            }
+            catch (Exception error) { reason = error.Message; return false; }
+        }
 
         private bool TryRead(string filename, out NativePlayerProfileReadback.Evidence evidence, out string reason)
         {

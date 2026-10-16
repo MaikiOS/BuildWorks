@@ -81,7 +81,7 @@ namespace OstrixMods.BuildWorks
             try
             {
                 if (!PersistenceCustodyValid) throw new InvalidOperationException("Transfer custody changed before recording persistence.");
-                journal.RecordPersistence(before, generation, profile, world);
+                journal.RecordPersistence(before, generation, profile, world, BlueprintStoragePlayerProfile.ProcessSession, player.GetInstanceID());
                 return true;
             }
             catch (Exception error) { reason = error.Message; return false; }
@@ -238,7 +238,9 @@ namespace OstrixMods.BuildWorks
             mismatch = "Container revision is stale.";
             if ((uint)RevisionField.GetValue(container) != zdo.DataRevision) return false;
             mismatch = "Player inventory manifest changed.";
-            if (InventoryDigest(source) != last.SourceManifest) return false;
+            if (InventoryDigest(source) != last.SourceManifest &&
+                (persisted.Schema < 5 || !BlueprintStoragePlayerProfile.TryVerifyLoaded(player, persisted.SavedPair,
+                    ContextValid, out _, out _))) return false;
             mismatch = "Container inventory manifest changed.";
             if (InventoryDigest(destination) != last.DestinationManifest) return false;
             mismatch = "Container native bytes changed.";

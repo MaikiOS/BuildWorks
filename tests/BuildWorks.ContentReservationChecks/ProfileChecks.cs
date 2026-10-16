@@ -95,7 +95,9 @@ namespace ReservationChecks
             var currentExpected = new BlueprintForeignPartData(expected.Format, expected.Info, Convert.ToBase64String(currentInventory), null);
             var currentFixture = new Fixture(currentInventory); currentFixture.Payload[0] = 47;
             Array.Copy(BitConverter.GetBytes(34), 0, currentFixture.Payload, currentFixture.Offset["playerVersion"], 4);
-            Check(Verify(currentFixture.File(), currentExpected, out _) && !Verify(currentFixture.File(), expected, out _),
+            byte[] oldInventory = (byte[])currentInventory.Clone(); oldInventory[0] = 109;
+            var oldExpected = new BlueprintForeignPartData(expected.Format, expected.Info, Convert.ToBase64String(oldInventory), null);
+            Check(Verify(currentFixture.File(), currentExpected, out _) && !Verify(currentFixture.File(), oldExpected, out _),
                 "profile47/player34/inventory110 or exact provided inventory identity lost");
             byte[] future = (byte[])currentFixture.Payload.Clone(); future[0] = 48;
             Check(!Verify(currentFixture.File(future), currentExpected, out _), "future profile48 accepted");

@@ -67,6 +67,22 @@ namespace OstrixMods.BuildWorks
         public string StoragePersistenceStatus() => GetComponent<BuildWorksTestStorage>()?.Status ?? "idle";
         public bool StoragePersistenceBusy() => GetComponent<BuildWorksTestStorage>()?.Busy ?? false;
 
+        public string CheckLoadedStorageInventory(string info, string bytes)
+        {
+            player = BuildWorksTestIsolation.RequireLoadedSession(); network = ZNet.instance;
+            if (running != null || capture != null || !SafeSession()) throw new InvalidOperationException("Focused idle isolated QA session required.");
+            var expected = new Geometry.BlueprintForeignPartData(Geometry.BlueprintForeignPartData.NativeContainerFormat, info, bytes, null);
+            var profile = Game.instance.GetPlayerProfile();
+            if (profile.m_fileSource != FileHelpers.FileSource.Local || !BlueprintStorageLoadedInventory.Matches(player.GetInventory(), expected))
+                throw new InvalidOperationException("Native loaded inventory projection differs.");
+            using (var file = new FileStream(profile.GetPath(), FileMode.Open, FileAccess.Read, FileShare.Read))
+                if (!Geometry.NativePlayerProfileReadback.TryVerify(file, player.GetPlayerID(), profile.GetName(), expected,
+                    name => name.GetStableHashCode(), out _, out string reason) ||
+                    !SafeSession() || !BlueprintStorageLoadedInventory.Matches(player.GetInventory(), expected))
+                    throw new InvalidOperationException(reason ?? "Native canonical profile or context differs.");
+            return "native-loaded-inventory-projection-verified-read-only";
+        }
+
         internal void Initialize()
         {
             directory = BuildWorksTestIsolation.ControlDirectory;

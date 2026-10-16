@@ -1,3 +1,9 @@
+## .198: first v11 asset integration verified in Valheim — 2026-10-16
+
+Installed QA0.19.198.0; SHA EA2BECDD…21D50,143 existing files unchanged at deployment. Four own source files match the approved snapshot;49,591-byte bundle contains only two shaders and one compute, no game models/textures. Normal/QA0/0, Host/control/isolation/localization1104, independent correctness PASSED/Ponytail Ship. Unity6000.0.61f1 and actual Valheim6000.0.75f1 verified loading, seven kernel layouts, GPU ClearLedger and repeated loading. This does NOT prove full simulation or house rendering. [Evidence and limits](FOG_ASSETS_198.md).
+
+Game closed, protections restored, own helper stopped, endpoint absent; items/resources unchanged, legacy WAL retained. Owner priority remains: v11 on native meshes/textures, body passage/return, multiple rotated parts; then a persistent project with board/materials/continuation/safe cancellation. Gameplay fog and board are not connected yet. Full goal ACTIVE; remaining scope retained.
+
 ## Owner changed next priority — 2026-10-16
 
 Next implement approved fog ghost v11 with a persistent unfinished-house project and stake/board: required materials, hammer interaction, continuation, cancellation and verified refunds. First actual-host visual integration, then persisted project state/full lifecycle. Preserve costs/rights/network rules; needed crash/replay/transfer completion are project dependencies. Other unresolved storage requirements remain in scope. [Sequence and acceptance](NEXT_FOG_PROJECT_V11_RU.md). Priority only, not implemented. QA .197 unchanged, game closed, goal ACTIVE.

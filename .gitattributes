@@ -1,0 +1,4 @@
+# Keep approved v11 source bytes and bundle hashes independent of core.autocrlf.
+src/BuildWorks/Assets/FogGhostV11/* -text
+src/BuildWorks/Assets/FogGhostV11/*.json text eol=lf
+tools/BuildWorks.UiWorkbench/Assets/BuildWorksFogRuntime/* -text

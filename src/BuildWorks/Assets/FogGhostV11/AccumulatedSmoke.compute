@@ -1,0 +1,198 @@
+#pragma kernel Clear
+#pragma kernel AdvanceVelocity
+#pragma kernel AdvanceMatter
+#pragma kernel CorrectMatter
+#pragma kernel ClearLedger
+#pragma kernel AccumulateLedger
+#pragma kernel UpdateSurface
+
+Texture3D<float4> _ReadColour, _ReadVelocity, _ReadOrigin, _Velocity;
+Texture3D<float4> _PredictedColour, _PredictedOrigin;
+Texture3D<float4> _ReadSurface;
+Texture3D<float> _Shape, _Noise;
+Texture3D<float4> _Pigment;
+SamplerState sampler_ReadColour, sampler_ReadVelocity, sampler_ReadOrigin, sampler_Velocity, sampler_Shape, sampler_Noise, sampler_Pigment;
+SamplerState sampler_PredictedColour;
+RWTexture3D<float4> _WriteColour, _WriteVelocity, _WriteOrigin;
+RWTexture3D<float4> _WriteSurface;
+RWStructuredBuffer<uint> _AwayMass;
+RWStructuredBuffer<uint> _PeakAway;
+RWStructuredBuffer<uint> _SurfaceState;
+float3 _Minimum, _Maximum, _Actor, _ActorVelocity;
+float3 _RestMin, _RestMax;
+float2 _Body;
+float _Dt, _Clock, _Seed, _Emit;
+int _ResetLedger;
+static const float3 Resolution = float3(96,80,80);
+static const uint LedgerSize = 32;
+
+float3 UV(float3 p) { return (p - _Minimum) / (_Maximum - _Minimum); }
+float3 RestUV(float3 p) { return (p-_RestMin)/(_RestMax-_RestMin); }
+float ReturnWeight(float3 source, float age)
+{
+    float phase = _Noise.SampleLevel(sampler_Noise,source*.37+_Seed*.017,0);
+    return smoothstep(.65+phase*.75,2.3+phase*1.3,age);
+}
+float Noise(float3 p) { return _Noise.SampleLevel(sampler_Noise, p * .19 + _Seed * .017 + float3(.017,-.013,.021) * _Clock, 0); }
+float3 Curl(float3 p, float3 axis)
+{
+    const float e = .04;
+    float3 gradient = float3(Noise(p+float3(e,0,0))-Noise(p-float3(e,0,0)),
+        Noise(p+float3(0,e,0))-Noise(p-float3(0,e,0)), Noise(p+float3(0,0,e))-Noise(p-float3(0,0,e))) / (2*e);
+    return cross(gradient, normalize(axis));
+}
+float3 BodyDelta(float3 p)
+{
+    float3 delta = p - _Actor;
+    delta.y -= clamp(delta.y, -max(0,_Body.y-_Body.x), max(0,_Body.y-_Body.x));
+    return delta;
+}
+bool Inside(float3 uv) { return all(uv > 0) && all(uv < 1); }
+uint2 SourceBin(float3 p) { return min((uint2)(saturate(RestUV(p).yz)*LedgerSize),LedgerSize-1); }
+
+[numthreads(64,1,1)]
+void ClearLedger(uint id : SV_DispatchThreadID)
+{
+    _PeakAway[id] = _ResetLedger!=0 || _AwayMass[id]==0 ? 0 : max(_PeakAway[id],_AwayMass[id]);
+    _AwayMass[id] = 0;
+    if(id==0) _SurfaceState[0]=0;
+}
+
+[numthreads(8,8,4)]
+void AccumulateLedger(uint3 id : SV_DispatchThreadID)
+{
+    float mass = _ReadColour[id].a;
+    if (mass < .001) return;
+    float3 p = lerp(_Minimum,_Maximum,(id+.5)/Resolution);
+    float3 source = _ReadOrigin[id].xyz/mass;
+    uint2 bin = SourceBin(source);
+    // ponytail: source YZ bins fit this one wall; use per-piece 3D ownership before a whole building.
+    uint away = (uint)(mass * smoothstep(.08,.25,length(p-source)) * 256);
+    InterlockedAdd(_AwayMass[bin.x+LedgerSize*bin.y],away);
+}
+
+[numthreads(8,8,4)]
+void Clear(uint3 id : SV_DispatchThreadID)
+{
+    _WriteColour[id] = 0; _WriteVelocity[id] = 0; _WriteOrigin[id] = 0; _WriteSurface[id] = 0;
+}
+
+[numthreads(8,8,4)]
+void AdvanceVelocity(uint3 id : SV_DispatchThreadID)
+{
+    float3 uv = (id+.5) / Resolution;
+    float3 p = lerp(_Minimum,_Maximum,uv);
+    float4 old = _ReadVelocity[id];
+    float3 back = UV(p - old.xyz * _Dt);
+    float3 v = Inside(back) ? _ReadVelocity.SampleLevel(sampler_ReadVelocity,back,0).xyz * exp(-_Dt*2.5) : 0;
+    float4 smoke = _ReadColour[id], history = _ReadOrigin[id];
+    float age = smoke.a > .001 ? history.w / smoke.a : 0;
+    float3 source = smoke.a > .001 ? history.xyz / smoke.a : p;
+    float returning = ReturnWeight(source,age);
+    float3 curl = Curl(p*1.2,float3(.7,1,-.4)) + Curl(p*3.1+19,float3(-.8,.3,1))*.5;
+    curl *= min(1, 3/max(.001,length(curl)));
+    v += (curl * 2 + float3(.04,.16,0)) * _Dt * (1-returning*.75);
+    float3 delta = BodyDelta(p);
+    float proximity = 1-smoothstep(_Body.x*.75,_Body.x+.26,length(delta));
+    float moving = saturate(length(_ActorVelocity));
+    float3 radial = delta / max(.01,length(delta));
+    float3 bodyVelocity = _ActorVelocity * min(1,4/max(.001,length(_ActorVelocity)));
+    float3 slip = -bodyVelocity + radial*dot(bodyVelocity,radial);
+    float3 surfaceFlow = bodyVelocity + slip*1.4 + radial*max(0,_Body.x+.04-length(delta))*12;
+    v = lerp(v,surfaceFlow,1-exp(-proximity*moving*_Emit*_Dt*14));
+    float3 axis = _ActorVelocity / max(.001,length(_ActorVelocity));
+    float axial = dot(delta,axis);
+    float3 ring = delta-axis*axial;
+    float radius = length(ring), ringSize = _Body.x+.12+(Noise(p*2.3+8)-.5)*.10;
+    float envelope = exp(-(axial*axial+pow(radius-ringSize,2))/.07);
+    v += (axis*(ringSize-radius)+ring/max(.05,radius)*axial)*envelope*moving*_Emit*_Dt*14;
+    v += (source-p)*returning*_Dt*4;
+    v *= exp(-returning*_Dt*3.4);
+    v *= min(1,2.8/max(.001,length(v)));
+    float rough = Noise(p*4.7+31);
+    float contact = (1-smoothstep(_Body.x*.55,_Body.x+.18+(rough-.5)*.18,length(delta))) * _Emit;
+    float3 restUV = RestUV(p);
+    contact *= Inside(restUV) ? step(.002,_Shape.SampleLevel(sampler_Shape,restUV,0)) : 0;
+    uint2 bin = SourceBin(p);
+    float outstanding = 0;
+    [unroll] for(int y=-1;y<=1;++y) [unroll] for(int x=-1;x<=1;++x)
+    {
+        uint2 neighbour = (uint2)clamp((int2)bin+int2(x,y),0,(int)LedgerSize-1);
+        uint index=neighbour.x+LedgerSize*neighbour.y;
+        outstanding = max(outstanding,saturate(_AwayMass[index]/max(768.0,(float)_PeakAway[index])));
+    }
+    float oldDamage = _ReadSurface[id].w;
+    float recovering = max(max(0,oldDamage-_Dt*1.25),min(oldDamage,outstanding));
+    float damage = max(recovering,min(contact,oldDamage+_Dt*5));
+    _WriteVelocity[id] = float4(v,damage);
+}
+
+[numthreads(8,8,4)]
+void UpdateSurface(uint3 id : SV_DispatchThreadID)
+{
+    float4 flow = _Velocity[id];
+    float3 target = flow.xyz*.045;
+    target *= min(1,.065/max(.001,length(target)));
+    target *= saturate(flow.w*4)*(1-flow.w*.65);
+    float3 displacement = lerp(_ReadSurface[id].xyz,target,1-exp(-_Dt*10));
+    if(flow.w < .001) displacement = 0;
+    _WriteSurface[id] = float4(displacement,flow.w);
+    if(flow.w >= .001) InterlockedOr(_SurfaceState[0],1);
+}
+
+[numthreads(8,8,4)]
+void AdvanceMatter(uint3 id : SV_DispatchThreadID)
+{
+    float3 uv = (id+.5) / Resolution;
+    float3 p = lerp(_Minimum,_Maximum,uv);
+    float3 back = UV(p-_Velocity[id].xyz*_Dt);
+    _WriteColour[id] = Inside(back) ? _ReadColour.SampleLevel(sampler_ReadColour,back,0) : 0;
+    _WriteOrigin[id] = Inside(back) ? _ReadOrigin.SampleLevel(sampler_ReadOrigin,back,0) : 0;
+}
+
+[numthreads(8,8,4)]
+void CorrectMatter(uint3 id : SV_DispatchThreadID)
+{
+    float3 uv = (id+.5) / Resolution;
+    float3 p = lerp(_Minimum,_Maximum,uv);
+    float4 flow = _Velocity[id];
+    float3 back = UV(p-flow.xyz*_Dt), forward = UV(p+flow.xyz*_Dt);
+    float4 colour = _PredictedColour[id], history = _PredictedOrigin[id];
+    float predictedMass = colour.a;
+    // Limited MacCormack correction preserves fine transported texture without negative density or new extrema.
+    if (Inside(back) && Inside(forward))
+    {
+        float4 corrected = colour + .5*(_ReadColour[id]-_PredictedColour.SampleLevel(sampler_PredictedColour,forward,0));
+        int3 cell = (int3)floor(back*Resolution-.5);
+        float4 lower=1e8,upper=-1e8;
+        [unroll] for(int z=0;z<2;++z) [unroll] for(int y=0;y<2;++y) [unroll] for(int x=0;x<2;++x)
+        {
+            int3 neighbour = clamp(cell+int3(x,y,z),0,(int3)Resolution-1);
+            float4 c=_ReadColour[neighbour];
+            lower=min(lower,c);upper=max(upper,c);
+        }
+        colour=clamp(corrected,lower,upper);
+        history = predictedMass > .000001 ? history * (colour.a/predictedMass)
+            : _ReadOrigin[id] * (colour.a/max(.000001,_ReadColour[id].a));
+        // New emission can make a nearly empty corrected cell visible in this same step.
+        colour.rgb=clamp(colour.rgb,0,colour.a);
+    }
+    float age = colour.a > .001 ? history.w / colour.a : 0;
+    float3 sourcePosition = colour.a > .001 ? history.xyz/colour.a : p;
+    float arrived = ReturnWeight(sourcePosition,age)*(1-smoothstep(.06,.24,length(p-sourcePosition)));
+    float3 edge = min(p-_Minimum,_Maximum-p);
+    float peripheral = 1-smoothstep(.15,.8,min(edge.x,min(edge.y,edge.z)));
+    // Open padding absorbs escaped wisps instead of clipping them at a visible box face.
+    float decay = exp(-_Dt*(.2+arrived*6+smoothstep(5,6,age)*5+peripheral*18));
+    colour *= decay; history *= decay; history.w += colour.a*_Dt;
+    float released = max(0,flow.w-_ReadSurface[id].w);
+    float grain = pow(smoothstep(.2,.8,Noise(p*3.7+float3(23,-11,7))),1.4);
+    float3 restUV = RestUV(p);
+    float source = Inside(restUV) ? _Shape.SampleLevel(sampler_Shape,restUV,0)*released*grain*6 : 0;
+    float3 pigment = _Pigment.SampleLevel(sampler_Pigment,saturate(restUV),0).rgb;
+    colour += float4(pigment,1)*source;
+    history += float4(p,0)*source;
+    float limit = min(1,12/max(.001,colour.a)); colour *= limit; history *= limit;
+    if (colour.a < .001) { colour=0; history=0; }
+    _WriteColour[id] = colour; _WriteOrigin[id] = history;
+}

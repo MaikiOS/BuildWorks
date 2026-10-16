@@ -1,0 +1,30 @@
+[CmdletBinding()]
+param([string]$UnityPath='C:\Program Files\Unity\Hub\Editor\6000.0.61f1\Editor\Unity.exe')
+$ErrorActionPreference='Stop'
+$root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$project=Join-Path $root 'tools/BuildWorks.UiWorkbench'
+$output=Join-Path $root 'artifacts/fog-runtime-assets'
+$source=Join-Path $root 'src/BuildWorks/Assets/FogGhostV11'
+if ((Get-Item -LiteralPath $UnityPath).VersionInfo.ProductVersion -notlike '6000.0.61f1*') { throw 'Approved shader build requires Unity6000.0.61f1.' }
+if (Get-CimInstance Win32_Process -Filter "Name = 'Unity.exe'" | Where-Object { $_.CommandLine -like ('*'+$project+'*') }) { throw 'Workbench already open; do not replace its session.' }
+$runtime=Join-Path $project 'Assets/BuildWorksFogRuntime'
+New-Item -ItemType Directory -Path $runtime,$output -Force|Out-Null
+$expected=@('AccumulatedSmoke.compute','FogGhostVolume.shader','TexturedGhost.shader','GhostMatter.cginc')
+$manifest=@(Get-Content -LiteralPath (Join-Path $source 'approved-sources.json') -Raw|ConvertFrom-Json)
+if($manifest.Count -ne 4 -or (($manifest.name|Sort-Object) -join '|') -cne (($expected|Sort-Object) -join '|')){throw 'Approved shader source list differs.'}
+foreach($entry in $manifest){
+    $path=Join-Path $source $entry.name
+    if((Get-FileHash -LiteralPath $path).Hash -cne $entry.sha256){throw ('Approved v11 source differs: '+$entry.name)}
+    Copy-Item -LiteralPath $path -Destination (Join-Path $runtime $entry.name)
+}
+Copy-Item -LiteralPath (Join-Path $root 'src/BuildWorks/BlueprintFogAssets.cs') -Destination (Join-Path $project 'Assets/Editor/RuntimeSources/BlueprintFogAssets.cs')
+$proof=Join-Path $output 'verification.json'
+$started=[datetime]::UtcNow
+$process=Start-Process -FilePath $UnityPath -ArgumentList @('-batchmode','-force-d3d11','-projectPath',('"'+$project+'"'),'-executeMethod','FogRuntimeAssetBuild.Run','-quit','-logFile',('"'+(Join-Path $output 'build.log')+'"')) -WindowStyle Hidden -PassThru -Wait
+if($process.ExitCode -ne 0){throw 'Fog bundle build/check failed; inspect artifacts/fog-runtime-assets/build.log.'}
+if(!(Test-Path -LiteralPath $proof) -or (Get-Item -LiteralPath $proof).LastWriteTimeUtc -lt $started){throw 'Fresh fog asset proof missing.'}
+$result=Get-Content -LiteralPath $proof -Raw|ConvertFrom-Json
+$bundle=Join-Path $output 'buildworks-fog-v11'
+if(!$result.passed -or $result.assets -ne 3 -or $result.kernels -ne 7 -or (Get-FileHash -LiteralPath $bundle).Hash -cne $result.sha256){throw 'Fog bundle evidence differs.'}
+Copy-Item -LiteralPath $bundle -Destination (Join-Path $source 'buildworks-fog-v11')
+$result|ConvertTo-Json

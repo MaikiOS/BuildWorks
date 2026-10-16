@@ -67,6 +67,30 @@ namespace OstrixMods.BuildWorks
         public string StoragePersistenceStatus() => GetComponent<BuildWorksTestStorage>()?.Status ?? "idle";
         public bool StoragePersistenceBusy() => GetComponent<BuildWorksTestStorage>()?.Busy ?? false;
 
+        public string CheckFogGhostAssets()
+        {
+            player = BuildWorksTestIsolation.RequireLoadedSession(); network = ZNet.instance;
+            if (running != null || capture != null || !SafeSession()) throw new InvalidOperationException("Focused idle isolated QA session required.");
+            for (int load = 0; load < 2; ++load)
+                using (var assets = BlueprintFogAssets.LoadEmbedded())
+                using (var away = new ComputeBuffer(1024, sizeof(uint)))
+                using (var peak = new ComputeBuffer(1024, sizeof(uint)))
+                using (var surface = new ComputeBuffer(1, sizeof(uint)))
+                {
+                    uint[] values = new uint[1024];
+                    for (int i = 0; i < values.Length; ++i) values[i] = 123;
+                    away.SetData(values); peak.SetData(values); surface.SetData(new[] { 123u });
+                    int kernel = assets.Solver.FindKernel("ClearLedger");
+                    assets.Solver.SetBuffer(kernel, "_AwayMass", away); assets.Solver.SetBuffer(kernel, "_PeakAway", peak);
+                    assets.Solver.SetBuffer(kernel, "_SurfaceState", surface); assets.Solver.SetInt("_ResetLedger", 1);
+                    assets.Solver.Dispatch(kernel, 16, 1, 1);
+                    away.GetData(values); foreach (uint value in values) if (value != 0) throw new InvalidDataException("Fog away ledger differs.");
+                    peak.GetData(values); foreach (uint value in values) if (value != 0) throw new InvalidDataException("Fog peak ledger differs.");
+                    surface.GetData(values, 0, 0, 1); if (values[0] != 0) throw new InvalidDataException("Fog surface ledger differs.");
+                }
+            return "fog-v11-3-assets-7-kernels-gpu-ledger-and-reload-verified";
+        }
+
         public string CheckLoadedStorageInventory(string info, string bytes)
         {
             player = BuildWorksTestIsolation.RequireLoadedSession(); network = ZNet.instance;

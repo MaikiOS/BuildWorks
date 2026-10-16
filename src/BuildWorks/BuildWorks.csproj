@@ -5,9 +5,9 @@
     <Nullable>disable</Nullable>
     <AssemblyName>BuildWorks</AssemblyName>
     <RootNamespace>OstrixMods.BuildWorks</RootNamespace>
-<Version>0.19.197</Version>
-<AssemblyVersion>0.19.197.0</AssemblyVersion>
-<FileVersion>0.19.197.0</FileVersion>
+<Version>0.19.198</Version>
+<AssemblyVersion>0.19.198.0</AssemblyVersion>
+<FileVersion>0.19.198.0</FileVersion>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <OutputPath>$(MSBuildThisFileDirectory)..\..\artifacts\bin\</OutputPath>
     <DefineConstants Condition="'$(BuildWorksTestStand)' == 'true'">$(DefineConstants);BUILDWORKS_TEST_STAND</DefineConstants>
@@ -34,6 +34,7 @@
     <Compile Remove="AdaptiveGablePiece.cs" />
     <EmbeddedResource Include="Assets\BlueprintEditorIcons\*.png" Exclude="Assets\BlueprintEditorIcons\snap-corner.png;Assets\BlueprintEditorIcons\snap-midpoint.png;Assets\BlueprintEditorIcons\snap-centre.png;Assets\BlueprintEditorIcons\snap-pin.png;Assets\BlueprintEditorIcons\snap-active.png" />
     <EmbeddedResource Include="Translations\*.tsv" />
+    <EmbeddedResource Include="Assets\FogGhostV11\buildworks-fog-v11" LogicalName="BuildWorks.FogGhostV11" />
   </ItemGroup>
 
   <ItemGroup>
@@ -51,6 +52,10 @@
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
       <HintPath>$(ValheimManagedDir)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.AssetBundleModule">
+      <HintPath>$(ValheimManagedDir)\UnityEngine.AssetBundleModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.IMGUIModule">

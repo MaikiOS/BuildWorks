@@ -64,9 +64,10 @@ namespace OstrixMods.BuildWorks
 
         internal static bool SharesNativePlacementData(GameObject placed, GameObject source)
         {
+            GameObject ghost = Player.m_localPlayer ? PlacementGhostField.GetValue(Player.m_localPlayer) as GameObject : null;
+            if (placed && (placed == source || placed == ghost)) return true;
             ZNetView view = placed ? placed.GetComponent<ZNetView>() : null;
             ZDO data = view ? view.GetZDO() : null;
-            GameObject ghost = Player.m_localPlayer ? PlacementGhostField.GetValue(Player.m_localPlayer) as GameObject : null;
             return data != null && (BlueprintMaterialState.SharesData(data, source) ||
                 BlueprintMaterialState.SharesData(data, ghost));
         }
@@ -483,6 +484,7 @@ namespace OstrixMods.BuildWorks
                 sessionMode != SessionMode.BlueprintWorldPlacement || !selectedPiece) return null;
             if (nativeConstructionPayment != null)
                 throw new InvalidOperationException("Recursive blueprint placement is not supported.");
+            BlueprintRotationState.RequireFreshCreation();
             return nativeConstructionPayment = new BlueprintConstructionRefund(player.GetInventory(), selectedPiece.m_resources);
         }
 
@@ -3077,7 +3079,14 @@ namespace OstrixMods.BuildWorks
 
             bool signFailed = placed && placementPlanIndex < placementPlan.Count &&
                 placementPlan[placementPlanIndex].SignText != null;
-            if (TakePendingPlacementSign(placed, out GameObject created, out string signText))
+            bool hasSign = TakePendingPlacementSign(placed, out GameObject created, out string signText);
+            if (placed && sessionMode == SessionMode.BlueprintWorldPlacement)
+            {
+                // The object/payment are enrolled now; a failed write follows verified removal/refund.
+                BlueprintRotationState.ApplyCreated(created, piece.gameObject,
+                    PlacementGhostField.GetValue(player) as GameObject);
+            }
+            if (hasSign)
             {
                 try { signFailed = !BlueprintSignText.TryApply(created, signText); }
                 catch (Exception error)
@@ -6845,11 +6854,18 @@ namespace OstrixMods.BuildWorks
         {
             bool unsafeMount = pendingItemStandRollbackUnsafe;
             int requested = currentBlueprintPlacements.Count;
+            int unsafeIdentities = 0;
             for (int index = currentBlueprintPlacements.Count - 1; index >= 0; --index)
             {
                 GameObject placed = currentBlueprintPlacements[index];
                 if (placed)
                 {
+                    if (SharesNativePlacementData(placed, selectedPiece ? selectedPiece.gameObject : null))
+                    {
+                        ++unsafeIdentities;
+                        Debug.LogError("BuildWorks rollback blocked: created object shares source/ghost network identity; automatic removal/refund refused.");
+                        continue;
+                    }
                     constructionPayments.TryGetValue(placed, out BlueprintConstructionRefund payment);
                     var rollback = new BlueprintRollbackItem(placed, payment);
                     pendingBlueprintRollbacks.Add(rollback);
@@ -6858,7 +6874,7 @@ namespace OstrixMods.BuildWorks
                 }
             }
             currentBlueprintPlacements.Clear();
-            int failed = RetryPendingBlueprintRollbacks(force: true);
+            int failed = RetryPendingBlueprintRollbacks(force: true) + unsafeIdentities;
             precisionEnabled = false;
             Finish();
             ShowStatus(player, BuildWorksLocalization.Text(unsafeMount ? "placement.rollback_mount_uncertain" : failed == 0

@@ -176,6 +176,7 @@ hud.cancel	ОТМЕНА
 hud.reset	СБРОСИТЬ
 hud.disable	ВЫКЛЮЧИТЬ
 placement.scale_persistence_unsupported	Размещённая деталь не поддерживает сохранение масштаба Valheim.
+placement.rotation_persistence_unsupported	Размещённая деталь не может безопасно сохранить точный поворот. Строительство остановлено.
 catalog.group.my_blueprints	МОИ ЧЕРТЕЖИ
 catalog.group.crafting	РЕМЕСЛО
 catalog.group.building	СТРОИТЕЛЬСТВО

@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.194";
+        internal const string PluginVersion = "0.19.195";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -1188,10 +1188,11 @@ namespace OstrixMods.BuildWorks
                 {
                     TerrainModifier.SetTriggerOnPlaced(false);
                     // A foreign init hook must not turn cleanup into deletion of source/ghost data.
-                    if (placed && PrecisionPlacementSession.SharesNativePlacementData(placed, source))
-                        UnityEngine.Object.Destroy(placed);
-                    else if (placed && ZNetScene.instance) ZNetScene.instance.Destroy(placed);
-                    else if (placed) UnityEngine.Object.Destroy(placed);
+                    if (placed && !PrecisionPlacementSession.SharesNativePlacementData(placed, source))
+                    {
+                        if (ZNetScene.instance) ZNetScene.instance.Destroy(placed);
+                        else UnityEngine.Object.Destroy(placed);
+                    }
                     throw;
                 }
             }

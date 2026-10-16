@@ -789,6 +789,42 @@ $applyPlacementScale = $precisionSessionType.Methods | Where-Object {
 $applyPlacementScaleOperands = @(
     $applyPlacementScale.Body.Instructions | ForEach-Object { [string]$_.Operand }
 ) -join "`n"
+$rotationState = $plugin.MainModule.Types | Where-Object Name -eq 'BlueprintRotationState'
+$rotationWriter = $rotationState.Methods | Where-Object Name -eq 'ApplyCreated'
+$rotationReader = $rotationState.Methods | Where-Object Name -eq 'TryRestore'
+$rotationChange = $rotationState.Methods | Where-Object Name -eq 'Invalidate'
+$rotationWriteCalls = @($rotationWriter.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+$rotationReadCalls = @($rotationReader.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+$rotationChangeCalls = @($rotationChange.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+$nativeZdo = $hostAssembly.MainModule.GetType('ZDO')
+$rawRotation = @($nativeZdo.Fields | Where-Object Name -eq 'm_rotation')
+Assert-Contract ($rawRotation.Count -eq 1 -and $rawRotation[0].FieldType.FullName -eq 'UnityEngine.Vector3') `
+    'Exact rotation witness requires the actual native Euler field.'
+foreach ($method in $nativeZdo.Methods | Where-Object Name -in @('Load','Deserialize')) {
+    Assert-Contract ((@($method.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n") -notmatch 'ZDO::SetRotation') `
+        'Native hydration must not invalidate the exact rotation through SetRotation.'
+}
+Assert-Contract ($rotationWriteCalls -match 'ZNetView::IsOwner' -and $rotationWriteCalls -match 'BlueprintMaterialState::SharesData' -and
+    $rotationWriteCalls -match 'ZPackage::WriteSmallRotation' -and $rotationWriteCalls -match 'ZPackage::ReadSmallRotation' -and
+    $rotationWriteCalls -match 'ZDO::Set' -and $rotationWriteCalls -match 'ZDO::GetQuaternion' -and
+    $rotationWriteCalls -notmatch 'ClaimOwnership|SetOwner|Deserialize|Load|ZDO::SetRotation') `
+    'Exact rotation must use an owned distinct created ZDO and the native codec without identity/native rotation replacement.'
+Assert-Contract ($rotationReadCalls -match 'ZDO::GetQuaternion' -and $rotationReadCalls -match 'BlueprintRotationState::Valid' -and
+    $rotationReadCalls -match 'BlueprintRotationState::Close' -and $rotationReadCalls -notmatch 'ZDO::Set|ZDO::Remove|ClaimOwnership|SetOwner') `
+    'Exact rotation reads must validate both quaternions and native witness without writes.'
+Assert-Contract ($rotationChangeCalls -match 'ZDO::RemoveQuaternion' -and $rotationChangeCalls -match 'BlueprintRotationState::Close' -and
+    $rotationChangeCalls -notmatch 'ZDO::SetRotation') 'Real native rotation changes must invalidate, not restore, the old exact rotation.'
+$beginPayment = $precisionSessionType.Methods | Where-Object Name -eq 'BeginConstructionPayment'
+$beginPaymentCalls = @($beginPayment.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+$placementFinished = $precisionSessionType.Methods | Where-Object Name -eq 'OnNativePlacementFinished'
+$placementFinishedCalls = @($placementFinished.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($beginPaymentCalls.IndexOf('BlueprintRotationState::RequireFreshCreation') -ge 0 -and
+    $beginPaymentCalls.IndexOf('BlueprintRotationState::RequireFreshCreation') -lt $beginPaymentCalls.IndexOf('BlueprintConstructionRefund::.ctor') -and
+    $applyPlacementScaleOperands -notmatch 'BlueprintRotationState::ApplyCreated' -and
+    $placementFinishedCalls.IndexOf('BlueprintRotationState::ApplyCreated') -gt $placementFinishedCalls.IndexOf('TakePendingPlacementSign') -and
+    $placementFinishedCalls.IndexOf('BlueprintRotationState::ApplyCreated') -lt $placementFinishedCalls.IndexOf('CompleteNativePlacement') -and
+    $sessionSource -match 'placed && sessionMode == SessionMode.BlueprintWorldPlacement') `
+    'Exact rotation must preflight before debit and write only after blueprint enrollment, so failures use the existing refund transaction.'
 $materialStateType = $plugin.MainModule.Types | Where-Object Name -eq 'BlueprintMaterialState'
 $materialPreviewType = $plugin.MainModule.Types | Where-Object Name -eq 'NativePlacementMaterialPreview'
 $materialPreviewShow = $materialPreviewType.Methods | Where-Object Name -eq 'Show'
@@ -857,6 +893,9 @@ Assert-Contract ($applyPlacementScaleOperands -match 'currentBlueprintPlacements
     $tryRollbackBlueprintOperands -notmatch 'ZNetView::ClaimOwnership' -and
     $tryRollbackBlueprintPiece.Body.ExceptionHandlers.Count -gt 0) `
     'Incomplete blueprint placement no longer follows the tracked cancellation path.'
+Assert-Contract ($cancelBlueprintOperands.IndexOf('SharesNativePlacementData') -ge 0 -and
+    $cancelBlueprintOperands.IndexOf('SharesNativePlacementData') -lt $cancelBlueprintOperands.IndexOf('BlueprintRollbackItem::.ctor')) `
+    'Rollback must refuse a created object sharing source/ghost network identity before queueing native removal.'
 Assert-Contract ($pluginSource -match 'BlueprintRollbackRemovalPatch' -and
     $pluginSource -match 'typeof\(HitData\), typeof\(bool\)' -and
     $pluginSource -match '__state\?\.RecordRemoval\(__1, __exception == null\)' -and
@@ -880,7 +919,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.194.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.195.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $serverAuthority = $plugin.MainModule.GetType('OstrixMods.BuildWorks.BlueprintServerAuthority')
 Assert-Contract ($null -ne $serverAuthority) 'Compiled server blueprint authority adapter is missing.'
@@ -2626,6 +2665,7 @@ Assert-Contract ($passiveAutoJoin.Parameters.Count -eq 4 -and
     $passiveAutoJoinOperands -notmatch 'AutoJoinRotation') `
     'Passive auto-join must preserve ordinary native pair/rotation and composite inclusive ordered distance selection.'
 & (Join-Path $PSScriptRoot 'Test-PassiveAutoJoin.ps1')
+& (Join-Path $PSScriptRoot 'Test-NativePlacementIdentity.ps1')
 $meshEdges = $pluginMethods | Where-Object Name -eq 'GetMeshFeatureEdges'
 $meshEdgeOperands = @($meshEdges.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($meshEdgeOperands -match 'AnchorAdjustment::ExtractFeatureEdges' -and

@@ -1,3 +1,9 @@
+## .195: exact house reload confirmed — 2026-10-16
+
+Verified and installed QA0.19.195.0;127 protected files unchanged at deployment. Actual Valheim: existing own QA194 Forest Hut, one real LMB at yaw225,28 native placements/debits with zero exceptions, Wood58→0, NoCostCheat=false. Normal logout/enter retained28 unique objects with exact position/quaternion/scale differences0 and identical full inventory; no repeated grant. Old .194 house untouched. [Evidence and limits](docs/ROTATION_PERSISTENCE_195.md).
+
+New exact state is blueprint-only; WorldPrecision unchanged. Write failure after debit uses existing confirmed cancellation/refund; ambiguous foreign identity blocks automatic deletion/compensation. Native failure compensation and remote clients remain untested. Protections restored, normal game exit, temporary GABS stopped. Next: populated storage/mounts, starting with the prepared native .187 scenario. Full goal ACTIVE, incomplete.
+
 ## .194: migration works; exact reload remains open — 2026-10-16
 
 Verified guarded QA deployment;123 files unchanged at install. Native review showed4 automatic roof replacements. QA194 Forest Hut passed editor/Save As/28 paid placements, Wood58→0. Reload retained28 parts, positions/scales and inventory, but10 rotations lost0.5 degrees. Full reload NOT passed. Current native WriteSmallRotation truncation confirmed. Next: exact rotation persistence, then populated objects. [Evidence and limits](docs/PREFAB_MIGRATION_194.md). Goal ACTIVE, incomplete.

@@ -22,6 +22,13 @@ public sealed class ZDO
     private readonly Dictionary<int, string> strings = new Dictionary<int, string>();
     private readonly Dictionary<int, int> integers = new Dictionary<int, int>();
     private readonly Dictionary<int, byte[]> bytes = new Dictionary<int, byte[]>();
+    private readonly Dictionary<int, Quaternion> rotations = new Dictionary<int, Quaternion>();
+    private Vector3 m_rotation;
+    public Quaternion GetRotation() => Quaternion.Euler(m_rotation);
+    public void SetRotation(Quaternion value) { m_rotation = value.eulerAngles; ++Writes; }
+    public bool GetQuaternion(int key, out Quaternion value) => rotations.TryGetValue(key, out value);
+    public void Set(int key, Quaternion value) { rotations[key] = value; ++Writes; }
+    public bool RemoveQuaternion(int key) { bool removed = rotations.Remove(key); if (removed) ++Writes; return removed; }
     public string GetString(int key, string fallback) => strings.TryGetValue(key, out string value) ? value : fallback;
     public void Set(int key, string value) { ++Writes; strings[key] = value; }
     public int GetInt(int key, int fallback)

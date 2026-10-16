@@ -176,6 +176,7 @@ hud.cancel	CANCEL
 hud.reset	RESET
 hud.disable	DISABLE
 placement.scale_persistence_unsupported	The placed part does not support Valheim scale persistence.
+placement.rotation_persistence_unsupported	The placed part cannot safely preserve its exact rotation. Construction stopped.
 catalog.group.my_blueprints	MY BLUEPRINTS
 catalog.group.crafting	CRAFTING
 catalog.group.building	BUILDING

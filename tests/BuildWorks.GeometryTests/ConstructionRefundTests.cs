@@ -115,6 +115,21 @@ internal static class ConstructionRefundTests
             Require(!unconfirmed.TryRefund(default, true) && ItemDrop.Drops.Count == before,
                 "Uncertain/ordinary native destruction plus later fallback duplicated recipe drops");
         }
+        // Native debit precedes PlacePiece; its failure handler can queue rollback before UpdatePlacement finalizes the debit.
+        wood.m_stack = 5;
+        var delayed = new BlueprintConstructionRefund(inventory, recipe);
+        wood.m_stack -= 2;
+        int delayedBefore = ItemDrop.Drops.Count;
+        Require(!delayed.TryRefund(default, true), "Failure refunded before the native debit snapshot completed");
+        delayed.Complete();
+        Require(!delayed.TryRefund(default, true), "Completed debit refunded while the failed object still existed");
+        delayed.RecordRemoval(true, true);
+        delayed.RecordNetworkRemoval(true);
+        Require(!delayed.TryRefund(default, false), "Failed object's surviving network identity allowed a refund");
+        Require(delayed.TryRefund(default, true) && delayed.TryRefund(default, true) &&
+            ItemDrop.Drops.Count == delayedBefore + 1 && ItemDrop.Drops[delayedBefore].m_stack == 2 &&
+            ItemDrop.Drops[delayedBefore].m_customData["key"] == "changed after debit",
+            "Deferred post-placement failure lost or duplicated the actual paid resources");
         Console.WriteLine("PASS actual construction debit/refund: no-cost, distinct/equal stacks, duplicate source refusal, item properties, idempotence, uncertain native failure; inert host doubles, no game proof");
     }
 

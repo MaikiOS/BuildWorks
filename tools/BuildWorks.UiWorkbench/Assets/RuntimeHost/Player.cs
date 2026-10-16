@@ -82,6 +82,18 @@ public class ZPackage
 {
     public byte[] Bytes;
     private readonly System.IO.MemoryStream stream = new System.IO.MemoryStream();
+    public ZPackage() { }
+    public ZPackage(byte[] data) { stream = new System.IO.MemoryStream(data); }
+    // Inert quantized-angle fixture; these are not the native wire bytes.
+    public void WriteSmallRotation(UnityEngine.Vector3 value)
+    {
+        value = new UnityEngine.Vector3(UnityEngine.Mathf.Floor(value.x * 2) * .5f,
+            UnityEngine.Mathf.Floor(value.y * 2) * .5f, UnityEngine.Mathf.Floor(value.z * 2) * .5f);
+        if ((value.x <= .5f || value.x >= 359.5f) && (value.z <= .5f || value.z >= 359.5f)) value.x = value.z = 0;
+        Writer.Write(value.x); Writer.Write(value.y); Writer.Write(value.z);
+    }
+    public UnityEngine.Vector3 ReadSmallRotation()
+    { var reader = new System.IO.BinaryReader(stream); return new UnityEngine.Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle()); }
     public void Write(byte value) => stream.WriteByte(value);
     public System.IO.BinaryWriter Writer => new System.IO.BinaryWriter(stream, System.Text.Encoding.UTF8, true);
     public byte[] GetArray() => Bytes ?? stream.ToArray();

@@ -1,3 +1,7 @@
+## Owner changed next priority — 2026-10-16
+
+Next implement approved fog ghost v11 with a persistent unfinished-house project and stake/board: required materials, hammer interaction, continuation, cancellation and verified refunds. First actual-host visual integration, then persisted project state/full lifecycle. Preserve costs/rights/network rules; needed crash/replay/transfer completion are project dependencies. Other unresolved storage requirements remain in scope. [Sequence and acceptance](docs/NEXT_FOG_PROJECT_V11_RU.md). Priority only, not implemented. QA .197 unchanged, game closed, goal ACTIVE.
+
 ## .197: limited native batch exchange verified — 2026-10-16
 
 Cancellation6→6, categorized import6→10, export with intentional ZIP Walls exclusion, reimport10→13, normal logout/world reentry retained13. Exact three-document field parity except fresh unique IDs/requested category; Floor/Walls opened in the actual editor. A later explicit external Walls placement selection created one personal copy: final14, auto-file retained. Sources/prior archives/legacy WAL unchanged. Most actions used runtime handlers, some selection collections directly, and selected actual UI clicks; not full manual acceptance. Process restart/unsaved draft/network/storage remain open. [Evidence and limits](docs/BATCH_NATIVE_197.md).

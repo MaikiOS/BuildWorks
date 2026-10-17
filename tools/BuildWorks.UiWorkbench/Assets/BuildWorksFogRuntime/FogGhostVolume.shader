@@ -11,6 +11,7 @@ Shader "Hidden/BuildWorks/FogGhostVolumeRuntime"
             #pragma fragment frag
             #pragma target 4.0
             #pragma multi_compile_local __ BUILDWORKS_FOG_TWO_SOURCES BUILDWORKS_FOG_ATLAS
+            #pragma multi_compile_local __ BUILDWORKS_FOG_DORMANT_FAST
             #include "UnityCG.cginc"
             #include "GhostMatter.cginc"
             sampler2D _MainTex;

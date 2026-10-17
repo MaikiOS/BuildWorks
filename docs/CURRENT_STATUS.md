@@ -2,7 +2,7 @@
 
 **2026-10-17 · [Русский](CURRENT_STATUS_RU.md) · [Roadmap](ROADMAP.md) · [Documentation](README.md)**
 
-Source and installed isolated QA build: **0.19.210**. Tested host: Valheim 1.0.20, Steam build25909357. Latest published binary is the historical [0.19.37 alpha prerelease](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha); its ZIP does not contain .206. There is no stable release. Source synchronization is not binary publication.
+Source and installed isolated QA build: **0.19.211**. Tested host: Valheim 1.0.20, Steam build25909357. Latest published binary is the historical [0.19.37 alpha prerelease](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha); its ZIP does not contain .206. There is no stable release. Source synchronization is not binary publication.
 
 | Area | Implemented / automated evidence | Valheim or user evidence | Still open |
 | --- | --- | --- | --- |
@@ -12,7 +12,7 @@ Source and installed isolated QA build: **0.19.210**. Tested host: Valheim 1.0.2
 | Catalog and file exchange | Categories, Save As, delete/hide, automatic portable file, Share, batch import/export | Limited batch .197 import/export/reentry proved | Full batch UI/dirty draft/restart; some owner checks remain |
 | Server library and sharing | Administrator publication; players/admin visibility, verified personal copies, provenance; in-process checks | Host+remote not accepted | Live access/reconnect/restart; direct player-to-player transfer |
 | Items and storage | Separate storage/mount inclusion; supplied-item preservation and journal foundations | Limited chest/inventory comparison only | Durable settlement, cancellation/refund/crash/replay, all holders/armor/admin restore and network authority |
-| v11 fog | [.210](FOG_SCRATCH_210.md): exact-grid shared scratch; Scratch360/36, Lazy5, frozen270/18, builds/contracts | Native28-part house:both-way passage/standing/recovery0; peak87408640, cleanup/inventory0→0 | Performance (down to8 FPS)/full roof appearance, then durable project/board and multiplayer |
+| v11 fog | [.211](FOG_RENDER_CACHE_211.md): packing cache/zero fields,10 exact comparisons/28 synthetic, Atlas4/v11 parity6, builds/contracts | .210 native28-part house:both-way passage/standing/recovery0; peak87408640, cleanup/inventory0→0 | .211 native FPS/full roof appearance, then durable project/board and network |
 | Unfinished construction | Existing transient pause/refund foundations | No persistent project acceptance | Durable project + stake/board + material continuation + confirmed cancel-refund + reload/server |
 | World selection and heavy chain | Capture/volume foundations and targeted checks | Basic capture accepted; later coordinate/height UX issues reported | Editable volume/gizmos, boundary rules, full loaded-area and performance acceptance |
 | World objects and EarthWorks | No terrain integration dependency | None claimed | Admin-priced nonrecipe objects; EarthWorks is a later separate integration |
@@ -30,3 +30,5 @@ Historical .207 proof: [packing and allocation-failure recovery](FOG_PACKING_207
 .209 installed, SHA `50263A0D3F8DA4C08E7600E2FCB8A51B5C0509511EE321DB1F8BE30EBE510927`;143 protected files unchanged. Normal/QA0/0, contracts/localization1104, targeted cutout/Lazy/v11 parity and independent PASSED/Ship passed. .209 has not run in Valheim yet. [Actual .208 house failure and fix](FOG_CUTOUT_209.md).
 
 .210 installed, SHA `A96AC9314A3F30176CD6CC358FE95A439ABB25B8EAD6269F2287AE3358CB734B`;143 protected files unchanged. The full tested house route now fits the field budget; performance/full appearance remain unaccepted. [Exact .210 evidence](FOG_SCRATCH_210.md).
+
+.211 installed, SHA `F748D15F60768E0B6C6A4BB24FF878F66613036432FA2CBD2A7093EEEA2278C2`;143 files unchanged. New/original shader and cache comparisons passed; Unity timings are noisy, native .211 untested. [Report .211](FOG_RENDER_CACHE_211.md).

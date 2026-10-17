@@ -89,12 +89,15 @@ public static class FogRuntimeAtlasCheck
                     }
                 }
                 Require(order<.000001&&pairDelta<.00001&&bytes>0&&bytes<=BlueprintFogAtlas.MaximumBytes,"Atlas order/pair/budget gate failed");
+                CheckPackingCache(assets,camera,probe,owners,prefabs,positions,origins,bodies,start,output);
                 owners[2].Root.SetActive(false);
                 Color[] oldPair=FogRuntimePairCheck.Capture(camera,probe,(image,target)=>volume.Render(camera,image,target,pair[0],pair[1],Beam,Vector3.right,2),output,"removal-direct");
                 Color[] remaining=FogRuntimePairCheck.Capture(camera,probe,(image,target)=>volume.RenderMany(camera,image,target,pair,Beam,Vector3.right,2),output,"removal-wrapper");
                 removalDelta=FogRuntimePairCheck.Delta(oldPair,remaining);
                 Require(removalDelta==0&&volume.AtlasBytes==0,"Removing third owner did not release derived atlas/exact pair fallback");
                 for(int i=0;i<3;++i) Fill(owners[i].Simulation.Smoke,i==0?new Color(.8f,.1f,.2f,1):i==1?new Color(.1f,.7f,.3f,1):new Color(.2f,.3f,.9f,1));
+                // This fixture writes GPU fields outside the simulation clock; invalidate its private render cache.
+                ResetPacking(atlas);
                 Color[] full=FogRuntimePairCheck.Capture(camera,probe,(image,target)=>atlas.Render(camera,image,target,owners,Beam,Vector3.right,0),output,"solid-three");
                 CheckPacked(atlas,owners);edgeDelta=CheckEdges(atlas,owners);
                 var oldOffsets=Field<Vector3Int[]>(atlas,"offsets").ToArray();
@@ -129,7 +132,7 @@ public static class FogRuntimeAtlasCheck
             File.WriteAllText(Path.Combine(output,"verification.json"),JsonUtility.ToJson(new Report{
                 passed=true,frames=frames,owners=3,atlasBytes=bytes,houseLayoutBytes=houseLayoutBytes,maxOrderDelta=order,pairDelta=pairDelta,removalDelta=removalDelta,
                 missingOwnerDelta=missingOwnerDelta,edgeDelta=edgeDelta,occlusionDelta=occlusionDelta,translatedDelta=translatedDelta,layoutRolled=layoutRolled,packedFieldsExact=true,
-                guardsRetainSimulations=true,allocationFailureRecovered=true,cleanup=true,gameHostTested=false,wholeHouseSupported=false},true));
+                guardsRetainSimulations=true,allocationFailureRecovered=true,packingCache=true,cleanup=true,gameHostTested=false,wholeHouseSupported=false},true));
         }
         finally
         {
@@ -137,6 +140,43 @@ public static class FogRuntimeAtlasCheck
             foreach(var prefab in prefabs)if(prefab)UnityEngine.Object.DestroyImmediate(prefab);
             foreach(var material in materials)if(material)UnityEngine.Object.DestroyImmediate(material);
             UnityEngine.Object.DestroyImmediate(host);PlayerSettings.colorSpace=previous;AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+        }
+    }
+    internal static void ResetPacking(BlueprintFogAtlas atlas)
+    {
+        var cached=typeof(BlueprintFogAtlas).GetField("packedOwners",BindingFlags.NonPublic|BindingFlags.Instance);
+        Require(cached!=null,"Packing cache fixture is not connected to production code");
+        var array=(Array)cached.GetValue(atlas);Array.Clear(array,0,array.Length);
+    }
+    private static void CheckPackingCache(BlueprintFogAssets assets,Camera camera,FogRenderProbe probe,BlueprintFogVisual[] owners,
+        GameObject[] prefabs,Vector3[] positions,Vector3[] origins,Vector2[] bodies,Vector3 start,string output)
+    {
+        using(var atlas=new BlueprintFogAtlas(assets))using(var reference=new BlueprintFogAtlas(assets))
+        {
+            Color[] Render(BlueprintFogAtlas a,BlueprintFogVisual[] set,string name)=>FogRuntimePairCheck.Capture(camera,probe,
+                (image,target)=>a.Render(camera,image,target,set,Beam,Vector3.right,0),output,name);
+            void Equal(BlueprintFogVisual[] set,string name)
+            {
+                Color[] cached=Render(atlas,set,name+"-cached");ResetPacking(reference);
+                Require(FogRuntimePairCheck.Delta(cached,Render(reference,set,name+"-forced"))==0,"Cached atlas pixels differ: "+name);
+            }
+            Equal(owners,"cache-initial");long before=atlas.PackDispatches;
+            Equal(owners,"cache-repeat");Require(atlas.PackDispatches==before,"Unchanged owners were packed again");
+            owners[0].AdvanceTo(owners[0].Clock+BlueprintFogSimulation.Step,start,bodies[0],false);
+            Equal(owners,"cache-one-tick");Require(atlas.PackDispatches==before+1,"One changed owner did not repack exactly once");
+            var reverse=new[]{owners[2],owners[1],owners[0]};before=atlas.PackDispatches;
+            Equal(reverse,"cache-reorder");Require(atlas.PackDispatches==before+3,"Changed block layout retained stale packed owners");
+            using(var replacement=new BlueprintFogVisual(assets,prefabs[2],positions[2],Quaternion.Euler(0,90,0),
+                new Vector3(1.2f,1,.8f),null,origins[2],start,bodies[2],null,null,true))
+            {
+                var replaced=new[]{replacement,owners[1],owners[0]};before=atlas.PackDispatches;
+                Equal(replaced,"cache-owner-replaced");Require(atlas.PackDispatches==before+1,"Same-size replacement reused previous owner's data");
+                before=atlas.PackDispatches;
+                Reject(()=>atlas.ChangeLayout(new[]{new Vector3Int(20,30,40)},2048,size=>{throw new InvalidOperationException("Injected cache allocation failure");}));
+                Equal(replaced,"cache-failed-layout");Require(atlas.PackDispatches==before,"Failed layout discarded valid cache");
+                atlas.ChangeLayout(Field<List<Vector3Int>>(atlas,"layoutBlocks").ToArray(),2048,size=>{});
+                Equal(replaced,"cache-layout-rebuilt");Require(atlas.PackDispatches==before+3,"Committed layout retained stale packed blocks");
+            }
         }
     }
     private static long CheckLayouts()
@@ -240,7 +280,7 @@ public static class FogRuntimeAtlasCheck
     private static void Require(bool condition,string message){if(!condition)throw new InvalidOperationException(message);}
     [Serializable]private sealed class Report
     {
-        public bool passed,layoutRolled,packedFieldsExact,guardsRetainSimulations,allocationFailureRecovered,cleanup,gameHostTested,wholeHouseSupported;
+        public bool passed,layoutRolled,packedFieldsExact,guardsRetainSimulations,allocationFailureRecovered,packingCache,cleanup,gameHostTested,wholeHouseSupported;
         public int frames,owners;public long atlasBytes,houseLayoutBytes;public double maxOrderDelta,pairDelta,removalDelta,missingOwnerDelta,edgeDelta,occlusionDelta,translatedDelta;
     }
 }

@@ -18,6 +18,10 @@ namespace OstrixMods.BuildWorks
         private readonly List<Vector3Int> blocks = new List<Vector3Int>(MaximumOwners);
         private readonly List<Vector3Int> layoutBlocks = new List<Vector3Int>(MaximumOwners);
         private int layoutLimit;
+        internal long PackDispatches { get; private set; }
+        private readonly BlueprintFogVisual[] packedOwners = new BlueprintFogVisual[MaximumOwners];
+        private readonly Texture[] packedSmoke = new Texture[MaximumOwners], packedSurface = new Texture[MaximumOwners];
+        private readonly int[] packedTicks = new int[MaximumOwners];
         private readonly HashSet<BlueprintFogVisual> unique = new HashSet<BlueprintFogVisual>();
         private readonly Vector3Int[] offsets = new Vector3Int[MaximumOwners];
         private readonly Vector4[] origins = new Vector4[MaximumOwners], restMin = new Vector4[MaximumOwners], restMax = new Vector4[MaximumOwners],
@@ -32,6 +36,7 @@ namespace OstrixMods.BuildWorks
             {
                 material = new Material(assets.Volume) { hideFlags = HideFlags.HideAndDontSave };
                 material.DisableKeyword("BUILDWORKS_FOG_TWO_SOURCES"); material.EnableKeyword("BUILDWORKS_FOG_ATLAS");
+                material.EnableKeyword("BUILDWORKS_FOG_DORMANT_FAST");
                 pack = UnityEngine.Object.Instantiate(assets.Solver); pack.hideFlags = HideFlags.HideAndDontSave;
                 kernel = pack.FindKernel("PackVolume");
             }
@@ -118,7 +123,7 @@ namespace OstrixMods.BuildWorks
                 origins[i] = new Vector4(origin.x, origin.y, origin.z, owner.Clock);
                 restMin[i] = owner.Source.Minimum; restMax[i] = owner.Source.Maximum;
                 fieldMin[i] = owner.FieldMinimum; fieldMax[i] = owner.FieldMaximum; actors[i] = owner.ActorRadius;
-                shapeSize[i] = new Vector4(source.width, source.height, source.depth, 0);
+                shapeSize[i] = new Vector4(source.width, source.height, source.depth, owner.Simulation == null ? 0 : 1);
                 fieldSize[i] = new Vector4(field.x, field.y, field.z, owner.BodyHalfHeight);
             }
             int steps = Mathf.CeilToInt(bounds.size.magnitude / .025f) + 162;
@@ -132,6 +137,11 @@ namespace OstrixMods.BuildWorks
             {
                 Vector3Int block = blocks[i], offset = offsets[i];
                 atlasOffset[i] = new Vector4(offset.x, offset.y, offset.z, 0);
+                BlueprintFogVisual owner = owners[i]; Texture currentSmoke = owner.Smoke, currentSurface = owner.Surface;
+                int tick = owner.Simulation?.Tick ?? -1;
+                // Source is immutable; field contents change only on a simulation tick or texture replacement.
+                if (ReferenceEquals(packedOwners[i], owner) && ReferenceEquals(packedSmoke[i], currentSmoke) &&
+                    ReferenceEquals(packedSurface[i], currentSurface) && packedTicks[i] == tick) continue;
                 // Pack only this block, retaining its own duplicated filtering borders.
                 pack.SetVector("_PackSize", new Vector4(block.x, block.y, block.z, 0));
                 pack.SetVector("_PackOffset", atlasOffset[i]); pack.SetVector("_PackShapeSize", shapeSize[i]); pack.SetVector("_PackFieldSize", fieldSize[i]);
@@ -139,6 +149,8 @@ namespace OstrixMods.BuildWorks
                 pack.SetTexture(kernel, "_PackSurface", owners[i].Surface); pack.SetTexture(kernel, "_PackedShape", shape);
                 pack.SetTexture(kernel, "_PackedSmoke", smoke); pack.SetTexture(kernel, "_PackedSurface", surface);
                 pack.Dispatch(kernel, (block.x + 7) / 8, (block.y + 7) / 8, (block.z + 3) / 4);
+                ++PackDispatches;
+                packedOwners[i] = owner; packedSmoke[i] = currentSmoke; packedSurface[i] = currentSurface; packedTicks[i] = tick;
             }
             material.SetTexture("_AtlasShape", shape); material.SetTexture("_AtlasSmoke", smoke); material.SetTexture("_AtlasSurface", surface);
             // BlueprintFogSource creates the same immutable procedural noise for every owner.
@@ -166,6 +178,7 @@ namespace OstrixMods.BuildWorks
             Array.Copy(pending, offsets, requested.Count);
             layoutBlocks.Clear(); for (int i = 0; i < requested.Count; ++i) layoutBlocks.Add(requested[i]);
             layoutLimit = limit;
+            ClearPackedOwners();
         }
 
         private void Resize(Vector3Int wanted)
@@ -189,9 +202,12 @@ namespace OstrixMods.BuildWorks
         }
         private static void Release(ref RenderTexture value)
         { if (value) { value.Release(); UnityEngine.Object.DestroyImmediate(value); } value = null; }
+        private void ClearPackedOwners()
+        { Array.Clear(packedOwners, 0, MaximumOwners); Array.Clear(packedSmoke, 0, MaximumOwners); Array.Clear(packedSurface, 0, MaximumOwners); }
         public void Dispose()
         {
             Release(ref shape); Release(ref smoke); Release(ref surface);
+            ClearPackedOwners();
             if (material) UnityEngine.Object.DestroyImmediate(material); material = null;
             if (pack) UnityEngine.Object.DestroyImmediate(pack); pack = null;
         }

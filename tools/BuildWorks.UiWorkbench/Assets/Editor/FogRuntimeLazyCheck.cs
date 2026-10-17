@@ -22,6 +22,7 @@ public static class FogRuntimeLazyCheck
         checker.SetPixels(Enumerable.Range(0,64).Select(i=>(i/8+i%8)%2==0?Color.white:Color.gray).ToArray());checker.Apply();
         var material=new Material(Shader.Find("Standard"));material.mainTexture=checker;material.color=new Color(.6f,.4f,.2f);prefab.GetComponent<Renderer>().sharedMaterial=material;
         var all=new BlueprintFogVisual[28];BlueprintFogVisual eager=null,lazy=null;int frames=0;long peak=0,restAtlas=0;double idleDelta=0,dynamicDelta=0,foregroundDelta=0;
+        double cachedRenderMs=0,forcedPackingMs=0,plainRenderMs=0,fullSamplingMs=0,fullSamplingPackingMs=0;
         try
         {
             PlayerSettings.colorSpace=ColorSpace.Linear;AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
@@ -83,9 +84,28 @@ public static class FogRuntimeLazyCheck
                 Require(pool.Count==0&&pool.FieldBytes==0&&all.All(v=>v.Simulation==null),"Resting 28-part set allocated simulations");
                 FogRuntimePairCheck.Capture(camera,probe,(image,target)=>volume.RenderMany(camera,image,target,all,new Vector3(-4,1,0),Vector3.right,0),output,"28-dormant");
                 restAtlas=volume.AtlasBytes;Require(restAtlas>0&&restAtlas<=BlueprintFogAtlas.MaximumBytes,"Dormant owners did not render through atlas");
+                var atlas=(BlueprintFogAtlas)typeof(BlueprintFogVolume).GetField("atlas",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Instance).GetValue(volume);
+                var cost=CheckDormantPacking(atlas,camera,probe,all,body,output);
+                plainRenderMs=cost[0];cachedRenderMs=cost[1];forcedPackingMs=cost[2];fullSamplingMs=cost[3];fullSamplingPackingMs=cost[4];
                 var victim=all[0];victim.AdvanceTo(BlueprintFogSimulation.Step,new Vector3(0,1,0),body,true);
                 Require(victim.Simulation!=null&&pool.Count==1,"Contact did not activate one owner");
                 FogRuntimePairCheck.Capture(camera,probe,(image,target)=>volume.RenderMany(camera,image,target,all,new Vector3(-4,1,0),Vector3.right,0),output,"28-mixed");
+                long before=atlas.PackDispatches;victim.AdvanceTo(2*BlueprintFogSimulation.Step,new Vector3(0,1,0),body,true);
+                ComparePacking(atlas,camera,probe,all,output,"28-active-tick");
+                Require(atlas.PackDispatches==before+1+2*all.Length,"Mixed atlas did not update only the active owner before forced comparison");
+                for(int tick=3;tick<=60;++tick)victim.AdvanceTo(tick*BlueprintFogSimulation.Step,new Vector3(0,1,0),body,true);
+                Require(MaxAlpha(victim.Simulation.Surface)>.5f&&MaxAlpha(victim.Simulation.Smoke)>0,"Mixed comparison did not contain deformed surface and smoke");
+                ComparePacking(atlas,camera,probe,all,output,"28-active-hold");
+                for(int tick=61;tick<=420;++tick)
+                {
+                    victim.AdvanceTo(tick*BlueprintFogSimulation.Step,new Vector3(30,1,30),body,true);
+                    if(tick%30==0)AsyncGPUReadback.WaitAllRequests();
+                }
+                Require(victim.Simulation==null&&pool.Count==0,"Mixed cache recovery did not return to the shared empty field");
+                ComparePacking(atlas,camera,probe,all,output,"28-recovered-empty");
+                victim.AdvanceTo(421*BlueprintFogSimulation.Step,new Vector3(0,1,0),body,true);
+                Require(victim.Simulation!=null&&pool.Count==1,"Mixed cache could not reacquire a recovered owner");
+                ComparePacking(atlas,camera,probe,all,output,"28-reacquired");
                 all[1].Dispose();all[1]=null;Require(assets.Empty&&victim.Simulation.Smoke&&pool.Count==1,"Dormant removal destroyed live neighbor");
                 foreach(var v in all)v?.Dispose();Require(pool.Count==0&&pool.FieldBytes==0,"Lazy cleanup retained fields");
                 var blueprint=new CompositeBlueprintStore.Blueprint();
@@ -115,9 +135,57 @@ public static class FogRuntimeLazyCheck
             }
             File.WriteAllText(Path.Combine(output,"verification.json"),JsonUtility.ToJson(new Report{passed=true,frames=frames,owners=28,
                 idleDelta=idleDelta,maxImageDelta=dynamicDelta,maxForegroundDelta=foregroundDelta,peakFieldBytes=peak,restAtlasBytes=restAtlas,
-                delayedClock=true,recoveredReleased=true,reentered=true,sharedEmptyRetained=true,mixedAtlas=true,blueprintAdapter=true,blueprintVisible=true,narrowContact=true,budgetFailureRetainsNeighbor=true,staleRecoveryRetained=true,sourceCutout=true,gameHostTested=false,wholeHouseSupported=false},true));
+                delayedClock=true,recoveredReleased=true,reentered=true,sharedEmptyRetained=true,mixedAtlas=true,blueprintAdapter=true,blueprintVisible=true,narrowContact=true,budgetFailureRetainsNeighbor=true,staleRecoveryRetained=true,sourceCutout=true,
+                packingCache=true,dormantSamplingExact=true,plainRenderMs=plainRenderMs,cachedRenderMs=cachedRenderMs,forcedPackingMs=forcedPackingMs,fullSamplingMs=fullSamplingMs,fullSamplingPackingMs=fullSamplingPackingMs,gameHostTested=false,wholeHouseSupported=false},true));
         }
         finally{eager?.Dispose();lazy?.Dispose();foreach(var v in all)v?.Dispose();UnityEngine.Object.DestroyImmediate(host);UnityEngine.Object.DestroyImmediate(prefab);UnityEngine.Object.DestroyImmediate(material);UnityEngine.Object.DestroyImmediate(checker);PlayerSettings.colorSpace=previous;}
+    }
+    private static void ComparePacking(BlueprintFogAtlas atlas,Camera camera,FogRenderProbe probe,BlueprintFogVisual[] owners,string output,string name)
+    {
+        var material=(Material)typeof(BlueprintFogAtlas).GetField("material",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Instance).GetValue(atlas);
+        foreach(float strength in new[]{0f,2f})
+        {
+            Color[] Render(string suffix)=>FogRuntimePairCheck.Capture(camera,probe,(image,target)=>atlas.Render(camera,image,target,owners,
+                new Vector3(-4,1,0),Vector3.right,strength),output,name+"-light"+strength+suffix);
+            Color[] cached=Render("-cached");FogRuntimeAtlasCheck.ResetPacking(atlas);
+            Require(FogRuntimePairCheck.Delta(cached,Render("-forced"))==0,"28-owner packed cache differs: "+name);
+            Require(material.IsKeywordEnabled("BUILDWORKS_FOG_DORMANT_FAST"),"Dormant fast variant is not enabled");
+            material.DisableKeyword("BUILDWORKS_FOG_DORMANT_FAST");
+            try{Require(FogRuntimePairCheck.Delta(cached,Render("-full-sampling"))==0,"Dormant sampling changed pixels: "+name);}
+            finally{material.EnableKeyword("BUILDWORKS_FOG_DORMANT_FAST");}
+        }
+    }
+    private static double[] CheckDormantPacking(BlueprintFogAtlas atlas,Camera camera,FogRenderProbe probe,BlueprintFogVisual[] owners,Vector2 body,string output)
+    {
+        long before=atlas.PackDispatches;
+        foreach(var owner in owners)owner.AdvanceTo(BlueprintFogSimulation.Step,new Vector3(30,1,30),body,true);
+        ComparePacking(atlas,camera,probe,owners,output,"28-dormant-clock");
+        Require(atlas.PackDispatches==before+2*owners.Length,"Dormant clock change unnecessarily repacked source fields");
+        var samples=Enumerable.Range(0,5).Select(i=>new double[5]).ToArray();
+        var material=(Material)typeof(BlueprintFogAtlas).GetField("material",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Instance).GetValue(atlas);
+        var target=RenderTexture.GetTemporary(384,216,24,RenderTextureFormat.ARGBHalf);var old=camera.targetTexture;
+        try
+        {
+            camera.targetTexture=target;
+            for(int sample=0;sample<6;++sample)for(int mode=0;mode<5;++mode)
+            {
+                int selected=mode;
+                if(mode>=3)material.DisableKeyword("BUILDWORKS_FOG_DORMANT_FAST");else material.EnableKeyword("BUILDWORKS_FOG_DORMANT_FAST");
+                probe.Render=(image,destination)=>{
+                    if(selected==0){Graphics.Blit(image,destination);return;}
+                    if(selected==2||selected==4)FogRuntimeAtlasCheck.ResetPacking(atlas);
+                    atlas.Render(camera,image,destination,owners,new Vector3(-4,1,0),Vector3.right,0);
+                };
+                long packed=atlas.PackDispatches;var watch=System.Diagnostics.Stopwatch.StartNew();
+                for(int frame=0;frame<3;++frame)camera.Render();
+                var sync=AsyncGPUReadback.Request(target,0);sync.WaitForCompletion();Require(!sync.hasError,"Packing benchmark readback failed");
+                watch.Stop();if(sample>0)samples[mode][sample-1]=watch.Elapsed.TotalMilliseconds/3;
+                Require(atlas.PackDispatches-packed==(mode==2||mode==4?3*owners.Length:0),"Packing benchmark did not exercise its declared mode");
+            }
+        }
+        finally{material.EnableKeyword("BUILDWORKS_FOG_DORMANT_FAST");camera.targetTexture=old;probe.Render=null;RenderTexture.ReleaseTemporary(target);}
+        foreach(var values in samples)Array.Sort(values);
+        return samples.Select(values=>values[2]).ToArray();
     }
     private static void CheckSourceCutout(BlueprintFogAssets assets)
     {
@@ -215,7 +283,7 @@ public static class FogRuntimeLazyCheck
     private static void Require(bool test,string message){if(!test)throw new InvalidOperationException(message);}
     [Serializable]private sealed class Report
     {
-        public bool passed,delayedClock,recoveredReleased,reentered,sharedEmptyRetained,mixedAtlas,blueprintAdapter,blueprintVisible,narrowContact,budgetFailureRetainsNeighbor,staleRecoveryRetained,sourceCutout,gameHostTested,wholeHouseSupported;
-        public int frames,owners;public long peakFieldBytes,restAtlasBytes;public double idleDelta,maxImageDelta,maxForegroundDelta;
+        public bool passed,delayedClock,recoveredReleased,reentered,sharedEmptyRetained,mixedAtlas,blueprintAdapter,blueprintVisible,narrowContact,budgetFailureRetainsNeighbor,staleRecoveryRetained,sourceCutout,packingCache,dormantSamplingExact,gameHostTested,wholeHouseSupported;
+        public int frames,owners;public long peakFieldBytes,restAtlasBytes;public double idleDelta,maxImageDelta,maxForegroundDelta,plainRenderMs,cachedRenderMs,forcedPackingMs,fullSamplingMs,fullSamplingPackingMs;
     }
 }

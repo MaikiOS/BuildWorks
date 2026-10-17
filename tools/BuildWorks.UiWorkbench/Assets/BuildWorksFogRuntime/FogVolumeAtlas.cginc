@@ -23,6 +23,11 @@ float3 AtlasDensities(float3 p, int owner, out float3 pigment)
     float3 uv = (p-_RegionRestMin[owner].xyz)/(_RegionRestMax[owner].xyz-_RegionRestMin[owner].xyz);
     float3 wakeUV = (p-_RegionFieldMin[owner].xyz)/(_RegionFieldMax[owner].xyz-_RegionFieldMin[owner].xyz);
     bool inRest = all(uv>=0) && all(uv<=1), inField = all(wakeUV>=0) && all(wakeUV<=1);
+    bool active = true;
+    #if defined(BUILDWORKS_FOG_DORMANT_FAST)
+    active = _RegionShapeSize[owner].w > .5;
+    inField = inField && active;
+    #endif
     float building=0, wake=0, wakeLight=1;
     [branch] if (inRest)
     {
@@ -31,7 +36,8 @@ float3 AtlasDensities(float3 p, int owner, out float3 pigment)
         {
             float3 moved=(p-AtlasDrift(p,owner)-_RegionRestMin[owner].xyz)/(_RegionRestMax[owner].xyz-_RegionRestMin[owner].xyz);
             shape=tex3Dlod(_AtlasShape,float4(AtlasUV(moved,_RegionShapeSize[owner].xyz,owner),0)).r;
-            float damage=tex3Dlod(_AtlasSurface,float4(AtlasUV(wakeUV,_RegionFieldSize[owner].xyz,owner),0)).w;
+            float damage=0;
+            [branch] if(active) damage=tex3Dlod(_AtlasSurface,float4(AtlasUV(wakeUV,_RegionFieldSize[owner].xyz,owner),0)).w;
             building=shape*(.45+AtlasNoise(p,owner)*.55)*(1-damage)*.85;
         }
     }
@@ -57,6 +63,15 @@ void AtlasCandidates(float3 origin, float3 ray, float enter, float leave, out in
     {
         float3 minimum=_RegionFieldMin[owner].xyz+_RegionOriginClock[owner].xyz;
         float3 maximum=_RegionFieldMax[owner].xyz+_RegionOriginClock[owner].xyz;
+        #if defined(BUILDWORKS_FOG_DORMANT_FAST)
+        [branch] if(_RegionShapeSize[owner].w<.5)
+        {
+            // Dormant fields contain no transported matter; retain a conservative parallel-ray margin.
+            float margin=.00001*(1+max(abs(enter),abs(leave)));
+            minimum=_RegionRestMin[owner].xyz+_RegionOriginClock[owner].xyz-margin;
+            maximum=_RegionRestMax[owner].xyz+_RegionOriginClock[owner].xyz+margin;
+        }
+        #endif
         float3 t0=(minimum-origin)/safeRay,t1=(maximum-origin)/safeRay,lo=min(t0,t1),hi=max(t0,t1);
         if(max(enter,max(max(lo.x,lo.y),lo.z))<min(leave,min(min(hi.x,hi.y),hi.z))) owners[count++]=owner;
     }

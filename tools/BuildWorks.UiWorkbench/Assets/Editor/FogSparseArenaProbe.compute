@@ -1,0 +1,198 @@
+#pragma kernel InitArena
+#pragma kernel BeginStep
+#pragma kernel StageLedger
+#pragma kernel IndexFields
+#pragma kernel ValidateCurrent
+#pragma kernel ReserveBlocks
+#pragma kernel ResolveBlocks
+#pragma kernel PackFields
+#pragma kernel CheckPacking
+#pragma kernel CommitVelocity
+#pragma kernel CommitLedger
+#pragma kernel PublishFields
+#pragma kernel CommitMaps
+#pragma kernel FinishStep
+#pragma kernel RestoreFields
+#pragma kernel ReleaseCurrent
+#pragma kernel ClearOwnerMaps
+
+// Test candidate. Dispatches are serial on the ordinary GPU queue; flags become immutable before commit.
+RWStructuredBuffer<uint> _Maps, _Free, _Control, _Receipts;
+RWStructuredBuffer<uint2> _Payload;
+RWStructuredBuffer<uint> _OwnerAway, _OwnerPeak, _OwnerState, _StageAway, _StagePeak, _StageState;
+Texture3D<float4> _ColourIn, _OriginIn, _SurfaceIn, _NextVelocity;
+RWTexture3D<float4> _ColourOut, _OriginOut, _SurfaceOut, _OwnerVelocity, _PublishedSmoke, _PublishedSurface;
+int3 _Grid, _Blocks, _RenderOffset;
+int _Capacity, _MapWords, _TotalMapWords, _ReceiptWords, _CurrentBase, _PendingBase, _Slot;
+int _Tick, _EmissionRevision, _InjectPackFailure;
+uint2 _OwnerBits, _GenerationBits, _SequenceBits;
+// Control: free count, request count, errors, reservation start/count, old count; 16 uints in total.
+static const uint Empty = 0xffffffffu;
+uint4 Bits(float4 v) { return f32tof16(v) & 0xffffu; }
+uint Block(uint3 g) { return g.x + _Blocks.x * (g.y + _Blocks.y * g.z); }
+uint BlocksPerField() { return (uint)_MapWords / 3u; }
+uint2 Pack(float4 v) { uint4 b = Bits(v); return uint2(b.x | (b.y << 16), b.z | (b.w << 16)); }
+float4 Unpack(uint2 b) { return float4(f16tof32(b.x & 0xffffu), f16tof32(b.x >> 16), f16tof32(b.y & 0xffffu), f16tof32(b.y >> 16)); }
+
+[numthreads(64,1,1)]
+void InitArena(uint id : SV_DispatchThreadID)
+{
+    if(id < (uint)_TotalMapWords) _Maps[id] = Empty;
+    if(id < (uint)_Capacity) _Free[id] = id;
+    if(id < (uint)_ReceiptWords) _Receipts[id] = 0;
+    if(id < 16) _Control[id] = id == 0 ? _Capacity : 0;
+}
+[numthreads(1,1,1)]
+void BeginStep(uint id : SV_DispatchThreadID)
+{
+    for(uint i = 1; i < 16; ++i) _Control[i] = 0;
+}
+[numthreads(64,1,1)]
+void StageLedger(uint id : SV_DispatchThreadID)
+{
+    if(id >= 1024) return;
+    _StageAway[id] = _OwnerAway[id]; _StagePeak[id] = _OwnerPeak[id];
+    if(id == 0) _StageState[0] = _OwnerState[0];
+}
+groupshared uint presence;
+[numthreads(4,4,4)]
+void IndexFields(uint3 id : SV_DispatchThreadID, uint3 group : SV_GroupID, uint local : SV_GroupIndex)
+{
+    if(local == 0) presence = 0;
+    GroupMemoryBarrierWithGroupSync();
+    uint4 a = Bits(_ColourIn.Load(int4(id,0))), b = Bits(_OriginIn.Load(int4(id,0))), c = Bits(_SurfaceIn.Load(int4(id,0)));
+    if(any((a & 0x7c00u) == 0x7c00u) || any((b & 0x7c00u) == 0x7c00u) || any((c & 0x7c00u) == 0x7c00u)) InterlockedOr(_Control[2],1);
+    if(any(a != 0)) InterlockedOr(presence,1);
+    if(any(b != 0)) InterlockedOr(presence,2);
+    if(any(c != 0)) InterlockedOr(presence,4);
+    GroupMemoryBarrierWithGroupSync();
+    if(local == 0) for(uint field = 0; field < 3; ++field)
+    {
+        uint ordinal = Empty;
+        if((presence & (1u << field)) != 0) InterlockedAdd(_Control[1],1,ordinal);
+        _Maps[_PendingBase + field * BlocksPerField() + Block(group)] = ordinal;
+    }
+}
+[numthreads(64,1,1)]
+void ValidateCurrent(uint id : SV_DispatchThreadID)
+{
+    if(id >= (uint)_MapWords) return;
+    uint block = _Maps[_CurrentBase + id];
+    if(block == Empty) return;
+    if(block >= (uint)_Capacity) InterlockedOr(_Control[2],4);
+    else InterlockedAdd(_Control[5],1);
+}
+[numthreads(1,1,1)]
+void ReserveBlocks(uint id : SV_DispatchThreadID)
+{
+    if(_Control[0] > (uint)_Capacity || _Control[5] > (uint)_Capacity - _Control[0]) _Control[2] |= 4;
+    if(_Control[2] != 0) return;
+    uint wanted = _Control[1];
+    if(wanted > _Control[0]) { _Control[2] = 2; return; }
+    _Control[0] -= wanted; _Control[3] = _Control[0]; _Control[4] = wanted;
+}
+[numthreads(64,1,1)]
+void ResolveBlocks(uint id : SV_DispatchThreadID)
+{
+    if(id >= (uint)_MapWords || _Control[2] != 0) return;
+    uint ordinal = _Maps[_PendingBase + id];
+    if(ordinal == Empty) return;
+    if(ordinal >= _Control[4] || _Control[3] + ordinal >= (uint)_Capacity) { InterlockedOr(_Control[2],4); return; }
+    uint block = _Free[_Control[3] + ordinal];
+    if(block >= (uint)_Capacity) { InterlockedOr(_Control[2],4); return; }
+    _Maps[_PendingBase + id] = block;
+}
+void Store(uint field, uint block, uint local, float4 value)
+{
+    uint address = _Maps[_PendingBase + field * BlocksPerField() + block];
+    if(address == Empty) return;
+    if(address >= (uint)_Capacity) { InterlockedOr(_Control[2],4); return; }
+    _Payload[address * 64 + local] = Pack(value);
+}
+[numthreads(4,4,4)]
+void PackFields(uint3 id : SV_DispatchThreadID, uint3 group : SV_GroupID, uint local : SV_GroupIndex)
+{
+    if(_Control[2] != 0) return;
+    uint block = Block(group);
+    Store(0,block,local,_ColourIn.Load(int4(id,0))); Store(1,block,local,_OriginIn.Load(int4(id,0))); Store(2,block,local,_SurfaceIn.Load(int4(id,0)));
+}
+[numthreads(1,1,1)]
+void CheckPacking(uint id : SV_DispatchThreadID)
+{
+    // Fault injection is confined to this private test shader.
+    if(_InjectPackFailure != 0) _Control[2] |= 8;
+}
+[numthreads(4,4,4)]
+void CommitVelocity(uint3 id : SV_DispatchThreadID)
+{
+    if(_Control[2] == 0) _OwnerVelocity[id] = _NextVelocity.Load(int4(id,0));
+}
+[numthreads(64,1,1)]
+void CommitLedger(uint id : SV_DispatchThreadID)
+{
+    if(id >= 1024 || _Control[2] != 0) return;
+    _OwnerAway[id] = _StageAway[id]; _OwnerPeak[id] = _StagePeak[id];
+    if(id == 0) _OwnerState[0] = _StageState[0];
+}
+[numthreads(4,4,4)]
+void PublishFields(uint3 id : SV_DispatchThreadID)
+{
+    if(any(id >= (uint3)(_Grid + 2)) || _Control[2] != 0) return;
+    int3 source = clamp((int3)id - 1,0,_Grid - 1);
+    uint3 target = id + (uint3)_RenderOffset;
+    _PublishedSmoke[target] = _ColourIn.Load(int4(source,0)); _PublishedSurface[target] = _SurfaceIn.Load(int4(source,0));
+}
+[numthreads(64,1,1)]
+void CommitMaps(uint id : SV_DispatchThreadID)
+{
+    if(id >= (uint)_MapWords || _Control[2] != 0) return;
+    uint old = _Maps[_CurrentBase + id];
+    if(old != Empty) { uint index; InterlockedAdd(_Control[0],1,index); _Free[index] = old; }
+    _Maps[_CurrentBase + id] = Empty;
+}
+[numthreads(1,1,1)]
+void FinishStep(uint id : SV_DispatchThreadID)
+{
+    // No other reservation runs between ReserveBlocks and this dispatch.
+    if(_Control[2] != 0) _Control[0] += _Control[4];
+    uint base = _Slot * 16;
+    _Receipts[base] = _OwnerBits.x; _Receipts[base+1] = _OwnerBits.y;
+    _Receipts[base+2] = _GenerationBits.x; _Receipts[base+3] = _GenerationBits.y;
+    _Receipts[base+4] = _SequenceBits.x; _Receipts[base+5] = _SequenceBits.y;
+    _Receipts[base+6] = _Tick; _Receipts[base+7] = _EmissionRevision; _Receipts[base+8] = _Control[2];
+    _Receipts[base+9] = _PendingBase; _Receipts[base+10] = _Control[0]; _Receipts[base+11] = _Control[1];
+    for(uint i = 12; i < 16; ++i) _Receipts[base+i] = 0;
+}
+float4 Load(uint field, uint block, uint local)
+{
+    uint address = _Maps[_CurrentBase + field * BlocksPerField() + block];
+    if(address == Empty) return 0;
+    if(address >= (uint)_Capacity) { InterlockedOr(_Control[2],4); return 0; }
+    return Unpack(_Payload[address * 64 + local]);
+}
+[numthreads(4,4,4)]
+void RestoreFields(uint3 id : SV_DispatchThreadID, uint3 group : SV_GroupID, uint local : SV_GroupIndex)
+{
+    uint block = Block(group);
+    _ColourOut[id] = Load(0,block,local); _OriginOut[id] = Load(1,block,local); _SurfaceOut[id] = Load(2,block,local);
+}
+[numthreads(64,1,1)]
+void ReleaseCurrent(uint id : SV_DispatchThreadID)
+{
+    if(id >= (uint)_MapWords) return;
+    uint old = _Maps[_CurrentBase + id];
+    if(old != Empty)
+    {
+        if(old >= (uint)_Capacity) { InterlockedOr(_Control[2],4); return; }
+        uint index; InterlockedAdd(_Control[0],1,index);
+        if(index >= (uint)_Capacity) { InterlockedOr(_Control[2],4); return; }
+        _Free[index] = old;
+    }
+    _Maps[_CurrentBase + id] = Empty;
+}
+[numthreads(64,1,1)]
+void ClearOwnerMaps(uint id : SV_DispatchThreadID)
+{
+    if(id >= (uint)_MapWords) return;
+    _Maps[_CurrentBase + id] = Empty; _Maps[_PendingBase + id] = Empty;
+}

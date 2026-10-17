@@ -79,6 +79,14 @@ Local receipts: `artifacts/fog-sparse-213/shared/verification.json`, `sources.js
 
 CPU readback/allocation every tick is measurement-only; its elapsed wall time is not a GPU timing. After storage, verify the shared workspace, sample/gutters/slot reuse, camera/geometry order, rotated pieces, owner removal and the house; separately measure all allocations/staging and GPU time.
 
+### CPU confirmation for the next step
+
+CPU confirmation control is implemented in `BlueprintFogSnapshotState`: owner/generation/sequence/tick/revision, no resubmit/recovery before confirmation, retirement/late replies and uncertain readback. All128 CPU test groups, normal/QA builds0/0 and independent PASSED/Ship passed. This controller is **not connected** to simulation yet: fixed GPU pool, commit kernels, input queue and renderer remain open; installed .213 is unchanged.
+
+Astra selected a fixed shared4³ GPU block pool, two maps per owner, staging ledger and asynchronous receipts. Reserve the whole request before modifying the free stack; a rejected step must retain encoded state/velocity/ledger/clock/render slot. A readback error after a possible commit does not prove rollback: hold the owner until safe whole-pool teardown. Draining the GPU queue alone cannot authorize freeing blocks with unknown ownership.
+
+The CPU implementation accounts for declared logical resources:8 owners/24860 blocks98303700 bytes; one extra block exceeds98304000. Rounded24576 blocks98157156, reserve146844 bytes; driver/readback staging, source and atlas are excluded. This is sizing, **not actual GPU allocations**. A test-only CPU oracle covers a one-block shortage, successful commit and packing rollback, neighbor preservation and1000 leak/duplicate-free cycles. GPU reservation/commit kernels are not written; this code does not replace the current solver. Local receipt: `artifacts/fog-sparse-213/snapshot-verification.json`.
+
 Source/anchor/admission must separately inspect actual triangles and pivots: do not replace the wall source with compact bake or apply global scaling. The per-piece YZ ledger still needs a separate spatial fix preserving the wall oracle and checking return normalization. Sparse storage does not eliminate the expensive owner-loop raymarch or prove FPS. Roof, native/owner acceptance and durable board remain open.
 
 Local CPU proof: `artifacts/fog-full-domain-plan-213/Check-Layout.ps1` and `layout.json`. GPU experiments have ended; Ostrix resumed playing another profile. Continue source/calculation work without game/GPU execution. Runtime .213 is unchanged.

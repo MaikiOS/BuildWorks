@@ -29,10 +29,34 @@ The local original handoff is `artifacts/fog-ghost-study/wall-11/HANDOFF_BUILDWO
 
 ## Current result
 
-[.210 shared scratch and native traversal](FOG_SCRATCH_210.md). Memory passes the tested route; performance and the durable board remain unfinished.
+[.213 shared noise frame](FOG_NOISE_FRAME_213.md) is checked and installed. The native .212 technical route passed, but Ostrix rejected dissolution/recovery and reported stutter. This is not v11 acceptance; native .213 remains untested.
 
-[.211 cache and dormant zero fields](FOG_RENDER_CACHE_211.md):10 exact RGB comparisons preserve v11 on control frames. Installed; native shader49/25/48 FPS with frozen simulation. Owner passage triggers recovery-readback failure and removes the house; fix/stable preview required before the board.
+### Why the smaller field did not retain the effect
 
-[.212 GPU reply lifetime](FOG_RECOVERY_212.md) is fixed after real cross-frame reproduction;24 PlayMode frames passed. Native .212: the28-part house passed both ways,35/35 steps in44s; contact6/8 owners, both recoveries0/0 bytes, peak87408640; inventory unchanged, no errors. Owner rejected the .212 appearance: dissolution/recovery differs from v11 and passage stutters. Visual integration is BLOCKED. Durable board remains open. The v11 bundle is unchanged.
+The Unity control uses identical source density, noise, seed, body, path, time and physical voxel spacing. A private compute copy changes only the absorption-edge expression. Its full-domain control matches all four runtime fields plus away/peak/state at12 capture times. Runtime shaders and installed .213 are unchanged.
 
-.213: [shared building noise frame](FOG_NOISE_FRAME_213.md) passed GPU/regressions/contracts/independent PASSED/Ship and is installed;143 files unchanged. SHA `3421595F8757AE894D7A262AC32BA6BD72B8180E12971C71C12E2F4D3D0BC4A8`. Native .213 is untested. Domain, YZ ownership, FPS/roof and durable board remain open.
+Volume-weighted smoke alpha at tick165:
+
+| Storage domain | Absorption boundary | Value |
+| --- | --- | --- |
+| Full | Full | 1.025640 |
+| Cropped | Cropped | 0.577369 |
+| Full | Cropped | 0.577870 |
+| Cropped | Full | 0.989743 |
+
+Inference for this route: premature absorption dominates the early difference; physical outflow alone does not explain it. Decoupling absorption still leaves differences: tick240 residue is0.068365 versus0.045331, with changed surface fields and return accounting. This alpha sum is a diagnostic, not proof of physical mass conservation.
+
+One bounded halo sweep retained voxel spacing and grid phase:
+
+| Grid | Smoke tick165 | Maximum surface-field difference tick165 | Fields for8 identical active sources + one scratch, bytes |
+| --- | --- | --- | --- |
+| 48×56×72 | 0.989743 | 0.164001 | 58834944 |
+| 64×72×80 | 1.024990 | 0.149597 | 112066560 |
+| 80×80×80 | 1.025927 | 0.053894 | 155648000 |
+| 96×80×80 | 1.025640 | 0 | 186777600 |
+
+A close total hides local differences. Only the full control retained exact state; this is an engineering check, not an owner-approved visual tolerance. The98304000-byte field limit is unchanged. These hypothetical identical-grid estimates exclude atlas/source costs; they are **not** an actual28-part layout check or proof that every other padding arrangement is impossible.
+
+Next: bounded shared spatial state retaining the full v11 physical domain and correct spatial return ownership. First prove the wall, rotated surfaces, seam, cleanup and budget; then attach it to the house. Do not ship larger per-part fields based on a similar alpha sum. YZ ledger, FPS/roof, native/owner acceptance and the durable board remain open.
+
+Local receipts: `artifacts/fog-boundary-213/sweep.json`, `sources.json`, `guard-verification.json`; nine corrupt receipts were rejected. Independent reading PASSED, separate Ponytail Ship; redundant GPU reads removed. No new game test, resource/save mutation or public release.

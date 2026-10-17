@@ -46,10 +46,16 @@ namespace OstrixMods.BuildWorks
         private long captureId;
         private int releaseFrame = -1;
         private BuildWorksTestFog fog;
+        private float manualFogUntil;
 
         public string StartFogVisual() => BeginFogVisual(false);
         public string StartFogPair() => BeginFogVisual(true);
         public string StartFogHouse(string blueprintId) => BeginFogVisual(false, blueprintId);
+        public string StartFogHouseManual(string blueprintId)
+        {
+            string result = StartFogHouse(blueprintId); manualFogUntil = Time.realtimeSinceStartup + 300;
+            return result + "-manual-300-seconds";
+        }
         private string BeginFogVisual(bool pair, string blueprintId = null)
         {
             player = BuildWorksTestIsolation.RequireLoadedSession(); network = ZNet.instance;
@@ -68,7 +74,7 @@ namespace OstrixMods.BuildWorks
 
         public string CloseFogVisual()
         {
-            BuildWorksTestFog retired = fog; fog = null;
+            BuildWorksTestFog retired = fog; fog = null; manualFogUntil = 0;
             if (retired) DestroyImmediate(retired);
             return "fog-v11-native-visual-closed";
         }
@@ -184,6 +190,7 @@ namespace OstrixMods.BuildWorks
             if (directory == null) return;
             try
             {
+                if (manualFogUntil > 0 && (!fog || Time.realtimeSinceStartup >= manualFogUntil)) CloseFogVisual();
                 if (UnityEngine.Input.GetKeyDown(KeyCode.F12) || File.Exists(PathFor("stop.flag")))
                 {
                     Stop("Emergency stop.");
@@ -393,9 +400,9 @@ namespace OstrixMods.BuildWorks
             }
         }
 
-        internal void Stop(string reason)
+        internal void Stop(string reason, bool preserveManualVisual = false)
         {
-            try { CloseFogVisual(); }
+            try { if (!preserveManualVisual || Time.realtimeSinceStartup >= manualFogUntil) CloseFogVisual(); }
             catch (Exception error) { Debug.LogError("Fog QA cleanup failed; continuing input release: " + error.Message); }
             try { GetComponent<BuildWorksTestStorage>()?.Cancel(reason); }
             catch (Exception error) { Debug.LogError("Storage QA cancellation failed; continuing input release: " + error.Message); }
@@ -419,8 +426,8 @@ namespace OstrixMods.BuildWorks
             }
             catch (Exception error) { Debug.LogError("BuildWorks QA input released; stop receipt failed: " + error.Message); }
         }
-        private void OnApplicationFocus(bool focused) { if (!focused) Stop("Focus lost."); }
-        private void OnApplicationPause(bool paused) { if (paused) Stop("Application paused."); }
+        private void OnApplicationFocus(bool focused) { if (!focused) Stop("Focus lost.", true); }
+        private void OnApplicationPause(bool paused) { if (paused) Stop("Application paused.", true); }
         private void OnDisable() { InputSystem.onAfterUpdate -= AfterInput; Stop("QA control disabled."); }
         private void OnDestroy() { InputSystem.onAfterUpdate -= AfterInput; Stop("QA control destroyed."); }
     }

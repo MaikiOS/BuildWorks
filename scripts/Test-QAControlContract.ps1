@@ -128,6 +128,39 @@ try {
         Require ((Calls $control $name) -match 'BuildWorksQaControl::Stop') "Missing release lifecycle: $name"
     }
     Require ((Calls $control 'Stop') -match 'BuildWorksQaInput::Release') 'Stop does not release input.'
+    $manual = @($control.Methods | Where-Object Name -eq 'StartFogHouseManual')[0]
+    Require ($null -ne $manual -and (Calls $control 'StartFogHouseManual') -match 'BuildWorksQaControl::StartFogHouse' -and
+        @($manual.Body.Instructions | Where-Object { $_.OpCode.Code -eq [Mono.Cecil.Cil.Code]::Ldc_R4 -and $_.Operand -eq 300 }).Count -eq 1 -and
+        (Calls $control 'StartFogHouseManual') -match 'get_realtimeSinceStartup' -and
+        (Calls $control 'CloseFogVisual') -match 'manualFogUntil' -and
+        (Calls $control 'Update') -match 'manualFogUntil') 'Manual visual is not isolated, bounded and cleared.'
+    $requireManualFogFlags = {
+    foreach ($name in 'OnApplicationFocus','OnApplicationPause','OnDisable','OnDestroy') {
+        $method = @($control.Methods | Where-Object Name -eq $name)[0]
+        $stopCall = @($method.Body.Instructions | Where-Object { $_.OpCode.Code -in @([Mono.Cecil.Cil.Code]::Call,[Mono.Cecil.Cil.Code]::Callvirt) -and $_.Operand.Name -eq 'Stop' })[0]
+        $expected = if ($name -in @('OnApplicationFocus','OnApplicationPause')) { [Mono.Cecil.Cil.Code]::Ldc_I4_1 } else { [Mono.Cecil.Cil.Code]::Ldc_I4_0 }
+        Require ($stopCall.Previous.OpCode.Code -eq $expected) "Manual visual/input lifecycle flag differs: $name"
+    }
+    }
+    & $requireManualFogFlags
+    $focus = @($control.Methods | Where-Object Name -eq 'OnApplicationFocus')[0]
+    $flag = @($focus.Body.Instructions | Where-Object { $_.OpCode.Code -in @([Mono.Cecil.Cil.Code]::Call,[Mono.Cecil.Cil.Code]::Callvirt) -and $_.Operand.Name -eq 'Stop' })[0].Previous
+    $originalFlag = $flag.OpCode
+    try {
+        $flag.OpCode = [Mono.Cecil.Cil.OpCodes]::Ldc_I4_0
+        $rejected = $false
+        try { & $requireManualFogFlags } catch {
+            if ($_.Exception.Message -cne 'Manual visual/input lifecycle flag differs: OnApplicationFocus') { throw }
+            $rejected = $true
+        }
+        Require $rejected 'Manual visual lifecycle accepted a disconnected focus flag.'
+    } finally { $flag.OpCode = $originalFlag }
+    foreach ($call in @($control.Methods | Where-Object Name -eq 'Update')[0].Body.Instructions |
+        Where-Object { $_.OpCode.Code -in @([Mono.Cecil.Cil.Code]::Call,[Mono.Cecil.Cil.Code]::Callvirt) -and $_.Operand.Name -eq 'Stop' }) {
+        Require ($call.Previous.OpCode.Code -eq [Mono.Cecil.Cil.Code]::Ldc_I4_0) 'Emergency/protocol stop unexpectedly preserves manual visual.'
+    }
+    'PASS compiled manual visual: explicit QA-only 300-second deadline; focus/pause retain visual, disable/destroy/emergency close it; existing input release remains required. Not runtime acceptance.'
+
     $revisionStores = @($control.Methods | Where-Object Name -eq 'Stop' | ForEach-Object { $_.Body.Instructions } |
         Where-Object { $_.OpCode.Code -eq [Mono.Cecil.Cil.Code]::Stfld -and $_.Operand.Name -eq 'stopRevision' })
     Require ($revisionStores.Count -eq 1) 'Idle emergency stop does not invalidate local model decisions.'

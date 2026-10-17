@@ -2,7 +2,7 @@
 
 [Русский](FOG_V11_INTEGRATION_RU.md) · [Current evidence](CURRENT_STATUS.md) · [Next milestones](ROADMAP.md)
 
-Source/QA .211 embeds an owned Linear shader/compute bundle with3 assets/8 kernels. The approved v11 source/archive is frozen locally; extracted vanilla assets are never redistributed. Native prefabs/textures are resolved from the host.
+Source/QA .212 embeds an owned Linear shader/compute bundle with3 assets/8 kernels. The approved v11 source/archive is frozen locally; extracted vanilla assets are never redistributed. Native prefabs/textures are resolved from the host.
 
 Implemented:source baking, capsule-driven deformation, independent owners, compact fields and shared GPU atlas. .210 adds exact-grid shared scratch:the actual28-part house passed both-way traversal/standing/exit, recovery0, peak87408640. Volume speed (down to8 FPS)/full roof appearance, multiple players and durable construction remain open. [Exact .210 evidence](FOG_SCRATCH_210.md).
 
@@ -32,3 +32,5 @@ The local original handoff is `artifacts/fog-ghost-study/wall-11/HANDOFF_BUILDWO
 [.210 shared scratch and native traversal](FOG_SCRATCH_210.md). Memory passes the tested route; performance and the durable board remain unfinished.
 
 [.211 cache and dormant zero fields](FOG_RENDER_CACHE_211.md):10 exact RGB comparisons preserve v11 on control frames. Installed; native shader49/25/48 FPS with frozen simulation. Owner passage triggers recovery-readback failure and removes the house; fix/stable preview required before the board.
+
+[.212 GPU reply lifetime](FOG_RECOVERY_212.md) is fixed after real cross-frame reproduction;24 PlayMode frames passed. QA installed; native passage/owner inspection and durable board remain unaccepted. The v11 bundle is unchanged.

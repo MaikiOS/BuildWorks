@@ -27,7 +27,8 @@ namespace OstrixMods.BuildWorks
         private bool disposed, faulted;
         private AsyncGPUReadbackRequest recoveryRequest;
         private bool recoveryPending, observedRecovery;
-        private int emissionRevision, requestedRevision, observedRevision;
+        private int emissionRevision, observedRevision;
+        private string recoveryFailure;
         internal RenderTexture Smoke => colour[current];
         internal RenderTexture Flow => velocity[current];
         internal RenderTexture Surface => surface[current];
@@ -156,19 +157,28 @@ namespace OstrixMods.BuildWorks
         {
             if (disposed) throw new ObjectDisposedException(nameof(BlueprintFogSimulation));
             if (faulted) throw new InvalidOperationException("Uncertain fog step cannot authorize recovery.");
-            if (recoveryPending && recoveryRequest.done)
-            {
-                recoveryPending = false;
-                if (recoveryRequest.hasError) throw new InvalidOperationException("Fog recovery readback failed; retain its owner.");
-                var flags = recoveryRequest.GetData<uint>();
-                if (flags.Length != 1) throw new InvalidOperationException("Incomplete fog recovery state.");
-                observedRecovery = flags[0] == 0; observedRevision = requestedRevision;
-            }
+            if (recoveryFailure != null) throw new InvalidOperationException(recoveryFailure);
             if (observedRecovery && observedRevision == emissionRevision) return true;
             if (!recoveryPending)
             {
-                requestedRevision = emissionRevision;
-                recoveryRequest = AsyncGPUReadback.Request(state); recoveryPending = true;
+                int revision = emissionRevision; recoveryPending = true;
+                try
+                {
+                    recoveryRequest = AsyncGPUReadback.Request(state, request => {
+                        if (disposed) return;
+                        recoveryPending = false;
+                        try
+                        {
+                            if (request.hasError) throw new InvalidOperationException("Fog recovery readback failed; retain its owner.");
+                            // Unity keeps the returned data for one frame; copy it before polling resumes after contact.
+                            var flags = request.GetData<uint>();
+                            if (flags.Length != 1) throw new InvalidOperationException("Incomplete fog recovery state.");
+                            observedRecovery = flags[0] == 0; observedRevision = revision;
+                        }
+                        catch (Exception error) { recoveryFailure = error.Message; }
+                    });
+                }
+                catch { recoveryPending = false; throw; }
             }
             return false;
         }

@@ -3,6 +3,7 @@ using System.Collections;
 using System.IO;
 using System.Reflection;
 using OstrixMods.BuildWorks;
+using OstrixMods.BuildWorks.Geometry;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -87,10 +88,79 @@ public static class FogRuntimeRecoveryCheck
                 try { simulation.TryGetRecovered(); } catch (ObjectDisposedException) { rejected = true; }
                 Require(rejected, "Pending callback resurrected a disposed simulation");
             }
-            int frames = Time.frameCount - firstFrame; Require(frames >= 24, "Recovery check did not advance real player frames");
+            using (var assets = new BlueprintFogAssets(File.ReadAllBytes(Path.Combine(root, "artifacts/fog-runtime-assets-candidate/buildworks-fog-v11"))))
+            using (var pool = BlueprintFogChannels.CreateArena(assets, 1, 8192))
+            {
+                BlueprintFogInputQueue.Sample Sample(float clock) => new BlueprintFogInputQueue.Sample(clock, new Point3(0, 0, 0), .3f, .95f, true, true, true);
+                BlueprintFogChannels.SnapshotChannel Acquire() => pool.AcquireSnapshot(0, Sample(0), (scratch, staged) =>
+                    new BlueprintFogSimulation(assets, shape, pigment, noise, new Vector3(-1.2f, -.2f, -1.215f), new Vector3(1.2f, 2.35f, 1.215f),
+                        new Vector3(-1, 0, -1), new Vector3(1, 2, 1), Vector3.zero, 37, scratch: scratch, stagedState: staged));
+                var owner = Acquire();
+                pool.SnapshotArena.Buffers["_StageState"].SetData(new[] { 3u });
+                Require(!pool.TryGetRecoveredSnapshot(owner), "Snapshot recovery skipped GPU confirmation");
+                var expired = owner.recoveryRequest;
+                AsyncGPUReadback.WaitAllRequests();
+                for (int frame = 0; frame < 6; ++frame) yield return null;
+                Require(expired.done && expired.hasError && pool.TryGetRecoveredSnapshot(owner), "Committed recovery used expired handle or neighbour workspace");
+
+                pool.CaptureSnapshot(owner, Sample(.105f));
+                Require(!pool.TryGetRecoveredSnapshot(owner), "Accepted input reused old recovery");
+                pool.TrySubmitSnapshot(owner, out var token);
+                Require(!pool.TryGetRecoveredSnapshot(owner), "Pending commit reused old recovery");
+                AsyncGPUReadback.WaitAllRequests(); pool.PollSnapshots();
+                Require(!pool.TryGetRecoveredSnapshot(owner), "New commit reused old recovery");
+                var old = owner.recoveryStamp;
+                pool.CaptureSnapshot(owner, Sample(.21f)); pool.TrySubmitSnapshot(owner, out token);
+                AsyncGPUReadback.WaitAllRequests(); pool.PollSnapshots();
+                for (int frame = 0; frame < 6; ++frame) yield return null;
+                Require(!pool.TryGetRecoveredSnapshot(owner), "In-flight recovery authorized a newer committed sequence");
+                owner.ReceiveRecovery(old, 0);
+                Require(!owner.recoveryReceived, "Stale recovery callback changed current request");
+                AsyncGPUReadback.WaitAllRequests();
+                for (int frame = 0; frame < 6; ++frame) yield return null;
+                Require(pool.TryGetRecoveredSnapshot(owner), "Fresh snapshot recovery lost its copied result");
+
+                pool.CaptureSnapshot(owner, Sample(.315f)); pool.TrySubmitSnapshot(owner, out token);
+                AsyncGPUReadback.WaitAllRequests(); pool.PollSnapshots();
+                Require(!pool.TryGetRecoveredSnapshot(owner), "Retirement case did not start readback");
+                pool.RetireSnapshot(owner);
+                Require(!pool.TryReleaseSnapshot(owner) && pool.Count == 1, "Retirement freed a ledger referenced by readback");
+                AsyncGPUReadback.WaitAllRequests();
+                Require(!pool.TryReleaseSnapshot(owner), "GPU release skipped confirmation after recovery");
+                AsyncGPUReadback.WaitAllRequests(); Require(pool.TryReleaseSnapshot(owner), "Recovered owner release failed");
+                var fresh = Acquire(); owner.ReceiveRecovery(old, 0);
+                Require(fresh.Generation != owner.Generation && !pool.TryGetRecoveredSnapshot(fresh), "Reused generation inherited recovery");
+                AsyncGPUReadback.WaitAllRequests();
+                foreach (uint flags in new[] { 1u, 2u })
+                {
+                    fresh.Ledger[2].SetData(new[] { flags });
+                    pool.CaptureSnapshot(fresh, Sample(flags * .001f)); pool.TrySubmitSnapshot(fresh, out token);
+                    AsyncGPUReadback.WaitAllRequests(); pool.PollSnapshots();
+                    Require(!pool.TryGetRecoveredSnapshot(fresh), "New sequence reused empty recovery");
+                    AsyncGPUReadback.WaitAllRequests();
+                    Require(!pool.TryGetRecoveredSnapshot(fresh) && fresh.Velocity, "Smoke-only or surface-only owner was released");
+                }
+                fresh.Ledger[2].SetData(new[] { 0u });
+                pool.CaptureSnapshot(fresh, Sample(.003f)); pool.TrySubmitSnapshot(fresh, out token);
+                AsyncGPUReadback.WaitAllRequests(); pool.PollSnapshots();
+                Require(!pool.TryGetRecoveredSnapshot(fresh), "Failure case did not request recovery");
+                fresh.ReceiveRecovery(fresh.recoveryStamp, null); AsyncGPUReadback.WaitAllRequests();
+                Require(!pool.TryGetRecoveredSnapshot(fresh) && !pool.RequiresSnapshotTeardown && fresh.Velocity,
+                    "Failed recovery inferred success or damaged neighbour allocator");
+                pool.CaptureSnapshot(fresh, Sample(.004f)); pool.TrySubmitSnapshot(fresh, out token);
+                AsyncGPUReadback.WaitAllRequests(); pool.PollSnapshots();
+                Require(!pool.TryGetRecoveredSnapshot(fresh), "Dispose case did not request recovery");
+                pool.Dispose();
+                for (int frame = 0; frame < 6; ++frame) yield return null;
+                Require(!fresh.Velocity && pool.Count == 0, "Pending recovery disposal leaked resources");
+            }
+            int frames = Time.frameCount - firstFrame; Require(frames >= 48, "Recovery check did not advance real player frames");
             File.WriteAllText(Path.Combine(output, "verification.json"), JsonUtility.ToJson(new Report {
                 passed = true, expiredHandleObserved = true, delayedReadbackRetained = true,
-                staleRecoveryRejected = true, pendingDisposeSafe = true, frames = frames, gameHostTested = false }, true));
+                staleRecoveryRejected = true, pendingDisposeSafe = true, snapshotRecoveryValidated = true,
+                snapshotWorkspaceIsolated = true, snapshotGenerationReuse = true, snapshotPendingRetirement = true,
+                snapshotSmokeAndSurfaceRetained = true, snapshotReadbackFailureRetained = true,
+                frames = frames, gameHostTested = false }, true));
         }
         finally
         {
@@ -102,6 +172,8 @@ public static class FogRuntimeRecoveryCheck
     [Serializable] private sealed class Report
     {
         public bool passed, expiredHandleObserved, delayedReadbackRetained, staleRecoveryRejected, pendingDisposeSafe, gameHostTested;
+        public bool snapshotRecoveryValidated, snapshotWorkspaceIsolated, snapshotGenerationReuse, snapshotPendingRetirement;
+        public bool snapshotSmokeAndSurfaceRetained, snapshotReadbackFailureRetained;
         public int frames;
     }
 }

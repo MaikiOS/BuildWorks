@@ -28,6 +28,10 @@ namespace OstrixMods.BuildWorks
             internal bool releasePending, releaseReceived;
             internal uint[] releaseReply;
             internal AsyncGPUReadbackRequest request;
+            internal AsyncGPUReadbackRequest recoveryRequest;
+            internal bool recoveryNativePending, recoveryReceived;
+            internal uint? recoveryFlags;
+            internal BlueprintFogSnapshotState.Submission recoveryStamp;
 
             internal SnapshotChannel(int slot, long identity, long generation, BlueprintFogInputQueue.Sample initial)
             {
@@ -54,7 +58,12 @@ namespace OstrixMods.BuildWorks
                 if (released || !releasePending || releaseReceived) return;
                 releaseReply = words == null ? null : (uint[])words.Clone(); releaseReceived = true;
             }
-            private static bool Same(BlueprintFogSnapshotState.Submission a, BlueprintFogSnapshotState.Submission b)
+            internal void ReceiveRecovery(BlueprintFogSnapshotState.Submission stamp, uint? flags)
+            {
+                if (released || recoveryReceived || !Same(stamp, recoveryStamp)) return;
+                recoveryFlags = flags; recoveryReceived = true;
+            }
+            internal static bool Same(BlueprintFogSnapshotState.Submission a, BlueprintFogSnapshotState.Submission b)
                 => a.Owner == b.Owner && a.Generation == b.Generation && a.Sequence == b.Sequence && a.Tick == b.Tick && a.EmissionRevision == b.EmissionRevision;
             internal void Release()
             {
@@ -222,11 +231,39 @@ namespace OstrixMods.BuildWorks
             return complete;
         }
 
+        internal bool TryGetRecoveredSnapshot(SnapshotChannel owner)
+        {
+            RequireOwner(owner);
+            if (snapshotTeardown || !owner.Inputs.CanRecover(owner.State.ConfirmedEmissionRevision)) return false;
+            if (owner.recoveryReceived && SnapshotChannel.Same(owner.recoveryStamp, owner.LastSubmission))
+                return owner.recoveryFlags == 0;
+            if (owner.recoveryNativePending) return false;
+            var stamp = owner.LastSubmission;
+            owner.recoveryStamp = stamp; owner.recoveryReceived = false; owner.recoveryFlags = null;
+            owner.recoveryNativePending = true;
+            try
+            {
+                // Read the committed owner's ledger, never the workspace most recently borrowed by a neighbour.
+                owner.recoveryRequest = AsyncGPUReadback.Request(owner.Ledger[2], request => {
+                    try
+                    {
+                        if (request.hasError) { owner.ReceiveRecovery(stamp, null); return; }
+                        var data = request.GetData<uint>();
+                        owner.ReceiveRecovery(stamp, data.Length == 1 && (data[0] & ~3u) == 0 ? (uint?)data[0] : null);
+                    }
+                    catch { owner.ReceiveRecovery(stamp, null); }
+                    finally { owner.recoveryNativePending = false; }
+                });
+            }
+            catch { owner.recoveryNativePending = false; owner.ReceiveRecovery(stamp, null); throw; }
+            return false;
+        }
+
         internal void RetireSnapshot(SnapshotChannel owner) { RequireOwner(owner); owner.State.Retire(); }
         internal bool TryReleaseSnapshot(SnapshotChannel owner)
         {
             RequireOwner(owner);
-            if (snapshotTeardown || owner.nativePending || !owner.State.CanReleaseResources) return false;
+            if (snapshotTeardown || owner.nativePending || owner.recoveryNativePending || !owner.State.CanReleaseResources) return false;
             if (owner.releasePending)
             {
                 if (!owner.releaseReceived) return false;
@@ -283,6 +320,7 @@ namespace OstrixMods.BuildWorks
             disposed = true;
             foreach (var owner in snapshotSlots) if (owner != null) owner.State.Retire();
             foreach (var owner in snapshotSlots) if (owner != null && owner.nativePending) owner.request.WaitForCompletion();
+            foreach (var owner in snapshotSlots) if (owner != null && owner.recoveryNativePending) owner.recoveryRequest.WaitForCompletion();
             // Also fences a dispatch that failed before its receipt request was created.
             var barrier = AsyncGPUReadback.Request(arena.Buffers["_Control"]); barrier.WaitForCompletion();
             if (barrier.hasError) throw new InvalidOperationException("Fog pool GPU drain was not confirmed; resources retained for retry.");

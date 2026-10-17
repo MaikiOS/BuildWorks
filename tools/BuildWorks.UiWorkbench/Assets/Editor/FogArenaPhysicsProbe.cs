@@ -45,6 +45,7 @@ public static class FogArenaPhysicsProbe
                     }
                     test.Wait(); test.CheckAll((batch + 1) % 20 == 0);
                 }
+                test.CheckRecovery();
                 test.RefreshMetadata(0, 360 * BlueprintFogSimulation.Step + .014f);
                 // Candidate CPU history is speculative on rejection; never reuse it to retry automatically.
                 test.Send(0, 368, true); test.Send(1, 368); test.Wait(); test.CheckAll(true);
@@ -63,13 +64,28 @@ public static class FogArenaPhysicsProbe
                 shortage.CheckAll(true);
                 fields += shortage.Fields; ledgers += shortage.Ledgers; atlases += shortage.Atlases; committed += shortage.Committed; rejected += shortage.Rejected; metadataChecks += shortage.MetadataChecks;
             }
+            int recoveryTicks = 0; bool activeObserved = false, recoveredObserved = false;
+            using (var recovery = new Probe(assets, source, body, 8192, codec))
+            {
+                for (int tick = 8; tick <= 1800; tick += 8)
+                {
+                    recovery.Send(0, tick); recovery.Send(1, tick); recovery.Wait();
+                    if (tick % 120 != 0) continue;
+                    var flags = recovery.CheckRecovery();
+                    activeObserved |= flags.Any(value => value != 0);
+                    if (activeObserved && flags.All(value => value == 0))
+                    { recoveryTicks = tick; recoveredObserved = true; recovery.CheckAll(true); break; }
+                }
+            }
+            Require(activeObserved && recoveredObserved, "Real wall smoke/deformation never completed committed recovery after leaving.");
             Require(metadataChecks == committed + rejected, "Metadata publication coverage incomplete.");
             File.WriteAllText(Path.Combine(output, "verification.json"), JsonUtility.ToJson(new Report {
                 passed = true, gridX = 96, gridY = 80, gridZ = 80, owners = 2, ticks = 360,
                 fieldComparisons = fields, ledgerComparisons = ledgers, atlasComparisons = atlases,
                 committed = committed, rejected = rejected, metadataComparisons = metadataChecks,
                 metadataBeforeReceipt = true, metadataOnlyTested = true, fractionalVisualClock = true, borrowedOwnershipValidated = true, borrowedInvalidCases = 11, runtimeArenaValidated = true,
-                runtimeChannelsValidated = true, runtimeLifecycleCases = lifecycleCases,
+                runtimeChannelsValidated = true, runtimeLifecycleCases = lifecycleCases, committedRecoveryComparisons = 2,
+                physicalRecoveryObservedActive = activeObserved, physicalRecoveryCompleted = recoveredObserved, physicalRecoveryTicks = recoveryTicks,
                 realSolver = true, stagedLedger = true, velocityAlias = true,
                 packingRollback = true, shortageRollback = true, callbackWaitsInFixture = true,
                 productionAllocatorTested = false, wholeHouseSupported = false, gameHostTested = false, gpuTimingsMeasured = false,
@@ -204,6 +220,19 @@ public static class FogArenaPhysicsProbe
             return new BlueprintFogInputQueue.Sample(clock, new Point3(actor.x, actor.y, actor.z), body.x, body.y, true, true, true);
         }
         internal void Capture(int slot, BlueprintFogInputQueue.Sample sample) => pool.CaptureSnapshot(owners[slot], sample);
+        internal uint[] CheckRecovery()
+        {
+            foreach (var owner in owners) Require(!pool.TryGetRecoveredSnapshot(owner), "Committed recovery skipped its readback.");
+            AsyncGPUReadback.WaitAllRequests();
+            var flags = new uint[Owners];
+            foreach (var owner in owners)
+            {
+                var state = new uint[1]; owner.Ledger[2].GetData(state);
+                Require(pool.TryGetRecoveredSnapshot(owner) == (state[0] == 0), "Recovery differs from real v11 committed smoke/deformation.");
+                flags[owner.Slot] = state[0];
+            }
+            return flags;
+        }
         internal BlueprintFogInputQueue InputQueue(int slot) => owners[slot].Inputs;
         internal BlueprintFogSnapshotState.Submission Send(int slot, int tick, bool inject = false,
             BlueprintFogInputQueue input = null, bool holdConfirmation = false)
@@ -349,8 +378,9 @@ public static class FogArenaPhysicsProbe
     {
         public bool passed, realSolver, stagedLedger, velocityAlias, packingRollback, shortageRollback, callbackWaitsInFixture,
             metadataBeforeReceipt, metadataOnlyTested, fractionalVisualClock, borrowedOwnershipValidated, runtimeArenaValidated, runtimeChannelsValidated,
-            productionAllocatorTested, wholeHouseSupported, gameHostTested, gpuTimingsMeasured;
-        public int borrowedInvalidCases, runtimeLifecycleCases, gridX, gridY, gridZ, owners, ticks, fieldComparisons, ledgerComparisons, atlasComparisons, committed, rejected, metadataComparisons;
+            productionAllocatorTested, wholeHouseSupported, gameHostTested, gpuTimingsMeasured, physicalRecoveryObservedActive, physicalRecoveryCompleted;
+        public int borrowedInvalidCases, runtimeLifecycleCases, committedRecoveryComparisons, gridX, gridY, gridZ, owners, ticks, fieldComparisons, ledgerComparisons, atlasComparisons, committed, rejected, metadataComparisons;
         public string note;
+        public int physicalRecoveryTicks;
     }
 }

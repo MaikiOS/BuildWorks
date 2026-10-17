@@ -12,7 +12,8 @@ namespace OstrixMods.BuildWorks
         internal const float Step = 1f / 30;
         internal const long FieldBytes = (long)Nx * Ny * Nz * 8 * 10;
         internal Vector3Int GridSize { get; private set; }
-        internal long AllocatedFieldBytes => (long)GridSize.x * GridSize.y * GridSize.z * 8 * 10;
+        internal long AllocatedFieldBytes => FieldVoxels(GridSize) * (Scratch == null ? 80 : 32);
+        internal BlueprintFogScratch Scratch { get; }
         private readonly RenderTexture[] colour = new RenderTexture[2], velocity = new RenderTexture[2],
             origin = new RenderTexture[2], surface = new RenderTexture[2];
         private RenderTexture predictedColour, predictedOrigin;
@@ -23,7 +24,7 @@ namespace OstrixMods.BuildWorks
         private int current, tick;
         private float inputTime;
         private Vector3 previous, inputPosition;
-        private bool disposed;
+        private bool disposed, faulted;
         private AsyncGPUReadbackRequest recoveryRequest;
         private bool recoveryPending, observedRecovery;
         private int emissionRevision, requestedRevision, observedRevision;
@@ -34,7 +35,7 @@ namespace OstrixMods.BuildWorks
 
         internal BlueprintFogSimulation(BlueprintFogAssets assets, Texture3D shape, Texture3D pigment,
             Texture3D noise, Vector3 minimum, Vector3 maximum, Vector3 restMinimum, Vector3 restMaximum,
-            Vector3 actor, float seed, Vector3Int? gridSize = null, float initialClock = 0)
+            Vector3 actor, float seed, Vector3Int? gridSize = null, float initialClock = 0, BlueprintFogScratch scratch = null)
         {
             if (!Finite(initialClock) || initialClock < 0 || initialClock > 86400) throw new ArgumentException("Invalid initial fog clock.");
             tick = Mathf.FloorToInt(initialClock / Step + .0001f); inputTime = initialClock;
@@ -48,8 +49,12 @@ namespace OstrixMods.BuildWorks
                     throw new ArgumentException("Fog simulation requires bounded local coordinates enclosing the rest shape.");
             GridSize = gridSize ?? new Vector3Int(Nx, Ny, Nz);
             ValidateGrid(GridSize, maximum - minimum, gridSize.HasValue);
+            if (scratch != null && scratch.GridSize != GridSize) throw new ArgumentException("Fog scratch must match the exact simulation grid.");
+            Scratch = scratch;
             if (!SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.ARGBHalf))
                 throw new NotSupportedException("Fog simulation half-float fields unavailable.");
+            if (Scratch != null && (SystemInfo.copyTextureSupport & CopyTextureSupport.Copy3D) == 0)
+                throw new NotSupportedException("Shared fog scratch requires native 3D texture copying.");
             try
             {
                 solver = UnityEngine.Object.Instantiate(assets.Solver);
@@ -78,8 +83,8 @@ namespace OstrixMods.BuildWorks
                 foreach (int kernel in new[] { clearLedger, flow }) solver.SetBuffer(kernel, "_PeakAway", peak);
                 foreach (int kernel in new[] { clearLedger, ledger, restore }) solver.SetBuffer(kernel, "_SurfaceState", state);
                 solver.SetInt("_ResetLedger", 1); solver.Dispatch(clearLedger, 16, 1, 1); solver.SetInt("_ResetLedger", 0);
-                predictedColour = Allocate("Predicted smoke"); predictedOrigin = Allocate("Predicted origins");
-                for (int index = 0; index < 2; ++index)
+                if (Scratch == null) { predictedColour = Allocate("Predicted smoke"); predictedOrigin = Allocate("Predicted origins"); }
+                for (int index = 0; index < (Scratch == null ? 2 : 1); ++index)
                 {
                     colour[index] = Allocate("Smoke " + index); velocity[index] = Allocate("Velocity " + index);
                     origin[index] = Allocate("Origins " + index); surface[index] = Allocate("Surface " + index);
@@ -95,6 +100,7 @@ namespace OstrixMods.BuildWorks
         internal void AdvanceTo(float time, Vector3 actor, Vector2 body, bool emit, bool emissionPossible = true)
         {
             if (disposed) throw new ObjectDisposedException(nameof(BlueprintFogSimulation));
+            if (faulted) throw new InvalidOperationException("Fog step result is uncertain; automatic retry is blocked.");
             Validate(actor);
             if (!Finite(time) || time < inputTime || time > 86400 || !Finite(body.x) || !Finite(body.y) ||
                 body.x <= 0 || body.y < body.x || body.y > 8)
@@ -112,22 +118,36 @@ namespace OstrixMods.BuildWorks
                 solver.SetFloat("_Clock", nextTime); solver.SetVector("_Actor", next);
                 solver.SetVector("_ActorVelocity", (next - previous) / Step);
                 int nextIndex = 1 - current;
-                foreach (int kernel in transport)
+                RenderTexture nextColour = Scratch?.Colour ?? colour[nextIndex], nextVelocity = Scratch?.Velocity ?? velocity[nextIndex],
+                    nextOrigin = Scratch?.Origin ?? origin[nextIndex], nextSurface = Scratch?.Surface ?? surface[nextIndex];
+                RenderTexture prediction = Scratch?.PredictedColour ?? predictedColour, predictionOrigin = Scratch?.PredictedOrigin ?? predictedOrigin;
+                try
                 {
-                    solver.SetTexture(kernel, "_ReadColour", colour[current]); solver.SetTexture(kernel, "_ReadVelocity", velocity[current]);
-                    solver.SetTexture(kernel, "_ReadOrigin", origin[current]); solver.SetTexture(kernel, "_ReadSurface", surface[current]);
+                    foreach (int kernel in transport)
+                    {
+                        solver.SetTexture(kernel, "_ReadColour", colour[current]); solver.SetTexture(kernel, "_ReadVelocity", velocity[current]);
+                        solver.SetTexture(kernel, "_ReadOrigin", origin[current]); solver.SetTexture(kernel, "_ReadSurface", surface[current]);
+                    }
+                    solver.SetTexture(flow, "_WriteVelocity", nextVelocity); Dispatch(flow);
+                    solver.SetTexture(matter, "_Velocity", nextVelocity); solver.SetTexture(matter, "_WriteColour", prediction);
+                    solver.SetTexture(matter, "_WriteOrigin", predictionOrigin); Dispatch(matter);
+                    solver.SetTexture(correct, "_Velocity", nextVelocity); solver.SetTexture(correct, "_PredictedColour", prediction);
+                    solver.SetTexture(correct, "_PredictedOrigin", predictionOrigin); solver.SetTexture(correct, "_WriteColour", nextColour);
+                    solver.SetTexture(correct, "_WriteOrigin", nextOrigin); Dispatch(correct);
+                    solver.Dispatch(clearLedger, 16, 1, 1);
+                    solver.SetTexture(ledger, "_ReadColour", nextColour); solver.SetTexture(ledger, "_ReadOrigin", nextOrigin); Dispatch(ledger);
+                    solver.SetTexture(restore, "_ReadSurface", surface[current]); solver.SetTexture(restore, "_Velocity", nextVelocity);
+                    solver.SetTexture(restore, "_WriteSurface", nextSurface); Dispatch(restore);
+                    if (Scratch != null)
+                    {
+                        // Finish every read of the old state before copying any result back to its owner.
+                        Graphics.CopyTexture(nextColour, colour[0]); Graphics.CopyTexture(nextVelocity, velocity[0]);
+                        Graphics.CopyTexture(nextOrigin, origin[0]); Graphics.CopyTexture(nextSurface, surface[0]);
+                    }
+                    else current = nextIndex;
+                    previous = next;
                 }
-                solver.SetTexture(flow, "_WriteVelocity", velocity[nextIndex]); Dispatch(flow);
-                solver.SetTexture(matter, "_Velocity", velocity[nextIndex]); solver.SetTexture(matter, "_WriteColour", predictedColour);
-                solver.SetTexture(matter, "_WriteOrigin", predictedOrigin); Dispatch(matter);
-                solver.SetTexture(correct, "_Velocity", velocity[nextIndex]); solver.SetTexture(correct, "_PredictedColour", predictedColour);
-                solver.SetTexture(correct, "_PredictedOrigin", predictedOrigin); solver.SetTexture(correct, "_WriteColour", colour[nextIndex]);
-                solver.SetTexture(correct, "_WriteOrigin", origin[nextIndex]); Dispatch(correct);
-                solver.Dispatch(clearLedger, 16, 1, 1);
-                solver.SetTexture(ledger, "_ReadColour", colour[nextIndex]); solver.SetTexture(ledger, "_ReadOrigin", origin[nextIndex]); Dispatch(ledger);
-                solver.SetTexture(restore, "_ReadSurface", surface[current]); solver.SetTexture(restore, "_Velocity", velocity[nextIndex]);
-                solver.SetTexture(restore, "_WriteSurface", surface[nextIndex]); Dispatch(restore);
-                current = nextIndex; previous = next;
+                catch { faulted = true; throw; }
             }
             inputTime = time; inputPosition = actor;
         }
@@ -135,6 +155,7 @@ namespace OstrixMods.BuildWorks
         internal bool TryGetRecovered()
         {
             if (disposed) throw new ObjectDisposedException(nameof(BlueprintFogSimulation));
+            if (faulted) throw new InvalidOperationException("Uncertain fog step cannot authorize recovery.");
             if (recoveryPending && recoveryRequest.done)
             {
                 recoveryPending = false;
@@ -165,10 +186,9 @@ namespace OstrixMods.BuildWorks
 
         private static void ValidateGrid(Vector3Int grid, Vector3 size, bool compact)
         {
-            if (size.x <= 0 || size.y <= 0 || size.z <= 0 || grid.x < 8 || grid.y < 8 || grid.z < 4 ||
-                grid.x > 256 || grid.y > 256 || grid.z > 256 || grid.x % 8 != 0 || grid.y % 8 != 0 || grid.z % 4 != 0 ||
-                (long)grid.x * grid.y * grid.z > (long)Nx * Ny * Nz)
+            if (size.x <= 0 || size.y <= 0 || size.z <= 0)
                 throw new ArgumentException("Fog grid exceeds its bounded allocation/dispatch budget.");
+            FieldVoxels(grid);
             if (compact && (size.x / grid.x > .07501f || size.y / grid.y > .06376f || size.z / grid.z > .06751f))
                 throw new ArgumentException("Fog compact grid cannot reduce the approved voxel detail.");
         }
@@ -176,9 +196,21 @@ namespace OstrixMods.BuildWorks
         private void Dispatch(int kernel) => solver.Dispatch(kernel, GridSize.x / 8, GridSize.y / 8, GridSize.z / 4);
 
         private RenderTexture Allocate(string label)
+            => AllocateField(GridSize, label);
+
+        internal static long FieldVoxels(Vector3Int grid)
         {
-            var field = new RenderTexture(GridSize.x, GridSize.y, 0, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear) {
-                name = "BuildWorks fog " + label, dimension = TextureDimension.Tex3D, volumeDepth = GridSize.z,
+            if (grid.x < 8 || grid.y < 8 || grid.z < 4 || grid.x > 256 || grid.y > 256 || grid.z > 256 ||
+                grid.x % 8 != 0 || grid.y % 8 != 0 || grid.z % 4 != 0 || (long)grid.x * grid.y * grid.z > (long)Nx * Ny * Nz)
+                throw new ArgumentException("Fog grid exceeds its bounded allocation/dispatch budget.");
+            return (long)grid.x * grid.y * grid.z;
+        }
+
+        internal static RenderTexture AllocateField(Vector3Int grid, string label)
+        {
+            FieldVoxels(grid);
+            var field = new RenderTexture(grid.x, grid.y, 0, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear) {
+                name = "BuildWorks fog " + label, dimension = TextureDimension.Tex3D, volumeDepth = grid.z,
                 enableRandomWrite = true, wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear,
                 hideFlags = HideFlags.HideAndDontSave
             };

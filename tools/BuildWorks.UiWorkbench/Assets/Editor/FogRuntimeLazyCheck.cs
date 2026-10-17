@@ -26,7 +26,7 @@ public static class FogRuntimeLazyCheck
         {
             PlayerSettings.colorSpace=ColorSpace.Linear;AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
             using(var assets=new BlueprintFogAssets(File.ReadAllBytes(Path.Combine(root,"src/BuildWorks/Assets/FogGhostRuntime/buildworks-fog-v11"))))
-            using(var pool=new BlueprintFogChannels(32,BlueprintFogChannels.MaximumFieldBudget))
+            using(var pool=new BlueprintFogChannels(32,BlueprintFogChannels.MaximumFieldBudget,true))
             using(var volume=new BlueprintFogVolume(assets))
             {
                 CheckSourceCutout(assets);CheckAdmission(assets,prefab);CheckStaleRecovery(assets,prefab);

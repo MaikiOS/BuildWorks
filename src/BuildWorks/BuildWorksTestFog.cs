@@ -78,7 +78,7 @@ namespace OstrixMods.BuildWorks
             oldDepth = view.depthTextureMode; ownedDepth = oldDepth | DepthTextureMode.Depth; view.depthTextureMode = ownedDepth;
             try
             {
-                assets = BlueprintFogAssets.LoadEmbedded(); channels = new BlueprintFogChannels(32, BlueprintFogChannels.MaximumFieldBudget);
+                assets = BlueprintFogAssets.LoadEmbedded(); channels = new BlueprintFogChannels(32, BlueprintFogChannels.MaximumFieldBudget, true);
                 Bounds body = capsule.bounds;
                 building = new BlueprintFogBuilding(assets, channels, blueprint, name => ZNetScene.instance.GetPrefab(name),
                     player.transform.position + Vector3.right * 6, Quaternion.identity, body.center,

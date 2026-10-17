@@ -6,6 +6,7 @@ This records changes and evidence, not future milestones. Historical results ret
 
 | Checkpoint | Change / evidence | Boundary |
 | --- | --- | --- |
+| [.210](FOG_SCRATCH_210.md) | Exact-grid shared GPU scratch; Scratch360/36/Lazy5/frozen270/18, builds/contracts/independent review; installed. Native28-part house:both-way passage/recovery0, peak87408640 | Volume speed down to8 FPS/full appearance not accepted; durable project/board still ahead |
 | [.209](FOG_CUTOUT_209.md) | Native .208 exposed28-part house traversal overflow; cleanup/inventory checked. Source alpha/cutout reproduced and fixed, Lazy/v11 parity/builds/contracts passed; .209 installed | .209 roof appearance and house budget remain open; board follows |
 | [.208](FOG_CONTACT_208.md) | Lazy final-R8 contact, shared zero/clock/recovery, blueprint renderer and QA house entry;28 synthetic records/5 frames and prior checks passed; installed | Actual Forest Hut/contact budget/FPS and persistent board remain open |
 | [.207](FOG_PACKING_207.md) |28 saved blocks126955800 instead of193460292 bytes; independent extents/borders, cache, failed allocation/exact restore; Unity/normal/QA/contracts passed, installed | Not a native house; contact fields and persistent project remain open |

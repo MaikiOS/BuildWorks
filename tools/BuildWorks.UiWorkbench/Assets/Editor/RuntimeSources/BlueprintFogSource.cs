@@ -131,6 +131,7 @@ namespace OstrixMods.BuildWorks
                         if (texture && !copies.TryGetValue(texture, out albedo)) { albedo = ReadableAlbedo(texture); copies.Add(texture, albedo); }
                         Color tint = block.HasColor("_Color") ? block.GetColor("_Color")
                             : material.HasProperty("_Color") ? material.GetColor("_Color") : Color.white;
+                        float cutoff = Mathf.Max(.001f, material.HasProperty("_Cutoff") ? material.GetFloat("_Cutoff") : 0);
                         Vector2 scale = texture ? material.GetTextureScale("_MainTex") : Vector2.one;
                         Vector2 offset = texture ? material.GetTextureOffset("_MainTex") : Vector2.zero;
                         int[] indices = part.Data.Submeshes[submesh];
@@ -155,6 +156,7 @@ namespace OstrixMods.BuildWorks
                                 Vector2 uv = part.Data.UV[ia] + (part.Data.UV[ib] - part.Data.UV[ia]) * u + (part.Data.UV[ic] - part.Data.UV[ia]) * v;
                                 uv = Vector2.Scale(uv, scale) + offset;
                                 Color color = (albedo ? albedo.GetPixelBilinear(uv.x, uv.y) : Color.white) * tint;
+                                if (color.a < cutoff) continue;
                                 int cell = x + Nx * (y + Ny * z); cells[cell] = 1; color.a = 1; colors[cell] = color;
                             }
                         }

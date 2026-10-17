@@ -124,13 +124,14 @@ namespace OstrixMods.BuildWorks
 
         private void Activate(Vector3 actor, float clock)
         {
-            BlueprintFogSimulation Create() => new BlueprintFogSimulation(assets, source.Shape, source.Pigment, source.Noise,
-                minimum, maximum, source.Minimum, source.Maximum, actor, 37, grid, clock);
+            BlueprintFogSimulation Create(BlueprintFogScratch scratch = null) => new BlueprintFogSimulation(assets, source.Shape, source.Pigment, source.Noise,
+                minimum, maximum, source.Minimum, source.Maximum, actor, 37, grid, clock, scratch);
             if (channelPool == null) { simulation = Create(); return; }
-            long bytes = grid.HasValue ? (long)grid.Value.x * grid.Value.y * grid.Value.z * 80 : BlueprintFogSimulation.FieldBytes;
+            Vector3Int size = grid ?? new Vector3Int(BlueprintFogSimulation.Nx, BlueprintFogSimulation.Ny, BlueprintFogSimulation.Nz);
             bool created = false;
-            if (!channelPool.TryAcquire(channelOwner, bytes, () => { created = true; return Create(); }, out var channel))
-                throw new InvalidOperationException("Fog active owner budget is full; existing matter retained.");
+            if (!channelPool.TryAcquire(channelOwner, size, scratch => { created = true; return Create(scratch); }, out var channel))
+                throw new InvalidOperationException("Fog active owner budget is full; existing matter retained. Grid " + size +
+                    ", active owners " + channelPool.Count + ", allocated field bytes " + channelPool.FieldBytes + ".");
             if (!created) throw new InvalidOperationException("Fog owner already has a visual.");
             simulation = channel;
         }

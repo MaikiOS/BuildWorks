@@ -18,6 +18,8 @@ BuildWorks extends Valheim's hammer with precise construction, a blueprint catal
 - Native piece construction with survival resources and checks. A28-part Forest Hut and exact reload were verified; this does not prove every imported building or multiplayer.
 - English fallback and Russian runtime catalog.
 
+Further development brings editable assemblies and repetitions, construction guides, and original adaptive pieces. See the [plugin roadmap](docs/ROADMAP.md) for the full progression.
+
 ## In progress
 
 Approved **v11 fog → whole unfinished house → persistent stake/board → material continuation/cancel/refund/reload** is the current priority. Three-source rendering is verified in Unity; the last native visual test used two walls. The whole-house effect and persistent board are not ready.

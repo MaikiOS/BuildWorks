@@ -1,19 +1,71 @@
 # BuildWorks roadmap
 
-**2026-10-17 · [Русский](ROADMAP_RU.md) · [Current evidence](CURRENT_STATUS.md)**
+[Русский](ROADMAP_RU.md) · Updated 17 October 2026
 
-This is the forward plan. Completed changes belong in the [development journal](DEVELOPMENT_JOURNAL.md); the former append-only roadmap is preserved as [history through .206](ROADMAP_HISTORY_206.md). No dates or completion percentages are promised.
+## Product direction
 
-| Order | Deliverable | Depends on | Done when |
-| --- | --- | --- | --- |
-| **1 — current** | Approved v11 on an actual unfinished house | .206 multi-source renderer; bounded contact ownership | Existing Forest Hut has recognizable textured transparent pieces, body passage/standing/return, independent matter and measured memory/FPS in Valheim; owner accepts look |
-| **2** | Persistent project and stake/board | 1; durable per-part identity, payment settlement and server authority | Missing resources leave pass-through unfinished parts; hammer opens materials/continue/cancel; reload/reconnect reconstructs state; confirmed cancellation returns exactly paid resources once |
-| **3** | Supported import/edit/build/reload across formats | Existing .195 house path; explicit source contracts | Declared .blueprint/.vbuild/internal cases retain transforms/scale/signs/anchors/materials; missing-data choices are clear; full batch paths and foreign-format interoperability verified |
-| **4** | Items, storage, mounts, armor and admin restore | 2's durable accounting; supplied-item identity | Independent settings, survival supplied attributes, no free repair/duplication; server-approved admin state; cancel/crash/replay/reload tests pass |
-| **5** | Usable large-world capture and heavy construction | Loaded-area/boundary rules; 1–4 performance measurements | Area + adjustable top/bottom + manual include/exclude works; no stale duplicates; catalog/editor/ghost/build/save remain bounded; small/direct vs large/planned threshold established |
-| **6** | Server library and sharing between players | Server role checks and durable state | Admin publishes players/admin entries; permitted players see and accept personal copies; direct player sharing; host+remote/reconnect/server restart and denial tests pass |
-| **7** | Remaining editor acceptance and release | Targeted regressions for reported UX; 1–6 | Axis/wrap/replacement/camera/anchors and supported resolutions pass; scoped manual and native checks documented; owner explicitly authorizes a binary release |
+BuildWorks provides free and precise construction in Valheim, from one piece to a complex custom building. Players will build manually, edit and reuse assemblies, transfer buildings through blueprints, gradually construct them with resources, and share them. Further development brings editable repetitions, construction guides, and original adaptive pieces for more ambitious architecture.
 
-Newly reproduced regressions in import→editor→native construction take priority over expanding features. Current owner order puts v11/board first; other requirements remain in the [project contract](../PROJECT_CONTRACT.md). Completed foundation: native precision/editor, selected import and Forest Hut reload, file/batch exchange, server UI foundation and bounded v11 renderer. Foundation is not full milestone completion.
+The foundation remains part of the game: real Valheim objects, understandable controls, construction costs, durable results, and cooperative play with server-authorized permissions.
 
-Later, after this module: EarthWorks terrain/material/planned-building integration and separately agreed original adaptive pieces/guides. No OBJ/FBX/glTF importer, terrain transfer or EarthWorks runtime dependency is added here. Curves/Line A/B need renewed tool-semantics approval.
+## Development milestones
+
+| Milestone | Player outcome | State |
+| --- | --- | --- |
+| 1. Precision construction and editor | Work freely with pieces and assemblies | Foundation available in alpha; complex cases still need verification |
+| 2. Buildings as blueprints | Take an existing building or save your own, edit it, and build it again | Partially implemented; completing the main journey |
+| 3. Construction projects | Leave a future house in the world and gradually supply its materials | **Current priority: v11 fog, then a persistent project with a board** |
+| 4. Complete and large buildings | Transfer large buildings, furnishings, and contents without loss | Foundations exist; substantial work remains |
+| 5. Shared libraries and cooperative construction | Share blueprints and use a server library | File sharing and server-library foundation exist; network journey incomplete |
+| 6. Editable assemblies and repetitions | Revise layout and repetition parameters after creation | Later milestone; ordinary Array and Contour already exist |
+| 7. Construction along guides | Place pieces and assemblies along lines and curves | Planned direction; tool behavior still needs agreement |
+| 8. Original adaptive pieces | Create shapes beyond rigid standard pieces | Longer-term direction; separate geometry and material development |
+| 9. Cooperation with EarthWorks | Connect site preparation and construction | Separate later milestone after construction projects are ready |
+
+Numbers show the direction of development. Some preparation can overlap. No entire milestone is declared complete; future release dates and versions are not assigned.
+
+## Milestone scope
+
+### 1. Precision construction and editor
+
+Translate, rotate, and scale on selected axes; reliably snap rotated pieces; use groups, independent anchors, connection points, Undo/Redo, and an interior camera. **Outcome:** predictable assembly, placement matching the preview, and the same shape after reload. Core tools exist; complex snapping and remaining control issues still need verification.
+
+### 2. Buildings as blueprints
+
+External library or world capture → editing → construction. A personal library with categories, understandable files, Save As, deletion, and batch import/export. Foreign formats declare supported data and losses. Locate a missing part by its saved position, replace it with your pieces, or exclude it in a separate copy. **Outcome:** usable construction blueprints with limitations explained beforehand. Selected houses passed this journey; the full declared corpus remains incomplete.
+
+### 3. Construction projects
+
+Insufficient materials leave a recognizable, pass-through v11 fog ghost. A stake and board let players equip a hammer, inspect shortages, supply materials, continue, or cancel. Finished parts become real objects; projects survive world visits; cancellation refunds actual spending without repeated payouts. **Outcome:** unfinished houses are convenient to return to. Current work brings v11 to a whole house, followed by persistent projects and the board; laboratory approval of the effect does not establish readiness of the mechanic.
+
+### 4. Complete and large buildings
+
+Capture an area with editable upper/lower bounds, manually include/exclude parts, and understand loaded-world limits. Handle signs, furnishings, storage, mounts, items, and armor stands. Independent content choices; survival uses supplied items with their own properties, while full administrative restoration requires authority. Trees and suitable objects without recipes are administrator-only or explicitly priced. **Outcome:** complete buildings pass the full journey without loss, duplication, or unacceptable delays. Load measurements will establish the boundary between small direct placement and large planned construction.
+
+### 5. Shared libraries and cooperative construction
+
+Share blueprints between players and use a server library published by its administrator. Separate player/administrator access, permitted personal copies, and consistent construction across participants. **Outcome:** libraries and projects work through reconnects and server restarts without permission bypasses or repeated charges/refunds. File sharing exists; direct transfer and complete cooperative behavior remain ahead.
+
+### 6. Editable assemblies and repetitions
+
+Align, distribute, mirror copies, and change spacing between pieces or assemblies without resizing their geometry. Saved Arrays retain their source assembly and allow later count/spacing edits. Linked instances with an explicit Make Unique action follow. **Outcome:** revise a fence, row of supports, or repeated assembly through parameters instead of rebuilding manually. Existing copy tools are a foundation; persistent editable operations are not ready.
+
+### 7. Construction along guides
+
+Straight A/B → polyline → arc → Bezier curve. Guides supply positions and orientations for pieces or repeated assemblies; ordinary pieces remain rigid. **Outcome:** edit a path, predictably construct along it, save, and resume. Before implementation, including A/B, agree on manual placement versus repetition, control points, spacing, and orientation.
+
+### 8. Original adaptive pieces
+
+Original BuildWorks pieces and materials change shape through agreed parameters or guides. Appearance, textures, collisions, and snap points match the resulting form. **Outcome:** richer architecture that reconstructs consistently after reload and for server participants. This is a later direction, not an available feature or a promise to deform arbitrary prefabs.
+
+### 9. Cooperation with EarthWorks
+
+Explicit cooperation between a separate terrain-preparation project and the building project: site → materials → gradual construction. **Outcome:** a coherent workflow between two independent mods. BuildWorks never alters terrain implicitly. Integration has not started; terrain transfer and arbitrary OBJ/FBX/glTF are not added to the current blueprint module.
+
+## Priorities and progression
+
+The next outcome is **v11 on a whole house → persistent construction project with a board**. Then continue completing the blueprint and full construction journey in milestones 2–5. Later tools in milestones 6–9 do not replace this work. Regressions in the working core take priority over feature expansion.
+
+Controls, Russian UI, performance, data preservation, and network authority apply at every milestone. Guides need saved assemblies; adaptive pieces need proven geometry and snapping; EarthWorks cooperation needs working construction projects. Public-release readiness requires game evidence and separate owner authorization to release.
+
+[Current evidence and limits](CURRENT_STATUS.md) · [Active work and manual checks](LIVE_CHECKLIST_RU.md) · [Development journal](DEVELOPMENT_JOURNAL.md) · [Current module contract](../PROJECT_CONTRACT.md)

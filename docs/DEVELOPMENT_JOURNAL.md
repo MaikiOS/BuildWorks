@@ -6,6 +6,7 @@ This records changes and evidence, not future milestones. Historical results ret
 
 | Checkpoint | Change / evidence | Boundary |
 | --- | --- | --- |
+| 2026-10-17 product roadmap correction | Restored whole-plugin purpose and 9 milestones, player outcomes, current priority, and later assemblies/guides/adaptive pieces/EarthWorks | Documentation only; no change to game features or readiness |
 | 2026-10-17 documentation refresh | Current EN/RU guides, forward roadmap separate from journal,468-document role index;51 references repaired/labeled, history/licenses and GitHub tables verified; independent PASSED/Ship | No new binary build or new runtime acceptance |
 | [.206](FOG_ATLAS_206.md) | Common GPU atlas/one integration for3 independent sources; packing/depth/translation/pair/visual/color checks | Installed, not native house/board |
 | [.205](FOG_OWNERS_205.md) | Whole-part compact visual and3 independent owners,20.57MiB fields | Unity proof, not house render |

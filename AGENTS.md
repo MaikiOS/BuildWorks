@@ -1,10 +1,13 @@
 # Project Purpose
 
-Continue the existing BuildWorks module: supported external/world-captured blueprint
+Develop the existing BuildWorks precision-construction plugin: reusable assemblies,
+blueprints, projects, and later agreed guides/original adaptive pieces. The current
+module is supported external/world-captured blueprint
 → editor → correct ghost/native paid construction → reload, with server authority.
 Current owner priority is approved v11 on a whole house, then a durable unfinished
 project and stake/board. Preserve existing tools and the full PROJECT_CONTRACT.md.
-The original single-piece precision slice is a foundation, not the current scope.
+The current blueprint goal is one module, not the whole product roadmap. Preserve
+the later assembly/guide/adaptive directions without starting them prematurely.
 docs/ROADMAP.md is the forward plan; docs/DEVELOPMENT_JOURNAL.md records history;
 docs/CURRENT_STATUS.md separates source/tests/deployment/game/owner/network proof.
 

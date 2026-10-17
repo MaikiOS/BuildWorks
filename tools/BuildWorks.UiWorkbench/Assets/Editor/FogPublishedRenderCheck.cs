@@ -1,0 +1,300 @@
+using System;
+using System.IO;
+using System.Linq;
+using OstrixMods.BuildWorks;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.Rendering;
+
+// Private render proof. CPU confirmation is deliberately held after GPU publication, never production scheduling.
+public static class FogPublishedRenderCheck
+{
+    private const string Keyword = "BUILDWORKS_FOG_PUBLISHED";
+    public static void Run()
+    {
+        string root = Path.GetFullPath(Path.Combine(Application.dataPath, "../../..")), output = Path.Combine(root, "artifacts/fog-published-render");
+        Directory.CreateDirectory(output); EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        PlayerSettings.colorSpace = ColorSpace.Linear;
+        var host = new GameObject("Published fog camera"); var camera = host.AddComponent<Camera>(); var probe = host.AddComponent<FogRenderProbe>();
+        camera.transform.position = new Vector3(4, 2.3f, -5); camera.transform.LookAt(new Vector3(0, 1, 1.1f)); camera.fieldOfView = 49;
+        camera.clearFlags = CameraClearFlags.SolidColor; camera.backgroundColor = new Color(.15f, .2f, .3f);
+        camera.allowHDR = true; camera.renderingPath = RenderingPath.DeferredShading; camera.depthTextureMode = DepthTextureMode.Depth;
+        var prefab = GameObject.CreatePrimitive(PrimitiveType.Cube); prefab.transform.position = Vector3.up; prefab.transform.localScale = new Vector3(.2f, 2, 2); prefab.SetActive(false);
+        var original = new Material(Shader.Find("Standard")); original.color = new Color(.64f, .31f, .12f); prefab.GetComponent<Renderer>().sharedMaterial = original;
+        var visuals = new BlueprintFogVisual[2]; var oracle = new BlueprintFogSimulation[2];
+        var body = new Vector2(.3f, .95f); var origins = new[] { Vector3.zero, new Vector3(0, 0, 2.5f) };
+        var last = new BlueprintFogInputQueue.Sample[2];
+        Material volume = null; ComputeShader pack = null; RenderTexture shape = null, smoke = null, surface = null;
+        Report report = null; int captures = 0, comparisons = 0, negativeControls = 0; double maxMean = 0, maxLocal = 0, poisonDelta = 0, disabledDelta = 0, staleDelta = 0;
+        try
+        {
+            using (var assets = new BlueprintFogAssets(File.ReadAllBytes(Path.Combine(root, "artifacts/fog-runtime-assets-candidate/buildworks-fog-v11"))))
+            {
+                for (int slot = 0; slot < 2; ++slot)
+                    visuals[slot] = new BlueprintFogVisual(assets, prefab, origins[slot] + Vector3.up, Quaternion.identity, Vector3.one,
+                        null, origins[slot], origins[slot] + new Vector3(-1.8f, .95f, 0), body);
+                var source = visuals[0];
+                using (var codec = new FogSparseStorageProbe())
+                using (var test = new FogArenaPhysicsProbe.Probe(assets, source, body, 8192, codec))
+                using (var bindings = new ComputeBuffer(10, 4))
+                using (var shortBindings = new ComputeBuffer(4, 4))
+                using (var shortMetadata = new ComputeBuffer(1, 4))
+                {
+                    var words = test.Binding(0).Concat(test.Binding(1)).ToArray(); bindings.SetData(words);
+                    var inputs = new[] { test.CreateInputQueue(0), test.CreateInputQueue(1) };
+                    for (int slot = 0; slot < 2; ++slot)
+                    {
+                        last[slot] = test.Observation(slot, 0);
+                        oracle[slot] = new BlueprintFogSimulation(assets, source.Source.Shape, source.Source.Pigment, source.Source.Noise,
+                            source.FieldMinimum, source.FieldMaximum, source.Source.Minimum, source.Source.Maximum,
+                            Actor(last[slot]), 37 + slot);
+                    }
+                    volume = new Material(assets.Volume); volume.EnableKeyword("BUILDWORKS_FOG_ATLAS"); volume.EnableKeyword("BUILDWORKS_FOG_DORMANT_FAST");
+                    pack = UnityEngine.Object.Instantiate(assets.Solver);
+                    Vector3Int block = new Vector3Int(146, 114, 122), size = new Vector3Int(146, 114, 244);
+                    shape = Atlas(size, RenderTextureFormat.RHalf); smoke = Atlas(size, RenderTextureFormat.ARGBHalf); surface = Atlas(size, RenderTextureFormat.ARGBHalf);
+                    var restMin = new Vector4[32]; var restMax = new Vector4[32]; var fieldMin = new Vector4[32]; var fieldMax = new Vector4[32];
+                    var offsets = new Vector4[32]; var dynamicOffsets = new Vector4[32]; var shapes = new Vector4[32]; var fields = new Vector4[32];
+                    for (int slot = 0; slot < 2; ++slot)
+                    {
+                        restMin[slot] = source.Source.Minimum; restMax[slot] = source.Source.Maximum;
+                        fieldMin[slot] = source.FieldMinimum; fieldMax[slot] = source.FieldMaximum;
+                        offsets[slot] = new Vector4(0, 0, slot * block.z, 0); dynamicOffsets[slot] = new Vector4(0, 0, slot * 82, 0);
+                        shapes[slot] = new Vector4(144, 112, 120, 1); fields[slot] = new Vector4(96, 80, 80, body.y);
+                    }
+                    volume.SetVectorArray("_RegionRestMin", restMin); volume.SetVectorArray("_RegionRestMax", restMax);
+                    volume.SetVectorArray("_RegionFieldMin", fieldMin); volume.SetVectorArray("_RegionFieldMax", fieldMax);
+                    volume.SetVectorArray("_RegionOffset", offsets); volume.SetVectorArray("_RegionDynamicOffset", dynamicOffsets);
+                    volume.SetVectorArray("_RegionNoiseOffset", new Vector4[32]); volume.SetVectorArray("_RegionShapeSize", shapes);
+                    volume.SetVector("_AtlasSize", new Vector4(size.x, size.y, size.z, 0)); volume.SetInt("_RegionCount", 2);
+                    Bounds bounds = source.VolumeBounds; bounds.Encapsulate(visuals[1].VolumeBounds);
+                    volume.SetVector("_FineMin", bounds.min); volume.SetVector("_FineMax", bounds.max); volume.SetInt("_IntegrationSteps", 1024);
+                    volume.SetTexture("_Noise", source.Source.Noise); volume.SetTexture("_AtlasShape", shape);
+                    volume.SetVector("_BeamOrigin", new Vector3(-4, 1, 0)); volume.SetVector("_BeamDirection", Vector3.right); volume.SetFloat("_BeamStrength", 0);
+                    volume.SetVector("_FogCameraOrigin", camera.transform.position); volume.SetVector("_CameraRight", camera.transform.right);
+                    volume.SetVector("_CameraUp", camera.transform.up); volume.SetVector("_CameraForward", camera.transform.forward);
+                    volume.SetFloat("_Aspect", 384f / 216); volume.SetFloat("_TanHalfFov", Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * .5f));
+                    void Published(Material material, int slot)
+                    {
+                        material.EnableKeyword(Keyword); material.SetBuffer("_FogBindings", bindings); material.SetBuffer("_PublishedMetadata", test.PublishedMetadata);
+                        material.SetInt("_PublishedSlots", 2); material.SetInt("_PublishedRegion", slot);
+                        material.SetTexture("_PublishedSurface", test.PublishedSurface); material.SetVector("_DynamicAtlasSize", new Vector4(98, 82, 164, 0));
+                        material.SetVector("_DynamicFieldSize", new Vector4(96, 80, 80, 0)); material.SetVector("_DynamicOffset", dynamicOffsets[slot]);
+                    }
+                    void Bind(bool published, bool poison = false, bool fallbackFirst = false, bool fallbackAll = false)
+                    {
+                        var originClocks = new Vector4[32]; var actors = new Vector4[32];
+                        for (int slot = 0; slot < 2; ++slot)
+                        {
+                            var sample = last[slot]; Vector3 actor = Actor(sample); Vector2 capsule = new Vector2(sample.Radius, sample.HalfHeight);
+                            originClocks[slot] = new Vector4(origins[slot].x, origins[slot].y, origins[slot].z, poison ? 777 : sample.Clock);
+                            actors[slot] = poison ? new Vector4(32, 32, 32, 7) : new Vector4(actor.x, actor.y, actor.z, capsule.x);
+                            fields[slot].w = poison ? 7 : capsule.y; shapes[slot].w = poison ? 0 : 1;
+                            bool empty = fallbackAll || (fallbackFirst && slot == 0); if (empty) { originClocks[slot].w = 0; shapes[slot].w = 0; }
+                            foreach (var material in visuals[slot].Source.Parts.SelectMany(p => p.Renderer.sharedMaterials))
+                            {
+                                material.DisableKeyword(Keyword);
+                                material.SetTexture("_MatterFlow", (poison || empty) ? (Texture)assets.Empty : oracle[slot].Surface);
+                                material.SetFloat("_Clock", empty ? 0 : poison ? 777 : sample.Clock); material.SetVector("_Body", poison ? new Vector2(7, 7) : capsule);
+                                var trail = new Vector4[24]; trail[0] = new Vector4(actor.x, actor.y, actor.z, sample.Nearby ? 1 : 0);
+                                if (poison || empty) trail[0] = new Vector4(32, 32, 32, 0); material.SetVectorArray("_Trail", trail);
+                                material.SetFloat("_MatterEnabled", (poison || empty) ? 0 : 1);
+                                if (published) Published(material, slot);
+                            }
+                        }
+                        volume.DisableKeyword(Keyword); volume.SetVectorArray("_RegionOriginClock", originClocks); volume.SetVectorArray("_RegionActorRadius", actors);
+                        volume.SetVectorArray("_RegionFieldSize", fields); volume.SetVectorArray("_RegionShapeSize", shapes);
+                        volume.SetTexture("_AtlasSmoke", published ? test.PublishedSmoke : smoke); volume.SetTexture("_AtlasSurface", published ? test.PublishedSurface : surface);
+                        if (published) Published(volume, 0);
+                    }
+                    void Pack()
+                    {
+                        int kernel = pack.FindKernel("PackVolume"); pack.SetVector("_PackSize", new Vector4(block.x, block.y, block.z, 0));
+                        pack.SetVector("_PackShapeSize", new Vector4(144, 112, 120, 0)); pack.SetVector("_PackFieldSize", new Vector4(96, 80, 80, 0));
+                        pack.SetTexture(kernel, "_PackShape", source.Source.Shape); pack.SetTexture(kernel, "_PackedShape", shape);
+                        pack.SetTexture(kernel, "_PackedSmoke", smoke); pack.SetTexture(kernel, "_PackedSurface", surface);
+                        for (int slot = 0; slot < 2; ++slot)
+                        {
+                            pack.SetVector("_PackOffset", offsets[slot]); pack.SetTexture(kernel, "_PackSmoke", oracle[slot].Smoke); pack.SetTexture(kernel, "_PackSurface", oracle[slot].Surface);
+                            pack.Dispatch(kernel, 19, 15, 31);
+                        }
+                    }
+                    Color[] Capture(string name, int mode)
+                    {
+                        foreach (var visual in visuals) visual.Root.SetActive(mode != 1); ++captures;
+                        return FogRuntimePairCheck.Capture(camera, probe, (image, target) => { if (mode == 0) Graphics.Blit(image, target); else Graphics.Blit(image, target, volume); }, output, name);
+                    }
+                    void Compare(Color[] a, Color[] b)
+                    {
+                        double mean = FogRuntimePairCheck.Delta(a, b), local = 0;
+                        for (int p = 0; p < a.Length; ++p) local = Math.Max(local, Math.Max(Math.Abs(a[p].r - b[p].r), Math.Max(Math.Abs(a[p].g - b[p].g), Math.Abs(a[p].b - b[p].b))));
+                        maxMean = Math.Max(maxMean, mean); maxLocal = Math.Max(maxLocal, local); ++comparisons;
+                        Require(mean < .0001 && local < .03, "Published render differs from the dense oracle: " + mean + "/" + local);
+                    }
+                    void Check(string name)
+                    {
+                        Pack();
+                        for (int mode = 0; mode < 3; ++mode)
+                        {
+                            Bind(false); var expected = Capture(name + "-" + mode + "-dense", mode);
+                            Bind(true); var actual = Capture(name + "-" + mode + "-published", mode); Compare(expected, actual);
+                            Bind(true, true); var poisoned = Capture(name + "-" + mode + "-poison", mode);
+                            poisonDelta = Math.Max(poisonDelta, FogRuntimePairCheck.Delta(actual, poisoned)); Compare(actual, poisoned);
+                            if (name == "96")
+                            {
+                                if (mode == 2)
+                                {
+                                    volume.DisableKeyword(Keyword);
+                                    foreach (var material in visuals.SelectMany(v => v.Source.Parts).SelectMany(p => p.Renderer.sharedMaterials)) material.DisableKeyword(Keyword);
+                                    disabledDelta = FogRuntimePairCheck.Delta(actual, Capture("disabled-negative", mode));
+                                    Require(disabledDelta > .0001, "Disabled keyword control was insensitive.");
+                                }
+                                Bind(false, fallbackFirst: true); var fallback = Capture("static-first-" + mode, mode);
+                                Bind(true, true);
+                                for (int word = 0; word < 5; ++word)
+                                {
+                                    var wrong = (uint[])words.Clone(); wrong[word] = word == 0 ? 2u : wrong[word] ^ 1u; bindings.SetData(wrong);
+                                    var invalid = Capture("invalid-binding-" + word + "-" + mode, mode); Compare(fallback, invalid); ++negativeControls;
+                                    if (mode == 2 && word == 4) staleDelta = FogRuntimePairCheck.Delta(actual, invalid);
+                                }
+                                bindings.SetData(words); Require(mode != 2 || staleDelta > .0001, "Generation control was insensitive.");
+                            }
+                        }
+                    }
+                    void BindingBounds()
+                    {
+                        for (int mode = 0; mode < 3; ++mode)
+                        {
+                            Bind(false, fallbackAll: true); var expected = Capture("bounds-static-" + mode, mode);
+                            for (int control = 0; control < 3; ++control)
+                            {
+                                Bind(true, true);
+                                foreach (var material in visuals.SelectMany(v => v.Source.Parts).SelectMany(p => p.Renderer.sharedMaterials).Concat(new[] { volume }))
+                                {
+                                    if (control == 0) material.SetInt("_PublishedSlots", 0);
+                                    else material.SetBuffer(control == 1 ? "_FogBindings" : "_PublishedMetadata", control == 1 ? shortBindings : shortMetadata);
+                                }
+                                Compare(expected, Capture("bounds-" + control + "-" + mode, mode)); ++negativeControls;
+                            }
+                            if (mode == 0) foreach (int invalidRegion in new[] { -1, 2 })
+                            {
+                                Bind(true, true);
+                                foreach (var material in visuals.SelectMany(v => v.Source.Parts).SelectMany(p => p.Renderer.sharedMaterials)) material.SetInt("_PublishedRegion", invalidRegion);
+                                Compare(expected, Capture("invalid-region-" + invalidRegion, mode)); ++negativeControls;
+                            }
+                        }
+                    }
+                    Check("initial");
+                    for (int tick = 8; tick <= 96; tick += 8)
+                    {
+                        for (int slot = 0; slot < 2; ++slot)
+                        {
+                            last[slot] = test.Observation(slot, tick * BlueprintFogSimulation.Step + .005f);
+                            inputs[slot].Capture(last[slot]); test.Send(slot, tick, input: inputs[slot], holdConfirmation: true);
+                            oracle[slot].AdvanceTo(last[slot].Clock, Actor(last[slot]), body, true);
+                        }
+                        AsyncGPUReadback.WaitAllRequests();
+                        Require(test.States.All(s => s.State == BlueprintFogSnapshotState.Phase.Pending && s.ConfirmedTick == tick - 8), "CPU confirmation was not held before geometry.");
+                        if (tick == 8 || tick == 64 || tick == 96) Check(tick.ToString());
+                        test.ReleaseConfirmations(); test.Wait();
+                    }
+                    for (int slot = 0; slot < 2; ++slot)
+                    {
+                        var sample = last[slot]; last[slot] = new BlueprintFogInputQueue.Sample(sample.Clock + .009f, sample.Actor, .43f, 1.15f, false, true, false);
+                        inputs[slot].Capture(last[slot]); test.Send(slot, 96, input: inputs[slot], holdConfirmation: true);
+                        oracle[slot].AdvanceTo(last[slot].Clock, Actor(last[slot]), new Vector2(.43f, 1.15f), false);
+                    }
+                    AsyncGPUReadback.WaitAllRequests(); Check("metadata-only"); test.ReleaseConfirmations(); test.Wait();
+                    BindingBounds();
+                    test.Send(0, 104, inject: true, holdConfirmation: true);
+                    AsyncGPUReadback.WaitAllRequests(); Check("rejected"); test.ReleaseConfirmations(); test.Wait();
+                    Require(test.Rejected == 1 && test.States[0].ConfirmedTick == 96, "Rejected fields changed render publication.");
+                    report = new Report { passed = true, owners = 2, negativeControls = negativeControls,
+                        captures = captures, comparisons = comparisons, maxMeanDelta = maxMean, maxLocalDelta = maxLocal, poisonedCpuDelta = poisonDelta,
+                        disabledKeywordDelta = disabledDelta, staleGenerationDelta = staleDelta, metadataOnly = true, rejectedRetained = true,
+                        geometryBeforeCpuConfirmation = true, meshAndAtlasVolume = true, productionSchedulerTested = false, wholeHouseSupported = false,
+                        gameHostTested = false, gpuTimingsMeasured = false };
+                }
+            }
+        }
+        finally
+        {
+            foreach (var item in oracle) item?.Dispose(); foreach (var item in visuals) item?.Dispose();
+            foreach (var item in new[] { shape, smoke, surface }) if (item) { item.Release(); UnityEngine.Object.DestroyImmediate(item); }
+            if (pack) UnityEngine.Object.DestroyImmediate(pack); if (volume) UnityEngine.Object.DestroyImmediate(volume);
+            UnityEngine.Object.DestroyImmediate(original); UnityEngine.Object.DestroyImmediate(prefab); UnityEngine.Object.DestroyImmediate(host);
+        }
+        var oldImages = LegacyImages(Path.Combine(root, "src/BuildWorks/Assets/FogGhostRuntime/buildworks-fog-v11"), output, "legacy-installed");
+        var newImages = LegacyImages(Path.Combine(root, "artifacts/fog-runtime-assets-candidate/buildworks-fog-v11"), output, "legacy-candidate");
+        report.legacyCaptures = oldImages.Length + newImages.Length;
+        for (int i = 0; i < oldImages.Length; ++i)
+        {
+            double delta = FogRuntimePairCheck.Delta(oldImages[i], newImages[i]); report.legacyMeanDelta = Math.Max(report.legacyMeanDelta, delta);
+            Require(delta == 0, "Legacy shader variant changed its pixels: " + delta);
+        }
+        File.WriteAllText(Path.Combine(output, "verification.json"), JsonUtility.ToJson(report, true));
+    }
+    private static Color[][] LegacyImages(string bundle, string output, string prefix)
+    {
+        var host = new GameObject("Legacy shader regression"); var camera = host.AddComponent<Camera>(); var probe = host.AddComponent<FogRenderProbe>();
+        camera.transform.position = new Vector3(4, 2.3f, -5); camera.transform.LookAt(new Vector3(0, 1, 1.1f)); camera.fieldOfView = 49;
+        camera.clearFlags = CameraClearFlags.SolidColor; camera.backgroundColor = new Color(.15f, .2f, .3f);
+        camera.allowHDR = true; camera.renderingPath = RenderingPath.DeferredShading; camera.depthTextureMode = DepthTextureMode.Depth;
+        var prefab = GameObject.CreatePrimitive(PrimitiveType.Cube); prefab.transform.localScale = new Vector3(.2f, 2, 2); prefab.SetActive(false);
+        var original = new Material(Shader.Find("Standard")); original.color = new Color(.64f, .31f, .12f); prefab.GetComponent<Renderer>().sharedMaterial = original;
+        var images = new System.Collections.Generic.List<Color[]>(); var owners = new BlueprintFogVisual[2]; var body = new Vector2(.3f, .95f);
+        try
+        {
+            using (var assets = new BlueprintFogAssets(File.ReadAllBytes(bundle)))
+            using (var volume = new BlueprintFogVolume(assets))
+            using (var atlas = new BlueprintFogAtlas(assets))
+            {
+                try
+                {
+                    for (int slot = 0; slot < 2; ++slot)
+                    {
+                        Vector3 origin = new Vector3(0, 0, slot * 2.5f);
+                        owners[slot] = new BlueprintFogVisual(assets, prefab, origin + Vector3.up, Quaternion.identity, Vector3.one, null,
+                            origin, origin + new Vector3(-1.8f, .95f, 0), body);
+                    }
+                    for (int tick = 0; tick <= 96; tick += 8)
+                    {
+                        float clock = tick * BlueprintFogSimulation.Step + .005f;
+                        foreach (var owner in owners) owner.AdvanceTo(clock, owner.Origin + new Vector3(tick < 64 ? -1.8f : 0, .95f, 0), body, true);
+                        if (tick != 0 && tick != 96) continue;
+                        for (int mode = 0; mode < 4; ++mode)
+                        {
+                            owners[1].Root.SetActive(mode != 1);
+                            int route = mode;
+                            images.Add(FogRuntimePairCheck.Capture(camera, probe, (image, target) => {
+                                if (route == 0) Graphics.Blit(image, target);
+                                else if (route == 1) owners[0].RenderVolume(camera, image, target, new Vector3(-4, 1, 0), Vector3.right, 0);
+                                else if (route == 2) volume.Render(camera, image, target, owners[0], owners[1], new Vector3(-4, 1, 0), Vector3.right, 0);
+                                else atlas.Render(camera, image, target, owners, new Vector3(-4, 1, 0), Vector3.right, 0);
+                            }, output, prefix + "-" + tick + "-" + mode));
+                        }
+                    }
+                }
+                finally { foreach (var owner in owners) owner?.Dispose(); }
+            }
+        }
+        finally { UnityEngine.Object.DestroyImmediate(original); UnityEngine.Object.DestroyImmediate(prefab); UnityEngine.Object.DestroyImmediate(host); }
+        return images.ToArray();
+    }
+    private static Vector3 Actor(BlueprintFogInputQueue.Sample sample) => new Vector3((float)sample.Actor.X, (float)sample.Actor.Y, (float)sample.Actor.Z);
+    private static RenderTexture Atlas(Vector3Int size, RenderTextureFormat format)
+    {
+        var texture = new RenderTexture(size.x, size.y, 0, format, RenderTextureReadWrite.Linear) { dimension = TextureDimension.Tex3D,
+            volumeDepth = size.z, enableRandomWrite = true, filterMode = FilterMode.Trilinear, wrapMode = TextureWrapMode.Clamp };
+        if (!texture.Create()) { UnityEngine.Object.DestroyImmediate(texture); throw new InvalidOperationException("Render proof atlas allocation failed."); } return texture;
+    }
+    private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
+    [Serializable] private sealed class Report
+    {
+        public bool passed, metadataOnly, rejectedRetained, geometryBeforeCpuConfirmation, meshAndAtlasVolume,
+            productionSchedulerTested, wholeHouseSupported, gameHostTested, gpuTimingsMeasured;
+        public int owners, captures, comparisons, negativeControls, legacyCaptures;
+        public double legacyMeanDelta, maxMeanDelta, maxLocalDelta, poisonedCpuDelta, disabledKeywordDelta, staleGenerationDelta;
+    }
+}

@@ -7,13 +7,21 @@ int _RegionCount, _IntegrationSteps;
 float4 _RegionOriginClock[32], _RegionRestMin[32], _RegionRestMax[32], _RegionFieldMin[32], _RegionFieldMax[32];
 float4 _RegionActorRadius[32], _RegionShapeSize[32], _RegionFieldSize[32], _RegionOffset[32];
 float4 _RegionNoiseOffset[32];
+#if defined(BUILDWORKS_FOG_PUBLISHED)
+float4 _RegionDynamicOffset[32];
+#endif
 
 float3 AtlasUV(float3 uv, float3 size, int owner)
 { return FogAtlasUV(uv,size,_RegionOffset[owner].xyz,_AtlasSize); }
 float AtlasNoise(float3 local, int owner)
 {
     local += _RegionNoiseOffset[owner].xyz;
-    float3 drift = float3(.010,.016,-.008) * _RegionOriginClock[owner].w;
+    #if defined(BUILDWORKS_FOG_PUBLISHED)
+    float clock = FogReadPublished(owner).clock;
+    #else
+    float clock = _RegionOriginClock[owner].w;
+    #endif
+    float3 drift = float3(.010,.016,-.008) * clock;
     return tex3Dlod(_Noise,float4(local*.11+drift,0)).r*.72 + tex3Dlod(_Noise,float4(local*.29-drift,0)).r*.28;
 }
 float3 AtlasDrift(float3 local, int owner)
@@ -26,9 +34,15 @@ float3 AtlasDensities(float3 p, int owner, out float3 pigment)
     float3 wakeUV = (p-_RegionFieldMin[owner].xyz)/(_RegionFieldMax[owner].xyz-_RegionFieldMin[owner].xyz);
     bool inRest = all(uv>=0) && all(uv<=1), inField = all(wakeUV>=0) && all(wakeUV<=1);
     bool active = true;
+    #if defined(BUILDWORKS_FOG_PUBLISHED)
+    FogPublishedState state = FogReadPublished(owner);
+    active = state.valid && state.active;
+    inField = inField && active;
+    #else
     #if defined(BUILDWORKS_FOG_DORMANT_FAST)
     active = _RegionShapeSize[owner].w > .5;
     inField = inField && active;
+    #endif
     #endif
     float building=0, wake=0, wakeLight=1;
     [branch] if (inRest)
@@ -39,18 +53,34 @@ float3 AtlasDensities(float3 p, int owner, out float3 pigment)
             float3 moved=(p-AtlasDrift(p,owner)-_RegionRestMin[owner].xyz)/(_RegionRestMax[owner].xyz-_RegionRestMin[owner].xyz);
             shape=tex3Dlod(_AtlasShape,float4(AtlasUV(moved,_RegionShapeSize[owner].xyz,owner),0)).r;
             float damage=0;
+            #if defined(BUILDWORKS_FOG_PUBLISHED)
+            [branch] if(active) damage=tex3Dlod(_AtlasSurface,float4(FogDynamicUV(wakeUV,_RegionFieldSize[owner].xyz,_RegionDynamicOffset[owner].xyz),0)).w;
+            #else
             [branch] if(active) damage=tex3Dlod(_AtlasSurface,float4(AtlasUV(wakeUV,_RegionFieldSize[owner].xyz,owner),0)).w;
+            #endif
             building=shape*(.45+AtlasNoise(p,owner)*.55)*(1-damage)*.85;
         }
     }
     [branch] if(inField)
     {
+        #if defined(BUILDWORKS_FOG_PUBLISHED)
+        float4 smoke=tex3Dlod(_AtlasSmoke,float4(FogDynamicUV(wakeUV,_RegionFieldSize[owner].xyz,_RegionDynamicOffset[owner].xyz),0));
+        float4 shade=tex3Dlod(_AtlasSmoke,float4(FogDynamicUV(wakeUV-_BeamDirection*.04,_RegionFieldSize[owner].xyz,_RegionDynamicOffset[owner].xyz),0));
+        #else
         float4 smoke=tex3Dlod(_AtlasSmoke,float4(AtlasUV(wakeUV,_RegionFieldSize[owner].xyz,owner),0));
         float4 shade=tex3Dlod(_AtlasSmoke,float4(AtlasUV(wakeUV-_BeamDirection*.04,_RegionFieldSize[owner].xyz,owner),0));
+        #endif
         wake=smoke.a*.85; wakeLight=exp(-shade.a*.28);
         pigment=lerp(smoke.rgb/max(.000001,smoke.a),float3(.70,.76,.82),.94);
-        float3 edge=min(p-_RegionFieldMin[owner].xyz,_RegionFieldMax[owner].xyz-p), delta=p-_RegionActorRadius[owner].xyz;
-        float radius=_RegionActorRadius[owner].w, halfHeight=_RegionFieldSize[owner].w;
+        #if defined(BUILDWORKS_FOG_PUBLISHED)
+        float4 actorRadius=state.actorRadius;
+        float halfHeight=state.halfHeight;
+        #else
+        float4 actorRadius=_RegionActorRadius[owner];
+        float halfHeight=_RegionFieldSize[owner].w;
+        #endif
+        float3 edge=min(p-_RegionFieldMin[owner].xyz,_RegionFieldMax[owner].xyz-p), delta=p-actorRadius.xyz;
+        float radius=actorRadius.w;
         delta.y-=clamp(delta.y,-max(0,halfHeight-radius),max(0,halfHeight-radius));
         wake*=.72*smoothstep(0,.24,min(edge.x,min(edge.y,edge.z)))*smoothstep(radius-.02,radius+.06,length(delta));
     }
@@ -66,7 +96,13 @@ void AtlasCandidates(float3 origin, float3 ray, float enter, float leave, out in
         float3 minimum=_RegionFieldMin[owner].xyz+_RegionOriginClock[owner].xyz;
         float3 maximum=_RegionFieldMax[owner].xyz+_RegionOriginClock[owner].xyz;
         #if defined(BUILDWORKS_FOG_DORMANT_FAST)
-        [branch] if(_RegionShapeSize[owner].w<.5)
+        #if defined(BUILDWORKS_FOG_PUBLISHED)
+        FogPublishedState state=FogReadPublished(owner);
+        bool dormant=!state.valid || !state.active;
+        #else
+        bool dormant=_RegionShapeSize[owner].w<.5;
+        #endif
+        [branch] if(dormant)
         {
             // Dormant fields contain no transported matter; retain a conservative parallel-ray margin.
             float margin=.00001*(1+max(abs(enter),abs(leave)));

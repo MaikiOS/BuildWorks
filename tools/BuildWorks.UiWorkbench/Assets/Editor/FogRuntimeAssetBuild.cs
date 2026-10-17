@@ -15,6 +15,9 @@ public static class FogRuntimeAssetBuild
     public static void RunGammaReference()
     { Build(ColorSpace.Gamma, "fog-runtime-assets-gamma"); }
 
+    public static void RunCandidate()
+    { Build(ColorSpace.Linear, "fog-runtime-assets-candidate"); }
+
     private static void Build(ColorSpace colorSpace, string outputFolder)
     {
         ColorSpace previous = PlayerSettings.colorSpace;
@@ -34,9 +37,11 @@ public static class FogRuntimeAssetBuild
         string output = Path.Combine(root, "artifacts", outputFolder);
         string source = Path.Combine(root, "src/BuildWorks/Assets/FogGhostRuntime");
         Directory.CreateDirectory(output);
-        foreach (string name in new[] { "AccumulatedSmoke.compute", "FogGhostVolume.shader", "TexturedGhost.shader", "GhostMatter.cginc", "FogVolumePair.cginc", "FogVolumeAtlas.cginc" })
+        foreach (string name in new[] { "AccumulatedSmoke.compute", "FogGhostVolume.shader", "TexturedGhost.shader", "GhostMatter.cginc", "FogVolumePair.cginc", "FogVolumeAtlas.cginc", "FogPublished.cginc" })
             if (Hash(Path.Combine(source, name)) != Hash(Path.Combine(Application.dataPath, "BuildWorksFogRuntime", name)))
                 throw new InvalidDataException("Approved v11 source differs: " + name);
+        CheckShaders(AssetDatabase.LoadAssetAtPath<Shader>("Assets/BuildWorksFogRuntime/TexturedGhost.shader"),
+            AssetDatabase.LoadAssetAtPath<Shader>("Assets/BuildWorksFogRuntime/FogGhostVolume.shader"));
         var build = new AssetBundleBuild {
             assetBundleName = "buildworks-fog-v11",
             assetNames = new[] { "Assets/BuildWorksFogRuntime/AccumulatedSmoke.compute", "Assets/BuildWorksFogRuntime/FogGhostVolume.shader", "Assets/BuildWorksFogRuntime/TexturedGhost.shader" }
@@ -48,6 +53,7 @@ public static class FogRuntimeAssetBuild
         if (new FileInfo(path).Length > 16 * 1024 * 1024) throw new InvalidDataException("Fog asset budget exceeded.");
         using (var assets = new BlueprintFogAssets(File.ReadAllBytes(path)))
         {
+            CheckShaders(assets.Surface, assets.Volume);
             CheckLedger(assets.Solver);
             var surface = new Material(assets.Surface); var volume = new Material(assets.Volume);
             try
@@ -65,7 +71,9 @@ public static class FogRuntimeAssetBuild
         File.WriteAllText(Path.Combine(output, "verification.json"), JsonUtility.ToJson(new Report {
             passed = true, unity = Application.unityVersion, graphics = SystemInfo.graphicsDeviceType.ToString(), colorSpace = QualitySettings.activeColorSpace.ToString(),
             sha256 = Hash(path), bytes = new FileInfo(path).Length, assets = 3, kernels = 8,
-            ledgerResetAndReload = true, emptyRejected = rejected, gameHostTested = false
+            ledgerResetAndReload = true, emptyRejected = rejected, gameHostTested = false, shaderMessagesChecked = true,
+            sources = new[] { "AccumulatedSmoke.compute", "FogGhostVolume.shader", "TexturedGhost.shader", "GhostMatter.cginc", "FogVolumePair.cginc", "FogVolumeAtlas.cginc", "FogPublished.cginc" }
+                .Select(name => new Source { name = name, sha256 = Hash(Path.Combine(source, name)) }).ToArray()
         }, true));
         Debug.Log("BuildWorks approved fog v11 bundle: build/load/8 kernels/GPU ledger/reload/empty rejection PASSED");
     }
@@ -88,9 +96,20 @@ public static class FogRuntimeAssetBuild
         }
     }
 
+    internal static void CheckShaders(params Shader[] shaders)
+    {
+        foreach (var shader in shaders)
+        {
+            if (!shader || !shader.isSupported) throw new InvalidDataException("Fog shader missing or unsupported.");
+            var errors = ShaderUtil.GetShaderMessages(shader).Where(m => m.severity == UnityEditor.Rendering.ShaderCompilerMessageSeverity.Error).ToArray();
+            if (errors.Length != 0) throw new InvalidDataException(shader.name + ": " + string.Join("; ", errors.Select(m => m.message)));
+        }
+    }
+
     private static string Hash(string path)
     { using (var hash = SHA256.Create()) using (var stream = File.OpenRead(path)) return BitConverter.ToString(hash.ComputeHash(stream)).Replace("-", ""); }
 
     [Serializable] private sealed class Report
-    { public bool passed, ledgerResetAndReload, emptyRejected, gameHostTested; public string unity, graphics, sha256, colorSpace; public long bytes; public int assets, kernels; }
+    { public bool passed, ledgerResetAndReload, emptyRejected, gameHostTested, shaderMessagesChecked; public string unity, graphics, sha256, colorSpace; public long bytes; public int assets, kernels; public Source[] sources; }
+    [Serializable] private sealed class Source { public string name, sha256; }
 }

@@ -102,6 +102,12 @@ public static class FogArenaPhysicsProbe
         private readonly BlueprintFogSnapshotState.Submission[] confirmed = new BlueprintFogSnapshotState.Submission[Owners];
         private readonly List<AsyncGPUReadbackRequest> requests = new List<AsyncGPUReadbackRequest>();
         private string failure;
+        private readonly List<Action> heldConfirmations = new List<Action>();
+        internal ComputeBuffer PublishedMetadata => buffers["_PublishedMetadata"];
+        internal RenderTexture PublishedSmoke => smoke;
+        internal RenderTexture PublishedSurface => surface;
+        internal uint[] Binding(int slot) => new[] { (uint)slot, (uint)confirmed[slot].Owner, (uint)(confirmed[slot].Owner >> 32), (uint)confirmed[slot].Generation, (uint)(confirmed[slot].Generation >> 32) };
+        internal void ReleaseConfirmations() { foreach (var complete in heldConfirmations) complete(); heldConfirmations.Clear(); }
         internal readonly BlueprintFogSnapshotState[] States = new BlueprintFogSnapshotState[Owners];
         internal readonly uint[] LastFlags = new uint[Owners];
         internal int Committed, Rejected, Fields, Ledgers, Atlases, MetadataChecks, ReceiptFirst;
@@ -200,7 +206,7 @@ public static class FogArenaPhysicsProbe
         }
         internal BlueprintFogInputQueue CreateInputQueue(int slot) => new BlueprintFogInputQueue(States[slot], Observation(slot, 0));
         internal BlueprintFogSnapshotState.Submission Send(int slot, int tick, bool inject = false, bool reverseCallbacks = false,
-            BlueprintFogInputQueue input = null)
+            BlueprintFogInputQueue input = null, bool holdConfirmation = false)
         {
             var owner = States[slot]; BlueprintFogSnapshotState.Submission token;
             if (input != null)
@@ -229,7 +235,7 @@ public static class FogArenaPhysicsProbe
             void Fail(string message) { Complete(token, BlueprintFogSnapshotState.Completion.Unknown); failure = message; }
             void Confirm()
             {
-                if (completed || observed == null || receipt == null) return;
+                if (holdConfirmation || completed || observed == null || receipt == null) return;
                 completed = true;
                 if (!ReferenceEquals(States[slot], owner) || receipt[9] != pendingBase || (receipt[8] & ~15u) != 0)
                 { Fail("Physics receipt layout/status/slot differs."); return; }
@@ -246,6 +252,7 @@ public static class FogArenaPhysicsProbe
                 }
                 else ++Rejected;
             }
+            if (holdConfirmation) heldConfirmations.Add(() => { holdConfirmation = false; Confirm(); });
             try
             {
                 Owner(slot); Dispatch("BeginStep");

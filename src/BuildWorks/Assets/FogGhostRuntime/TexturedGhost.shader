@@ -21,6 +21,8 @@ Shader "BuildWorks/Fog/TexturedGhost"
         Cull Back ZWrite Off
         CGPROGRAM
         #pragma target 4.0
+        #pragma multi_compile_local __ BUILDWORKS_FOG_PUBLISHED
+        #pragma target 4.5 BUILDWORKS_FOG_PUBLISHED
         #pragma surface surf Standard alpha:fade keepalpha fullforwardshadows vertex:vert
         #include "UnityStandardUtils.cginc"
         #include "GhostMatter.cginc"

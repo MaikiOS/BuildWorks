@@ -13,6 +13,7 @@ function Guard([string]$mode,[string]$pattern){
 $physics=@{passed=$true;realSolver=$true;stagedLedger=$true;velocityAlias=$true;packingRollback=$true;shortageRollback=$true;callbackWaitsInFixture=$true;productionAllocatorTested=$false;wholeHouseSupported=$false;gameHostTested=$false;gpuTimingsMeasured=$false;gridX=96;gridY=80;gridZ=80;owners=2;ticks=360;fieldComparisons=664;ledgerComparisons=498;atlasComparisons=28;committed=161;rejected=2;metadataComparisons=164;metadataBeforeReceipt=$true;metadataOnlyTested=$true;fractionalVisualClock=$true}
 $arena=@{passed=$true;shortageRollback=$true;packingRollback=$true;nonfiniteRollback=$true;pendingRemoval=$true;reusedSlot=$true;guttersExact=$true;freeBlocksConserved=$true;productionAllocatorTested=$false;fullWallTested=$false;wholeHouseSupported=$false;gameHostTested=$false;owners=8;capacityBlocks=27;committed=47;rejected=3;batchChecks=15;fieldComparisons=480;ledgerComparisons=360}
 $frames=@{queuedInputsReplayed=$true;capturedWhilePending=$true;metadataOnlyPending=$true;passed=$true;cachedRepliesAfterExpiry=$true;receiptFirstHandled=$true;pendingResubmitRejected=$true;pendingRetireRetained=$true;generationReuse=$true;lateReplyRejected=$true;pollingHasNoWait=$true;verificationBarriersBetweenBatches=$true;productionAllocatorTested=$false;rendererTested=$false;wholeHouseSupported=$false;gameHostTested=$false;gpuTimingsMeasured=$false;frames=33;owners=2;committed=54;rejected=0;fieldComparisons=232;ledgerComparisons=174;atlasComparisons=20;metadataComparisons=54}
+$published=@{passed=$true;metadataOnly=$true;rejectedRetained=$true;geometryBeforeCpuConfirmation=$true;meshAndAtlasVolume=$true;productionSchedulerTested=$false;wholeHouseSupported=$false;gameHostTested=$false;gpuTimingsMeasured=$false;owners=2;captures=87;comparisons=62;negativeControls=26;legacyCaptures=16;legacyMeanDelta=0.0;maxMeanDelta=0.0;maxLocalDelta=0.0;poisonedCpuDelta=0.0;disabledKeywordDelta=.001;staleGenerationDelta=.001}
 $negative=0
 foreach($fixture in @(@('ArenaPhysicsOnly','*Arena physics evidence missing*',$physics),@('ArenaOnly','*Arena GPU evidence missing*',$arena),@('ArenaFramesOnly','*Arena frames evidence missing*',$frames))){
     $guard=Guard $fixture[0] $fixture[1];$baseline=$fixture[2];$result=$baseline.Clone(); & $guard
@@ -25,10 +26,62 @@ foreach($fixture in @(@('ArenaPhysicsOnly','*Arena physics evidence missing*',$p
         }
     }
 }
+$guard=Guard 'PublishedOnly' '*Published render evidence missing*'
+$result=$published.Clone(); & $guard
+foreach($field in $published.Keys){
+    $baseline=$published[$field]
+    $badValues=if($baseline -is [bool]){@($null,'true',(-not $baseline))}elseif($field -in @('owners','captures','comparisons','negativeControls','legacyCaptures')){@($null,'bad',[double]::NaN,[double]::PositiveInfinity,($baseline+1))}else{
+        $limit=switch($field){maxMeanDelta{.0001};maxLocalDelta{.03};poisonedCpuDelta{.000001};legacyMeanDelta{.000001};default{.0001}}
+        @($null,'bad',[double]::NaN,[double]::PositiveInfinity,-1,$true,$limit)
+    }
+    foreach($bad in $badValues){
+        $result=$published.Clone();$result[$field]=$bad;$rejected=$false
+        try{& $guard}catch{$rejected=$true}
+        if(!$rejected){throw "Corrupt PublishedOnly fixture accepted: $field=$bad"};++$negative
+    }
+}
 $guard=Guard 'ArenaPhysicsOnly' '*Arena physics evidence missing*'
 $result=$physics.Clone();$result.committed=340;$result.metadataComparisons=343;& $guard
 $guard=Guard 'ArenaFramesOnly' '*Arena frames evidence missing*'
 $result=$frames.Clone();$result.frames=5000;& $guard
+$guard=Guard 'PublishedOnly' '*source manifest invalid*'
+$actualRoot=$root
+$root=Join-Path $root 'artifacts/fog-evidence-candidate-fixture'
+$folder=Join-Path $root 'src/BuildWorks/Assets/FogGhostRuntime';$output=Join-Path $root 'artifacts/fog-runtime-assets-candidate'
+New-Item -ItemType Directory -Path $folder,$output -Force|Out-Null
+$names=@('AccumulatedSmoke.compute','FogGhostVolume.shader','TexturedGhost.shader','GhostMatter.cginc','FogVolumePair.cginc','FogVolumeAtlas.cginc','FogPublished.cginc')
+$sources=@(foreach($name in $names){Set-Content -LiteralPath (Join-Path $folder $name) -Value ('validator fixture '+$name);@{name=$name;sha256=(Get-FileHash -LiteralPath (Join-Path $folder $name)).Hash}})
+Set-Content -LiteralPath (Join-Path $output 'buildworks-fog-v11') -Value 'validator fixture only'
+$baseline=@{passed=$true;shaderMessagesChecked=$true;colorSpace='Linear';sources=$sources;sha256=(Get-FileHash -LiteralPath (Join-Path $output 'buildworks-fog-v11')).Hash}
+try{
+    $baseline|ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $output 'verification.json');& $guard
+    foreach($case in @('missing','duplicate','unknown','sourceHash','bundleHash','shaderCheck','passed','colorSpace')){
+        $bad=$baseline|ConvertTo-Json -Depth 5|ConvertFrom-Json
+        switch($case){
+            missing{$bad.sources=@($bad.sources|Select-Object -Skip 1)}
+            duplicate{$bad.sources[1].name=$bad.sources[0].name}
+            unknown{$bad.sources[0].name='../Unknown.cginc'}
+            sourceHash{$bad.sources[0].sha256='BAD'}
+            bundleHash{$bad.sha256='BAD'}
+            shaderCheck{$bad.shaderMessagesChecked='true'}
+            passed{$bad.passed='true'}
+            colorSpace{$bad.colorSpace='Gamma'}
+        }
+        $bad|ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $output 'verification.json');$rejected=$false
+        try{& $guard}catch{$rejected=$true}
+        if(!$rejected){throw "Invalid candidate source manifest accepted: $case"};++$negative
+    }
+}finally{$root=$actualRoot}
+$builder=[Management.Automation.Language.Parser]::ParseFile((Join-Path $root 'scripts/Build-FogGhostAssets.ps1'),[ref]$tokens,[ref]$errors)
+if($errors.Count){throw ($errors|Out-String)}
+$copy=@($builder.FindAll({param($n) $n -is [Management.Automation.Language.ForEachStatementAst] -and $n.Condition.Extent.Text -like '*BlueprintFogAssets.cs*'},$true))
+if($copy.Count -ne 1 -or $copy[0].Condition.Extent.Text -notlike '*BlueprintFogSnapshotState.cs*' -or $copy[0].Condition.Extent.Text -notlike '*BlueprintFogInputQueue.cs*'){throw 'Asset builder must stage both fog input types on a clean checkout.'}
+$project=Join-Path $root ('artifacts/fog-build-copy-fixture/'+[guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path (Join-Path $project 'Assets/Editor/RuntimeSources') -Force|Out-Null
+& ([scriptblock]::Create($copy[0].Extent.Text))
+foreach($name in @('BlueprintFogSnapshotState.cs','BlueprintFogInputQueue.cs')){
+    if((Get-FileHash -LiteralPath (Join-Path $root ('src/BuildWorks/'+$name))).Hash -cne (Get-FileHash -LiteralPath (Join-Path $project ('Assets/Editor/RuntimeSources/'+$name))).Hash){throw 'Clean asset-build staging differs.'}
+}
 $probe=[IO.File]::ReadAllText((Join-Path $root 'tools/BuildWorks.UiWorkbench/Assets/Editor/FogArenaPhysicsProbe.cs'))
 $poll=[regex]::Match($probe,'internal bool Poll\(\)[\s\S]*?\n        \}')
 if(!$poll.Success -or $poll.Value -match 'WaitForCompletion|WaitAllRequests|GetData'){throw 'Polling must use copied callback results without blocking/native data reads.'}

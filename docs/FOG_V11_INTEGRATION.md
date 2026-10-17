@@ -2,7 +2,7 @@
 
 [Русский](FOG_V11_INTEGRATION_RU.md) · [Current evidence](CURRENT_STATUS.md) · [Next milestones](ROADMAP.md)
 
-**Logical-part input is separated from GPU generations, verified in Unity:** Channels retains accepted movement while waiting for a slot, recovery and retirement; new generations receive the original baseline and tail. The105-frame run (57 source frames) covers two sources/one slot, both reentry windows, contact hold, waiting-source fairness, removal and failed-acquire callback after drain. A real wall replayed after waiting matches7 field/ledger comparisons with nonzero effect. C#0/0,131CPU groups/533rejections/32coverage; physics/frames/render and independent PASSED/Ship. [Details](FOG_PUBLISHED_RENDER_213.md#logical-source-part-queue-and-generations). **Building is not switched yet:** Visual must own a logical source safely, source textures must outlive GPU use and dormant rendering must retain continuous clocks; then real28 admission/spatial ledger/house/FPS and durable board. Accepted idle tails can still require another slot; throughput remains open. Installed .213/working bundle unchanged.
+**Visual/source lifetime and dormant rendering verified; continuous v11 parity still fails.** Visual now captures into its logical source and retains source textures through confirmed GPU drain. Eight same-baseline mesh/volume comparisons pass (maximum local error0.0001220703125); both disposal orders and invalid mapping/domain/legacy routes are checked. Existing30/14/7 and16 pixel-exact legacy captures remain. Normal/QA/Editor0/0,131CPU groups/574 corrupt-report rejections/32coverage; independent correctness PASSED/Ponytail Ship for source only. **Blocker:** a cold source discards the nonzero background velocity accumulated during idle; continuous-v11 control differs by0.11407470703125. `continuousV11Parity=false` is retained separately from the passing late-start integration oracle. Do not switch Building or deploy this backend until idle/reentry fidelity and real28 admission/spatial ledger/house/FPS pass. Installed .213 and working bundle are unchanged.
 
 Source/QA .213 embeds an owned Linear shader/compute bundle with3 assets/8 kernels. The approved v11 source/archive is frozen locally; extracted vanilla assets are never redistributed. Native prefabs/textures are resolved from the host.
 
@@ -107,8 +107,6 @@ Local receipts: `artifacts/fog-boundary-213/sweep.json`, `sources.json`, `guard-
 
 ### Full physics and metadata publication: GPU gate
 
-**Full physics GPU gate passed:** actual v11, two96×80×80 owners, batches1–8 and fractional time;664 exact field/498 ledger/28 atlas comparisons,239 commits/2 safe rejections,242 checks of64-byte metadata before CPU confirmation. Zero-step metadata-only and pending-owner rejection checked. C#0/0,2 HLSL kernels0/0,169 negative CPU fixtures and independent PASSED/Ship. **This private fixture waits for readbacks: shader consumers, real callback frames, production memory, house and FPS remain unproven.** Runtime/QA .213 unchanged; Valheim was not launched.
-
 `FogArenaPhysicsProbe.cs` uses the existing solver without changing runtime. Reflection borrows three read fields and staging ledgers; original owner velocity/ledgers remain committed until GPU publication. Prediction holds read velocity only until `AdvanceVelocity`, is then reused normally, and receives final velocity after all reads. Full maps require450 groups and ledger16; the synthetic fixture did not prove ledger carry-through.
 
 Main route:360 ticks/two owners,80 batches1–8,161 expected commits and one injected packing rejection; a separate one-block pool must exhaust safely. The oracle advances only after a confirmed commit. Rejected speculative input history cannot be retried. Checks cover four fields, three ledgers, clock, unique map/free IDs; six publication checks include all gutters. Actual GPU total664/498/28 is confirmed by a fresh receipt;239 commits/2 rejections.
@@ -123,8 +121,6 @@ Local: `artifacts/fog-arena-physics/verification.json`, `sources.json`, `unity.l
 
 ### Input queue and real frames: verified private route
 
-**Input queue and real frames verified:**64 observations, up to16 samples/8 ticks per batch; exact order/fractional and equal time/body/emit/possible/nearby. Confirmation removes only its prefix; overflow remains faulted after success; recovery waits for an empty queue.129 CPU groups, normal/QA/Editor C#0/0,261 negative CPU fixtures, independent PASSED/Ship. GPU:243 real Unity player frames,54 commits,232 field/174 ledger/20 atlas/54 metadata comparisons; capture while pending, receipt-first, expired handle, pending retirement/new generation/stale receipt passed. Full physics regression664/498/28 and239/2/242 passed again. **Queue integration is private-fixture only; production scheduler/render integration, house/FPS remain open.** Installed .213/bundle unchanged; Valheim was not launched.
-
 `FogArenaFramesCheck.cs` reuses the full Probe with an owned procedural wall, not a game-world source.24 batches1–8 alternate owners. Six frames without polling after completion must expire a native handle while copied replies survive. A further pending batch retires owner0; reuse is blocked until callback, then maps/atlas are cleared and new solver/ledger/velocity/generation created. A stale receipt is rejected during the new pending batch; the neighbor retains its clock.
 
 The join no longer assumes callback order. The fixture reverses request registration and requires an observed receipt-first case. `Poll` reads cached CPU phases without `WaitForCompletion`, `WaitAllRequests` or `GetData`; separate exact oracle comparisons and teardown may block. This does not prove production input queue, render cadence or FPS. Real Play Mode requires the runner to omit `-quit`; its own timeout remains.
@@ -138,8 +134,6 @@ With queued inputs and metadata-only pending, actual results are232/174/20/54,54
 Fresh archives: `artifacts/fog-input-213/physics/` and `frames/`; CPU `geometry-tests.log`, `cpu-verification.json`, `fingerprint-verification.json`. The command wrapper initially checked an unset `$LASTEXITCODE` after the successful PowerShell physics runner and emitted `Full physics regression failed`; physics was not rerun, and the Frame runner then separately exited0. Same Unity licensing warnings; no shader/compile/test errors.
 
 ### Published state: mesh and volume
-
-**Mesh/Atlas consumer verified in Unity:**87 captures/62 comparisons/26 negative cases;16 legacy captures are pixel-exact, CPU poison0. Separate candidate; normal/QA/Editor0/0,129 groups/363 CPU rejections, independent PASSED/Ship. [Evidence and limits](FOG_PUBLISHED_RENDER_213.md). Runtime backend, house/FPS and board remain open; installed .213 unchanged.
 
 ### Runtime: explicit borrowed fields
 

@@ -15,7 +15,8 @@ float3 _NoiseOffset;
 float GhostClock()
 {
     #if defined(BUILDWORKS_FOG_PUBLISHED)
-    return FogReadPublished(_PublishedRegion).clock;
+    FogPublishedState state = FogReadPublished(_PublishedRegion);
+    return state.dormant ? _Clock : state.clock;
     #else
     return _Clock;
     #endif
@@ -54,8 +55,8 @@ float GhostClear(float3 p)
     float clear = 0;
     #if defined(BUILDWORKS_FOG_PUBLISHED)
     FogPublishedState state = FogReadPublished(_PublishedRegion);
-    if (!state.valid) return 0;
-    float2 body = float2(state.actorRadius.w, state.halfHeight);
+    if (!state.valid && !state.dormant) return 0;
+    float2 body = state.dormant ? _Body : float2(state.actorRadius.w, state.halfHeight);
     // The accumulated runtime keeps only trail[0]; older trail entries belong to the legacy variant.
     const int trailCount = 1;
     #else
@@ -65,7 +66,7 @@ float GhostClear(float3 p)
     [unroll] for (int j = 0; j < trailCount; ++j)
     {
         #if defined(BUILDWORKS_FOG_PUBLISHED)
-        float4 trail = float4(state.actorRadius.xyz, state.weight);
+        float4 trail = state.dormant ? _Trail[0] : float4(state.actorRadius.xyz, state.weight);
         #else
         float4 trail = _Trail[j];
         #endif

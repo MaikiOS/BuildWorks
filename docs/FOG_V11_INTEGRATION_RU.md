@@ -2,7 +2,7 @@
 
 [English](FOG_V11_INTEGRATION.md) · [Доказанный статус](CURRENT_STATUS_RU.md) · [Этапы](ROADMAP_RU.md)
 
-**Очередь логической детали и GPU-поколения разделены, проверены в Unity:** Channels сохраняет принятый путь при ожидании слота, recovery и retirement; новая generation получает прежний baseline и хвост. В прогоне105 настоящих кадров (57 для источников) проверены два источника/один слот, оба повторных входа, удержание текущего контакта, выдача ожидающей детали, удаление и failed-acquire callback после drain. Реальная стена после ожидания дала7 точных сравнений полей/ledger и ненулевой эффект. C#0/0,131CPU-группа/533 отказа/32coverage; physics/frame/render и независимые PASSED/Ship. [Подробности](FOG_PUBLISHED_RENDER_213_RU.md#logical-source-очередь-детали-и-поколения). **Building ещё не переключён:** нужны привязка Visual к logical source, безопасное владение source textures и непрерывные часы dormant-рендера; затем admission28/пространственный ledger/дом/FPS и постоянная табличка. Replay принятого idle-хвоста иногда требует нового slot; производительность ещё открыта. Установленная .213/рабочий bundle неизменны.
+**Владение Visual/source и dormant-рендер проверены; непрерывная эквивалентность v11 не проходит.** Visual передаёт ввод очереди детали и удерживает source textures до подтверждённого GPU drain. Восемь сравнений mesh/volume при одинаковом baseline проходят (максимальная локальная ошибка0.0001220703125); проверены оба порядка закрытия, отказы чужого mapping/compact domain/legacy-пути. Прежние30/14/7 и16 попиксельно точных legacy-кадров сохранены. Normal/QA/Editor0/0,131CPU-группа/574 отказа повреждённых отчётов/32coverage; независимые correctness PASSED/Ponytail Ship только для исходников. **Блокер:** холодный источник теряет ненулевое фоновое течение, накопленное во время ожидания; контроль непрерывного v11 отличается на0.11407470703125. `continuousV11Parity=false` сохранён отдельно от прошедшего late-start эталона интеграции. Не переключать Building и не устанавливать этот backend до исправления idle/reentry и проверки admission28/пространственного ledger/дома/FPS. Установленная .213 и рабочий bundle неизменны.
 
 Исходники/QA.213 содержат собственный Linear shader/compute-пакет:3 assets/8 kernels. Утверждённый источник/архив v11 заморожен локально; извлечённые vanilla-материалы не распространяются. Игровые prefab/текстуры берутся из host.
 
@@ -107,8 +107,6 @@ Source/anchor/admission проверяются отдельно по насто�
 
 ### Полная физика и публикация metadata: GPU gate
 
-**Полный physics GPU gate прошёл:** настоящий v11, два владельца96×80×80, пакеты1–8 и дробное время;664 точных сравнения полей/498 ledger/28 atlas,239 commit/2 безопасных отказа,242 проверки64-byte metadata до CPU-подтверждения. Проверен zero-step metadata-only и запрет обновления pending-владельца. C#0/0,2 HLSL-ядра0/0,169 отрицательных CPU-фикстур и независимые PASSED/Ship. **Это частный стенд с ожиданием readback: shader-потребители, настоящие кадры callback, production память, дом и FPS не доказаны.** Runtime/QA .213 неизменны; Valheim не запускался.
-
 `FogArenaPhysicsProbe.cs` использует существующий solver без изменения runtime. Через reflection три read-поля и ledger привязаны к общему набору; первоначальные owner velocity/ledger сохраняются отдельно до GPU commit. Prediction-текстура хранит read velocity только до `AdvanceVelocity`, затем используется штатно; следующая скорость копируется обратно после всех чтений. Полные карты требуют450 групп, ledger —16; маленькая синтетика эту передачу не доказывала.
 
 Основной маршрут:360 ticks двумя владельцами,80 пакетов1–8,161 ожидаемый commit и injected packing-отказ; отдельный pool ёмкостью1 блок должен безопасно исчерпаться. Oracle обновляется только после подтверждённого commit. После отказа speculative input history не используется повторно. Каждая проверка сравнивает4 поля,3 ledger, clock, уникальность maps/free; шесть публикаций включают все gutters. Полученный GPU-результат664/498/28 подтверждён свежей квитанцией; всего239 commit/2 отказа.
@@ -123,8 +121,6 @@ Source/anchor/admission проверяются отдельно по насто�
 
 ### Очередь и настоящие кадры: проверенный private путь
 
-**Очередь и настоящие кадры проверены:**64 наблюдения, максимум16 samples/8 ticks в пакете, точный порядок/дробное и равное время/body/emit/possible/nearby; подтверждение удаляет только свой префикс, overflow остаётся ошибкой после success, recovery ждёт пустую очередь.129 CPU-групп, normal/QA/Editor C#0/0,261 отрицательная CPU-фикстура, независимые PASSED/Ship. GPU:243 настоящих кадра Unity,54 commit,232 field/174 ledger/20 atlas/54 metadata; capture при pending, receipt-first, expired handle, pending retirement/новая generation/старая квитанция прошли. Полная physics-регрессия664/498/28 и239/2/242 прошла повторно. **Очередь подключена только в private стенде; игровой scheduler/render integration, дом/FPS ещё открыты.** Установленная .213/bundle неизменны; Valheim не запускался.
-
 `FogArenaFramesCheck.cs` переиспользует полный Probe на процедурной стене, не исходниках игрового мира.24 пакета1–8 и чередование владельцев; шесть кадров без опроса после готовности должны показать истечение native handle, тогда как скопированные ответы сохраняются. После ещё одного pending batch owner0 уходит в retirement, повторное использование запрещено до callback; затем очищаются maps/atlas, создаются новые solver/ledger/velocity/generation, старая квитанция отклоняется при новом pending batch. Сосед продолжает свой clock.
 
 Новый join не предполагает порядок callbacks. Frame fixture меняет порядок регистрации запросов и требует фактически наблюдённого receipt-first случая. `Poll` читает только CPU-кэш фаз, без `WaitForCompletion`, `WaitAllRequests` и `GetData`; отдельные точные oracle-сверки и teardown могут блокировать. Это не production input queue, render cadence или FPS. Проверка требует реального Play Mode, поэтому runner не использует `-quit`; собственный timeout сохраняется.
@@ -138,8 +134,6 @@ Source/anchor/admission проверяются отдельно по насто�
 Свежие архивы: `artifacts/fog-input-213/physics/` и `frames/`; CPU `geometry-tests.log`, `cpu-verification.json`, `fingerprint-verification.json`. Обёртка запуска сначала ошибочно проверила неустановленный `$LASTEXITCODE` после успешного PowerShell physics runner и вывела `Full physics regression failed`; physics не перезапускали, затем Frame runner отдельно завершился exit0. Unity licensing warnings прежние; shader/compile/test ошибок нет.
 
 ### Опубликованное состояние: mesh и объём
-
-**Mesh/Atlas consumer проверен в Unity:**87 кадров/62 сравнения/26 отрицательных случаев;16 legacy-кадров попиксельно совпали, CPU poison0. Candidate отдельно; normal/QA/Editor0/0,129 групп/363 отрицательных CPU-проверки, независимые PASSED/Ship. [Доказательства и границы](FOG_PUBLISHED_RENDER_213_RU.md). Игровой backend, дом/FPS и табличка ещё открыты; установленная .213 не менялась.
 
 ### Runtime: явное заимствование полей
 

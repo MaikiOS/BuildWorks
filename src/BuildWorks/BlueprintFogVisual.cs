@@ -15,6 +15,7 @@ namespace OstrixMods.BuildWorks
         private BlueprintFogSource source;
         private BlueprintFogSimulation simulation;
         private BlueprintFogChannels channelPool;
+        private BlueprintFogChannels.SnapshotSource logicalSource;
         private string channelOwner;
         private readonly List<Material> surfaces = new List<Material>();
         private Material volume;
@@ -27,9 +28,11 @@ namespace OstrixMods.BuildWorks
         internal GameObject Root => visual;
         internal BlueprintFogSource Source => source;
         internal BlueprintFogSimulation Simulation => simulation;
+        internal BlueprintFogChannels.SnapshotSource LogicalSource => logicalSource;
+        internal BlueprintFogChannels.SnapshotChannel Snapshot => logicalSource?.Snapshot?.State.State == BlueprintFogSnapshotState.Phase.Retired ? null : logicalSource?.Snapshot;
         internal Texture Smoke => simulation != null ? (Texture)simulation.Smoke : assets.Empty;
         internal Texture Surface => simulation != null ? (Texture)simulation.Surface : assets.Empty;
-        internal Vector3Int FieldSize => simulation?.GridSize ?? Vector3Int.one;
+        internal Vector3Int FieldSize => logicalSource != null ? new Vector3Int(96, 80, 80) : simulation?.GridSize ?? Vector3Int.one;
         internal Vector3 FieldMinimum => minimum;
         internal Vector3 FieldMaximum => maximum;
         internal Vector4 ActorRadius => new Vector4(trail[0].x, trail[0].y, trail[0].z, body.x);
@@ -43,7 +46,9 @@ namespace OstrixMods.BuildWorks
             Vector3? noiseOrigin = null)
         {
             if (assets == null || !prefab) throw new ArgumentException("Fog prefab/assets missing.");
-            if (lazyFields && (!compactRegion || channels == null || string.IsNullOrWhiteSpace(owner)))
+            bool published = channels?.SnapshotArena != null;
+            if (published && compactRegion) throw new ArgumentException("Published v11 requires the full physical domain; compact-source admission is unproved.");
+            if (lazyFields && !published && (!compactRegion || channels == null || string.IsNullOrWhiteSpace(owner)))
                 throw new ArgumentException("Lazy fog requires a compact region and named channel pool.");
             ValidateClockBody(0, capsule); this.assets = assets; this.lazyFields = lazyFields;
             try
@@ -59,9 +64,20 @@ namespace OstrixMods.BuildWorks
                 maximum = source.Maximum + new Vector3(1.2f, .6f, 1);
                 Vector3 localActor = LocalActor(actor, out bool nearby);
                 body = capsule;
-                grid = compactRegion ? BlueprintFogSimulation.CompactGrid(minimum, maximum) : (Vector3Int?)null;
+                grid = !published && compactRegion ? BlueprintFogSimulation.CompactGrid(minimum, maximum) : (Vector3Int?)null;
                 channelPool = channels; channelOwner = owner;
-                if (!lazyFields)
+                if (published)
+                {
+                    // The scheduler can outlive this visual while queued GPU work still reads its source textures.
+                    // shortcut: cold sources restart velocity; prove continuous idle/reentry parity before house activation.
+                    var retained = source; Vector3 low = minimum, high = maximum, phase = NoiseOffset;
+                    logicalSource = channels.RegisterSnapshotSource(Sample(0, localActor, capsule, false, false, nearby),
+                        (scratch, staged, initial) => new BlueprintFogSimulation(assets, retained.Shape, retained.Pigment, retained.Noise,
+                            low, high, retained.Minimum, retained.Maximum,
+                            new Vector3((float)initial.Actor.X, (float)initial.Actor.Y, (float)initial.Actor.Z), 37,
+                            initialClock: initial.Clock, scratch: scratch, noiseOffset: phase, stagedState: staged), retained.Dispose);
+                }
+                else if (!lazyFields)
                 {
                     Activate(localActor, 0);
                     simulation.AdvanceTo(0, localActor, capsule, nearby);
@@ -108,8 +124,10 @@ namespace OstrixMods.BuildWorks
             if (source == null) throw new ObjectDisposedException(nameof(BlueprintFogVisual));
             ValidateClockBody(clock, capsule);
             Vector3 local = LocalActor(actor, out bool nearby), previous = new Vector3(trail[0].x, trail[0].y, trail[0].z);
-            bool contact = lazyFields && emit && nearby && source.MightContact(previous, local, capsule);
-            if (contact && simulation == null)
+            bool contact = (lazyFields || logicalSource != null) && emit && nearby && source.MightContact(previous, local, capsule);
+            if (logicalSource != null)
+                channelPool.CaptureSource(logicalSource, Sample(clock, local, capsule, emit && nearby, contact, nearby));
+            else if (contact && simulation == null)
             {
                 if (Mathf.FloorToInt(clock / BlueprintFogSimulation.Step + .0001f) -
                     Mathf.FloorToInt(time / BlueprintFogSimulation.Step + .0001f) > 8)
@@ -124,6 +142,9 @@ namespace OstrixMods.BuildWorks
             time = clock; body = capsule; trail[0] = new Vector4(local.x, local.y, local.z, nearby ? 1 : 0);
             Bind();
         }
+
+        private static BlueprintFogInputQueue.Sample Sample(float clock, Vector3 actor, Vector2 capsule, bool emit, bool contact, bool nearby)
+            => new BlueprintFogInputQueue.Sample(clock, new Geometry.Point3(actor.x, actor.y, actor.z), capsule.x, capsule.y, emit, contact, nearby);
 
         private void Activate(Vector3 actor, float clock)
         {
@@ -168,6 +189,7 @@ namespace OstrixMods.BuildWorks
         internal void BindVolume(Material material, string suffix)
         {
             if (source == null || !Smoke || !Surface) throw new ObjectDisposedException(nameof(BlueprintFogVisual));
+            if (logicalSource != null) throw new InvalidOperationException("Published fog requires its prepared atlas, not a legacy volume pass.");
             material.SetTexture("_Shape" + suffix, source.Shape); material.SetTexture("_Albedo" + suffix, source.Pigment);
             material.SetTexture("_Noise" + suffix, source.Noise); material.SetTexture("_Wake" + suffix, Smoke);
             material.SetTexture("_MatterFlow" + suffix, Surface);
@@ -197,6 +219,12 @@ namespace OstrixMods.BuildWorks
                 material.SetVector("_DynamicAtlasSize", new Vector4(98, 82, 82 * pool.SnapshotCapacity, 0));
                 material.SetVector("_DynamicFieldSize", new Vector4(96, 80, 80, 0)); material.SetVector("_DynamicOffset", offset);
             }
+        }
+
+        internal void ValidatePublishedMapping(BlueprintFogChannels pool, BlueprintFogChannels.SnapshotChannel snapshot)
+        {
+            if (logicalSource != null && (!ReferenceEquals(channelPool, pool) || !ReferenceEquals(Snapshot, snapshot)))
+                throw new ArgumentException("Fog visual must use its own published source mapping.");
         }
 
         internal void UnbindPublished()
@@ -233,6 +261,11 @@ namespace OstrixMods.BuildWorks
         public void Dispose()
         {
             if (visual) visual.SetActive(false);
+            if (logicalSource != null)
+            {
+                if (!logicalSource.Released && !logicalSource.Removed) channelPool.RemoveSource(logicalSource);
+                logicalSource = null; source = null;
+            }
             if (channelPool != null) { if (simulation != null) channelPool.Remove(channelOwner, simulation); channelPool = null; }
             else simulation?.Dispose();
             simulation = null;

@@ -77,6 +77,7 @@ namespace OstrixMods.BuildWorks
             {
                 if (owners[i] == null || owners[i].Source == null || !unique.Add(owners[i]) ||
                     (snapshots[i] != null && !uniqueSnapshots.Add(snapshots[i]))) throw new ArgumentException("Published fog owners must be distinct and live.");
+                owners[i].ValidatePublishedMapping(publishedPool, snapshots[i]);
                 publishedPool.WriteSnapshotBinding(snapshots[i], bindingWords, i * 5);
                 dynamicOffsets[i] = new Vector4(0, 0, (snapshots[i]?.Slot ?? 0) * 82, 0);
             }
@@ -174,6 +175,7 @@ namespace OstrixMods.BuildWorks
             {
                 BlueprintFogVisual owner = owners[i];
                 if (owner == null || !unique.Add(owner) || owner.Source == null || !owner.Source.Shape || !owner.Smoke || !owner.Surface) throw new ArgumentException("Fog atlas needs distinct live owners.");
+                if (publishedPool == null && owner.LogicalSource != null) throw new ArgumentException("Logical fog visual requires a published atlas.");
                 if (i == 0) bounds = owner.VolumeBounds; else bounds.Encapsulate(owner.VolumeBounds);
                 Texture3D source = owner.Source.Shape; Vector3Int field = publishedPool == null ? owner.FieldSize : new Vector3Int(96, 80, 80);
                 blocks.Add(publishedPool != null ? new Vector3Int(source.width + 2, source.height + 2, source.depth + 2) :

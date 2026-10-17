@@ -17,7 +17,8 @@ float AtlasNoise(float3 local, int owner)
 {
     local += _RegionNoiseOffset[owner].xyz;
     #if defined(BUILDWORKS_FOG_PUBLISHED)
-    float clock = FogReadPublished(owner).clock;
+    FogPublishedState state = FogReadPublished(owner);
+    float clock = state.dormant ? _RegionOriginClock[owner].w : state.clock;
     #else
     float clock = _RegionOriginClock[owner].w;
     #endif

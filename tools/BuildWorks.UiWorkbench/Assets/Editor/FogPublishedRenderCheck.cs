@@ -217,6 +217,8 @@ public static class FogPublishedRenderCheck
                         gameHostTested = false, gpuTimingsMeasured = false };
                 }
                 CheckRuntimeAtlas(assets, visuals, camera, probe, output, report);
+                foreach (var visual in visuals) visual.Root.SetActive(false);
+                CheckLogicalVisual(assets, prefab, camera, probe, output, report);
             }
         }
         finally
@@ -357,6 +359,102 @@ public static class FogPublishedRenderCheck
             report.runtimeVisualAtlasValidated = true; report.staticSourceSeparated = true;
         }
     }
+    private static void CheckLogicalVisual(BlueprintFogAssets assets, GameObject prefab, Camera camera, FogRenderProbe probe, string output, Report report)
+    {
+        var body = new Vector2(.3f, .95f); var outside = new Vector3(-1.8f, .95f, 0);
+        using (var pool = BlueprintFogChannels.CreateArena(assets, 1, 8192))
+        using (var dense = new BlueprintFogAtlas(assets))
+        using (var published = new BlueprintFogAtlas(assets, pool))
+        using (var expected = new BlueprintFogVisual(assets, prefab, Vector3.up, Quaternion.identity, Vector3.one, null, Vector3.zero, outside, body))
+        using (var actual = new BlueprintFogVisual(assets, prefab, Vector3.up, Quaternion.identity, Vector3.one, null, Vector3.zero, outside, body, pool))
+        {
+            Require(actual.Simulation == null && actual.Snapshot == null && actual.LogicalSource != null, "Visual eagerly allocated a legacy simulation.");
+            void Compare(string name, bool continuousControl = false)
+            {
+                for (int mode = 0; mode < (continuousControl ? 1 : 2); ++mode)
+                {
+                    actual.Root.SetActive(false); expected.Root.SetActive(true);
+                    int route = mode;
+                    var baseline = FogRuntimePairCheck.Capture(camera, probe, (image, target) => {
+                        if (route == 0) Graphics.Blit(image, target);
+                        else dense.Render(camera, image, target, new[] { expected }, Vector3.zero, Vector3.right, 0);
+                    }, output, "logical-" + name + "-" + mode + "-dense");
+                    expected.Root.SetActive(false); actual.Root.SetActive(true);
+                    var mapping = new[] { actual.Snapshot }; published.PreparePublished(new[] { actual }, mapping);
+                    var image = FogRuntimePairCheck.Capture(camera, probe, (input, target) => {
+                        if (route == 0) Graphics.Blit(input, target);
+                        else published.Render(camera, input, target, new[] { actual }, Vector3.zero, Vector3.right, 0, mapping);
+                    }, output, "logical-" + name + "-" + mode + "-published");
+                    double delta = FogRuntimePairCheck.Delta(baseline, image), local = 0;
+                    for (int i = 0; i < image.Length; ++i) local = Math.Max(local, Math.Max(Math.Abs(baseline[i].r - image[i].r), Math.Max(Math.Abs(baseline[i].g - image[i].g), Math.Abs(baseline[i].b - image[i].b))));
+                    if (continuousControl)
+                    {
+                        report.continuousIdleMaxLocalDelta = local;
+                        report.continuousV11Parity = false;
+                        Require(local >= .03, "Continuous idle velocity control no longer reproduces the known fidelity blocker; reassess it.");
+                        report.continuousIdleControlSensitive = true; continue;
+                    }
+                    report.logicalVisualMaxMeanDelta = Math.Max(report.logicalVisualMaxMeanDelta, delta);
+                    report.logicalVisualMaxLocalDelta = Math.Max(report.logicalVisualMaxLocalDelta, local);
+                    Require(delta < .0001 && local < .03, "Logical Visual differs from dense rendering: " + name + "/" + mode + "/" + delta + "/" + local);
+                    ++report.logicalVisualComparisons;
+                }
+            }
+            for (int i = 1; i <= 16; ++i)
+            {
+                Vector3 actor = i <= 8 ? Vector3.up * .95f : outside;
+                actual.AdvanceTo(i * .2f, actor, body, false); expected.AdvanceTo(i * .2f, actor, body, false); pool.PumpSources();
+                Require(actual.Snapshot == null && actual.LogicalSource.Inputs.Count == 0, "Dormant visual queued an idle simulation.");
+                if (i == 8)
+                    foreach (var material in actual.Source.Parts.Concat(expected.Source.Parts).SelectMany(part => part.Renderer.sharedMaterials))
+                        material.SetFloat("_Accumulated", 0); // Exercise GhostClear as well as the accumulated geometry variant.
+                if (i == 8 || i == 16) Compare("dormant-" + i);
+            }
+            Vector3 inside = Vector3.up * .95f;
+            actual.AdvanceTo(3.4f, inside, body, true); expected.AdvanceTo(3.4f, inside, body, true); pool.PumpSources();
+            Require(actual.Snapshot != null && actual.Snapshot.State.State == BlueprintFogSnapshotState.Phase.Pending, "Visual contact did not submit its queued path.");
+            AsyncGPUReadback.WaitAllRequests(); Compare("continuous-idle-failing-gate", true);
+            // Integration oracle starts at the same dormant baseline. The continuous v11 failure remains separately recorded above.
+            expected.Simulation.Dispose();
+            var late = new BlueprintFogSimulation(assets, expected.Source.Shape, expected.Source.Pigment, expected.Source.Noise,
+                expected.FieldMinimum, expected.FieldMaximum, expected.Source.Minimum, expected.Source.Maximum, outside, 37, initialClock: 3.2f);
+            typeof(BlueprintFogVisual).GetField("simulation", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).SetValue(expected, late);
+            expected.AdvanceTo(3.4f, inside, body, true); Compare("late-start-contact-before-confirmation");
+            // Latest CPU input cannot replace the actor/clock of the snapshot already published by the GPU.
+            actual.AdvanceTo(3.41f, outside, new Vector2(.5f, 1.3f), false); Compare("queued-metadata");
+            Require(actual.LogicalSource.Inputs.Count >= 2, "Visual lost accepted input while its receipt was pending.");
+            bool rejected = false;
+            try { published.PreparePublished(new[] { actual }, new BlueprintFogChannels.SnapshotChannel[1]); }
+            catch (ArgumentException) { rejected = true; }
+            Require(rejected, "Logical visual accepted an unassigned mapping while its own snapshot is live.");
+            rejected = false;
+            try { using (var invalid = new BlueprintFogVisual(assets, prefab, Vector3.up, Quaternion.identity, Vector3.one, null, Vector3.zero, outside, body, pool, compactRegion: true)) { } }
+            catch (ArgumentException) { rejected = true; }
+            Require(rejected, "Logical visual accepted an unproved compact physical domain.");
+            rejected = false;
+            var legacy = new Material(assets.Volume);
+            try { actual.BindVolume(legacy, ""); } catch (InvalidOperationException) { rejected = true; }
+            finally { UnityEngine.Object.DestroyImmediate(legacy); }
+            Require(rejected, "Logical visual accepted a legacy volume pass.");
+            var retained = actual.Source; var logical = actual.LogicalSource;
+            published.Dispose(); actual.Dispose(); actual.Dispose();
+            Require(retained.Shape && retained.Pigment && retained.Noise && !logical.Released, "Visual freed source textures before GPU drain.");
+            pool.Dispose();
+            Require(!retained.Shape && !retained.Pigment && !retained.Noise && logical.Released, "Visual source leaked after confirmed pool teardown.");
+            expected.Dispose();
+            report.logicalVisualValidated = true; report.logicalVisualDeferredDisposal = true; report.dormantClockAndBodyValidated = true;
+        }
+        using (var pool = BlueprintFogChannels.CreateArena(assets, 1, 8192))
+        using (var visual = new BlueprintFogVisual(assets, prefab, Vector3.up, Quaternion.identity, Vector3.one, null, Vector3.zero, outside, body, pool))
+        {
+            visual.AdvanceTo(.2f, Vector3.up * .95f, body, true); pool.PumpSources();
+            var logical = visual.LogicalSource; var retained = visual.Source;
+            Require(visual.Snapshot != null && retained.Shape && !logical.Released, "Pool-first fixture did not submit a live visual.");
+            pool.Dispose();
+            Require(logical.Released && !retained.Shape && !retained.Pigment && !retained.Noise, "Pool-first teardown retained source textures.");
+            visual.Dispose(); visual.Dispose();
+        }
+    }
     private static Color[][] LegacyImages(string bundle, string output, string prefix)
     {
         var host = new GameObject("Legacy shader regression"); var camera = host.AddComponent<Camera>(); var probe = host.AddComponent<FogRenderProbe>();
@@ -416,6 +514,11 @@ public static class FogPublishedRenderCheck
     {
         public bool runtimeChannelsValidated;
         public bool runtimeVisualAtlasValidated, staticSourceSeparated;
+        public bool logicalVisualValidated, logicalVisualDeferredDisposal, dormantClockAndBodyValidated;
+        public bool continuousV11Parity, continuousIdleControlSensitive;
+        public double continuousIdleMaxLocalDelta;
+        public int logicalVisualComparisons;
+        public double logicalVisualMaxMeanDelta, logicalVisualMaxLocalDelta;
         public bool passed, metadataOnly, rejectedRetained, geometryBeforeCpuConfirmation, meshAndAtlasVolume,
             productionSchedulerTested, wholeHouseSupported, gameHostTested, gpuTimingsMeasured;
         public int owners, captures, comparisons, negativeControls, legacyCaptures;

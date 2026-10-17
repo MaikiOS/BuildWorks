@@ -12,7 +12,7 @@ struct FogPublishedState
 {
     float4 actorRadius;
     float halfHeight, clock, weight;
-    bool valid, active;
+    bool valid, active, dormant;
 };
 FogPublishedState FogReadPublished(int region)
 {
@@ -23,7 +23,11 @@ FogPublishedState FogReadPublished(int region)
     _FogBindings.GetDimensions(bindingWords, bindingStride);
     _PublishedMetadata.GetDimensions(metadataWords, metadataStride);
     if (region < 0 || (uint)region >= bindingWords / 5 || bindingStride != 4 || metadataStride != 4 || _PublishedSlots <= 0) return state;
+    if ((uint)_PublishedSlots > metadataWords / 16) return state;
     uint binding = region * 5, slot = _FogBindings[binding];
+    // Only the explicit unassigned tuple may use this source's CPU clock/body; corrupt bindings stay inert.
+    state.dormant = slot == 0xffffffffu && _FogBindings[binding + 1] == 0 && _FogBindings[binding + 2] == 0
+        && _FogBindings[binding + 3] == 0 && _FogBindings[binding + 4] == 0;
     if (slot >= (uint)_PublishedSlots || slot >= metadataWords / 16) return state;
     uint base = slot * 16, flags = _PublishedMetadata[base + 7];
     if ((flags & 1) == 0 || _PublishedMetadata[base + 8] != _FogBindings[binding + 1]

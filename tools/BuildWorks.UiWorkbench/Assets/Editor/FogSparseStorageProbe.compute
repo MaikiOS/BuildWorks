@@ -1,0 +1,78 @@
+#pragma kernel IndexBlocks
+#pragma kernel PackBlocks
+#pragma kernel UnpackBlocks
+#pragma kernel ClearDense
+#pragma kernel CompareDense
+#pragma kernel CompareWords
+
+// Measurement prototype only. Physical v11 kernels do not include this file.
+Texture3D<float4> _Dense, _Expected;
+RWTexture3D<float4> _Restored;
+RWStructuredBuffer<uint> _Map, _Count, _Flags;
+RWStructuredBuffer<uint2> _Packed;
+StructuredBuffer<uint> _WordsA, _WordsB;
+int3 _Blocks;
+int _Capacity, _WordCount;
+groupshared uint present, slot;
+
+uint BlockIndex(uint3 group) { return group.x + _Blocks.x * (group.y + _Blocks.y * group.z); }
+uint4 HalfBits(float4 value) { return f32tof16(value) & 0xffffu; }
+
+[numthreads(4,4,4)]
+void IndexBlocks(uint3 id : SV_DispatchThreadID, uint3 group : SV_GroupID, uint local : SV_GroupIndex)
+{
+    if(local==0) present=0;
+    GroupMemoryBarrierWithGroupSync();
+    uint4 bits=HalfBits(_Dense.Load(int4(id,0)));
+    if(any((bits & 0x7c00u)==0x7c00u)) InterlockedOr(_Flags[0],1);
+    if(any(bits!=0)) InterlockedOr(present,1);
+    GroupMemoryBarrierWithGroupSync();
+    if(local==0)
+    {
+        slot=0xffffffffu;
+        if(present!=0) InterlockedAdd(_Count[0],1,slot);
+        _Map[BlockIndex(group)]=slot;
+    }
+}
+
+[numthreads(4,4,4)]
+void PackBlocks(uint3 id : SV_DispatchThreadID, uint3 group : SV_GroupID, uint local : SV_GroupIndex)
+{
+    uint address=_Map[BlockIndex(group)];
+    if(address==0xffffffffu) return;
+    if(address>=(uint)_Capacity){InterlockedOr(_Flags[0],2);return;}
+    uint4 bits=HalfBits(_Dense.Load(int4(id,0)));
+    _Packed[address*64+local]=uint2(bits.x | (bits.y<<16),bits.z | (bits.w<<16));
+}
+
+[numthreads(4,4,4)]
+void UnpackBlocks(uint3 id : SV_DispatchThreadID, uint3 group : SV_GroupID, uint local : SV_GroupIndex)
+{
+    uint address=_Map[BlockIndex(group)];
+    if(address==0xffffffffu){_Restored[id]=0;return;}
+    if(address>=(uint)_Capacity){InterlockedOr(_Flags[0],2);return;}
+    uint2 packed=_Packed[address*64+local];
+    _Restored[id]=float4(f16tof32(packed.x & 0xffffu),f16tof32(packed.x>>16),
+        f16tof32(packed.y & 0xffffu),f16tof32(packed.y>>16));
+}
+
+[numthreads(4,4,4)]
+void ClearDense(uint3 id : SV_DispatchThreadID)
+{
+    // A nonzero sentinel makes omitted zero blocks and incomplete writes observable.
+    _Restored[id]=float4(.125,-.25,1,.5);
+}
+
+[numthreads(4,4,4)]
+void CompareDense(uint3 id : SV_DispatchThreadID)
+{
+    uint4 a=HalfBits(_Dense.Load(int4(id,0))),b=HalfBits(_Expected.Load(int4(id,0)));
+    if(any((a & 0x7c00u)==0x7c00u)||any((b & 0x7c00u)==0x7c00u)) InterlockedOr(_Flags[0],1);
+    if(any(a!=b)) InterlockedOr(_Flags[0],4);
+}
+
+[numthreads(64,1,1)]
+void CompareWords(uint id : SV_DispatchThreadID)
+{
+    if(id<(uint)_WordCount && _WordsA[id]!=_WordsB[id]) InterlockedOr(_Flags[0],8);
+}

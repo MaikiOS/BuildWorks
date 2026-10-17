@@ -6,6 +6,7 @@ This records changes and evidence, not future milestones. Historical results ret
 
 | Checkpoint | Change / evidence | Boundary |
 | --- | --- | --- |
+| Post-.213 storage-test preparation | Isolated codec/full wall/raw-bit fixtures; C#0/0,6 compute kernels compiled onCPU;29 synthetic corrupt reports rejected, prior Domain/Noise receipts accepted; independent PASSED/Ship | Unity import/GPU roundtrip/actual occupancy/peaks untested; no shared workspace/game integration. .213 and bundle unchanged; no game/GPU launch |
 | Post-.213 architecture | Astra: retain independent provenance/full domains; one workspace, sparse nonvelocity state and split atlases. CPU ran current Layout: fixture126955800 exact, split98452056<128MiB for declared bounds/8 fields | Designed, not implemented. Actual occupancy/generation peaks/source admission/render lifecycle/FPS unverified; no game/GPU launch |
 | Unity, .213 boundaries | Causal2×2 absorption/storage control; full control4 fields+away/peak/state exact at12 frames; four-size sweep, nine corrupt-receipt rejections; independent PASSED/Ship | Diagnostic only: larger per-part candidate not accepted; runtime/installed .213 unchanged, native/full appearance/board remain open |
 | [.213](FOG_NOISE_FRAME_213.md) | Shared surface/compute/single/pair/atlas noise frame; GPU3×3, exact transport/emission/return, regressions/builds/contracts and independent PASSED/Ship; installed,143 files unchanged | Native .213 untested; domain/ownership/FPS/roof/board open. Rejected empty-cell optimization is absent |

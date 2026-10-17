@@ -6,7 +6,7 @@ This records changes and evidence, not future milestones. Historical results ret
 
 | Checkpoint | Change / evidence | Boundary |
 | --- | --- | --- |
-| [.212](FOG_RECOVERY_212.md) | Disappearance reproduced before fix; callback copy/revision/Dispose, Recovery24 real frames, Scratch/Lazy/builds/contracts/independent PASSED/Ship. Explicit300s manual QA inspection; installed | Native .212 untested; roof/FPS/durable board open |
+| [.212](FOG_RECOVERY_212.md) | Disappearance reproduced before fix; callback copy/revision/Dispose, Recovery24 real frames, Scratch/Lazy/builds/contracts/independent PASSED/Ship. Explicit300s manual QA inspection; installed | Native .212: the28-part house passed both ways,35/35 steps in44s; contact6/8 owners, both recoveries0/0 bytes, peak87408640; inventory unchanged, no errors. A300s manual inspection is running; owner acceptance pending. Roof/FPS/board open |
 | Native .211 | Same camera/frozen simulation:shader49.15/24.80/48.26 FPS; first recovery0/peak87408640. Three owner runs exposed recovery-readback disappearance | Full script FAILED; reverse contact11 FPS, stable five-minute preview not delivered |
 | [.211](FOG_RENDER_CACHE_211.md) | Atlas cache/dormant zero sampling; redundant packing reproduced,10 exact comparisons/28 synthetic, Atlas/v11 parity/builds/contracts/review; installed | Native FPS/full-house appearance untested; durable board still ahead |
 | [.210](FOG_SCRATCH_210.md) | Exact-grid shared GPU scratch; Scratch360/36/Lazy5/frozen270/18, builds/contracts/independent review; installed. Native28-part house:both-way passage/recovery0, peak87408640 | Volume speed down to8 FPS/full appearance not accepted; durable project/board still ahead |

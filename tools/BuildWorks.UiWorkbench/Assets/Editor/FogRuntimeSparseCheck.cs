@@ -73,10 +73,11 @@ public static class FogRuntimeSparseCheck
                     }
                     Require(fieldComparisons == 1444 && ledgerComparisons == 1083 && cpuComparisons == 16 && liveSteps > 0 && firstSmoke && repeatedSmoke,
                         "Sparse comparison did not exercise the full live route.");
+                    var shared = FogSparseSharedProbe.Run(codec, assets, visual);
                     long voxels = 96L * 80 * 80, workspace = voxels * 8 * 9, velocities = voxels * 8 * 8;
                     long projection = workspace + velocities + 9 * peakStored + 8 * (1024 * 8L + 4) + codec.CommonBufferBytes;
                     File.WriteAllText(Path.Combine(output, "verification.json"), JsonUtility.ToJson(new Report {
-                        passed = true, gameHostTested = false, wholeHouseSupported = false, productionAllocatorTested = false,
+                        passed = true, shared = shared, gameHostTested = false, wholeHouseSupported = false, productionAllocatorTested = false,
                         gpuTimingsMeasured = false, ticks = 360, fieldComparisons = fieldComparisons, ledgerComparisons = ledgerComparisons,
                         cpuRawComparisons = cpuComparisons, finiteHalfPatterns = 63488, rawFixtures = 3, negativeControls = 4,
                         recontact = repeatedSmoke, liveSteps = liveSteps, peakStoredBytes = peakStored, peakOldNewBytes = peakGenerations,
@@ -146,15 +147,15 @@ public static class FogRuntimeSparseCheck
         else x = Mathf.Lerp(0, -1.8f, Mathf.Clamp01(time - 9));
         return new Vector3(x, .95f, 0);
     }
-    private static RenderTexture Current(BlueprintFogSimulation simulation, string name)
+    internal static RenderTexture Current(BlueprintFogSimulation simulation, string name)
     {
         var type = typeof(BlueprintFogSimulation);
         int index = (int)type.GetField("current", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(simulation);
         return ((RenderTexture[])type.GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(simulation))[index];
     }
-    private static ComputeBuffer Buffer(BlueprintFogSimulation simulation, string name)
+    internal static ComputeBuffer Buffer(BlueprintFogSimulation simulation, string name)
         => (ComputeBuffer)typeof(BlueprintFogSimulation).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(simulation);
-    private static ushort[] Read(RenderTexture texture)
+    internal static ushort[] Read(RenderTexture texture)
     {
         var request = AsyncGPUReadback.Request(texture); request.WaitForCompletion();
         Require(!request.hasError, "Sparse raw readback failed.");
@@ -178,6 +179,7 @@ public static class FogRuntimeSparseCheck
     {
         public bool passed, gameHostTested, wholeHouseSupported, productionAllocatorTested, gpuTimingsMeasured, recontact,
             projectionFitsFieldCap, projectionIsHouseAdmission;
+        public FogSparseSharedProbe.Report shared;
         public int ticks, fieldComparisons, ledgerComparisons, cpuRawComparisons, finiteHalfPatterns, rawFixtures, negativeControls, liveSteps;
         public long peakStoredBytes, peakOldNewBytes, commonBufferBytes, comparisonDenseTextureBytes, projectedEightIdenticalOwnersBytes;
         public double synchronizedRoundTripMilliseconds; public string note;

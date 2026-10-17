@@ -2,6 +2,8 @@
 
 2026-10-17 · [Русский](HANDOFF_RU.md)
 
+**Runtime borrowing verified:** Simulation explicitly borrows fields/ledger without reflection substitution and retains external resources on Dispose.11 resource-validation rejections before GPU writes; physics/frame/render and legacy scratch/recovery passed. Normal/QA/Editor0/0,129groups/371CPU rejections. [Details](docs/FOG_PUBLISHED_RENDER_213.md#runtime-explicit-borrowed-fields). Pool/scheduler/split atlas and house/FPS remain open; installed .213 unchanged.
+
 **Mesh/Atlas consumer verified in Unity:**87 captures/62 comparisons/26 negative cases;16 legacy captures are pixel-exact, CPU poison0. Separate candidate; normal/QA/Editor0/0,129 groups/363 CPU rejections, independent PASSED/Ship. [Evidence and limits](docs/FOG_PUBLISHED_RENDER_213.md). Runtime backend, house/FPS and board remain open; installed .213 unchanged.
 
 **Input queue and real frames verified:**64 observations, up to16 samples/8 ticks per batch; exact order/fractional and equal time/body/emit/possible/nearby. Confirmation removes only its prefix; overflow remains faulted after success; recovery waits for an empty queue.129 CPU groups, normal/QA/Editor C#0/0,261 negative CPU fixtures, independent PASSED/Ship. GPU:243 real Unity player frames,54 commits,232 field/174 ledger/20 atlas/54 metadata comparisons; capture while pending, receipt-first, expired handle, pending retirement/new generation/stale receipt passed. Full physics regression664/498/28 and239/2/242 passed again. **Queue integration is private-fixture only; production scheduler/render integration, house/FPS remain open.** Installed .213/bundle unchanged; Valheim was not launched.

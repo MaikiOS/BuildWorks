@@ -6,6 +6,7 @@
 
 | Этап | Что изменилось / доказательство | Граница |
 | --- | --- | --- |
+| 2026-10-17 · runtime staged ownership | Явные borrowed fields/ledger вместо reflection-подмены;11 отказов до записи, безопасные Dispose/recovery. Physics/Frame236/render87/62 и legacy Scratch/Recovery на одном SHA; normal/QA/Editor0/0,129групп/371CPU-отказ; PASSED/Ship. | Runtime API расчёта; pool ещё Editor. Игровой scheduler/split atlas/source admission/пространственный ledger/дом/FPS открыты. .213 неизменна. |
 | 2026-10-17 · опубликованное состояние в shaders |87 кадров/62 сравнения/26 проверок bounds/identity;16 legacy-кадров старого/candidate bundle точны. Ошибка parser устранена; shader messages/source fingerprints,363 CPU-отказа; независимые PASSED/Ship. | Частный mesh/Atlas-путь двух владельцев; не production scheduler/дом/FPS/Valheim. .213 не менялась. |
 | 2026-10-17 · очередь/настоящие кадры GPU | CPU-кольцо64/пакет16/8 ticks,129 групп/normal/QA/Editor0/0,261 CPU-отказ. Physics664/498/28/239/2/242 повторён; Frame243кадра/54commit/232/174/20/54, retirement/expiry/reuse/receipt-first/queued input прошли; PASSED/Ship. | Private fixture с verification barriers; не production throughput/render/дом/FPS. QA .213 не менялась, Valheim не запускался. |
 | 2026-10-17 · подготовка межкадрового gate | Async join в любом порядке, cached poll/expiry, retirement и generation reuse; процедурная стена/полные grids. C#0/0,252 CPU-отказа; PASSED/Ship. | GPU не запускался, пока Ostrix играет. Новый frame gate и physics-регрессия ожидают свободного окна; runtime/QA .213 неизменны. |

@@ -138,3 +138,11 @@ Fresh archives: `artifacts/fog-input-213/physics/` and `frames/`; CPU `geometry-
 ### Published state: mesh and volume
 
 **Mesh/Atlas consumer verified in Unity:**87 captures/62 comparisons/26 negative cases;16 legacy captures are pixel-exact, CPU poison0. Separate candidate; normal/QA/Editor0/0,129 groups/363 CPU rejections, independent PASSED/Ship. [Evidence and limits](FOG_PUBLISHED_RENDER_213.md). Runtime backend, house/FPS and board remain open; installed .213 unchanged.
+
+### Runtime: explicit borrowed fields
+
+`BlueprintFogSimulation.StagedState` replaces reflection-based field/ledger substitution in the fixed-pool probe. Dimensions/format/UAV/Trilinear/noMip/ClampU/V/W and aliases are validated before GPU writes. Borrowed fields are neither reallocated nor released by the solver; staged recovery cannot authorize release from the common ledger. Committed velocity/ledger remain owned by the pool. The legacy constructor/Dispose route is retained. `BlueprintFogScratch(includeReadFields:true)` owns all9 workspace fields/44236800B; existing callers retain6 fields. Probe no longer releases shared reads separately.
+
+Verified:11 invalid resource sets reject without changing sentinels; valid Dispose retains borrowed resources. GPU physics664/498/28,239commits/2rejections/242metadata;Frame236frames54/232/174/20/54;render87/62/26+legacy16/delta0; legacy Scratch360/36 and Recovery24 passed with the same runtime SHA. Normal/QA/Editor0/0,129groups,371negative CPU cases, independent PASSED/Ship. Local receipts/fingerprints:`artifacts/fog-borrow-213/`.
+
+This is the runtime solver API exercised by the check, **not a complete game allocator/scheduler**. The pool remains an Editor fixture. House memory/source admission/spatial ledger/FPS remain open; installed .213/bundle unchanged.

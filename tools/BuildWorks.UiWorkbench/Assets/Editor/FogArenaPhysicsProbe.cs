@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using OstrixMods.BuildWorks;
 using OstrixMods.BuildWorks.Geometry;
 using UnityEditor;
@@ -32,7 +31,7 @@ public static class FogArenaPhysicsProbe
             int fields, ledgers, atlases, committed, rejected, metadataChecks;
             using (var test = new Probe(assets, source, body, 8192, codec))
             {
-                test.CheckAll(true);
+                test.CheckBorrowing(); test.CheckAll(true);
                 int tick = 0;
                 for (int batch = 0; tick < 360; ++batch)
                 {
@@ -68,7 +67,7 @@ public static class FogArenaPhysicsProbe
                 passed = true, gridX = 96, gridY = 80, gridZ = 80, owners = 2, ticks = 360,
                 fieldComparisons = fields, ledgerComparisons = ledgers, atlasComparisons = atlases,
                 committed = committed, rejected = rejected, metadataComparisons = metadataChecks,
-                metadataBeforeReceipt = true, metadataOnlyTested = true, fractionalVisualClock = true,
+                metadataBeforeReceipt = true, metadataOnlyTested = true, fractionalVisualClock = true, borrowedOwnershipValidated = true, borrowedInvalidCases = 11,
                 realSolver = true, stagedLedger = true, velocityAlias = true,
                 packingRollback = true, shortageRollback = true, callbackWaitsInFixture = true,
                 productionAllocatorTested = false, wholeHouseSupported = false, gameHostTested = false, gpuTimingsMeasured = false,
@@ -140,8 +139,8 @@ public static class FogArenaPhysicsProbe
                 Bind("CommitVelocity", "_Control"); Bind("PublishFields", "_Control"); Bind("CommitMaps", "_Maps", "_Free", "_Control"); Bind("FinishStep", "_Control", "_Receipts");
                 Bind("RestoreFields", "_Maps", "_Payload", "_Control");
                 Bind("ReleaseCurrent", "_Maps", "_Free", "_Control"); Bind("ClearOwnerMaps", "_Maps");
-                scratch = new BlueprintFogScratch(Grid);
-                for (int f = 0; f < 3; ++f) reads[f] = BlueprintFogSimulation.AllocateField(Grid, "Arena physics read " + f);
+                scratch = new BlueprintFogScratch(Grid, includeReadFields: true);
+                reads[0] = scratch.ReadColour; reads[1] = scratch.ReadOrigin; reads[2] = scratch.ReadSurface;
                 foreach (string name in new[] { "IndexFields", "PackFields", "PublishFields" })
                 {
                     shader.SetTexture(kernels[name], "_ColourIn", reads[0]); shader.SetTexture(kernels[name], "_SurfaceIn", reads[2]);
@@ -157,23 +156,15 @@ public static class FogArenaPhysicsProbe
         }
         private void CreateOwner(int i)
         {
-            BlueprintFogSimulation Make(BlueprintFogScratch temporary = null) => new BlueprintFogSimulation(assets,
+            BlueprintFogSimulation Make(BlueprintFogSimulation.StagedState staged = null) => new BlueprintFogSimulation(assets,
                 source.Source.Shape, source.Source.Pigment, source.Source.Noise, source.FieldMinimum, source.FieldMaximum,
-                source.Source.Minimum, source.Source.Maximum, Position(i, 0), 37 + i, scratch: temporary);
-            reference[i] = Make(); candidate[i] = Make(scratch);
-            // Owner resources stay committed; the actual AdvanceTo may write only the shared workspace/ledger.
-            for (int f = 0; f < 3; ++f) { var pair = Pair(candidate[i], FieldNames[f]); Release(pair[0]); pair[0] = reads[f]; }
-            velocity[i] = Pair(candidate[i], "velocity")[0]; Pair(candidate[i], "velocity")[0] = scratch.PredictedColour;
+                source.Source.Minimum, source.Source.Maximum, Position(i, 0), 37 + i, scratch: staged == null ? null : scratch, stagedState: staged);
+            reference[i] = Make();
+            velocity[i] = BlueprintFogSimulation.AllocateField(Grid, "Arena committed velocity " + i);
             ledger[i] = new ComputeBuffer[3];
-            for (int f = 0; f < 3; ++f)
-            {
-                string name = new[] { "away", "peak", "state" }[f]; ledger[i][f] = FogRuntimeSparseCheck.Buffer(candidate[i], name);
-                Member(name).SetValue(candidate[i], buffers[new[] { "_StageAway", "_StagePeak", "_StageState" }[f]]);
-            }
-            var solver = (ComputeShader)Member("solver").GetValue(candidate[i]);
-            foreach (string name in new[] { "ClearLedger", "AdvanceVelocity", "AccumulateLedger" }) solver.SetBuffer(solver.FindKernel(name), "_AwayMass", buffers["_StageAway"]);
-            foreach (string name in new[] { "ClearLedger", "AdvanceVelocity" }) solver.SetBuffer(solver.FindKernel(name), "_PeakAway", buffers["_StagePeak"]);
-            foreach (string name in new[] { "ClearLedger", "AccumulateLedger", "UpdateSurface" }) solver.SetBuffer(solver.FindKernel(name), "_SurfaceState", buffers["_StageState"]);
+            for (int f = 0; f < 3; ++f) { ledger[i][f] = new ComputeBuffer(f == 2 ? 1 : 1024, 4); ledger[i][f].SetData(new uint[f == 2 ? 1 : 1024]); }
+            candidate[i] = Make(new BlueprintFogSimulation.StagedState(reads[0], reads[1], reads[2], buffers["_StageAway"], buffers["_StagePeak"], buffers["_StageState"]));
+            Graphics.CopyTexture(scratch.PredictedColour, velocity[i]);
             States[i] = new BlueprintFogSnapshotState((1L << 33) + i + 1, ++generations[i]);
             Owner(i); Dispatch("BeginStep"); GridDispatch("RestoreFields"); Publish();
             var initial = new BlueprintFogSnapshotState.Submission((1L << 33) + i + 1, generations[i], 0, 0, 0);
@@ -198,6 +189,45 @@ public static class FogArenaPhysicsProbe
             shader.SetInts("_RenderOffset", 0, 0, slot * 82); shader.SetTexture(kernels["CommitVelocity"], "_OwnerVelocity", velocity[slot]);
             foreach (string name in new[] { "StageLedger", "CommitLedger" }) for (int f = 0; f < 3; ++f)
                 shader.SetBuffer(kernels[name], new[] { "_OwnerAway", "_OwnerPeak", "_OwnerState" }[f], ledger[slot][f]);
+        }
+        internal void CheckBorrowing()
+        {
+            var away = buffers["_StageAway"]; var peak = buffers["_StagePeak"]; var state = buffers["_StageState"];
+            BlueprintFogSimulation.StagedState State(RenderTexture colour = null, RenderTexture origin = null, ComputeBuffer a = null, ComputeBuffer p = null, ComputeBuffer s = null)
+                => new BlueprintFogSimulation.StagedState(colour ?? reads[0], origin ?? reads[1], reads[2], a ?? away, p ?? peak, s ?? state);
+            BlueprintFogSimulation Make(BlueprintFogSimulation.StagedState staged, BlueprintFogScratch workspace)
+                => new BlueprintFogSimulation(assets, source.Source.Shape, source.Source.Pigment, source.Source.Noise,
+                    source.FieldMinimum, source.FieldMaximum, source.Source.Minimum, source.Source.Maximum, Position(0, 0), 37,
+                    scratch: workspace, stagedState: staged);
+            away.SetData(Enumerable.Repeat(17u, 1024).ToArray()); state.SetData(new[] { 23u });
+            void Reject(BlueprintFogSimulation.StagedState staged, BlueprintFogScratch workspace)
+            {
+                bool rejected = false; try { using (var invalid = Make(staged, workspace)) { } } catch (ArgumentException) { rejected = true; }
+                Require(rejected, "Invalid staged resources accepted.");
+                var marker = new uint[1024]; away.GetData(marker); var flags = new uint[1]; state.GetData(flags);
+                Require(marker.All(v => v == 17) && flags[0] == 23, "Staged validation wrote to borrowed buffers before rejecting.");
+            }
+            Reject(State(), null);
+            Reject(new BlueprintFogSimulation.StagedState(null, reads[1], reads[2], away, peak, state), scratch);
+            Reject(State(origin: reads[0]), scratch); Reject(State(colour: scratch.Colour), scratch);
+            Reject(new BlueprintFogSimulation.StagedState(reads[0], reads[1], reads[2], null, peak, state), scratch);
+            Reject(State(p: away), scratch); Reject(State(s: away), scratch);
+            using (var dead = new ComputeBuffer(1024, 4)) { dead.Release(); Reject(State(a: dead), scratch); }
+            reads[0].filterMode = FilterMode.Point;
+            try { Reject(State(), scratch); } finally { reads[0].filterMode = FilterMode.Trilinear; }
+            reads[1].wrapModeV = TextureWrapMode.Repeat;
+            try { Reject(State(), scratch); } finally { reads[1].wrapModeV = TextureWrapMode.Clamp; }
+            scratch.PredictedColour.filterMode = FilterMode.Point;
+            try { Reject(State(), scratch); } finally { scratch.PredictedColour.filterMode = FilterMode.Trilinear; }
+            using (var view = Make(State(), scratch))
+            {
+                Require(view.AllocatedFieldBytes == 0, "Borrowed fields charged as owned dense allocations.");
+                Require(scratch.FieldBytes == 44236800, "Full workspace must account for all nine fields.");
+                bool blocked = false; try { view.TryGetRecovered(); } catch (InvalidOperationException) { blocked = true; }
+                Require(blocked, "Borrowed workspace ledger authorized per-owner recovery.");
+            }
+            Require(reads.All(t => t && t.IsCreated()) && scratch.PredictedColour.IsCreated() && away.IsValid() && peak.IsValid() && state.IsValid(),
+                "Disposing staged solver released arena resources.");
         }
         internal BlueprintFogInputQueue.Sample Observation(int slot, float clock)
         {
@@ -392,31 +422,17 @@ public static class FogArenaPhysicsProbe
             foreach (var request in requests) request.WaitForCompletion(); requests.Clear();
             for (int slot = 0; slot < Owners; ++slot) DisposeOwner(slot);
             foreach (var buffer in buffers.Values) buffer.Release();
-            foreach (var texture in reads.Concat(new[] { smoke, surface })) Release(texture);
+            foreach (var texture in new[] { smoke, surface }) Release(texture);
             scratch?.Dispose(); if (shader) UnityEngine.Object.DestroyImmediate(shader); if (metadataShader) UnityEngine.Object.DestroyImmediate(metadataShader);
         }
         private void DisposeOwner(int slot)
         {
-            var simulation = candidate[slot];
-            if (simulation != null)
-            {
-                // The diagnostic owns all detached resources; a partially constructed owner may still own some.
-                foreach (string name in FieldNames.Concat(new[] { "velocity" }))
-                {
-                    var pair = Pair(simulation, name);
-                    if (reads.Any(t => ReferenceEquals(t, pair[0])) || ReferenceEquals(scratch?.PredictedColour, pair[0])) pair[0] = null;
-                }
-                foreach (string name in new[] { "away", "peak", "state" })
-                    if (buffers.Values.Any(b => ReferenceEquals(b, Member(name).GetValue(simulation)))) Member(name).SetValue(simulation, null);
-                simulation.Dispose();
-            }
+            candidate[slot]?.Dispose();
             candidate[slot] = null; reference[slot]?.Dispose(); reference[slot] = null;
             if (ledger[slot] != null) foreach (var buffer in ledger[slot]) buffer?.Release(); ledger[slot] = null;
             Release(velocity[slot]); velocity[slot] = null;
         }
     }
-    private static FieldInfo Member(string name) => typeof(BlueprintFogSimulation).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
-    private static RenderTexture[] Pair(BlueprintFogSimulation simulation, string name) => (RenderTexture[])Member(name).GetValue(simulation);
     private static void Release(RenderTexture texture) { if (texture) { texture.Release(); UnityEngine.Object.DestroyImmediate(texture); } }
     private static Vector3 Position(int owner, float time)
     {
@@ -429,9 +445,9 @@ public static class FogArenaPhysicsProbe
     [Serializable] private sealed class Report
     {
         public bool passed, realSolver, stagedLedger, velocityAlias, packingRollback, shortageRollback, callbackWaitsInFixture,
-            metadataBeforeReceipt, metadataOnlyTested, fractionalVisualClock,
+            metadataBeforeReceipt, metadataOnlyTested, fractionalVisualClock, borrowedOwnershipValidated,
             productionAllocatorTested, wholeHouseSupported, gameHostTested, gpuTimingsMeasured;
-        public int gridX, gridY, gridZ, owners, ticks, fieldComparisons, ledgerComparisons, atlasComparisons, committed, rejected, metadataComparisons;
+        public int borrowedInvalidCases, gridX, gridY, gridZ, owners, ticks, fieldComparisons, ledgerComparisons, atlasComparisons, committed, rejected, metadataComparisons;
         public string note;
     }
 }

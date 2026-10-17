@@ -26,3 +26,11 @@
 Следующий законченный шаг: runtime arena и split atlas в существующих Channels/Simulation/Scratch/Atlas, затем admission реальной геометрии и пространственный ledger вместо YZ-only. Полный domain, бюджет всех живых состояний и безопасный отказ обязательны. Производственный scheduler/render lifecycle, дом28, FPS, многопользовательский проход и постоянная табличка пока не проверены. Новый consumer ограничен текущим accumulated-v11 с одним actor/trail[0]; прежние варианты остаются для legacy путей. Другие графические API этим D3D11-прогоном не доказаны.
 
 Независимое чтение также обнаружило пропуск input/state при копировании C# сборщиком assets. Оба файла добавлены и сверяются по SHA; CPU-тест выполняет реальный цикл копирования в пустую папку. Оставшиеся от прежних запусков RuntimeSources не требуются.
+
+### Runtime: явное заимствование полей
+
+`BlueprintFogSimulation.StagedState` заменяет reflection-подмену временных полей и ledger в fixed-pool probe. Расчёт проверяет размеры/формат/UAV/Trilinear/noMip/ClampU/V/W и отсутствие alias до GPU-записей. Заимствованные поля не выделяются повторно и не освобождаются расчётом; стадия не может разрешить recovery по общему ledger. Committed velocity/ledger остаются у владельца пула. Обычный constructor/Dispose сохранены. `BlueprintFogScratch(includeReadFields:true)` единолично владеет всеми9 полями рабочего набора44236800B; прежние callers получают6 полей как раньше. Probe не освобождает read-поля отдельно.
+
+Проверено:11 неверных наборов ресурсов отклонены без изменения sentinel; valid Dispose сохраняет borrowed ресурсы. GPU physics664/498/28,239commit/2отказа/242metadata;Frame236 кадра54/232/174/20/54;render87/62/26+legacy16/delta0; прежние Scratch360/36 и Recovery24 прошли на одном source SHA. Normal/QA/Editor0/0,129 групп,371 отрицательная CPU-проверка, независимые PASSED/Ship. Квитанции и fingerprints локальны в `artifacts/fog-borrow-213/`.
+
+Это рабочий API расчёта, используемый проверкой, **не готовый игровой allocator/scheduler**. Сам pool пока остаётся Editor-стендом. Полная память дома, source admission, пространственный ledger и FPS ещё открыты; installed .213/bundle неизменны.

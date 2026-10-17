@@ -12,8 +12,47 @@ namespace OstrixMods.BuildWorks
         internal const float Step = 1f / 30;
         internal const long FieldBytes = (long)Nx * Ny * Nz * 8 * 10;
         internal Vector3Int GridSize { get; private set; }
-        internal long AllocatedFieldBytes => FieldVoxels(GridSize) * (Scratch == null ? 80 : 32);
+        internal long AllocatedFieldBytes => staged ? 0 : FieldVoxels(GridSize) * (Scratch == null ? 80 : 32);
         internal BlueprintFogScratch Scratch { get; }
+        private readonly bool staged;
+
+        // Borrowed workspace only. The arena owns its lifetime and publishes committed fields separately.
+        internal sealed class StagedState
+        {
+            internal readonly RenderTexture Colour, Origin, Surface;
+            internal readonly ComputeBuffer Away, Peak, State;
+            internal StagedState(RenderTexture colour, RenderTexture origin, RenderTexture surface,
+                ComputeBuffer away, ComputeBuffer peak, ComputeBuffer state)
+            { Colour = colour; Origin = origin; Surface = surface; Away = away; Peak = peak; State = state; }
+            private static bool SamplingMatches(RenderTexture field) => field.filterMode == FilterMode.Trilinear && !field.useMipMap &&
+                field.wrapModeU == TextureWrapMode.Clamp && field.wrapModeV == TextureWrapMode.Clamp && field.wrapModeW == TextureWrapMode.Clamp;
+            private static bool FieldMatches(RenderTexture field, Vector3Int grid) => field && field.IsCreated() &&
+                field.dimension == TextureDimension.Tex3D && field.format == RenderTextureFormat.ARGBHalf && field.enableRandomWrite &&
+                field.width == grid.x && field.height == grid.y && field.volumeDepth == grid.z && SamplingMatches(field);
+            internal void Validate(Vector3Int grid, BlueprintFogScratch scratch)
+            {
+                if (scratch == null || scratch.GridSize != grid) throw new ArgumentException("Staged fog needs its matching workspace.");
+                foreach (var field in new[] { scratch.Colour, scratch.Velocity, scratch.Origin, scratch.Surface, scratch.PredictedColour, scratch.PredictedOrigin })
+                    if (!FieldMatches(field, grid)) throw new ArgumentException("Staged fog workspace was released or sampling differs.");
+                var reads = new[] { Colour, Origin, Surface };
+                for (int i = 0; i < reads.Length; ++i)
+                {
+                    RenderTexture field = reads[i];
+                    if (!FieldMatches(field, grid))
+                        throw new ArgumentException("Staged fog read field differs from its workspace.");
+                    foreach (var other in new[] { scratch.Colour, scratch.Velocity, scratch.Origin, scratch.Surface, scratch.PredictedColour, scratch.PredictedOrigin })
+                        if (ReferenceEquals(field, other)) throw new ArgumentException("Staged fog reads alias a write target.");
+                    for (int j = 0; j < i; ++j) if (ReferenceEquals(field, reads[j])) throw new ArgumentException("Staged fog reads alias each other.");
+                }
+                var buffers = new[] { Away, Peak, State };
+                for (int i = 0; i < buffers.Length; ++i)
+                {
+                    if (buffers[i] == null || !buffers[i].IsValid() || buffers[i].stride != 4 || buffers[i].count != (i == 2 ? 1 : 1024))
+                        throw new ArgumentException("Staged fog ledger layout invalid.");
+                    for (int j = 0; j < i; ++j) if (ReferenceEquals(buffers[i], buffers[j])) throw new ArgumentException("Staged fog ledgers alias each other.");
+                }
+            }
+        }
         private readonly RenderTexture[] colour = new RenderTexture[2], velocity = new RenderTexture[2],
             origin = new RenderTexture[2], surface = new RenderTexture[2];
         private RenderTexture predictedColour, predictedOrigin;
@@ -37,7 +76,7 @@ namespace OstrixMods.BuildWorks
         internal BlueprintFogSimulation(BlueprintFogAssets assets, Texture3D shape, Texture3D pigment,
             Texture3D noise, Vector3 minimum, Vector3 maximum, Vector3 restMinimum, Vector3 restMaximum,
             Vector3 actor, float seed, Vector3Int? gridSize = null, float initialClock = 0, BlueprintFogScratch scratch = null,
-            Vector3? noiseOffset = null)
+            Vector3? noiseOffset = null, StagedState stagedState = null)
         {
             if (!Finite(initialClock) || initialClock < 0 || initialClock > 86400) throw new ArgumentException("Invalid initial fog clock.");
             tick = Mathf.FloorToInt(initialClock / Step + .0001f); inputTime = initialClock;
@@ -54,6 +93,8 @@ namespace OstrixMods.BuildWorks
             ValidateGrid(GridSize, maximum - minimum, gridSize.HasValue);
             if (scratch != null && scratch.GridSize != GridSize) throw new ArgumentException("Fog scratch must match the exact simulation grid.");
             Scratch = scratch;
+            staged = stagedState != null;
+            stagedState?.Validate(GridSize, scratch);
             if (!SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.ARGBHalf))
                 throw new NotSupportedException("Fog simulation half-float fields unavailable.");
             if (Scratch != null && (SystemInfo.copyTextureSupport & CopyTextureSupport.Copy3D) == 0)
@@ -81,8 +122,9 @@ namespace OstrixMods.BuildWorks
                     solver.SetTexture(kernel, "_Shape", shape); solver.SetTexture(kernel, "_Pigment", pigment);
                     solver.SetTexture(kernel, "_Noise", noise);
                 }
-                away = new ComputeBuffer(1024, sizeof(uint)); peak = new ComputeBuffer(1024, sizeof(uint));
-                state = new ComputeBuffer(1, sizeof(uint));
+                away = staged ? stagedState.Away : new ComputeBuffer(1024, sizeof(uint));
+                peak = staged ? stagedState.Peak : new ComputeBuffer(1024, sizeof(uint));
+                state = staged ? stagedState.State : new ComputeBuffer(1, sizeof(uint));
                 foreach (int kernel in new[] { clearLedger, flow, ledger }) solver.SetBuffer(kernel, "_AwayMass", away);
                 foreach (int kernel in new[] { clearLedger, flow }) solver.SetBuffer(kernel, "_PeakAway", peak);
                 foreach (int kernel in new[] { clearLedger, ledger, restore }) solver.SetBuffer(kernel, "_SurfaceState", state);
@@ -90,8 +132,10 @@ namespace OstrixMods.BuildWorks
                 if (Scratch == null) { predictedColour = Allocate("Predicted smoke"); predictedOrigin = Allocate("Predicted origins"); }
                 for (int index = 0; index < (Scratch == null ? 2 : 1); ++index)
                 {
-                    colour[index] = Allocate("Smoke " + index); velocity[index] = Allocate("Velocity " + index);
-                    origin[index] = Allocate("Origins " + index); surface[index] = Allocate("Surface " + index);
+                    colour[index] = staged ? stagedState.Colour : Allocate("Smoke " + index);
+                    velocity[index] = staged ? Scratch.PredictedColour : Allocate("Velocity " + index);
+                    origin[index] = staged ? stagedState.Origin : Allocate("Origins " + index);
+                    surface[index] = staged ? stagedState.Surface : Allocate("Surface " + index);
                     solver.SetTexture(clear, "_WriteColour", colour[index]); solver.SetTexture(clear, "_WriteVelocity", velocity[index]);
                     solver.SetTexture(clear, "_WriteOrigin", origin[index]); solver.SetTexture(clear, "_WriteSurface", surface[index]);
                     Dispatch(clear);
@@ -159,6 +203,7 @@ namespace OstrixMods.BuildWorks
         internal bool TryGetRecovered()
         {
             if (disposed) throw new ObjectDisposedException(nameof(BlueprintFogSimulation));
+            if (staged) throw new InvalidOperationException("Staged fog recovery must read the committed owner's ledger.");
             if (faulted) throw new InvalidOperationException("Uncertain fog step cannot authorize recovery.");
             if (recoveryFailure != null) throw new InvalidOperationException(recoveryFailure);
             if (observedRecovery && observedRevision == emissionRevision) return true;
@@ -238,8 +283,9 @@ namespace OstrixMods.BuildWorks
             if (recoveryPending) { recoveryRequest.WaitForCompletion(); recoveryPending = false; }
             Release(ref predictedColour); Release(ref predictedOrigin);
             foreach (RenderTexture[] pair in new[] { colour, velocity, origin, surface })
-                for (int index = 0; index < pair.Length; ++index) Release(ref pair[index]);
-            away?.Release(); away = null; peak?.Release(); peak = null; state?.Release(); state = null;
+                for (int index = 0; index < pair.Length; ++index) { if (!staged) Release(ref pair[index]); else pair[index] = null; }
+            if (!staged) { away?.Release(); peak?.Release(); state?.Release(); }
+            away = peak = state = null;
             if (solver) UnityEngine.Object.DestroyImmediate(solver);
             solver = null;
         }

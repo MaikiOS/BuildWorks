@@ -2,6 +2,8 @@
 
 2026-10-17 · [English](HANDOFF.md)
 
+**Runtime borrowing проверен:** Simulation теперь явно заимствует поля/ledger без reflection-подмены и не освобождает чужие ресурсы.11 отказов проверки ресурсов до GPU-записей, physics/frame/render и прежние scratch/recovery прошли; normal/QA/Editor0/0,129 групп/371 CPU-отказ. [Подробности](docs/FOG_PUBLISHED_RENDER_213_RU.md#runtime-явное-заимствование-полей). Pool/scheduler/split atlas и дом/FPS ещё открыты; установленная .213 не менялась.
+
 **Mesh/Atlas consumer проверен в Unity:**87 кадров/62 сравнения/26 отрицательных случаев;16 legacy-кадров попиксельно совпали, CPU poison0. Candidate отдельно; normal/QA/Editor0/0,129 групп/363 отрицательных CPU-проверки, независимые PASSED/Ship. [Доказательства и границы](docs/FOG_PUBLISHED_RENDER_213_RU.md). Игровой backend, дом/FPS и табличка ещё открыты; установленная .213 не менялась.
 
 **Очередь и настоящие кадры проверены:**64 наблюдения, максимум16 samples/8 ticks в пакете, точный порядок/дробное и равное время/body/emit/possible/nearby; подтверждение удаляет только свой префикс, overflow остаётся ошибкой после success, recovery ждёт пустую очередь.129 CPU-групп, normal/QA/Editor C#0/0,261 отрицательная CPU-фикстура, независимые PASSED/Ship. GPU:243 настоящих кадра Unity,54 commit,232 field/174 ledger/20 atlas/54 metadata; capture при pending, receipt-first, expired handle, pending retirement/новая generation/старая квитанция прошли. Полная physics-регрессия664/498/28 и239/2/242 прошла повторно. **Очередь подключена только в private стенде; игровой scheduler/render integration, дом/FPS ещё открыты.** Установленная .213/bundle неизменны; Valheim не запускался.

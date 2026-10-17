@@ -8,6 +8,9 @@ namespace OstrixMods.BuildWorks
     // One renderer-only source region; the caller owns the asset bundle and construction state.
     internal sealed class BlueprintFogVisual : IDisposable
     {
+        private readonly BlueprintFogAssets assets;
+        private readonly bool lazyFields;
+        private readonly Vector3Int? grid;
         private GameObject visual;
         private BlueprintFogSource source;
         private BlueprintFogSimulation simulation;
@@ -23,6 +26,9 @@ namespace OstrixMods.BuildWorks
         internal GameObject Root => visual;
         internal BlueprintFogSource Source => source;
         internal BlueprintFogSimulation Simulation => simulation;
+        internal Texture Smoke => simulation != null ? (Texture)simulation.Smoke : assets.Empty;
+        internal Texture Surface => simulation != null ? (Texture)simulation.Surface : assets.Empty;
+        internal Vector3Int FieldSize => simulation?.GridSize ?? Vector3Int.one;
         internal Vector3 FieldMinimum => minimum;
         internal Vector3 FieldMaximum => maximum;
         internal Vector4 ActorRadius => new Vector4(trail[0].x, trail[0].y, trail[0].z, body.x);
@@ -32,9 +38,12 @@ namespace OstrixMods.BuildWorks
 
         internal BlueprintFogVisual(BlueprintFogAssets assets, GameObject prefab, Vector3 position,
             Quaternion rotation, Vector3 relativeScale, int? materialSeed, Vector3 origin, Vector3 actor, Vector2 capsule,
-            BlueprintFogChannels channels = null, string owner = null, bool compactRegion = false)
+            BlueprintFogChannels channels = null, string owner = null, bool compactRegion = false, bool lazyFields = false)
         {
             if (assets == null || !prefab) throw new ArgumentException("Fog prefab/assets missing.");
+            if (lazyFields && (!compactRegion || channels == null || string.IsNullOrWhiteSpace(owner)))
+                throw new ArgumentException("Lazy fog requires a compact region and named channel pool.");
+            ValidateClockBody(0, capsule); this.assets = assets; this.lazyFields = lazyFields;
             try
             {
                 visual = PlacementGhostPreviewView.CreateVisualClone(prefab, "BuildWorks_FogVisual", prefab.layer, materialSeed);
@@ -47,20 +56,13 @@ namespace OstrixMods.BuildWorks
                 maximum = source.Maximum + new Vector3(1.2f, .6f, 1);
                 Vector3 localActor = LocalActor(actor, out bool nearby);
                 body = capsule;
-                Vector3Int? grid = compactRegion ? BlueprintFogSimulation.CompactGrid(minimum, maximum) : (Vector3Int?)null;
-                long reservedBytes = grid.HasValue ? (long)grid.Value.x * grid.Value.y * grid.Value.z * 80 : BlueprintFogSimulation.FieldBytes;
-                BlueprintFogSimulation Create() => new BlueprintFogSimulation(assets, source.Shape, source.Pigment, source.Noise,
-                    minimum, maximum, source.Minimum, source.Maximum, localActor, 37, grid);
-                if (channels == null) simulation = Create();
-                else
+                grid = compactRegion ? BlueprintFogSimulation.CompactGrid(minimum, maximum) : (Vector3Int?)null;
+                channelPool = channels; channelOwner = owner;
+                if (!lazyFields)
                 {
-                    bool created = false;
-                    if (!channels.TryAcquire(owner, reservedBytes, () => { created = true; return Create(); }, out var channel))
-                        throw new InvalidOperationException("Fog active owner budget is full; existing matter retained.");
-                    if (!created) throw new InvalidOperationException("Fog owner already has a visual.");
-                    simulation = channel; channelPool = channels; channelOwner = owner;
+                    Activate(localActor, 0);
+                    simulation.AdvanceTo(0, localActor, capsule, nearby);
                 }
-                simulation.AdvanceTo(0, localActor, capsule, nearby);
                 foreach (BlueprintFogSource.Part part in source.Parts)
                 {
                     Material[] originals = part.Renderer.sharedMaterials, replacements = new Material[originals.Length];
@@ -100,11 +102,45 @@ namespace OstrixMods.BuildWorks
 
         internal void AdvanceTo(float clock, Vector3 actor, Vector2 capsule, bool emit)
         {
-            if (simulation == null) throw new ObjectDisposedException(nameof(BlueprintFogVisual));
-            Vector3 local = LocalActor(actor, out bool nearby);
-            simulation.AdvanceTo(clock, local, capsule, emit && nearby);
+            if (source == null) throw new ObjectDisposedException(nameof(BlueprintFogVisual));
+            ValidateClockBody(clock, capsule);
+            Vector3 local = LocalActor(actor, out bool nearby), previous = new Vector3(trail[0].x, trail[0].y, trail[0].z);
+            bool contact = lazyFields && emit && nearby && source.MightContact(previous, local, capsule);
+            if (contact && simulation == null)
+            {
+                if (Mathf.FloorToInt(clock / BlueprintFogSimulation.Step + .0001f) -
+                    Mathf.FloorToInt(time / BlueprintFogSimulation.Step + .0001f) > 8)
+                    throw new ArgumentException("Fog activation exceeds eight fixed steps.");
+                Activate(previous, time);
+            }
+            if (simulation != null)
+            {
+                simulation.AdvanceTo(clock, local, capsule, emit && nearby, !lazyFields || contact);
+                if (lazyFields && !contact && channelPool.TryReleaseRecovered(channelOwner)) simulation = null;
+            }
             time = clock; body = capsule; trail[0] = new Vector4(local.x, local.y, local.z, nearby ? 1 : 0);
             Bind();
+        }
+
+        private void Activate(Vector3 actor, float clock)
+        {
+            BlueprintFogSimulation Create() => new BlueprintFogSimulation(assets, source.Shape, source.Pigment, source.Noise,
+                minimum, maximum, source.Minimum, source.Maximum, actor, 37, grid, clock);
+            if (channelPool == null) { simulation = Create(); return; }
+            long bytes = grid.HasValue ? (long)grid.Value.x * grid.Value.y * grid.Value.z * 80 : BlueprintFogSimulation.FieldBytes;
+            bool created = false;
+            if (!channelPool.TryAcquire(channelOwner, bytes, () => { created = true; return Create(); }, out var channel))
+                throw new InvalidOperationException("Fog active owner budget is full; existing matter retained.");
+            if (!created) throw new InvalidOperationException("Fog owner already has a visual.");
+            simulation = channel;
+        }
+
+        private void ValidateClockBody(float clock, Vector2 capsule)
+        {
+            bool Finite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
+            if (!Finite(clock) || clock < time || clock > 86400 || !Finite(capsule.x) || !Finite(capsule.y) ||
+                capsule.x <= 0 || capsule.y < capsule.x || capsule.y > 8)
+                throw new ArgumentException("Invalid fog clock or body capsule.");
         }
 
         internal void RenderVolume(Camera camera, RenderTexture image, RenderTexture target,
@@ -127,10 +163,10 @@ namespace OstrixMods.BuildWorks
 
         internal void BindVolume(Material material, string suffix)
         {
-            if (simulation == null || !simulation.Smoke || source == null) throw new ObjectDisposedException(nameof(BlueprintFogVisual));
+            if (source == null || !Smoke || !Surface) throw new ObjectDisposedException(nameof(BlueprintFogVisual));
             material.SetTexture("_Shape" + suffix, source.Shape); material.SetTexture("_Albedo" + suffix, source.Pigment);
-            material.SetTexture("_Noise" + suffix, source.Noise); material.SetTexture("_Wake" + suffix, simulation.Smoke);
-            material.SetTexture("_MatterFlow" + suffix, simulation.Surface);
+            material.SetTexture("_Noise" + suffix, source.Noise); material.SetTexture("_Wake" + suffix, Smoke);
+            material.SetTexture("_MatterFlow" + suffix, Surface);
             material.SetVector("_VolumeMin" + suffix, source.Minimum); material.SetVector("_VolumeMax" + suffix, source.Maximum);
             material.SetVector("_WakeMin" + suffix, minimum); material.SetVector("_WakeMax" + suffix, maximum);
             material.SetVector("_MatterMin" + suffix, minimum); material.SetVector("_MatterMax" + suffix, maximum);
@@ -151,7 +187,7 @@ namespace OstrixMods.BuildWorks
         }
         private void Bind(Material material)
         {
-            material.SetTexture("_Noise", source.Noise); material.SetTexture("_MatterFlow", simulation.Surface);
+            material.SetTexture("_Noise", source.Noise); material.SetTexture("_MatterFlow", Surface);
             material.SetVector("_MatterMin", minimum); material.SetVector("_MatterMax", maximum);
             material.SetFloat("_MatterEnabled", 1); material.SetFloat("_Accumulated", 1);
             material.SetVector("_FogOrigin", Origin); material.SetFloat("_Clock", time); material.SetFloat("_Disperse", 1);
@@ -170,7 +206,7 @@ namespace OstrixMods.BuildWorks
         public void Dispose()
         {
             if (visual) visual.SetActive(false);
-            if (channelPool != null) { channelPool.Remove(channelOwner, simulation); channelPool = null; }
+            if (channelPool != null) { if (simulation != null) channelPool.Remove(channelOwner, simulation); channelPool = null; }
             else simulation?.Dispose();
             simulation = null;
             foreach (Material material in surfaces) if (material) UnityEngine.Object.DestroyImmediate(material);

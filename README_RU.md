@@ -6,7 +6,7 @@ BuildWorks расширяет молоток Valheim точным строите
 
 ![Концепт BuildWorks](docs/images/buildworks-hero-concept.png)
 
-**Текущие исходники / изолированная QA: 0.19.207.** Последний публичный пакет: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), исторический prerelease. Его ZIP не содержит новые функции исходников. Новый публичный бинарный релиз не опубликован.
+**Текущие исходники / изолированная QA: 0.19.208.** Последний публичный пакет: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), исторический prerelease. Его ZIP не содержит новые функции исходников. Новый публичный бинарный релиз не опубликован.
 
 ## Возможности
 

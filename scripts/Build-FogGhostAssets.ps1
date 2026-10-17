@@ -20,7 +20,7 @@ foreach($entry in $manifest){
 }
 Copy-Item -LiteralPath (Join-Path $ported 'FogVolumePair.cginc') -Destination (Join-Path $runtime 'FogVolumePair.cginc')
 Copy-Item -LiteralPath (Join-Path $ported 'FogVolumeAtlas.cginc') -Destination (Join-Path $runtime 'FogVolumeAtlas.cginc')
-foreach($name in @('BlueprintFogAssets.cs','BlueprintFogSimulation.cs','BlueprintEditorMeshData.cs','BlueprintFogContactMesh.cs','BlueprintFogSource.cs','BlueprintFogVisual.cs','BlueprintFogChannels.cs','BlueprintFogVolume.cs','BlueprintFogAtlas.cs')){
+foreach($name in @('BlueprintFogAssets.cs','BlueprintFogSimulation.cs','BlueprintEditorMeshData.cs','BlueprintFogContactMesh.cs','BlueprintFogSource.cs','BlueprintFogVisual.cs','BlueprintFogChannels.cs','BlueprintFogVolume.cs','BlueprintFogAtlas.cs','BlueprintFogBuilding.cs')){
     Copy-Item -LiteralPath (Join-Path $root ('src/BuildWorks/'+$name)) -Destination (Join-Path $project ('Assets/Editor/RuntimeSources/'+$name))
 }
 $proof=Join-Path $output 'verification.json'

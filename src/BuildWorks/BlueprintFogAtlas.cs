@@ -109,18 +109,17 @@ namespace OstrixMods.BuildWorks
             for (int i = 0; i < owners.Count; ++i)
             {
                 BlueprintFogVisual owner = owners[i];
-                if (owner == null || !unique.Add(owner) || owner.Source == null || !owner.Source.Shape || owner.Simulation == null ||
-                    !owner.Simulation.Smoke || !owner.Simulation.Surface) throw new ArgumentException("Fog atlas needs distinct live owners.");
+                if (owner == null || !unique.Add(owner) || owner.Source == null || !owner.Source.Shape || !owner.Smoke || !owner.Surface) throw new ArgumentException("Fog atlas needs distinct live owners.");
                 if (i == 0) bounds = owner.VolumeBounds; else bounds.Encapsulate(owner.VolumeBounds);
-                Texture3D source = owner.Source.Shape; RenderTexture field = owner.Simulation.Smoke;
-                blocks.Add(new Vector3Int(Mathf.Max(source.width, field.width) + 2, Mathf.Max(source.height, field.height) + 2,
-                    Mathf.Max(source.depth, field.volumeDepth) + 2));
+                Texture3D source = owner.Source.Shape; Vector3Int field = owner.FieldSize;
+                blocks.Add(new Vector3Int(Mathf.Max(source.width, field.x) + 2, Mathf.Max(source.height, field.y) + 2,
+                    Mathf.Max(source.depth, field.z) + 2));
                 Vector3 origin = owner.Origin - frame;
                 origins[i] = new Vector4(origin.x, origin.y, origin.z, owner.Clock);
                 restMin[i] = owner.Source.Minimum; restMax[i] = owner.Source.Maximum;
                 fieldMin[i] = owner.FieldMinimum; fieldMax[i] = owner.FieldMaximum; actors[i] = owner.ActorRadius;
                 shapeSize[i] = new Vector4(source.width, source.height, source.depth, 0);
-                fieldSize[i] = new Vector4(field.width, field.height, field.volumeDepth, owner.BodyHalfHeight);
+                fieldSize[i] = new Vector4(field.x, field.y, field.z, owner.BodyHalfHeight);
             }
             int steps = Mathf.CeilToInt(bounds.size.magnitude / .025f) + 162;
             if (bounds.size.magnitude > 64 || (long)steps * owners.Count > 32768)
@@ -136,8 +135,8 @@ namespace OstrixMods.BuildWorks
                 // Pack only this block, retaining its own duplicated filtering borders.
                 pack.SetVector("_PackSize", new Vector4(block.x, block.y, block.z, 0));
                 pack.SetVector("_PackOffset", atlasOffset[i]); pack.SetVector("_PackShapeSize", shapeSize[i]); pack.SetVector("_PackFieldSize", fieldSize[i]);
-                pack.SetTexture(kernel, "_PackShape", owners[i].Source.Shape); pack.SetTexture(kernel, "_PackSmoke", owners[i].Simulation.Smoke);
-                pack.SetTexture(kernel, "_PackSurface", owners[i].Simulation.Surface); pack.SetTexture(kernel, "_PackedShape", shape);
+                pack.SetTexture(kernel, "_PackShape", owners[i].Source.Shape); pack.SetTexture(kernel, "_PackSmoke", owners[i].Smoke);
+                pack.SetTexture(kernel, "_PackSurface", owners[i].Surface); pack.SetTexture(kernel, "_PackedShape", shape);
                 pack.SetTexture(kernel, "_PackedSmoke", smoke); pack.SetTexture(kernel, "_PackedSurface", surface);
                 pack.Dispatch(kernel, (block.x + 7) / 8, (block.y + 7) / 8, (block.z + 3) / 4);
             }

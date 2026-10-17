@@ -2,7 +2,7 @@
 
 **2026-10-17 · [Русский](CURRENT_STATUS_RU.md) · [Roadmap](ROADMAP.md) · [Documentation](README.md)**
 
-Source and installed isolated QA build: **0.19.207**. Tested host: Valheim 1.0.20, Steam build25909357. Latest published binary is the historical [0.19.37 alpha prerelease](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha); its ZIP does not contain .206. There is no stable release. Source synchronization is not binary publication.
+Source and installed isolated QA build: **0.19.208**. Tested host: Valheim 1.0.20, Steam build25909357. Latest published binary is the historical [0.19.37 alpha prerelease](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha); its ZIP does not contain .206. There is no stable release. Source synchronization is not binary publication.
 
 | Area | Implemented / automated evidence | Valheim or user evidence | Still open |
 | --- | --- | --- | --- |
@@ -23,4 +23,6 @@ Historical .206 proof: QA.206 installed DLL SHA `B1691BB1DAE7668AEBC924A185329F4
 
 Next: approved v11 on existing Forest Hut, then persistent unfinished project and board. [Full scope](../PROJECT_CONTRACT.md), [ordered milestones](ROADMAP.md), [owner live list](LIVE_CHECKLIST_RU.md). Accepted cases need no repeat without a regression reason.
 
-.207: [packing and allocation-failure recovery](FOG_PACKING_207.md) verified; saved28-block dimensions fit128MiB. QA installed, SHA `1A7B711678F1C22886C79B89C5845DCAC94EA1FFF1FB6C82FA87709454566AA5`. This is not a native house: simulation/contact budgets remain open. Native .207 untested.
+Historical .207 proof: [packing and allocation-failure recovery](FOG_PACKING_207.md) verified; saved28-block dimensions fit128MiB. QA installed, SHA `1A7B711678F1C22886C79B89C5845DCAC94EA1FFF1FB6C82FA87709454566AA5`. This is not a native house: simulation/contact budgets remain open. Native .207 untested.
+
+.208: [contact fields and blueprint adapter](FOG_CONTACT_208.md) verified in Unity:28 synthetic records,5 comparison frames, budget/recovery/cleanup. QA installed, SHA `A7BAC4CCAABB4748DB648BAA2B3144350924B16D28EC7433D0A84A1B750E5822`;143 protected files unchanged. Actual Forest Hut/memory/FPS and persistent board remain open; native .208 untested.

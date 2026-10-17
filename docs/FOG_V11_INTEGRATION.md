@@ -2,7 +2,7 @@
 
 [Русский](FOG_V11_INTEGRATION_RU.md) · [Current evidence](CURRENT_STATUS.md) · [Next milestones](ROADMAP.md)
 
-Source/QA .207 embeds an owned Linear shader/compute bundle with3 assets/8 kernels. The approved v11 source/archive is frozen locally; extracted vanilla assets are never redistributed. Native prefabs/textures are resolved from the host.
+Source/QA .208 embeds an owned Linear shader/compute bundle with3 assets/8 kernels. The approved v11 source/archive is frozen locally; extracted vanilla assets are never redistributed. Native prefabs/textures are resolved from the host.
 
 Implemented: textured visual/source baking; capsule-driven deformation; independent simulation ownership, compact physical-resolution fields; shared two-source volume, and derived multi-source GPU atlas. Last native rendering is .203/two walls; .206/three sources is Unity proof. Whole-house look/performance, multiple players and persistent construction are open. [Exact .206 evidence and memory limits](FOG_ATLAS_206.md).
 
@@ -20,3 +20,5 @@ Approved behavior: shape/textures/transmission remain recognizable; body lightly
 The local original handoff is `artifacts/fog-ghost-study/wall-11/HANDOFF_BUILDWORKS_RU.md`, not a public download. [Initial integration analysis](FOG_V11_INTEGRATION_HISTORY_206.md) is historical, including its former compatibility and memory assumptions.
 
 [.207 packing and allocation-failure checks](FOG_PACKING_207.md) admit the saved house block layout; actual contact fields and native house remain open.
+
+[Contact fields .208](FOG_CONTACT_208.md): dormant pieces retain their full visual; actual house/contact set/FPS still require Valheim.

@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.207";
+        internal const string PluginVersion = "0.19.208";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -333,6 +333,13 @@ namespace OstrixMods.BuildWorks
         }
 
 #if BUILDWORKS_TEST_STAND
+        internal static CompositeBlueprintStore.Blueprint QaBlueprint(string id)
+        {
+            RequireQaStorageIdle();
+            foreach (var blueprint in instance.session.BlueprintStore.All()) if (blueprint.id == id) return blueprint;
+            throw new ArgumentException("QA blueprint ID is not in the existing personal library.");
+        }
+
         internal static void RequireQaStorageIdle()
         {
             if (!instance || instance.blueprintEditor?.IsOpen == true || instance.session == null || !instance.session.QaStorageIdle)

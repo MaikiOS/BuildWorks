@@ -49,14 +49,20 @@ namespace OstrixMods.BuildWorks
 
         public string StartFogVisual() => BeginFogVisual(false);
         public string StartFogPair() => BeginFogVisual(true);
-        private string BeginFogVisual(bool pair)
+        public string StartFogHouse(string blueprintId) => BeginFogVisual(false, blueprintId);
+        private string BeginFogVisual(bool pair, string blueprintId = null)
         {
             player = BuildWorksTestIsolation.RequireLoadedSession(); network = ZNet.instance;
             if (running != null || capture != null || !SafeSession()) throw new InvalidOperationException("Focused idle isolated QA session required.");
             Camera camera = Camera.main;
             if (!camera) throw new InvalidOperationException("Native QA camera missing.");
             CloseFogVisual(); fog = camera.gameObject.AddComponent<BuildWorksTestFog>();
-            try { fog.Initialize(player, pair); return pair ? "fog-v11-native-pair-active" : "fog-v11-native-visual-active"; }
+            try
+            {
+                if (blueprintId == null) fog.Initialize(player, pair);
+                else fog.InitializeBlueprint(player, BuildWorksPlugin.QaBlueprint(blueprintId));
+                return blueprintId != null ? "fog-v11-native-house-active" : pair ? "fog-v11-native-pair-active" : "fog-v11-native-visual-active";
+            }
             catch { CloseFogVisual(); throw; }
         }
 

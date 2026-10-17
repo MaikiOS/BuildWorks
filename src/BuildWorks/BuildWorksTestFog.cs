@@ -10,6 +10,7 @@ namespace OstrixMods.BuildWorks
         private BlueprintFogAssets assets;
         private BlueprintFogVisual visual;
         private BlueprintFogVisual second;
+        private BlueprintFogBuilding building;
         private BlueprintFogChannels channels;
         private BlueprintFogVolume volume;
         private Player player;
@@ -19,9 +20,13 @@ namespace OstrixMods.BuildWorks
         private DepthTextureMode oldDepth, ownedDepth;
         private float clock;
         public int RenderFrames { get; private set; }
-        public int Tick => visual?.Simulation?.Tick ?? 0;
-        public Vector3 Origin => visual?.Origin ?? Vector3.zero;
-        public bool Active => visual != null;
+        public int Tick => visual?.Simulation?.Tick ?? (building == null ? 0 : Mathf.FloorToInt(building.Clock / BlueprintFogSimulation.Step + .0001f));
+        public Vector3 Origin => visual?.Origin ?? building?.Origin ?? Vector3.zero;
+        public bool Active => visual != null || building != null;
+        public int PartCount => building?.Count ?? (visual == null ? 0 : second == null ? 1 : 2);
+        public long FieldBytes => channels?.FieldBytes ?? visual?.Simulation?.AllocatedFieldBytes ?? 0;
+        public long AtlasBytes => building?.AtlasBytes ?? volume?.AtlasBytes ?? 0;
+        public long PeakFieldBytes { get; private set; }
         public int ActiveOwners => channels?.Count ?? (visual == null ? 0 : 1);
         public bool SkipVolume { get; set; }
         public bool SkipSimulation { get; set; }
@@ -64,9 +69,27 @@ namespace OstrixMods.BuildWorks
             catch { Cleanup(); throw; }
         }
 
+        internal void InitializeBlueprint(Player owner, CompositeBlueprintStore.Blueprint blueprint)
+        {
+            player = BuildWorksTestIsolation.RequireLoadedSession(); network = ZNet.instance;
+            if (owner != player) throw new InvalidOperationException("Fog QA player changed.");
+            view = GetComponent<Camera>(); capsule = player.GetComponent<CapsuleCollider>();
+            if (!view || !capsule || !ZNetScene.instance) throw new InvalidOperationException("Fog QA camera/body/prefab registry missing.");
+            oldDepth = view.depthTextureMode; ownedDepth = oldDepth | DepthTextureMode.Depth; view.depthTextureMode = ownedDepth;
+            try
+            {
+                assets = BlueprintFogAssets.LoadEmbedded(); channels = new BlueprintFogChannels(32, BlueprintFogChannels.MaximumFieldBudget);
+                Bounds body = capsule.bounds;
+                building = new BlueprintFogBuilding(assets, channels, blueprint, name => ZNetScene.instance.GetPrefab(name),
+                    player.transform.position + Vector3.right * 6, Quaternion.identity, body.center,
+                    new Vector2(Mathf.Max(body.extents.x, body.extents.z), body.extents.y));
+            }
+            catch { Cleanup(); throw; }
+        }
+
         private void Update()
         {
-            if (visual == null) return;
+            if (!Active) return;
             if (!player || player != Player.m_localPlayer || !network || network != ZNet.instance ||
                 player.IsDead() || !Game.instance || Game.instance.IsShuttingDown())
             { Destroy(this); return; }
@@ -75,20 +98,24 @@ namespace OstrixMods.BuildWorks
             {
                 clock += Mathf.Min(Time.deltaTime, BlueprintFogSimulation.Step * 8);
                 Bounds bounds = capsule.bounds;
-                visual.AdvanceTo(clock, bounds.center, new Vector2(Mathf.Max(bounds.extents.x, bounds.extents.z), bounds.extents.y), true);
+                visual?.AdvanceTo(clock, bounds.center, new Vector2(Mathf.Max(bounds.extents.x, bounds.extents.z), bounds.extents.y), true);
                 second?.AdvanceTo(clock, bounds.center, new Vector2(Mathf.Max(bounds.extents.x, bounds.extents.z), bounds.extents.y), true);
+                building?.AdvanceTo(clock, bounds.center, new Vector2(Mathf.Max(bounds.extents.x, bounds.extents.z), bounds.extents.y), true);
+                PeakFieldBytes = Math.Max(PeakFieldBytes, FieldBytes);
             }
             catch (Exception error) { Fail(error); }
         }
 
         private void OnRenderImage(RenderTexture source, RenderTexture target)
         {
-            if (visual == null || SkipVolume) { Graphics.Blit(source, target); return; }
+            if (!Active || SkipVolume) { Graphics.Blit(source, target); return; }
             try
             {
                 Light sun = RenderSettings.sun;
                 Vector3 direction = sun ? sun.transform.forward : Vector3.down;
-                if (volume != null) volume.Render(view, source, target, visual, second, visual.Origin - direction * 8,
+                if (building != null) building.Render(view, source, target, player.transform.position - direction * 8,
+                    direction, sun ? Mathf.Max(0, sun.intensity) * 1.6f : 0);
+                else if (volume != null) volume.Render(view, source, target, visual, second, visual.Origin - direction * 8,
                     direction, sun ? Mathf.Max(0, sun.intensity) * 1.6f : 0);
                 else visual.RenderVolume(view, source, target, visual.Origin - direction * 8,
                     direction, sun ? Mathf.Max(0, sun.intensity) * 1.6f : 0);
@@ -126,6 +153,7 @@ namespace OstrixMods.BuildWorks
         private void OnDestroy() => Cleanup();
         private void Cleanup()
         {
+            building?.Dispose(); building = null;
             visual?.Dispose(); visual = null; second?.Dispose(); second = null;
             volume?.Dispose(); volume = null; channels?.Dispose(); channels = null; assets?.Dispose(); assets = null;
             if (view && view.depthTextureMode == ownedDepth) view.depthTextureMode = oldDepth;

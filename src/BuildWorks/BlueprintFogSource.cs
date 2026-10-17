@@ -81,6 +81,34 @@ namespace OstrixMods.BuildWorks
             catch { Dispose(); throw; }
         }
 
+        internal bool MightContact(Vector3 previous, Vector3 current, Vector2 body)
+        {
+            if (!Shape) throw new ObjectDisposedException(nameof(BlueprintFogSource));
+            Vector3 voxel = new Vector3((Maximum.x - Minimum.x) / Nx, (Maximum.y - Minimum.y) / Ny, (Maximum.z - Minimum.z) / Nz);
+            // Include the .27m emission envelope, .065m surface displacement and the full trilinear footprint.
+            Vector3 reach = new Vector3(body.x + .35f, body.y + .35f, body.x + .35f) + voxel;
+            Vector3 low = Vector3.Min(previous, current) - reach, high = Vector3.Max(previous, current) + reach;
+            if (high.x < Minimum.x || high.y < Minimum.y || high.z < Minimum.z ||
+                low.x > Maximum.x || low.y > Maximum.y || low.z > Maximum.z) return false;
+            int Start(float a, float b, float step, int count) => Mathf.Clamp(Mathf.FloorToInt((a - b) / step - .5f), 0, count - 1);
+            int End(float a, float b, float step, int count) => Mathf.Clamp(Mathf.CeilToInt((a - b) / step - .5f), 0, count - 1);
+            int x0 = Start(low.x, Minimum.x, voxel.x, Nx), x1 = End(high.x, Minimum.x, voxel.x, Nx);
+            int y0 = Start(low.y, Minimum.y, voxel.y, Ny), y1 = End(high.y, Minimum.y, voxel.y, Ny);
+            int z0 = Start(low.z, Minimum.z, voxel.z, Nz), z1 = End(high.z, Minimum.z, voxel.z, Nz);
+            var density = Shape.GetPixelData<byte>(0);
+            Vector2 path = new Vector2(current.x - previous.x, current.z - previous.z);
+            float radius = body.x + .35f + voxel.magnitude, squared = radius * radius;
+            for (int z = z0; z <= z1; ++z) for (int y = y0; y <= y1; ++y) for (int x = x0; x <= x1; ++x)
+            {
+                if (density[x + Nx * (y + Ny * z)] == 0) continue;
+                Vector2 delta = new Vector2(Minimum.x + (x + .5f) * voxel.x - previous.x,
+                    Minimum.z + (z + .5f) * voxel.z - previous.z);
+                float t = path.sqrMagnitude > .000001f ? Mathf.Clamp01(Vector2.Dot(delta, path) / path.sqrMagnitude) : 0;
+                if ((delta - path * t).sqrMagnitude <= squared) return true;
+            }
+            return false;
+        }
+
         private void Bake()
         {
             var cells = new float[Nx * Ny * Nz]; var colors = new Color[cells.Length];

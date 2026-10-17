@@ -10,6 +10,7 @@ namespace OstrixMods.BuildWorks
         internal const string ResourceName = "BuildWorks.FogGhostV11";
         internal static readonly string[] Kernels = { "Clear", "AdvanceVelocity", "AdvanceMatter", "CorrectMatter", "ClearLedger", "AccumulateLedger", "UpdateSurface", "PackVolume" };
         private AssetBundle bundle;
+        internal Texture3D Empty { get; private set; }
         internal Shader Surface { get; private set; }
         internal Shader Volume { get; private set; }
         internal ComputeShader Solver { get; private set; }
@@ -52,12 +53,17 @@ namespace OstrixMods.BuildWorks
                     if (kernel == "ClearLedger" ? x != 64 || y != 1 || z != 1 : x != 8 || y != 8 || z != 4)
                         throw new InvalidDataException("Fog v11 kernel layout differs: " + kernel);
                 }
+                Empty = new Texture3D(1, 1, 1, TextureFormat.RGBAHalf, false) {
+                    name = "BuildWorks empty fog field", wrapMode = TextureWrapMode.Clamp,
+                    filterMode = FilterMode.Trilinear, hideFlags = HideFlags.HideAndDontSave };
+                Empty.SetPixels(new[] { Color.clear }); Empty.Apply(false, true);
             }
             catch { Dispose(); throw; }
         }
 
         public void Dispose()
         {
+            if (Empty) UnityEngine.Object.DestroyImmediate(Empty); Empty = null;
             if (bundle) bundle.Unload(true);
             bundle = null; Surface = null; Volume = null; Solver = null;
         }

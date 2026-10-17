@@ -34,8 +34,10 @@ namespace OstrixMods.BuildWorks
 
         internal BlueprintFogSimulation(BlueprintFogAssets assets, Texture3D shape, Texture3D pigment,
             Texture3D noise, Vector3 minimum, Vector3 maximum, Vector3 restMinimum, Vector3 restMaximum,
-            Vector3 actor, float seed, Vector3Int? gridSize = null)
+            Vector3 actor, float seed, Vector3Int? gridSize = null, float initialClock = 0)
         {
+            if (!Finite(initialClock) || initialClock < 0 || initialClock > 86400) throw new ArgumentException("Invalid initial fog clock.");
+            tick = Mathf.FloorToInt(initialClock / Step + .0001f); inputTime = initialClock;
             Validate(actor); Validate(minimum); Validate(maximum); Validate(restMinimum); Validate(restMaximum);
             if (assets == null || !assets.Solver || !shape || !pigment || !noise || !Finite(seed))
                 throw new ArgumentException("Missing fog simulation input.");
@@ -90,7 +92,7 @@ namespace OstrixMods.BuildWorks
             catch { Dispose(); throw; }
         }
 
-        internal void AdvanceTo(float time, Vector3 actor, Vector2 body, bool emit)
+        internal void AdvanceTo(float time, Vector3 actor, Vector2 body, bool emit, bool emissionPossible = true)
         {
             if (disposed) throw new ObjectDisposedException(nameof(BlueprintFogSimulation));
             Validate(actor);
@@ -100,7 +102,8 @@ namespace OstrixMods.BuildWorks
             int target = Mathf.FloorToInt(time / Step + .0001f);
             // Reject an unbounded catch-up rather than stalling the game or silently resetting visible matter.
             if (target - tick > 8) throw new ArgumentException("Fog advance exceeds eight fixed steps; caller must bound elapsed time.");
-            if (emit && target > tick) ++emissionRevision;
+            // Body wind can continue outside the source without invalidating a recovery readback.
+            if (emit && emissionPossible && target > tick) ++emissionRevision;
             solver.SetVector("_Body", body); solver.SetFloat("_Emit", emit ? 1 : 0);
             while (tick < target)
             {

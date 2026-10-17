@@ -42,7 +42,7 @@ public static class FogPublishedRenderCheck
                 using (var shortMetadata = new ComputeBuffer(1, 4))
                 {
                     var words = test.Binding(0).Concat(test.Binding(1)).ToArray(); bindings.SetData(words);
-                    var inputs = new[] { test.CreateInputQueue(0), test.CreateInputQueue(1) };
+                    var inputs = new[] { test.InputQueue(0), test.InputQueue(1) };
                     for (int slot = 0; slot < 2; ++slot)
                     {
                         last[slot] = test.Observation(slot, 0);
@@ -191,7 +191,7 @@ public static class FogPublishedRenderCheck
                         for (int slot = 0; slot < 2; ++slot)
                         {
                             last[slot] = test.Observation(slot, tick * BlueprintFogSimulation.Step + .005f);
-                            inputs[slot].Capture(last[slot]); test.Send(slot, tick, input: inputs[slot], holdConfirmation: true);
+                            test.Capture(slot, last[slot]); test.Send(slot, tick, input: inputs[slot], holdConfirmation: true);
                             oracle[slot].AdvanceTo(last[slot].Clock, Actor(last[slot]), body, true);
                         }
                         AsyncGPUReadback.WaitAllRequests();
@@ -202,7 +202,7 @@ public static class FogPublishedRenderCheck
                     for (int slot = 0; slot < 2; ++slot)
                     {
                         var sample = last[slot]; last[slot] = new BlueprintFogInputQueue.Sample(sample.Clock + .009f, sample.Actor, .43f, 1.15f, false, true, false);
-                        inputs[slot].Capture(last[slot]); test.Send(slot, 96, input: inputs[slot], holdConfirmation: true);
+                        test.Capture(slot, last[slot]); test.Send(slot, 96, input: inputs[slot], holdConfirmation: true);
                         oracle[slot].AdvanceTo(last[slot].Clock, Actor(last[slot]), new Vector2(.43f, 1.15f), false);
                     }
                     AsyncGPUReadback.WaitAllRequests(); Check("metadata-only"); test.ReleaseConfirmations(); test.Wait();
@@ -210,7 +210,7 @@ public static class FogPublishedRenderCheck
                     test.Send(0, 104, inject: true, holdConfirmation: true);
                     AsyncGPUReadback.WaitAllRequests(); Check("rejected"); test.ReleaseConfirmations(); test.Wait();
                     Require(test.Rejected == 1 && test.States[0].ConfirmedTick == 96, "Rejected fields changed render publication.");
-                    report = new Report { passed = true, owners = 2, negativeControls = negativeControls,
+                    report = new Report { passed = true, runtimeChannelsValidated = true, owners = 2, negativeControls = negativeControls,
                         captures = captures, comparisons = comparisons, maxMeanDelta = maxMean, maxLocalDelta = maxLocal, poisonedCpuDelta = poisonDelta,
                         disabledKeywordDelta = disabledDelta, staleGenerationDelta = staleDelta, metadataOnly = true, rejectedRetained = true,
                         geometryBeforeCpuConfirmation = true, meshAndAtlasVolume = true, productionSchedulerTested = false, wholeHouseSupported = false,
@@ -292,6 +292,7 @@ public static class FogPublishedRenderCheck
     private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
     [Serializable] private sealed class Report
     {
+        public bool runtimeChannelsValidated;
         public bool passed, metadataOnly, rejectedRetained, geometryBeforeCpuConfirmation, meshAndAtlasVolume,
             productionSchedulerTested, wholeHouseSupported, gameHostTested, gpuTimingsMeasured;
         public int owners, captures, comparisons, negativeControls, legacyCaptures;

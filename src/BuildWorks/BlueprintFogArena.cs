@@ -26,11 +26,12 @@ namespace OstrixMods.BuildWorks
         // Includes the committed velocity/ledger reservation that the channel owner allocates separately.
         internal long ReservedFieldBytes { get; }
         internal long RenderBytes { get; }
+        internal int BlockCapacity { get; }
 
         internal BlueprintFogArena(ComputeShader arenaProgram, ComputeShader metadataProgram, int owners, int capacity)
         {
             if (!arenaProgram || !metadataProgram) throw new ArgumentException("Fog arena programs missing.");
-            ReservedFieldBytes = BlueprintFogSnapshotState.EstimateFieldBytes(owners, capacity); ownerCount = owners;
+            ReservedFieldBytes = BlueprintFogSnapshotState.EstimateFieldBytes(owners, capacity); ownerCount = owners; BlockCapacity = capacity;
             RenderBytes = checked(98L * 82 * 82 * owners * 16);
             if (ReservedFieldBytes > MaximumFieldBytes || RenderBytes > BlueprintFogAtlas.MaximumBytes || Math.Max(98L, 82L * owners) > SystemInfo.maxTexture3DSize)
                 throw new ArgumentException("Fog arena exceeds its field or render reservation.");

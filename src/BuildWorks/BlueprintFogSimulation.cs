@@ -72,6 +72,9 @@ namespace OstrixMods.BuildWorks
         internal RenderTexture Flow => velocity[current];
         internal RenderTexture Surface => surface[current];
         internal int Tick => tick;
+        internal bool UsesStagedState(StagedState expected) => staged && expected != null &&
+            ReferenceEquals(colour[0], expected.Colour) && ReferenceEquals(origin[0], expected.Origin) && ReferenceEquals(surface[0], expected.Surface) &&
+            ReferenceEquals(away, expected.Away) && ReferenceEquals(peak, expected.Peak) && ReferenceEquals(state, expected.State);
 
         internal BlueprintFogSimulation(BlueprintFogAssets assets, Texture3D shape, Texture3D pigment,
             Texture3D noise, Vector3 minimum, Vector3 maximum, Vector3 restMinimum, Vector3 restMaximum,

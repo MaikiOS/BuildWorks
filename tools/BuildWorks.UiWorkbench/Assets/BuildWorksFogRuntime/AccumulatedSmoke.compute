@@ -22,6 +22,7 @@ RWStructuredBuffer<uint> _PeakAway;
 RWStructuredBuffer<uint> _SurfaceState;
 float3 _Minimum, _Maximum, _Actor, _ActorVelocity;
 float3 _RestMin, _RestMax;
+float3 _NoiseOffset;
 float2 _Body;
 float _Dt, _Clock, _Seed, _Emit;
 int _ResetLedger;
@@ -56,7 +57,7 @@ float3 UV(float3 p) { return (p - _Minimum) / (_Maximum - _Minimum); }
 float3 RestUV(float3 p) { return (p-_RestMin)/(_RestMax-_RestMin); }
 float ReturnWeight(float3 source, float age)
 {
-    float phase = _Noise.SampleLevel(sampler_Noise,source*.37+_Seed*.017,0);
+    float phase = _Noise.SampleLevel(sampler_Noise,(source+_NoiseOffset)*.37+_Seed*.017,0);
     return smoothstep(.65+phase*.75,2.3+phase*1.3,age);
 }
 float Noise(float3 p) { return _Noise.SampleLevel(sampler_Noise, p * .19 + _Seed * .017 + float3(.017,-.013,.021) * _Clock, 0); }
@@ -116,7 +117,8 @@ void AdvanceVelocity(uint3 id : SV_DispatchThreadID)
     float age = smoke.a > .001 ? history.w / smoke.a : 0;
     float3 source = smoke.a > .001 ? history.xyz / smoke.a : p;
     float returning = ReturnWeight(source,age);
-    float3 curl = Curl(p*1.2,float3(.7,1,-.4)) + Curl(p*3.1+19,float3(-.8,.3,1))*.5;
+    float3 phasePosition = p + _NoiseOffset;
+    float3 curl = Curl(phasePosition*1.2,float3(.7,1,-.4)) + Curl(phasePosition*3.1+19,float3(-.8,.3,1))*.5;
     curl *= min(1, 3/max(.001,length(curl)));
     v += (curl * 2 + float3(.04,.16,0)) * _Dt * (1-returning*.75);
     float3 delta = BodyDelta(p);
@@ -130,13 +132,13 @@ void AdvanceVelocity(uint3 id : SV_DispatchThreadID)
     float3 axis = _ActorVelocity / max(.001,length(_ActorVelocity));
     float axial = dot(delta,axis);
     float3 ring = delta-axis*axial;
-    float radius = length(ring), ringSize = _Body.x+.12+(Noise(p*2.3+8)-.5)*.10;
+    float radius = length(ring), ringSize = _Body.x+.12+(Noise(phasePosition*2.3+8)-.5)*.10;
     float envelope = exp(-(axial*axial+pow(radius-ringSize,2))/.07);
     v += (axis*(ringSize-radius)+ring/max(.05,radius)*axial)*envelope*moving*_Emit*_Dt*14;
     v += (source-p)*returning*_Dt*4;
     v *= exp(-returning*_Dt*3.4);
     v *= min(1,2.8/max(.001,length(v)));
-    float rough = Noise(p*4.7+31);
+    float rough = Noise(phasePosition*4.7+31);
     float contact = (1-smoothstep(_Body.x*.55,_Body.x+.18+(rough-.5)*.18,length(delta))) * _Emit;
     float3 restUV = RestUV(p);
     contact *= Inside(restUV) ? step(.002,_Shape.SampleLevel(sampler_Shape,restUV,0)) : 0;
@@ -213,7 +215,7 @@ void CorrectMatter(uint3 id : SV_DispatchThreadID)
     float decay = exp(-_Dt*(.2+arrived*6+smoothstep(5,6,age)*5+peripheral*18));
     colour *= decay; history *= decay; history.w += colour.a*_Dt;
     float released = max(0,flow.w-_ReadSurface[id].w);
-    float grain = pow(smoothstep(.2,.8,Noise(p*3.7+float3(23,-11,7))),1.4);
+    float grain = pow(smoothstep(.2,.8,Noise((p+_NoiseOffset)*3.7+float3(23,-11,7))),1.4);
     float3 restUV = RestUV(p);
     float source = Inside(restUV) ? _Shape.SampleLevel(sampler_Shape,restUV,0)*released*grain*6 : 0;
     float3 pigment = _Pigment.SampleLevel(sampler_Pigment,saturate(restUV),0).rgb;

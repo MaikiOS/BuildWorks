@@ -26,7 +26,8 @@ namespace OstrixMods.BuildWorks
         private readonly Vector3Int[] offsets = new Vector3Int[MaximumOwners];
         private readonly Vector4[] origins = new Vector4[MaximumOwners], restMin = new Vector4[MaximumOwners], restMax = new Vector4[MaximumOwners],
             fieldMin = new Vector4[MaximumOwners], fieldMax = new Vector4[MaximumOwners], actors = new Vector4[MaximumOwners],
-            shapeSize = new Vector4[MaximumOwners], fieldSize = new Vector4[MaximumOwners], atlasOffset = new Vector4[MaximumOwners];
+            shapeSize = new Vector4[MaximumOwners], fieldSize = new Vector4[MaximumOwners], atlasOffset = new Vector4[MaximumOwners],
+            noiseOffset = new Vector4[MaximumOwners];
         internal long Bytes => shape ? (long)size.x * size.y * size.z * 18 : 0;
 
         internal BlueprintFogAtlas(BlueprintFogAssets assets)
@@ -121,6 +122,7 @@ namespace OstrixMods.BuildWorks
                     Mathf.Max(source.depth, field.z) + 2));
                 Vector3 origin = owner.Origin - frame;
                 origins[i] = new Vector4(origin.x, origin.y, origin.z, owner.Clock);
+                noiseOffset[i] = owner.NoiseOffset;
                 restMin[i] = owner.Source.Minimum; restMax[i] = owner.Source.Maximum;
                 fieldMin[i] = owner.FieldMinimum; fieldMax[i] = owner.FieldMaximum; actors[i] = owner.ActorRadius;
                 shapeSize[i] = new Vector4(source.width, source.height, source.depth, owner.Simulation == null ? 0 : 1);
@@ -159,6 +161,7 @@ namespace OstrixMods.BuildWorks
             material.SetVectorArray("_RegionOriginClock", origins); material.SetVectorArray("_RegionRestMin", restMin); material.SetVectorArray("_RegionRestMax", restMax);
             material.SetVectorArray("_RegionFieldMin", fieldMin); material.SetVectorArray("_RegionFieldMax", fieldMax); material.SetVectorArray("_RegionActorRadius", actors);
             material.SetVectorArray("_RegionShapeSize", shapeSize); material.SetVectorArray("_RegionFieldSize", fieldSize); material.SetVectorArray("_RegionOffset", atlasOffset);
+            material.SetVectorArray("_RegionNoiseOffset", noiseOffset);
             material.SetVector("_FineMin", bounds.min - frame); material.SetVector("_FineMax", bounds.max - frame); material.SetInt("_IntegrationSteps", steps);
             material.SetVector("_FogCameraOrigin", camera.transform.position - frame);
             material.SetVector("_CameraRight", camera.transform.right); material.SetVector("_CameraUp", camera.transform.up); material.SetVector("_CameraForward", camera.transform.forward);

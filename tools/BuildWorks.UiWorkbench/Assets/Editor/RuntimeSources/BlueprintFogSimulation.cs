@@ -36,11 +36,13 @@ namespace OstrixMods.BuildWorks
 
         internal BlueprintFogSimulation(BlueprintFogAssets assets, Texture3D shape, Texture3D pigment,
             Texture3D noise, Vector3 minimum, Vector3 maximum, Vector3 restMinimum, Vector3 restMaximum,
-            Vector3 actor, float seed, Vector3Int? gridSize = null, float initialClock = 0, BlueprintFogScratch scratch = null)
+            Vector3 actor, float seed, Vector3Int? gridSize = null, float initialClock = 0, BlueprintFogScratch scratch = null,
+            Vector3? noiseOffset = null)
         {
             if (!Finite(initialClock) || initialClock < 0 || initialClock > 86400) throw new ArgumentException("Invalid initial fog clock.");
             tick = Mathf.FloorToInt(initialClock / Step + .0001f); inputTime = initialClock;
             Validate(actor); Validate(minimum); Validate(maximum); Validate(restMinimum); Validate(restMaximum);
+            Vector3 phase = noiseOffset ?? Vector3.zero; Validate(phase);
             if (assets == null || !assets.Solver || !shape || !pigment || !noise || !Finite(seed))
                 throw new ArgumentException("Missing fog simulation input.");
             for (int axis = 0; axis < 3; ++axis)
@@ -71,6 +73,7 @@ namespace OstrixMods.BuildWorks
                 clearLedger = solver.FindKernel("ClearLedger"); ledger = solver.FindKernel("AccumulateLedger");
                 restore = solver.FindKernel("UpdateSurface"); transport = new[] { flow, matter, correct };
                 solver.SetVector("_Minimum", minimum); solver.SetVector("_Maximum", maximum);
+                solver.SetVector("_NoiseOffset", phase);
                 solver.SetVector("_RestMin", restMinimum); solver.SetVector("_RestMax", restMaximum);
                 solver.SetFloat("_Seed", seed); solver.SetFloat("_Dt", Step);
                 foreach (int kernel in transport)
@@ -244,7 +247,7 @@ namespace OstrixMods.BuildWorks
         private static void Release(ref RenderTexture field)
         { if (field) { field.Release(); UnityEngine.Object.DestroyImmediate(field); } field = null; }
         private static bool Finite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
-        private static void Validate(Vector3 value)
+        internal static void Validate(Vector3 value)
         {
             if (!Finite(value.x) || !Finite(value.y) || !Finite(value.z) ||
                 Mathf.Abs(value.x) > 64 || Mathf.Abs(value.y) > 64 || Mathf.Abs(value.z) > 64)

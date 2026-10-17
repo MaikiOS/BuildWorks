@@ -2,7 +2,7 @@
 
 **2026-10-17 · [Русский](CURRENT_STATUS_RU.md) · [Roadmap](ROADMAP.md) · [Documentation](README.md)**
 
-Source and installed isolated QA build: **0.19.212**. Tested host: Valheim 1.0.20, Steam build25909357. Latest published binary is the historical [0.19.37 alpha prerelease](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha); its ZIP does not contain the current changes. There is no stable release. Source synchronization is not binary publication.
+Source and installed isolated QA build: **0.19.213**. Tested host: Valheim 1.0.20, Steam build25909357. Latest published binary is the historical [0.19.37 alpha prerelease](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha); its ZIP does not contain the current changes. There is no stable release. Source synchronization is not binary publication.
 
 | Area | Implemented / automated evidence | Valheim or user evidence | Still open |
 | --- | --- | --- | --- |
@@ -12,7 +12,7 @@ Source and installed isolated QA build: **0.19.212**. Tested host: Valheim 1.0.2
 | Catalog and file exchange | Categories, Save As, delete/hide, automatic portable file, Share, batch import/export | Limited batch .197 import/export/reentry proved | Full batch UI/dirty draft/restart; some owner checks remain |
 | Server library and sharing | Administrator publication; players/admin visibility, verified personal copies, provenance; in-process checks | Host+remote not accepted | Live access/reconnect/restart; direct player-to-player transfer |
 | Items and storage | Separate storage/mount inclusion; supplied-item preservation and journal foundations | Limited chest/inventory comparison only | Durable settlement, cancellation/refund/crash/replay, all holders/armor/admin restore and network authority |
-| v11 fog | [.212](FOG_RECOVERY_212.md): callback/revision/Dispose, cross-frame Recovery24; Scratch/Lazy/builds/contracts/independent checks | Native .212: the28-part house passed both ways,35/35 steps in44s; contact6/8 owners, both recoveries0/0 bytes, peak87408640; inventory unchanged, no errors. Owner rejected the .212 appearance: dissolution/recovery differs from v11 and passage stutters. Visual integration is BLOCKED. | Restore v11 dissolution/recovery and passage performance; roof, then durable project/board/network |
+| v11 fog | [.213](FOG_NOISE_FRAME_213.md): GPU3×3, transport/emission/return, Frozen/Pair/Atlas/Lazy/Scratch/Recovery/Gamma/builds/contracts; PASSED/Ship; QA installed, native .213 untested | Native .212: the28-part house passed both ways,35/35 steps in44s; contact6/8 owners, both recoveries0/0 bytes, peak87408640; inventory unchanged, no errors. Owner rejected the .212 appearance: dissolution/recovery differs from v11 and passage stutters. Visual integration is BLOCKED. | Restore v11 dissolution/recovery and passage performance; roof, then durable project/board/network |
 | Unfinished construction | Existing transient pause/refund foundations | No persistent project acceptance | Durable project + stake/board + material continuation + confirmed cancel-refund + reload/server |
 | World selection and heavy chain | Capture/volume foundations and targeted checks | Basic capture accepted; later coordinate/height UX issues reported | Editable volume/gizmos, boundary rules, full loaded-area and performance acceptance |
 | World objects and EarthWorks | No terrain integration dependency | None claimed | Admin-priced nonrecipe objects; EarthWorks is a later separate integration |
@@ -34,3 +34,5 @@ Historical .207 proof: [packing and allocation-failure recovery](FOG_PACKING_207
 .211 installed, SHA `F748D15F60768E0B6C6A4BB24FF878F66613036432FA2CBD2A7093EEEA2278C2`;143 files unchanged. New/original shader and cache comparisons passed; Unity timings are noisy, native .211 exposed recovery failure after owner passage; full scenario FAILED. [Report .211](FOG_RENDER_CACHE_211.md).
 
 .212 installed, SHA `71E5B6DF7A260E8E9FBBD479F0A4E07908ADBD1D09CAB31028EA0DB00CE2A469`;143 current files unchanged. Cross-frame failure reproduced and fixed in Unity;24 real frames passed. Native .212: the28-part house passed both ways,35/35 steps in44s; contact6/8 owners, both recoveries0/0 bytes, peak87408640; inventory unchanged, no errors. Owner rejected the .212 appearance: dissolution/recovery differs from v11 and passage stutters. Visual integration is BLOCKED. [Report](FOG_RECOVERY_212.md).
+
+.213: [shared building noise frame](FOG_NOISE_FRAME_213.md) passed GPU/regressions/contracts/independent PASSED/Ship and is installed;143 files unchanged. SHA `3421595F8757AE894D7A262AC32BA6BD72B8180E12971C71C12E2F4D3D0BC4A8`. Native .213 is untested. Domain, YZ ownership, FPS/roof and durable board remain open.

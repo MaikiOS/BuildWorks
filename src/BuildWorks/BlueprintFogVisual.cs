@@ -23,6 +23,7 @@ namespace OstrixMods.BuildWorks
         private Vector2 body;
         private float time;
         internal Vector3 Origin { get; private set; }
+        internal Vector3 NoiseOffset { get; private set; }
         internal GameObject Root => visual;
         internal BlueprintFogSource Source => source;
         internal BlueprintFogSimulation Simulation => simulation;
@@ -38,7 +39,8 @@ namespace OstrixMods.BuildWorks
 
         internal BlueprintFogVisual(BlueprintFogAssets assets, GameObject prefab, Vector3 position,
             Quaternion rotation, Vector3 relativeScale, int? materialSeed, Vector3 origin, Vector3 actor, Vector2 capsule,
-            BlueprintFogChannels channels = null, string owner = null, bool compactRegion = false, bool lazyFields = false)
+            BlueprintFogChannels channels = null, string owner = null, bool compactRegion = false, bool lazyFields = false,
+            Vector3? noiseOrigin = null)
         {
             if (assets == null || !prefab) throw new ArgumentException("Fog prefab/assets missing.");
             if (lazyFields && (!compactRegion || channels == null || string.IsNullOrWhiteSpace(owner)))
@@ -51,6 +53,7 @@ namespace OstrixMods.BuildWorks
                 visual.transform.SetPositionAndRotation(position, rotation);
                 visual.transform.localScale = Vector3.Scale(prefab.transform.localScale, relativeScale);
                 Origin = origin;
+                NoiseOffset = origin - (noiseOrigin ?? origin); BlueprintFogSimulation.Validate(NoiseOffset);
                 source = new BlueprintFogSource(visual, Origin, compactRegion);
                 minimum = source.Minimum - new Vector3(1.2f, 0, 1);
                 maximum = source.Maximum + new Vector3(1.2f, .6f, 1);
@@ -125,7 +128,7 @@ namespace OstrixMods.BuildWorks
         private void Activate(Vector3 actor, float clock)
         {
             BlueprintFogSimulation Create(BlueprintFogScratch scratch = null) => new BlueprintFogSimulation(assets, source.Shape, source.Pigment, source.Noise,
-                minimum, maximum, source.Minimum, source.Maximum, actor, 37, grid, clock, scratch);
+                minimum, maximum, source.Minimum, source.Maximum, actor, 37, grid, clock, scratch, NoiseOffset);
             if (channelPool == null) { simulation = Create(); return; }
             Vector3Int size = grid ?? new Vector3Int(BlueprintFogSimulation.Nx, BlueprintFogSimulation.Ny, BlueprintFogSimulation.Nz);
             bool created = false;
@@ -172,6 +175,7 @@ namespace OstrixMods.BuildWorks
             material.SetVector("_WakeMin" + suffix, minimum); material.SetVector("_WakeMax" + suffix, maximum);
             material.SetVector("_MatterMin" + suffix, minimum); material.SetVector("_MatterMax" + suffix, maximum);
             material.SetVector("_FogOrigin" + suffix, Origin); material.SetVector("_Body" + suffix, body);
+            material.SetVector("_NoiseOffset" + suffix, NoiseOffset);
             material.SetFloat("_Clock" + suffix, time); material.SetFloat("_Density" + suffix, .85f); material.SetFloat("_Flow" + suffix, .12f);
             if (suffix.Length == 0)
             {
@@ -192,6 +196,7 @@ namespace OstrixMods.BuildWorks
             material.SetVector("_MatterMin", minimum); material.SetVector("_MatterMax", maximum);
             material.SetFloat("_MatterEnabled", 1); material.SetFloat("_Accumulated", 1);
             material.SetVector("_FogOrigin", Origin); material.SetFloat("_Clock", time); material.SetFloat("_Disperse", 1);
+            material.SetVector("_NoiseOffset", NoiseOffset);
             material.SetFloat("_Flow", .12f); material.SetVector("_Body", body); material.SetVectorArray("_Trail", trail);
         }
         private Vector3 LocalActor(Vector3 actor, out bool nearby)

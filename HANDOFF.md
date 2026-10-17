@@ -3,7 +3,10 @@
 2026-10-17 · [Русский](HANDOFF_RU.md)
 
 1. Read [PROJECT_CONTRACT](PROJECT_CONTRACT.md), [current evidence](docs/CURRENT_STATUS.md), [forward roadmap](docs/ROADMAP.md) and project AGENTS. Preserve the complete goal; this file is not a goal API update.
-2. Source and installed QA0.19.212; DLL SHA 71E5B6DF7A260E8E9FBBD479F0A4E07908ADBD1D09CAB31028EA0DB00CE2A469. [Report .212](docs/FOG_RECOVERY_212.md). Public binary .37 alpha is unchanged.
+2. Source and installed QA0.19.213; DLL SHA 3421595F8757AE894D7A262AC32BA6BD72B8180E12971C71C12E2F4D3D0BC4A8. [Report .213](docs/FOG_NOISE_FRAME_213.md). Public binary .37 alpha is unchanged.
+
+[.213](docs/FOG_NOISE_FRAME_213.md) aligns noise phases across parts; GPU checks/regressions passed and QA is installed. Native .213 is untested; boundary loss, recovery ownership and performance remain open.
+
 3. Native .210:actual28-part Forest Hut, both-way passage/standing/full exit without failure; peak87408640/98304000. After15 seconds recovery:0 owners/0 bytes. Cleanup fog=null, inventory0→0, no grants/world construction. QA normally closed.
 4. The .211 disappearance was reproduced before fixing. .212 copies GPU results in the callback, retains revision/Dispose guards;24 real PlayMode frames passed. Explicit300s QA inspection survives focus/pause with input stopped; F12 still closes it. Native .212 route35/35 passed, both recoveries0, inventory unchanged. Owner rejected dissolution/recovery and reported severe passage stutter. Fix the compact-domain/ownership/noise gaps and reproduce the approved effect before the durable board. Do not repeat .211.
 5. Native import/build/reload of one paid28-part Forest Hut passed on .195. Limited batch exchange passed on .197. Preserve accepted cases; don't repeat without a changed path/regression reason.

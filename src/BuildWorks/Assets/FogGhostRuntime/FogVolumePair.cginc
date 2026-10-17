@@ -4,6 +4,7 @@ float3 _VolumeMinB, _VolumeMaxB, _WakeMinB, _WakeMaxB, _MatterMinB, _MatterMaxB,
 float4 _ActorB;
 float2 _BodyB;
 float _ClockB, _DensityB, _FlowB;
+float3 _NoiseOffsetB;
 
 float4 PairTransportB(float3 local)
 {
@@ -12,6 +13,7 @@ float4 PairTransportB(float3 local)
 }
 float PairNoiseB(float3 local)
 {
+    local += _NoiseOffsetB;
     float3 drift = float3(.010, .016, -.008) * _ClockB;
     return tex3Dlod(_NoiseB, float4(local * .11 + drift, 0)).r * .72
         + tex3Dlod(_NoiseB, float4(local * .29 - drift, 0)).r * .28;

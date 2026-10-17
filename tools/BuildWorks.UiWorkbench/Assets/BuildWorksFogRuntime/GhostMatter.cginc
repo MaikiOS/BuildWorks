@@ -9,6 +9,7 @@ float3 _MatterMin, _MatterMax;
 float _MatterEnabled;
 float _Accumulated;
 float3 _FogOrigin;
+float3 _NoiseOffset;
 
 float4 GhostTransport(float3 p)
 {
@@ -22,7 +23,7 @@ float4 GhostTransport(float3 p)
 
 float GhostNoise(float3 p)
 {
-    p -= _FogOrigin;
+    p = p - _FogOrigin + _NoiseOffset;
     float3 drift = float3(.010, .016, -.008) * _Clock;
     return tex3Dlod(_Noise, float4(p * .11 + drift, 0)).r * .72
         + tex3Dlod(_Noise, float4(p * .29 - drift, 0)).r * .28;
@@ -30,7 +31,7 @@ float GhostNoise(float3 p)
 float GhostClear(float3 p)
 {
     p -= _FogOrigin;
-    float noise = tex3Dlod(_Noise, float4(p * .73 + _Clock * .025, 0)).r;
+    float noise = tex3Dlod(_Noise, float4((p + _NoiseOffset) * .73 + _Clock * .025, 0)).r;
     float clear = 0;
     [unroll] for (int j = 0; j < 24; ++j)
     {

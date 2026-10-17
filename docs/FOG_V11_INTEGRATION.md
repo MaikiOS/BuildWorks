@@ -2,7 +2,7 @@
 
 [Русский](FOG_V11_INTEGRATION_RU.md) · [Current evidence](CURRENT_STATUS.md) · [Next milestones](ROADMAP.md)
 
-Source/QA .212 embeds an owned Linear shader/compute bundle with3 assets/8 kernels. The approved v11 source/archive is frozen locally; extracted vanilla assets are never redistributed. Native prefabs/textures are resolved from the host.
+Source/QA .213 embeds an owned Linear shader/compute bundle with3 assets/8 kernels. The approved v11 source/archive is frozen locally; extracted vanilla assets are never redistributed. Native prefabs/textures are resolved from the host.
 
 Implemented:source baking, capsule-driven deformation, independent owners, compact fields and shared GPU atlas. .210 adds exact-grid shared scratch:the actual28-part house passed both-way traversal/standing/exit, recovery0, peak87408640. Volume speed (down to8 FPS)/full roof appearance, multiple players and durable construction remain open. [Exact .210 evidence](FOG_SCRATCH_210.md).
 
@@ -34,3 +34,5 @@ The local original handoff is `artifacts/fog-ghost-study/wall-11/HANDOFF_BUILDWO
 [.211 cache and dormant zero fields](FOG_RENDER_CACHE_211.md):10 exact RGB comparisons preserve v11 on control frames. Installed; native shader49/25/48 FPS with frozen simulation. Owner passage triggers recovery-readback failure and removes the house; fix/stable preview required before the board.
 
 [.212 GPU reply lifetime](FOG_RECOVERY_212.md) is fixed after real cross-frame reproduction;24 PlayMode frames passed. Native .212: the28-part house passed both ways,35/35 steps in44s; contact6/8 owners, both recoveries0/0 bytes, peak87408640; inventory unchanged, no errors. Owner rejected the .212 appearance: dissolution/recovery differs from v11 and passage stutters. Visual integration is BLOCKED. Durable board remains open. The v11 bundle is unchanged.
+
+.213: [shared building noise frame](FOG_NOISE_FRAME_213.md) passed GPU/regressions/contracts/independent PASSED/Ship and is installed;143 files unchanged. SHA `3421595F8757AE894D7A262AC32BA6BD72B8180E12971C71C12E2F4D3D0BC4A8`. Native .213 is untested. Domain, YZ ownership, FPS/roof and durable board remain open.

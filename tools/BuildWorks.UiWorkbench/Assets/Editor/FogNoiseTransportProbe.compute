@@ -1,0 +1,10 @@
+#pragma kernel SampleReturn
+#include "../BuildWorksFogRuntime/AccumulatedSmoke.compute"
+RWStructuredBuffer<float4> _ProbeResult;
+float3 _ProbePosition;
+[numthreads(1,1,1)]
+void SampleReturn(uint id : SV_DispatchThreadID)
+{
+    _ProbeResult[0] = float4(ReturnWeight(_ProbePosition, .5), ReturnWeight(_ProbePosition, 1.8),
+        ReturnWeight(_ProbePosition, 2.5), ReturnWeight(_ProbePosition, 4));
+}

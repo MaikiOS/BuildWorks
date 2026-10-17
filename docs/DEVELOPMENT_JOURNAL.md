@@ -6,6 +6,7 @@ This records changes and evidence, not future milestones. Historical results ret
 
 | Checkpoint | Change / evidence | Boundary |
 | --- | --- | --- |
+| [.213](FOG_NOISE_FRAME_213.md) | Shared surface/compute/single/pair/atlas noise frame; GPU3×3, exact transport/emission/return, regressions/builds/contracts and independent PASSED/Ship; installed,143 files unchanged | Native .213 untested; domain/ownership/FPS/roof/board open. Rejected empty-cell optimization is absent |
 | [.212](FOG_RECOVERY_212.md) | Disappearance reproduced before fix; callback copy/revision/Dispose, Recovery24 real frames, Scratch/Lazy/builds/contracts/independent PASSED/Ship. Explicit300s manual QA inspection; installed | Native .212: the28-part house passed both ways,35/35 steps in44s; contact6/8 owners, both recoveries0/0 bytes, peak87408640; inventory unchanged, no errors. Owner rejected the .212 appearance: dissolution/recovery differs from v11 and passage stutters. Visual integration is BLOCKED. Roof/FPS/board open |
 | Native .211 | Same camera/frozen simulation:shader49.15/24.80/48.26 FPS; first recovery0/peak87408640. Three owner runs exposed recovery-readback disappearance | Full script FAILED; reverse contact11 FPS, stable five-minute preview not delivered |
 | [.211](FOG_RENDER_CACHE_211.md) | Atlas cache/dormant zero sampling; redundant packing reproduced,10 exact comparisons/28 synthetic, Atlas/v11 parity/builds/contracts/review; installed | Native FPS/full-house appearance untested; durable board still ahead |

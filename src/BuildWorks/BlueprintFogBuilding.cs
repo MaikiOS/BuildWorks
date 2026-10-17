@@ -38,7 +38,7 @@ namespace OstrixMods.BuildWorks
                     var part = blueprint.parts[i]; Vector3 position = origin + rotation * part.position.ToVector3();
                     parts.Add(new BlueprintFogVisual(assets, prefabs[i], position, rotation * part.rotation.ToQuaternion(),
                         part.PlacementScale(prefabs[i].transform.localScale), part.materialSeed, position, actor, capsule,
-                        channels, owner + ":" + i, true, true));
+                        channels, owner + ":" + i, true, true, origin));
                 }
             }
             catch { Dispose(); throw; }

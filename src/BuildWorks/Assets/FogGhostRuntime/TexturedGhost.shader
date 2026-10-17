@@ -8,6 +8,7 @@ Shader "BuildWorks/Fog/TexturedGhost"
         _BumpScale ("Normal strength", Float) = 1
         _Cutoff ("Original cutout", Range(0,1)) = 0
         _Noise ("Cloud noise", 3D) = "gray" {}
+        _NoiseOffset ("Building noise offset", Vector) = (0,0,0,0)
         _MatterFlow ("Shared matter transport", 3D) = "black" {}
         _DenseContact ("Subdivided contact mesh", Float) = 0
         _ContactGeometry ("Transport textured geometry", Float) = 1

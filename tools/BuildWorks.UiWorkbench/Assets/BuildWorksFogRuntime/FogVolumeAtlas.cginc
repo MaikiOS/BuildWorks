@@ -6,11 +6,13 @@ float3 _AtlasSize, _FineMin, _FineMax;
 int _RegionCount, _IntegrationSteps;
 float4 _RegionOriginClock[32], _RegionRestMin[32], _RegionRestMax[32], _RegionFieldMin[32], _RegionFieldMax[32];
 float4 _RegionActorRadius[32], _RegionShapeSize[32], _RegionFieldSize[32], _RegionOffset[32];
+float4 _RegionNoiseOffset[32];
 
 float3 AtlasUV(float3 uv, float3 size, int owner)
 { return FogAtlasUV(uv,size,_RegionOffset[owner].xyz,_AtlasSize); }
 float AtlasNoise(float3 local, int owner)
 {
+    local += _RegionNoiseOffset[owner].xyz;
     float3 drift = float3(.010,.016,-.008) * _RegionOriginClock[owner].w;
     return tex3Dlod(_Noise,float4(local*.11+drift,0)).r*.72 + tex3Dlod(_Noise,float4(local*.29-drift,0)).r*.28;
 }

@@ -10,7 +10,7 @@ function Guard([string]$mode,[string]$pattern){
     [scriptblock]::Create($body.Substring(1,$body.Length-2))
 }
 # These are validator fixtures, never receipts from a GPU run.
-$physics=@{passed=$true;realSolver=$true;stagedLedger=$true;velocityAlias=$true;packingRollback=$true;shortageRollback=$true;callbackWaitsInFixture=$true;productionAllocatorTested=$false;wholeHouseSupported=$false;gameHostTested=$false;gpuTimingsMeasured=$false;gridX=96;gridY=80;gridZ=80;owners=2;ticks=360;fieldComparisons=664;ledgerComparisons=498;atlasComparisons=28;committed=161;rejected=2}
+$physics=@{passed=$true;realSolver=$true;stagedLedger=$true;velocityAlias=$true;packingRollback=$true;shortageRollback=$true;callbackWaitsInFixture=$true;productionAllocatorTested=$false;wholeHouseSupported=$false;gameHostTested=$false;gpuTimingsMeasured=$false;gridX=96;gridY=80;gridZ=80;owners=2;ticks=360;fieldComparisons=664;ledgerComparisons=498;atlasComparisons=28;committed=161;rejected=2;metadataComparisons=164;metadataBeforeReceipt=$true;metadataOnlyTested=$true;fractionalVisualClock=$true}
 $arena=@{passed=$true;shortageRollback=$true;packingRollback=$true;nonfiniteRollback=$true;pendingRemoval=$true;reusedSlot=$true;guttersExact=$true;freeBlocksConserved=$true;productionAllocatorTested=$false;fullWallTested=$false;wholeHouseSupported=$false;gameHostTested=$false;owners=8;capacityBlocks=27;committed=47;rejected=3;batchChecks=15;fieldComparisons=480;ledgerComparisons=360}
 $negative=0
 foreach($fixture in @(@('ArenaPhysicsOnly','*Arena physics evidence missing*',$physics),@('ArenaOnly','*Arena GPU evidence missing*',$arena))){
@@ -25,5 +25,5 @@ foreach($fixture in @(@('ArenaPhysicsOnly','*Arena physics evidence missing*',$p
     }
 }
 $guard=Guard 'ArenaPhysicsOnly' '*Arena physics evidence missing*'
-$result=$physics.Clone();$result.committed=340;& $guard
+$result=$physics.Clone();$result.committed=340;$result.metadataComparisons=343;& $guard
 @{passed=$true;gpuExecuted=$false;fixturesOnly=$true;negativeCases=$negative;parserErrors=0}|ConvertTo-Json

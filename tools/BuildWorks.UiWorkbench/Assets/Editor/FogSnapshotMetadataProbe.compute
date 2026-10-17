@@ -1,0 +1,30 @@
+#pragma kernel InitMetadata
+#pragma kernel PublishMetadata
+
+// Dispatch after field/gutter writes and before any draw; the CPU receipt is a separate record.
+StructuredBuffer<uint> _Control;
+RWStructuredBuffer<uint> _PublishedMetadata;
+int _MetadataWords, _Slot, _Tick, _EmissionRevision, _PublishFlags;
+uint2 _OwnerBits, _GenerationBits, _SequenceBits;
+float4 _ActorRadius;
+float3 _ShapeClock; // half height, fractional visual clock, trail[0].w (not emission).
+
+[numthreads(64,1,1)]
+void InitMetadata(uint id : SV_DispatchThreadID)
+{
+    if(id < (uint)_MetadataWords) _PublishedMetadata[id] = 0;
+}
+[numthreads(1,1,1)]
+void PublishMetadata(uint id : SV_DispatchThreadID)
+{
+    if(_Control[2] != 0) return;
+    uint base = _Slot * 16;
+    _PublishedMetadata[base] = asuint(_ActorRadius.x); _PublishedMetadata[base+1] = asuint(_ActorRadius.y);
+    _PublishedMetadata[base+2] = asuint(_ActorRadius.z); _PublishedMetadata[base+3] = asuint(_ActorRadius.w);
+    _PublishedMetadata[base+4] = asuint(_ShapeClock.x); _PublishedMetadata[base+5] = asuint(_ShapeClock.y);
+    _PublishedMetadata[base+6] = asuint(_ShapeClock.z); _PublishedMetadata[base+7] = _PublishFlags;
+    _PublishedMetadata[base+8] = _OwnerBits.x; _PublishedMetadata[base+9] = _OwnerBits.y;
+    _PublishedMetadata[base+10] = _GenerationBits.x; _PublishedMetadata[base+11] = _GenerationBits.y;
+    _PublishedMetadata[base+12] = _SequenceBits.x; _PublishedMetadata[base+13] = _SequenceBits.y;
+    _PublishedMetadata[base+14] = _Tick; _PublishedMetadata[base+15] = _EmissionRevision;
+}

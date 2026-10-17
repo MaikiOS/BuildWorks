@@ -6,6 +6,7 @@ This records changes and evidence, not future milestones. Historical results ret
 
 | Checkpoint | Change / evidence | Boundary |
 | --- | --- | --- |
+| 2026-10-17 · inter-frame gate preparation | Either-order async join, cached poll/expiry, retirement and generation reuse; procedural wall/full grids. C#0/0,252 CPU rejections; PASSED/Ship. | No GPU while Ostrix plays. New frame gate and physics regression await a free window; runtime/QA .213 unchanged. |
 | 2026-10-17 · full physics/metadata GPU gate | Two96×80×80 owners/batches1–8/fractional clocks:664/498/28 exact field/ledger/atlas,239 commits/2 rejections;242 metadata checks before CPU receipt including zero-step. C#0/0,2 HLSL0/0,169 CPU rejections; PASSED/Ship. | Private readback waits, not shader/render/callback frames/house memory/FPS. Runtime/QA .213 unchanged. |
 | 2026-10-17 · physics gate preparation | Actual v11 connected to a private fixed-pool fixture:2 full owners/batches1–8/staged ledger/velocity/commit/oracle. C#0/0;155 CPU validator rejections; PASSED/Ship. | New GPU run not executed; expected664/498/28 are not results. Runtime/QA .213 unchanged; production integration open. |
 | Post-.213 fixed-pool GPU candidate |17 kernels;8 synthetic8³ owners,47 commits/3 rejections,15 full checks480 fields/360 ledger; gutters/free list, shortage/packing/Inf/pending removal/reuse. C#0/0,71 corrupt receipt rejections, independent PASSED/Ship | Not full v11/production allocator/real-frame callback/house/FPS. Runtime bundle and installed .213 unchanged; no Valheim launch |

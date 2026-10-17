@@ -2,6 +2,8 @@
 
 **2026-10-17 · [Русский](CURRENT_STATUS_RU.md) · [Roadmap](ROADMAP.md) · [Documentation](README.md)**
 
+**Next inter-frame scenario prepared; its GPU run has not occurred.** `-ArenaFramesOnly` uses real Unity player frames, joins copied metadata/receipt in either order, polls without blocking, and checks expired handles, pending retirement and clean generation reuse. C#0/0,252 negative CPU fixtures, independent PASSED/Ship. The full physics GPU evidence below belongs to `1718e35`; after Probe changes it must be rerun along with the new frame gate. No Unity/GPU/game input while Ostrix plays. Installed .213 unchanged.
+
 **Full physics GPU gate passed:** actual v11, two96×80×80 owners, batches1–8 and fractional time;664 exact field/498 ledger/28 atlas comparisons,239 commits/2 safe rejections,242 checks of64-byte metadata before CPU confirmation. Zero-step metadata-only and pending-owner rejection checked. C#0/0,2 HLSL kernels0/0,169 negative CPU fixtures and independent PASSED/Ship. **This private fixture waits for readbacks: shader consumers, real callback frames, production memory, house and FPS remain unproven.** Runtime/QA .213 unchanged; Valheim was not launched.
 
 Source and installed isolated QA build: **0.19.213**. Tested host: Valheim 1.0.20, Steam build25909357. Latest published binary is the historical [0.19.37 alpha prerelease](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha); its ZIP does not contain the current changes. There is no stable release. Source synchronization is not binary publication.

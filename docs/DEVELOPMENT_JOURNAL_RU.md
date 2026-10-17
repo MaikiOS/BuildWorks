@@ -6,6 +6,7 @@
 
 | Этап | Что изменилось / доказательство | Граница |
 | --- | --- | --- |
+| 2026-10-17 · подготовка межкадрового gate | Async join в любом порядке, cached poll/expiry, retirement и generation reuse; процедурная стена/полные grids. C#0/0,252 CPU-отказа; PASSED/Ship. | GPU не запускался, пока Ostrix играет. Новый frame gate и physics-регрессия ожидают свободного окна; runtime/QA .213 неизменны. |
 | 2026-10-17 · полный physics/metadata GPU gate | Два96×80×80 владельца/пакеты1–8/дробные часы:664/498/28 точных field/ledger/atlas,239 commit/2 отказа;242 metadata до CPU receipt, включая zero-step. C#0/0,2 HLSL0/0,169 CPU-отказов; PASSED/Ship. | Private readback waits, не shader/render/кадры callback/память дома/FPS. Runtime и QA .213 неизменны. |
 | 2026-10-17 · подготовка physics gate | Настоящий v11 соединён с частным fixed-pool стендом:2 полных владельца/пакеты1–8/staged ledger/velocity/commit/oracle. C#0/0;155 CPU-отказов валидатора; PASSED/Ship. | Новый GPU-прогон не выполнен; ожидаемые664/498/28 не результаты. Runtime/QA .213 неизменны, игровая интеграция открыта. |
 | GPU-кандидат fixed pool после .213 |17 ядер;8 синтетических8³ владельцев,47 commit/3 отказа,15 полных сверок480 fields/360 ledger; gutters/free-list, shortage/packing/Inf/pending removal/reuse. C#0/0,71 отрицательная проверка отчёта, независимые PASSED/Ship | Не полный v11/production allocator/реальные кадры callback/дом/FPS. Runtime bundle и установленная .213 неизменны, Valheim не запускался |

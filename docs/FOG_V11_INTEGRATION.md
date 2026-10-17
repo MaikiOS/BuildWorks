@@ -118,3 +118,13 @@ This fixture waits for readbacks, uses reflection and additional reference/sourc
 Eight slots add512B to prior CPU sizing:24860 blocks98304212 exceed98304000;24859 give98303696, rounded24576 give98157668. This is sizing, not a measured allocation peak; existing `EstimateFieldBytes` still describes the previous layout without metadata and cannot admit the entire new path. The two-owner/8192-block/metadata fixture declares58779980 logical bytes, excluding reference/source/atlas/construction/driver staging.
 
 Local: `artifacts/fog-arena-physics/verification.json`, `sources.json`, `unity.log`, `cpu-verification.json`, `fingerprint-verification.json`. Executed source hashes match; owned bundle and QA DLL unchanged. Unity logged LicensingClient/access-token warnings, then resolved Personal entitlement and exited0; no compile/shader/test errors. FXC first rejected Unity `#pragma kernel` (X3568); stripping only those lines in a temporary copy passed /WX.
+
+### Next step: real-frame preparation
+
+**Next inter-frame scenario prepared; its GPU run has not occurred.** `-ArenaFramesOnly` uses real Unity player frames, joins copied metadata/receipt in either order, polls without blocking, and checks expired handles, pending retirement and clean generation reuse. C#0/0,252 negative CPU fixtures, independent PASSED/Ship. The full physics GPU evidence below belongs to `1718e35`; after Probe changes it must be rerun along with the new frame gate. No Unity/GPU/game input while Ostrix plays. Installed .213 unchanged.
+
+`FogArenaFramesCheck.cs` reuses the full Probe with an owned procedural wall, not a game-world source.24 batches1–8 alternate owners. Six frames without polling after completion must expire a native handle while copied replies survive. A further pending batch retires owner0; reuse is blocked until callback, then maps/atlas are cleared and new solver/ledger/velocity/generation created. A stale receipt is rejected during the new pending batch; the neighbor retains its clock.
+
+The join no longer assumes callback order. The fixture reverses request registration and requires an observed receipt-first case. `Poll` reads cached CPU phases without `WaitForCompletion`, `WaitAllRequests` or `GetData`; separate exact oracle comparisons and teardown may block. This does not prove production input queue, render cadence or FPS. Real Play Mode requires the runner to omit `-quit`; its own timeout remains.
+
+Expected224/168/16/52 and52 commits are **not GPU results yet**. Prior664/498/28 and239/2 belong to checkpoint1718e35; the modified Probe requires a regression rerun. Historical receipts retained; installed DLL/bundle unchanged.

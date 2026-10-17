@@ -6,6 +6,7 @@ This records changes and evidence, not future milestones. Historical results ret
 
 | Checkpoint | Change / evidence | Boundary |
 | --- | --- | --- |
+| Native .211 | Same camera/frozen simulation:shader49.15/24.80/48.26 FPS; first recovery0/peak87408640. Three owner runs exposed recovery-readback disappearance | Full script FAILED; reverse contact11 FPS, stable five-minute preview not delivered |
 | [.211](FOG_RENDER_CACHE_211.md) | Atlas cache/dormant zero sampling; redundant packing reproduced,10 exact comparisons/28 synthetic, Atlas/v11 parity/builds/contracts/review; installed | Native FPS/full-house appearance untested; durable board still ahead |
 | [.210](FOG_SCRATCH_210.md) | Exact-grid shared GPU scratch; Scratch360/36/Lazy5/frozen270/18, builds/contracts/independent review; installed. Native28-part house:both-way passage/recovery0, peak87408640 | Volume speed down to8 FPS/full appearance not accepted; durable project/board still ahead |
 | [.209](FOG_CUTOUT_209.md) | Native .208 exposed28-part house traversal overflow; cleanup/inventory checked. Source alpha/cutout reproduced and fixed, Lazy/v11 parity/builds/contracts passed; .209 installed | .209 roof appearance and house budget remain open; board follows |

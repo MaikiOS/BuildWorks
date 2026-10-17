@@ -31,4 +31,4 @@ The local original handoff is `artifacts/fog-ghost-study/wall-11/HANDOFF_BUILDWO
 
 [.210 shared scratch and native traversal](FOG_SCRATCH_210.md). Memory passes the tested route; performance and the durable board remain unfinished.
 
-[.211 cache and dormant zero fields](FOG_RENDER_CACHE_211.md):10 exact RGB comparisons preserve v11 on control frames. Installed; native FPS untested and durable construction still open.
+[.211 cache and dormant zero fields](FOG_RENDER_CACHE_211.md):10 exact RGB comparisons preserve v11 on control frames. Installed; native shader49/25/48 FPS with frozen simulation. Owner passage triggers recovery-readback failure and removes the house; fix/stable preview required before the board.

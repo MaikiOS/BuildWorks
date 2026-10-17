@@ -22,7 +22,7 @@ Further development brings editable assemblies and repetitions, construction gui
 
 ## In progress
 
-Approved **v11 fog → whole unfinished house → persistent stake/board → material continuation/cancel/refund/reload** remains the priority. [.210](docs/FOG_SCRATCH_210.md): the native28-part house passed both directions and released recovered fields to0; the previous route overflow is fixed. [.211 removes redundant rendering work](docs/FOG_RENDER_CACHE_211.md), with exact pixel comparisons; native FPS is untested. Full-house appearance and the persistent board remain open.
+Approved **v11 fog → whole unfinished house → persistent stake/board → material continuation/cancel/refund/reload** remains the priority. [.210](docs/FOG_SCRATCH_210.md): the native28-part house passed both directions and released recovered fields to0; the previous route overflow is fixed. [.211 removes redundant rendering work](docs/FOG_RENDER_CACHE_211.md), with exact pixel comparisons; the new shader is faster at a fixed native camera, but owner passage exposed disappearance on recovery failure. Full-house appearance and the persistent board remain open.
 
 Storage/mount/admin restoration, direct player sharing, full server acceptance, volume-selection UX and heavy-building performance remain incomplete. Production interactive/editor budget is512 parts; isolated QA can exercise higher limits. No promise that arbitrary huge/modded builds work.
 

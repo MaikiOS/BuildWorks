@@ -22,7 +22,7 @@ Further development brings editable assemblies and repetitions, construction gui
 
 ## In progress
 
-Approved **v11 → whole unfinished house → persistent stake/board → material continuation/cancel/refund/reload** remains the priority. [.212](docs/FOG_RECOVERY_212.md) fixes a reproduced cross-frame error that removed the house after passage. The native house passed both directions without disappearing; owner acceptance remains pending. Full-house appearance/speed and the persistent board remain open.
+Approved **v11 → whole unfinished house → persistent stake/board → material continuation/cancel/refund/reload** remains the priority. [.212](docs/FOG_RECOVERY_212.md) fixes a reproduced cross-frame error that removed the house after passage. The native house passed both directions without disappearing; the owner rejected dissolution/recovery and passage performance. Full-house appearance/speed and the persistent board remain open.
 
 Storage/mount/admin restoration, direct player sharing, full server acceptance, volume-selection UX and heavy-building performance remain incomplete. Production interactive/editor budget is512 parts; isolated QA can exercise higher limits. No promise that arbitrary huge/modded builds work.
 

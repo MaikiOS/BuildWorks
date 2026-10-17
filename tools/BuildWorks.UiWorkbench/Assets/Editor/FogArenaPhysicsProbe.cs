@@ -29,6 +29,7 @@ public static class FogArenaPhysicsProbe
         using (var codec = new FogSparseStorageProbe())
         {
             int lifecycleCases = FogRuntimeChannelLifecycleCheck.Run(assets, source);
+            CheckLogicalSourceReplay(assets, source, body, codec);
             int fields, ledgers, atlases, committed, rejected, metadataChecks;
             using (var test = new Probe(assets, source, body, 8192, codec))
             {
@@ -85,12 +86,56 @@ public static class FogArenaPhysicsProbe
                 committed = committed, rejected = rejected, metadataComparisons = metadataChecks,
                 metadataBeforeReceipt = true, metadataOnlyTested = true, fractionalVisualClock = true, borrowedOwnershipValidated = true, borrowedInvalidCases = 11, runtimeArenaValidated = true,
                 runtimeChannelsValidated = true, runtimeLifecycleCases = lifecycleCases, committedRecoveryComparisons = 2,
+                logicalSourcePhysicsComparisons = 7,
                 physicalRecoveryObservedActive = activeObserved, physicalRecoveryCompleted = recoveredObserved, physicalRecoveryTicks = recoveryTicks,
                 realSolver = true, stagedLedger = true, velocityAlias = true,
                 packingRollback = true, shortageRollback = true, callbackWaitsInFixture = true,
                 productionAllocatorTested = false, wholeHouseSupported = false, gameHostTested = false, gpuTimingsMeasured = false,
                 note = "Two full-wall owners, batches1..8, alternate order, exact four fields/three ledgers and six publication checks. " +
                     "64-byte metadata is checked before CPU confirmation; one zero-step publication. Reference/source/atlas/temporary construction allocations excluded from production budget claims. This physics gate does not prove game integration, throughput or whole-house rendering. Runtime Channels own input/receipt/retirement lifecycle;38 fault cases passed." }, true));
+        }
+    }
+
+    private static void CheckLogicalSourceReplay(BlueprintFogAssets assets, BlueprintFogVisual visual, Vector2 body, FogSparseStorageProbe codec)
+    {
+        var initial = new BlueprintFogInputQueue.Sample(0, new Point3(-1.8f, .95f, 0), body.x, body.y, true, true, true);
+        BlueprintFogSimulation Make(BlueprintFogInputQueue.Sample baseline, BlueprintFogScratch scratch = null, BlueprintFogSimulation.StagedState staged = null)
+            => new BlueprintFogSimulation(assets, visual.Source.Shape, visual.Source.Pigment, visual.Source.Noise,
+                visual.FieldMinimum, visual.FieldMaximum, visual.Source.Minimum, visual.Source.Maximum, Actor(baseline), 37,
+                initialClock: baseline.Clock, scratch: scratch, stagedState: staged);
+        Vector3 Actor(BlueprintFogInputQueue.Sample sample) => new Vector3((float)sample.Actor.X, (float)sample.Actor.Y, (float)sample.Actor.Z);
+        using (var pool = BlueprintFogChannels.CreateArena(assets, 1, 8192))
+        using (var dense = Make(initial))
+        {
+            var blocker = pool.AcquireSnapshot(0, initial, (scratch, staged) => Make(initial, scratch, staged));
+            float factoryClock = -1;
+            var source = pool.RegisterSnapshotSource(initial, (scratch, staged, baseline) => {
+                factoryClock = baseline.Clock; return Make(baseline, scratch, staged);
+            });
+            for (int i = 1; i <= 8; ++i)
+            {
+                var sample = new BlueprintFogInputQueue.Sample(i * .06f, new Point3(-1.8f + i * .225f, .95f, 0), body.x, body.y, true, true, true);
+                pool.CaptureSource(source, sample); dense.AdvanceTo(sample.Clock, Actor(sample), body, true);
+            }
+            pool.PumpSources();
+            Require(source.Snapshot == null && source.Inputs.Count == 8 && factoryClock == -1, "Occupied slot invoked source factory or dropped accepted wall movement.");
+            pool.RetireSnapshot(blocker); Require(!pool.TryReleaseSnapshot(blocker), "Source replay blocker released without confirmation.");
+            AsyncGPUReadback.WaitAllRequests(); Require(pool.TryReleaseSnapshot(blocker), "Source replay blocker retirement did not confirm.");
+            for (int attempt = 0; attempt < 32; ++attempt)
+            {
+                pool.PumpSources(); AsyncGPUReadback.WaitAllRequests();
+                if (source.Inputs.Count == 0 && source.Snapshot.State.State == BlueprintFogSnapshotState.Phase.Ready) break;
+            }
+            var owner = source.Snapshot;
+            Require(factoryClock == 0 && source.Inputs.Count == 0 && owner != null && source.Inputs.Committed.Clock == .48f,
+                "Delayed source did not replay from its original baseline.");
+            pool.BindSnapshot(owner); pool.SnapshotArena.Dispatch("BeginStep"); pool.SnapshotArena.Dispatch("RestoreFields", 24, 20, 20);
+            var scratchState = pool.SnapshotArena.Scratch;
+            codec.BeginComparison(); codec.Compare(scratchState.ReadColour, dense.Smoke); codec.Compare(scratchState.ReadOrigin, FogRuntimeSparseCheck.Current(dense, "origin"));
+            codec.Compare(scratchState.ReadSurface, dense.Surface); codec.Compare(owner.Velocity, dense.Flow);
+            for (int i = 0; i < 3; ++i) codec.Compare(owner.Ledger[i], FogRuntimeSparseCheck.Buffer(dense, new[] { "away", "peak", "state" }[i]));
+            codec.RequireClean(); var flags = new uint[1]; owner.Ledger[2].GetData(flags);
+            Require(flags[0] != 0, "Delayed logical replay never generated real wall smoke/deformation.");
         }
     }
 
@@ -382,5 +427,6 @@ public static class FogArenaPhysicsProbe
         public int borrowedInvalidCases, runtimeLifecycleCases, committedRecoveryComparisons, gridX, gridY, gridZ, owners, ticks, fieldComparisons, ledgerComparisons, atlasComparisons, committed, rejected, metadataComparisons;
         public string note;
         public int physicalRecoveryTicks;
+        public int logicalSourcePhysicsComparisons;
     }
 }

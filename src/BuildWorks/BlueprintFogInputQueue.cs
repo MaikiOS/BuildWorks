@@ -21,7 +21,8 @@ namespace OstrixMods.BuildWorks
             }
         }
         private readonly Sample[] samples = new Sample[Capacity];
-        internal BlueprintFogSnapshotState Owner { get; }
+        internal BlueprintFogSnapshotState Owner { get; private set; }
+        private readonly bool detachable;
         internal int Count { get; private set; }
         internal int PendingCount { get; private set; }
         internal bool PendingMetadataOnly { get; private set; }
@@ -38,10 +39,46 @@ namespace OstrixMods.BuildWorks
             Owner = owner; Committed = initial; capturedClock = initial.Clock;
         }
 
+        internal BlueprintFogInputQueue(Sample initial)
+        {
+            Validate(initial); detachable = true; Committed = initial; capturedClock = initial.Clock;
+        }
+
+        internal void Attach(BlueprintFogSnapshotState owner)
+        {
+            if (!detachable || Owner != null || Faulted || PendingCount != 0 || owner == null ||
+                owner.State != BlueprintFogSnapshotState.Phase.Ready || owner.ConfirmedTick != Tick(Committed.Clock) || owner.ConfirmedEmissionRevision != 0)
+                throw new InvalidOperationException("Fog logical input cannot attach to this generation/baseline.");
+            Owner = owner;
+        }
+
+        // The pool calls this only after confirming GPU release; it never removes accepted observations.
+        internal void Detach(BlueprintFogSnapshotState owner)
+        {
+            if (!detachable || owner == null || !ReferenceEquals(Owner, owner) || PendingCount != 0 || !owner.CanReleaseResources || owner.RequiresGpuDrain)
+                throw new InvalidOperationException("Fog logical input cannot detach before confirmed retirement.");
+            Owner = null;
+        }
+
+        internal void TrackDormant(Sample sample)
+        {
+            Validate(sample);
+            if (!detachable || Owner != null || Count != 0 || Faulted || (sample.Emit && sample.EmissionPossible) ||
+                sample.Clock < capturedClock || Tick(sample.Clock) - Tick(capturedClock) > 8)
+                throw new InvalidOperationException("Only an empty dormant source may update its non-emitting baseline.");
+            Committed = sample; capturedClock = sample.Clock;
+        }
+
+        internal bool HasEmission
+        {
+            get { for (int i = 0; i < Count; ++i) if (At(i).Emit && At(i).EmissionPossible) return true; return false; }
+        }
+
         internal void Capture(Sample sample)
         {
             Validate(sample);
-            if (Faulted || (Owner.State != BlueprintFogSnapshotState.Phase.Ready && Owner.State != BlueprintFogSnapshotState.Phase.Pending))
+            if (Faulted || (Owner != null && Owner.State == BlueprintFogSnapshotState.Phase.Faulted) ||
+                (!detachable && (Owner.State != BlueprintFogSnapshotState.Phase.Ready && Owner.State != BlueprintFogSnapshotState.Phase.Pending)))
                 throw new InvalidOperationException("Fog input owner stopped; retain its published snapshot and accepted history.");
             if (sample.Clock < capturedClock || Tick(sample.Clock) - Tick(capturedClock) > 8)
                 throw new ArgumentException("Fog observation clock must be monotonic and bounded to eight fixed steps.");
@@ -63,7 +100,7 @@ namespace OstrixMods.BuildWorks
         {
             receipt = default;
             if (Faulted) throw new InvalidOperationException("Faulted fog input must not be replayed automatically.");
-            if (PendingCount != 0 || Count == 0 || Owner.State != BlueprintFogSnapshotState.Phase.Ready) return false;
+            if (PendingCount != 0 || Count == 0 || Owner == null || Owner.State != BlueprintFogSnapshotState.Phase.Ready) return false;
             if (Tick(Committed.Clock) != Owner.ConfirmedTick) throw new InvalidOperationException("Fog queue and owner clocks differ.");
             int count = 0, tick = Owner.ConfirmedTick, revision = Owner.ConfirmedEmissionRevision;
             while (count < Count && count < MaximumBatchSamples && Tick(At(count).Clock) - Owner.ConfirmedTick <= 8)
@@ -89,8 +126,9 @@ namespace OstrixMods.BuildWorks
             PendingCount = 0; PendingMetadataOnly = false; return true;
         }
 
-        internal bool CanRecover(int emissionRevision)
-            => Count == 0 && PendingCount == 0 && !Faulted && Owner.CanRecover(emissionRevision);
+        internal bool CanObserveRecovery(int emissionRevision)
+            => PendingCount == 0 && !Faulted && Owner != null && Owner.CanRecover(emissionRevision);
+        internal bool CanRecover(int emissionRevision) => Count == 0 && CanObserveRecovery(emissionRevision);
 
         private static int Tick(float clock) => (int)Math.Floor(clock / (1f / 30) + .0001f);
         private static void Validate(Sample sample)

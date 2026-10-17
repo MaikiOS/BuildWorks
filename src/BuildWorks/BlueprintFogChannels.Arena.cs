@@ -12,7 +12,7 @@ namespace OstrixMods.BuildWorks
             internal readonly int Slot;
             internal readonly long Identity, Generation;
             internal readonly BlueprintFogInputQueue Inputs;
-            internal BlueprintFogSnapshotState State => Inputs.Owner;
+            internal BlueprintFogSnapshotState State { get; }
             internal readonly RenderTexture Velocity;
             internal readonly ComputeBuffer[] Ledger = new ComputeBuffer[3];
             internal BlueprintFogSnapshotState.Submission LastSubmission { get; set; }
@@ -33,11 +33,11 @@ namespace OstrixMods.BuildWorks
             internal uint? recoveryFlags;
             internal BlueprintFogSnapshotState.Submission recoveryStamp;
 
-            internal SnapshotChannel(int slot, long identity, long generation, BlueprintFogInputQueue.Sample initial)
+            internal SnapshotChannel(int slot, long identity, long generation, BlueprintFogInputQueue.Sample initial, BlueprintFogInputQueue inputs)
             {
                 Slot = slot; Identity = identity; Generation = generation;
-                Inputs = new BlueprintFogInputQueue(new BlueprintFogSnapshotState(identity, generation,
-                    Mathf.FloorToInt(initial.Clock / BlueprintFogSimulation.Step + .0001f)), initial);
+                State = new BlueprintFogSnapshotState(identity, generation, Mathf.FloorToInt(initial.Clock / BlueprintFogSimulation.Step + .0001f));
+                Inputs = inputs ?? new BlueprintFogInputQueue(State, initial);
                 LastSubmission = new BlueprintFogSnapshotState.Submission(identity, generation, 0, State.ConfirmedTick, 0);
                 try
                 {
@@ -116,20 +116,22 @@ namespace OstrixMods.BuildWorks
         private void RequireOwner(SnapshotChannel owner)
         {
             RequireSnapshots();
-            if (owner == null || owner.Slot < 0 || owner.Slot >= capacity || !ReferenceEquals(snapshotSlots[owner.Slot], owner))
+            if (owner == null || owner.Slot < 0 || owner.Slot >= capacity || !ReferenceEquals(snapshotSlots[owner.Slot], owner) || !ReferenceEquals(owner.Inputs.Owner, owner.State))
                 throw new ArgumentException("Fog snapshot owner is stale or belongs to another pool.");
         }
 
         internal SnapshotChannel AcquireSnapshot(int slot, BlueprintFogInputQueue.Sample initial,
-            Func<BlueprintFogScratch, BlueprintFogSimulation.StagedState, BlueprintFogSimulation> create)
+            Func<BlueprintFogScratch, BlueprintFogSimulation.StagedState, BlueprintFogSimulation> create, BlueprintFogInputQueue inputs = null)
         {
             RequireSnapshots();
             if (snapshotTeardown) throw new InvalidOperationException("Uncertain fog pool requires teardown.");
             if (slot < 0 || slot >= capacity || snapshotSlots[slot] != null || create == null) throw new ArgumentException("Fog snapshot slot/factory invalid.");
+            if (inputs != null && (inputs.Owner != null || inputs.Faulted || !inputs.Committed.Equals(initial)))
+                throw new ArgumentException("Fog source input differs from its detached baseline.");
             SnapshotChannel owner = null; bool initializing = false; creating = true;
             try
             {
-                owner = new SnapshotChannel(slot, checked(++nextIdentity), checked(++generations[slot]), initial);
+                owner = new SnapshotChannel(slot, checked(++nextIdentity), checked(++generations[slot]), initial, inputs);
                 var scratch = arena.Scratch; var buffers = arena.Buffers;
                 var staged = new BlueprintFogSimulation.StagedState(scratch.ReadColour, scratch.ReadOrigin,
                     scratch.ReadSurface, buffers["_StageAway"], buffers["_StagePeak"], buffers["_StageState"]);
@@ -144,6 +146,7 @@ namespace OstrixMods.BuildWorks
                 Graphics.CopyTexture(scratch.PredictedColour, owner.Velocity);
                 BindSnapshotCore(owner); arena.Dispatch("BeginStep"); arena.Dispatch("RestoreFields", 24, 20, 20); arena.Dispatch("PublishFields", 25, 21, 21);
                 arena.PublishMetadata(slot, owner.LastSubmission, Actor(initial), Body(initial), initial.Clock, 0, 0);
+                inputs?.Attach(owner.State);
                 snapshotSlots[slot] = owner; ++snapshotCount; return owner;
             }
             catch
@@ -247,6 +250,12 @@ namespace OstrixMods.BuildWorks
         {
             RequireOwner(owner);
             if (snapshotTeardown || !owner.Inputs.CanRecover(owner.State.ConfirmedEmissionRevision)) return false;
+            return ObserveSnapshotRecovery(owner);
+        }
+
+        private bool ObserveSnapshotRecovery(SnapshotChannel owner)
+        {
+            if (snapshotTeardown || !owner.Inputs.CanObserveRecovery(owner.State.ConfirmedEmissionRevision)) return false;
             if (owner.recoveryReceived && SnapshotChannel.Same(owner.recoveryStamp, owner.LastSubmission))
                 return owner.recoveryFlags == 0;
             if (owner.recoveryNativePending) return false;
@@ -328,7 +337,7 @@ namespace OstrixMods.BuildWorks
         private void DisposeSnapshots()
         {
             if (snapshotsDisposed) return;
-            if (creating) throw new InvalidOperationException("Fog channel factory must not dispose its pool.");
+            if (creating || pumpingSources) throw new InvalidOperationException("Fog channel callback must not dispose its pool.");
             disposed = true;
             foreach (var owner in snapshotSlots) if (owner != null) owner.State.Retire();
             foreach (var owner in snapshotSlots) if (owner != null && owner.nativePending) owner.request.WaitForCompletion();
@@ -338,6 +347,7 @@ namespace OstrixMods.BuildWorks
             if (barrier.hasError) throw new InvalidOperationException("Fog pool GPU drain was not confirmed; resources retained for retry.");
             foreach (var owner in snapshotSlots) if (owner != null) { owner.State.ConfirmPoolTeardown(); owner.Release(); }
             arena.Dispose(); snapshotCount = 0; snapshotsDisposed = true;
+            CloseSources();
         }
     }
 }

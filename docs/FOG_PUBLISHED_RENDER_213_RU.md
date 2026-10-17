@@ -45,4 +45,14 @@ CPU-резерв теперь включает опубликованные meta
 
 Первый запуск финальной серии не состоялся: auto-review превысил deadline. Единственный повтор с ограничением запуска до17:56UTC прошёл целиком. Это не ошибка физического расчёта. Установленная .213/bundle и миры не менялись.
 
-**Ещё не подключены:** создание core из `BlueprintFogChannels`, channel lifetime/callback scheduler, упаковка и загрузка двух дополнительных compute-программ в production bundle. Пока программы предоставляет Editor-стенд. Split static source layout, admission реальных28 деталей, пространственный ledger, дом/FPS и табличка остаются открытыми. Runtime GPU-core не означает готовое игровое строительство.
+**На этапе GPU-core ещё не были подключены:** создание core из `BlueprintFogChannels`, channel lifetime/callback scheduler, упаковка и загрузка двух дополнительных compute-программ в production bundle. Тогда программы предоставлял Editor-стенд; подготовка bundle описана ниже. Split static source layout, admission реальных28 деталей, пространственный ledger, дом/FPS и табличка остаются открытыми. Runtime GPU-core не означает готовое игровое строительство.
+
+### Runtime compute assets: подготовка без GPU
+
+Две owned compute-программы перенесены из Editor в `src/BuildWorks/Assets/FogGhostRuntime/FogArena.compute` и `FogSnapshotMetadata.compute`; compute-файлы побайтно сохранены, GUID meta сохранены; один meta приведён к LF для Git-проверки. `BlueprintFogAssetLayout` — единый точный список3 legacy/5 current assets и9 исходников. Loader принимает только полный набор, проверяет наличие и размеры рабочих групп8+17+2 ядер, сохраняет загрузку старого3-asset bundle. Arena больше не дублирует перечень17 ядер. QA возвращает фактическое число загруженных assets/ядер.
+
+Builder готовит5 assets/27 ядер с отдельным candidate-выходом, проверкой публикации metadata/отказа/reload. Physics/frame/render стенды берут обе программы из bundle; синтетический8³ gate использует canonical source. Staging и fingerprints охватывают новые исходники; старый3-asset candidate не может подтвердить этот этап. Рабочий bundle не заменялся.
+
+Найдена ошибка очистки: один dispatch64 потоков оставлял metadata владельцев5–8 неинициализированными. Runtime теперь рассчитывает число групп по всем16 словам каждого владельца. CPU-регрессия исполняет фактическое C# выражение и сверяет покрытие с шириной настоящего HLSL-ядра для1–32 владельцев. Старый двухвладельческий GPU gate не покрывал эту ошибку.
+
+Проверены130 CPU-групп,377 повреждённых отчётов/manifest и32 случая покрытия; clean staging проверен на пустой папке. Normal/QA/offline Editor C#0/0; все19 compute-ядер скомпилированы fxc без GPU. Локальные доказательства: `artifacts/fog-assets-runtime-213/`. **GPU build/load/reload нового bundle, новые physics/frame/render и Valheim не запускались**: разрешённое часовое окно закончилось. Это подготовка production loader, а не готовый игровой backend. Далее новый candidate GPU gate, Channels/callback/split source atlas; admission28/spatial ledger/дом/FPS и табличка остаются открыты. Установленная .213 и встроенный3-asset bundle неизменны.

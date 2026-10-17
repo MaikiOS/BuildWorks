@@ -24,7 +24,10 @@ foreach($entry in $manifest){
 Copy-Item -LiteralPath (Join-Path $ported 'FogVolumePair.cginc') -Destination (Join-Path $runtime 'FogVolumePair.cginc')
 Copy-Item -LiteralPath (Join-Path $ported 'FogVolumeAtlas.cginc') -Destination (Join-Path $runtime 'FogVolumeAtlas.cginc')
 Copy-Item -LiteralPath (Join-Path $ported 'FogPublished.cginc') -Destination (Join-Path $runtime 'FogPublished.cginc')
-foreach($name in @('BlueprintFogAssets.cs','BlueprintFogArena.cs','BlueprintFogSimulation.cs','BlueprintFogSnapshotState.cs','BlueprintFogInputQueue.cs','BlueprintFogScratch.cs','BlueprintEditorMeshData.cs','BlueprintFogContactMesh.cs','BlueprintFogSource.cs','BlueprintFogVisual.cs','BlueprintFogChannels.cs','BlueprintFogVolume.cs','BlueprintFogAtlas.cs','BlueprintFogBuilding.cs')){
+foreach($name in @('FogArena.compute','FogSnapshotMetadata.compute')){
+    foreach($suffix in @('','.meta')){Copy-Item -LiteralPath (Join-Path $ported ($name+$suffix)) -Destination (Join-Path $runtime ($name+$suffix))}
+}
+foreach($name in @('BlueprintFogAssets.cs','BlueprintFogAssetLayout.cs','BlueprintFogArena.cs','BlueprintFogSimulation.cs','BlueprintFogSnapshotState.cs','BlueprintFogInputQueue.cs','BlueprintFogScratch.cs','BlueprintEditorMeshData.cs','BlueprintFogContactMesh.cs','BlueprintFogSource.cs','BlueprintFogVisual.cs','BlueprintFogChannels.cs','BlueprintFogVolume.cs','BlueprintFogAtlas.cs','BlueprintFogBuilding.cs')){
     Copy-Item -LiteralPath (Join-Path $root ('src/BuildWorks/'+$name)) -Destination (Join-Path $project ('Assets/Editor/RuntimeSources/'+$name))
     if((Get-FileHash -LiteralPath (Join-Path $root ('src/BuildWorks/'+$name))).Hash -cne (Get-FileHash -LiteralPath (Join-Path $project ('Assets/Editor/RuntimeSources/'+$name))).Hash){throw 'Fog runtime source copy differs.'}
 }
@@ -43,6 +46,6 @@ if(Select-String -LiteralPath (Join-Path $output 'build.log') -Pattern '^Shader 
 if(!(Test-Path -LiteralPath $proof) -or (Get-Item -LiteralPath $proof).LastWriteTimeUtc -lt $started){throw 'Fresh fog asset proof missing.'}
 $result=Get-Content -LiteralPath $proof -Raw|ConvertFrom-Json
 $bundle=Join-Path $output 'buildworks-fog-v11'
-if(!$result.passed -or $result.shaderMessagesChecked -isnot [bool] -or !$result.shaderMessagesChecked -or $result.colorSpace -cne $(if($GammaReference){'Gamma'}else{'Linear'}) -or $result.assets -ne 3 -or $result.kernels -ne 8 -or (Get-FileHash -LiteralPath $bundle).Hash -cne $result.sha256){throw 'Fog bundle evidence differs.'}
+if(!$result.passed -or $result.shaderMessagesChecked -isnot [bool] -or !$result.shaderMessagesChecked -or $result.arenaPublicationAndReload -isnot [bool] -or !$result.arenaPublicationAndReload -or $result.colorSpace -cne $(if($GammaReference){'Gamma'}else{'Linear'}) -or $result.assets -ne 5 -or $result.kernels -ne 27 -or (Get-FileHash -LiteralPath $bundle).Hash -cne $result.sha256){throw 'Fog bundle evidence differs.'}
 if(!$GammaReference -and !$CandidateOnly){Copy-Item -LiteralPath $bundle -Destination (Join-Path $ported 'buildworks-fog-v11')}
 $result|ConvertTo-Json

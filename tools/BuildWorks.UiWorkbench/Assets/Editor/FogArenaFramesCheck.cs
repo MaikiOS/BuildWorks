@@ -53,7 +53,7 @@ public static class FogArenaFramesCheck
         var body = new Vector2(.3f, .95f); int firstFrame = Time.frameCount;
         try
         {
-            using (var assets = new BlueprintFogAssets(File.ReadAllBytes(Path.Combine(root, "src/BuildWorks/Assets/FogGhostRuntime/buildworks-fog-v11"))))
+            using (var assets = new BlueprintFogAssets(File.ReadAllBytes(Path.Combine(root, "artifacts/fog-runtime-assets-candidate/buildworks-fog-v11"))))
             using (var source = new BlueprintFogVisual(assets, wall, Vector3.up, Quaternion.identity, Vector3.one,
                 null, Vector3.zero, new Vector3(-1.8f, .95f, 0), body))
             using (var codec = new FogSparseStorageProbe())

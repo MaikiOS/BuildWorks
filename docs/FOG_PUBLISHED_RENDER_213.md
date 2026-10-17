@@ -45,4 +45,14 @@ Final GPU:physics239commits/2rejections/664field/498ledger/28atlas/242metadata;4
 
 The first final-series launch never executed: automatic approval review exceeded its deadline. One retry, guarded against starting after17:56UTC, completed. This was not a physics failure. Installed .213/bundle and worlds remained unchanged.
 
-**Not connected yet:** construction from `BlueprintFogChannels`, channel lifetime/callback scheduler, packaging/loading the two additional compute programs in the production bundle. Editor still supplies their prototypes. Split static source layout, real28-part admission, spatial ledger, house/FPS and board remain open. Runtime GPU core does not mean complete in-game construction.
+**Not connected at the GPU-core checkpoint:** construction from `BlueprintFogChannels`, channel lifetime/callback scheduler, packaging/loading the two additional compute programs in the production bundle. At that checkpoint Editor supplied their prototypes; the following section records bundle preparation. Split static source layout, real28-part admission, spatial ledger, house/FPS and board remain open. Runtime GPU core does not mean complete in-game construction.
+
+### Runtime compute assets: preparation without GPU
+
+Two owned compute programs moved from Editor to `src/BuildWorks/Assets/FogGhostRuntime/FogArena.compute` and `FogSnapshotMetadata.compute`; compute source remains byte-exact and meta GUIDs are retained; one meta uses LF for the Git whitespace check. `BlueprintFogAssetLayout` defines the exact3 legacy/5 current asset sets and9 source files. Loader accepts complete sets only and checks8+17+2 kernel names/thread layouts, retaining old3-asset loading. Arena shares its17-kernel list. QA reports actual loaded asset/kernel counts.
+
+Builder prepares5assets/27kernels in a separate candidate output with metadata publication/rejection/reload checks. Physics/frame/render checks take both programs from that bundle; the synthetic8³ gate uses canonical source. Clean staging and fingerprints cover the new files; an old3-asset candidate cannot prove this stage. Working bundle was not replaced.
+
+Fixed a real initialization gap: one64-thread dispatch left metadata of owners5–8 uninitialized. Runtime now covers all16 words per owner. CPU regression compiles the actual C# dispatch expression and verifies coverage against the actual HLSL kernel width for1–32 owners. The earlier2-owner GPU gate did not cover this fault.
+
+Verified130CPU groups,377 corrupt receipt/manifest fixtures and32 coverage cases; clean staging checked in an empty folder. Normal/QA/offline Editor C#0/0; all19compute kernels compiled with fxc without GPU. Local evidence:`artifacts/fog-assets-runtime-213/`. **New bundle GPU build/load/reload, new physics/frame/render and Valheim were not run:** the authorized one-hour window ended. This prepares the production loader; it is not a complete game backend. Next:new candidate GPU gate, Channels/callback/split source atlas; real28 admission/spatial ledger/house/FPS and board remain open. Installed .213 and embedded3-asset bundle unchanged.

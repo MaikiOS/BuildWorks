@@ -70,7 +70,7 @@ public static class FogRuntimeArenaCheck
         {
             try
             {
-                shader = UnityEngine.Object.Instantiate(AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Editor/FogSparseArenaProbe.compute"));
+                shader = UnityEngine.Object.Instantiate(AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/BuildWorksFogRuntime/FogArena.compute"));
                 if (!shader) throw new InvalidOperationException("Arena compute asset missing.");
                 foreach (string name in new[] { "InitArena", "BeginStep", "StageLedger", "IndexFields", "ValidateCurrent", "ReserveBlocks", "ResolveBlocks", "PackFields", "CheckPacking", "CommitVelocity", "CommitLedger", "PublishFields", "CommitMaps", "FinishStep", "RestoreFields", "ReleaseCurrent", "ClearOwnerMaps" }) kernels.Add(name, shader.FindKernel(name));
                 Add("_Maps", 8 * 2 * MapWords, 4); Add("_Free", Capacity, 4); Add("_Control", 16, 4); Add("_Receipts", 8 * 16, 4); Add("_Payload", Capacity * 64, 8);

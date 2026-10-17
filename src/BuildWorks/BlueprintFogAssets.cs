@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Linq;
 using UnityEngine;
 
 namespace OstrixMods.BuildWorks
@@ -14,6 +13,10 @@ namespace OstrixMods.BuildWorks
         internal Shader Surface { get; private set; }
         internal Shader Volume { get; private set; }
         internal ComputeShader Solver { get; private set; }
+        internal ComputeShader Arena { get; private set; }
+        internal ComputeShader Metadata { get; private set; }
+        internal int AssetCount => Arena ? BlueprintFogAssetLayout.Current.Length : BlueprintFogAssetLayout.Legacy.Length;
+        internal int KernelCount => Kernels.Length + (Arena ? BlueprintFogArena.KernelNames.Length + 2 : 0);
 
         internal static BlueprintFogAssets LoadEmbedded()
         {
@@ -38,9 +41,8 @@ namespace OstrixMods.BuildWorks
             {
                 bundle = AssetBundle.LoadFromMemory(bytes);
                 if (!bundle) throw new InvalidDataException("Fog v11 bundle could not be loaded.");
-                var expected = new[] { "assets/buildworksfogruntime/accumulatedsmoke.compute", "assets/buildworksfogruntime/fogghostvolume.shader", "assets/buildworksfogruntime/texturedghost.shader" };
-                if (!bundle.GetAllAssetNames().OrderBy(name => name, StringComparer.Ordinal).SequenceEqual(expected))
-                    throw new InvalidDataException("Fog v11 bundle contains unexpected assets.");
+                bool hasArena = BlueprintFogAssetLayout.HasArena(bundle.GetAllAssetNames());
+                var expected = BlueprintFogAssetLayout.Legacy;
                 Surface = bundle.LoadAsset<Shader>(expected[2]); Volume = bundle.LoadAsset<Shader>(expected[1]);
                 Solver = bundle.LoadAsset<ComputeShader>(expected[0]);
                 if (!Surface || Surface.name != "BuildWorks/Fog/TexturedGhost" || !Surface.isSupported ||
@@ -48,10 +50,19 @@ namespace OstrixMods.BuildWorks
                     throw new NotSupportedException("Fog v11 shaders are unavailable on this graphics device.");
                 foreach (string kernel in Kernels)
                 {
-                    int index = Solver.FindKernel(kernel);
-                    Solver.GetKernelThreadGroupSizes(index, out uint x, out uint y, out uint z);
-                    if (kernel == "ClearLedger" ? x != 64 || y != 1 || z != 1 : x != 8 || y != 8 || z != 4)
-                        throw new InvalidDataException("Fog v11 kernel layout differs: " + kernel);
+                    CheckKernel(Solver, kernel, kernel == "ClearLedger" ? 64u : 8u, kernel == "ClearLedger" ? 1u : 8u, kernel == "ClearLedger" ? 1u : 4u);
+                }
+                if (hasArena)
+                {
+                    Arena = bundle.LoadAsset<ComputeShader>(BlueprintFogAssetLayout.Prefix + "fogarena.compute");
+                    Metadata = bundle.LoadAsset<ComputeShader>(BlueprintFogAssetLayout.Prefix + "fogsnapshotmetadata.compute");
+                    foreach (string kernel in BlueprintFogArena.KernelNames)
+                    {
+                        bool field = kernel == "IndexFields" || kernel == "PackFields" || kernel == "CommitVelocity" || kernel == "PublishFields" || kernel == "RestoreFields";
+                        bool serial = kernel == "BeginStep" || kernel == "ReserveBlocks" || kernel == "CheckPacking" || kernel == "FinishStep";
+                        CheckKernel(Arena, kernel, field ? 4u : serial ? 1u : 64u, field ? 4u : 1u, field ? 4u : 1u);
+                    }
+                    CheckKernel(Metadata, "InitMetadata", 64, 1, 1); CheckKernel(Metadata, "PublishMetadata", 1, 1, 1);
                 }
                 Empty = new Texture3D(1, 1, 1, TextureFormat.RGBAHalf, false) {
                     name = "BuildWorks empty fog field", wrapMode = TextureWrapMode.Clamp,
@@ -61,11 +72,18 @@ namespace OstrixMods.BuildWorks
             catch { Dispose(); throw; }
         }
 
+        private static void CheckKernel(ComputeShader program, string name, uint expectedX, uint expectedY, uint expectedZ)
+        {
+            if (!program || !program.HasKernel(name)) throw new InvalidDataException("Fog v11 kernel missing: " + name);
+            program.GetKernelThreadGroupSizes(program.FindKernel(name), out uint x, out uint y, out uint z);
+            if (x != expectedX || y != expectedY || z != expectedZ) throw new InvalidDataException("Fog v11 kernel layout differs: " + name);
+        }
+
         public void Dispose()
         {
             if (Empty) UnityEngine.Object.DestroyImmediate(Empty); Empty = null;
             if (bundle) bundle.Unload(true);
-            bundle = null; Surface = null; Volume = null; Solver = null;
+            bundle = null; Surface = null; Volume = null; Solver = null; Arena = null; Metadata = null;
         }
     }
 }

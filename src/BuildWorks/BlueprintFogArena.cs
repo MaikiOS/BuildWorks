@@ -10,6 +10,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const int MapWords = 28800;
         internal const long MaximumFieldBytes = 98304000;
+        internal static readonly string[] KernelNames = { "InitArena", "BeginStep", "StageLedger", "IndexFields", "ValidateCurrent", "ReserveBlocks", "ResolveBlocks", "PackFields", "CheckPacking", "CommitVelocity", "CommitLedger", "PublishFields", "CommitMaps", "FinishStep", "RestoreFields", "ReleaseCurrent", "ClearOwnerMaps" };
         private readonly Dictionary<string, int> kernels = new Dictionary<string, int>();
         private readonly Dictionary<string, ComputeBuffer> buffers = new Dictionary<string, ComputeBuffer>();
         private readonly ComputeShader shader, metadataShader;
@@ -38,7 +39,7 @@ namespace OstrixMods.BuildWorks
             {
                 shader = UnityEngine.Object.Instantiate(arenaProgram);
                 if (!shader) throw new InvalidOperationException("Arena compute missing.");
-                foreach (string name in new[] { "InitArena", "BeginStep", "StageLedger", "IndexFields", "ValidateCurrent", "ReserveBlocks", "ResolveBlocks", "PackFields", "CheckPacking", "CommitVelocity", "CommitLedger", "PublishFields", "CommitMaps", "FinishStep", "RestoreFields", "ReleaseCurrent", "ClearOwnerMaps" }) kernels.Add(name, shader.FindKernel(name));
+                foreach (string name in KernelNames) kernels.Add(name, shader.FindKernel(name));
                 Add("_Maps", owners * 2 * MapWords, 4); Add("_Free", capacity, 4); Add("_Control", 16, 4); Add("_Receipts", owners * 16, 4); Add("_Payload", capacity * 64, 8);
                 Add("_StageAway", 1024, 4); Add("_StagePeak", 1024, 4); Add("_StageState", 1, 4);
                 metadataShader = UnityEngine.Object.Instantiate(metadataProgram);
@@ -49,7 +50,7 @@ namespace OstrixMods.BuildWorks
                 metadataShader.SetBuffer(initMetadata, "_PublishedMetadata", buffers["_PublishedMetadata"]);
                 metadataShader.SetBuffer(publishMetadata, "_PublishedMetadata", buffers["_PublishedMetadata"]);
                 metadataShader.SetBuffer(publishMetadata, "_Control", buffers["_Control"]);
-                metadataShader.Dispatch(initMetadata, 1, 1, 1);
+                metadataShader.Dispatch(initMetadata, (owners * 16 + 63) / 64, 1, 1);
                 shader.SetInts("_Grid", 96, 80, 80); shader.SetInts("_Blocks", 24, 20, 20);
                 shader.SetInt("_Capacity", capacity); shader.SetInt("_MapWords", MapWords); shader.SetInt("_TotalMapWords", owners * 2 * MapWords); shader.SetInt("_ReceiptWords", owners * 16);
                 Bind("InitArena", "_Maps", "_Free", "_Control", "_Receipts"); Bind("BeginStep", "_Control");

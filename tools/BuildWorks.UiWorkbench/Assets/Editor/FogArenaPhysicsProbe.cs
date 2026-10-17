@@ -24,7 +24,7 @@ public static class FogArenaPhysicsProbe
         var actor = (Transform)type.GetField("actor").GetValue(lab); Bounds bounds = actor.GetComponent<Collider>().bounds;
         var body = new Vector2(Mathf.Max(bounds.extents.x, bounds.extents.z), bounds.extents.y);
         lab.enabled = false; original.SetActive(false); ghost.SetActive(false);
-        using (var assets = new BlueprintFogAssets(File.ReadAllBytes(Path.Combine(root, "src/BuildWorks/Assets/FogGhostRuntime/buildworks-fog-v11"))))
+        using (var assets = new BlueprintFogAssets(File.ReadAllBytes(Path.Combine(root, "artifacts/fog-runtime-assets-candidate/buildworks-fog-v11"))))
         using (var source = new BlueprintFogVisual(assets, original, Vector3.zero, Quaternion.identity, Vector3.one, null, Vector3.zero, Position(0, 0), body))
         using (var codec = new FogSparseStorageProbe())
         {
@@ -115,8 +115,8 @@ public static class FogArenaPhysicsProbe
             this.capacity = capacity; this.body = body; this.codec = codec; this.assets = assets; this.source = source;
             try
             {
-                arena = new BlueprintFogArena(AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Editor/FogSparseArenaProbe.compute"),
-                    AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Editor/FogSnapshotMetadataProbe.compute"), Owners, capacity);
+                arena = new BlueprintFogArena(assets.Arena,
+                    assets.Metadata, Owners, capacity);
                 shader = arena.Program; buffers = arena.Buffers; scratch = arena.Scratch;
                 reads[0] = scratch.ReadColour; reads[1] = scratch.ReadOrigin; reads[2] = scratch.ReadSurface;
                 smoke = arena.Smoke; surface = arena.Surface;
@@ -158,7 +158,7 @@ public static class FogArenaPhysicsProbe
             void RejectArena(int owners, int capacity)
             {
                 bool rejected = false;
-                try { using (var invalid = new BlueprintFogArena(shader, AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Editor/FogSnapshotMetadataProbe.compute"), owners, capacity)) { } }
+                try { using (var invalid = new BlueprintFogArena(shader, assets.Metadata, owners, capacity)) { } }
                 catch (ArgumentException) { rejected = true; }
                 Require(rejected, "Arena accepted invalid sizing or a budget overflow.");
             }

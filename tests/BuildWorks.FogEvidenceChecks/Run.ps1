@@ -44,18 +44,18 @@ $guard=Guard 'ArenaPhysicsOnly' '*Arena physics evidence missing*'
 $result=$physics.Clone();$result.committed=340;$result.metadataComparisons=343;& $guard
 $guard=Guard 'ArenaFramesOnly' '*Arena frames evidence missing*'
 $result=$frames.Clone();$result.frames=5000;& $guard
-$guard=Guard 'PublishedOnly' '*source manifest invalid*'
+$guard=Guard 'arenaBundle' '*source manifest invalid*'
 $actualRoot=$root
 $root=Join-Path $root 'artifacts/fog-evidence-candidate-fixture'
 $folder=Join-Path $root 'src/BuildWorks/Assets/FogGhostRuntime';$output=Join-Path $root 'artifacts/fog-runtime-assets-candidate'
 New-Item -ItemType Directory -Path $folder,$output -Force|Out-Null
-$names=@('AccumulatedSmoke.compute','FogGhostVolume.shader','TexturedGhost.shader','GhostMatter.cginc','FogVolumePair.cginc','FogVolumeAtlas.cginc','FogPublished.cginc')
+$names=@('AccumulatedSmoke.compute','FogGhostVolume.shader','TexturedGhost.shader','GhostMatter.cginc','FogVolumePair.cginc','FogVolumeAtlas.cginc','FogPublished.cginc','FogArena.compute','FogSnapshotMetadata.compute')
 $sources=@(foreach($name in $names){Set-Content -LiteralPath (Join-Path $folder $name) -Value ('validator fixture '+$name);@{name=$name;sha256=(Get-FileHash -LiteralPath (Join-Path $folder $name)).Hash}})
 Set-Content -LiteralPath (Join-Path $output 'buildworks-fog-v11') -Value 'validator fixture only'
-$baseline=@{passed=$true;shaderMessagesChecked=$true;colorSpace='Linear';sources=$sources;sha256=(Get-FileHash -LiteralPath (Join-Path $output 'buildworks-fog-v11')).Hash}
+$baseline=@{passed=$true;shaderMessagesChecked=$true;colorSpace='Linear';assets=5;kernels=27;arenaPublicationAndReload=$true;sources=$sources;sha256=(Get-FileHash -LiteralPath (Join-Path $output 'buildworks-fog-v11')).Hash}
 try{
     $baseline|ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $output 'verification.json');& $guard
-    foreach($case in @('missing','duplicate','unknown','sourceHash','bundleHash','shaderCheck','passed','colorSpace')){
+    foreach($case in @('missing','duplicate','unknown','sourceHash','bundleHash','shaderCheck','passed','colorSpace','assets','kernels','arenaPublication')){
         $bad=$baseline|ConvertTo-Json -Depth 5|ConvertFrom-Json
         switch($case){
             missing{$bad.sources=@($bad.sources|Select-Object -Skip 1)}
@@ -66,6 +66,9 @@ try{
             shaderCheck{$bad.shaderMessagesChecked='true'}
             passed{$bad.passed='true'}
             colorSpace{$bad.colorSpace='Gamma'}
+            assets{$bad.assets=3}
+            kernels{$bad.kernels=8}
+            arenaPublication{$bad.arenaPublicationAndReload='true'}
         }
         $bad|ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $output 'verification.json');$rejected=$false
         try{& $guard}catch{$rejected=$true}
@@ -79,10 +82,27 @@ if($copy.Count -ne 1 -or $copy[0].Condition.Extent.Text -notlike '*BlueprintFogS
 $project=Join-Path $root ('artifacts/fog-build-copy-fixture/'+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path (Join-Path $project 'Assets/Editor/RuntimeSources') -Force|Out-Null
 & ([scriptblock]::Create($copy[0].Extent.Text))
-foreach($name in @('BlueprintFogSnapshotState.cs','BlueprintFogInputQueue.cs')){
+foreach($name in @('BlueprintFogSnapshotState.cs','BlueprintFogInputQueue.cs','BlueprintFogAssetLayout.cs','BlueprintFogArena.cs')){
     if((Get-FileHash -LiteralPath (Join-Path $root ('src/BuildWorks/'+$name))).Hash -cne (Get-FileHash -LiteralPath (Join-Path $project ('Assets/Editor/RuntimeSources/'+$name))).Hash){throw 'Clean asset-build staging differs.'}
+}
+$assetCopy=@($builder.FindAll({param($n) $n -is [Management.Automation.Language.ForEachStatementAst] -and $n.Condition.Extent.Text -eq "@('FogArena.compute','FogSnapshotMetadata.compute')"},$true))
+if($assetCopy.Count -ne 1){throw 'Asset builder must stage both runtime compute programs.'}
+$ported=Join-Path $root 'src/BuildWorks/Assets/FogGhostRuntime';$runtime=Join-Path $project 'Assets/BuildWorksFogRuntime'
+New-Item -ItemType Directory -Path $runtime -Force|Out-Null
+& ([scriptblock]::Create($assetCopy[0].Extent.Text))
+foreach($name in @('FogArena.compute','FogSnapshotMetadata.compute')){
+    foreach($suffix in @('','.meta')){if((Get-FileHash -LiteralPath (Join-Path $ported ($name+$suffix))).Hash -cne (Get-FileHash -LiteralPath (Join-Path $runtime ($name+$suffix))).Hash){throw 'Runtime compute staging differs.'}}
 }
 $probe=[IO.File]::ReadAllText((Join-Path $root 'tools/BuildWorks.UiWorkbench/Assets/Editor/FogArenaPhysicsProbe.cs'))
 $poll=[regex]::Match($probe,'internal bool Poll\(\)[\s\S]*?\n        \}')
 if(!$poll.Success -or $poll.Value -match 'WaitForCompletion|WaitAllRequests|GetData'){throw 'Polling must use copied callback results without blocking/native data reads.'}
-@{passed=$true;gpuExecuted=$false;fixturesOnly=$true;negativeCases=$negative;parserErrors=0}|ConvertTo-Json
+# Evaluate the actual C# dispatch expression against the actual kernel width, without a Unity process.
+$arenaSource=[IO.File]::ReadAllText((Join-Path $root 'src/BuildWorks/BlueprintFogArena.cs'))
+$dispatch=[regex]::Match($arenaSource,'metadataShader\.Dispatch\(initMetadata, (.+), 1, 1\);')
+$metadataSource=[IO.File]::ReadAllText((Join-Path $ported 'FogSnapshotMetadata.compute'))
+$width=[regex]::Match($metadataSource,'\[numthreads\((\d+),1,1\)\]\s*void InitMetadata').Groups[1].Value
+if(!$dispatch.Success -or !$width){throw 'Metadata initialization coverage could not be checked.'}
+$typeName='FogMetadataCoverage'+[guid]::NewGuid().ToString('N')
+$coverage=Add-Type -TypeDefinition "public static class $typeName { public static int Groups(int owners) { return $($dispatch.Groups[1].Value); } }" -PassThru
+foreach($owners in 1..32){$groups=$coverage::Groups($owners);$words=$owners*16;if($groups*[int]$width -lt $words -or ($groups-1)*[int]$width -ge $words){throw "Metadata dispatch does not cover all words: owners=$owners"}}
+@{passed=$true;gpuExecuted=$false;fixturesOnly=$true;negativeCases=$negative;parserErrors=0;metadataCoverageCases=32}|ConvertTo-Json

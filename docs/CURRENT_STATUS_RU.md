@@ -2,6 +2,8 @@
 
 **2026-10-17 · [English](CURRENT_STATUS.md) · [План](ROADMAP_RU.md) · [Документация](README_RU.md)**
 
+**Runtime compute assets — код подготовлен, GPU-проверка ожидает:** две программы перенесены побайтно из Editor в runtime-assets. Загрузчик проверяет полные наборы3/5 assets и layouts8/27 ядер; physics/frame/render стенды переведены на программы из candidate bundle. CPU:130 групп,377 отказов и32 проверки покрытия metadata, C#/HLSL прошли. Найдена и исправлена неполная инициализация metadata при5+ владельцах. **Новый5-asset bundle ещё не собран и не выполнен наGPU; прежние GPU-результаты не подтверждают этот путь.** Далее candidate build/load/reload → повтор physics/frame/render → Channels/callback/split atlas/дом. Установленная .213 и её bundle неизменны.
+
 **Runtime GPU-core проверен:** буферы/общие поля/atlas/dispatch/metadata теперь в `BlueprintFogArena`; Probe использует его. GPU physics/Frame227/render и legacy прошли, normal/QA/Editor0/0,129групп/374CPU-отказа; PASSED/Ship. [Граница](FOG_PUBLISHED_RENDER_213_RU.md#runtime-gpu-core): Channels/callback/production asset loader и дом ещё не подключены. Установленная .213 неизменна.
 
 **Runtime borrowing проверен:** Simulation теперь явно заимствует поля/ledger без reflection-подмены и не освобождает чужие ресурсы.11 отказов проверки ресурсов до GPU-записей, physics/frame/render и прежние scratch/recovery прошли; normal/QA/Editor0/0,129 групп/371 CPU-отказ. [Подробности](FOG_PUBLISHED_RENDER_213_RU.md#runtime-явное-заимствование-полей). Pool/scheduler/split atlas и дом/FPS ещё открыты; установленная .213 не менялась.

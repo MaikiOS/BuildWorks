@@ -104,12 +104,14 @@ namespace OstrixMods.BuildWorks
         {
             player = BuildWorksTestIsolation.RequireLoadedSession(); network = ZNet.instance;
             if (running != null || capture != null || !SafeSession()) throw new InvalidOperationException("Focused idle isolated QA session required.");
+            int assetCount = 0, kernelCount = 0;
             for (int load = 0; load < 2; ++load)
                 using (var assets = BlueprintFogAssets.LoadEmbedded())
                 using (var away = new ComputeBuffer(1024, sizeof(uint)))
                 using (var peak = new ComputeBuffer(1024, sizeof(uint)))
                 using (var surface = new ComputeBuffer(1, sizeof(uint)))
                 {
+                    assetCount = assets.AssetCount; kernelCount = assets.KernelCount;
                     uint[] values = new uint[1024];
                     for (int i = 0; i < values.Length; ++i) values[i] = 123;
                     away.SetData(values); peak.SetData(values); surface.SetData(new[] { 123u });
@@ -121,7 +123,7 @@ namespace OstrixMods.BuildWorks
                     peak.GetData(values); foreach (uint value in values) if (value != 0) throw new InvalidDataException("Fog peak ledger differs.");
                     surface.GetData(values, 0, 0, 1); if (values[0] != 0) throw new InvalidDataException("Fog surface ledger differs.");
                 }
-            return "fog-v11-3-assets-" + BlueprintFogAssets.Kernels.Length + "-kernels-gpu-ledger-and-reload-verified";
+            return "fog-v11-" + assetCount + "-assets-" + kernelCount + "-kernels-gpu-ledger-and-reload-verified";
         }
 
         public string CheckLoadedStorageInventory(string info, string bytes)

@@ -2,6 +2,8 @@
 
 [Русский](FOG_V11_INTEGRATION_RU.md) · [Current evidence](CURRENT_STATUS.md) · [Next milestones](ROADMAP.md)
 
+**Runtime compute assets — source prepared, GPU verification pending:** two programs moved byte-exactly from Editor into runtime assets. Loader validates complete3/5-asset sets and8/27-kernel layouts; physics/frame/render checks now take programs from the candidate bundle. CPU:130groups,377 rejections and32 metadata-coverage cases; C#/HLSL passed. Fixed incomplete metadata initialization for5+ owners. **The new5-asset bundle has not been built or executed on GPU; earlier GPU receipts do not prove this path.** Next:candidate build/load/reload → physics/frame/render rerun → Channels/callback/split atlas/house. Installed .213/bundle unchanged.
+
 Source/QA .213 embeds an owned Linear shader/compute bundle with3 assets/8 kernels. The approved v11 source/archive is frozen locally; extracted vanilla assets are never redistributed. Native prefabs/textures are resolved from the host.
 
 Implemented:source baking, capsule-driven deformation, independent owners, compact fields and shared GPU atlas. .210 adds exact-grid shared scratch:the actual28-part house passed both-way traversal/standing/exit, recovery0, peak87408640. Volume speed (down to8 FPS)/full roof appearance, multiple players and durable construction remain open. [Exact .210 evidence](FOG_SCRATCH_210.md).

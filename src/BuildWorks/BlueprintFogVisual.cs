@@ -185,6 +185,27 @@ namespace OstrixMods.BuildWorks
             else material.SetVector("_ActorB", trail[0]);
         }
 
+        internal void BindPublished(BlueprintFogChannels pool, ComputeBuffer bindings, int region, Vector4 offset)
+        {
+            if (source == null) throw new ObjectDisposedException(nameof(BlueprintFogVisual));
+            foreach (var material in surfaces)
+            {
+                material.EnableKeyword("BUILDWORKS_FOG_PUBLISHED");
+                material.SetBuffer("_FogBindings", bindings); material.SetBuffer("_PublishedMetadata", pool.SnapshotArena.Buffers["_PublishedMetadata"]);
+                material.SetInt("_PublishedSlots", pool.SnapshotCapacity); material.SetInt("_PublishedRegion", region);
+                material.SetTexture("_PublishedSurface", pool.SnapshotArena.Surface);
+                material.SetVector("_DynamicAtlasSize", new Vector4(98, 82, 82 * pool.SnapshotCapacity, 0));
+                material.SetVector("_DynamicFieldSize", new Vector4(96, 80, 80, 0)); material.SetVector("_DynamicOffset", offset);
+            }
+        }
+
+        internal void UnbindPublished()
+        {
+            if (source == null) return;
+            foreach (var material in surfaces) material.DisableKeyword("BUILDWORKS_FOG_PUBLISHED");
+            Bind();
+        }
+
         private void Bind()
         {
             foreach (Material material in surfaces) Bind(material);

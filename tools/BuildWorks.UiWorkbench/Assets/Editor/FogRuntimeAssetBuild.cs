@@ -72,17 +72,17 @@ public static class FogRuntimeAssetBuild
         if (!rejected) throw new InvalidOperationException("Empty resource was accepted.");
         File.WriteAllText(Path.Combine(output, "verification.json"), JsonUtility.ToJson(new Report {
             passed = true, unity = Application.unityVersion, graphics = SystemInfo.graphicsDeviceType.ToString(), colorSpace = QualitySettings.activeColorSpace.ToString(),
-            sha256 = Hash(path), bytes = new FileInfo(path).Length, assets = 5, kernels = 27, arenaPublicationAndReload = true,
+            sha256 = Hash(path), bytes = new FileInfo(path).Length, assets = 5, kernels = 28, arenaPublicationAndReload = true,
             ledgerResetAndReload = true, emptyRejected = rejected, gameHostTested = false, shaderMessagesChecked = true,
             sources = BlueprintFogAssetLayout.Sources
                 .Select(name => new Source { name = name, sha256 = Hash(Path.Combine(source, name)) }).ToArray()
         }, true));
-        Debug.Log("BuildWorks fog v11 bundle: build/load/27 kernels/GPU ledger/arena publication/reload/empty rejection PASSED");
+        Debug.Log("BuildWorks fog v11 bundle: build/load/28 kernels/GPU ledger/arena publication/reload/empty rejection PASSED");
     }
 
     private static void CheckArena(BlueprintFogAssets assets)
     {
-        if (!assets.Arena || !assets.Metadata || assets.AssetCount != 5 || assets.KernelCount != 27)
+        if (!assets.Arena || !assets.Metadata || assets.AssetCount != 5 || assets.KernelCount != 28)
             throw new InvalidDataException("Fog bundle did not load the runtime arena programs.");
         using (var arena = new BlueprintFogArena(assets.Arena, assets.Metadata, 1, 1))
         {

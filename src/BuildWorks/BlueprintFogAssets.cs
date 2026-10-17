@@ -58,6 +58,7 @@ namespace OstrixMods.BuildWorks
                     Metadata = bundle.LoadAsset<ComputeShader>(BlueprintFogAssetLayout.Prefix + "fogsnapshotmetadata.compute");
                     foreach (string kernel in BlueprintFogArena.KernelNames)
                     {
+                        if (kernel == "PackStaticSource") { CheckKernel(Arena, kernel, 8, 8, 4); continue; }
                         bool field = kernel == "IndexFields" || kernel == "PackFields" || kernel == "CommitVelocity" || kernel == "PublishFields" || kernel == "RestoreFields";
                         bool serial = kernel == "BeginStep" || kernel == "ReserveBlocks" || kernel == "CheckPacking" || kernel == "FinishStep";
                         CheckKernel(Arena, kernel, field ? 4u : serial ? 1u : 64u, field ? 4u : 1u, field ? 4u : 1u);

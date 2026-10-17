@@ -216,6 +216,7 @@ public static class FogPublishedRenderCheck
                         geometryBeforeCpuConfirmation = true, meshAndAtlasVolume = true, productionSchedulerTested = false, wholeHouseSupported = false,
                         gameHostTested = false, gpuTimingsMeasured = false };
                 }
+                CheckRuntimeAtlas(assets, visuals, camera, probe, output, report);
             }
         }
         finally
@@ -234,6 +235,127 @@ public static class FogPublishedRenderCheck
             Require(delta == 0, "Legacy shader variant changed its pixels: " + delta);
         }
         File.WriteAllText(Path.Combine(output, "verification.json"), JsonUtility.ToJson(report, true));
+    }
+    private static void CheckRuntimeAtlas(BlueprintFogAssets assets, BlueprintFogVisual[] visuals, Camera camera, FogRenderProbe probe, string output, Report report)
+    {
+        foreach (var visual in visuals) { visual.UnbindPublished(); visual.Root.SetActive(true); }
+        using (var pool = BlueprintFogChannels.CreateArena(assets, 2, 8192))
+        using (var dense = new BlueprintFogAtlas(assets))
+        using (var published = new BlueprintFogAtlas(assets, pool))
+        {
+            var handles = new BlueprintFogChannels.SnapshotChannel[2];
+            var samples = new BlueprintFogInputQueue.Sample[2];
+            var body = new Vector2(.3f, .95f);
+            for (int slot = 0; slot < 2; ++slot)
+            {
+                var visual = visuals[slot];
+                samples[slot] = new BlueprintFogInputQueue.Sample(0, new OstrixMods.BuildWorks.Geometry.Point3(-1.8, .95, 0), body.x, body.y, true, true, true);
+                handles[slot] = pool.AcquireSnapshot(slot, samples[slot], (scratch, staged) =>
+                    new BlueprintFogSimulation(assets, visual.Source.Shape, visual.Source.Pigment, visual.Source.Noise,
+                        visual.FieldMinimum, visual.FieldMaximum, visual.Source.Minimum, visual.Source.Maximum, Actor(samples[slot]), 37,
+                        scratch: scratch, stagedState: staged));
+            }
+            void Reject(Action action) { bool rejected = false; try { action(); } catch (ArgumentException) { rejected = true; } catch (InvalidOperationException) { rejected = true; } Require(rejected, "Invalid runtime atlas mapping accepted."); ++report.runtimeMappingNegativeCases; }
+            Reject(() => published.Render(camera, null, null, visuals, Vector3.zero, Vector3.right, 0, handles));
+            Reject(() => published.PreparePublished(visuals, new[] { handles[0], handles[0] }));
+            Reject(() => published.PreparePublished(visuals, new[] { handles[0] }));
+            void Compare(string name, BlueprintFogVisual[] display, BlueprintFogChannels.SnapshotChannel[] mapping)
+            {
+                for (int mode = 0; mode < 2; ++mode)
+                {
+                    foreach (var visual in visuals) visual.UnbindPublished();
+                    int route = mode;
+                    var expected = FogRuntimePairCheck.Capture(camera, probe, (image, target) => {
+                        if (route == 0) Graphics.Blit(image, target);
+                        else dense.Render(camera, image, target, display, new Vector3(-4, 1, 0), Vector3.right, 0);
+                    }, output, "runtime-" + name + "-" + mode + "-dense");
+                    published.PreparePublished(display, mapping);
+                    var actual = FogRuntimePairCheck.Capture(camera, probe, (image, target) => {
+                        if (route == 0) Graphics.Blit(image, target);
+                        else published.Render(camera, image, target, display, new Vector3(-4, 1, 0), Vector3.right, 0, mapping);
+                    }, output, "runtime-" + name + "-" + mode + "-published");
+                    double delta = FogRuntimePairCheck.Delta(expected, actual);
+                    double local = 0;
+                    for (int p = 0; p < expected.Length; ++p) local = Math.Max(local, Math.Max(Math.Abs(expected[p].r - actual[p].r), Math.Max(Math.Abs(expected[p].g - actual[p].g), Math.Abs(expected[p].b - actual[p].b))));
+                    report.runtimeMaxMeanDelta = Math.Max(report.runtimeMaxMeanDelta, delta);
+                    report.runtimeMaxLocalDelta = Math.Max(report.runtimeMaxLocalDelta, local);
+                    Require(delta < .0001 && local < .03, "Runtime Visual/Atlas differs from dense rendering: " + name + "/" + mode + "/" + delta + "/" + local);
+                    report.runtimeVisualAtlasCaptures += 2; ++report.runtimeVisualAtlasComparisons;
+                }
+            }
+            Compare("dormant", visuals, new BlueprintFogChannels.SnapshotChannel[2]);
+            Compare("initial", visuals, handles);
+            for (int tick = 8; tick <= 96; tick += 8)
+            {
+                for (int slot = 0; slot < 2; ++slot)
+                {
+                    float clock = tick * BlueprintFogSimulation.Step + .005f;
+                    var local = new Vector3(Mathf.Lerp(-1.8f, 0, Mathf.Clamp01(clock - 2 - slot * .6f)), .95f, 0);
+                    var capsule = new Vector2(body.x + slot * .04f, body.y + slot * .1f);
+                    samples[slot] = new BlueprintFogInputQueue.Sample(clock, new OstrixMods.BuildWorks.Geometry.Point3(local.x, local.y, local.z), capsule.x, capsule.y, true, true, true);
+                    pool.CaptureSnapshot(handles[slot], samples[slot]); pool.TrySubmitSnapshot(handles[slot], out var token);
+                    visuals[slot].AdvanceTo(clock, visuals[slot].Origin + local, capsule, true);
+                }
+                AsyncGPUReadback.WaitAllRequests();
+                if (tick == 64 || tick == 96)
+                {
+                    Require(handles.All(handle => handle.State.State == BlueprintFogSnapshotState.Phase.Pending), "Runtime render did not hold CPU confirmation.");
+                    Compare(tick.ToString(), visuals, handles);
+                    if (tick == 96)
+                    {
+                        Color[] CaptureMapping(BlueprintFogChannels.SnapshotChannel[] mapping, string label)
+                        {
+                            published.PreparePublished(visuals, mapping);
+                            return FogRuntimePairCheck.Capture(camera, probe, (image, target) => published.Render(camera, image, target, visuals,
+                                new Vector3(-4, 1, 0), Vector3.right, 0, mapping), output, "runtime-mapping-" + label);
+                        }
+                        var expected = CaptureMapping(handles, "correct");
+                        var wrong = CaptureMapping(new[] { handles[1], handles[0] }, "wrong");
+                        report.runtimeWrongMappingDelta = FogRuntimePairCheck.Delta(expected, wrong);
+                        Require(report.runtimeWrongMappingDelta > .0001, "Runtime mapping control is insensitive to swapped dynamic owners.");
+                        report.runtimeVisualAtlasCaptures += 2; ++report.runtimeMappingNegativeCases;
+                        published.PreparePublished(visuals, handles);
+                    }
+                }
+                pool.PollSnapshots();
+            }
+            long initialPacks = published.PackDispatches;
+            for (int slot = 0; slot < 2; ++slot)
+            {
+                var old = samples[slot]; var capsule = new Vector2(.43f - slot * .09f, 1.15f - slot * .2f);
+                samples[slot] = new BlueprintFogInputQueue.Sample(old.Clock + .009f, old.Actor, capsule.x, capsule.y, false, true, true);
+                pool.CaptureSnapshot(handles[slot], samples[slot]); pool.TrySubmitSnapshot(handles[slot], out var token);
+                visuals[slot].AdvanceTo(samples[slot].Clock, visuals[slot].Origin + Actor(samples[slot]), capsule, false);
+            }
+            AsyncGPUReadback.WaitAllRequests(); Compare("metadata", visuals, handles); pool.PollSnapshots();
+            var before = samples[0];
+            pool.CaptureSnapshot(handles[0], new BlueprintFogInputQueue.Sample(before.Clock + 8 * BlueprintFogSimulation.Step, before.Actor, before.Radius, before.HalfHeight, true, true, true));
+            pool.SnapshotArena.Program.SetInt("_InjectPackFailure", 1);
+            pool.TrySubmitSnapshot(handles[0], out var rejectedToken); pool.SnapshotArena.Program.SetInt("_InjectPackFailure", 0);
+            AsyncGPUReadback.WaitAllRequests(); Compare("rejected", visuals, handles); pool.PollSnapshots();
+            Require(handles[0].LastFlags == 8 && published.PackDispatches == initialPacks && initialPacks == 2, "Runtime source cache repacked dynamic fields or rejected state committed.");
+            Compare("reordered", new[] { visuals[1], visuals[0] }, new[] { handles[1], handles[0] });
+            using (var foreignPool = BlueprintFogChannels.CreateArena(assets, 1, 8192))
+            {
+                var v = visuals[0]; var initial = new BlueprintFogInputQueue.Sample(0, samples[0].Actor, body.x, body.y, true, true, true);
+                var foreign = foreignPool.AcquireSnapshot(0, initial, (scratch, staged) => new BlueprintFogSimulation(assets,
+                    v.Source.Shape, v.Source.Pigment, v.Source.Noise, v.FieldMinimum, v.FieldMaximum, v.Source.Minimum, v.Source.Maximum,
+                    Actor(initial), 37, scratch: scratch, stagedState: staged));
+                Reject(() => published.PreparePublished(visuals, new[] { foreign, handles[1] }));
+            }
+            pool.RetireSnapshot(handles[0]); Require(!pool.TryReleaseSnapshot(handles[0]), "Runtime retirement skipped GPU confirmation.");
+            AsyncGPUReadback.WaitAllRequests(); Require(pool.TryReleaseSnapshot(handles[0]), "Runtime retirement did not complete.");
+            Reject(() => published.PreparePublished(visuals, handles));
+            report.runtimeStaticBytes = published.Bytes;
+            report.runtimeCombinedRenderBytes = published.Bytes + pool.SnapshotArena.RenderBytes;
+            Require(published.Bytes == 8122272 && report.runtimeCombinedRenderBytes == 29208736, "Split atlas bytes include hidden full dynamic copies.");
+            bool allocated = false;
+            Reject(() => published.ChangeLayout(new[] { new Vector3Int(512, 512, 256) }, 512, size => { allocated = true; }));
+            Require(!allocated && published.Bytes == report.runtimeStaticBytes, "Combined render budget allocated or replaced the retained atlas before rejecting.");
+            published.Dispose(); published.Dispose();
+            Require(pool.SnapshotArena.Smoke.IsCreated() && pool.SnapshotArena.Surface.IsCreated(), "Atlas disposal freed borrowed publication.");
+            report.runtimeVisualAtlasValidated = true; report.staticSourceSeparated = true;
+        }
     }
     private static Color[][] LegacyImages(string bundle, string output, string prefix)
     {
@@ -293,9 +415,14 @@ public static class FogPublishedRenderCheck
     [Serializable] private sealed class Report
     {
         public bool runtimeChannelsValidated;
+        public bool runtimeVisualAtlasValidated, staticSourceSeparated;
         public bool passed, metadataOnly, rejectedRetained, geometryBeforeCpuConfirmation, meshAndAtlasVolume,
             productionSchedulerTested, wholeHouseSupported, gameHostTested, gpuTimingsMeasured;
         public int owners, captures, comparisons, negativeControls, legacyCaptures;
+        public int runtimeVisualAtlasCaptures, runtimeVisualAtlasComparisons;
+        public int runtimeMappingNegativeCases;
+        public long runtimeStaticBytes, runtimeCombinedRenderBytes;
+        public double runtimeMaxMeanDelta, runtimeMaxLocalDelta, runtimeWrongMappingDelta;
         public double legacyMeanDelta, maxMeanDelta, maxLocalDelta, poisonedCpuDelta, disabledKeywordDelta, staleGenerationDelta;
     }
 }

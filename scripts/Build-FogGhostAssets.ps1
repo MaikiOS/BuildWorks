@@ -46,6 +46,6 @@ if(Select-String -LiteralPath (Join-Path $output 'build.log') -Pattern '^Shader 
 if(!(Test-Path -LiteralPath $proof) -or (Get-Item -LiteralPath $proof).LastWriteTimeUtc -lt $started){throw 'Fresh fog asset proof missing.'}
 $result=Get-Content -LiteralPath $proof -Raw|ConvertFrom-Json
 $bundle=Join-Path $output 'buildworks-fog-v11'
-if(!$result.passed -or $result.shaderMessagesChecked -isnot [bool] -or !$result.shaderMessagesChecked -or $result.arenaPublicationAndReload -isnot [bool] -or !$result.arenaPublicationAndReload -or $result.colorSpace -cne $(if($GammaReference){'Gamma'}else{'Linear'}) -or $result.assets -ne 5 -or $result.kernels -ne 27 -or (Get-FileHash -LiteralPath $bundle).Hash -cne $result.sha256){throw 'Fog bundle evidence differs.'}
+if(!$result.passed -or $result.shaderMessagesChecked -isnot [bool] -or !$result.shaderMessagesChecked -or $result.arenaPublicationAndReload -isnot [bool] -or !$result.arenaPublicationAndReload -or $result.colorSpace -cne $(if($GammaReference){'Gamma'}else{'Linear'}) -or $result.assets -ne 5 -or $result.kernels -ne 28 -or (Get-FileHash -LiteralPath $bundle).Hash -cne $result.sha256){throw 'Fog bundle evidence differs.'}
 if(!$GammaReference -and !$CandidateOnly){Copy-Item -LiteralPath $bundle -Destination (Join-Path $ported 'buildworks-fog-v11')}
 $result|ConvertTo-Json

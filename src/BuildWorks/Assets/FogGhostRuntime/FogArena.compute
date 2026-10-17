@@ -15,6 +15,18 @@
 #pragma kernel RestoreFields
 #pragma kernel ReleaseCurrent
 #pragma kernel ClearOwnerMaps
+#pragma kernel PackStaticSource
+
+Texture3D<float> _StaticSource;
+RWTexture3D<float> _StaticAtlas;
+int3 _StaticSize, _StaticOffset, _StaticShapeSize;
+[numthreads(8,8,4)]
+void PackStaticSource(uint3 id : SV_DispatchThreadID)
+{
+    if (any(id >= (uint3)_StaticSize)) return;
+    int3 cell = clamp((int3)id - 1, 0, _StaticShapeSize - 1);
+    _StaticAtlas[id + (uint3)_StaticOffset] = _StaticSource.Load(int4(cell, 0));
+}
 
 // Test candidate. Dispatches are serial on the ordinary GPU queue; flags become immutable before commit.
 RWStructuredBuffer<uint> _Maps, _Free, _Control, _Receipts;

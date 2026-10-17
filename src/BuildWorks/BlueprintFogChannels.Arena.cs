@@ -83,6 +83,18 @@ namespace OstrixMods.BuildWorks
         private bool snapshotTeardown, snapshotsDisposed;
         internal BlueprintFogArena SnapshotArena => arena;
         internal bool RequiresSnapshotTeardown => snapshotTeardown;
+        internal int SnapshotCapacity { get { RequireSnapshots(); return capacity; } }
+
+        internal void WriteSnapshotBinding(SnapshotChannel owner, uint[] words, int offset)
+        {
+            RequireSnapshots();
+            if (words == null || offset < 0 || offset > words.Length - 5) throw new ArgumentException("Fog binding range invalid.");
+            if (owner != null) RequireOwner(owner);
+            words[offset] = owner == null ? uint.MaxValue : (uint)owner.Slot;
+            long identity = owner?.Identity ?? 0, generation = owner?.Generation ?? 0;
+            words[offset + 1] = (uint)identity; words[offset + 2] = (uint)(identity >> 32);
+            words[offset + 3] = (uint)generation; words[offset + 4] = (uint)(generation >> 32);
+        }
 
         internal static BlueprintFogChannels CreateArena(BlueprintFogAssets assets, int ownerLimit, int blockCapacity)
         {

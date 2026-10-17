@@ -29,7 +29,7 @@ public static class FogRuntimeLazyCheck
             using(var pool=new BlueprintFogChannels(32,BlueprintFogChannels.MaximumFieldBudget))
             using(var volume=new BlueprintFogVolume(assets))
             {
-                CheckAdmission(assets,prefab);CheckStaleRecovery(assets,prefab);
+                CheckSourceCutout(assets);CheckAdmission(assets,prefab);CheckStaleRecovery(assets,prefab);
                 Vector2 body=new Vector2(.3f,.95f);Vector3 start=new Vector3(-3,.85f,0),position=Vector3.up;
                 eager=new BlueprintFogVisual(assets,prefab,position,Quaternion.identity,Vector3.one,null,Vector3.zero,start,body,null,null,true);
                 lazy=new BlueprintFogVisual(assets,prefab,position,Quaternion.identity,Vector3.one,null,Vector3.zero,start,body,pool,"lazy",true,true);
@@ -115,9 +115,39 @@ public static class FogRuntimeLazyCheck
             }
             File.WriteAllText(Path.Combine(output,"verification.json"),JsonUtility.ToJson(new Report{passed=true,frames=frames,owners=28,
                 idleDelta=idleDelta,maxImageDelta=dynamicDelta,maxForegroundDelta=foregroundDelta,peakFieldBytes=peak,restAtlasBytes=restAtlas,
-                delayedClock=true,recoveredReleased=true,reentered=true,sharedEmptyRetained=true,mixedAtlas=true,blueprintAdapter=true,blueprintVisible=true,narrowContact=true,budgetFailureRetainsNeighbor=true,staleRecoveryRetained=true,gameHostTested=false,wholeHouseSupported=false},true));
+                delayedClock=true,recoveredReleased=true,reentered=true,sharedEmptyRetained=true,mixedAtlas=true,blueprintAdapter=true,blueprintVisible=true,narrowContact=true,budgetFailureRetainsNeighbor=true,staleRecoveryRetained=true,sourceCutout=true,gameHostTested=false,wholeHouseSupported=false},true));
         }
         finally{eager?.Dispose();lazy?.Dispose();foreach(var v in all)v?.Dispose();UnityEngine.Object.DestroyImmediate(host);UnityEngine.Object.DestroyImmediate(prefab);UnityEngine.Object.DestroyImmediate(material);UnityEngine.Object.DestroyImmediate(checker);PlayerSettings.colorSpace=previous;}
+    }
+    private static void CheckSourceCutout(BlueprintFogAssets assets)
+    {
+        var quad=GameObject.CreatePrimitive(PrimitiveType.Quad);
+        quad.transform.position=Vector3.up;quad.transform.localScale=new Vector3(2,2,1);quad.SetActive(false);
+        var texture=new Texture2D(16,8,TextureFormat.RGBA32,false){wrapMode=TextureWrapMode.Clamp,filterMode=FilterMode.Point};
+        var material=new Material(assets.Surface);material.SetFloat("_Cutoff",.5f);material.mainTexture=texture;
+        quad.GetComponent<Renderer>().sharedMaterial=material;
+        try
+        {
+            texture.SetPixels(Enumerable.Range(0,128).Select(i=>new Color(1,1,1,i%16<8?1:.25f)).ToArray());texture.Apply();
+            void Check(bool reversed)
+            {
+                using(var source=new BlueprintFogSource(quad,Vector3.zero,true))
+                {
+                    byte Density(float x)
+                    {
+                        Vector3 q=new Vector3(x,1,0)-source.Minimum,s=source.Maximum-source.Minimum;
+                        return source.Shape.GetPixelData<byte>(0)[Mathf.FloorToInt(q.x/s.x*source.Shape.width)+source.Shape.width*
+                            (Mathf.FloorToInt(q.y/s.y*source.Shape.height)+source.Shape.height*Mathf.FloorToInt(q.z/s.z*source.Shape.depth))];
+                    }
+                    Require(Density(reversed ? .6f : -.6f)>0,"Cutout negative control lost its opaque surface");
+                    Require(Density(reversed ? -.6f : .6f)==0,"Transparent cutout texels generated fog density");
+                    Vector3 empty=new Vector3(reversed ? -.75f : .75f,1,0);
+                    Require(!source.MightContact(empty,empty,new Vector2(.02f,.02f)),"Cutout-only contact allocated fields");
+                }
+            }
+            Check(false);material.mainTextureScale=new Vector2(-1,1);material.mainTextureOffset=Vector2.right;Check(true);
+        }
+        finally{UnityEngine.Object.DestroyImmediate(quad);UnityEngine.Object.DestroyImmediate(material);UnityEngine.Object.DestroyImmediate(texture);}
     }
     private static void CheckAdmission(BlueprintFogAssets assets,GameObject prefab)
     {
@@ -185,7 +215,7 @@ public static class FogRuntimeLazyCheck
     private static void Require(bool test,string message){if(!test)throw new InvalidOperationException(message);}
     [Serializable]private sealed class Report
     {
-        public bool passed,delayedClock,recoveredReleased,reentered,sharedEmptyRetained,mixedAtlas,blueprintAdapter,blueprintVisible,narrowContact,budgetFailureRetainsNeighbor,staleRecoveryRetained,gameHostTested,wholeHouseSupported;
+        public bool passed,delayedClock,recoveredReleased,reentered,sharedEmptyRetained,mixedAtlas,blueprintAdapter,blueprintVisible,narrowContact,budgetFailureRetainsNeighbor,staleRecoveryRetained,sourceCutout,gameHostTested,wholeHouseSupported;
         public int frames,owners;public long peakFieldBytes,restAtlasBytes;public double idleDelta,maxImageDelta,maxForegroundDelta;
     }
 }

@@ -2,7 +2,7 @@
 
 [Русский](FOG_V11_INTEGRATION_RU.md) · [Current evidence](CURRENT_STATUS.md) · [Next milestones](ROADMAP.md)
 
-Source/QA .206 embeds an owned Linear shader/compute bundle with3 assets/8 kernels. The approved v11 source/archive is frozen locally; extracted vanilla assets are never redistributed. Native prefabs/textures are resolved from the host.
+Source/QA .207 embeds an owned Linear shader/compute bundle with3 assets/8 kernels. The approved v11 source/archive is frozen locally; extracted vanilla assets are never redistributed. Native prefabs/textures are resolved from the host.
 
 Implemented: textured visual/source baking; capsule-driven deformation; independent simulation ownership, compact physical-resolution fields; shared two-source volume, and derived multi-source GPU atlas. Last native rendering is .203/two walls; .206/three sources is Unity proof. Whole-house look/performance, multiple players and persistent construction are open. [Exact .206 evidence and memory limits](FOG_ATLAS_206.md).
 
@@ -18,3 +18,5 @@ Current work: existing Forest Hut (28) parts with bounded contact fields, recogn
 Approved behavior: shape/textures/transmission remain recognizable; body lightly distorts and opens bright transparent swirling fog; opening holds while inside; matter returns smoothly after exit. No timer-only disappearance, wood chips, dense brown replacement smoke or repeating sprite substitute. Preserve the visual reference while optimizing ownership.
 
 The local original handoff is `artifacts/fog-ghost-study/wall-11/HANDOFF_BUILDWORKS_RU.md`, not a public download. [Initial integration analysis](FOG_V11_INTEGRATION_HISTORY_206.md) is historical, including its former compatibility and memory assumptions.
+
+[.207 packing and allocation-failure checks](FOG_PACKING_207.md) admit the saved house block layout; actual contact fields and native house remain open.

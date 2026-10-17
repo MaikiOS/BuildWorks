@@ -2,7 +2,7 @@
 
 **2026-10-17 · [Русский](CURRENT_STATUS_RU.md) · [Roadmap](ROADMAP.md) · [Documentation](README.md)**
 
-Source and installed isolated QA build: **0.19.206**. Tested host: Valheim 1.0.20, Steam build25909357. Latest published binary is the historical [0.19.37 alpha prerelease](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha); its ZIP does not contain .206. There is no stable release. Source synchronization is not binary publication.
+Source and installed isolated QA build: **0.19.207**. Tested host: Valheim 1.0.20, Steam build25909357. Latest published binary is the historical [0.19.37 alpha prerelease](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha); its ZIP does not contain .206. There is no stable release. Source synchronization is not binary publication.
 
 | Area | Implemented / automated evidence | Valheim or user evidence | Still open |
 | --- | --- | --- | --- |
@@ -19,6 +19,8 @@ Source and installed isolated QA build: **0.19.206**. Tested host: Valheim 1.0.2
 
 Evidence levels are distinct: source → automated checks → deployment → native Valheim → owner acceptance → host+remote. A later build number does not upgrade older evidence. [.193](WORLD_SNAP_193_RU.md), [.195](ROTATION_PERSISTENCE_195.md), [.197](BATCH_NATIVE_197.md) and [.206](FOG_ATLAS_206.md) document their exact scope.
 
-QA.206 installed DLL SHA `B1691BB1DAE7668AEBC924A185329F4AE552492B4A57457D6A798A0DF68042FC`;143 protected files retained their hashes/timestamps. Normal/QA builds: 0warnings/0errors, host/control/isolation/localization 1104 and independent reviews passed. .206 has not run in Valheim. Local receipts are under `artifacts/fog-atlas-206` and are not shipped in GitHub.
+Historical .206 proof: QA.206 installed DLL SHA `B1691BB1DAE7668AEBC924A185329F4AE552492B4A57457D6A798A0DF68042FC`;143 protected files retained their hashes/timestamps. Normal/QA builds: 0warnings/0errors, host/control/isolation/localization 1104 and independent reviews passed. .206 has not run in Valheim. Local receipts are under `artifacts/fog-atlas-206` and are not shipped in GitHub.
 
 Next: approved v11 on existing Forest Hut, then persistent unfinished project and board. [Full scope](../PROJECT_CONTRACT.md), [ordered milestones](ROADMAP.md), [owner live list](LIVE_CHECKLIST_RU.md). Accepted cases need no repeat without a regression reason.
+
+.207: [packing and allocation-failure recovery](FOG_PACKING_207.md) verified; saved28-block dimensions fit128MiB. QA installed, SHA `1A7B711678F1C22886C79B89C5845DCAC94EA1FFF1FB6C82FA87709454566AA5`. This is not a native house: simulation/contact budgets remain open. Native .207 untested.

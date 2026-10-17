@@ -27,6 +27,7 @@ public static class FogRuntimeAtlasCheck
         Vector3[] origins={Vector3.zero,new Vector3(.35f,.1f,.2f),new Vector3(-.2f,.05f,-.3f)};
         Vector2[] bodies={new Vector2(.25f,.85f),new Vector2(.3f,.95f),new Vector2(.35f,1.05f)};
         Vector3 start=new Vector3(-1.4f,.85f,0);Color[] nearContact=null;
+        long houseLayoutBytes=CheckLayouts();
         int frames=0;long bytes=0;double order=0,pairDelta=0,removalDelta=0,missingOwnerDelta=0,edgeDelta=0,occlusionDelta=0,translatedDelta=0;bool layoutRolled=false;
         try
         {
@@ -96,6 +97,16 @@ public static class FogRuntimeAtlasCheck
                 for(int i=0;i<3;++i) Fill(owners[i].Simulation.Smoke,i==0?new Color(.8f,.1f,.2f,1):i==1?new Color(.1f,.7f,.3f,1):new Color(.2f,.3f,.9f,1));
                 Color[] full=FogRuntimePairCheck.Capture(camera,probe,(image,target)=>atlas.Render(camera,image,target,owners,Beam,Vector3.right,0),output,"solid-three");
                 CheckPacked(atlas,owners);edgeDelta=CheckEdges(atlas,owners);
+                var oldOffsets=Field<Vector3Int[]>(atlas,"offsets").ToArray();
+                var oldBlocks=Field<List<Vector3Int>>(atlas,"layoutBlocks").ToArray();
+                var oldShape=Field<RenderTexture>(atlas,"shape");bool allocationCalled=false;
+                Reject(()=>atlas.ChangeLayout(new[]{new Vector3Int(20,30,40),new Vector3Int(50,20,15)},2048,size=>{
+                    allocationCalled=true;throw new InvalidOperationException("Injected allocation failure");}));
+                Require(allocationCalled&&oldOffsets.SequenceEqual(Field<Vector3Int[]>(atlas,"offsets"))&&
+                    oldBlocks.SequenceEqual(Field<List<Vector3Int>>(atlas,"layoutBlocks"))&&oldShape==Field<RenderTexture>(atlas,"shape"),
+                    "Failed resize committed coordinates without its textures");
+                Color[] restored=FogRuntimePairCheck.Capture(camera,probe,(image,target)=>atlas.Render(camera,image,target,owners,Beam,Vector3.right,0),output,"allocation-failed-restore");
+                Require(FogRuntimePairCheck.Delta(full,restored)==0,"Previous layout changed after failed allocation");
                 Color[] omitted=FogRuntimePairCheck.Capture(camera,probe,(image,target)=>atlas.Render(camera,image,target,pair,Beam,Vector3.right,0),output,"solid-two");
                 missingOwnerDelta=FogRuntimePairCheck.Delta(full,omitted);
                 Require(missingOwnerDelta>.001&&edgeDelta<.00001,"Third density absent or filtering crossed owners");
@@ -116,9 +127,9 @@ public static class FogRuntimeAtlasCheck
                 foreach(var owner in owners)owner.Dispose();Require(pool.Count==0&&pool.FieldBytes==0,"Translated atlas cleanup failed");
             }
             File.WriteAllText(Path.Combine(output,"verification.json"),JsonUtility.ToJson(new Report{
-                passed=true,frames=frames,owners=3,atlasBytes=bytes,maxOrderDelta=order,pairDelta=pairDelta,removalDelta=removalDelta,
+                passed=true,frames=frames,owners=3,atlasBytes=bytes,houseLayoutBytes=houseLayoutBytes,maxOrderDelta=order,pairDelta=pairDelta,removalDelta=removalDelta,
                 missingOwnerDelta=missingOwnerDelta,edgeDelta=edgeDelta,occlusionDelta=occlusionDelta,translatedDelta=translatedDelta,layoutRolled=layoutRolled,packedFieldsExact=true,
-                guardsRetainSimulations=true,cleanup=true,gameHostTested=false,wholeHouseSupported=false},true));
+                guardsRetainSimulations=true,allocationFailureRecovered=true,cleanup=true,gameHostTested=false,wholeHouseSupported=false},true));
         }
         finally
         {
@@ -127,6 +138,47 @@ public static class FogRuntimeAtlasCheck
             foreach(var material in materials)if(material)UnityEngine.Object.DestroyImmediate(material);
             UnityEngine.Object.DestroyImmediate(host);PlayerSettings.colorSpace=previous;AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
         }
+    }
+    private static long CheckLayouts()
+    {
+        // Sanitized saved-bounds dimensions, including filtering borders; no game assets or personal IDs.
+        var house = new List<Vector3Int>();
+        foreach (var entry in new[]{new Vector4(42,26,79,6),new Vector4(69,26,80,4),new Vector4(50,59,79,4),
+            new Vector4(68,59,42,4),new Vector4(97,49,87,4),new Vector4(76,46,42,4),new Vector4(84,49,42,2)})
+            for(int i=0;i<(int)entry.w;++i)house.Add(new Vector3Int((int)entry.x,(int)entry.y,(int)entry.z));
+        long bytes=CheckLayout(house,2048);
+        Require(bytes<=BlueprintFogAtlas.MaximumBytes,"Saved 28-part house still exceeds atlas budget");
+        var random=new System.Random(207);
+        for(int test=0;test<100;++test)
+        {
+            var blocks=new List<Vector3Int>();
+            for(int i=0;i<32;++i)blocks.Add(new Vector3Int(random.Next(3,25),random.Next(3,25),random.Next(3,25)));
+            CheckLayout(blocks,128);
+        }
+        var offsets=new Vector3Int[32];
+        Reject(()=>BlueprintFogAtlas.Layout(null,64,offsets));
+        Reject(()=>BlueprintFogAtlas.Layout(new Vector3Int[0],64,offsets));
+        Reject(()=>BlueprintFogAtlas.Layout(Enumerable.Repeat(new Vector3Int(3,3,3),33).ToArray(),64,new Vector3Int[33]));
+        Reject(()=>BlueprintFogAtlas.Layout(new[]{new Vector3Int(3,3,3)},0,offsets));
+        Reject(()=>BlueprintFogAtlas.Layout(new[]{new Vector3Int(3,2,3)},64,offsets));
+        Reject(()=>BlueprintFogAtlas.Layout(new[]{new Vector3Int(int.MaxValue,int.MaxValue,int.MaxValue)},int.MaxValue,offsets));
+        Reject(()=>BlueprintFogAtlas.Layout(Enumerable.Repeat(new Vector3Int(128,128,128),4).ToArray(),2048,offsets));
+        return bytes;
+    }
+    private static long CheckLayout(IReadOnlyList<Vector3Int> blocks,int limit)
+    {
+        var offsets=new Vector3Int[blocks.Count];var repeated=new Vector3Int[blocks.Count];
+        Vector3Int size=BlueprintFogAtlas.Layout(blocks,limit,offsets);
+        Require(size==BlueprintFogAtlas.Layout(blocks,limit,repeated)&&offsets.SequenceEqual(repeated),"Atlas layout is not deterministic");
+        Require(size.x<=limit&&size.y<=limit&&size.z<=limit,"Atlas exceeds device bounds");
+        long bytes=(long)size.x*size.y*size.z*18;Require(bytes<=BlueprintFogAtlas.MaximumBytes,"Atlas exceeds memory bounds");
+        for(int i=0;i<blocks.Count;++i)
+        {
+            Vector3Int end=offsets[i]+blocks[i];
+            Require(offsets[i].x>=0&&offsets[i].y>=0&&offsets[i].z>=0&&end.x<=size.x&&end.y<=size.y&&end.z<=size.z,"Atlas clips a block");
+            for(int j=0;j<i;++j)Require(!Overlap(offsets[i],blocks[i],offsets[j],blocks[j]),"Atlas overlaps filtering borders");
+        }
+        return bytes;
     }
     private static T Field<T>(BlueprintFogAtlas atlas,string name)=>(T)typeof(BlueprintFogAtlas).GetField(name,BindingFlags.NonPublic|BindingFlags.Instance).GetValue(atlas);
     private static void CheckPacked(BlueprintFogAtlas atlas,BlueprintFogVisual[] owners)
@@ -188,7 +240,7 @@ public static class FogRuntimeAtlasCheck
     private static void Require(bool condition,string message){if(!condition)throw new InvalidOperationException(message);}
     [Serializable]private sealed class Report
     {
-        public bool passed,layoutRolled,packedFieldsExact,guardsRetainSimulations,cleanup,gameHostTested,wholeHouseSupported;
-        public int frames,owners;public long atlasBytes;public double maxOrderDelta,pairDelta,removalDelta,missingOwnerDelta,edgeDelta,occlusionDelta,translatedDelta;
+        public bool passed,layoutRolled,packedFieldsExact,guardsRetainSimulations,allocationFailureRecovered,cleanup,gameHostTested,wholeHouseSupported;
+        public int frames,owners;public long atlasBytes,houseLayoutBytes;public double maxOrderDelta,pairDelta,removalDelta,missingOwnerDelta,edgeDelta,occlusionDelta,translatedDelta;
     }
 }

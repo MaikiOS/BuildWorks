@@ -16,6 +16,8 @@ namespace OstrixMods.BuildWorks
         private RenderTexture shape, smoke, surface;
         private Vector3Int size;
         private readonly List<Vector3Int> blocks = new List<Vector3Int>(MaximumOwners);
+        private readonly List<Vector3Int> layoutBlocks = new List<Vector3Int>(MaximumOwners);
+        private int layoutLimit;
         private readonly HashSet<BlueprintFogVisual> unique = new HashSet<BlueprintFogVisual>();
         private readonly Vector3Int[] offsets = new Vector3Int[MaximumOwners];
         private readonly Vector4[] origins = new Vector4[MaximumOwners], restMin = new Vector4[MaximumOwners], restMax = new Vector4[MaximumOwners],
@@ -40,24 +42,57 @@ namespace OstrixMods.BuildWorks
         {
             if (blocks == null || blocks.Count < 1 || blocks.Count > MaximumOwners || offsets == null || offsets.Length < blocks.Count || limit < 1)
                 throw new ArgumentException("Fog atlas layout input invalid.");
-            int width = 0, height = 0;
+            Vector3Int minimum = Vector3Int.zero; long occupied = 0;
             foreach (Vector3Int block in blocks)
             {
                 if (block.x < 3 || block.y < 3 || block.z < 3 || block.x > limit || block.y > limit || block.z > limit)
                     throw new InvalidOperationException("Fog atlas block exceeds device axis budget.");
-                width = Mathf.Max(width, block.x); height = Mathf.Max(height, block.y);
+                if ((long)block.x * block.y > MaximumBytes / 18 / block.z)
+                    throw new InvalidOperationException("Fog atlas block exceeds its render memory budget.");
+                occupied += (long)block.x * block.y * block.z;
+                minimum = Vector3Int.Max(minimum, block);
             }
-            int x = 0, y = 0, z = 0; Vector3Int result = Vector3Int.zero;
-            for (int i = 0; i < blocks.Count; ++i)
+            if (occupied > MaximumBytes / 18) throw new InvalidOperationException("Fog atlas exceeds its render memory budget.");
+            var order = new int[blocks.Count];
+            for (int i = 0; i < order.Length; ++i) order[i] = i;
+            Array.Sort(order, (a, b) => {
+                int compare = blocks[b].z.CompareTo(blocks[a].z);
+                if (compare == 0) compare = blocks[b].y.CompareTo(blocks[a].y);
+                if (compare == 0) compare = blocks[b].x.CompareTo(blocks[a].x);
+                return compare == 0 ? a.CompareTo(b) : compare;
+            });
+            var trial = new Vector3Int[blocks.Count];
+            Vector3Int result = Vector3Int.zero; long best = MaximumBytes / 18 + 1;
+            // shortcut: bounded shelf search, not an optimal bin packer; revisit if a real admitted house cannot fit.
+            List<int> heights = Candidates(minimum.y, limit);
+            foreach (int width in Candidates(minimum.x, limit)) foreach (int height in heights)
             {
-                if (z > limit - blocks[i].z) { z = 0; x += width; }
-                if (x > limit - width) { x = 0; y += height; }
-                if (y > limit - height) throw new InvalidOperationException("Fog atlas exceeds device axis budget.");
-                offsets[i] = new Vector3Int(x, y, z); z += blocks[i].z;
-                result = Vector3Int.Max(result, new Vector3Int(x + width, y + height, z));
+                int x = 0, y = 0, z = 0, row = 0, layer = 0; Vector3Int extent = Vector3Int.zero; bool fits = true;
+                foreach (int i in order)
+                {
+                    Vector3Int block = blocks[i];
+                    if (x > width - block.x) { x = 0; y += row; row = 0; }
+                    if (y > height - block.y) { x = y = row = 0; z += layer; layer = 0; }
+                    if (z > limit - block.z) { fits = false; break; }
+                    trial[i] = new Vector3Int(x, y, z);
+                    extent = Vector3Int.Max(extent, trial[i] + block);
+                    x += block.x; row = Mathf.Max(row, block.y); layer = Mathf.Max(layer, block.z);
+                }
+                if (!fits || (long)extent.x * extent.y > (best - 1) / extent.z) continue;
+                best = (long)extent.x * extent.y * extent.z; result = extent;
+                Array.Copy(trial, offsets, blocks.Count);
             }
-            if ((long)result.x * result.y * result.z * 18 > MaximumBytes)
-                throw new InvalidOperationException("Fog atlas exceeds its render memory budget.");
+            if (result == Vector3Int.zero) throw new InvalidOperationException("Fog atlas cannot fit its device/render memory budget.");
+            return result;
+        }
+
+        private static List<int> Candidates(int minimum, int limit)
+        {
+            var result = new List<int>(40);
+            for (int i = 0; i < 32 && minimum <= limit - i * 8; ++i) result.Add(minimum + i * 8);
+            for (long value = minimum; value < limit; value *= 2)
+                if (!result.Contains((int)value)) result.Add((int)value);
+            if (!result.Contains(limit)) result.Add(limit);
             return result;
         }
 
@@ -90,21 +125,21 @@ namespace OstrixMods.BuildWorks
             int steps = Mathf.CeilToInt(bounds.size.magnitude / .025f) + 162;
             if (bounds.size.magnitude > 64 || (long)steps * owners.Count > 32768)
                 throw new InvalidOperationException("Fog atlas exceeds its bounded integration work.");
-            Vector3Int wanted = Layout(blocks, SystemInfo.maxTexture3DSize, offsets);
-            Resize(wanted);
-            int columnWidth = 0, columnHeight = 0;
-            foreach (Vector3Int b in blocks) { columnWidth = Mathf.Max(columnWidth, b.x); columnHeight = Mathf.Max(columnHeight, b.y); }
+            int limit = SystemInfo.maxTexture3DSize;
+            bool changed = layoutLimit != limit || layoutBlocks.Count != blocks.Count;
+            for (int i = 0; !changed && i < blocks.Count; ++i) changed = layoutBlocks[i] != blocks[i];
+            if (changed) ChangeLayout(blocks, limit, Resize);
             for (int i = 0; i < owners.Count; ++i)
             {
                 Vector3Int block = blocks[i], offset = offsets[i];
                 atlasOffset[i] = new Vector4(offset.x, offset.y, offset.z, 0);
-                // Each Z column has the same XY pitch, including duplicated filtering borders.
-                pack.SetVector("_PackSize", new Vector4(columnWidth, columnHeight, block.z, 0));
+                // Pack only this block, retaining its own duplicated filtering borders.
+                pack.SetVector("_PackSize", new Vector4(block.x, block.y, block.z, 0));
                 pack.SetVector("_PackOffset", atlasOffset[i]); pack.SetVector("_PackShapeSize", shapeSize[i]); pack.SetVector("_PackFieldSize", fieldSize[i]);
                 pack.SetTexture(kernel, "_PackShape", owners[i].Source.Shape); pack.SetTexture(kernel, "_PackSmoke", owners[i].Simulation.Smoke);
                 pack.SetTexture(kernel, "_PackSurface", owners[i].Simulation.Surface); pack.SetTexture(kernel, "_PackedShape", shape);
                 pack.SetTexture(kernel, "_PackedSmoke", smoke); pack.SetTexture(kernel, "_PackedSurface", surface);
-                pack.Dispatch(kernel, (columnWidth + 7) / 8, (columnHeight + 7) / 8, (block.z + 3) / 4);
+                pack.Dispatch(kernel, (block.x + 7) / 8, (block.y + 7) / 8, (block.z + 3) / 4);
             }
             material.SetTexture("_AtlasShape", shape); material.SetTexture("_AtlasSmoke", smoke); material.SetTexture("_AtlasSurface", surface);
             // BlueprintFogSource creates the same immutable procedural noise for every owner.
@@ -120,6 +155,18 @@ namespace OstrixMods.BuildWorks
             material.SetVector("_BeamOrigin", beamOrigin - frame); material.SetVector("_BeamDirection", beamDirection.normalized);
             material.SetFloat("_BeamStrength", beamStrength); material.SetFloat("_BeamAttenuation", 1);
             Graphics.Blit(image, target, material);
+        }
+
+        internal void ChangeLayout(IReadOnlyList<Vector3Int> requested, int limit, Action<Vector3Int> allocate)
+        {
+            if (allocate == null) throw new ArgumentNullException(nameof(allocate));
+            var pending = new Vector3Int[MaximumOwners];
+            Vector3Int wanted = Layout(requested, limit, pending);
+            // Commit coordinates only after allocation succeeds, so the old atlas remains reusable on failure.
+            allocate(wanted);
+            Array.Copy(pending, offsets, requested.Count);
+            layoutBlocks.Clear(); for (int i = 0; i < requested.Count; ++i) layoutBlocks.Add(requested[i]);
+            layoutLimit = limit;
         }
 
         private void Resize(Vector3Int wanted)

@@ -6,6 +6,7 @@ This records changes and evidence, not future milestones. Historical results ret
 
 | Checkpoint | Change / evidence | Boundary |
 | --- | --- | --- |
+| [.207](FOG_PACKING_207.md) |28 saved blocks126955800 instead of193460292 bytes; independent extents/borders, cache, failed allocation/exact restore; Unity/normal/QA/contracts passed, installed | Not a native house; contact fields and persistent project remain open |
 | 2026-10-17 product roadmap correction | Restored whole-plugin purpose and 9 milestones, player outcomes, current priority, and later assemblies/guides/adaptive pieces/EarthWorks | Documentation only; no change to game features or readiness |
 | 2026-10-17 documentation refresh | Current EN/RU guides, forward roadmap separate from journal,468-document role index;51 references repaired/labeled, history/licenses and GitHub tables verified; independent PASSED/Ship | No new binary build or new runtime acceptance |
 | [.206](FOG_ATLAS_206.md) | Common GPU atlas/one integration for3 independent sources; packing/depth/translation/pair/visual/color checks | Installed, not native house/board |

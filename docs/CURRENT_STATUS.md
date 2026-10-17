@@ -2,6 +2,8 @@
 
 **2026-10-17 · [Русский](CURRENT_STATUS_RU.md) · [Roadmap](ROADMAP.md) · [Documentation](README.md)**
 
+Prepared private full-physics `-ArenaPhysicsOnly`: real `AdvanceTo`, two96×80×80 owners, one nine-texture workspace,1024-word staged ledger and velocity alias, batches1–8, alternating order, conditional publication/exact comparisons and rejection cases. C#0/0,155 negative CPU report-validator fixtures and independent PASSED/Ship. **The new GPU scenario has not run; no precision, memory, callback-frame, house appearance or FPS proof.** Installed .213/runtime bundle unchanged.
+
 Source and installed isolated QA build: **0.19.213**. Tested host: Valheim 1.0.20, Steam build25909357. Latest published binary is the historical [0.19.37 alpha prerelease](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha); its ZIP does not contain the current changes. There is no stable release. Source synchronization is not binary publication.
 
 | Area | Implemented / automated evidence | Valheim or user evidence | Still open |

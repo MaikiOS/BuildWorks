@@ -2,6 +2,8 @@
 
 2026-10-17 · [Русский](HANDOFF_RU.md)
 
+Prepared private full-physics `-ArenaPhysicsOnly`: real `AdvanceTo`, two96×80×80 owners, one nine-texture workspace,1024-word staged ledger and velocity alias, batches1–8, alternating order, conditional publication/exact comparisons and rejection cases. C#0/0,155 negative CPU report-validator fixtures and independent PASSED/Ship. **The new GPU scenario has not run; no precision, memory, callback-frame, house appearance or FPS proof.** Installed .213/runtime bundle unchanged.
+
 1. Read [PROJECT_CONTRACT](PROJECT_CONTRACT.md), [current evidence](docs/CURRENT_STATUS.md), [forward roadmap](docs/ROADMAP.md) and project AGENTS. Preserve the complete goal; this file is not a goal API update.
 2. Source and installed QA0.19.213; DLL SHA 3421595F8757AE894D7A262AC32BA6BD72B8180E12971C71C12E2F4D3D0BC4A8. [Report .213](docs/FOG_NOISE_FRAME_213.md). Public binary .37 alpha is unchanged.
 

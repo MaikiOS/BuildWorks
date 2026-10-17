@@ -102,3 +102,13 @@ Source/anchor/admission must separately inspect actual triangles and pivots: do 
 Local CPU proof: `artifacts/fog-full-domain-plan-213/Check-Layout.ps1` and `layout.json`. GPU experiments have ended; Ostrix resumed playing another profile. Continue source/calculation work without game/GPU execution. Runtime .213 is unchanged.
 
 Local receipts: `artifacts/fog-boundary-213/sweep.json`, `sources.json`, `guard-verification.json`; nine corrupt receipts were rejected. Independent reading PASSED, separate Ponytail Ship; redundant GPU reads removed. No new game test, resource/save mutation or public release.
+
+### Full physics: prepared gate
+
+Prepared private full-physics `-ArenaPhysicsOnly`: real `AdvanceTo`, two96×80×80 owners, one nine-texture workspace,1024-word staged ledger and velocity alias, batches1–8, alternating order, conditional publication/exact comparisons and rejection cases. C#0/0,155 negative CPU report-validator fixtures and independent PASSED/Ship. **The new GPU scenario has not run; no precision, memory, callback-frame, house appearance or FPS proof.** Installed .213/runtime bundle unchanged.
+
+`FogArenaPhysicsProbe.cs` uses the existing solver without changing runtime. Reflection borrows three read fields and staging ledgers; original owner velocity/ledgers remain committed until GPU publication. Prediction holds read velocity only until `AdvanceVelocity`, is then reused normally, and receives final velocity after all reads. Full maps require450 groups and ledger16; the synthetic fixture did not prove ledger carry-through.
+
+Main route:360 ticks/two owners,80 batches1–8,161 expected commits and one injected packing rejection; a separate one-block pool must exhaust safely. The oracle advances only after a confirmed commit. Rejected speculative input history cannot be retried. Checks cover four fields, three ledgers, clock, unique map/free IDs; six publication checks include all gutters. Expected total664/498/28 is **not an executed GPU result**.
+
+This fixture waits for readbacks, uses reflection and additional reference/source/atlas/temporary construction allocations; it is not production memory admission or live callback/render proof. Matching clock/body/domain metadata is not transactionally published yet. A fresh free GPU window is needed; the Editor-reference compile output must not be installed in Valheim.

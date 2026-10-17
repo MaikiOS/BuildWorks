@@ -57,6 +57,24 @@ One bounded halo sweep retained voxel spacing and grid phase:
 
 A close total hides local differences. Only the full control retained exact state; this is an engineering check, not an owner-approved visual tolerance. The98304000-byte field limit is unchanged. These hypothetical identical-grid estimates exclude atlas/source costs; they are **not** an actual28-part layout check or proof that every other padding arrangement is impossible.
 
-Next: bounded shared spatial state retaining the full v11 physical domain and correct spatial return ownership. First prove the wall, rotated surfaces, seam, cleanup and budget; then attach it to the house. Do not ship larger per-part fields based on a similar alpha sum. YZ ledger, FPS/roof, native/owner acceptance and the durable board remain open.
+### Next candidate: independent state, shared workspace
+
+Astra's review confirmed that merging independent pieces into one simulation is unsafe here. `history.xyz / mass` stores a mean source position; owner fractions cannot be reconstructed afterward using nearest-piece or a3D lookup.
+
+This candidate is **not implemented**:
+
+- Each owner retains the full logical v11 domain, clock, identity and dense velocity: curl exists even in empty cells.
+- Colour/origin/surface use lossless sparse blocks. Only a block whose raw half bits are all0 may be absent; negative zero must survive. Decode to one shared dense workspace before each step, initially retaining the physics kernels and hardware filtering.
+- A static RHalf atlas holds all source shapes; separate RGBAHalf smoke/surface atlases hold active and unrecovered owners. Pack and bind **before geometry rendering**; `OnRenderImage` reads the published generation only. Stable slots/revisions, gutters and slot reuse need their own checks.
+
+CPU executed the current integer-only `Layout` without Unity/GPU. The saved28-block fixture reproduced126955800 bytes exactly. Its bounds conservatively allocate14106200 bytes for static RHalf shape; eight hypothetical full dynamic fields including gutters need84345856. The98452056-byte sum fits128MiB. The former common18-byte layout for28 full fields needs at least332111808 and was rejected. This covers **the saved fixture and hypothetical8 fields**, not admission of the current house.
+
+The proposed9-texture workspace takes44236800 bytes and eight dense velocities39321600, leaving14745600 under the current field cap for sparse blocks, maps, ledger and simultaneously live old/new generations. This remaining capacity is **not verified** on real state. Count staging/allocation peaks; no added epsilon or eviction. Neither32 dense velocities nor a permanent eight-owner maximum may be assumed.
+
+First GPU proof after separate authorization: the same original full wall, pack→clear dense reads→unpack→existing kernels on every step; compare all4 fields and ledger bitwise through360 ticks, recontact and block boundaries. Measure occupancy, actual allocations and GPU time. CPU readback/allocation every tick is acceptable only as a measurement prototype. Then verify sample/gutters/slot reuse and camera/geometry order, rotated pieces, owner removal and the house.
+
+Source/anchor/admission must separately inspect actual triangles and pivots: do not replace the wall source with compact bake or apply global scaling. The per-piece YZ ledger still needs a separate spatial fix preserving the wall oracle and checking return normalization. Sparse storage does not eliminate the expensive owner-loop raymarch or prove FPS. Roof, native/owner acceptance and durable board remain open.
+
+Local CPU proof: `artifacts/fog-full-domain-plan-213/Check-Layout.ps1` and `layout.json`. While Ostrix plays another profile, continue source/calculation work without game/GPU execution. Runtime .213 is unchanged.
 
 Local receipts: `artifacts/fog-boundary-213/sweep.json`, `sources.json`, `guard-verification.json`; nine corrupt receipts were rejected. Independent reading PASSED, separate Ponytail Ship; redundant GPU reads removed. No new game test, resource/save mutation or public release.

@@ -56,6 +56,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Run("Foreign ZDO reader is typed, immutable, bounded and rejects malformed packages", ForeignZdoChecks.Run);
             Run("Construction cancellation refunds actual paid item stacks only", ConstructionRefundTests.Run);
             Run("Fog snapshots confirm exact receipts and retain uncertain or pending owners", FogSnapshotChecks.Run);
+            Run("Fog input retains ordered observations until exact confirmation and fails explicitly on overflow", FogInputChecks.Run);
             Run("Straight repeat uses exact step", StraightRepeatUsesExactStep);
             Run("Connected ring starts at selected support", ConnectedRingStartsAtSelectedSupport);
             Run("Concave ring follows graph neighbors", ConcaveRingFollowsGraphNeighbors);

@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using OstrixMods.BuildWorks;
+using OstrixMods.BuildWorks.Geometry;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -170,7 +171,7 @@ public static class FogArenaPhysicsProbe
             States[i] = new BlueprintFogSnapshotState((1L << 33) + i + 1, ++generations[i]);
             Owner(i); Dispatch("BeginStep"); GridDispatch("RestoreFields"); Publish();
             var initial = new BlueprintFogSnapshotState.Submission((1L << 33) + i + 1, generations[i], 0, 0, 0);
-            PublishMetadata(i, initial, Position(i, 0), 0, 0, 0);
+            PublishMetadata(i, initial, Position(i, 0), body, 0, 0, 0);
             published[i] = Metadata(initial, Position(i, 0), body, 0, 0, 0); confirmed[i] = initial;
         }
         private void Add(string name, int count, int stride) => buffers.Add(name, new ComputeBuffer(count, stride));
@@ -192,15 +193,40 @@ public static class FogArenaPhysicsProbe
             foreach (string name in new[] { "StageLedger", "CommitLedger" }) for (int f = 0; f < 3; ++f)
                 shader.SetBuffer(kernels[name], new[] { "_OwnerAway", "_OwnerPeak", "_OwnerState" }[f], ledger[slot][f]);
         }
-        internal BlueprintFogSnapshotState.Submission Send(int slot, int tick, bool inject = false, bool reverseCallbacks = false)
+        internal BlueprintFogInputQueue.Sample Observation(int slot, float clock)
         {
-            var owner = States[slot]; var token = owner.Submit(tick, owner.ConfirmedEmissionRevision + 1); Owner(slot);
-            int pendingBase = (slot * 2 + 1 - banks[slot]) * MapWords;
-            float clock = tick * BlueprintFogSimulation.Step + .005f;
             Vector3 actor = Position(slot, clock);
-            uint[] before = published[slot], next = Metadata(token, actor, body, clock, 1), observed = null, receipt = null;
+            return new BlueprintFogInputQueue.Sample(clock, new Point3(actor.x, actor.y, actor.z), body.x, body.y, true, true, true);
+        }
+        internal BlueprintFogInputQueue CreateInputQueue(int slot) => new BlueprintFogInputQueue(States[slot], Observation(slot, 0));
+        internal BlueprintFogSnapshotState.Submission Send(int slot, int tick, bool inject = false, bool reverseCallbacks = false,
+            BlueprintFogInputQueue input = null)
+        {
+            var owner = States[slot]; BlueprintFogSnapshotState.Submission token;
+            if (input != null)
+            {
+                if (!ReferenceEquals(input.Owner, owner) || !input.TryBegin(out token)) throw new InvalidOperationException("Queued owner is not ready.");
+                if (token.Tick != tick) { input.Complete(token, BlueprintFogSnapshotState.Completion.Rejected); throw new InvalidOperationException("Queued fixture did not reach its requested bounded tick."); }
+            }
+            else token = owner.Submit(tick, owner.ConfirmedEmissionRevision + 1);
+            var observations = input == null ? new[] { Observation(slot, tick * BlueprintFogSimulation.Step + .005f) }
+                : Enumerable.Range(0, input.PendingCount).Select(input.At).ToArray();
+            bool metadataOnly = token.Tick == owner.ConfirmedTick;
+            int pendingBase = (slot * 2 + (metadataOnly ? banks[slot] : 1 - banks[slot])) * MapWords;
+            var last = observations[observations.Length - 1]; float clock = last.Clock;
+            var actor = new Vector3((float)last.Actor.X, (float)last.Actor.Y, (float)last.Actor.Z);
+            var capsule = new Vector2(last.Radius, last.HalfHeight); float weight = last.Nearby ? 1 : 0;
+            uint[] before = published[slot], next = Metadata(token, actor, capsule, clock, weight), observed = null, receipt = null;
             bool completed = false;
-            void Fail(string message) { owner.Complete(token, BlueprintFogSnapshotState.Completion.Unknown); failure = message; }
+            bool Complete(BlueprintFogSnapshotState.Submission stamp, BlueprintFogSnapshotState.Completion outcome)
+                => input == null ? owner.Complete(stamp, outcome) : input.Complete(stamp, outcome);
+            void Replay(BlueprintFogSimulation simulation)
+            {
+                foreach (var sample in observations) simulation.AdvanceTo(sample.Clock,
+                    new Vector3((float)sample.Actor.X, (float)sample.Actor.Y, (float)sample.Actor.Z),
+                    new Vector2(sample.Radius, sample.HalfHeight), sample.Emit, sample.EmissionPossible);
+            }
+            void Fail(string message) { Complete(token, BlueprintFogSnapshotState.Completion.Unknown); failure = message; }
             void Confirm()
             {
                 if (completed || observed == null || receipt == null) return;
@@ -210,26 +236,35 @@ public static class FogArenaPhysicsProbe
                 var reply = new BlueprintFogSnapshotState.Submission(Long(receipt[0], receipt[1]), Long(receipt[2], receipt[3]), Long(receipt[4], receipt[5]), (int)receipt[6], (int)receipt[7]);
                 if (!observed.SequenceEqual(receipt[8] == 0 ? next : before))
                 { Fail("Metadata differs from the committed fields or changed on rejection."); return; }
-                if (!owner.Complete(reply, receipt[8] == 0 ? BlueprintFogSnapshotState.Completion.Committed : BlueprintFogSnapshotState.Completion.Rejected))
+                if (!Complete(reply, receipt[8] == 0 ? BlueprintFogSnapshotState.Completion.Committed : BlueprintFogSnapshotState.Completion.Rejected))
                 { Fail("Physics receipt identity differs."); return; }
                 LastFlags[slot] = receipt[8];
                 if (LastFlags[slot] == 0)
                 {
-                    banks[slot] = 1 - banks[slot]; published[slot] = next; confirmed[slot] = token; ++Committed;
-                    reference[slot].AdvanceTo(clock, actor, body, true);
+                    if (!metadataOnly) banks[slot] = 1 - banks[slot];
+                    published[slot] = next; confirmed[slot] = token; ++Committed; Replay(reference[slot]);
                 }
                 else ++Rejected;
             }
             try
             {
-                Dispatch("BeginStep"); GridDispatch("RestoreFields"); Dispatch("StageLedger", 16);
-                // Only AdvanceVelocity reads this alias; Matter overwrites it after that read finishes.
-                Graphics.CopyTexture(velocity[slot], scratch.PredictedColour);
-                candidate[slot].AdvanceTo(clock, actor, body, true);
+                Owner(slot); Dispatch("BeginStep");
+                if (!metadataOnly)
+                {
+                    GridDispatch("RestoreFields"); Dispatch("StageLedger", 16);
+                    // Only AdvanceVelocity reads this alias; Matter overwrites it after that read finishes.
+                    Graphics.CopyTexture(velocity[slot], scratch.PredictedColour);
+                }
+                Replay(candidate[slot]);
                 Bits("_OwnerBits", token.Owner); Bits("_GenerationBits", token.Generation); Bits("_SequenceBits", token.Sequence);
                 shader.SetInt("_Tick", token.Tick); shader.SetInt("_EmissionRevision", token.EmissionRevision); shader.SetInt("_InjectPackFailure", inject ? 1 : 0);
-                GridDispatch("IndexFields"); MapDispatch("ValidateCurrent"); Dispatch("ReserveBlocks"); MapDispatch("ResolveBlocks"); GridDispatch("PackFields"); Dispatch("CheckPacking");
-                GridDispatch("CommitVelocity"); Dispatch("CommitLedger", 16); Publish(); PublishMetadata(slot, token, actor, clock, 1); MapDispatch("CommitMaps"); Dispatch("FinishStep");
+                if (!metadataOnly)
+                {
+                    GridDispatch("IndexFields"); MapDispatch("ValidateCurrent"); Dispatch("ReserveBlocks"); MapDispatch("ResolveBlocks"); GridDispatch("PackFields"); Dispatch("CheckPacking");
+                    GridDispatch("CommitVelocity"); Dispatch("CommitLedger", 16); Publish(); MapDispatch("CommitMaps");
+                }
+                shader.SetInt("_PendingBase", pendingBase);
+                PublishMetadata(slot, token, actor, capsule, clock, weight); Dispatch("FinishStep");
                 Action<AsyncGPUReadbackRequest> metadataCallback = request => {
                     if (request.hasError) { Fail("Published metadata readback failed."); return; }
                     var data = request.GetData<uint>();
@@ -255,18 +290,18 @@ public static class FogArenaPhysicsProbe
                     requests.Add(AsyncGPUReadback.Request(buffers["_Receipts"], receiptCallback));
                 }
             }
-            catch { owner.Complete(token, BlueprintFogSnapshotState.Completion.Unknown); throw; }
+            catch { Complete(token, BlueprintFogSnapshotState.Completion.Unknown); throw; }
             return token;
         }
         private void Bits(string name, long value) => shader.SetInts(name, unchecked((int)value), (int)(value >> 32));
-        private void PublishMetadata(int slot, BlueprintFogSnapshotState.Submission token, Vector3 actor, float clock, float weight, uint flags = 3)
+        private void PublishMetadata(int slot, BlueprintFogSnapshotState.Submission token, Vector3 actor, Vector2 capsule, float clock, float weight, uint flags = 3)
         {
             metadataShader.SetInt("_Slot", slot); metadataShader.SetInt("_Tick", token.Tick); metadataShader.SetInt("_EmissionRevision", token.EmissionRevision); metadataShader.SetInt("_PublishFlags", (int)flags);
             metadataShader.SetInts("_OwnerBits", unchecked((int)token.Owner), (int)(token.Owner >> 32));
             metadataShader.SetInts("_GenerationBits", unchecked((int)token.Generation), (int)(token.Generation >> 32));
             metadataShader.SetInts("_SequenceBits", unchecked((int)token.Sequence), (int)(token.Sequence >> 32));
-            metadataShader.SetVector("_ActorRadius", new Vector4(actor.x, actor.y, actor.z, body.x));
-            metadataShader.SetVector("_ShapeClock", new Vector4(body.y, clock, weight, 0));
+            metadataShader.SetVector("_ActorRadius", new Vector4(actor.x, actor.y, actor.z, capsule.x));
+            metadataShader.SetVector("_ShapeClock", new Vector4(capsule.y, clock, weight, 0));
             metadataShader.Dispatch(publishMetadata, 1, 1, 1);
         }
         internal void RefreshMetadata(int slot, float clock)
@@ -276,7 +311,7 @@ public static class FogArenaPhysicsProbe
                 throw new InvalidOperationException("Metadata-only publication needs a confirmed, unchanged tick.");
             Vector3 actor = Position(slot, clock); var token = confirmed[slot];
             candidate[slot].AdvanceTo(clock, actor, body, true); reference[slot].AdvanceTo(clock, actor, body, true);
-            Owner(slot); Dispatch("BeginStep"); PublishMetadata(slot, token, actor, clock, 0);
+            Owner(slot); Dispatch("BeginStep"); PublishMetadata(slot, token, actor, body, clock, 0);
             var next = Metadata(token, actor, body, clock, 0);
             var request = AsyncGPUReadback.Request(buffers["_PublishedMetadata"]); request.WaitForCompletion();
             Require(!request.hasError && request.GetData<uint>().Skip(slot * 16).Take(16).SequenceEqual(next), "Zero-step metadata differs.");

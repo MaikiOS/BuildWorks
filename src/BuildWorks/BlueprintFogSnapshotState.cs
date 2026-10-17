@@ -32,10 +32,11 @@ namespace OstrixMods.BuildWorks
             this.owner = owner; this.generation = generation; ConfirmedTick = initialTick;
         }
 
-        internal Submission Submit(int tick, int emissionRevision)
+        internal Submission Submit(int tick, int emissionRevision, bool metadataOnly = false)
         {
             if (State != Phase.Ready) throw new InvalidOperationException("Fog snapshot cannot advance before confirmation or after retirement/failure.");
-            if (tick <= ConfirmedTick || tick > 2592000 || tick - ConfirmedTick > 8 || emissionRevision < ConfirmedEmissionRevision)
+            if (tick < ConfirmedTick || tick > 2592000 || tick - ConfirmedTick > 8 || emissionRevision < ConfirmedEmissionRevision ||
+                (metadataOnly ? tick != ConfirmedTick || emissionRevision != ConfirmedEmissionRevision : tick == ConfirmedTick))
                 throw new ArgumentException("Fog snapshot advance exceeds its bounded clock/revision.");
             var submitted = new Submission(owner, generation, checked(sequence + 1), tick, emissionRevision);
             sequence = submitted.Sequence; pending = submitted; State = Phase.Pending;

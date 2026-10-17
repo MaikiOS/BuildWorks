@@ -6,6 +6,7 @@ This records changes and evidence, not future milestones. Historical results ret
 
 | Checkpoint | Change / evidence | Boundary |
 | --- | --- | --- |
+| 2026-10-17 · input queue/real-frame GPU | CPU ring64/batch16/8 ticks,129 groups/normal/QA/Editor0/0,261 CPU rejections. Physics664/498/28/239/2/242 reran; Frame243frames/54commits/232/174/20/54,retirement/expiry/reuse/receipt-first/queued input passed; PASSED/Ship. | Private verification barriers; not production throughput/render/house/FPS. QA .213 unchanged; no Valheim run. |
 | 2026-10-17 · inter-frame gate preparation | Either-order async join, cached poll/expiry, retirement and generation reuse; procedural wall/full grids. C#0/0,252 CPU rejections; PASSED/Ship. | No GPU while Ostrix plays. New frame gate and physics regression await a free window; runtime/QA .213 unchanged. |
 | 2026-10-17 · full physics/metadata GPU gate | Two96×80×80 owners/batches1–8/fractional clocks:664/498/28 exact field/ledger/atlas,239 commits/2 rejections;242 metadata checks before CPU receipt including zero-step. C#0/0,2 HLSL0/0,169 CPU rejections; PASSED/Ship. | Private readback waits, not shader/render/callback frames/house memory/FPS. Runtime/QA .213 unchanged. |
 | 2026-10-17 · physics gate preparation | Actual v11 connected to a private fixed-pool fixture:2 full owners/batches1–8/staged ledger/velocity/commit/oracle. C#0/0;155 CPU validator rejections; PASSED/Ship. | New GPU run not executed; expected664/498/28 are not results. Runtime/QA .213 unchanged; production integration open. |

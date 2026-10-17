@@ -60,15 +60,34 @@ public static class FogArenaFramesCheck
             using (var test = new FogArenaPhysicsProbe.Probe(assets, source, body, 8192, codec))
             {
                 source.Root.SetActive(false); test.CheckAll(true);
+                var inputs = new[] { test.CreateInputQueue(0), test.CreateInputQueue(1) };
+                for (int slot = 0; slot < 2; ++slot)
+                {
+                    inputs[slot].Capture(test.Observation(slot, .005f)); test.Send(slot, 0, input: inputs[slot]);
+                    Require(inputs[slot].PendingMetadataOnly && !inputs[slot].CanRecover(0), "Metadata-only work escaped pending ownership.");
+                }
+                yield return null;
+                int metadataDeadline = Time.frameCount + 180;
+                while (!test.Poll()) { Require(Time.frameCount < metadataDeadline, "Metadata-only callback timed out."); yield return null; }
+                test.CheckAll(true);
+                Require(inputs[0].Count == 0 && inputs[1].Count == 0 && inputs[0].Owner.ConfirmedTick == 0 && inputs[1].Owner.ConfirmedTick == 0, "Metadata-only publication changed fixed state or lost confirmation.");
                 int tick = 0;
                 for (int batch = 0; batch < 24; ++batch)
                 {
                     tick += batch % 8 + 1;
-                    for (int visit = 0; visit < 2; ++visit) test.Send(batch % 2 == 0 ? visit : 1 - visit, tick, reverseCallbacks: batch % 2 == 1);
+                    for (int visit = 0; visit < 2; ++visit)
+                    {
+                        int slot = batch % 2 == 0 ? visit : 1 - visit;
+                        inputs[slot].Capture(test.Observation(slot, inputs[slot].Committed.Clock + .009f));
+                        inputs[slot].Capture(test.Observation(slot, tick * BlueprintFogSimulation.Step + .005f));
+                        test.Send(slot, tick, reverseCallbacks: batch % 2 == 1, input: inputs[slot]);
+                    }
                     if (batch == 0)
                     {
                         bool blocked = false; try { test.Send(0, tick + 1); } catch (InvalidOperationException) { blocked = true; }
                         Require(blocked, "A pending owner accepted a second physics batch.");
+                        inputs[0].Capture(test.Observation(0, tick * BlueprintFogSimulation.Step + .010f));
+                        Require(inputs[0].PendingCount == 2 && inputs[0].Count == 3, "Pending capture changed the submitted prefix.");
                     }
                     yield return null;
                     int deadline = Time.frameCount + 180;
@@ -80,6 +99,7 @@ public static class FogArenaFramesCheck
                     }
                     while (!test.Poll()) { Require(Time.frameCount < deadline, "Frame polling timed out."); yield return null; }
                     test.CheckAll(false);
+                    if (batch > 0) Require(inputs[0].Count == 0 && inputs[1].Count == 0, "Confirmed input prefix retained or dropped its tail.");
                     File.AppendAllText(trace, JsonUtility.ToJson(new Event { frame = Time.frameCount, tick = tick, committed = test.Committed }) + "\n");
                 }
                 Require(tick == 108, "Frame fixture did not cover three complete1..8 step cycles.");
@@ -100,17 +120,18 @@ public static class FogArenaFramesCheck
                 while (!test.Poll()) { Require(Time.frameCount < reuseDeadline, "Slot reuse callback timed out."); yield return null; }
                 test.CheckAll(true);
                 int frames = Time.frameCount - firstFrame;
-                Require(frames >= 32 && test.ReceiptFirst > 0 && test.Committed == 52 && test.Rejected == 0 && test.MetadataChecks == 52 &&
-                    test.Fields == 224 && test.Ledgers == 168 && test.Atlases == 16, "Frame fixture coverage incomplete.");
+                Require(frames >= 33 && test.ReceiptFirst > 0 && test.Committed == 54 && test.Rejected == 0 && test.MetadataChecks == 54 &&
+                    test.Fields == 232 && test.Ledgers == 174 && test.Atlases == 20, "Frame fixture coverage incomplete.");
                 File.WriteAllText(Path.Combine(output, "verification.json"), JsonUtility.ToJson(new Report {
                     passed = true, frames = frames, owners = 2, committed = test.Committed, rejected = test.Rejected,
                     fieldComparisons = test.Fields, ledgerComparisons = test.Ledgers, atlasComparisons = test.Atlases, metadataComparisons = test.MetadataChecks,
-                    cachedRepliesAfterExpiry = true, receiptFirstHandled = true, pendingResubmitRejected = true, pendingRetireRetained = true,
+                    cachedRepliesAfterExpiry = true, queuedInputsReplayed = true, capturedWhilePending = true, metadataOnlyPending = true,
+                    receiptFirstHandled = true, pendingResubmitRejected = true, pendingRetireRetained = true,
                     generationReuse = true, lateReplyRejected = true, pollingHasNoWait = true,
                     verificationBarriersBetweenBatches = true, productionAllocatorTested = false, rendererTested = false,
                     wholeHouseSupported = false, gameHostTested = false, gpuTimingsMeasured = false,
                     note = "Real Unity player frames; submission/polling do not wait. Exact oracle comparisons and teardown may block. " +
-                        "Procedural wall/two full grids; no input queue, renderer, house memory or FPS proof." }, true));
+                        "Procedural wall/two full grids; ordered queued samples replayed, but no production scheduler throughput, renderer, house memory or FPS proof." }, true));
             }
         }
         finally { UnityEngine.Object.DestroyImmediate(wall); UnityEngine.Object.DestroyImmediate(camera); }
@@ -119,7 +140,7 @@ public static class FogArenaFramesCheck
     [Serializable] private sealed class Event { public int frame, tick, committed; }
     [Serializable] private sealed class Report
     {
-        public bool passed, cachedRepliesAfterExpiry, receiptFirstHandled, pendingResubmitRejected, pendingRetireRetained, generationReuse, lateReplyRejected,
+        public bool passed, cachedRepliesAfterExpiry, queuedInputsReplayed, capturedWhilePending, metadataOnlyPending, receiptFirstHandled, pendingResubmitRejected, pendingRetireRetained, generationReuse, lateReplyRejected,
             pollingHasNoWait, verificationBarriersBetweenBatches, productionAllocatorTested, rendererTested, wholeHouseSupported, gameHostTested, gpuTimingsMeasured;
         public int frames, owners, committed, rejected, fieldComparisons, ledgerComparisons, atlasComparisons, metadataComparisons;
         public string note;

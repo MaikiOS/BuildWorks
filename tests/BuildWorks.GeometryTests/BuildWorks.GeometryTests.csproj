@@ -11,5 +11,6 @@
     <ProjectReference Include="..\..\src\BuildWorks.Geometry\BuildWorks.Geometry.csproj" />
     <Compile Include="..\..\src\BuildWorks\BlueprintConstructionRefund.cs" Link="BlueprintConstructionRefund.cs" />
     <Compile Include="..\..\src\BuildWorks\BlueprintFogSnapshotState.cs" Link="BlueprintFogSnapshotState.cs" />
+    <Compile Include="..\..\src\BuildWorks\BlueprintFogInputQueue.cs" Link="BlueprintFogInputQueue.cs" />
   </ItemGroup>
 </Project>

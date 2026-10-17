@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Исторический снимок: версии, галочки, «установлено/следом» и ручные команды ниже относятся к исходному этапу. [Текущее состояние и очередь](CURRENT_STATUS_RU.md).
+
 # Local agent real-Valheim pilot — 2026-10-12
 
 Authorized after Ostrix entered QA world. Process29660, loader0.19.164, fresh

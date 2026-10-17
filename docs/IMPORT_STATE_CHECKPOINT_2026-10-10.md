@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # .138 — scoped foreign-state conversion work
 
 Code b89cac712e15e2853fb13111d5502b42c1c8f848. Ordinary ZDO field-type map is

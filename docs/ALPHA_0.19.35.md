@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # BuildWorks 0.19.35 alpha source status
 
 **English** | [Русский](ALPHA_0.19.35_RU.md)

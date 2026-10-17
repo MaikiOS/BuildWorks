@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # .188 — explicit catalogue replacement of loaded parts
 
 Native .187 QA passed 96 Forest Hut import/edit/Undo/Redo/Save As/reopen steps. Placement stopped before its ghost: four `wood_wall_roof` records resolve visually but are absent from all 609 current Hammer entries. `wood_wall_roof_a` exists separately; no verified automatic migration was found. No construction or debit occurred; Wood64 remained.

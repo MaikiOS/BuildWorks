@@ -1,3 +1,6 @@
+<!-- docs-role: design record; reviewed 2026-10-17 -->
+> Design/specification record: requirements below are not blanket implementation or acceptance claims. [Current state and queue](../../docs/CURRENT_STATUS.md).
+
 # Missing alignment: confirmed copy semantics
 
 Confirmed by Ostrix on2026-10-13: selected source walls remain at their original positions; new copies align near the missing marker. Implemented/tested and deployed in .178; game acceptance pending. See docs/MISSING_COPY_178_RU.md.

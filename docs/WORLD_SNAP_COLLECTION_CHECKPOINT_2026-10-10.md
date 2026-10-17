@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # 0.19.125 — shared world snap collection
 
 Source checkpoint only; installed QA remains0.19.117. The measured quadratic

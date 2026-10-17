@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # .172 — provided-item transfer foundation (source only)
 
 2026-10-13. Installed QA remains .170. Populated container placement is still blocked; the new primitive is not connected to world placement.

@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # .194 — roof migration and native result
 
 2026-10-16. QA 0.19.194.0 installed only in TerrainRamp-1.0-Test; full goal ACTIVE and incomplete.

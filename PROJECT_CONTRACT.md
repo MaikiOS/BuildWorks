@@ -1,0 +1,23 @@
+# BuildWorks project contract
+
+**Updated: 2026-10-17 · [Русский](PROJECT_CONTRACT_RU.md) · [Current evidence](docs/CURRENT_STATUS.md)**
+
+Continue the existing standalone BuildWorks. Preserve working precision/editor tools and native Valheim pieces, prices, ownership and permissions. The end state is external-library or world-captured building → BuildWorks blueprint → editor changes → correct ghost/scale/placement → resource-paid native construction → identical supported result after reload; the server confirms multiplayer state and authority.
+
+Required module scope:
+
+1. Keep evidence for source, automated tests, deployment, native game, owner acceptance and networking separate. Preserve historical failures and accepted cases; maintain current status and a short live list.
+2. Internal documents retain hierarchy, prefab IDs, TRS/component scale, groups, text, free anchors, user snaps, dependencies, supported object state and provenance. Never change input files. Preserve unknown source data with version/origin; distinguish archived, understood and actually restored behavior.
+3. Import only declared supported formats/dialects. Export format/name/folder with a loss review; foreign formats receive only their confirmed fields. Keep the full native document separately. Record corpus attribution/permissions; do not distribute unlicensed blueprints or extracted game assets.
+4. Missing prefab records remain editable with original transforms. Use known local bounds or an honest unknown-size marker. Provide explicit copy alignment/replacement and a reviewed copy without missing parts; refuse an empty result. No name-similarity substitutions.
+5. Preserve editor history/groups/gizmos/camera. Free anchors are independent objects; transform pivot and placement anchor are separate. Temporary A/B points are not persisted anchors. Rotated/scaled snap frames must be correct in editor and world.
+6. Separate loose items, storage contents, mounts/holders and armor. Independent import/export/build choices do not erase source content. Survival uses supplied resources/items and their actual properties, without free repair/upgrades/admin attributes. Admin restoration requires server authorization. Constructive text/settings are distinct from wear/fuel/inventory. Old network IDs never identify new objects.
+7. Support suitable nonrecipe world objects only for admins or at explicitly assigned, server-checked prices. No free placement because a recipe is absent.
+8. Capture loaded objects only: area, adjustable upper/lower bounds, manual include/exclude, clear intersection rules and loaded-area limits. No guessed remote data or forced streaming. Highlight visibly without glare.
+9. On insufficient resources, preserve a durable unfinished project and pass-through v11 parts, with a nearby stake/board. A selected/equipped hammer opens shortages, continuation and cancel. Confirmed parts become native objects. Persist/recover/reconnect; cancel refunds only actually paid resources after confirmed removal, once, including failure/replay handling.
+10. Preserve approved v11 textures, shape, light transmission, body deformation, bright transparent swirls, standing opening and smooth return. Visual state does not authorize construction or own resources. Prove real prefabs, multiple transforms and a whole house; bound CPU/GPU/memory without erasing another part's unrecovered matter.
+11. Measure read/convert/catalog/thumbnail/editor/ghost/build/save. QA quantity bypasses remain isolated; malformed-file/overflow/memory protection stays. After heavy proof, define small/direct versus large/planned construction. OBJ/FBX/glTF and terrain transfer are outside this module; EarthWorks is separate, not a dependency.
+12. Provide readable Russian UI, paths/progress/result/close controls, both catalog entry points and resolution checks. Prepare named test files and supplied stands/items. Verify normal/admin/missing/scale/text/mount/storage/heavy/cancel/failure/reload/network with no duplication or loss. Use only the authorized isolated profile through Thunderstore Modded; preserve main saves.
+13. Support Save As, category and explicit delete/hide, automatic portable files/Share, reviewed batch operations, server players/admin visibility and sharing between players. Only admins publish the common server library; players may accept personal copies. Full remote access remains an acceptance gate.
+
+Original adaptive meshes/materials and guides remain later agreed work. No Jotunn or EarthWorks/TerrainRamp runtime dependency; do not copy gameplay-mod code/assets. Ordinary native placement remains the commit path. [Roadmap](docs/ROADMAP.md) orders work; no partial checkpoint completes this contract.

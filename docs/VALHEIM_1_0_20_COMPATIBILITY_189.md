@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # .189 — Valheim 1.0.20 compatibility
 
 Steam changed the host from1.0.17/build25730771 to1.0.20/build25909357 after .188 verification/deployment. The old QA fingerprint refused activation before root changes or Harmony patches; BuildWorks disabled itself, exposing the ordinary save lists. No saves were restored and no automated game input was sent. The owner entered TerrainRamp_Lab and then exited.

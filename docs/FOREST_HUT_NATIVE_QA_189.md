@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # Forest Hut native QA .189 — 2026-10-15
 
 QA 0.19.189.0 on Valheim 1.0.20/build25909357 was launched through Thunderstore TerrainRamp-1.0-Test Modded with the existing one-shot GABS bridge permission. Fresh logs and the native save list confirmed QA isolation.

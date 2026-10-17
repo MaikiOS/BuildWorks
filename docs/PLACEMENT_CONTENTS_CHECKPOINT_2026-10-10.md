@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # QA0.19.143 — placement contents review
 
 Catalog placement, normal Hammer clicks and F9 share an explicit review gate for independent storage and mounted-item choices. The existing exchange review UI prepares a detached transient recipe. Saved blueprints and source files retain their contents. Existing external placement-copy creation happens only after confirmation and does not persist the contents policy.

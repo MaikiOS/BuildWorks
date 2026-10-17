@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # QA0.19.142 — ordinary empty-container construction
 
 Fixed a reproduced whole-blueprint rejection: an empty or explicitly cleared `valheim-container-v1` archive incorrectly entered mounted-item validation. Validation, supply selection and native-placement completion now share the same supply requirement.

@@ -1,3 +1,6 @@
+<!-- docs-role: design record; reviewed 2026-10-17 -->
+> Design/specification record: requirements below are not blanket implementation or acceptance claims. [Current state and queue](../../docs/CURRENT_STATUS.md).
+
 # External blueprint libraries — verified test build 0.19.56
 
 Historical installed baseline. Current source work and changed limits are tracked in

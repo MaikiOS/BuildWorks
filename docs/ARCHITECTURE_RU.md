@@ -105,3 +105,19 @@ G/R/S редактора используют снимки существующ�
 - Новая команда редактора: сначала транзакция документа, затем controller, затем view.
 - Новая группа Hammer: стабильный ID в `HammerCatalogOrganizer`, подпись в TSV.
 - Изменение host API: одна reflection/Harmony-граница и assertion в `Test-HostContract.ps1`.
+
+
+## Текущая карта модулей (.206)
+
+| Ответственность | Исходники | Граница |
+| --- | --- | --- |
+| Файлы/конвертация | `BlueprintExchangeView`, `BlueprintExchangeFormat`, `ExternalBlueprintLibrary`, `CompositeBlueprintStore` | Store24/portable13; архив неизвестного не восстанавливает поведение |
+| Файловый/групповой обмен | `CompositeBlueprintStore`, `BlueprintExchangeBatchView` | Переносимые файлы/ZIP, не прямая передача игроку |
+| Серверный каталог | `ServerBlueprintLibrary`, `BlueprintExchangeServerView` | Проверка ролей/ревизий; живая сеть не принята |
+| Предметы/хранилища | `BlueprintStorageTransfer`, `BlueprintStorageTransferJournal`, `BlueprintStoragePersistence` | Окончательное долговечное завершение/recovery открыты; старый WAL сохранить |
+| Объём в мире | `WorldBlueprintVolumeSelection` | Только загруженные объекты; UX не закончен |
+| Туман | `BlueprintFogAssets/Source/Visual/Simulation/Channels/Volume/Atlas` | Временный рендер, независимые владельцы/производный атлас; постоянного дома нет |
+
+`PrecisionPlacementSession` остаётся координатором native размещения. Временная пауза/очередь и `BlueprintConstructionRefund` не являются журналом постоянного проекта. Права/оплата принадлежат строительному состоянию; сбой renderer не меняет его. QA отличается через `BUILDWORKS_TEST_STAND`; изоляция и обычная цена сохраняются.
+
+[Версия/доказательства](CURRENT_STATUS_RU.md) · [Зависимости будущих этапов](ROADMAP_RU.md). Старые архитектурные описания не расширяют игровое подтверждение.

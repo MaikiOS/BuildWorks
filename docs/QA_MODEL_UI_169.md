@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # QA .168/.169: live evidence and manual acceptance
 
 On2026-10-12 Ostrix stopped work on the local model tester. No further model inference or game input is scheduled. QA0.19.169 is already installed; [manual checks](MANUAL_QA_169_RU.md) need no new deployment. [Detailed evidence](QA_MODEL_UI_169_RU.md).

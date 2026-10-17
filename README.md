@@ -1,83 +1,54 @@
 # BuildWorks
 
-**English** | [Русский](README_RU.md)
+**English · [Русский](README_RU.md)**
 
-> Source candidate 0.19.52 for Valheim 1.0.16. The latest binary prerelease remains 0.19.37; no new binary release is published. Tests use only TerrainRamp-1.0-Test; restored ordinary helpers and optional small mesh dots await owner checks 1–3. The .51 magnet/view-depth checks are accepted.
+BuildWorks extends Valheim's hammer with precise construction, a blueprint catalog and a dedicated editor. Import a supported building, edit its real pieces, place it through Valheim's normal construction path, and keep its supported transforms after reload. Capture and edit your own buildings too.
 
 ![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
 
-BuildWorks is a precision construction toolkit for Valheim. It extends the regular hammer with an indexed catalog, lets players assemble composite blueprints in a dedicated editor, and provides precise placement for individual pieces or an entire blueprint in the world.
+**Current source / isolated QA: 0.19.206.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new binary release is being published by this documentation update.
 
-The central rule is simple: players still build real Valheim pieces. BuildWorks does not replace a structure with one decorative model and does not alter terrain behind the scenes.
+## Capabilities
 
-```mermaid
-flowchart LR
-    A[Vanilla hammer] --> B[BuildWorks index]
-    B --> C[Single piece]
-    B --> D[Blueprint library]
-    D --> E[Blueprint Editor]
-    E --> F[Pieces and groups]
-    E --> G[Array and Contour]
-    E --> H[Blueprint anchor]
-    C --> I[F9 precision placement]
-    D --> I
-    I --> J[Native Valheim validation]
-    J --> K[Real pieces in the world]
-```
+- Hammer categories, search, recents, favorites and blueprint cards.
+- Blueprint editor with object tree, groups, independent anchors, user snap points, Undo/Redo and interior camera.
+- XYZ translation/rotation and component scaling1–1000%, numeric entry, single/paired axes, Array and Contour tools.
+- Supported `.blueprint` / `.vbuild` imports, reviewed exports, categories, Save As, delete/hide, automatic portable files, Share and batch operations.
+- Missing-part records retain transforms; explicit alignment copies leave originals intact. Unknown models are not invented.
+- Native piece construction with survival resources and checks. A28-part Forest Hut and exact reload were verified; this does not prove every imported building or multiplayer.
+- English fallback and Russian runtime catalog.
 
-## What works now
+## In progress
 
-- indexed hammer UI with categories, materials, recents, favorites, search, and blueprints;
-- creating a blueprint from world pieces or from an empty document;
-- a dedicated editor with a catalog, camera, grid, object tree, and Undo/Redo;
-- precise translation, three-axis rotation, and uniform scaling;
-- persistent editor Q/E snap-mode feedback and visible targets within 2 m; aimed editor capture uses that radius, unaimed capture remains 0.55 m;
-- groups, nesting, local group anchors, and a separate world anchor for the blueprint;
-- Array with line/plane layouts, Pack/Fit/exact spacing, rise, heading, pitch, roll, scale step, and symmetry;
-- Contour repetition of a selected piece or group along a connected chain;
-- F9 world editing for a piece or composite blueprint;
-- sequential construction of real pieces using normal Valheim resources, permissions, and restrictions.
-- English-first runtime localization with a complete Russian catalog.
+Approved **v11 fog → whole unfinished house → persistent stake/board → material continuation/cancel/refund/reload** is the current priority. Three-source rendering is verified in Unity; the last native visual test used two walls. The whole-house effect and persistent board are not ready.
 
-Full documentation: [features and interactions](docs/FEATURES.md), [controls](docs/CONTROLS.md), [architecture](docs/ARCHITECTURE.md), [localization](docs/LOCALIZATION.md), [installation](docs/INSTALL.md), and [roadmap](docs/ROADMAP.md).
+Storage/mount/admin restoration, direct player sharing, full server acceptance, volume-selection UX and heavy-building performance remain incomplete. Production interactive/editor budget is512 parts; isolated QA can exercise higher limits. No promise that arbitrary huge/modded builds work.
 
-## Alpha status
+[Current evidence and limits](docs/CURRENT_STATUS.md) · [Forward roadmap](docs/ROADMAP.md) · [Development journal](docs/DEVELOPMENT_JOURNAL.md)
 
-Candidate 0.19.41 fixes the contour guide to full edge endpoints, fully hides editor occluders with F7/button, organizes shortcuts into six groups, adds editor-only FOV controls with game reset, and compacts the object tree with anchor badges, eye/lock columns and an overflow scrollbar. Release, geometry/store/localization, editor bridge, world layout, host/deployment checks and 81 fresh Unity Workbench captures plus input regressions pass. A focused game series and multiplayer remain owner gates.
+## Documentation
 
-See [the ordered development roadmap](docs/ROADMAP.md) and [current acceptance series](specs/roadmap/current-pass.md). [0.19.37](docs/ALPHA_0.19.37.md) remains historical release evidence.
+[Documentation index](docs/README.md) · [Features](docs/FEATURES.md) · [Controls](docs/CONTROLS.md) · [Installation](docs/INSTALL.md) · [Formats](specs/roadmap/blueprint-format.md) · [Architecture](docs/ARCHITECTURE.md) · [Localization](docs/LOCALIZATION.md)
 
-## License and pull requests
+Historical test reports keep their original version and scope. Build success, deployment, native game checks, owner acceptance and host+remote are separate evidence levels.
 
-BuildWorks is proprietary/source-available software, not open-source software. The official binaries may be installed for personal, non-commercial testing. You may inspect and fork the source solely to prepare a pull request. Reusing BuildWorks code or original materials in another project, redistributing them, or using them commercially requires prior written permission from the owner.
+## Dependencies and source build
 
-See [LICENSE](LICENSE) for the governing terms, the [Russian convenience translation](LICENSE_RU.md), and [CONTRIBUTING.md](CONTRIBUTING.md) to propose a change.
+Valheim and BepInExPack Valheim5.4.x are required. Jotunn, TerrainRamp and EarthWorks are not runtime dependencies. Current host compatibility is recorded in [status](docs/CURRENT_STATUS.md).
 
-## Dependencies
-
-- Valheim;
-- BepInExPack Valheim 5.4.x.
-
-Jotunn, TerrainRamp, and EarthWorks are not BuildWorks dependencies.
-
-## Building from source
-
-You need the .NET SDK, an installed copy of Valheim, and BepInExPack. BuildWorks compiles directly against Valheim host assemblies, so provide local paths without committing game DLLs to the repository:
+Use .NET SDK and local host assemblies; never commit game DLLs:
 
 ```powershell
 dotnet build .\src\BuildWorks\BuildWorks.csproj -c Release `
   -p:ProfileRoot="C:\path\to\BepInEx-profile" `
   -p:ValheimManagedDir="C:\path\to\Valheim\valheim_Data\Managed"
-```
-
-Deterministic geometry checks:
-
-```powershell
 dotnet run --project .\tests\BuildWorks.GeometryTests\BuildWorks.GeometryTests.csproj -c Release
 ```
 
-## Important limitation
+Developer deployment is guarded and restricted to TerrainRamp-1.0-Test. Launch QA only through Thunderstore **Modded**; source main is not an instruction to replace a gameplay installation.
 
-This is an early testing alpha, not a stable public release. Back up the world and character before use. Multiplayer, the complete save/exit/reload matrix, blueprint import/export, and future procedural curves have not passed their final gates.
+## License
 
-The concept cover above was created for this repository and is not an in-game screenshot. The remaining documentation images are captures of the implemented UI from the Unity Workbench. See [IMAGES.md](docs/IMAGES.md) for provenance.
+BuildWorks is proprietary/source-available, not open-source. Official binaries may be used for personal non-commercial testing. Source access/forking is permitted solely to prepare a pull request; reuse, redistribution or commercial use requires the owner's prior written permission. [LICENSE](LICENSE) governs; [Russian translation](LICENSE_RU.md) is for convenience. See [CONTRIBUTING](CONTRIBUTING.md).
+
+The cover is concept art, not a gameplay screenshot. [Image provenance](docs/IMAGES.md). OBJ/FBX/glTF and terrain transfer are outside this module; EarthWorks integration is later work.

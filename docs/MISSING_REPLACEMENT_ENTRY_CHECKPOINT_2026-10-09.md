@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # Visible missing-part replacement — 2026-10-09
 
 Source and automated checkpoint only; not deployed. Installed QA .116 remains

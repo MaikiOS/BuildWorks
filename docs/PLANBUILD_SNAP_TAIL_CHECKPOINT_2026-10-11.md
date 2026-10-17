@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # .154 — PlanBuild snap rows with trailing fields
 
 Code3a2c82b, normal/QA sources .154. Not deployed; installed QA remains .146.

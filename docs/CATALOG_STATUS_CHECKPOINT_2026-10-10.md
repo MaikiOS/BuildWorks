@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # .139 — catalogue availability checks
 
 Code a4e66c95ef294a7f1c120eacd7712a79b4b3ed33. Installed only in TerrainRamp-1.0-Test;

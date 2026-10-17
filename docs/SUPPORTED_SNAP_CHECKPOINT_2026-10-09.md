@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # Supported native snap fixture — source checkpoint, not deployed
 
 Three original fixtures are ready in `tests/fixtures/player-exchange`:

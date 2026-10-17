@@ -1,3 +1,6 @@
+<!-- docs-role: design record; reviewed 2026-10-17 -->
+> Design/specification record: requirements below are not blanket implementation or acceptance claims. [Current state and queue](../../docs/CURRENT_STATUS.md).
+
 # BuildWorks editor input revision and acceptance tests
 
 **English** | [Русский](editor-input-revision_RU.md)

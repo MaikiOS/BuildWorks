@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # .108 — staged heavy editor loading and virtual outliner
 
 QA .108 installed; hashes match,48 QA files and library unchanged. Checkpoint:e51c840. No game execution.

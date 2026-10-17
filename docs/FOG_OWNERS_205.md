@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # Compact visual and multiple v11 owners — .205
 
 2026-10-16. Optional compact BlueprintFogSource derives whole-part bounds from indexed transformed geometry, preserving source voxel spacing and padding. Axes<=256, cells<=1,935,360; oversized/distant parts fail before Bake without clipping/scaling. BlueprintFogVisual connects this source to compact simulation. A configurable owner pool admits<=32 owners within98,304,000 field bytes per pool; default remains two. Reservation precedes factory; oversized returned allocation is disposed, existing borrowed instances are rejected before disposal. Factories must return newly exclusively owned channels; cross-pool borrowing is unsupported.

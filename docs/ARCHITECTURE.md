@@ -121,3 +121,19 @@ Marker costs stay empty: the adapter never consumes or assigns resources.
 - New editor command: document transaction first, controller binding second, view last.
 - New Hammer group/material rule: stable ID in `HammerCatalogOrganizer`, localized label in TSV.
 - Host API adaptation: one reflection/Harmony boundary, guarded by `Test-HostContract.ps1`.
+
+
+## Current module map (.206)
+
+| Responsibility | Sources | Boundary |
+| --- | --- | --- |
+| Files/catalog conversion | `BlueprintExchangeView`, `BlueprintExchangeFormat`, `ExternalBlueprintLibrary`, `CompositeBlueprintStore` | Native store24 / portable13; opaque source data is not restored behavior |
+| File share and batch | `CompositeBlueprintStore`, `BlueprintExchangeBatchView` | Managed portable files; batch ZIP; not direct player transfer |
+| Server catalog | `ServerBlueprintLibrary`, `BlueprintExchangeServerView` | Server role/revision checks; live network acceptance open |
+| Storage/items | `BlueprintStorageTransfer`, `BlueprintStorageTransferJournal`, `BlueprintStoragePersistence` | Durable final settlement/recovery still open; keep old WAL |
+| World volume capture | `WorldBlueprintVolumeSelection` | Loaded objects only; interactive volume UX incomplete |
+| Fog | `BlueprintFogAssets/Source/Visual/Simulation/Channels/Volume/Atlas` | Temporary rendering; independent owners, derived atlas; no durable house project |
+
+`PrecisionPlacementSession` remains the native placement coordinator. Its current pause/queue and `BlueprintConstructionRefund` do not constitute a persistent project journal. Construction state must own authority/costs; renderer failures cannot change it. Normal and QA builds differ at `BUILDWORKS_TEST_STAND`; preserve isolation and ordinary costs.
+
+Current version/evidence: [status](CURRENT_STATUS.md). Future dependencies: [roadmap](ROADMAP.md). Historical architecture details below/above do not upgrade runtime proof.

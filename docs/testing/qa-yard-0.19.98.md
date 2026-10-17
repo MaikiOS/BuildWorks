@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](../CURRENT_STATUS.md).
+
 # QA yard 0.19.98
 
 ## QA .101 — native spawn teleport cooldown
@@ -46,7 +49,7 @@ removed without drops only inside this QA area. Stations have a separate one-sho
 the original supplies receipt is retained. Midday is reapplied after world entry and
 previous lighting restored at logout. No debugmode/free-cost/global keys are enabled.
 
-Root: TerrainRamp-1.0-Test/BepInEx/config/BuildWorks/qa-saves/43d3719a7ee649d184e26ef1daa441a3.
+Root: TerrainRamp-1.0-Test/BepInEx/config/BuildWorks/qa-saves/<existing-token>.
 Plan: qa-yard-plan.txt (X/Y/Z); receipts: qa-yard.txt and qa-yard-stations.txt.
 Do not delete/reset these files to retry an incomplete attempt. Inspect the log and backup.
 

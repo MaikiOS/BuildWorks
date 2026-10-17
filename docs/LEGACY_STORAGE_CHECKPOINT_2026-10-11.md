@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # .158 — source-bound Inventory106 inspection
 
 Source `16afb6291a3f0260a99c8d8b4a64e38ca331398d`, 2026-10-11.

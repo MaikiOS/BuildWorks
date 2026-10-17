@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # Precise rotation for new blueprint pieces — .195
 
 Current Valheim stores Euler angles in ZDO and truncates disk rotations to half-degree bins. The paid .194 Forest Hut lost 0.5 degrees on 10/28 pieces after reload; positions, scale and inventory remained equal. Full reload therefore failed.

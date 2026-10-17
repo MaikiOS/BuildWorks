@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # All-missing import — source checkpoint .170
 
 2026-10-12. Installed .169 is unchanged. No deployment, game input or local-model run. [Manual .169 checklist](MANUAL_QA_169_RU.md).

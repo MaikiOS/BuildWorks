@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # Combined v11 volume: .203
 
 2026-10-16. BlueprintFogVolume samples two independent owners at the same world position before scattering/extinction. FogVolumePair.cginc uses a separate local shader keyword; the approved one-owner path remains. Visuals now use the bounded pool without duplicate ownership or silent eviction. Late disposal of an old visual removes only its expected simulation, preserving a reused owner ID; regression passed.

@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Исторический снимок: версии, галочки, «установлено/следом» и ручные команды ниже относятся к исходному этапу. [Текущее состояние и очередь](../CURRENT_STATUS_RU.md).
+
 # QA-пакет 0.19.93–0.19.97: запуск/персонаж/слоты сохранений, native стенд открыт
 
 ## QA .100 — проверено автоматически, в игре ещё не подтверждено
@@ -93,7 +96,7 @@ Complete при следующем запуске предотвращает д�
 Из `Default/BuildWorks`, PowerShell 7:
 
 ```powershell
-./scripts/Deploy-TestBuild.ps1 -TargetProfile TerrainRamp-1.0-Test -QaStandToken 43d3719a7ee649d184e26ef1daa441a3
+./scripts/Deploy-TestBuild.ps1 -TargetProfile TerrainRamp-1.0-Test -QaStandToken <existing-token>
 ```
 
 Разрешённая установка .93 и исправления .94 выполнена в реальный тестовый профиль.
@@ -106,7 +109,7 @@ QA DLL, проверяет host/known-bootstrap guard и все исходные
 Внешние файлы остаются локально, вне Git/релизов: [авторы, ссылки и условия](external-path-2026-10-07_RU.md).
 
 Планируемые имя персонажа и мира: **BW_QA_43d3719a**. Папка saves:
-`TerrainRamp-1.0-Test/BepInEx/config/BuildWorks/qa-saves/43d3719a7ee649d184e26ef1daa441a3`.
+`TerrainRamp-1.0-Test/BepInEx/config/BuildWorks/qa-saves/<existing-token>`.
 Их настоящие UID создаёт Valheim; старые сетевые идентификаторы не копируются.
 Разрешение на этот изолированный QA запуск/создание saves уже дано. В Thunderstore выбрать
 TerrainRamp-1.0-Test и нажать ТОЛЬКО Modded; запуск напрямую через Steam/аргументы запрещён.

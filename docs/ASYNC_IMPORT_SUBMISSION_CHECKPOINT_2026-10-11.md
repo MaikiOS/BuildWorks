@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # .152 — submission normalization in the existing worker
 
 Code b2fae84. Source normal/QA .152 only; installed QA remains .146. No Valheim,

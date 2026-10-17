@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Исторический снимок: версии, галочки, «установлено/следом» и ручные команды ниже относятся к исходному этапу. [Текущее состояние и очередь](CURRENT_STATUS_RU.md).
+
 # Ручная очередь .180 — свои импорты в чистый каталог
 
 Игру запускать, когда Ostrix удобно, через Thunderstore → TerrainRamp-1.0-Test →
@@ -5,7 +8,7 @@ Modded. Очередь предназначена для .180 после уст�
 указана в живом списке. Основной мир и сохранения не использовать.
 
 **Все подготовленные исходники:**
-[Blueprints-for-import](<C:/Users/nfspr/AppData/Roaming/Thunderstore Mod Manager/DataFolder/Valheim/profiles/Default/BuildWorks/artifacts/Blueprints-for-import>).
+Blueprints-for-import — `artifacts/Blueprints-for-import` (локально, не поставляется).
 Эта папка не сканируется игрой. В ней576 файлов чертежей и28 прежних ZIP-импортов;
 наборы могут повторять модели. Сведения об авторах и источниках находятся рядом
 в provenance.json/README. Наличие файла не означает поддержки его формата/модов.

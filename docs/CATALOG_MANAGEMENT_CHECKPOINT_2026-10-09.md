@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # Catalogue management — source checkpoint, not deployed
 
 Both catalogues expose owned **Delete blueprint**, external **Hide from catalogue**

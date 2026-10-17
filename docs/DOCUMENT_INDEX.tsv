@@ -1,0 +1,469 @@
+path	role
+AGENTS.md	current
+CONTRIBUTING.md	current
+CONTRIBUTING_RU.md	current
+HANDOFF.md	current
+HANDOFF_HISTORY_206.md	historical snapshot
+HANDOFF_HISTORY_206_RU.md	historical snapshot
+HANDOFF_RU.md	current
+LICENSE_RU.md	unchanged license/config
+PROJECT_CONTRACT.md	current
+PROJECT_CONTRACT_RU.md	current
+PUBLISH_CHECKLIST.md	current
+PUBLISH_CHECKLIST_RU.md	current
+README.md	current
+README_RU.md	current
+ROADMAP.md	current
+ROADMAP_RU.md	current
+docs/ALPHA_0.19.33.md	historical snapshot
+docs/ALPHA_0.19.33_RU.md	historical snapshot
+docs/ALPHA_0.19.34.md	historical snapshot
+docs/ALPHA_0.19.34_RU.md	historical snapshot
+docs/ALPHA_0.19.35.md	historical snapshot
+docs/ALPHA_0.19.35_RU.md	historical snapshot
+docs/ALPHA_0.19.36.md	historical snapshot
+docs/ALPHA_0.19.36_RU.md	historical snapshot
+docs/ALPHA_0.19.37.md	historical snapshot
+docs/ALPHA_0.19.37_RU.md	historical snapshot
+docs/ARCHITECTURE.md	current
+docs/ARCHITECTURE_RU.md	current
+docs/ASYNC_IMPORT_REVIEW_CHECKPOINT_2026-10-11.md	historical snapshot
+docs/ASYNC_IMPORT_REVIEW_CHECKPOINT_2026-10-11_RU.md	historical snapshot
+docs/ASYNC_IMPORT_SUBMISSION_CHECKPOINT_2026-10-11.md	historical snapshot
+docs/ASYNC_IMPORT_SUBMISSION_CHECKPOINT_2026-10-11_RU.md	historical snapshot
+docs/ASYNC_MISSING_REVIEW_CHECKPOINT_2026-10-11.md	historical snapshot
+docs/ASYNC_MISSING_REVIEW_CHECKPOINT_2026-10-11_RU.md	historical snapshot
+docs/AXIS_SCALE_INPUT_CHECKPOINT_2026-10-10.md	historical snapshot
+docs/AXIS_SCALE_INPUT_CHECKPOINT_2026-10-10_RU.md	historical snapshot
+docs/BATCH_EXCHANGE_183.md	historical snapshot
+docs/BATCH_EXCHANGE_183_RU.md	historical snapshot
+docs/BATCH_NATIVE_197.md	historical snapshot
+docs/BATCH_NATIVE_197_RU.md	historical snapshot
+docs/CAPTURE_SNAP_CHECKPOINT_2026-10-09.md	historical snapshot
+docs/CAPTURE_SNAP_CHECKPOINT_2026-10-09_RU.md	historical snapshot
+docs/CATALOG_MANAGEMENT_CHECKPOINT_2026-10-09.md	historical snapshot
+docs/CATALOG_MANAGEMENT_CHECKPOINT_2026-10-09_RU.md	historical snapshot
+docs/CATALOG_STATUS_CHECKPOINT_2026-10-10.md	historical snapshot
+docs/CATALOG_STATUS_CHECKPOINT_2026-10-10_RU.md	historical snapshot
+docs/COLLIDER_CONTACT_161_2026-10-12.md	historical snapshot
+docs/COLLIDER_CONTACT_161_2026-10-12_RU.md	historical snapshot
+docs/CONTACT_DIAGNOSTICS_160_2026-10-12.md	historical snapshot
+docs/CONTACT_DIAGNOSTICS_160_2026-10-12_RU.md	historical snapshot
+docs/CONTENTS_FIXTURES_CHECKPOINT_2026-10-10.md	historical snapshot
+docs/CONTENTS_FIXTURES_CHECKPOINT_2026-10-10_RU.md	historical snapshot
+docs/CONTENT_JOURNAL_173.md	historical snapshot
+docs/CONTENT_JOURNAL_173_RU.md	historical snapshot
+docs/CONTENT_PROFILE_176.md	historical snapshot
+docs/CONTENT_PROFILE_176_RU.md	historical snapshot
+docs/CONTENT_RECOVERY_175.md	historical snapshot
+docs/CONTENT_RECOVERY_175_RU.md	historical snapshot
+docs/CONTENT_RESERVATION_171.md	historical snapshot
+docs/CONTENT_RESERVATION_171_RU.md	historical snapshot
+docs/CONTENT_RETURN_174.md	historical snapshot
+docs/CONTENT_RETURN_174_RU.md	historical snapshot
+docs/CONTENT_TRANSFER_172.md	historical snapshot
+docs/CONTENT_TRANSFER_172_RU.md	historical snapshot
+docs/CONTROLS.md	current
+docs/CONTROLS_RU.md	current
+docs/CONVERTER_SNAPSHOT_190.md	historical snapshot
+docs/CONVERTER_SNAPSHOT_190_RU.md	historical snapshot
+docs/CORPUS_ROUNDTRIP_2026-10-12.md	historical snapshot
+docs/CORPUS_ROUNDTRIP_2026-10-12_RU.md	historical snapshot
+docs/CURRENT_STATUS.md	current
+docs/CURRENT_STATUS_RU.md	current
+docs/CURSOR_WRAP_CHECKPOINT_2026-10-10.md	historical snapshot
+docs/CURSOR_WRAP_CHECKPOINT_2026-10-10_RU.md	historical snapshot
+docs/DEVELOPMENT_JOURNAL.md	current
+docs/DEVELOPMENT_JOURNAL_RU.md	current
+docs/EDITOR_CATALOG_REPLACEMENT_188.md	historical snapshot
+docs/EDITOR_CATALOG_REPLACEMENT_188_RU.md	historical snapshot
+docs/EDITOR_FEEDBACK_0.19.132_RU.md	historical snapshot
+docs/EDITOR_POPUP_FILTER_CHECKPOINT_2026-10-10.md	historical snapshot
+docs/EDITOR_POPUP_FILTER_CHECKPOINT_2026-10-10_RU.md	historical snapshot
+docs/EMPTY_CONTAINER_CHECKPOINT_2026-10-10.md	historical snapshot
+docs/EMPTY_CONTAINER_CHECKPOINT_2026-10-10_RU.md	historical snapshot
+docs/EXTERNAL_CORPUS_REGISTER.md	reference
+docs/EXTERNAL_CORPUS_REGISTER_RU.md	reference
+docs/FEATURES.md	current
+docs/FEATURES_RU.md	current
+docs/FOG_ASSETS_198.md	historical snapshot
+docs/FOG_ASSETS_198_RU.md	historical snapshot
+docs/FOG_ATLAS_206.md	historical snapshot
+docs/FOG_ATLAS_206_RU.md	historical snapshot
+docs/FOG_CHANNELS_202.md	historical snapshot
+docs/FOG_CHANNELS_202_RU.md	historical snapshot
+docs/FOG_COLOR_201.md	historical snapshot
+docs/FOG_COLOR_201_RU.md	historical snapshot
+docs/FOG_COMPACT_204.md	historical snapshot
+docs/FOG_COMPACT_204_RU.md	historical snapshot
+docs/FOG_OWNERS_205.md	historical snapshot
+docs/FOG_OWNERS_205_RU.md	historical snapshot
+docs/FOG_RENDER_200.md	historical snapshot
+docs/FOG_RENDER_200_RU.md	historical snapshot
+docs/FOG_SIMULATION_199.md	historical snapshot
+docs/FOG_SIMULATION_199_RU.md	historical snapshot
+docs/FOG_V11_INTEGRATION.md	current
+docs/FOG_V11_INTEGRATION_HISTORY_206.md	historical snapshot
+docs/FOG_V11_INTEGRATION_HISTORY_206_RU.md	historical snapshot
+docs/FOG_V11_INTEGRATION_RU.md	current
+docs/FOG_VOLUME_203.md	historical snapshot
+docs/FOG_VOLUME_203_RU.md	historical snapshot
+docs/FOREST_HUT_NATIVE_QA_189.md	historical snapshot
+docs/FOREST_HUT_NATIVE_QA_189_RU.md	historical snapshot
+docs/GAME_CONTROL_RESEARCH_2026-10-12.md	historical snapshot
+docs/GAME_CONTROL_RESEARCH_2026-10-12_RU.md	historical snapshot
+docs/GIZMO_POOL_CHECKPOINT_2026-10-09.md	historical snapshot
+docs/GIZMO_POOL_CHECKPOINT_2026-10-09_RU.md	historical snapshot
+docs/GIZMO_QUERY_CHECKPOINT_2026-10-09.md	historical snapshot
+docs/GIZMO_QUERY_CHECKPOINT_2026-10-09_RU.md	historical snapshot
+docs/GOAL_AMENDMENT_2026-10-08_RU.md	historical snapshot
+docs/GOAL_AMENDMENT_2026-10-09.md	historical snapshot
+docs/GOAL_AMENDMENT_2026-10-09_RU.md	historical snapshot
+docs/GOAL_AMENDMENT_FOG_V11_RU.md	historical snapshot
+docs/GOAL_AUDIT_2026-10-08.md	historical snapshot
+docs/GOAL_AUDIT_2026-10-08_RU.md	historical snapshot
+docs/GOAL_LOCAL_QA_AGENT_RU.md	historical snapshot
+docs/HAMMER_AVAILABILITY_179_RU.md	historical snapshot
+docs/HAMMER_NATIVE_SOCKETS_CHECKPOINT_2026-10-10.md	historical snapshot
+docs/HAMMER_NATIVE_SOCKETS_CHECKPOINT_2026-10-10_RU.md	historical snapshot
+docs/HAMMER_SNAP_CHECKPOINT_2026-10-10.md	historical snapshot
+docs/HAMMER_SNAP_CHECKPOINT_2026-10-10_RU.md	historical snapshot
+docs/HASHED_HOLDER_CHECKPOINT_2026-10-11.md	historical snapshot
+docs/HASHED_HOLDER_CHECKPOINT_2026-10-11_RU.md	historical snapshot
+docs/IMAGES.md	reference
+docs/IMAGES_RU.md	reference
+docs/IMPORT_CATEGORIES_181.md	historical snapshot
+docs/IMPORT_CATEGORIES_181_RU.md	historical snapshot
+docs/IMPORT_FLOW_180.md	historical snapshot
+docs/IMPORT_FLOW_180_RU.md	historical snapshot
+docs/IMPORT_STATE_CHECKPOINT_2026-10-10.md	historical snapshot
+docs/IMPORT_STATE_CHECKPOINT_2026-10-10_RU.md	historical snapshot
+docs/IMPORT_TIMINGS_177_RU.md	historical snapshot
+docs/IMPORT_VALIDATION_CHECKPOINT_2026-10-10.md	historical snapshot
+docs/IMPORT_VALIDATION_CHECKPOINT_2026-10-10_RU.md	historical snapshot
+docs/INSTALL.md	current
+docs/INSTALL_RU.md	current
+docs/INTERIOR_CAMERA_CHECKPOINT_2026-10-09.md	historical snapshot
+docs/INTERIOR_CAMERA_CHECKPOINT_2026-10-09_RU.md	historical snapshot
+docs/LARGE_SNAP_AUDIT_2026-10-09.md	historical snapshot
+docs/LARGE_SNAP_AUDIT_2026-10-09_RU.md	historical snapshot
+docs/LARGE_SNAP_CHECKPOINT_2026-10-10.md	historical snapshot
+docs/LARGE_SNAP_CHECKPOINT_2026-10-10_RU.md	historical snapshot
+docs/LEGACY_SIGN_CHECKPOINT_2026-10-10.md	historical snapshot
+docs/LEGACY_SIGN_CHECKPOINT_2026-10-10_RU.md	historical snapshot
+docs/LEGACY_STORAGE_CHECKPOINT_2026-10-11.md	historical snapshot
+docs/LEGACY_STORAGE_CHECKPOINT_2026-10-11_RU.md	historical snapshot
+docs/LEGACY_VBUILD_CHECKPOINT_2026-10-09.md	historical snapshot
+docs/LEGACY_VBUILD_CHECKPOINT_2026-10-09_RU.md	historical snapshot
+docs/LIVE_CHECKLIST_HISTORY_2026-10-14_RU.md	historical snapshot
+docs/LIVE_CHECKLIST_HISTORY_206_RU.md	historical snapshot
+docs/LIVE_CHECKLIST_RU.md	current
+docs/LOCALIZATION.md	current
+docs/LOCALIZATION_RU.md	current
+docs/LOCAL_QA_AGENT_2026-10-12.md	historical snapshot
+docs/LOCAL_QA_AGENT_2026-10-12_RU.md	historical snapshot
+docs/LOCAL_QA_FULL_SCENARIOS.md	historical snapshot
+docs/LOCAL_QA_FULL_SCENARIOS_RU.md	historical snapshot
+docs/LOCAL_QA_MISSION_2026-10-12_RU.md	historical snapshot
+docs/LOCAL_QA_MOTION_2026-10-12.md	historical snapshot
+docs/LOCAL_QA_MOTION_2026-10-12_RU.md	historical snapshot
+docs/LOCAL_QA_RUNTIME_2026-10-12.md	historical snapshot
+docs/LOCAL_QA_RUNTIME_2026-10-12_RU.md	historical snapshot
+docs/MANUAL_FEEDBACK_176_2026-10-13_RU.md	historical snapshot
+docs/MANUAL_FIXES_177_RU.md	historical snapshot
+docs/MANUAL_QA_169_RU.md	historical snapshot
+docs/MANUAL_QA_170_RU.md	historical snapshot
+docs/MANUAL_QA_173_RU.md	historical snapshot
+docs/MANUAL_QA_174_RU.md	historical snapshot
+docs/MANUAL_QA_175_RU.md	historical snapshot
+docs/MANUAL_QA_176_RU.md	historical snapshot
+docs/MANUAL_QA_177_RU.md	historical snapshot
+docs/MANUAL_QA_178_RU.md	historical snapshot
+docs/MANUAL_QA_179_RU.md	historical snapshot
+docs/MANUAL_QA_180.md	historical snapshot
+docs/MANUAL_QA_180_RU.md	historical snapshot
+docs/MANUAL_QA_181.md	historical snapshot
+docs/MANUAL_QA_181_RU.md	historical snapshot
+docs/MANUAL_QA_182.md	historical snapshot
+docs/MANUAL_QA_182_RU.md	historical snapshot
+docs/MANUAL_QA_183.md	historical snapshot
+docs/MANUAL_QA_183_RU.md	historical snapshot
+docs/MANUAL_QA_184.md	historical snapshot
+docs/MANUAL_QA_184_RU.md	historical snapshot
+docs/MANUAL_QA_187_RU.md	historical snapshot
+docs/MANUAL_QA_190_RU.md	historical snapshot
+docs/MANUAL_QA_191_RU.md	historical snapshot
+docs/MANUAL_QA_192_RU.md	historical snapshot
+docs/MANUAL_QA_193_RU.md	historical snapshot
+docs/MATERIAL_VARIATION_CONTRACT.md	current
+docs/MATERIAL_VARIATION_CONTRACT_RU.md	current
+docs/MATERIAL_VARIATION_HISTORY_206.md	historical snapshot
+docs/MATERIAL_VARIATION_HISTORY_206_RU.md	historical snapshot
+docs/MISSING_COPY_178_RU.md	historical snapshot
+docs/MISSING_IMPORT_170.md	historical snapshot
+docs/MISSING_IMPORT_170_RU.md	historical snapshot
+docs/MISSING_PART_REPLACEMENT.md	current
+docs/MISSING_PART_REPLACEMENT_RU.md	current
+docs/MISSING_POSITION_CHECKPOINT_2026-10-10.md	historical snapshot
+docs/MISSING_POSITION_CHECKPOINT_2026-10-10_RU.md	historical snapshot
+docs/MISSING_REPLACEMENT_ENTRY_CHECKPOINT_2026-10-09.md	historical snapshot
+docs/MISSING_REPLACEMENT_ENTRY_CHECKPOINT_2026-10-09_RU.md	historical snapshot
+docs/MOUNT_RESERVATION_CHECKPOINT_2026-10-10_RU.md	historical snapshot
+docs/NEAREST_PART_CHECKPOINT_2026-10-09.md	historical snapshot
+docs/NEAREST_PART_CHECKPOINT_2026-10-09_RU.md	historical snapshot
+docs/NEXT_FOG_PROJECT_V11_RU.md	current
+docs/NEXT_STEPS_170_RU.md	historical snapshot
+docs/OUTLINER_FILTER_CHECKPOINT_2026-10-09.md	historical snapshot
+docs/OUTLINER_FILTER_CHECKPOINT_2026-10-09_RU.md	historical snapshot
+docs/PAIRED_AXIS_CHECKPOINT_2026-10-10.md	historical snapshot
+docs/PAIRED_AXIS_CHECKPOINT_2026-10-10_RU.md	historical snapshot
+docs/PARTIAL_THUMBNAIL_CHECKPOINT_2026-10-09.md	historical snapshot
+docs/PARTIAL_THUMBNAIL_CHECKPOINT_2026-10-09_RU.md	historical snapshot
+docs/PASSIVE_SNAP_163_2026-10-12.md	historical snapshot
+docs/PASSIVE_SNAP_163_2026-10-12_RU.md	historical snapshot
+docs/PLACEMENT_CONTENTS_CHECKPOINT_2026-10-10.md	historical snapshot
+docs/PLACEMENT_CONTENTS_CHECKPOINT_2026-10-10_RU.md	historical snapshot
+docs/PLACEMENT_SOURCE_HEADERS.md	historical snapshot
+docs/PLACEMENT_SOURCE_HEADERS_RU.md	historical snapshot
+docs/PLANBUILD_COMMA_CHECKPOINT_2026-10-11.md	historical snapshot
+docs/PLANBUILD_COMMA_CHECKPOINT_2026-10-11_RU.md	historical snapshot
+docs/PLANBUILD_EXPORT_CHECKPOINT_2026-10-10.md	historical snapshot
+docs/PLANBUILD_EXPORT_CHECKPOINT_2026-10-10_RU.md	historical snapshot
+docs/PLANBUILD_SNAP_TAIL_CHECKPOINT_2026-10-11.md	historical snapshot
+docs/PLANBUILD_SNAP_TAIL_CHECKPOINT_2026-10-11_RU.md	historical snapshot
+docs/PREFAB_MIGRATION_191.md	historical snapshot
+docs/PREFAB_MIGRATION_191_RU.md	historical snapshot
+docs/PREFAB_MIGRATION_194.md	historical snapshot
+docs/PREFAB_MIGRATION_194_RU.md	historical snapshot
+docs/PREFAB_MIGRATION_EVIDENCE_RU.md	historical snapshot
+docs/PUBLISH_CHECKLIST_0.19.37.md	historical snapshot
+docs/PUBLISH_CHECKLIST_0.19.37_RU.md	historical snapshot
+docs/QA_0.19.108_RU.md	historical snapshot
+docs/QA_0.19.109_RU.md	historical snapshot
+docs/QA_0.19.110_RU.md	historical snapshot
+docs/QA_0.19.111_RU.md	historical snapshot
+docs/QA_0.19.112_RU.md	historical snapshot
+docs/QA_0.19.113_RU.md	historical snapshot
+docs/QA_0.19.114_RU.md	historical snapshot
+docs/QA_0.19.115_RU.md	historical snapshot
+docs/QA_0.19.116_RU.md	historical snapshot
+docs/QA_0.19.117_RU.md	historical snapshot
+docs/QA_0.19.132_RU.md	historical snapshot
+docs/QA_0.19.135_RU.md	historical snapshot
+docs/QA_0.19.136_RU.md	historical snapshot
+docs/QA_0.19.137_RU.md	historical snapshot
+docs/QA_0.19.138_RU.md	historical snapshot
+docs/QA_0.19.139_RU.md	historical snapshot
+docs/QA_0.19.140_RU.md	historical snapshot
+docs/QA_0.19.144_RU.md	historical snapshot
+docs/QA_0.19.150_RU.md	historical snapshot
+docs/QA_0.19.151_RU.md	historical snapshot
+docs/QA_0.19.154_RU.md	historical snapshot
+docs/QA_0.19.155_RU.md	historical snapshot
+docs/QA_0.19.158_RU.md	historical snapshot
+docs/QA_CHANNEL_SMOKE_2026-10-11_RU.md	historical snapshot
+docs/QA_CONTROL.md	current
+docs/QA_CONTROL_HISTORY_206.md	historical snapshot
+docs/QA_CONTROL_HISTORY_206_RU.md	historical snapshot
+docs/QA_CONTROL_RU.md	current
+docs/QA_DEPLOY_161_2026-10-12.md	historical snapshot
+docs/QA_DEPLOY_161_2026-10-12_RU.md	historical snapshot
+docs/QA_DEPLOY_163_2026-10-12.md	historical snapshot
+docs/QA_DEPLOY_163_2026-10-12_RU.md	historical snapshot
+docs/QA_DEPLOY_2026-10-11.md	historical snapshot
+docs/QA_DEPLOY_2026-10-11_RU.md	historical snapshot
+docs/QA_MODEL_UI_167.md	historical snapshot
+docs/QA_MODEL_UI_167_RU.md	historical snapshot
+docs/QA_MODEL_UI_169.md	historical snapshot
+docs/QA_MODEL_UI_169_RU.md	historical snapshot
+docs/QA_NATIVE_159_2026-10-11.md	historical snapshot
+docs/QA_NATIVE_159_2026-10-11_RU.md	historical snapshot
+docs/QA_NATIVE_160_2026-10-12.md	historical snapshot
+docs/QA_NATIVE_160_2026-10-12_RU.md	historical snapshot
+docs/QA_RESPOND_CHECKPOINT_2026-10-11.md	historical snapshot
+docs/QA_RESPOND_CHECKPOINT_2026-10-11_RU.md	historical snapshot
+docs/QA_SNAP_CONTACT_162_2026-10-12.md	historical snapshot
+docs/QA_SNAP_CONTACT_162_2026-10-12_RU.md	historical snapshot
+docs/QA_TEXT_SUBMIT_165_RU.md	historical snapshot
+docs/QA_UI_TARGETS_166.md	historical snapshot
+docs/QA_UI_TARGETS_166_RU.md	historical snapshot
+docs/QA_VISION_PROBE_2026-10-12.md	historical snapshot
+docs/QA_VISION_PROBE_2026-10-12_RU.md	historical snapshot
+docs/QA_WORLD_CAPTURE_CHECKPOINT_2026-10-10.md	historical snapshot
+docs/QA_WORLD_CAPTURE_CHECKPOINT_2026-10-10_RU.md	historical snapshot
+docs/README.md	current
+docs/README_RU.md	current
+docs/REFUND_IDENTITY_CHECKPOINT_2026-10-11.md	historical snapshot
+docs/REFUND_IDENTITY_CHECKPOINT_2026-10-11_RU.md	historical snapshot
+docs/REPLACEMENT_POSE_CHECKPOINT_2026-10-10.md	historical snapshot
+docs/REPLACEMENT_POSE_CHECKPOINT_2026-10-10_RU.md	historical snapshot
+docs/ROADMAP.md	current
+docs/ROADMAP_HISTORY_206.md	historical snapshot
+docs/ROADMAP_HISTORY_206_RU.md	historical snapshot
+docs/ROADMAP_RU.md	current
+docs/ROTATION_PERSISTENCE_195.md	historical snapshot
+docs/ROTATION_PERSISTENCE_195_RU.md	historical snapshot
+docs/SAVE_AS_CHECKPOINT_2026-10-09.md	historical snapshot
+docs/SAVE_AS_CHECKPOINT_2026-10-09_RU.md	historical snapshot
+docs/SCALE_BOUNDARY_CHECKPOINT_2026-10-10.md	historical snapshot
+docs/SCALE_BOUNDARY_CHECKPOINT_2026-10-10_RU.md	historical snapshot
+docs/SERVER_LIBRARY_FOUNDATION.md	historical snapshot
+docs/SERVER_LIBRARY_FOUNDATION_RU.md	historical snapshot
+docs/SERVER_LIBRARY_PANEL.md	current
+docs/SERVER_LIBRARY_PANEL_RU.md	current
+docs/SHARE_FILES_182.md	historical snapshot
+docs/SHARE_FILES_182_RU.md	historical snapshot
+docs/SHORT_HOLDER_CHECKPOINT_2026-10-11.md	historical snapshot
+docs/SHORT_HOLDER_CHECKPOINT_2026-10-11_RU.md	historical snapshot
+docs/SIGN_PREVIEW_192.md	historical snapshot
+docs/SIGN_PREVIEW_192_RU.md	historical snapshot
+docs/SOURCE_EVIDENCE_COPY_CHECKPOINT_2026-10-10.md	historical snapshot
+docs/SOURCE_EVIDENCE_COPY_CHECKPOINT_2026-10-10_RU.md	historical snapshot
+docs/SOURCE_MEMORY_CHECKPOINT_2026-10-11.md	historical snapshot
+docs/SOURCE_MEMORY_CHECKPOINT_2026-10-11_RU.md	historical snapshot
+docs/STORAGE_FIRST_LOAD_197.md	historical snapshot
+docs/STORAGE_FIRST_LOAD_197_RU.md	historical snapshot
+docs/STORAGE_NATIVE_QA_187.md	historical snapshot
+docs/STORAGE_PAIRED_PERSISTENCE_186.md	historical snapshot
+docs/STORAGE_PAIRED_PERSISTENCE_186_RU.md	historical snapshot
+docs/STORAGE_RECOVERY_196.md	historical snapshot
+docs/STORAGE_RECOVERY_196_RU.md	historical snapshot
+docs/STORAGE_TRANSFER_AUDIT_2026-10-10_RU.md	historical snapshot
+docs/STORAGE_WORLD_READBACK_185.md	historical snapshot
+docs/STORAGE_WORLD_READBACK_185_RU.md	historical snapshot
+docs/SUPPORTED_SNAP_CHECKPOINT_2026-10-09.md	historical snapshot
+docs/SUPPORTED_SNAP_CHECKPOINT_2026-10-09_RU.md	historical snapshot
+docs/VALHEIM_1_0_20_COMPATIBILITY_189.md	historical snapshot
+docs/VALHEIM_1_0_20_COMPATIBILITY_189_RU.md	historical snapshot
+docs/VOLUME_SELECTION_CHECKPOINT_2026-10-11.md	historical snapshot
+docs/VOLUME_SELECTION_CHECKPOINT_2026-10-11_RU.md	historical snapshot
+docs/WORK_STATUS_HISTORY_206_RU.md	historical snapshot
+docs/WORK_STATUS_RU.md	current
+docs/WORLD_SELECTION_CHECKPOINT_2026-10-11.md	historical snapshot
+docs/WORLD_SELECTION_CHECKPOINT_2026-10-11_RU.md	historical snapshot
+docs/WORLD_SNAP_193.md	historical snapshot
+docs/WORLD_SNAP_193_RU.md	historical snapshot
+docs/WORLD_SNAP_AUDIT_192.md	historical snapshot
+docs/WORLD_SNAP_AUDIT_192_RU.md	historical snapshot
+docs/WORLD_SNAP_COLLECTION_CHECKPOINT_2026-10-10.md	historical snapshot
+docs/WORLD_SNAP_COLLECTION_CHECKPOINT_2026-10-10_RU.md	historical snapshot
+docs/XYZ_SCALE_CHECKPOINT_2026-10-09.md	historical snapshot
+docs/XYZ_SCALE_CHECKPOINT_2026-10-09_RU.md	historical snapshot
+docs/artwork/snap-point-assets.md	historical snapshot
+docs/artwork/snap-point-assets_RU.md	historical snapshot
+docs/checkpoint-0.19.107.md	historical snapshot
+docs/checkpoint-0.19.107_RU.md	historical snapshot
+docs/checkpoint-0.19.108.md	historical snapshot
+docs/checkpoint-0.19.108_RU.md	historical snapshot
+docs/checkpoint-0.19.109.md	historical snapshot
+docs/checkpoint-0.19.109_RU.md	historical snapshot
+docs/checkpoint-0.19.110.md	historical snapshot
+docs/checkpoint-0.19.110_RU.md	historical snapshot
+docs/checkpoint-0.19.111.md	historical snapshot
+docs/checkpoint-0.19.111_RU.md	historical snapshot
+docs/checkpoint-0.19.112.md	historical snapshot
+docs/checkpoint-0.19.112_RU.md	historical snapshot
+docs/checkpoint-0.19.113.md	historical snapshot
+docs/checkpoint-0.19.113_RU.md	historical snapshot
+docs/checkpoint-0.19.114.md	historical snapshot
+docs/checkpoint-0.19.114_RU.md	historical snapshot
+docs/checkpoint-0.19.115.md	historical snapshot
+docs/checkpoint-0.19.115_RU.md	historical snapshot
+docs/checkpoint-0.19.116.md	historical snapshot
+docs/checkpoint-0.19.116_RU.md	historical snapshot
+docs/continuation-audit-2026-10-07.md	historical snapshot
+docs/continuation-audit-2026-10-07_RU.md	historical snapshot
+docs/feedback-2026-10-08.md	historical snapshot
+docs/feedback-2026-10-08_RU.md	historical snapshot
+docs/feedback-2026-10-09.md	historical snapshot
+docs/feedback-2026-10-09_RU.md	historical snapshot
+docs/feedback-2026-10-10_RU.md	historical snapshot
+docs/import-axis-evidence.md	historical snapshot
+docs/scale-basis-next-step.md	historical snapshot
+docs/testing/catalog-exchange-0.19.65_RU.md	historical snapshot
+docs/testing/catalog-exchange-0.19.67.md	historical snapshot
+docs/testing/catalog-exchange-0.19.67_RU.md	historical snapshot
+docs/testing/external-path-2026-10-07.md	historical snapshot
+docs/testing/external-path-2026-10-07_RU.md	historical snapshot
+docs/testing/free-supports-0.19.64.md	historical snapshot
+docs/testing/free-supports-0.19.64_RU.md	historical snapshot
+docs/testing/full-acceptance-0.19.80.md	historical snapshot
+docs/testing/full-acceptance-0.19.80_RU.md	historical snapshot
+docs/testing/itemstand-placement-0.19.80.md	historical snapshot
+docs/testing/itemstand-placement-0.19.80_RU.md	historical snapshot
+docs/testing/missing-catalogue-0.19.89.md	historical snapshot
+docs/testing/missing-catalogue-0.19.89_RU.md	historical snapshot
+docs/testing/missing-model-0.19.88.md	historical snapshot
+docs/testing/missing-model-0.19.88_RU.md	historical snapshot
+docs/testing/player-exchange-0.19.81.md	historical snapshot
+docs/testing/player-exchange-0.19.81_RU.md	historical snapshot
+docs/testing/player-exchange-0.19.82.md	historical snapshot
+docs/testing/player-exchange-0.19.82_RU.md	historical snapshot
+docs/testing/qa-save-isolation-0.19.90.md	historical snapshot
+docs/testing/qa-save-isolation-0.19.90_RU.md	historical snapshot
+docs/testing/qa-stand-0.19.93.md	historical snapshot
+docs/testing/qa-stand-0.19.93_RU.md	historical snapshot
+docs/testing/qa-yard-0.19.98.md	historical snapshot
+docs/testing/qa-yard-0.19.98_RU.md	historical snapshot
+release-notes-0.19.33.md	historical snapshot
+release-notes-0.19.33_RU.md	historical snapshot
+release-notes-0.19.34.md	historical snapshot
+release-notes-0.19.34_RU.md	historical snapshot
+release-notes-0.19.35.md	historical snapshot
+release-notes-0.19.35_RU.md	historical snapshot
+release-notes-0.19.36.md	historical snapshot
+release-notes-0.19.36_RU.md	historical snapshot
+release-notes-0.19.37.md	historical snapshot
+release-notes-0.19.37_RU.md	historical snapshot
+specs/roadmap/README.md	current
+specs/roadmap/archive/pass-0.19.45.md	historical snapshot
+specs/roadmap/archive/pass-0.19.45_RU.md	historical snapshot
+specs/roadmap/archive/pass-0.19.48.md	historical snapshot
+specs/roadmap/archive/pass-0.19.48_RU.md	historical snapshot
+specs/roadmap/archive/pass-0.19.49.md	historical snapshot
+specs/roadmap/archive/pass-0.19.49_RU.md	historical snapshot
+specs/roadmap/archive/pass-0.19.50.md	historical snapshot
+specs/roadmap/archive/pass-0.19.50_RU.md	historical snapshot
+specs/roadmap/archive/pass-0.19.51.md	historical snapshot
+specs/roadmap/archive/pass-0.19.51_RU.md	historical snapshot
+specs/roadmap/archive/pass-0.19.52.md	historical snapshot
+specs/roadmap/archive/pass-0.19.52_RU.md	historical snapshot
+specs/roadmap/archive/pass-0.19.53.md	historical snapshot
+specs/roadmap/archive/pass-0.19.53_RU.md	historical snapshot
+specs/roadmap/archive/pass-0.19.54.md	historical snapshot
+specs/roadmap/archive/pass-0.19.54_RU.md	historical snapshot
+specs/roadmap/blueprint-exchange-research.md	design record
+specs/roadmap/blueprint-exchange-research_RU.md	design record
+specs/roadmap/blueprint-format-history-206.md	historical snapshot
+specs/roadmap/blueprint-format-history-206_RU.md	historical snapshot
+specs/roadmap/blueprint-format.md	current
+specs/roadmap/blueprint-format_RU.md	current
+specs/roadmap/blueprint-render-performance.md	design record
+specs/roadmap/blueprint-render-performance_RU.md	design record
+specs/roadmap/blueprint-signs.md	design record
+specs/roadmap/blueprint-signs_RU.md	design record
+specs/roadmap/blueprint-support-frames.md	design record
+specs/roadmap/blueprint-support-frames_RU.md	design record
+specs/roadmap/current-pass.md	historical snapshot
+specs/roadmap/current-pass_RU.md	historical snapshot
+specs/roadmap/editor-input-revision.md	design record
+specs/roadmap/editor-input-revision_RU.md	design record
+specs/roadmap/editor-visibility-proposal.md	design record
+specs/roadmap/editor-visibility-proposal_RU.md	design record
+specs/roadmap/external-corpus-2026-10-07.md	design record
+specs/roadmap/external-corpus-2026-10-07_RU.md	design record
+specs/roadmap/missing-copy-alignment.md	design record
+specs/roadmap/snap-art-and-hud-proposal.md	design record
+specs/roadmap/snap-art-and-hud-proposal_RU.md	design record
+specs/roadmap/storage-placement.md	design record
+specs/roadmap/testing-history.md	historical snapshot
+specs/roadmap/testing-history_RU.md	historical snapshot
+specs/spec-hammer-blueprint-library.md	design record
+specs/spec-pattern-recipes.md	design record
+specs/spec-pattern-recipes_RU.md	design record
+tools/BuildWorks.UiWorkbench/Assets/TextMesh Pro/Fonts/LiberationSans - OFL.txt	unchanged license/config
+tools/BuildWorks.UiWorkbench/Assets/TextMesh Pro/Resources/LineBreaking Following Characters.txt	unchanged license/config
+tools/BuildWorks.UiWorkbench/Assets/TextMesh Pro/Resources/LineBreaking Leading Characters.txt	unchanged license/config
+tools/BuildWorks.UiWorkbench/Assets/TextMesh Pro/Sprites/EmojiOne Attribution.txt	unchanged license/config
+tools/BuildWorks.UiWorkbench/ProjectSettings/ProjectVersion.txt	unchanged license/config
+tools/BuildWorks.UiWorkbench/README.md	current

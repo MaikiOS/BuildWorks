@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](../CURRENT_STATUS.md).
+
 # QA save isolation: checkpoints 0.19.90–0.19.93
 
 **English** | [Русский](qa-save-isolation-0.19.90_RU.md)

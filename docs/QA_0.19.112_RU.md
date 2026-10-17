@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Исторический снимок: версии, галочки, «установлено/следом» и ручные команды ниже относятся к исходному этапу. [Текущее состояние и очередь](CURRENT_STATUS_RU.md).
+
 # Проверка .112 — одна стена
 
 Готовый файл: `tests/fixtures/single-part/11-single-part.blueprint`, имя

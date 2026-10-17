@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](../../docs/CURRENT_STATUS.md).
+
 # BuildWorks historical test scenarios
 
 Frozen scenarios before 0.19.45, not a current answer list.

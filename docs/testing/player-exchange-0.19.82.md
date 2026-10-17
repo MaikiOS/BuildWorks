@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](../CURRENT_STATUS.md).
+
 # Exchange path acceptance — 0.19.82
 
 Owner-facing instructions: [Russian, with literal file names and Russian explanations](player-exchange-0.19.82_RU.md).

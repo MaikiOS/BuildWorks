@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 ## 2026-10-14 — .184 installed: server panel and insertion provenance
 
 Immutable editor provenance now travels through insertion/Undo/Redo and explicit Save/Save As/Update. Stable union deduplicates exact records; same-key conflict and16-origin overflow refuse before mutating parts. Explicit empty lists clear cancelled insertion history, legacy null callers preserve it; failed update restores previous references and bytes.

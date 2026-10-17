@@ -1,8 +1,11 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Исторический снимок: версии, галочки, «установлено/следом» и ручные команды ниже относятся к исходному этапу. [Текущее состояние и очередь](CURRENT_STATUS_RU.md).
+
 # .181 — категория до импорта
 
 Проверять, когда удобно, после установки .181 через обычный QA-профиль
 TerrainRamp-1.0-Test → Modded. Каталог не заполняется автоматически.
-[Все исходники для выбранных тобой импортов](<C:/Users/nfspr/AppData/Roaming/Thunderstore Mod Manager/DataFolder/Valheim/profiles/Default/BuildWorks/artifacts/Blueprints-for-import>).
+Все исходники для выбранных тобой импортов — `artifacts/Blueprints-for-import` (локально, не поставляется).
 Можно использовать свои файлы. Готовый небольшой пример двух чертежей:
 `BuildWorks-tests/34-two-categories.zip` в этой папке.
 

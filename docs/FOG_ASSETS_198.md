@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # First v11 asset port, QA .198
 
 2026-10-16. Added an explicit owned bundle loader, reproducible Unity6000.0.61f1/DX11 build and QA-only compatibility probe. Four source files match the approved v11 snapshot. Bundle49591B contains exactly two original shaders and one compute, no game models/textures or external dependencies. Bundle SHA FA9133955263DAE16A8BB51B3D0CE10C8FBB70F35ECF43A0A49AFBCAD2D3484F.

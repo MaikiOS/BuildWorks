@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](../CURRENT_STATUS.md).
+
 # Prepared player checks — 0.19.81
 
 [Detailed Russian steps](player-exchange-0.19.81_RU.md) are the owner-facing test instructions.

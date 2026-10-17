@@ -1,9 +1,12 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](../../../docs/CURRENT_STATUS.md).
+
 # BuildWorks mesh corners and view depth game checks
 
-**English** | [Русский](current-pass_RU.md)
+**English** | [Русский](../current-pass_RU.md)
 
 Test **0.19.51**, only in **TerrainRamp-1.0-Test**.
-Reply only to **1–6 below**. The .50 series is [archived](archive/pass-0.19.50.md).
+Reply only to **1–6 below**. The .50 series is [archived](pass-0.19.50.md).
 The owner accepted sizing, selected pivot artwork, transforms, optional B and
 localization in .50. This pass rechecks mesh corners, magnetic capture and depth.
 Automated checks do not constitute Valheim acceptance.

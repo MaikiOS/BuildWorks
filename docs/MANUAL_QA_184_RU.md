@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Исторический снимок: версии, галочки, «установлено/следом» и ручные команды ниже относятся к исходному этапу. [Текущее состояние и очередь](CURRENT_STATUS_RU.md).
+
 # Ручная очередь .184 — серверная библиотека и сохранность копий
 
 [English](MANUAL_QA_184.md) | **Русский**
@@ -10,9 +13,9 @@
 
 ## Исходник
 
-[Batch-183](<C:/Users/nfspr/AppData/Roaming/Thunderstore Mod Manager/DataFolder/Valheim/profiles/Default/BuildWorks/artifacts/Blueprints-for-import/BuildWorks-tests/Batch-183>): `01-floor.blueprint` → BW183 Floor, одна деревянная деталь. Импортируй только его, открой в редакторе → «Сохранить как…» → имя `QA184 Floor` → подтвердить сохранение. Если такая собственная карточка уже есть, используй её; новые копии без необходимости не нужны.
+Batch-183 — `artifacts/Blueprints-for-import/BuildWorks-tests/Batch-183` (локально, не поставляется): `01-floor.blueprint` → BW183 Floor, одна деревянная деталь. Импортируй только его, открой в редакторе → «Сохранить как…» → имя `QA184 Floor` → подтвердить сохранение. Если такая собственная карточка уже есть, используй её; новые копии без необходимости не нужны.
 
-[Другие исходные библиотеки](<C:/Users/nfspr/AppData/Roaming/Thunderstore Mod Manager/DataFolder/Valheim/profiles/Default/BuildWorks/artifacts/Blueprints-for-import>). Они сами в каталог не добавляются.
+Другие исходные библиотеки — `artifacts/Blueprints-for-import` (локально, не поставляется). Они сами в каталог не добавляются.
 
 ## 1. Публикация и отмена
 
@@ -56,4 +59,4 @@
 
 Объединение происхождения вставок, Undo/Redo/Save/Save As, конфликт и лимит16 проверены автоматически на реальном контроллере и файлах. Не создавай вручную16 серверных записей ради повторения CPU-отказов.
 
-[Личные автофайлы для передачи](<C:/Users/nfspr/AppData/Roaming/Thunderstore Mod Manager/DataFolder/Valheim/profiles/TerrainRamp-1.0-Test/BepInEx/config/BuildWorks/share>). [Серверные файлы](<C:/Users/nfspr/AppData/Roaming/Thunderstore Mod Manager/DataFolder/Valheim/profiles/TerrainRamp-1.0-Test/BepInEx/config/BuildWorks/server>) разделяются по UID мира. Не редактируй ZIP/ACL вручную: это не пользовательский способ назначения прав.
+Личные автофайлы для передачи — `share` (локально, не поставляется). Серверные файлы — `server` (локально, не поставляется) разделяются по UID мира. Не редактируй ZIP/ACL вручную: это не пользовательский способ назначения прав.

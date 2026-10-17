@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # Live .161 evidence and diagnostic .162 — 2026-10-12
 
 QA .162 deployed only to TerrainRamp-1.0-Test. Full construction, world snap,

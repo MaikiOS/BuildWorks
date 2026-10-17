@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # .187 — one-shot native storage save/reload QA
 
 QA-only BuildWorksTestStorage is created by an explicit BuildWorksQaControl call. It never starts automatically. The normal assembly contains neither the component nor its receipt parser. No new runtime service or production construction bypass is introduced.

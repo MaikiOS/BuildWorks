@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](../CURRENT_STATUS.md).
+
 # QA package 0.19.93–0.19.97: startup/respawn/primary-slot corrections, native stand pending
 
 ## QA .100 — automated checks passed; native acceptance remains open
@@ -86,7 +89,7 @@ Blueprint construction still uses the existing survival resource/placement path.
 After owner authorization only, from Default/BuildWorks in PowerShell7:
 
 ```powershell
-./scripts/Deploy-TestBuild.ps1 -TargetProfile TerrainRamp-1.0-Test -QaStandToken 43d3719a7ee649d184e26ef1daa441a3
+./scripts/Deploy-TestBuild.ps1 -TargetProfile TerrainRamp-1.0-Test -QaStandToken <existing-token>
 ```
 
 Authorized guarded .93 deployment and the .94 correction have run against the live profile.
@@ -98,7 +101,7 @@ also refuses. Cleanup/library additions are forbidden in QA mode. External files
 and outside Git/releases; [provenance and conditions](external-path-2026-10-07.md).
 
 Planned world/character name: **BW_QA_43d3719a**. Native Valheim assigns fresh actual IDs.
-Save root: `TerrainRamp-1.0-Test/BepInEx/config/BuildWorks/qa-saves/43d3719a7ee649d184e26ef1daa441a3`.
+Save root: `TerrainRamp-1.0-Test/BepInEx/config/BuildWorks/qa-saves/<existing-token>`.
 Authorization for this isolated QA launch/save creation is already given. Launch ONLY with
 Thunderstore profile TerrainRamp-1.0-Test, button Modded; never direct Steam/game arguments.
 Native UI control is unavailable here; the user clicks, then fresh logs/receipts are inspected.

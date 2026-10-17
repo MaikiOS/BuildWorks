@@ -1,3 +1,6 @@
+<!-- docs-role: design record; reviewed 2026-10-17 -->
+> Design/specification record: requirements below are not blanket implementation or acceptance claims. [Current state and queue](../../docs/CURRENT_STATUS.md).
+
 # Additional external corpus and format boundaries — 2026-10-07
 
 **English** | [Русский](external-corpus-2026-10-07_RU.md)

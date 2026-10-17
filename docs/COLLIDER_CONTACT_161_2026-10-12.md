@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # .161 — collider contact source candidate; runtime pending
 
 **English** | [Русский](COLLIDER_CONTACT_161_2026-10-12_RU.md)

@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # E08 — hierarchy-preserving outliner filters
 
 2026-10-09. Source and automated evidence only; not deployed. QA0.19.116

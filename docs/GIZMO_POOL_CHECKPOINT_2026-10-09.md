@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # Gizmo anchor renderer pool — source0.19.119
 
 Source only; installed isolated QA0.19.117 pair remains unchanged. No deployment,

@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # Limited native batch exchange check, QA .197
 
 2026-10-16. Actual Valheim, Thunderstore TerrainRamp-1.0-Test → Modded, existing BW_QA_43d3719a character/world. Installed QA0.19.197.0 remains unchanged; SHA32780B01…6882F3. No gameplay source or DLL changes.

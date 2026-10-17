@@ -1,28 +1,16 @@
-# Publish checklist — BuildWorks 0.19.37 alpha source
+# Binary release gates
 
-**English** | [Русский](PUBLISH_CHECKLIST_RU.md)
+[Русский](PUBLISH_CHECKLIST_RU.md) · [Source/QA/public versions](docs/CURRENT_STATUS.md)
 
-## Ready locally
+A source checkpoint push is not a binary release. Do not inherit old release checkboxes or publish automatically.
 
-- [x] English-first README, feature guide, controls, architecture, localization guide, and public roadmap;
-- [x] complete Russian counterparts;
-- [x] proprietary/source-available license and contribution rules;
-- [x] clean source, tests, scripts, and Workbench copy without game DLLs or user data;
-- [x] Release build: 0 warnings, 0 errors;
-- [x] localization: 596/596 keys and embedded-resource verification;
-- [x] Geometry 104, Store, EditorBridge 3, WorldLayout 10, HostContract, Unity Workbench 81/81;
-- [x] Git remote points to `https://github.com/MaikiOS/BuildWorks.git`;
-- [x] release changes are grouped into one verified checkpoint commit.
+- [ ] Identify the exact candidate commit, matching DLL pair, host compatibility and supported feature scope.
+- [ ] Run affected build/localization/geometry/store/host checks; UI/fog checks when changed. Record inherited failures separately.
+- [ ] Deploy through the guarded authorized QA path while Valheim is closed; verify hashes and protected data.
+- [ ] Pass the applicable native visual/input/construction/cancel/resource/reload cases in supported languages/resolutions.
+- [ ] Complete host+remote/reconnect/restart/permissions checks for features advertised as network-ready.
+- [ ] Document unsupported formats/state, missing models, limits and outstanding work. Do not advertise a lab renderer as a persistent house.
+- [ ] Verify package provenance/license, own assets only, no game DLLs/saves/tokens/logs or test authority bypasses.
+- [ ] Obtain explicit owner approval for this binary release, then create versioned notes/manifests/hashes from the accepted pair.
 
-## Before publishing 0.19.37
-
-- [x] install only in `TerrainRamp-1.0-Test` after explicit owner approval and while Valheim is closed;
-- [x] complete the English in-game UI smoke;
-- [ ] complete the Russian in-game UI smoke;
-- [x] accept the reported slanted-piece Q/E positioning in-game;
-- [ ] verify the persistent footer, 2 m target preview, unchanged 0.55 m snap threshold, then the pending roof/furniture, Q/E-below-grid, and fresh-Array smoke tests;
-- [x] generate a 0.19.37 binary ZIP from the accepted DLL pair;
-- [ ] update screenshots if the in-game language layout differs from the Workbench;
-- [x] receive explicit owner authorization to commit, push, and create the prerelease.
-
-The 0.19.33 ZIP and manifests are retained as historical alpha artifacts. They are not a 0.19.37 release. The 0.19.34 source report is retained as the rejected dotted-token baseline; 0.19.35 records the accepted English-localization fix.
+Current .206 is installed QA, not a public package; unfinished house/board and full module acceptance remain open. Historical [.37 checklist](docs/PUBLISH_CHECKLIST_0.19.37.md) and published alpha assets retain their original scope. [LICENSE](LICENSE) is unchanged.

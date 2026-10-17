@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # One-wall v11 renderer, QA .200
 
 2026-10-16. Added bounded source baking, submesh-preserving contact subdivision, renderer-only visual ownership and an explicit QA-only native probe. Original approved source/archive remains frozen; ported shader formulas are unchanged except origin-relative coordinates/explicit camera position. Own bundle49,871B contains exactly3 shader/compute assets, no game assets; SHA63AD7F430310C20A5BF4056661405CA081BAB3B89594254684FC5F5F904C935F.

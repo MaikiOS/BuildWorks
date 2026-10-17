@@ -1,10 +1,13 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](../../../docs/CURRENT_STATUS.md).
+
 # BuildWorks ordinary helpers and experimental corner game checks
 
-**English** | [Русский](current-pass_RU.md)
+**English** | [Русский](../current-pass_RU.md)
 
 Test **0.19.52**, only in **TerrainRamp-1.0-Test**.
 Reply only to **1–3 below**. The .51 checks 3–6 are accepted: do not repeat the
-full magnet/native-filter/view-depth series. [The .51 list](archive/pass-0.19.51.md)
+full magnet/native-filter/view-depth series. [The .51 list](pass-0.19.51.md)
 is an archive, not additional questions. Automated tests do not prove real prefab
 behavior in Valheim.
 

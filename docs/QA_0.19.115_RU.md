@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Исторический снимок: версии, галочки, «установлено/следом» и ручные команды ниже относятся к исходному этапу. [Текущее состояние и очередь](CURRENT_STATUS_RU.md).
+
 # Проверка .115 — заменить отсутствующую деталь своими
 
 Файл: `tests/fixtures/replacement/14-replace-missing.buildworks.json`.

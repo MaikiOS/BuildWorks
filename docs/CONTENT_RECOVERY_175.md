@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # .175 — persistent target marker and explicit reconciled return
 
 2026-10-13. Recovery groundwork only; populated-container placement remains disabled.

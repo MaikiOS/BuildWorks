@@ -22,8 +22,8 @@ menus and dragging show their own hints instead. The Inspector keeps its height.
 | Action | Control |
 | --- | --- |
 | Catalog | Tab or Shift+A |
-| Select / Gizmo / Array / Contour | 1 / 2 / 3 / 4 (F9 also opens Gizmo) |
-| Temporary Move / Rotate / uniform Scale | G / R / S |
+| Select / Gizmo / Array / Contour | Ctrl+1 / Ctrl+2 / Ctrl+3 / Ctrl+4 (F9 also opens Gizmo) |
+| Temporary Move / Rotate / Scale | G / R / S |
 | Single tools menu / search | Space / F3 |
 | Undo / Redo | Ctrl+Z / Ctrl+Y |
 | Save | Ctrl+S |
@@ -108,3 +108,12 @@ cannot be picked. The collapsible footer keeps a highlighted next-action strip.
 | Cancel | Esc |
 
 F9, F10, Alt, N, HUD position, and UI scale can be changed in the BepInEx configuration.
+
+
+## Current editor additions
+
+[Status](CURRENT_STATUS.md) records the build and acceptance limits. Ctrl+Shift+S opens Save As. During G/S press X then Z for the XZ pair; R remains a single-axis rotation. Repeating the active axis changes coordinate frame; Shift+axis excludes it for a movement plane. Component scale is1–1000%, with numeric tool fields. Shift removes step quantization for the active transform; use numeric fields for exact values.
+
+A short MMB click without motion deletes the hovered unlocked piece in selection/placement; dragging MMB orbits the camera. Delete during placement removes the hovered piece; outside placement it removes selected pieces. These are distinct states.
+
+Viewport pointer wrapping exists, but focus/windows and some edges still need regression acceptance. Interior camera is available through Camera; use contextual hints. It does not grant admin permissions.

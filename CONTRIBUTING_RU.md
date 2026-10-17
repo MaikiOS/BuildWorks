@@ -6,7 +6,7 @@ BuildWorks — proprietary/source-available проект. Pull Request прив�
 
 ## Перед правкой
 
-1. Прочитайте [карту архитектуры](docs/ARCHITECTURE_RU.md) и [текущий статус альфы](docs/ALPHA_0.19.37_RU.md).
+1. Прочитайте [карту архитектуры](docs/ARCHITECTURE_RU.md) и [текущий статус альфы](docs/CURRENT_STATUS_RU.md).
 2. Перед изменением общего host-adapter или helper найдите всех его вызывающих.
 3. Не смешивайте стабильные ID, поля сохранения, ключи локализации и переведённые подписи.
 4. Сохраняйте native-проверки Valheim: размещение, ресурсы, права, владение и сеть.
@@ -18,7 +18,7 @@ BuildWorks — proprietary/source-available проект. Pull Request прив�
 
 English — основной язык документации и обязательный fallback. Russian — полный runtime/documentation дубль. Каждый пользовательский ключ добавляется в оба TSV; переведённый текст нельзя сравнивать в логике. Подробности: [LOCALIZATION_RU.md](docs/LOCALIZATION_RU.md).
 
-## Обязательные автоматические проверки
+## Проверки затронутой ответственности
 
 Запускайте из корня репозитория и указывайте, что реально проверено, а что не проверялось в Valheim.
 
@@ -46,3 +46,5 @@ dotnet run --project .\tests\BuildWorks.StoreTests\BuildWorks.StoreTests.csproj 
 - Опишите причину, затронутую ответственность, тесты, непроверенные runtime-границы и влияние на миграцию.
 
 Отправляя вклад, вы соглашаетесь с разделом `Contributions` файла [LICENSE](LICENSE).
+
+Список выше — доступные проверки, не команда запускать все на любой diff. Для документации проверяются ссылки/факты/разделение истории; для кода — build/localization и целевые проверки затронутого блока. UI требует Workbench; fog — соответствующий Test-FogSimulation; QA — control/isolation; сохранение/права требуют native reload/host+remote. Сборка не является игровой приёмкой.

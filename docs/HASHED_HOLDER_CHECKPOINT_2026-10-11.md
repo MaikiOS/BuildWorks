@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # .155 — source-bound holder Info and typed numeric item IDs
 
 Code **db9e508**, normal/QA .155. **Not installed:** QA remains .146.

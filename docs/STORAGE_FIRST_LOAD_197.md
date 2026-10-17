@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # .197 — exact first-load player inventory comparison
 
 Verified 2026-10-16 on Valheim Build25909357. v5 WAL retains bounded immutable

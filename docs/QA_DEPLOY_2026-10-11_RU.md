@@ -1,9 +1,12 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Исторический снимок: версии, галочки, «установлено/следом» и ручные команды ниже относятся к исходному этапу. [Текущее состояние и очередь](CURRENT_STATUS_RU.md).
+
 # Установлена QA .157 — игровая приёмка впереди
 
 2026-10-11 Ostrix штатно вышел из Valheim. Агент отдельно подтвердил отсутствие
 valheim/valheim_server, выполнил Deploy-TestBuild -WhatIf и установил готовую
 QA .157 только через scripts/Deploy-TestBuild.ps1 в TerrainRamp-1.0-Test с прежним
-QaStandToken43d3719a7ee649d184e26ef1daa441a3. Нормальный профиль не изменялся.
+QaStandToken<existing-token>. Нормальный профиль не изменялся.
 
 | Проверено после установки | Результат |
 | --- | --- |

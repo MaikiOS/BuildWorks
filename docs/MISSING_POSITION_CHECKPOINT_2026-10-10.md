@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 ## 2026-10-10 — QA0.19.135: positioning and scale boundaries
 
 Code ba977c4. Separate Align action retains the missing record/marker. Recorded

@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # Fog v11 color contract: .201
 
 2026-10-16. The pale .200 wall was reproduced with a Gamma-built shader bundle in a Linear/HDR/Deferred host. The bundle build now explicitly targets Linear; all four runtime shader/compute sources and the approved v11 archive remain unchanged.

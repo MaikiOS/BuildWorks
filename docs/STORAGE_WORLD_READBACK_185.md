@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # .185 WIP — bounded saved-storage readback
 
 QA0.19.185.0 is installed in TerrainRamp-1.0-Test after automated checks. Both deployed hashes match and111 existing config/save files are unchanged; the catalogue/imports remain empty. The185 core is not connected to placement; no in-game acceptance of185 is claimed. Existing manual184/Batch-183 checks remain applicable.

@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Исторический снимок: версии, галочки, «установлено/следом» и ручные команды ниже относятся к исходному этапу. [Текущее состояние и очередь](CURRENT_STATUS_RU.md).
+
 ## 2026-10-14 — .187 установлена: готов полный native QA-сценарий сохранения
 
 Одноразовый оплаченный native сундук, перенос2 собственных Wood, парное сохранение .186 и read-only сверка после настоящего logout/enter. Квитанция с Flush предшествует изменению; F12/фокус/контекст/срок прекращают продолжение. Проверяется отсутствие активного редактора/precision, чтобы чужой scale/material не попал в стенд. В обычной DLL тестового механизма нет. Выдача/повтор/возврат/settlement не добавлены.
@@ -24,7 +27,7 @@ normal/QA0/0, Host187/localization1100,18 receipt cases/изоляция, input4
 
 # BuildWorks — живой список работ
 
-Обновлено:2026-10-14. Установлена QA **0.19.184** в **TerrainRamp-1.0-Test**. Каталог пустой; чертежи выбираешь и импортируешь ты. [Папка исходников](<C:/Users/nfspr/AppData/Roaming/Thunderstore Mod Manager/DataFolder/Valheim/profiles/Default/BuildWorks/artifacts/Blueprints-for-import>), [групповой набор Batch-183](<C:/Users/nfspr/AppData/Roaming/Thunderstore Mod Manager/DataFolder/Valheim/profiles/Default/BuildWorks/artifacts/Blueprints-for-import/BuildWorks-tests/Batch-183>), [ручная очередь .184](MANUAL_QA_184_RU.md).
+Обновлено:2026-10-14. Установлена QA **0.19.184** в **TerrainRamp-1.0-Test**. Каталог пустой; чертежи выбираешь и импортируешь ты. Папка исходников — `artifacts/Blueprints-for-import` (локально, не поставляется), групповой набор Batch-183 — `artifacts/Blueprints-for-import/BuildWorks-tests/Batch-183` (локально, не поставляется), [ручная очередь .184](MANUAL_QA_184_RU.md).
 
 ## Сейчас
 

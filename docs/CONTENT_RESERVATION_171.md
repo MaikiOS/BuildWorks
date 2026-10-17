@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # Shared contents reservation — .171 sources, 2026-10-13
 
 The existing Supply now owns an immutable list of exact ItemData references, quantities and one-unit provided-property snapshots. Mounts keep their existing Item/Contents appearance and reserve one unit. Containers reserve decoded prefab/Stack only, carry no mounted appearance, preserve separate own stacks and commit aggregate counts only after full selection succeeds. Recorded cell/max-stack limits are conservative preflight; actual prefab grid, quest/equip and ownership checks remain transfer work.

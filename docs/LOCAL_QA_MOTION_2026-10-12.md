@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # Local camera/walk and TEST24 — 2026-10-12
 
 Installed QA0.19.165 was unchanged. Native console submission, ghost/god on and

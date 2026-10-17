@@ -6,7 +6,7 @@ BuildWorks is proprietary/source-available software. Pull requests are welcome, 
 
 ## Before editing
 
-1. Read [the architecture map](docs/ARCHITECTURE.md) and the [current alpha status](docs/ALPHA_0.19.37.md).
+1. Read [the architecture map](docs/ARCHITECTURE.md) and the [current alpha status](docs/CURRENT_STATUS.md).
 2. Search every caller before changing a shared host adapter or helper.
 3. Keep stable IDs, serialized field names, localization keys, and translated labels separate.
 4. Preserve native Valheim placement, resource, permission, ownership, and networking checks.
@@ -18,7 +18,7 @@ The lower-case fields in `CompositeBlueprintStore` are an existing JSON schema. 
 
 English is the fallback and primary documentation language. Russian is a complete runtime/documentation duplicate. Add every player-facing key to both TSV catalogs and never compare translated text in logic. Follow [LOCALIZATION.md](docs/LOCALIZATION.md).
 
-## Required automated checks
+## Verification by affected responsibility
 
 Run from the repository root. Report exactly which checks ran and which Valheim scenarios did not.
 
@@ -46,3 +46,5 @@ The last command launches the isolated Unity Workbench, not Valheim. No automate
 - Include the reason, affected responsibility, tests, runtime gaps, and migration impact.
 
 By submitting a contribution, you accept the `Contributions` section of [LICENSE](LICENSE).
+
+The commands above are available gates, not a requirement to run every suite for every edit. Documentation needs link/fact/history checks; code needs build/localization and affected targeted suites. UI needs Workbench; fog needs the applicable Test-FogSimulation mode; QA needs control/isolation; persistence/rights need native reload/host+remote. A build is not game acceptance.

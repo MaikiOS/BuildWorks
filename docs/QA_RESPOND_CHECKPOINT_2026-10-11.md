@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 **Current2026-10-11:** QA .157 installed after normal game exit; both DLLs/155 existing config/import/save files verified, Default clean. No agent game launch or new native acceptance. [Deployment and next steps](QA_DEPLOY_2026-10-11.md). Earlier source/native observations below remain historical.
 
 # .156 — QA replies after the selected UI object is destroyed

@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # Manual .180 queue — chosen imports into a clean catalog
 
 When convenient, launch through Thunderstore → TerrainRamp-1.0-Test → Modded.

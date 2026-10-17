@@ -1,24 +1,7 @@
-# BuildWorks execution queue
+# BuildWorks plans and specifications
 
-**English** | [Русский](../../docs/ROADMAP_RU.md)
+The active forward queue is [ROADMAP](../../docs/ROADMAP.md) ([Русский](../../docs/ROADMAP_RU.md)); facts and acceptance are in [current status](../../docs/CURRENT_STATUS.md). The latest owner priority is v11 on a whole house, then persistent project/board.
 
-The authoritative sequence/status is [the roadmap](../../docs/ROADMAP.md).
-Active work: [BW-01 points](current-pass.md). Do not keep another status table here.
+[Current format contract](blueprint-format.md) · [Full scope](../../PROJECT_CONTRACT.md) · [Development journal](../../docs/DEVELOPMENT_JOURNAL.md)
 
-| Current ID | Reference material, not current status |
-| --- | --- |
-| BW-00 | Historical cards 03 and 08 |
-| BW-01 | Historical cards 01 and 02 |
-| BW-02 | Recipe contract and group document APIs |
-| BW-03 | Recipe contract and historical card 06 |
-| BW-04 | Construction guides and historical card 06; renewed discussion required |
-| BW-05 | Historical cards 04 and 05 |
-| BW-06 | Historical cards 07 and 09 |
-
-`taskcards/01`–`09` retain historical requirements/evidence, not the current work
-order. Old Store versions, profiles, STOP and BLOCKED do not override the roadmap.
-Archives retain original project-root link context.
-
-Every checkpoint records scope/invariant, commit, relevant commands, DLL hashes
-and owner gates. Commit/push only the verified step. Helpers do not authorize
-game or save mutation.
+Other specs are design/requirement records, not blanket implementation evidence. `current-pass.md` is the retained historical .56 catalog series; it is not today's pending manual queue. `archive/` and old task cards keep their original context. Select owner checks through the [live list](../../docs/LIVE_CHECKLIST_RU.md).

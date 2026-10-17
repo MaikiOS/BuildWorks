@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # Ordinary world snapping audit (.192)
 
 2026-10-15. Diagnostic only; no product fix or native acceptance claimed. The running Default-Compat-Test game, input and saves were untouched.

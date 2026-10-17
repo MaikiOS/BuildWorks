@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # .176 — canonical Local character inventory readback
 
 2026-10-13. QA **0.19.176** deployed to **TerrainRamp-1.0-Test**.

@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # .186 — paired Local character and world persistence evidence
 
 A completed exact item transfer can now request the current Local character save and exactly the next Local world generation, then append their verified evidence together to WAL4. This internal mechanism does not yet enable populated storage placement, settlement, refunds or remote acknowledgement.

@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 ## 2026-10-12 — .160 native: refusal measured, visible refund verified
 
 One TEST24 attempt built floor/wall2/4, then chest NoRayHits. A real floor hit

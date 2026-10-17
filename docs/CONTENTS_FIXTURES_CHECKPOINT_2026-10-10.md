@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # QA .144 — independent contents fixtures
 
 Installed only into TerrainRamp-1.0-Test; source9b40045. Evidence: `artifacts/checkpoint-0.19.144/{verification,installation}.json`. Both DLLs and new fixtures24/25 match SHA;137 existing config/import/save files unchanged, Default clean. Valheim was not launched and saves were not written.

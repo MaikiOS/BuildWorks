@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # Compact local v11 fields — .204
 
 2026-10-16. Optional grid dimensions in BlueprintFogSimulation use the same dimensions for all ten half-float fields and dispatch. CompactGrid rounds to8×8×4 groups, preserves approved physical voxel spacing (at most0.075/0.06375/0.0675m), caps each axis256 and total614400 cells, and rejects invalid/coarse grids before allocation. A separate local compute keyword supplies dynamic resolution; default explicitly disables it and retains the approved static96×80×80 path. The owner pool sums actual field allocations.

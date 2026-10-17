@@ -1,3 +1,6 @@
+<!-- docs-role: design record; reviewed 2026-10-17 -->
+> Design/specification record: requirements below are not blanket implementation or acceptance claims. [Current state and queue](../../docs/CURRENT_STATUS.md).
+
 # Survival storage placement — implementation contract
 
 Status: shared reservation .171, local native transfer .172, write-ahead evidence .173 same-session inverse return .174 and marker-bound explicit recovery .175 and canonical Local inventory readback .176 implemented in sources, 2026-10-13. Installed QA .176 still

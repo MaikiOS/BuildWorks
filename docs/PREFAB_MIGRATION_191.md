@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # .191: explicit legacy roof migration
 
 File and batch import review can replace the exact native `wood_wall_roof`→`wood_wall_roof_a` pair. Current developer labels, prototype geometry/material/collider/LOD data and a positive native target recipe gate the rule; unsupported source state is not guessed. IDs/counts appear before confirmation and the native gate is rechecked before writing. Existing own blueprints are not silently rewritten.

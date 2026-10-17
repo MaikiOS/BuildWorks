@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # Local-model UI .167 — offline, 2026-10-12
 
 The [12 whole scenarios](LOCAL_QA_FULL_SCENARIOS.md) are prepared. This checkpoint

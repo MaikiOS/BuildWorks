@@ -21,3 +21,5 @@ TSV values support `\n`, `\t`, and `\\`. Keys are case-sensitive. Duplicate keys
 `CompositeBlueprintStore` stays independent from Unity localization. It returns `$buildworks_...` error keys, and UI boundaries resolve them with `BuildWorksLocalization.ResolveUserText`. The legacy persisted category `ПРОЧЕЕ` is migrated to stable ID `OTHER` when loaded.
 
 The check verifies matching catalogs, stable key syntax, placeholder parity, statically referenced keys, absence of embedded Cyrillic UI literals, and both embedded TSV resources in the built DLL. The isolated Unity Workbench copies `English.tsv` and uses an English-only test adapter; production language registration remains exclusively in `BuildWorksLocalization.cs`.
+
+The .206 check covers 1104 matching EN/RU keys and embedded resources; this count is checkpoint evidence, not a fixed schema. See [current status](CURRENT_STATUS.md).

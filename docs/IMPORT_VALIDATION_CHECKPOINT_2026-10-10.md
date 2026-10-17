@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # .132 — reuse unchanged foreign parsing within import validation
 
 Code checkpoint `4e9b34e`; diagnostic checkpoint `b9e6312`. QA 0.19.132 is installed

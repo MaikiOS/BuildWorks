@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # .192 — sign text in previews
 
 Saved text previously reached the placed native Sign but was absent from editor, thumbnail and ghost visuals because the renderer-only clone omitted the TMP widget. BlueprintSignPreview now bakes owned glyph meshes from the native widget's font/material/layout and nested transforms. No Sign, ZNetView or Canvas is cloned into the final preview; no SetText/ZDO operation runs.

@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # .153 — initial missing-part review in the existing worker
 
 Normal/QA sources .153; installed QA remains .146. No Valheim, Unity, native

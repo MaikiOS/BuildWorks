@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # Independent fog channels: .202
 
 2026-10-16. A bounded two-owner transport pool is the next foundation for v11 on an unfinished house. This is not multiple-piece rendering, whole-house contact admission or the project board.

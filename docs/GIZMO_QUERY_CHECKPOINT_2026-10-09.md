@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # Anchor projection and visibility work — source 0.19.121
 
 Installed QA remains 0.19.117. No deployment, Valheim launch, saves or multiplayer

@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # .173 — write-ahead transfer evidence (source only)
 
 QA .173 was deployed later on2026-10-13 with verified version/two hashes and158 unchanged config files; see [manual .173](MANUAL_QA_173_RU.md). Populated placement is still blocked; the journal is connected to the .172 local primitive, which world placement does not call yet.

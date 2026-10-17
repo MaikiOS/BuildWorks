@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Исторический снимок: версии, галочки, «установлено/следом» и ручные команды ниже относятся к исходному этапу. [Текущее состояние и очередь](CURRENT_STATUS_RU.md).
+
 # Рендер одной стены v11: .200
 
 2026-10-16. Добавлены `BlueprintFogSource`, `BlueprintFogContactMesh`, `BlueprintFogVisual` и QA-only пробник `BuildWorksTestFog`. Визуал использует renderer-only копию доступного prefab, его исходные меши/UV/текстуры и локальные метры. Collider/Piece/ZNetView в копию не переносятся. Стоимость, стройка, предметы, сохранение и сеть этим визуалом не управляются.

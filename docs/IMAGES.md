@@ -1,3 +1,5 @@
+> Provenance/reference snapshot. Dates and checks below refer to those original inputs, not a new 2026-10-17 network retrieval. [Current status](CURRENT_STATUS.md). Local artifacts are not shipped.
+
 # Images
 
 **English** | [Русский](IMAGES_RU.md)

@@ -1,3 +1,6 @@
+<!-- docs-role: design record; reviewed 2026-10-17 -->
+> Design/specification record: requirements below are not blanket implementation or acceptance claims. [Current state and queue](../../docs/CURRENT_STATUS.md).
+
 # Blueprint signs — source checkpoint 0.19.58
 
 **English** | [Русский](blueprint-signs_RU.md)

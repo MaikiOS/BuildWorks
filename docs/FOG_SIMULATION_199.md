@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # Runtime v11 simulation (.199)
 
 2026-10-16. `BlueprintFogSimulation` ports all seven v11 compute stages into an owned, disposable runtime instance with bounded local coordinates/fixed-step catch-up. Borrowed shape/pigment/noise remain caller-owned. No gameplay/startup/payment/save/network callers exist yet.

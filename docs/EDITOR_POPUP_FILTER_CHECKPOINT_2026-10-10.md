@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # .131 — tools popup and compact outliner filters
 
 Source0.19.131, local checkpoint `279d265`. Not deployed; QA0.19.117 remains

@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # Large snap sets — measurement before changing limits
 
 Source0.19.118; installed QA0.19.117 remains unchanged (both hashes checked).

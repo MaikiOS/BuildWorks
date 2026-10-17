@@ -1,9 +1,12 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](../../../docs/CURRENT_STATUS.md).
+
 # BuildWorks exact chair corner game checks
 
-**English** | [Русский](current-pass_RU.md)
+**English** | [Русский](../current-pass_RU.md)
 
 Test **0.19.53**, only in **TerrainRamp-1.0-Test**. Reply only to **1–2 below**.
-The accepted .52 checks 1–2 are not repeated; [the old list](archive/pass-0.19.52.md)
+The accepted .52 checks 1–2 are not repeated; [the old list](pass-0.19.52.md)
 is an archive. This revision uses exact mesh geometry in the editor by disabling
 decorative native Piece vertex noise on preview materials only. Textures remain;
 world pieces and their original materials are unchanged.

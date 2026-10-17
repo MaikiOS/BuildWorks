@@ -1,9 +1,12 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](../../../docs/CURRENT_STATUS.md).
+
 # BuildWorks point and gizmo game tests
 
-**English** | [Русский](current-pass_RU.md)
+**English** | [Русский](../current-pass_RU.md)
 
 Test **0.19.50**, only in **TerrainRamp-1.0-Test**. Reply to the numbered
-tests below, not the [archived .49 list](archive/pass-0.19.49.md).
+tests below, not the [archived .49 list](pass-0.19.49.md).
 Workbench checks pass; actual Valheim readability and physical input remain unverified.
 First inspect **1–3**. If unreadable, send a screenshot before continuing.
 

@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # .147 — PlanBuild decimal commas, offline checkpoint
 
 Source `ca8c5f7`. Normal and QA0.19.147 built; installed QA remains0.19.146.

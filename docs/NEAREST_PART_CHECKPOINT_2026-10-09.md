@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Historical snapshot: versions, checkboxes, installed/next text and manual commands below apply to the original checkpoint. [Current state and queue](CURRENT_STATUS.md).
+
 # Exact nearest-part assignment — source 0.19.120
 
 Installed QA remains 0.19.117. No deployment, Valheim launch, world/save change or

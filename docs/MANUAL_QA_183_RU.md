@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Исторический снимок: версии, галочки, «установлено/следом» и ручные команды ниже относятся к исходному этапу. [Текущее состояние и очередь](CURRENT_STATUS_RU.md).
+
 # Ручная очередь .183 — групповой импорт и экспорт
 
 2026-10-16: Codex проверил ограниченный путь в Valheim .197: обзор/отмена, категории, экспорт с исключением, обратный импорт и logout/reentry. [Границы и доказательства](BATCH_NATIVE_197_RU.md). Повторять его без причины не нужно; несохранённый черновик/Undo, полный перезапуск процесса и весь мышиный ввод ещё не проверены. Тест добавил7 внешних карточек и одну явную личную копию Walls; итог14, это учтённые тестовые результаты.
@@ -6,14 +9,14 @@
 
 ## Где взять чертежи
 
-[Готовый небольшой набор Batch-183](<C:/Users/nfspr/AppData/Roaming/Thunderstore Mod Manager/DataFolder/Valheim/profiles/Default/BuildWorks/artifacts/Blueprints-for-import/BuildWorks-tests/Batch-183>) содержит:
+Готовый небольшой набор Batch-183 — `artifacts/Blueprints-for-import/BuildWorks-tests/Batch-183` (локально, не поставляется) содержит:
 
 - `01-floor.blueprint` → **BW183 Floor**, 1 деталь, категория BW183 FLOORS.
 - `02-walls.blueprint` → **BW183 Walls**, 2 детали, категория BW183 WALLS.
 - `03-two-documents.zip` → **BW183 ZIP Floor** и **BW183 ZIP Walls**, 1 и 2 детали.
 - `04-deliberately-invalid.blueprint` → намеренно повреждённый файл; ожидается явное предупреждение и пропуск.
 
-Это собственные технические примеры BuildWorks. [Другие внешние библиотеки](<C:/Users/nfspr/AppData/Roaming/Thunderstore Mod Manager/DataFolder/Valheim/profiles/Default/BuildWorks/artifacts/Blueprints-for-import>) — BiomeBlueprints-1.0.3, 2v2t-5.0.0 и Previous-imports; происхождение/условия сохранены рядом. Доступность файла не доказывает поддержку каждого его объекта.
+Это собственные технические примеры BuildWorks. Другие внешние библиотеки — `artifacts/Blueprints-for-import` (локально, не поставляется) — BiomeBlueprints-1.0.3, 2v2t-5.0.0 и Previous-imports; происхождение/условия сохранены рядом. Доступность файла не доказывает поддержку каждого его объекта.
 
 ## 1. Выбор группы и отмена до подтверждения
 
@@ -67,6 +70,6 @@
 
 ## Где хранятся результаты
 
-[Импортированные архивы](<C:/Users/nfspr/AppData/Roaming/Thunderstore Mod Manager/DataFolder/Valheim/profiles/TerrainRamp-1.0-Test/BepInEx/config/BuildWorks/imports>) — один новый архив на подтверждённую группу, с документами и точными исходниками. [Экспорт по умолчанию](<C:/Users/nfspr/AppData/Roaming/Thunderstore Mod Manager/DataFolder/Valheim/profiles/TerrainRamp-1.0-Test/BepInEx/config/BuildWorks/exports>). [Автофайлы собственных сохранённых чертежей](<C:/Users/nfspr/AppData/Roaming/Thunderstore Mod Manager/DataFolder/Valheim/profiles/TerrainRamp-1.0-Test/BepInEx/config/BuildWorks/share>). Импортированные карточки появляются в share после собственного сохранения/«Поделиться»; исходная внешняя библиотека сама туда не копируется.
+Импортированные архивы — `imports` (локально, не поставляется) — один новый архив на подтверждённую группу, с документами и точными исходниками. Экспорт по умолчанию — `exports` (локально, не поставляется). Автофайлы собственных сохранённых чертежей — `share` (локально, не поставляется). Импортированные карточки появляются в share после собственного сохранения/«Поделиться»; исходная внешняя библиотека сама туда не копируется.
 
 Отмена во время записи, отсутствие частичного ZIP, конфликт имени, изменение источника, общие лимиты и независимые настройки хранилищ/креплений проверены автоматически. Не повреждай свою библиотеку ради повторения этих отказов. Игровое строительство, предметы, тяжёлые дома и сеть остаются отдельными открытыми проверками полной цели.

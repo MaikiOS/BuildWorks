@@ -1,3 +1,6 @@
+<!-- docs-role: historical snapshot; reviewed 2026-10-17 -->
+> Исторический снимок: версии, галочки, «установлено/следом» и ручные команды ниже относятся к исходному этапу. [Текущее состояние и очередь](CURRENT_STATUS_RU.md).
+
 # .127 — legacy-надпись PlanBuild и семь отказов координат
 
 Исправлен отказ чтения надписи, которая начинается с кавычки, но не является
@@ -45,7 +48,7 @@ portable roundtrip с точным текстом источника и прив
 
 Архив не извлекался и не изменялся; SHA256:
 `4A6E6A53F246B5CF4C7EA9472F726D9F35687BCE978F28AB47A020AEE759DD88`.
-Авторство/условия: [локальный provenance](../artifacts/external-blueprints/2v2t-5.0.0/provenance.json).
+Авторство/условия: локальный provenance — `artifacts/external-blueprints/2v2t-5.0.0/provenance.json` (локально, не поставляется).
 Чужие файлы и модели не включены в Git или релиз.
 
 Автоматически: normal/QA0/0; полные StoreTests/корпус; HostContract Steam25185596;

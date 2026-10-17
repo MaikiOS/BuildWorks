@@ -67,7 +67,7 @@ public static class FogArenaPhysicsProbe
                 passed = true, gridX = 96, gridY = 80, gridZ = 80, owners = 2, ticks = 360,
                 fieldComparisons = fields, ledgerComparisons = ledgers, atlasComparisons = atlases,
                 committed = committed, rejected = rejected, metadataComparisons = metadataChecks,
-                metadataBeforeReceipt = true, metadataOnlyTested = true, fractionalVisualClock = true, borrowedOwnershipValidated = true, borrowedInvalidCases = 11,
+                metadataBeforeReceipt = true, metadataOnlyTested = true, fractionalVisualClock = true, borrowedOwnershipValidated = true, borrowedInvalidCases = 11, runtimeArenaValidated = true,
                 realSolver = true, stagedLedger = true, velocityAlias = true,
                 packingRollback = true, shortageRollback = true, callbackWaitsInFixture = true,
                 productionAllocatorTested = false, wholeHouseSupported = false, gameHostTested = false, gpuTimingsMeasured = false,
@@ -86,10 +86,9 @@ public static class FogArenaPhysicsProbe
         private readonly BlueprintFogAssets assets;
         private readonly BlueprintFogVisual source;
         private readonly FogSparseStorageProbe codec;
-        private readonly ComputeShader shader, metadataShader;
-        private readonly int initMetadata, publishMetadata;
-        private readonly Dictionary<string, int> kernels = new Dictionary<string, int>();
-        private readonly Dictionary<string, ComputeBuffer> buffers = new Dictionary<string, ComputeBuffer>();
+        private readonly BlueprintFogArena arena;
+        private readonly ComputeShader shader;
+        private readonly IReadOnlyDictionary<string, ComputeBuffer> buffers;
         private readonly BlueprintFogSimulation[] candidate = new BlueprintFogSimulation[Owners], reference = new BlueprintFogSimulation[Owners];
         private readonly RenderTexture[] reads = new RenderTexture[3], velocity = new RenderTexture[Owners];
         private readonly ComputeBuffer[][] ledger = new ComputeBuffer[Owners][];
@@ -116,40 +115,11 @@ public static class FogArenaPhysicsProbe
             this.capacity = capacity; this.body = body; this.codec = codec; this.assets = assets; this.source = source;
             try
             {
-                shader = UnityEngine.Object.Instantiate(AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Editor/FogSparseArenaProbe.compute"));
-                if (!shader) throw new InvalidOperationException("Arena compute missing.");
-                foreach (string name in new[] { "InitArena", "BeginStep", "StageLedger", "IndexFields", "ValidateCurrent", "ReserveBlocks", "ResolveBlocks", "PackFields", "CheckPacking", "CommitVelocity", "CommitLedger", "PublishFields", "CommitMaps", "FinishStep", "RestoreFields", "ReleaseCurrent", "ClearOwnerMaps" }) kernels.Add(name, shader.FindKernel(name));
-                Add("_Maps", Owners * 2 * MapWords, 4); Add("_Free", capacity, 4); Add("_Control", 16, 4); Add("_Receipts", Owners * 16, 4); Add("_Payload", capacity * 64, 8);
-                Add("_StageAway", 1024, 4); Add("_StagePeak", 1024, 4); Add("_StageState", 1, 4);
-                metadataShader = UnityEngine.Object.Instantiate(AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Editor/FogSnapshotMetadataProbe.compute"));
-                if (!metadataShader) throw new InvalidOperationException("Metadata compute missing.");
-                initMetadata = metadataShader.FindKernel("InitMetadata"); publishMetadata = metadataShader.FindKernel("PublishMetadata");
-                Add("_PublishedMetadata", Owners * 16, 4);
-                metadataShader.SetInt("_MetadataWords", Owners * 16);
-                metadataShader.SetBuffer(initMetadata, "_PublishedMetadata", buffers["_PublishedMetadata"]);
-                metadataShader.SetBuffer(publishMetadata, "_PublishedMetadata", buffers["_PublishedMetadata"]);
-                metadataShader.SetBuffer(publishMetadata, "_Control", buffers["_Control"]);
-                metadataShader.Dispatch(initMetadata, 1, 1, 1);
-                shader.SetInts("_Grid", 96, 80, 80); shader.SetInts("_Blocks", 24, 20, 20);
-                shader.SetInt("_Capacity", capacity); shader.SetInt("_MapWords", MapWords); shader.SetInt("_TotalMapWords", Owners * 2 * MapWords); shader.SetInt("_ReceiptWords", Owners * 16);
-                Bind("InitArena", "_Maps", "_Free", "_Control", "_Receipts"); Bind("BeginStep", "_Control");
-                Bind("StageLedger", "_StageAway", "_StagePeak", "_StageState"); Bind("CommitLedger", "_StageAway", "_StagePeak", "_StageState", "_Control");
-                Bind("IndexFields", "_Maps", "_Control"); Bind("ValidateCurrent", "_Maps", "_Control"); Bind("ReserveBlocks", "_Control");
-                Bind("ResolveBlocks", "_Maps", "_Free", "_Control"); Bind("PackFields", "_Maps", "_Control", "_Payload"); Bind("CheckPacking", "_Control");
-                Bind("CommitVelocity", "_Control"); Bind("PublishFields", "_Control"); Bind("CommitMaps", "_Maps", "_Free", "_Control"); Bind("FinishStep", "_Control", "_Receipts");
-                Bind("RestoreFields", "_Maps", "_Payload", "_Control");
-                Bind("ReleaseCurrent", "_Maps", "_Free", "_Control"); Bind("ClearOwnerMaps", "_Maps");
-                scratch = new BlueprintFogScratch(Grid, includeReadFields: true);
+                arena = new BlueprintFogArena(AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Editor/FogSparseArenaProbe.compute"),
+                    AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Editor/FogSnapshotMetadataProbe.compute"), Owners, capacity);
+                shader = arena.Program; buffers = arena.Buffers; scratch = arena.Scratch;
                 reads[0] = scratch.ReadColour; reads[1] = scratch.ReadOrigin; reads[2] = scratch.ReadSurface;
-                foreach (string name in new[] { "IndexFields", "PackFields", "PublishFields" })
-                {
-                    shader.SetTexture(kernels[name], "_ColourIn", reads[0]); shader.SetTexture(kernels[name], "_SurfaceIn", reads[2]);
-                    if (name != "PublishFields") shader.SetTexture(kernels[name], "_OriginIn", reads[1]);
-                }
-                for (int f = 0; f < 3; ++f) shader.SetTexture(kernels["RestoreFields"], new[] { "_ColourOut", "_OriginOut", "_SurfaceOut" }[f], reads[f]);
-                shader.SetTexture(kernels["CommitVelocity"], "_NextVelocity", scratch.Velocity);
-                smoke = Atlas(); surface = Atlas(); shader.SetTexture(kernels["PublishFields"], "_PublishedSmoke", smoke); shader.SetTexture(kernels["PublishFields"], "_PublishedSurface", surface);
-                Dispatch("InitArena", (Math.Max(Owners * 2 * MapWords, capacity) + 63) / 64);
+                smoke = arena.Smoke; surface = arena.Surface;
                 for (int i = 0; i < Owners; ++i) CreateOwner(i);
             }
             catch { Dispose(); throw; }
@@ -171,27 +141,35 @@ public static class FogArenaPhysicsProbe
             PublishMetadata(i, initial, Position(i, 0), body, 0, 0, 0);
             published[i] = Metadata(initial, Position(i, 0), body, 0, 0, 0); confirmed[i] = initial;
         }
-        private void Add(string name, int count, int stride) => buffers.Add(name, new ComputeBuffer(count, stride));
-        private void Bind(string kernel, params string[] names) { foreach (string name in names) shader.SetBuffer(kernels[kernel], name, buffers[name]); }
-        private void Dispatch(string name, int x = 1, int y = 1, int z = 1) => shader.Dispatch(kernels[name], x, y, z);
+        private void Dispatch(string name, int x = 1, int y = 1, int z = 1) => arena.Dispatch(name, x, y, z);
         private void GridDispatch(string name) => Dispatch(name, 24, 20, 20);
         private void MapDispatch(string name) => Dispatch(name, (MapWords + 63) / 64);
         private void Publish() => Dispatch("PublishFields", 25, 21, 21);
-        private static RenderTexture Atlas()
-        {
-            var t = new RenderTexture(98, 82, 0, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear) {
-                dimension = TextureDimension.Tex3D, volumeDepth = 82 * Owners, enableRandomWrite = true, filterMode = FilterMode.Trilinear, wrapMode = TextureWrapMode.Clamp };
-            if (!t.Create()) { UnityEngine.Object.DestroyImmediate(t); throw new InvalidOperationException("Physics atlas allocation failed."); } return t;
-        }
         private void Owner(int slot)
         {
             shader.SetInt("_Slot", slot); shader.SetInt("_CurrentBase", (slot * 2 + banks[slot]) * MapWords); shader.SetInt("_PendingBase", (slot * 2 + 1 - banks[slot]) * MapWords);
-            shader.SetInts("_RenderOffset", 0, 0, slot * 82); shader.SetTexture(kernels["CommitVelocity"], "_OwnerVelocity", velocity[slot]);
+            shader.SetInts("_RenderOffset", 0, 0, slot * 82); shader.SetTexture(arena.Kernel("CommitVelocity"), "_OwnerVelocity", velocity[slot]);
             foreach (string name in new[] { "StageLedger", "CommitLedger" }) for (int f = 0; f < 3; ++f)
-                shader.SetBuffer(kernels[name], new[] { "_OwnerAway", "_OwnerPeak", "_OwnerState" }[f], ledger[slot][f]);
+                shader.SetBuffer(arena.Kernel(name), new[] { "_OwnerAway", "_OwnerPeak", "_OwnerState" }[f], ledger[slot][f]);
         }
         internal void CheckBorrowing()
         {
+            Require(arena.ReservedFieldBytes == 58779980, "Arena reservation omitted owner metadata or committed fields.");
+            void RejectArena(int owners, int capacity)
+            {
+                bool rejected = false;
+                try { using (var invalid = new BlueprintFogArena(shader, AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Editor/FogSnapshotMetadataProbe.compute"), owners, capacity)) { } }
+                catch (ArgumentException) { rejected = true; }
+                Require(rejected, "Arena accepted invalid sizing or a budget overflow.");
+            }
+            RejectArena(0, 1); RejectArena(2, 0); RejectArena(8, 24860); RejectArena(32, 1);
+            for (int slot = -1; slot <= 2; slot += 3)
+            {
+                bool rejected = false;
+                try { arena.PublishMetadata(slot, new BlueprintFogSnapshotState.Submission(1, 1, 0, 0, 0), Vector3.zero, body, 0, 0, 0); }
+                catch (ArgumentOutOfRangeException) { rejected = true; }
+                Require(rejected, "Arena published metadata outside its slots.");
+            }
             var away = buffers["_StageAway"]; var peak = buffers["_StagePeak"]; var state = buffers["_StageState"];
             BlueprintFogSimulation.StagedState State(RenderTexture colour = null, RenderTexture origin = null, ComputeBuffer a = null, ComputeBuffer p = null, ComputeBuffer s = null)
                 => new BlueprintFogSimulation.StagedState(colour ?? reads[0], origin ?? reads[1], reads[2], a ?? away, p ?? peak, s ?? state);
@@ -332,15 +310,7 @@ public static class FogArenaPhysicsProbe
         }
         private void Bits(string name, long value) => shader.SetInts(name, unchecked((int)value), (int)(value >> 32));
         private void PublishMetadata(int slot, BlueprintFogSnapshotState.Submission token, Vector3 actor, Vector2 capsule, float clock, float weight, uint flags = 3)
-        {
-            metadataShader.SetInt("_Slot", slot); metadataShader.SetInt("_Tick", token.Tick); metadataShader.SetInt("_EmissionRevision", token.EmissionRevision); metadataShader.SetInt("_PublishFlags", (int)flags);
-            metadataShader.SetInts("_OwnerBits", unchecked((int)token.Owner), (int)(token.Owner >> 32));
-            metadataShader.SetInts("_GenerationBits", unchecked((int)token.Generation), (int)(token.Generation >> 32));
-            metadataShader.SetInts("_SequenceBits", unchecked((int)token.Sequence), (int)(token.Sequence >> 32));
-            metadataShader.SetVector("_ActorRadius", new Vector4(actor.x, actor.y, actor.z, capsule.x));
-            metadataShader.SetVector("_ShapeClock", new Vector4(capsule.y, clock, weight, 0));
-            metadataShader.Dispatch(publishMetadata, 1, 1, 1);
-        }
+            => arena.PublishMetadata(slot, token, actor, capsule, clock, weight, flags);
         internal void RefreshMetadata(int slot, float clock)
         {
             if (States[slot].State != BlueprintFogSnapshotState.Phase.Ready || States[slot].ConfirmedTick == 0 ||
@@ -421,9 +391,7 @@ public static class FogArenaPhysicsProbe
         {
             foreach (var request in requests) request.WaitForCompletion(); requests.Clear();
             for (int slot = 0; slot < Owners; ++slot) DisposeOwner(slot);
-            foreach (var buffer in buffers.Values) buffer.Release();
-            foreach (var texture in new[] { smoke, surface }) Release(texture);
-            scratch?.Dispose(); if (shader) UnityEngine.Object.DestroyImmediate(shader); if (metadataShader) UnityEngine.Object.DestroyImmediate(metadataShader);
+            arena?.Dispose();
         }
         private void DisposeOwner(int slot)
         {
@@ -445,7 +413,7 @@ public static class FogArenaPhysicsProbe
     [Serializable] private sealed class Report
     {
         public bool passed, realSolver, stagedLedger, velocityAlias, packingRollback, shortageRollback, callbackWaitsInFixture,
-            metadataBeforeReceipt, metadataOnlyTested, fractionalVisualClock, borrowedOwnershipValidated,
+            metadataBeforeReceipt, metadataOnlyTested, fractionalVisualClock, borrowedOwnershipValidated, runtimeArenaValidated,
             productionAllocatorTested, wholeHouseSupported, gameHostTested, gpuTimingsMeasured;
         public int borrowedInvalidCases, gridX, gridY, gridZ, owners, ticks, fieldComparisons, ledgerComparisons, atlasComparisons, committed, rejected, metadataComparisons;
         public string note;

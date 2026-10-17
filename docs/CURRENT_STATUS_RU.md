@@ -2,6 +2,8 @@
 
 **2026-10-17 · [English](CURRENT_STATUS.md) · [План](ROADMAP_RU.md) · [Документация](README_RU.md)**
 
+**Runtime GPU-core проверен:** буферы/общие поля/atlas/dispatch/metadata теперь в `BlueprintFogArena`; Probe использует его. GPU physics/Frame227/render и legacy прошли, normal/QA/Editor0/0,129групп/374CPU-отказа; PASSED/Ship. [Граница](FOG_PUBLISHED_RENDER_213_RU.md#runtime-gpu-core): Channels/callback/production asset loader и дом ещё не подключены. Установленная .213 неизменна.
+
 **Runtime borrowing проверен:** Simulation теперь явно заимствует поля/ledger без reflection-подмены и не освобождает чужие ресурсы.11 отказов проверки ресурсов до GPU-записей, physics/frame/render и прежние scratch/recovery прошли; normal/QA/Editor0/0,129 групп/371 CPU-отказ. [Подробности](FOG_PUBLISHED_RENDER_213_RU.md#runtime-явное-заимствование-полей). Pool/scheduler/split atlas и дом/FPS ещё открыты; установленная .213 не менялась.
 
 **Mesh/Atlas consumer проверен в Unity:**87 кадров/62 сравнения/26 отрицательных случаев;16 legacy-кадров попиксельно совпали, CPU poison0. Candidate отдельно; normal/QA/Editor0/0,129 групп/363 отрицательных CPU-проверки, независимые PASSED/Ship. [Доказательства и границы](FOG_PUBLISHED_RENDER_213_RU.md). Игровой backend, дом/FPS и табличка ещё открыты; установленная .213 не менялась.

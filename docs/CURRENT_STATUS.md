@@ -2,6 +2,8 @@
 
 **2026-10-17 · [Русский](CURRENT_STATUS_RU.md) · [Roadmap](ROADMAP.md) · [Documentation](README.md)**
 
+**Runtime GPU core verified:** buffers/workspace/atlases/dispatch/metadata now live in `BlueprintFogArena`, used by Probe. Physics/Frame227/render/legacy passed, normal/QA/Editor0/0,129groups/374CPU rejections; PASSED/Ship. [Boundary](FOG_PUBLISHED_RENDER_213.md#runtime-gpu-core): Channels/callback/production asset loader and house remain disconnected. Installed .213 unchanged.
+
 **Runtime borrowing verified:** Simulation explicitly borrows fields/ledger without reflection substitution and retains external resources on Dispose.11 resource-validation rejections before GPU writes; physics/frame/render and legacy scratch/recovery passed. Normal/QA/Editor0/0,129groups/371CPU rejections. [Details](FOG_PUBLISHED_RENDER_213.md#runtime-explicit-borrowed-fields). Pool/scheduler/split atlas and house/FPS remain open; installed .213 unchanged.
 
 **Mesh/Atlas consumer verified in Unity:**87 captures/62 comparisons/26 negative cases;16 legacy captures are pixel-exact, CPU poison0. Separate candidate; normal/QA/Editor0/0,129 groups/363 CPU rejections, independent PASSED/Ship. [Evidence and limits](FOG_PUBLISHED_RENDER_213.md). Runtime backend, house/FPS and board remain open; installed .213 unchanged.

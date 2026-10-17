@@ -34,3 +34,15 @@
 Проверено:11 неверных наборов ресурсов отклонены без изменения sentinel; valid Dispose сохраняет borrowed ресурсы. GPU physics664/498/28,239commit/2отказа/242metadata;Frame236 кадра54/232/174/20/54;render87/62/26+legacy16/delta0; прежние Scratch360/36 и Recovery24 прошли на одном source SHA. Normal/QA/Editor0/0,129 групп,371 отрицательная CPU-проверка, независимые PASSED/Ship. Квитанции и fingerprints локальны в `artifacts/fog-borrow-213/`.
 
 Это рабочий API расчёта, используемый проверкой, **не готовый игровой allocator/scheduler**. Сам pool пока остаётся Editor-стендом. Полная память дома, source admission, пространственный ledger и FPS ещё открыты; installed .213/bundle неизменны.
+
+### Runtime GPU-core
+
+`BlueprintFogArena` теперь владеет maps/free-list/payload/control/receipts/metadata, общим9-field workspace и двумя dynamic atlases; binding/dispatch и metadata publication извлечены из Probe без изменения kernels. Сам Probe вызывает runtime-код и продолжает владеть committed velocity/ledger, очередями, callback и dense oracle. Нормальные сборки не содержат UnityEditor-зависимости этого core. Core требует, чтобы владелец сначала завершил readbacks, затем освободил арену; существующий Probe соблюдает этот порядок.
+
+CPU-резерв теперь включает опубликованные metadata64B/owner:8/24859blocks=98303696B проходит,8/24860 превышает98304000B; округлённые24576=98157668B. Для проверенных2 владельцев/8192blocks резерв58779980B включает отдельные committed fields/ledger; это не замер всей памяти дома. Dynamic atlas проверяется отдельно против128MiB и максимума3D-текстуры; static source/driver memory не включены. Неверный размер/превышение бюджета отклоняются до выделения, metadata slot проверяется до dispatch.
+
+Финальный GPU:physics239commit/2отказа/664field/498ledger/28atlas/242metadata;4 неверных размера/бюджета и2 slot-случая плюс11 borrowing-отказов прошли. Frame227/54commit/232/174/20/54;render87/62/26+legacy16delta0;Scratch360/36,Recovery24. Normal/QA/Editor0/0,129 групп/374 CPU-отказа, независимые PASSED/Ship. Все5 режимов привязаны к одинаковым Arena/Scratch/Simulation SHA; локальный архив `artifacts/fog-arena-runtime-213/`.
+
+Первый запуск финальной серии не состоялся: auto-review превысил deadline. Единственный повтор с ограничением запуска до17:56UTC прошёл целиком. Это не ошибка физического расчёта. Установленная .213/bundle и миры не менялись.
+
+**Ещё не подключены:** создание core из `BlueprintFogChannels`, channel lifetime/callback scheduler, упаковка и загрузка двух дополнительных compute-программ в production bundle. Пока программы предоставляет Editor-стенд. Split static source layout, admission реальных28 деталей, пространственный ledger, дом/FPS и табличка остаются открытыми. Runtime GPU-core не означает готовое игровое строительство.

@@ -34,3 +34,15 @@ Independent review also caught missing input/state copies in the asset builder. 
 Verified:11 invalid resource sets reject without changing sentinels; valid Dispose retains borrowed resources. GPU physics664/498/28,239commits/2rejections/242metadata;Frame236frames54/232/174/20/54;render87/62/26+legacy16/delta0; legacy Scratch360/36 and Recovery24 passed with the same runtime SHA. Normal/QA/Editor0/0,129groups,371negative CPU cases, independent PASSED/Ship. Local receipts/fingerprints:`artifacts/fog-borrow-213/`.
 
 This is the runtime solver API exercised by the check, **not a complete game allocator/scheduler**. The pool remains an Editor fixture. House memory/source admission/spatial ledger/FPS remain open; installed .213/bundle unchanged.
+
+### Runtime GPU core
+
+`BlueprintFogArena` now owns maps/free-list/payload/control/receipts/metadata, the shared9-field workspace and two dynamic atlases. Bindings/dispatch and metadata publication were extracted from Probe without changing kernels. Probe calls runtime code and still owns committed velocity/ledger, queues, callbacks and dense oracle. Normal builds have no UnityEditor dependency for this core. The caller must drain readbacks before arena disposal; the existing Probe follows that order.
+
+The CPU reservation now includes published metadata64B/owner:8owners/24859blocks=98303696B fits;8/24860 exceeds98304000B; rounded24576=98157668B. The verified2owner/8192block reservation58779980B includes separately owned committed fields/ledger; it is not whole-house memory measurement. Dynamic atlases have a separate128MiB/device3D-size guard; static source and driver memory are excluded. Invalid sizing/budget rejects before allocation; metadata slot rejects before dispatch.
+
+Final GPU:physics239commits/2rejections/664field/498ledger/28atlas/242metadata;4 sizing/budget and2 slot cases plus11 borrowed-resource rejections passed. Frame227/54commits/232/174/20/54;render87/62/26+legacy16delta0;Scratch360/36,Recovery24. Normal/QA/Editor0/0,129groups/374CPU rejections, independent PASSED/Ship. All5 modes match current Arena/Scratch/Simulation SHA; local archive:`artifacts/fog-arena-runtime-213/`.
+
+The first final-series launch never executed: automatic approval review exceeded its deadline. One retry, guarded against starting after17:56UTC, completed. This was not a physics failure. Installed .213/bundle and worlds remained unchanged.
+
+**Not connected yet:** construction from `BlueprintFogChannels`, channel lifetime/callback scheduler, packaging/loading the two additional compute programs in the production bundle. Editor still supplies their prototypes. Split static source layout, real28-part admission, spatial ledger, house/FPS and board remain open. Runtime GPU core does not mean complete in-game construction.

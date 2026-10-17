@@ -24,7 +24,7 @@ foreach($entry in $manifest){
 Copy-Item -LiteralPath (Join-Path $ported 'FogVolumePair.cginc') -Destination (Join-Path $runtime 'FogVolumePair.cginc')
 Copy-Item -LiteralPath (Join-Path $ported 'FogVolumeAtlas.cginc') -Destination (Join-Path $runtime 'FogVolumeAtlas.cginc')
 Copy-Item -LiteralPath (Join-Path $ported 'FogPublished.cginc') -Destination (Join-Path $runtime 'FogPublished.cginc')
-foreach($name in @('BlueprintFogAssets.cs','BlueprintFogSimulation.cs','BlueprintFogSnapshotState.cs','BlueprintFogInputQueue.cs','BlueprintFogScratch.cs','BlueprintEditorMeshData.cs','BlueprintFogContactMesh.cs','BlueprintFogSource.cs','BlueprintFogVisual.cs','BlueprintFogChannels.cs','BlueprintFogVolume.cs','BlueprintFogAtlas.cs','BlueprintFogBuilding.cs')){
+foreach($name in @('BlueprintFogAssets.cs','BlueprintFogArena.cs','BlueprintFogSimulation.cs','BlueprintFogSnapshotState.cs','BlueprintFogInputQueue.cs','BlueprintFogScratch.cs','BlueprintEditorMeshData.cs','BlueprintFogContactMesh.cs','BlueprintFogSource.cs','BlueprintFogVisual.cs','BlueprintFogChannels.cs','BlueprintFogVolume.cs','BlueprintFogAtlas.cs','BlueprintFogBuilding.cs')){
     Copy-Item -LiteralPath (Join-Path $root ('src/BuildWorks/'+$name)) -Destination (Join-Path $project ('Assets/Editor/RuntimeSources/'+$name))
     if((Get-FileHash -LiteralPath (Join-Path $root ('src/BuildWorks/'+$name))).Hash -cne (Get-FileHash -LiteralPath (Join-Path $project ('Assets/Editor/RuntimeSources/'+$name))).Hash){throw 'Fog runtime source copy differs.'}
 }

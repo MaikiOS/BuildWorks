@@ -41,9 +41,9 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Reject(() => clock.Submit(2591999, 0)); Reject(() => clock.Submit(2592001, 0)); Reject(() => clock.Submit(2592000, -1));
             Require(clock.Complete(clock.Submit(2592000, 3), BlueprintFogSnapshotState.Completion.Committed), "Maximum legal clock rejected.");
             Reject(() => new BlueprintFogSnapshotState(12, 1).Submit(9, 0));
-            Require(BlueprintFogSnapshotState.EstimateFieldBytes(8, 24860) == 98303700, "Fixed pool byte accounting changed.");
-            Require(BlueprintFogSnapshotState.EstimateFieldBytes(8, 24861) > 98304000, "One extra block hid a budget overflow.");
-            Require(BlueprintFogSnapshotState.EstimateFieldBytes(8, 24576) == 98157156, "Rounded capacity lost its explicit reserve.");
+            Require(BlueprintFogSnapshotState.EstimateFieldBytes(8, 24859) == 98303696, "Fixed pool byte accounting changed.");
+            Require(BlueprintFogSnapshotState.EstimateFieldBytes(8, 24860) > 98304000, "One extra block hid a budget overflow.");
+            Require(BlueprintFogSnapshotState.EstimateFieldBytes(8, 24576) == 98157668, "Rounded capacity lost its explicit reserve.");
             Require(BlueprintFogSnapshotState.EstimateFieldBytes(32, 1) > 98304000, "Owner capacity was confused with actual field admission.");
             Reject(() => BlueprintFogSnapshotState.EstimateFieldBytes(0, 1)); Reject(() => BlueprintFogSnapshotState.EstimateFieldBytes(33, 1));
             Reject(() => BlueprintFogSnapshotState.EstimateFieldBytes(8, 0)); Reject(() => BlueprintFogSnapshotState.EstimateFieldBytes(8, int.MaxValue));

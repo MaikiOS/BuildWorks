@@ -59,6 +59,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Run("Fog input retains ordered observations until exact confirmation and fails explicitly on overflow", FogInputChecks.Run);
             Run("Logical fog input survives unavailable slots, retirement and generation changes", FogDetachedInputChecks.Run);
             Run("Fog bundles accept only complete legacy or arena asset sets", FogAssetChecks.Run);
+            Run("Published sparse metrics decode all half patterns and reject stale, corrupt or mismatched pages", FogMetricChecks.Run);
             Run("Straight repeat uses exact step", StraightRepeatUsesExactStep);
             Run("Connected ring starts at selected support", ConnectedRingStartsAtSelectedSupport);
             Run("Concave ring follows graph neighbors", ConcaveRingFollowsGraphNeighbors);

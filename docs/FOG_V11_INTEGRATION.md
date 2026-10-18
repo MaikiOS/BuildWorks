@@ -1,6 +1,6 @@
 # Approved v11 integration
 
-**Current .220:** one four-section wall recorded in4directions, ValheimQA18/18+39/39; flags2/free2800/wanted2834 proved and bounded reserve corrected. Numeric recovery/approved v11 parity/house/FPS/durable board remain open. [Current evidence](CHECKPOINT_220.md). Normal construction uses the previous backend.
+**Current .221:** Valheim30/30 front pass through four-section wall;54,336 inner RGBA texels, three fresh zero smoke/surface/ledgerFlags samples. [Evidence](CHECKPOINT_221.md). Visual v11/other numeric directions/house/FPS/board remain open. Ordinary construction retains previous backend.
 
 ## Historical .213 diagnosis and subsequent experiments (superseded by the current evidence above)
 

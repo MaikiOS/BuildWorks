@@ -181,6 +181,36 @@ namespace OstrixMods.BuildWorks
         public string PassFailure { get; private set; }
         public bool PassRunning => wallPass != null;
         private bool wallLine;
+        private BlueprintFogChannels.MetricsProbe metrics;
+        public static string BeginPublishedMetrics(bool compareBricks = false)
+        {
+            BuildWorksTestIsolation.RequireLoadedSession();
+            var fog = Camera.main ? Camera.main.GetComponent<BuildWorksTestFog>() : null;
+            if (!fog || !fog.Active || !fog.PublishedHouse || fog.metrics?.Pending == true)
+                throw new InvalidOperationException("Prepared published fog and no pending measurement required.");
+            fog.metrics?.Dispose();
+            fog.metrics = new BlueprintFogChannels.MetricsProbe(fog.channels, compareBricks, fog.PassPhase, fog.PassSide);
+            return "published-metrics-started";
+        }
+        public static string PublishedMetricsStatus()
+        {
+            BuildWorksTestIsolation.RequireLoadedSession();
+            var fog = Camera.main ? Camera.main.GetComponent<BuildWorksTestFog>() : null;
+            return fog?.metrics?.Status() ?? "absent";
+        }
+        public static string SavePublishedMetrics()
+        {
+            BuildWorksTestIsolation.RequireLoadedSession();
+            var fog = Camera.main ? Camera.main.GetComponent<BuildWorksTestFog>() : null;
+            if (!fog || fog.metrics == null || fog.metrics.Pending) throw new InvalidOperationException("Completed fog metrics required.");
+            string result = fog.metrics.Status();
+            if (!fog.metrics.Succeeded) throw new InvalidOperationException("Fog metrics failed: " + result);
+            string directory = System.IO.Path.Combine(BepInEx.Paths.BepInExRootPath, "BuildWorksQA");
+            System.IO.Directory.CreateDirectory(directory);
+            string path = System.IO.Path.Combine(directory, "fog-metrics-" + Guid.NewGuid().ToString("N") + ".json");
+            System.IO.File.WriteAllText(path, result);
+            return path;
+        }
         private System.Collections.Generic.IEnumerator<object> wallPass;
         private static BuildWorksTestFog movementOwner;
         private Vector3 passDirection;
@@ -440,6 +470,7 @@ namespace OstrixMods.BuildWorks
         private void OnDestroy() => Cleanup();
         private void Cleanup()
         {
+            metrics?.Dispose();
             if (movementOwner == this) movementOwner = null;
             passDirection = Vector3.zero;
             var movement = wallPass; wallPass = null; movement?.Dispose();

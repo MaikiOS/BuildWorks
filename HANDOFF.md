@@ -2,12 +2,12 @@
 
 2026-10-18 · [Русский](HANDOFF_RU.md)
 
-**QA .220 installed: one four-section long wall recorded from four directions.** ValheimQA18/18+39/39; storage flags2 diagnosed and corrected for the bounded four-wall fixture. v11 parity/numeric recovery/FPS/house/board remain open. [Evidence and limits](docs/CHECKPOINT_220.md).
+**QA .221 installed: numerical long-wall recovery verified in Valheim.**30/30;54,336 inner RGBA texels match payload, three fresh recovery samples have smoke/surface/ledgerFlags0. Approved visual v11/house/FPS/board remain open. [Evidence and limits](docs/CHECKPOINT_221.md).
 
 1. Read [PROJECT_CONTRACT](PROJECT_CONTRACT.md), [current evidence](docs/CURRENT_STATUS.md), [forward roadmap](docs/ROADMAP.md) and project AGENTS. Preserve the complete goal; this file is not a goal API update.
-2. Source and installed QA0.19.220; DLL SHA 86B01BFCD04CF369AA019B9D89E1327396E6116DED752202B091C50BA893C1C0. [Report .220](docs/CHECKPOINT_220.md). Public binary .37 alpha is unchanged.
+2. Source and installed QA0.19.221; DLL SHA 2A146A973FB18C3D244A7C963240CCA458BB0A03C0AAD84A2B21F53BDC770577. [Report .221](docs/CHECKPOINT_221.md). Public binary .37 alpha is unchanged.
 
-Results below retain their original checkpoint versions; the current installation is stated above. Next work is numeric/visual long-wall recovery against approved v11, then the house; a durable project requires its own server journal, not storage WAL.
+Results below retain their original checkpoint versions; the current installation is stated above. Next work is visual long-wall parity against approved v11; numeric front-pass recovery is verified, then the house; a durable project requires its own server journal, not storage WAL.
 
 [.213](docs/FOG_NOISE_FRAME_213.md) aligns noise phases across parts; GPU checks/regressions passed and QA is installed. Native .213 is untested; boundary loss, recovery ownership and performance remain open.
 

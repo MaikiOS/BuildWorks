@@ -1,6 +1,6 @@
 # Подключение утверждённого v11
 
-**Актуально .223:** immutable Spatial3D в QA-пулу, Unity168exact/legacy270/18, Valheim11/11+66/66:4 прохода/recovery0/365 184 inner texel. [Отчёт](CHECKPOINT_223_RU.md). Нормализация/вид/дом/FPS/постоянная табличка открыты; ordinary construction прежний backend.
+**Актуально .224:** local X-window peak, canonical78+78 exact fields,168 pool/dense; native11/11+66/66/4 прохода/recovery0. [Доказательства](CHECKPOINT_224_RU.md). Вид настоящих prefab/дом/FPS/постоянная табличка открыты; ordinary construction прежний backend.
 
 
 ## Историческая диагностика .213 и последующие опыты (актуальное состояние выше)

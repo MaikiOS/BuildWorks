@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Globalization;
 using System.Linq;
 using OstrixMods.BuildWorks;
 using UnityEditor;
@@ -11,6 +12,118 @@ public static class FogRuntimeSimulationCheck
 {
     public static void Run() => Run(false);
     public static void RunCandidate() => Run(true);
+    public static void RunRecoveryComparison() => RecoveryComparison(false);
+    public static void RunWindowRecoveryComparison() => RecoveryComparison(true);
+    private static void RecoveryComparison(bool window)
+    {
+        string root = Path.GetFullPath(Path.Combine(Application.dataPath, "../../.."));
+        string output = Path.Combine(root, window ? "artifacts/fog-recovery-curves-224/window-fields" : "artifacts/fog-recovery-curves-224/full12s"); Directory.CreateDirectory(output);
+        try
+        {
+            int comparisons = 0;
+            using (var assets = new BlueprintFogAssets(File.ReadAllBytes(Path.Combine(root, "artifacts/fog-runtime-assets-candidate/buildworks-fog-v11"))))
+                for (int route = 0; route < 2; ++route) comparisons += CompareRecovery(assets, output, route, window);
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+                File.WriteAllText(Path.Combine(output, "verification.json"), JsonUtility.ToJson(new CurveReport {
+                    passed = true, routes = 2, samplesPerRoutePerLayout = 61, seconds = 12, frozenExactFieldComparisons = comparisons,
+                    spatialExactFieldComparisons = window ? comparisons : 0,
+                    solverBundleSha256 = BitConverter.ToString(sha.ComputeHash(
+                        File.ReadAllBytes(Path.Combine(root, "artifacts/fog-runtime-assets-candidate/buildworks-fog-v11")))).Replace("-", "")
+                }, true));
+            Debug.Log("FOG_RECOVERY_CURVES_CAPTURED frozenExact=" + comparisons);
+        }
+        catch (Exception error) { File.WriteAllText(Path.Combine(output, "failure.txt"), error.ToString()); Debug.LogException(error); EditorApplication.Exit(1); }
+    }
+    private static int CompareRecovery(BlueprintFogAssets assets, string output, int route, bool compareSpatial)
+    {
+        Vector3 restMin = new Vector3(-2.4f, -.7f, -1.7f), restMax = new Vector3(2.4f, 3.8f, 1.7f);
+        Vector3 minimum = restMin - new Vector3(1.2f, 0, 1), maximum = restMax + new Vector3(1.2f, .6f, 1);
+        var shape = new Texture3D(96, 80, 80, TextureFormat.R8, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear };
+        var pigment = new Texture3D(1, 1, 1, TextureFormat.RGBA32, false); var noise = Noise();
+        var host = new GameObject("Frozen recovery curve reference"); ComputeShader referenceSolver = null;
+        BlueprintFogSimulation legacy = null, spatial = null;
+        try
+        {
+            var density = new byte[96 * 80 * 80];
+            for (int z = 0; z < 80; ++z) for (int y = 0; y < 80; ++y) for (int x = 0; x < 96; ++x)
+            {
+                Vector3 p = new Vector3(Mathf.Lerp(restMin.x, restMax.x, (x + .5f) / 96),
+                    Mathf.Lerp(restMin.y, restMax.y, (y + .5f) / 80), Mathf.Lerp(restMin.z, restMax.z, (z + .5f) / 80));
+                density[x + 96 * (y + 80 * z)] = p.y > 0 && p.y < 2 && Mathf.Abs(p.z) < 1
+                    ? (byte)Mathf.RoundToInt(255 * Mathf.Exp(-p.x * p.x / .008f)) : (byte)0;
+            }
+            shape.SetPixelData(density, 0); shape.Apply(false, false);
+            pigment.SetPixel(0, 0, 0, new Color(.4f, .2f, .1f, 1)); pigment.Apply(false, false);
+            Vector3 Position(float t) => route == 0 ? Actor(t) : new Vector3(-.12f, .95f, Actor(t).x);
+            Vector3 start = Position(0); var body = new Vector2(.3f, .95f);
+            referenceSolver = UnityEngine.Object.Instantiate(AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/FogGhostLab/AccumulatedSmoke.compute"));
+            var reference = host.AddComponent<Frozen>(); reference.solver = referenceSolver;
+            reference.shape = shape; reference.pigment = pigment; reference.noise = noise;
+            reference.minimum = minimum; reference.maximum = maximum; reference.restMinimum = restMin; reference.restMaximum = restMax;
+            reference.ResetState(0, start, false, 0, 37);
+            legacy = new BlueprintFogSimulation(assets, shape, pigment, noise, minimum, maximum, restMin, restMax, start, 37);
+            spatial = new BlueprintFogSimulation(assets, shape, pigment, noise, minimum, maximum, restMin, restMax, start, 37, ledgerLayout: BlueprintFogLedgerLayout.Spatial3D);
+            int exact = 0; bool legacyContact = false, spatialContact = false;
+            using (var csv = new StreamWriter(Path.Combine(output, route == 0 ? "normal.csv" : "along.csv")))
+            {
+                csv.WriteLine("tick,seconds,layout,smokeMaximum,smokeSum,smokeCells,surfaceMaximum,surfaceSum,surfaceCells");
+                for (int tick = 0; tick <= 360; ++tick)
+                {
+                    float time = tick * BlueprintFogSimulation.Step; Vector3 actor = Position(time);
+                    reference.Evaluate(time, actor, body, false, 0, 37, true);
+                    legacy.AdvanceTo(time, actor, body, true); spatial.AdvanceTo(time, actor, body, true);
+                    if (tick % 30 == 0)
+                    {
+                        Equal(reference.Smoke, legacy.Smoke, "curve smoke", tick); Equal(reference.Flow, legacy.Flow, "curve flow", tick);
+                        Equal(reference.Surface, legacy.Surface, "curve surface", tick); exact += 3;
+                        if (compareSpatial)
+                        {
+                            Equal(legacy.Smoke, spatial.Smoke, "spatial curve smoke", tick); Equal(legacy.Flow, spatial.Flow, "spatial curve flow", tick);
+                            Equal(legacy.Surface, spatial.Surface, "spatial curve surface", tick);
+                        }
+                    }
+                    if (tick % 6 != 0) continue;
+                    foreach (var simulation in new[] { legacy, spatial })
+                    {
+                        var smoke = AlphaMetrics(simulation.Smoke); var surface = AlphaMetrics(simulation.Surface);
+                        if (surface[0] > .5) { if (simulation == legacy) legacyContact = true; else spatialContact = true; }
+                        csv.WriteLine(string.Join(",", new[] { (double)tick, time, simulation == legacy ? 0 : 1,
+                            smoke[0], smoke[1], smoke[2], surface[0], surface[1], surface[2] }.Select(v => v.ToString("R", CultureInfo.InvariantCulture))));
+                    }
+                }
+            }
+            Require(legacyContact && spatialContact, "Recovery comparison missed body contact.");
+            Require(MaxAlpha(legacy.Surface) == 0 && MaxAlpha(spatial.Surface) == 0, "Recovery comparison did not reach restored surface.");
+            return exact;
+        }
+        finally
+        {
+            legacy?.Dispose(); spatial?.Dispose(); UnityEngine.Object.DestroyImmediate(host);
+            if (referenceSolver) UnityEngine.Object.DestroyImmediate(referenceSolver);
+            foreach (var texture in new Texture[] { shape, pigment, noise }) UnityEngine.Object.DestroyImmediate(texture);
+        }
+    }
+    private static double[] AlphaMetrics(RenderTexture field)
+    {
+        var request = AsyncGPUReadback.Request(field, 0, TextureFormat.RGBAFloat); request.WaitForCompletion();
+        Require(!request.hasError, "Curve readback failed."); double maximum = 0, sum = 0; int cells = 0, count = 0;
+        for (int layer = 0; layer < request.layerCount; ++layer)
+        {
+            var data = request.GetData<float>(layer); count += data.Length;
+            for (int i = 3; i < data.Length; i += 4)
+            {
+                float alpha = data[i]; Require(!float.IsNaN(alpha) && !float.IsInfinity(alpha) && alpha >= 0, "Invalid curve alpha.");
+                maximum = Math.Max(maximum, alpha); sum += alpha; if (alpha >= .001f) ++cells;
+            }
+        }
+        Require(count == BlueprintFogSimulation.Nx * BlueprintFogSimulation.Ny * BlueprintFogSimulation.Nz * 4, "Curve requires every 3D layer.");
+        return new[] { maximum, sum, (double)cells };
+    }
+    [Serializable] private sealed class CurveReport
+    {
+        public bool passed, nativeGameTested = false, visualParityAccepted = false;
+        public int routes, samplesPerRoutePerLayout, seconds, frozenExactFieldComparisons, spatialExactFieldComparisons; public string solverBundleSha256;
+    }
     private static void Run(bool candidateBundle)
     {
         string root = Path.GetFullPath(Path.Combine(Application.dataPath, "../../.."));

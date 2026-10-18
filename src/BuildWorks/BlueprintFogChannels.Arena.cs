@@ -127,8 +127,7 @@ namespace OstrixMods.BuildWorks
             BlueprintFogLedgerLayout ledgerLayout = BlueprintFogLedgerLayout.LegacyYZ)
         {
             if (assets == null) throw new ArgumentNullException(nameof(assets));
-            if (ledgerLayout == BlueprintFogLedgerLayout.Spatial3D && !assets.Solver.HasKernel("ClearSpatialLedger"))
-                throw new NotSupportedException("Fog solver bundle does not support Spatial3D ledgers.");
+            if (ledgerLayout == BlueprintFogLedgerLayout.Spatial3D) assets.RequireSpatialLedger();
             var pool = new BlueprintFogChannels(ownerLimit, MaximumFieldBudget);
             if (residentOwners == 0)
             {

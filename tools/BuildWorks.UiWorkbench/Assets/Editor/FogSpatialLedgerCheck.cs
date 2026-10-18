@@ -9,10 +9,12 @@ using UnityEngine.Rendering;
 public static class FogSpatialLedgerCheck
 {
     private const BlueprintFogLedgerLayout Spatial = BlueprintFogLedgerLayout.Spatial3D;
-    public static void Run()
+    public static void Run() => Run(false);
+    public static void RunWindow() => Run(true);
+    private static void Run(bool window)
     {
         string root = Path.GetFullPath(Path.Combine(Application.dataPath, "../../.."));
-        string output = Path.Combine(root, "artifacts/fog-spatial-ledger-223"); Directory.CreateDirectory(output);
+        string output = Path.Combine(root, window ? "artifacts/fog-spatial-window-224/verified" : "artifacts/fog-spatial-ledger-223"); Directory.CreateDirectory(output);
         var report = new Report();
         try
         {
@@ -23,8 +25,16 @@ public static class FogSpatialLedgerCheck
                 catch (NotSupportedException) { rejected = true; }
                 Require(rejected, "Legacy bundle accepted spatial allocation."); report.oldBundleRejected = true;
             }
+            if (window)
+                using (var prior = new BlueprintFogAssets(File.ReadAllBytes(Path.Combine(root, "artifacts/fog-recovery-curves-224/baseline-bundle-223/buildworks-fog-v11"))))
+                {
+                    bool rejected = false;
+                    try { prior.RequireSpatialLedger(); } catch (NotSupportedException) { rejected = true; }
+                    Require(rejected, "Per-cell peak bundle accepted window semantics."); report.previousSpatialBundleRejected = true;
+                }
             using (var assets = new BlueprintFogAssets(File.ReadAllBytes(Path.Combine(root, "artifacts/fog-runtime-assets-candidate/buildworks-fog-v11"))))
             {
+                if (window) VerifyWindowPeak(assets, report);
                 VerifyBuffers(assets, report);
                 for (int variant = 0; variant < 3; ++variant) VerifyCycle(assets, variant, report);
             }
@@ -33,6 +43,34 @@ public static class FogSpatialLedgerCheck
             Debug.Log("FOG_SPATIAL_LEDGER_PASSED " + JsonUtility.ToJson(report)); EditorApplication.Exit(0);
         }
         catch (Exception error) { File.WriteAllText(Path.Combine(output, "failure.txt"), error.ToString()); Debug.LogException(error); EditorApplication.Exit(1); }
+    }
+    private static void VerifyWindowPeak(BlueprintFogAssets assets, Report report)
+    {
+        assets.RequireSpatialLedger();
+        var solver = UnityEngine.Object.Instantiate(assets.Solver);
+        try
+        {
+            using (var away = new ComputeBuffer(16384, 4))
+            using (var peak = new ComputeBuffer(16384, 4))
+            using (var state = new ComputeBuffer(1, 4))
+            {
+                int clear = solver.FindKernel("ClearSpatialLedger"), update = solver.FindKernel("UpdateSpatialPeak");
+                foreach (int kernel in new[] { clear, update }) { solver.SetBuffer(kernel, "_AwayMass", away); solver.SetBuffer(kernel, "_PeakAway", peak); }
+                solver.SetBuffer(clear, "_SurfaceState", state); solver.SetInt("_ResetLedger", 1); solver.Dispatch(clear, 256, 1, 1); solver.SetInt("_ResetLedger", 0);
+                var mass = new uint[16384]; mass[7] = 1000; mass[0] = 2000; mass[15] = 3000;
+                away.SetData(mass); solver.Dispatch(update, 256, 1, 1);
+                var actual = new uint[16384]; peak.GetData(actual);
+                Require(actual[8] == 1000 && actual[0] == 2000 && actual[15] == 3000, "Spatial window duplicated a boundary or missed a neighbour.");
+                solver.Dispatch(clear, 256, 1, 1); mass = new uint[16384]; mass[8] = 1000; away.SetData(mass); solver.Dispatch(update, 256, 1, 1); peak.GetData(actual);
+                Require(actual[8] == 1000 && actual[0] == 0 && actual[15] == 0, "Spatial peak summed separate historical maxima or failed to reset empty windows.");
+                solver.Dispatch(clear, 256, 1, 1); mass[7] = 1000; away.SetData(mass); solver.Dispatch(update, 256, 1, 1); peak.GetData(actual);
+                Require(actual[8] == 2000, "Simultaneous spatial mass did not update its peak.");
+                solver.Dispatch(clear, 256, 1, 1); solver.Dispatch(update, 256, 1, 1); peak.GetData(actual);
+                Require(actual.All(v => v == 0), "Recovered spatial windows retained old peaks.");
+                report.windowPeakHistory = report.uniqueWindowBoundaries = true;
+            }
+        }
+        finally { UnityEngine.Object.DestroyImmediate(solver); }
     }
     private static void VerifyBuffers(BlueprintFogAssets assets, Report report)
     {
@@ -122,7 +160,7 @@ public static class FogSpatialLedgerCheck
     private static void Require(bool value, string message) { if (!value) throw new InvalidOperationException(message); }
     [Serializable] private sealed class Report
     {
-        public bool passed, oldBundleRejected, budgetRejected, stageCommitFull16384, rejectedCommitRetained;
+        public bool passed, oldBundleRejected, budgetRejected, stageCommitFull16384, rejectedCommitRetained, windowPeakHistory, uniqueWindowBoundaries, previousSpatialBundleRejected;
         public int fullCycles, exactComparisons; public long allocatedFieldBytes;
         public bool nativeGameTested = false, visualParityAccepted = false;
     }

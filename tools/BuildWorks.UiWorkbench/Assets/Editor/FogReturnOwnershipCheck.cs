@@ -13,10 +13,11 @@ public static class FogReturnOwnershipCheck
     public static void Run() => Run(false);
     public static void RunCandidate() => Run(true);
     public static void RunRuntimeSpatial() => Run(true, true);
-    private static void Run(bool candidate, bool runtime = false)
+    public static void RunRuntimeWindow() => Run(true, true, true);
+    private static void Run(bool candidate, bool runtime = false, bool window = false)
     {
         string root = Path.GetFullPath(Path.Combine(Application.dataPath, "../../.."));
-        string output = Path.Combine(root, runtime ? "artifacts/fog-spatial-ledger-223" : "artifacts/fog-return-ownership-222");
+        string output = Path.Combine(root, window ? "artifacts/fog-spatial-window-224/verified" : runtime ? "artifacts/fog-spatial-ledger-223" : "artifacts/fog-return-ownership-222");
         Directory.CreateDirectory(output);
         try
         {

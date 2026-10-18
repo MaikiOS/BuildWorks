@@ -2,10 +2,10 @@
 
 **2026-10-18 · [Русский](CURRENT_STATUS_RU.md) · [Roadmap](ROADMAP.md) · [Documentation](README.md)**
 
-**QA .223 installed: Spatial3D wired into QA pool; native four passes11/11+66/66.**365,184 inner RGBA texels, zero smoke/surface/recovery flags after exits. Exact legacy oracle; spatial look/house/FPS/board remain open. [Evidence and limits](CHECKPOINT_223.md).
+**QA .224 installed: local X-window peak restores canonical v11 curves,78+78 exact fields; native11/11+66/66.** Actual-prefab look/house/FPS/board open. [Evidence](CHECKPOINT_224.md).
 
 
-Source and installed isolated QA build: **0.19.223**. Tested host: Valheim 1.0.20, Steam build25909357. Latest published binary is the historical [0.19.37 alpha prerelease](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha); its ZIP does not contain the current changes. There is no stable release. Source synchronization is not binary publication.
+Source and installed isolated QA build: **0.19.224**. Tested host: Valheim 1.0.20, Steam build25909357. Latest published binary is the historical [0.19.37 alpha prerelease](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha); its ZIP does not contain the current changes. There is no stable release. Source synchronization is not binary publication.
 
 | Area | Implemented / automated evidence | Valheim or user evidence | Still open |
 | --- | --- | --- | --- |
@@ -15,7 +15,7 @@ Source and installed isolated QA build: **0.19.223**. Tested host: Valheim 1.0.2
 | Catalog and file exchange | Categories, Save As, delete/hide, automatic portable file, Share, batch import/export | Limited batch .197 import/export/reentry proved | Full batch UI/dirty draft/restart; some owner checks remain |
 | Server library and sharing | Administrator publication; players/admin visibility, verified personal copies, provenance; in-process checks | Host+remote not accepted | Live access/reconnect/restart; direct player-to-player transfer |
 | Items and storage | Separate storage/mount inclusion; supplied-item preservation and journal foundations | Limited chest/inventory comparison only | Durable settlement, cancellation/refund/crash/replay, all holders/armor/admin restore and network authority |
-| v11 fog | [.223](CHECKPOINT_223.md): immutable spatial/legacy, full budget/ledgers,3cycles168exact | Native11/11+66/66,4directions/365,184 inner texels/recovery0, legacy270/18 | Spatial look/normalisation, scales/tilts/FPS, house budget, board/reload/network |
+| v11 fog | [.224](CHECKPOINT_224.md): coherent X-window peak/canonical78+78exact | Native11/11+66/66/4clips/recovery0 | Actual-prefab look/scale/tilt/recontact/FPS, house budget, board/reload/network |
 | Unfinished construction | Existing transient pause/refund foundations | No persistent project acceptance | Durable project + stake/board + material continuation + confirmed cancel-refund + reload/server |
 | World selection and heavy chain | Capture/volume foundations and targeted checks | Basic capture accepted; later coordinate/height UX issues reported | Editable volume/gizmos, boundary rules, full loaded-area and performance acceptance |
 | World objects and EarthWorks | No terrain integration dependency | None claimed | Admin-priced nonrecipe objects; EarthWorks is a later separate integration |

@@ -6,9 +6,9 @@ BuildWorks расширяет молоток Valheim точным строите
 
 ![Концепт BuildWorks](docs/images/buildworks-hero-concept.png)
 
-**Текущие исходники / изолированная QA: 0.19.223.** Последний публичный пакет: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), исторический prerelease. Его ZIP не содержит новые функции исходников. Новый публичный бинарный релиз не опубликован.
+**Текущие исходники / изолированная QA: 0.19.224.** Последний публичный пакет: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), исторический prerelease. Его ZIP не содержит новые функции исходников. Новый публичный бинарный релиз не опубликован.
 
-**QA .223 установлена: Spatial3D подключён к QA-пулу, четыре прохода в Valheim прошли11/11+66/66.**365 184 inner RGBA texel, восстановление smoke/surface/recovery flags0. Legacy oracle точный; художественный вид Spatial3D/дом/FPS/табличка открыты. [Доказательства и границы](docs/CHECKPOINT_223_RU.md).
+**QA .224 установлена: локальный X-peak восстановил canonical кривые v11 —78+78 exact fields; native11/11+66/66.** Вид настоящих prefab/дом/FPS/табличка открыты. [Доказательства](docs/CHECKPOINT_224_RU.md).
 
 
 ## Возможности

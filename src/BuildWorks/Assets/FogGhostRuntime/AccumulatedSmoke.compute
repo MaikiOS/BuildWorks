@@ -4,6 +4,7 @@
 #pragma kernel CorrectMatter
 #pragma kernel ClearLedger
 #pragma kernel ClearSpatialLedger
+#pragma kernel UpdateSpatialPeak
 #pragma kernel AccumulateLedger
 #pragma kernel UpdateSurface
 #pragma kernel PackVolume
@@ -80,6 +81,13 @@ bool Inside(float3 uv) { return all(uv > 0) && all(uv < 1); }
 uint2 SourceBin(float3 p) { return min((uint2)(saturate(RestUV(p).yz)*LedgerSize),LedgerSize-1); }
 uint3 SpatialBin(float3 p) { return min((uint3)(saturate(RestUV(p))*uint3(16,32,32)),uint3(15,31,31)); }
 uint SpatialIndex(uint3 bin) { return bin.x+16*(bin.y+32*bin.z); }
+uint SpatialWindowMass(uint3 bin)
+{
+    uint mass = 0;
+    for(int x=max(0,(int)bin.x-1);x<=min(15,(int)bin.x+1);++x)
+        mass += _AwayMass[SpatialIndex(uint3(x,bin.yz))];
+    return mass;
+}
 
 [numthreads(64,1,1)]
 void ClearLedger(uint id : SV_DispatchThreadID)
@@ -93,9 +101,19 @@ void ClearLedger(uint id : SV_DispatchThreadID)
 void ClearSpatialLedger(uint id : SV_DispatchThreadID)
 {
     if(id >= 16384) return;
-    _PeakAway[id] = _ResetLedger!=0 || _AwayMass[id]==0 ? 0 : max(_PeakAway[id],_AwayMass[id]);
+    if(_ResetLedger!=0) _PeakAway[id] = 0;
     _AwayMass[id] = 0;
     if(id==0) _SurfaceState[0]=0;
+}
+
+// Read every window before a separate dispatch clears Away; threadgroups cannot share a barrier.
+[numthreads(64,1,1)]
+void UpdateSpatialPeak(uint id : SV_DispatchThreadID)
+{
+    if(id >= 16384) return;
+    uint3 bin = uint3(id%16,(id/16)%32,id/(16*32));
+    uint mass = SpatialWindowMass(bin);
+    _PeakAway[id] = mass==0 ? 0 : max(_PeakAway[id],mass);
 }
 
 [numthreads(8,8,4)]
@@ -160,11 +178,11 @@ void AdvanceVelocity(uint3 id : SV_DispatchThreadID)
     if(_SpatialLedger!=0)
     {
         uint3 spatial = SpatialBin(p);
-        [unroll] for(int z=-1;z<=1;++z) [unroll] for(int y=-1;y<=1;++y) [unroll] for(int x=-1;x<=1;++x)
+        [unroll] for(int z=-1;z<=1;++z) [unroll] for(int y=-1;y<=1;++y)
         {
-            uint3 neighbour = (uint3)clamp((int3)spatial+int3(x,y,z),int3(0,0,0),int3(15,31,31));
+            uint3 neighbour = (uint3)clamp((int3)spatial+int3(0,y,z),int3(0,0,0),int3(15,31,31));
             uint index = SpatialIndex(neighbour);
-            outstanding = max(outstanding,saturate(_AwayMass[index]/max(768.0,(float)_PeakAway[index])));
+            outstanding = max(outstanding,saturate(SpatialWindowMass(neighbour)/max(768.0,(float)_PeakAway[index])));
         }
     }
     else

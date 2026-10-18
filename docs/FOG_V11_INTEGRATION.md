@@ -1,6 +1,6 @@
 # Approved v11 integration
 
-**Current .223:** immutable QA Spatial3D pool, Unity168exact/legacy270/18, native11/11+66/66:4passes/recovery0/365,184 inner texels. [Evidence](CHECKPOINT_223.md). Normalisation/look/house/FPS/durable board open; ordinary construction retains previous backend.
+**Current .224:** local X-window peak,canonical78+78 exact fields/168pool; native11/11+66/66/4passes/recovery0. [Evidence](CHECKPOINT_224.md). Actual-prefab look/house/FPS/durable board open; ordinary construction previous backend.
 
 
 ## Historical .213 diagnosis and subsequent experiments (superseded by the current evidence above)

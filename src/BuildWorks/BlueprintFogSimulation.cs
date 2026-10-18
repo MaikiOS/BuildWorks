@@ -62,7 +62,7 @@ namespace OstrixMods.BuildWorks
         private RenderTexture predictedColour, predictedOrigin;
         private ComputeShader solver;
         private ComputeBuffer away, peak, state;
-        private readonly int clear, flow, matter, correct, clearLedger, ledger, restore;
+        private readonly int clear, flow, matter, correct, clearLedger, ledger, restore, updateSpatialPeak;
         private readonly int[] transport;
         private int current, tick;
         private float inputTime;
@@ -95,8 +95,7 @@ namespace OstrixMods.BuildWorks
             // Borrowed stage layout is authoritative; the optional argument configures standalone dense oracles.
             LedgerLayout = stagedState?.Layout ?? ledgerLayout;
             ledgerCells = BlueprintFogSnapshotState.LedgerCells(LedgerLayout);
-            if (LedgerLayout == BlueprintFogLedgerLayout.Spatial3D && !assets.Solver.HasKernel("ClearSpatialLedger"))
-                throw new NotSupportedException("Fog bundle does not support Spatial3D ledgers.");
+            if (LedgerLayout == BlueprintFogLedgerLayout.Spatial3D) assets.RequireSpatialLedger();
             for (int axis = 0; axis < 3; ++axis)
                 if (maximum[axis] <= minimum[axis] || restMaximum[axis] <= restMinimum[axis] ||
                     minimum[axis] > restMinimum[axis] || maximum[axis] < restMaximum[axis] ||
@@ -125,6 +124,7 @@ namespace OstrixMods.BuildWorks
                 clear = solver.FindKernel("Clear"); flow = solver.FindKernel("AdvanceVelocity");
                 matter = solver.FindKernel("AdvanceMatter"); correct = solver.FindKernel("CorrectMatter");
                 clearLedger = solver.FindKernel(LedgerLayout == BlueprintFogLedgerLayout.Spatial3D ? "ClearSpatialLedger" : "ClearLedger"); ledger = solver.FindKernel("AccumulateLedger");
+                updateSpatialPeak = LedgerLayout == BlueprintFogLedgerLayout.Spatial3D ? solver.FindKernel("UpdateSpatialPeak") : -1;
                 if (solver.HasKernel("ClearSpatialLedger")) solver.SetInt("_SpatialLedger", LedgerLayout == BlueprintFogLedgerLayout.Spatial3D ? 1 : 0);
                 restore = solver.FindKernel("UpdateSurface"); transport = new[] { flow, matter, correct };
                 solver.SetVector("_Minimum", minimum); solver.SetVector("_Maximum", maximum);
@@ -141,6 +141,7 @@ namespace OstrixMods.BuildWorks
                 state = staged ? stagedState.State : new ComputeBuffer(1, sizeof(uint));
                 foreach (int kernel in new[] { clearLedger, flow, ledger }) solver.SetBuffer(kernel, "_AwayMass", away);
                 foreach (int kernel in new[] { clearLedger, flow }) solver.SetBuffer(kernel, "_PeakAway", peak);
+                if (updateSpatialPeak >= 0) { solver.SetBuffer(updateSpatialPeak, "_AwayMass", away); solver.SetBuffer(updateSpatialPeak, "_PeakAway", peak); }
                 foreach (int kernel in new[] { clearLedger, ledger, restore }) solver.SetBuffer(kernel, "_SurfaceState", state);
                 solver.SetInt("_ResetLedger", 1); solver.Dispatch(clearLedger, ledgerCells / 64, 1, 1); solver.SetInt("_ResetLedger", 0);
                 if (Scratch == null) { predictedColour = Allocate("Predicted smoke"); predictedOrigin = Allocate("Predicted origins"); }
@@ -196,6 +197,7 @@ namespace OstrixMods.BuildWorks
                     solver.SetTexture(correct, "_Velocity", nextVelocity); solver.SetTexture(correct, "_PredictedColour", prediction);
                     solver.SetTexture(correct, "_PredictedOrigin", predictionOrigin); solver.SetTexture(correct, "_WriteColour", nextColour);
                     solver.SetTexture(correct, "_WriteOrigin", nextOrigin); Dispatch(correct);
+                    if (updateSpatialPeak >= 0) solver.Dispatch(updateSpatialPeak, ledgerCells / 64, 1, 1);
                     solver.Dispatch(clearLedger, ledgerCells / 64, 1, 1);
                     solver.SetTexture(ledger, "_ReadColour", nextColour); solver.SetTexture(ledger, "_ReadOrigin", nextOrigin); Dispatch(ledger);
                     solver.SetTexture(restore, "_ReadSurface", surface[current]); solver.SetTexture(restore, "_Velocity", nextVelocity);

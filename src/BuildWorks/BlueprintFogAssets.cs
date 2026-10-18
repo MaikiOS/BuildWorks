@@ -73,6 +73,15 @@ namespace OstrixMods.BuildWorks
             catch { Dispose(); throw; }
         }
 
+        internal void RequireSpatialLedger()
+        {
+            if (!Solver || !Arena || !Solver.HasKernel("ClearSpatialLedger") || !Solver.HasKernel("UpdateSpatialPeak") ||
+                !Arena.HasKernel("StageSpatialLedger") || !Arena.HasKernel("CommitSpatialLedger"))
+                throw new NotSupportedException("Fog bundle does not support spatial window ledgers.");
+            CheckKernel(Solver, "ClearSpatialLedger", 64, 1, 1); CheckKernel(Solver, "UpdateSpatialPeak", 64, 1, 1);
+            CheckKernel(Arena, "StageSpatialLedger", 64, 1, 1); CheckKernel(Arena, "CommitSpatialLedger", 64, 1, 1);
+        }
+
         private static void CheckKernel(ComputeShader program, string name, uint expectedX, uint expectedY, uint expectedZ)
         {
             if (!program || !program.HasKernel(name)) throw new InvalidDataException("Fog v11 kernel missing: " + name);

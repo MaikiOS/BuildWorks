@@ -55,7 +55,7 @@ float3 AtlasDensities(float3 p, int owner, out float3 pigment)
             shape=tex3Dlod(_AtlasShape,float4(AtlasUV(moved,_RegionShapeSize[owner].xyz,owner),0)).r;
             float damage=0;
             #if defined(BUILDWORKS_FOG_PUBLISHED)
-            [branch] if(active) damage=tex3Dlod(_AtlasSurface,float4(FogDynamicUV(wakeUV,_RegionFieldSize[owner].xyz,_RegionDynamicOffset[owner].xyz),0)).w;
+            [branch] if(active) damage=(_PublishedSparse != 0 ? FogPackedSample(owner,2,wakeUV) : tex3Dlod(_AtlasSurface,float4(FogDynamicUV(wakeUV,_RegionFieldSize[owner].xyz,_RegionDynamicOffset[owner].xyz),0))).w;
             #else
             [branch] if(active) damage=tex3Dlod(_AtlasSurface,float4(AtlasUV(wakeUV,_RegionFieldSize[owner].xyz,owner),0)).w;
             #endif
@@ -65,8 +65,8 @@ float3 AtlasDensities(float3 p, int owner, out float3 pigment)
     [branch] if(inField)
     {
         #if defined(BUILDWORKS_FOG_PUBLISHED)
-        float4 smoke=tex3Dlod(_AtlasSmoke,float4(FogDynamicUV(wakeUV,_RegionFieldSize[owner].xyz,_RegionDynamicOffset[owner].xyz),0));
-        float4 shade=tex3Dlod(_AtlasSmoke,float4(FogDynamicUV(wakeUV-_BeamDirection*.04,_RegionFieldSize[owner].xyz,_RegionDynamicOffset[owner].xyz),0));
+        float4 smoke=_PublishedSparse != 0 ? FogPackedSample(owner,0,wakeUV) : tex3Dlod(_AtlasSmoke,float4(FogDynamicUV(wakeUV,_RegionFieldSize[owner].xyz,_RegionDynamicOffset[owner].xyz),0));
+        float4 shade=_PublishedSparse != 0 ? FogPackedSample(owner,0,wakeUV-_BeamDirection*.04) : tex3Dlod(_AtlasSmoke,float4(FogDynamicUV(wakeUV-_BeamDirection*.04,_RegionFieldSize[owner].xyz,_RegionDynamicOffset[owner].xyz),0));
         #else
         float4 smoke=tex3Dlod(_AtlasSmoke,float4(AtlasUV(wakeUV,_RegionFieldSize[owner].xyz,owner),0));
         float4 shade=tex3Dlod(_AtlasSmoke,float4(AtlasUV(wakeUV-_BeamDirection*.04,_RegionFieldSize[owner].xyz,owner),0));

@@ -23,22 +23,27 @@ namespace OstrixMods.BuildWorks
         internal BlueprintFogScratch Scratch { get; }
         internal RenderTexture Smoke { get; }
         internal RenderTexture Surface { get; }
+        internal RenderTexture Bricks { get; }
+        internal Vector3Int BrickGrid { get; }
         // Includes the committed velocity/ledger reservation that the channel owner allocates separately.
         internal long ReservedFieldBytes { get; }
         internal long RenderBytes { get; }
         internal int BlockCapacity { get; }
 
-        internal BlueprintFogArena(ComputeShader arenaProgram, ComputeShader metadataProgram, int owners, int capacity)
+        internal BlueprintFogArena(ComputeShader arenaProgram, ComputeShader metadataProgram, int owners, int capacity, bool denseReference = false)
         {
             if (!arenaProgram || !metadataProgram) throw new ArgumentException("Fog arena programs missing.");
             ReservedFieldBytes = BlueprintFogSnapshotState.EstimateFieldBytes(owners, capacity); ownerCount = owners; BlockCapacity = capacity;
-            RenderBytes = checked(98L * 82 * 82 * owners * 16);
-            if (ReservedFieldBytes > MaximumFieldBytes || RenderBytes > BlueprintFogAtlas.MaximumBytes || Math.Max(98L, 82L * owners) > SystemInfo.maxTexture3DSize)
+            int side = Mathf.CeilToInt(Mathf.Pow(capacity, 1f / 3));
+            BrickGrid = new Vector3Int(side, side, (capacity + side * side - 1) / (side * side));
+            RenderBytes = denseReference ? checked(98L * 82 * 82 * owners * 16) : checked((long)BrickGrid.x * BrickGrid.y * BrickGrid.z * 216 * 8);
+            if (ReservedFieldBytes > MaximumFieldBytes || RenderBytes > BlueprintFogAtlas.MaximumBytes || (denseReference ? Math.Max(98L, 82L * owners) : Math.Max(BrickGrid.x, Math.Max(BrickGrid.y, BrickGrid.z)) * 6L) > SystemInfo.maxTexture3DSize)
                 throw new ArgumentException("Fog arena exceeds its field or render reservation.");
             if (!SystemInfo.supportsComputeShaders || !SystemInfo.supports3DTextures) throw new NotSupportedException("Fog arena requires compute and 3D textures.");
             try
             {
                 shader = UnityEngine.Object.Instantiate(arenaProgram);
+                if (denseReference) shader.EnableKeyword("BUILDWORKS_FOG_DENSE_REFERENCE");
                 if (!shader) throw new InvalidOperationException("Arena compute missing.");
                 foreach (string name in KernelNames) kernels.Add(name, shader.FindKernel(name));
                 Add("_Maps", owners * 2 * MapWords, 4); Add("_Free", capacity, 4); Add("_Control", 16, 4); Add("_Receipts", owners * 16, 4); Add("_Payload", capacity * 64, 8);
@@ -46,10 +51,11 @@ namespace OstrixMods.BuildWorks
                 metadataShader = UnityEngine.Object.Instantiate(metadataProgram);
                 if (!metadataShader) throw new InvalidOperationException("Metadata compute missing.");
                 initMetadata = metadataShader.FindKernel("InitMetadata"); publishMetadata = metadataShader.FindKernel("PublishMetadata");
-                Add("_PublishedMetadata", owners * 16, 4);
+                Add("_PublishedMetadata", owners * 16, 4); Add("_PublishedMapBases", owners, 4);
                 metadataShader.SetInt("_MetadataWords", owners * 16);
                 metadataShader.SetBuffer(initMetadata, "_PublishedMetadata", buffers["_PublishedMetadata"]);
                 metadataShader.SetBuffer(publishMetadata, "_PublishedMetadata", buffers["_PublishedMetadata"]);
+                metadataShader.SetBuffer(publishMetadata, "_PublishedMapBases", buffers["_PublishedMapBases"]);
                 metadataShader.SetBuffer(publishMetadata, "_Control", buffers["_Control"]);
                 metadataShader.Dispatch(initMetadata, (owners * 16 + 63) / 64, 1, 1);
                 shader.SetInts("_Grid", 96, 80, 80); shader.SetInts("_Blocks", 24, 20, 20);
@@ -70,7 +76,11 @@ namespace OstrixMods.BuildWorks
                 }
                 for (int f = 0; f < 3; ++f) shader.SetTexture(kernels["RestoreFields"], new[] { "_ColourOut", "_OriginOut", "_SurfaceOut" }[f], reads[f]);
                 shader.SetTexture(kernels["CommitVelocity"], "_NextVelocity", Scratch.Velocity);
-                Smoke = Atlas(owners); Surface = Atlas(owners); shader.SetTexture(kernels["PublishFields"], "_PublishedSmoke", Smoke); shader.SetTexture(kernels["PublishFields"], "_PublishedSurface", Surface);
+                // Dense publication exists only for the independent Unity numerical oracle.
+                if (denseReference) { Smoke = Atlas(owners); Surface = Atlas(owners);
+                    shader.SetTexture(kernels["PublishFields"], "_PublishedSmoke", Smoke); shader.SetTexture(kernels["PublishFields"], "_PublishedSurface", Surface); }
+                else { Bricks = Atlas(BrickGrid * 6); shader.SetInts("_BrickGrid", BrickGrid.x, BrickGrid.y, BrickGrid.z);
+                    shader.SetTexture(kernels["PublishFields"], "_PublishedBricks", Bricks); shader.SetBuffer(kernels["PublishFields"], "_Maps", buffers["_Maps"]); }
                 Dispatch("InitArena", (Math.Max(owners * 2 * MapWords, capacity) + 63) / 64);
             }
             catch { Dispose(); throw; }
@@ -80,18 +90,30 @@ namespace OstrixMods.BuildWorks
         internal int Kernel(string name) => kernels[name];
         internal void Dispatch(string name, int x = 1, int y = 1, int z = 1)
         { if (disposed) throw new ObjectDisposedException(nameof(BlueprintFogArena)); shader.Dispatch(kernels[name], x, y, z); }
-        private static RenderTexture Atlas(int owners)
+        internal void BindPublication(Material material)
         {
-            var texture = new RenderTexture(98, 82, 0, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear) {
-                dimension = TextureDimension.Tex3D, volumeDepth = checked(82 * owners), enableRandomWrite = true,
+            if (disposed) throw new ObjectDisposedException(nameof(BlueprintFogArena));
+            material.SetInt("_PublishedSparse", Bricks ? 1 : 0); material.SetInt("_PublishedBlockCapacity", BlockCapacity);
+            material.SetBuffer("_PublishedMaps", buffers["_Maps"]);
+            if (Bricks) { material.SetTexture("_PublishedBricks", Bricks); material.SetVector("_PublishedBrickGrid", (Vector3)BrickGrid); }
+            material.SetBuffer("_PublishedMapBases", buffers["_PublishedMapBases"]);
+        }
+        private static RenderTexture Atlas(int owners) => Atlas(new Vector3Int(98, 82, checked(82 * owners)));
+        private static RenderTexture Atlas(Vector3Int size)
+        {
+            var texture = new RenderTexture(size.x, size.y, 0, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear) {
+                dimension = TextureDimension.Tex3D, volumeDepth = size.z, enableRandomWrite = true,
                 filterMode = FilterMode.Trilinear, wrapMode = TextureWrapMode.Clamp };
             if (!texture.Create()) { UnityEngine.Object.DestroyImmediate(texture); throw new InvalidOperationException("Fog arena atlas allocation failed."); }
             return texture;
         }
-        internal void PublishMetadata(int slot, BlueprintFogSnapshotState.Submission token, Vector3 actor, Vector2 capsule, float clock, float weight, uint flags = 3)
+        internal void PublishMetadata(int slot, BlueprintFogSnapshotState.Submission token, Vector3 actor, Vector2 capsule, float clock, float weight, uint flags = 3, int mapBase = -1)
         {
             if (disposed) throw new ObjectDisposedException(nameof(BlueprintFogArena));
             if (slot < 0 || slot >= ownerCount) throw new ArgumentOutOfRangeException(nameof(slot));
+            if (mapBase == -1) mapBase = slot * 2 * MapWords;
+            if (mapBase != slot * 2 * MapWords && mapBase != (slot * 2 + 1) * MapWords) throw new ArgumentException("Fog published map belongs to another slot.");
+            metadataShader.SetInt("_PublishMapBase", mapBase);
             metadataShader.SetInt("_Slot", slot); metadataShader.SetInt("_Tick", token.Tick); metadataShader.SetInt("_EmissionRevision", token.EmissionRevision); metadataShader.SetInt("_PublishFlags", (int)flags);
             metadataShader.SetInts("_OwnerBits", unchecked((int)token.Owner), (int)(token.Owner >> 32));
             metadataShader.SetInts("_GenerationBits", unchecked((int)token.Generation), (int)(token.Generation >> 32));
@@ -104,7 +126,7 @@ namespace OstrixMods.BuildWorks
         {
             if (disposed) return; disposed = true;
             foreach (var buffer in buffers.Values) buffer.Release(); buffers.Clear();
-            foreach (var texture in new[] { Smoke, Surface }) if (texture) { texture.Release(); UnityEngine.Object.DestroyImmediate(texture); }
+            foreach (var texture in new[] { Smoke, Surface, Bricks }) if (texture) { texture.Release(); UnityEngine.Object.DestroyImmediate(texture); }
             Scratch?.Dispose();
             if (shader) UnityEngine.Object.DestroyImmediate(shader); if (metadataShader) UnityEngine.Object.DestroyImmediate(metadataShader);
         }

@@ -68,10 +68,19 @@ docs/CURRENT_STATUS.md separates source/tests/deployment/game/owner/network proo
 - `Default\BuildWorks` is the source and artifact tree, not an installed mod.
   `Default\BepInEx\plugins` must never contain `BuildWorks.dll`,
   `BuildWorks.Geometry.dll`, or `Ostrix-BuildWorks`.
-- Do not launch Valheim, modify saves, or publish a package without Ostrix's
-  explicit authorization.
-- Authorized QA launches use Thunderstore profile `TerrainRamp-1.0-Test` and its
-  `Modded` button. Do not bypass the manager with a direct Steam/game launch.
+- ValheimQA is the default automated in-game verification method. Read
+  `../ValheimQA/RUNBOOK_RU.md` and follow the standing workflow in `../AGENTS.md`,
+  approved by Ostrix on 2026-10-18. It authorizes automatic bridge preparation,
+  direct GABS launch with `TerrainRamp-1.0-Test` BepInEx, existing isolated QA
+  identities, read-only/transient tests, normal QA save/exit and bridge restore
+  within the current mod task, without repeated per-launch confirmation.
+- This replaces the older Thunderstore/Modded-only rule for automated QA.
+  `Deploy-TestBuild.ps1` still governs mod DLL deployment; bridge DLLs use the
+  shared Prepare/Restore scripts. Restoring bridge DLLs does not revert the mod
+  or change the chosen QA method. Do not interrupt an existing player session.
+- World-changing tests must stay within Ostrix's current task authorization.
+  Resets, new resource grants, unrelated construction/terrain edits, other
+  profiles, multiplayer and publication require their own authorized scope.
 
 # Visible Progress
 
@@ -101,7 +110,8 @@ dotnet build .\src\BuildWorks\BuildWorks.csproj -c Release
 ```
 
 Remove `-WhatIf` only for an authorized test deployment. Deployment does not
-authorize launching Valheim or changing worlds, characters, or saves.
+by itself authorize new world/character changes; QA launches follow the standing
+ValheimQA workflow above, including normal saving of the isolated QA session.
 
 For another local layout, override `ProfileRoot` and `ValheimManagedDir` with
 MSBuild `-p:` arguments rather than editing the project file.

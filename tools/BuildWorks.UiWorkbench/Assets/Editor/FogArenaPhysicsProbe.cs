@@ -173,13 +173,14 @@ public static class FogArenaPhysicsProbe
         internal BlueprintFogSnapshotState[] States => owners.Select(o => o.State).ToArray();
         internal readonly uint[] LastFlags = new uint[Owners];
         internal int Committed, Rejected, Fields, Ledgers, Atlases, MetadataChecks, ReceiptFirst;
+        private int expectedMetadataChecks;
 
         internal Probe(BlueprintFogAssets assets, BlueprintFogVisual source, Vector2 body, int capacity, FogSparseStorageProbe codec)
         {
             this.capacity = capacity; this.body = body; this.codec = codec; this.assets = assets; this.source = source;
             try
             {
-                pool = BlueprintFogChannels.CreateArena(assets, Owners, capacity); arena = pool.SnapshotArena;
+                pool = BlueprintFogChannels.CreateArena(assets, Owners, capacity, denseReference: true); arena = pool.SnapshotArena;
                 shader = arena.Program; buffers = arena.Buffers; scratch = arena.Scratch;
                 reads[0] = scratch.ReadColour; reads[1] = scratch.ReadOrigin; reads[2] = scratch.ReadSurface;
                 smoke = arena.Smoke; surface = arena.Surface;
@@ -206,7 +207,7 @@ public static class FogArenaPhysicsProbe
         internal void DeliverStale(int slot, BlueprintFogSnapshotState.Submission token) => owners[slot].Receive(token, null);
         internal void CheckBorrowing()
         {
-            Require(arena.ReservedFieldBytes == 58779980, "Arena reservation omitted owner metadata or committed fields.");
+            Require(arena.ReservedFieldBytes == 58779988, "Arena reservation omitted owner metadata, map bases or committed fields.");
             void RejectArena(int owners, int capacity)
             {
                 bool rejected = false;
@@ -329,6 +330,7 @@ public static class FogArenaPhysicsProbe
                 catch (Exception error) { failure = error.Message; }
             };
             // Independent observation, never a production confirmation dependency.
+            ++expectedMetadataChecks;
             requests.Add(AsyncGPUReadback.Request(buffers["_PublishedMetadata"], metadataCallback));
             return token;
         }
@@ -355,7 +357,7 @@ public static class FogArenaPhysicsProbe
             if (failure != null) throw new InvalidOperationException(failure);
             if (releases.Count != 0) return false;
             pool.PollSnapshots(); foreach (var complete in heldConfirmations) complete();
-            if (!RepliesComplete || MetadataChecks != Committed + Rejected) return false;
+            if (!RepliesComplete || MetadataChecks != expectedMetadataChecks || Committed + Rejected != expectedMetadataChecks) return false;
             heldConfirmations.Clear(); requests.Clear(); return true;
         }
         internal void ResetOwner(int slot)

@@ -215,7 +215,8 @@ namespace OstrixMods.BuildWorks
                 material.EnableKeyword("BUILDWORKS_FOG_PUBLISHED");
                 material.SetBuffer("_FogBindings", bindings); material.SetBuffer("_PublishedMetadata", pool.SnapshotArena.Buffers["_PublishedMetadata"]);
                 material.SetInt("_PublishedSlots", pool.SnapshotCapacity); material.SetInt("_PublishedRegion", region);
-                material.SetTexture("_PublishedSurface", pool.SnapshotArena.Surface);
+                pool.SnapshotArena.BindPublication(material);
+                if (pool.SnapshotArena.Surface) material.SetTexture("_PublishedSurface", pool.SnapshotArena.Surface);
                 material.SetVector("_DynamicAtlasSize", new Vector4(98, 82, 82 * pool.SnapshotCapacity, 0));
                 material.SetVector("_DynamicFieldSize", new Vector4(96, 80, 80, 0)); material.SetVector("_DynamicOffset", offset);
             }

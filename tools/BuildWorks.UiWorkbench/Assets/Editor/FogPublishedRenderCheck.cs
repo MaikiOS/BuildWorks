@@ -216,6 +216,7 @@ public static class FogPublishedRenderCheck
                         geometryBeforeCpuConfirmation = true, meshAndAtlasVolume = true, productionSchedulerTested = false, wholeHouseSupported = false,
                         gameHostTested = false, gpuTimingsMeasured = false };
                 }
+                report.pageSamplingNegativeCases = FogPageSamplingCheck.Check();
                 CheckRuntimeAtlas(assets, visuals, camera, probe, output, report);
                 foreach (var visual in visuals) visual.Root.SetActive(false);
                 CheckLogicalVisual(assets, prefab, camera, probe, output, report);
@@ -350,13 +351,13 @@ public static class FogPublishedRenderCheck
             Reject(() => published.PreparePublished(visuals, handles));
             report.runtimeStaticBytes = published.Bytes;
             report.runtimeCombinedRenderBytes = published.Bytes + pool.SnapshotArena.RenderBytes;
-            Require(published.Bytes == 8122272 && report.runtimeCombinedRenderBytes == 29208736, "Split atlas bytes include hidden full dynamic copies.");
+            Require(published.Bytes == 8122272 && report.runtimeCombinedRenderBytes == 22601184, "Split atlas bytes include hidden full dynamic copies.");
             bool allocated = false;
             Reject(() => published.ChangeLayout(new[] { new Vector3Int(512, 512, 256) }, 512, size => { allocated = true; }));
             Require(!allocated && published.Bytes == report.runtimeStaticBytes, "Combined render budget allocated or replaced the retained atlas before rejecting.");
             published.Dispose(); published.Dispose();
-            Require(pool.SnapshotArena.Smoke.IsCreated() && pool.SnapshotArena.Surface.IsCreated(), "Atlas disposal freed borrowed publication.");
-            report.runtimeVisualAtlasValidated = true; report.staticSourceSeparated = true;
+            Require(pool.SnapshotArena.Smoke == null && pool.SnapshotArena.Surface == null && pool.SnapshotArena.Bricks.IsCreated(), "Production publication allocated dense field copies.");
+            report.runtimeVisualAtlasValidated = true; report.staticSourceSeparated = true; report.hardwareFilteredPages = true;
         }
     }
     private static void CheckLogicalVisual(BlueprintFogAssets assets, GameObject prefab, Camera camera, FogRenderProbe probe, string output, Report report)
@@ -566,6 +567,8 @@ public static class FogPublishedRenderCheck
         public int runtimeVisualAtlasCaptures, runtimeVisualAtlasComparisons;
         public int runtimeMappingNegativeCases;
         public long runtimeStaticBytes, runtimeCombinedRenderBytes;
+        public bool hardwareFilteredPages;
+        public int pageSamplingNegativeCases;
         public double runtimeMaxMeanDelta, runtimeMaxLocalDelta, runtimeWrongMappingDelta;
         public double legacyMeanDelta, maxMeanDelta, maxLocalDelta, poisonedCpuDelta, disabledKeywordDelta, staleGenerationDelta;
     }

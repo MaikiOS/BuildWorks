@@ -2,10 +2,10 @@
 
 2026-10-18 · [Русский](HANDOFF_RU.md)
 
-**QA .215 installed: height-edit completion refreshes volume membership.** Unity48/3/4; actual background Valheim40/40 plus identity40/40, unchanged inventory, normal exit/bridge restored. Strict v11 passed56 exact and18 visual GPU comparisons across continuous idle/reentry; Building does not activate it yet. House28/board/network remain open. [Changes and limits](docs/CHECKPOINT_215.md).
+**QA .216 installed: hardware-filtered sparse v11 pages.** Unity56/18, runtime14 comparisons/15 negative cases; actual ValheimQA7/7 resources/metadata/cleanup, unchanged inventory and restored bridge. Dynamic pages14478912bytes; house28 velocity still exceeds the safety cap. Strict backend is not activated by Building; house/board remain open. [Evidence and limits](docs/CHECKPOINT_216.md).
 
 1. Read [PROJECT_CONTRACT](PROJECT_CONTRACT.md), [current evidence](docs/CURRENT_STATUS.md), [forward roadmap](docs/ROADMAP.md) and project AGENTS. Preserve the complete goal; this file is not a goal API update.
-2. Source and installed QA0.19.215; DLL SHA 328CCC9841FCA6B21529F52CD89D177684E09D8974D48A7D59E5E1FA75AC39AE. [Report .215](docs/CHECKPOINT_215.md). Public binary .37 alpha is unchanged.
+2. Source and installed QA0.19.216; DLL SHA CCDF3CA513C8D2A39E47564E698D300C16B790124B264C108F878EF4442CE45C. [Report .216](docs/CHECKPOINT_216.md). Public binary .37 alpha is unchanged.
 
 Results below retain their original checkpoint versions; the current installation is stated above. Next integration work is exact whole-house memory/domain admission; a durable project requires its own server journal, not storage WAL.
 
@@ -24,6 +24,6 @@ Small fixed-pool GPU candidate passed `-ArenaOnly`:8 synthetic8×8×8 owners,47 
 5. Native import/build/reload of one paid28-part Forest Hut passed on .195. Limited batch exchange passed on .197. Preserve accepted cases; don't repeat without a changed path/regression reason.
 6. .212 normal/QA0/0, host/control/isolation/localization1104, Recovery24/Scratch360/36/Lazy28/5/10 exact RGB comparisons and independent PASSED/Ship.143 current files unchanged; receipts artifacts/fog-recovery-212. verify unavailable; direct checks used.
 7. No catalog bulk seeding, token reset, save creation or repeated grants. Preserve existing storage WAL/receipts/chest/inventory; final settlement/recovery remains open. Storage WAL is not a project journal.
-8. Deploy only with the guarded script to TerrainRamp-1.0-Test while Valheim is closed. Launch only Thunderstore Modded into the existing authorized QA identity. Source Default is not an installation. The local model pilot remains stopped.
+8. Default automated QA uses local ValheimQA, `../ValheimQA/RUNBOOK_RU.md`: direct GABS launch with TerrainRamp-1.0-Test BepInEx, existing isolated QA identities, state checks, normal exit and bridge restore. Standing18Oct2026 permission replaces Modded-only for these tests; never interrupt the owner session. Resets/new grants/unrelated world edits/other profiles/network need their own scope. The local stand is not distributed in GitHub. Deploy DLLs only with the guarded script while the game is closed.
 
 [Live work list](docs/LIVE_CHECKLIST_RU.md) · [development journal](docs/DEVELOPMENT_JOURNAL.md) · [full previous handoff](HANDOFF_HISTORY_206.md). Historical counters/next-step text are not current authority. Current GitHub docs include a complete role index; third-party licenses/game assets remain untouched.

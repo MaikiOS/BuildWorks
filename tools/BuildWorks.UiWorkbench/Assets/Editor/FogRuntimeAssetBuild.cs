@@ -87,12 +87,20 @@ public static class FogRuntimeAssetBuild
         using (var arena = new BlueprintFogArena(assets.Arena, assets.Metadata, 1, 1))
         {
             var token = new BlueprintFogSnapshotState.Submission((1L << 33) + 7, (1L << 34) + 9, 3, 2, 1);
-            arena.PublishMetadata(0, token, new Vector3(1, 2, 3), new Vector2(.3f, .95f), .14f, 1);
+            arena.PublishMetadata(0, token, new Vector3(1, 2, 3), new Vector2(.3f, .95f), .14f, 1, mapBase: BlueprintFogArena.MapWords);
+            var mapBases = new uint[1]; arena.Buffers["_PublishedMapBases"].GetData(mapBases);
+            if (mapBases[0] != BlueprintFogArena.MapWords) throw new InvalidDataException("Fog GPU map publication differs from its committed bank.");
+            bool invalidMapRejected = false;
+            try { arena.PublishMetadata(0, token, Vector3.zero, Vector2.one, 0, 0, mapBase: BlueprintFogArena.MapWords * 2); }
+            catch (ArgumentException) { invalidMapRejected = true; }
+            if (!invalidMapRejected) throw new InvalidDataException("Fog publication accepted another slot's map.");
             var values = new uint[16]; arena.Buffers["_PublishedMetadata"].GetData(values);
             if (values[7] != 3 || values[8] != 7 || values[9] != 2 || values[10] != 9 || values[11] != 4 || values[12] != 3 || values[13] != 0 || values[14] != 2 || values[15] != 1)
                 throw new InvalidDataException("Bundled fog arena did not publish exact owner metadata.");
             var rejected = new uint[16]; rejected[2] = 8; arena.Buffers["_Control"].SetData(rejected);
             arena.PublishMetadata(0, token, Vector3.zero, Vector2.one, 0, 0, 0);
+            arena.Buffers["_PublishedMapBases"].GetData(mapBases);
+            if (mapBases[0] != BlueprintFogArena.MapWords) throw new InvalidDataException("Rejected publication switched the confirmed map bank.");
             var retained = new uint[16]; arena.Buffers["_PublishedMetadata"].GetData(retained);
             if (!values.SequenceEqual(retained)) throw new InvalidDataException("Rejected arena publication changed the confirmed metadata.");
         }

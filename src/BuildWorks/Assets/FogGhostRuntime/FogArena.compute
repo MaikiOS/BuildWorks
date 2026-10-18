@@ -1,3 +1,4 @@
+#pragma multi_compile_local __ BUILDWORKS_FOG_DENSE_REFERENCE
 #pragma kernel InitArena
 #pragma kernel BeginStep
 #pragma kernel StageLedger
@@ -33,7 +34,13 @@ RWStructuredBuffer<uint> _Maps, _Free, _Control, _Receipts;
 RWStructuredBuffer<uint2> _Payload;
 RWStructuredBuffer<uint> _OwnerAway, _OwnerPeak, _OwnerState, _StageAway, _StagePeak, _StageState;
 Texture3D<float4> _ColourIn, _OriginIn, _SurfaceIn, _NextVelocity;
-RWTexture3D<float4> _ColourOut, _OriginOut, _SurfaceOut, _OwnerVelocity, _PublishedSmoke, _PublishedSurface;
+RWTexture3D<float4> _ColourOut, _OriginOut, _SurfaceOut, _OwnerVelocity;
+#if defined(BUILDWORKS_FOG_DENSE_REFERENCE)
+RWTexture3D<float4> _PublishedSmoke, _PublishedSurface;
+#else
+RWTexture3D<float4> _PublishedBricks;
+int3 _BrickGrid;
+#endif
 int3 _Grid, _Blocks, _RenderOffset;
 int _Capacity, _MapWords, _TotalMapWords, _ReceiptWords, _CurrentBase, _PendingBase, _Slot;
 int _Tick, _EmissionRevision, _InjectPackFailure;
@@ -147,12 +154,30 @@ void CommitLedger(uint id : SV_DispatchThreadID)
     if(id == 0) _OwnerState[0] = _StageState[0];
 }
 [numthreads(4,4,4)]
-void PublishFields(uint3 id : SV_DispatchThreadID)
+void PublishFields(uint3 id : SV_DispatchThreadID, uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
 {
-    if(any(id >= (uint3)(_Grid + 2)) || _Control[2] != 0) return;
+    if(_Control[2] != 0) return;
+    #if defined(BUILDWORKS_FOG_DENSE_REFERENCE)
+    if(any(id >= (uint3)(_Grid + 2))) return;
     int3 source = clamp((int3)id - 1,0,_Grid - 1);
     uint3 target = id + (uint3)_RenderOffset;
     _PublishedSmoke[target] = _ColourIn.Load(int4(source,0)); _PublishedSurface[target] = _SurfaceIn.Load(int4(source,0));
+    #else
+    if(any(group >= (uint3)_Blocks)) return;
+    uint block = Block(group);
+    [unroll] for(uint field=0;field<=2;field+=2)
+    {
+        uint page = _Maps[_PendingBase + field * BlocksPerField() + block];
+        if(page == Empty || page >= (uint)_Capacity) continue;
+        uint3 tile = uint3(page % _BrickGrid.x, (page / _BrickGrid.x) % _BrickGrid.y, page / (_BrickGrid.x * _BrickGrid.y)) * 6;
+        for(uint cell=lane;cell<216;cell+=64)
+        {
+            uint3 local=uint3(cell%6,(cell/6)%6,cell/36);
+            int3 source=clamp((int3)(group*4+local)-1,0,_Grid-1);
+            _PublishedBricks[tile+local]=field==0 ? _ColourIn.Load(int4(source,0)) : _SurfaceIn.Load(int4(source,0));
+        }
+    }
+    #endif
 }
 [numthreads(64,1,1)]
 void CommitMaps(uint id : SV_DispatchThreadID)

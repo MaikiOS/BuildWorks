@@ -6,9 +6,9 @@ BuildWorks extends Valheim's hammer with precise construction, a blueprint catal
 
 ![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
 
-**Current source / isolated QA: 0.19.215.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
+**Current source / isolated QA: 0.19.216.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
 
-**QA .215 installed: height-edit completion refreshes volume membership.** Unity48/3/4; actual background Valheim40/40 plus identity40/40, unchanged inventory, normal exit/bridge restored. Strict v11 passed56 exact and18 visual GPU comparisons across continuous idle/reentry; Building does not activate it yet. House28/board/network remain open. [Changes and limits](docs/CHECKPOINT_215.md).
+**QA .216 installed: hardware-filtered sparse v11 pages.** Unity56/18, runtime14 comparisons/15 negative cases; actual ValheimQA7/7 resources/metadata/cleanup, unchanged inventory and restored bridge. Dynamic pages14478912bytes; house28 velocity still exceeds the safety cap. Strict backend is not activated by Building; house/board remain open. [Evidence and limits](docs/CHECKPOINT_216.md).
 
 ## Capabilities
 
@@ -49,7 +49,7 @@ dotnet build .\src\BuildWorks\BuildWorks.csproj -c Release `
 dotnet run --project .\tests\BuildWorks.GeometryTests\BuildWorks.GeometryTests.csproj -c Release
 ```
 
-Developer deployment is guarded and restricted to TerrainRamp-1.0-Test. Launch QA only through Thunderstore **Modded**; source main is not an instruction to replace a gameplay installation.
+Default automated QA uses local ValheimQA, `../ValheimQA/RUNBOOK_RU.md`: direct GABS launch with TerrainRamp-1.0-Test BepInEx, existing isolated QA identities, state checks, normal exit and bridge restore. Standing18Oct2026 permission replaces Modded-only for these tests; never interrupt the owner session. Resets/new grants/unrelated world edits/other profiles/network need their own scope. The local stand is not distributed in GitHub.
 
 ## License
 

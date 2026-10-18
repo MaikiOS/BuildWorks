@@ -34,7 +34,7 @@ float4 GhostTransport(float3 p)
     float3 uv = (p - _MatterMin) / (_MatterMax - _MatterMin);
     if (any(uv < 0) || any(uv > 1)) return 0;
     #if defined(BUILDWORKS_FOG_PUBLISHED)
-    float4 field = tex3Dlod(_PublishedSurface, float4(FogDynamicUV(uv, _DynamicFieldSize, _DynamicOffset), 0));
+    float4 field = _PublishedSparse != 0 ? FogPackedSample(_PublishedRegion,2,uv) : tex3Dlod(_PublishedSurface, float4(FogDynamicUV(uv, _DynamicFieldSize, _DynamicOffset), 0));
     #else
     float4 field = tex3Dlod(_MatterFlow, float4(uv, 0));
     #endif

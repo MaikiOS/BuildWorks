@@ -4,7 +4,7 @@
 
 `BUILDWORKS_TEST_STAND` enables the local bounded keyboard/mouse/state channel. Normal builds exclude QA control and its InputSystem dependency. It is actual Valheim input, not Valheim inside Unity Editor. The control channel uses isolated files; optional GABS/ValAgent transport is a separate explicitly armed helper. No always-on public gameplay service is introduced.
 
-Only the existing authorized QA profile/world/character is allowed. Do not publish the personal stand token, create new saves, reset provisioning or replay item grants. Launch through Thunderstore TerrainRamp-1.0-Test **Modded**. First confirm process/profile/isolation, then current world, focus, position and inventory. A historical receipt or session file alone does not prove a live process.
+Default automated QA uses local ValheimQA, `../ValheimQA/RUNBOOK_RU.md`: direct GABS launch with TerrainRamp-1.0-Test BepInEx, existing isolated QA identities, state checks, normal exit and bridge restore. Standing18Oct2026 permission replaces Modded-only for these tests; never interrupt the owner session. Resets/new grants/unrelated world edits/other profiles/network need their own scope. The local stand is not distributed in GitHub. Never publish the personal token.
 
 From the canonical BuildWorks source root in PowerShell7:
 

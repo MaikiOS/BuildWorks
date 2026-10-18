@@ -7,6 +7,47 @@ namespace OstrixMods.BuildWorks
 {
     internal sealed class BuildWorksTestFog : MonoBehaviour
     {
+        // GABS can call handlers but cannot retain an internal constructor result for this resource-only probe.
+        public static string VerifyPublication()
+        {
+            BuildWorksTestIsolation.RequireLoadedSession();
+            string path = System.IO.Path.GetFullPath(System.IO.Path.Combine(BepInEx.Paths.BepInExRootPath,
+                "..", "..", "Default", "BuildWorks", "artifacts", "fog-runtime-assets-candidate", "buildworks-fog-v11"));
+            var result = new PublicationReceipt();
+            RenderTexture pages;
+            using (var probeAssets = new BlueprintFogAssets(System.IO.File.ReadAllBytes(path)))
+            using (var pool = BlueprintFogChannels.CreateArena(probeAssets, 2, 8192))
+            {
+                var arena = pool.SnapshotArena; pages = arena.Bricks;
+                if (!pages || !pages.IsCreated() || arena.Smoke || arena.Surface || arena.RenderBytes != 14478912)
+                    throw new InvalidOperationException("Native fog publication allocated unexpected render resources.");
+                var token = new BlueprintFogSnapshotState.Submission(1, 1, 1, 1, 1);
+                arena.PublishMetadata(1, token, Vector3.zero, new Vector2(.3f, .95f), .1f, 1, mapBase: 86400);
+                var bases = new uint[2]; arena.Buffers["_PublishedMapBases"].GetData(bases);
+                if (bases[1] != 86400) throw new InvalidOperationException("Native GPU did not publish the expected map bank.");
+                var metadata = new uint[32]; arena.Buffers["_PublishedMetadata"].GetData(metadata);
+                var control = new uint[16]; control[2] = 8; arena.Buffers["_Control"].SetData(control);
+                arena.PublishMetadata(1, token, Vector3.one, Vector2.one, .2f, 0, mapBase: 57600);
+                arena.Buffers["_PublishedMapBases"].GetData(bases);
+                if (bases[1] != 86400) throw new InvalidOperationException("Rejected native publication changed the confirmed map bank.");
+                var retained = new uint[32]; arena.Buffers["_PublishedMetadata"].GetData(retained);
+                for (int i = 0; i < metadata.Length; ++i)
+                    if (metadata[i] != retained[i]) throw new InvalidOperationException("Rejected native publication changed the confirmed metadata.");
+                result.renderBytes = arena.RenderBytes; result.reservedFieldBytes = arena.ReservedFieldBytes;
+                result.assets = probeAssets.AssetCount; result.kernels = probeAssets.KernelCount;
+            }
+            if (pages) throw new InvalidOperationException("Native publication pages survived their pool teardown.");
+            result.passed = result.packingRejectRetained = result.pagesReleased = true;
+            return JsonUtility.ToJson(result);
+        }
+        [Serializable] private sealed class PublicationReceipt
+        {
+            public bool passed, packingRejectRetained, pagesReleased;
+            public bool gameHostTested = true, visualParityTested = false, constructionTested = false, wholeHouseSupported = false;
+            public long renderBytes, reservedFieldBytes;
+            public int assets, kernels;
+        }
+
         private BlueprintFogAssets assets;
         private BlueprintFogVisual visual;
         private BlueprintFogVisual second;

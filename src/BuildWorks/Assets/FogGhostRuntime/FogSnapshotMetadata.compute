@@ -3,8 +3,8 @@
 
 // Dispatch after field/gutter writes and before any draw; the CPU receipt is a separate record.
 StructuredBuffer<uint> _Control;
-RWStructuredBuffer<uint> _PublishedMetadata;
-int _MetadataWords, _Slot, _Tick, _EmissionRevision, _PublishFlags;
+RWStructuredBuffer<uint> _PublishedMetadata, _PublishedMapBases;
+int _MetadataWords, _Slot, _Tick, _EmissionRevision, _PublishFlags, _PublishMapBase;
 uint2 _OwnerBits, _GenerationBits, _SequenceBits;
 float4 _ActorRadius;
 float3 _ShapeClock; // half height, fractional visual clock, trail[0].w (not emission).
@@ -19,6 +19,7 @@ void PublishMetadata(uint id : SV_DispatchThreadID)
 {
     if(_Control[2] != 0) return;
     uint base = _Slot * 16;
+    _PublishedMapBases[_Slot] = _PublishMapBase;
     _PublishedMetadata[base] = asuint(_ActorRadius.x); _PublishedMetadata[base+1] = asuint(_ActorRadius.y);
     _PublishedMetadata[base+2] = asuint(_ActorRadius.z); _PublishedMetadata[base+3] = asuint(_ActorRadius.w);
     _PublishedMetadata[base+4] = asuint(_ShapeClock.x); _PublishedMetadata[base+5] = asuint(_ShapeClock.y);

@@ -96,11 +96,11 @@ namespace OstrixMods.BuildWorks
             words[offset + 3] = (uint)generation; words[offset + 4] = (uint)(generation >> 32);
         }
 
-        internal static BlueprintFogChannels CreateArena(BlueprintFogAssets assets, int ownerLimit, int blockCapacity)
+        internal static BlueprintFogChannels CreateArena(BlueprintFogAssets assets, int ownerLimit, int blockCapacity, bool denseReference = false)
         {
             if (assets == null) throw new ArgumentNullException(nameof(assets));
             var pool = new BlueprintFogChannels(ownerLimit, MaximumFieldBudget);
-            pool.arena = new BlueprintFogArena(assets.Arena, assets.Metadata, ownerLimit, blockCapacity);
+            pool.arena = new BlueprintFogArena(assets.Arena, assets.Metadata, ownerLimit, blockCapacity, denseReference);
             pool.snapshotSlots = new SnapshotChannel[ownerLimit]; pool.generations = new long[ownerLimit];
             return pool;
         }
@@ -201,7 +201,7 @@ namespace OstrixMods.BuildWorks
                 }
                 shader.SetInt("_PendingBase", pendingBase);
                 var last = owner.Inputs.At(owner.Inputs.PendingCount - 1);
-                arena.PublishMetadata(owner.Slot, token, Actor(last), Body(last), last.Clock, last.Nearby ? 1 : 0); arena.Dispatch("FinishStep");
+                arena.PublishMetadata(owner.Slot, token, Actor(last), Body(last), last.Clock, last.Nearby ? 1 : 0, mapBase: pendingBase); arena.Dispatch("FinishStep");
                 var stamp = token; owner.nativePending = true;
                 owner.request = AsyncGPUReadback.Request(arena.Buffers["_Receipts"], request => {
                     try

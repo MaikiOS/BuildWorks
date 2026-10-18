@@ -17,7 +17,7 @@ Never leave a second older DLL elsewhere in plugins. Startup `BepInEx/LogOutput.
 
 Only `TerrainRamp-1.0-Test` is authorized. `Default/BuildWorks` is the source tree; `Default/BepInEx/plugins` must not contain BuildWorks. Use `scripts/Deploy-TestBuild.ps1 -TargetProfile TerrainRamp-1.0-Test` first with `-WhatIf`. The existing isolated stand uses `-QaStandToken <existing-token>` after building with `-p:BuildWorksTestStand=true`; never create/reset a token or saves to repopulate cards. The script verifies hashes and refuses running Valheim and other profiles. Deployment does not itself authorize game/world actions.
 
-Launch through Thunderstore → TerrainRamp-1.0-Test → **Modded**, then only the authorized existing QA world/character. No direct Steam/game launch. QA .206 is installed; it has not run in Valheim. Do not change a DLL while any Valheim process is running.
+Default automated QA uses local ValheimQA, `../ValheimQA/RUNBOOK_RU.md`: direct GABS launch with TerrainRamp-1.0-Test BepInEx, existing isolated QA identities, state checks, normal exit and bridge restore. Standing18Oct2026 permission replaces Modded-only for these tests; never interrupt the owner session. Resets/new grants/unrelated world edits/other profiles/network need their own scope. The local stand is not distributed in GitHub. See CURRENT_STATUS for the current installation; never replace DLLs while Valheim runs.
 
 ## Data and removal
 

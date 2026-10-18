@@ -87,7 +87,7 @@ namespace OstrixMods.BuildWorks
             const long cells = 96L * 80 * 80, ledgerBytes = 1024 * 4 * 2 + 4;
             if (owners < 1 || owners > 32 || blockCapacity < 1 || blockCapacity > 98304000 / 516)
                 throw new ArgumentException("Fog sparse pool sizing invalid.");
-            return cells * 8 * (9 + owners) + owners * (2 * 3 * (cells / 64) * 4 + ledgerBytes + 128) +
+            return cells * 8 * (9 + owners) + owners * (2 * 3 * (cells / 64) * 4 + ledgerBytes + 132) +
                 ledgerBytes + 64 + blockCapacity * 516L;
         }
     }

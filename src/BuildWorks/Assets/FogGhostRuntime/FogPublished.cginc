@@ -4,9 +4,13 @@
 // Immutable bindings: slot, owner low/high, generation low/high. Publication precedes every draw.
 #if !defined(SHADER_TARGET_SURFACE_ANALYSIS)
 StructuredBuffer<uint> _FogBindings, _PublishedMetadata;
+StructuredBuffer<uint> _PublishedMaps, _PublishedMapBases;
+
 #endif
 int _PublishedSlots, _PublishedRegion;
-sampler3D _PublishedSurface;
+int _PublishedSparse, _PublishedBlockCapacity;
+sampler3D _PublishedSurface, _PublishedBricks;
+float3 _PublishedBrickGrid;
 float3 _DynamicAtlasSize, _DynamicFieldSize, _DynamicOffset;
 struct FogPublishedState
 {
@@ -43,5 +47,35 @@ FogPublishedState FogReadPublished(int region)
 }
 float3 FogDynamicUV(float3 uv, float3 size, float3 offset)
 { return (offset + 1 + saturate(uv) * size) / _DynamicAtlasSize; }
+// A physical page includes a one-cell halo; the native sampler retains its filtering.
+float4 FogPackedSample(int region, uint field, float3 uv)
+{
+    #if !defined(SHADER_TARGET_SURFACE_ANALYSIS)
+    FogPublishedState state = FogReadPublished(region);
+    if (!state.valid || !state.active || (field != 0 && field != 2)) return 0;
+    uint bases, baseStride, maps, mapStride;
+    _PublishedMapBases.GetDimensions(bases, baseStride); _PublishedMaps.GetDimensions(maps, mapStride);
+    uint slot = _FogBindings[region * 5];
+    if (slot >= bases || baseStride != 4 || mapStride != 4 || any(_PublishedBrickGrid < 1)) return 0;
+    uint base = _PublishedMapBases[slot], first = slot * 57600;
+    if ((base != first && base != first + 28800) || base > maps || maps - base < 28800) return 0;
+    float3 q = saturate(uv) * float3(96,80,80) - .5;
+    int3 cell = (int3)floor(q);
+    uint capacity = (uint)(_PublishedBrickGrid.x * _PublishedBrickGrid.y * _PublishedBrickGrid.z);
+    if (_PublishedBlockCapacity < 1 || (uint)_PublishedBlockCapacity > capacity) return 0;
+    // Any occupied neighbour page contains all eight taps, including across an empty block.
+    [unroll] for(int z=0;z<2;++z) [unroll] for(int y=0;y<2;++y) [unroll] for(int x=0;x<2;++x)
+    {
+        uint3 block = (uint3)clamp(cell+int3(x,y,z),int3(0,0,0),int3(95,79,79))/4;
+        uint page = _PublishedMaps[base + field * 9600 + block.x + 24*(block.y+20*block.z)];
+        if(page == 0xffffffffu) continue;
+        if(page >= (uint)_PublishedBlockCapacity) return 0;
+        float3 tile = float3(page % (uint)_PublishedBrickGrid.x, (page / (uint)_PublishedBrickGrid.x) % (uint)_PublishedBrickGrid.y,
+            page / (uint)(_PublishedBrickGrid.x * _PublishedBrickGrid.y)) * 6;
+        return tex3Dlod(_PublishedBricks,float4((tile+1.5+q-(float3)block*4)/(_PublishedBrickGrid*6),0));
+    }
+    #endif
+    return 0;
+}
 #endif
 #endif

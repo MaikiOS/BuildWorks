@@ -224,12 +224,13 @@ namespace OstrixMods.BuildWorks
                 packedOwners[i] = owner; packedSmoke[i] = currentSmoke; packedSurface[i] = currentSurface; packedTicks[i] = tick;
             }
             material.SetTexture("_AtlasShape", shape);
-            material.SetTexture("_AtlasSmoke", publishedPool?.SnapshotArena.Smoke ?? smoke);
-            material.SetTexture("_AtlasSurface", publishedPool?.SnapshotArena.Surface ?? surface);
+            if (publishedPool == null || publishedPool.SnapshotArena.Smoke) material.SetTexture("_AtlasSmoke", publishedPool?.SnapshotArena.Smoke ?? smoke);
+            if (publishedPool == null || publishedPool.SnapshotArena.Surface) material.SetTexture("_AtlasSurface", publishedPool?.SnapshotArena.Surface ?? surface);
             if (publishedPool != null)
             {
                 material.SetBuffer("_FogBindings", bindings); material.SetBuffer("_PublishedMetadata", publishedPool.SnapshotArena.Buffers["_PublishedMetadata"]);
                 material.SetInt("_PublishedSlots", publishedPool.SnapshotCapacity);
+                publishedPool.SnapshotArena.BindPublication(material);
                 material.SetVector("_DynamicAtlasSize", new Vector4(98, 82, 82 * publishedPool.SnapshotCapacity, 0));
                 material.SetVectorArray("_RegionDynamicOffset", dynamicOffsets);
             }

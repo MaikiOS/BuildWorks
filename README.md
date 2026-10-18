@@ -10,6 +10,8 @@ BuildWorks extends Valheim's hammer with precise construction, a blueprint catal
 
 **QA .221 installed: numerical long-wall recovery verified in Valheim.**30/30;54,336 inner RGBA texels match payload, three fresh recovery samples have smoke/surface/ledgerFlags0. Approved visual v11/house/FPS/board remain open. [Evidence and limits](docs/CHECKPOINT_221.md).
 
+**Diagnostic222:** GPU confirmed aliasing distinct X source positions in legacy YZ return bins. An isolated3D candidate removes this alias; runtime is not fixed, installed .221 unchanged. [Cause, evidence and next step](docs/FOG_RETURN_OWNERSHIP_222.md).
+
 ## Capabilities
 
 - Hammer categories, search, recents, favorites and blueprint cards.

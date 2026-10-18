@@ -2,6 +2,8 @@
 
 **Current .221:** Valheim30/30 front pass through four-section wall;54,336 inner RGBA texels, three fresh zero smoke/surface/ledgerFlags samples. [Evidence](CHECKPOINT_221.md). Visual v11/other numeric directions/house/FPS/board remain open. Ordinary construction retains previous backend.
 
+**Diagnostic222:** GPU confirmed aliasing distinct X source positions in legacy YZ return bins. An isolated3D candidate removes this alias; runtime is not fixed, installed .221 unchanged. [Cause, evidence and next step](FOG_RETURN_OWNERSHIP_222.md).
+
 ## Historical .213 diagnosis and subsequent experiments (superseded by the current evidence above)
 
 [Русский](FOG_V11_INTEGRATION_RU.md) · [Current evidence](CURRENT_STATUS.md) · [Next milestones](ROADMAP.md)

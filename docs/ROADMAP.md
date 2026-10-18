@@ -36,7 +36,7 @@ External library or world capture → editing → construction. A personal libra
 
 ### 3. Construction projects
 
-Insufficient materials leave a recognizable, pass-through v11 fog ghost. A stake and board let players equip a hammer, inspect shortages, supply materials, continue, or cancel. Finished parts become real objects; projects survive world visits; cancellation refunds actual spending without repeated payouts. **Outcome:** unfinished houses are convenient to return to. Current work brings v11 to a whole house, followed by persistent projects and the board; laboratory approval of the effect does not establish readiness of the mechanic.
+Insufficient materials leave a recognizable, pass-through v11 fog ghost. A stake and board let players equip a hammer, inspect shortages, supply materials, continue, or cancel. Finished parts become real objects; projects survive world visits; cancellation refunds actual spending without repeated payouts. **Outcome:** unfinished houses are convenient to return to. Current work brings v11 to a whole house, followed by persistent projects and the board; laboratory approval of the effect does not establish readiness of the mechanic. Returned fog must restore the correct surface independently of prefab orientation and nearby damaged parts.
 
 ### 4. Complete and large buildings
 

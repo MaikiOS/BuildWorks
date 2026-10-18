@@ -6,6 +6,7 @@ This records changes and evidence, not future milestones. Historical results ret
 
 | Checkpoint | Change / evidence | Boundary |
 | --- | --- | --- |
+| 2026-10-18 · diagnostic222 | [GPU source-bin alias](FOG_RETURN_OWNERSHIP_222.md): compiled .221 solver wrongly retains old damage1.8m away alongX; isolated3D control separates it. Frozen lab/native sheets. | Runtime/DLL remain .221; full3D lifecycle/visual parity not proved. |
 | 2026-10-18 · .221 | [.221](CHECKPOINT_221.md): published GPU metrics/inner Bricks,132CPU, native30/30, three fresh zero-alpha recovery samples; installed/restored. Bridge71 compiled checks. | Visual v11/FPS/house-budget/board remain open; strict bridge not native-tested. |
 | 2026-10-18 · .220 | [.220](CHECKPOINT_220.md): one4-section wall,4 recorded directions,18/18+39/39; flags2 receipt/four-wall reserve, Unity6 retention, bridge58 tests; installed/restored. | No numeric v11 parity/FPS/house-budget/board acceptance. |
 | 2026-10-18 · .219 | [.219](CHECKPOINT_219.md): cooperative preparation/cancel, Unity15, native28/28; handler0.11s/full30.32s/max45.71ms, inventory/cleanup; installed/restored. | No continuous house appearance/recovery/FPS/board acceptance. |

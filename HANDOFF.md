@@ -4,10 +4,12 @@
 
 **QA .221 installed: numerical long-wall recovery verified in Valheim.**30/30;54,336 inner RGBA texels match payload, three fresh recovery samples have smoke/surface/ledgerFlags0. Approved visual v11/house/FPS/board remain open. [Evidence and limits](docs/CHECKPOINT_221.md).
 
+**Diagnostic222:** GPU confirmed aliasing distinct X source positions in legacy YZ return bins. An isolated3D candidate removes this alias; runtime is not fixed, installed .221 unchanged. [Cause, evidence and next step](docs/FOG_RETURN_OWNERSHIP_222.md).
+
 1. Read [PROJECT_CONTRACT](PROJECT_CONTRACT.md), [current evidence](docs/CURRENT_STATUS.md), [forward roadmap](docs/ROADMAP.md) and project AGENTS. Preserve the complete goal; this file is not a goal API update.
 2. Source and installed QA0.19.221; DLL SHA 2A146A973FB18C3D244A7C963240CCA458BB0A03C0AAD84A2B21F53BDC770577. [Report .221](docs/CHECKPOINT_221.md). Public binary .37 alpha is unchanged.
 
-Results below retain their original checkpoint versions; the current installation is stated above. Next work is visual long-wall parity against approved v11; numeric front-pass recovery is verified, then the house; a durable project requires its own server journal, not storage WAL.
+Results below retain their original checkpoint versions; the current installation is stated above. Next work is spatial return ownership instead of YZ aliasing, then matched long-wall/v11 capture and the house; a durable project requires its own server journal, not storage WAL.
 
 [.213](docs/FOG_NOISE_FRAME_213.md) aligns noise phases across parts; GPU checks/regressions passed and QA is installed. Native .213 is untested; boundary loss, recovery ownership and performance remain open.
 

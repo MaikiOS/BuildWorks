@@ -1,5 +1,7 @@
 # BuildWorks documentation
 
+[Return ownership diagnostic222](FOG_RETURN_OWNERSHIP_222.md) — YZ alias reproduced; runtime fix remains open.
+
 [Русский](README_RU.md) · [Project home](../README.md)
 
 Start with [current evidence](CURRENT_STATUS.md), then the [forward roadmap](ROADMAP.md). What changed is in the separate [development journal](DEVELOPMENT_JOURNAL.md).

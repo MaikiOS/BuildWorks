@@ -4,6 +4,8 @@
 
 **QA .221 installed: numerical long-wall recovery verified in Valheim.**30/30;54,336 inner RGBA texels match payload, three fresh recovery samples have smoke/surface/ledgerFlags0. Approved visual v11/house/FPS/board remain open. [Evidence and limits](CHECKPOINT_221.md).
 
+**Diagnostic222:** GPU confirmed aliasing distinct X source positions in legacy YZ return bins. An isolated3D candidate removes this alias; runtime is not fixed, installed .221 unchanged. [Cause, evidence and next step](FOG_RETURN_OWNERSHIP_222.md).
+
 Source and installed isolated QA build: **0.19.221**. Tested host: Valheim 1.0.20, Steam build25909357. Latest published binary is the historical [0.19.37 alpha prerelease](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha); its ZIP does not contain the current changes. There is no stable release. Source synchronization is not binary publication.
 
 | Area | Implemented / automated evidence | Valheim or user evidence | Still open |

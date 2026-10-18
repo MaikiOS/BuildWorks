@@ -1,5 +1,7 @@
 # Документация BuildWorks
 
+[Диагностика возврата222](FOG_RETURN_OWNERSHIP_222_RU.md) — причина YZ-alias подтверждена, игровой fix ещё впереди.
+
 [English](README.md) · [Главная проекта](../README_RU.md)
 
 Начните с [доказанного состояния](CURRENT_STATUS_RU.md), затем [плана будущих этапов](ROADMAP_RU.md). Сделанные изменения — в отдельном [журнале](DEVELOPMENT_JOURNAL_RU.md).

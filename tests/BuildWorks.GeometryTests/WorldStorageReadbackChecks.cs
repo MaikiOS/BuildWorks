@@ -16,6 +16,23 @@ namespace OstrixMods.BuildWorks.GeometryTests
         internal static void Run()
         {
             var fixture = new Fixture();
+            byte[] receipt = Encoding.UTF8.GetBytes("project/part/operation/exact-receipt");
+            var receiptExpected = NativeWorldStorageReadback.Expectation.ForExactBlob(71, Operation, 43, 100, 1, 2, 3, receipt);
+            var receiptFixture = new Fixture { Chunk = Chunk(inventory: receipt) };
+            receipt[0] ^= 1;
+            Check(receiptFixture.Verify(out var receiptEvidence, receiptExpected) && receiptEvidence.PayloadSha256.Length == 64,
+                "Exact receipt blob was rejected or aliased caller data");
+            Check(!new Fixture().Verify(out _, receiptExpected), "Native inventory silently substituted for the exact receipt");
+            bool refusedInventory = false;
+            try { Expect(Encoding.UTF8.GetBytes("not-an-inventory")); } catch (ArgumentException) { refusedInventory = true; }
+            Check(refusedInventory, "Receipt support weakened the native inventory constructor");
+            foreach (byte[] invalid in new[] { Array.Empty<byte>(), new byte[65537] })
+            {
+                bool refused = false;
+                try { NativeWorldStorageReadback.Expectation.ForExactBlob(71, Operation, 43, 100, 1, 2, 3, invalid); }
+                catch (ArgumentException) { refused = true; }
+                Check(refused, "Unbounded/empty construction receipt accepted");
+            }
             Check(fixture.Verify(out var evidence) && evidence.World == 71 && evidence.Operation == Operation &&
                 evidence.FormatVersion == 41 &&
                 evidence.Chunks == 1 && evidence.Objects == 1 && evidence.Chunk == "01_02__3_1.chunk" && evidence.ObjectOffset == 6 &&

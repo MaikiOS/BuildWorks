@@ -14,6 +14,7 @@ namespace OstrixMods.BuildWorks
         private const int MaximumBytes = BlueprintExchangeFormat.MaximumBytes + CompositeBlueprintStore.MaximumParts * 64 + 256;
         private readonly string directory;
         private readonly long world;
+        internal string DirectoryPath => directory;
 
         internal readonly struct Pose
         {
@@ -92,6 +93,8 @@ namespace OstrixMods.BuildWorks
                     throw new InvalidOperationException("Project was already cancelled by another operation.");
                 }
                 if (current.Revision != expectedRevision) throw new InvalidOperationException("Project revision changed.");
+                if (BlueprintConstructionPartJournal.HasExecutionEvidence(this, current))
+                    throw new InvalidOperationException("Project has construction execution evidence; unpaid cancellation is refused.");
                 var cancelled = new Record(id, world, 2, operation, current.RootPose, current.BlueprintBytes, current.Parts.ToArray());
                 Commit(cancelled, true); return Load(id);
             }
@@ -193,7 +196,7 @@ namespace OstrixMods.BuildWorks
             if (id == Guid.Empty) throw new ArgumentException("Project ID is required.", nameof(id));
             CompositeBlueprintStore.ValidateExchangeDirectory(directory); return Path.Combine(directory, id.ToString("N") + ".bwproject");
         }
-        private FileStream Lock(Guid id)
+        internal FileStream Lock(Guid id)
         { string path = PathFor(id) + ".lock"; CheckFile(path); return new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None); }
         private static void CheckFile(string path)
         { if (File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new InvalidDataException("Project path cannot be a reparse point."); }

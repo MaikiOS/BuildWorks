@@ -6,6 +6,7 @@ This records changes and evidence, not future milestones. Historical results ret
 
 | Checkpoint | Change / evidence | Boundary |
 | --- | --- | --- |
+| 2026-10-18 · source beyond .225 | Detached operation journal: intent/observation/confirmation, exact stack/property and hash checks; StoreTests/Geometry/host/localization, normal/QA0 errors/13CS0649, independent review. Parallel [EarthWorks architecture](EARTHWORKS_BOUNDARY.md); owner specified one board/store and initial blueprint-driven preparation. | No native caller, deployment or game payment proof; integration design remains under discussion. |
 | 2026-10-18 · .225 | [.225](CHECKPOINT_225.md): durable unpaid snapshot/stake/panel, Valheim19/19 +14/14, logout/login/cancel replay; Gamma/Linear matched-scene108 exact/36 each. Installed/restored. | Ordinary wiring/payment/fog/remote and native input/HUD remain open. |
 | 2026-10-18 · .224 | [.224](CHECKPOINT_224.md): coherent local X-window peak, canonical78+78 exact fields/168 pool; native11/11+66/66/4clips/recovery0. Installed/restored. | Actual-prefab visual/house/FPS/board open. |
 | 2026-10-18 · .223 | [.223](CHECKPOINT_223.md): immutable Spatial3D pool/staging/budget,28owners98,041,636B,168exact cycles, legacy270/18; native11/11+66/66/4clips/recovery0. Installed/restored. | Spatial look/normalisation/house/FPS/board not accepted. |

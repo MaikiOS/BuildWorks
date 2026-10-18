@@ -5,7 +5,7 @@
 **QA .225 installed: durable unpaid project/stake passed19/19 +14/14 in Valheim, including logout/login and cancellation.** Project fog, payments and ordinary construction wiring remain open. [Evidence](CHECKPOINT_225.md).
 
 
-Source and installed isolated QA build: **0.19.225**. Tested host: Valheim 1.0.20, Steam build25909357. Latest published binary is the historical [0.19.37 alpha prerelease](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha); its ZIP does not contain the current changes. There is no stable release. Source synchronization is not binary publication.
+Installed isolated QA build: **0.19.225**. Source is ahead by a detached construction journal: StoreTests/Geometry passed; normal/QA builds have 0 errors and 13 CS0649 warnings for fields not yet populated by a native caller. This is not native paid-continuation proof. The owner clarified the [EarthWorks boundary](EARTHWORKS_BOUNDARY.md): initial blueprint-driven terrain preparation, one board/store; architecture remains under discussion. Tested host: Valheim 1.0.20, Steam build25909357. Latest published binary is the historical [0.19.37 alpha prerelease](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha); its ZIP does not contain the current changes. There is no stable release. Source synchronization is not binary publication.
 
 | Area | Implemented / automated evidence | Valheim or user evidence | Still open |
 | --- | --- | --- | --- |

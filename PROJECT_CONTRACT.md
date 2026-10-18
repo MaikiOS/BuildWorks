@@ -1,6 +1,6 @@
 # BuildWorks project contract
 
-**Updated: 2026-10-17 · [Русский](PROJECT_CONTRACT_RU.md) · [Current evidence](docs/CURRENT_STATUS.md)**
+**Updated: 2026-10-18 · [Русский](PROJECT_CONTRACT_RU.md) · [Current evidence](docs/CURRENT_STATUS.md)**
 
 Continue the existing standalone BuildWorks. Preserve working precision/editor tools and native Valheim pieces, prices, ownership and permissions. The end state is external-library or world-captured building → BuildWorks blueprint → editor changes → correct ghost/scale/placement → resource-paid native construction → identical supported result after reload; the server confirms multiplayer state and authority.
 
@@ -21,3 +21,5 @@ Required module scope:
 13. Support Save As, category and explicit delete/hide, automatic portable files/Share, reviewed batch operations, server players/admin visibility and sharing between players. Only admins publish the common server library; players may accept personal copies. Full remote access remains an acceptance gate.
 
 Original adaptive meshes/materials and guides remain later agreed work. No Jotunn or EarthWorks/TerrainRamp runtime dependency; do not copy gameplay-mod code/assets. Ordinary native placement remains the commit path. [Roadmap](docs/ROADMAP.md) orders work; no partial checkpoint completes this contract.
+
+Owner boundary, 2026-10-18: the unfinished building, v11 ghost and project stake/board are the future cooperation point with EarthWorks. Terrain preparation starts from the selected house/blueprint; the joint project uses one board and one material store. BuildWorks owns the building; EarthWorks exclusively owns terrain preparation. Cancelling a BuildWorks project must never restore or otherwise alter terrain. Board presentation, actions and storage access/accounting remain to be agreed. The [integration proposal](docs/EARTHWORKS_BOUNDARY.md) is a draft, not an implemented API or approved interaction design.

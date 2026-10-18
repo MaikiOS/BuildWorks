@@ -6,7 +6,7 @@
 
 
 1. Read [PROJECT_CONTRACT](PROJECT_CONTRACT.md), [current evidence](docs/CURRENT_STATUS.md), [forward roadmap](docs/ROADMAP.md) and project AGENTS. Preserve the complete goal; this file is not a goal API update.
-2. Source and installed QA0.19.225; DLL SHA 09C32F8D6BC01B2A13C611B3583C6869557B6E39E34D2D99C841A3C309911F2A. [Report .225](docs/CHECKPOINT_225.md). Public binary .37 alpha is unchanged.
+2. Installed QA0.19.225; source is ahead by a separately tested detached journal, with no native caller or new deployment. StoreTests/Geometry/host/localization passed; normal/QA0 errors/13CS0649. See the [clarified EarthWorks boundary](docs/EARTHWORKS_BOUNDARY.md): initial blueprint-driven terrain preparation and one board/store. Installed DLL SHA 09C32F8D6BC01B2A13C611B3583C6869557B6E39E34D2D99C841A3C309911F2A. [Report .225](docs/CHECKPOINT_225.md). Public binary .37 alpha is unchanged.
 
 Results below retain their original checkpoint versions; the current installation is stated above. Next work is durable payment/new-object confirmation and board continuation, then unfinished-part fog. The unpaid host slice is not paid/network construction.
 

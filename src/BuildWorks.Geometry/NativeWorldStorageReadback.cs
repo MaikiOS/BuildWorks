@@ -29,10 +29,17 @@ namespace OstrixMods.BuildWorks.Geometry
             internal readonly byte[] Inventory;
             internal readonly string Marker;
             public Expectation(long world, Guid operation, int prefab, long creator, int creatorKey, int markerKey, int itemsKey, byte[] inventory)
+                : this(world, operation, prefab, creator, creatorKey, markerKey, itemsKey, inventory, true) { }
+
+            public static Expectation ForExactBlob(long world, Guid operation, int prefab, long creator,
+                int creatorKey, int markerKey, int receiptKey, byte[] receipt) =>
+                new Expectation(world, operation, prefab, creator, creatorKey, markerKey, receiptKey, receipt, false);
+
+            private Expectation(long world, Guid operation, int prefab, long creator, int creatorKey, int markerKey, int itemsKey, byte[] inventory, bool nativeInventory)
             {
                 if (world == 0 || operation == Guid.Empty || prefab == 0 || creator == 0 || creatorKey == markerKey || markerKey == itemsKey || creatorKey == itemsKey ||
-                    inventory == null || inventory.Length < 6 || inventory.Length > 1024 * 1024 ||
-                    BitConverter.ToInt32(inventory, 0) != 109 && BitConverter.ToInt32(inventory, 0) != 110)
+                    inventory == null || (nativeInventory ? inventory.Length < 6 || inventory.Length > 1024 * 1024 ||
+                        BitConverter.ToInt32(inventory, 0) != 109 && BitConverter.ToInt32(inventory, 0) != 110 : inventory.Length < 1 || inventory.Length > 65536))
                     throw new ArgumentException("Invalid saved-storage expectation.");
                 World = world; Operation = operation; Prefab = prefab; Creator = creator;
                 CreatorKey = creatorKey; MarkerKey = markerKey; ItemsKey = itemsKey; Inventory = (byte[])inventory.Clone();
@@ -49,6 +56,7 @@ namespace OstrixMods.BuildWorks.Geometry
             public string Chunk { get; }
             public long ObjectOffset { get; }
             public string InventorySha256 { get; }
+            public string PayloadSha256 => InventorySha256;
             internal Evidence(Expectation expected, int version, int chunks, int objects, string chunk, long offset)
             {
                 FormatVersion = version;

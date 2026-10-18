@@ -1,6 +1,6 @@
 # BuildWorks roadmap
 
-[Русский](ROADMAP_RU.md) · Updated 17 October 2026
+[Русский](ROADMAP_RU.md) · Updated 18 October 2026
 
 ## Product direction
 
@@ -60,7 +60,7 @@ Original BuildWorks pieces and materials change shape through agreed parameters 
 
 ### 9. Cooperation with EarthWorks
 
-Explicit cooperation between a separate terrain-preparation project and the building project: site → materials → gradual construction. **Outcome:** a coherent workflow between two independent mods. BuildWorks never alters terrain implicitly. Integration has not started; terrain transfer and arbitrary OBJ/FBX/glTF are not added to the current blueprint module.
+Explicit cooperation between a separate terrain-preparation project and the building project: site → materials → gradual construction. **Outcome:** a coherent workflow between two independent mods. The unfinished building, v11 ghost and stake/board form the cooperation point. EarthWorks alone owns terrain; cancelling the building never changes or restores it. Preparation starts from the selected house/blueprint, with one board and one material store for the joint project. Presentation/actions, access and accounting remain to be agreed. The [architecture proposal](EARTHWORKS_BOUNDARY.md) is not approved; implementation follows independent building projects and the required EarthWorks tools. Terrain transfer and arbitrary OBJ/FBX/glTF are not added to the current blueprint module.
 
 ## Priorities and progression
 

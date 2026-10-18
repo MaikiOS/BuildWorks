@@ -59,6 +59,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             invalid = pose.Values; invalid[7] = 0; Refuse<InvalidDataException>(() => new Projects.Pose(invalid));
             Require(store.Load(id).Blueprint.parts.Select(p => p.stableId).SequenceEqual(new[] { "a", "b" }), "Source stable IDs were lost.");
             Console.WriteLine("PASS unpaid project store: immutable portable snapshot/TRS/part IDs, atomic reload/cancel replay, world/revision/conflict/corruption/extra-data/IO failures. No native construction, payment, refunds, board or server authorization executed.");
+            ConstructionPartJournalChecks.Run(Path.Combine(folder, "part-journal"));
         }
         private static B.Part Part(string id, float x) => new B.Part {
             stableId = id, prefabName = "woodwall", displayName = "Wall", position = new B.VectorData { x = x },

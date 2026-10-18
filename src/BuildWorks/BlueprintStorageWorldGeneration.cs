@@ -34,7 +34,8 @@ namespace OstrixMods.BuildWorks
             { Passed = passed; Evidence = evidence; Reason = reason; }
         }
 
-        private BlueprintStorageWorldGeneration(Guid operation, Guid marker, int prefab, long creator, byte[] items, Func<bool> custodyUnchanged)
+        private BlueprintStorageWorldGeneration(Guid operation, Func<bool> custodyUnchanged,
+            Func<long, NativeWorldStorageReadback.Expectation> expectation)
         {
             Operation = operation; this.custodyUnchanged = custodyUnchanged;
             threadId = Thread.CurrentThread.ManagedThreadId;
@@ -43,11 +44,20 @@ namespace OstrixMods.BuildWorks
             if (!Path.IsPathRooted(nativeDirectory)) throw new InvalidOperationException("Native world directory is not absolute.");
             directory = Path.GetFullPath(nativeDirectory);
             Generation = SaveSystem.GetSaveNumber();
-            expected = new NativeWorldStorageReadback.Expectation(worldId, marker, prefab, creator,
-                ZDOVars.s_creator, BlueprintStorageCapture.TransferMarkerKey, ZDOVars.s_items, items);
+            expected = expectation(worldId);
         }
 
         internal static bool TryCapture(Guid operation, Guid marker, int prefab, long creator, byte[] items, Func<bool> custodyUnchanged,
+            out BlueprintStorageWorldGeneration expectation, out string reason)
+            => TryCapture(operation, custodyUnchanged, world => new NativeWorldStorageReadback.Expectation(world, marker, prefab, creator,
+                ZDOVars.s_creator, BlueprintStorageCapture.TransferMarkerKey, ZDOVars.s_items, items), out expectation, out reason);
+
+        internal static bool TryCaptureReceipt(Guid operation, int prefab, long creator, int markerKey, int receiptKey, byte[] receipt,
+            Func<bool> custodyUnchanged, out BlueprintStorageWorldGeneration expectation, out string reason)
+            => TryCapture(operation, custodyUnchanged, world => NativeWorldStorageReadback.Expectation.ForExactBlob(world, operation, prefab,
+                creator, ZDOVars.s_creator, markerKey, receiptKey, receipt), out expectation, out reason);
+
+        private static bool TryCapture(Guid operation, Func<bool> custodyUnchanged, Func<long, NativeWorldStorageReadback.Expectation> factory,
             out BlueprintStorageWorldGeneration expectation, out string reason)
         {
             expectation = null; reason = null;
@@ -57,7 +67,7 @@ namespace OstrixMods.BuildWorks
                     ZNet.instance.IsSaving() || ZNet.instance.GetWorld() == null ||
                     ZNet.instance.GetWorld().m_fileSource != FileHelpers.FileSource.Local || !custodyUnchanged())
                     throw new InvalidOperationException("Readback requires the current Local host, an idle save and exact completed item custody.");
-                var candidate = new BlueprintStorageWorldGeneration(operation, marker, prefab, creator, items, custodyUnchanged);
+                var candidate = new BlueprintStorageWorldGeneration(operation, custodyUnchanged, factory);
                 if (!candidate.Valid()) throw new InvalidOperationException("World generation, source or custody changed during capture.");
                 expectation = candidate; return true;
             }

@@ -2,6 +2,8 @@
 
 [Русский](EARTHWORKS_BOUNDARY_RU.md) · 18 October 2026 · **owner boundary confirmed; integration design pending discussion**
 
+**Current work is independent BuildWorks house construction without site preparation.** Terrain work comes later when EarthWorks is connected; its absence does not block building. The joint workflow below is a subsequent stage.
+
 ## Confirmed by Ostrix
 
 - The unfinished building, approved v11 fog and stake/board are the future cooperation point.

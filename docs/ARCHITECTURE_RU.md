@@ -19,6 +19,7 @@
 | Локализация | `BuildWorksLocalization.cs` | `Translations/English.tsv`, `Translations/Russian.tsv` |
 | Только отображение требований чертежа | `BlueprintResourceHudView.cs` | `HammerBlueprintPieceRegistry.cs`, `PrecisionPlacementSession.cs` |
 | Сохраняемые неоплаченные проекты локального хоста | `BlueprintConstructionProjectStore.cs` | `BlueprintConstructionProjectRuntime.cs`, `BlueprintConstructionProjectBoard.cs`, `BlueprintConstructionProjectView.cs` |
+| Native-достройка и точная запись оплаты | `BlueprintConstructionPartExecution.cs`, `BlueprintConstructionPartJournal.cs` | `PrecisionPlacementSession.Project.cs`, `BlueprintConstructionProjectPersistence.cs`; local-host только, не общий crash recovery |
 
 Неоплаченный проект отделён от `PrecisionPlacementSession`: файл текущего мира хранит snapshot и окончательную отмену, колышки/окна пересоздаются. Обычная стройка пока его не вызывает. Журнал намерения/подтверждения оплаты, продолжение, туман проекта и полномочия remote-клиента ещё предстоит подключить; неоплаченный формат не выполняет операций инвентаря или native-объектов.
 

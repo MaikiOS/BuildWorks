@@ -2,10 +2,10 @@
 
 **2026-10-18 · [Русский](CURRENT_STATUS_RU.md) · [Roadmap](ROADMAP.md) · [Documentation](README.md)**
 
-**QA .225 installed: durable unpaid project/stake passed19/19 +14/14 in Valheim, including logout/login and cancellation.** Project fog, payments and ordinary construction wiring remain open. [Evidence](CHECKPOINT_225.md).
+**QA .226 installed:** four-wall native continuation16/16 and world reload10/10, with exact debit/save evidence. Project fog, paid cancellation and server work remain open. [.226](CHECKPOINT_226.md).
 
 
-Installed isolated QA build: **0.19.225**. Source is ahead by a detached construction journal: StoreTests/Geometry passed; normal/QA builds have 0 errors and 13 CS0649 warnings for fields not yet populated by a native caller. This is not native paid-continuation proof. The owner clarified the [EarthWorks boundary](EARTHWORKS_BOUNDARY.md): initial blueprint-driven terrain preparation, one board/store; architecture remains under discussion. Tested host: Valheim 1.0.20, Steam build25909357. Latest published binary is the historical [0.19.37 alpha prerelease](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha); its ZIP does not contain the current changes. There is no stable release. Source synchronization is not binary publication.
+Installed isolated QA **0.19.226**. Normal/QA0/0, full Store/Geometry, host1.0.20/25909357, localization1118 and independent review passed. Valheim16/16+10/10 covers four walls/native payment/paired saves/world reload, a bounded host slice. No site preparation; EarthWorks comes later. Public0.19.37 alpha remains historical; no new binary release.
 
 | Area | Implemented / automated evidence | Valheim or user evidence | Still open |
 | --- | --- | --- | --- |
@@ -16,7 +16,7 @@ Installed isolated QA build: **0.19.225**. Source is ahead by a detached constru
 | Server library and sharing | Administrator publication; players/admin visibility, verified personal copies, provenance; in-process checks | Host+remote not accepted | Live access/reconnect/restart; direct player-to-player transfer |
 | Items and storage | Separate storage/mount inclusion; supplied-item preservation and journal foundations | Limited chest/inventory comparison only | Durable settlement, cancellation/refund/crash/replay, all holders/armor/admin restore and network authority |
 | v11 fog | .224 canonical78+78 exact; .225 Gamma/Linear each108 exact fields/36 images | Native .224:11/11+66/66/4clips/recovery0; .225 matched-scene is Unity-only | Actual-prefab look/scale/tilt/recontact/FPS, house budget, project fog and networking |
-| Unfinished construction | .225: durable unpaid snapshot, local stake/panel/cancel; ordinary path unchanged | Valheim19/19 +14/14: runtime/logout-login, exact IDs/TRS, cancellation/replay, equal inventory lists | Payment/continuation, fog, native input/HUD, crash reconciliation and server/remote |
+| Unfinished construction | .226 Intent/Observed/Committed, native ProjectPart, board-handler continuation and bounded existing-operation reconciliation | Valheim16/16+10/10:4walls,2Wood/part, exact TRS/receipt/paired save/world reload | Ordinary Create wiring, fog, paid cancellation, general crash reconciliation, native input/HUD, server/remote |
 | World selection and heavy chain | Capture/volume foundations and targeted checks | Basic capture accepted; later coordinate/height UX issues reported | Editable volume/gizmos, boundary rules, full loaded-area and performance acceptance |
 | World objects and EarthWorks | No terrain integration dependency | None claimed | Admin-priced nonrecipe objects; EarthWorks is a later separate integration |
 

@@ -65,6 +65,17 @@ namespace OstrixMods.BuildWorks
 
         internal BlueprintConstructionPartJournal(Plan plans) { this.plans = plans ?? throw new ArgumentNullException(nameof(plans)); }
 
+        internal static void RequireCapacity(BlueprintForeignPartData before, PaidRow[] possibleDebits)
+        {
+            ValidateInventory(before?.Info, before?.Zdo);
+            if (possibleDebits == null || possibleDebits.Length > 4096 || possibleDebits.Any(row => row?.Prefab == null || row.Properties == null))
+                throw new InvalidDataException("Construction debit preflight is incomplete.");
+            // Actual receipts have fixed-size hashes; reserve more than their framing and each row before native debit.
+            long receipt = 1024 + possibleDebits.Sum(row => 128L + Encoding.UTF8.GetByteCount(row.Prefab));
+            long bytes = before.Zdo.Length * 2L + possibleDebits.Sum(row => (long)row.Properties.Length);
+            if (receipt > 65536 || bytes > MaximumBytes / 2) throw new InvalidDataException("Construction evidence exceeds its preflight budget.");
+        }
+
         internal Record Prepare(Guid project, Guid part, Guid operation, long player,
             BlueprintForeignPartData inventory, out bool newlyPrepared)
         {

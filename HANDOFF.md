@@ -2,13 +2,13 @@
 
 2026-10-18 · [Русский](HANDOFF_RU.md)
 
-**QA .225 installed: durable unpaid project/stake passed19/19 +14/14 in Valheim, including logout/login and cancellation.** Project fog, payments and ordinary construction wiring remain open. [Evidence](docs/CHECKPOINT_225.md).
+**QA .226 installed:** four-wall native continuation16/16 and world reload10/10, with exact debit/save evidence. Project fog, paid cancellation and server work remain open. [.226](docs/CHECKPOINT_226.md).
 
 
 1. Read [PROJECT_CONTRACT](PROJECT_CONTRACT.md), [current evidence](docs/CURRENT_STATUS.md), [forward roadmap](docs/ROADMAP.md) and project AGENTS. Preserve the complete goal; this file is not a goal API update.
-2. Installed QA0.19.225; source is ahead by a separately tested detached journal, with no native caller or new deployment. StoreTests/Geometry/host/localization passed; normal/QA0 errors/13CS0649. See the [clarified EarthWorks boundary](docs/EARTHWORKS_BOUNDARY.md): initial blueprint-driven terrain preparation and one board/store. Installed DLL SHA 09C32F8D6BC01B2A13C611B3583C6869557B6E39E34D2D99C841A3C309911F2A. [Report .225](docs/CHECKPOINT_225.md). Public binary .37 alpha is unchanged.
+2. QA0.19.226 installed; normal/QA0/0, full Store/Geometry/host/localization1118; Valheim16/16+10/10. SHA 43E1DC7AF5F5F68CB083D34CE47E75970CF1F026BF00D8DC06A761EF3FD640F7. Next: unfinished-part fog and ordinary Create wiring; paid refunds/full reconciliation/remote remain open. No site preparation; EarthWorks comes later. Public .37 alpha unchanged.
 
-Results below retain their original checkpoint versions; the current installation is stated above. Next work is durable payment/new-object confirmation and board continuation, then unfinished-part fog. The unpaid host slice is not paid/network construction.
+Development paused at Ostrix's request on18October. After resuming: unfinished-part v11 fog and ordinary project creation, then confirmed paid cancellation/refunds. Results below retain their historical versions; the bounded .226 paid slice is not the complete module or network construction.
 
 [.213](docs/FOG_NOISE_FRAME_213.md) aligns noise phases across parts; GPU checks/regressions passed and QA is installed. Native .213 is untested; boundary loss, recovery ownership and performance remain open.
 

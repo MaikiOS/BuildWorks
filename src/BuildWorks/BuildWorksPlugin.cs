@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.225";
+        internal const string PluginVersion = "0.19.226";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -35,6 +35,8 @@ namespace OstrixMods.BuildWorks
         private BlueprintConstructionProjectRuntime constructionProjects;
         internal static bool CanOpenConstructionProject => instance && instance.blueprintEditor?.BlocksWorldInput != true &&
             !HammerCatalogView.BlocksExchangeInput && instance.session?.CanOpenConstructionProject == true;
+        internal static bool BeginConstructionProjectPart(BlueprintConstructionPartExecution execution) => instance &&
+            instance.session?.BeginProjectPart(execution) == true;
         internal static BlueprintServerClient ServerLibraryClient => instance?.serverLibrary?.Client;
 #if BUILDWORKS_TEST_STAND
         private BuildWorksQaControl qaControl;

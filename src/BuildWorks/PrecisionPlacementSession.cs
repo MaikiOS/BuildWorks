@@ -108,6 +108,12 @@ namespace OstrixMods.BuildWorks
                 currentBlueprintPlacements.Add(placed);
                 constructionPayments[placed] = nativeConstructionPayment;
             }
+            if (sessionMode == SessionMode.ProjectPart)
+            {
+                if (SharesNativePlacementData(placed, source.gameObject)) throw new InvalidOperationException("Project creation shares source identity.");
+                BlueprintWorldSnapPoints.Apply(placed, placementPlan[placementPlanIndex].CustomSnapPoints);
+                projectPart.Created(placed);
+            }
             pendingNativePiece = placed;
             pendingNativePlanIndex = placementPlanIndex;
         }
@@ -135,6 +141,7 @@ namespace OstrixMods.BuildWorks
         {
             None,
             WorldPrecision,
+            ProjectPart,
             BlueprintWorldPlacement,
             BlueprintWorldSelection,
             BlueprintEditor
@@ -481,10 +488,12 @@ namespace OstrixMods.BuildWorks
         internal BlueprintConstructionRefund BeginConstructionPayment(Player player)
         {
             if (player != Player.m_localPlayer || state != PlacementState.Armed ||
-                sessionMode != SessionMode.BlueprintWorldPlacement || !selectedPiece) return null;
+                sessionMode != SessionMode.BlueprintWorldPlacement && sessionMode != SessionMode.ProjectPart || !selectedPiece) return null;
+            if (sessionMode == SessionMode.ProjectPart && !automaticPlacementRunning) return null;
             if (nativeConstructionPayment != null)
                 throw new InvalidOperationException("Recursive blueprint placement is not supported.");
             BlueprintRotationState.RequireFreshCreation();
+            projectPart?.BeforeNative();
             return nativeConstructionPayment = new BlueprintConstructionRefund(player.GetInventory(), selectedPiece.m_resources);
         }
 
@@ -494,6 +503,11 @@ namespace OstrixMods.BuildWorks
             try { payment.Complete(); }
             finally
             { if (ReferenceEquals(nativeConstructionPayment, payment)) nativeConstructionPayment = null; }
+            if (sessionMode == SessionMode.ProjectPart)
+            {
+                projectPart.EndNative(payment, error);
+                projectPart = null; Finish(); return;
+            }
             if (error != null || payment.Error != null)
             {
                 pendingConstructionCompletion = false;
@@ -1054,6 +1068,7 @@ namespace OstrixMods.BuildWorks
 
             if (Input.GetKeyDown(KeyCode.Escape))
             {
+                if (sessionMode == SessionMode.ProjectPart) { Cancel(); return; }
                 if (sessionMode == SessionMode.BlueprintEditor)
                 {
                     if (blueprintWorkspaceEditPart != null)
@@ -2553,7 +2568,7 @@ namespace OstrixMods.BuildWorks
         {
             ghost = null;
             source = null;
-            if (activeBlueprint == null || SupportsPrecisionPlacement(selectedPiece) || !allowNativeGhostUpdate ||
+            if (sessionMode != SessionMode.ProjectPart && (activeBlueprint == null || SupportsPrecisionPlacement(selectedPiece)) || !allowNativeGhostUpdate ||
                 state == PlacementState.Inactive || !PlacementSelectionStillValid(player) ||
                 placementPlanIndex >= placementPlan.Count ||
                 placementPlanIndex >= placementPlanPieces.Count ||
@@ -2590,7 +2605,7 @@ namespace OstrixMods.BuildWorks
             {
                 return false;
             }
-            if (sessionMode == SessionMode.BlueprintWorldPlacement && state == PlacementState.Armed &&
+            if ((sessionMode == SessionMode.BlueprintWorldPlacement || sessionMode == SessionMode.ProjectPart) && state == PlacementState.Armed &&
                 nativeConstructionPayment == null) return true;
             if (sessionMode == SessionMode.BlueprintEditor) return true;
             if (pendingItemStandContents != null) return true;
@@ -3080,7 +3095,7 @@ namespace OstrixMods.BuildWorks
             bool signFailed = placed && placementPlanIndex < placementPlan.Count &&
                 placementPlan[placementPlanIndex].SignText != null;
             bool hasSign = TakePendingPlacementSign(placed, out GameObject created, out string signText);
-            if (placed && sessionMode == SessionMode.BlueprintWorldPlacement)
+            if (placed && (sessionMode == SessionMode.BlueprintWorldPlacement || sessionMode == SessionMode.ProjectPart))
             {
                 // The object/payment are enrolled now; a failed write follows verified removal/refund.
                 BlueprintRotationState.ApplyCreated(created, piece.gameObject,
@@ -3095,6 +3110,8 @@ namespace OstrixMods.BuildWorks
                     Debug.LogWarning("BuildWorks native sign apply failed: " + error.GetType().Name);
                 }
             }
+            if (sessionMode == SessionMode.ProjectPart)
+            { projectPart.PlacementResult(placed, signFailed); return; }
             if (placed)
             {
                 BlueprintForeignPartData contents = placementPlan[placementPlanIndex].ItemStandContents;
@@ -3161,6 +3178,8 @@ namespace OstrixMods.BuildWorks
 
         private void PauseAutomaticPlacement(Player player, string reason)
         {
+            if (sessionMode == SessionMode.ProjectPart)
+            { projectPart?.StopBeforeNative(reason); projectPart = null; Finish(); return; }
             RestoreAutomaticCooldown(player);
             automaticPlacementPaused = true;
             automaticPauseReason = reason;
@@ -3178,6 +3197,7 @@ namespace OstrixMods.BuildWorks
 
         private bool TrySkipPlayerBlockedPlacement(Player player)
         {
+            if (sessionMode == SessionMode.ProjectPart) return false;
             if (player.GetPlacementStatus() != Player.PlacementStatus.BlockedbyPlayer ||
                 placementPlanIndex >= placementPlan.Count)
             {
@@ -3208,6 +3228,8 @@ namespace OstrixMods.BuildWorks
 
         public void OnNativePlacementException(Player player, Piece piece)
         {
+            if (sessionMode == SessionMode.ProjectPart)
+            { projectPart?.Refuse("Native construction failed; project evidence retained."); projectPart = null; Finish(); return; }
             if (player == Player.m_localPlayer)
             {
                 pendingNativePiece = null;
@@ -6802,6 +6824,8 @@ namespace OstrixMods.BuildWorks
 
         private void Cancel(bool restoreCursor = true)
         {
+            if (sessionMode == SessionMode.ProjectPart)
+            { projectPart?.StopBeforeNative("Construction stopped; project retained."); projectPart = null; Finish(restoreCursor); return; }
             if (sessionMode == SessionMode.BlueprintEditor &&
                 blueprintWorkspaceEditPart != null)
             {

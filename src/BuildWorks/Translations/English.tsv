@@ -224,7 +224,11 @@ project.cancel	Cancel unpaid project
 project.unpaid	Unbuilt parts: {0}. No resources contributed.
 project.cancel_confirm	Press Cancel again to remove the unpaid project. Nothing will be granted.
 project.missing	Some required prefabs are unavailable.
-project.payment_pending	Development stage: payment and continuation are not connected yet. Closing keeps the project.
+project.payment_pending	Continue uses your inventory and normal Valheim placement rules. Paid-project cancellation and mounted/container contents are not available at this development stage. Closing keeps the project.
+project.continue	Continue construction
+project.progress	Built: {0} / {1} parts.
+project.review	An operation needs verification. Repeating construction or an automatic refund is blocked.
+project.unavailable	The construction project is not ready for this operation.
 project.error	Project operation failed: {0}
 placement.pause.validation	the next part did not pass Valheim validation
 placement.pause.tool_missing	the required part is unavailable in the current hammer

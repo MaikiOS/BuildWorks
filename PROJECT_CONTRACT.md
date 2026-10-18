@@ -2,6 +2,8 @@
 
 **Updated: 2026-10-18 · [Русский](PROJECT_CONTRACT_RU.md) · [Current evidence](docs/CURRENT_STATUS.md)**
 
+**Current stage:** independent BuildWorks house construction without foundation or terrain preparation. Blueprint-driven site preparation comes later through EarthWorks; building does not require the other mod.
+
 Continue the existing standalone BuildWorks. Preserve working precision/editor tools and native Valheim pieces, prices, ownership and permissions. The end state is external-library or world-captured building → BuildWorks blueprint → editor changes → correct ghost/scale/placement → resource-paid native construction → identical supported result after reload; the server confirms multiplayer state and authority.
 
 Required module scope:

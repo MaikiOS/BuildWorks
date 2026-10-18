@@ -8,7 +8,7 @@ using Store = OstrixMods.BuildWorks.BlueprintConstructionProjectStore;
 
 namespace OstrixMods.BuildWorks
 {
-    // shortcut: unpaid local-host projects only; add authenticated remote/payment operations before enabling ordinary construction.
+    // shortcut: private Local host only; authenticated remote operations require their own persistence/authority proof.
     internal sealed class BlueprintConstructionProjectRuntime : IDisposable
     {
         private readonly string root;
@@ -19,11 +19,16 @@ namespace OstrixMods.BuildWorks
         private Store store;
         private readonly BlueprintConstructionProjectView view = new BlueprintConstructionProjectView();
         private bool failed, disposed;
+        private BlueprintConstructionPartExecution execution;
+        private Guid queued;
+        private int queuedFrame;
+        private bool recoveryOnly;
+        internal BlueprintConstructionPartExecution Execution => execution;
         internal int BoardCount => boards.Count;
         internal long World => world;
         internal string Failure { get; private set; }
         internal BlueprintConstructionProjectBoard OpenBoard { get; private set; }
-        internal bool BlocksInput => view.IsOpen;
+        internal bool BlocksInput => view.IsOpen || execution?.Saving == true;
 
         internal BlueprintConstructionProjectRuntime(string configPath, Action<Exception> log)
         { root = Path.Combine(configPath ?? throw new ArgumentNullException(nameof(configPath)), "BuildWorks", "server"); this.log = log; }
@@ -33,7 +38,27 @@ namespace OstrixMods.BuildWorks
             if (disposed) return;
             ZNet current = ZNet.instance; long uid = WorldId(current);
             if (network != current || uid != world) { Suspend(); network = current; world = uid; }
-            if (!Allowed()) { ClearBoards(); store = null; return; }
+            if (!Allowed()) { execution?.Refuse("Construction context closed; evidence retained."); execution = null; queued = Guid.Empty; ClearBoards(); store = null; return; }
+            if (execution != null && !execution.Finished)
+            {
+                execution.Tick();
+                if (execution.Finished && execution.Status == "committed" && !recoveryOnly) { queued = execution.Project; queuedFrame = Time.frameCount; }
+            }
+            if (queued != Guid.Empty && Time.frameCount > queuedFrame && !view.IsOpen && BuildWorksPlugin.CanOpenConstructionProject)
+            {
+                Guid id = queued; queued = Guid.Empty;
+                try
+                {
+                    var part = NextPart(id);
+                    if (part != null)
+                    {
+                        recoveryOnly = false;
+                        execution = new BlueprintConstructionPartExecution(store, id, part.Id);
+                        if (!BuildWorksPlugin.BeginConstructionProjectPart(execution)) execution.StopBeforeNative("Native session could not start.");
+                    }
+                }
+                catch (Exception error) { Failure = error.Message; log?.Invoke(error); }
+            }
             if (OpenBoard && (!Player.m_localPlayer || Player.m_localPlayer.IsDead() ||
                 !HasHammer(Player.m_localPlayer) || Vector3.Distance(Player.m_localPlayer.transform.position, OpenBoard.transform.position) > 5)) Close();
             try { view.Tick(this, OpenBoard); }
@@ -60,6 +85,38 @@ namespace OstrixMods.BuildWorks
         }
 
         internal Store.Record Read(Guid id) { RequireContext(); return store.Load(id); }
+        internal BlueprintConstructionPartJournal.Record ReadPart(Guid id, Guid part) { RequireContext(); return new BlueprintConstructionPartJournal(store).Read(id, part); }
+        internal (int Built, int Total, bool NeedsReview) Progress(Guid id)
+        {
+            var record = Read(id); var rows = record.Parts.Select(part => ReadPart(id, part.Id)).ToArray();
+            return (rows.Count(row => row?.Phase == BlueprintConstructionPartJournal.Committed), rows.Length, rows.Any(row => row?.RequiresReconciliation == true));
+        }
+        private Store.Part NextPart(Guid id)
+        {
+            var plan = Read(id); if (plan.Cancelled) throw new InvalidOperationException("Construction project was cancelled.");
+            if (Progress(id).NeedsReview) throw new InvalidOperationException(BuildWorksLocalization.Text("project.review"));
+            return plan.Parts.FirstOrDefault(part => ReadPart(id, part.Id)?.Phase != BlueprintConstructionPartJournal.Committed);
+        }
+        internal void Continue(Guid id)
+        {
+            RequireContext();
+            if (!OpenBoard || OpenBoard.Id != id || !HasHammer(Player.m_localPlayer) || queued != Guid.Empty || execution != null && !execution.Finished ||
+                Vector3.Distance(Player.m_localPlayer.transform.position, OpenBoard.transform.position) > 5)
+                throw new InvalidOperationException(BuildWorksLocalization.Text("project.unavailable"));
+            if (NextPart(id) == null) return;
+            Failure = null; queued = id; queuedFrame = Time.frameCount; Close();
+        }
+        // Explicit operator recovery only; this never places, pays, refunds or automatically advances the project.
+        internal void RecoverKnownObject(Guid project, Guid part, Guid operation)
+        {
+            RequireContext();
+            if (!OpenBoard || OpenBoard.Id != project || queued != Guid.Empty || execution != null && !execution.Finished ||
+                !HasHammer(Player.m_localPlayer) ||
+                Vector3.Distance(Player.m_localPlayer.transform.position, OpenBoard.transform.position) > 5)
+                throw new InvalidOperationException(BuildWorksLocalization.Text("project.unavailable"));
+            Close(); recoveryOnly = true;
+            execution = new BlueprintConstructionPartExecution(store, project, part, operation);
+        }
         internal BlueprintConstructionProjectBoard Board(Guid id) => boards.TryGetValue(id, out var board) ? board : null;
 
         internal void CancelUnpaid(Guid id, long revision, Guid operation)
@@ -115,7 +172,8 @@ namespace OstrixMods.BuildWorks
             boards.Clear();
         }
         internal void Suspend()
-        { ClearBoards(); store = null; network = null; world = 0; failed = false; Failure = null; }
+        { execution?.Refuse("Construction suspended; evidence retained."); execution = null; queued = Guid.Empty;
+            ClearBoards(); store = null; network = null; world = 0; failed = false; Failure = null; }
         public void Dispose() { if (disposed) return; Suspend(); disposed = true; }
     }
 }

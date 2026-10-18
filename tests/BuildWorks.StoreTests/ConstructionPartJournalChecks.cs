@@ -32,6 +32,12 @@ namespace OstrixMods.BuildWorks.StoreTests
             Refuse<InvalidOperationException>(() => plans.CancelUnpaid(plan.Id, 1, Guid.NewGuid()));
             string path = Path.Combine(plans.DirectoryPath, plan.Id.ToString("N") + "." + part.ToString("N") + ".bwpart");
             byte[] intent = File.ReadAllBytes(path);
+            Journal.RequireCapacity(before, new[] { Paid() });
+            var excessive = Paid(); excessive.Prefab = new string('x', 65536);
+            Refuse<InvalidDataException>(() => Journal.RequireCapacity(before, new[] { excessive }));
+            excessive = Paid(); excessive.Properties = new string('x', 4 * 1024 * 1024);
+            Refuse<InvalidDataException>(() => Journal.RequireCapacity(before, new[] { excessive }));
+            Refuse<InvalidDataException>(() => Journal.RequireCapacity(before, new Journal.PaidRow[] { null }));
             Refuse<InvalidDataException>(() => Observe(before, new[] { Paid() }));
             var invalid = Paid(); invalid.X = 7; Refuse<InvalidDataException>(() => Observe(after, new[] { invalid }));
             invalid = Paid(); invalid.Before = 4; Refuse<InvalidDataException>(() => Observe(after, new[] { invalid }));
@@ -67,10 +73,27 @@ namespace OstrixMods.BuildWorks.StoreTests
             Check(journal.RecordNoEffect(second.Id, secondPart, secondOp, before, true).Phase == Journal.NoEffect, "No-effect outcome missing.");
             journal.Prepare(second.Id, secondPart, Guid.NewGuid(), 17, before, out created);
             Check(created, "Proven no-effect refused a new operation.");
+            // Wood record captured from the failed native .226 intent; after has only its 50 -> 48 debit.
+            var nativeBefore = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat,
+                "8:4:1:50|Wood", "bgAAAAEAECcAAAMDAEkyAMMk8/YB", null);
+            var nativeAfter = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat,
+                "8:4:1:48|Wood", "bgAAAAEAECcAAAMDAEkwAMMk8/YB", null);
+            var native = plans.Create(Guid.NewGuid(), blueprint, pose, new[] { pose });
+            Guid nativePart = native.Parts[0].Id, nativeOp = Guid.NewGuid();
+            journal.Prepare(native.Id, nativePart, nativeOp, 17, nativeBefore, out _);
+            var nativeRow = new Journal.PaidRow { Prefab = "Wood", Properties = "bhAnAAADAwBBwyTz9gE=", Before = 50, Paid = 2, X = 3, Y = 3, Quality = 1 };
+            byte[] packet = Convert.FromBase64String(nativeRow.Properties); packet[0] = 109;
+            nativeRow.Properties = Convert.ToBase64String(packet);
+            Refuse<InvalidDataException>(() => NativeObserve());
+            packet[0] = 110; packet[packet.Length - 1] = 0; nativeRow.Properties = Convert.ToBase64String(packet);
+            Refuse<InvalidDataException>(() => NativeObserve());
+            packet[packet.Length - 1] = 1; nativeRow.Properties = Convert.ToBase64String(packet);
+            Check(NativeObserve().Phase == Journal.Observed, "Native v110 cheated provenance was lost or its correct debit refused.");
             Console.WriteLine("PASS detached construction journal: intent/replay, exact stack/property debit checks, paired-hash binding, corruption, cancel guard and no-effect retry. Supplied save hashes are fixtures; no native payment, rights, save or refund executed.");
 
             Journal.Record Observe(BlueprintForeignPartData inventory, Journal.PaidRow[] rows) =>
                 journal.Observe(plan.Id, part, operation, 31, 9, "woodwall".GetStableHashCode(), 17, inventory, false, rows);
+            Journal.Record NativeObserve() => journal.Observe(native.Id, nativePart, nativeOp, 31, 9, "woodwall".GetStableHashCode(), 17, nativeAfter, false, new[] { nativeRow });
         }
         private static Journal.PaidRow Paid() => new Journal.PaidRow { Prefab = "Wood", Properties = Properties(), Before = 3, Paid = 2, X = 0, Y = 0, Variant = 0, Quality = 1 };
         private static BlueprintForeignPartData Inventory(int count)

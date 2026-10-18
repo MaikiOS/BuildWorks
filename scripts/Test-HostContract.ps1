@@ -823,8 +823,27 @@ Assert-Contract ($beginPaymentCalls.IndexOf('BlueprintRotationState::RequireFres
     $applyPlacementScaleOperands -notmatch 'BlueprintRotationState::ApplyCreated' -and
     $placementFinishedCalls.IndexOf('BlueprintRotationState::ApplyCreated') -gt $placementFinishedCalls.IndexOf('TakePendingPlacementSign') -and
     $placementFinishedCalls.IndexOf('BlueprintRotationState::ApplyCreated') -lt $placementFinishedCalls.IndexOf('CompleteNativePlacement') -and
-    $sessionSource -match 'placed && sessionMode == SessionMode.BlueprintWorldPlacement') `
+    $sessionSource -match 'placed && \(sessionMode == SessionMode.BlueprintWorldPlacement \|\| sessionMode == SessionMode.ProjectPart\)') `
     'Exact rotation must preflight before debit and write only after blueprint enrollment, so failures use the existing refund transaction.'
+$projectExecutionType = $plugin.MainModule.Types | Where-Object Name -eq 'BlueprintConstructionPartExecution'
+$projectCtor = $projectExecutionType.Methods | Where-Object Name -eq '.ctor'
+$projectCtorCalls = @($projectCtor.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+$projectEnd = $projectExecutionType.Methods | Where-Object Name -eq 'EndNative'
+$projectEndCalls = @($projectEnd.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+$projectObserve = $projectExecutionType.Methods | Where-Object Name -eq 'Observe'
+$projectObserveCalls = @($projectObserve.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+$endPayment = $precisionSessionType.Methods | Where-Object Name -eq 'EndConstructionPayment'
+$endPaymentCalls = @($endPayment.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($projectCtorCalls.IndexOf('PrecisionPlacementSession::SupportsProjectPart') -ge 0 -and
+    $projectCtorCalls.IndexOf('BlueprintConstructionPartJournal::RequireCapacity') -ge 0 -and
+    $projectCtorCalls.IndexOf('BlueprintConstructionPartJournal::RequireCapacity') -lt $projectCtorCalls.IndexOf('BlueprintConstructionPartJournal::Prepare') -and
+    $projectEndCalls.IndexOf('BlueprintConstructionRefund::DescribePaid') -ge 0 -and
+    $projectEndCalls.IndexOf('BlueprintConstructionRefund::DescribePaid') -lt $projectEndCalls.IndexOf('BlueprintConstructionPartExecution::Observe') -and
+    $projectObserveCalls.IndexOf('BlueprintConstructionPartJournal::Observe') -ge 0 -and
+    $projectObserveCalls.IndexOf('BlueprintConstructionPartJournal::Observe') -lt $projectObserveCalls.IndexOf('BlueprintConstructionProjectPersistence::TryBegin') -and
+    $endPaymentCalls.IndexOf('BlueprintConstructionRefund::Complete') -ge 0 -and
+    $endPaymentCalls.IndexOf('BlueprintConstructionRefund::Complete') -lt $endPaymentCalls.IndexOf('BlueprintConstructionPartExecution::EndNative')) `
+    'Project construction must reject unsupported pieces/preflight capacity before intent, observe the actual native debit and only then save.'
 $materialStateType = $plugin.MainModule.Types | Where-Object Name -eq 'BlueprintMaterialState'
 $materialPreviewType = $plugin.MainModule.Types | Where-Object Name -eq 'NativePlacementMaterialPreview'
 $materialPreviewShow = $materialPreviewType.Methods | Where-Object Name -eq 'Show'
@@ -919,7 +938,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.225.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.226.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $fogResource = @($plugin.MainModule.Resources | Where-Object Name -eq 'BuildWorks.FogGhostV11')
 Assert-Contract ($fogResource.Count -eq 1 -and $fogResource[0] -is [Mono.Cecil.EmbeddedResource]) 'Compiled v11 fog resource is missing or duplicated.'
@@ -3414,6 +3433,9 @@ foreach ($field in 'm_durability', 'm_gridPos', 'm_worldLevel', 'm_quality', 'm_
 }
 Assert-Contract ($itemSaveCalls -notmatch 'ZDO::|RPC|Object::Instantiate|Inventory::Load|Inventory::Changed' -and
     @($itemSave.Body.Instructions | Where-Object { $_.OpCode.Name -in @('stfld', 'stsfld') }).Count -eq 0) 'Native ItemData.Save gained live-state side effects.'
+$itemSnapshot = $plugin.MainModule.GetType('OstrixMods.BuildWorks.BlueprintItemStandPlacement').Methods | Where-Object Name -eq 'SnapshotItem'
+Assert-Contract (@($itemSnapshot.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'ldc.i4.s' -and [int]$_.Operand -eq 110 }).Count -eq 1) `
+    'Native item snapshots must use the v110 envelope matching Inventory.Save and preserve cheated provenance.'
 $nativeContainerSave = $containerType.Methods | Where-Object Name -eq 'Save'
 $nativeContainerSaveCalls = ($nativeContainerSave.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($nativeContainerSaveCalls -match 'ZDOVars::s_items' -and $nativeContainerSaveCalls -match 'ZDO::Set\(System.Int32,System.Byte\[\]\)') 'Native Container no longer persists its exact byte package.'

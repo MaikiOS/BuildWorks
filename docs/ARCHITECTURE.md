@@ -19,6 +19,7 @@ BuildWorks has two assemblies. `BuildWorks.dll` integrates with Valheim and Unit
 | Localization | `BuildWorksLocalization.cs` | `Translations/English.tsv`, `Translations/Russian.tsv` |
 | Display-only blueprint requirements | `BlueprintResourceHudView.cs` | `HammerBlueprintPieceRegistry.cs`, `PrecisionPlacementSession.cs` |
 | Durable unpaid local-host projects | `BlueprintConstructionProjectStore.cs` | `BlueprintConstructionProjectRuntime.cs`, `BlueprintConstructionProjectBoard.cs`, `BlueprintConstructionProjectView.cs` |
+| Native continuation and exact debit evidence | `BlueprintConstructionPartExecution.cs`, `BlueprintConstructionPartJournal.cs` | `PrecisionPlacementSession.Project.cs`, `BlueprintConstructionProjectPersistence.cs`; local-host only, not general crash recovery |
 
 The unpaid project runtime is separate from `PrecisionPlacementSession`: world-bound files own its snapshot and terminal cancellation, while boards/panels are disposable presentation. Ordinary construction does not call it yet. Payment intent/confirmation, continuation, project fog and authenticated remote authority remain separate required integration work; no inventory or native-object operations exist in this unpaid format.
 

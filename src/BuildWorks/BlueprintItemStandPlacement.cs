@@ -300,7 +300,8 @@ namespace OstrixMods.BuildWorks
                 copy.m_equipped = false;
             }
             var package = new ZPackage();
-            package.Write((byte)109);
+            // Current ItemData.Save includes v110's cheated flag; a v109 envelope silently loses it.
+            package.Write((byte)110);
             copy.Save(package);
             byte[] bytes = package.GetArray();
             if (bytes.Length > 24576) throw new ArgumentException("Mounted item exceeds the native snapshot limit.");

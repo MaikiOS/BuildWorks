@@ -34,8 +34,9 @@ namespace OstrixMods.BuildWorks
                 Close(); project = board.Id;
                 TMP_Text template = Hud.instance ? Hud.instance.m_pieceDescription : null;
                 if (!template || !template.font) throw new InvalidOperationException("Native project UI font is missing.");
-                var blueprint = runtime.Read(board.Id).Blueprint;
-                var pieces = blueprint.parts.Select(p => ZNetScene.instance.GetPrefab(p.prefabName)?.GetComponent<Piece>()).ToArray();
+                var record = runtime.Read(board.Id); var blueprint = record.Blueprint;
+                var pieces = record.Parts.Where(part => runtime.ReadPart(record.Id, part.Id)?.Phase != BlueprintConstructionPartJournal.Committed)
+                    .Select(part => ZNetScene.instance.GetPrefab(blueprint.parts[part.SourceIndex].prefabName)?.GetComponent<Piece>()).ToArray();
                 missing = pieces.Any(p => !p); costs = HammerBlueprintPieceRegistry.ResourceCosts(pieces);
                 oldLock = Cursor.lockState; oldVisible = Cursor.visible;
                 root = new GameObject("BuildWorks_ConstructionProject", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
@@ -55,7 +56,12 @@ namespace OstrixMods.BuildWorks
                 scroll.viewport = viewport; scroll.content = summary.rectTransform; scroll.horizontal = false;
                 scroll.movementType = ScrollRect.MovementType.Clamped; scroll.scrollSensitivity = 40;
                 Button(panel, template, "project.close", new Vector2(184, 36), new Vector2(174, 166), runtime.Close);
-                Button(panel, template, "project.cancel", new Vector2(250, 44), new Vector2(0, -170), () =>
+                Button(panel, template, "project.continue", new Vector2(250, 44), new Vector2(-135, -170), () =>
+                {
+                    try { runtime.Continue(board.Id); }
+                    catch (Exception error) { operationError = BuildWorksLocalization.Text("project.error", error.Message); nextRefresh = 0; }
+                });
+                Button(panel, template, "project.cancel", new Vector2(250, 44), new Vector2(135, -170), () =>
                 {
                     if (!confirming) { confirming = true; cancelOperation = Guid.NewGuid(); nextRefresh = 0; return; }
                     operationError = null;
@@ -66,10 +72,13 @@ namespace OstrixMods.BuildWorks
             }
             if (Time.unscaledTime < nextRefresh) return;
             nextRefresh = Time.unscaledTime + .5f;
-            var text = new StringBuilder(BuildWorksLocalization.Text("project.unpaid", board.PartCount));
+            var text = new StringBuilder();
             if (confirming) text.AppendLine().AppendLine(BuildWorksLocalization.Text("project.cancel_confirm"));
             try
             {
+                var progress = runtime.Progress(board.Id);
+                text.Insert(0, BuildWorksLocalization.Text("project.progress", progress.Built, progress.Total));
+                if (progress.NeedsReview) text.AppendLine().AppendLine(BuildWorksLocalization.Text("project.review"));
                 if (missing) text.AppendLine().AppendLine(BuildWorksLocalization.Text("project.missing"));
                 else foreach (var cost in costs)
                 {
@@ -79,6 +88,8 @@ namespace OstrixMods.BuildWorks
                     text.AppendLine().Append(cost.Name).Append(": ").Append(have).Append(" / ").Append(amount);
                 }
                 text.AppendLine().AppendLine(BuildWorksLocalization.Text("project.payment_pending"));
+                if (runtime.Failure != null || runtime.Execution?.Reason != null)
+                    text.AppendLine().AppendLine(BuildWorksLocalization.Text("project.error", runtime.Failure ?? runtime.Execution.Reason));
                 if (operationError != null) text.AppendLine().AppendLine(operationError);
                 summary.text = text.ToString();
             }

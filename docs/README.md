@@ -1,6 +1,6 @@
 # BuildWorks documentation
 
-[.225](CHECKPOINT_225.md) — unpaid project/stake verified; paid continuation and project fog remain open.
+[.226](CHECKPOINT_226.md) — four-wall paid continuation/world reload verified; unfinished-project fog remains open.
 
 [Русский](README_RU.md) · [Project home](../README.md)
 

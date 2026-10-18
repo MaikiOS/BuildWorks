@@ -27,8 +27,19 @@ namespace OstrixMods.BuildWorks
         {
             Player player = BuildWorksTestIsolation.RequireLoadedSession(); BuildWorksPlugin.RequireQaStorageIdle();
             if (lastId != Guid.Empty && !Runtime.Read(lastId).Cancelled) throw new InvalidOperationException("Previous unpaid fixture is still active.");
-            Vector3 origin = player.transform.position + player.transform.right * 2;
             Quaternion rotation = Quaternion.Euler(0, 37, 0);
+            Vector3 origin = player.transform.position + rotation * (Vector3.forward * 3 - Vector3.right * 3);
+            var wall = ZNetScene.instance.GetPrefab("woodwall");
+            if (!wall || !BuildWorksPlacementValidation.TryGetBounds(wall, out var wallBounds)) throw new InvalidOperationException("QA wall bounds are missing.");
+            var heights = new float[4];
+            for (int i = 0; i < heights.Length; ++i)
+            {
+                Vector3 point = origin + rotation * new Vector3(i * 2, 0, 0);
+                if (!ZoneSystem.instance.IsZoneLoaded(point) || !ZoneSystem.instance.GetGroundHeight(point, out heights[i]))
+                    throw new InvalidOperationException("QA wall ground is not loaded; terrain will not be changed.");
+            }
+            if (heights.Max() - heights.Min() > .015f) throw new InvalidOperationException("QA wall requires an already flat site; no terrain preparation will run.");
+            origin.y = heights.Max() - (wallBounds.min.y - wall.transform.position.y);
             var blueprint = new CompositeBlueprintStore.Blueprint {
                 id = Guid.NewGuid().ToString("N"), name = "QA unpaid construction", category = "QA", prefabName = "BuildWorks_QA_Unpaid", primaryPartId = "wall-0"
             };
@@ -79,6 +90,56 @@ namespace OstrixMods.BuildWorks
         }
         public static string Cancel()
         { BuildWorksTestIsolation.RequireLoadedSession(); Runtime.CancelUnpaid(lastId, 1, cancelOperation); return Inspect(); }
+        public static string Continue()
+        { BuildWorksTestIsolation.RequireLoadedSession(); BuildWorksPlugin.RequireQaStorageIdle(); Runtime.Continue(lastId); return "queued-native-paid-construction"; }
+        public static string RecoverKnownObject(string part, string operation)
+        {
+            BuildWorksTestIsolation.RequireLoadedSession(); BuildWorksPlugin.RequireQaStorageIdle();
+            Runtime.RecoverKnownObject(lastId, Guid.ParseExact(part, "N"), Guid.ParseExact(operation, "N"));
+            return "verifying-existing-debit-and-object";
+        }
+        public static bool SnapshotVersionAndProvenance()
+        {
+            var player = BuildWorksTestIsolation.RequireLoadedSession();
+            if (!BlueprintStorageCapture.TrySnapshotInventory(player.GetInventory(), out var inventory) ||
+                !OstrixMods.BuildWorks.Geometry.BlueprintContainerInventory.TryRead(inventory, name => name.GetStableHashCode(), out var originals)) return false;
+            foreach (var item in player.GetInventory().GetAllItems())
+            {
+                var data = new OstrixMods.BuildWorks.Geometry.BlueprintForeignPartData(OstrixMods.BuildWorks.Geometry.BlueprintForeignPartData.NativeItemStandFormat,
+                    item.m_dropPrefab.name + ":" + item.m_variant + ":" + item.m_quality + ":0", BlueprintItemStandPlacement.SnapshotItem(item), null);
+                if (!OstrixMods.BuildWorks.Geometry.BlueprintItemStandContents.TryRead(data, name => name.GetStableHashCode(), out var parsed) || parsed.SourceVersion != 110 ||
+                    parsed.Cheated != originals.Single(original => original.X == item.m_gridPos.x && original.Y == item.m_gridPos.y).Cheated) return false;
+            }
+            return true;
+        }
+        public static bool ScopeGuards()
+        {
+            BuildWorksTestIsolation.RequireLoadedSession();
+            Piece Prefab(string name) => ZNetScene.instance.GetPrefab(name)?.GetComponent<Piece>() ?? throw new InvalidOperationException("QA prefab missing: " + name);
+            return PrecisionPlacementSession.SupportsProjectPart(Prefab("woodwall")) && PrecisionPlacementSession.SupportsProjectPart(Prefab("wood_floor")) &&
+                !PrecisionPlacementSession.SupportsProjectPart(Prefab("fire_pit")) && !PrecisionPlacementSession.SupportsProjectPart(Prefab("piece_chest_wood")) &&
+                !PrecisionPlacementSession.SupportsProjectPart(Prefab("itemstand"));
+        }
+        public static object PaidProgress()
+        {
+            var player = BuildWorksTestIsolation.RequireLoadedSession(); var runtime = Runtime; var record = runtime.Read(lastId);
+            var progress = runtime.Progress(lastId); var operation = runtime.Execution;
+            var parts = record.Parts.Select(part => {
+                var receipt = runtime.ReadPart(lastId, part.Id);
+                var instance = receipt == null ? null : BlueprintConstructionPartExecution.FindMarked(receipt.Operation, record.Blueprint.parts[part.SourceIndex].prefabName);
+                float[] pose = part.WorldPose.Values;
+                return new PaidPart { part = part.Id.ToString("N"), phase = receipt?.Phase ?? 0, operation = receipt?.Operation.ToString("N"),
+                    present = instance, exactPose = instance && Vector3.Distance(instance.transform.position, new Vector3(pose[0], pose[1], pose[2])) <= .001f &&
+                        Quaternion.Angle(instance.transform.rotation, new Quaternion(pose[3], pose[4], pose[5], pose[6])) <= .01f &&
+                        Vector3.Distance(instance.transform.localScale, new Vector3(pose[7], pose[8], pose[9])) <= .001f,
+                    paid = receipt?.Paid?.Sum(row => row.Paid) ?? 0,
+                    receiptMatches = instance && receipt?.Receipt != null && instance.GetComponent<ZNetView>().GetZDO()
+                        .GetByteArray(BlueprintConstructionPartExecution.ReceiptKey)?.SequenceEqual(receipt.Receipt) == true };
+            }).ToArray();
+            return new PaidReceipt { built = progress.Built, total = progress.Total, needsReview = progress.NeedsReview,
+                status = operation?.Status, reason = runtime.Failure ?? operation?.Reason, blocked = runtime.BlocksInput,
+                wood = player.GetInventory().CountItems("$item_wood", -1, true), parts = parts };
+        }
         private static BlueprintConstructionProjectRuntime Runtime => BuildWorksPlugin.QaConstructionProjects ?? throw new InvalidOperationException("Project runtime is absent.");
         private static Store.Pose Pose(Vector3 p, Quaternion q) => new Store.Pose(new[] { p.x, p.y, p.z, q.x, q.y, q.z, q.w, 1, 1, 1 });
         [Serializable] private sealed class Receipt
@@ -88,6 +149,8 @@ namespace OstrixMods.BuildWorks
             public int boards, boardColliders;
             public bool exactSnapshotParts, cancelled, boardPresent, open, blocked, hasNativePiece, hasNetworkView;
         }
+        [Serializable] private sealed class PaidPart { public string part, operation; public int phase, paid; public bool present, exactPose, receiptMatches; }
+        [Serializable] private sealed class PaidReceipt { public int built, total, wood; public bool needsReview, blocked; public string status, reason; public PaidPart[] parts; }
     }
 }
 #endif

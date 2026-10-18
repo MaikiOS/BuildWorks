@@ -20,7 +20,8 @@ namespace OstrixMods.BuildWorks
         {
             get
             {
-                if (arena != null) return snapshotsDisposed ? 0 : arena.ReservedFieldBytes - (capacity - snapshotCount) * (96L * 80 * 80 * 8 + 8196);
+                if (arena != null) return snapshotsDisposed ? 0 : arena.ReservedFieldBytes -
+                    (arena.ResidentCapacity - ResidentSnapshotCount) * (long)VelocityWords * 2 - (capacity - snapshotCount) * 8196;
                 long bytes = 0;
                 foreach (BlueprintFogSimulation channel in channels.Values) bytes += channel.AllocatedFieldBytes;
                 foreach (BlueprintFogScratch scratch in scratches.Values) bytes += scratch.FieldBytes;

@@ -6,6 +6,7 @@ This records changes and evidence, not future milestones. Historical results ret
 
 | Checkpoint | Change / evidence | Boundary |
 | --- | --- | --- |
+| 2026-10-18 · .217 | [.217](CHECKPOINT_217.md): exact GPU↔RAM paging; Unity28/7,2688/196/8contacts; ValheimQA8/8, installed, bridge restored. | Procedural paging/resource proof; actual house/visuals/FPS/board/network open. |
 | 2026-10-18 · .216 | [.216](CHECKPOINT_216.md): sparse publication, Unity56/18 +14/15; ValheimQA7/7, installed, bridge restored. | House velocity/visuals/board/network remain open. |
 | 2026-10-18 · .215 | [.215](CHECKPOINT_215.md): height Unity48/3/4 + Valheim40/40/identity40/40; resident v11 GPU56/18; QA installed, inventory/ordinary saves preserved, bridge restored. | Bounded pool only; whole-house/board/network open. |
 | [.214](CHECKPOINT_214.md) · 2026-10-18 | Canvas rectangle and exact imported-card focus; Unity48/3, builds0/0,131CPU, host/control/isolation/localization1104, independent PASSED/Ship. Installed,143 data files unchanged. Separate4 exact RAM v11 checkpoints,14 GPU rows,1646 negative/32metadata. | Valheim .214 untested; synchronous16.7–25.1ms restore and about525MiB payload for28 are not game-ready. Building fog unchanged; house/FPS/board/network open. |

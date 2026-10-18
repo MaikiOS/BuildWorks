@@ -6,9 +6,9 @@ BuildWorks extends Valheim's hammer with precise construction, a blueprint catal
 
 ![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
 
-**Current source / isolated QA: 0.19.216.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
+**Current source / isolated QA: 0.19.217.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
 
-**QA .216 installed: hardware-filtered sparse v11 pages.** Unity56/18, runtime14 comparisons/15 negative cases; actual ValheimQA7/7 resources/metadata/cleanup, unchanged inventory and restored bridge. Dynamic pages14478912bytes; house28 velocity still exceeds the safety cap. Strict backend is not activated by Building; house/board remain open. [Evidence and limits](docs/CHECKPOINT_216.md).
+**QA .217 installed: exact GPU↔RAM v11 velocity paging.** Unity28/7:2688samples/196exact comparisons,8contacts; ValheimQA8/8:94478116-byte reservation,2457600half-word roundtrip, unchanged inventory/restored bridge. Strict backend is not activated by Building; real house/visual v11/FPS then board remain next. [Evidence and limits](docs/CHECKPOINT_217.md).
 
 ## Capabilities
 

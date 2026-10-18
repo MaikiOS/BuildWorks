@@ -45,6 +45,10 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Require(BlueprintFogSnapshotState.EstimateFieldBytes(8, 24860) > 98304000, "One extra block hid a budget overflow.");
             Require(BlueprintFogSnapshotState.EstimateFieldBytes(8, 24576) == 98157700, "Rounded capacity lost its explicit reserve.");
             Require(BlueprintFogSnapshotState.EstimateFieldBytes(32, 1) > 98304000, "Owner capacity was confused with actual field admission.");
+            Require(BlueprintFogSnapshotState.EstimateFieldBytes(28, 8192, 7) == 94478116, "Paged pool omitted logical metadata, ledger or shared upload.");
+            Require(BlueprintFogSnapshotState.EstimateFieldBytes(28, 8192, 8) == 99393316, "An eighth resident velocity hid a budget overflow.");
+            Reject(() => BlueprintFogSnapshotState.EstimateFieldBytes(28, 8192, 29));
+            Reject(() => BlueprintFogSnapshotState.EstimateFieldBytes(28, 8192, -1));
             Reject(() => BlueprintFogSnapshotState.EstimateFieldBytes(0, 1)); Reject(() => BlueprintFogSnapshotState.EstimateFieldBytes(33, 1));
             Reject(() => BlueprintFogSnapshotState.EstimateFieldBytes(8, 0)); Reject(() => BlueprintFogSnapshotState.EstimateFieldBytes(8, int.MaxValue));
             CheckReservationOracle();

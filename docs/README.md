@@ -11,7 +11,7 @@ Start with [current evidence](CURRENT_STATUS.md), then the [forward roadmap](ROA
 | Import/export and missing models | [Format contract](../specs/roadmap/blueprint-format.md), [missing alignment](MISSING_PART_REPLACEMENT.md), [source register](EXTERNAL_CORPUS_REGISTER.md) |
 | Server catalog and personal files | [Server panel](SERVER_LIBRARY_PANEL.md), [file sharing checkpoint](SHARE_FILES_182.md) |
 | Contribute | [Contributing](../CONTRIBUTING.md), [architecture](ARCHITECTURE.md), [localization](LOCALIZATION.md), [release gates](../PUBLISH_CHECKLIST.md) |
-| Current .216 evidence | [Sparse publication / native resources](CHECKPOINT_216.md), [Русский](CHECKPOINT_216_RU.md) |
+| Current .217 evidence | [Exact paging / native roundtrip](CHECKPOINT_217.md), [Русский](CHECKPOINT_217_RU.md) |
 | Current fog work | [Integration boundary](FOG_V11_INTEGRATION.md), [native traversal .210](FOG_SCRATCH_210.md), [rendering .211](FOG_RENDER_CACHE_211.md), [recovery .212](FOG_RECOVERY_212.md), [noise frame .213](FOG_NOISE_FRAME_213.md), [next owner queue](NEXT_FOG_PROJECT_V11_RU.md) |
 | QA and pending acceptance | [Control protocol](QA_CONTROL.md), [owner live list](LIVE_CHECKLIST_RU.md), [requirement matrix](CURRENT_STATUS.md) |
 | History | [Journal](DEVELOPMENT_JOURNAL.md), [all documents/roles](DOCUMENT_INDEX.tsv) |

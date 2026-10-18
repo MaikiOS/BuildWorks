@@ -26,6 +26,8 @@ public static class FogArenaFramesCheck
         PlayerSettings.colorSpace = ColorSpace.Linear;
         SessionState.SetBool(Pending, true); EditorApplication.EnterPlaymode();
     }
+    public static void DiagnosePaging()
+    { SessionState.SetBool("BuildWorks.FogPaging.Diagnostic", true); Run(); }
     private static void Advance()
     {
         try
@@ -59,6 +61,15 @@ public static class FogArenaFramesCheck
             using (var codec = new FogSparseStorageProbe())
             using (var test = new FogArenaPhysicsProbe.Probe(assets, source, body, 8192, codec))
             {
+                if (SessionState.GetBool("BuildWorks.FogPaging.Diagnostic", false))
+                {
+                    SessionState.SetBool("BuildWorks.FogPaging.Diagnostic", false);
+                    string path = Path.Combine(root, "artifacts/checkpoint-217/paging-diagnostic.txt"); File.WriteAllText(path, "");
+                    var diagnostic = FogVelocityPagingCheck.Frames(assets, source, body, codec, path);
+                    try { while (diagnostic.MoveNext()) yield return null; }
+                    finally { (diagnostic as IDisposable)?.Dispose(); }
+                    yield break;
+                }
                 source.Root.SetActive(false); test.CheckAll(true);
                 var inputs = new[] { test.InputQueue(0), test.InputQueue(1) };
                 for (int slot = 0; slot < 2; ++slot)
@@ -120,7 +131,20 @@ public static class FogArenaFramesCheck
                 int reuseDeadline = Time.frameCount + 180;
                 while (!test.Poll()) { Require(Time.frameCount < reuseDeadline, "Slot reuse callback timed out."); yield return null; }
                 test.CheckAll(true);
-                int frames = Time.frameCount - firstFrame;
+                int frames = Time.frameCount - firstFrame, pagingStart = Time.frameCount;
+                double pagingSeconds = 0;
+                var paging = FogVelocityPagingCheck.Frames(assets, source, body, codec, measured: value => pagingSeconds = value);
+                try { while (paging.MoveNext()) yield return null; }
+                finally { (paging as IDisposable)?.Dispose(); }
+                int pagingFrames = Time.frameCount - pagingStart;
+                double houseSeconds = 0;
+                int houseContacts = 0;
+                var house = FogVelocityPagingCheck.Frames(assets, source, body, codec, measured: value => houseSeconds = value, sourceCount: 28, residentLimit: 0, contacts: value => houseContacts = value);
+                try { while (house.MoveNext()) yield return null; }
+                finally { (house as IDisposable)?.Dispose(); }
+                var overlap = FogVelocityPagingCheck.Frames(assets, source, body, codec, sourceCount: 28, residentLimit: 0, expectOverlapShortage: true);
+                try { while (overlap.MoveNext()) yield return null; }
+                finally { (overlap as IDisposable)?.Dispose(); }
                 Require(frames >= 33 && test.ReceiptFirst > 0 && test.Committed == 54 && test.Rejected == 0 && test.MetadataChecks == 54 &&
                     test.Fields == 232 && test.Ledgers == 174 && test.Atlases == 20, "Frame fixture coverage incomplete.");
                 File.WriteAllText(Path.Combine(output, "verification.json"), JsonUtility.ToJson(new Report {
@@ -131,6 +155,11 @@ public static class FogArenaFramesCheck
                     generationReuse = true, lateReplyRejected = true, pollingHasNoWait = true,
                     verificationBarriersBetweenBatches = true, productionAllocatorTested = false, rendererTested = false,
                     wholeHouseSupported = false, gameHostTested = false, gpuTimingsMeasured = false,
+                    velocityPagingFrames = pagingFrames, velocityPagingSamples = 288, velocityPagingComparisons = 21,
+                    velocityPagingSeconds = pagingSeconds,
+                    velocityHouseSamples = 2688, velocityHouseComparisons = 196, velocityHouseSeconds = houseSeconds,
+                    velocityHouseContacts = houseContacts,
+                    velocityOverlapRejected = true,
                     note = "Real Unity player frames; submission/polling do not wait. Exact oracle comparisons and teardown may block. " +
                         "Procedural wall/two full grids; ordered queued samples replayed, but no production scheduler throughput, renderer, house memory or FPS proof." }, true));
             }
@@ -144,6 +173,12 @@ public static class FogArenaFramesCheck
         public bool runtimeChannelsValidated, passed, cachedRepliesAfterExpiry, queuedInputsReplayed, capturedWhilePending, metadataOnlyPending, receiptFirstHandled, pendingResubmitRejected, pendingRetireRetained, generationReuse, lateReplyRejected,
             pollingHasNoWait, verificationBarriersBetweenBatches, productionAllocatorTested, rendererTested, wholeHouseSupported, gameHostTested, gpuTimingsMeasured;
         public int frames, owners, committed, rejected, fieldComparisons, ledgerComparisons, atlasComparisons, metadataComparisons;
+        public int velocityPagingFrames, velocityPagingSamples, velocityPagingComparisons;
+        public double velocityPagingSeconds;
+        public int velocityHouseSamples, velocityHouseComparisons;
+        public int velocityHouseContacts;
+        public double velocityHouseSeconds;
+        public bool velocityOverlapRejected;
         public string note;
     }
 }

@@ -48,6 +48,63 @@ namespace OstrixMods.BuildWorks
             public int assets, kernels;
         }
 
+        public static string VerifyVelocityPaging()
+        {
+            BuildWorksTestIsolation.RequireLoadedSession();
+            string path = System.IO.Path.GetFullPath(System.IO.Path.Combine(BepInEx.Paths.BepInExRootPath,
+                "..", "..", "Default", "BuildWorks", "artifacts", "fog-runtime-assets-candidate", "buildworks-fog-v11"));
+            var shape = new Texture3D(4, 4, 4, TextureFormat.RGBAHalf, false);
+            var result = new VelocityReceipt(); Texture3D upload;
+            try
+            {
+                shape.SetPixelData(new ushort[256], 0); shape.Apply(false, false);
+                using (var probeAssets = new BlueprintFogAssets(System.IO.File.ReadAllBytes(path)))
+                using (var pool = BlueprintFogChannels.CreateArena(probeAssets, 28, 8192))
+                {
+                    upload = pool.SnapshotArena.VelocityUpload;
+                    var initial = new BlueprintFogInputQueue.Sample(0, new Geometry.Point3(0, 0, 0), .3f, .95f, false, false, false);
+                    BlueprintFogChannels.SnapshotChannel owner = null;
+                    for (int i = 0; i < 28; ++i)
+                    {
+                        var created = pool.AcquireSnapshot(i, initial, (scratch, staged) => new BlueprintFogSimulation(probeAssets,
+                            shape, shape, shape, Vector3.one * -2, Vector3.one * 2, -Vector3.one, Vector3.one,
+                            Vector3.zero, 37, scratch: scratch, stagedState: staged));
+                        if (i == 0) owner = created;
+                    }
+                    if (pool.Count != 28 || pool.ResidentSnapshotCount != 7 || pool.FieldBytes != 94478116)
+                        throw new InvalidOperationException("Native paged pool reservation differs.");
+                    var pattern = new ushort[2457600];
+                    for (int i = 0; i < pattern.Length; ++i) pattern[i] = (ushort)(i * 17 % 0x7c00);
+                    upload.SetPixelData(pattern, 0); upload.Apply(false, false); Graphics.CopyTexture(upload, owner.Velocity);
+                    pool.PageSnapshotVelocity(owner); owner.evictionRequest.WaitForCompletion(); pool.PollSnapshots();
+                    if (owner.Velocity || owner.coldVelocity == null || !pool.EnsureSnapshotVelocity(owner))
+                        throw new InvalidOperationException("Native velocity paging did not restore its owner.");
+                    var read = AsyncGPUReadback.Request(owner.Velocity, 0); read.WaitForCompletion();
+                    if (read.hasError) throw new InvalidOperationException("Native restored velocity readback failed.");
+                    int offset = 0;
+                    for (int layer = 0; layer < read.layerCount; ++layer)
+                    {
+                        var data = read.GetData<ushort>(layer);
+                        for (int i = 0; i < data.Length; ++i)
+                            if (offset >= pattern.Length || data[i] != pattern[offset++]) throw new InvalidOperationException("Native velocity half bits differ.");
+                    }
+                    if (offset != pattern.Length) throw new InvalidOperationException("Native velocity page was truncated.");
+                    result.fieldBytes = pool.FieldBytes; result.rawWords = offset;
+                }
+                if (upload) throw new InvalidOperationException("Native velocity upload survived teardown.");
+                result.passed = result.exactVelocity = result.uploadReleased = true;
+                return JsonUtility.ToJson(result);
+            }
+            finally { DestroyImmediate(shape); }
+        }
+        [Serializable] private sealed class VelocityReceipt
+        {
+            public bool passed, exactVelocity, uploadReleased;
+            public bool gameHostTested = true, visualParityTested = false, wholeHouseSupported = false;
+            public int logicalOwners = 28, residentLimit = 7, rawWords;
+            public long fieldBytes;
+        }
+
         private BlueprintFogAssets assets;
         private BlueprintFogVisual visual;
         private BlueprintFogVisual second;

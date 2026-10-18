@@ -5,7 +5,7 @@ namespace OstrixMods.BuildWorks
 {
     internal sealed partial class BlueprintFogChannels
     {
-        // Each admitted part reserves a resident slot; recovered matter still has live velocity/history.
+        // Each admitted part retains its logical slot; only confirmed velocity pages may leave GPU memory.
         internal sealed class SnapshotSource
         {
             internal readonly BlueprintFogInputQueue Inputs;
@@ -99,7 +99,7 @@ namespace OstrixMods.BuildWorks
                     if (owner.State.State != BlueprintFogSnapshotState.Phase.Ready) continue;
                     // An empty/recovered surface does not reset the v11 background flow or CPU integrator.
                     // Only explicit source removal may retire this generation.
-                    TrySubmitSnapshot(owner, out var token);
+                    if (TrySubmitSnapshot(owner, out var token)) sourceCursor = (index + 1) % count;
                 }
             }
             finally

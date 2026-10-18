@@ -6,6 +6,7 @@
 
 | Этап | Что изменилось / доказательство | Граница |
 | --- | --- | --- |
+| 2026-10-18 · .217 | [.217](CHECKPOINT_217_RU.md): exact GPU↔RAM paging; Unity28/7,2688/196/8contacts; ValheimQA8/8, installed, bridge restored. | Procedural paging/resource proof; actual house/visuals/FPS/board/network open. |
 | 2026-10-18 · .216 | [.216](CHECKPOINT_216_RU.md): sparse publication, Unity56/18 +14/15; ValheimQA7/7, installed, bridge restored. | House velocity/visuals/board/network remain open. |
 | 2026-10-18 · .215 | [.215](CHECKPOINT_215_RU.md): height Unity48/3/4 + Valheim40/40/ID40/40; resident v11 GPU56/18; QA установлена, инвентарь/основные saves сохранены, мост восстановлен. | Bounded pool only; whole-house/board/network open. |
 | [.214](CHECKPOINT_214_RU.md) · 2026-10-18 | Координаты рамки Canvas и фокус точной импортированной карточки; Unity48/3, сборки0/0,131CPU, host/control/изоляция/localization1104, независимые PASSED/Ship. Установлена,143 файла данных неизменны. Отдельно:4 точных RAM checkpoint v11,14 строк GPU-опыта,1646 отрицательных/32metadata. | .214 в Valheim не проверена; синхронное восстановление16.7–25.1мс и около525МиБ payload для28 не готовы для игры. Building fog не менялся; дом/FPS/табличка/сеть открыты. |

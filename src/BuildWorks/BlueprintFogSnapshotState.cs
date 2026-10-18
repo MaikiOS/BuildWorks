@@ -82,12 +82,15 @@ namespace OstrixMods.BuildWorks
         }
 
         // Full 96x80x80 v11 fields only; source/atlas/driver readback staging are separate budgets.
-        internal static long EstimateFieldBytes(int owners, int blockCapacity)
+        internal static long EstimateFieldBytes(int owners, int blockCapacity, int residentOwners = 0)
         {
             const long cells = 96L * 80 * 80, ledgerBytes = 1024 * 4 * 2 + 4;
             if (owners < 1 || owners > 32 || blockCapacity < 1 || blockCapacity > 98304000 / 516)
                 throw new ArgumentException("Fog sparse pool sizing invalid.");
-            return cells * 8 * (9 + owners) + owners * (2 * 3 * (cells / 64) * 4 + ledgerBytes + 132) +
+            if (residentOwners == 0) residentOwners = owners;
+            if (residentOwners < 1 || residentOwners > owners) throw new ArgumentException("Fog resident owner count invalid.");
+            // A paged pool also reserves one shared GPU upload texture.
+            return cells * 8 * (9 + residentOwners + (residentOwners < owners ? 1 : 0)) + owners * (2 * 3 * (cells / 64) * 4 + ledgerBytes + 132) +
                 ledgerBytes + 64 + blockCapacity * 516L;
         }
     }

@@ -2,12 +2,12 @@
 
 2026-10-18 · [Русский](HANDOFF_RU.md)
 
-**QA .216 installed: hardware-filtered sparse v11 pages.** Unity56/18, runtime14 comparisons/15 negative cases; actual ValheimQA7/7 resources/metadata/cleanup, unchanged inventory and restored bridge. Dynamic pages14478912bytes; house28 velocity still exceeds the safety cap. Strict backend is not activated by Building; house/board remain open. [Evidence and limits](docs/CHECKPOINT_216.md).
+**QA .217 installed: exact GPU↔RAM v11 velocity paging.** Unity28/7:2688samples/196exact comparisons,8contacts; ValheimQA8/8:94478116-byte reservation,2457600half-word roundtrip, unchanged inventory/restored bridge. Strict backend is not activated by Building; real house/visual v11/FPS then board remain next. [Evidence and limits](docs/CHECKPOINT_217.md).
 
 1. Read [PROJECT_CONTRACT](PROJECT_CONTRACT.md), [current evidence](docs/CURRENT_STATUS.md), [forward roadmap](docs/ROADMAP.md) and project AGENTS. Preserve the complete goal; this file is not a goal API update.
-2. Source and installed QA0.19.216; DLL SHA CCDF3CA513C8D2A39E47564E698D300C16B790124B264C108F878EF4442CE45C. [Report .216](docs/CHECKPOINT_216.md). Public binary .37 alpha is unchanged.
+2. Source and installed QA0.19.217; DLL SHA C282AD9CDA33CAE8EA4DB541F863482C2BB3B59BC194BD10929429BA808D2FDE. [Report .217](docs/CHECKPOINT_217.md). Public binary .37 alpha is unchanged.
 
-Results below retain their original checkpoint versions; the current installation is stated above. Next integration work is exact whole-house memory/domain admission; a durable project requires its own server journal, not storage WAL.
+Results below retain their original checkpoint versions; the current installation is stated above. Next integration work is the real-house QA renderer with the verified paged pool; a durable project requires its own server journal, not storage WAL.
 
 [.213](docs/FOG_NOISE_FRAME_213.md) aligns noise phases across parts; GPU checks/regressions passed and QA is installed. Native .213 is untested; boundary loss, recovery ownership and performance remain open.
 

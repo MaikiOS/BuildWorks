@@ -29,11 +29,14 @@ namespace OstrixMods.BuildWorks
         internal long ReservedFieldBytes { get; }
         internal long RenderBytes { get; }
         internal int BlockCapacity { get; }
+        internal int ResidentCapacity { get; }
+        internal Texture3D VelocityUpload { get; }
 
-        internal BlueprintFogArena(ComputeShader arenaProgram, ComputeShader metadataProgram, int owners, int capacity, bool denseReference = false)
+        internal BlueprintFogArena(ComputeShader arenaProgram, ComputeShader metadataProgram, int owners, int capacity, bool denseReference = false, int residentOwners = 0)
         {
             if (!arenaProgram || !metadataProgram) throw new ArgumentException("Fog arena programs missing.");
-            ReservedFieldBytes = BlueprintFogSnapshotState.EstimateFieldBytes(owners, capacity); ownerCount = owners; BlockCapacity = capacity;
+            ReservedFieldBytes = BlueprintFogSnapshotState.EstimateFieldBytes(owners, capacity, residentOwners); ownerCount = owners; BlockCapacity = capacity;
+            ResidentCapacity = residentOwners == 0 ? owners : residentOwners;
             int side = Mathf.CeilToInt(Mathf.Pow(capacity, 1f / 3));
             BrickGrid = new Vector3Int(side, side, (capacity + side * side - 1) / (side * side));
             RenderBytes = denseReference ? checked(98L * 82 * 82 * owners * 16) : checked((long)BrickGrid.x * BrickGrid.y * BrickGrid.z * 216 * 8);
@@ -68,6 +71,7 @@ namespace OstrixMods.BuildWorks
                 Bind("RestoreFields", "_Maps", "_Payload", "_Control");
                 Bind("ReleaseCurrent", "_Maps", "_Free", "_Control"); Bind("ClearOwnerMaps", "_Maps");
                 Scratch = new BlueprintFogScratch(new Vector3Int(96, 80, 80), includeReadFields: true);
+                if (ResidentCapacity < owners) VelocityUpload = new Texture3D(96, 80, 80, TextureFormat.RGBAHalf, false) { hideFlags = HideFlags.HideAndDontSave };
                 reads[0] = Scratch.ReadColour; reads[1] = Scratch.ReadOrigin; reads[2] = Scratch.ReadSurface;
                 foreach (string name in new[] { "IndexFields", "PackFields", "PublishFields" })
                 {
@@ -128,6 +132,7 @@ namespace OstrixMods.BuildWorks
             foreach (var buffer in buffers.Values) buffer.Release(); buffers.Clear();
             foreach (var texture in new[] { Smoke, Surface, Bricks }) if (texture) { texture.Release(); UnityEngine.Object.DestroyImmediate(texture); }
             Scratch?.Dispose();
+            if (VelocityUpload) UnityEngine.Object.DestroyImmediate(VelocityUpload);
             if (shader) UnityEngine.Object.DestroyImmediate(shader); if (metadataShader) UnityEngine.Object.DestroyImmediate(metadataShader);
         }
     }

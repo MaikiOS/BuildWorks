@@ -13,7 +13,7 @@ namespace OstrixMods.BuildWorks
             internal readonly long Identity, Generation;
             internal readonly BlueprintFogInputQueue Inputs;
             internal BlueprintFogSnapshotState State { get; }
-            internal readonly RenderTexture Velocity;
+            internal RenderTexture Velocity;
             internal readonly ComputeBuffer[] Ledger = new ComputeBuffer[3];
             internal BlueprintFogSnapshotState.Submission LastSubmission { get; set; }
             internal BlueprintFogSnapshotState.Completion LastCompletion { get; set; }
@@ -30,10 +30,17 @@ namespace OstrixMods.BuildWorks
             internal AsyncGPUReadbackRequest request;
             internal AsyncGPUReadbackRequest recoveryRequest;
             internal bool recoveryNativePending, recoveryReceived;
+            internal ushort[] coldVelocity, evictionReply;
+            internal bool evictionPending, evictionNativePending, evictionReceived;
+            internal AsyncGPUReadbackRequest evictionRequest;
+            internal BlueprintFogSnapshotState.Submission evictionStamp;
+            internal BlueprintFogSnapshotState.Submission coldVelocityStamp;
+            internal bool evictionRelease;
+            internal long velocityUse;
             internal uint? recoveryFlags;
             internal BlueprintFogSnapshotState.Submission recoveryStamp;
 
-            internal SnapshotChannel(int slot, long identity, long generation, BlueprintFogInputQueue.Sample initial, BlueprintFogInputQueue inputs)
+            internal SnapshotChannel(int slot, long identity, long generation, BlueprintFogInputQueue.Sample initial, BlueprintFogInputQueue inputs, bool resident = true)
             {
                 Slot = slot; Identity = identity; Generation = generation;
                 State = new BlueprintFogSnapshotState(identity, generation, Mathf.FloorToInt(initial.Clock / BlueprintFogSimulation.Step + .0001f));
@@ -41,7 +48,8 @@ namespace OstrixMods.BuildWorks
                 LastSubmission = new BlueprintFogSnapshotState.Submission(identity, generation, 0, State.ConfirmedTick, 0);
                 try
                 {
-                    Velocity = BlueprintFogSimulation.AllocateField(new Vector3Int(96, 80, 80), "Fog committed velocity " + slot);
+                    if (resident) Velocity = BlueprintFogSimulation.AllocateField(new Vector3Int(96, 80, 80), "Fog committed velocity " + slot);
+                    else coldVelocity = new ushort[VelocityWords];
                     for (int i = 0; i < Ledger.Length; ++i) { Ledger[i] = new ComputeBuffer(i == 2 ? 1 : 1024, 4); Ledger[i].SetData(new uint[i == 2 ? 1 : 1024]); }
                 }
                 catch { Release(); throw; }
@@ -63,6 +71,11 @@ namespace OstrixMods.BuildWorks
                 if (released || recoveryReceived || !Same(stamp, recoveryStamp)) return;
                 recoveryFlags = flags; recoveryReceived = true;
             }
+            internal void ReceiveVelocity(BlueprintFogSnapshotState.Submission stamp, ushort[] words)
+            {
+                if (released || !evictionPending || evictionReceived || !Same(stamp, evictionStamp)) return;
+                evictionReply = words; evictionReceived = true;
+            }
             internal static bool Same(BlueprintFogSnapshotState.Submission a, BlueprintFogSnapshotState.Submission b)
                 => a.Owner == b.Owner && a.Generation == b.Generation && a.Sequence == b.Sequence && a.Tick == b.Tick && a.EmissionRevision == b.EmissionRevision;
             internal void Release()
@@ -71,6 +84,7 @@ namespace OstrixMods.BuildWorks
                 simulation?.Dispose(); simulation = null;
                 foreach (var buffer in Ledger) buffer?.Release();
                 if (Velocity) { Velocity.Release(); UnityEngine.Object.DestroyImmediate(Velocity); }
+                coldVelocity = evictionReply = null;
                 released = true;
             }
         }
@@ -96,11 +110,16 @@ namespace OstrixMods.BuildWorks
             words[offset + 3] = (uint)generation; words[offset + 4] = (uint)(generation >> 32);
         }
 
-        internal static BlueprintFogChannels CreateArena(BlueprintFogAssets assets, int ownerLimit, int blockCapacity, bool denseReference = false)
+        internal static BlueprintFogChannels CreateArena(BlueprintFogAssets assets, int ownerLimit, int blockCapacity, bool denseReference = false, int residentOwners = 0)
         {
             if (assets == null) throw new ArgumentNullException(nameof(assets));
             var pool = new BlueprintFogChannels(ownerLimit, MaximumFieldBudget);
-            pool.arena = new BlueprintFogArena(assets.Arena, assets.Metadata, ownerLimit, blockCapacity, denseReference);
+            if (residentOwners == 0)
+            {
+                residentOwners = ownerLimit;
+                while (residentOwners > 1 && BlueprintFogSnapshotState.EstimateFieldBytes(ownerLimit, blockCapacity, residentOwners) > MaximumFieldBudget) --residentOwners;
+            }
+            pool.arena = new BlueprintFogArena(assets.Arena, assets.Metadata, ownerLimit, blockCapacity, denseReference, residentOwners);
             pool.snapshotSlots = new SnapshotChannel[ownerLimit]; pool.generations = new long[ownerLimit];
             return pool;
         }
@@ -131,7 +150,7 @@ namespace OstrixMods.BuildWorks
             SnapshotChannel owner = null; bool initializing = false; creating = true;
             try
             {
-                owner = new SnapshotChannel(slot, checked(++nextIdentity), checked(++generations[slot]), initial, inputs);
+                owner = new SnapshotChannel(slot, checked(++nextIdentity), checked(++generations[slot]), initial, inputs, ResidentSnapshotCount < arena.ResidentCapacity);
                 var scratch = arena.Scratch; var buffers = arena.Buffers;
                 var staged = new BlueprintFogSimulation.StagedState(scratch.ReadColour, scratch.ReadOrigin,
                     scratch.ReadSurface, buffers["_StageAway"], buffers["_StagePeak"], buffers["_StageState"]);
@@ -143,7 +162,7 @@ namespace OstrixMods.BuildWorks
                     owner.simulation.Tick != owner.State.ConfirmedTick || owner.simulation.AllocatedFieldBytes != 0 || !ReferenceEquals(owner.simulation.Scratch, scratch) || !owner.simulation.UsesStagedState(staged))
                     throw new InvalidOperationException("Fog snapshot factory differs from its full-field reservation.");
                 initializing = true;
-                Graphics.CopyTexture(scratch.PredictedColour, owner.Velocity);
+                if (owner.Velocity) Graphics.CopyTexture(scratch.PredictedColour, owner.Velocity);
                 BindSnapshotCore(owner); arena.Dispatch("BeginStep"); arena.Dispatch("RestoreFields", 24, 20, 20); arena.Dispatch("PublishFields", 25, 21, 21);
                 arena.PublishMetadata(slot, owner.LastSubmission, Actor(initial), Body(initial), initial.Clock, 0, 0);
                 inputs?.Attach(owner.State);
@@ -173,6 +192,8 @@ namespace OstrixMods.BuildWorks
         {
             RequireOwner(owner);
             if (snapshotTeardown) throw new InvalidOperationException("Uncertain fog pool cannot submit more work.");
+            token = default;
+            if (owner.Inputs.Count == 0 || owner.State.State != BlueprintFogSnapshotState.Phase.Ready || !EnsureSnapshotVelocity(owner)) return false;
             if (!owner.Inputs.TryBegin(out token)) return false;
             owner.pending = token; owner.pendingBatch = true; owner.received = false; owner.reply = null;
             bool metadataOnly = owner.Inputs.PendingMetadataOnly;
@@ -202,6 +223,7 @@ namespace OstrixMods.BuildWorks
                 shader.SetInt("_PendingBase", pendingBase);
                 var last = owner.Inputs.At(owner.Inputs.PendingCount - 1);
                 arena.PublishMetadata(owner.Slot, token, Actor(last), Body(last), last.Clock, last.Nearby ? 1 : 0, mapBase: pendingBase); arena.Dispatch("FinishStep");
+                if (arena.VelocityUpload && !metadataOnly) RequestSnapshotVelocity(owner, token, false);
                 var stamp = token; owner.nativePending = true;
                 owner.request = AsyncGPUReadback.Request(arena.Buffers["_Receipts"], request => {
                     try
@@ -233,6 +255,8 @@ namespace OstrixMods.BuildWorks
                 if (owner == null || !owner.pendingBatch) continue;
                 if (!owner.received) { complete = false; continue; }
                 var token = owner.pending; var words = owner.reply;
+                bool metadataOnly = owner.Inputs.PendingMetadataOnly;
+                bool retainedVelocity = metadataOnly && owner.coldVelocity != null && SnapshotChannel.Same(owner.coldVelocityStamp, owner.LastSubmission);
                 int expectedBase = (owner.Slot * 2 + (owner.Inputs.PendingMetadataOnly ? owner.Bank : 1 - owner.Bank)) * BlueprintFogArena.MapWords;
                 bool valid = words != null && words.Length == 16 && Long(words[0], words[1]) == token.Owner && Long(words[2], words[3]) == token.Generation &&
                     Long(words[4], words[5]) == token.Sequence && words[6] == token.Tick && words[7] == token.EmissionRevision && (words[8] & ~15u) == 0 && words[9] == expectedBase;
@@ -240,9 +264,16 @@ namespace OstrixMods.BuildWorks
                 if (outcome == BlueprintFogSnapshotState.Completion.Committed && !owner.Inputs.PendingMetadataOnly) owner.Bank = 1 - owner.Bank;
                 if (!owner.Inputs.Complete(token, outcome)) throw new InvalidOperationException("Fog channel lost its pending identity.");
                 owner.LastSubmission = token; owner.LastCompletion = outcome; owner.LastFlags = valid ? words[8] : uint.MaxValue;
+                if (outcome == BlueprintFogSnapshotState.Completion.Committed)
+                {
+                    if (retainedVelocity) owner.coldVelocityStamp = token;
+                    else owner.coldVelocity = null;
+                }
                 owner.pendingBatch = false; owner.reply = null;
                 if (!valid || (words[8] & 4) != 0) { owner.Error = "Fog receipt or allocator failed; pool teardown required."; snapshotTeardown = true; }
             }
+            PollSnapshotVelocity();
+            foreach (var owner in snapshotSlots) if (owner != null && owner.evictionPending) complete = false;
             return complete;
         }
 
@@ -290,7 +321,7 @@ namespace OstrixMods.BuildWorks
         internal bool TryReleaseSnapshot(SnapshotChannel owner)
         {
             RequireOwner(owner);
-            if (snapshotTeardown || owner.nativePending || owner.recoveryNativePending || !owner.State.CanReleaseResources) return false;
+            if (snapshotTeardown || owner.nativePending || owner.recoveryNativePending || owner.evictionPending || !owner.State.CanReleaseResources) return false;
             if (owner.releasePending)
             {
                 if (!owner.releaseReceived) return false;
@@ -331,7 +362,7 @@ namespace OstrixMods.BuildWorks
             var shader = arena.Program; int words = BlueprintFogArena.MapWords;
             shader.SetInt("_Slot", owner.Slot); shader.SetInt("_CurrentBase", (owner.Slot * 2 + owner.Bank) * words);
             shader.SetInt("_PendingBase", (owner.Slot * 2 + 1 - owner.Bank) * words); shader.SetInts("_RenderOffset", 0, 0, owner.Slot * 82);
-            shader.SetTexture(arena.Kernel("CommitVelocity"), "_OwnerVelocity", owner.Velocity);
+            shader.SetTexture(arena.Kernel("CommitVelocity"), "_OwnerVelocity", owner.Velocity ? owner.Velocity : arena.Scratch.PredictedColour);
             foreach (string name in new[] { "StageLedger", "CommitLedger" }) for (int i = 0; i < 3; ++i)
                 shader.SetBuffer(arena.Kernel(name), new[] { "_OwnerAway", "_OwnerPeak", "_OwnerState" }[i], owner.Ledger[i]);
         }
@@ -348,6 +379,7 @@ namespace OstrixMods.BuildWorks
             foreach (var owner in snapshotSlots) if (owner != null) owner.State.Retire();
             foreach (var owner in snapshotSlots) if (owner != null && owner.nativePending) owner.request.WaitForCompletion();
             foreach (var owner in snapshotSlots) if (owner != null && owner.recoveryNativePending) owner.recoveryRequest.WaitForCompletion();
+            foreach (var owner in snapshotSlots) if (owner != null && owner.evictionNativePending) owner.evictionRequest.WaitForCompletion();
             // Also fences a dispatch that failed before its receipt request was created.
             var barrier = AsyncGPUReadback.Request(arena.Buffers["_Control"]); barrier.WaitForCompletion();
             if (barrier.hasError) throw new InvalidOperationException("Fog pool GPU drain was not confirmed; resources retained for retry.");

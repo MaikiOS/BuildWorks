@@ -29,6 +29,7 @@ public static class FogArenaPhysicsProbe
         using (var codec = new FogSparseStorageProbe())
         {
             int lifecycleCases = FogRuntimeChannelLifecycleCheck.Run(assets, source);
+            int pagingComparisons = FogVelocityPagingCheck.Run(assets, source, body, codec);
             CheckLogicalSourceReplay(assets, source, body, codec);
             int fields, ledgers, atlases, committed, rejected, metadataChecks;
             using (var test = new Probe(assets, source, body, 8192, codec))
@@ -87,6 +88,7 @@ public static class FogArenaPhysicsProbe
                 metadataBeforeReceipt = true, metadataOnlyTested = true, fractionalVisualClock = true, borrowedOwnershipValidated = true, borrowedInvalidCases = 11, runtimeArenaValidated = true,
                 runtimeChannelsValidated = true, runtimeLifecycleCases = lifecycleCases, committedRecoveryComparisons = 2,
                 logicalSourcePhysicsComparisons = 7,
+                velocityPagingComparisons = pagingComparisons, velocityPagingLogicalOwners = 28, velocityPagingResidentOwners = 7,
                 physicalRecoveryObservedActive = activeObserved, physicalRecoveryCompleted = recoveredObserved, physicalRecoveryTicks = recoveryTicks,
                 realSolver = true, stagedLedger = true, velocityAlias = true,
                 packingRollback = true, shortageRollback = true, callbackWaitsInFixture = true,
@@ -430,5 +432,6 @@ public static class FogArenaPhysicsProbe
         public string note;
         public int physicalRecoveryTicks;
         public int logicalSourcePhysicsComparisons;
+        public int velocityPagingComparisons, velocityPagingLogicalOwners, velocityPagingResidentOwners;
     }
 }

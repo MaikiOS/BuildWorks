@@ -7,6 +7,29 @@ namespace OstrixMods.BuildWorks
 {
     internal sealed class BuildWorksTestFog : MonoBehaviour
     {
+        public static string HouseStatus()
+        {
+            BuildWorksTestIsolation.RequireLoadedSession();
+            var fog = Camera.main ? Camera.main.GetComponent<BuildWorksTestFog>() : null;
+            return JsonUtility.ToJson(new HouseReceipt {
+                active = fog && fog.PublishedHouse, failure = fog?.Failure,
+                parts = fog?.PartCount ?? 0, owners = fog?.ActiveOwners ?? 0, residentOwners = fog?.ResidentOwners ?? 0,
+                queuedSamples = fog?.building?.QueuedSamples ?? 0, minimumTick = fog?.building?.MinimumConfirmedTick ?? 0,
+                lastFlags = fog?.building?.LastFlags ?? 0, frames = fog?.RenderFrames ?? 0,
+                fieldBytes = fog?.FieldBytes ?? 0, renderBytes = fog?.AtlasBytes ?? 0, velocityRamBytes = fog?.VelocityRamBytes ?? 0,
+                origin = fog?.Origin ?? Vector3.zero, clock = fog?.clock ?? 0,
+                processMemory = System.Diagnostics.Process.GetCurrentProcess().PrivateMemorySize64 });
+        }
+        [Serializable] private sealed class HouseReceipt
+        {
+            public bool active;
+            public string failure;
+            public int parts, owners, residentOwners, queuedSamples, minimumTick, frames;
+            public uint lastFlags;
+            public long fieldBytes, renderBytes, velocityRamBytes, processMemory;
+            public Vector3 origin;
+            public float clock;
+        }
         // GABS can call handlers but cannot retain an internal constructor result for this resource-only probe.
         public static string VerifyPublication()
         {
@@ -124,6 +147,9 @@ namespace OstrixMods.BuildWorks
         public int PartCount => building?.Count ?? (visual == null ? 0 : second == null ? 1 : 2);
         public long FieldBytes => channels?.FieldBytes ?? visual?.Simulation?.AllocatedFieldBytes ?? 0;
         public long AtlasBytes => building?.AtlasBytes ?? volume?.AtlasBytes ?? 0;
+        public bool PublishedHouse => building != null && channels?.SnapshotArena != null;
+        public long VelocityRamBytes => PublishedHouse ? channels.VelocityRamBytes : 0;
+        public int ResidentOwners => PublishedHouse ? channels.ResidentSnapshotCount : 0;
         public long PeakFieldBytes { get; private set; }
         public int ActiveOwners => channels?.Count ?? (visual == null ? 0 : 1);
         public bool SkipVolume { get; set; }
@@ -176,13 +202,24 @@ namespace OstrixMods.BuildWorks
             oldDepth = view.depthTextureMode; ownedDepth = oldDepth | DepthTextureMode.Depth; view.depthTextureMode = ownedDepth;
             try
             {
-                assets = BlueprintFogAssets.LoadEmbedded(); channels = new BlueprintFogChannels(32, BlueprintFogChannels.MaximumFieldBudget, true);
+                string path = System.IO.Path.GetFullPath(System.IO.Path.Combine(BepInEx.Paths.BepInExRootPath,
+                    "..", "..", "Default", "BuildWorks", "artifacts", "fog-runtime-assets-candidate", "buildworks-fog-v11"));
+                assets = new BlueprintFogAssets(System.IO.File.ReadAllBytes(path));
+                channels = BlueprintFogChannels.CreateArena(assets, blueprint.parts.Count, 8192);
                 Bounds body = capsule.bounds;
                 building = new BlueprintFogBuilding(assets, channels, blueprint, name => ZNetScene.instance.GetPrefab(name),
                     player.transform.position + Vector3.right * 6, Quaternion.identity, body.center,
                     new Vector2(Mathf.Max(body.extents.x, body.extents.z), body.extents.y));
+                building.PrepareRender();
             }
             catch { Cleanup(); throw; }
+        }
+
+        private void OnPreCull()
+        {
+            if (!Active || !enabled) return;
+            try { building?.PrepareRender(); }
+            catch (Exception error) { Fail(error); }
         }
 
         private void Update()
@@ -198,7 +235,13 @@ namespace OstrixMods.BuildWorks
                 Bounds bounds = capsule.bounds;
                 visual?.AdvanceTo(clock, bounds.center, new Vector2(Mathf.Max(bounds.extents.x, bounds.extents.z), bounds.extents.y), true);
                 second?.AdvanceTo(clock, bounds.center, new Vector2(Mathf.Max(bounds.extents.x, bounds.extents.z), bounds.extents.y), true);
-                building?.AdvanceTo(clock, bounds.center, new Vector2(Mathf.Max(bounds.extents.x, bounds.extents.z), bounds.extents.y), true);
+                if (building != null)
+                {
+                    if (Mathf.FloorToInt(clock / BlueprintFogSimulation.Step + .0001f) >
+                        Mathf.FloorToInt(building.Clock / BlueprintFogSimulation.Step + .0001f))
+                        building.AdvanceTo(clock, bounds.center, new Vector2(Mathf.Max(bounds.extents.x, bounds.extents.z), bounds.extents.y), true);
+                    else building.Pump();
+                }
                 PeakFieldBytes = Math.Max(PeakFieldBytes, FieldBytes);
             }
             catch (Exception error) { Fail(error); }

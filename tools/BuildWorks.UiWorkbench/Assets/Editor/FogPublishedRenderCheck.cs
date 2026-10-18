@@ -220,6 +220,7 @@ public static class FogPublishedRenderCheck
                 CheckRuntimeAtlas(assets, visuals, camera, probe, output, report);
                 foreach (var visual in visuals) visual.Root.SetActive(false);
                 CheckLogicalVisual(assets, prefab, camera, probe, output, report);
+                CheckBuilding(assets, prefab, camera, probe, output, report);
             }
         }
         finally
@@ -550,10 +551,79 @@ public static class FogPublishedRenderCheck
             volumeDepth = size.z, enableRandomWrite = true, filterMode = FilterMode.Trilinear, wrapMode = TextureWrapMode.Clamp };
         if (!texture.Create()) { UnityEngine.Object.DestroyImmediate(texture); throw new InvalidOperationException("Render proof atlas allocation failed."); } return texture;
     }
+    private static void CheckBuilding(BlueprintFogAssets assets, GameObject prefab, Camera camera, FogRenderProbe probe, string output, Report report)
+    {
+        var blueprint = new CompositeBlueprintStore.Blueprint();
+        for (int i = 0; i < 2; ++i) blueprint.parts.Add(new CompositeBlueprintStore.Part {
+            stableId = "published-building-" + i, prefabName = "wall",
+            position = new CompositeBlueprintStore.VectorData(new Vector3(i * .7f, 1, i * .8f)),
+            rotation = new CompositeBlueprintStore.QuaternionData(Quaternion.Euler(0, i * 90, 0)),
+            scale = new CompositeBlueprintStore.VectorData(new Vector3(1.1f, .9f, 1.2f)) });
+        var body = new Vector2(.3f, .95f); Vector3 actor = new Vector3(-1.8f, .95f, 0);
+        var expected = new BlueprintFogVisual[2];
+        using (var pool = BlueprintFogChannels.CreateArena(assets, 2, 8192))
+        using (var building = new BlueprintFogBuilding(assets, pool, blueprint, _ => prefab, Vector3.zero, Quaternion.identity, actor, body))
+        using (var dense = new BlueprintFogAtlas(assets))
+        {
+            var actual = (System.Collections.Generic.List<BlueprintFogVisual>)typeof(BlueprintFogBuilding)
+                .GetField("parts", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(building);
+            try
+            {
+                for (int i = 0; i < 2; ++i)
+                {
+                    var part = blueprint.parts[i]; var root = actual[i].Root.transform;
+                    Require(actual[i].LogicalSource != null && actual[i].Simulation == null &&
+                        Vector3.Distance(root.position, part.position.ToVector3()) < .00001f &&
+                        Quaternion.Angle(root.rotation, part.rotation.ToQuaternion()) < .001f &&
+                        Vector3.Distance(root.localScale, Vector3.Scale(prefab.transform.localScale, part.scale.ToVector3())) < .00001f,
+                        "Published building changed part TRS or created a legacy solver.");
+                    Require(actual[i].Root.GetComponentsInChildren<Collider>(true).Length == 0, "Fog building retained physical colliders.");
+                    expected[i] = new BlueprintFogVisual(assets, prefab, root.position, root.rotation, part.scale.ToVector3(), null,
+                        actual[i].Origin, actor, body, noiseOrigin: Vector3.zero);
+                    expected[i].Root.SetActive(false);
+                }
+                void Compare(string label)
+                {
+                    foreach (var part in actual) part.Root.SetActive(false);
+                    foreach (var part in expected) part.Root.SetActive(true);
+                    var reference = FogRuntimePairCheck.Capture(camera, probe, (image, target) =>
+                        dense.Render(camera, image, target, expected, Vector3.zero, Vector3.right, 0), output, "building-" + label + "-dense");
+                    foreach (var part in expected) part.Root.SetActive(false);
+                    foreach (var part in actual) part.Root.SetActive(true);
+                    building.PrepareRender();
+                    var image = FogRuntimePairCheck.Capture(camera, probe, (input, target) =>
+                        building.Render(camera, input, target, Vector3.zero, Vector3.right, 0), output, "building-" + label + "-published");
+                    double delta = FogRuntimePairCheck.Delta(reference, image), local = 0;
+                    for (int i = 0; i < image.Length; ++i) local = Math.Max(local, Math.Max(Math.Abs(reference[i].r-image[i].r),
+                        Math.Max(Math.Abs(reference[i].g-image[i].g), Math.Abs(reference[i].b-image[i].b))));
+                    Require(delta < .0001 && local < .03, "Building differs from independent dense v11: " + label + "/" + delta + "/" + local);
+                    ++report.buildingComparisons;
+                }
+                Compare("rest");
+                for (int tick = 1; tick <= 24; ++tick)
+                {
+                    actor = tick <= 16 ? new Vector3(.3f, .95f, .4f) : new Vector3(-1.8f, .95f, 0);
+                    float clock = tick * BlueprintFogSimulation.Step;
+                    building.AdvanceTo(clock, actor, body, true);
+                    foreach (var part in expected) part.AdvanceTo(clock, actor, body, true);
+                    for (int wait = 0; wait < 16 && actual.Any(part => part.LogicalSource.Inputs.Count != 0); ++wait)
+                    { AsyncGPUReadback.WaitAllRequests(); building.Pump(); }
+                    Require(actual.All(part => part.LogicalSource.Inputs.Count == 0 && part.Snapshot.State.ConfirmedTick == tick && part.Snapshot.LastFlags == 0),
+                        "Building failed to commit all source histories.");
+                    if (tick == 8 || tick == 16 || tick == 24) Compare("tick-" + tick);
+                }
+                Require(building.AtlasBytes > pool.SnapshotArena.RenderBytes, "Building metrics omitted static/dynamic render resources.");
+                report.buildingAdapterValidated = true;
+            }
+            finally { foreach (var part in expected) part?.Dispose(); }
+        }
+    }
     private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
     [Serializable] private sealed class Report
     {
         public bool runtimeChannelsValidated;
+        public bool buildingAdapterValidated;
+        public int buildingComparisons;
         public bool runtimeVisualAtlasValidated, staticSourceSeparated;
         public bool logicalVisualValidated, logicalVisualDeferredDisposal, dormantClockAndBodyValidated;
         public bool continuousV11Parity, coldIdleControlSensitive;

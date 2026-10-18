@@ -2,12 +2,12 @@
 
 2026-10-18 · [Русский](HANDOFF_RU.md)
 
-**QA .217 installed: exact GPU↔RAM v11 velocity paging.** Unity28/7:2688samples/196exact comparisons,8contacts; ValheimQA8/8:94478116-byte reservation,2457600half-word roundtrip, unchanged inventory/restored bridge. Strict backend is not activated by Building; real house/visual v11/FPS then board remain next. [Evidence and limits](docs/CHECKPOINT_217.md).
+**QA .218 installed: strict v11 now renders the real Forest Hut28 in ValheimQA.** Unity4 building comparisons and native contact/hold/exit/history/cleanup passed; five PNGs, unchanged inventory/restored bridge. Creation exceeded15s; animation fidelity/FPS/board remain open. [Evidence and failures](docs/CHECKPOINT_218.md).
 
 1. Read [PROJECT_CONTRACT](PROJECT_CONTRACT.md), [current evidence](docs/CURRENT_STATUS.md), [forward roadmap](docs/ROADMAP.md) and project AGENTS. Preserve the complete goal; this file is not a goal API update.
-2. Source and installed QA0.19.217; DLL SHA C282AD9CDA33CAE8EA4DB541F863482C2BB3B59BC194BD10929429BA808D2FDE. [Report .217](docs/CHECKPOINT_217.md). Public binary .37 alpha is unchanged.
+2. Source and installed QA0.19.218; DLL SHA 6522F72375A7567AD3F2D10378E5CA08FFF347A0E41729BCCA42F423B9F79A6A. [Report .218](docs/CHECKPOINT_218.md). Public binary .37 alpha is unchanged.
 
-Results below retain their original checkpoint versions; the current installation is stated above. Next integration work is the real-house QA renderer with the verified paged pool; a durable project requires its own server journal, not storage WAL.
+Results below retain their original checkpoint versions; the current installation is stated above. Next work is continuous fixed-camera house capture, numeric recovery and responsive source preparation; a durable project requires its own server journal, not storage WAL.
 
 [.213](docs/FOG_NOISE_FRAME_213.md) aligns noise phases across parts; GPU checks/regressions passed and QA is installed. Native .213 is untested; boundary loss, recovery ownership and performance remain open.
 

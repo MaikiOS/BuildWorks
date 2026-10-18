@@ -6,9 +6,9 @@ BuildWorks extends Valheim's hammer with precise construction, a blueprint catal
 
 ![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
 
-**Current source / isolated QA: 0.19.217.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
+**Current source / isolated QA: 0.19.218.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
 
-**QA .217 installed: exact GPU↔RAM v11 velocity paging.** Unity28/7:2688samples/196exact comparisons,8contacts; ValheimQA8/8:94478116-byte reservation,2457600half-word roundtrip, unchanged inventory/restored bridge. Strict backend is not activated by Building; real house/visual v11/FPS then board remain next. [Evidence and limits](docs/CHECKPOINT_217.md).
+**QA .218 installed: strict v11 now renders the real Forest Hut28 in ValheimQA.** Unity4 building comparisons and native contact/hold/exit/history/cleanup passed; five PNGs, unchanged inventory/restored bridge. Creation exceeded15s; animation fidelity/FPS/board remain open. [Evidence and failures](docs/CHECKPOINT_218.md).
 
 ## Capabilities
 

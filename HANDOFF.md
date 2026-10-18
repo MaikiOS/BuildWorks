@@ -2,14 +2,13 @@
 
 2026-10-18 · [Русский](HANDOFF_RU.md)
 
-**QA .221 installed: numerical long-wall recovery verified in Valheim.**30/30;54,336 inner RGBA texels match payload, three fresh recovery samples have smoke/surface/ledgerFlags0. Approved visual v11/house/FPS/board remain open. [Evidence and limits](docs/CHECKPOINT_221.md).
+**QA .223 installed: Spatial3D wired into QA pool; native four passes11/11+66/66.**365,184 inner RGBA texels, zero smoke/surface/recovery flags after exits. Exact legacy oracle; spatial look/house/FPS/board remain open. [Evidence and limits](docs/CHECKPOINT_223.md).
 
-**Diagnostic222:** GPU confirmed aliasing distinct X source positions in legacy YZ return bins. An isolated3D candidate removes this alias; runtime is not fixed, installed .221 unchanged. [Cause, evidence and next step](docs/FOG_RETURN_OWNERSHIP_222.md).
 
 1. Read [PROJECT_CONTRACT](PROJECT_CONTRACT.md), [current evidence](docs/CURRENT_STATUS.md), [forward roadmap](docs/ROADMAP.md) and project AGENTS. Preserve the complete goal; this file is not a goal API update.
-2. Source and installed QA0.19.221; DLL SHA 2A146A973FB18C3D244A7C963240CCA458BB0A03C0AAD84A2B21F53BDC770577. [Report .221](docs/CHECKPOINT_221.md). Public binary .37 alpha is unchanged.
+2. Source and installed QA0.19.223; DLL SHA 87DF0753C327F0A1904C9F56076AA1B4C48EEC78417D116F123BDCA01064031B. [Report .223](docs/CHECKPOINT_223.md). Public binary .37 alpha is unchanged.
 
-Results below retain their original checkpoint versions; the current installation is stated above. Next work is spatial return ownership instead of YZ aliasing, then matched long-wall/v11 capture and the house; a durable project requires its own server journal, not storage WAL.
+Results below retain their original checkpoint versions; the current installation is stated above. Next work is canonical legacy/spatial recovery curves and matched long-wall/v11 capture, then house; a durable project requires its own server journal, not storage WAL.
 
 [.213](docs/FOG_NOISE_FRAME_213.md) aligns noise phases across parts; GPU checks/regressions passed and QA is installed. Native .213 is untested; boundary loss, recovery ownership and performance remain open.
 

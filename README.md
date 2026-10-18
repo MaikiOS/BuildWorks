@@ -6,11 +6,10 @@ BuildWorks extends Valheim's hammer with precise construction, a blueprint catal
 
 ![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
 
-**Current source / isolated QA: 0.19.221.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
+**Current source / isolated QA: 0.19.223.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
 
-**QA .221 installed: numerical long-wall recovery verified in Valheim.**30/30;54,336 inner RGBA texels match payload, three fresh recovery samples have smoke/surface/ledgerFlags0. Approved visual v11/house/FPS/board remain open. [Evidence and limits](docs/CHECKPOINT_221.md).
+**QA .223 installed: Spatial3D wired into QA pool; native four passes11/11+66/66.**365,184 inner RGBA texels, zero smoke/surface/recovery flags after exits. Exact legacy oracle; spatial look/house/FPS/board remain open. [Evidence and limits](docs/CHECKPOINT_223.md).
 
-**Diagnostic222:** GPU confirmed aliasing distinct X source positions in legacy YZ return bins. An isolated3D candidate removes this alias; runtime is not fixed, installed .221 unchanged. [Cause, evidence and next step](docs/FOG_RETURN_OWNERSHIP_222.md).
 
 ## Capabilities
 

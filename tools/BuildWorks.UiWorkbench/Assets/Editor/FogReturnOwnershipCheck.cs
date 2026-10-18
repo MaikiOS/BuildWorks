@@ -12,20 +12,23 @@ public static class FogReturnOwnershipCheck
     private const int Nx = 96, Ny = 80, Nz = 80;
     public static void Run() => Run(false);
     public static void RunCandidate() => Run(true);
-    private static void Run(bool candidate)
+    public static void RunRuntimeSpatial() => Run(true, true);
+    private static void Run(bool candidate, bool runtime = false)
     {
         string root = Path.GetFullPath(Path.Combine(Application.dataPath, "../../.."));
-        string output = Path.Combine(root, "artifacts/fog-return-ownership-222");
+        string output = Path.Combine(root, runtime ? "artifacts/fog-spatial-ledger-223" : "artifacts/fog-return-ownership-222");
         Directory.CreateDirectory(output);
         try
         {
             using (var assets = new BlueprintFogAssets(File.ReadAllBytes(Path.Combine(root, "artifacts/fog-runtime-assets-candidate/buildworks-fog-v11"))))
             {
-                var solver = UnityEngine.Object.Instantiate(candidate
+                var solver = UnityEngine.Object.Instantiate(candidate && !runtime
                     ? AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Editor/OwnershipCandidate/SpatialLedger.compute") : assets.Solver);
                 try
                 {
                     solver.DisableKeyword("BUILDWORKS_FOG_COMPACT_GRID");
+                    if (runtime && !solver.HasKernel("ClearSpatialLedger")) throw new NotSupportedException("Runtime spatial solver required.");
+                    if (solver.HasKernel("ClearSpatialLedger")) solver.SetInt("_SpatialLedger", runtime ? 1 : 0);
                     int count = Nx * Ny * Nz;
                     Vector3 low = new Vector3(-3.6f, -.7f, -2.7f), high = new Vector3(3.6f, 4.4f, 2.7f);
                     int Index(int x, int y, int z) => x + Nx * (y + Ny * z);

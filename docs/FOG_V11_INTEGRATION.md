@@ -1,8 +1,7 @@
 # Approved v11 integration
 
-**Current .221:** Valheim30/30 front pass through four-section wall;54,336 inner RGBA texels, three fresh zero smoke/surface/ledgerFlags samples. [Evidence](CHECKPOINT_221.md). Visual v11/other numeric directions/house/FPS/board remain open. Ordinary construction retains previous backend.
+**Current .223:** immutable QA Spatial3D pool, Unity168exact/legacy270/18, native11/11+66/66:4passes/recovery0/365,184 inner texels. [Evidence](CHECKPOINT_223.md). Normalisation/look/house/FPS/durable board open; ordinary construction retains previous backend.
 
-**Diagnostic222:** GPU confirmed aliasing distinct X source positions in legacy YZ return bins. An isolated3D candidate removes this alias; runtime is not fixed, installed .221 unchanged. [Cause, evidence and next step](FOG_RETURN_OWNERSHIP_222.md).
 
 ## Historical .213 diagnosis and subsequent experiments (superseded by the current evidence above)
 

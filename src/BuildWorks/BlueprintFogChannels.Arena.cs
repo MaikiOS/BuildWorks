@@ -51,7 +51,8 @@ namespace OstrixMods.BuildWorks
             internal uint? recoveryFlags;
             internal BlueprintFogSnapshotState.Submission recoveryStamp;
 
-            internal SnapshotChannel(int slot, long identity, long generation, BlueprintFogInputQueue.Sample initial, BlueprintFogInputQueue inputs, bool resident = true)
+            internal SnapshotChannel(int slot, long identity, long generation, BlueprintFogInputQueue.Sample initial, BlueprintFogInputQueue inputs, bool resident = true,
+                BlueprintFogLedgerLayout ledgerLayout = BlueprintFogLedgerLayout.LegacyYZ)
             {
                 Slot = slot; Identity = identity; Generation = generation;
                 State = new BlueprintFogSnapshotState(identity, generation, Mathf.FloorToInt(initial.Clock / BlueprintFogSimulation.Step + .0001f));
@@ -61,7 +62,8 @@ namespace OstrixMods.BuildWorks
                 {
                     if (resident) Velocity = BlueprintFogSimulation.AllocateField(new Vector3Int(96, 80, 80), "Fog committed velocity " + slot);
                     else coldVelocity = new ushort[VelocityWords];
-                    for (int i = 0; i < Ledger.Length; ++i) { Ledger[i] = new ComputeBuffer(i == 2 ? 1 : 1024, 4); Ledger[i].SetData(new uint[i == 2 ? 1 : 1024]); }
+                    int cells = BlueprintFogSnapshotState.LedgerCells(ledgerLayout);
+                    for (int i = 0; i < Ledger.Length; ++i) { Ledger[i] = new ComputeBuffer(i == 2 ? 1 : cells, 4); Ledger[i].SetData(new uint[i == 2 ? 1 : cells]); }
                 }
                 catch { Release(); throw; }
             }
@@ -121,16 +123,19 @@ namespace OstrixMods.BuildWorks
             words[offset + 3] = (uint)generation; words[offset + 4] = (uint)(generation >> 32);
         }
 
-        internal static BlueprintFogChannels CreateArena(BlueprintFogAssets assets, int ownerLimit, int blockCapacity, bool denseReference = false, int residentOwners = 0)
+        internal static BlueprintFogChannels CreateArena(BlueprintFogAssets assets, int ownerLimit, int blockCapacity, bool denseReference = false, int residentOwners = 0,
+            BlueprintFogLedgerLayout ledgerLayout = BlueprintFogLedgerLayout.LegacyYZ)
         {
             if (assets == null) throw new ArgumentNullException(nameof(assets));
+            if (ledgerLayout == BlueprintFogLedgerLayout.Spatial3D && !assets.Solver.HasKernel("ClearSpatialLedger"))
+                throw new NotSupportedException("Fog solver bundle does not support Spatial3D ledgers.");
             var pool = new BlueprintFogChannels(ownerLimit, MaximumFieldBudget);
             if (residentOwners == 0)
             {
                 residentOwners = ownerLimit;
-                while (residentOwners > 1 && BlueprintFogSnapshotState.EstimateFieldBytes(ownerLimit, blockCapacity, residentOwners) > MaximumFieldBudget) --residentOwners;
+                while (residentOwners > 1 && BlueprintFogSnapshotState.EstimateFieldBytes(ownerLimit, blockCapacity, residentOwners, ledgerLayout) > MaximumFieldBudget) --residentOwners;
             }
-            pool.arena = new BlueprintFogArena(assets.Arena, assets.Metadata, ownerLimit, blockCapacity, denseReference, residentOwners);
+            pool.arena = new BlueprintFogArena(assets.Arena, assets.Metadata, ownerLimit, blockCapacity, denseReference, residentOwners, ledgerLayout);
             pool.snapshotSlots = new SnapshotChannel[ownerLimit]; pool.generations = new long[ownerLimit];
             return pool;
         }
@@ -161,10 +166,10 @@ namespace OstrixMods.BuildWorks
             SnapshotChannel owner = null; bool initializing = false; creating = true;
             try
             {
-                owner = new SnapshotChannel(slot, checked(++nextIdentity), checked(++generations[slot]), initial, inputs, ResidentSnapshotCount < arena.ResidentCapacity);
+                owner = new SnapshotChannel(slot, checked(++nextIdentity), checked(++generations[slot]), initial, inputs, ResidentSnapshotCount < arena.ResidentCapacity, arena.LedgerLayout);
                 var scratch = arena.Scratch; var buffers = arena.Buffers;
                 var staged = new BlueprintFogSimulation.StagedState(scratch.ReadColour, scratch.ReadOrigin,
-                    scratch.ReadSurface, buffers["_StageAway"], buffers["_StagePeak"], buffers["_StageState"]);
+                    scratch.ReadSurface, buffers["_StageAway"], buffers["_StagePeak"], buffers["_StageState"], arena.LedgerLayout);
                 var candidate = create(scratch, staged);
                 foreach (var existing in snapshotSlots) if (existing != null && ReferenceEquals(existing.simulation, candidate))
                     throw new InvalidOperationException("Fog solver already belongs to another snapshot owner.");
@@ -214,7 +219,7 @@ namespace OstrixMods.BuildWorks
                 BindSnapshot(owner); arena.Dispatch("BeginStep");
                 if (!metadataOnly)
                 {
-                    arena.Dispatch("RestoreFields", 24, 20, 20); arena.Dispatch("StageLedger", 16);
+                    arena.Dispatch("RestoreFields", 24, 20, 20); arena.Dispatch("StageLedger", arena.LedgerCells / 64);
                     Graphics.CopyTexture(owner.Velocity, arena.Scratch.PredictedColour);
                 }
                 for (int i = 0; i < owner.Inputs.PendingCount; ++i)
@@ -229,7 +234,7 @@ namespace OstrixMods.BuildWorks
                 {
                     arena.Dispatch("IndexFields", 24, 20, 20); arena.Dispatch("ValidateCurrent", 450); arena.Dispatch("ReserveBlocks");
                     arena.Dispatch("ResolveBlocks", 450); arena.Dispatch("PackFields", 24, 20, 20); arena.Dispatch("CheckPacking");
-                    arena.Dispatch("CommitVelocity", 24, 20, 20); arena.Dispatch("CommitLedger", 16); arena.Dispatch("PublishFields", 25, 21, 21); arena.Dispatch("CommitMaps", 450);
+                    arena.Dispatch("CommitVelocity", 24, 20, 20); arena.Dispatch("CommitLedger", arena.LedgerCells / 64); arena.Dispatch("PublishFields", 25, 21, 21); arena.Dispatch("CommitMaps", 450);
                 }
                 shader.SetInt("_PendingBase", pendingBase);
                 var last = owner.Inputs.At(owner.Inputs.PendingCount - 1);

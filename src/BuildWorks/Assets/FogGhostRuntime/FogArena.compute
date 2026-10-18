@@ -2,6 +2,7 @@
 #pragma kernel InitArena
 #pragma kernel BeginStep
 #pragma kernel StageLedger
+#pragma kernel StageSpatialLedger
 #pragma kernel IndexFields
 #pragma kernel ValidateCurrent
 #pragma kernel ReserveBlocks
@@ -10,6 +11,7 @@
 #pragma kernel CheckPacking
 #pragma kernel CommitVelocity
 #pragma kernel CommitLedger
+#pragma kernel CommitSpatialLedger
 #pragma kernel PublishFields
 #pragma kernel CommitMaps
 #pragma kernel FinishStep
@@ -70,6 +72,14 @@ void BeginStep(uint id : SV_DispatchThreadID)
 void StageLedger(uint id : SV_DispatchThreadID)
 {
     if(id >= 1024) return;
+    _StageAway[id] = _OwnerAway[id]; _StagePeak[id] = _OwnerPeak[id];
+    if(id == 0) _StageState[0] = _OwnerState[0];
+}
+
+[numthreads(64,1,1)]
+void StageSpatialLedger(uint id : SV_DispatchThreadID)
+{
+    if(id >= 16384) return;
     _StageAway[id] = _OwnerAway[id]; _StagePeak[id] = _OwnerPeak[id];
     if(id == 0) _StageState[0] = _OwnerState[0];
 }
@@ -150,6 +160,14 @@ void CommitVelocity(uint3 id : SV_DispatchThreadID)
 void CommitLedger(uint id : SV_DispatchThreadID)
 {
     if(id >= 1024 || _Control[2] != 0) return;
+    _OwnerAway[id] = _StageAway[id]; _OwnerPeak[id] = _StagePeak[id];
+    if(id == 0) _OwnerState[0] = _StageState[0];
+}
+
+[numthreads(64,1,1)]
+void CommitSpatialLedger(uint id : SV_DispatchThreadID)
+{
+    if(id >= 16384 || _Control[2] != 0) return;
     _OwnerAway[id] = _StageAway[id]; _OwnerPeak[id] = _StagePeak[id];
     if(id == 0) _OwnerState[0] = _StageState[0];
 }

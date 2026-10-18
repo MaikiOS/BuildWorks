@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 
 namespace OstrixMods.BuildWorks
 {
-    // shortcut: approved one-wall YZ ownership; extend ownership before sharing a field across a house.
+    // LegacyYZ retains the approved wall oracle; Spatial3D separates source positions in all three axes.
     // Coordinates are local metres; shape/pigment/noise are borrowed and must outlive this simulation.
     internal sealed class BlueprintFogSimulation : IDisposable
     {
@@ -15,15 +15,19 @@ namespace OstrixMods.BuildWorks
         internal long AllocatedFieldBytes => staged ? 0 : FieldVoxels(GridSize) * (Scratch == null ? 80 : 32);
         internal BlueprintFogScratch Scratch { get; }
         private readonly bool staged;
+        internal BlueprintFogLedgerLayout LedgerLayout { get; }
+        private readonly int ledgerCells;
 
         // Borrowed workspace only. The arena owns its lifetime and publishes committed fields separately.
         internal sealed class StagedState
         {
             internal readonly RenderTexture Colour, Origin, Surface;
             internal readonly ComputeBuffer Away, Peak, State;
+            internal readonly BlueprintFogLedgerLayout Layout;
             internal StagedState(RenderTexture colour, RenderTexture origin, RenderTexture surface,
-                ComputeBuffer away, ComputeBuffer peak, ComputeBuffer state)
-            { Colour = colour; Origin = origin; Surface = surface; Away = away; Peak = peak; State = state; }
+                ComputeBuffer away, ComputeBuffer peak, ComputeBuffer state,
+                BlueprintFogLedgerLayout layout = BlueprintFogLedgerLayout.LegacyYZ)
+            { Colour = colour; Origin = origin; Surface = surface; Away = away; Peak = peak; State = state; Layout = layout; }
             private static bool SamplingMatches(RenderTexture field) => field.filterMode == FilterMode.Trilinear && !field.useMipMap &&
                 field.wrapModeU == TextureWrapMode.Clamp && field.wrapModeV == TextureWrapMode.Clamp && field.wrapModeW == TextureWrapMode.Clamp;
             private static bool FieldMatches(RenderTexture field, Vector3Int grid) => field && field.IsCreated() &&
@@ -47,7 +51,7 @@ namespace OstrixMods.BuildWorks
                 var buffers = new[] { Away, Peak, State };
                 for (int i = 0; i < buffers.Length; ++i)
                 {
-                    if (buffers[i] == null || !buffers[i].IsValid() || buffers[i].stride != 4 || buffers[i].count != (i == 2 ? 1 : 1024))
+                    if (buffers[i] == null || !buffers[i].IsValid() || buffers[i].stride != 4 || buffers[i].count != (i == 2 ? 1 : BlueprintFogSnapshotState.LedgerCells(Layout)))
                         throw new ArgumentException("Staged fog ledger layout invalid.");
                     for (int j = 0; j < i; ++j) if (ReferenceEquals(buffers[i], buffers[j])) throw new ArgumentException("Staged fog ledgers alias each other.");
                 }
@@ -74,12 +78,13 @@ namespace OstrixMods.BuildWorks
         internal int Tick => tick;
         internal bool UsesStagedState(StagedState expected) => staged && expected != null &&
             ReferenceEquals(colour[0], expected.Colour) && ReferenceEquals(origin[0], expected.Origin) && ReferenceEquals(surface[0], expected.Surface) &&
-            ReferenceEquals(away, expected.Away) && ReferenceEquals(peak, expected.Peak) && ReferenceEquals(state, expected.State);
+            ReferenceEquals(away, expected.Away) && ReferenceEquals(peak, expected.Peak) && ReferenceEquals(state, expected.State) && LedgerLayout == expected.Layout;
 
         internal BlueprintFogSimulation(BlueprintFogAssets assets, Texture3D shape, Texture3D pigment,
             Texture3D noise, Vector3 minimum, Vector3 maximum, Vector3 restMinimum, Vector3 restMaximum,
             Vector3 actor, float seed, Vector3Int? gridSize = null, float initialClock = 0, BlueprintFogScratch scratch = null,
-            Vector3? noiseOffset = null, StagedState stagedState = null)
+            Vector3? noiseOffset = null, StagedState stagedState = null,
+            BlueprintFogLedgerLayout ledgerLayout = BlueprintFogLedgerLayout.LegacyYZ)
         {
             if (!Finite(initialClock) || initialClock < 0 || initialClock > 86400) throw new ArgumentException("Invalid initial fog clock.");
             tick = Mathf.FloorToInt(initialClock / Step + .0001f); inputTime = initialClock;
@@ -87,6 +92,11 @@ namespace OstrixMods.BuildWorks
             Vector3 phase = noiseOffset ?? Vector3.zero; Validate(phase);
             if (assets == null || !assets.Solver || !shape || !pigment || !noise || !Finite(seed))
                 throw new ArgumentException("Missing fog simulation input.");
+            // Borrowed stage layout is authoritative; the optional argument configures standalone dense oracles.
+            LedgerLayout = stagedState?.Layout ?? ledgerLayout;
+            ledgerCells = BlueprintFogSnapshotState.LedgerCells(LedgerLayout);
+            if (LedgerLayout == BlueprintFogLedgerLayout.Spatial3D && !assets.Solver.HasKernel("ClearSpatialLedger"))
+                throw new NotSupportedException("Fog bundle does not support Spatial3D ledgers.");
             for (int axis = 0; axis < 3; ++axis)
                 if (maximum[axis] <= minimum[axis] || restMaximum[axis] <= restMinimum[axis] ||
                     minimum[axis] > restMinimum[axis] || maximum[axis] < restMaximum[axis] ||
@@ -114,7 +124,8 @@ namespace OstrixMods.BuildWorks
                 else solver.DisableKeyword("BUILDWORKS_FOG_COMPACT_GRID");
                 clear = solver.FindKernel("Clear"); flow = solver.FindKernel("AdvanceVelocity");
                 matter = solver.FindKernel("AdvanceMatter"); correct = solver.FindKernel("CorrectMatter");
-                clearLedger = solver.FindKernel("ClearLedger"); ledger = solver.FindKernel("AccumulateLedger");
+                clearLedger = solver.FindKernel(LedgerLayout == BlueprintFogLedgerLayout.Spatial3D ? "ClearSpatialLedger" : "ClearLedger"); ledger = solver.FindKernel("AccumulateLedger");
+                if (solver.HasKernel("ClearSpatialLedger")) solver.SetInt("_SpatialLedger", LedgerLayout == BlueprintFogLedgerLayout.Spatial3D ? 1 : 0);
                 restore = solver.FindKernel("UpdateSurface"); transport = new[] { flow, matter, correct };
                 solver.SetVector("_Minimum", minimum); solver.SetVector("_Maximum", maximum);
                 solver.SetVector("_NoiseOffset", phase);
@@ -125,13 +136,13 @@ namespace OstrixMods.BuildWorks
                     solver.SetTexture(kernel, "_Shape", shape); solver.SetTexture(kernel, "_Pigment", pigment);
                     solver.SetTexture(kernel, "_Noise", noise);
                 }
-                away = staged ? stagedState.Away : new ComputeBuffer(1024, sizeof(uint));
-                peak = staged ? stagedState.Peak : new ComputeBuffer(1024, sizeof(uint));
+                away = staged ? stagedState.Away : new ComputeBuffer(ledgerCells, sizeof(uint));
+                peak = staged ? stagedState.Peak : new ComputeBuffer(ledgerCells, sizeof(uint));
                 state = staged ? stagedState.State : new ComputeBuffer(1, sizeof(uint));
                 foreach (int kernel in new[] { clearLedger, flow, ledger }) solver.SetBuffer(kernel, "_AwayMass", away);
                 foreach (int kernel in new[] { clearLedger, flow }) solver.SetBuffer(kernel, "_PeakAway", peak);
                 foreach (int kernel in new[] { clearLedger, ledger, restore }) solver.SetBuffer(kernel, "_SurfaceState", state);
-                solver.SetInt("_ResetLedger", 1); solver.Dispatch(clearLedger, 16, 1, 1); solver.SetInt("_ResetLedger", 0);
+                solver.SetInt("_ResetLedger", 1); solver.Dispatch(clearLedger, ledgerCells / 64, 1, 1); solver.SetInt("_ResetLedger", 0);
                 if (Scratch == null) { predictedColour = Allocate("Predicted smoke"); predictedOrigin = Allocate("Predicted origins"); }
                 for (int index = 0; index < (Scratch == null ? 2 : 1); ++index)
                 {
@@ -185,7 +196,7 @@ namespace OstrixMods.BuildWorks
                     solver.SetTexture(correct, "_Velocity", nextVelocity); solver.SetTexture(correct, "_PredictedColour", prediction);
                     solver.SetTexture(correct, "_PredictedOrigin", predictionOrigin); solver.SetTexture(correct, "_WriteColour", nextColour);
                     solver.SetTexture(correct, "_WriteOrigin", nextOrigin); Dispatch(correct);
-                    solver.Dispatch(clearLedger, 16, 1, 1);
+                    solver.Dispatch(clearLedger, ledgerCells / 64, 1, 1);
                     solver.SetTexture(ledger, "_ReadColour", nextColour); solver.SetTexture(ledger, "_ReadOrigin", nextOrigin); Dispatch(ledger);
                     solver.SetTexture(restore, "_ReadSurface", surface[current]); solver.SetTexture(restore, "_Velocity", nextVelocity);
                     solver.SetTexture(restore, "_WriteSurface", nextSurface); Dispatch(restore);

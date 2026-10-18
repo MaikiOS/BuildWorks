@@ -1,0 +1,25 @@
+# .223 — spatial return in the game pool
+
+2026-10-18 · [Русский](CHECKPOINT_223_RU.md) · [Full checklist](LIVE_CHECKLIST_RU.md)
+
+QA **0.19.223.0** installed only in TerrainRamp-1.0-Test; SHA `87DF0753C327F0A1904C9F56076AA1B4C48EEC78417D116F123BDCA01064031B`. QA InitializeBlueprint now selects Spatial3D for wall/house. **Ordinary construction retains the previous backend**; no durable project/board yet. Costs/rights/domain/precision/smoke transport/approved archive/embedded bundle unchanged. QA candidate bundle SHA B8C5D64CA0836A3CE8B20B9426B55F2A2DE51D09B4DFCE4080C367A27515866C.
+
+Immutable LegacyYZ1024 and Spatial3D16×32×32 flow through pool/generation/arena/stage/simulation; dense oracle explicitly selects the same layout. No live migration or reinterpretation of peak/away. Owner+stage allocation/validation/dispatch/FieldBytes corrected, sparse payload/maps/velocity unchanged. Old bundle rejects spatial before allocation; new clear/stage/commit entries are only required for spatial. Threshold768 unchanged. Actual new solver preserves sourceA.5 and lets unrelatedX/Z recover to.458251953 (RunRuntimeSpatial, no generated222 shader). The old222 generator is a pinned diagnostic, not current bundle acceptance.
+
+Normal/QA0warnings/errors, Geometry132 groups/current host/localization1104/991/isolation/control passed. Independent correctness/Ponytail PASSED/Ship to native QA; no installed verify skill. Actual28owner/7resident/8192block buffers plus shared staging/upload **98,041,636B**, matching count×stride/extents/reservation/FieldBytes; not total driver VRAM. Eighth resident rejected,98,304,000 cap unchanged, margin262,364. Full16,384-word stage/commit and rejected-commit retention passed. Three full16s cycles (wall/yaw90/compound nonplanar):168 exact comparisons of4fields+3ledgers against dense spatial, contact/final recovery flags0 reached. Not scale/tilt or rotation-invariant noise proof. New bundle LegacyYZ:270ticks/18 exact frozen-v11 field comparisons, damage1→0; legacy exact does not establish spatial visual parity.
+
+Manifest counts28 baseline contract kernels;3optional spatial entries covered by actual full-buffer checks. Nonblocking limitation: optional entries are presence-checked, not generic load-time64×1×1 checked; validate dimensions before accepting future bundle variants. Current binary is established by full16K tests.
+
+Native ValheimQA/GABS/existing isolated identities/cloud=false: preparation **11/11,5.4s**; four real passes through one8m wall of4adjacent native sections **66/66,56.0s**, optional failures0, no scenario errors. Preparation has2optional backpack API warnings. Strict bridge0ac107 handles valid native scripts;71 compiled malformed-predicate tests are not separately native-proven.
+
+Hold ticks2636/2987/3405/3811 have positive smoke/surface. **365,184 inner RGBA texels** match reachable published payload (46,656/34,112/135,488/148,928). After exits ticks2959/3307/3754/4155 have all smoke/surface alpha/nonzero and Ledger[2] recovery flags0; fresh4194/4231 confirm final state.11samples retain identities and strictly advance sequence/tick/clock. Threshold.001, observed exact0. Native whole Away/Peak/gutters/interpolation/final pixels not compared.
+
+Four fixed-camera clips83/74/98/85frames,340total, contain enter/hold/exit/recovery. Camera restored every frame; reverse1/3 omit a separate approach phase. Initial idle/previous-complete frame is excluded from route counts. PNG/JSONL retained; VFR videos use real sample intervals, no interpolation. Capture about6–7fps is not game FPS.
+
+Four-wall field82,383,460B; post-render render74,580,096B (before first render58,335,552). Metric CPU decoding1.38–8.07ms; request-to-status148–252ms includes polling, not GPU timing. Inventory/backpacks identical; closed counters0. No desktop input/grants/native construction/resets/terrain/hostile removal.
+
+Normal logout/menu/Quit PID56216,3bridge DLLs hash-restored.4137 regular files unchanged by size/exact timestamps (not hashes);134/143 protected hashes unchanged,9 ordinary QA save/control changes/rotations; cfg version header only. Collector idle-side assertion and wait-step KeyError fixed without replaying game. Incorrect helper paths/unsupported control-check argument were not counted; correct checks passed.
+
+Private native evidence Default/ValheimQA/artifacts/20261018-154239; Unity BuildWorks/artifacts/fog-spatial-ledger-223 and fog-legacy-spatial-bundle-223; source/install artifacts/checkpoint-223. Correct-root SocratiCode green38174, no graph dependencies for SnapshotState, direct callers checked without reindex. No game assets/frames/binaries published.
+
+Open: return duration/look after3D mass splitting (768 unnormalised), averaged-origin approximation, matched approved-v11 parity, scales/tilts, FPS/GPU timing, house28/storage capacity, owner acceptance, durable project/board/reload/server. House remains8192blocks;32768 is four-wall only. Next canonical legacy/spatial recovery curves and matched long-wall look, then house. All14blocks retained; goal active.

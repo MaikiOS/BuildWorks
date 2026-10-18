@@ -2,6 +2,7 @@ using System;
 
 namespace OstrixMods.BuildWorks
 {
+    internal enum BlueprintFogLedgerLayout { LegacyYZ, Spatial3D }
     // CPU confirmation only. A receipt can confirm GPU work, never infer rollback after a readback error.
     internal sealed class BlueprintFogSnapshotState
     {
@@ -82,9 +83,17 @@ namespace OstrixMods.BuildWorks
         }
 
         // Full 96x80x80 v11 fields only; source/atlas/driver readback staging are separate budgets.
-        internal static long EstimateFieldBytes(int owners, int blockCapacity, int residentOwners = 0)
+        internal static int LedgerCells(BlueprintFogLedgerLayout layout)
         {
-            const long cells = 96L * 80 * 80, ledgerBytes = 1024 * 4 * 2 + 4;
+            if (layout == BlueprintFogLedgerLayout.LegacyYZ) return 1024;
+            if (layout == BlueprintFogLedgerLayout.Spatial3D) return 16384;
+            throw new ArgumentException("Unknown fog ledger layout.");
+        }
+        internal static long EstimateFieldBytes(int owners, int blockCapacity, int residentOwners = 0,
+            BlueprintFogLedgerLayout layout = BlueprintFogLedgerLayout.LegacyYZ)
+        {
+            const long cells = 96L * 80 * 80;
+            long ledgerBytes = LedgerCells(layout) * 8L + 4;
             if (owners < 1 || owners > 32 || blockCapacity < 1 || blockCapacity > 98304000 / 516)
                 throw new ArgumentException("Fog sparse pool sizing invalid.");
             if (residentOwners == 0) residentOwners = owners;

@@ -23,6 +23,7 @@ namespace OstrixMods.BuildWorks
                 parts = fog?.PartCount ?? 0, owners = fog?.ActiveOwners ?? 0, residentOwners = fog?.ResidentOwners ?? 0,
                 blockCapacity = fog?.channels?.SnapshotArena?.BlockCapacity ?? 0,
                 residentCapacity = fog?.channels?.SnapshotArena?.ResidentCapacity ?? 0,
+                ledgerCells = fog?.channels?.SnapshotArena?.LedgerCells ?? 0,
                 queuedSamples = fog?.building?.QueuedSamples ?? 0, minimumTick = fog?.building?.MinimumConfirmedTick ?? 0,
                 lastFlags = fog?.building?.LastFlags ?? 0, frames = fog?.RenderFrames ?? 0,
                 fieldBytes = fog?.FieldBytes ?? 0, renderBytes = fog?.AtlasBytes ?? 0, velocityRamBytes = fog?.VelocityRamBytes ?? 0,
@@ -41,6 +42,7 @@ namespace OstrixMods.BuildWorks
             public uint lastFlags;
             public string firstFaultJson;
             public int blockCapacity, residentCapacity;
+            public int ledgerCells;
             public long fieldBytes, renderBytes, velocityRamBytes, processMemory;
             public Vector3 origin;
             public float clock;
@@ -357,7 +359,7 @@ namespace OstrixMods.BuildWorks
                 string path = System.IO.Path.GetFullPath(System.IO.Path.Combine(BepInEx.Paths.BepInExRootPath,
                     "..", "..", "Default", "BuildWorks", "artifacts", "fog-runtime-assets-candidate", "buildworks-fog-v11"));
                 assets = new BlueprintFogAssets(System.IO.File.ReadAllBytes(path));
-                channels = BlueprintFogChannels.CreateArena(assets, blueprint.parts.Count, blockCapacity);
+                channels = BlueprintFogChannels.CreateArena(assets, blueprint.parts.Count, blockCapacity, ledgerLayout: BlueprintFogLedgerLayout.Spatial3D);
                 Bounds body = capsule.bounds;
                 building = new BlueprintFogBuilding(assets, channels, blueprint, name => ZNetScene.instance.GetPrefab(name),
                     player.transform.position + Vector3.right * 6, Quaternion.identity, body.center,

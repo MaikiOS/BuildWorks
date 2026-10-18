@@ -47,6 +47,10 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Require(BlueprintFogSnapshotState.EstimateFieldBytes(32, 1) > 98304000, "Owner capacity was confused with actual field admission.");
             Require(BlueprintFogSnapshotState.EstimateFieldBytes(28, 8192, 7) == 94478116, "Paged pool omitted logical metadata, ledger or shared upload.");
             Require(BlueprintFogSnapshotState.EstimateFieldBytes(28, 8192, 8) == 99393316, "An eighth resident velocity hid a budget overflow.");
+            Require(BlueprintFogSnapshotState.EstimateFieldBytes(28, 8192, 7, BlueprintFogLedgerLayout.Spatial3D) == 98041636, "Spatial owner/stage ledgers escaped the complete reserve.");
+            Require(BlueprintFogSnapshotState.EstimateFieldBytes(28, 8192, 8, BlueprintFogLedgerLayout.Spatial3D) > 98304000, "Spatial eighth resident must exceed the budget.");
+            Require(BlueprintFogSnapshotState.LedgerCells(BlueprintFogLedgerLayout.Spatial3D) == 16384 && BlueprintFogSnapshotState.LedgerCells(BlueprintFogLedgerLayout.LegacyYZ) == 1024, "Ledger layouts changed.");
+            Reject(() => BlueprintFogSnapshotState.EstimateFieldBytes(1, 1, 1, (BlueprintFogLedgerLayout)123));
             Reject(() => BlueprintFogSnapshotState.EstimateFieldBytes(28, 8192, 29));
             Reject(() => BlueprintFogSnapshotState.EstimateFieldBytes(28, 8192, -1));
             Reject(() => BlueprintFogSnapshotState.EstimateFieldBytes(0, 1)); Reject(() => BlueprintFogSnapshotState.EstimateFieldBytes(33, 1));

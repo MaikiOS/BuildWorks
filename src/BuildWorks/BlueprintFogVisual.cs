@@ -10,6 +10,7 @@ namespace OstrixMods.BuildWorks
     {
         private readonly BlueprintFogAssets assets;
         private readonly bool lazyFields;
+        private readonly BlueprintFogLedgerLayout denseLedgerLayout;
         private readonly Vector3Int? grid;
         private GameObject visual;
         private BlueprintFogSource source;
@@ -45,14 +46,15 @@ namespace OstrixMods.BuildWorks
         internal BlueprintFogVisual(BlueprintFogAssets assets, GameObject prefab, Vector3 position,
             Quaternion rotation, Vector3 relativeScale, int? materialSeed, Vector3 origin, Vector3 actor, Vector2 capsule,
             BlueprintFogChannels channels = null, string owner = null, bool compactRegion = false, bool lazyFields = false,
-            Vector3? noiseOrigin = null, bool deferPreparation = false)
+            Vector3? noiseOrigin = null, bool deferPreparation = false,
+            BlueprintFogLedgerLayout ledgerLayout = BlueprintFogLedgerLayout.LegacyYZ)
         {
             if (assets == null || !prefab) throw new ArgumentException("Fog prefab/assets missing.");
             bool published = channels?.SnapshotArena != null;
             if (published && compactRegion) throw new ArgumentException("Published v11 requires the full physical domain; compact-source admission is unproved.");
             if (lazyFields && !published && (!compactRegion || channels == null || string.IsNullOrWhiteSpace(owner)))
                 throw new ArgumentException("Lazy fog requires a compact region and named channel pool.");
-            ValidateClockBody(0, capsule); this.assets = assets; this.lazyFields = lazyFields;
+            ValidateClockBody(0, capsule); this.assets = assets; this.lazyFields = lazyFields; denseLedgerLayout = ledgerLayout;
             try
             {
                 visual = PlacementGhostPreviewView.CreateVisualClone(prefab, "BuildWorks_FogVisual", prefab.layer, materialSeed);
@@ -172,7 +174,7 @@ namespace OstrixMods.BuildWorks
         private void Activate(Vector3 actor, float clock)
         {
             BlueprintFogSimulation Create(BlueprintFogScratch scratch = null) => new BlueprintFogSimulation(assets, source.Shape, source.Pigment, source.Noise,
-                minimum, maximum, source.Minimum, source.Maximum, actor, 37, grid, clock, scratch, NoiseOffset);
+                minimum, maximum, source.Minimum, source.Maximum, actor, 37, grid, clock, scratch, NoiseOffset, ledgerLayout: denseLedgerLayout);
             if (channelPool == null) { simulation = Create(); return; }
             Vector3Int size = grid ?? new Vector3Int(BlueprintFogSimulation.Nx, BlueprintFogSimulation.Ny, BlueprintFogSimulation.Nz);
             bool created = false;

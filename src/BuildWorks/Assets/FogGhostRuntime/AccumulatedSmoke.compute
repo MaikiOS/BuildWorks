@@ -3,6 +3,7 @@
 #pragma kernel AdvanceMatter
 #pragma kernel CorrectMatter
 #pragma kernel ClearLedger
+#pragma kernel ClearSpatialLedger
 #pragma kernel AccumulateLedger
 #pragma kernel UpdateSurface
 #pragma kernel PackVolume
@@ -26,6 +27,7 @@ float3 _NoiseOffset;
 float2 _Body;
 float _Dt, _Clock, _Seed, _Emit;
 int _ResetLedger;
+int _SpatialLedger;
 #if defined(BUILDWORKS_FOG_COMPACT_GRID)
 float3 _GridResolution;
 #define Resolution _GridResolution
@@ -76,10 +78,21 @@ float3 BodyDelta(float3 p)
 }
 bool Inside(float3 uv) { return all(uv > 0) && all(uv < 1); }
 uint2 SourceBin(float3 p) { return min((uint2)(saturate(RestUV(p).yz)*LedgerSize),LedgerSize-1); }
+uint3 SpatialBin(float3 p) { return min((uint3)(saturate(RestUV(p))*uint3(16,32,32)),uint3(15,31,31)); }
+uint SpatialIndex(uint3 bin) { return bin.x+16*(bin.y+32*bin.z); }
 
 [numthreads(64,1,1)]
 void ClearLedger(uint id : SV_DispatchThreadID)
 {
+    _PeakAway[id] = _ResetLedger!=0 || _AwayMass[id]==0 ? 0 : max(_PeakAway[id],_AwayMass[id]);
+    _AwayMass[id] = 0;
+    if(id==0) _SurfaceState[0]=0;
+}
+
+[numthreads(64,1,1)]
+void ClearSpatialLedger(uint id : SV_DispatchThreadID)
+{
+    if(id >= 16384) return;
     _PeakAway[id] = _ResetLedger!=0 || _AwayMass[id]==0 ? 0 : max(_PeakAway[id],_AwayMass[id]);
     _AwayMass[id] = 0;
     if(id==0) _SurfaceState[0]=0;
@@ -94,9 +107,9 @@ void AccumulateLedger(uint3 id : SV_DispatchThreadID)
     float3 p = lerp(_Minimum,_Maximum,(id+.5)/Resolution);
     float3 source = _ReadOrigin[id].xyz/mass;
     uint2 bin = SourceBin(source);
-    // ponytail: source YZ bins fit this one wall; use per-piece 3D ownership before a whole building.
     uint away = (uint)(mass * smoothstep(.08,.25,length(p-source)) * 256);
-    InterlockedAdd(_AwayMass[bin.x+LedgerSize*bin.y],away);
+    uint index = _SpatialLedger!=0 ? SpatialIndex(SpatialBin(source)) : bin.x+LedgerSize*bin.y;
+    InterlockedAdd(_AwayMass[index],away);
 }
 
 [numthreads(8,8,4)]
@@ -144,11 +157,24 @@ void AdvanceVelocity(uint3 id : SV_DispatchThreadID)
     contact *= Inside(restUV) ? step(.002,_Shape.SampleLevel(sampler_Shape,restUV,0)) : 0;
     uint2 bin = SourceBin(p);
     float outstanding = 0;
+    if(_SpatialLedger!=0)
+    {
+        uint3 spatial = SpatialBin(p);
+        [unroll] for(int z=-1;z<=1;++z) [unroll] for(int y=-1;y<=1;++y) [unroll] for(int x=-1;x<=1;++x)
+        {
+            uint3 neighbour = (uint3)clamp((int3)spatial+int3(x,y,z),int3(0,0,0),int3(15,31,31));
+            uint index = SpatialIndex(neighbour);
+            outstanding = max(outstanding,saturate(_AwayMass[index]/max(768.0,(float)_PeakAway[index])));
+        }
+    }
+    else
+    {
     [unroll] for(int y=-1;y<=1;++y) [unroll] for(int x=-1;x<=1;++x)
     {
         uint2 neighbour = (uint2)clamp((int2)bin+int2(x,y),0,(int)LedgerSize-1);
         uint index=neighbour.x+LedgerSize*neighbour.y;
         outstanding = max(outstanding,saturate(_AwayMass[index]/max(768.0,(float)_PeakAway[index])));
+    }
     }
     float oldDamage = _ReadSurface[id].w;
     float recovering = max(max(0,oldDamage-_Dt*1.25),min(oldDamage,outstanding));

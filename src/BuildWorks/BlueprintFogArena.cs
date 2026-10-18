@@ -30,12 +30,20 @@ namespace OstrixMods.BuildWorks
         internal long RenderBytes { get; }
         internal int BlockCapacity { get; }
         internal int ResidentCapacity { get; }
+        internal BlueprintFogLedgerLayout LedgerLayout { get; }
+        internal int LedgerCells => BlueprintFogSnapshotState.LedgerCells(LedgerLayout);
+        internal long LedgerBytes => LedgerCells * 8L + 4;
         internal Texture3D VelocityUpload { get; }
 
-        internal BlueprintFogArena(ComputeShader arenaProgram, ComputeShader metadataProgram, int owners, int capacity, bool denseReference = false, int residentOwners = 0)
+        internal BlueprintFogArena(ComputeShader arenaProgram, ComputeShader metadataProgram, int owners, int capacity, bool denseReference = false, int residentOwners = 0,
+            BlueprintFogLedgerLayout ledgerLayout = BlueprintFogLedgerLayout.LegacyYZ)
         {
             if (!arenaProgram || !metadataProgram) throw new ArgumentException("Fog arena programs missing.");
-            ReservedFieldBytes = BlueprintFogSnapshotState.EstimateFieldBytes(owners, capacity, residentOwners); ownerCount = owners; BlockCapacity = capacity;
+            if (ledgerLayout == BlueprintFogLedgerLayout.Spatial3D &&
+                (!arenaProgram.HasKernel("StageSpatialLedger") || !arenaProgram.HasKernel("CommitSpatialLedger")))
+                throw new NotSupportedException("Fog arena bundle does not support Spatial3D ledgers.");
+            LedgerLayout = ledgerLayout;
+            ReservedFieldBytes = BlueprintFogSnapshotState.EstimateFieldBytes(owners, capacity, residentOwners, ledgerLayout); ownerCount = owners; BlockCapacity = capacity;
             ResidentCapacity = residentOwners == 0 ? owners : residentOwners;
             int side = Mathf.CeilToInt(Mathf.Pow(capacity, 1f / 3));
             BrickGrid = new Vector3Int(side, side, (capacity + side * side - 1) / (side * side));
@@ -48,9 +56,11 @@ namespace OstrixMods.BuildWorks
                 shader = UnityEngine.Object.Instantiate(arenaProgram);
                 if (denseReference) shader.EnableKeyword("BUILDWORKS_FOG_DENSE_REFERENCE");
                 if (!shader) throw new InvalidOperationException("Arena compute missing.");
-                foreach (string name in KernelNames) kernels.Add(name, shader.FindKernel(name));
+                foreach (string name in KernelNames)
+                    kernels.Add(name, shader.FindKernel(ledgerLayout == BlueprintFogLedgerLayout.Spatial3D &&
+                        (name == "StageLedger" || name == "CommitLedger") ? name.Replace("Ledger", "SpatialLedger") : name));
                 Add("_Maps", owners * 2 * MapWords, 4); Add("_Free", capacity, 4); Add("_Control", 16, 4); Add("_Receipts", owners * 16, 4); Add("_Payload", capacity * 64, 8);
-                Add("_StageAway", 1024, 4); Add("_StagePeak", 1024, 4); Add("_StageState", 1, 4);
+                Add("_StageAway", LedgerCells, 4); Add("_StagePeak", LedgerCells, 4); Add("_StageState", 1, 4);
                 metadataShader = UnityEngine.Object.Instantiate(metadataProgram);
                 if (!metadataShader) throw new InvalidOperationException("Metadata compute missing.");
                 initMetadata = metadataShader.FindKernel("InitMetadata"); publishMetadata = metadataShader.FindKernel("PublishMetadata");

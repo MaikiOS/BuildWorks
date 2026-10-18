@@ -9,10 +9,12 @@ using Frozen = BuildWorks.FogRuntimeReference.FogMatterSimulation;
 
 public static class FogRuntimeSimulationCheck
 {
-    public static void Run()
+    public static void Run() => Run(false);
+    public static void RunCandidate() => Run(true);
+    private static void Run(bool candidateBundle)
     {
         string root = Path.GetFullPath(Path.Combine(Application.dataPath, "../../.."));
-        string output = Path.Combine(root, "artifacts/fog-runtime-simulation");
+        string output = Path.Combine(root, candidateBundle ? "artifacts/fog-legacy-spatial-bundle-223" : "artifacts/fog-runtime-simulation");
         Directory.CreateDirectory(output);
         File.WriteAllText(Path.Combine(output, "samples.txt"), "");
         var shape = new Texture3D(96, 80, 80, TextureFormat.R8, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear };
@@ -38,7 +40,7 @@ public static class FogRuntimeSimulationCheck
             shape.SetPixelData(density, 0); shape.Apply();
             pigment.SetPixels(Enumerable.Range(0, 16 * 16 * 16).Select(i => new Color(.25f + i % 16 * .02f, .2f, .1f, 1)).ToArray());
             pigment.Apply();
-            using (var assets = new BlueprintFogAssets(File.ReadAllBytes(Path.Combine(root, "src/BuildWorks/Assets/FogGhostRuntime/buildworks-fog-v11"))))
+            using (var assets = new BlueprintFogAssets(File.ReadAllBytes(Path.Combine(root, candidateBundle ? "artifacts/fog-runtime-assets-candidate/buildworks-fog-v11" : "src/BuildWorks/Assets/FogGhostRuntime/buildworks-fog-v11"))))
             {
                 referenceSolver = UnityEngine.Object.Instantiate(AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/FogGhostLab/AccumulatedSmoke.compute"));
                 var reference = host.AddComponent<Frozen>();

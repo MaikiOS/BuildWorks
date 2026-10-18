@@ -216,6 +216,16 @@ placement.blueprint_precision_hint	BuildWorks: F9 edits the whole blueprint posi
 placement.blueprint_prepare_failed	BuildWorks: the blueprint could not be prepared for placement.
 placement.pause.scale	part does not support Valheim scale persistence
 placement.pause.resources	not enough resources
+project.name	Construction project
+project.interact	[Use] Inspect construction project
+project.hammer	Equip a usable hammer to manage this project.
+project.close	Close
+project.cancel	Cancel unpaid project
+project.unpaid	Unbuilt parts: {0}. No resources contributed.
+project.cancel_confirm	Press Cancel again to remove the unpaid project. Nothing will be granted.
+project.missing	Some required prefabs are unavailable.
+project.payment_pending	Development stage: payment and continuation are not connected yet. Closing keeps the project.
+project.error	Project operation failed: {0}
 placement.pause.validation	the next part did not pass Valheim validation
 placement.pause.tool_missing	the required part is unavailable in the current hammer
 placement.pause.native_start	Valheim did not start placement; check the hammer and stamina

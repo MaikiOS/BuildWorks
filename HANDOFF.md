@@ -2,13 +2,13 @@
 
 2026-10-18 · [Русский](HANDOFF_RU.md)
 
-**QA .224 installed: local X-window peak restores canonical v11 curves,78+78 exact fields; native11/11+66/66.** Actual-prefab look/house/FPS/board open. [Evidence](docs/CHECKPOINT_224.md).
+**QA .225 installed: durable unpaid project/stake passed19/19 +14/14 in Valheim, including logout/login and cancellation.** Project fog, payments and ordinary construction wiring remain open. [Evidence](docs/CHECKPOINT_225.md).
 
 
 1. Read [PROJECT_CONTRACT](PROJECT_CONTRACT.md), [current evidence](docs/CURRENT_STATUS.md), [forward roadmap](docs/ROADMAP.md) and project AGENTS. Preserve the complete goal; this file is not a goal API update.
-2. Source and installed QA0.19.224; DLL SHA 53AF6E79410FD02397AE83CDD47D86B760105B007CDC92D507186F9C0DAFE64F. [Report .223](docs/CHECKPOINT_224.md). Public binary .37 alpha is unchanged.
+2. Source and installed QA0.19.225; DLL SHA 09C32F8D6BC01B2A13C611B3583C6869557B6E39E34D2D99C841A3C309911F2A. [Report .225](docs/CHECKPOINT_225.md). Public binary .37 alpha is unchanged.
 
-Results below retain their original checkpoint versions; the current installation is stated above. Next work is matched long-wall/v11 capture, then house; a durable project requires its own server journal, not storage WAL.
+Results below retain their original checkpoint versions; the current installation is stated above. Next work is durable payment/new-object confirmation and board continuation, then unfinished-part fog. The unpaid host slice is not paid/network construction.
 
 [.213](docs/FOG_NOISE_FRAME_213.md) aligns noise phases across parts; GPU checks/regressions passed and QA is installed. Native .213 is untested; boundary loss, recovery ownership and performance remain open.
 

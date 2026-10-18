@@ -3237,6 +3237,10 @@ namespace OstrixMods.BuildWorks
                 (!item.m_shared.m_useDurability || item.m_durability > 0f);
         }
 
+        internal static bool HasUsableHammer(Player player) => player && UsesHammerPieceTable(player) && HasUsableBuildTool(player);
+        internal bool CanOpenConstructionProject => state == PlacementState.Inactive && sessionMode == SessionMode.None &&
+            Player.m_localPlayer && !Hud.IsPieceSelectionVisible() && GameplayInputAvailable(Player.m_localPlayer);
+
         public void Dispose()
         {
             materialPreview.Dispose();

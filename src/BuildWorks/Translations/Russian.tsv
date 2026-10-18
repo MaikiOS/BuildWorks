@@ -216,6 +216,16 @@ placement.blueprint_precision_hint	BuildWorks: F9 — точное положе�
 placement.blueprint_prepare_failed	BuildWorks: чертёж не удалось подготовить к установке.
 placement.pause.scale	деталь не поддерживает сохранение масштаба Valheim
 placement.pause.resources	не хватает ресурсов
+project.name	Строительный проект
+project.interact	[Взаимодействовать] Открыть строительный проект
+project.hammer	Возьмите исправный молоток для управления проектом.
+project.close	Закрыть
+project.cancel	Отменить неоплаченный проект
+project.unpaid	Незавершённых деталей: {0}. Ресурсы ещё не внесены.
+project.cancel_confirm	Нажмите «Отменить» ещё раз: неоплаченный проект исчезнет без выдачи ресурсов.
+project.missing	Часть необходимых деталей недоступна.
+project.payment_pending	Этап разработки: оплата и продолжение пока не подключены. Закрытие сохраняет проект.
+project.error	Не удалось выполнить действие с проектом: {0}
 placement.pause.validation	следующая деталь не проходит проверку Valheim
 placement.pause.tool_missing	нужная деталь недоступна в текущем молотке
 placement.pause.native_start	Valheim не начал установку; проверь молоток и выносливость

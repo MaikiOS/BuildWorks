@@ -14,7 +14,7 @@ The foundation remains part of the game: real Valheim objects, understandable co
 | --- | --- | --- |
 | 1. Precision construction and editor | Work freely with pieces and assemblies | Foundation available in alpha; complex cases still need verification |
 | 2. Buildings as blueprints | Take an existing building or save your own, edit it, and build it again | Partially implemented; completing the main journey |
-| 3. Construction projects | Leave a future house in the world and gradually supply its materials | **Current priority: v11 fog, then a persistent project with a board** |
+| 3. Construction projects | Leave a future house in the world and gradually supply its materials | **Current priority: paid continuation through a durable project/board with v11 fog** |
 | 4. Complete and large buildings | Transfer large buildings, furnishings, and contents without loss | Foundations exist; substantial work remains |
 | 5. Shared libraries and cooperative construction | Share blueprints and use a server library | File sharing and server-library foundation exist; network journey incomplete |
 | 6. Editable assemblies and repetitions | Revise layout and repetition parameters after creation | Later milestone; ordinary Array and Contour already exist |
@@ -36,7 +36,7 @@ External library or world capture → editing → construction. A personal libra
 
 ### 3. Construction projects
 
-Insufficient materials leave a recognizable, pass-through v11 fog ghost. A stake and board let players equip a hammer, inspect shortages, supply materials, continue, or cancel. Finished parts become real objects; projects survive world visits; cancellation refunds actual spending without repeated payouts. **Outcome:** unfinished houses are convenient to return to. Current work brings v11 to a whole house, followed by persistent projects and the board; laboratory approval of the effect does not establish readiness of the mechanic. Returned fog must restore the correct surface independently of prefab orientation and nearby damaged parts.
+Insufficient materials leave a recognizable, pass-through v11 fog ghost. A stake and board let players equip a hammer, inspect shortages, supply materials, continue, or cancel. Finished parts become real objects; projects survive world visits; cancellation refunds actual spending without repeated payouts. **Outcome:** unfinished houses are convenient to return to. Connect the durable project/board to confirmed payment and actual construction, then unfinished-part fog and whole-house acceptance; laboratory approval alone does not establish readiness of the mechanic. Returned fog must restore the correct surface independently of prefab orientation and nearby damaged parts.
 
 ### 4. Complete and large buildings
 
@@ -64,7 +64,7 @@ Explicit cooperation between a separate terrain-preparation project and the buil
 
 ## Priorities and progression
 
-The next outcome is **v11 on a whole house → persistent construction project with a board**. Then continue completing the blueprint and full construction journey in milestones 2–5. Later tools in milestones 6–9 do not replace this work. Regressions in the working core take priority over feature expansion.
+The next outcome is **a durable construction project with paid board continuation and v11 on unfinished parts of the house**. Then continue completing the blueprint and full construction journey in milestones 2–5. Later tools in milestones 6–9 do not replace this work. Regressions in the working core take priority over feature expansion.
 
 Controls, Russian UI, performance, data preservation, and network authority apply at every milestone. Guides need saved assemblies; adaptive pieces need proven geometry and snapping; EarthWorks cooperation needs working construction projects. Public-release readiness requires game evidence and separate owner authorization to release.
 

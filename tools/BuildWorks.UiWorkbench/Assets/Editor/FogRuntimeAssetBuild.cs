@@ -18,6 +18,9 @@ public static class FogRuntimeAssetBuild
     public static void RunCandidate()
     { Build(ColorSpace.Linear, "fog-runtime-assets-candidate"); }
 
+    public static void RunWindowGammaReference()
+    { Build(ColorSpace.Gamma, "fog-window-gamma-225"); }
+
     private static void Build(ColorSpace colorSpace, string outputFolder)
     {
         ColorSpace previous = PlayerSettings.colorSpace;

@@ -6,6 +6,7 @@
 
 | Этап | Что изменилось / доказательство | Граница |
 | --- | --- | --- |
+| 2026-10-18 · .225 | [.225](CHECKPOINT_225_RU.md): сохраняемый неоплаченный проект/колышек/окно, Valheim19/19 +14/14, logout/login/повтор отмены; Gamma/Linear по108 точных сравнений полей/36 кадров. Установлено, мост восстановлен. | Обычная стройка/оплата/туман/remote и native ввод/HUD ещё не подключены или не приняты. |
 | 2026-10-18 · .224 | [.224](CHECKPOINT_224_RU.md): coherent local X-window peak, canonical78+78 exact fields/168 pool; native11/11+66/66/4clips/recovery0. Installed/restored. | Actual-prefab visual/house/FPS/board open. |
 | 2026-10-18 · .223 | [.223](CHECKPOINT_223_RU.md): immutable Spatial3D pool/staging/budget,28owners98,041,636B,168exact cycles, legacy270/18; native11/11+66/66/4clips/recovery0. Installed/restored. | Spatial look/normalisation/house/FPS/board not accepted. |
 | 2026-10-18 · diagnostic222 | [GPU source-bin alias](FOG_RETURN_OWNERSHIP_222_RU.md): compiled .221 solver wrongly retains old damage1.8m away alongX; isolated3D control separates it. Frozen lab/native sheets. | Runtime/DLL remain .221; full3D lifecycle/visual parity not proved. |

@@ -31,10 +31,13 @@ namespace OstrixMods.BuildWorks.StoreTests
                 { BatchExchangeChecks.Run(Path.Combine(directory, "batch-exchange")); return 0; }
                 if (args.Length == 1 && args[0] == "--server-library")
                 { ServerLibraryChecks.Run(Path.Combine(directory, "server-library")); return 0; }
+                if (args.Length == 1 && args[0] == "--construction-projects")
+                { ConstructionProjectChecks.Run(Path.Combine(directory, "construction-projects")); return 0; }
                 if (args.Length == 1 && args[0] == "--library-origin")
                 { LibraryOriginChecks.Run(Path.Combine(directory, "library-origin")); return 0; }
                 if (args.Length == 1 && args[0] == "--planbuild-snap-tails")
                 { PlanBuildSnapTailChecks.Run(Path.Combine(directory, "snap-tails")); return 0; }
+                ConstructionProjectChecks.Run(Path.Combine(directory, "construction-projects"));
                 PlanBuildSnapTailChecks.Run(Path.Combine(directory, "snap-tails"));
                 SourceEvidenceCacheChecks.Run();
                 PrefabMigrationChecks.Run(Path.Combine(directory, "prefab-migration"));

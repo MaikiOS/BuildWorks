@@ -6,9 +6,9 @@ BuildWorks extends Valheim's hammer with precise construction, a blueprint catal
 
 ![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
 
-**Current source / isolated QA: 0.19.224.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
+**Current source / isolated QA: 0.19.225.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
 
-**QA .224 installed: local X-window peak restores canonical v11 curves,78+78 exact fields; native11/11+66/66.** Actual-prefab look/house/FPS/board open. [Evidence](docs/CHECKPOINT_224.md).
+**QA .225 installed: durable unpaid project/stake passed19/19 +14/14 in Valheim, including logout/login and cancellation.** Project fog, payments and ordinary construction wiring remain open. [Evidence](docs/CHECKPOINT_225.md).
 
 
 ## Capabilities

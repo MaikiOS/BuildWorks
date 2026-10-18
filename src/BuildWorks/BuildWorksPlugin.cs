@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.224";
+        internal const string PluginVersion = "0.19.225";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -32,6 +32,9 @@ namespace OstrixMods.BuildWorks
         private Harmony harmony;
         private PrecisionPlacementSession session;
         private BlueprintServerRuntime serverLibrary;
+        private BlueprintConstructionProjectRuntime constructionProjects;
+        internal static bool CanOpenConstructionProject => instance && instance.blueprintEditor?.BlocksWorldInput != true &&
+            !HammerCatalogView.BlocksExchangeInput && instance.session?.CanOpenConstructionProject == true;
         internal static BlueprintServerClient ServerLibraryClient => instance?.serverLibrary?.Client;
 #if BUILDWORKS_TEST_STAND
         private BuildWorksQaControl qaControl;
@@ -72,6 +75,8 @@ namespace OstrixMods.BuildWorks
             instance = this;
             serverLibrary = new BlueprintServerRuntime(Paths.ConfigPath,
                 exception => Logger.LogError("BuildWorks server library: " + exception));
+            constructionProjects = new BlueprintConstructionProjectRuntime(Paths.ConfigPath,
+                exception => Logger.LogError("BuildWorks construction projects: " + exception));
             TogglePrecisionKey = Config.Bind(
                 "Controls",
                 "TogglePrecisionPlacement",
@@ -256,6 +261,8 @@ namespace OstrixMods.BuildWorks
         private void Update()
         {
             serverLibrary?.Tick(ZNet.instance, Time.realtimeSinceStartupAsDouble);
+            constructionProjects?.Tick();
+            if (constructionProjects?.BlocksInput == true) return;
             if (!Player.m_localPlayer)
             {
                 DisposeBlueprintEditor();
@@ -333,6 +340,7 @@ namespace OstrixMods.BuildWorks
         }
 
 #if BUILDWORKS_TEST_STAND
+        internal static BlueprintConstructionProjectRuntime QaConstructionProjects => instance?.constructionProjects;
         internal static CompositeBlueprintStore.Blueprint QaBlueprint(string id)
         {
             RequireQaStorageIdle();
@@ -355,6 +363,7 @@ namespace OstrixMods.BuildWorks
 #endif
         private void OnDisable()
         {
+            constructionProjects?.Suspend();
             serverLibrary?.Suspend();
 #if BUILDWORKS_TEST_STAND
             if (qaControl) qaControl.enabled = false;
@@ -363,6 +372,7 @@ namespace OstrixMods.BuildWorks
 
         private void OnDestroy()
         {
+            constructionProjects?.Dispose(); constructionProjects = null;
             serverLibrary?.Dispose();
             serverLibrary = null;
 #if BUILDWORKS_TEST_STAND
@@ -423,6 +433,7 @@ namespace OstrixMods.BuildWorks
 
         private void HandleHostLogout()
         {
+            constructionProjects?.Suspend();
 #if BUILDWORKS_TEST_STAND
             qaControl?.ResetSession();
             BuildWorksTestYard.RestoreDaylight();
@@ -710,6 +721,7 @@ namespace OstrixMods.BuildWorks
 
         private static bool ShouldBlockNativePlacement(Player player, Piece piece)
         {
+            if (instance?.constructionProjects?.BlocksInput == true) return true;
             if (HammerCatalogView.BlocksExchangeInput) return true;
             if (instance?.blueprintEditor?.BlocksWorldInput == true) return true;
             return instance?.session?.ShouldBlockNativePlacement(player, piece) == true;
@@ -717,6 +729,7 @@ namespace OstrixMods.BuildWorks
 
         private static bool ShouldBlockPlayerInput(Player player)
         {
+            if (instance?.constructionProjects?.BlocksInput == true) return true;
             if (HammerCatalogView.BlocksExchangeInput) return true;
             if (instance?.blueprintEditor?.BlocksWorldInput == true) return true;
             return instance?.session?.ShouldBlockPlayerInput(player) == true;
@@ -724,6 +737,7 @@ namespace OstrixMods.BuildWorks
 
         private static bool ShouldBlockGameCamera()
         {
+            if (instance?.constructionProjects?.BlocksInput == true) return true;
             if (HammerCatalogView.BlocksExchangeInput) return true;
             if (instance?.blueprintEditor?.BlocksWorldInput == true) return true;
             return instance?.session?.ShouldBlockGameCamera() == true;
@@ -731,6 +745,7 @@ namespace OstrixMods.BuildWorks
 
         private static bool ShouldBlockCharacterControls()
         {
+            if (instance?.constructionProjects?.BlocksInput == true) return true;
             if (HammerCatalogView.BlocksExchangeInput) return true;
             if (instance?.blueprintEditor?.BlocksWorldInput == true) return true;
             return instance?.session?.ShouldBlockCharacterControls() == true;

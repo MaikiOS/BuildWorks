@@ -6,6 +6,7 @@
 
 | Этап | Что изменилось / доказательство | Граница |
 | --- | --- | --- |
+| 2026-10-18 · .219 | [.219](CHECKPOINT_219_RU.md): cooperative preparation/cancel, Unity15, native28/28; handler0.11s/full30.32s/max45.71ms, inventory/cleanup; installed/restored. | No continuous house appearance/recovery/FPS/board acceptance. |
 | 2026-10-18 · .218 | [.218](CHECKPOINT_218_RU.md): strict real-house QA renderer, Unity4 dense comparisons; native28/7/contact/hold/exit/5 PNG/cleanup; installed/restored. | Setup>15s remains failed; no continuous animation/fidelity/FPS/board acceptance. |
 | 2026-10-18 · .217 | [.217](CHECKPOINT_217_RU.md): exact GPU↔RAM paging; Unity28/7,2688/196/8contacts; ValheimQA8/8, installed, bridge restored. | Procedural paging/resource proof; actual house/visuals/FPS/board/network open. |
 | 2026-10-18 · .216 | [.216](CHECKPOINT_216_RU.md): sparse publication, Unity56/18 +14/15; ValheimQA7/7, installed, bridge restored. | House velocity/visuals/board/network remain open. |

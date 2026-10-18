@@ -67,7 +67,7 @@ namespace OstrixMods.BuildWorks
             {
                 if (blueprintId == null) fog.Initialize(player, pair);
                 else fog.InitializeBlueprint(player, BuildWorksPlugin.QaBlueprint(blueprintId));
-                return blueprintId != null ? "fog-v11-native-house-active" : pair ? "fog-v11-native-pair-active" : "fog-v11-native-visual-active";
+                return blueprintId != null ? "fog-v11-native-house-preparing" : pair ? "fog-v11-native-pair-active" : "fog-v11-native-visual-active";
             }
             catch { CloseFogVisual(); throw; }
         }

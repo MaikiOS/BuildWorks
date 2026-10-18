@@ -22,8 +22,17 @@ namespace OstrixMods.BuildWorks
         internal Texture3D Noise { get; private set; }
         internal int Occupied { get; private set; }
         private readonly int Nx = 144, Ny = 112, Nz = 120;
+        private bool preparing, prepared, disposed, cooperative;
+        private long sliceStarted;
+        internal string PreparationPhase { get; private set; }
+        private void BeginSlice()
+        {
+            if (disposed) throw new ObjectDisposedException(nameof(BlueprintFogSource));
+            sliceStarted = System.Diagnostics.Stopwatch.GetTimestamp();
+        }
+        private bool YieldDue => cooperative && (System.Diagnostics.Stopwatch.GetTimestamp() - sliceStarted) >= System.Diagnostics.Stopwatch.Frequency * .008;
 
-        internal BlueprintFogSource(GameObject visual, Vector3 origin, bool compact = false)
+        internal BlueprintFogSource(GameObject visual, Vector3 origin, bool compact = false, bool deferPreparation = false)
         {
             if (!visual || !Finite(origin)) throw new ArgumentException("Missing fog visual or local origin.");
             try
@@ -69,16 +78,35 @@ namespace OstrixMods.BuildWorks
                         Minimum.x < -64 || Minimum.y < -64 || Minimum.z < -64 || Maximum.x > 64 || Maximum.y > 64 || Maximum.z > 64)
                         throw new InvalidOperationException("Fog part exceeds its compact source budget; spatial clipping is required.");
                 }
-                Bake(); Noise = CreateNoise();
+                if (!deferPreparation) foreach (var step in Prepare(false)) { }
+            }
+            catch { Dispose(); throw; }
+        }
+
+        internal IEnumerable<object> Prepare(bool yieldBetweenSlices = true)
+        {
+            if (disposed || preparing || prepared) throw new InvalidOperationException("Fog source preparation is closed or already started.");
+            preparing = true; cooperative = yieldBetweenSlices; BeginSlice();
+            bool complete = false;
+            try
+            {
+                foreach (var step in Bake()) yield return step;
+                PreparationPhase = "noise";
+                if (cooperative) { yield return null; BeginSlice(); }
+                foreach (var step in CreateNoise()) yield return step;
+                PreparationPhase = "mesh";
+                if (cooperative) { yield return null; BeginSlice(); }
                 int denseVertices = 0;
                 foreach (Part part in Parts)
                 {
                     part.Dense = BlueprintFogContactMesh.Create(part.Original, part.Data, part.ToMetres);
                     denseVertices = checked(denseVertices + part.Dense.vertexCount);
                     if (denseVertices > 500000) throw new InvalidOperationException("Fog region exceeds its total contact vertex budget.");
+                    if (YieldDue) { yield return null; BeginSlice(); }
                 }
+                prepared = complete = true; PreparationPhase = "ready";
             }
-            catch { Dispose(); throw; }
+            finally { preparing = false; if (!complete) Dispose(); }
         }
 
         internal bool MightContact(Vector3 previous, Vector3 current, Vector2 body)
@@ -109,8 +137,10 @@ namespace OstrixMods.BuildWorks
             return false;
         }
 
-        private void Bake()
+        private IEnumerable<object> Bake()
         {
+            PreparationPhase = "sampling";
+            if (cooperative) { yield return null; BeginSlice(); }
             var cells = new float[Nx * Ny * Nz]; var colors = new Color[cells.Length];
             var copies = new Dictionary<Texture, Texture2D>(); int samples = 0;
             Vector3 size = Maximum - Minimum, grid = new Vector3(Nx / size.x, Ny / size.y, Nz / size.z);
@@ -147,6 +177,7 @@ namespace OstrixMods.BuildWorks
                                 throw new InvalidOperationException("Fog source triangle sampling exceeds its budget.");
                             for (int i = 0; i <= steps; ++i) for (int j = 0; j <= steps - i; ++j)
                             {
+                                if ((samples & 4095) == 0 && YieldDue) { yield return null; BeginSlice(); }
                                 ++samples; float u = i / (float)steps, v = j / (float)steps;
                                 Vector3 p = a + (b - a) * u + (c - a) * v;
                                 Vector3 q = Vector3.Scale(p - Minimum, grid);
@@ -164,17 +195,41 @@ namespace OstrixMods.BuildWorks
                 }
             }
             finally { foreach (Texture2D texture in copies.Values) UnityEngine.Object.DestroyImmediate(texture); }
-            foreach (float cell in cells) if (cell > 0) ++Occupied;
+            for (int i = 0; i < cells.Length; ++i)
+            {
+                if (cells[i] > 0) ++Occupied;
+                if ((i & 16383) == 0 && YieldDue) { yield return null; BeginSlice(); }
+            }
             if (Occupied == 0) throw new InvalidOperationException("Fog source contains no visible density.");
-            foreach (int stride in new[] { 1, Nx, Nx * Ny }) { cells = Filter(cells, stride, true); colors = SpreadColor(colors, stride); }
+            PreparationPhase = "filter";
+            if (cooperative) { yield return null; BeginSlice(); }
+            foreach (int stride in new[] { 1, Nx, Nx * Ny })
+            {
+                foreach (var step in Filter(cells, stride, true, result => cells = result)) yield return step;
+                foreach (var step in SpreadColor(colors, stride, result => colors = result)) yield return step;
+            }
             for (int repeat = 0; repeat < 2; ++repeat)
-                foreach (int stride in new[] { 1, Nx, Nx * Ny }) { cells = Filter(cells, stride, false); colors = SpreadColor(colors, stride); }
+                foreach (int stride in new[] { 1, Nx, Nx * Ny })
+                {
+                    foreach (var step in Filter(cells, stride, false, result => cells = result)) yield return step;
+                    foreach (var step in SpreadColor(colors, stride, result => colors = result)) yield return step;
+                }
+            PreparationPhase = "upload";
+            if (cooperative) { yield return null; BeginSlice(); }
             var bytes = new byte[cells.Length];
-            for (int i = 0; i < bytes.Length; ++i) bytes[i] = (byte)Mathf.RoundToInt(Mathf.Clamp01(cells[i]) * 255);
+            for (int i = 0; i < bytes.Length; ++i)
+            {
+                bytes[i] = (byte)Mathf.RoundToInt(Mathf.Clamp01(cells[i]) * 255);
+                if ((i & 16383) == 0 && YieldDue) { yield return null; BeginSlice(); }
+            }
             Shape = new Texture3D(Nx, Ny, Nz, TextureFormat.R8, false) { name = "BuildWorks fog source", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, hideFlags = HideFlags.HideAndDontSave };
             Shape.SetPixelData(bytes, 0); Shape.Apply(false, false);
+            PreparationPhase = "shape-uploaded";
+            if (cooperative) { yield return null; BeginSlice(); }
             Pigment = new Texture3D(Nx, Ny, Nz, TextureFormat.RGBA32, false) { name = "BuildWorks fog pigment", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, hideFlags = HideFlags.HideAndDontSave };
             Pigment.SetPixels(colors); Pigment.Apply(false, false);
+            PreparationPhase = "pigment-uploaded";
+            if (cooperative) { yield return null; BeginSlice(); }
         }
 
         private static Texture2D ReadableAlbedo(Texture original)
@@ -189,25 +244,35 @@ namespace OstrixMods.BuildWorks
             catch { if (copy) UnityEngine.Object.DestroyImmediate(copy); throw; }
             finally { RenderTexture.active = previous; RenderTexture.ReleaseTemporary(target); }
         }
-        private float[] Filter(float[] source, int stride, bool dilate)
+        private IEnumerable<object> Filter(float[] source, int stride, bool dilate, Action<float[]> done)
         {
             var result = new float[source.Length];
-            for (int z = 1; z < Nz - 1; ++z) for (int y = 1; y < Ny - 1; ++y) for (int x = 1; x < Nx - 1; ++x)
+            for (int z = 1; z < Nz - 1; ++z)
+            {
+            for (int y = 1; y < Ny - 1; ++y) for (int x = 1; x < Nx - 1; ++x)
             { int i = x + Nx * (y + Ny * z); result[i] = dilate ? Mathf.Max(source[i], Mathf.Max(source[i - stride], source[i + stride])) : source[i - stride] * .25f + source[i] * .5f + source[i + stride] * .25f; }
-            return result;
+                if (YieldDue) { yield return null; BeginSlice(); }
+            }
+            done(result);
         }
-        private Color[] SpreadColor(Color[] source, int stride)
+        private IEnumerable<object> SpreadColor(Color[] source, int stride, Action<Color[]> done)
         {
             var result = (Color[])source.Clone();
-            for (int z = 1; z < Nz - 1; ++z) for (int y = 1; y < Ny - 1; ++y) for (int x = 1; x < Nx - 1; ++x)
+            for (int z = 1; z < Nz - 1; ++z)
+            {
+            for (int y = 1; y < Ny - 1; ++y) for (int x = 1; x < Nx - 1; ++x)
             { int i = x + Nx * (y + Ny * z); if (source[i].a > 0) continue; Color sum = source[i - stride] + source[i + stride]; if (sum.a > 0) result[i] = sum / sum.a; }
-            return result;
+                if (YieldDue) { yield return null; BeginSlice(); }
+            }
+            done(result);
         }
-        private static Texture3D CreateNoise()
+        private IEnumerable<object> CreateNoise()
         {
             const int n = 64; var bytes = new byte[n * n * n];
             float Hash(int x, int y, int z) { uint h = unchecked((uint)((x & 15) * 374761393 + (y & 15) * 668265263 + (z & 15) * 1274126177)); h = (h ^ (h >> 13)) * 1274126177u; return (h ^ (h >> 16)) / (float)uint.MaxValue; }
-            for (int z = 0; z < n; ++z) for (int y = 0; y < n; ++y) for (int x = 0; x < n; ++x)
+            for (int z = 0; z < n; ++z)
+            {
+            for (int y = 0; y < n; ++y) for (int x = 0; x < n; ++x)
             {
                 int ix = x / 4, iy = y / 4, iz = z / 4;
                 float u = Mathf.SmoothStep(0, 1, x % 4 / 4f), v = Mathf.SmoothStep(0, 1, y % 4 / 4f), w = Mathf.SmoothStep(0, 1, z % 4 / 4f);
@@ -215,8 +280,10 @@ namespace OstrixMods.BuildWorks
                 float high = Mathf.Lerp(Mathf.Lerp(Hash(ix, iy, iz + 1), Hash(ix + 1, iy, iz + 1), u), Mathf.Lerp(Hash(ix, iy + 1, iz + 1), Hash(ix + 1, iy + 1, iz + 1), u), v);
                 bytes[x + n * (y + n * z)] = (byte)(Mathf.Lerp(low, high, w) * 255);
             }
+                if (YieldDue) { yield return null; BeginSlice(); }
+            }
             var texture = new Texture3D(n, n, n, TextureFormat.R8, false) { name = "BuildWorks fog noise", wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear, hideFlags = HideFlags.HideAndDontSave };
-            try { texture.SetPixelData(bytes, 0); texture.Apply(false, false); return texture; }
+            try { texture.SetPixelData(bytes, 0); texture.Apply(false, false); Noise = texture; }
             catch { UnityEngine.Object.DestroyImmediate(texture); throw; }
         }
         private static bool ActiveBelow(Transform node, Transform root)
@@ -224,6 +291,8 @@ namespace OstrixMods.BuildWorks
         private static bool Finite(Vector3 p) => !float.IsNaN(p.x) && !float.IsInfinity(p.x) && !float.IsNaN(p.y) && !float.IsInfinity(p.y) && !float.IsNaN(p.z) && !float.IsInfinity(p.z);
         public void Dispose()
         {
+            if (disposed) return;
+            disposed = true;
             foreach (Part part in Parts) if (part.Dense) UnityEngine.Object.DestroyImmediate(part.Dense);
             Parts.Clear();
             if (Shape) UnityEngine.Object.DestroyImmediate(Shape); Shape = null;

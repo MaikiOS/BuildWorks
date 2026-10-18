@@ -12,6 +12,12 @@ namespace OstrixMods.BuildWorks
         private BlueprintFogAtlas published;
         private readonly BlueprintFogChannels channels;
         private readonly BlueprintFogChannels.SnapshotChannel[] snapshots;
+        private readonly Func<BlueprintFogVisual>[] preparations;
+        private bool preparing, disposed;
+        internal bool Ready { get; private set; }
+        internal int PreparedParts { get; private set; }
+        internal int PlannedParts => preparations.Length;
+        internal string PreparationPhase => Ready ? "ready" : parts.Count == 0 ? "parts" : parts[parts.Count - 1].Source?.PreparationPhase ?? "closed";
         internal int Count => parts.Count;
         internal Vector3 Origin { get; private set; }
         internal float Clock { get; private set; }
@@ -22,7 +28,7 @@ namespace OstrixMods.BuildWorks
 
         internal BlueprintFogBuilding(BlueprintFogAssets assets, BlueprintFogChannels channels,
             CompositeBlueprintStore.Blueprint blueprint, Func<string, GameObject> resolve,
-            Vector3 origin, Quaternion rotation, Vector3 actor, Vector2 capsule)
+            Vector3 origin, Quaternion rotation, Vector3 actor, Vector2 capsule, bool deferPreparation = false)
         {
             if (assets == null || channels == null || resolve == null || blueprint?.parts == null ||
                 blueprint.parts.Count < 1 || blueprint.parts.Count > BlueprintFogAtlas.MaximumOwners)
@@ -37,6 +43,8 @@ namespace OstrixMods.BuildWorks
             Origin = origin;
             this.channels = channels;
             if (channels.SnapshotArena != null) snapshots = new BlueprintFogChannels.SnapshotChannel[prefabs.Length];
+            if (deferPreparation && snapshots == null) throw new ArgumentException("Deferred building requires the strict published pool.");
+            preparations = new Func<BlueprintFogVisual>[prefabs.Length];
             string owner = Guid.NewGuid().ToString("N");
             try
             {
@@ -54,16 +62,44 @@ namespace OstrixMods.BuildWorks
                         // Centre the full v11 domain on geometry, independently from a corner/bottom prefab pivot.
                         fieldOrigin += facing * Vector3.Scale(bounds.center, Vector3.Scale(prefabs[i].transform.localScale, scale)) - Vector3.up * 1.55f;
                     }
-                    parts.Add(new BlueprintFogVisual(assets, prefabs[i], position, facing,
-                        scale, part.materialSeed, fieldOrigin, actor, capsule,
-                        channels, owner + ":" + i, snapshots == null, true, origin));
+                    // Freeze inputs before yielding; later library edits cannot mutate the preparing building.
+                    var prefab = prefabs[i]; int? seed = part.materialSeed; string id = owner + ":" + i;
+                    preparations[i] = () => new BlueprintFogVisual(assets, prefab, position, facing,
+                        scale, seed, fieldOrigin, actor, capsule,
+                        channels, id, snapshots == null, true, origin, deferPreparation);
+                }
+                if (!deferPreparation)
+                {
+                    foreach (var create in preparations) { parts.Add(create()); ++PreparedParts; }
+                    Array.Clear(preparations, 0, preparations.Length); Ready = true;
                 }
             }
             catch { Dispose(); throw; }
         }
 
+        internal IEnumerable<object> Prepare()
+        {
+            if (disposed || preparing || Ready) throw new InvalidOperationException("Fog building preparation is closed or already started.");
+            preparing = true; bool complete = false;
+            try
+            {
+                foreach (var create in preparations)
+                {
+                    var visual = create(); parts.Add(visual);
+                    foreach (var step in visual.Prepare()) yield return step;
+                    ++PreparedParts;
+                    yield return null;
+                }
+                PrepareRender();
+                foreach (var part in parts) part.Root.SetActive(true);
+                Array.Clear(preparations, 0, preparations.Length); Ready = complete = true;
+            }
+            finally { preparing = false; if (!complete) Dispose(); }
+        }
+
         internal void AdvanceTo(float clock, Vector3 actor, Vector2 capsule, bool emit)
         {
+            if (!Ready) throw new InvalidOperationException("Fog building is not prepared.");
             if (volume == null && published == null) throw new ObjectDisposedException(nameof(BlueprintFogBuilding));
             foreach (BlueprintFogVisual part in parts) part.AdvanceTo(clock, actor, capsule, emit);
             Pump();
@@ -86,14 +122,18 @@ namespace OstrixMods.BuildWorks
         }
         internal void Render(Camera camera, RenderTexture image, RenderTexture target, Vector3 beamOrigin, Vector3 beamDirection, float strength)
         {
+            if (!Ready) throw new InvalidOperationException("Fog building is not prepared.");
             if (volume == null && published == null) throw new ObjectDisposedException(nameof(BlueprintFogBuilding));
             if (published != null) published.Render(camera, image, target, parts, beamOrigin, beamDirection, strength, snapshots);
             else volume.RenderMany(camera, image, target, parts, beamOrigin, beamDirection, strength);
         }
         public void Dispose()
         {
+            if (disposed) return;
+            disposed = true; Ready = false;
             published?.Dispose(); published = null; volume?.Dispose(); volume = null;
             foreach (BlueprintFogVisual part in parts) part.Dispose(); parts.Clear();
+            if (preparations != null) Array.Clear(preparations, 0, preparations.Length);
         }
     }
 }

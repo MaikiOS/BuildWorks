@@ -221,6 +221,7 @@ public static class FogPublishedRenderCheck
                 foreach (var visual in visuals) visual.Root.SetActive(false);
                 CheckLogicalVisual(assets, prefab, camera, probe, output, report);
                 CheckBuilding(assets, prefab, camera, probe, output, report);
+                FogPreparationCheck.Check(assets, out report.preparationCases, out report.preparationMaxStepMilliseconds);
             }
         }
         finally
@@ -624,6 +625,8 @@ public static class FogPublishedRenderCheck
         public bool runtimeChannelsValidated;
         public bool buildingAdapterValidated;
         public int buildingComparisons;
+        public int preparationCases;
+        public double preparationMaxStepMilliseconds;
         public bool runtimeVisualAtlasValidated, staticSourceSeparated;
         public bool logicalVisualValidated, logicalVisualDeferredDisposal, dormantClockAndBodyValidated;
         public bool continuousV11Parity, coldIdleControlSensitive;

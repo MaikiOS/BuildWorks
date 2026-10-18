@@ -2,10 +2,10 @@
 
 2026-10-18 · [Русский](HANDOFF_RU.md)
 
-**QA .218 installed: strict v11 now renders the real Forest Hut28 in ValheimQA.** Unity4 building comparisons and native contact/hold/exit/history/cleanup passed; five PNGs, unchanged inventory/restored bridge. Creation exceeded15s; animation fidelity/FPS/board remain open. [Evidence and failures](docs/CHECKPOINT_218.md).
+**QA .219 installed: house preparation no longer stalls the main thread for15s.** ValheimQA28/28, handler0.11s, whole preparation30.32s in steps ≤45.71ms; cancel/inventory/cleanup passed. v11 appearance/animation/FPS/board remain open. [Evidence and limits](docs/CHECKPOINT_219.md).
 
 1. Read [PROJECT_CONTRACT](PROJECT_CONTRACT.md), [current evidence](docs/CURRENT_STATUS.md), [forward roadmap](docs/ROADMAP.md) and project AGENTS. Preserve the complete goal; this file is not a goal API update.
-2. Source and installed QA0.19.218; DLL SHA 6522F72375A7567AD3F2D10378E5CA08FFF347A0E41729BCCA42F423B9F79A6A. [Report .218](docs/CHECKPOINT_218.md). Public binary .37 alpha is unchanged.
+2. Source and installed QA0.19.219; DLL SHA E98E8081277AF5EE70D4BDF270D3E53EB5903C96E77E6969010DEA91AEFC1367. [Report .219](docs/CHECKPOINT_219.md). Public binary .37 alpha is unchanged.
 
 Results below retain their original checkpoint versions; the current installation is stated above. Next work is continuous fixed-camera house capture, numeric recovery and responsive source preparation; a durable project requires its own server journal, not storage WAL.
 

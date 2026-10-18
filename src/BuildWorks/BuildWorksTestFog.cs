@@ -12,7 +12,10 @@ namespace OstrixMods.BuildWorks
             BuildWorksTestIsolation.RequireLoadedSession();
             var fog = Camera.main ? Camera.main.GetComponent<BuildWorksTestFog>() : null;
             return JsonUtility.ToJson(new HouseReceipt {
-                active = fog && fog.PublishedHouse, failure = fog?.Failure,
+                active = fog && fog.Active && fog.PublishedHouse, preparing = fog && fog.preparation != null, failure = fog?.Failure,
+                expectedParts = fog?.building?.PlannedParts ?? 0, preparedParts = fog?.building?.PreparedParts ?? 0,
+                preparationPhase = fog?.building?.PreparationPhase, preparationSteps = fog?.preparationSteps ?? 0,
+                preparationMilliseconds = fog?.PreparationMilliseconds ?? 0, maxPreparationStepMilliseconds = fog?.maxPreparationStepMilliseconds ?? 0,
                 parts = fog?.PartCount ?? 0, owners = fog?.ActiveOwners ?? 0, residentOwners = fog?.ResidentOwners ?? 0,
                 queuedSamples = fog?.building?.QueuedSamples ?? 0, minimumTick = fog?.building?.MinimumConfirmedTick ?? 0,
                 lastFlags = fog?.building?.LastFlags ?? 0, frames = fog?.RenderFrames ?? 0,
@@ -22,8 +25,10 @@ namespace OstrixMods.BuildWorks
         }
         [Serializable] private sealed class HouseReceipt
         {
-            public bool active;
-            public string failure;
+            public bool active, preparing;
+            public string failure, preparationPhase;
+            public int expectedParts, preparedParts, preparationSteps;
+            public double preparationMilliseconds, maxPreparationStepMilliseconds;
             public int parts, owners, residentOwners, queuedSamples, minimumTick, frames;
             public uint lastFlags;
             public long fieldBytes, renderBytes, velocityRamBytes, processMemory;
@@ -140,10 +145,15 @@ namespace OstrixMods.BuildWorks
         private Camera view;
         private DepthTextureMode oldDepth, ownedDepth;
         private float clock;
+        private System.Collections.Generic.IEnumerator<object> preparation;
+        private float preparationStarted;
+        private double preparationMilliseconds, maxPreparationStepMilliseconds;
+        private int preparationSteps;
+        private double PreparationMilliseconds => preparation != null ? (Time.realtimeSinceStartup - preparationStarted) * 1000d : preparationMilliseconds;
         public int RenderFrames { get; private set; }
         public int Tick => visual?.Simulation?.Tick ?? (building == null ? 0 : Mathf.FloorToInt(building.Clock / BlueprintFogSimulation.Step + .0001f));
         public Vector3 Origin => visual?.Origin ?? building?.Origin ?? Vector3.zero;
-        public bool Active => visual != null || building != null;
+        public bool Active => visual != null || building?.Ready == true;
         public int PartCount => building?.Count ?? (visual == null ? 0 : second == null ? 1 : 2);
         public long FieldBytes => channels?.FieldBytes ?? visual?.Simulation?.AllocatedFieldBytes ?? 0;
         public long AtlasBytes => building?.AtlasBytes ?? volume?.AtlasBytes ?? 0;
@@ -209,8 +219,8 @@ namespace OstrixMods.BuildWorks
                 Bounds body = capsule.bounds;
                 building = new BlueprintFogBuilding(assets, channels, blueprint, name => ZNetScene.instance.GetPrefab(name),
                     player.transform.position + Vector3.right * 6, Quaternion.identity, body.center,
-                    new Vector2(Mathf.Max(body.extents.x, body.extents.z), body.extents.y));
-                building.PrepareRender();
+                    new Vector2(Mathf.Max(body.extents.x, body.extents.z), body.extents.y), deferPreparation: true);
+                preparation = building.Prepare().GetEnumerator(); preparationStarted = Time.realtimeSinceStartup;
             }
             catch { Cleanup(); throw; }
         }
@@ -224,10 +234,27 @@ namespace OstrixMods.BuildWorks
 
         private void Update()
         {
-            if (!Active) return;
+            if (!Active && preparation == null) return;
             if (!player || player != Player.m_localPlayer || !network || network != ZNet.instance ||
                 player.IsDead() || !Game.instance || Game.instance.IsShuttingDown())
             { Destroy(this); return; }
+            if (preparation != null)
+            {
+                try
+                {
+                    long started = System.Diagnostics.Stopwatch.GetTimestamp();
+                    bool more = preparation.MoveNext(); ++preparationSteps;
+                    maxPreparationStepMilliseconds = Math.Max(maxPreparationStepMilliseconds,
+                        (System.Diagnostics.Stopwatch.GetTimestamp() - started) * 1000d / System.Diagnostics.Stopwatch.Frequency);
+                    if (!more)
+                    {
+                        preparation.Dispose(); preparation = null;
+                        preparationMilliseconds = (Time.realtimeSinceStartup - preparationStarted) * 1000d; clock = 0;
+                    }
+                }
+                catch (Exception error) { Cleanup(); Fail(error); }
+                return;
+            }
             if (SkipSimulation) return;
             try
             {
@@ -294,10 +321,15 @@ namespace OstrixMods.BuildWorks
         private void OnDestroy() => Cleanup();
         private void Cleanup()
         {
+            var pending = preparation; preparation = null;
+            try { pending?.Dispose(); }
+            finally
+            {
             building?.Dispose(); building = null;
             visual?.Dispose(); visual = null; second?.Dispose(); second = null;
             volume?.Dispose(); volume = null; channels?.Dispose(); channels = null; assets?.Dispose(); assets = null;
             if (view && view.depthTextureMode == ownedDepth) view.depthTextureMode = oldDepth;
+            }
         }
     }
 }

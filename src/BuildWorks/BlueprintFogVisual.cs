@@ -23,6 +23,8 @@ namespace OstrixMods.BuildWorks
         private readonly Vector3 minimum, maximum;
         private Vector2 body;
         private float time;
+        private bool deferred, preparing;
+        private Vector3 preparationActor;
         internal Vector3 Origin { get; private set; }
         internal Vector3 NoiseOffset { get; private set; }
         internal GameObject Root => visual;
@@ -43,7 +45,7 @@ namespace OstrixMods.BuildWorks
         internal BlueprintFogVisual(BlueprintFogAssets assets, GameObject prefab, Vector3 position,
             Quaternion rotation, Vector3 relativeScale, int? materialSeed, Vector3 origin, Vector3 actor, Vector2 capsule,
             BlueprintFogChannels channels = null, string owner = null, bool compactRegion = false, bool lazyFields = false,
-            Vector3? noiseOrigin = null)
+            Vector3? noiseOrigin = null, bool deferPreparation = false)
         {
             if (assets == null || !prefab) throw new ArgumentException("Fog prefab/assets missing.");
             bool published = channels?.SnapshotArena != null;
@@ -59,13 +61,36 @@ namespace OstrixMods.BuildWorks
                 visual.transform.localScale = Vector3.Scale(prefab.transform.localScale, relativeScale);
                 Origin = origin;
                 NoiseOffset = origin - (noiseOrigin ?? origin); BlueprintFogSimulation.Validate(NoiseOffset);
-                source = new BlueprintFogSource(visual, Origin, compactRegion);
+                source = new BlueprintFogSource(visual, Origin, compactRegion, deferPreparation);
                 minimum = source.Minimum - new Vector3(1.2f, 0, 1);
                 maximum = source.Maximum + new Vector3(1.2f, .6f, 1);
-                Vector3 localActor = LocalActor(actor, out bool nearby);
                 body = capsule;
                 grid = !published && compactRegion ? BlueprintFogSimulation.CompactGrid(minimum, maximum) : (Vector3Int?)null;
                 channelPool = channels; channelOwner = owner;
+                deferred = deferPreparation; preparationActor = actor;
+                if (!deferred) Initialize(actor, true);
+            }
+            catch { Dispose(); throw; }
+        }
+
+        internal IEnumerable<object> Prepare()
+        {
+            if (!deferred || preparing || source == null) throw new InvalidOperationException("Fog visual preparation is closed or already started.");
+            preparing = true;
+            bool complete = false;
+            try
+            {
+                foreach (var step in source.Prepare()) yield return step;
+                Initialize(preparationActor, false); deferred = false; complete = true;
+            }
+            finally { preparing = false; if (!complete) Dispose(); }
+        }
+
+        private void Initialize(Vector3 actor, bool activate)
+        {
+            bool published = channelPool?.SnapshotArena != null;
+            var channels = channelPool; Vector2 capsule = body;
+            Vector3 localActor = LocalActor(actor, out bool nearby);
                 if (published)
                 {
                     // The scheduler can outlive this visual while queued GPU work still reads its source textures.
@@ -114,9 +139,7 @@ namespace OstrixMods.BuildWorks
                 volume = new Material(assets.Volume) { name = "BuildWorks v11 volume", hideFlags = HideFlags.HideAndDontSave };
                 volume.SetTexture("_Shape", source.Shape); volume.SetTexture("_Albedo", source.Pigment);
                 trail[0] = new Vector4(localActor.x, localActor.y, localActor.z, nearby ? 1 : 0);
-                Bind(); visual.SetActive(true);
-            }
-            catch { Dispose(); throw; }
+                Bind(); visual.SetActive(activate);
         }
 
         internal void AdvanceTo(float clock, Vector3 actor, Vector2 capsule, bool emit)

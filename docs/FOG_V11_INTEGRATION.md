@@ -1,6 +1,6 @@
 # Approved v11 integration
 
-**Current .218:** the strict paged pool is connected to the real Forest Hut28 QA renderer; native contact/hold/exit/history and five frames are recorded. Setup exceeded15s; continuous visual fidelity/numeric recovery/FPS and durable board remain open. [Current evidence and failures](CHECKPOINT_218.md). Ordinary construction still uses the previous backend.
+**Current .219:** cooperative QA-house preparation: ValheimQA28/28, handler0.11s/full30.32s/max45.71ms; cancellation/inventory/cleanup passed. Prior .218 traversal retained; continuous appearance/numeric recovery/FPS/durable board remain open. [Current evidence](CHECKPOINT_219.md). Normal construction still uses the previous backend.
 
 ## Historical .213 diagnosis and subsequent experiments (superseded by the current evidence above)
 

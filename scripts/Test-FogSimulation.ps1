@@ -1,12 +1,13 @@
 [CmdletBinding()]
-param([string]$UnityPath='C:\Program Files\Unity\Hub\Editor\6000.0.61f1\Editor\Unity.exe',[switch]$MeshOnly,[switch]$VisualOnly,[switch]$ColorOnly,[switch]$ChannelsOnly,[switch]$PairOnly,[switch]$CompactOnly,[switch]$OwnersOnly,[switch]$AtlasOnly,[switch]$LazyOnly,[switch]$ScratchOnly,[switch]$RecoveryOnly,[switch]$DomainOnly,[switch]$NoiseOnly,[switch]$SparseOnly,[switch]$ArenaOnly,[switch]$ArenaPhysicsOnly,[switch]$ArenaFramesOnly,[switch]$PublishedOnly)
+param([string]$UnityPath='C:\Program Files\Unity\Hub\Editor\6000.0.61f1\Editor\Unity.exe',[switch]$MeshOnly,[switch]$VisualOnly,[switch]$ColorOnly,[switch]$ChannelsOnly,[switch]$PairOnly,[switch]$CompactOnly,[switch]$OwnersOnly,[switch]$AtlasOnly,[switch]$LazyOnly,[switch]$ScratchOnly,[switch]$RecoveryOnly,[switch]$DomainOnly,[switch]$NoiseOnly,[switch]$SparseOnly,[switch]$ArenaOnly,[switch]$ArenaPhysicsOnly,[switch]$ArenaFramesOnly,[switch]$PublishedOnly,[switch]$IdleOnly)
 $ErrorActionPreference='Stop'
 $root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $project=Join-Path $root 'tools/BuildWorks.UiWorkbench'
-if(@($MeshOnly,$VisualOnly,$ColorOnly,$ChannelsOnly,$PairOnly,$CompactOnly,$OwnersOnly,$AtlasOnly,$LazyOnly,$ScratchOnly,$RecoveryOnly,$DomainOnly,$NoiseOnly,$SparseOnly,$ArenaOnly,$ArenaPhysicsOnly,$ArenaFramesOnly,$PublishedOnly|Where-Object{$_}).Count -gt 1){throw 'Choose one fog check mode.'}
+if(@($MeshOnly,$VisualOnly,$ColorOnly,$ChannelsOnly,$PairOnly,$CompactOnly,$OwnersOnly,$AtlasOnly,$LazyOnly,$ScratchOnly,$RecoveryOnly,$DomainOnly,$NoiseOnly,$SparseOnly,$ArenaOnly,$ArenaPhysicsOnly,$ArenaFramesOnly,$PublishedOnly,$IdleOnly|Where-Object{$_}).Count -gt 1){throw 'Choose one fog check mode.'}
 $output=Join-Path $root $(if($ArenaOnly){'artifacts/fog-runtime-arena'}elseif($SparseOnly){'artifacts/fog-runtime-sparse'}elseif($NoiseOnly){'artifacts/fog-runtime-noise'}elseif($DomainOnly){'artifacts/fog-runtime-domain'}elseif($RecoveryOnly){'artifacts/fog-runtime-recovery'}elseif($ScratchOnly){'artifacts/fog-runtime-scratch'}elseif($LazyOnly){'artifacts/fog-runtime-lazy'}elseif($AtlasOnly){'artifacts/fog-runtime-atlas'}elseif($OwnersOnly){'artifacts/fog-runtime-owners'}elseif($CompactOnly){'artifacts/fog-runtime-compact'}elseif($PairOnly){'artifacts/fog-runtime-pair'}elseif($ChannelsOnly){'artifacts/fog-runtime-channels'}elseif($ColorOnly){'artifacts/fog-color-check'}elseif($VisualOnly){'artifacts/fog-runtime-visual'}elseif($MeshOnly){'artifacts/fog-runtime-mesh'}else{'artifacts/fog-runtime-simulation'})
 if($ArenaPhysicsOnly){$output=Join-Path $root 'artifacts/fog-arena-physics'}
 if($ArenaFramesOnly){$output=Join-Path $root 'artifacts/fog-arena-frames'}
+if($IdleOnly){$output=Join-Path $root 'artifacts/fog-idle-velocity'}
 if($PublishedOnly){$output=Join-Path $root 'artifacts/fog-published-render'}
 $arenaBundle=$PublishedOnly -or $ArenaPhysicsOnly -or $ArenaFramesOnly -or $RecoveryOnly
 if($arenaBundle){
@@ -16,7 +17,7 @@ if($arenaBundle){
     foreach($entry in $candidate.sources){if((Get-FileHash -LiteralPath (Join-Path $root ('src/BuildWorks/Assets/FogGhostRuntime/'+$entry.name))).Hash -cne $entry.sha256){throw 'Rebuild candidate shader bundle: source changed.'}}
     if((Get-FileHash -LiteralPath (Join-Path $root 'artifacts/fog-runtime-assets-candidate/buildworks-fog-v11')).Hash -cne $candidate.sha256){throw 'Rebuild candidate shader bundle: bundle hash differs.'}
 }
-if(($SparseOnly -or $ArenaOnly -or $ArenaPhysicsOnly -or $ArenaFramesOnly -or $PublishedOnly) -and (Get-Process -Name valheim,valheim_server -ErrorAction SilentlyContinue)){throw 'Fog GPU measurement requires Valheim to be closed.'}
+if(($IdleOnly -or $SparseOnly -or $ArenaOnly -or $ArenaPhysicsOnly -or $ArenaFramesOnly -or $PublishedOnly) -and (Get-Process -Name valheim,valheim_server -ErrorAction SilentlyContinue)){throw 'Fog GPU measurement requires Valheim to be closed.'}
 if ((Get-Item -LiteralPath $UnityPath).VersionInfo.ProductVersion -notlike '6000.0.61f1*') { throw 'Fog reference check requires Unity6000.0.61f1.' }
 if (Get-CimInstance Win32_Process -Filter "Name = 'Unity.exe'" | Where-Object { $_.CommandLine -like ('*'+$project+'*') }) { throw 'Workbench already open; do not replace its session.' }
 $reference=Join-Path $project 'Assets/FogRuntimeReference/FogMatterSimulation.cs'
@@ -41,9 +42,10 @@ $method=if($ArenaOnly){'FogRuntimeArenaCheck.Run'}elseif($SparseOnly){'FogRuntim
 $settings=Join-Path $project 'ProjectSettings/ProjectSettings.asset'
 if($ArenaPhysicsOnly){$method='FogArenaPhysicsProbe.Run'}
 if($ArenaFramesOnly){$method='FogArenaFramesCheck.Run'}
+if($IdleOnly){$method='FogIdleVelocityCheck.Run'}
 if($PublishedOnly){$method='FogPublishedRenderCheck.Run'}
 $settingsBytes=if($ColorOnly -or $PairOnly -or $OwnersOnly -or $AtlasOnly -or $LazyOnly -or $ScratchOnly -or $RecoveryOnly -or $DomainOnly -or $NoiseOnly -or $SparseOnly -or $ArenaOnly){[IO.File]::ReadAllBytes($settings)}else{$null}
-if($ArenaPhysicsOnly -or $ArenaFramesOnly -or $PublishedOnly){$settingsBytes=[IO.File]::ReadAllBytes($settings)}
+if($IdleOnly -or $ArenaPhysicsOnly -or $ArenaFramesOnly -or $PublishedOnly){$settingsBytes=[IO.File]::ReadAllBytes($settings)}
 try {
     $arguments=@('-batchmode','-force-d3d11','-projectPath',('"'+$project+'"'),'-executeMethod',$method,'-logFile',('"'+(Join-Path $output 'unity.log')+'"'))
     if(!$RecoveryOnly -and !$ArenaFramesOnly){$arguments+='-quit'}
@@ -57,7 +59,23 @@ if(Select-String -LiteralPath (Join-Path $output 'unity.log') -Pattern '^Shader 
 $proof=Join-Path $output $(if($DomainOnly){'comparison.json'}else{'verification.json'})
 if(!(Test-Path -LiteralPath $proof) -or (Get-Item -LiteralPath $proof).LastWriteTimeUtc -lt $started){throw 'Fresh fog simulation proof missing.'}
 $result=Get-Content -LiteralPath $proof -Raw|ConvertFrom-Json
-if($PublishedOnly){
+if($IdleOnly){
+    if($result.collected -isnot [bool] -or !$result.collected -or $result.exactReplayValidated -isnot [bool] -or !$result.exactReplayValidated -or $result.runtimePolicyImplemented -isnot [bool] -or $result.runtimePolicyImplemented -or $result.wholeHouseSupported -isnot [bool] -or $result.wholeHouseSupported -or $result.gameHostTested -isnot [bool] -or $result.gameHostTested -or $result.scenarios -ne 2 -or @($result.rows).Count -ne 14){throw 'Idle replay diagnostic incomplete; not runtime acceptance.'}
+    if($result.scenarios -isnot [long] -and $result.scenarios -isnot [int]){throw 'Idle scenario count invalid.'}
+    $seen=[Collections.Generic.HashSet[string]]::new()
+    foreach($row in $result.rows){
+        foreach($field in @('scenario','windowSeconds','imageComparisons','differentHalfWords','differentLedgerWords','checkpointTick','checkpointFieldLedgerBytes')){if(($row.$field -isnot [long] -and $row.$field -isnot [int]) -or $row.$field -lt 0){throw ('Idle integer invalid: '+$field)}}
+        foreach($field in @('initialClock','fieldMaxDelta','meanRgbDelta','localRgbDelta','synchronizedPrewarmMilliseconds','synchronizedRestoreMilliseconds')){if(($row.$field -isnot [double] -and $row.$field -isnot [long] -and $row.$field -isnot [int]) -or [double]::IsNaN($row.$field) -or [double]::IsInfinity($row.$field) -or $row.$field -lt 0){throw ('Idle measurement invalid: '+$field)}}
+        foreach($field in @('exactReplayControl','withinExistingImageLimits','checkpointRestored')){if($row.$field -isnot [bool]){throw ('Idle flag invalid: '+$field)}}
+        if($row.scenario -notin @(0,1) -or $row.windowSeconds -notin @(0,2,4,8,12) -or $row.checkpointTick -notin @(0,240,400) -or $row.imageComparisons -ne $(if($row.checkpointTick -eq 400){6}else{12}) -or !$seen.Add(('{0}:{1}:{2}' -f $row.scenario,$row.windowSeconds,$row.checkpointTick)) -or $row.synchronizedPrewarmMilliseconds -le 0){throw 'Idle row coverage invalid.'}
+        if($row.checkpointRestored -ne ($row.checkpointTick -ne 0) -or ($row.checkpointTick -eq 240 -and $row.windowSeconds -ne 4) -or ($row.checkpointTick -eq 400 -and $row.windowSeconds -ne 0) -or $row.checkpointFieldLedgerBytes -ne $(if($row.checkpointRestored){19668996}else{0}) -or ($row.checkpointRestored -and $row.synchronizedRestoreMilliseconds -le 0) -or (!$row.checkpointRestored -and $row.synchronizedRestoreMilliseconds -ne 0)){throw 'Idle checkpoint coverage invalid.'}
+        $startTick=if($row.checkpointTick -ne 0){$row.checkpointTick}elseif($row.windowSeconds -eq 0){360}else{[math]::Floor((360-$row.windowSeconds*30)/8)*8}
+        $initial=if($startTick -eq 0){0}else{$startTick/30+.005}
+        if([math]::Abs($row.initialClock-$initial) -gt .00001 -or $row.exactReplayControl -ne ($row.windowSeconds -eq 12) -or $row.withinExistingImageLimits -ne ($row.meanRgbDelta -lt .0001 -and $row.localRgbDelta -lt .03)){throw 'Idle row interpretation invalid.'}
+        if(($row.exactReplayControl -or $row.checkpointRestored) -and ($row.differentHalfWords -ne 0 -or $row.differentLedgerWords -ne 0 -or $row.fieldMaxDelta -ne 0 -or $row.meanRgbDelta -ne 0 -or $row.localRgbDelta -ne 0)){throw 'Idle full replay control failed.'}
+    }
+}
+elseif($PublishedOnly){
     foreach($field in @('continuousIdleControlSensitive','logicalVisualValidated','logicalVisualDeferredDisposal','dormantClockAndBodyValidated','runtimeVisualAtlasValidated','staticSourceSeparated','runtimeChannelsValidated','passed','metadataOnly','rejectedRetained','geometryBeforeCpuConfirmation','meshAndAtlasVolume')){if($result.$field -isnot [bool] -or !$result.$field){throw ('Published render evidence missing or false: '+$field)}}
     foreach($field in @('continuousV11Parity','productionSchedulerTested','wholeHouseSupported','gameHostTested','gpuTimingsMeasured')){if($result.$field -isnot [bool] -or $result.$field){throw ('Published render scope invalid: '+$field)}}
     foreach($field in @('logicalVisualComparisons','runtimeVisualAtlasCaptures','runtimeVisualAtlasComparisons','runtimeMappingNegativeCases','runtimeStaticBytes','runtimeCombinedRenderBytes','owners','captures','comparisons','negativeControls','legacyCaptures')){if($result.$field -isnot [long] -and $result.$field -isnot [int]){throw ('Published render integer invalid: '+$field)}}
@@ -118,5 +136,6 @@ if($ArenaOnly -or $arenaBundle){foreach($file in @('FogArena.compute','FogSnapsh
 if($ArenaOnly){foreach($file in @('FogRuntimeArenaCheck.cs')){$sourceReceipt[$file]=(Get-FileHash -LiteralPath (Join-Path $project ('Assets/Editor/'+$file))).Hash};$sourceReceipt['snapshotStateSha']=(Get-FileHash -LiteralPath (Join-Path $root 'src/BuildWorks/BlueprintFogSnapshotState.cs')).Hash;$sourceReceipt['inputQueueSha']=(Get-FileHash -LiteralPath (Join-Path $root 'src/BuildWorks/BlueprintFogInputQueue.cs')).Hash}
 if($ArenaPhysicsOnly -or $ArenaFramesOnly -or $PublishedOnly){foreach($file in @('FogRuntimeChannelLifecycleCheck.cs','FogPublishedRenderCheck.cs','FogArenaFramesCheck.cs','FogArenaPhysicsProbe.cs','FogSparseStorageProbe.cs','FogSparseStorageProbe.compute','FogRuntimeSparseCheck.cs')){$sourceReceipt[$file]=(Get-FileHash -LiteralPath (Join-Path $project ('Assets/Editor/'+$file))).Hash};$sourceReceipt['snapshotStateSha']=(Get-FileHash -LiteralPath (Join-Path $root 'src/BuildWorks/BlueprintFogSnapshotState.cs')).Hash;$sourceReceipt['inputQueueSha']=(Get-FileHash -LiteralPath (Join-Path $root 'src/BuildWorks/BlueprintFogInputQueue.cs')).Hash}
 if($PublishedOnly){foreach($file in @('GhostMatter.cginc','FogPublished.cginc','TexturedGhost.shader','FogGhostVolume.shader','FogVolumeAtlas.cginc')){$sourceReceipt[$file]=(Get-FileHash -LiteralPath (Join-Path $root ('src/BuildWorks/Assets/FogGhostRuntime/'+$file))).Hash}}
+if($IdleOnly){$sourceReceipt['FogIdleVelocityCheck.cs']=(Get-FileHash -LiteralPath (Join-Path $project 'Assets/Editor/FogIdleVelocityCheck.cs')).Hash}
 $sourceReceipt|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $output 'sources.json')
 $result|ConvertTo-Json

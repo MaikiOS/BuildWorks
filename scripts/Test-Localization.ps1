@@ -84,6 +84,8 @@ $sourceFiles = @(Get-ChildItem $allSourceRoot -Recurse -Filter '*.cs' -File |
     Where-Object { $_.FullName -notmatch '\\(?:bin|obj)\\' })
 $sourceText = ($sourceFiles | ForEach-Object { [IO.File]::ReadAllText($_.FullName) }) -join "`n"
 $nonLocalizationDottedLiterals = @(
+    'accumulatedsmoke.compute', 'fogarena.compute', 'fogsnapshotmetadata.compute',
+    'fogghostvolume.shader', 'texturedghost.shader',
     'blueprints.json',
     'manifest.tsv',
     'access.json', 'blueprint.buildworks.json',

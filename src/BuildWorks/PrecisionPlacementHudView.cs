@@ -390,9 +390,15 @@ namespace OstrixMods.BuildWorks
         public void ShowSelectionBox(Vector2 start, Vector2 end)
         {
             if (!EnsureCreated()) return;
-            Vector2 minimum = Vector2.Min(start, end);
-            Vector2 maximum = Vector2.Max(start, end);
-            selectionBoxRect.anchoredPosition = minimum;
+            var parent = selectionBoxRect.parent as RectTransform;
+            Canvas canvas = parent ? parent.GetComponentInParent<Canvas>()?.rootCanvas : null;
+            Camera camera = canvas && canvas.renderMode != RenderMode.ScreenSpaceOverlay ? canvas.worldCamera : null;
+            if (!parent || !RectTransformUtility.ScreenPointToLocalPointInRectangle(parent, start, camera, out var first) ||
+                !RectTransformUtility.ScreenPointToLocalPointInRectangle(parent, end, camera, out var last))
+            { HideSelectionBox(); return; }
+            Vector2 minimum = Vector2.Min(first, last);
+            Vector2 maximum = Vector2.Max(first, last);
+            selectionBoxRect.anchoredPosition = minimum - parent.rect.min;
             selectionBoxRect.sizeDelta = maximum - minimum;
             selectionBox.SetActive(true);
         }

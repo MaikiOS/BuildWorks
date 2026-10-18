@@ -1,11 +1,13 @@
 # BuildWorks continuation
 
-2026-10-17 · [Русский](HANDOFF_RU.md)
+2026-10-18 · [Русский](HANDOFF_RU.md)
 
-**Visual/source lifetime and dormant rendering verified; continuous v11 parity still fails.** Visual now captures into its logical source and retains source textures through confirmed GPU drain. Eight same-baseline mesh/volume comparisons pass (maximum local error0.0001220703125); both disposal orders and invalid mapping/domain/legacy routes are checked. Existing30/14/7 and16 pixel-exact legacy captures remain. Normal/QA/Editor0/0,131CPU groups/574 corrupt-report rejections/32coverage; independent correctness PASSED/Ponytail Ship for source only. **Blocker:** a cold source discards the nonzero background velocity accumulated during idle; continuous-v11 control differs by0.11407470703125. `continuousV11Parity=false` is retained separately from the passing late-start integration oracle. Do not switch Building or deploy this backend until idle/reentry fidelity and real28 admission/spatial ledger/house/FPS pass. Installed .213 and working bundle are unchanged.
+**QA .214 installed: screen rectangle and imported editor card focus fixed.** Unity48/3, normal/QA0/0,131CPU groups, host/control/isolation/localization1104 passed;143 profile data files unchanged. Valheim .214 is untested. A separate GPU experiment exactly restored all4 fields,3 ledgers and CPU integration state at4 v11 checkpoints; this private synchronous16.7–25.1ms path is not a production solution. Eight seconds of replay still fail fidelity. Building does not activate the new fog backend; the working bundle is unchanged. [Changes, limits and two owner checks](docs/CHECKPOINT_214.md).
 
 1. Read [PROJECT_CONTRACT](PROJECT_CONTRACT.md), [current evidence](docs/CURRENT_STATUS.md), [forward roadmap](docs/ROADMAP.md) and project AGENTS. Preserve the complete goal; this file is not a goal API update.
-2. Source and installed QA0.19.213; DLL SHA 3421595F8757AE894D7A262AC32BA6BD72B8180E12971C71C12E2F4D3D0BC4A8. [Report .213](docs/FOG_NOISE_FRAME_213.md). Public binary .37 alpha is unchanged.
+2. Source and installed QA0.19.214; DLL SHA A57FB813C53C20C2C271765C8AD40A9F7BF3841578BBEFC2D1FEE1233156E2D4. [Report .214](docs/CHECKPOINT_214.md). Public binary .37 alpha is unchanged.
+
+Results below retain their original checkpoint versions; the current installation is stated above. Next integration work is bounded fog-state preservation; a durable project requires its own server journal, not storage WAL.
 
 [.213](docs/FOG_NOISE_FRAME_213.md) aligns noise phases across parts; GPU checks/regressions passed and QA is installed. Native .213 is untested; boundary loss, recovery ownership and performance remain open.
 

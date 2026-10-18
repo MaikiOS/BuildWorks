@@ -1,10 +1,10 @@
 # Current BuildWorks status
 
-**2026-10-17 · [Русский](CURRENT_STATUS_RU.md) · [Roadmap](ROADMAP.md) · [Documentation](README.md)**
+**2026-10-18 · [Русский](CURRENT_STATUS_RU.md) · [Roadmap](ROADMAP.md) · [Documentation](README.md)**
 
-**Visual/source lifetime and dormant rendering verified; continuous v11 parity still fails.** Visual now captures into its logical source and retains source textures through confirmed GPU drain. Eight same-baseline mesh/volume comparisons pass (maximum local error0.0001220703125); both disposal orders and invalid mapping/domain/legacy routes are checked. Existing30/14/7 and16 pixel-exact legacy captures remain. Normal/QA/Editor0/0,131CPU groups/574 corrupt-report rejections/32coverage; independent correctness PASSED/Ponytail Ship for source only. **Blocker:** a cold source discards the nonzero background velocity accumulated during idle; continuous-v11 control differs by0.11407470703125. `continuousV11Parity=false` is retained separately from the passing late-start integration oracle. Do not switch Building or deploy this backend until idle/reentry fidelity and real28 admission/spatial ledger/house/FPS pass. Installed .213 and working bundle are unchanged.
+**QA .214 installed: screen rectangle and imported editor card focus fixed.** Unity48/3, normal/QA0/0,131CPU groups, host/control/isolation/localization1104 passed;143 profile data files unchanged. Valheim .214 is untested. A separate GPU experiment exactly restored all4 fields,3 ledgers and CPU integration state at4 v11 checkpoints; this private synchronous16.7–25.1ms path is not a production solution. Eight seconds of replay still fail fidelity. Building does not activate the new fog backend; the working bundle is unchanged. [Changes, limits and two owner checks](CHECKPOINT_214.md).
 
-Source and installed isolated QA build: **0.19.213**. Tested host: Valheim 1.0.20, Steam build25909357. Latest published binary is the historical [0.19.37 alpha prerelease](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha); its ZIP does not contain the current changes. There is no stable release. Source synchronization is not binary publication.
+Source and installed isolated QA build: **0.19.214**. Tested host: Valheim 1.0.20, Steam build25909357. Latest published binary is the historical [0.19.37 alpha prerelease](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha); its ZIP does not contain the current changes. There is no stable release. Source synchronization is not binary publication.
 
 | Area | Implemented / automated evidence | Valheim or user evidence | Still open |
 | --- | --- | --- | --- |

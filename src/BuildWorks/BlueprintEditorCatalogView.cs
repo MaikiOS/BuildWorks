@@ -185,8 +185,6 @@ namespace OstrixMods.BuildWorks
             filter.Page = 0;
             catalogNavigationId = target.id; catalogNavigationSource = target.importSource;
             OpenCatalog(items);
-            Transform card = catalogGrid.Find("Catalog_" + target.id);
-            if (card && EventSystem.current) EventSystem.current.SetSelectedGameObject(card.gameObject);
             return true;
         }
 
@@ -237,7 +235,8 @@ namespace OstrixMods.BuildWorks
                  Matches("#" + (item.Index + 1), f.Query))).ToList();
             if (f.Section == "recent") filtered.Sort((a, b) => catalogRecent.IndexOf(a.PrefabName).CompareTo(catalogRecent.IndexOf(b.PrefabName)));
             catalogPageCount = Math.Max(1, (filtered.Count + catalogLayout.PageSize - 1) / catalogLayout.PageSize);
-            if (catalogNavigationId != null)
+            bool focusImported = catalogNavigationId != null;
+            if (focusImported)
             {
                 int index = filtered.FindIndex(item => item.Blueprint?.id == catalogNavigationId &&
                     item.Blueprint.importSource == catalogNavigationSource);
@@ -248,7 +247,12 @@ namespace OstrixMods.BuildWorks
             var visible = filtered.Skip(catalogPage * catalogLayout.PageSize).Take(catalogLayout.PageSize).ToArray();
             var selected = visible.FirstOrDefault(item => SameCatalogItem(item, catalogPreviewItem)) ?? visible.FirstOrDefault();
             catalogPreviewItem = selected;
-            foreach (BlueprintEditorCatalogItem item in filtered.Skip(catalogPage * catalogLayout.PageSize).Take(catalogLayout.PageSize)) AddCatalogCard(item);
+            Button importedCard = null;
+            foreach (BlueprintEditorCatalogItem item in visible)
+            {
+                Button card = AddCatalogCard(item);
+                if (focusImported && ReferenceEquals(item, selected)) importedCard = card;
+            }
             catalogEmpty.gameObject.SetActive(filtered.Count == 0);
             catalogPageText.text = (catalogPage + 1) + " / " + catalogPageCount;
             catalogPageInput.SetTextWithoutNotify((catalogPage + 1).ToString());
@@ -265,8 +269,9 @@ namespace OstrixMods.BuildWorks
             SetButtonLabel(catalogMaterialButton, f.Material == null ? CatalogText("all_materials") : BuildWorksLocalization.CatalogLabel(f.Material));
             SetButtonLabel(catalogSourceButton, f.Source == null ? CatalogText("all_sources") : BuildWorksLocalization.CatalogLabel(f.Source));
             RebuildCatalogNavigation(); RebuildCatalogContext(); PreviewCatalogItem(selected);
+            if (importedCard && EventSystem.current) EventSystem.current.SetSelectedGameObject(importedCard.gameObject);
         }
-        private void AddCatalogCard(BlueprintEditorCatalogItem item)
+        private Button AddCatalogCard(BlueprintEditorCatalogItem item)
         {
             BlueprintEditorCatalogItem captured = item;
             Button button = CreateButton("Catalog_" + item.PrefabName, catalogGrid, item.DisplayName, (float)catalogLayout.CellWidth, () =>
@@ -309,6 +314,7 @@ namespace OstrixMods.BuildWorks
             BlueprintEditorHoverTarget hover = button.gameObject.AddComponent<BlueprintEditorHoverTarget>();
             hover.Initialize(item.DisplayName + "\n" + (item.UnavailableReason ?? item.WarningReason ?? item.PrefabName + " · #" + (item.Index + 1)),
                 (rect, text) => { PreviewCatalogItem(captured); BeginTooltip(rect, text); }, EndTooltip);
+            return button;
         }
         private void AddCatalogImage(Transform parent, string name, Sprite sprite, float x, float y, float w, float h)
         {

@@ -154,6 +154,49 @@ public static class FogRuntimeRecoveryCheck
                 for (int frame = 0; frame < 6; ++frame) yield return null;
                 Require(!fresh.Velocity && pool.Count == 0, "Pending recovery disposal leaked resources");
             }
+            int faultCases = 0;
+            using (var assets = new BlueprintFogAssets(File.ReadAllBytes(Path.Combine(root, "artifacts/fog-runtime-assets-candidate/buildworks-fog-v11"))))
+            foreach (int faultCase in new[] { 8, 1, 2, 4, 0, -1 })
+            using (var pool = BlueprintFogChannels.CreateArena(assets, 1, 8192))
+            {
+                BlueprintFogInputQueue.Sample Sample(float clock) => new BlueprintFogInputQueue.Sample(clock, new Point3(0, 0, 0), .3f, .95f, true, true, true);
+                var owner = pool.AcquireSnapshot(0, Sample(0), (scratch, staged) =>
+                    new BlueprintFogSimulation(assets, shape, pigment, noise, new Vector3(-1.2f, -.2f, -1.215f), new Vector3(1.2f, 2.35f, 1.215f),
+                        new Vector3(-1, 0, -1), new Vector3(1, 2, 1), Vector3.zero, 37, scratch: scratch, stagedState: staged));
+                pool.CaptureSnapshot(owner, Sample(.105f));
+                if (faultCase == -1) UnityEngine.Object.DestroyImmediate(pool.SnapshotArena.Program);
+                else pool.SnapshotArena.Program.SetInt("_InjectPackFailure", faultCase == 8 ? 1 : 0);
+                BlueprintFogSnapshotState.Submission token;
+                bool submissionFailed = false;
+                try { pool.TrySubmitSnapshot(owner, out token); }
+                catch when (faultCase == -1) { token = owner.pending; submissionFailed = true; }
+                uint[] raw = null;
+                if (!submissionFailed)
+                {
+                    AsyncGPUReadback.WaitAllRequests();
+                    raw = owner.reply;
+                    Require(raw != null && raw.Length == 16 && raw[8] == (faultCase == 8 ? 8u : 0u), "Real GPU negative control differs");
+                    // Only flags8 is injected on the GPU; other cases exercise cached-receipt handling explicitly.
+                    if (faultCase > 0) raw[8] = (uint)faultCase;
+                    else ++raw[0];
+                    pool.PollSnapshots();
+                }
+                var fault = pool.FirstSnapshotFault;
+                Require(fault != null && fault.owner == token.Owner && fault.generation == token.Generation && fault.sequence == token.Sequence &&
+                    fault.tick == token.Tick && fault.confirmedTick == 0 && fault.pending == 1 && fault.queued == 1 &&
+                    fault.committedClock == 0 && fault.firstClock == .105f && fault.lastClock == .105f && !fault.metadataOnly &&
+                    fault.receiptValid == (faultCase > 0), "First fault lost its pre-completion context");
+                Require(owner.Inputs.Count == 1 && owner.Inputs.Committed.Clock == 0 && owner.Inputs.Faulted &&
+                    pool.RequiresSnapshotTeardown == (faultCase <= 0 || faultCase == 4), "Fault changed accepted input or teardown policy");
+                Require(faultCase == -1 ? submissionFailed && fault.receipt == null && fault.reason.StartsWith("submission:") :
+                    fault.receipt.Length == 16 && fault.receipt[8] == (uint)faultCase && !ReferenceEquals(fault.receipt, raw), "Fault receipt was invented or shared");
+                string saved = JsonUtility.ToJson(fault);
+                if (raw != null) raw[10] ^= 1;
+                pool.PollSnapshots(); pool.Dispose(); pool.Dispose();
+                Require(JsonUtility.ToJson(pool.FirstSnapshotFault) == saved && pool.Count == 0, "Cleanup overwrote first fault");
+                ++faultCases;
+            }
+            Require(faultCases == 6, "Fault retention coverage incomplete");
             int sourceStartFrame = Time.frameCount, releasedSources = 0;
             using (var assets = new BlueprintFogAssets(File.ReadAllBytes(Path.Combine(root, "artifacts/fog-runtime-assets-candidate/buildworks-fog-v11"))))
             using (var pool = BlueprintFogChannels.CreateArena(assets, 1, 8192))
@@ -227,6 +270,7 @@ public static class FogRuntimeRecoveryCheck
                 logicalSourcesValidated = true, sourceResidentEmptyState = true, sourceAdmissionBounded = true, sourceRecoveryReentry = true, sourceExplicitRetireGuarded = true,
                 sourceRemovalAfterDrain = true, sourceAcceptedTailReplayed = true, sourceFrames = Time.frameCount - sourceStartFrame,
                 sourceFailedAcquireRetained = true,
+                faultReceiptCases = faultCases,
                 frames = frames, gameHostTested = false }, true));
         }
         finally
@@ -244,6 +288,7 @@ public static class FogRuntimeRecoveryCheck
         public bool logicalSourcesValidated, sourceResidentEmptyState, sourceAdmissionBounded, sourceRecoveryReentry, sourceExplicitRetireGuarded, sourceRemovalAfterDrain, sourceAcceptedTailReplayed;
         public bool sourceFailedAcquireRetained;
         public int sourceFrames;
+        public int faultReceiptCases;
         public int frames;
     }
 }

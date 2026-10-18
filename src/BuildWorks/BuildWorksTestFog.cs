@@ -2,6 +2,7 @@
 using System;
 using UnityEngine;
 using UnityEngine.Rendering;
+using HarmonyLib;
 
 namespace OstrixMods.BuildWorks
 {
@@ -16,7 +17,12 @@ namespace OstrixMods.BuildWorks
                 expectedParts = fog?.building?.PlannedParts ?? 0, preparedParts = fog?.building?.PreparedParts ?? 0,
                 preparationPhase = fog?.building?.PreparationPhase, preparationSteps = fog?.preparationSteps ?? 0,
                 preparationMilliseconds = fog?.PreparationMilliseconds ?? 0, maxPreparationStepMilliseconds = fog?.maxPreparationStepMilliseconds ?? 0,
+                passPhase = fog?.PassPhase, passSide = fog?.PassSide ?? -1, passFailure = fog?.PassFailure,
+                passRunning = fog && fog.PassRunning,
+                firstFaultJson = fog?.FirstFaultJson,
                 parts = fog?.PartCount ?? 0, owners = fog?.ActiveOwners ?? 0, residentOwners = fog?.ResidentOwners ?? 0,
+                blockCapacity = fog?.channels?.SnapshotArena?.BlockCapacity ?? 0,
+                residentCapacity = fog?.channels?.SnapshotArena?.ResidentCapacity ?? 0,
                 queuedSamples = fog?.building?.QueuedSamples ?? 0, minimumTick = fog?.building?.MinimumConfirmedTick ?? 0,
                 lastFlags = fog?.building?.LastFlags ?? 0, frames = fog?.RenderFrames ?? 0,
                 fieldBytes = fog?.FieldBytes ?? 0, renderBytes = fog?.AtlasBytes ?? 0, velocityRamBytes = fog?.VelocityRamBytes ?? 0,
@@ -25,12 +31,16 @@ namespace OstrixMods.BuildWorks
         }
         [Serializable] private sealed class HouseReceipt
         {
-            public bool active, preparing;
+            public bool active, preparing, passRunning;
             public string failure, preparationPhase;
+            public string passPhase, passFailure;
+            public int passSide;
             public int expectedParts, preparedParts, preparationSteps;
             public double preparationMilliseconds, maxPreparationStepMilliseconds;
             public int parts, owners, residentOwners, queuedSamples, minimumTick, frames;
             public uint lastFlags;
+            public string firstFaultJson;
+            public int blockCapacity, residentCapacity;
             public long fieldBytes, renderBytes, velocityRamBytes, processMemory;
             public Vector3 origin;
             public float clock;
@@ -166,6 +176,108 @@ namespace OstrixMods.BuildWorks
         public bool SkipSimulation { get; set; }
         public string Failure { get; private set; }
         public Bounds PrefabBounds { get; private set; }
+        public string PassPhase { get; private set; } = "idle";
+        public int PassSide { get; private set; } = -1;
+        public string PassFailure { get; private set; }
+        public bool PassRunning => wallPass != null;
+        private bool wallLine;
+        private System.Collections.Generic.IEnumerator<object> wallPass;
+        private static BuildWorksTestFog movementOwner;
+        private Vector3 passDirection;
+
+        internal void InitializeWallLine(Player owner)
+        {
+            var prefab = ZNetScene.instance ? ZNetScene.instance.GetPrefab("woodwall") : null;
+            if (!prefab || !BlueprintPrefabMetadataCapture.TryGetLocalVisualBounds(prefab, out Bounds bounds, true))
+                throw new InvalidOperationException("Wall-line QA requires the native wall bounds.");
+            bounds = new Bounds(Vector3.Scale(bounds.center, prefab.transform.localScale), Vector3.Scale(bounds.size, prefab.transform.localScale));
+            var blueprint = new CompositeBlueprintStore.Blueprint { name = "Transient four-section wall" };
+            for (int i = 0; i < 4; ++i)
+                blueprint.parts.Add(new CompositeBlueprintStore.Part {
+                    prefabName = "woodwall", stableId = "qa-wall-line-" + i,
+                    position = new CompositeBlueprintStore.VectorData(new Vector3(i * 2 - 3 - bounds.center.x, -bounds.min.y, -bounds.center.z)),
+                    rotation = new CompositeBlueprintStore.QuaternionData(Quaternion.identity) });
+            // Reserve the single-wall transaction allowance for each of the four adjacent sections.
+            InitializeBlueprint(owner, blueprint, blockCapacity: 4 * 8192); wallLine = true;
+        }
+
+        public static string StartWallPass(int side)
+        {
+            BuildWorksTestIsolation.RequireLoadedSession();
+            var fog = Camera.main ? Camera.main.GetComponent<BuildWorksTestFog>() : null;
+            if (!fog || !fog.wallLine || !fog.Active || fog.wallPass != null || side < 0 || side > 3)
+                throw new InvalidOperationException("Prepared idle four-section wall and side 0..3 required.");
+            fog.PassFailure = null; fog.PassSide = side; fog.wallPass = fog.WallPass(side).GetEnumerator(); movementOwner = fog;
+            return "wall-pass-started";
+        }
+
+        private System.Collections.Generic.IEnumerable<object> WallPass(int side)
+        {
+            Vector3 direction = side == 0 ? Vector3.forward : side == 1 ? Vector3.back : side == 2 ? Vector3.right : Vector3.left;
+            float distance = side < 2 ? 2 : 5;
+            Vector3 centre = Origin;
+            try
+            {
+                PassPhase = "approach";
+                foreach (var step in WalkTo(centre - direction * distance)) yield return step;
+                PassPhase = "enter";
+                foreach (var step in WalkTo(centre)) yield return step;
+                player.SetMoveDir(Vector3.zero); player.SetRun(false); PassPhase = "hold";
+                float until = Time.realtimeSinceStartup + 2;
+                while (Time.realtimeSinceStartup < until) yield return null;
+                PassPhase = "exit";
+                foreach (var step in WalkTo(centre + direction * distance)) yield return step;
+                player.SetMoveDir(Vector3.zero); player.SetRun(false); PassPhase = "recovery";
+                until = Time.realtimeSinceStartup + 8;
+                while (Time.realtimeSinceStartup < until) yield return null;
+                PassPhase = "complete";
+            }
+            finally
+            {
+                if (movementOwner == this) movementOwner = null;
+                passDirection = Vector3.zero;
+                if (player) { player.SetMoveDir(Vector3.zero); player.SetRun(false); }
+            }
+        }
+
+        private System.Collections.Generic.IEnumerable<object> WalkTo(Vector3 target)
+        {
+            float deadline = Time.realtimeSinceStartup + 15;
+            while (true)
+            {
+                Vector3 delta = target - player.transform.position; delta.y = 0;
+                if (delta.magnitude <= .12f) { passDirection = Vector3.zero; yield break; }
+                if (Time.realtimeSinceStartup >= deadline) throw new InvalidOperationException("Wall pass did not reach its waypoint; route stopped.");
+                passDirection = delta.normalized * Mathf.Min(1, delta.magnitude / .5f);
+                yield return null;
+            }
+        }
+
+        private void FixedUpdate()
+        {
+            if (wallPass == null) return;
+            try
+            {
+                if (!Active || !player || player != Player.m_localPlayer || player.IsDead() || !network || network != ZNet.instance || Game.instance.IsShuttingDown())
+                    throw new InvalidOperationException("Wall pass lost the live QA session.");
+                if (wallPass.MoveNext()) return;
+            }
+            catch (Exception error) { PassFailure = error.Message; PassPhase = "failed"; }
+            wallPass.Dispose(); wallPass = null;
+        }
+
+        [HarmonyPatch(typeof(Player), nameof(Player.SetControls))]
+        private static class WallPassControls
+        {
+            private static void Postfix(Player __instance)
+            {
+                var owner = movementOwner;
+                if (!owner || owner.wallPass == null || owner.player != __instance || __instance != Player.m_localPlayer) return;
+                // Native SetControls otherwise overwrites world movement later in the same physics tick.
+                __instance.SetMoveDir(owner.passDirection); __instance.SetRun(false);
+                if (owner.passDirection.sqrMagnitude > .0001f) __instance.SetLookDir(owner.passDirection.normalized);
+            }
+        }
 
         internal void Initialize(Player owner, bool pair = false)
         {
@@ -203,7 +315,7 @@ namespace OstrixMods.BuildWorks
             catch { Cleanup(); throw; }
         }
 
-        internal void InitializeBlueprint(Player owner, CompositeBlueprintStore.Blueprint blueprint)
+        internal void InitializeBlueprint(Player owner, CompositeBlueprintStore.Blueprint blueprint, int blockCapacity = 8192)
         {
             player = BuildWorksTestIsolation.RequireLoadedSession(); network = ZNet.instance;
             if (owner != player) throw new InvalidOperationException("Fog QA player changed.");
@@ -215,7 +327,7 @@ namespace OstrixMods.BuildWorks
                 string path = System.IO.Path.GetFullPath(System.IO.Path.Combine(BepInEx.Paths.BepInExRootPath,
                     "..", "..", "Default", "BuildWorks", "artifacts", "fog-runtime-assets-candidate", "buildworks-fog-v11"));
                 assets = new BlueprintFogAssets(System.IO.File.ReadAllBytes(path));
-                channels = BlueprintFogChannels.CreateArena(assets, blueprint.parts.Count, 8192);
+                channels = BlueprintFogChannels.CreateArena(assets, blueprint.parts.Count, blockCapacity);
                 Bounds body = capsule.bounds;
                 building = new BlueprintFogBuilding(assets, channels, blueprint, name => ZNetScene.instance.GetPrefab(name),
                     player.transform.position + Vector3.right * 6, Quaternion.identity, body.center,
@@ -293,7 +405,14 @@ namespace OstrixMods.BuildWorks
         }
 
         private void Fail(Exception error)
-        { Failure = error.Message; Debug.LogError("BuildWorks fog QA stopped: " + Failure); enabled = false; }
+        {
+            Failure = error.Message;
+            firstFault = firstFault ?? channels?.FirstSnapshotFault;
+            if (wallPass != null) { PassFailure = Failure; PassPhase = "failed"; }
+            Debug.LogError("BuildWorks fog QA stopped: " + error + "\nFirst GPU fault: " + JsonUtility.ToJson(firstFault)); enabled = false;
+        }
+        private BlueprintFogChannels.SnapshotFault firstFault;
+        private string FirstFaultJson => (firstFault ?? channels?.FirstSnapshotFault) is BlueprintFogChannels.SnapshotFault fault ? JsonUtility.ToJson(fault) : "";
         public float SampleSurfaceDamage() => SampleAlpha(visual?.Simulation?.Surface);
         public float SampleSmokeDensity() => SampleAlpha(visual?.Simulation?.Smoke);
         public float SampleSecondSurfaceDamage() => SampleAlpha(second?.Simulation?.Surface);
@@ -321,6 +440,9 @@ namespace OstrixMods.BuildWorks
         private void OnDestroy() => Cleanup();
         private void Cleanup()
         {
+            if (movementOwner == this) movementOwner = null;
+            passDirection = Vector3.zero;
+            var movement = wallPass; wallPass = null; movement?.Dispose();
             var pending = preparation; preparation = null;
             try { pending?.Dispose(); }
             finally

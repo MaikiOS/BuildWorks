@@ -85,7 +85,12 @@ namespace OstrixMods.BuildWorks
                     var source = sources[index]; var owner = source.Snapshot;
                     if (source.Removed) { if (owner == null) source.Close(); continue; }
                     if (source.Inputs.Faulted || (owner != null && owner.State.State == BlueprintFogSnapshotState.Phase.Faulted))
-                    { source.Error = "Fog source failed; published state and accepted history retained."; continue; }
+                    {
+                        source.Error = "Fog source failed: inputFaulted=" + source.Inputs.Faulted + ", state=" + owner?.State.State +
+                            ", flags=" + owner?.LastFlags + ", queued=" + source.Inputs.Count + ", pending=" + source.Inputs.PendingCount +
+                            "; published state and accepted history retained.";
+                        continue;
+                    }
                     if (owner == null)
                     {
                         // Start at the original baseline, including every accepted idle observation.

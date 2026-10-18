@@ -6,6 +6,17 @@ namespace OstrixMods.BuildWorks
 {
     internal sealed partial class BlueprintFogChannels
     {
+        [Serializable] internal sealed class SnapshotFault
+        {
+            public int slot, tick, emissionRevision, confirmedTick, queued, pending, expectedBase;
+            public long owner, generation, sequence;
+            public bool receiptValid, metadataOnly;
+            public float committedClock, firstClock, lastClock;
+            public uint[] receipt;
+            public string reason;
+        }
+        internal SnapshotFault FirstSnapshotFault { get; private set; }
+
         // Strict snapshots never expose the speculative solver as an ordinary committed simulation.
         internal sealed class SnapshotChannel
         {
@@ -239,8 +250,9 @@ namespace OstrixMods.BuildWorks
                     finally { owner.nativePending = false; }
                 });
             }
-            catch
+            catch (Exception error)
             {
+                RecordSnapshotFault(owner, token, null, false, pendingBase, "submission: " + error);
                 owner.nativePending = false; owner.Inputs.Complete(token, BlueprintFogSnapshotState.Completion.Unknown);
                 owner.pendingBatch = false; owner.Error = "Fog dispatch/readback submission failed."; snapshotTeardown = true; throw;
             }
@@ -261,6 +273,8 @@ namespace OstrixMods.BuildWorks
                 bool valid = words != null && words.Length == 16 && Long(words[0], words[1]) == token.Owner && Long(words[2], words[3]) == token.Generation &&
                     Long(words[4], words[5]) == token.Sequence && words[6] == token.Tick && words[7] == token.EmissionRevision && (words[8] & ~15u) == 0 && words[9] == expectedBase;
                 var outcome = !valid ? BlueprintFogSnapshotState.Completion.Unknown : words[8] == 0 ? BlueprintFogSnapshotState.Completion.Committed : BlueprintFogSnapshotState.Completion.Rejected;
+                if (outcome != BlueprintFogSnapshotState.Completion.Committed)
+                    RecordSnapshotFault(owner, token, words, valid, expectedBase, valid ? "GPU rejected" : "receipt invalid or unavailable");
                 if (outcome == BlueprintFogSnapshotState.Completion.Committed && !owner.Inputs.PendingMetadataOnly) owner.Bank = 1 - owner.Bank;
                 if (!owner.Inputs.Complete(token, outcome)) throw new InvalidOperationException("Fog channel lost its pending identity.");
                 owner.LastSubmission = token; owner.LastCompletion = outcome; owner.LastFlags = valid ? words[8] : uint.MaxValue;
@@ -275,6 +289,21 @@ namespace OstrixMods.BuildWorks
             PollSnapshotVelocity();
             foreach (var owner in snapshotSlots) if (owner != null && owner.evictionPending) complete = false;
             return complete;
+        }
+
+        private void RecordSnapshotFault(SnapshotChannel owner, BlueprintFogSnapshotState.Submission token, uint[] words,
+            bool valid, int expectedBase, string reason)
+        {
+            // Complete clears pending observations; retain the first fault before teardown loses its evidence.
+            if (FirstSnapshotFault != null) return;
+            FirstSnapshotFault = new SnapshotFault {
+                slot = owner.Slot, owner = token.Owner, generation = token.Generation, sequence = token.Sequence,
+                tick = token.Tick, emissionRevision = token.EmissionRevision, confirmedTick = owner.State.ConfirmedTick,
+                queued = owner.Inputs.Count, pending = owner.Inputs.PendingCount, expectedBase = expectedBase,
+                metadataOnly = owner.Inputs.PendingMetadataOnly, receiptValid = valid, committedClock = owner.Inputs.Committed.Clock,
+                firstClock = owner.Inputs.At(0).Clock, lastClock = owner.Inputs.At(owner.Inputs.Count - 1).Clock,
+                receipt = words == null ? null : (uint[])words.Clone(), reason = reason
+            };
         }
 
         internal bool TryGetRecoveredSnapshot(SnapshotChannel owner)

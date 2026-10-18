@@ -51,12 +51,13 @@ namespace OstrixMods.BuildWorks
         public string StartFogVisual() => BeginFogVisual(false);
         public string StartFogPair() => BeginFogVisual(true);
         public string StartFogHouse(string blueprintId) => BeginFogVisual(false, blueprintId);
+        public string StartFogWallLine() => BeginFogVisual(false, wallLine: true);
         public string StartFogHouseManual(string blueprintId)
         {
             string result = StartFogHouse(blueprintId); manualFogUntil = Time.realtimeSinceStartup + 300;
             return result + "-manual-300-seconds";
         }
-        private string BeginFogVisual(bool pair, string blueprintId = null)
+        private string BeginFogVisual(bool pair, string blueprintId = null, bool wallLine = false)
         {
             player = BuildWorksTestIsolation.RequireLoadedSession(); network = ZNet.instance;
             if (running != null || capture != null || !SafeSession()) throw new InvalidOperationException("Focused idle isolated QA session required.");
@@ -65,9 +66,10 @@ namespace OstrixMods.BuildWorks
             CloseFogVisual(); fog = camera.gameObject.AddComponent<BuildWorksTestFog>();
             try
             {
-                if (blueprintId == null) fog.Initialize(player, pair);
+                if (wallLine) fog.InitializeWallLine(player);
+                else if (blueprintId == null) fog.Initialize(player, pair);
                 else fog.InitializeBlueprint(player, BuildWorksPlugin.QaBlueprint(blueprintId));
-                return blueprintId != null ? "fog-v11-native-house-preparing" : pair ? "fog-v11-native-pair-active" : "fog-v11-native-visual-active";
+                return wallLine ? "fog-v11-native-wall-line-preparing" : blueprintId != null ? "fog-v11-native-house-preparing" : pair ? "fog-v11-native-pair-active" : "fog-v11-native-visual-active";
             }
             catch { CloseFogVisual(); throw; }
         }

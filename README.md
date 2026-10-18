@@ -6,9 +6,9 @@ BuildWorks extends Valheim's hammer with precise construction, a blueprint catal
 
 ![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
 
-**Current source / isolated QA: 0.19.219.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
+**Current source / isolated QA: 0.19.220.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
 
-**QA .219 installed: house preparation no longer stalls the main thread for15s.** ValheimQA28/28, handler0.11s, whole preparation30.32s in steps ≤45.71ms; cancel/inventory/cleanup passed. v11 appearance/animation/FPS/board remain open. [Evidence and limits](docs/CHECKPOINT_219.md).
+**QA .220 installed: one four-section long wall recorded from four directions.** ValheimQA18/18+39/39; storage flags2 diagnosed and corrected for the bounded four-wall fixture. v11 parity/numeric recovery/FPS/house/board remain open. [Evidence and limits](docs/CHECKPOINT_220.md).
 
 ## Capabilities
 

@@ -6,6 +6,7 @@ This records changes and evidence, not future milestones. Historical results ret
 
 | Checkpoint | Change / evidence | Boundary |
 | --- | --- | --- |
+| 2026-10-18 · .220 | [.220](CHECKPOINT_220.md): one4-section wall,4 recorded directions,18/18+39/39; flags2 receipt/four-wall reserve, Unity6 retention, bridge58 tests; installed/restored. | No numeric v11 parity/FPS/house-budget/board acceptance. |
 | 2026-10-18 · .219 | [.219](CHECKPOINT_219.md): cooperative preparation/cancel, Unity15, native28/28; handler0.11s/full30.32s/max45.71ms, inventory/cleanup; installed/restored. | No continuous house appearance/recovery/FPS/board acceptance. |
 | 2026-10-18 · .218 | [.218](CHECKPOINT_218.md): strict real-house QA renderer, Unity4 dense comparisons; native28/7/contact/hold/exit/5 PNG/cleanup; installed/restored. | Setup>15s remains failed; no continuous animation/fidelity/FPS/board acceptance. |
 | 2026-10-18 · .217 | [.217](CHECKPOINT_217.md): exact GPU↔RAM paging; Unity28/7,2688/196/8contacts; ValheimQA8/8, installed, bridge restored. | Procedural paging/resource proof; actual house/visuals/FPS/board/network open. |

@@ -1,6 +1,6 @@
 # Approved v11 integration
 
-**Current .219:** cooperative QA-house preparation: ValheimQA28/28, handler0.11s/full30.32s/max45.71ms; cancellation/inventory/cleanup passed. Prior .218 traversal retained; continuous appearance/numeric recovery/FPS/durable board remain open. [Current evidence](CHECKPOINT_219.md). Normal construction still uses the previous backend.
+**Current .220:** one four-section wall recorded in4directions, ValheimQA18/18+39/39; flags2/free2800/wanted2834 proved and bounded reserve corrected. Numeric recovery/approved v11 parity/house/FPS/durable board remain open. [Current evidence](CHECKPOINT_220.md). Normal construction uses the previous backend.
 
 ## Historical .213 diagnosis and subsequent experiments (superseded by the current evidence above)
 

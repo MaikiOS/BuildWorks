@@ -110,8 +110,10 @@ namespace OstrixMods.BuildWorks
             if (published != null)
             {
                 channels.PumpSources();
-                foreach (var part in parts) if (part.LogicalSource.Error != null || part.LogicalSource.Inputs.Faulted)
-                    throw new InvalidOperationException(part.LogicalSource.Error ?? "Fog building input history is full; state retained.");
+                for (int i = 0; i < parts.Count; ++i)
+                    if (parts[i].LogicalSource.Error != null || parts[i].LogicalSource.Inputs.Faulted)
+                        throw new InvalidOperationException("Fog part " + i + ": " +
+                            (parts[i].LogicalSource.Error ?? "Fog building input history is full; state retained."));
             }
         }
         internal void PrepareRender()

@@ -280,7 +280,13 @@ namespace OstrixMods.BuildWorks
             return false;
         }
 
-        internal void RetireSnapshot(SnapshotChannel owner) { RequireOwner(owner); owner.State.Retire(); }
+        internal void RetireSnapshot(SnapshotChannel owner)
+        {
+            RequireOwner(owner);
+            if (sources.Exists(source => ReferenceEquals(source.Snapshot, owner) && !source.Removed))
+                throw new InvalidOperationException("A live fog source retains its state until explicit removal.");
+            owner.State.Retire();
+        }
         internal bool TryReleaseSnapshot(SnapshotChannel owner)
         {
             RequireOwner(owner);

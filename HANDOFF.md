@@ -2,12 +2,12 @@
 
 2026-10-18 · [Русский](HANDOFF_RU.md)
 
-**QA .214 installed: screen rectangle and imported editor card focus fixed.** Unity48/3, normal/QA0/0,131CPU groups, host/control/isolation/localization1104 passed;143 profile data files unchanged. Valheim .214 is untested. A separate GPU experiment exactly restored all4 fields,3 ledgers and CPU integration state at4 v11 checkpoints; this private synchronous16.7–25.1ms path is not a production solution. Eight seconds of replay still fail fidelity. Building does not activate the new fog backend; the working bundle is unchanged. [Changes, limits and two owner checks](docs/CHECKPOINT_214.md).
+**QA .215 installed: height-edit completion refreshes volume membership.** Unity48/3/4; actual background Valheim40/40 plus identity40/40, unchanged inventory, normal exit/bridge restored. Strict v11 passed56 exact and18 visual GPU comparisons across continuous idle/reentry; Building does not activate it yet. House28/board/network remain open. [Changes and limits](docs/CHECKPOINT_215.md).
 
 1. Read [PROJECT_CONTRACT](PROJECT_CONTRACT.md), [current evidence](docs/CURRENT_STATUS.md), [forward roadmap](docs/ROADMAP.md) and project AGENTS. Preserve the complete goal; this file is not a goal API update.
-2. Source and installed QA0.19.214; DLL SHA A57FB813C53C20C2C271765C8AD40A9F7BF3841578BBEFC2D1FEE1233156E2D4. [Report .214](docs/CHECKPOINT_214.md). Public binary .37 alpha is unchanged.
+2. Source and installed QA0.19.215; DLL SHA 328CCC9841FCA6B21529F52CD89D177684E09D8974D48A7D59E5E1FA75AC39AE. [Report .215](docs/CHECKPOINT_215.md). Public binary .37 alpha is unchanged.
 
-Results below retain their original checkpoint versions; the current installation is stated above. Next integration work is bounded fog-state preservation; a durable project requires its own server journal, not storage WAL.
+Results below retain their original checkpoint versions; the current installation is stated above. Next integration work is exact whole-house memory/domain admission; a durable project requires its own server journal, not storage WAL.
 
 [.213](docs/FOG_NOISE_FRAME_213.md) aligns noise phases across parts; GPU checks/regressions passed and QA is installed. Native .213 is untested; boundary loss, recovery ownership and performance remain open.
 

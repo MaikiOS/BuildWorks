@@ -2,9 +2,9 @@
 
 **2026-10-18 · [Русский](CURRENT_STATUS_RU.md) · [Roadmap](ROADMAP.md) · [Documentation](README.md)**
 
-**QA .214 installed: screen rectangle and imported editor card focus fixed.** Unity48/3, normal/QA0/0,131CPU groups, host/control/isolation/localization1104 passed;143 profile data files unchanged. Valheim .214 is untested. A separate GPU experiment exactly restored all4 fields,3 ledgers and CPU integration state at4 v11 checkpoints; this private synchronous16.7–25.1ms path is not a production solution. Eight seconds of replay still fail fidelity. Building does not activate the new fog backend; the working bundle is unchanged. [Changes, limits and two owner checks](CHECKPOINT_214.md).
+**QA .215 installed: height-edit completion refreshes volume membership.** Unity48/3/4; actual background Valheim40/40 plus identity40/40, unchanged inventory, normal exit/bridge restored. Strict v11 passed56 exact and18 visual GPU comparisons across continuous idle/reentry; Building does not activate it yet. House28/board/network remain open. [Changes and limits](CHECKPOINT_215.md).
 
-Source and installed isolated QA build: **0.19.214**. Tested host: Valheim 1.0.20, Steam build25909357. Latest published binary is the historical [0.19.37 alpha prerelease](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha); its ZIP does not contain the current changes. There is no stable release. Source synchronization is not binary publication.
+Source and installed isolated QA build: **0.19.215**. Tested host: Valheim 1.0.20, Steam build25909357. Latest published binary is the historical [0.19.37 alpha prerelease](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha); its ZIP does not contain the current changes. There is no stable release. Source synchronization is not binary publication.
 
 | Area | Implemented / automated evidence | Valheim or user evidence | Still open |
 | --- | --- | --- | --- |

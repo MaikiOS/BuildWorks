@@ -14,11 +14,11 @@ using Object = UnityEngine.Object;
 
 // Actual HUD/catalog methods in Unity; external Valheim host types remain Workbench substitutes.
 [InitializeOnLoad]
-public static class ReleaseRegression214
+public static class ReleaseRegression
 {
     private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
-    private const string Pending = "BuildWorks.Release214.Pending";
-    static ReleaseRegression214()
+    private const string Pending = "BuildWorks.ReleaseRegression.Pending";
+    static ReleaseRegression()
     {
         EditorApplication.playModeStateChanged += state => {
             if (state != PlayModeStateChange.EnteredPlayMode || !SessionState.GetBool(Pending, false)) return;
@@ -36,7 +36,7 @@ public static class ReleaseRegression214
     }
     private static void Check()
     {
-        string root = Path.GetFullPath(Path.Combine(Application.dataPath, "../../..")), output = Path.Combine(root, "artifacts/release-214");
+        string root = Path.GetFullPath(Path.Combine(Application.dataPath, "../../..")), output = Path.Combine(root, "artifacts/release-regression");
         Directory.CreateDirectory(output);
         var eventHost = new GameObject("Release event system", typeof(EventSystem));
         var fontHost = new GameObject("Release font", typeof(RectTransform), typeof(TextMeshProUGUI));
@@ -107,15 +107,41 @@ public static class ReleaseRegression214
                 Require(!view.ShowImportedCatalog(items, new CompositeBlueprintStore.Blueprint { id = imported.id, importSource = "absent.blueprint" }) &&
                     EventSystem.current.currentSelectedGameObject == before, "Absent import source changed selection."); ++catalogCases;
             }
-            Require(rectangles == 48 && catalogCases == 3, "Release regression coverage incomplete.");
-            File.WriteAllText(Path.Combine(output, "ui-verification.json"), JsonUtility.ToJson(new Result { passed = true, rectangles = rectangles, catalogCases = catalogCases }, true));
-            Debug.Log("BUILDWORKS_RELEASE214_OK");
+            int heightControls = CheckHeightControl(font);
+            Require(rectangles == 48 && catalogCases == 3 && heightControls == 4, "Release regression coverage incomplete.");
+            File.WriteAllText(Path.Combine(output, "ui-verification.json"), JsonUtility.ToJson(new Result { passed = true, rectangles = rectangles, catalogCases = catalogCases, heightControls = heightControls }, true));
+            Debug.Log("BUILDWORKS_RELEASE_REGRESSION_OK");
         }
         finally { if (ownedFont && !EditorUtility.IsPersistent(ownedFont)) Object.DestroyImmediate(ownedFont); Object.DestroyImmediate(fontHost); Object.DestroyImmediate(eventHost); }
+    }
+    private static int CheckHeightControl(TMP_Text label)
+    {
+        var host = new GameObject("Height control", typeof(RectTransform), typeof(Image), typeof(TMP_InputField), typeof(AngleDragControl));
+        try
+        {
+            var input = host.GetComponent<TMP_InputField>(); input.textComponent = label; input.enabled = false;
+            var control = host.GetComponent<AngleDragControl>(); int previews = 0, finished = 0;
+            control.Initialize(delta => { ++previews; control.SetValue(control.Value + delta, "height"); }, input, label, false, .05f, -512, 512);
+            control.EditFinished = () => { Require(!input.enabled, "Height completion retained text input."); ++finished; };
+            var drag = new PointerEventData(EventSystem.current) { button = PointerEventData.InputButton.Left };
+            control.OnBeginDrag(drag);
+            for (int i = 1; i <= 64; ++i) { drag.position = new Vector2(i, 0); control.OnDrag(drag); }
+            Require(previews == 64 && finished == 0, "Height preview ran completion before release.");
+            control.OnEndDrag(drag); control.OnEndDrag(drag); Require(finished == 1, "Height drag completion duplicated or missing.");
+            control.OnScroll(new PointerEventData(EventSystem.current) { scrollDelta = Vector2.up });
+            Require(finished == 2, "Height wheel did not complete.");
+            control.OnPointerClick(new PointerEventData(EventSystem.current) { button = PointerEventData.InputButton.Right });
+            Require(finished == 3 && control.Value == 0, "Height reset did not complete.");
+            control.OnPointerClick(new PointerEventData(EventSystem.current) { button = PointerEventData.InputButton.Left });
+            input.onValueChanged.Invoke("12.5"); Require(input.enabled && finished == 3, "Text preview ended the gesture.");
+            input.onEndEdit.Invoke("12.5"); Require(finished == 4 && control.Value == 12.5f, "Height text completion failed.");
+            return finished;
+        }
+        finally { Object.DestroyImmediate(host); }
     }
     private static BlueprintEditorCatalogItem Item(CompositeBlueprintStore.Blueprint blueprint, int index)
         => new BlueprintEditorCatalogItem("blueprint_" + blueprint.id, blueprint.name, null, blueprint.category, "Blueprints", "source", index, blueprint);
     private static void Set(object target, string name, object value) => target.GetType().GetField(name, Private).SetValue(target, value);
     private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
-    [Serializable] private sealed class Result { public bool passed, gameHostTested = false; public int rectangles, catalogCases; }
+    [Serializable] private sealed class Result { public bool passed, gameHostTested = false; public int rectangles, catalogCases, heightControls; }
 }

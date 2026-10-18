@@ -10,13 +10,18 @@ namespace OstrixMods.BuildWorks.GeometryTests
             => new BlueprintFogInputQueue.Sample(time, new Point3(x, 1, 0), .3f, .95f, true, contact, true);
         internal static void Run()
         {
-            var queue = new BlueprintFogInputQueue(Sample(0, contact: false));
-            queue.TrackDormant(Sample(.1f, 1, false));
-            Require(queue.Owner == null && queue.Count == 0 && queue.Committed.Clock == .1f, "Dormant baseline allocated input/state.");
-            Reject(() => queue.TrackDormant(Sample(.11f)));
+            var idle = new BlueprintFogInputQueue(Sample(0, contact: false));
+            idle.Capture(Sample(.1f, 1, false));
+            Require(idle.Owner == null && idle.Count == 1 && idle.Committed.Clock == 0 && idle.At(0).Clock == .1f,
+                "Idle input silently advanced the uncomputed baseline.");
+            idle.Attach(new BlueprintFogSnapshotState(5, 1));
+            Require(idle.TryBegin(out var idleToken) && idleToken.Tick == 3 && idle.PendingCount == 1,
+                "Initial idle observation was not submitted as real fixed steps.");
+            idle.Complete(idleToken, BlueprintFogSnapshotState.Completion.Committed);
+            Require(idle.Count == 0 && idle.Committed.Clock == .1f, "Idle baseline advanced before its confirmed computation.");
+            var queue = new BlueprintFogInputQueue(Sample(.1f, 1, false));
             queue.Capture(Sample(.2f, 2)); queue.Capture(Sample(.3f, 3, false));
             Require(queue.HasEmission && !queue.TryBegin(out _) && queue.Count == 2, "Waiting for a slot lost an accepted path.");
-            Reject(() => queue.TrackDormant(Sample(.31f, contact: false)));
             Reject(() => queue.Attach(new BlueprintFogSnapshotState(1, 1)));
             var a = new BlueprintFogSnapshotState(1, 1, 3); queue.Attach(a);
             Reject(() => queue.Attach(a)); Reject(() => queue.Detach(a));

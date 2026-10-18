@@ -165,49 +165,44 @@ public static class FogRuntimeRecoveryCheck
                         new Vector3(-1, 0, -1), new Vector3(1, 2, 1), new Vector3((float)initial.Actor.X, (float)initial.Actor.Y, (float)initial.Actor.Z), 37,
                         initialClock: initial.Clock, scratch: scratch, stagedState: staged);
                 var a = pool.RegisterSnapshotSource(Sample(0, 0, false), Make, () => ++releasedSources);
-                var b = pool.RegisterSnapshotSource(Sample(0, 0, false), Make, () => ++releasedSources);
-                pool.CaptureSource(a, Sample(.005f, 1)); pool.CaptureSource(b, Sample(.005f, -1)); pool.PumpSources();
+                bool full = false;
+                try { pool.RegisterSnapshotSource(Sample(0, 0, false), Make, () => ++releasedSources); }
+                catch (InvalidOperationException) { full = true; }
+                Require(full && pool.Count == 0 && releasedSources == 0, "Logical admission exceeded its resident reservation or mutated GPU/release state.");
+                pool.CaptureSource(a, Sample(.005f, 1, false)); pool.PumpSources();
                 var old = a.Snapshot;
-                Require(old != null && b.Snapshot == null && b.Inputs.Count == 1, "Occupied slot dropped or evicted a waiting source");
-                pool.CaptureSource(a, Sample(.01f, 2, false)); pool.CaptureSource(b, Sample(.01f, -2));
+                Require(old != null && a.Inputs.PendingCount == 1, "Initial idle observation was discarded instead of submitted.");
+                pool.CaptureSource(a, Sample(.01f, 2, false));
                 for (int frame = 0; frame < 6; ++frame) yield return null;
                 pool.PumpSources();
-                Require(old.recoveryNativePending && a.Inputs.Count == 1 && a.Inputs.Committed.Clock == .005f, "Recovery barrier did not retain its queued noncontact tail");
-                pool.CaptureSource(a, Sample(.02f, 3)); pool.PumpSources();
-                Require(old.State.State == BlueprintFogSnapshotState.Phase.Pending && a.Inputs.PendingCount == 2, "Reentry during recovery did not replay the accepted path");
+                Require(a.Inputs.Committed.Clock == .005f && a.Inputs.PendingCount == 1, "Pending idle tail was lost or replayed early.");
+                pool.CaptureSource(a, Sample(.02f, 3));
                 for (int frame = 0; frame < 6; ++frame) yield return null;
                 pool.PumpSources();
-                Require(!old.recoveryNativePending && !old.State.CanReleaseResources, "Empty ledger retired a source while the latest observation still had contact");
+                Require(a.Inputs.Committed.Clock == .01f && a.Inputs.PendingCount == 1, "Reentry replaced an accepted noncontact path.");
+                for (int frame = 0; frame < 6; ++frame) yield return null;
+                pool.PumpSources();
+                Require(a.Inputs.Committed.Clock == .02f && a.Inputs.Count == 0 && ReferenceEquals(old, a.Snapshot), "Reentry reset the resident generation.");
                 pool.CaptureSource(a, Sample(.025f, 4, false)); pool.PumpSources();
                 for (int frame = 0; frame < 6; ++frame) yield return null;
                 pool.PumpSources();
-                Require(old.State.CanReleaseResources, "Recovered source did not retire while retaining noncontact tail");
+                var empty = new uint[1]; old.Ledger[2].GetData(empty);
+                Require(empty[0] == 0 && ReferenceEquals(old, a.Snapshot) && old.Velocity && !old.State.CanReleaseResources && !old.recoveryNativePending,
+                    "Recovered owner retired, reset state, or stalled idle batches on redundant recovery reads.");
+                bool guarded = false; try { pool.RetireSnapshot(old); } catch (InvalidOperationException) { guarded = true; }
+                Require(guarded && old.State.State == BlueprintFogSnapshotState.Phase.Ready, "Live source allowed a cold generation restart.");
                 pool.CaptureSource(a, Sample(.026f, 5)); pool.PumpSources();
-                Require(a.Inputs.Count == 2 && a.Snapshot == old && b.Snapshot == null, "Reentry undid retirement or lost its accepted tail");
+                Require(ReferenceEquals(old, a.Snapshot) && a.Inputs.PendingCount == 1, "Recovery reentry changed identity or dropped input.");
+                pool.RemoveSource(a);
+                Require(!a.Released && old.Velocity && releasedSources == 0, "Removal released source textures before its pending GPU batch.");
                 for (int frame = 0; frame < 6; ++frame) yield return null;
                 pool.PumpSources();
-                Require(b.Snapshot != null && a.Snapshot == null && a.Inputs.Count == 2 && !old.Velocity,
-                    "Retiring source seized the slot before the waiting source");
-                var retiring = b.Snapshot; pool.RemoveSource(b);
-                Require(releasedSources == 0 && retiring.Velocity, "Removing source freed borrowed textures before GPU drain");
+                Require(!a.Released && old.Velocity && old.releasePending, "Removal skipped the GPU release confirmation.");
                 for (int frame = 0; frame < 6; ++frame) yield return null;
                 pool.PumpSources();
+                Require(a.Released && releasedSources == 1 && !old.Velocity && a.Inputs.Committed.Clock == .026f && pool.Count == 0,
+                    "Explicit removal lost its accepted pending tail or duplicated release.");
                 for (int frame = 0; frame < 6; ++frame) yield return null;
-                pool.PumpSources();
-                Require(b.Released && releasedSources == 1 && !retiring.Velocity && a.Snapshot != null && a.Snapshot.Generation > old.Generation &&
-                    a.Inputs.Committed.Clock == .02f && a.Inputs.PendingCount == 2 && old.State.CanReleaseResources,
-                    "Source removal/reacquisition changed its baseline, old generation or queued replay");
-                for (int frame = 0; frame < 6; ++frame) yield return null;
-                pool.PumpSources(); pool.CaptureSource(a, Sample(.027f, 6, false));
-                bool drained = false;
-                for (int frame = 0; frame < 120; ++frame)
-                {
-                    yield return null; pool.PumpSources();
-                    if (a.Snapshot == null && a.Inputs.Count == 0) { drained = true; break; }
-                }
-                Require(drained && a.Inputs.Committed.Clock == .027f && a.Inputs.Committed.Actor.X == 6,
-                    "Noncontact accepted tail was dropped or empty generations retired before replaying it");
-                pool.RemoveSource(a); Require(a.Released && releasedSources == 2, "Dormant source cleanup was not exactly once");
                 bool closed = false; try { pool.CaptureSource(a, Sample(.028f, 7)); } catch (ArgumentException) { closed = true; }
                 Require(closed, "Removed logical source accepted input");
                 var failing = pool.RegisterSnapshotSource(Sample(.03f, 0, false), (scratch, staged, initial) => {
@@ -218,18 +213,18 @@ public static class FogRuntimeRecoveryCheck
                 Require(failed && pool.RequiresSnapshotTeardown && pool.Count == 1 && failing.Snapshot == null,
                     "Failed source initialization did not retain its orphaned GPU owner");
                 pool.RemoveSource(failing);
-                Require(!failing.Released && releasedSources == 2, "Failed initialization released borrowed source before whole-pool drain");
+                Require(!failing.Released && releasedSources == 1, "Failed initialization released borrowed source before whole-pool drain");
                 pool.Dispose(); pool.Dispose();
-                Require(failing.Released && releasedSources == 3 && pool.Count == 0, "Failed initialization cleanup was early, duplicated or omitted");
+                Require(failing.Released && releasedSources == 2 && pool.Count == 0, "Failed initialization cleanup was early, duplicated or omitted");
             }
-            Require(releasedSources == 3 && Time.frameCount - sourceStartFrame >= 42, "Source teardown duplicated release or did not run real frames");
+            Require(releasedSources == 2 && Time.frameCount - sourceStartFrame >= 42, "Source teardown duplicated release or did not run real frames");
             int frames = Time.frameCount - firstFrame; Require(frames >= 48, "Recovery check did not advance real player frames");
             File.WriteAllText(Path.Combine(output, "verification.json"), JsonUtility.ToJson(new Report {
                 passed = true, expiredHandleObserved = true, delayedReadbackRetained = true,
                 staleRecoveryRejected = true, pendingDisposeSafe = true, snapshotRecoveryValidated = true,
                 snapshotWorkspaceIsolated = true, snapshotGenerationReuse = true, snapshotPendingRetirement = true,
                 snapshotSmokeAndSurfaceRetained = true, snapshotReadbackFailureRetained = true,
-                logicalSourcesValidated = true, sourceFairness = true, sourceRecoveryReentry = true, sourceRetirementReentry = true,
+                logicalSourcesValidated = true, sourceResidentEmptyState = true, sourceAdmissionBounded = true, sourceRecoveryReentry = true, sourceExplicitRetireGuarded = true,
                 sourceRemovalAfterDrain = true, sourceAcceptedTailReplayed = true, sourceFrames = Time.frameCount - sourceStartFrame,
                 sourceFailedAcquireRetained = true,
                 frames = frames, gameHostTested = false }, true));
@@ -246,7 +241,7 @@ public static class FogRuntimeRecoveryCheck
         public bool passed, expiredHandleObserved, delayedReadbackRetained, staleRecoveryRejected, pendingDisposeSafe, gameHostTested;
         public bool snapshotRecoveryValidated, snapshotWorkspaceIsolated, snapshotGenerationReuse, snapshotPendingRetirement;
         public bool snapshotSmokeAndSurfaceRetained, snapshotReadbackFailureRetained;
-        public bool logicalSourcesValidated, sourceFairness, sourceRecoveryReentry, sourceRetirementReentry, sourceRemovalAfterDrain, sourceAcceptedTailReplayed;
+        public bool logicalSourcesValidated, sourceResidentEmptyState, sourceAdmissionBounded, sourceRecoveryReentry, sourceExplicitRetireGuarded, sourceRemovalAfterDrain, sourceAcceptedTailReplayed;
         public bool sourceFailedAcquireRetained;
         public int sourceFrames;
         public int frames;

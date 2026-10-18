@@ -389,10 +389,9 @@ public static class FogPublishedRenderCheck
                     for (int i = 0; i < image.Length; ++i) local = Math.Max(local, Math.Max(Math.Abs(baseline[i].r - image[i].r), Math.Max(Math.Abs(baseline[i].g - image[i].g), Math.Abs(baseline[i].b - image[i].b))));
                     if (continuousControl)
                     {
-                        report.continuousIdleMaxLocalDelta = local;
-                        report.continuousV11Parity = false;
-                        Require(local >= .03, "Continuous idle velocity control no longer reproduces the known fidelity blocker; reassess it.");
-                        report.continuousIdleControlSensitive = true; continue;
+                        report.coldIdleMaxLocalDelta = local;
+                        Require(local >= .03, "Cold-start negative control is not sensitive to lost idle velocity.");
+                        report.coldIdleControlSensitive = true; continue;
                     }
                     report.logicalVisualMaxMeanDelta = Math.Max(report.logicalVisualMaxMeanDelta, delta);
                     report.logicalVisualMaxLocalDelta = Math.Max(report.logicalVisualMaxLocalDelta, local);
@@ -400,29 +399,70 @@ public static class FogPublishedRenderCheck
                     ++report.logicalVisualComparisons;
                 }
             }
+            void CompareFields()
+            {
+                var owner = actual.Snapshot;
+                Require(owner != null && owner.State.State == BlueprintFogSnapshotState.Phase.Ready, "Continuous comparison requires confirmed state.");
+                pool.BindSnapshot(owner); pool.SnapshotArena.Dispatch("BeginStep"); pool.SnapshotArena.Dispatch("RestoreFields", 24, 20, 20);
+                var scratch = pool.SnapshotArena.Scratch;
+                using (var codec = new FogSparseStorageProbe())
+                {
+                    codec.BeginComparison(); codec.Compare(scratch.ReadColour, expected.Simulation.Smoke);
+                    codec.Compare(scratch.ReadOrigin, FogRuntimeSparseCheck.Current(expected.Simulation, "origin"));
+                    codec.Compare(scratch.ReadSurface, expected.Simulation.Surface); codec.Compare(owner.Velocity, expected.Simulation.Flow);
+                    for (int i = 0; i < 3; ++i) codec.Compare(owner.Ledger[i], FogRuntimeSparseCheck.Buffer(expected.Simulation, new[] { "away", "peak", "state" }[i]));
+                    codec.RequireClean(); report.continuousStateComparisons += 7;
+                }
+            }
             for (int i = 1; i <= 16; ++i)
             {
                 Vector3 actor = i <= 8 ? Vector3.up * .95f : outside;
                 actual.AdvanceTo(i * .2f, actor, body, false); expected.AdvanceTo(i * .2f, actor, body, false); pool.PumpSources();
-                Require(actual.Snapshot == null && actual.LogicalSource.Inputs.Count == 0, "Dormant visual queued an idle simulation.");
+                AsyncGPUReadback.WaitAllRequests(); pool.PumpSources();
+                Require(actual.Snapshot != null && actual.LogicalSource.Inputs.Count == 0, "Idle visual lost its resident solver or accepted input.");
                 if (i == 8)
                     foreach (var material in actual.Source.Parts.Concat(expected.Source.Parts).SelectMany(part => part.Renderer.sharedMaterials))
                         material.SetFloat("_Accumulated", 0); // Exercise GhostClear as well as the accumulated geometry variant.
-                if (i == 8 || i == 16) Compare("dormant-" + i);
+                if (i == 8 || i == 16) { Compare("resident-idle-" + i); CompareFields(); }
             }
             Vector3 inside = Vector3.up * .95f;
             actual.AdvanceTo(3.4f, inside, body, true); expected.AdvanceTo(3.4f, inside, body, true); pool.PumpSources();
             Require(actual.Snapshot != null && actual.Snapshot.State.State == BlueprintFogSnapshotState.Phase.Pending, "Visual contact did not submit its queued path.");
-            AsyncGPUReadback.WaitAllRequests(); Compare("continuous-idle-failing-gate", true);
-            // Integration oracle starts at the same dormant baseline. The continuous v11 failure remains separately recorded above.
-            expected.Simulation.Dispose();
-            var late = new BlueprintFogSimulation(assets, expected.Source.Shape, expected.Source.Pigment, expected.Source.Noise,
-                expected.FieldMinimum, expected.FieldMaximum, expected.Source.Minimum, expected.Source.Maximum, outside, 37, initialClock: 3.2f);
-            typeof(BlueprintFogVisual).GetField("simulation", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).SetValue(expected, late);
-            expected.AdvanceTo(3.4f, inside, body, true); Compare("late-start-contact-before-confirmation");
+            AsyncGPUReadback.WaitAllRequests(); Compare("continuous-idle-before-confirmation");
+            // Deliberately restart only the negative oracle: the real source must retain continuous flow.
+            var continuous = expected.Simulation;
+            using (var cold = new BlueprintFogSimulation(assets, expected.Source.Shape, expected.Source.Pigment, expected.Source.Noise,
+                expected.FieldMinimum, expected.FieldMaximum, expected.Source.Minimum, expected.Source.Maximum, outside, 37, initialClock: 3.2f))
+            {
+                var field = typeof(BlueprintFogVisual).GetField("simulation", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                try
+                {
+                    cold.AdvanceTo(3.4f, inside, body, true); field.SetValue(expected, cold);
+                    expected.AdvanceTo(3.4f, inside, body, true); Compare("cold-start-negative", true);
+                }
+                finally { field.SetValue(expected, continuous); expected.AdvanceTo(3.4f, inside, body, true); }
+            }
             // Latest CPU input cannot replace the actor/clock of the snapshot already published by the GPU.
             actual.AdvanceTo(3.41f, outside, new Vector2(.5f, 1.3f), false); Compare("queued-metadata");
             Require(actual.LogicalSource.Inputs.Count >= 2, "Visual lost accepted input while its receipt was pending.");
+            pool.PumpSources(); AsyncGPUReadback.WaitAllRequests(); pool.PumpSources();
+            expected.AdvanceTo(3.41f, outside, new Vector2(.5f, 1.3f), false); CompareFields();
+            var resident = actual.Snapshot;
+            // Continue all idle steps after contact, including body wind, then re-enter the same generation.
+            for (int i = 18; i <= 128; ++i)
+            {
+                Vector3 actor = outside + new Vector3(0, 0, Mathf.Sin(i * .3f) * .4f);
+                actual.AdvanceTo(i * .2f, actor, body, false); expected.AdvanceTo(i * .2f, actor, body, false);
+                pool.PumpSources(); AsyncGPUReadback.WaitAllRequests(); pool.PumpSources();
+                Require(ReferenceEquals(resident, actual.Snapshot), "Recovery discarded continuous velocity/history.");
+                if (i % 32 == 0) { Compare("resident-recovery-" + i); CompareFields(); }
+            }
+            var flags = new uint[1]; resident.Ledger[2].GetData(flags);
+            Require(flags[0] == 0, "Continuous fixture did not actually reach recovery.");
+            actual.AdvanceTo(25.8f, inside, body, true); expected.AdvanceTo(25.8f, inside, body, true);
+            pool.PumpSources(); AsyncGPUReadback.WaitAllRequests(); pool.PumpSources();
+            Compare("resident-reentry"); CompareFields();
+            report.continuousV11Parity = true;
             bool rejected = false;
             try { published.PreparePublished(new[] { actual }, new BlueprintFogChannels.SnapshotChannel[1]); }
             catch (ArgumentException) { rejected = true; }
@@ -515,8 +555,9 @@ public static class FogPublishedRenderCheck
         public bool runtimeChannelsValidated;
         public bool runtimeVisualAtlasValidated, staticSourceSeparated;
         public bool logicalVisualValidated, logicalVisualDeferredDisposal, dormantClockAndBodyValidated;
-        public bool continuousV11Parity, continuousIdleControlSensitive;
-        public double continuousIdleMaxLocalDelta;
+        public bool continuousV11Parity, coldIdleControlSensitive;
+        public double coldIdleMaxLocalDelta;
+        public int continuousStateComparisons;
         public int logicalVisualComparisons;
         public double logicalVisualMaxMeanDelta, logicalVisualMaxLocalDelta;
         public bool passed, metadataOnly, rejectedRetained, geometryBeforeCpuConfirmation, meshAndAtlasVolume,

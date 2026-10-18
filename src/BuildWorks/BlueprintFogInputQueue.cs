@@ -60,15 +60,6 @@ namespace OstrixMods.BuildWorks
             Owner = null;
         }
 
-        internal void TrackDormant(Sample sample)
-        {
-            Validate(sample);
-            if (!detachable || Owner != null || Count != 0 || Faulted || (sample.Emit && sample.EmissionPossible) ||
-                sample.Clock < capturedClock || Tick(sample.Clock) - Tick(capturedClock) > 8)
-                throw new InvalidOperationException("Only an empty dormant source may update its non-emitting baseline.");
-            Committed = sample; capturedClock = sample.Clock;
-        }
-
         internal bool HasEmission
         {
             get { for (int i = 0; i < Count; ++i) if (At(i).Emit && At(i).EmissionPossible) return true; return false; }

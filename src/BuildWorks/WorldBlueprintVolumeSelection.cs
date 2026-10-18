@@ -68,14 +68,22 @@ namespace OstrixMods.BuildWorks
         private void AdjustBlueprintVolumeHeight(float delta, bool top)
         {
             if (!selectingBlueprint || !blueprintVolumeMode || float.IsNaN(delta) || float.IsInfinity(delta)) return;
-            if (top) blueprintVolumeTop = Mathf.Clamp(blueprintVolumeTop + delta, -512f, 512f);
-            else blueprintVolumeBottom = Mathf.Clamp(blueprintVolumeBottom + delta, -512f, 512f);
+            float previous = top ? blueprintVolumeTop : blueprintVolumeBottom;
+            float next = Mathf.Clamp(previous + delta, -512f, 512f);
+            if (next == previous) return;
+            if (top) blueprintVolumeTop = next;
+            else blueprintVolumeBottom = next;
             blueprintVolumeDirty = blueprintVolumeReady;
             blueprintVolumeStatus = null;
             if (blueprintVolumeReady && blueprintVolumeBottom <= blueprintVolumeTop)
                 ShowBlueprintVolume(BlueprintVolume(blueprintVolumeFirst, blueprintVolumeSecond));
             else blueprintVolumeView.Hide();
             UpdateBlueprintVolumeHud(refreshItems: false);
+        }
+
+        private void CompleteBlueprintVolumeHeightEdit()
+        {
+            if (blueprintVolumeDirty) RefreshBlueprintVolumeSelection();
         }
 
         private bool TryBlueprintAreaPoint(Camera camera, Vector2 mouse, out Vector3 point)

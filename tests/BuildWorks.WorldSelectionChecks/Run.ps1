@@ -37,3 +37,10 @@ $end = $source.LastIndexOf("`n    }", [StringComparison]::Ordinal)
 if ($start -lt 0 -or $end -le $start) { throw 'Volume HUD method boundaries changed; update the offline harness.' }
 Add-Type -TypeDefinition $harness.Replace('// HUD_METHOD', $source.Substring($start, $end - $start))
 [VolumeHudChecks]::Run()
+$source = [IO.File]::ReadAllText((Join-Path $root 'src/BuildWorks/PrecisionPlacementHudView.cs'))
+$start = $source.IndexOf('    internal sealed class AngleDragControl', [StringComparison]::Ordinal)
+$end = $source.LastIndexOf('}', [StringComparison]::Ordinal)
+if ($start -lt 0 -or $end -le $start) { throw 'Angle control boundaries changed; update the offline harness.' }
+$harness = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'AngleCommitHarness.cs'))
+Add-Type -TypeDefinition $harness.Replace('// CONTROL', ('namespace OstrixMods.BuildWorks {' + $source.Substring($start, $end - $start) + '}'))
+[AngleCommitChecks]::Run()

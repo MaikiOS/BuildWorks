@@ -13,12 +13,20 @@ public sealed class VolumeHudChecks
     private int blueprintVolumeFirst = 0, blueprintVolumeSecond = 1;
     private readonly View blueprintVolumeView = new View();
     private readonly Hud hud = new Hud();
+    private int refreshes;
+    private bool refuseRefresh;
 
     // HEIGHT_METHOD
     // HUD_METHOD
 
     private int BlueprintVolume(int first, int second) => 0;
     private void ShowBlueprintVolume(int volume) { }
+    private bool RefreshBlueprintVolumeSelection()
+    {
+        ++refreshes;
+        if (refuseRefresh) return false;
+        blueprintVolumeDirty = false; return true;
+    }
 
     public static string Run()
     {
@@ -32,12 +40,27 @@ public sealed class VolumeHudChecks
         Require(ReferenceEquals(snapshot, check.hud.Items) && Localization.instance.Calls == 50000 && check.hud.Updates == 65 &&
             check.blueprintVolumeDirty && check.blueprintVolumeStatus == null && check.blueprintVolumeTop > 20,
             "Height-only edits rebuilt/localized the heavy row snapshot or failed to update the HUD.");
+        check.CompleteBlueprintVolumeHeightEdit(); check.CompleteBlueprintVolumeHeightEdit();
+        Require(check.refreshes == 1 && !check.blueprintVolumeDirty, "Completed height gesture did not request exactly one refresh.");
+        check.AdjustBlueprintVolumeHeight(.05f, false); check.refuseRefresh = true;
+        check.CompleteBlueprintVolumeHeightEdit();
+        Require(check.refreshes == 2 && check.blueprintVolumeDirty, "Refused refresh incorrectly cleared stale selection.");
+        check.refuseRefresh = false; check.CompleteBlueprintVolumeHeightEdit();
+        Require(check.refreshes == 3 && !check.blueprintVolumeDirty, "Refresh retry failed.");
         check.blueprintSelection.RemoveAt(0);
         check.UpdateBlueprintVolumeHud();
         Require(!ReferenceEquals(snapshot, check.hud.Items) && !check.hud.Items[0].selected &&
             check.hud.Items[1].selected && Localization.instance.Calls == 100000,
             "Membership update left the row snapshot stale.");
-        return "PASS actual height/HUD source: 50000 rows, 64 height edits reuse snapshot, membership refresh rebuilds. Host substitutes only.";
+        check.blueprintVolumeTop = 512;
+        check.AdjustBlueprintVolumeHeight(1, true); check.AdjustBlueprintVolumeHeight(0, false);
+        check.CompleteBlueprintVolumeHeightEdit();
+        Require(check.refreshes == 3 && !check.blueprintVolumeDirty, "Clamped/equal edits queried unchanged membership.");
+        check.AdjustBlueprintVolumeHeight(-.05f, false); check.AdjustBlueprintVolumeHeight(1, true);
+        Require(check.blueprintVolumeDirty, "No-op edit cleared an earlier pending change.");
+        check.CompleteBlueprintVolumeHeightEdit();
+        Require(check.refreshes == 4 && !check.blueprintVolumeDirty, "Pending change was lost at the clamp edge.");
+        return "PASS actual height/HUD source: 50000 rows, 64 previews reuse snapshot, completion requests one refresh; refusal/retry retained, membership snapshot rebuilds. Host substitutes only.";
     }
 
     private static void Require(bool value, string message) { if (!value) throw new Exception(message); }

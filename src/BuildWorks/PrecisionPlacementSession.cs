@@ -684,7 +684,7 @@ namespace OstrixMods.BuildWorks
                 DisablePrecision,
                 ConfirmEditor);
             hud.ConfigureWorldSelection(ToggleBlueprintVolumeMode, AdjustBlueprintVolumeHeight,
-                () => RefreshBlueprintVolumeSelection(), ToggleBlueprintVolumeRow);
+                () => RefreshBlueprintVolumeSelection(), ToggleBlueprintVolumeRow, CompleteBlueprintVolumeHeightEdit);
             HammerCatalogView.Configure(
                 blueprintStore,
                 blueprintPieceRegistry,

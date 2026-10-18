@@ -69,7 +69,7 @@ namespace OstrixMods.BuildWorks
                 if (published)
                 {
                     // The scheduler can outlive this visual while queued GPU work still reads its source textures.
-                    // shortcut: cold sources restart velocity; prove continuous idle/reentry parity before house activation.
+                    // Admitted sources retain their complete solver state through idle and recovery.
                     var retained = source; Vector3 low = minimum, high = maximum, phase = NoiseOffset;
                     logicalSource = channels.RegisterSnapshotSource(Sample(0, localActor, capsule, false, false, nearby),
                         (scratch, staged, initial) => new BlueprintFogSimulation(assets, retained.Shape, retained.Pigment, retained.Noise,

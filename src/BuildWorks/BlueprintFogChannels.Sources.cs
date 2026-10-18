@@ -5,7 +5,7 @@ namespace OstrixMods.BuildWorks
 {
     internal sealed partial class BlueprintFogChannels
     {
-        // A logical part keeps its accepted path while a physical slot retires or is unavailable.
+        // Each admitted part reserves a resident slot; recovered matter still has live velocity/history.
         internal sealed class SnapshotSource
         {
             internal readonly BlueprintFogInputQueue Inputs;
@@ -33,7 +33,7 @@ namespace OstrixMods.BuildWorks
             Func<BlueprintFogScratch, BlueprintFogSimulation.StagedState, BlueprintFogInputQueue.Sample, BlueprintFogSimulation> create, Action release = null)
         {
             RequireSnapshots();
-            if (pumpingSources || snapshotTeardown || sources.Count >= 32 || create == null)
+            if (pumpingSources || snapshotTeardown || sources.Count >= capacity || create == null)
                 throw new InvalidOperationException("Fog logical source registration unavailable.");
             var source = new SnapshotSource(initial, create, release); sources.Add(source); return source;
         }
@@ -50,8 +50,7 @@ namespace OstrixMods.BuildWorks
         {
             RequireSource(source);
             if (snapshotTeardown || source.Error != null) throw new InvalidOperationException("Stopped fog source retains its accepted history.");
-            if (source.Snapshot == null && source.Inputs.Count == 0 && !(sample.Emit && sample.EmissionPossible)) source.Inputs.TrackDormant(sample);
-            else source.Inputs.Capture(sample);
+            source.Inputs.Capture(sample);
         }
 
         internal void RemoveSource(SnapshotSource source)
@@ -69,7 +68,7 @@ namespace OstrixMods.BuildWorks
             {
                 PollSnapshots();
                 if (snapshotTeardown) throw new InvalidOperationException("Fog source receipt requires whole-pool teardown.");
-                // Confirm every retirement before choosing the next waiting source; a retiring source cannot seize its own slot again.
+                // Confirm explicitly removed sources' GPU retirement before scheduling accepted observations.
                 foreach (var source in sources)
                 {
                     var owner = source.Snapshot;
@@ -89,7 +88,7 @@ namespace OstrixMods.BuildWorks
                     { source.Error = "Fog source failed; published state and accepted history retained."; continue; }
                     if (owner == null)
                     {
-                        // shortcut: replay accepted idle tails in a new slot; verify cold-state fast-forward before house FPS acceptance.
+                        // Start at the original baseline, including every accepted idle observation.
                         if (source.Inputs.Count == 0) continue;
                         int slot = Array.FindIndex(snapshotSlots, value => value == null);
                         if (slot < 0) continue;
@@ -98,15 +97,8 @@ namespace OstrixMods.BuildWorks
                         sourceCursor = (index + 1) % count;
                     }
                     if (owner.State.State != BlueprintFogSnapshotState.Phase.Ready) continue;
-                    var last = source.Inputs.Committed;
-                    bool contact = source.Inputs.HasEmission || (source.Inputs.Count == 0 && last.Emit && last.EmissionPossible);
-                    if (owner.LastSubmission.Sequence != 0 && !contact)
-                    {
-                        // Freeze submissions, not capture, until this exact committed recovery observation arrives.
-                        bool recovered = ObserveSnapshotRecovery(owner);
-                        if (!owner.recoveryReceived || !SnapshotChannel.Same(owner.recoveryStamp, owner.LastSubmission)) continue;
-                        if (recovered) { owner.State.Retire(); continue; }
-                    }
+                    // An empty/recovered surface does not reset the v11 background flow or CPU integrator.
+                    // Only explicit source removal may retire this generation.
                     TrySubmitSnapshot(owner, out var token);
                 }
             }

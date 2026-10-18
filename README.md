@@ -6,9 +6,9 @@ BuildWorks extends Valheim's hammer with precise construction, a blueprint catal
 
 ![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
 
-**Current source / isolated QA: 0.19.214.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
+**Current source / isolated QA: 0.19.215.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
 
-[.214](docs/CHECKPOINT_214.md) fixes rectangle coordinates and import focus; Unity48/3, builds and contracts passed, QA installed. Valheim is untested; exact v11 state preservation is only a separate experiment, while house/board remain open.
+**QA .215 installed: height-edit completion refreshes volume membership.** Unity48/3/4; actual background Valheim40/40 plus identity40/40, unchanged inventory, normal exit/bridge restored. Strict v11 passed56 exact and18 visual GPU comparisons across continuous idle/reentry; Building does not activate it yet. House28/board/network remain open. [Changes and limits](docs/CHECKPOINT_215.md).
 
 ## Capabilities
 

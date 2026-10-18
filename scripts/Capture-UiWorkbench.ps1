@@ -22,15 +22,22 @@ if (-not (Test-Path -LiteralPath (Join-Path $ProjectPath 'ProjectSettings\Projec
 $geometryProject = Join-Path $repositoryRoot 'src\BuildWorks.Geometry\BuildWorks.Geometry.csproj'
 $geometryDll = Join-Path $repositoryRoot 'src\BuildWorks.Geometry\bin\Release\netstandard2.0\BuildWorks.Geometry.dll'
 $pluginsPath = Join-Path $projectPath 'Assets\Plugins'
-$logPath = Join-Path $repositoryRoot $(if ($ReleaseOnly) { 'artifacts\release-214\unity.log' } elseif ($ContactOnly) { 'artifacts\placement-contact\unity.log' } else { 'artifacts\unity-workbench-capture.log' })
+$logPath = Join-Path $repositoryRoot $(if ($ReleaseOnly) { 'artifacts\release-regression\unity.log' } elseif ($ContactOnly) { 'artifacts\placement-contact\unity.log' } else { 'artifacts\unity-workbench-capture.log' })
 $outputPath = Join-Path $repositoryRoot 'artifacts\ui-workbench'
 $startedAt = [DateTime]::UtcNow
-$statusPath = Join-Path $repositoryRoot $(if ($ReleaseOnly) { 'artifacts\release-214\verification-status.json' } elseif ($ContactOnly) { 'artifacts\placement-contact\verification-status.json' } else { 'artifacts\ui-runtime\verification-status.json' })
+$statusPath = Join-Path $repositoryRoot $(if ($ReleaseOnly) { 'artifacts\release-regression\verification-status.json' } elseif ($ContactOnly) { 'artifacts\placement-contact\verification-status.json' } else { 'artifacts\ui-runtime\verification-status.json' })
 New-Item -ItemType Directory -Path (Split-Path -Parent $statusPath) -Force | Out-Null
-$runningStatus = if ($ReleaseOnly) { 'running_release214' } elseif ($ContactOnly) { 'running_placement_contact' } else { 'running_runtime_workbench' }
+$runningStatus = if ($ReleaseOnly) { 'running_release_regression' } elseif ($ContactOnly) { 'running_placement_contact' } else { 'running_runtime_workbench' }
 @{ status = $runningStatus; startedAtUtc = $startedAt.ToString('o'); gameHostTested = $false } |
     ConvertTo-Json | Set-Content -LiteralPath $statusPath
 $requiredVersion = '6000.0.61f1'
+trap {
+    if ($ReleaseOnly) {
+        @{ status = 'failed_release_regression_workbench'; completedAtUtc = [DateTime]::UtcNow.ToString('o'); error = $_.Exception.Message; gameHostTested = $false } |
+            ConvertTo-Json | Set-Content -LiteralPath $statusPath
+    }
+    throw $_
+}
 
 if (-not (Test-Path -LiteralPath $UnityPath -PathType Leaf)) {
     throw "Unity $requiredVersion not found: $UnityPath"
@@ -88,10 +95,10 @@ New-Item -ItemType Directory -Path $iconDestination -Force | Out-Null
 Get-ChildItem -LiteralPath (Join-Path $repositoryRoot 'src\BuildWorks\Assets\BlueprintEditorIcons') -Filter '*.png' |
     Copy-Item -Destination $iconDestination -Force
 $sourceProof | Set-Content -LiteralPath (Join-Path (Split-Path -Parent $statusPath) 'source-sha256.txt')
-if ($ReleaseOnly) { "ReleaseRegression214.cs $((Get-FileHash -LiteralPath (Join-Path $projectPath 'Assets/Editor/ReleaseRegression214.cs')).Hash)" | Add-Content -LiteralPath (Join-Path (Split-Path -Parent $statusPath) 'source-sha256.txt') }
+if ($ReleaseOnly) { "ReleaseRegression.cs $((Get-FileHash -LiteralPath (Join-Path $projectPath 'Assets/Editor/ReleaseRegression.cs')).Hash)" | Add-Content -LiteralPath (Join-Path (Split-Path -Parent $statusPath) 'source-sha256.txt') }
 
 New-Item -ItemType Directory -Path (Split-Path -Parent $logPath) -Force | Out-Null
-$method = if ($ReleaseOnly) { 'ReleaseRegression214.Run' } elseif ($ContactOnly) { 'PlacementContactAcceptance.Verify' } else { 'RuntimeEditorAcceptance.CaptureAll' }
+$method = if ($ReleaseOnly) { 'ReleaseRegression.Run' } elseif ($ContactOnly) { 'PlacementContactAcceptance.Verify' } else { 'RuntimeEditorAcceptance.CaptureAll' }
 $graphics = if ($ContactOnly) { '-nographics ' } else { '' }
 $arguments = "-batchmode $graphics-projectPath `"$projectPath`" " +
     "-executeMethod $method -logFile `"$logPath`""
@@ -109,7 +116,7 @@ while (-not $process.WaitForExit(1000)) {
 if ($process.ExitCode -ne 0) {
     $existingStatus = Get-Content -LiteralPath $statusPath -Raw | ConvertFrom-Json
     if ($existingStatus.status -eq $runningStatus) {
-        @{ status = $(if ($ReleaseOnly) { 'failed_release214_workbench' } elseif ($ContactOnly) { 'failed_placement_contact' } else { 'failed_runtime_workbench' }); completedAtUtc = [DateTime]::UtcNow.ToString('o'); logPath = $logPath; gameHostTested = $false } |
+        @{ status = $(if ($ReleaseOnly) { 'failed_release_regression_workbench' } elseif ($ContactOnly) { 'failed_placement_contact' } else { 'failed_runtime_workbench' }); completedAtUtc = [DateTime]::UtcNow.ToString('o'); logPath = $logPath; gameHostTested = $false } |
             ConvertTo-Json | Set-Content -LiteralPath $statusPath
     }
     if (Test-Path -LiteralPath $logPath -PathType Leaf) {
@@ -119,14 +126,15 @@ if ($process.ExitCode -ne 0) {
 }
 
 if ($ReleaseOnly) {
-    $proofPath = Join-Path $repositoryRoot 'artifacts/release-214/ui-verification.json'
-    if (!(Test-Path -LiteralPath $proofPath) -or (Get-Item -LiteralPath $proofPath).LastWriteTimeUtc -lt $startedAt) { throw 'Fresh release214 proof missing.' }
+    $proofPath = Join-Path $repositoryRoot 'artifacts/release-regression/ui-verification.json'
+    if (!(Test-Path -LiteralPath $proofPath) -or (Get-Item -LiteralPath $proofPath).LastWriteTimeUtc -lt $startedAt) { throw 'Fresh release_regression proof missing.' }
     $proof = Get-Content -LiteralPath $proofPath -Raw | ConvertFrom-Json
     if ($proof.passed -isnot [bool] -or !$proof.passed -or $proof.gameHostTested -isnot [bool] -or $proof.gameHostTested -or
         ($proof.rectangles -isnot [int] -and $proof.rectangles -isnot [long]) -or $proof.rectangles -ne 48 -or
         ($proof.catalogCases -isnot [int] -and $proof.catalogCases -isnot [long]) -or $proof.catalogCases -ne 3 -or
-        !(Select-String -LiteralPath $logPath -SimpleMatch 'BUILDWORKS_RELEASE214_OK' -Quiet)) { throw 'Release214 UI coverage incomplete.' }
-    @{ status = 'passed_release214_workbench'; completedAtUtc = [DateTime]::UtcNow.ToString('o'); gameHostTested = $false } | ConvertTo-Json | Set-Content -LiteralPath $statusPath
+        ($proof.heightControls -isnot [int] -and $proof.heightControls -isnot [long]) -or $proof.heightControls -ne 4 -or
+        !(Select-String -LiteralPath $logPath -SimpleMatch 'BUILDWORKS_RELEASE_REGRESSION_OK' -Quiet)) { throw 'Release regression UI coverage incomplete.' }
+    @{ status = 'passed_release_regression_workbench'; completedAtUtc = [DateTime]::UtcNow.ToString('o'); gameHostTested = $false } | ConvertTo-Json | Set-Content -LiteralPath $statusPath
     $proof | ConvertTo-Json
     return
 }

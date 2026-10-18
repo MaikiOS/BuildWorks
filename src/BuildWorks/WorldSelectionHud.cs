@@ -17,6 +17,7 @@ namespace OstrixMods.BuildWorks
         private IReadOnlyList<(string name, bool selected)> worldSelectionItems = Array.Empty<(string, bool)>();
         private int worldSelectionPageIndex;
         private Action worldSelectionToggle, worldSelectionApply;
+        private Action worldSelectionHeightFinished;
         private Action<float, bool> worldSelectionHeight;
         private Action<int> worldSelectionToggleRow;
         private bool worldSelectionVolume;
@@ -24,12 +25,14 @@ namespace OstrixMods.BuildWorks
             (worldSelectionBottomControl.gameObject.activeInHierarchy && worldSelectionBottomControl.IsEditing ||
                 worldSelectionTopControl.gameObject.activeInHierarchy && worldSelectionTopControl.IsEditing);
 
-        internal void ConfigureWorldSelection(Action toggle, Action<float, bool> height, Action apply, Action<int> toggleRow)
+        internal void ConfigureWorldSelection(Action toggle, Action<float, bool> height, Action apply, Action<int> toggleRow,
+            Action heightFinished = null)
         {
             worldSelectionToggle = toggle;
             worldSelectionHeight = height;
             worldSelectionApply = apply;
             worldSelectionToggleRow = toggleRow;
+            worldSelectionHeightFinished = heightFinished;
         }
 
         internal void SetWorldSelectionState(bool volume, float bottom, float top, string status,
@@ -65,6 +68,7 @@ namespace OstrixMods.BuildWorks
             worldSelectionTop = CreateAngleControl("VolumeTop", rect, new Vector2(190, -90), new Vector2(175, 28),
                 buttonTemplate, fontTemplate, value => worldSelectionHeight?.Invoke(value, true), out worldSelectionTopControl,
                 false, .05f, -512, 512);
+            worldSelectionBottomControl.EditFinished = worldSelectionTopControl.EditFinished = () => worldSelectionHeightFinished?.Invoke();
             worldSelectionRefresh = CreateButton("VolumeRefresh", rect, new Vector2(370, -90), new Vector2(200, 28),
                 buttonTemplate, fontTemplate, () => worldSelectionApply?.Invoke());
             worldSelectionRefresh.text = BuildWorksLocalization.Text("selection.refresh");

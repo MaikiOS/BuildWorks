@@ -933,6 +933,7 @@ namespace OstrixMods.BuildWorks
     internal sealed class AngleDragControl : MonoBehaviour,
         IBeginDragHandler,
         IDragHandler,
+        IEndDragHandler,
         IScrollHandler,
         IPointerClickHandler
     {
@@ -946,9 +947,11 @@ namespace OstrixMods.BuildWorks
         private float unitStep;
         private float minimum;
         private float maximum;
+        private bool dragging;
 
         public float Value { get; set; }
         public bool IsEditing => input && input.enabled;
+        internal Action EditFinished { get; set; }
 
         public void Initialize(Action<float> adjustAngle, TMP_InputField inputField, TMP_Text valueLabel,
             bool normalizeDegrees = true, float unitStep = 1f,
@@ -976,6 +979,15 @@ namespace OstrixMods.BuildWorks
             if (IsEditing || eventData.button != PointerEventData.InputButton.Left) return;
             eventData.eligibleForClick = false;
             previousPointer = eventData.position;
+            dragging = true;
+            eventData.Use();
+        }
+
+        public void OnEndDrag(PointerEventData eventData)
+        {
+            if (!dragging || eventData.button != PointerEventData.InputButton.Left) return;
+            dragging = false;
+            EditFinished?.Invoke();
             eventData.Use();
         }
 
@@ -993,6 +1005,7 @@ namespace OstrixMods.BuildWorks
         {
             if (IsEditing || adjust == null || Mathf.Abs(eventData.scrollDelta.y) < 0.01f) return;
             adjust(Mathf.Sign(eventData.scrollDelta.y) * WheelStep() * unitStep);
+            EditFinished?.Invoke();
             eventData.Use();
         }
 
@@ -1002,6 +1015,7 @@ namespace OstrixMods.BuildWorks
             if (eventData.button == PointerEventData.InputButton.Right && !IsEditing)
             {
                 adjust(-Value);
+                EditFinished?.Invoke();
                 eventData.Use();
             }
             else if (eventData.button == PointerEventData.InputButton.Left && !eventData.dragging && !IsEditing)
@@ -1036,6 +1050,7 @@ namespace OstrixMods.BuildWorks
             else
                 PreviewTextEdit(text);
             input.enabled = false;
+            EditFinished?.Invoke();
         }
 
         private bool TryParseAngle(string text, out float value)

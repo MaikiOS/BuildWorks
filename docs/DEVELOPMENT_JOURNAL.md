@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-19 —244: native house with sparse capture
+
+**Native check244, installed .241:** real Forest Hut28: preparation6/6, unrecorded route14/14, contact snapshot/two sparse images24/24.12 active contact parts/354624 exact inner texels; all28 recovered to zero. Inventory unchanged; own unpaid fixture closed, normal exit/bridge3/3. Continuous capture,48s low cadence and visual acceptance remain open. Final Goal API read returned **paused**; agent did not change it, resume through the UI. [Evidence](CHECKPOINT_244.md).
+
 ## 2026-10-19 — diagnostics242–243: rejected speedups and unavailable GPU timestamps
 
 **Diagnostics242–243; game .241:** both candidates still overflowed queue64 (21.28s/22.78s); a fresh old-path control failed at38.70s. Exact checks passed; no speedup established. Two GPU timestamp probes returned only zeros and were stopped. Experiments are archived; working code restored to710bcb6. No deployment, Valheim run or save changes. Next: native house state/recovery with sparse images, separating continuous capture cost;48s/visual acceptance remain open. [Evidence](CHECKPOINT_243.md).

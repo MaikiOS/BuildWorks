@@ -1,5 +1,7 @@
 # Current BuildWorks status
 
+**Native check244, installed .241:** real Forest Hut28: preparation6/6, unrecorded route14/14, contact snapshot/two sparse images24/24.12 active contact parts/354624 exact inner texels; all28 recovered to zero. Inventory unchanged; own unpaid fixture closed, normal exit/bridge3/3. Continuous capture,48s low cadence and visual acceptance remain open. Final Goal API read returned **paused**; agent did not change it, resume through the UI. [Evidence](CHECKPOINT_244.md).
+
 **Diagnostics242–243; game .241:** both candidates still overflowed queue64 (21.28s/22.78s); a fresh old-path control failed at38.70s. Exact checks passed; no speedup established. Two GPU timestamp probes returned only zeros and were stopped. Experiments are archived; working code restored to710bcb6. No deployment, Valheim run or save changes. Next: native house state/recovery with sparse images, separating continuous capture cost;48s/visual acceptance remain open. [Evidence](CHECKPOINT_243.md).
 
 **QA .241 installed:** shader reuses validated state/clock;14 RGB comparisons against the previous path are exactly zero. ValheimQA passed7/7+59/59:4 passes through a four-section wall,482 frames,467456 exact inner texels; all16 recovered parts have zero fields/flags. Inventory unchanged, own fixture closed, normal exit and bridge3/3 restored. **Whole-house fog remains unfixed:** two48s GPU attempts failed at queue64 after37.01s/39.85s; repetitions stopped. RAM reuse remains disabled in the game. [Evidence](CHECKPOINT_241.md).

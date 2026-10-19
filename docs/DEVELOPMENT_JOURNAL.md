@@ -6,6 +6,7 @@ This records changes and evidence, not future milestones. Historical results ret
 
 | Checkpoint | Change / evidence | Boundary |
 | --- | --- | --- |
+| 2026-10-19 · .231 | [Project → v11](CHECKPOINT_231.md): shared pool/atlas, world poses/journal masks; native31/31 on two TEMP projects, refusal/reload and retained paid fixture. Installed/bridge restored. | Synthetic journal transitions; ordinary Create/new paid continuation with fog, house appearance/refund/recovery/network open. |
 | 2026-10-19 · .230 | [v11 renderer](CHECKPOINT_230.md): embedded6F2A, frozen world poses/independent parts; GPU23/8, native33/33 with5 Camera.Render calls; installed/bridge restored. | Persisted-project/ordinary Create hooks and house appearance/network remain open. |
 | 2026-10-19 · .229 | [Deterministic equal-distance snaps](CHECKPOINT_229.md): scratch-list ordering, native171 + stand576/2304,0/0 changes, manual6/6; installed/bridge restored. Parallel frozen v11 baseline,1748+32 CPU checks/Editor compilation. | Camera/held tilt/project fog/Create/refund/recovery/network open; no new GPU run. |
 | 2026-10-19 · .228 source | [F9 rotation preserved](CHECKPOINT_228.md), no-pair no-op; builds/Store/Geometry/contracts/review pass. Owner stand18 received. | Native regression not run; .227 installed, .228 awaits closed game. v11/ordinary Create/held tilt open. |

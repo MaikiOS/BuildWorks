@@ -4,7 +4,7 @@
 
 ## Фактический разрыв
 
-`BlueprintConstructionProjectRuntime` пока не создаёт `BlueprintFogBuilding`. Последний используется только QA-кодом `BuildWorksTestFog`. Обычное размещение ещё не вызывает сохраняемый `Runtime.Create`.
+В .231 `BlueprintConstructionProjectRuntime` создаёт `BlueprintFogBuilding` через общий `BlueprintConstructionProjectFog`; WorldPose и journal-маски подключены. Valheim 31/31 на двух временных проектах, синтетические receipts отдельно от реальной оплаты. [Доказательства](CHECKPOINT_231_RU.md). Обычное размещение ещё не вызывает сохраняемый `Runtime.Create`.
 
 Встроенный bundle в .230 теперь равен проверенному Linear candidate6F2A…138133B/5assets/28kernels. Прежний DD9576…62061B/3assets/8kernels сохранён как pinned legacy fixture; source shader/solver не менялись.
 
@@ -16,9 +16,9 @@
 
 1. **Сделано в .229:** старый bundle закреплён в tests/fixtures/fog-legacy-linear; оба legacy caller проверяют SHA/62061B и загружают те же байты. CPU1748+32, corrupt/candidate rejection и Unity-компиляция прошли. Отрицательные spatial/pixel проверки сохранены. Это ещё не повтор GPU-сравнения.
 2. **Сделано в .230:** проверенный Linear bundle встроен; GPU default270/18, Published23preparation/8lifecycle и legacy16/delta0, Recovery90/fault6, Window168; native33/33 с рендером. Window — Gamma numeric check; native загрузка проверена отдельно в Linear.
-3. Renderer .230 уже принимает frozen world TRS, не применяет корневую позу/scale повторно. **Осталось:** передать Store.Part.WorldPose из runtime-проекта; действующего caller пока нет.
-4. **Сделано в renderer .230:** SetPartVisible/RemovePart, подготовка/pending retirement, сохранность соседних полей/часов, zero pass-through. **Осталось:** отображать фактические journal-фазы из runtime без изменения оплаты.
-5. Подключить камерный цикл подготовки/обновления/рендера к жизненному циклу мира. При отмене, выгрузке и закрытии сначала завершить подготовку, затем retirement и подтверждённый GPU drain, после этого освободить текстуры, пул и assets.
+3. Renderer .230 уже принимает frozen world TRS, не применяет корневую позу/scale повторно. **Сделано в .231:** runtime передаёт Store.Part.WorldPose напрямую; native exact TRS включает неединичный scale.
+4. **Сделано в renderer .230:** SetPartVisible/RemovePart, подготовка/pending retirement, сохранность соседних полей/часов, zero pass-through. **Сделано в .231:** маски следуют журналу; native переходы проверены в отдельном синтетическом TEMP Store без новой оплаты.
+5. **Подключено в .231:** один камерный цикл подготовки/обновления/рендера, общий ограниченный pool/atlas и отказ нового visual без сброса старых. Реальные GPU faults и смена камеры ещё не введены в тесте. При отмене, выгрузке и закрытии сначала завершить подготовку, затем retirement и подтверждённый GPU drain, после этого освободить текстуры, пул и assets.
 
 ## Граница состояния
 

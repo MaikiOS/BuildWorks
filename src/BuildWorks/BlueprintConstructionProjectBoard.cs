@@ -16,6 +16,7 @@ namespace OstrixMods.BuildWorks
         internal long Revision => record.Revision;
         internal string BlueprintName { get; private set; }
         internal int PartCount => record.Parts.Count;
+        internal BlueprintConstructionProjectStore.Record Record => record;
 
         internal void Initialize(BlueprintConstructionProjectRuntime runtime, BlueprintConstructionProjectStore.Record project)
         {

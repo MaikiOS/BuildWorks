@@ -28,6 +28,8 @@ namespace OstrixMods.BuildWorks
         private readonly List<SnapshotSource> sources = new List<SnapshotSource>();
         private int sourceCursor;
         private bool pumpingSources;
+        internal int RetiringSources
+        { get { int count = 0; foreach (var source in sources) if (source.Removed && !source.Released) ++count; return count; } }
 
         internal SnapshotSource RegisterSnapshotSource(BlueprintFogInputQueue.Sample initial,
             Func<BlueprintFogScratch, BlueprintFogSimulation.StagedState, BlueprintFogInputQueue.Sample, BlueprintFogSimulation> create, Action release = null)

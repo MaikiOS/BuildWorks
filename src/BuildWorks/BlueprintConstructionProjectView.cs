@@ -91,6 +91,8 @@ namespace OstrixMods.BuildWorks
                 if (runtime.Failure != null || runtime.Execution?.Reason != null)
                     text.AppendLine().AppendLine(BuildWorksLocalization.Text("project.error", runtime.Failure ?? runtime.Execution.Reason));
                 if (operationError != null) text.AppendLine().AppendLine(operationError);
+                string fogError = runtime.FogError(board.Id);
+                if (fogError != null) text.AppendLine().AppendLine(BuildWorksLocalization.Text("project.fog_error", fogError));
                 summary.text = text.ToString();
             }
             catch (Exception error) { summary.text = BuildWorksLocalization.Text("project.error", error.Message); }

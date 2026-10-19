@@ -1,0 +1,17 @@
+# .231 — persisted construction journals drive v11 presentation
+
+19 October 2026 · [Русский](CHECKPOINT_231_RU.md)
+
+The existing local-host project runtime now creates fog from frozen blueprint parts and authoritative `WorldPose`. One camera display shares one embedded bundle, fixed pool and atlas across admitted projects. Ordinary Hammer placement still does not create this durable project.
+
+No journal/NoEffect shows a part; Intent/Observed hides it without replacing its source; Committed retires it. Startup excludes committed parts. Execution transitions refresh masks. Rendering never writes payment, inventory, journal or world objects and does not block project input. Rejected admission retains the plan/board and existing sources, with a separate preview error. Successful unpaid cancellation commits terminal state before visual retirement. Cleanup closes preparation, retires sources, drains the pool, releases atlas/assets and restores camera depth. Review caught and fixed depth ownership after failed asset initialization.
+
+Normal/QA builds passed with zero warnings/errors; Geometry, targeted Store/journal, HostContract 1.0.20/25909357, localization 1119 and two independent correctness/Ponytail reviews passed. Frozen GPU regression: 270 ticks/18 exact fields, recovered damage0. Shader/solver/bundle6F2A unchanged.
+
+Native Valheim: **31/31**, optional failures0, 10.1s. Two temporary projects/four renderer walls share the pool; exact world position/rotation and nonuniform scale .75/1.15, masks4→3→4→3, commitment retirement, neighbour source/clock preservation, capacity refusal, reload and teardown passed. Fixed32 logical/32768 blocks/4resident reserve97,423,684B within98,304,000B; observed field93,753,556B and atlas/pages74,580,096B within128MiB. Five explicit Camera.Render calls and a positive render counter establish execution, not appearance acceptance.
+
+**Temporary journal transitions are synthetic, not payment proof.** Fixture plans live in a new TEMP directory outside the profile server store. Fake object/save proofs and a cost-free journal row test presentation only; no native Piece/ZDO, debit or grant occurred. The helper refuses to allocate when the production runtime already owns GPU resources. Separately, depth4 PaidProgress confirms all four existing .226 native objects: phase3/present/exactPose/receiptMatches. The inventory JSON and five real server plan/journal file hashes remained identical.
+
+Own PID18732 quit normally; bridge3DLL restore verified. Regular4137 files unchanged by size/time; content hashes were not collected. Two optional backpack API lookup warnings are retained separately. QA **0.19.231** installed only in TerrainRamp-1.0-Test, SHA `19F8E81CCF093A31C50D704C63EDB161D48B4245F957E27FC96F94C7D526055C`. Local evidence: `artifacts/checkpoint-231` and sibling `ValheimQA/artifacts/20261019-104733`. The verify skill is absent; actual checks are listed instead.
+
+Open: ordinary Create, real paid continuation with fog, paid cancellation/general recovery, four-sided wall passages/house appearance, FPS/heavy blueprints, native E/HUD, network. Camera replacement and actual GPU/source/drain faults were not injected. The current32-owner/64m/32768-work backend explicitly refuses additional visual admission and retains existing history; large-building support remains unfinished. No terrain work/EarthWorks integration. All14 goal blocks retained; Goal API active.

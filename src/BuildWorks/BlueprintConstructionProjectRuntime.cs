@@ -23,6 +23,11 @@ namespace OstrixMods.BuildWorks
         private Guid queued;
         private int queuedFrame;
         private bool recoveryOnly;
+        private BlueprintConstructionProjectFog fog;
+        private BlueprintConstructionPartExecution fogExecution;
+        private string fogExecutionStatus;
+        internal BlueprintConstructionProjectFog Fog => fog;
+        internal string FogError(Guid id) => fog ? fog.Error(id) : null;
         internal BlueprintConstructionPartExecution Execution => execution;
         internal int BoardCount => boards.Count;
         internal long World => world;
@@ -63,8 +68,7 @@ namespace OstrixMods.BuildWorks
                 !HasHammer(Player.m_localPlayer) || Vector3.Distance(Player.m_localPlayer.transform.position, OpenBoard.transform.position) > 5)) Close();
             try { view.Tick(this, OpenBoard); }
             catch (Exception error) { Close(); log?.Invoke(error); }
-            if (failed || store != null) return;
-            try
+            if (!failed && store == null) try
             {
                 store = new Store(Path.Combine(root, "world_" + world.ToString(CultureInfo.InvariantCulture), "projects"), world);
                 foreach (Guid id in store.Ids())
@@ -74,6 +78,7 @@ namespace OstrixMods.BuildWorks
                 }
             }
             catch (Exception error) { ClearBoards(); store = null; failed = true; Failure = error.Message; log?.Invoke(error); }
+            TickFog();
         }
 
         internal Store.Record Create(Guid id, CompositeBlueprintStore.Blueprint blueprint, Store.Pose rootPose, IReadOnlyList<Store.Pose> poses)
@@ -81,6 +86,7 @@ namespace OstrixMods.BuildWorks
             RequireContext();
             Store.Record record = store.Create(id, blueprint, rootPose, poses);
             if (!boards.ContainsKey(id)) AddBoard(record);
+            TickFog();
             return record;
         }
 
@@ -124,6 +130,8 @@ namespace OstrixMods.BuildWorks
             RequireContext();
             // Commit the terminal record before removing any world presentation; cancellation cannot refund an unpaid plan.
             store.CancelUnpaid(id, revision, operation);
+            try { fog?.Remove(id); }
+            catch (Exception error) { log?.Invoke(error); }
             if (boards.TryGetValue(id, out var board))
             {
                 if (OpenBoard == board) OpenBoard = null;
@@ -168,8 +176,26 @@ namespace OstrixMods.BuildWorks
         private void ClearBoards()
         {
             Close();
+            if (!ReferenceEquals(fog, null) && fog.Close()) fog = null;
+            fogExecution = null; fogExecutionStatus = null;
             foreach (var board in boards.Values) if (board) board.Retire();
             boards.Clear();
+        }
+        private void TickFog()
+        {
+            if (failed || store == null || boards.Count == 0) return;
+            try
+            {
+                Camera camera = Camera.main;
+                if (!ReferenceEquals(fog, null) && (!fog || fog.gameObject != (camera ? camera.gameObject : null)))
+                { if (!fog.Close()) return; fog = null; }
+                if (!camera) return;
+                if (!fog) { fog = camera.gameObject.AddComponent<BlueprintConstructionProjectFog>(); fog.Initialize(this, log); }
+                foreach (var board in boards.Values) if (board && !fog.Has(board.Id)) fog.Add(board.Record);
+                if (execution != null && (fogExecution != execution || fogExecutionStatus != execution.Status))
+                { fog.Refresh(execution.Project); fogExecution = execution; fogExecutionStatus = execution.Status; }
+            }
+            catch (Exception error) { log?.Invoke(error); }
         }
         internal void Suspend()
         { execution?.Refuse("Construction suspended; evidence retained."); execution = null; queued = Guid.Empty;

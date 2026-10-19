@@ -18,6 +18,7 @@ namespace OstrixMods.BuildWorks
         private readonly Func<BlueprintFogVisual>[] preparations;
         private bool preparing, disposed;
         private bool renderPrepared;
+        private readonly bool sharedDisplay;
         private int preparingIndex = -1, removedCount;
         internal bool Ready { get; private set; }
         internal int PreparedParts { get; private set; }
@@ -44,7 +45,7 @@ namespace OstrixMods.BuildWorks
         internal BlueprintFogBuilding(BlueprintFogAssets assets, BlueprintFogChannels channels,
             CompositeBlueprintStore.Blueprint blueprint, Func<string, GameObject> resolve,
             Vector3 origin, Quaternion rotation, Vector3 actor, Vector2 capsule, bool deferPreparation = false,
-            IReadOnlyList<(Vector3 Position, Quaternion Rotation, Vector3 Scale)> worldPoses = null)
+            IReadOnlyList<(Vector3 Position, Quaternion Rotation, Vector3 Scale)> worldPoses = null, bool sharedDisplay = false)
         {
             if (assets == null || channels == null || resolve == null || blueprint?.parts == null ||
                 blueprint.parts.Count < 1 || blueprint.parts.Count > BlueprintFogAtlas.MaximumOwners)
@@ -62,14 +63,19 @@ namespace OstrixMods.BuildWorks
             }
             Origin = origin;
             this.channels = channels;
+            this.sharedDisplay = sharedDisplay;
             if (channels.SnapshotArena != null) snapshots = new List<BlueprintFogChannels.SnapshotChannel>(prefabs.Length);
+            if (sharedDisplay && snapshots == null) throw new ArgumentException("Shared display requires the strict published pool.");
             if (deferPreparation && snapshots == null) throw new ArgumentException("Deferred building requires the strict published pool.");
             preparations = new Func<BlueprintFogVisual>[prefabs.Length];
             string owner = Guid.NewGuid().ToString("N");
             try
             {
-                if (snapshots != null) published = new BlueprintFogAtlas(assets, channels);
-                else volume = new BlueprintFogVolume(assets);
+                if (!sharedDisplay)
+                {
+                    if (snapshots != null) published = new BlueprintFogAtlas(assets, channels);
+                    else volume = new BlueprintFogVolume(assets);
+                }
                 for (int i = 0; i < prefabs.Length; ++i)
                 {
                     var part = blueprint.parts[i]; Vector3 position, scale; Quaternion facing;
@@ -176,14 +182,14 @@ namespace OstrixMods.BuildWorks
         internal void AdvanceTo(float clock, Vector3 actor, Vector2 capsule, bool emit)
         {
             if (!Ready) throw new InvalidOperationException("Fog building is not prepared.");
-            if (volume == null && published == null) throw new ObjectDisposedException(nameof(BlueprintFogBuilding));
+            if (disposed) throw new ObjectDisposedException(nameof(BlueprintFogBuilding));
             foreach (BlueprintFogVisual part in parts) part.AdvanceTo(clock, actor, capsule, emit);
             Pump();
             Clock = clock;
         }
         internal void Pump()
         {
-            if (published != null)
+            if (snapshots != null && !disposed)
             {
                 channels.PumpSources();
                 renderPrepared = false;
@@ -206,6 +212,19 @@ namespace OstrixMods.BuildWorks
                 else published.PreparePublished(visibleParts, snapshots);
             }
             renderPrepared = true;
+        }
+        internal void AppendPublishedSources(List<BlueprintFogVisual> owners, List<BlueprintFogChannels.SnapshotChannel> channels, bool includeHidden = false)
+        {
+            if (!sharedDisplay || disposed) throw new InvalidOperationException("Shared fog display is not available.");
+            if (!Ready) return;
+            for (int i = 0; i < indexedParts.Length; ++i)
+                if (!removed[i] && (visible[i] || includeHidden) && prepared[i])
+                { owners.Add(indexedParts[i]); channels.Add(indexedParts[i].Snapshot); }
+        }
+        internal void SetDisplayActive(bool value)
+        {
+            for (int i = 0; i < indexedParts.Length; ++i)
+                if (indexedParts[i]?.Root) indexedParts[i].Root.SetActive(value && Ready && !removed[i] && visible[i]);
         }
         internal void Render(Camera camera, RenderTexture image, RenderTexture target, Vector3 beamOrigin, Vector3 beamDirection, float strength)
         {

@@ -295,6 +295,24 @@ namespace OstrixMods.BuildWorks
             Array.Clear(preparedOwners, 0, MaximumOwners); Array.Clear(preparedSnapshots, 0, MaximumOwners);
             ClearPackedOwners();
         }
+        internal void PreparePublishedLayout(IReadOnlyList<BlueprintFogVisual> owners)
+        {
+            if (publishedPool == null || owners == null || owners.Count < 1 || owners.Count > MaximumOwners)
+                throw new ArgumentException("Published fog layout owner count invalid.");
+            var requested = new List<Vector3Int>(owners.Count); Bounds bounds = default;
+            for (int i = 0; i < owners.Count; ++i)
+            {
+                var owner = owners[i];
+                if (owner?.Source == null || !owner.Source.Shape) throw new ArgumentException("Fog layout source missing.");
+                var texture = owner.Source.Shape;
+                requested.Add(new Vector3Int(texture.width + 2, texture.height + 2, texture.depth + 2));
+                if (i == 0) bounds = owner.VolumeBounds; else bounds.Encapsulate(owner.VolumeBounds);
+            }
+            int steps = Mathf.CeilToInt(bounds.size.magnitude / .025f) + 162;
+            if (bounds.size.magnitude > 64 || (long)steps * owners.Count > 32768)
+                throw new InvalidOperationException("Fog projects exceed the bounded visible integration domain.");
+            ChangeLayout(requested, SystemInfo.maxTexture3DSize, Resize);
+        }
         public void Dispose()
         {
             ClearPublished();

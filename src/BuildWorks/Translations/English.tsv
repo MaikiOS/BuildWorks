@@ -230,6 +230,7 @@ project.progress	Built: {0} / {1} parts.
 project.review	An operation needs verification. Repeating construction or an automatic refund is blocked.
 project.unavailable	The construction project is not ready for this operation.
 project.error	Project operation failed: {0}
+project.fog_error	Preview unavailable: {0}. Your project and construction records are retained.
 placement.pause.validation	the next part did not pass Valheim validation
 placement.pause.tool_missing	the required part is unavailable in the current hammer
 placement.pause.native_start	Valheim did not start placement; check the hammer and stamina

@@ -11,7 +11,7 @@ New-Item -ItemType Directory -Path $directory | Out-Null
 $path=Join-Path $directory 'synthetic-validator-input.json'
 $started=[datetime]::UtcNow.AddSeconds(-1); $id=[guid]::NewGuid().ToString('N'); $rejections=0
 function Receipt([string]$mode='NativeCadence') {
-    $native=$mode -cne 'Controls'; $polling=$mode -ceq 'PollingCandidate'; $duration=if($native){48}else{22}
+    $native=$mode -cne 'Controls'; $postCapture=$mode -ceq 'PostCaptureCandidate'; $polling=$postCapture -or $mode -ceq 'PollingCandidate'; $duration=if($native){48}else{22}
     $pairs=switch($mode){'Controls'{0,1,2,3}'NativeControls'{1,2}default{3}}
     $cases=@(foreach($pair in $pairs){
         $capture=($pair -band 2) -ne 0
@@ -19,10 +19,11 @@ function Receipt([string]$mode='NativeCadence') {
           inputSeconds=$duration;clock=$duration;drainSeconds=.2;hostFrames=$duration*30;hostFramesPerSecond=30;maxQueue=12;
           captures=$(if($capture){2}else{0});captureBytes=$(if($capture){1000}else{0});captureMilliseconds=@(if($capture){55;56});
           receiptUpdates=$(if($polling){10}else{0});velocityUpdates=$(if($polling){10}else{0});recoveryUpdates=0;
+          postCapturePumps=$(if($postCapture){2}else{0});
           pollingMilliseconds=$(if($polling){1}else{0});maxPollingMilliseconds=$(if($polling){.1}else{0})}
     })
     @{passed=$true;gameHostTested=$false;nativeHouseGeometryTested=$false;gpuTimingsMeasured=$false;
-      explicitPolling=$polling;mode=$mode;runId=$id;requestedFrameRate=$(if($native){36}else{-1});
+      explicitPolling=$polling;postCapturePump=$postCapture;mode=$mode;runId=$id;requestedFrameRate=$(if($native){36}else{-1});
       configuration='32slots/32768blocks/Spatial3D/4resident;28procedural walls';cases=$cases}
 }
 function Reject([string]$name,[scriptblock]$edit,[string]$expected='NativeCadence') {
@@ -34,7 +35,7 @@ function Reject([string]$name,[scriptblock]$edit,[string]$expected='NativeCadenc
     $script:rejections++
 }
 # Synthetic validator fixtures, never GPU/Valheim evidence.
-foreach($mode in @('Controls','NativeCadence','NativeControls','PollingCandidate')){
+foreach($mode in @('Controls','NativeCadence','NativeControls','PollingCandidate','PostCaptureCandidate')){
     Receipt $mode | ConvertTo-Json -Depth 9 | Set-Content -LiteralPath $path
     Assert-FogProductionFramesEvidence $path $started $mode $id
 }
@@ -73,6 +74,13 @@ Reject 'unreported polling' {param($v) $v.cases[0].receiptUpdates=1}
 Reject 'ordinary report as candidate' {param($v) $v.explicitPolling=$false} 'PollingCandidate'
 Reject 'candidate without updates' {param($v) $v.cases[0].velocityUpdates=0} 'PollingCandidate'
 Reject 'candidate without timing' {param($v) $v.cases[0].pollingMilliseconds=0} 'PollingCandidate'
+Reject 'post-capture disguised as polling' {param($v) $v.postCapturePump=$true} 'PollingCandidate'
+Reject 'post-capture without flag' {param($v) $v.postCapturePump=$false} 'PostCaptureCandidate'
+Reject 'post-capture flag string' {param($v) $v.postCapturePump='true'} 'PostCaptureCandidate'
+Reject 'post-capture missing calls' {param($v) $v.cases[0].postCapturePumps=0} 'PostCaptureCandidate'
+Reject 'post-capture count differs' {param($v) $v.cases[0].postCapturePumps=1} 'PostCaptureCandidate'
+Reject 'post-capture fractional calls' {param($v) $v.cases[0].postCapturePumps=2.5} 'PostCaptureCandidate'
+Reject 'post-capture without polling' {param($v) $v.explicitPolling=$false} 'PostCaptureCandidate'
 $stale=Receipt; $stale | ConvertTo-Json -Depth 9 | Set-Content -LiteralPath $path
 (Get-Item -LiteralPath $path).LastWriteTimeUtc=$started.AddMinutes(-1)
 try {Assert-FogProductionFramesEvidence $path $started 'NativeCadence' $id; throw 'STALE_ACCEPTED'}catch{if($_.Exception.Message -eq 'STALE_ACCEPTED'){throw}; $rejections++}
@@ -90,7 +98,7 @@ foreach($invalid in @('duplicate','missing','stringFlag')){
     $rejected=$false; try {& $manifestCheck}catch{$rejected=$true}
     if(!$rejected){throw ('Invalid shader manifest accepted: '+$invalid)}; $rejections++
 }
-@{passed=$true;syntheticValidatorOnly=$true;positiveModes=4;positiveManifests=1;rejected=$rejections;gpuStarted=$false;
+@{passed=$true;syntheticValidatorOnly=$true;positiveModes=5;positiveManifests=1;rejected=$rejections;gpuStarted=$false;
   validatorSha256=(Get-FileHash -LiteralPath (Join-Path $root 'scripts/Test-FogProductionFrames.ps1')).Hash;
   suiteSha256=(Get-FileHash -LiteralPath $PSCommandPath).Hash} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $directory 'verification.json')
-Write-Output ('PASS production-frame receipt gate:4 modes/1 manifest/'+$rejections+' negative cases; CPU only. '+$directory)
+Write-Output ('PASS production-frame receipt gate:5 modes/1 manifest/'+$rejections+' negative cases; CPU only. '+$directory)

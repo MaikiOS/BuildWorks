@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-19 — diagnostic238: service after Capture
+
+A separate mode retains PollingCandidate and adds exactly one pump after each successful capture. CPU gate5modes/48rejections and read-only review passed. GPU FAILED queue64 at35.05s; dense comparisons0. No production promotion or new deployment; QA .237 unchanged. [Evidence and next measurement](CHECKPOINT_238.md).
+
 ## 2026-10-19 — .237: saved-part absence before refund
 
 A bounded batch reader and game-thread adapter cover the complete mapped world41/42 set, keep absence distinct from presence, and reject corruption, generation or custody changes.574 reader and153 adapter CPU assertions, Store, builds/contracts and two read-only reviews passed. Paid cancellation/delivery remain disabled. [Report](CHECKPOINT_237.md), [technical plan](PROJECT_CANCELLATION_PROTOCOL.md).

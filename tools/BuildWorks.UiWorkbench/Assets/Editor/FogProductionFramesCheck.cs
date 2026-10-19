@@ -37,6 +37,8 @@ public static class FogProductionFramesCheck
     { SessionState.SetBool(Pending + ".NativeControls", true); RunNativeCadence(); }
     public static void RunPollingCandidate()
     { SessionState.SetBool(Pending + ".PollingCandidate", true); RunNativeCadence(); }
+    public static void RunPostCaptureCandidate()
+    { SessionState.SetBool(Pending + ".PostCaptureCandidate", true); RunPollingCandidate(); }
     private static void Advance()
     {
         try
@@ -63,11 +65,13 @@ public static class FogProductionFramesCheck
         bool nativeCadence = SessionState.GetBool(Pending + ".NativeCadence", false); SessionState.SetBool(Pending + ".NativeCadence", false);
         bool controls = SessionState.GetBool(Pending + ".NativeControls", false); SessionState.SetBool(Pending + ".NativeControls", false);
         bool polling = SessionState.GetBool(Pending + ".PollingCandidate", false); SessionState.SetBool(Pending + ".PollingCandidate", false);
+        bool postCapture = SessionState.GetBool(Pending + ".PostCaptureCandidate", false); SessionState.SetBool(Pending + ".PostCaptureCandidate", false);
         if (nativeCadence) { QualitySettings.vSyncCount = 0; Application.targetFrameRate = 36; }
-        string modeName = polling ? "PollingCandidate" : controls ? "NativeControls" : nativeCadence ? "NativeCadence" : "Controls";
+        string modeName = postCapture ? "PostCaptureCandidate" : polling ? "PollingCandidate" : controls ? "NativeControls" : nativeCadence ? "NativeCadence" : "Controls";
         string output = Argument("-fogEvidenceOutput") ?? Path.Combine(root, "artifacts/checkpoint-234/" + (polling ? "polling-candidate" : controls ? "native-controls" : nativeCadence ? "native-cadence" : "production-frames")); Directory.CreateDirectory(output);
         var report = currentReport = new Report(); reportPath = Path.Combine(output, "verification.json");
         report.requestedFrameRate = nativeCadence ? 36 : -1; report.mode = modeName; report.runId = Argument("-fogEvidenceId"); report.explicitPolling = polling;
+        report.postCapturePump = postCapture;
         using (var assets = new BlueprintFogAssets(File.ReadAllBytes(Path.Combine(root, "artifacts/fog-runtime-assets-candidate/buildworks-fog-v11"))))
         {
             for (int mode = controls ? 1 : nativeCadence ? 3 : 0; mode < (controls ? 3 : 4); ++mode)
@@ -75,7 +79,7 @@ public static class FogProductionFramesCheck
                 var result = new Case { contact = (mode & 1) != 0, capture = (mode & 2) != 0 };
                 string folder = Path.Combine(output, "case-" + mode); Directory.CreateDirectory(folder);
                 report.cases.Add(result);
-                var test = Measure(assets, result, folder, nativeCadence ? 48 : 22, polling);
+                var test = Measure(assets, result, folder, nativeCadence ? 48 : 22, polling, postCapture);
                 try { while (test.MoveNext()) yield return null; }
                 finally { (test as IDisposable)?.Dispose(); }
                 File.WriteAllText(Path.Combine(output, "verification.json"), JsonUtility.ToJson(report, true));
@@ -85,7 +89,7 @@ public static class FogProductionFramesCheck
         File.WriteAllText(Path.Combine(output, "verification.json"), JsonUtility.ToJson(report, true));
         Debug.Log("BUILDWORKS_PRODUCTION_FRAMES_" + (report.passed ? "OK" : "FAILED"));
     }
-    private static IEnumerator Measure(BlueprintFogAssets assets, Case result, string output, int duration, bool polling)
+    private static IEnumerator Measure(BlueprintFogAssets assets, Case result, string output, int duration, bool polling, bool postCapture)
     {
         var body = new Vector2(.3f, .95f);
         var wall = GameObject.CreatePrimitive(PrimitiveType.Cube); wall.transform.localScale = new Vector3(.2f, 2, 2); wall.SetActive(false);
@@ -196,6 +200,11 @@ public static class FogProductionFramesCheck
                             probe.Render = (image, destination) => atlas.Render(camera, image, destination, visuals, new Vector3(-4, 1, 0), Vector3.right, 0, snapshots);
                             var watch = System.Diagnostics.Stopwatch.StartNew(); Capture(camera, probe, target, pixels, Path.Combine(output, "frame-" + result.captures.ToString("D4") + ".png"), result);
                             result.captureMilliseconds.Add(watch.Elapsed.TotalMilliseconds); ++result.captures;
+                            if (postCapture)
+                            {
+                                // Test whether synchronous capture leaves completed readbacks idle until the next host frame.
+                                PollCandidate(); pool.PumpSources(); ++result.postCapturePumps;
+                            }
                             nextCapture = Time.realtimeSinceStartupAsDouble - started + .1;
                         }
                         if (elapsed >= nextTrace) { Trace(); nextTrace = elapsed + .25; }
@@ -269,8 +278,8 @@ public static class FogProductionFramesCheck
     private static string Argument(string name)
     { var args = Environment.GetCommandLineArgs(); int index = Array.IndexOf(args, name); return index >= 0 && index + 1 < args.Length ? args[index + 1] : null; }
     private static void Require(bool value, string message) { if (!value) throw new InvalidOperationException(message); }
-    [Serializable] private sealed class Report { public bool passed, gameHostTested, nativeHouseGeometryTested, gpuTimingsMeasured, explicitPolling; public int requestedFrameRate; public string mode, runId, configuration = "32slots/32768blocks/Spatial3D/4resident;28procedural walls"; public List<Case> cases = new List<Case>(); }
-    [Serializable] private sealed class Case { public bool passed, contact, capture; public string failure; public int maxQueue, captures, hostFrames, scalarComparisons, fieldComparisons, receiptUpdates, velocityUpdates, recoveryUpdates; public long captureBytes; public float clock; public double inputSeconds, drainSeconds, hostFramesPerSecond, pollingMilliseconds, maxPollingMilliseconds; public List<double> captureMilliseconds = new List<double>(); }
+    [Serializable] private sealed class Report { public bool passed, gameHostTested, nativeHouseGeometryTested, gpuTimingsMeasured, explicitPolling, postCapturePump; public int requestedFrameRate; public string mode, runId, configuration = "32slots/32768blocks/Spatial3D/4resident;28procedural walls"; public List<Case> cases = new List<Case>(); }
+    [Serializable] private sealed class Case { public bool passed, contact, capture; public string failure; public int maxQueue, captures, hostFrames, scalarComparisons, fieldComparisons, receiptUpdates, velocityUpdates, recoveryUpdates, postCapturePumps; public long captureBytes; public float clock; public double inputSeconds, drainSeconds, hostFramesPerSecond, pollingMilliseconds, maxPollingMilliseconds; public List<double> captureMilliseconds = new List<double>(); }
     [Serializable] private sealed class Frame { public int hostFrame, cursor, resident; public double seconds; public float clock; public string reason; public long fieldBytes, velocityRamBytes; public Owner[] owners; }
     [Serializable] private sealed class Owner { public int slot, queued, pending, tick, accepted; public uint flags; public string state, error; public bool resident, nativePending, evictionPending, evictionNativePending; public double secondsWithoutProgress; }
     [Serializable] private sealed class Accepted { public Series[] owners; }

@@ -1,10 +1,10 @@
 # BuildWorks continuation
 
+**Diagnostic238, game version .237:** PostCaptureCandidate also FAILED — queue64 at35.05s/29.24FPS,135 captures/135 additional pumps; exact comparisons were not reached. Repeats stopped after two equivalent failures; production unchanged. Next: measure actual batches, receipt/velocity waits, texture creation/upload and capture stages; Update-call counts do not identify the bottleneck. [Evidence](docs/CHECKPOINT_238.md).
+
 **Source .237 / installed QA .237:** a distinct batch-absence proof scans every mapped saved-world chunk once and binds the result to world, generation and unchanged custody. Geometry574 and adapter153 CPU assertions, Store, normal/QA0/0, host/localization1122/separation passed. This is a prerequisite for safe refunds, **not implemented paid cancellation**: removal, delivery and pickup remain disconnected. [Evidence](docs/CHECKPOINT_237.md).
 
 **Deployment and Valheim .237:** guarded QA installation verified, SHA6A7BFDA209DCB16283DD5486C21A8C24477F96F7979589F3152B3928248B8242. Actual wrapper read generation143/world42:6chunks/44661objects, refused a present marker and accepted the absent batch; inventory identical. This does not test removal/refund. Evidence: `artifacts/checkpoint-237/native/verification.json`, `../ValheimQA/artifacts/20261019-172816/`.
-
-**Additional GPU check,19 October:** PollingCandidate FAILED: queue64 at34.15s/30.72FPS;936+936 Update calls are not completed transfers, dense comparisons0. Production unchanged. Next test-only experiment: service completed requests after Capture; do not repeat native house before PASS. Evidence: `artifacts/fog-production-frames/PollingCandidate-20261019-172119-b06faa2a/`.
 
 2026-10-19 · [Русский](HANDOFF_RU.md)
 

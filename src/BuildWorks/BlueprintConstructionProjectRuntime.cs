@@ -26,6 +26,9 @@ namespace OstrixMods.BuildWorks
         private BlueprintConstructionProjectFog fog;
         private BlueprintConstructionPartExecution fogExecution;
         private string fogExecutionStatus;
+#if BUILDWORKS_TEST_STAND
+        internal static bool QaFailNextBoard;
+#endif
         internal BlueprintConstructionProjectFog Fog => fog;
         internal string FogError(Guid id) => fog ? fog.Error(id) : null;
         internal BlueprintConstructionPartExecution Execution => execution;
@@ -34,6 +37,12 @@ namespace OstrixMods.BuildWorks
         internal string Failure { get; private set; }
         internal BlueprintConstructionProjectBoard OpenBoard { get; private set; }
         internal bool BlocksInput => view.IsOpen || execution?.Saving == true;
+        internal static bool IsPrivateLocalPlacement => ZNet.instance && Player.m_localPlayer && Game.instance &&
+            !Game.instance.IsShuttingDown() && ZNet.instance.IsServer() && !ZNet.instance.IsDedicated() &&
+            !ZNet.IsOpenServer() && ZNet.instance.GetPeers().Count == 0 && ZNet.instance.LocalPlayerIsAdminOrHost() &&
+            ZNet.instance.GetWorld()?.m_fileSource == FileHelpers.FileSource.Local;
+        internal bool CanCreateFromPlacement => !disposed && !failed && store != null && Allowed() &&
+            IsPrivateLocalPlacement;
 
         internal BlueprintConstructionProjectRuntime(string configPath, Action<Exception> log)
         { root = Path.Combine(configPath ?? throw new ArgumentNullException(nameof(configPath)), "BuildWorks", "server"); this.log = log; }
@@ -85,12 +94,26 @@ namespace OstrixMods.BuildWorks
         {
             RequireContext();
             Store.Record record = store.Create(id, blueprint, rootPose, poses);
-            if (!boards.ContainsKey(id)) AddBoard(record);
-            TickFog();
+            // A confirmed durable write remains successful even when its presentation cannot be created.
+            try
+            {
+#if BUILDWORKS_TEST_STAND
+                if (QaFailNextBoard) { QaFailNextBoard = false; throw new IOException("QA deliberate post-commit board failure."); }
+#endif
+                if (!boards.ContainsKey(id)) AddBoard(record); TickFog();
+            }
+            catch (Exception error) { Failure = error.Message; log?.Invoke(error); }
             return record;
         }
 
         internal Store.Record Read(Guid id) { RequireContext(); return store.Load(id); }
+        internal bool StartCreated(Guid id)
+        {
+            RequireContext();
+            if (!CanCreateFromPlacement || !Board(id) || queued != Guid.Empty || OpenBoard || execution != null && !execution.Finished) return false;
+            if (NextPart(id) == null) return false;
+            Failure = null; recoveryOnly = false; queued = id; queuedFrame = Time.frameCount; return true;
+        }
         internal BlueprintConstructionPartJournal.Record ReadPart(Guid id, Guid part) { RequireContext(); return new BlueprintConstructionPartJournal(store).Read(id, part); }
         internal (int Built, int Total, bool NeedsReview) Progress(Guid id)
         {

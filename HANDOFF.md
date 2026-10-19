@@ -2,13 +2,13 @@
 
 2026-10-19 · [Русский](HANDOFF_RU.md)
 
-**QA .231 installed:** project/journal v11 hook, native31/31 and GPU270/18. Synthetic TEMP journals are separate from the existing paid native fixture. Process closed/bridge restored. **Next: ordinary Create, real paid continuation with fog, wall passages/house.** [Evidence](docs/CHECKPOINT_231.md).
+**QA .232 installed:** ordinary caller→durable project→board/v11→native payment→world reload. Valheim21+17+9+8; fixed the first-part stall. Process closed/bridge restored. **Next: long wall/house, paid cancellation and recovery.** [Evidence](docs/CHECKPOINT_232.md).
 
 
 1. Read [PROJECT_CONTRACT](PROJECT_CONTRACT.md), [current evidence](docs/CURRENT_STATUS.md), [forward roadmap](docs/ROADMAP.md) and project AGENTS. Preserve the complete goal; this file is not a goal API update.
-2. QA0.19.231, SHA19F8E81CCF093A31C50D704C63EDB161D48B4245F957E27FC96F94C7D526055C. Bound shared resources; fog failure must preserve board/payment. No site preparation; public .37 alpha unchanged.
+2. QA0.19.232, SHA9BA4E5610650794B2D724E28FCDFEE77AB28598527C9C34D3B03751B5A3675A3. Private Local structural caller only; special/contents retain their previous path. Fog failure must preserve board/payment. No terrain work; public .37 alpha unchanged.
 
-Work resumed; Goal API active. ValheimQA is the default automated game test. Own PID18732 exited normally; bridge restored. Historical evidence below retains its original versions; .229 does not complete the module.
+Work resumed; Goal API active. ValheimQA is the default automated game test, with no desktop input. Own PID56652 exited normally; bridge restored. Historical evidence below retains its original versions; .232 does not complete the module.
 
 [.213](docs/FOG_NOISE_FRAME_213.md) aligns noise phases across parts; GPU checks/regressions passed and QA is installed. Native .213 is untested; boundary loss, recovery ownership and performance remain open.
 

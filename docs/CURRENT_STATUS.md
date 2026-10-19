@@ -2,7 +2,7 @@
 
 **2026-10-19 · [Русский](CURRENT_STATUS_RU.md) · [Roadmap](ROADMAP.md) · [Documentation](README.md)**
 
-**QA .231 installed:** persisted projects/journal phases now drive one shared v11 renderer; Valheim 31/31, exact TRS and bounded admission. Temporary-store journal receipts are synthetic; existing native paid objects were separately verified, not newly paid. [Limits](CHECKPOINT_231.md): ordinary Create, paid cancellation/recovery, house appearance and network remain open. Camera/held-tilt snapping is not accepted.
+**QA .232 installed:** ordinary structural confirmation saves a project before native debit; Valheim21/21 failures/retry,17/17 fog/payment,9/9 board continuation and8/8 world reload. Two walls paid4Wood; the retained1/2 project finished for another2Wood. Fixed the stall after the first part. [Limits](CHECKPOINT_232.md): private Local host, no special/contents or paid refund, full visual/network acceptance. Camera/held-tilt snapping remains open.
 
 **Last bounded game proof .226:** four-wall native continuation16/16 and world reload10/10, with exact debit/save evidence. Project fog, paid cancellation and server work remain open. [.226](CHECKPOINT_226.md).
 
@@ -17,8 +17,8 @@ Previous QA **0.19.226**: Normal/QA0/0, full Store/Geometry, host1.0.20/25909357
 | Catalog and file exchange | Categories, Save As, delete/hide, automatic portable file, Share, batch import/export | Limited batch .197 import/export/reentry proved | Full batch UI/dirty draft/restart; some owner checks remain |
 | Server library and sharing | Administrator publication; players/admin visibility, verified personal copies, provenance; in-process checks | Host+remote not accepted | Live access/reconnect/restart; direct player-to-player transfer |
 | Items and storage | Separate storage/mount inclusion; supplied-item preservation and journal foundations | Limited chest/inventory comparison only | Durable settlement, cancellation/refund/crash/replay, all holders/armor/admin restore and network authority |
-| v11 fog | .231 shared project renderer, WorldPose/journal masks/bounded admission; GPU270/18, normal/QA/CPU/review | Valheim31/31 on two temporary projects, synthetic phases/scale/refusal/reload; existing4 paid native objects retained | Ordinary Create, new paid continuation with fog, passages/house appearance/FPS/faults/network |
-| Unfinished construction | .226 native ProjectPart/payment/reload; .231 journal-driven v11 with independent visual failure | Prior16/16+10/10; .231 TEMP journal/render/reload31/31 and retained4 paid native objects | Ordinary Create, new paid continuation with fog, paid cancellation/general recovery, native input/HUD, server/remote |
+| v11 fog | .231 shared renderer; .232 real structural project/journal | Two unpaid parts visible; committed2/2 removed from fog; world reload without another debit | Passages/wall/house appearance/FPS, faults and network |
+| Unfinished construction | .232 ordinary Hammer caller, frozen plan, board and native ProjectPart | Valheim21+17+9+8;2/2 walls4Wood, separate1/2→2/2 continuation2Wood, native TRS/receipt after reload | All objects/contents, paid cancellation/general recovery, HUD/native E, server/remote |
 | World selection and heavy chain | Capture/volume foundations and targeted checks | Basic capture accepted; later coordinate/height UX issues reported | Editable volume/gizmos, boundary rules, full loaded-area and performance acceptance |
 | World objects and EarthWorks | No terrain integration dependency | None claimed | Admin-priced nonrecipe objects; EarthWorks is a later separate integration |
 

@@ -14,6 +14,9 @@ namespace OstrixMods.BuildWorks
         private const int MaximumBytes = BlueprintExchangeFormat.MaximumBytes + CompositeBlueprintStore.MaximumParts * 64 + 256;
         private readonly string directory;
         private readonly long world;
+#if BUILDWORKS_TEST_STAND
+        internal static bool QaFailAfterCommit;
+#endif
         internal string DirectoryPath => directory;
 
         internal readonly struct Pose
@@ -77,7 +80,11 @@ namespace OstrixMods.BuildWorks
                         prior.Parts.Select(p => p.WorldPose).Zip(partPoses, SamePose).All(v => v)) return prior;
                     throw new InvalidOperationException("Project identity already has a different plan or terminal state.");
                 }
-                Commit(record, false); return Load(id);
+                Commit(record, false);
+#if BUILDWORKS_TEST_STAND
+                if (QaFailAfterCommit) { QaFailAfterCommit = false; throw new IOException("QA deliberate post-commit observation failure."); }
+#endif
+                return Load(id);
             }
         }
 

@@ -2032,6 +2032,7 @@ namespace OstrixMods.BuildWorks
             CompositeBlueprintStore.Blueprint blueprint,
             bool editBeforePlacement = false)
         {
+            LastCreatedProject = Guid.Empty;
             if (ReferenceEquals(PlacementRecipe(blueprint), blueprint) && RequiresContentsChoice(blueprint))
                 return RequestContentsChoice(player, blueprint, fromCatalog: false, precision: editBeforePlacement);
             blueprint = PlacementRecipe(blueprint);
@@ -2147,7 +2148,7 @@ namespace OstrixMods.BuildWorks
                 // ArmPlacement already reports the specific failure (including missing mounted items).
                 Finish();
             }
-            return armed || state == PlacementState.Armed;
+            return armed || state == PlacementState.Armed || LastCreatedProject != Guid.Empty;
         }
 
         public void LateUpdate()
@@ -3262,7 +3263,8 @@ namespace OstrixMods.BuildWorks
         }
 
         internal static bool HasUsableHammer(Player player) => player && UsesHammerPieceTable(player) && HasUsableBuildTool(player);
-        internal bool CanOpenConstructionProject => state == PlacementState.Inactive && sessionMode == SessionMode.None &&
+        internal bool CanOpenConstructionProject => state == PlacementState.Inactive &&
+            (sessionMode == SessionMode.None || sessionMode == SessionMode.BlueprintWorldPlacement) && pendingCatalogBlueprint == null &&
             Player.m_localPlayer && !Hud.IsPieceSelectionVisible() && GameplayInputAvailable(Player.m_localPlayer);
 
         public void Dispose()
@@ -6588,6 +6590,7 @@ namespace OstrixMods.BuildWorks
                 return false;
             }
             editorRootBeforePlacement = new TransformSnapshot(currentPosition, currentRotation);
+            if (TryCreateConstructionProject(player)) return false;
             placementPlanIndex = 0;
             automaticSkippedPlacements = 0;
             if (sessionMode == SessionMode.BlueprintWorldPlacement)

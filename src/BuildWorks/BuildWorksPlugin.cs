@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.231";
+        internal const string PluginVersion = "0.19.232";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -33,6 +33,7 @@ namespace OstrixMods.BuildWorks
         private PrecisionPlacementSession session;
         private BlueprintServerRuntime serverLibrary;
         private BlueprintConstructionProjectRuntime constructionProjects;
+        internal static BlueprintConstructionProjectRuntime ConstructionProjects => instance?.constructionProjects;
         internal static bool CanOpenConstructionProject => instance && instance.blueprintEditor?.BlocksWorldInput != true &&
             !HammerCatalogView.BlocksExchangeInput && instance.session?.CanOpenConstructionProject == true;
         internal static bool BeginConstructionProjectPart(BlueprintConstructionPartExecution execution) => instance &&
@@ -343,6 +344,7 @@ namespace OstrixMods.BuildWorks
 
 #if BUILDWORKS_TEST_STAND
         internal static BlueprintConstructionProjectRuntime QaConstructionProjects => instance?.constructionProjects;
+        internal static PrecisionPlacementSession QaPlacementSession => instance?.session;
         internal static CompositeBlueprintStore.Blueprint QaBlueprint(string id)
         {
             RequireQaStorageIdle();

@@ -27,7 +27,7 @@ namespace OstrixMods.BuildWorks
             uint revision = zdo.DataRevision;
             int hash = stand.GetAttachedItem();
             if (hash == 0) return stand && view && view.IsValid() &&
-                ReferenceEquals(StandView.GetValue(stand), view) && zdo.DataRevision == revision;
+                ReferenceEquals(StandView.GetValue(stand), view) && ReferenceEquals(view.GetZDO(), zdo) && zdo.DataRevision == revision;
             GameObject item = ObjectDB.instance ? ObjectDB.instance.GetItemPrefab(hash) : null;
             if (!item || !item.GetComponent<ItemDrop>()) return false;
             int variant = zdo.GetInt(ZDOVars.s_variant, 0);
@@ -46,7 +46,7 @@ namespace OstrixMods.BuildWorks
                 if (package != null && !BlueprintItemStandContents.TryRead(snapshot, name => name.GetStableHashCode(), out _))
                     return false;
                 if (!stand || !view || !view.IsValid() ||
-                    !ReferenceEquals(StandView.GetValue(stand), view) || zdo.DataRevision != revision) return false;
+                    !ReferenceEquals(StandView.GetValue(stand), view) || !ReferenceEquals(view.GetZDO(), zdo) || zdo.DataRevision != revision) return false;
                 data = snapshot;
                 return true;
             }

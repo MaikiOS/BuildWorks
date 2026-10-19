@@ -6,7 +6,9 @@ BuildWorks extends Valheim's hammer with precise construction, a blueprint catal
 
 ![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
 
-**Current source / isolated QA: 0.19.233.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
+**Current source:0.19.235; installed isolated QA:0.19.233.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
+
+[.235](docs/CHECKPOINT_235.md) fixes captured ItemStand ZDO identity, with11 CPU regressions and builds/contracts passing; game deployment is pending. ArmorStand and whole-house fog remain unfinished.
 
 [Diagnostic checkpoint234](docs/CHECKPOINT_234.md) reproduces the lower-frame-rate fog queue failure and prepares a test-only experiment. It does not change the game DLL or establish whole-house support.
 

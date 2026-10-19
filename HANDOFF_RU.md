@@ -1,5 +1,7 @@
 # Продолжение BuildWorks
 
+**Исходники/сборки .235, установлена QA .233:** исправлена подмена ZDO при захвате ItemStand,11 CPU и normal/QA/host/localization1121/separation прошли. Не устанавливать при работающей игре. GPU/Valheim не запускались, туман unchanged; следующий эксперимент —234 PollingCandidate после освобождения GPU. [Отчёт .235](docs/CHECKPOINT_235_RU.md). Полная ArmorStand требует pose/slot/package adapter, guard сохранён.
+
 **После .233 — [диагностический этап234](docs/CHECKPOINT_234_RU.md):** запись при31,7FPS воспроизводит queue64 без контакта, контакт без записи48с проходит. Подготовлен test-only `PollingCandidate`; GPU ещё не запускался, runtime/DLL .233. Следующий запуск — `scripts/Test-FogProductionFrames.ps1 -Mode PollingCandidate` только после освобождения GPU, без повторения прежнего failed-house. Пока Ostrix играет — CPU-работа. Source/read-only review PASSED; это не приёмка дома.
 
 2026-10-19 · [English](HANDOFF.md)

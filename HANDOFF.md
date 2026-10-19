@@ -1,5 +1,7 @@
 # BuildWorks continuation
 
+**Source/build .235, installed QA .233:** captured ItemStand ZDO identity fixed;11 CPU checks plus normal/QA/host/localization1121/separation passed. Do not deploy with a running game. No GPU/Valheim run; fog unchanged. Next experiment is234 PollingCandidate when GPU is free. [Report .235](docs/CHECKPOINT_235.md). Full ArmorStand needs its own pose/slot/package adapter; guard retained.
+
 **After .233 — [diagnostic checkpoint234](docs/CHECKPOINT_234.md):** recording at31.7FPS reproduces queue64 without contact; contact without recording passes48s. Test-only `PollingCandidate` is prepared, not GPU-run; runtime/DLL remains .233. Next: `scripts/Test-FogProductionFrames.ps1 -Mode PollingCandidate` only when GPU is free, without repeating the failed native house. CPU-only while Ostrix plays. Source/read-only review passed, not house acceptance.
 
 2026-10-19 · [Русский](HANDOFF_RU.md)

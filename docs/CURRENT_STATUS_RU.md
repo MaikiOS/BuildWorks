@@ -1,5 +1,7 @@
 # Актуальное состояние BuildWorks
 
+**Источник .235 / установлена QA .233:** исправлен захват устаревшего ItemStand ZDO;11 CPU-регрессий, normal/QA0/0, host/localization1121/separation прошли. Игра/GPU не запускались; ArmorStand и дом остаются открыты. [Доказательства](CHECKPOINT_235_RU.md).
+
 **Диагностика234, DLL остаётся .233:** queue64 воспроизведён при31,7FPS даже без контакта; контакт без записи48с прошёл. Подготовлен test-only polling-кандидат, GPU ещё не проверен; CPU4/1/41 и offline Editor compile прошли. [Доказательства](CHECKPOINT_234_RU.md).
 
 **2026-10-19 · [English](CURRENT_STATUS.md) · [План](ROADMAP_RU.md) · [Документация](README_RU.md)**

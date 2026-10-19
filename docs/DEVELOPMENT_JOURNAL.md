@@ -1,5 +1,12 @@
 # BuildWorks development journal
 
+## 2026-10-19 — .235: captured stand ZDO identity
+
+Old source reproduced stale empty/occupied capture after same-view/equal-revision
+ZDO replacement. Two reference guards fix it;11 CPU checks, normal/QA0/0,
+host/localization1121/separation and reviews passed. QA .233 remains installed;
+no GPU/game run. ArmorStand guard retained. [Evidence](CHECKPOINT_235.md).
+
 ## 2026-10-19 — diagnostic checkpoint234, DLL .233
 
 Recording at lower frame rates reproduced queue64 without contact; contact without

@@ -1,5 +1,7 @@
 # Current BuildWorks status
 
+**Source .235 / installed QA .233:** stale ItemStand ZDO capture fixed;11 CPU regressions, normal/QA0/0, host/localization1121/separation passed. No game/GPU run; ArmorStand and whole-house fog remain open. [Evidence](CHECKPOINT_235.md).
+
 **Diagnostic234, DLL remains .233:** queue64 reproduced at31.7FPS without contact; contact without recording passed48s. A test-only polling candidate is prepared, not GPU-tested; CPU4/1/41 and offline Editor compilation passed. [Evidence](CHECKPOINT_234.md).
 
 **2026-10-19 · [Русский](CURRENT_STATUS_RU.md) · [Roadmap](ROADMAP.md) · [Documentation](README.md)**

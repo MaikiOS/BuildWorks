@@ -2,7 +2,7 @@
 
 **2026-10-19 · [Русский](CURRENT_STATUS_RU.md) · [Roadmap](ROADMAP.md) · [Documentation](README.md)**
 
-**QA .229 installed:** exact-distance ties stabilized; Valheim171 plus stand576/2304, native/F9 order changes0/0, manual6/6, inventory unchanged. normal/QA0/0, Geometry, HostContract97, localization1118, Unity Harmony17125×128 and independent review pass. Legacy v11 baseline pinned; CPU1748+32 and Editor compilation pass. [Evidence/limits](CHECKPOINT_229.md). Camera/held tilt and complete world snapping remain open.
+**QA .230 installed:** embedded v11 bundle and independent hide/show/retire of parts; GPU23preparation/8lifecycle and Valheim33/33 with explicit Camera.Render passed. normal/QA0/0, Geometry/host/localization and independent review. [Limits](CHECKPOINT_230.md): persisted-project hook/ordinary Create/house appearance/network remain open. The .229 tie-order fix retains its bounded proof; camera/held tilt remain open.
 
 **Last bounded game proof .226:** four-wall native continuation16/16 and world reload10/10, with exact debit/save evidence. Project fog, paid cancellation and server work remain open. [.226](CHECKPOINT_226.md).
 
@@ -17,7 +17,7 @@ Previous QA **0.19.226**: Normal/QA0/0, full Store/Geometry, host1.0.20/25909357
 | Catalog and file exchange | Categories, Save As, delete/hide, automatic portable file, Share, batch import/export | Limited batch .197 import/export/reentry proved | Full batch UI/dirty draft/restart; some owner checks remain |
 | Server library and sharing | Administrator publication; players/admin visibility, verified personal copies, provenance; in-process checks | Host+remote not accepted | Live access/reconnect/restart; direct player-to-player transfer |
 | Items and storage | Separate storage/mount inclusion; supplied-item preservation and journal foundations | Limited chest/inventory comparison only | Durable settlement, cancellation/refund/crash/replay, all holders/armor/admin restore and network authority |
-| v11 fog | .224 canonical78+78 exact; .225 Gamma/Linear each108 exact fields/36 images | Native .224:11/11+66/66/4clips/recovery0; .225 matched-scene is Unity-only | Actual-prefab look/scale/tilt/recontact/FPS, house budget, project fog and networking |
+| v11 fog | .230 embedded6F2A; GPU23preparation/8lifecycle,87captures/62comparisons, legacy16/delta0; world poses/independent part states | Valheim33/33 with5 Camera.Render calls,5assets/28kernels; prior .224 videos remain separate | Project/journal hook, ordinary Create, native appearance/passages/house/FPS/network |
 | Unfinished construction | .226 Intent/Observed/Committed, native ProjectPart, board-handler continuation and bounded existing-operation reconciliation | Valheim16/16+10/10:4walls,2Wood/part, exact TRS/receipt/paired save/world reload | Ordinary Create wiring, fog, paid cancellation, general crash reconciliation, native input/HUD, server/remote |
 | World selection and heavy chain | Capture/volume foundations and targeted checks | Basic capture accepted; later coordinate/height UX issues reported | Editable volume/gizmos, boundary rules, full loaded-area and performance acceptance |
 | World objects and EarthWorks | No terrain integration dependency | None claimed | Admin-priced nonrecipe objects; EarthWorks is a later separate integration |

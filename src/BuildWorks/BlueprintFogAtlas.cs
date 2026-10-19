@@ -288,10 +288,16 @@ namespace OstrixMods.BuildWorks
         { if (value) { value.Release(); UnityEngine.Object.DestroyImmediate(value); } value = null; }
         private void ClearPackedOwners()
         { Array.Clear(packedOwners, 0, MaximumOwners); Array.Clear(packedSmoke, 0, MaximumOwners); Array.Clear(packedSurface, 0, MaximumOwners); }
-        public void Dispose()
+        internal void ClearPublished()
         {
             for (int i = 0; i < preparedCount; ++i) preparedOwners[i]?.UnbindPublished();
             preparedCount = 0;
+            Array.Clear(preparedOwners, 0, MaximumOwners); Array.Clear(preparedSnapshots, 0, MaximumOwners);
+            ClearPackedOwners();
+        }
+        public void Dispose()
+        {
+            ClearPublished();
             Release(ref shape); Release(ref smoke); Release(ref surface);
             bindings?.Release(); bindings = null;
             ClearPackedOwners();

@@ -33,7 +33,7 @@ public static class FogSpatialLedgerCheck
                     try { prior.RequireSpatialLedger(); } catch (NotSupportedException) { rejected = true; }
                     Require(rejected, "Per-cell peak bundle accepted window semantics."); report.previousSpatialBundleRejected = true;
                 }
-            using (var assets = new BlueprintFogAssets(File.ReadAllBytes(Path.Combine(root, "artifacts/fog-runtime-assets-candidate/buildworks-fog-v11"))))
+            using (var assets = new BlueprintFogAssets(File.ReadAllBytes(Path.Combine(root, "src/BuildWorks/Assets/FogGhostRuntime/buildworks-fog-v11"))))
             {
                 if (window) VerifyWindowPeak(assets, report);
                 VerifyBuffers(assets, report);

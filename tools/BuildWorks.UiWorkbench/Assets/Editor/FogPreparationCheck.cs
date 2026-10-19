@@ -4,6 +4,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using OstrixMods.BuildWorks;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public static class FogPreparationCheck
 {
@@ -87,10 +88,146 @@ public static class FogPreparationCheck
         finally { DestroyFixture(invalid); }
         CheckBuildingPreparation(assets, cancel: true); CheckBuildingPreparation(assets, cancel: false);
         CheckVisualReentry(assets);
-        cases = signatures + cancelled + 1 + 2 + 1; maximumStepMilliseconds = maximumMs;
+        int lifecycle = CheckPartLifecycle(assets);
+        cases = signatures + cancelled + 1 + 2 + 1 + lifecycle; maximumStepMilliseconds = maximumMs;
         File.WriteAllText(Path.Combine(Application.dataPath, "../../../artifacts/fog-published-render/preparation.json"), JsonUtility.ToJson(new PreparationReceipt {
             passed = true, sourceSignatureCases = signatures, cancelledPhases = cancelled, faultCases = 1, buildingCases = 2, visualReentryCases = 1,
-            steps = steps, maxStepMilliseconds = maximumMs }, true));
+            partLifecycleCases = lifecycle, steps = steps, maxStepMilliseconds = maximumMs }, true));
+    }
+    private static int CheckPartLifecycle(BlueprintFogAssets assets)
+    {
+        var prefab = Fixture(0);
+        var blueprint = new CompositeBlueprintStore.Blueprint();
+        for (int i = 0; i < 2; ++i) blueprint.parts.Add(new CompositeBlueprintStore.Part {
+            stableId = "lifecycle-" + i, prefabName = "wall", position = new CompositeBlueprintStore.VectorData(new Vector3(i, 0, 0)),
+            rotation = new CompositeBlueprintStore.QuaternionData(Quaternion.identity), scale = new CompositeBlueprintStore.VectorData(Vector3.one) });
+        var body = new Vector2(.3f, .95f); Vector3 away = Vector3.one * 20;
+        try
+        {
+            for (int mode = 0; mode < 3; ++mode)
+            using (var pool = BlueprintFogChannels.CreateArena(assets, 2, 8192, ledgerLayout: BlueprintFogLedgerLayout.Spatial3D))
+            using (var building = new BlueprintFogBuilding(assets, pool, blueprint, _ => prefab, Vector3.zero, Quaternion.identity, away, body, true))
+            {
+                bool removed = mode == 0;
+                int index = mode == 0 ? 1 : 0;
+                if (removed) building.RemovePart(index);
+                using (var preparation = building.Prepare().GetEnumerator())
+                {
+                    int steps = 0;
+                    while (preparation.MoveNext())
+                    {
+                        Require(++steps < 10000, "Per-part preparation removal did not terminate.");
+                        if (!removed && (mode == 1 || building.PreparedParts == 1))
+                        { building.RemovePart(index); building.RemovePart(index); removed = true; }
+                    }
+                }
+                Require(removed && building.Ready && building.Count == 1 && building.PlannedParts == 1 && building.PreparedParts == 1 &&
+                    Parts(building).Single().Root.activeSelf, "Removal before/during/after preparation retained a part or reset its neighbour.");
+                building.Dispose();
+                Require(Registered(pool) == 0, "Preparation removal leaked a source registration.");
+            }
+            var pose0 = (Position: new Vector3(2500, 1, -1700), Rotation: Quaternion.Euler(12, 37, -9), Scale: new Vector3(1.2f, .9f, .7f));
+            var pose1 = (Position: new Vector3(2500.8f, 1, -1700), Rotation: Quaternion.Euler(-7, 13, 5), Scale: new Vector3(.8f, 1.1f, 1));
+            var poses = new[] { pose0, pose1 };
+            using (var pool = BlueprintFogChannels.CreateArena(assets, 2, 8192, ledgerLayout: BlueprintFogLedgerLayout.Spatial3D))
+            using (var building = new BlueprintFogBuilding(assets, pool, blueprint, _ => prefab, new Vector3(2493, 3, -1692), Quaternion.Euler(15, 80, 5), away, body, true, poses))
+            {
+                poses[0] = (Vector3.one * 1000, Quaternion.identity, Vector3.one);
+                using (var pending = building.Prepare().GetEnumerator()) { int steps = 0; while (pending.MoveNext()) Require(++steps < 10000, "World-pose preparation stalled."); }
+                var first = Parts(building)[0]; var neighbour = Parts(building)[1];
+                Require(first.Root.transform.position == pose0.Position && first.Root.transform.rotation == pose0.Rotation &&
+                    first.Root.transform.localScale == Vector3.Scale(prefab.transform.localScale, pose0.Scale) && neighbour.Root.transform.position == pose1.Position,
+                    "Authoritative world pose was recomputed, mutated or scaled twice.");
+                var firstLogical = first.LogicalSource; var neighbourLogical = neighbour.LogicalSource;
+                building.SetPartVisible(0, false);
+                Require(building.VisibleCount == 1, "Visible status is stale before publication.");
+                building.PrepareRender();
+                Require(!first.Root.activeSelf && neighbour.Root.activeSelf && Visible(building) == 1, "Hidden part remained in mesh/volume publication.");
+                building.SetPartVisible(1, false); building.PrepareRender();
+                CheckEmptyBlit(building);
+                building.SetPartVisible(0, true); building.SetPartVisible(1, true); building.PrepareRender();
+                Require(Visible(building) == 2 && ReferenceEquals(first.LogicalSource, firstLogical) && ReferenceEquals(neighbour.LogicalSource, neighbourLogical) &&
+                    first.Clock == 0 && neighbour.Clock == 0, "Hide/show recreated or advanced a logical source.");
+                Vector3 actor = first.Origin + Vector3.up * 1.55f;
+                building.AdvanceTo(BlueprintFogSimulation.Step * 4, actor, body, true);
+                Drain(building, () => first.Snapshot != null && neighbour.Snapshot != null &&
+                    first.Snapshot.State.ConfirmedTick == 4 && neighbour.Snapshot.State.ConfirmedTick == 4 &&
+                    first.LogicalSource.Inputs.Count == 0 && neighbour.LogicalSource.Inputs.Count == 0);
+                var retained = first.Source; var originalNeighbour = neighbour.Snapshot;
+                long generation = originalNeighbour.Generation; float clock = neighbour.Clock;
+                byte[] before = Fields(pool, originalNeighbour);
+                first.AdvanceTo(BlueprintFogSimulation.Step * 5, actor, body, true); building.Pump();
+                Require(first.Snapshot != null && first.Snapshot.pendingBatch, "Pending-removal fixture did not submit native GPU work.");
+                building.RemovePart(0);
+                Require(building.VisibleCount == 1, "Retired status is stale before publication.");
+                building.PrepareRender();
+                Require(retained.Shape && building.Count == 1 && !first.Root && Visible(building) == 1, "Pending source freed before retirement or still rendered.");
+                Drain(building, () => !retained.Shape);
+                Require(ReferenceEquals(neighbour.Snapshot, originalNeighbour) && neighbour.Snapshot.Generation == generation && neighbour.Clock == clock &&
+                    Fields(pool, originalNeighbour).SequenceEqual(before), "Removing one part changed its neighbour identity, clock or GPU fields.");
+                building.RemovePart(1); building.RemovePart(1); building.PrepareRender();
+                Require(building.Count == 0 && building.PreparedParts == 0 && building.PlannedParts == 0, "Final part did not retire idempotently.");
+                CheckEmptyBlit(building);
+                Drain(building, () => Registered(pool) == 0);
+            }
+            for (int invalid = 0; invalid < 4; ++invalid)
+            using (var pool = BlueprintFogChannels.CreateArena(assets, 2, 8192, ledgerLayout: BlueprintFogLedgerLayout.Spatial3D))
+            {
+                var bad = new[] { pose0, pose1 };
+                if (invalid == 0) bad[0].Position = new Vector3(float.NaN, 0, 0);
+                if (invalid == 1) bad[0].Rotation = new Quaternion(0, 0, 0, 0);
+                if (invalid == 2) bad[0].Scale = new Vector3(0, 1, 1);
+                if (invalid == 3) bad = new[] { pose0 };
+                bool rejected = false;
+                try { using (var building = new BlueprintFogBuilding(assets, pool, blueprint, _ => prefab, Vector3.zero, Quaternion.identity, away, body, true, bad)) { } }
+                catch (ArgumentException) { rejected = true; }
+                Require(rejected && Registered(pool) == 0, "Invalid authoritative pose accepted or retained a source.");
+            }
+            return 8;
+        }
+        finally { DestroyFixture(prefab); }
+    }
+    private static System.Collections.Generic.List<BlueprintFogVisual> Parts(BlueprintFogBuilding building) =>
+        (System.Collections.Generic.List<BlueprintFogVisual>)typeof(BlueprintFogBuilding).GetField("parts", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(building);
+    private static int Visible(BlueprintFogBuilding building) => ((System.Collections.ICollection)typeof(BlueprintFogBuilding)
+        .GetField("visibleParts", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(building)).Count;
+    private static int Registered(BlueprintFogChannels pool) => ((System.Collections.ICollection)typeof(BlueprintFogChannels)
+        .GetField("sources", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(pool)).Count;
+    private static void Drain(BlueprintFogBuilding building, Func<bool> complete)
+    {
+        for (int attempt = 0; attempt < 32; ++attempt)
+        { AsyncGPUReadback.WaitAllRequests(); building.Pump(); if (complete()) return; }
+        throw new InvalidOperationException("Per-part GPU retirement/confirmation did not finish.");
+    }
+    private static byte[] Fields(BlueprintFogChannels pool, BlueprintFogChannels.SnapshotChannel owner)
+    {
+        pool.BindSnapshot(owner); pool.SnapshotArena.Dispatch("BeginStep"); pool.SnapshotArena.Dispatch("RestoreFields", 24, 20, 20);
+        using (var bytes = new MemoryStream())
+        using (var writer = new BinaryWriter(bytes))
+        {
+            foreach (var texture in new[] { pool.SnapshotArena.Scratch.ReadColour, pool.SnapshotArena.Scratch.ReadOrigin, pool.SnapshotArena.Scratch.ReadSurface, owner.Velocity })
+            {
+                var request = AsyncGPUReadback.Request(texture); request.WaitForCompletion(); Require(!request.hasError, "Neighbour readback failed.");
+                for (int layer = 0; layer < request.layerCount; ++layer) writer.Write(request.GetData<byte>(layer).ToArray());
+            }
+            foreach (var buffer in owner.Ledger) { var words = new uint[buffer.count]; buffer.GetData(words); foreach (uint word in words) writer.Write(word); }
+            return bytes.ToArray();
+        }
+    }
+    private static void CheckEmptyBlit(BlueprintFogBuilding building)
+    {
+        var image = RenderTexture.GetTemporary(8, 8, 0, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
+        var target = RenderTexture.GetTemporary(8, 8, 0, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
+        var old = RenderTexture.active;
+        try
+        {
+            RenderTexture.active = image; GL.Clear(false, true, new Color(.25f, .5f, .75f, 1));
+            building.Render(null, image, target, Vector3.zero, Vector3.down, 1);
+            var a = AsyncGPUReadback.Request(image); var b = AsyncGPUReadback.Request(target);
+            a.WaitForCompletion(); b.WaitForCompletion();
+            Require(!a.hasError && !b.hasError && a.GetData<byte>().SequenceEqual(b.GetData<byte>()), "Empty building did not pass the image through exactly.");
+        }
+        finally { RenderTexture.active = old; RenderTexture.ReleaseTemporary(image); RenderTexture.ReleaseTemporary(target); }
     }
     private static void CheckVisualReentry(BlueprintFogAssets assets)
     {
@@ -152,7 +289,7 @@ public static class FogPreparationCheck
         finally { DestroyFixture(prefab); }
     }
     private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
-    [Serializable] private sealed class PreparationReceipt { public bool passed; public int sourceSignatureCases, cancelledPhases, faultCases, buildingCases, visualReentryCases, steps; public double maxStepMilliseconds; }
+    [Serializable] private sealed class PreparationReceipt { public bool passed; public int sourceSignatureCases, cancelledPhases, faultCases, buildingCases, visualReentryCases, partLifecycleCases, steps; public double maxStepMilliseconds; }
     private static GameObject Fixture(int variant)
     {
         var root = GameObject.CreatePrimitive(PrimitiveType.Cube); root.name = "Fog preparation fixture";

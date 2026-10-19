@@ -21,6 +21,7 @@ namespace OstrixMods.BuildWorks
                 passRunning = fog && fog.PassRunning,
                 firstFaultJson = fog?.FirstFaultJson,
                 parts = fog?.PartCount ?? 0, owners = fog?.ActiveOwners ?? 0, residentOwners = fog?.ResidentOwners ?? 0,
+                visibleParts = fog?.building?.VisibleCount ?? 0, assets = fog?.assets?.AssetCount ?? 0, kernels = fog?.assets?.KernelCount ?? 0,
                 blockCapacity = fog?.channels?.SnapshotArena?.BlockCapacity ?? 0,
                 residentCapacity = fog?.channels?.SnapshotArena?.ResidentCapacity ?? 0,
                 ledgerCells = fog?.channels?.SnapshotArena?.LedgerCells ?? 0,
@@ -38,7 +39,7 @@ namespace OstrixMods.BuildWorks
             public int passSide;
             public int expectedParts, preparedParts, preparationSteps;
             public double preparationMilliseconds, maxPreparationStepMilliseconds;
-            public int parts, owners, residentOwners, queuedSamples, minimumTick, frames;
+            public int parts, owners, residentOwners, queuedSamples, minimumTick, frames, visibleParts, assets, kernels;
             public uint lastFlags;
             public string firstFaultJson;
             public int blockCapacity, residentCapacity;
@@ -51,11 +52,9 @@ namespace OstrixMods.BuildWorks
         public static string VerifyPublication()
         {
             BuildWorksTestIsolation.RequireLoadedSession();
-            string path = System.IO.Path.GetFullPath(System.IO.Path.Combine(BepInEx.Paths.BepInExRootPath,
-                "..", "..", "Default", "BuildWorks", "artifacts", "fog-runtime-assets-candidate", "buildworks-fog-v11"));
             var result = new PublicationReceipt();
             RenderTexture pages;
-            using (var probeAssets = new BlueprintFogAssets(System.IO.File.ReadAllBytes(path)))
+            using (var probeAssets = BlueprintFogAssets.LoadEmbedded())
             using (var pool = BlueprintFogChannels.CreateArena(probeAssets, 2, 8192))
             {
                 var arena = pool.SnapshotArena; pages = arena.Bricks;
@@ -91,14 +90,12 @@ namespace OstrixMods.BuildWorks
         public static string VerifyVelocityPaging()
         {
             BuildWorksTestIsolation.RequireLoadedSession();
-            string path = System.IO.Path.GetFullPath(System.IO.Path.Combine(BepInEx.Paths.BepInExRootPath,
-                "..", "..", "Default", "BuildWorks", "artifacts", "fog-runtime-assets-candidate", "buildworks-fog-v11"));
             var shape = new Texture3D(4, 4, 4, TextureFormat.RGBAHalf, false);
             var result = new VelocityReceipt(); Texture3D upload;
             try
             {
                 shape.SetPixelData(new ushort[256], 0); shape.Apply(false, false);
-                using (var probeAssets = new BlueprintFogAssets(System.IO.File.ReadAllBytes(path)))
+                using (var probeAssets = BlueprintFogAssets.LoadEmbedded())
                 using (var pool = BlueprintFogChannels.CreateArena(probeAssets, 28, 8192))
                 {
                     upload = pool.SnapshotArena.VelocityUpload;
@@ -216,6 +213,26 @@ namespace OstrixMods.BuildWorks
         private System.Collections.Generic.IEnumerator<object> wallPass;
         private static BuildWorksTestFog movementOwner;
         private Vector3 passDirection;
+
+        public static string SetPartVisible(int index, bool visible)
+        {
+            BuildWorksTestIsolation.RequireLoadedSession();
+            var fog = Camera.main ? Camera.main.GetComponent<BuildWorksTestFog>() : null;
+            if (!fog || fog.building == null || !fog.building.Ready || fog.wallPass != null)
+                throw new InvalidOperationException("Prepared idle QA fog building required.");
+            fog.building.SetPartVisible(index, visible);
+            return HouseStatus();
+        }
+
+        public static string RemovePart(int index)
+        {
+            BuildWorksTestIsolation.RequireLoadedSession();
+            var fog = Camera.main ? Camera.main.GetComponent<BuildWorksTestFog>() : null;
+            if (!fog || fog.building == null || !fog.building.Ready || fog.wallPass != null)
+                throw new InvalidOperationException("Prepared idle QA fog building required.");
+            fog.building.RemovePart(index);
+            return HouseStatus();
+        }
 
         internal void InitializeWallLine(Player owner)
         {
@@ -356,9 +373,7 @@ namespace OstrixMods.BuildWorks
             oldDepth = view.depthTextureMode; ownedDepth = oldDepth | DepthTextureMode.Depth; view.depthTextureMode = ownedDepth;
             try
             {
-                string path = System.IO.Path.GetFullPath(System.IO.Path.Combine(BepInEx.Paths.BepInExRootPath,
-                    "..", "..", "Default", "BuildWorks", "artifacts", "fog-runtime-assets-candidate", "buildworks-fog-v11"));
-                assets = new BlueprintFogAssets(System.IO.File.ReadAllBytes(path));
+                assets = BlueprintFogAssets.LoadEmbedded();
                 channels = BlueprintFogChannels.CreateArena(assets, blueprint.parts.Count, blockCapacity, ledgerLayout: BlueprintFogLedgerLayout.Spatial3D);
                 Bounds body = capsule.bounds;
                 building = new BlueprintFogBuilding(assets, channels, blueprint, name => ZNetScene.instance.GetPrefab(name),

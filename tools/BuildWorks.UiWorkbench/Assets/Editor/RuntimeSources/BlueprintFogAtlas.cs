@@ -23,12 +23,20 @@ namespace OstrixMods.BuildWorks
         private readonly Texture[] packedSmoke = new Texture[MaximumOwners], packedSurface = new Texture[MaximumOwners];
         private readonly int[] packedTicks = new int[MaximumOwners];
         private readonly HashSet<BlueprintFogVisual> unique = new HashSet<BlueprintFogVisual>();
+        private readonly BlueprintFogChannels publishedPool;
+        private ComputeBuffer bindings;
+        private readonly BlueprintFogVisual[] preparedOwners = new BlueprintFogVisual[MaximumOwners];
+        private readonly BlueprintFogChannels.SnapshotChannel[] preparedSnapshots = new BlueprintFogChannels.SnapshotChannel[MaximumOwners];
+        private int preparedCount;
+        private readonly uint[] bindingWords = new uint[MaximumOwners * 5];
+        private readonly Vector4[] dynamicOffsets = new Vector4[MaximumOwners];
+        private readonly HashSet<BlueprintFogChannels.SnapshotChannel> uniqueSnapshots = new HashSet<BlueprintFogChannels.SnapshotChannel>();
         private readonly Vector3Int[] offsets = new Vector3Int[MaximumOwners];
         private readonly Vector4[] origins = new Vector4[MaximumOwners], restMin = new Vector4[MaximumOwners], restMax = new Vector4[MaximumOwners],
             fieldMin = new Vector4[MaximumOwners], fieldMax = new Vector4[MaximumOwners], actors = new Vector4[MaximumOwners],
             shapeSize = new Vector4[MaximumOwners], fieldSize = new Vector4[MaximumOwners], atlasOffset = new Vector4[MaximumOwners],
             noiseOffset = new Vector4[MaximumOwners];
-        internal long Bytes => shape ? (long)size.x * size.y * size.z * 18 : 0;
+        internal long Bytes => shape ? (long)size.x * size.y * size.z * (publishedPool == null ? 18 : 2) : 0;
 
         internal BlueprintFogAtlas(BlueprintFogAssets assets)
         {
@@ -44,7 +52,49 @@ namespace OstrixMods.BuildWorks
             catch { Dispose(); throw; }
         }
 
+        internal BlueprintFogAtlas(BlueprintFogAssets assets, BlueprintFogChannels snapshots) : this(assets)
+        {
+            try
+            {
+                if (snapshots == null || snapshots.SnapshotArena == null) throw new ArgumentException("Published atlas requires a snapshot pool.");
+                publishedPool = snapshots;
+                UnityEngine.Object.DestroyImmediate(pack); pack = UnityEngine.Object.Instantiate(assets.Arena);
+                pack.hideFlags = HideFlags.HideAndDontSave; kernel = pack.FindKernel("PackStaticSource");
+                bindings = new ComputeBuffer(MaximumOwners * 5, 4);
+                material.EnableKeyword("BUILDWORKS_FOG_PUBLISHED");
+            }
+            catch { Dispose(); throw; }
+        }
+
+        // Call before geometry is drawn, not just from the later OnRenderImage volume pass.
+        internal void PreparePublished(IReadOnlyList<BlueprintFogVisual> owners, IReadOnlyList<BlueprintFogChannels.SnapshotChannel> snapshots)
+        {
+            if (!material) throw new ObjectDisposedException(nameof(BlueprintFogAtlas));
+            if (publishedPool == null || owners == null || snapshots == null || owners.Count < 1 || owners.Count > MaximumOwners || snapshots.Count != owners.Count)
+                throw new ArgumentException("Published fog binding count invalid.");
+            unique.Clear(); uniqueSnapshots.Clear();
+            for (int i = 0; i < owners.Count; ++i)
+            {
+                if (owners[i] == null || owners[i].Source == null || !unique.Add(owners[i]) ||
+                    (snapshots[i] != null && !uniqueSnapshots.Add(snapshots[i]))) throw new ArgumentException("Published fog owners must be distinct and live.");
+                owners[i].ValidatePublishedMapping(publishedPool, snapshots[i]);
+                publishedPool.WriteSnapshotBinding(snapshots[i], bindingWords, i * 5);
+                dynamicOffsets[i] = new Vector4(0, 0, (snapshots[i]?.Slot ?? 0) * 82, 0);
+            }
+            for (int i = 0; i < preparedCount; ++i) if (!unique.Contains(preparedOwners[i])) preparedOwners[i].UnbindPublished();
+            bindings.SetData(bindingWords);
+            for (int i = 0; i < owners.Count; ++i)
+            {
+                owners[i].BindPublished(publishedPool, bindings, i, dynamicOffsets[i]);
+                preparedOwners[i] = owners[i]; preparedSnapshots[i] = snapshots[i];
+            }
+            preparedCount = owners.Count;
+        }
+
         internal static Vector3Int Layout(IReadOnlyList<Vector3Int> blocks, int limit, Vector3Int[] offsets)
+            => Layout(blocks, limit, offsets, 18, MaximumBytes);
+
+        private static Vector3Int Layout(IReadOnlyList<Vector3Int> blocks, int limit, Vector3Int[] offsets, int bytesPerVoxel, long budget)
         {
             if (blocks == null || blocks.Count < 1 || blocks.Count > MaximumOwners || offsets == null || offsets.Length < blocks.Count || limit < 1)
                 throw new ArgumentException("Fog atlas layout input invalid.");
@@ -53,12 +103,12 @@ namespace OstrixMods.BuildWorks
             {
                 if (block.x < 3 || block.y < 3 || block.z < 3 || block.x > limit || block.y > limit || block.z > limit)
                     throw new InvalidOperationException("Fog atlas block exceeds device axis budget.");
-                if ((long)block.x * block.y > MaximumBytes / 18 / block.z)
+                if ((long)block.x * block.y > budget / bytesPerVoxel / block.z)
                     throw new InvalidOperationException("Fog atlas block exceeds its render memory budget.");
                 occupied += (long)block.x * block.y * block.z;
                 minimum = Vector3Int.Max(minimum, block);
             }
-            if (occupied > MaximumBytes / 18) throw new InvalidOperationException("Fog atlas exceeds its render memory budget.");
+            if (occupied > budget / bytesPerVoxel) throw new InvalidOperationException("Fog atlas exceeds its render memory budget.");
             var order = new int[blocks.Count];
             for (int i = 0; i < order.Length; ++i) order[i] = i;
             Array.Sort(order, (a, b) => {
@@ -68,7 +118,7 @@ namespace OstrixMods.BuildWorks
                 return compare == 0 ? a.CompareTo(b) : compare;
             });
             var trial = new Vector3Int[blocks.Count];
-            Vector3Int result = Vector3Int.zero; long best = MaximumBytes / 18 + 1;
+            Vector3Int result = Vector3Int.zero; long best = budget / bytesPerVoxel + 1;
             // shortcut: bounded shelf search, not an optimal bin packer; revisit if a real admitted house cannot fit.
             List<int> heights = Candidates(minimum.y, limit);
             foreach (int width in Candidates(minimum.x, limit)) foreach (int height in heights)
@@ -103,12 +153,21 @@ namespace OstrixMods.BuildWorks
         }
 
         internal void Render(Camera camera, RenderTexture image, RenderTexture target, IReadOnlyList<BlueprintFogVisual> owners,
-            Vector3 beamOrigin, Vector3 beamDirection, float beamStrength)
+            Vector3 beamOrigin, Vector3 beamDirection, float beamStrength, IReadOnlyList<BlueprintFogChannels.SnapshotChannel> snapshots = null)
         {
             if (!material) throw new ObjectDisposedException(nameof(BlueprintFogAtlas));
             if (!camera || camera.orthographic || camera.stereoEnabled || (camera.depthTextureMode & DepthTextureMode.Depth) == 0)
                 throw new InvalidOperationException("Fog atlas requires a perspective mono camera with depth.");
             if (owners == null || owners.Count < 1 || owners.Count > MaximumOwners) throw new ArgumentException("Fog atlas owner count invalid.");
+            if (publishedPool != null)
+            {
+                if (snapshots == null || snapshots.Count != owners.Count || preparedCount != owners.Count)
+                    throw new InvalidOperationException("Prepare published fog before drawing geometry.");
+                for (int i = 0; i < owners.Count; ++i) if (!ReferenceEquals(preparedOwners[i], owners[i]) || !ReferenceEquals(preparedSnapshots[i], snapshots[i]))
+                    throw new InvalidOperationException("Prepare changed fog owners before drawing geometry.");
+                PreparePublished(owners, snapshots);
+            }
+            else if (snapshots != null) throw new ArgumentException("Legacy fog atlas cannot consume snapshot owners.");
             blocks.Clear(); unique.Clear(); Bounds bounds = default;
             Vector3 frame = camera.transform.position;
             frame = new Vector3(Mathf.Floor(frame.x / 128) * 128, Mathf.Floor(frame.y / 128) * 128, Mathf.Floor(frame.z / 128) * 128);
@@ -116,10 +175,11 @@ namespace OstrixMods.BuildWorks
             {
                 BlueprintFogVisual owner = owners[i];
                 if (owner == null || !unique.Add(owner) || owner.Source == null || !owner.Source.Shape || !owner.Smoke || !owner.Surface) throw new ArgumentException("Fog atlas needs distinct live owners.");
+                if (publishedPool == null && owner.LogicalSource != null) throw new ArgumentException("Logical fog visual requires a published atlas.");
                 if (i == 0) bounds = owner.VolumeBounds; else bounds.Encapsulate(owner.VolumeBounds);
-                Texture3D source = owner.Source.Shape; Vector3Int field = owner.FieldSize;
-                blocks.Add(new Vector3Int(Mathf.Max(source.width, field.x) + 2, Mathf.Max(source.height, field.y) + 2,
-                    Mathf.Max(source.depth, field.z) + 2));
+                Texture3D source = owner.Source.Shape; Vector3Int field = publishedPool == null ? owner.FieldSize : new Vector3Int(96, 80, 80);
+                blocks.Add(publishedPool != null ? new Vector3Int(source.width + 2, source.height + 2, source.depth + 2) :
+                    new Vector3Int(Mathf.Max(source.width, field.x) + 2, Mathf.Max(source.height, field.y) + 2, Mathf.Max(source.depth, field.z) + 2));
                 Vector3 origin = owner.Origin - frame;
                 origins[i] = new Vector4(origin.x, origin.y, origin.z, owner.Clock);
                 noiseOffset[i] = owner.NoiseOffset;
@@ -141,6 +201,15 @@ namespace OstrixMods.BuildWorks
                 atlasOffset[i] = new Vector4(offset.x, offset.y, offset.z, 0);
                 BlueprintFogVisual owner = owners[i]; Texture currentSmoke = owner.Smoke, currentSurface = owner.Surface;
                 int tick = owner.Simulation?.Tick ?? -1;
+                if (publishedPool != null)
+                {
+                    if (ReferenceEquals(packedOwners[i], owner)) continue;
+                    pack.SetInts("_StaticSize", block.x, block.y, block.z); pack.SetInts("_StaticOffset", offset.x, offset.y, offset.z);
+                    pack.SetInts("_StaticShapeSize", owner.Source.Shape.width, owner.Source.Shape.height, owner.Source.Shape.depth);
+                    pack.SetTexture(kernel, "_StaticSource", owner.Source.Shape); pack.SetTexture(kernel, "_StaticAtlas", shape);
+                    pack.Dispatch(kernel, (block.x + 7) / 8, (block.y + 7) / 8, (block.z + 3) / 4);
+                    ++PackDispatches; packedOwners[i] = owner; continue;
+                }
                 // Source is immutable; field contents change only on a simulation tick or texture replacement.
                 if (ReferenceEquals(packedOwners[i], owner) && ReferenceEquals(packedSmoke[i], currentSmoke) &&
                     ReferenceEquals(packedSurface[i], currentSurface) && packedTicks[i] == tick) continue;
@@ -154,7 +223,17 @@ namespace OstrixMods.BuildWorks
                 ++PackDispatches;
                 packedOwners[i] = owner; packedSmoke[i] = currentSmoke; packedSurface[i] = currentSurface; packedTicks[i] = tick;
             }
-            material.SetTexture("_AtlasShape", shape); material.SetTexture("_AtlasSmoke", smoke); material.SetTexture("_AtlasSurface", surface);
+            material.SetTexture("_AtlasShape", shape);
+            if (publishedPool == null || publishedPool.SnapshotArena.Smoke) material.SetTexture("_AtlasSmoke", publishedPool?.SnapshotArena.Smoke ?? smoke);
+            if (publishedPool == null || publishedPool.SnapshotArena.Surface) material.SetTexture("_AtlasSurface", publishedPool?.SnapshotArena.Surface ?? surface);
+            if (publishedPool != null)
+            {
+                material.SetBuffer("_FogBindings", bindings); material.SetBuffer("_PublishedMetadata", publishedPool.SnapshotArena.Buffers["_PublishedMetadata"]);
+                material.SetInt("_PublishedSlots", publishedPool.SnapshotCapacity);
+                publishedPool.SnapshotArena.BindPublication(material);
+                material.SetVector("_DynamicAtlasSize", new Vector4(98, 82, 82 * publishedPool.SnapshotCapacity, 0));
+                material.SetVectorArray("_RegionDynamicOffset", dynamicOffsets);
+            }
             // BlueprintFogSource creates the same immutable procedural noise for every owner.
             material.SetTexture("_Noise", owners[0].Source.Noise);
             material.SetVector("_AtlasSize", new Vector4(size.x, size.y, size.z, 0)); material.SetInt("_RegionCount", owners.Count);
@@ -175,7 +254,8 @@ namespace OstrixMods.BuildWorks
         {
             if (allocate == null) throw new ArgumentNullException(nameof(allocate));
             var pending = new Vector3Int[MaximumOwners];
-            Vector3Int wanted = Layout(requested, limit, pending);
+            Vector3Int wanted = publishedPool == null ? Layout(requested, limit, pending) :
+                Layout(requested, limit, pending, 2, MaximumBytes - publishedPool.SnapshotArena.RenderBytes);
             // Commit coordinates only after allocation succeeds, so the old atlas remains reusable on failure.
             allocate(wanted);
             Array.Copy(pending, offsets, requested.Count);
@@ -190,7 +270,8 @@ namespace OstrixMods.BuildWorks
             RenderTexture a = null, b = null, c = null;
             try
             {
-                a = Allocate(wanted, RenderTextureFormat.RHalf); b = Allocate(wanted, RenderTextureFormat.ARGBHalf); c = Allocate(wanted, RenderTextureFormat.ARGBHalf);
+                a = Allocate(wanted, RenderTextureFormat.RHalf);
+                if (publishedPool == null) { b = Allocate(wanted, RenderTextureFormat.ARGBHalf); c = Allocate(wanted, RenderTextureFormat.ARGBHalf); }
             }
             catch { Release(ref a); Release(ref b); Release(ref c); throw; }
             Release(ref shape); Release(ref smoke); Release(ref surface); shape = a; smoke = b; surface = c; size = wanted;
@@ -207,9 +288,18 @@ namespace OstrixMods.BuildWorks
         { if (value) { value.Release(); UnityEngine.Object.DestroyImmediate(value); } value = null; }
         private void ClearPackedOwners()
         { Array.Clear(packedOwners, 0, MaximumOwners); Array.Clear(packedSmoke, 0, MaximumOwners); Array.Clear(packedSurface, 0, MaximumOwners); }
+        internal void ClearPublished()
+        {
+            for (int i = 0; i < preparedCount; ++i) preparedOwners[i]?.UnbindPublished();
+            preparedCount = 0;
+            Array.Clear(preparedOwners, 0, MaximumOwners); Array.Clear(preparedSnapshots, 0, MaximumOwners);
+            ClearPackedOwners();
+        }
         public void Dispose()
         {
+            ClearPublished();
             Release(ref shape); Release(ref smoke); Release(ref surface);
+            bindings?.Release(); bindings = null;
             ClearPackedOwners();
             if (material) UnityEngine.Object.DestroyImmediate(material); material = null;
             if (pack) UnityEngine.Object.DestroyImmediate(pack); pack = null;

@@ -6,18 +6,18 @@
 
 `BlueprintConstructionProjectRuntime` пока не создаёт `BlueprintFogBuilding`. Последний используется только QA-кодом `BuildWorksTestFog`. Обычное размещение ещё не вызывает сохраняемый `Runtime.Create`.
 
-Встроенный `src/BuildWorks/Assets/FogGhostRuntime/buildworks-fog-v11` — прежний bundle: SHA256 `DD9576EC6925082A5B59615C7EB813CC8B93067FFCBAB5D926AACE29558C61DD`, 62061 байт, 3 ресурса / 8 compute kernels.
+Встроенный bundle в .230 теперь равен проверенному Linear candidate6F2A…138133B/5assets/28kernels. Прежний DD9576…62061B/3assets/8kernels сохранён как pinned legacy fixture; source shader/solver не менялись.
 
 Проверенный Linear candidate: `artifacts/fog-runtime-assets-candidate/buildworks-fog-v11`, SHA256 `6F2A58531F61A3E12FCE61A549546092B699815B85E2457DA31C3F261F8F6F3B`, 138133 байта, 5 ресурсов / 28 kernels. Независимый агент повторно сверил все 9 исходных shader/include/compute хешей с receipt. Этот candidate закреплён проверками .224 и Linear-сравнением .225. Gamma-сравнение использует отдельный bundle; его результат не означает поддержку Gamma загрузчиком production.
 
-`Test-HostContract.ps1` пока подтверждает лишь равенство встроенного ресурса DLL файлу source bundle. Это не подтверждение нового Spatial3D/window режима.
+`Test-HostContract.ps1` подтверждает DLL resource=source=6F2A; Valheim33/33 дополнительно прошёл LoadEmbedded/SpatialLedger16384/5assets/28kernels и явный Camera.Render. Это не приёмка внешнего вида дома.
 
 ## Минимальная очередь без переделки эффекта
 
 1. **Сделано в .229:** старый bundle закреплён в tests/fixtures/fog-legacy-linear; оба legacy caller проверяют SHA/62061B и загружают те же байты. CPU1748+32, corrupt/candidate rejection и Unity-компиляция прошли. Отрицательные spatial/pixel проверки сохранены. Это ещё не повтор GPU-сравнения.
-2. Перенести уже проверенные байты Linear candidate в embedded; проверить provenance, набор ресурсов, `RequireSpatialLedger`, затронутые negative/retirement и matched-render проверки. Не менять solver, шум, пороги или утверждённый внешний вид.
-3. Создавать визуал по сохранённому `Store.Part.WorldPose`. Не вычислять повторно мировую позу из относительного чертежа; исходный масштаб prefab учитывает `BlueprintFogVisual`.
-4. Добавить удаление/завершение одной части без пересоздания остальных, сброса их часов и v11-состояния. При нуле частей — обычный проход изображения, без пустого atlas.
+2. **Сделано в .230:** проверенный Linear bundle встроен; GPU default270/18, Published23preparation/8lifecycle и legacy16/delta0, Recovery90/fault6, Window168; native33/33 с рендером. Window — Gamma numeric check; native загрузка проверена отдельно в Linear.
+3. Renderer .230 уже принимает frozen world TRS, не применяет корневую позу/scale повторно. **Осталось:** передать Store.Part.WorldPose из runtime-проекта; действующего caller пока нет.
+4. **Сделано в renderer .230:** SetPartVisible/RemovePart, подготовка/pending retirement, сохранность соседних полей/часов, zero pass-through. **Осталось:** отображать фактические journal-фазы из runtime без изменения оплаты.
 5. Подключить камерный цикл подготовки/обновления/рендера к жизненному циклу мира. При отмене, выгрузке и закрытии сначала завершить подготовку, затем retirement и подтверждённый GPU drain, после этого освободить текстуры, пул и assets.
 
 ## Граница состояния

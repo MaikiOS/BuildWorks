@@ -138,8 +138,30 @@ public static class FogVelocityPagingCheck
                         int slot = batch % 2 == 0 ? visit : 2 - visit;
                         var owner = owners[slot]; var sample = Sample(batch * 8 * BlueprintFogSimulation.Step);
                         pool.CaptureSnapshot(owner, sample); Resident(pool, owner);
+                        var previousLease = owner.coldLease;
                         Require(pool.TrySubmitSnapshot(owner, out _), "Restored owner failed to submit queued history.");
+                        var stagedLease = owner.evictionLease; var stagedStamp = owner.evictionStamp;
+                        if (previousLease != null && batch <= 2)
+                        {
+                            AsyncGPUReadback.WaitAllRequests();
+                            if (batch == 1)
+                            {
+                                owner.evictionReceived = false; pool.PollSnapshots();
+                                Require(!owner.pendingBatch && ReferenceEquals(owner.coldLease, previousLease) && previousLease.Words != null,
+                                    "Receipt-first discarded the previous committed page.");
+                                owner.evictionReceived = true;
+                            }
+                            else
+                            {
+                                owner.received = false; pool.PollSnapshots();
+                                Require(owner.pendingBatch && ReferenceEquals(owner.coldLease, previousLease) && ReferenceEquals(owner.evictionLease, stagedLease),
+                                    "Velocity-first committed before its matching receipt.");
+                                owner.received = true;
+                            }
+                        }
                         references[slot].AdvanceTo(sample.Clock, Actor(sample), body, true, true); Drain(pool);
+                        Require(!owner.CanCopyVelocity(stagedStamp, stagedLease) && ReferenceEquals(owner.coldLease, stagedLease) &&
+                            (previousLease == null || previousLease.Words == null), "Accepted/stale callback retained writable custody or leaked an old page.");
                         Require(owner.State.State == BlueprintFogSnapshotState.Phase.Ready && owner.Inputs.Count == 0 &&
                             owner.State.ConfirmedTick == batch * 8, "Paged step lost confirmed history.");
                         pool.BindSnapshot(owner); pool.SnapshotArena.Dispatch("BeginStep"); pool.SnapshotArena.Dispatch("RestoreFields", 24, 20, 20);
@@ -173,6 +195,8 @@ public static class FogVelocityPagingCheck
                 pool.CaptureSnapshot(last, Sample(last.Inputs.Committed.Clock + .001f)); Resident(pool, last);
                 Require(pool.TrySubmitSnapshot(last, out _) && last.Inputs.PendingMetadataOnly, "Cold metadata update did not preserve zero-step semantics.");
                 Drain(pool); Require(beforeMetadata.SequenceEqual(FogRuntimeSparseCheck.Read(last.Velocity)), "Metadata update reset paged velocity.");
+                Require(pool.ReadVelocityPages().peak <= 4 && pool.ReadVelocityPages().free <= 1 && pool.ReadVelocityPages().reuses > 0,
+                    "Paging did not reuse bounded RAM pages.");
             }
             Require(!upload, "Paging upload texture leaked after pool drain.");
         }
@@ -191,6 +215,16 @@ public static class FogVelocityPagingCheck
             pool.PageSnapshotVelocity(owner); owner.evictionReply = null; owner.evictionReceived = true; Drain(pool);
             Require(pool.RequiresSnapshotTeardown && owner.Velocity == velocity && owner.Inputs.Count == 1 &&
                 owner.Inputs.PendingCount == 0, "Failed page lost GPU state or accepted history.");
+        }
+        using (var pool = BlueprintFogChannels.CreateArena(assets, 2, 8192, residentOwners: 1))
+        {
+            var owner = pool.AcquireSnapshot(0, initial, (scratch, staged) => Make(0, scratch, staged));
+            pool.CaptureSnapshot(owner, Sample(.1f)); Require(pool.TrySubmitSnapshot(owner, out _), "Receipt rejection setup failed."); Drain(pool);
+            var previous = owner.coldLease;
+            pool.CaptureSnapshot(owner, Sample(.2f)); Require(pool.TrySubmitSnapshot(owner, out _), "Receipt rejection second submission failed.");
+            var staged = owner.evictionLease; AsyncGPUReadback.WaitAllRequests(); owner.reply[8] = 1; pool.PollSnapshots();
+            Require(pool.RequiresSnapshotTeardown && ReferenceEquals(previous, owner.coldLease) && previous.Words != null && staged.Words != null,
+                "Rejected receipt accepted staging or discarded the previous committed page.");
         }
         using (var pool = BlueprintFogChannels.CreateArena(assets, 2, 8192, residentOwners: 1))
         {

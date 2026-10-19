@@ -6,13 +6,15 @@ BuildWorks extends Valheim's hammer with precise construction, a blueprint catal
 
 ![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
 
-**Current source:0.19.239; installed isolated QA:0.19.239.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
+**Current source:0.19.240; installed isolated QA:0.19.240.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
+
+[.240](docs/CHECKPOINT_240.md) preserves two failed fog experiments. Memory reuse is **disabled** in normal/QA builds; whole-house fog remains unfixed. No .240 Valheim run.
 
 [.239](docs/CHECKPOINT_239.md) adds bounded QA fog measurements:20s with exact comparisons passed, not a whole-house fix. Evidence directs the next experiment toward payload arrays rather than a texture-pool rewrite.
 
 [.237](docs/CHECKPOINT_237.md) adds saved-world batch absence evidence, a prerequisite for paid cancellation. Physical refund delivery and guarded pickup remain unfinished; see the [plan](docs/PROJECT_CANCELLATION_PROTOCOL.md).
 
-[.236](docs/CHECKPOINT_236.md) archives native armor pose/slots;28 CPU capture cases, serialization and builds passed. Equipment restoration and whole-house fog remain unfinished; The later .237 QA build is installed; native armor capture itself remains untested.
+[.236](docs/CHECKPOINT_236.md) archives native armor pose/slots;28 CPU capture cases, serialization and builds passed. Equipment restoration and whole-house fog remain unfinished; The archive is included in installed .240; native armor capture remains unverified; native armor capture itself remains untested.
 
 [Diagnostic checkpoint234](docs/CHECKPOINT_234.md) reproduces the lower-frame-rate fog queue failure and prepares a test-only experiment. It does not change the game DLL or establish whole-house support.
 

@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('Controls','NativeCadence','NativeControls','PollingCandidate','PostCaptureCandidate','TelemetryMeasurement')][string]$Mode='Controls',
+    [ValidateSet('Controls','NativeCadence','NativeControls','PollingCandidate','PostCaptureCandidate','TelemetryMeasurement','ReuseCandidate','AsyncCaptureCandidate')][string]$Mode='Controls',
     [string]$UnityPath='C:/Program Files/Unity/Hub/Editor/6000.0.61f1/Editor/Unity.exe'
 )
 $ErrorActionPreference='Stop'
@@ -16,6 +16,9 @@ function Assert-FogProductionFramesEvidence([string]$Path,[datetime]$StartedUtc,
     }
     $postCapture=$ExpectedMode -ceq 'PostCaptureCandidate'
     $measurement=$ExpectedMode -ceq 'TelemetryMeasurement'
+    $async=$ExpectedMode -ceq 'AsyncCaptureCandidate'
+    $reuse=$async -or $ExpectedMode -ceq 'ReuseCandidate'
+    $profiling=$measurement -or $reuse
     $polling=$postCapture -or $ExpectedMode -ceq 'PollingCandidate'
     $native=$ExpectedMode -cne 'Controls'; $duration=if($measurement){20}elseif($native){48}else{22}
     $pairs=@(switch($ExpectedMode){
@@ -25,12 +28,16 @@ function Assert-FogProductionFramesEvidence([string]$Path,[datetime]$StartedUtc,
         'PollingCandidate' {@('True:True')}
         'PostCaptureCandidate' {@('True:True')}
         'TelemetryMeasurement' {@('True:True')}
+        'ReuseCandidate' {@('True:True')}
+        'AsyncCaptureCandidate' {@('True:True')}
         default {throw 'Unknown production-frame mode.'}
     })
     if($result.passed -isnot [bool] -or !$result.passed -or $result.mode -cne $ExpectedMode -or $result.runId -cne $RunId -or
+       $result.velocityPageReuseCandidate -isnot [bool] -or !$result.velocityPageReuseCandidate -or
        $result.explicitPolling -isnot [bool] -or $result.explicitPolling -ne $polling -or
        $result.postCapturePump -isnot [bool] -or $result.postCapturePump -ne $postCapture -or
        $result.measurementOnly -isnot [bool] -or $result.measurementOnly -ne $measurement -or
+       $result.asyncCapture -isnot [bool] -or $result.asyncCapture -ne $async -or
        !(Number $result.requestedFrameRate $true) -or $result.requestedFrameRate -ne $(if($native){36}else{-1}) -or
        $result.configuration -cne '32slots/32768blocks/Spatial3D/4resident;28procedural walls'){throw 'Production-frame identity/configuration failed.'}
     foreach($flag in @('gameHostTested','nativeHouseGeometryTested','gpuTimingsMeasured')){
@@ -65,10 +72,27 @@ function Assert-FogProductionFramesEvidence([string]$Path,[datetime]$StartedUtc,
            ($case.capture -and ($case.captures -lt 1 -or $case.captureBytes -lt 1)) -or
            (!$case.capture -and ($case.captures -ne 0 -or $case.captureBytes -ne 0))){throw 'Capture evidence incomplete.'}
         foreach($elapsed in $case.captureMilliseconds){if(!(Number $elapsed) -or $elapsed -le 0){throw 'Invalid capture timing.'}}
-        if($measurement){
+        if($profiling){
             if(!(Number $case.managedBytesStart $true) -or $case.managedBytesStart -le 0 -or
                !(Number $case.managedBytesEnd $true) -or $case.managedBytesEnd -le 0 -or @($case.gcCollections).Count -ne 3){throw 'Managed memory measurement missing.'}
             foreach($count in $case.gcCollections){if(!(Number $count $true) -or $count -lt 0){throw 'Invalid GC delta.'}}
+            if($async){
+                if(!(Number $case.captureRequests $true) -or $case.captureRequests -ne $case.captures -or
+                   !(Number $case.captureReferenceComparisons $true) -or $case.captureReferenceComparisons -ne 1 -or
+                   !(Number $case.captureCpuCopyMilliseconds) -or $case.captureCpuCopyMilliseconds -le 0){throw 'Async capture lost frames or exact reference comparison.'}
+            }
+            if($reuse){
+                foreach($pages in @($case.pagesWindow,$case.pagesDrained)){
+                    foreach($key in @('limit','freeLimit','words','allocated','active','free','peak','allocations','reuses','bytes')){
+                        if(!(Number $pages.$key $true) -or $pages.$key -lt 0){throw 'Invalid RAM page accounting type.'}
+                    }
+                    if($pages.limit -ne 36 -or $pages.freeLimit -ne 4 -or $pages.words -ne 2457600 -or
+                       $pages.active -lt 28 -or $pages.free -gt 4 -or $pages.allocated -ne $pages.active+$pages.free -or
+                       $pages.allocated -gt 36 -or $pages.peak -gt 36 -or $pages.peak -lt $pages.allocated -or
+                       $pages.allocations -ne $pages.peak -or $pages.reuses -lt 1 -or $pages.bytes -ne $pages.allocated*4915200L){throw 'RAM page bound/reuse/accounting differs.'}
+                }
+                if($case.pagesDrained.allocations -ne $case.pagesWindow.allocations -or $case.pagesDrained.reuses -lt $case.pagesWindow.reuses){throw 'RAM page allocations grew after warmup.'}
+            }
             if(!(Number $case.captureStageCount $true) -or $case.captureStageCount -ne $case.captures){throw 'Capture stages not measured.'}
             foreach($key in @('captureRenderMilliseconds','captureReadPixelsMilliseconds','capturePngMilliseconds','captureDiskMilliseconds')){
                 if(!(Number $case.$key) -or $case.$key -le 0){throw ('Invalid capture stage timing: '+$key)}
@@ -126,7 +150,8 @@ foreach($entry in $candidate.sources){
 if((Get-FileHash -LiteralPath (Join-Path $root 'artifacts/fog-runtime-assets-candidate/buildworks-fog-v11')).Hash -cne $candidate.sha256){throw 'Candidate bundle hash differs.'}
 $inputs=@(Get-ChildItem -LiteralPath (Join-Path $project 'Assets/Editor/RuntimeSources') -Filter 'BlueprintFog*.cs')+
     @(Get-Item -LiteralPath (Join-Path $project 'Assets/Editor/RuntimeSources/BlueprintEditorMeshData.cs'))+
-    @(Get-Item -LiteralPath (Join-Path $project 'Assets/Editor/RuntimeSources/FogPerformanceCounters.cs'))
+    @(Get-Item -LiteralPath (Join-Path $project 'Assets/Editor/RuntimeSources/FogPerformanceCounters.cs'))+
+    @(Get-Item -LiteralPath (Join-Path $project 'Assets/Editor/RuntimeSources/FogVelocityPages.cs'))
 foreach($runtimeFile in $inputs){
     if((Get-FileHash -LiteralPath $runtimeFile.FullName).Hash -cne (Get-FileHash -LiteralPath (Join-Path $root ('src/BuildWorks/'+$runtimeFile.Name))).Hash){throw ('Runtime mirror differs: '+$runtimeFile.Name)}
 }
@@ -136,7 +161,7 @@ New-Item -ItemType Directory -Path $output | Out-Null
 Get-ChildItem -LiteralPath (Join-Path $project 'Assets/Editor') -Filter '*.cs' -Recurse | ForEach-Object {
     @{file=[IO.Path]::GetRelativePath($project,$_.FullName);sha256=(Get-FileHash -LiteralPath $_.FullName).Hash}
 } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'sources.json')
-$method=switch($Mode){'Controls'{'Run'}'NativeCadence'{'RunNativeCadence'}'NativeControls'{'RunNativeControls'}'PollingCandidate'{'RunPollingCandidate'}'PostCaptureCandidate'{'RunPostCaptureCandidate'}'TelemetryMeasurement'{'RunTelemetryMeasurement'}}
+$method=switch($Mode){'Controls'{'Run'}'NativeCadence'{'RunNativeCadence'}'NativeControls'{'RunNativeControls'}'PollingCandidate'{'RunPollingCandidate'}'PostCaptureCandidate'{'RunPostCaptureCandidate'}'TelemetryMeasurement'{'RunTelemetryMeasurement'}'ReuseCandidate'{'RunReuseCandidate'}'AsyncCaptureCandidate'{'RunAsyncCaptureCandidate'}}
 $settings=Join-Path $project 'ProjectSettings/ProjectSettings.asset'; $saved=[IO.File]::ReadAllBytes($settings)
 $process=$null; $started=[datetime]::UtcNow
 try {

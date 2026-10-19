@@ -21,6 +21,7 @@ function Measurement {
 }
 function Receipt([string]$mode='NativeCadence') {
     $native=$mode -cne 'Controls'; $measurement=$mode -ceq 'TelemetryMeasurement'; $postCapture=$mode -ceq 'PostCaptureCandidate'; $polling=$postCapture -or $mode -ceq 'PollingCandidate'; $duration=if($measurement){20}elseif($native){48}else{22}
+    $profiling=$measurement -or $mode -cin @('ReuseCandidate','AsyncCaptureCandidate')
     $pairs=switch($mode){'Controls'{0,1,2,3}'NativeControls'{1,2}default{3}}
     $cases=@(foreach($pair in $pairs){
         $capture=($pair -band 2) -ne 0
@@ -29,13 +30,16 @@ function Receipt([string]$mode='NativeCadence') {
           captures=$(if($capture){2}else{0});captureBytes=$(if($capture){1000}else{0});captureMilliseconds=@(if($capture){55;56});
           receiptUpdates=$(if($polling){10}else{0});velocityUpdates=$(if($polling){10}else{0});recoveryUpdates=0;
           postCapturePumps=$(if($postCapture){2}else{0});
-          captureStageCount=$(if($measurement){2}else{0});captureRenderMilliseconds=10;captureReadPixelsMilliseconds=10;capturePngMilliseconds=10;captureDiskMilliseconds=1;
+          captureStageCount=$(if($profiling){2}else{0});captureRenderMilliseconds=10;captureReadPixelsMilliseconds=10;capturePngMilliseconds=10;captureDiskMilliseconds=1;
           managedBytesStart=1000000;managedBytesEnd=2000000;gcCollections=@(1,1,1);
-          performanceWindow=$(if($measurement){Measurement}else{$null});performanceDrained=$(if($measurement){Measurement}else{$null});
+          captureRequests=2;captureReferenceComparisons=1;captureCpuCopyMilliseconds=1;
+          performanceWindow=$(if($profiling){Measurement}else{$null});performanceDrained=$(if($profiling){Measurement}else{$null});
+          pagesWindow=@{limit=36;freeLimit=4;words=2457600;allocated=32;active=28;free=4;peak=32;allocations=32;reuses=100;bytes=157286400};
+          pagesDrained=@{limit=36;freeLimit=4;words=2457600;allocated=32;active=28;free=4;peak=32;allocations=32;reuses=110;bytes=157286400};
           pollingMilliseconds=$(if($polling){1}else{0});maxPollingMilliseconds=$(if($polling){.1}else{0})}
     })
-    @{passed=$true;gameHostTested=$false;nativeHouseGeometryTested=$false;gpuTimingsMeasured=$false;
-      explicitPolling=$polling;postCapturePump=$postCapture;measurementOnly=$measurement;mode=$mode;runId=$id;requestedFrameRate=$(if($native){36}else{-1});
+    @{passed=$true;velocityPageReuseCandidate=$true;gameHostTested=$false;nativeHouseGeometryTested=$false;gpuTimingsMeasured=$false;
+      explicitPolling=$polling;postCapturePump=$postCapture;measurementOnly=$measurement;asyncCapture=($mode -ceq 'AsyncCaptureCandidate');mode=$mode;runId=$id;requestedFrameRate=$(if($native){36}else{-1});
       configuration='32slots/32768blocks/Spatial3D/4resident;28procedural walls';cases=$cases}
 }
 function Reject([string]$name,[scriptblock]$edit,[string]$expected='NativeCadence') {
@@ -47,7 +51,7 @@ function Reject([string]$name,[scriptblock]$edit,[string]$expected='NativeCadenc
     $script:rejections++
 }
 # Synthetic validator fixtures, never GPU/Valheim evidence.
-foreach($mode in @('Controls','NativeCadence','NativeControls','PollingCandidate','PostCaptureCandidate','TelemetryMeasurement')){
+foreach($mode in @('Controls','NativeCadence','NativeControls','PollingCandidate','PostCaptureCandidate','TelemetryMeasurement','ReuseCandidate','AsyncCaptureCandidate')){
     Receipt $mode | ConvertTo-Json -Depth 9 | Set-Content -LiteralPath $path
     Assert-FogProductionFramesEvidence $path $started $mode $id
 }
@@ -110,6 +114,22 @@ Reject 'measurement requested bytes differ' {param($v) $v.cases[0].performanceWi
 Reject 'measurement copy bytes differ' {param($v) $v.cases[0].performanceWindow.flows[0].cpuCopiedBytes=20480} 'TelemetryMeasurement'
 Reject 'measurement batch count differs' {param($v) $v.cases[0].performanceWindow.batches=9} 'TelemetryMeasurement'
 Reject 'measurement reset in drain' {param($v) $v.cases[0].performanceDrained.stages[0].count=9} 'TelemetryMeasurement'
+Reject 'reuse missing page accounting' {param($v) $v.cases[0].pagesWindow=$null} 'ReuseCandidate'
+Reject 'reuse page type' {param($v) $v.cases[0].pagesWindow.active='28'} 'ReuseCandidate'
+Reject 'reuse not bounded' {param($v) $v.cases[0].pagesWindow.peak=37} 'ReuseCandidate'
+Reject 'reuse excess free pages' {param($v) $v.cases[0].pagesWindow.free=8} 'ReuseCandidate'
+Reject 'reuse bad bytes' {param($v) $v.cases[0].pagesWindow.bytes=1} 'ReuseCandidate'
+Reject 'reuse repeated allocations' {param($v) $v.cases[0].pagesWindow.allocations=100} 'ReuseCandidate'
+Reject 'reuse growing after warmup' {param($v) $v.cases[0].pagesDrained.allocations=33; $v.cases[0].pagesDrained.peak=33} 'ReuseCandidate'
+Reject 'reuse no reuse' {param($v) $v.cases[0].pagesWindow.reuses=0} 'ReuseCandidate'
+Reject 'reuse short48' {param($v) $v.cases[0].inputSeconds=20} 'ReuseCandidate'
+Reject 'async disguised as sync' {param($v) $v.asyncCapture=$true} 'ReuseCandidate'
+Reject 'async missing flag' {param($v) $v.asyncCapture=$false} 'AsyncCaptureCandidate'
+Reject 'async lost frame' {param($v) $v.cases[0].captureRequests=3} 'AsyncCaptureCandidate'
+Reject 'async no reference' {param($v) $v.cases[0].captureReferenceComparisons=0} 'AsyncCaptureCandidate'
+Reject 'async no copy' {param($v) $v.cases[0].captureCpuCopyMilliseconds=0} 'AsyncCaptureCandidate'
+Reject 'async short48' {param($v) $v.cases[0].inputSeconds=20} 'AsyncCaptureCandidate'
+Reject 'candidate mislabelled production' {param($v) $v.velocityPageReuseCandidate=$false} 'AsyncCaptureCandidate'
 $stale=Receipt; $stale | ConvertTo-Json -Depth 9 | Set-Content -LiteralPath $path
 (Get-Item -LiteralPath $path).LastWriteTimeUtc=$started.AddMinutes(-1)
 try {Assert-FogProductionFramesEvidence $path $started 'NativeCadence' $id; throw 'STALE_ACCEPTED'}catch{if($_.Exception.Message -eq 'STALE_ACCEPTED'){throw}; $rejections++}
@@ -127,7 +147,7 @@ foreach($invalid in @('duplicate','missing','stringFlag')){
     $rejected=$false; try {& $manifestCheck}catch{$rejected=$true}
     if(!$rejected){throw ('Invalid shader manifest accepted: '+$invalid)}; $rejections++
 }
-@{passed=$true;syntheticValidatorOnly=$true;positiveModes=6;positiveManifests=1;rejected=$rejections;gpuStarted=$false;
+@{passed=$true;syntheticValidatorOnly=$true;positiveModes=8;positiveManifests=1;rejected=$rejections;gpuStarted=$false;
   validatorSha256=(Get-FileHash -LiteralPath (Join-Path $root 'scripts/Test-FogProductionFrames.ps1')).Hash;
   suiteSha256=(Get-FileHash -LiteralPath $PSCommandPath).Hash} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $directory 'verification.json')
-Write-Output ('PASS production-frame receipt gate:6 modes/1 manifest/'+$rejections+' negative cases; CPU only. '+$directory)
+Write-Output ('PASS production-frame receipt gate:8 modes/1 manifest/'+$rejections+' negative cases; CPU only. '+$directory)

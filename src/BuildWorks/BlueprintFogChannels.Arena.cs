@@ -42,6 +42,10 @@ namespace OstrixMods.BuildWorks
             internal AsyncGPUReadbackRequest recoveryRequest;
             internal bool recoveryNativePending, recoveryReceived;
             internal ushort[] coldVelocity, evictionReply;
+#if BUILDWORKS_FOG_PAGE_REUSE_CANDIDATE || UNITY_EDITOR
+            internal FogVelocityPages.Lease coldLease, evictionLease;
+            private readonly FogVelocityPages velocityPages;
+#endif
             internal bool evictionPending, evictionNativePending, evictionReceived;
             internal AsyncGPUReadbackRequest evictionRequest;
             internal BlueprintFogSnapshotState.Submission evictionStamp;
@@ -52,16 +56,27 @@ namespace OstrixMods.BuildWorks
             internal BlueprintFogSnapshotState.Submission recoveryStamp;
 
             internal SnapshotChannel(int slot, long identity, long generation, BlueprintFogInputQueue.Sample initial, BlueprintFogInputQueue inputs, bool resident = true,
-                BlueprintFogLedgerLayout ledgerLayout = BlueprintFogLedgerLayout.LegacyYZ)
+                BlueprintFogLedgerLayout ledgerLayout = BlueprintFogLedgerLayout.LegacyYZ
+#if BUILDWORKS_FOG_PAGE_REUSE_CANDIDATE || UNITY_EDITOR
+                , FogVelocityPages velocityPages = null
+#endif
+                )
             {
                 Slot = slot; Identity = identity; Generation = generation;
+#if BUILDWORKS_FOG_PAGE_REUSE_CANDIDATE || UNITY_EDITOR
+                this.velocityPages = velocityPages;
+#endif
                 State = new BlueprintFogSnapshotState(identity, generation, Mathf.FloorToInt(initial.Clock / BlueprintFogSimulation.Step + .0001f));
                 Inputs = inputs ?? new BlueprintFogInputQueue(State, initial);
                 LastSubmission = new BlueprintFogSnapshotState.Submission(identity, generation, 0, State.ConfirmedTick, 0);
                 try
                 {
                     if (resident) Velocity = BlueprintFogSimulation.AllocateField(new Vector3Int(96, 80, 80), "Fog committed velocity " + slot);
+#if BUILDWORKS_FOG_PAGE_REUSE_CANDIDATE || UNITY_EDITOR
+                    else { coldLease = velocityPages.Rent(true); coldVelocity = coldLease.Words; }
+#else
                     else coldVelocity = new ushort[VelocityWords];
+#endif
                     int cells = BlueprintFogSnapshotState.LedgerCells(ledgerLayout);
                     for (int i = 0; i < Ledger.Length; ++i) { Ledger[i] = new ComputeBuffer(i == 2 ? 1 : cells, 4); Ledger[i].SetData(new uint[i == 2 ? 1 : cells]); }
                 }
@@ -89,6 +104,11 @@ namespace OstrixMods.BuildWorks
                 if (released || !evictionPending || evictionReceived || !Same(stamp, evictionStamp)) return;
                 evictionReply = words; evictionReceived = true;
             }
+#if BUILDWORKS_FOG_PAGE_REUSE_CANDIDATE || UNITY_EDITOR
+            internal bool CanCopyVelocity(BlueprintFogSnapshotState.Submission stamp, FogVelocityPages.Lease lease)
+                => !released && evictionPending && !evictionReceived && Same(stamp, evictionStamp) &&
+                    ReferenceEquals(evictionLease, lease) && velocityPages.CanWrite(lease);
+#endif
             internal static bool Same(BlueprintFogSnapshotState.Submission a, BlueprintFogSnapshotState.Submission b)
                 => a.Owner == b.Owner && a.Generation == b.Generation && a.Sequence == b.Sequence && a.Tick == b.Tick && a.EmissionRevision == b.EmissionRevision;
             internal void Release()
@@ -97,12 +117,20 @@ namespace OstrixMods.BuildWorks
                 simulation?.Dispose(); simulation = null;
                 foreach (var buffer in Ledger) buffer?.Release();
                 if (Velocity) { Velocity.Release(); UnityEngine.Object.DestroyImmediate(Velocity); }
+#if BUILDWORKS_FOG_PAGE_REUSE_CANDIDATE || UNITY_EDITOR
+                if (evictionLease != null && !ReferenceEquals(evictionLease, coldLease)) velocityPages.Return(evictionLease);
+                if (coldLease != null) velocityPages.Return(coldLease);
+                coldLease = evictionLease = null;
+#endif
                 coldVelocity = evictionReply = null;
                 released = true;
             }
         }
 
         private BlueprintFogArena arena;
+#if BUILDWORKS_FOG_PAGE_REUSE_CANDIDATE || UNITY_EDITOR
+        private FogVelocityPages velocityPages;
+#endif
         private SnapshotChannel[] snapshotSlots;
         private long[] generations;
         private long nextIdentity;
@@ -135,6 +163,9 @@ namespace OstrixMods.BuildWorks
                 while (residentOwners > 1 && BlueprintFogSnapshotState.EstimateFieldBytes(ownerLimit, blockCapacity, residentOwners, ledgerLayout) > MaximumFieldBudget) --residentOwners;
             }
             pool.arena = new BlueprintFogArena(assets.Arena, assets.Metadata, ownerLimit, blockCapacity, denseReference, residentOwners, ledgerLayout);
+#if BUILDWORKS_FOG_PAGE_REUSE_CANDIDATE || UNITY_EDITOR
+            pool.velocityPages = new FogVelocityPages(ownerLimit, residentOwners, VelocityWords);
+#endif
             pool.snapshotSlots = new SnapshotChannel[ownerLimit]; pool.generations = new long[ownerLimit];
             return pool;
         }
@@ -165,7 +196,11 @@ namespace OstrixMods.BuildWorks
             SnapshotChannel owner = null; bool initializing = false; creating = true;
             try
             {
-                owner = new SnapshotChannel(slot, checked(++nextIdentity), checked(++generations[slot]), initial, inputs, ResidentSnapshotCount < arena.ResidentCapacity, arena.LedgerLayout);
+                owner = new SnapshotChannel(slot, checked(++nextIdentity), checked(++generations[slot]), initial, inputs, ResidentSnapshotCount < arena.ResidentCapacity, arena.LedgerLayout
+#if BUILDWORKS_FOG_PAGE_REUSE_CANDIDATE || UNITY_EDITOR
+                    , velocityPages
+#endif
+                    );
                 var scratch = arena.Scratch; var buffers = arena.Buffers;
                 var staged = new BlueprintFogSimulation.StagedState(scratch.ReadColour, scratch.ReadOrigin,
                     scratch.ReadSurface, buffers["_StageAway"], buffers["_StagePeak"], buffers["_StageState"], arena.LedgerLayout);
@@ -295,7 +330,11 @@ namespace OstrixMods.BuildWorks
                 if (outcome == BlueprintFogSnapshotState.Completion.Committed)
                 {
                     if (retainedVelocity) owner.coldVelocityStamp = token;
+#if BUILDWORKS_FOG_PAGE_REUSE_CANDIDATE || UNITY_EDITOR
+                    // Keep the previous CPU page until the matching velocity has also been confirmed.
+#else
                     else owner.coldVelocity = null;
+#endif
                 }
                 owner.pendingBatch = false; owner.reply = null;
                 if (!valid || (words[8] & 4) != 0) { owner.Error = "Fog receipt or allocator failed; pool teardown required."; snapshotTeardown = true; }
@@ -427,6 +466,9 @@ namespace OstrixMods.BuildWorks
             var barrier = AsyncGPUReadback.Request(arena.Buffers["_Control"]); barrier.WaitForCompletion();
             if (barrier.hasError) throw new InvalidOperationException("Fog pool GPU drain was not confirmed; resources retained for retry.");
             foreach (var owner in snapshotSlots) if (owner != null) { owner.State.ConfirmPoolTeardown(); owner.Release(); }
+#if BUILDWORKS_FOG_PAGE_REUSE_CANDIDATE || UNITY_EDITOR
+            velocityPages.ClearFree();
+#endif
             arena.Dispose(); snapshotCount = 0; snapshotsDisposed = true;
             CloseSources();
         }

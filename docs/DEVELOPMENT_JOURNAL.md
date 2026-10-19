@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-19 — .240: bounded reuse and failed asynchronous control
+
+**Diagnostic checkpoint .240 / default QA .240 installed:** bounded CPU velocity-page reuse passed15 grouped CPU checks and252 exact GPU comparisons, but queue overflow remained. Synchronous recording failed at25.68s; asynchronous recording at34.37s, both queue64. Repetitions stopped. The candidate is limited to an explicit build symbol/Unity Editor; normal and installed QA exclude it and preserve the previous8 fog methods/handlers in IL. Whole-house fog remains unfixed. [Evidence](CHECKPOINT_240.md).
+
 ## 2026-10-19 — .239: velocity and capture measurement
 
 Bounded QA observer preserves simulation; normal8methods/handlers including callbacks retain IL after generated closure-name normalization.15CPU and gate6/65 passed. Unity20s:140/196,drain1.77s,maxQ45. Measured9.69GB new payload arrays, CallbackCopy2.20s/Upload1.44s/ReadPixels2.80s. Not GPU/GC pause timing or a house fix. Next candidate: safe CPU payload reuse. [Report](CHECKPOINT_239.md).

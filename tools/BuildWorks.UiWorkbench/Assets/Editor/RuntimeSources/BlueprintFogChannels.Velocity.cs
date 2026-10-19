@@ -12,6 +12,10 @@ namespace OstrixMods.BuildWorks
         {
             get { int count = 0; if (snapshotSlots != null) foreach (var owner in snapshotSlots) if (owner != null && owner.Velocity) ++count; return count; }
         }
+#if BUILDWORKS_FOG_PAGE_REUSE_CANDIDATE || UNITY_EDITOR
+        internal long VelocityRamBytes => velocityPages?.Bytes ?? 0;
+        internal FogVelocityPages.Snapshot ReadVelocityPages() => velocityPages?.Read();
+#else
         internal long VelocityRamBytes
         {
             get
@@ -22,6 +26,7 @@ namespace OstrixMods.BuildWorks
                 return bytes;
             }
         }
+#endif
 
         internal bool PageSnapshotVelocity(SnapshotChannel owner)
         {
@@ -35,6 +40,9 @@ namespace OstrixMods.BuildWorks
             {
                 PerfCached();
                 owner.evictionStamp = owner.LastSubmission; owner.evictionPending = owner.evictionReceived = owner.evictionRelease = true;
+#if BUILDWORKS_FOG_PAGE_REUSE_CANDIDATE || UNITY_EDITOR
+                owner.evictionLease = owner.coldLease;
+#endif
                 owner.evictionReply = owner.coldVelocity; return false;
             }
             RequestSnapshotVelocity(owner, owner.LastSubmission, true); return false;
@@ -42,6 +50,10 @@ namespace OstrixMods.BuildWorks
 
         private void RequestSnapshotVelocity(SnapshotChannel owner, BlueprintFogSnapshotState.Submission stamp, bool release)
         {
+#if BUILDWORKS_FOG_PAGE_REUSE_CANDIDATE || UNITY_EDITOR
+            var lease = velocityPages.Rent(false);
+            owner.evictionLease = lease;
+#endif
             owner.evictionStamp = stamp; owner.evictionRelease = release; owner.evictionPending = owner.evictionNativePending = true;
             owner.evictionReceived = false; owner.evictionReply = null;
             try
@@ -51,10 +63,18 @@ namespace OstrixMods.BuildWorks
                     long perfCopy = 0; PerfStart(ref perfCopy); long perfCopied = 0;
                     try
                     {
+#if BUILDWORKS_FOG_PAGE_REUSE_CANDIDATE || UNITY_EDITOR
+                        if (!owner.CanCopyVelocity(stamp, lease)) return;
+#endif
                         ushort[] copy = null;
                         if (!request.hasError && request.layerCount > 0 && request.layerCount <= 80)
                         {
-                            copy = new ushort[VelocityWords]; int offset = 0;
+#if BUILDWORKS_FOG_PAGE_REUSE_CANDIDATE || UNITY_EDITOR
+                            copy = lease.Words;
+#else
+                            copy = new ushort[VelocityWords];
+#endif
+                            int offset = 0;
                             for (int layer = 0; layer < request.layerCount; ++layer)
                             {
                                 var data = request.GetData<ushort>(layer);
@@ -72,7 +92,11 @@ namespace OstrixMods.BuildWorks
                     finally {
                         PerfElapsed(FogPerformanceCounters.Stage.CallbackCopy, perfCopy);
                         PerfReceived(owner, FogPerformanceCounters.Kind.Velocity, stamp, perfCopied);
+#if BUILDWORKS_FOG_PAGE_REUSE_CANDIDATE || UNITY_EDITOR
+                        if (ReferenceEquals(owner.evictionLease, lease) && SnapshotChannel.Same(owner.evictionStamp, stamp)) owner.evictionNativePending = false;
+#else
                         owner.evictionNativePending = false;
+#endif
                     }
                 });
             }
@@ -86,11 +110,22 @@ namespace OstrixMods.BuildWorks
             {
                 if (owner == null || !owner.evictionPending || owner.evictionNativePending || !owner.evictionReceived) continue;
                 if (owner.pendingBatch) continue;
-                if (owner.evictionReply == null || owner.evictionReply.Length != VelocityWords || !SnapshotChannel.Same(owner.evictionStamp, owner.LastSubmission))
+                if (owner.evictionReply == null || owner.evictionReply.Length != VelocityWords || !SnapshotChannel.Same(owner.evictionStamp, owner.LastSubmission)
+#if BUILDWORKS_FOG_PAGE_REUSE_CANDIDATE || UNITY_EDITOR
+                    || (owner.LastSubmission.Sequence != 0 && owner.LastCompletion != BlueprintFogSnapshotState.Completion.Committed)
+#endif
+                    )
                 { PerfVelocityAccepted(owner, false); owner.Error = "Fog velocity page was not confirmed; GPU state retained."; snapshotTeardown = true; continue; }
                 PerfVelocityAccepted(owner, true);
                 // The solver and its five CPU integrator values remain alive; maps and ledgers never move.
+#if BUILDWORKS_FOG_PAGE_REUSE_CANDIDATE || UNITY_EDITOR
+                var previous = owner.coldLease;
+                owner.coldLease = owner.evictionLease; owner.evictionLease = null;
+#endif
                 owner.coldVelocity = owner.evictionReply; owner.coldVelocityStamp = owner.evictionStamp; owner.evictionReply = null;
+#if BUILDWORKS_FOG_PAGE_REUSE_CANDIDATE || UNITY_EDITOR
+                if (previous != null && !ReferenceEquals(previous, owner.coldLease)) velocityPages.Return(previous);
+#endif
                 if (owner.evictionRelease) {
                     long perfRelease = 0; PerfStart(ref perfRelease);
                     owner.Velocity.Release(); UnityEngine.Object.DestroyImmediate(owner.Velocity); owner.Velocity = null;

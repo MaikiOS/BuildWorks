@@ -261,7 +261,7 @@ contour.simple_path_missing	BuildWorks: не найдена простая це�
 snap.pin_other_first	BuildWorks: для вращения штатной точки сначала закрепи другую опору через Shift.
 snap.mesh_enabled	BuildWorks: магнит по модели — Ctrl совмещает только выбранные точки.
 snap.native_only	BuildWorks: магнит использует только штатные точки Valheim.
-snap.auto_align_enabled	BuildWorks: автостык включён — ориентация и штатные точки совмещаются вместе.
+snap.auto_align_enabled	BuildWorks: автостык включён — точки совмещаются, выставленный поворот сохраняется.
 snap.auto_align_disabled	BuildWorks: автостык выключен.
 blueprint.save_failed	BuildWorks: {0}
 blueprint.world_saved	BuildWorks: {0} сохранён в ЧЕРТЕЖИ → {1}. Детали мира сохранены на месте.

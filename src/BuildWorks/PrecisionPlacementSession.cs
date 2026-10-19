@@ -285,7 +285,6 @@ namespace OstrixMods.BuildWorks
         private const float BlueprintWorkspaceRotationStep = 22.5f;
         private const float BlueprintWorkspaceSnapDistance = 0.55f;
         private static readonly Vector3 EditorWorkspaceOrigin = Vector3.zero;
-        private const float AutoAlignmentDistance = 0.35f;
         private const float AutoSnapDistance = 0.75f;
 
         private readonly TransformGizmoView gizmo = new TransformGizmoView();
@@ -6145,68 +6144,38 @@ namespace OstrixMods.BuildWorks
                 out _))
                 return false;
 
+            return TryAutoAlignToPiece(targetPiece);
+        }
+
+        private bool TryAutoAlignToPiece(Piece targetPiece)
+        {
             Vector3 oldPosition = currentPosition;
             Quaternion oldRotation = currentRotation;
-            Quaternion targetRotation = targetPiece.transform.rotation;
             if (TryFindAlignedSnapPair(
                 targetPiece,
-                targetRotation,
+                currentRotation,
                 out Vector3 sourceLocal,
                 out Vector3 targetWorld))
             {
-                currentRotation = targetRotation;
                 MovePieceWithoutMovingCameraFocus(ToUnity(AnchorAdjustment.PositionForFixedAnchor(
                     ToGeometry(targetWorld),
                     ToGeometry(sourceLocal),
                     ToGeometry(currentRotation))));
                 alignmentTargetVisible = true;
                 alignmentTargetPosition = targetWorld;
-                alignmentTargetRotation = targetRotation;
+                alignmentTargetRotation = currentRotation;
                 return TransformChanged(
                     oldPosition, oldRotation, currentPosition, currentRotation);
             }
 
-            float bestDistance = AutoAlignmentDistance * AutoAlignmentDistance;
-            Vector3 bestPoint = Vector3.zero;
-            Vector3 bestAnchor = Vector3.zero;
-            Vector3 bestAnchorWorld = Vector3.zero;
-            Collider[] colliders = targetPiece.GetComponentsInChildren<Collider>();
-            foreach (Collider collider in colliders)
-            {
-                if (!collider || !collider.enabled || collider.isTrigger ||
-                    !collider.gameObject.activeInHierarchy)
-                    continue;
-                foreach (Vector3 localAnchor in anchorLocalPoints)
-                {
-                    Vector3 source = currentPosition + currentRotation * localAnchor;
-                    Vector3 closest = collider.ClosestPoint(source);
-                    float distance = (closest - source).sqrMagnitude;
-                    if (distance >= bestDistance) continue;
-                    bestDistance = distance;
-                    bestPoint = closest;
-                    bestAnchor = localAnchor;
-                    bestAnchorWorld = source;
-                }
-            }
-            if (bestDistance >= AutoAlignmentDistance * AutoAlignmentDistance) return false;
-
-            currentRotation = targetRotation;
-            if (Quaternion.Angle(oldRotation, currentRotation) > 0.0001f)
-            {
-                MovePieceWithoutMovingCameraFocus(ToUnity(AnchorAdjustment.PositionForFixedAnchor(
-                    ToGeometry(bestAnchorWorld),
-                    ToGeometry(bestAnchor),
-                    ToGeometry(currentRotation))));
-            }
-            alignmentTargetVisible = true;
-            alignmentTargetPosition = bestPoint;
-            alignmentTargetRotation = targetRotation;
-            return TransformChanged(oldPosition, oldRotation, currentPosition, currentRotation);
+            // Without a pair, leave the player's pose alone. Surface magnetism
+            // belongs to the explicit Ctrl tool, not automatic orientation changes.
+            return false;
         }
 
         private bool TryFindAlignedSnapPair(
             Piece targetPiece,
-            Quaternion targetRotation,
+            Quaternion sourceRotation,
             out Vector3 sourceLocal,
             out Vector3 targetWorld)
         {
@@ -6219,7 +6188,7 @@ namespace OstrixMods.BuildWorks
             for (int source = NativeAnchorStart; source < anchorLocalPoints.Length; ++source)
             {
                 Vector3 candidateSource = anchorLocalPoints[source];
-                Vector3 sourceWorld = currentPosition + targetRotation * candidateSource;
+                Vector3 sourceWorld = currentPosition + sourceRotation * candidateSource;
                 foreach (Transform target in nativeSnapPoints)
                 {
                     if (!target) continue;

@@ -1,11 +1,13 @@
 # Current BuildWorks status
 
-**2026-10-18 · [Русский](CURRENT_STATUS_RU.md) · [Roadmap](ROADMAP.md) · [Documentation](README.md)**
+**2026-10-19 · [Русский](CURRENT_STATUS_RU.md) · [Roadmap](ROADMAP.md) · [Documentation](README.md)**
 
-**QA .226 installed:** four-wall native continuation16/16 and world reload10/10, with exact debit/save evidence. Project fog, paid cancellation and server work remain open. [.226](CHECKPOINT_226.md).
+**Candidate .228, not game-accepted:** normal/QA0/0, full Store/Geometry, host/localization and independent source review pass. F9 keeps player rotation; no pair leaves the pose unchanged. Owner stand18 received and file-imported twice into temporary stores. Intermediate .227 is installed; .228 awaits a closed game. Owner requested work without the game19Oct. [Evidence/queue/pending cleanup](CHECKPOINT_228.md). The general world snap issue remains open.
+
+**Last bounded game proof .226:** four-wall native continuation16/16 and world reload10/10, with exact debit/save evidence. Project fog, paid cancellation and server work remain open. [.226](CHECKPOINT_226.md).
 
 
-Installed isolated QA **0.19.226**. Normal/QA0/0, full Store/Geometry, host1.0.20/25909357, localization1118 and independent review passed. Valheim16/16+10/10 covers four walls/native payment/paired saves/world reload, a bounded host slice. No site preparation; EarthWorks comes later. Public0.19.37 alpha remains historical; no new binary release.
+Previous QA **0.19.226**: Normal/QA0/0, full Store/Geometry, host1.0.20/25909357, localization1118 and independent review passed. Valheim16/16+10/10 covers four walls/native payment/paired saves/world reload, a bounded host slice. No site preparation; EarthWorks comes later. Public0.19.37 alpha remains historical; no new binary release.
 
 | Area | Implemented / automated evidence | Valheim or user evidence | Still open |
 | --- | --- | --- | --- |
@@ -24,7 +26,7 @@ Evidence levels are distinct: source → automated checks → deployment → nat
 
 Historical .206 proof: QA.206 installed DLL SHA `B1691BB1DAE7668AEBC924A185329F4AE552492B4A57457D6A798A0DF68042FC`;143 protected files retained their hashes/timestamps. Normal/QA builds: 0warnings/0errors, host/control/isolation/localization 1104 and independent reviews passed. .206 has not run in Valheim. Local receipts are under `artifacts/fog-atlas-206` and are not shipped in GitHub.
 
-Next: durable payment/new-object confirmation and board continuation; connect unfinished-part fog and complete house acceptance. [Full scope](../PROJECT_CONTRACT.md), [ordered milestones](ROADMAP.md), [owner live list](LIVE_CHECKLIST_RU.md). Accepted cases need no repeat without a regression reason.
+Next: native snapping on the owner stand, unfinished-part v11 and house acceptance, the ordinary Create path, paid cancellation and general recovery. [Full scope](../PROJECT_CONTRACT.md), [ordered milestones](ROADMAP.md), [owner live list](LIVE_CHECKLIST_RU.md). Accepted cases need no repeat without a regression reason.
 
 Historical .207 proof: [packing and allocation-failure recovery](FOG_PACKING_207.md) verified; saved28-block dimensions fit128MiB. QA installed, SHA `1A7B711678F1C22886C79B89C5845DCAC94EA1FFF1FB6C82FA87709454566AA5`. This is not a native house: simulation/contact budgets remain open. Native .207 untested.
 

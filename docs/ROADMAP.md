@@ -30,6 +30,8 @@ Numbers show the direction of development. Some preparation can overlap. No enti
 
 Translate, rotate, and scale on selected axes; reliably snap rotated pieces; use groups, independent anchors, connection points, Undo/Redo, and an interior camera. **Outcome:** predictable assembly, placement matching the preview, and the same shape after reload. Core tools exist; complex snapping and remaining control issues still need verification.
 
+Ordinary world auto-join, including F9, preserves the chosen player rotation. Adopting additional target tilt is a separate held mode, without hidden turns caused by equivalent axes of symmetric beams. **Acceptance:** unchanged inputs give an unchanged result across camera sides, vertical/horizontal/diagonal prefabs, actual root XYZ changes, manual rotation and mode transitions. Prefab mesh tilt and root rotation are distinct cases.
+
 ### 2. Buildings as blueprints
 
 External library or world capture → editing → construction. A personal library with categories, understandable files, Save As, deletion, and batch import/export. Foreign formats declare supported data and losses. Locate a missing part by its saved position, replace it with your pieces, or exclude it in a separate copy. **Outcome:** usable construction blueprints with limitations explained beforehand. Selected houses passed this journey; the full declared corpus remains incomplete.

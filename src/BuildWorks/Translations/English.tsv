@@ -261,7 +261,7 @@ contour.simple_path_missing	BuildWorks: no simple branch-free chain or loop was 
 snap.pin_other_first	BuildWorks: pin another support with Shift before rotating a native snap point.
 snap.mesh_enabled	BuildWorks: model snapping — Ctrl aligns only the selected points.
 snap.native_only	BuildWorks: snapping uses native Valheim points only.
-snap.auto_align_enabled	BuildWorks: auto-join enabled — orientation and native points align together.
+snap.auto_align_enabled	BuildWorks: auto-join enabled — points align, your chosen rotation is preserved.
 snap.auto_align_disabled	BuildWorks: auto-join disabled.
 blueprint.save_failed	BuildWorks: {0}
 blueprint.world_saved	BuildWorks: {0} saved to BLUEPRINTS → {1}. World parts were left in place.

@@ -938,7 +938,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.226.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.228.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $fogResource = @($plugin.MainModule.Resources | Where-Object Name -eq 'BuildWorks.FogGhostV11')
 Assert-Contract ($fogResource.Count -eq 1 -and $fogResource[0] -is [Mono.Cecil.EmbeddedResource]) 'Compiled v11 fog resource is missing or duplicated.'
@@ -2656,11 +2656,11 @@ $autoSnapOperands = @($autoSnap.Body.Instructions | ForEach-Object { [string]$_.
 Assert-Contract ($autoSnapOperands -match 'Piece::GetSnapPoints' -and
     $sessionSource -match 'AutoSnapDistance = 0\.75f') `
     'Automatic joining no longer searches the target piece snap points.'
-$autoAlign = $pluginMethods | Where-Object Name -eq 'TryAutoAlignToTouchingPiece'
+$autoAlign = $pluginMethods | Where-Object Name -eq 'TryAutoAlignToPiece'
 $autoAlignOperands = @($autoAlign.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($autoAlignOperands -match 'TryFindAlignedSnapPair' -and
     $autoAlignOperands -match 'AnchorAdjustment::PositionForFixedAnchor') `
-    'Automatic joining no longer aligns orientation and position together.'
+    'Automatic joining no longer places the chosen source anchor at the target.'
 $passiveAutoJoin = $pluginMethods | Where-Object {
     $_.Name -eq 'ApplyPassiveAutoJoin' -and
     $_.DeclaringType.Name -eq 'PrecisionPlacementSession'
@@ -2776,9 +2776,13 @@ $autoAlignmentOperands = @(
     $autoAlignment.Body.Instructions | ForEach-Object { [string]$_.Operand }
 ) -join "`n"
 Assert-Contract ($autoAlignmentOperands -match 'TryGetPlacedPieceAt' -and
-    $autoAlignmentOperands -match 'Collider::ClosestPoint' -and
-    $autoAlignmentOperands -match 'AnchorAdjustment::PositionForFixedAnchor') `
-    'Compiled automatic alignment does not use the pointed piece, contact geometry, and a fixed source anchor.'
+    $autoAlignmentOperands -match 'TryAutoAlignToPiece' -and
+    $autoAlignOperands -notmatch 'Collider::ClosestPoint' -and
+    $autoAlignOperands -match 'AnchorAdjustment::PositionForFixedAnchor') `
+    'Compiled automatic alignment must use the pointed piece and a fixed source anchor without an implicit surface magnet.'
+Assert-Contract (@($autoAlign.Body.Instructions | Where-Object {
+    $_.OpCode.Name -eq 'stfld' -and [string]$_.Operand -match '::currentRotation$'
+}).Count -eq 0) 'Automatic joining must not overwrite the player rotation.'
 $midpointType = $pluginTypes | Where-Object Name -eq 'VanillaMidpointSnapPoints'
 Assert-Contract ($null -ne $midpointType) 'Compiled vanilla midpoint helper is missing.'
 $midpointAppend = $midpointType.Methods | Where-Object Name -eq 'Append'

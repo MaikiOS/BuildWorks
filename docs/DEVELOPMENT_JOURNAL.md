@@ -6,6 +6,7 @@ This records changes and evidence, not future milestones. Historical results ret
 
 | Checkpoint | Change / evidence | Boundary |
 | --- | --- | --- |
+| 2026-10-19 · .228 source | [F9 rotation preserved](CHECKPOINT_228.md), no-pair no-op; builds/Store/Geometry/contracts/review pass. Owner stand18 received. | Native regression not run; .227 installed, .228 awaits closed game. v11/ordinary Create/held tilt open. |
 | 2026-10-18 · .226 | [Native continuation/reload](CHECKPOINT_226.md):16/16+10/10, existing debit without replay,3more walls/6Wood; v110 provenance and persistent operation markers instead of session ZDOIDs. Builds/Store/Geometry/contracts passed; installed. | Ordinary Create/fog/paid refunds/general recovery/remote open. No site preparation in current work. |
 | 2026-10-18 · source beyond .225 | Detached operation journal: intent/observation/confirmation, exact stack/property and hash checks; StoreTests/Geometry/host/localization, normal/QA0 errors/13CS0649, independent review. Parallel [EarthWorks architecture](EARTHWORKS_BOUNDARY.md); owner specified one board/store and initial blueprint-driven preparation. | No native caller, deployment or game payment proof; integration design remains under discussion. |
 | 2026-10-18 · .225 | [.225](CHECKPOINT_225.md): durable unpaid snapshot/stake/panel, Valheim19/19 +14/14, logout/login/cancel replay; Gamma/Linear matched-scene108 exact/36 each. Installed/restored. | Ordinary wiring/payment/fog/remote and native input/HUD remain open. |

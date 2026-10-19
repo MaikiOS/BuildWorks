@@ -18,6 +18,8 @@ namespace OstrixMods.BuildWorks
         private readonly List<Vector3Int> blocks = new List<Vector3Int>(MaximumOwners);
         private readonly List<Vector3Int> layoutBlocks = new List<Vector3Int>(MaximumOwners);
         private int layoutLimit;
+        private readonly Texture3D[] layoutSources = new Texture3D[MaximumOwners];
+        private int layoutSourceCount;
         internal long PackDispatches { get; private set; }
         private readonly BlueprintFogVisual[] packedOwners = new BlueprintFogVisual[MaximumOwners];
         private readonly Texture[] packedSmoke = new Texture[MaximumOwners], packedSurface = new Texture[MaximumOwners];
@@ -194,7 +196,8 @@ namespace OstrixMods.BuildWorks
             int limit = SystemInfo.maxTexture3DSize;
             bool changed = layoutLimit != limit || layoutBlocks.Count != blocks.Count;
             for (int i = 0; !changed && i < blocks.Count; ++i) changed = layoutBlocks[i] != blocks[i];
-            if (changed) ChangeLayout(blocks, limit, Resize);
+            if (publishedPool != null) PreparePublishedLayout(owners);
+            else if (changed) ChangeLayout(blocks, limit, Resize);
             for (int i = 0; i < owners.Count; ++i)
             {
                 Vector3Int block = blocks[i], offset = offsets[i];
@@ -261,6 +264,8 @@ namespace OstrixMods.BuildWorks
             Array.Copy(pending, offsets, requested.Count);
             layoutBlocks.Clear(); for (int i = 0; i < requested.Count; ++i) layoutBlocks.Add(requested[i]);
             layoutLimit = limit;
+            layoutSourceCount = 0;
+            Array.Clear(layoutSources, 0, layoutSources.Length);
             ClearPackedOwners();
         }
 
@@ -299,19 +304,49 @@ namespace OstrixMods.BuildWorks
         {
             if (publishedPool == null || owners == null || owners.Count < 1 || owners.Count > MaximumOwners)
                 throw new ArgumentException("Published fog layout owner count invalid.");
-            var requested = new List<Vector3Int>(owners.Count); Bounds bounds = default;
+            Bounds bounds = default;
+            bool unchanged = layoutSourceCount == owners.Count && layoutLimit == SystemInfo.maxTexture3DSize;
             for (int i = 0; i < owners.Count; ++i)
             {
                 var owner = owners[i];
                 if (owner?.Source == null || !owner.Source.Shape) throw new ArgumentException("Fog layout source missing.");
                 var texture = owner.Source.Shape;
-                requested.Add(new Vector3Int(texture.width + 2, texture.height + 2, texture.depth + 2));
+                unchanged &= ReferenceEquals(layoutSources[i], texture);
                 if (i == 0) bounds = owner.VolumeBounds; else bounds.Encapsulate(owner.VolumeBounds);
             }
             int steps = Mathf.CeilToInt(bounds.size.magnitude / .025f) + 162;
             if (bounds.size.magnitude > 64 || (long)steps * owners.Count > 32768)
                 throw new InvalidOperationException("Fog projects exceed the bounded visible integration domain.");
+            if (unchanged) return;
+            var requested = new List<Vector3Int>(owners.Count);
+            var distinct = new List<BlueprintFogSource>(owners.Count);
+            var mapping = new int[owners.Count];
+            for (int i = 0; i < owners.Count; ++i)
+            {
+                var source = owners[i].Source; int group = 0;
+                for (; group < distinct.Count; ++group) if (SameShape(source, distinct[group])) break;
+                if (group == distinct.Count)
+                {
+                    distinct.Add(source); var texture = source.Shape;
+                    requested.Add(new Vector3Int(texture.width + 2, texture.height + 2, texture.depth + 2));
+                }
+                mapping[i] = group;
+            }
             ChangeLayout(requested, SystemInfo.maxTexture3DSize, Resize);
+            var groupedOffsets = (Vector3Int[])offsets.Clone();
+            for (int i = 0; i < owners.Count; ++i)
+            { offsets[i] = groupedOffsets[mapping[i]]; layoutSources[i] = owners[i].Source.Shape; }
+            layoutSourceCount = owners.Count;
+        }
+
+        private static bool SameShape(BlueprintFogSource a, BlueprintFogSource b)
+        {
+            var x = a.Shape; var y = b.Shape;
+            if (a.ShapeHash != b.ShapeHash || x.width != y.width || x.height != y.height || x.depth != y.depth) return false;
+            // Hashes only reject candidates; alias immutable density after exact byte comparison.
+            var left = x.GetPixelData<byte>(0); var right = y.GetPixelData<byte>(0);
+            for (int i = 0; i < left.Length; ++i) if (left[i] != right[i]) return false;
+            return true;
         }
         public void Dispose()
         {

@@ -11,6 +11,57 @@ using UnityEngine.Rendering;
 public static class FogPublishedRenderCheck
 {
     private const string Keyword = "BUILDWORKS_FOG_PUBLISHED";
+    public static void RunSharing()
+    {
+        string root = Path.GetFullPath(Path.Combine(Application.dataPath, "../../.."));
+        string output = Path.Combine(root, "artifacts/checkpoint-233/sharing"); Directory.CreateDirectory(output);
+        ColorSpace previousSpace = PlayerSettings.colorSpace;
+        PlayerSettings.colorSpace = ColorSpace.Linear; AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+        EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        var host = new GameObject("Sharing camera"); var camera = host.AddComponent<Camera>(); var probe = host.AddComponent<FogRenderProbe>();
+        camera.transform.position = new Vector3(4, 2.3f, -5); camera.transform.LookAt(new Vector3(0, 1, 1.1f)); camera.fieldOfView = 49;
+        camera.clearFlags = CameraClearFlags.SolidColor; camera.backgroundColor = new Color(.15f, .2f, .3f);
+        camera.allowHDR = true; camera.renderingPath = RenderingPath.DeferredShading; camera.depthTextureMode = DepthTextureMode.Depth;
+        var prefab = GameObject.CreatePrimitive(PrimitiveType.Cube); prefab.transform.localScale = new Vector3(.2f, 2, 2); prefab.SetActive(false);
+        var original = new Material(Shader.Find("Standard")); original.color = new Color(.64f, .31f, .12f); prefab.GetComponent<Renderer>().sharedMaterial = original;
+        var visuals = new BlueprintFogVisual[2]; var report = new Report();
+        try
+        {
+            using (var assets = new BlueprintFogAssets(File.ReadAllBytes(Path.Combine(root, "artifacts/fog-runtime-assets-candidate/buildworks-fog-v11"))))
+            {
+                FogPreparationCheck.Check(assets, out report.preparationCases, out report.preparationMaxStepMilliseconds, Path.Combine(output, "preparation.json"));
+                for (int i = 0; i < 2; ++i)
+                {
+                    var origin = new Vector3(0, 0, i * 2.5f);
+                    visuals[i] = new BlueprintFogVisual(assets, prefab, origin + Vector3.up, Quaternion.identity, Vector3.one,
+                        null, origin, origin + new Vector3(-1.8f, .95f, 0), new Vector2(.3f, .95f));
+                }
+                CheckRuntimeAtlas(assets, visuals, camera, probe, output, report);
+                Require(report.runtimeVisualAtlasValidated, "Sharing checks did not complete.");
+                File.WriteAllText(Path.Combine(output, "verification.json"), JsonUtility.ToJson(new SharingReport {
+                    passed = true, captures = report.runtimeVisualAtlasCaptures, comparisons = report.runtimeVisualAtlasComparisons,
+                    mappingNegativeCases = report.runtimeMappingNegativeCases, staticBytes = report.runtimeStaticBytes,
+                    combinedRenderBytes = report.runtimeCombinedRenderBytes, maxMeanDelta = report.runtimeMaxMeanDelta,
+                    maxLocalDelta = report.runtimeMaxLocalDelta, wrongMappingDelta = report.runtimeWrongMappingDelta }, true));
+                Debug.Log("BUILDWORKS_FOG_SHARING_OK");
+            }
+        }
+        finally
+        {
+            foreach (var visual in visuals) visual?.Dispose();
+            UnityEngine.Object.DestroyImmediate(original); UnityEngine.Object.DestroyImmediate(prefab); UnityEngine.Object.DestroyImmediate(host);
+            PlayerSettings.colorSpace = previousSpace; AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+        }
+        EditorApplication.Exit(0);
+    }
+    [Serializable] private sealed class SharingReport
+    {
+        public string scope = "Immutable static shape sharing; independent dynamic owners and dense/published pixels";
+        public bool passed;
+        public int captures, comparisons, mappingNegativeCases;
+        public long staticBytes, combinedRenderBytes;
+        public double maxMeanDelta, maxLocalDelta, wrongMappingDelta;
+    }
     public static void Run()
     {
         string root = Path.GetFullPath(Path.Combine(Application.dataPath, "../../..")), output = Path.Combine(root, "artifacts/fog-published-render");
@@ -289,6 +340,17 @@ public static class FogPublishedRenderCheck
                 }
             }
             Compare("dormant", visuals, new BlueprintFogChannels.SnapshotChannel[2]);
+            var offsets = (Vector3Int[])typeof(BlueprintFogAtlas).GetField("offsets", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(published);
+            Require(offsets[0] == offsets[1], "Identical immutable sources were not shared.");
+            var same = typeof(BlueprintFogAtlas).GetMethod("SameShape", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+            var bytes = visuals[1].Source.Shape.GetPixelData<byte>(0); byte previous = bytes[0];
+            try
+            {
+                bytes[0] ^= 1;
+                Require(!(bool)same.Invoke(null, new object[] { visuals[0].Source, visuals[1].Source }), "Hash collision aliased different bytes.");
+            }
+            finally { bytes[0] = previous; }
+            Require((bool)same.Invoke(null, new object[] { visuals[0].Source, visuals[1].Source }), "Restored identical source differs.");
             Compare("initial", visuals, handles);
             for (int tick = 8; tick <= 96; tick += 8)
             {
@@ -353,7 +415,7 @@ public static class FogPublishedRenderCheck
             Reject(() => published.PreparePublished(visuals, handles));
             report.runtimeStaticBytes = published.Bytes;
             report.runtimeCombinedRenderBytes = published.Bytes + pool.SnapshotArena.RenderBytes;
-            Require(published.Bytes == 8122272 && report.runtimeCombinedRenderBytes == 22601184, "Split atlas bytes include hidden full dynamic copies.");
+            Require(published.Bytes == 4061136 && report.runtimeCombinedRenderBytes == 18540048, "Identical static shapes were duplicated or dynamic owners merged.");
             bool allocated = false;
             Reject(() => published.ChangeLayout(new[] { new Vector3Int(512, 512, 256) }, 512, size => { allocated = true; }));
             Require(!allocated && published.Bytes == report.runtimeStaticBytes, "Combined render budget allocated or replaced the retained atlas before rejecting.");

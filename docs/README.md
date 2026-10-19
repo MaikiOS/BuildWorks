@@ -1,6 +1,6 @@
 # BuildWorks documentation
 
-[.226](CHECKPOINT_226.md) — four-wall paid continuation/world reload verified; unfinished-project fog remains open.
+[.233](CHECKPOINT_233.md) — verified four-part wall passages and exact static sharing; house28 still overflows its input queue during passage.
 
 [Русский](README_RU.md) · [Project home](../README.md)
 

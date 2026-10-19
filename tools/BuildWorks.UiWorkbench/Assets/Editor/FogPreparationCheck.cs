@@ -24,7 +24,7 @@ public static class FogPreparationCheck
         }
         File.WriteAllText(BaselinePath, JsonUtility.ToJson(baseline, true));
     }
-    internal static void Check(BlueprintFogAssets assets, out int cases, out double maximumStepMilliseconds)
+    internal static void Check(BlueprintFogAssets assets, out int cases, out double maximumStepMilliseconds, string outputPath = null)
     {
         Require(QualitySettings.activeColorSpace == ColorSpace.Linear, "Source baseline requires the native Linear color space.");
         var baseline = JsonUtility.FromJson<Baseline>(File.ReadAllText(BaselinePath));
@@ -90,7 +90,7 @@ public static class FogPreparationCheck
         CheckVisualReentry(assets);
         int lifecycle = CheckPartLifecycle(assets);
         cases = signatures + cancelled + 1 + 2 + 1 + lifecycle; maximumStepMilliseconds = maximumMs;
-        File.WriteAllText(Path.Combine(Application.dataPath, "../../../artifacts/fog-published-render/preparation.json"), JsonUtility.ToJson(new PreparationReceipt {
+        File.WriteAllText(outputPath ?? Path.Combine(Application.dataPath, "../../../artifacts/fog-published-render/preparation.json"), JsonUtility.ToJson(new PreparationReceipt {
             passed = true, sourceSignatureCases = signatures, cancelledPhases = cancelled, faultCases = 1, buildingCases = 2, visualReentryCases = 1,
             partLifecycleCases = lifecycle, steps = steps, maxStepMilliseconds = maximumMs }, true));
     }

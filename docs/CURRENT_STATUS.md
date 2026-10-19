@@ -2,7 +2,7 @@
 
 **2026-10-19 · [Русский](CURRENT_STATUS_RU.md) · [Roadmap](ROADMAP.md) · [Documentation](README.md)**
 
-**QA .232 installed:** ordinary structural confirmation saves a project before native debit; Valheim21/21 failures/retry,17/17 fog/payment,9/9 board continuation and8/8 world reload. Two walls paid4Wood; the retained1/2 project finished for another2Wood. Fixed the stall after the first part. [Limits](CHECKPOINT_232.md): private Local host, no special/contents or paid refund, full visual/network acceptance. Camera/held-tilt snapping remains open.
+**QA .233 installed:** a real unpaid wall project passed7/7+59/59, four directions/481 frames, all four parts recovered to zero. Exact immutable shape sharing removed the28-part house atlas refusal; Unity14 comparisons passed. **House passage remains FAILED:** healthy10s idle then queue overflow during recording/contact; repetitions stopped. [Evidence and next slice](CHECKPOINT_233.md). Payment/reload .232 remain separate proof; appearance, refund/recovery and network are not accepted.
 
 **Last bounded game proof .226:** four-wall native continuation16/16 and world reload10/10, with exact debit/save evidence. Project fog, paid cancellation and server work remain open. [.226](CHECKPOINT_226.md).
 
@@ -17,7 +17,7 @@ Previous QA **0.19.226**: Normal/QA0/0, full Store/Geometry, host1.0.20/25909357
 | Catalog and file exchange | Categories, Save As, delete/hide, automatic portable file, Share, batch import/export | Limited batch .197 import/export/reentry proved | Full batch UI/dirty draft/restart; some owner checks remain |
 | Server library and sharing | Administrator publication; players/admin visibility, verified personal copies, provenance; in-process checks | Host+remote not accepted | Live access/reconnect/restart; direct player-to-player transfer |
 | Items and storage | Separate storage/mount inclusion; supplied-item preservation and journal foundations | Limited chest/inventory comparison only | Durable settlement, cancellation/refund/crash/replay, all holders/armor/admin restore and network authority |
-| v11 fog | .231 shared renderer; .232 real structural project/journal | Two unpaid parts visible; committed2/2 removed from fog; world reload without another debit | Passages/wall/house appearance/FPS, faults and network |
+| v11 fog | .233 exact shape sharing without shader/bundle changes;14 GPU comparisons | Real four-part wall7+59/4 directions/481 frames/recovery0; house28 admitted, passage FAILED queue overflow | Stable house/appearance/FPS, production32/32768/Spatial3D/4resident diagnostics, faults/network |
 | Unfinished construction | .232 ordinary Hammer caller, frozen plan, board and native ProjectPart | Valheim21+17+9+8;2/2 walls4Wood, separate1/2→2/2 continuation2Wood, native TRS/receipt after reload | All objects/contents, paid cancellation/general recovery, HUD/native E, server/remote |
 | World selection and heavy chain | Capture/volume foundations and targeted checks | Basic capture accepted; later coordinate/height UX issues reported | Editable volume/gizmos, boundary rules, full loaded-area and performance acceptance |
 | World objects and EarthWorks | No terrain integration dependency | None claimed | Admin-priced nonrecipe objects; EarthWorks is a later separate integration |
@@ -26,7 +26,7 @@ Evidence levels are distinct: source → automated checks → deployment → nat
 
 Historical .206 proof: QA.206 installed DLL SHA `B1691BB1DAE7668AEBC924A185329F4AE552492B4A57457D6A798A0DF68042FC`;143 protected files retained their hashes/timestamps. Normal/QA builds: 0warnings/0errors, host/control/isolation/localization 1104 and independent reviews passed. .206 has not run in Valheim. Local receipts are under `artifacts/fog-atlas-206` and are not shipped in GitHub.
 
-Next: native snapping on the owner stand, unfinished-part v11 and house acceptance, the ordinary Create path, paid cancellation and general recovery. [Full scope](../PROJECT_CONTRACT.md), [ordered milestones](ROADMAP.md), [owner live list](LIVE_CHECKLIST_RU.md). Accepted cases need no repeat without a regression reason.
+Next: reproduce production house/queue scheduling in Unity, then stable native passage; paid cancellation/recovery and camera/held-tilt snapping remain parallel work. [Full scope](../PROJECT_CONTRACT.md), [roadmap](ROADMAP.md), [live list](LIVE_CHECKLIST_RU.md). Accepted cases need no repeat without a regression reason.
 
 Historical .207 proof: [packing and allocation-failure recovery](FOG_PACKING_207.md) verified; saved28-block dimensions fit128MiB. QA installed, SHA `1A7B711678F1C22886C79B89C5845DCAC94EA1FFF1FB6C82FA87709454566AA5`. This is not a native house: simulation/contact budgets remain open. Native .207 untested.
 

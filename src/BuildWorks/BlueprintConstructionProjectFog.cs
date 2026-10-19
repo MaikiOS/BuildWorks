@@ -18,6 +18,7 @@ namespace OstrixMods.BuildWorks
             internal IEnumerator<object> Preparation;
             internal string Error;
             internal bool Admitted;
+            internal float Clock;
         }
         private readonly Dictionary<Guid, Entry> entries = new Dictionary<Guid, Entry>();
         private readonly List<BlueprintFogVisual> owners = new List<BlueprintFogVisual>(32);
@@ -44,6 +45,9 @@ namespace OstrixMods.BuildWorks
         internal bool Has(Guid id) => entries.ContainsKey(id);
         internal string Error(Guid id) => failure ?? (entries.TryGetValue(id, out var entry) ? entry.Error : null);
         internal BlueprintFogBuilding Building(Guid id) => entries.TryGetValue(id, out var entry) ? entry.Building : null;
+#if BUILDWORKS_TEST_STAND
+        internal BlueprintFogChannels QaChannels => channels;
+#endif
 
         internal void Initialize(BlueprintConstructionProjectRuntime owner, Action<Exception> report)
         { runtime = owner; log = report; view = GetComponent<Camera>(); }
@@ -137,14 +141,18 @@ namespace OstrixMods.BuildWorks
                             entry.Building.SetDisplayActive(false);
                             Collect(true); entry.Building.AppendPublishedSources(owners, snapshots, true);
                             if (owners.Count > 0) atlas.PreparePublishedLayout(owners);
+                            entry.Clock = entry.Building.Clock;
                             entry.Admitted = true; layoutDirty = true; entry.Building.SetDisplayActive(true);
                         }
                         catch (Exception error) { FailEntry(entry, error); }
                     }
                     if (entry.Admitted)
                     {
-                        float clock = entry.Building.Clock + Mathf.Min(Time.deltaTime, BlueprintFogSimulation.Step * 8);
-                        entry.Building.AdvanceTo(clock, actor, capsule, !Player.m_localPlayer.IsDead());
+                        entry.Clock += Mathf.Min(Time.deltaTime, BlueprintFogSimulation.Step * 8);
+                        if (Mathf.FloorToInt(entry.Clock / BlueprintFogSimulation.Step + .0001f) >
+                            Mathf.FloorToInt(entry.Building.Clock / BlueprintFogSimulation.Step + .0001f))
+                            entry.Building.AdvanceTo(entry.Clock, actor, capsule, !Player.m_localPlayer.IsDead());
+                        else entry.Building.Pump();
                     }
                 }
                 channels.PumpSources();

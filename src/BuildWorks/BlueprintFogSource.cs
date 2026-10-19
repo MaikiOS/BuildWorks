@@ -21,6 +21,7 @@ namespace OstrixMods.BuildWorks
         internal Texture3D Pigment { get; private set; }
         internal Texture3D Noise { get; private set; }
         internal int Occupied { get; private set; }
+        internal ulong ShapeHash { get; private set; }
         private readonly int Nx = 144, Ny = 112, Nz = 120;
         private bool preparing, prepared, disposed, cooperative;
         private long sliceStarted;
@@ -217,13 +218,16 @@ namespace OstrixMods.BuildWorks
             PreparationPhase = "upload";
             if (cooperative) { yield return null; BeginSlice(); }
             var bytes = new byte[cells.Length];
+            ulong hash = 14695981039346656037UL;
             for (int i = 0; i < bytes.Length; ++i)
             {
                 bytes[i] = (byte)Mathf.RoundToInt(Mathf.Clamp01(cells[i]) * 255);
+                hash = unchecked((hash ^ bytes[i]) * 1099511628211UL);
                 if ((i & 16383) == 0 && YieldDue) { yield return null; BeginSlice(); }
             }
             Shape = new Texture3D(Nx, Ny, Nz, TextureFormat.R8, false) { name = "BuildWorks fog source", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, hideFlags = HideFlags.HideAndDontSave };
             Shape.SetPixelData(bytes, 0); Shape.Apply(false, false);
+            ShapeHash = hash;
             PreparationPhase = "shape-uploaded";
             if (cooperative) { yield return null; BeginSlice(); }
             Pigment = new Texture3D(Nx, Ny, Nz, TextureFormat.RGBA32, false) { name = "BuildWorks fog pigment", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, hideFlags = HideFlags.HideAndDontSave };

@@ -8,10 +8,12 @@ namespace OstrixMods.BuildWorks
 {
     internal sealed class BuildWorksTestFog : MonoBehaviour
     {
+        private static BuildWorksTestFog borrowedProbe;
+        public static BuildWorksTestFog CurrentProbe => borrowedProbe ? borrowedProbe : Camera.main ? Camera.main.GetComponent<BuildWorksTestFog>() : null;
         public static string HouseStatus()
         {
             BuildWorksTestIsolation.RequireLoadedSession();
-            var fog = Camera.main ? Camera.main.GetComponent<BuildWorksTestFog>() : null;
+            var fog = CurrentProbe;
             return JsonUtility.ToJson(new HouseReceipt {
                 active = fog && fog.Active && fog.PublishedHouse, preparing = fog && fog.preparation != null, failure = fog?.Failure,
                 expectedParts = fog?.building?.PlannedParts ?? 0, preparedParts = fog?.building?.PreparedParts ?? 0,
@@ -146,6 +148,10 @@ namespace OstrixMods.BuildWorks
         private BlueprintFogVisual visual;
         private BlueprintFogVisual second;
         private BlueprintFogBuilding building;
+        private BlueprintConstructionProjectRuntime borrowedProject;
+        private Guid borrowedProjectId;
+        private Vector3 borrowedCentre;
+        private Vector2 borrowedDistances;
         private BlueprintFogChannels channels;
         private BlueprintFogVolume volume;
         private Player player;
@@ -161,8 +167,8 @@ namespace OstrixMods.BuildWorks
         private double PreparationMilliseconds => preparation != null ? (Time.realtimeSinceStartup - preparationStarted) * 1000d : preparationMilliseconds;
         public int RenderFrames { get; private set; }
         public int Tick => visual?.Simulation?.Tick ?? (building == null ? 0 : Mathf.FloorToInt(building.Clock / BlueprintFogSimulation.Step + .0001f));
-        public Vector3 Origin => visual?.Origin ?? building?.Origin ?? Vector3.zero;
-        public bool Active => visual != null || building?.Ready == true;
+        public Vector3 Origin => borrowedProject != null ? borrowedCentre : visual?.Origin ?? building?.Origin ?? Vector3.zero;
+        public bool Active => Failure == null && (visual != null || building?.Ready == true);
         public int PartCount => building?.Count ?? (visual == null ? 0 : second == null ? 1 : 2);
         public long FieldBytes => channels?.FieldBytes ?? visual?.Simulation?.AllocatedFieldBytes ?? 0;
         public long AtlasBytes => building?.AtlasBytes ?? volume?.AtlasBytes ?? 0;
@@ -173,7 +179,14 @@ namespace OstrixMods.BuildWorks
         public int ActiveOwners => channels?.Count ?? (visual == null ? 0 : 1);
         public bool SkipVolume { get; set; }
         public bool SkipSimulation { get; set; }
-        public string Failure { get; private set; }
+        private string failure;
+        public string Failure
+        {
+            get => failure ?? (borrowedProject == null ? null : !player || player != Player.m_localPlayer || !network || network != ZNet.instance ||
+                !Game.instance || Game.instance.IsShuttingDown() ? "Borrowed QA session changed." : borrowedProject.FogError(borrowedProjectId) ??
+                (borrowedProject.Fog?.Building(borrowedProjectId) == building ? null : "Borrowed construction fog changed."));
+            private set => failure = value;
+        }
         public Bounds PrefabBounds { get; private set; }
         public string PassPhase { get; private set; } = "idle";
         public int PassSide { get; private set; } = -1;
@@ -181,10 +194,20 @@ namespace OstrixMods.BuildWorks
         public bool PassRunning => wallPass != null;
         private bool wallLine;
         private BlueprintFogChannels.MetricsProbe metrics;
+        internal void AttachProject(BlueprintConstructionProjectRuntime runtime, Guid id, Vector3 centre, Vector2 distances)
+        {
+            player = BuildWorksTestIsolation.RequireLoadedSession(); network = ZNet.instance;
+            if (building != null || visual != null || runtime.Fog?.Building(id)?.Ready != true || runtime.FogError(id) != null)
+                throw new InvalidOperationException("An idle probe and a ready real construction project are required.");
+            borrowedProject = runtime; borrowedProjectId = id; borrowedCentre = centre;
+            borrowedDistances = distances;
+            building = runtime.Fog.Building(id); channels = runtime.Fog.QaChannels; wallLine = true;
+            borrowedProbe = this;
+        }
         public static string BeginPublishedMetrics(bool compareBricks = false)
         {
             BuildWorksTestIsolation.RequireLoadedSession();
-            var fog = Camera.main ? Camera.main.GetComponent<BuildWorksTestFog>() : null;
+            var fog = CurrentProbe;
             if (!fog || !fog.Active || !fog.PublishedHouse || fog.metrics?.Pending == true)
                 throw new InvalidOperationException("Prepared published fog and no pending measurement required.");
             fog.metrics?.Dispose();
@@ -194,13 +217,13 @@ namespace OstrixMods.BuildWorks
         public static string PublishedMetricsStatus()
         {
             BuildWorksTestIsolation.RequireLoadedSession();
-            var fog = Camera.main ? Camera.main.GetComponent<BuildWorksTestFog>() : null;
+            var fog = CurrentProbe;
             return fog?.metrics?.Status() ?? "absent";
         }
         public static string SavePublishedMetrics()
         {
             BuildWorksTestIsolation.RequireLoadedSession();
-            var fog = Camera.main ? Camera.main.GetComponent<BuildWorksTestFog>() : null;
+            var fog = CurrentProbe;
             if (!fog || fog.metrics == null || fog.metrics.Pending) throw new InvalidOperationException("Completed fog metrics required.");
             string result = fog.metrics.Status();
             if (!fog.metrics.Succeeded) throw new InvalidOperationException("Fog metrics failed: " + result);
@@ -217,8 +240,8 @@ namespace OstrixMods.BuildWorks
         public static string SetPartVisible(int index, bool visible)
         {
             BuildWorksTestIsolation.RequireLoadedSession();
-            var fog = Camera.main ? Camera.main.GetComponent<BuildWorksTestFog>() : null;
-            if (!fog || fog.building == null || !fog.building.Ready || fog.wallPass != null)
+            var fog = CurrentProbe;
+            if (!fog || fog.borrowedProject != null || fog.building == null || !fog.building.Ready || fog.wallPass != null)
                 throw new InvalidOperationException("Prepared idle QA fog building required.");
             fog.building.SetPartVisible(index, visible);
             return HouseStatus();
@@ -227,8 +250,8 @@ namespace OstrixMods.BuildWorks
         public static string RemovePart(int index)
         {
             BuildWorksTestIsolation.RequireLoadedSession();
-            var fog = Camera.main ? Camera.main.GetComponent<BuildWorksTestFog>() : null;
-            if (!fog || fog.building == null || !fog.building.Ready || fog.wallPass != null)
+            var fog = CurrentProbe;
+            if (!fog || fog.borrowedProject != null || fog.building == null || !fog.building.Ready || fog.wallPass != null)
                 throw new InvalidOperationException("Prepared idle QA fog building required.");
             fog.building.RemovePart(index);
             return HouseStatus();
@@ -253,7 +276,7 @@ namespace OstrixMods.BuildWorks
         public static string StartWallPass(int side)
         {
             BuildWorksTestIsolation.RequireLoadedSession();
-            var fog = Camera.main ? Camera.main.GetComponent<BuildWorksTestFog>() : null;
+            var fog = CurrentProbe;
             if (!fog || !fog.wallLine || !fog.Active || fog.wallPass != null || side < 0 || side > 3)
                 throw new InvalidOperationException("Prepared idle four-section wall and side 0..3 required.");
             fog.PassFailure = null; fog.PassSide = side; fog.wallPass = fog.WallPass(side).GetEnumerator(); movementOwner = fog;
@@ -263,7 +286,7 @@ namespace OstrixMods.BuildWorks
         private System.Collections.Generic.IEnumerable<object> WallPass(int side)
         {
             Vector3 direction = side == 0 ? Vector3.forward : side == 1 ? Vector3.back : side == 2 ? Vector3.right : Vector3.left;
-            float distance = side < 2 ? 2 : 5;
+            float distance = borrowedProject != null ? side < 2 ? borrowedDistances.y : borrowedDistances.x : side < 2 ? 2 : 5;
             Vector3 centre = Origin;
             try
             {
@@ -309,6 +332,8 @@ namespace OstrixMods.BuildWorks
             {
                 if (!Active || !player || player != Player.m_localPlayer || player.IsDead() || !network || network != ZNet.instance || Game.instance.IsShuttingDown())
                     throw new InvalidOperationException("Wall pass lost the live QA session.");
+                if (borrowedProject != null && (borrowedProject.FogError(borrowedProjectId) != null || borrowedProject.Fog?.Building(borrowedProjectId) != building))
+                    throw new InvalidOperationException("The borrowed construction fog changed or failed.");
                 if (wallPass.MoveNext()) return;
             }
             catch (Exception error) { PassFailure = error.Message; PassPhase = "failed"; }
@@ -386,13 +411,14 @@ namespace OstrixMods.BuildWorks
 
         private void OnPreCull()
         {
-            if (!Active || !enabled) return;
+            if (borrowedProject != null || !Active || !enabled) return;
             try { building?.PrepareRender(); }
             catch (Exception error) { Fail(error); }
         }
 
         private void Update()
         {
+            if (borrowedProject != null) return;
             if (!Active && preparation == null) return;
             if (!player || player != Player.m_localPlayer || !network || network != ZNet.instance ||
                 player.IsDead() || !Game.instance || Game.instance.IsShuttingDown())
@@ -435,6 +461,7 @@ namespace OstrixMods.BuildWorks
 
         private void OnRenderImage(RenderTexture source, RenderTexture target)
         {
+            if (borrowedProject != null) { Graphics.Blit(source, target); return; }
             if (!Active || SkipVolume) { Graphics.Blit(source, target); return; }
             try
             {
@@ -492,6 +519,9 @@ namespace OstrixMods.BuildWorks
             passDirection = Vector3.zero;
             var movement = wallPass; wallPass = null; movement?.Dispose();
             var pending = preparation; preparation = null;
+            // The project alone owns its renderer and GPU pool; this probe borrows only movement/measurement access.
+            if (borrowedProject != null) { building = null; channels = null; borrowedProject = null; }
+            if (borrowedProbe == this) borrowedProbe = null;
             try { pending?.Dispose(); }
             finally
             {

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Threading;
@@ -18,6 +19,7 @@ namespace OstrixMods.BuildWorks
         private readonly int threadId;
         private readonly Func<bool> custodyUnchanged;
         private readonly NativeWorldStorageReadback.Expectation expected;
+        private readonly NativeWorldStorageReadback.AbsenceExpectation absent;
         private Task<ReadResult> read;
         private CancellationToken cancellation;
         private bool refused;
@@ -29,13 +31,14 @@ namespace OstrixMods.BuildWorks
         {
             internal readonly bool Passed;
             internal readonly NativeWorldStorageReadback.Evidence Evidence;
+            internal readonly NativeWorldStorageReadback.AbsenceEvidence Absence;
             internal readonly string Reason;
-            internal ReadResult(bool passed, NativeWorldStorageReadback.Evidence evidence, string reason)
-            { Passed = passed; Evidence = evidence; Reason = reason; }
+            internal ReadResult(bool passed, NativeWorldStorageReadback.Evidence evidence, NativeWorldStorageReadback.AbsenceEvidence absence, string reason)
+            { Passed = passed; Evidence = evidence; Absence = absence; Reason = reason; }
         }
 
         private BlueprintStorageWorldGeneration(Guid operation, Func<bool> custodyUnchanged,
-            Func<long, NativeWorldStorageReadback.Expectation> expectation)
+            Func<long, NativeWorldStorageReadback.Expectation> expectation, Func<long, NativeWorldStorageReadback.AbsenceExpectation> absence)
         {
             Operation = operation; this.custodyUnchanged = custodyUnchanged;
             threadId = Thread.CurrentThread.ManagedThreadId;
@@ -44,7 +47,7 @@ namespace OstrixMods.BuildWorks
             if (!Path.IsPathRooted(nativeDirectory)) throw new InvalidOperationException("Native world directory is not absolute.");
             directory = Path.GetFullPath(nativeDirectory);
             Generation = SaveSystem.GetSaveNumber();
-            expected = expectation(worldId);
+            expected = expectation?.Invoke(worldId); absent = absence?.Invoke(worldId);
         }
 
         internal static bool TryCapture(Guid operation, Guid marker, int prefab, long creator, byte[] items, Func<bool> custodyUnchanged,
@@ -57,8 +60,13 @@ namespace OstrixMods.BuildWorks
             => TryCapture(operation, custodyUnchanged, world => NativeWorldStorageReadback.Expectation.ForExactBlob(world, operation, prefab,
                 creator, ZDOVars.s_creator, markerKey, receiptKey, receipt), out expectation, out reason);
 
-        private static bool TryCapture(Guid operation, Func<bool> custodyUnchanged, Func<long, NativeWorldStorageReadback.Expectation> factory,
+        internal static bool TryCaptureAbsence(Guid operation, int markerKey, IEnumerable<Guid> parts, Func<bool> custodyUnchanged,
             out BlueprintStorageWorldGeneration expectation, out string reason)
+            => TryCapture(operation, custodyUnchanged, null, out expectation, out reason,
+                world => new NativeWorldStorageReadback.AbsenceExpectation(world, markerKey, parts));
+
+        private static bool TryCapture(Guid operation, Func<bool> custodyUnchanged, Func<long, NativeWorldStorageReadback.Expectation> factory,
+            out BlueprintStorageWorldGeneration expectation, out string reason, Func<long, NativeWorldStorageReadback.AbsenceExpectation> absence = null)
         {
             expectation = null; reason = null;
             try
@@ -67,7 +75,7 @@ namespace OstrixMods.BuildWorks
                     ZNet.instance.IsSaving() || ZNet.instance.GetWorld() == null ||
                     ZNet.instance.GetWorld().m_fileSource != FileHelpers.FileSource.Local || !custodyUnchanged())
                     throw new InvalidOperationException("Readback requires the current Local host, an idle save and exact completed item custody.");
-                var candidate = new BlueprintStorageWorldGeneration(operation, custodyUnchanged, factory);
+                var candidate = new BlueprintStorageWorldGeneration(operation, custodyUnchanged, factory, absence);
                 if (!candidate.Valid()) throw new InvalidOperationException("World generation, source or custody changed during capture.");
                 expectation = candidate; return true;
             }
@@ -93,10 +101,17 @@ namespace OstrixMods.BuildWorks
                     throw new InvalidOperationException("World readback was already started, cancelled or its captured context changed.");
                 cancellation = token;
                 string root = directory; uint generation = Generation; var snapshot = expected;
+                var absentSnapshot = absent;
                 read = Task.Run(() =>
                 {
+                    if (absentSnapshot != null)
+                    {
+                        bool missing = NativeWorldStorageFiles.TryVerifyAbsence(root, generation, absentSnapshot,
+                            out var proof, out var failure, token);
+                        return new ReadResult(missing, null, proof, failure);
+                    }
                     bool passed = NativeWorldStorageFiles.TryVerify(root, generation, snapshot, out var evidence, out var error, token);
-                    return new ReadResult(passed, evidence, error);
+                    return new ReadResult(passed, evidence, null, error);
                 });
                 return true;
             }
@@ -105,7 +120,21 @@ namespace OstrixMods.BuildWorks
 
         internal bool TryFinish(out NativeWorldStorageReadback.Evidence evidence, out string reason)
         {
-            evidence = null; reason = null;
+            evidence = null;
+            if (!TryFinishRead(false, out var result, out reason)) return false;
+            evidence = result.Evidence; return true;
+        }
+
+        internal bool TryFinishAbsence(out NativeWorldStorageReadback.AbsenceEvidence evidence, out string reason)
+        {
+            evidence = null;
+            if (!TryFinishRead(true, out var result, out reason)) return false;
+            evidence = result.Absence; return true;
+        }
+
+        private bool TryFinishRead(bool wantAbsence, out ReadResult completed, out string reason)
+        {
+            completed = null; reason = null;
             if (Thread.CurrentThread.ManagedThreadId != threadId)
             { reason = "World readback must be accepted on its owning game thread."; return false; }
             if (read == null || !read.IsCompleted)
@@ -115,8 +144,10 @@ namespace OstrixMods.BuildWorks
                 cancellation.ThrowIfCancellationRequested();
                 if (read.IsFaulted) throw read.Exception.GetBaseException();
                 var result = read.Result;
-                if (!result.Passed || !Valid()) throw new InvalidOperationException(result.Reason ?? "World generation or item custody changed during readback.");
-                evidence = result.Evidence; return true;
+                if (wantAbsence != (absent != null) || !result.Passed || !Valid() ||
+                    (wantAbsence ? result.Absence == null || result.Absence.Generation != Generation : result.Evidence == null))
+                    throw new InvalidOperationException(result.Reason ?? "World generation, evidence kind or item custody changed during readback.");
+                completed = result; return true;
             }
             catch (Exception error) { refused = true; reason = error.Message; return false; }
         }

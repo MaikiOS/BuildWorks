@@ -1,14 +1,14 @@
 # Current BuildWorks status
 
-**Source .236 / installed QA .233:** native ArmorStand pose and ordered slots now enter a bounded own archive. Exact packages, unknown records and inactive residue survive; excluding equipment retains the archive. Pose/equipment preview and placement are still unsupported. Geometry/Store,28 CPU capture cases, normal/QA0/0, host/localization1122/separation and offline Workbench compilation passed. No game/GPU run. [Evidence](CHECKPOINT_236.md).
+**Source .237 / installed QA .237:** a distinct batch-absence proof scans every mapped saved-world chunk once and binds the result to world, generation and unchanged custody. Geometry574 and adapter153 CPU assertions, Store, normal/QA0/0, host/localization1122/separation passed. This is a prerequisite for safe refunds, **not implemented paid cancellation**: removal, delivery and pickup remain disconnected. [Evidence](CHECKPOINT_237.md).
 
-**Previous checkpoint .235:** stale ItemStand ZDO capture fixed;11 CPU regressions, normal/QA0/0, host/localization1121/separation passed. No game/GPU run; ArmorStand and whole-house fog remain open. [Evidence](CHECKPOINT_235.md).
+**Deployment and Valheim .237:** guarded QA installation verified, SHA6A7BFDA209DCB16283DD5486C21A8C24477F96F7979589F3152B3928248B8242. Actual wrapper read generation143/world42:6chunks/44661objects, refused a present marker and accepted the absent batch; inventory identical. This does not test removal/refund. Evidence: `artifacts/checkpoint-237/native/verification.json`, `../ValheimQA/artifacts/20261019-172816/`.
 
-**Diagnostic234, DLL remains .233:** queue64 reproduced at31.7FPS without contact; contact without recording passed48s. A test-only polling candidate is prepared, not GPU-tested; CPU4/1/41 and offline Editor compilation passed. [Evidence](CHECKPOINT_234.md).
+**Additional GPU check,19 October:** PollingCandidate FAILED: queue64 at34.15s/30.72FPS;936+936 Update calls are not completed transfers, dense comparisons0. Production unchanged. Next test-only experiment: service completed requests after Capture; do not repeat native house before PASS. Evidence: `artifacts/fog-production-frames/PollingCandidate-20261019-172119-b06faa2a/`.
 
 **2026-10-19 · [Русский](CURRENT_STATUS_RU.md) · [Roadmap](ROADMAP.md) · [Documentation](README.md)**
 
-**QA .233 installed:** a real unpaid wall project passed7/7+59/59, four directions/481 frames, all four parts recovered to zero. Exact immutable shape sharing removed the28-part house atlas refusal; Unity14 comparisons passed. **House passage remains FAILED:** healthy10s idle then queue overflow during recording/contact; repetitions stopped. [Evidence and next slice](CHECKPOINT_233.md). Payment/reload .232 remain separate proof; appearance, refund/recovery and network are not accepted.
+**Historical .233 game evidence:** a real unpaid wall project passed7/7+59/59, four directions/481 frames, all four parts recovered to zero. Exact immutable shape sharing removed the28-part house atlas refusal; Unity14 comparisons passed. **House passage remains FAILED:** healthy10s idle then queue overflow during recording/contact; repetitions stopped. [Evidence and next slice](CHECKPOINT_233.md). Payment/reload .232 remain separate proof; appearance, refund/recovery and network are not accepted.
 
 **Last bounded game proof .226:** four-wall native continuation16/16 and world reload10/10, with exact debit/save evidence. Project fog, paid cancellation and server work remain open. [.226](CHECKPOINT_226.md).
 
@@ -19,7 +19,7 @@ Previous QA **0.19.226**: Normal/QA0/0, full Store/Geometry, host1.0.20/25909357
 | --- | --- | --- | --- |
 | Precision placement and editor | XYZ, paired axes, 1–1000% component scale, groups, anchors, Undo/Redo, Save As, filters and interior camera | Owner accepted specific scale/save/camera/catalog cases; ordinary snap checked in .193 | Broader rotated/modded contacts, pointer wrapping edge cases and full visual acceptance |
 | Imported construction | Explicit prefab migration, supported text/material paths, real native pieces | Forest Hut (28) paid pieces and exact transform/inventory reload in [.195](ROTATION_PERSISTENCE_195.md) | All formats/prefabs, constructive state, large buildings and networking |
-| Formats and missing parts | Native store24/portable13; supported .blueprint/.vbuild import, reviewed export, missing records/bounds/copy alignment | Limited import/editor cases accepted | Unknown models/behavior are not restored by archiving; wider native corpus acceptance |
+| Formats and missing parts | Native store25/portable14; supported .blueprint/.vbuild import, reviewed export, missing records/bounds/copy alignment | Limited import/editor cases accepted | Unknown models/behavior are not restored by archiving; wider native corpus acceptance |
 | Catalog and file exchange | Categories, Save As, delete/hide, automatic portable file, Share, batch import/export | Limited batch .197 import/export/reentry proved | Full batch UI/dirty draft/restart; some owner checks remain |
 | Server library and sharing | Administrator publication; players/admin visibility, verified personal copies, provenance; in-process checks | Host+remote not accepted | Live access/reconnect/restart; direct player-to-player transfer |
 | Items and storage | Separate storage/mount inclusion; supplied-item preservation and journal foundations | Limited chest/inventory comparison only | Durable settlement, cancellation/refund/crash/replay, all holders/armor/admin restore and network authority |

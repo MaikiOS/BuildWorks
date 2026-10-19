@@ -11,8 +11,17 @@ namespace OstrixMods.BuildWorks.Geometry
     {
         public static bool TryVerify(string directory, uint generation, NativeWorldStorageReadback.Expectation expected,
             out NativeWorldStorageReadback.Evidence evidence, out string reason, CancellationToken cancellation = default)
+            => TryReadGeneration(directory, generation, expected, null, out evidence, out _, out reason, cancellation);
+
+        public static bool TryVerifyAbsence(string directory, uint generation, NativeWorldStorageReadback.AbsenceExpectation expected,
+            out NativeWorldStorageReadback.AbsenceEvidence evidence, out string reason, CancellationToken cancellation = default)
+            => TryReadGeneration(directory, generation, null, expected, out _, out evidence, out reason, cancellation);
+
+        private static bool TryReadGeneration(string directory, uint generation, NativeWorldStorageReadback.Expectation expected,
+            NativeWorldStorageReadback.AbsenceExpectation absent, out NativeWorldStorageReadback.Evidence evidence,
+            out NativeWorldStorageReadback.AbsenceEvidence absence, out string reason, CancellationToken cancellation)
         {
-            evidence = null; reason = null;
+            evidence = null; absence = null; reason = null;
             try
             {
                 if (string.IsNullOrWhiteSpace(directory) || !Path.IsPathRooted(directory) || generation == 0)
@@ -33,17 +42,25 @@ namespace OstrixMods.BuildWorks.Geometry
                     if (!NativeWorldStorageReadback.SupportedVersion(version)) throw new InvalidDataException("Unsupported DB2 version.");
                     double time = header.ReadDouble();
                     if (double.IsNaN(time) || double.IsInfinity(time)) throw new InvalidDataException("Invalid DB2 world time.");
-                    if (!NativeWorldStorageReadback.TryVerify(metadata, mapping, completion,
-                        name => Open(root, name), expected, out var result, out reason, cancellation)) return false;
-                    if (result.FormatVersion != version) throw new InvalidDataException("DB2 and committed generation versions differ.");
+                    NativeWorldStorageReadback.Evidence result = null;
+                    NativeWorldStorageReadback.AbsenceEvidence absentResult = null;
+                    if (absent != null)
+                    {
+                        if (!NativeWorldStorageReadback.TryVerifyAbsence(metadata, mapping, completion,
+                            name => Open(root, name), absent, out absentResult, out reason, cancellation)) return false;
+                    }
+                    else if (!NativeWorldStorageReadback.TryVerify(metadata, mapping, completion,
+                        name => Open(root, name), expected, out result, out reason, cancellation)) return false;
+                    if ((result?.FormatVersion ?? absentResult.FormatVersion) != version)
+                        throw new InvalidDataException("DB2 and committed generation versions differ.");
                     CheckRoot(root);
                     cancellation.ThrowIfCancellationRequested();
-                    evidence = result; return true;
+                    evidence = result; absence = absentResult?.SavedAt(generation); return true;
                 }
             }
             catch (Exception error) when (error is IOException || error is InvalidDataException || error is UnauthorizedAccessException ||
                 error is ArgumentException || error is OverflowException || error is OperationCanceledException)
-            { evidence = null; reason = error.Message; return false; }
+            { evidence = null; absence = null; reason = error.Message; return false; }
         }
 
         private static void CheckRoot(string root)

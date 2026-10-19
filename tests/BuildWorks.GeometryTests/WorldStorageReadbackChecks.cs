@@ -134,12 +134,93 @@ namespace OstrixMods.BuildWorks.GeometryTests
             before = GC.GetAllocatedBytesForCurrentThread();
             opaquePassed = fixture.Verify(out _); allocated = GC.GetAllocatedBytesForCurrentThread() - before;
             Check(opaquePassed && allocated < 512 * 1024, "Unrelated native string value was decoded/allocated or blocked: " + allocated);
-            Console.WriteLine("PASS saved-world41 storage readback: " + assertions + " bounded structural/identity/contents/duplicate/truncation/cancel assertions; no native world save, settlement or network proof");
+            AbsenceChecks();
+            Console.WriteLine("PASS saved-world41/42 presence and batch absence: " + assertions + " bounded structural/identity/contents/duplicate/truncation/cancel assertions; no native world save, settlement or network proof");
+        }
+        private static void AbsenceChecks()
+        {
+            Guid other = new Guid("99999999-9999-9999-9999-999999999999");
+            var ids = new[] { Operation, Guid.NewGuid() };
+            var query = new NativeWorldStorageReadback.AbsenceExpectation(71, 2, ids);
+            ids[0] = other;
+            var fixture = new Fixture { Chunk = Chunk(marker: other.ToString("N")), Map = Mapping(3, chunks: 2) };
+            Check(fixture.Absent(query, out var proof) && proof.World == 71 && proof.MarkerKey == 2 && proof.CompleteMappedScan &&
+                proof.Chunks == 2 && proof.Objects == 2 && proof.Operations[0] == Operation && proof.Generation == 0 && fixture.Opens == 2,
+                "Batch absence failed, aliased caller identities, or did not finish all mapped chunks exactly once");
+            foreach (string marker in new[] { Operation.ToString("N"), Operation.ToString("N").ToUpperInvariant(), query.Operations[1].ToString("N"), "malformed" })
+            {
+                fixture = new Fixture { Map = Mapping(2, chunks: 2) };
+                fixture.AbsenceChunk = name => new MemoryStream(Chunk(marker: name.StartsWith("01_02", StringComparison.Ordinal)
+                    ? other.ToString("N") : marker, creator: 17, prefab: 99), false);
+                Check(!fixture.Absent(query, out proof) && proof == null && fixture.Opens == 2,
+                    "Late marker, changed-case marker or wrong prefab/creator counted as absent");
+            }
+            foreach (byte[] bad in new[] { Chunk(marker: other.ToString("N"), duplicateKey: true), Chunk(marker: other.ToString("N"), nonfinite: true),
+                Chunk(marker: other.ToString("N"), flags: 0x4000), Chunk(marker: other.ToString("N"), count: 2),
+                Chunk(marker: other.ToString("N"), markerWrongType: true) })
+            {
+                fixture = new Fixture { Chunk = bad };
+                Check(!fixture.Absent(query, out proof) && proof == null, "Corrupt or mismatched chunk accepted as absence");
+            }
+            fixture = new Fixture { Chunk = Chunk(marker: "") };
+            Check(fixture.Absent(query, out _), "Unmarked ordinary object prevented absence proof");
+            fixture = new Fixture { Chunk = Chunk(marker: other.ToString("N")), Meta = Metadata(72) };
+            Check(!fixture.Absent(query, out proof) && proof == null, "Other world accepted for batch absence");
+            fixture = new Fixture { Chunk = Chunk(marker: other.ToString("N")), Missing = true };
+            Check(!fixture.Absent(query, out proof) && proof == null, "Missing mapped chunk counted as absence");
+            fixture = new Fixture { Chunk = Chunk(marker: other.ToString("N")) };
+            foreach (string field in new[] { "Meta", "Map", "Chunk", "Ok" })
+            {
+                var member = typeof(Fixture).GetField(field); byte[] valid = (byte[])member.GetValue(fixture);
+                for (int n = 0; n < valid.Length; ++n)
+                {
+                    member.SetValue(fixture, valid.Take(n).ToArray());
+                    Check(!fixture.Absent(query, out proof) && proof == null, "Truncated absence " + field + " accepted at " + n);
+                }
+                member.SetValue(fixture, valid.Concat(new byte[] { 0 }).ToArray());
+                Check(!fixture.Absent(query, out proof) && proof == null, "Trailing absence " + field + " accepted");
+                member.SetValue(fixture, valid);
+            }
+            foreach (Guid[] invalid in new[] { Array.Empty<Guid>(), new[] { Guid.Empty }, new[] { Operation, Operation },
+                Enumerable.Repeat(Operation, BlueprintEditorDocument.MaximumParts + 1).ToArray() })
+            {
+                bool rejected = false;
+                try { new NativeWorldStorageReadback.AbsenceExpectation(71, 2, invalid); } catch (ArgumentException) { rejected = true; }
+                Check(rejected, "Invalid/empty/duplicate/unbounded batch absence identity accepted");
+            }
+            using (var cancel = new CancellationTokenSource())
+            {
+                cancel.Cancel(); fixture = new Fixture { Chunk = Chunk(marker: other.ToString("N")) };
+                Check(!fixture.Absent(query, out proof, cancel.Token) && proof == null && fixture.Opens == 0, "Pre-cancelled absence scanned files");
+            }
+            using (var cancel = new CancellationTokenSource())
+            {
+                fixture = new Fixture { AbsenceChunk = _ => new CancelOnDispose(Chunk(marker: other.ToString("N")), cancel) };
+                Check(!fixture.Absent(query, out proof, cancel.Token) && proof == null, "Final chunk-close cancellation accepted as absence");
+            }
+            fixture = new Fixture { Map = Mapping(10001, objects: 10001), Chunk = Chunk(marker: other.ToString("N"), count: 10001) };
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            Check(fixture.Absent(query, out proof) && proof.Objects == 10001 && fixture.Opens == 1 &&
+                GC.GetAllocatedBytesForCurrentThread() - before < 4 * 1024 * 1024, "Batch absence rescanned or allocated per requested operation");
         }
         private sealed class Fixture
         {
             public byte[] Meta = Metadata(71), Map = Mapping(1), Ok = BitConverter.GetBytes(41), Chunk = WorldStorageReadbackChecks.Chunk();
             internal bool Missing;
+            internal int Opens;
+            internal Func<string, Stream> AbsenceChunk;
+            internal bool Absent(NativeWorldStorageReadback.AbsenceExpectation query, out NativeWorldStorageReadback.AbsenceEvidence evidence,
+                CancellationToken cancellation = default)
+            {
+                Opens = 0;
+                using (var meta = new MemoryStream(Meta, false))
+                using (var map = new MemoryStream(Map, false))
+                using (var ok = new MemoryStream(Ok, false))
+                    return NativeWorldStorageReadback.TryVerifyAbsence(meta, map, ok, name => {
+                        ++Opens; if (Missing) throw new FileNotFoundException();
+                        return AbsenceChunk?.Invoke(name) ?? new MemoryStream(Chunk, false);
+                    }, query, out evidence, out _, cancellation);
+            }
             internal bool Verify(out NativeWorldStorageReadback.Evidence evidence, NativeWorldStorageReadback.Expectation expectation = null,
                 CancellationToken cancellation = default)
             {
@@ -170,12 +251,12 @@ namespace OstrixMods.BuildWorks.GeometryTests
             for (int n = 0; n < chunks; ++n) { w.Write((ushort)(258 + n)); w.Write((byte)3); w.Write(1u); w.Write(objects); }
         });
         private static byte[] Chunk(string marker = null, long creator = 100, int prefab = 43, byte[] inventory = null,
-            int flags = 256 | 32 | 64 | 128, int count = 1, bool duplicateKey = false, bool nonfinite = false, bool largeMap = false, string opaqueText = null) => Bytes(w =>
+            int flags = 256 | 32 | 64 | 128, int count = 1, bool duplicateKey = false, bool nonfinite = false, bool largeMap = false, string opaqueText = null, bool markerWrongType = false) => Bytes(w =>
         {
             w.Write((short)41); w.Write(count);
             for (int item = 0; item < count; ++item)
             {
-                int bits = flags | (nonfinite || largeMap ? 2 : 0);
+                int bits = flags | (nonfinite || largeMap ? 2 : 0) | (markerWrongType ? 16 : 0);
                 w.Write((ushort)bits);
                 if ((bits & 8192) != 0) { w.Write((short)0); w.Write((short)0); }
                 else { w.Write(0f); w.Write(1f); w.Write(0f); }
@@ -190,7 +271,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
                     if (entries < 128) w.Write((byte)entries); else { w.Write((byte)128); w.Write((byte)128); }
                     for (int n = 0; n < entries; ++n)
                     {
-                        w.Write(map == 4 ? 1 : map == 5 ? (n == 0 ? 2 : 4) : map == 6 ? 3 : 1000 + n);
+                        w.Write(map == 4 ? 1 : map == 5 ? (n == 0 ? 2 : 4) : map == 6 ? 3 : map == 3 && markerWrongType ? 2 : 1000 + n);
                         switch (map)
                         {
                             case 0: w.Write(nonfinite ? float.NaN : 1f); break;

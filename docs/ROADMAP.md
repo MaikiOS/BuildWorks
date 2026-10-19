@@ -40,6 +40,8 @@ External library or world capture → editing → construction. A personal libra
 
 Insufficient materials leave a recognizable, pass-through v11 fog ghost. A stake and board let players equip a hammer, inspect shortages, supply materials, continue, or cancel. Finished parts become real objects; projects survive world visits; cancellation refunds actual spending without repeated payouts. **Outcome:** unfinished houses are convenient to return to. Connect the durable project/board to confirmed payment and actual construction, then unfinished-part fog and whole-house acceptance; laboratory approval alone does not establish readiness of the mechanic. Returned fog must restore the correct surface independently of prefab orientation and nearby damaged parts.
 
+Cancellation requires durable deletion, physical refund issuance and collection records; an ambiguous crash outcome must never automatically replay delivery. [Technical plan](PROJECT_CANCELLATION_PROTOCOL.md).
+
 ### 4. Complete and large buildings
 
 Capture an area with editable upper/lower bounds, manually include/exclude parts, and understand loaded-world limits. Handle signs, furnishings, storage, mounts, items, and armor stands. Independent content choices; survival uses supplied items with their own properties, while full administrative restoration requires authority. Trees and suitable objects without recipes are administrator-only or explicitly priced. **Outcome:** complete buildings pass the full journey without loss, duplication, or unacceptable delays. Load measurements will establish the boundary between small direct placement and large planned construction.

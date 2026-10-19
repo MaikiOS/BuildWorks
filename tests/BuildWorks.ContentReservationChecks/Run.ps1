@@ -84,6 +84,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Reservation CPU harness build failed.' }
 if ($LASTEXITCODE -ne 0) { throw 'Reservation CPU checks failed. Native transfer is not exercised.' }
 @{ status = 'passed_cpu_host_substitutes'; sourceSHA256 = $sourceHash; previewSHA256 = $previewHash; transferSHA256 = $transferHash; captureSHA256 = $captureHash; journalSHA256 = $journalHash; profileAdapterSHA256 = $profileHash; profileParserSHA256 = $profileParserHash; loadedInventorySHA256 = $loadedHash;
     worldGenerationAdapterSHA256 = $worldHash; worldGenerationAdapterTestedWithHostSubstitutes = $true;
+    batchAbsenceAdapterTestedWithHostSubstitutes = $true; paidCancellationImplemented = $false;
     pairedPersistenceSHA256 = $persistenceHash; pairedPersistenceHostSubstitutes = $true; profileWriteObserverSHA256 = $profileWriteHash;
     canonicalLocalProfileParserTested = $true; livePlayerProfileReadbackTested = $false;
     journalIOTested = $true; explicitExactRecoveryTestedWithHostSubstitutes = $true; durableRecoveryImplemented = $false; populatedPlacementEnabled = $false; nativeTransferTested = $false; gameTested = $false } |

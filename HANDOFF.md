@@ -1,16 +1,18 @@
 # BuildWorks continuation
 
-**Source .236 / installed QA .233:** native ArmorStand pose and ordered slots now enter a bounded own archive. Exact packages, unknown records and inactive residue survive; excluding equipment retains the archive. Pose/equipment preview and placement are still unsupported. Geometry/Store,28 CPU capture cases, normal/QA0/0, host/localization1122/separation and offline Workbench compilation passed. No game/GPU run. [Evidence](docs/CHECKPOINT_236.md).
+**Source .237 / installed QA .237:** a distinct batch-absence proof scans every mapped saved-world chunk once and binds the result to world, generation and unchanged custody. Geometry574 and adapter153 CPU assertions, Store, normal/QA0/0, host/localization1122/separation passed. This is a prerequisite for safe refunds, **not implemented paid cancellation**: removal, delivery and pickup remain disconnected. [Evidence](docs/CHECKPOINT_237.md).
 
-**After .233 — [diagnostic checkpoint234](docs/CHECKPOINT_234.md):** recording at31.7FPS reproduces queue64 without contact; contact without recording passes48s. Test-only `PollingCandidate` is prepared, not GPU-run; runtime/DLL remains .233. Next: `scripts/Test-FogProductionFrames.ps1 -Mode PollingCandidate` only when GPU is free, without repeating the failed native house. CPU-only while Ostrix plays. Source/read-only review passed, not house acceptance.
+**Deployment and Valheim .237:** guarded QA installation verified, SHA6A7BFDA209DCB16283DD5486C21A8C24477F96F7979589F3152B3928248B8242. Actual wrapper read generation143/world42:6chunks/44661objects, refused a present marker and accepted the absent batch; inventory identical. This does not test removal/refund. Evidence: `artifacts/checkpoint-237/native/verification.json`, `../ValheimQA/artifacts/20261019-172816/`.
+
+**Additional GPU check,19 October:** PollingCandidate FAILED: queue64 at34.15s/30.72FPS;936+936 Update calls are not completed transfers, dense comparisons0. Production unchanged. Next test-only experiment: service completed requests after Capture; do not repeat native house before PASS. Evidence: `artifacts/fog-production-frames/PollingCandidate-20261019-172119-b06faa2a/`.
 
 2026-10-19 · [Русский](HANDOFF_RU.md)
 
-**QA .233 installed:** a real unpaid wall project passed7/7+59/59, four directions/481 frames, all four parts recovered to zero. Exact immutable shape sharing removed the28-part house atlas refusal; Unity14 comparisons passed. **House passage remains FAILED:** healthy10s idle then queue overflow during recording/contact; repetitions stopped. [Evidence and next slice](docs/CHECKPOINT_233.md). Payment/reload .232 remain separate proof; appearance, refund/recovery and network are not accepted.
+**Historical .233 game evidence:** a real unpaid wall project passed7/7+59/59, four directions/481 frames, all four parts recovered to zero. Exact immutable shape sharing removed the28-part house atlas refusal; Unity14 comparisons passed. **House passage remains FAILED:** healthy10s idle then queue overflow during recording/contact; repetitions stopped. [Evidence and next slice](docs/CHECKPOINT_233.md). Payment/reload .232 remain separate proof; appearance, refund/recovery and network are not accepted.
 
 
 1. Read [PROJECT_CONTRACT](PROJECT_CONTRACT.md), [current evidence](docs/CURRENT_STATUS.md), [forward roadmap](docs/ROADMAP.md) and project AGENTS. Preserve the complete goal; this file is not a goal API update.
-2. QA0.19.233, SHA8A4BF2BA75915056ADD3639A87BBBEDFFA817DF6E72F037B3162D81A217948E8. Private Local structural caller; special/contents retain the previous path. Native house appearance remains failed by queue overflow; do not repeat blindly or change history/budgets. No terrain work.
+2. QA0.19.237, SHA6A7BFDA209DCB16283DD5486C21A8C24477F96F7979589F3152B3928248B8242. Private Local structural caller; special/contents retain the previous path. Native house appearance remains failed by queue overflow; do not repeat blindly or change history/budgets. No terrain work.
 
 Work resumed; Goal API active. ValheimQA is the default automated game test, with no desktop input. Own PID54116 exited normally; bridge3/3 restored. Historical evidence below retains its original versions; .232 does not complete the module.
 

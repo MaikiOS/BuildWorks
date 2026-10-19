@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-19 — .237: saved-part absence before refund
+
+A bounded batch reader and game-thread adapter cover the complete mapped world41/42 set, keep absence distinct from presence, and reject corruption, generation or custody changes.574 reader and153 adapter CPU assertions, Store, builds/contracts and two read-only reviews passed. Paid cancellation/delivery remain disabled. [Report](CHECKPOINT_237.md), [technical plan](PROJECT_CANCELLATION_PROTOCOL.md).
+
 ## 2026-10-19 — .236: native ArmorStand archive
 
 Capture now reaches own documents, local25 and portable14. Inactive ID0 never becomes an item; opaque packets survive. Equipment exclusion retains pose/bytes. Preview and placement remain explicitly unavailable. Geometry/Store,28 CPU capture cases, normal/QA/host/localization1122/separation/offline compilation and two reviews passed; no native capture or deployment while Ostrix plays. Fog and payment unchanged. [Evidence](CHECKPOINT_236.md).

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -64,6 +65,50 @@ namespace OstrixMods.BuildWorks.Geometry
                 using (var hash = SHA256.Create()) InventorySha256 = BitConverter.ToString(hash.ComputeHash(expected.Inventory)).Replace("-", "");
             }
         }
+        public sealed class AbsenceExpectation
+        {
+            public long World { get; }
+            public int MarkerKey { get; }
+            public IReadOnlyList<Guid> Operations { get; }
+            private readonly HashSet<Guid> operations;
+            public AbsenceExpectation(long world, int markerKey, IEnumerable<Guid> operations)
+            {
+                if (world == 0 || markerKey == 0 || operations == null) throw new ArgumentException("Missing operation absence context.");
+                Guid[] copy = operations.Take(BlueprintEditorDocument.MaximumParts + 1).ToArray();
+                this.operations = new HashSet<Guid>(copy);
+                if (copy.Length == 0 || copy.Length > BlueprintEditorDocument.MaximumParts || copy.Any(id => id == Guid.Empty) ||
+                    this.operations.Count != copy.Length) throw new ArgumentException("Invalid operation absence set.");
+                World = world; MarkerKey = markerKey; Operations = Array.AsReadOnly(copy);
+            }
+            internal bool Contains(string marker)
+            {
+                if (string.IsNullOrEmpty(marker)) return false;
+                if (marker.Length != 32 || !Guid.TryParseExact(marker, "N", out Guid operation) || operation == Guid.Empty)
+                    throw new InvalidDataException("Malformed operation marker prevents an absence proof.");
+                return operations.Contains(operation);
+            }
+        }
+        // A complete mapped-chunk scan, never positive-object or full DB2/native-load evidence.
+        public sealed class AbsenceEvidence
+        {
+            private readonly AbsenceExpectation expectation;
+            public long World { get; }
+            public int MarkerKey { get; }
+            public IReadOnlyList<Guid> Operations { get; }
+            public int FormatVersion { get; }
+            public int Chunks { get; }
+            public int Objects { get; }
+            public bool CompleteMappedScan => true;
+            public uint Generation { get; }
+            internal AbsenceEvidence(AbsenceExpectation expected, int version, int chunks, int objects, uint generation = 0)
+            { expectation = expected; World = expected.World; MarkerKey = expected.MarkerKey; Operations = expected.Operations;
+                FormatVersion = version; Chunks = chunks; Objects = objects; Generation = generation; }
+            internal AbsenceEvidence SavedAt(uint generation)
+            {
+                if (generation == 0 || Generation != 0) throw new ArgumentException("Invalid saved absence generation.");
+                return new AbsenceEvidence(expectation, FormatVersion, Chunks, Objects, generation);
+            }
+        }
         private sealed class ChunkInfo
         {
             internal string Name;
@@ -71,11 +116,20 @@ namespace OstrixMods.BuildWorks.Geometry
         }
         public static bool TryVerify(Stream metadata, Stream mapping, Stream completion, Func<string, Stream> openChunk,
             Expectation expected, out Evidence evidence, out string reason, CancellationToken cancellation = default)
+            => TryScan(metadata, mapping, completion, openChunk, expected, null, out evidence, out _, out reason, cancellation);
+
+        public static bool TryVerifyAbsence(Stream metadata, Stream mapping, Stream completion, Func<string, Stream> openChunk,
+            AbsenceExpectation expected, out AbsenceEvidence evidence, out string reason, CancellationToken cancellation = default)
+            => TryScan(metadata, mapping, completion, openChunk, null, expected, out _, out evidence, out reason, cancellation);
+
+        private static bool TryScan(Stream metadata, Stream mapping, Stream completion, Func<string, Stream> openChunk,
+            Expectation expected, AbsenceExpectation absent, out Evidence evidence, out AbsenceEvidence absence,
+            out string reason, CancellationToken cancellation)
         {
-            evidence = null; reason = null;
+            evidence = null; absence = null; reason = null;
             try
             {
-                if (expected == null || openChunk == null) throw new InvalidDataException("Missing saved-storage context.");
+                if (expected == null && absent == null || openChunk == null) throw new InvalidDataException("Missing saved-storage context.");
                 cancellation.ThrowIfCancellationRequested();
                 int version;
                 using (var ok = Reader(completion, 4))
@@ -89,7 +143,7 @@ namespace OstrixMods.BuildWorks.Geometry
                     if (meta.ReadInt32() != metadata.Length - 4 || meta.ReadInt32() != version)
                         throw new InvalidDataException("Invalid world metadata framing/version.");
                     Text(meta); Text(meta); meta.ReadInt32();
-                    if (meta.ReadInt64() != expected.World) throw new InvalidDataException("Different saved world UID.");
+                    if (meta.ReadInt64() != (expected?.World ?? absent.World)) throw new InvalidDataException("Different saved world UID.");
                     meta.ReadInt32();
                     if (meta.ReadByte() != 1) throw new InvalidDataException("Saved world does not require object data.");
                     int keys = Count(meta, 65536, 1);
@@ -138,22 +192,27 @@ namespace OstrixMods.BuildWorks.Geometry
                         for (int i = 0; i < chunk.Count; ++i)
                         {
                             cancellation.ThrowIfCancellationRequested(); long offset = stream.Position;
-                            if (ReadObject(reader, expected, scratchKeys, cancellation))
-                            { if (++matches > 1) throw new InvalidDataException("Duplicate saved operation marker."); foundChunk = chunk.Name; foundOffset = offset; }
+                            if (ReadObject(reader, expected, absent, scratchKeys, cancellation))
+                            {
+                                if (absent != null) throw new InvalidDataException("A saved operation marker is still present.");
+                                if (++matches > 1) throw new InvalidDataException("Duplicate saved operation marker."); foundChunk = chunk.Name; foundOffset = offset;
+                            }
                             ++totalObjects;
                         }
                         End(reader);
                     }
                 }
-                if (matches != 1) throw new InvalidDataException("Saved operation marker not found.");
+                if (absent == null && matches != 1) throw new InvalidDataException("Saved operation marker not found.");
                 cancellation.ThrowIfCancellationRequested();
-                evidence = new Evidence(expected, version, chunks.Count, totalObjects, foundChunk, foundOffset); return true;
+                if (absent != null) absence = new AbsenceEvidence(absent, version, chunks.Count, totalObjects);
+                else evidence = new Evidence(expected, version, chunks.Count, totalObjects, foundChunk, foundOffset);
+                return true;
             }
             catch (Exception error) when (error is IOException || error is InvalidDataException || error is UnauthorizedAccessException ||
                 error is ArgumentException || error is OverflowException || error is OperationCanceledException)
             { reason = error.Message; return false; }
         }
-        private static bool ReadObject(BinaryReader reader, Expectation expected, int[] scratchKeys, CancellationToken cancellation)
+        private static bool ReadObject(BinaryReader reader, Expectation expected, AbsenceExpectation absent, int[] scratchKeys, CancellationToken cancellation)
         {
             ushort flags = reader.ReadUInt16();
             if ((flags & ~0x3fff) != 0) throw new InvalidDataException("Unsupported ZDO flags.");
@@ -175,20 +234,22 @@ namespace OstrixMods.BuildWorks.Geometry
                     if ((i & 127) == 0) cancellation.ThrowIfCancellationRequested();
                     int key = reader.ReadInt32();
                     scratchKeys[i] = key;
+                    if (absent != null && key == absent.MarkerKey && map != 5)
+                        throw new InvalidDataException("Unexpected operation marker type prevents an absence proof.");
                     switch (map)
                     {
                         case 0: Finite(reader, 1); break;
                         case 1: Finite(reader, 3); break;
                         case 2: Finite(reader, 4); break;
                         case 3: reader.ReadInt32(); break;
-                        case 4: long value = reader.ReadInt64(); if (key == expected.CreatorKey) creator = value; break;
+                        case 4: long value = reader.ReadInt64(); if (expected != null && key == expected.CreatorKey) creator = value; break;
                         case 5:
-                            if (key == expected.MarkerKey) marker = Text(reader);
+                            if (key == (expected?.MarkerKey ?? absent.MarkerKey)) marker = Text(reader);
                             else SkipText(reader);
                             break;
                         case 6:
                             int length = Count(reader, MaximumChunkBytes, 1);
-                            if (key == expected.ItemsKey && marker == expected.Marker)
+                            if (expected != null && key == expected.ItemsKey && marker == expected.Marker)
                             {
                                 itemsPresent = true; itemsMatch = length == expected.Inventory.Length;
                                 if (length > 1024 * 1024) throw new InvalidDataException("Marked inventory exceeds supported budget.");
@@ -210,6 +271,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 for (int i = 1; i < count; ++i)
                     if (scratchKeys[i] == scratchKeys[i - 1]) throw new InvalidDataException("Duplicate typed ZDO key.");
             }
+            if (absent != null) return absent.Contains(marker);
             if (marker != expected.Marker) return false;
             if ((flags & 256) == 0 || prefab != expected.Prefab || creator != expected.Creator || !itemsPresent)
                 throw new InvalidDataException("Saved marked object's identity or contents differ.");

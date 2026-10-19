@@ -15,7 +15,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const int MaximumBytes = 32 * 1024 * 1024;
         private const string FormatName = "buildworks-blueprint";
-        internal const int Version = 13;
+        internal const int Version = 14;
 
         [DataContract]
         private sealed class Envelope
@@ -149,6 +149,8 @@ namespace OstrixMods.BuildWorks
                     throw new InvalidDataException("$buildworks_import.part_limit");
                 if (envelope.version < 11 && envelope.blueprint?.customSnapPoints?.Count > 512)
                     throw new InvalidDataException("$buildworks_import.document_invalid");
+                if (envelope.version < 14 && HasNativeArmorState(envelope.blueprint))
+                    throw new InvalidDataException("$buildworks_store.unknown_version");
                 ValidateBlueprint(envelope.blueprint);
                 if (envelope.requiredPrefabIds == null ||
                     !envelope.requiredPrefabIds.SequenceEqual(Prefabs(envelope.blueprint), StringComparer.Ordinal))
@@ -169,7 +171,14 @@ namespace OstrixMods.BuildWorks
             .Concat(blueprint.parts.Where(part => part.foreignData?.format == Geometry.BlueprintForeignPartData.NativeContainerFormat &&
                     !part.foreignData.contentsCleared)
                 .SelectMany(part => part.foreignData.info.Split('|').Skip(1)))
+            .Concat(blueprint.parts.Where(part => part.foreignData?.format == Geometry.BlueprintForeignPartData.NativeArmorStandFormat &&
+                    !part.foreignData.contentsCleared)
+                .SelectMany(part => Geometry.BlueprintArmorStandState.Read(part.foreignData.ToGeometry()).Slots)
+                .Where(slot => slot.ItemId != 0 && slot.Prefab != null && slot.Prefab.GetStableHashCode() == slot.ItemId).Select(slot => slot.Prefab))
             .Distinct(StringComparer.Ordinal).OrderBy(name => name, StringComparer.Ordinal).ToList();
+
+        internal static bool HasNativeArmorState(CompositeBlueprintStore.Blueprint blueprint) =>
+            blueprint?.parts?.Any(part => part?.foreignData?.format == Geometry.BlueprintForeignPartData.NativeArmorStandFormat) == true;
 
         private static void ValidateBlueprint(CompositeBlueprintStore.Blueprint blueprint)
         {

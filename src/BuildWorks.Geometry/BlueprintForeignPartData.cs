@@ -9,19 +9,21 @@ namespace OstrixMods.BuildWorks.Geometry
     {
         public const string NativeItemStandFormat = "valheim-itemstand-v1";
         public const string NativeContainerFormat = "valheim-container-v1";
+        public const string NativeArmorStandFormat = "valheim-armorstand-v1";
         public const int MaximumContainerBytes = 1024 * 1024;
         public const int MaximumContainerBase64 = ((MaximumContainerBytes + 2) / 3) * 4;
         public BlueprintForeignPartData(string format, string info, string zdo, string chance, bool contentsCleared = false)
         {
-            if (format != "blueprint" && format != "vbuild" && format != NativeItemStandFormat && format != NativeContainerFormat)
+            if (format != "blueprint" && format != "vbuild" && format != NativeItemStandFormat && format != NativeContainerFormat && format != NativeArmorStandFormat)
                 throw new ArgumentException("Unknown part-state format.");
-            if (contentsCleared && format != NativeItemStandFormat && format != NativeContainerFormat)
+            if (contentsCleared && format != NativeItemStandFormat && format != NativeContainerFormat && format != NativeArmorStandFormat)
                 throw new ArgumentException("Cannot clear unknown object contents.");
             foreach (string value in new[] { info, chance })
                 if (value != null && value.Length > 32768) throw new ArgumentException("Foreign data is too large.");
-            if (zdo != null && zdo.Length > (format == NativeContainerFormat ? MaximumContainerBase64 : 32768))
+            if (zdo != null && zdo.Length > (format == NativeContainerFormat || format == NativeArmorStandFormat ? MaximumContainerBase64 : 32768))
                 throw new ArgumentException("Foreign data is too large.");
             if (info == null && zdo == null && chance == null) throw new ArgumentException("Empty foreign data.");
+            if (format == NativeArmorStandFormat) BlueprintArmorStandState.Decode(info, zdo, chance);
             if (format == NativeItemStandFormat)
             {
                 string[] fields = info?.Split(':');
@@ -91,7 +93,7 @@ namespace OstrixMods.BuildWorks.Geometry
 
         public BlueprintForeignPartData WithoutContents(Func<string, int> prefabHash)
         {
-            if (Format != NativeItemStandFormat && Format != NativeContainerFormat ||
+            if (Format != NativeItemStandFormat && Format != NativeContainerFormat && Format != NativeArmorStandFormat ||
                 Format == NativeContainerFormat && !BlueprintContainerInventory.TryRead(this, prefabHash, out _) ||
                 Format == NativeItemStandFormat && Zdo != null && !BlueprintItemStandContents.TryRead(this, prefabHash, out _))
                 throw new ArgumentException("Cannot clear unreadable object contents.");

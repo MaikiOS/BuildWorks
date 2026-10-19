@@ -938,7 +938,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.235.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.236.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $fogResource = @($plugin.MainModule.Resources | Where-Object Name -eq 'BuildWorks.FogGhostV11')
 Assert-Contract ($fogResource.Count -eq 1 -and $fogResource[0] -is [Mono.Cecil.EmbeddedResource]) 'Compiled v11 fog resource is missing or duplicated.'
@@ -2056,7 +2056,7 @@ Assert-Contract ($updateDocumentMethods.Count -eq 5 -and
         @($_.Parameters | Where-Object Name -eq 'placementSupportId').Count -eq 1
     }).Count -eq 1) `
     'Blueprint frame update overload or a compatibility overload is missing.'
-Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion = 24' -and
+Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion = 25' -and
     $blueprintStoreSource -match 'loaded\.version < 6' -and
     $blueprintStoreSource -match 'ValidScale\(part\.scale\)' -and
     $blueprintStoreSource -match 'if \(loaded\.version < 4\)' -and
@@ -3318,6 +3318,25 @@ $captureIdentityGuards = @($nativeCapture.Body.Instructions | Where-Object {
 })
 Assert-Contract ([regex]::Matches($captureCalls, 'ZNetView::GetZDO').Count -eq 3 -and $captureIdentityGuards.Count -eq 2) `
     'Empty and occupied ItemStand capture must recheck actual ZDO identity, not only old revision and view.'
+$armorCapture = ($pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintArmorStandCapture' -and $_.Name -eq 'TryCapture' })
+$armorCalls = ($armorCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+$armorFieldNames = (($armorCapture.DeclaringType.Methods | Where-Object Name -eq '.cctor').Body.Instructions |
+    ForEach-Object { [string]$_.Operand }) -join "`n"
+$armorIdentityGuards = @($armorCapture.Body.Instructions | Where-Object {
+    [string]$_.Operand -match 'ZNetView::GetZDO' -and $_.Next.OpCode.Name -like 'ldloc*' -and
+    $_.Next.Next.OpCode.Name -like 'bne.un*'
+})
+Assert-Contract ($captureCalls -match 'BlueprintArmorStandCapture::TryCapture' -and
+    $armorCalls -match 'ZDOVars::s_pose' -and $armorCalls -match 'ZDO::GetByteArray' -and
+    $armorCalls -match 'BlueprintArmorStandState::ToForeignData' -and $armorCalls -match 'ZDO::get_DataRevision' -and
+    $armorCalls -match 'System.Array::Clone' -and $armorIdentityGuards.Count -eq 1 -and
+    $armorFieldNames -match 'm_queuedItem' -and $armorFieldNames -match 'm_pose' -and $armorFieldNames -notmatch 'm_startPose' -and
+    $armorCalls -notmatch 'ZDO::Set|ZNetView::InvokeRPC|Inventory::|Object::Instantiate|ItemData::Load|ItemDrop::LoadFromZDO') `
+    'Armor archive capture must retain ordinal slots/pose and actual ZDO identity without native restoration or writes.'
+$armorType = $hostAssembly.MainModule.Types | Where-Object Name -eq 'ArmorStand'
+Assert-Contract (@($armorType.Fields | Where-Object { $_.Name -in @('m_nview','m_queuedItem','m_pose') -and $_.IsPrivate }).Count -eq 3 -and
+    @($armorType.Fields | Where-Object { $_.Name -eq 'm_slots' -and $_.IsPublic }).Count -eq 1) `
+    'ArmorStand read-side field visibility changed.'
 $standView = $standType.Fields | Where-Object Name -eq 'm_nview'
 Assert-Contract ($standView.IsPrivate -and $standView.FieldType.FullName -eq 'ZNetView') 'ItemStand native view field changed.'
 $standQueue = $standType.Fields | Where-Object Name -eq 'm_queuedItem'

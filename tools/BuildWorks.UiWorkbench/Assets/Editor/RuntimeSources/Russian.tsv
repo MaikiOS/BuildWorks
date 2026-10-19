@@ -176,6 +176,7 @@ hud.cancel	ОТМЕНА
 hud.reset	СБРОСИТЬ
 hud.disable	ВЫКЛЮЧИТЬ
 placement.scale_persistence_unsupported	Размещённая деталь не поддерживает сохранение масштаба Valheim.
+placement.rotation_persistence_unsupported	Размещённая деталь не может безопасно сохранить точный поворот. Строительство остановлено.
 catalog.group.my_blueprints	МОИ ЧЕРТЕЖИ
 catalog.group.crafting	РЕМЕСЛО
 catalog.group.building	СТРОИТЕЛЬСТВО
@@ -215,6 +216,23 @@ placement.blueprint_precision_hint	BuildWorks: F9 — точное положе�
 placement.blueprint_prepare_failed	BuildWorks: чертёж не удалось подготовить к установке.
 placement.pause.scale	деталь не поддерживает сохранение масштаба Valheim
 placement.pause.resources	не хватает ресурсов
+project.name	Строительный проект
+project.interact	[Взаимодействовать] Открыть строительный проект
+project.hammer	Возьмите исправный молоток для управления проектом.
+project.close	Закрыть
+project.cancel	Отменить неоплаченный проект
+project.unpaid	Незавершённых деталей: {0}. Ресурсы ещё не внесены.
+project.cancel_confirm	Нажмите «Отменить» ещё раз: неоплаченный проект исчезнет без выдачи ресурсов.
+project.missing	Часть необходимых деталей недоступна.
+project.payment_pending	Достройка использует ваш инвентарь и обычные правила Valheim. На этом этапе ещё недоступны отмена оплаченного проекта и содержимое креплений/хранилищ. Закрытие сохраняет проект.
+project.continue	Продолжить строительство
+project.progress	Построено: {0} / {1} деталей.
+project.review	Операция требует проверки. Повтор строительства и автоматический возврат заблокированы.
+project.unavailable	Строительный проект сейчас не готов к этой операции.
+project.error	Не удалось выполнить действие с проектом: {0}
+project.fog_error	Предварительный вид недоступен: {0}. Проект и записи строительства сохранены.
+project.created	Проект сохранён. Стройка использует ваши материалы; если она остановится, вернитесь к табличке с молотком.
+project.saved_error	Проект {0} сохранён, но табличка недоступна: {1}. Строительство не началось.
 placement.pause.validation	следующая деталь не проходит проверку Valheim
 placement.pause.tool_missing	нужная деталь недоступна в текущем молотке
 placement.pause.native_start	Valheim не начал установку; проверь молоток и выносливость
@@ -246,7 +264,7 @@ contour.simple_path_missing	BuildWorks: не найдена простая це�
 snap.pin_other_first	BuildWorks: для вращения штатной точки сначала закрепи другую опору через Shift.
 snap.mesh_enabled	BuildWorks: магнит по модели — Ctrl совмещает только выбранные точки.
 snap.native_only	BuildWorks: магнит использует только штатные точки Valheim.
-snap.auto_align_enabled	BuildWorks: автостык включён — ориентация и штатные точки совмещаются вместе.
+snap.auto_align_enabled	BuildWorks: автостык включён — точки совмещаются, выставленный поворот сохраняется.
 snap.auto_align_disabled	BuildWorks: автостык выключен.
 blueprint.save_failed	BuildWorks: {0}
 blueprint.world_saved	BuildWorks: {0} сохранён в ЧЕРТЕЖИ → {1}. Детали мира сохранены на месте.
@@ -1107,3 +1125,4 @@ server.origin_conflict	У вставляемого чертежа противо
 
 exchange.prefab_migration	Замена устаревшей детали: {0} — {1} шт. Исходный ID сохранён; строительство по правилам актуальной детали.
 exchange.plan_migrations	История замен деталей: {0}. В стороннем файле остаются актуальные ID; исходные ID и история сохраняются только в полном файле BuildWorks рядом.
+exchange.native_armor_archive	Стойки брони: {0}. Неразобранных активных записей предметов в архиве: {1}. Поза и записи слотов сохранены; экипировка и поза пока не показаны в редакторе и не восстанавливаются при строительстве. Размещение такого чертежа недоступно, в том числе без экипировки.

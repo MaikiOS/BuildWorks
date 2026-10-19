@@ -142,19 +142,28 @@ namespace OstrixMods.BuildWorks.Geometry
             if (data?.Format != BlueprintForeignPartData.NativeItemStandFormat || data.Zdo == null || prefabHash == null)
                 return false;
             string[] fields = data.Info.Split(':');
-            int hash = prefabHash(fields[0]);
+            if (!TryReadPackage(fields[0], Convert.FromBase64String(data.Zdo), prefabHash, out var parsed) ||
+                parsed.Quality != int.Parse(fields[2], CultureInfo.InvariantCulture) ||
+                parsed.Variant != int.Parse(fields[1], CultureInfo.InvariantCulture)) return false;
+            item = parsed; return true;
+        }
+
+        internal static bool TryReadPackage(string prefab, byte[] package, Func<string, int> prefabHash,
+            out BlueprintContainerInventory.Item item)
+        {
+            item = null;
+            if (package == null || prefabHash == null) return false;
+            int hash = prefabHash(prefab);
             if (hash == 0) return false;
             try
             {
-                using (var stream = new MemoryStream(Convert.FromBase64String(data.Zdo), false))
+                using (var stream = new MemoryStream(package, false))
                 using (var reader = new BinaryReader(stream, new UTF8Encoding(false, true)))
                 {
                     int version = reader.ReadByte();
                     if (version != 109 && version != 110) return false;
-                    var parsed = BlueprintContainerInventory.ReadItem(reader, new Dictionary<int, string> { [hash] = fields[0] }, version);
-                    if (stream.Position != stream.Length || parsed.Stack != 1 ||
-                        parsed.Quality != int.Parse(fields[2], CultureInfo.InvariantCulture) ||
-                        parsed.Variant != int.Parse(fields[1], CultureInfo.InvariantCulture)) return false;
+                    var parsed = BlueprintContainerInventory.ReadItem(reader, new Dictionary<int, string> { [hash] = prefab }, version);
+                    if (stream.Position != stream.Length || parsed.Stack != 1) return false;
                     item = parsed; return true;
                 }
             }

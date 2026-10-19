@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-19 — .236: native ArmorStand archive
+
+Capture now reaches own documents, local25 and portable14. Inactive ID0 never becomes an item; opaque packets survive. Equipment exclusion retains pose/bytes. Preview and placement remain explicitly unavailable. Geometry/Store,28 CPU capture cases, normal/QA/host/localization1122/separation/offline compilation and two reviews passed; no native capture or deployment while Ostrix plays. Fog and payment unchanged. [Evidence](CHECKPOINT_236.md).
+
 ## 2026-10-19 — .235: captured stand ZDO identity
 
 Old source reproduced stale empty/occupied capture after same-view/equal-revision

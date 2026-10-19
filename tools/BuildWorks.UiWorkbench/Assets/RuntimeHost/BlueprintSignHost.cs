@@ -59,7 +59,7 @@ public struct ZDOID
 }
 public static class ZDOVars
 {
-    public const int s_text = 1, s_item = 2, s_variant = 3, s_quality = 4, s_type = 5, s_itemData = 6, s_items = 7, s_addedDefaultItems = 8;
+    public const int s_text = 1, s_item = 2, s_variant = 3, s_quality = 4, s_type = 5, s_itemData = 6, s_items = 7, s_addedDefaultItems = 8, s_pose = 9;
 }
 public sealed class Sign : MonoBehaviour
 {

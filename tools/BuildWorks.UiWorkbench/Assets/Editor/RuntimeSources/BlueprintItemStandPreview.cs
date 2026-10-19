@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using OstrixMods.BuildWorks.Geometry;
 using UnityEngine;
 
@@ -25,6 +26,13 @@ namespace OstrixMods.BuildWorks
         {
             warning = null;
             content = null;
+            if (data?.Format == BlueprintForeignPartData.NativeArmorStandFormat)
+            {
+                int unreadable = BlueprintArmorStandState.Read(data).Slots.Count(slot => slot.ItemId != 0 &&
+                    !slot.TryInspect(name => name.GetStableHashCode(), out _));
+                warning = BuildWorksLocalization.Text("exchange.native_armor_archive", 1, unreadable);
+                return false;
+            }
             if (data == null || data.ContentsCleared || !source || !visual) return false;
             ItemStand stand = source.GetComponent<ItemStand>();
             if (!stand) return false;

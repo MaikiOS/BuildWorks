@@ -45,17 +45,17 @@ namespace OstrixMods.BuildWorks.StoreTests
                 "Explicit null seed was invented");
             foreach (string invalid in new[] { "-1", "2147483648", "1.5", "\"1\"", "true", "{}", "[]" })
                 Refuse(() => BlueprintExchangeFormat.Decode(current.Replace("\"materialSeed\":2147483647", "\"materialSeed\":" + invalid)));
-            Refuse(() => BlueprintExchangeFormat.Decode(current.Replace("\"version\":13", "\"version\":9")));
+            Refuse(() => BlueprintExchangeFormat.Decode(current.Replace("\"version\":14", "\"version\":9")));
             Refuse(() => BlueprintExchangeFormat.Decode(current.Replace("\"materialSeed\":2147483647", "\"materialSeed\":0,\"materialSeed\":1")));
             Refuse(() => BlueprintExchangeFormat.Decode(current.Replace("\"materialSeed\":2147483647", "\"materialSeed\":0,\"futureAppearance\":1")));
             part.materialSeed = -1;
             Require(!store.TryUpdateDocument(saved, new[] { part }, saved.groups, saved.anchors, out error) &&
                 File.ReadAllText(Path.Combine(directory, "library.json")) == native, "Invalid seed changed the native file");
             string oldPath = Path.Combine(directory, "old.json");
-            File.WriteAllText(oldPath, native.Replace(",\"hiddenSources\":[]", "").Replace("\"version\":24", "\"version\":19"));
+            File.WriteAllText(oldPath, native.Replace(",\"hiddenSources\":[]", "").Replace("\"version\":25", "\"version\":19"));
             var oldStore = new CompositeBlueprintStore(oldPath);
             Require(oldStore.All().Count == 0 && !oldStore.TrySave("Invalid", saved.parts, saved.anchors, out _, out _) &&
-                File.ReadAllText(oldPath) == native.Replace(",\"hiddenSources\":[]", "").Replace("\"version\":24", "\"version\":19"), "Old schema accepted or rewrote an appearance field");
+                File.ReadAllText(oldPath) == native.Replace(",\"hiddenSources\":[]", "").Replace("\"version\":25", "\"version\":19"), "Old schema accepted or rewrote an appearance field");
             part.materialSeed = null;
             Require(store.TryUpdateParts(saved, new[] { part }, saved.anchors, out error) && saved.parts.Single().materialSeed == int.MaxValue,
                 "Legacy part-only update lost its retained appearance recipe");
@@ -72,12 +72,12 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(store.TryUpdateDocument(saved, new[] { part }, saved.groups, saved.anchors, out error) &&
                 !File.ReadAllText(Path.Combine(directory, "library.json")).Contains("materialSeed"), "Explicit document clear did not clear the seed");
             foreach (int version in new[] { 8, 9 })
-                Require(BlueprintExchangeFormat.Decode(json.Replace("\"version\":13", "\"version\":" + version)).parts.Single().materialSeed == null,
+                Require(BlueprintExchangeFormat.Decode(json.Replace("\"version\":14", "\"version\":" + version)).parts.Single().materialSeed == null,
                     "Legacy portable without an appearance field stopped loading");
             Require(!CompositeBlueprintStore.HasForeignData(saved), "Unspecified seed left an appearance blocker");
             foreach (int version in new[] { 18, 19 })
             {
-                string legacy = File.ReadAllText(Path.Combine(directory, "library.json")).Replace(",\"hiddenSources\":[]", "").Replace("\"version\":24", "\"version\":" + version);
+                string legacy = File.ReadAllText(Path.Combine(directory, "library.json")).Replace(",\"hiddenSources\":[]", "").Replace("\"version\":25", "\"version\":" + version);
                 File.WriteAllText(oldPath, legacy);
                 Require(new CompositeBlueprintStore(oldPath).All().Single().parts.Single().materialSeed == null && File.ReadAllText(oldPath) == legacy,
                     "Legacy native without appearance changed on read");

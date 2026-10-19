@@ -35,7 +35,7 @@ namespace OstrixMods.BuildWorks
         internal const string DefaultCategory = "OTHER";
         private const string LegacyDefaultCategory = "ПРОЧЕЕ";
         private const string LocalizationPrefix = "$buildworks_";
-        private const int FormatVersion = 24;
+        private const int FormatVersion = 25;
         internal const int MaximumLibraryOrigins = Geometry.BlueprintLibraryOrigin.MaximumCount;
         private const int MaximumBlueprints = 32;
         private const int MaximumCategories = 12;
@@ -928,7 +928,7 @@ namespace OstrixMods.BuildWorks
         {
             internal int Storages, Mounts, Unknown, UnreadableStorages, UnreadableMounts, AlreadyCleared;
             internal long StoredItems;
-            internal int ArmorStates;
+            internal int ArmorStates, NativeArmorStates, UninspectedArmorSlots;
             internal int IgnoredSnapPointRows;
             internal readonly SortedDictionary<string, int> ArmorStateSources = new SortedDictionary<string, int>(StringComparer.Ordinal);
             internal int RemainingUnknown(bool omitArmorState) => Unknown - (omitArmorState ? ArmorStates : 0);
@@ -940,6 +940,8 @@ namespace OstrixMods.BuildWorks
                 Storages += other.Storages; StoredItems += other.StoredItems; Mounts += other.Mounts; Unknown += other.Unknown;
                 UnreadableStorages += other.UnreadableStorages; UnreadableMounts += other.UnreadableMounts;
                 AlreadyCleared += other.AlreadyCleared; ArmorStates += other.ArmorStates;
+                NativeArmorStates += other.NativeArmorStates;
+                UninspectedArmorSlots += other.UninspectedArmorSlots;
                 IgnoredSnapPointRows += other.IgnoredSnapPointRows;
                 foreach (var entry in other.ArmorStateSources)
                 {
@@ -1038,6 +1040,15 @@ namespace OstrixMods.BuildWorks
                 if (part.materialSeed.HasValue && supportsMaterialSeed?.Invoke(part.prefabName) != true) ++result.Unknown;
                 var contents = part.foreignData?.ToGeometry();
                 if (contents == null) continue;
+                if (contents.Format == Geometry.BlueprintForeignPartData.NativeArmorStandFormat)
+                {
+                    ++result.NativeArmorStates;
+                    var slots = Geometry.BlueprintArmorStandState.Read(contents).Slots;
+                    result.UninspectedArmorSlots += slots.Count(slot => slot.ItemId != 0 && !slot.TryInspect(prefabHash, out _));
+                    if (contents.ContentsCleared) ++result.AlreadyCleared;
+                    else result.Mounts += slots.Count(slot => slot.ItemId != 0);
+                    continue;
+                }
                 if (contents.Format == Geometry.BlueprintForeignPartData.NativeItemStandFormat && contents.Zdo != null &&
                     !Geometry.BlueprintItemStandContents.TryRead(contents, prefabHash, out _))
                 {
@@ -1097,7 +1108,8 @@ namespace OstrixMods.BuildWorks
                 { part.foreignData = null; continue; }
                 if (!clearStorage && !clearMounts) continue;
                 if (contents.Format != Geometry.BlueprintForeignPartData.NativeContainerFormat &&
-                    contents.Format != Geometry.BlueprintForeignPartData.NativeItemStandFormat)
+                    contents.Format != Geometry.BlueprintForeignPartData.NativeItemStandFormat &&
+                    contents.Format != Geometry.BlueprintForeignPartData.NativeArmorStandFormat)
                     throw new InvalidDataException("$buildworks_import.object_data");
                 if (contents.Format == Geometry.BlueprintForeignPartData.NativeContainerFormat ? clearStorage : clearMounts)
                     part.foreignData = ForeignPartData.FromGeometry(contents.WithoutContents(prefabHash));
@@ -1744,6 +1756,8 @@ namespace OstrixMods.BuildWorks
                     allowMaterialSeedFields: loaded.version >= 20, allowHiddenSources: loaded.version >= 21,
                     allowLibraryOriginFields: loaded.version >= 23, allowPrefabMigrationFields: loaded.version >= 24);
                 loaded.blueprints = loaded.blueprints ?? new List<Blueprint>();
+                if (loaded.version < 25 && loaded.blueprints.Any(BlueprintExchangeFormat.HasNativeArmorState))
+                    throw new InvalidDataException(UserError("store.unknown_version"));
                 loaded.categories = loaded.categories ?? new List<string>();
                 loaded.hiddenSources = loaded.hiddenSources ?? new List<string>();
                 if (!ValidHiddenSources(loaded.hiddenSources))

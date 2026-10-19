@@ -337,7 +337,8 @@ namespace OstrixMods.BuildWorks
             primary.interactable = catalogRetry && !busy || !completed && !busy && ImportCategoryIsValid() && listing == null && !directory.gameObject.activeSelf &&
                 (blueprint != null || selected != null) && (!reviewingContents ||
                 (planBuild ? planReview != null : contentsSummary != null && missingReview != null &&
-                (blueprint != null || missingReview.EmptyDocuments == 0) && (!omitMissingParts || missingReview.CanOmit)));
+                (blueprint != null || missingReview.EmptyDocuments == 0) && (!omitMissingParts || missingReview.CanOmit) &&
+                (place == null || contentsSummary.NativeArmorStates == 0)));
             copyPath.interactable = !busy;
             if (completed || busy)
                 foreach (Selectable control in root.GetComponentsInChildren<Selectable>())
@@ -634,6 +635,8 @@ namespace OstrixMods.BuildWorks
             if (effective.ArmorStates > 0)
                 contentsDetails.text += "\n" + T("exchange.armor_losses", effective.ArmorStates) + "\n" +
                     string.Join("\n", effective.ArmorStateSources.Select(entry => T("exchange.loss_source", entry.Key, entry.Value)));
+            if (effective.NativeArmorStates > 0)
+                contentsDetails.text += "\n" + T("exchange.native_armor_archive", effective.NativeArmorStates, effective.UninspectedArmorSlots);
             if (!missingReview.Known) contentsDetails.text += "\n" + T("exchange.missing_unavailable");
             else if (missingReview.Parts > 0)
                 contentsDetails.text += "\n" + T("exchange.missing_losses", missingReview.Parts) + "\n" +
@@ -671,7 +674,7 @@ namespace OstrixMods.BuildWorks
             skin.Apply(armorChoice, active: omitArmorState);
             skin.Apply(missingChoice, active: omitMissingParts);
             skin.Apply(storageChoice, active: clearStorage); skin.Apply(mountChoice, active: clearMounts);
-            message.text = place != null ? T("placement.contents_policy") : missingReview.EmptyDocuments > 0
+            message.text = place != null ? T(effective.NativeArmorStates > 0 ? "exchange.native_armor_archive" : "placement.contents_policy", effective.NativeArmorStates, effective.UninspectedArmorSlots) : missingReview.EmptyDocuments > 0
                 ? T(blueprint == null ? "exchange.missing_import_empty" : "exchange.missing_empty") :
                 omitMissingParts ? T("exchange.missing_warning", missingReview.Parts, remainingUnknown, omitArmorState ? effective.ArmorStates : 0) :
                 omitArmorState ? T("exchange.armor_warning", effective.ArmorStates, remainingUnknown) :

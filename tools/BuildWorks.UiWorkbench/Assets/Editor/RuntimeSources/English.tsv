@@ -176,6 +176,7 @@ hud.cancel	CANCEL
 hud.reset	RESET
 hud.disable	DISABLE
 placement.scale_persistence_unsupported	The placed part does not support Valheim scale persistence.
+placement.rotation_persistence_unsupported	The placed part cannot safely preserve its exact rotation. Construction stopped.
 catalog.group.my_blueprints	MY BLUEPRINTS
 catalog.group.crafting	CRAFTING
 catalog.group.building	BUILDING
@@ -215,6 +216,23 @@ placement.blueprint_precision_hint	BuildWorks: F9 edits the whole blueprint posi
 placement.blueprint_prepare_failed	BuildWorks: the blueprint could not be prepared for placement.
 placement.pause.scale	part does not support Valheim scale persistence
 placement.pause.resources	not enough resources
+project.name	Construction project
+project.interact	[Use] Inspect construction project
+project.hammer	Equip a usable hammer to manage this project.
+project.close	Close
+project.cancel	Cancel unpaid project
+project.unpaid	Unbuilt parts: {0}. No resources contributed.
+project.cancel_confirm	Press Cancel again to remove the unpaid project. Nothing will be granted.
+project.missing	Some required prefabs are unavailable.
+project.payment_pending	Continue uses your inventory and normal Valheim placement rules. Paid-project cancellation and mounted/container contents are not available at this development stage. Closing keeps the project.
+project.continue	Continue construction
+project.progress	Built: {0} / {1} parts.
+project.review	An operation needs verification. Repeating construction or an automatic refund is blocked.
+project.unavailable	The construction project is not ready for this operation.
+project.error	Project operation failed: {0}
+project.fog_error	Preview unavailable: {0}. Your project and construction records are retained.
+project.created	Project saved. Construction uses your materials; if it stops, return to its board with a hammer.
+project.saved_error	Project {0} is saved, but its board is unavailable: {1}. Construction has not started.
 placement.pause.validation	the next part did not pass Valheim validation
 placement.pause.tool_missing	the required part is unavailable in the current hammer
 placement.pause.native_start	Valheim did not start placement; check the hammer and stamina
@@ -246,7 +264,7 @@ contour.simple_path_missing	BuildWorks: no simple branch-free chain or loop was 
 snap.pin_other_first	BuildWorks: pin another support with Shift before rotating a native snap point.
 snap.mesh_enabled	BuildWorks: model snapping — Ctrl aligns only the selected points.
 snap.native_only	BuildWorks: snapping uses native Valheim points only.
-snap.auto_align_enabled	BuildWorks: auto-join enabled — orientation and native points align together.
+snap.auto_align_enabled	BuildWorks: auto-join enabled — points align, your chosen rotation is preserved.
 snap.auto_align_disabled	BuildWorks: auto-join disabled.
 blueprint.save_failed	BuildWorks: {0}
 blueprint.world_saved	BuildWorks: {0} saved to BLUEPRINTS → {1}. World parts were left in place.
@@ -1107,3 +1125,4 @@ server.origin_conflict	The inserted blueprint has conflicting origin records. No
 
 exchange.prefab_migration	Legacy part replacement: {0} — {1} parts. Original ID retained; construction follows the current part rules.
 exchange.plan_migrations	Part migration records: {0}. The foreign file contains current IDs; original IDs and migration history remain in the adjacent full BuildWorks file only.
+exchange.native_armor_archive	Armor stands: {0}. Uninspected active item records in the archive: {1}. Pose and slot records are preserved; equipment and pose are not yet previewed or restored. Placement of this blueprint is unavailable, including with equipment disabled.

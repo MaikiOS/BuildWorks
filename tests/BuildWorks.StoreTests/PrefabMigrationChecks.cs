@@ -45,10 +45,10 @@ namespace OstrixMods.BuildWorks.StoreTests
                 BlueprintExchangeFormat.Decode(Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(migrated))) })
                 Require(copy.parts[0].originalPrefabName == BlueprintPrefabMigration.OldRoof && CompositeBlueprintStore.Valid(copy), "Copy lost migration provenance");
             string portable = Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(migrated));
-            Require(portable.Contains("\"version\":13"), "Portable migration version missing");
+            Require(portable.Contains("\"version\":14"), "Portable migration version missing");
             Require(PlanBuildExport.Review(migrated, _ => new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 }).PrefabMigrations == 1,
                 "Foreign export omitted migration without reporting loss");
-            Refuses(() => BlueprintExchangeFormat.Decode(portable.Replace("\"version\":13", "\"version\":12")));
+            Refuses(() => BlueprintExchangeFormat.Decode(portable.Replace("\"version\":14", "\"version\":12")));
             foreach (Action<CompositeBlueprintStore.Blueprint> tamper in new Action<CompositeBlueprintStore.Blueprint>[] {
                 value => value.parts[0].originalPrefabName = "other", value => value.parts[0].prefabName = "woodwall",
                 value => value.parts[0].sourceLine++, value => value.parts[0].sourceDocumentId = null })
@@ -59,9 +59,9 @@ namespace OstrixMods.BuildWorks.StoreTests
             var store = new CompositeBlueprintStore(Path.Combine(folder, "library.json"));
             Require(store.TryGetOrCreatePlacementCopy(migratedExternal, out var own, out string error), error);
             string library = File.ReadAllText(Path.Combine(folder, "library.json"));
-            Require(library.Contains("\"version\":24") && new CompositeBlueprintStore(Path.Combine(folder, "library.json")).All().Single().parts[0].originalPrefabName == BlueprintPrefabMigration.OldRoof,
+            Require(library.Contains("\"version\":25") && new CompositeBlueprintStore(Path.Combine(folder, "library.json")).All().Single().parts[0].originalPrefabName == BlueprintPrefabMigration.OldRoof,
                 "Native migration not saved/reopened");
-            File.WriteAllText(Path.Combine(folder, "old-library.json"), library.Replace("\"version\":24", "\"version\":23"));
+            File.WriteAllText(Path.Combine(folder, "old-library.json"), library.Replace("\"version\":25", "\"version\":23"));
             Require(new CompositeBlueprintStore(Path.Combine(folder, "old-library.json")).All().Count == 0, "Native23 accepted new migration field");
             var part = migrated.parts[0];
             var editorPart = new BlueprintEditorPart(part.stableId, part.prefabName, part.displayName, new Point3(1, 2, 3), new Rotation3(0, 0, 0, 1),

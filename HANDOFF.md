@@ -1,6 +1,6 @@
 # BuildWorks continuation
 
-**Source/build .235, installed QA .233:** captured ItemStand ZDO identity fixed;11 CPU checks plus normal/QA/host/localization1121/separation passed. Do not deploy with a running game. No GPU/Valheim run; fog unchanged. Next experiment is234 PollingCandidate when GPU is free. [Report .235](docs/CHECKPOINT_235.md). Full ArmorStand needs its own pose/slot/package adapter; guard retained.
+**Source .236 / installed QA .233:** native ArmorStand pose and ordered slots now enter a bounded own archive. Exact packages, unknown records and inactive residue survive; excluding equipment retains the archive. Pose/equipment preview and placement are still unsupported. Geometry/Store,28 CPU capture cases, normal/QA0/0, host/localization1122/separation and offline Workbench compilation passed. No game/GPU run. [Evidence](docs/CHECKPOINT_236.md).
 
 **After .233 — [diagnostic checkpoint234](docs/CHECKPOINT_234.md):** recording at31.7FPS reproduces queue64 without contact; contact without recording passes48s. Test-only `PollingCandidate` is prepared, not GPU-run; runtime/DLL remains .233. Next: `scripts/Test-FogProductionFrames.ps1 -Mode PollingCandidate` only when GPU is free, without repeating the failed native house. CPU-only while Ostrix plays. Source/read-only review passed, not house acceptance.
 

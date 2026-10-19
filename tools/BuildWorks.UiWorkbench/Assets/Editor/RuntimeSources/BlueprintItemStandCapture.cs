@@ -16,8 +16,8 @@ namespace OstrixMods.BuildWorks
         {
             data = null;
             if (!piece) return false;
-            // Armour contents and pose need a separate native slot adapter.
-            if (piece.GetComponent<ArmorStand>()) return false;
+            ArmorStand armor = piece.GetComponent<ArmorStand>();
+            if (armor) return BlueprintArmorStandCapture.TryCapture(armor, out data);
             ItemStand stand = piece.GetComponent<ItemStand>();
             if (!stand) return true;
             var view = StandView?.GetValue(stand) as ZNetView;

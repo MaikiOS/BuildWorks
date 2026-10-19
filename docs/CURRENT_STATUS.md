@@ -1,6 +1,8 @@
 # Current BuildWorks status
 
-**Source .235 / installed QA .233:** stale ItemStand ZDO capture fixed;11 CPU regressions, normal/QA0/0, host/localization1121/separation passed. No game/GPU run; ArmorStand and whole-house fog remain open. [Evidence](CHECKPOINT_235.md).
+**Source .236 / installed QA .233:** native ArmorStand pose and ordered slots now enter a bounded own archive. Exact packages, unknown records and inactive residue survive; excluding equipment retains the archive. Pose/equipment preview and placement are still unsupported. Geometry/Store,28 CPU capture cases, normal/QA0/0, host/localization1122/separation and offline Workbench compilation passed. No game/GPU run. [Evidence](CHECKPOINT_236.md).
+
+**Previous checkpoint .235:** stale ItemStand ZDO capture fixed;11 CPU regressions, normal/QA0/0, host/localization1121/separation passed. No game/GPU run; ArmorStand and whole-house fog remain open. [Evidence](CHECKPOINT_235.md).
 
 **Diagnostic234, DLL remains .233:** queue64 reproduced at31.7FPS without contact; contact without recording passed48s. A test-only polling candidate is prepared, not GPU-tested; CPU4/1/41 and offline Editor compilation passed. [Evidence](CHECKPOINT_234.md).
 

@@ -114,4 +114,9 @@ public class ObjectDB
     public GameObject GetItemPrefab(int hash) => ItemHashes.TryGetValue(hash, out GameObject item) ? item : null;
     public static implicit operator bool(ObjectDB value) => value != null;
 }
-public class ArmorStand : MonoBehaviour { }
+public class ArmorStand : MonoBehaviour
+{
+    // Read-side shape only; actual capture behavior is covered by the CPU host fixture.
+    public sealed class ArmorStandSlot { public int m_slot; }
+    public List<ArmorStandSlot> m_slots = new List<ArmorStandSlot>();
+}

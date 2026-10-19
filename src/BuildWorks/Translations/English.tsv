@@ -1125,3 +1125,4 @@ server.origin_conflict	The inserted blueprint has conflicting origin records. No
 
 exchange.prefab_migration	Legacy part replacement: {0} — {1} parts. Original ID retained; construction follows the current part rules.
 exchange.plan_migrations	Part migration records: {0}. The foreign file contains current IDs; original IDs and migration history remain in the adjacent full BuildWorks file only.
+exchange.native_armor_archive	Armor stands: {0}. Uninspected active item records in the archive: {1}. Pose and slot records are preserved; equipment and pose are not yet previewed or restored. Placement of this blueprint is unavailable, including with equipment disabled.

@@ -19,7 +19,16 @@ function Measurement {
       stageNames=@('Submit','SolverSubmission','RestoreCreate','PageRelease','Upload','CopyEnqueue','CallbackCopy');flowNames=@('Receipt','Velocity');
       stages=@(foreach($s in 0..6){@{count=10;totalMilliseconds=20;maxMilliseconds=3}});flows=$flows}
 }
+function QueueTrace([string]$shape='steady') {
+    $folder=Join-Path $directory 'case-3'; New-Item -ItemType Directory -Path $folder -Force|Out-Null
+    @(foreach($second in 38..48){
+        if($shape -ceq 'short' -and $second -lt 47){continue}
+        $queued=($second % 2)*7; if($shape -ceq 'growing' -and $second -ge 43){$queued+=10}
+        @{seconds=[double]$second;owners=@(foreach($owner in 0..27){@{queued=$queued}})} | ConvertTo-Json -Depth 4 -Compress
+    }) | Set-Content -LiteralPath (Join-Path $folder 'frames.jsonl')
+}
 function Receipt([string]$mode='NativeCadence') {
+    if($mode -ceq 'AsyncCaptureCandidate'){QueueTrace}
     $native=$mode -cne 'Controls'; $measurement=$mode -ceq 'TelemetryMeasurement'; $postCapture=$mode -ceq 'PostCaptureCandidate'; $polling=$postCapture -or $mode -ceq 'PollingCandidate'; $duration=if($measurement){20}elseif($native){48}else{22}
     $profiling=$measurement -or $mode -cin @('ReuseCandidate','AsyncCaptureCandidate')
     $pairs=switch($mode){'Controls'{0,1,2,3}'NativeControls'{1,2}default{3}}
@@ -130,6 +139,9 @@ Reject 'async no reference' {param($v) $v.cases[0].captureReferenceComparisons=0
 Reject 'async no copy' {param($v) $v.cases[0].captureCpuCopyMilliseconds=0} 'AsyncCaptureCandidate'
 Reject 'async short48' {param($v) $v.cases[0].inputSeconds=20} 'AsyncCaptureCandidate'
 Reject 'candidate mislabelled production' {param($v) $v.velocityPageReuseCandidate=$false} 'AsyncCaptureCandidate'
+Reject 'tail grows despite queue below64' {param($v) QueueTrace 'growing'} 'AsyncCaptureCandidate'
+Reject 'tail lacks coverage' {param($v) QueueTrace 'short'} 'AsyncCaptureCandidate'
+Reject 'tail absent' {param($v) Remove-Item -LiteralPath (Join-Path $directory 'case-3/frames.jsonl')} 'AsyncCaptureCandidate'
 $stale=Receipt; $stale | ConvertTo-Json -Depth 9 | Set-Content -LiteralPath $path
 (Get-Item -LiteralPath $path).LastWriteTimeUtc=$started.AddMinutes(-1)
 try {Assert-FogProductionFramesEvidence $path $started 'NativeCadence' $id; throw 'STALE_ACCEPTED'}catch{if($_.Exception.Message -eq 'STALE_ACCEPTED'){throw}; $rejections++}

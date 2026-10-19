@@ -80,6 +80,23 @@ function Assert-FogProductionFramesEvidence([string]$Path,[datetime]$StartedUtc,
                 if(!(Number $case.captureRequests $true) -or $case.captureRequests -ne $case.captures -or
                    !(Number $case.captureReferenceComparisons $true) -or $case.captureReferenceComparisons -ne 1 -or
                    !(Number $case.captureCpuCopyMilliseconds) -or $case.captureCpuCopyMilliseconds -le 0){throw 'Async capture lost frames or exact reference comparison.'}
+                $tracePath=Join-Path (Split-Path -Parent $Path) 'case-3/frames.jsonl'
+                if(!(Test-Path -LiteralPath $tracePath -PathType Leaf) -or (Get-Item -LiteralPath $tracePath).LastWriteTimeUtc -lt $StartedUtc){throw 'Fresh steady-tail trace missing.'}
+                $trace=@(Get-Content -LiteralPath $tracePath | ForEach-Object {$_ | ConvertFrom-Json})
+                $points=@(foreach($frame in $trace){
+                    if(!(Number $frame.seconds) -or $frame.seconds -lt 0 -or @($frame.owners).Count -ne 28){throw 'Invalid steady-tail frame.'}
+                    $total=0
+                    foreach($owner in $frame.owners){
+                        if(!(Number $owner.queued $true) -or $owner.queued -lt 0 -or $owner.queued -ge 64){throw 'Invalid steady-tail queue.'}
+                        $total+=$owner.queued
+                    }
+                    [pscustomobject]@{seconds=$frame.seconds;queued=$total}
+                })
+                $first=@($points | Where-Object {$_.seconds -ge $case.inputSeconds-10 -and $_.seconds -lt $case.inputSeconds-5})
+                $last=@($points | Where-Object {$_.seconds -ge $case.inputSeconds-5 -and $_.seconds -le $case.inputSeconds})
+                if($first.Count -lt 5 -or $last.Count -lt 5){throw 'Steady-tail coverage missing.'}
+                $early=$first | Measure-Object queued -Minimum -Maximum; $late=$last | Measure-Object queued -Minimum -Maximum
+                if($late.Minimum -gt $early.Minimum -or $late.Maximum -gt $early.Maximum){throw 'Queue envelope still grows in the final10seconds.'}
             }
             if($reuse){
                 foreach($pages in @($case.pagesWindow,$case.pagesDrained)){

@@ -39,6 +39,14 @@ namespace OstrixMods.BuildWorks
             shapeSize = new Vector4[MaximumOwners], fieldSize = new Vector4[MaximumOwners], atlasOffset = new Vector4[MaximumOwners],
             noiseOffset = new Vector4[MaximumOwners];
         internal long Bytes => shape ? (long)size.x * size.y * size.z * (publishedPool == null ? 18 : 2) : 0;
+#if BUILDWORKS_TEST_STAND || UNITY_EDITOR
+        internal void SetRenderBoundsBaselineForCheck(bool enabled)
+        {
+            if (!material) throw new ObjectDisposedException(nameof(BlueprintFogAtlas));
+            if (enabled) material.EnableKeyword("BUILDWORKS_FOG_BOUNDS_BASELINE");
+            else material.DisableKeyword("BUILDWORKS_FOG_BOUNDS_BASELINE");
+        }
+#endif
 
         internal BlueprintFogAtlas(BlueprintFogAssets assets)
         {

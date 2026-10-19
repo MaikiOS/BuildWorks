@@ -335,6 +335,26 @@ public static class FogPublishedRenderCheck
                     for (int p = 0; p < expected.Length; ++p) local = Math.Max(local, Math.Max(Math.Abs(expected[p].r - actual[p].r), Math.Max(Math.Abs(expected[p].g - actual[p].g), Math.Abs(expected[p].b - actual[p].b))));
                     report.runtimeMaxMeanDelta = Math.Max(report.runtimeMaxMeanDelta, delta);
                     report.runtimeMaxLocalDelta = Math.Max(report.runtimeMaxLocalDelta, local);
+                    if (route == 1)
+                    {
+                        foreach (float strength in new[] { 0f, 1f })
+                        {
+                            Color[] BoundsImage(bool baseline)
+                            {
+                                published.SetRenderBoundsBaselineForCheck(baseline);
+                                return FogRuntimePairCheck.Capture(camera, probe, (image, target) => published.Render(camera, image, target, display,
+                                    new Vector3(-4, 1, 0), Vector3.right, strength, mapping), output,
+                                    "bounds-" + name + "-" + strength + "-" + baseline);
+                            }
+                            Color[] previous;
+                            try { previous = BoundsImage(true); }
+                            finally { published.SetRenderBoundsBaselineForCheck(false); }
+                            var optimized = BoundsImage(false);
+                            double boundsDelta = FogRuntimePairCheck.Delta(previous, optimized);
+                            Require(previous.Length == optimized.Length && boundsDelta == 0, "Bounds early-exit changed frozen pixels: " + name + "/" + strength + "/" + boundsDelta);
+                            ++report.renderBoundsComparisons; report.renderBoundsMaxDelta = Math.Max(report.renderBoundsMaxDelta, boundsDelta);
+                        }
+                    }
                     Require(delta < .0001 && local < .03, "Runtime Visual/Atlas differs from dense rendering: " + name + "/" + mode + "/" + delta + "/" + local);
                     report.runtimeVisualAtlasCaptures += 2; ++report.runtimeVisualAtlasComparisons;
                 }
@@ -684,6 +704,8 @@ public static class FogPublishedRenderCheck
     private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
     [Serializable] private sealed class Report
     {
+        public int renderBoundsComparisons; public double renderBoundsMaxDelta;
+
         public bool runtimeChannelsValidated;
         public bool buildingAdapterValidated;
         public int buildingComparisons;

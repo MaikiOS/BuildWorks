@@ -1,6 +1,8 @@
 # BuildWorks continuation
 
-**Diagnostic checkpoint .240 / default QA .240 installed:** bounded CPU velocity-page reuse passed15 grouped CPU checks and252 exact GPU comparisons, but queue overflow remained. Synchronous recording failed at25.68s; asynchronous recording at34.37s, both queue64. Repetitions stopped. The candidate is limited to an explicit build symbol/Unity Editor; normal and installed QA exclude it and preserve the previous8 fog methods/handlers in IL. Whole-house fog remains unfixed. [Evidence](docs/CHECKPOINT_240.md).
+**QA .241 installed:** shader reuses validated state/clock;14 RGB comparisons against the previous path are exactly zero. ValheimQA passed7/7+59/59:4 passes through a four-section wall,482 frames,467456 exact inner texels; all16 recovered parts have zero fields/flags. Inventory unchanged, own fixture closed, normal exit and bridge3/3 restored. **Whole-house fog remains unfixed:** two48s GPU attempts failed at queue64 after37.01s/39.85s; repetitions stopped. RAM reuse remains disabled in the game. [Evidence](docs/CHECKPOINT_241.md).
+
+**Historical diagnostic checkpoint .240:** bounded CPU velocity-page reuse passed15 grouped CPU checks and252 exact GPU comparisons, but queue overflow remained. Synchronous recording failed at25.68s; asynchronous recording at34.37s, both queue64. Repetitions stopped. The candidate is limited to an explicit build symbol/Unity Editor; normal and installed QA exclude it and preserve the previous8 fog methods/handlers in IL. Whole-house fog remains unfixed. [Evidence](docs/CHECKPOINT_240.md).
 
 **Historical .239 measurement (included in .240):** a bounded QA observer measured the unchanged algorithm in Unity:20.02s, drain1.77s,140scalar/196field PASS; maxQueue45 is not48s whole-house stability. Payload callbacks allocated9.69GB of arrays; CallbackCopy2.20s/Upload1.44s/ReadPixels2.80s versus Create+Release0.37s. Next investigate bounded managed-payload reuse while retaining the old page until complete confirmation. Normal IL8methods/handlers unchanged;15observer CPU checks and gate6/65 passed. [Evidence](docs/CHECKPOINT_239.md).
 
@@ -18,7 +20,7 @@
 
 
 1. Read [PROJECT_CONTRACT](PROJECT_CONTRACT.md), [current evidence](docs/CURRENT_STATUS.md), [forward roadmap](docs/ROADMAP.md) and project AGENTS. Preserve the complete goal; this file is not a goal API update.
-2. Default QA0.19.240, SHA19D8521FECBF78A79F3B305F59933132D15311D33EE41FDD052731A5F65B354D. Reuse candidate disabled. Private Local structural caller; special/contents retain the previous path. Native house appearance remains failed by queue overflow; do not repeat blindly or change history/budgets. No terrain work.
+2. Default QA0.19.241, SHA4E1B7227DDDAF5E179850594928B905A1E077FEF4AED13B477D05135804D8DE9. Reuse candidate disabled. Private Local structural caller; special/contents retain the previous path. Native house appearance remains failed by queue overflow; do not repeat blindly or change history/budgets. No terrain work.
 
 Work resumed; Goal API active. ValheimQA is the default automated game test, with no desktop input. Own PID54116 exited normally; bridge3/3 restored. Historical evidence below retains its original versions; .232 does not complete the module.
 

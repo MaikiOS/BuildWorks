@@ -48,10 +48,9 @@ FogPublishedState FogReadPublished(int region)
 float3 FogDynamicUV(float3 uv, float3 size, float3 offset)
 { return (offset + 1 + saturate(uv) * size) / _DynamicAtlasSize; }
 // A physical page includes a one-cell halo; the native sampler retains its filtering.
-float4 FogPackedSample(int region, uint field, float3 uv)
+float4 FogPackedSample(int region, uint field, float3 uv, FogPublishedState state)
 {
     #if !defined(SHADER_TARGET_SURFACE_ANALYSIS)
-    FogPublishedState state = FogReadPublished(region);
     if (!state.valid || !state.active || (field != 0 && field != 2)) return 0;
     uint bases, baseStride, maps, mapStride;
     _PublishedMapBases.GetDimensions(bases, baseStride); _PublishedMaps.GetDimensions(maps, mapStride);
@@ -77,5 +76,7 @@ float4 FogPackedSample(int region, uint field, float3 uv)
     #endif
     return 0;
 }
+float4 FogPackedSample(int region, uint field, float3 uv)
+{ return FogPackedSample(region,field,uv,FogReadPublished(region)); }
 #endif
 #endif

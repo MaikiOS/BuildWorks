@@ -1,12 +1,14 @@
 # BuildWorks
 
+**QA .241 installed:** shader reuses validated state/clock;14 RGB comparisons against the previous path are exactly zero. ValheimQA passed7/7+59/59:4 passes through a four-section wall,482 frames,467456 exact inner texels; all16 recovered parts have zero fields/flags. Inventory unchanged, own fixture closed, normal exit and bridge3/3 restored. **Whole-house fog remains unfixed:** two48s GPU attempts failed at queue64 after37.01s/39.85s; repetitions stopped. RAM reuse remains disabled in the game. [Evidence](docs/CHECKPOINT_241.md).
+
 **English · [Русский](README_RU.md)**
 
 BuildWorks extends Valheim's hammer with precise construction, a blueprint catalog and a dedicated editor. Import a supported building, edit its real pieces, place it through Valheim's normal construction path, and keep its supported transforms after reload. Capture and edit your own buildings too.
 
 ![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
 
-**Current source:0.19.240; installed isolated QA:0.19.240.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
+**Current source:0.19.241; installed isolated QA:0.19.241.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
 
 [.240](docs/CHECKPOINT_240.md) preserves two failed fog experiments. Memory reuse is **disabled** in normal/QA builds; whole-house fog remains unfixed. No .240 Valheim run.
 
@@ -18,7 +20,7 @@ BuildWorks extends Valheim's hammer with precise construction, a blueprint catal
 
 [Diagnostic checkpoint234](docs/CHECKPOINT_234.md) reproduces the lower-frame-rate fog queue failure and prepares a test-only experiment. It does not change the game DLL or establish whole-house support.
 
-**QA .233 installed:** a real unpaid wall project passed7/7+59/59, four directions/481 frames, all four parts recovered to zero. Exact immutable shape sharing removed the28-part house atlas refusal; Unity14 comparisons passed. **House passage remains FAILED:** healthy10s idle then queue overflow during recording/contact; repetitions stopped. [Evidence and next slice](docs/CHECKPOINT_233.md). Payment/reload .232 remain separate proof; appearance, refund/recovery and network are not accepted.
+**Historical .233 checkpoint:** a real unpaid wall project passed7/7+59/59, four directions/481 frames, all four parts recovered to zero. Exact immutable shape sharing removed the28-part house atlas refusal; Unity14 comparisons passed. **House passage remains FAILED:** healthy10s idle then queue overflow during recording/contact; repetitions stopped. [Evidence and next slice](docs/CHECKPOINT_233.md). Payment/reload .232 remain separate proof; appearance, refund/recovery and network are not accepted.
 
 
 ## Capabilities

@@ -10,8 +10,17 @@ $directory=Join-Path $root ('artifacts/fog-evidence-fixtures/production-'+[guid]
 New-Item -ItemType Directory -Path $directory | Out-Null
 $path=Join-Path $directory 'synthetic-validator-input.json'
 $started=[datetime]::UtcNow.AddSeconds(-1); $id=[guid]::NewGuid().ToString('N'); $rejections=0
+function Measurement {
+    $flows=@(foreach($k in 0,1){$bytes=if($k -eq 0){2048}else{4915200};$copy=if($k -eq 0){64}else{4915200}
+        @{requested=10;callbacks=10;accepted=10;rejected=0;submissionFailures=0;unreadable=0;requestedBytes=10*$bytes;cpuCopiedBytes=10*$copy;
+          awaitingCallback=0;awaitingAcceptance=0;requestToCallbackMilliseconds=20;maxRequestToCallbackMilliseconds=3;
+          callbackToAcceptMilliseconds=10;maxCallbackToAcceptMilliseconds=2}})
+    @{valid=$true;capacity=32;invalid=0;threadMismatches=0;staleEvents=0;unobservedEvents=0;batches=10;samples=80;ticks=80;
+      stageNames=@('Submit','SolverSubmission','RestoreCreate','PageRelease','Upload','CopyEnqueue','CallbackCopy');flowNames=@('Receipt','Velocity');
+      stages=@(foreach($s in 0..6){@{count=10;totalMilliseconds=20;maxMilliseconds=3}});flows=$flows}
+}
 function Receipt([string]$mode='NativeCadence') {
-    $native=$mode -cne 'Controls'; $postCapture=$mode -ceq 'PostCaptureCandidate'; $polling=$postCapture -or $mode -ceq 'PollingCandidate'; $duration=if($native){48}else{22}
+    $native=$mode -cne 'Controls'; $measurement=$mode -ceq 'TelemetryMeasurement'; $postCapture=$mode -ceq 'PostCaptureCandidate'; $polling=$postCapture -or $mode -ceq 'PollingCandidate'; $duration=if($measurement){20}elseif($native){48}else{22}
     $pairs=switch($mode){'Controls'{0,1,2,3}'NativeControls'{1,2}default{3}}
     $cases=@(foreach($pair in $pairs){
         $capture=($pair -band 2) -ne 0
@@ -20,10 +29,13 @@ function Receipt([string]$mode='NativeCadence') {
           captures=$(if($capture){2}else{0});captureBytes=$(if($capture){1000}else{0});captureMilliseconds=@(if($capture){55;56});
           receiptUpdates=$(if($polling){10}else{0});velocityUpdates=$(if($polling){10}else{0});recoveryUpdates=0;
           postCapturePumps=$(if($postCapture){2}else{0});
+          captureStageCount=$(if($measurement){2}else{0});captureRenderMilliseconds=10;captureReadPixelsMilliseconds=10;capturePngMilliseconds=10;captureDiskMilliseconds=1;
+          managedBytesStart=1000000;managedBytesEnd=2000000;gcCollections=@(1,1,1);
+          performanceWindow=$(if($measurement){Measurement}else{$null});performanceDrained=$(if($measurement){Measurement}else{$null});
           pollingMilliseconds=$(if($polling){1}else{0});maxPollingMilliseconds=$(if($polling){.1}else{0})}
     })
     @{passed=$true;gameHostTested=$false;nativeHouseGeometryTested=$false;gpuTimingsMeasured=$false;
-      explicitPolling=$polling;postCapturePump=$postCapture;mode=$mode;runId=$id;requestedFrameRate=$(if($native){36}else{-1});
+      explicitPolling=$polling;postCapturePump=$postCapture;measurementOnly=$measurement;mode=$mode;runId=$id;requestedFrameRate=$(if($native){36}else{-1});
       configuration='32slots/32768blocks/Spatial3D/4resident;28procedural walls';cases=$cases}
 }
 function Reject([string]$name,[scriptblock]$edit,[string]$expected='NativeCadence') {
@@ -35,7 +47,7 @@ function Reject([string]$name,[scriptblock]$edit,[string]$expected='NativeCadenc
     $script:rejections++
 }
 # Synthetic validator fixtures, never GPU/Valheim evidence.
-foreach($mode in @('Controls','NativeCadence','NativeControls','PollingCandidate','PostCaptureCandidate')){
+foreach($mode in @('Controls','NativeCadence','NativeControls','PollingCandidate','PostCaptureCandidate','TelemetryMeasurement')){
     Receipt $mode | ConvertTo-Json -Depth 9 | Set-Content -LiteralPath $path
     Assert-FogProductionFramesEvidence $path $started $mode $id
 }
@@ -81,6 +93,23 @@ Reject 'post-capture missing calls' {param($v) $v.cases[0].postCapturePumps=0} '
 Reject 'post-capture count differs' {param($v) $v.cases[0].postCapturePumps=1} 'PostCaptureCandidate'
 Reject 'post-capture fractional calls' {param($v) $v.cases[0].postCapturePumps=2.5} 'PostCaptureCandidate'
 Reject 'post-capture without polling' {param($v) $v.explicitPolling=$false} 'PostCaptureCandidate'
+Reject '20s measurement presented as48s' {param($v) $v.measurementOnly=$true}
+Reject 'measurement flag missing' {param($v) $v.measurementOnly=$false} 'TelemetryMeasurement'
+Reject 'measurement no actual snapshots' {param($v) $v.cases[0].performanceWindow=$null} 'TelemetryMeasurement'
+Reject 'measurement invalid' {param($v) $v.cases[0].performanceWindow.valid=$false} 'TelemetryMeasurement'
+Reject 'measurement foreign thread' {param($v) $v.cases[0].performanceWindow.threadMismatches=1} 'TelemetryMeasurement'
+Reject 'measurement wrong counter type' {param($v) $v.cases[0].performanceWindow.invalid='0'} 'TelemetryMeasurement'
+Reject 'measurement wrong phases' {param($v) $v.cases[0].performanceWindow.stageNames[0]='GPU time'} 'TelemetryMeasurement'
+Reject 'measurement allocation not reached' {param($v) $v.cases[0].performanceWindow.stages[2].count=0} 'TelemetryMeasurement'
+Reject 'measurement no capture stages' {param($v) $v.cases[0].captureStageCount=0} 'TelemetryMeasurement'
+Reject 'measurement invalid capture timing' {param($v) $v.cases[0].captureRenderMilliseconds=[double]::NaN} 'TelemetryMeasurement'
+Reject 'measurement missing GC deltas' {param($v) $v.cases[0].gcCollections=@()} 'TelemetryMeasurement'
+Reject 'measurement negative GC delta' {param($v) $v.cases[0].gcCollections[1]=-1} 'TelemetryMeasurement'
+Reject 'measurement completion count differs' {param($v) $v.cases[0].performanceWindow.flows[0].callbacks=9} 'TelemetryMeasurement'
+Reject 'measurement requested bytes differ' {param($v) $v.cases[0].performanceWindow.flows[0].requestedBytes=640} 'TelemetryMeasurement'
+Reject 'measurement copy bytes differ' {param($v) $v.cases[0].performanceWindow.flows[0].cpuCopiedBytes=20480} 'TelemetryMeasurement'
+Reject 'measurement batch count differs' {param($v) $v.cases[0].performanceWindow.batches=9} 'TelemetryMeasurement'
+Reject 'measurement reset in drain' {param($v) $v.cases[0].performanceDrained.stages[0].count=9} 'TelemetryMeasurement'
 $stale=Receipt; $stale | ConvertTo-Json -Depth 9 | Set-Content -LiteralPath $path
 (Get-Item -LiteralPath $path).LastWriteTimeUtc=$started.AddMinutes(-1)
 try {Assert-FogProductionFramesEvidence $path $started 'NativeCadence' $id; throw 'STALE_ACCEPTED'}catch{if($_.Exception.Message -eq 'STALE_ACCEPTED'){throw}; $rejections++}
@@ -98,7 +127,7 @@ foreach($invalid in @('duplicate','missing','stringFlag')){
     $rejected=$false; try {& $manifestCheck}catch{$rejected=$true}
     if(!$rejected){throw ('Invalid shader manifest accepted: '+$invalid)}; $rejections++
 }
-@{passed=$true;syntheticValidatorOnly=$true;positiveModes=5;positiveManifests=1;rejected=$rejections;gpuStarted=$false;
+@{passed=$true;syntheticValidatorOnly=$true;positiveModes=6;positiveManifests=1;rejected=$rejections;gpuStarted=$false;
   validatorSha256=(Get-FileHash -LiteralPath (Join-Path $root 'scripts/Test-FogProductionFrames.ps1')).Hash;
   suiteSha256=(Get-FileHash -LiteralPath $PSCommandPath).Hash} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $directory 'verification.json')
-Write-Output ('PASS production-frame receipt gate:5 modes/1 manifest/'+$rejections+' negative cases; CPU only. '+$directory)
+Write-Output ('PASS production-frame receipt gate:6 modes/1 manifest/'+$rejections+' negative cases; CPU only. '+$directory)

@@ -33,6 +33,7 @@ namespace OstrixMods.BuildWorks
                 owner.State.State != BlueprintFogSnapshotState.Phase.Ready) return false;
             if (owner.coldVelocity != null && SnapshotChannel.Same(owner.coldVelocityStamp, owner.LastSubmission))
             {
+                PerfCached();
                 owner.evictionStamp = owner.LastSubmission; owner.evictionPending = owner.evictionReceived = owner.evictionRelease = true;
                 owner.evictionReply = owner.coldVelocity; return false;
             }
@@ -45,7 +46,9 @@ namespace OstrixMods.BuildWorks
             owner.evictionReceived = false; owner.evictionReply = null;
             try
             {
+                PerfRequested(owner, FogPerformanceCounters.Kind.Velocity, stamp, VelocityWords * 2L);
                 owner.evictionRequest = AsyncGPUReadback.Request(owner.Velocity, 0, request => {
+                    long perfCopy = 0; PerfStart(ref perfCopy); long perfCopied = 0;
                     try
                     {
                         ushort[] copy = null;
@@ -61,12 +64,19 @@ namespace OstrixMods.BuildWorks
                             if (offset != VelocityWords) copy = null;
                         }
                         owner.ReceiveVelocity(stamp, copy);
+#if BUILDWORKS_TEST_STAND || UNITY_EDITOR
+                        if (copy != null) perfCopied = VelocityWords * 2L;
+#endif
                     }
                     catch { owner.ReceiveVelocity(stamp, null); }
-                    finally { owner.evictionNativePending = false; }
+                    finally {
+                        PerfElapsed(FogPerformanceCounters.Stage.CallbackCopy, perfCopy);
+                        PerfReceived(owner, FogPerformanceCounters.Kind.Velocity, stamp, perfCopied);
+                        owner.evictionNativePending = false;
+                    }
                 });
             }
-            catch { owner.evictionNativePending = false; snapshotTeardown = true; owner.Error = "Fog velocity readback submission failed; state retained."; throw; }
+            catch { PerfFailed(owner, FogPerformanceCounters.Kind.Velocity, stamp); owner.evictionNativePending = false; snapshotTeardown = true; owner.Error = "Fog velocity readback submission failed; state retained."; throw; }
         }
 
         private void PollSnapshotVelocity()
@@ -77,10 +87,15 @@ namespace OstrixMods.BuildWorks
                 if (owner == null || !owner.evictionPending || owner.evictionNativePending || !owner.evictionReceived) continue;
                 if (owner.pendingBatch) continue;
                 if (owner.evictionReply == null || owner.evictionReply.Length != VelocityWords || !SnapshotChannel.Same(owner.evictionStamp, owner.LastSubmission))
-                { owner.Error = "Fog velocity page was not confirmed; GPU state retained."; snapshotTeardown = true; continue; }
+                { PerfVelocityAccepted(owner, false); owner.Error = "Fog velocity page was not confirmed; GPU state retained."; snapshotTeardown = true; continue; }
+                PerfVelocityAccepted(owner, true);
                 // The solver and its five CPU integrator values remain alive; maps and ledgers never move.
                 owner.coldVelocity = owner.evictionReply; owner.coldVelocityStamp = owner.evictionStamp; owner.evictionReply = null;
-                if (owner.evictionRelease) { owner.Velocity.Release(); UnityEngine.Object.DestroyImmediate(owner.Velocity); owner.Velocity = null; }
+                if (owner.evictionRelease) {
+                    long perfRelease = 0; PerfStart(ref perfRelease);
+                    owner.Velocity.Release(); UnityEngine.Object.DestroyImmediate(owner.Velocity); owner.Velocity = null;
+                    PerfElapsed(FogPerformanceCounters.Stage.PageRelease, perfRelease);
+                }
                 owner.evictionPending = owner.evictionReceived = false;
             }
         }
@@ -89,7 +104,7 @@ namespace OstrixMods.BuildWorks
         {
             RequireOwner(owner);
             if (snapshotTeardown) throw new InvalidOperationException("Stopped fog pool cannot restore velocity.");
-            if (owner.evictionPending) return false;
+            if (owner.evictionPending) { PerfWaiting(); return false; }
             if (owner.Velocity) { owner.velocityUse = checked(++velocityUse); return true; }
             if (owner.pendingBatch || owner.State.State != BlueprintFogSnapshotState.Phase.Ready) return false;
             if (owner.coldVelocity == null || owner.coldVelocity.Length != VelocityWords || !arena.VelocityUpload)
@@ -106,14 +121,21 @@ namespace OstrixMods.BuildWorks
                     PageSnapshotVelocity(victim); PollSnapshotVelocity();
                     if (ResidentSnapshotCount < arena.ResidentCapacity) return EnsureSnapshotVelocity(owner);
                 }
+                else PerfNoVictim();
                 return false;
             }
             // Keep the RAM page until the next confirmed step; an uncertain upload must retain both copies.
             try
             {
+                long perfCreate = 0; PerfStart(ref perfCreate);
                 owner.Velocity = BlueprintFogSimulation.AllocateField(new Vector3Int(96, 80, 80), "Fog restored velocity " + owner.Slot);
+                PerfElapsed(FogPerformanceCounters.Stage.RestoreCreate, perfCreate);
+                long perfUpload = 0; PerfStart(ref perfUpload);
                 arena.VelocityUpload.SetPixelData(owner.coldVelocity, 0); arena.VelocityUpload.Apply(false, false);
+                PerfElapsed(FogPerformanceCounters.Stage.Upload, perfUpload);
+                long perfCopy = 0; PerfStart(ref perfCopy);
                 Graphics.CopyTexture(arena.VelocityUpload, owner.Velocity);
+                PerfElapsed(FogPerformanceCounters.Stage.CopyEnqueue, perfCopy);
                 owner.velocityUse = checked(++velocityUse); return true;
             }
             catch { snapshotTeardown = true; owner.Error = "Fog velocity upload failed; RAM and GPU state retained."; throw; }

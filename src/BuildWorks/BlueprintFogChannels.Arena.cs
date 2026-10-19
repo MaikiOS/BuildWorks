@@ -213,6 +213,7 @@ namespace OstrixMods.BuildWorks
             owner.pending = token; owner.pendingBatch = true; owner.received = false; owner.reply = null;
             bool metadataOnly = owner.Inputs.PendingMetadataOnly;
             int pendingBase = (owner.Slot * 2 + (metadataOnly ? owner.Bank : 1 - owner.Bank)) * BlueprintFogArena.MapWords;
+            long perfSubmit = 0; PerfStart(ref perfSubmit);
             try
             {
                 BindSnapshot(owner); arena.Dispatch("BeginStep");
@@ -221,11 +222,13 @@ namespace OstrixMods.BuildWorks
                     arena.Dispatch("RestoreFields", 24, 20, 20); arena.Dispatch("StageLedger", arena.LedgerCells / 64);
                     Graphics.CopyTexture(owner.Velocity, arena.Scratch.PredictedColour);
                 }
+                long perfSolver = 0; PerfStart(ref perfSolver);
                 for (int i = 0; i < owner.Inputs.PendingCount; ++i)
                 {
                     var sample = owner.Inputs.At(i);
                     owner.simulation.AdvanceTo(sample.Clock, Actor(sample), Body(sample), sample.Emit, sample.EmissionPossible);
                 }
+                PerfElapsed(FogPerformanceCounters.Stage.SolverSubmission, perfSolver);
                 var shader = arena.Program;
                 Bits(shader, "_OwnerBits", token.Owner); Bits(shader, "_GenerationBits", token.Generation); Bits(shader, "_SequenceBits", token.Sequence);
                 shader.SetInt("_Tick", token.Tick); shader.SetInt("_EmissionRevision", token.EmissionRevision);
@@ -240,7 +243,10 @@ namespace OstrixMods.BuildWorks
                 arena.PublishMetadata(owner.Slot, token, Actor(last), Body(last), last.Clock, last.Nearby ? 1 : 0, mapBase: pendingBase); arena.Dispatch("FinishStep");
                 if (arena.VelocityUpload && !metadataOnly) RequestSnapshotVelocity(owner, token, false);
                 var stamp = token; owner.nativePending = true;
+                PerfBatch(owner.Inputs.PendingCount, token.Tick - owner.State.ConfirmedTick, metadataOnly);
+                PerfRequested(owner, FogPerformanceCounters.Kind.Receipt, stamp, capacity * 16L * 4);
                 owner.request = AsyncGPUReadback.Request(arena.Buffers["_Receipts"], request => {
+                    long perfCopied = 0;
                     try
                     {
                         if (request.hasError) { snapshotTeardown = true; owner.Receive(stamp, null); return; }
@@ -248,14 +254,17 @@ namespace OstrixMods.BuildWorks
                         if (data.Length != capacity * 16) { snapshotTeardown = true; owner.Receive(stamp, null); return; }
                         var copy = new uint[16]; for (int i = 0; i < 16; ++i) copy[i] = data[owner.Slot * 16 + i];
                         owner.Receive(stamp, copy);
+                        perfCopied = 64;
                         if ((copy[8] & 4) != 0) snapshotTeardown = true;
                     }
                     catch { snapshotTeardown = true; owner.Receive(stamp, null); }
-                    finally { owner.nativePending = false; }
+                    finally { PerfReceived(owner, FogPerformanceCounters.Kind.Receipt, stamp, perfCopied); owner.nativePending = false; }
                 });
+                PerfElapsed(FogPerformanceCounters.Stage.Submit, perfSubmit);
             }
             catch (Exception error)
             {
+                PerfFailed(owner, FogPerformanceCounters.Kind.Receipt, token);
                 RecordSnapshotFault(owner, token, null, false, pendingBase, "submission: " + error);
                 owner.nativePending = false; owner.Inputs.Complete(token, BlueprintFogSnapshotState.Completion.Unknown);
                 owner.pendingBatch = false; owner.Error = "Fog dispatch/readback submission failed."; snapshotTeardown = true; throw;
@@ -281,6 +290,7 @@ namespace OstrixMods.BuildWorks
                     RecordSnapshotFault(owner, token, words, valid, expectedBase, valid ? "GPU rejected" : "receipt invalid or unavailable");
                 if (outcome == BlueprintFogSnapshotState.Completion.Committed && !owner.Inputs.PendingMetadataOnly) owner.Bank = 1 - owner.Bank;
                 if (!owner.Inputs.Complete(token, outcome)) throw new InvalidOperationException("Fog channel lost its pending identity.");
+                PerfAccepted(owner, FogPerformanceCounters.Kind.Receipt, token, outcome == BlueprintFogSnapshotState.Completion.Committed);
                 owner.LastSubmission = token; owner.LastCompletion = outcome; owner.LastFlags = valid ? words[8] : uint.MaxValue;
                 if (outcome == BlueprintFogSnapshotState.Completion.Committed)
                 {

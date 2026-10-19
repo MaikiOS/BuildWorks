@@ -6,7 +6,9 @@ BuildWorks extends Valheim's hammer with precise construction, a blueprint catal
 
 ![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
 
-**Current source:0.19.237; installed isolated QA:0.19.237.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
+**Current source:0.19.239; installed isolated QA:0.19.239.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
+
+[.239](docs/CHECKPOINT_239.md) adds bounded QA fog measurements:20s with exact comparisons passed, not a whole-house fix. Evidence directs the next experiment toward payload arrays rather than a texture-pool rewrite.
 
 [.237](docs/CHECKPOINT_237.md) adds saved-world batch absence evidence, a prerequisite for paid cancellation. Physical refund delivery and guarded pickup remain unfinished; see the [plan](docs/PROJECT_CANCELLATION_PROTOCOL.md).
 

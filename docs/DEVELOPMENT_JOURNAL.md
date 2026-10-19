@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-19 — .239: velocity and capture measurement
+
+Bounded QA observer preserves simulation; normal8methods/handlers including callbacks retain IL after generated closure-name normalization.15CPU and gate6/65 passed. Unity20s:140/196,drain1.77s,maxQ45. Measured9.69GB new payload arrays, CallbackCopy2.20s/Upload1.44s/ReadPixels2.80s. Not GPU/GC pause timing or a house fix. Next candidate: safe CPU payload reuse. [Report](CHECKPOINT_239.md).
+
 ## 2026-10-19 — diagnostic238: service after Capture
 
 A separate mode retains PollingCandidate and adds exactly one pump after each successful capture. CPU gate5modes/48rejections and read-only review passed. GPU FAILED queue64 at35.05s; dense comparisons0. No production promotion or new deployment; QA .237 unchanged. [Evidence and next measurement](CHECKPOINT_238.md).

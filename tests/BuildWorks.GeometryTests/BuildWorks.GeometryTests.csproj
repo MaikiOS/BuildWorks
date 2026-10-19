@@ -13,6 +13,7 @@
     <Compile Include="..\..\src\BuildWorks\BlueprintConstructionRefund.cs" Link="BlueprintConstructionRefund.cs" />
     <Compile Include="..\..\src\BuildWorks\BlueprintFogSnapshotState.cs" Link="BlueprintFogSnapshotState.cs" />
     <Compile Include="..\..\src\BuildWorks\BlueprintFogInputQueue.cs" Link="BlueprintFogInputQueue.cs" />
+    <Compile Include="..\..\src\BuildWorks\FogPerformanceCounters.cs" Link="FogPerformanceCounters.cs" />
     <Compile Include="..\..\src\BuildWorks\BlueprintFogAssetLayout.cs" Link="BlueprintFogAssetLayout.cs" />
   </ItemGroup>
 </Project>

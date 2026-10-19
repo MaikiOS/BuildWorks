@@ -1,5 +1,12 @@
 # BuildWorks development journal
 
+## 2026-10-19 — diagnostic checkpoint234, DLL .233
+
+Recording at lower frame rates reproduced queue64 without contact; contact without
+recording passed48s. Added a strict runner and test-only polling candidate;
+CPU4modes/1manifest/41negative cases and offline Editor compilation passed.
+No candidate GPU run, runtime fix or deployment. [Evidence](CHECKPOINT_234.md).
+
 [Русский](DEVELOPMENT_JOURNAL_RU.md) · [Forward roadmap](ROADMAP.md) · [Current status](CURRENT_STATUS.md)
 
 This records changes and evidence, not future milestones. Historical results retain their original version and limits.

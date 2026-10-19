@@ -1,5 +1,7 @@
 # Current BuildWorks status
 
+**Diagnostic234, DLL remains .233:** queue64 reproduced at31.7FPS without contact; contact without recording passed48s. A test-only polling candidate is prepared, not GPU-tested; CPU4/1/41 and offline Editor compilation passed. [Evidence](CHECKPOINT_234.md).
+
 **2026-10-19 · [Русский](CURRENT_STATUS_RU.md) · [Roadmap](ROADMAP.md) · [Documentation](README.md)**
 
 **QA .233 installed:** a real unpaid wall project passed7/7+59/59, four directions/481 frames, all four parts recovered to zero. Exact immutable shape sharing removed the28-part house atlas refusal; Unity14 comparisons passed. **House passage remains FAILED:** healthy10s idle then queue overflow during recording/contact; repetitions stopped. [Evidence and next slice](CHECKPOINT_233.md). Payment/reload .232 remain separate proof; appearance, refund/recovery and network are not accepted.

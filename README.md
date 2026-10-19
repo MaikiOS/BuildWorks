@@ -8,6 +8,8 @@ BuildWorks extends Valheim's hammer with precise construction, a blueprint catal
 
 **Current source / isolated QA: 0.19.233.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
 
+[Diagnostic checkpoint234](docs/CHECKPOINT_234.md) reproduces the lower-frame-rate fog queue failure and prepares a test-only experiment. It does not change the game DLL or establish whole-house support.
+
 **QA .233 installed:** a real unpaid wall project passed7/7+59/59, four directions/481 frames, all four parts recovered to zero. Exact immutable shape sharing removed the28-part house atlas refusal; Unity14 comparisons passed. **House passage remains FAILED:** healthy10s idle then queue overflow during recording/contact; repetitions stopped. [Evidence and next slice](docs/CHECKPOINT_233.md). Payment/reload .232 remain separate proof; appearance, refund/recovery and network are not accepted.
 
 

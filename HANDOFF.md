@@ -1,5 +1,7 @@
 # BuildWorks continuation
 
+**After .233 — [diagnostic checkpoint234](docs/CHECKPOINT_234.md):** recording at31.7FPS reproduces queue64 without contact; contact without recording passes48s. Test-only `PollingCandidate` is prepared, not GPU-run; runtime/DLL remains .233. Next: `scripts/Test-FogProductionFrames.ps1 -Mode PollingCandidate` only when GPU is free, without repeating the failed native house. CPU-only while Ostrix plays. Source/read-only review passed, not house acceptance.
+
 2026-10-19 · [Русский](HANDOFF_RU.md)
 
 **QA .233 installed:** a real unpaid wall project passed7/7+59/59, four directions/481 frames, all four parts recovered to zero. Exact immutable shape sharing removed the28-part house atlas refusal; Unity14 comparisons passed. **House passage remains FAILED:** healthy10s idle then queue overflow during recording/contact; repetitions stopped. [Evidence and next slice](docs/CHECKPOINT_233.md). Payment/reload .232 remain separate proof; appearance, refund/recovery and network are not accepted.

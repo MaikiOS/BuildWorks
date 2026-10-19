@@ -1,14 +1,14 @@
 # BuildWorks continuation
 
-2026-10-18 · [Русский](HANDOFF_RU.md)
+2026-10-19 · [Русский](HANDOFF_RU.md)
 
-**QA .226 installed:** four-wall native continuation16/16 and world reload10/10, with exact debit/save evidence. Project fog, paid cancellation and server work remain open. [.226](docs/CHECKPOINT_226.md).
+**QA .229 installed:** Valheim171 + stand576/2304,0/0 order-dependent positions, manual6/6; bridge restored. Camera/held tilt, project fog/Create/refund/recovery/remote open. [Exact status](docs/CHECKPOINT_229.md).
 
 
 1. Read [PROJECT_CONTRACT](PROJECT_CONTRACT.md), [current evidence](docs/CURRENT_STATUS.md), [forward roadmap](docs/ROADMAP.md) and project AGENTS. Preserve the complete goal; this file is not a goal API update.
-2. QA0.19.226 installed; normal/QA0/0, full Store/Geometry/host/localization1118; Valheim16/16+10/10. SHA 43E1DC7AF5F5F68CB083D34CE47E75970CF1F026BF00D8DC06A761EF3FD640F7. Next: unfinished-part fog and ordinary Create wiring; paid refunds/full reconciliation/remote remain open. No site preparation; EarthWorks comes later. Public .37 alpha unchanged.
+2. QA0.19.229, SHA88BA8B7CB6F349C1688AAA1CAD995F7BC648A5C4B8C5DF0F6AD6BF53D41D68D6. Next camera/ray and v11 integration; legacy baseline pinned. No site preparation; public .37 alpha unchanged.
 
-Development paused at Ostrix's request on18October. After resuming: unfinished-part v11 fog and ordinary project creation, then confirmed paid cancellation/refunds. Results below retain their historical versions; the bounded .226 paid slice is not the complete module or network construction.
+Work resumed; Goal API active. ValheimQA is the default automated game test. Own PID38872 exited normally; bridge restored. Historical evidence below retains its original versions; .229 does not complete the module.
 
 [.213](docs/FOG_NOISE_FRAME_213.md) aligns noise phases across parts; GPU checks/regressions passed and QA is installed. Native .213 is untested; boundary loss, recovery ownership and performance remain open.
 

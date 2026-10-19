@@ -19,6 +19,7 @@ namespace OstrixMods.BuildWorks
                 typeof(Transform).MakeByRefType(), typeof(float).MakeByRefType() });
         private static readonly NativeSearch Native = AccessTools.MethodDelegate<NativeSearch>(InnerMethod);
         private static readonly MethodInfo OuterMethod = AccessTools.Method(typeof(Player), "FindClosestSnapPoints");
+        private static readonly Comparison<Transform> PointOrder = (left, right) => ComparePosition(left.position, right.position);
         [ThreadStatic] private static Context current;
 
         private sealed class Context
@@ -45,14 +46,59 @@ namespace OstrixMods.BuildWorks
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
         {
             var code = new List<CodeInstruction>(instructions);
+            MethodInfo gather = AccessTools.Method(typeof(Piece), "GetSnapPoints", new[] {
+                typeof(Vector3), typeof(float), typeof(List<Transform>), typeof(List<Piece>) });
+            int gatherIndex = code.FindIndex(instruction => instruction.Calls(gather));
             if (InnerMethod == null || InnerMethod.IsStatic || InnerMethod.ReturnType != typeof(bool) ||
-                code.FindAll(instruction => instruction.Calls(InnerMethod)).Count != 2)
+                code.FindAll(instruction => instruction.Calls(InnerMethod)).Count != 2 ||
+                gather == null || !gather.IsStatic || gatherIndex < 0 ||
+                gatherIndex + 1 >= code.Count || code[gatherIndex + 1].labels.Count != 0 ||
+                code.FindAll(instruction => instruction.Calls(gather)).Count != 1 ||
+                code.FindIndex(instruction => instruction.Calls(InnerMethod)) <= gatherIndex)
                 throw new InvalidOperationException("Current Valheim snap search layout is unsupported.");
+            code.InsertRange(gatherIndex + 1, new[] {
+                new CodeInstruction(OpCodes.Ldarg_0),
+                new CodeInstruction(OpCodes.Ldarg_0),
+                new CodeInstruction(OpCodes.Ldfld, AccessTools.Field(typeof(Player), "m_tempSnapPoints1")),
+                new CodeInstruction(OpCodes.Ldarg_0),
+                new CodeInstruction(OpCodes.Ldfld, AccessTools.Field(typeof(Player), "m_tempSnapPoints2")),
+                new CodeInstruction(OpCodes.Ldarg_0),
+                new CodeInstruction(OpCodes.Ldfld, AccessTools.Field(typeof(Player), "m_manualSnapPoint")),
+                new CodeInstruction(OpCodes.Ldarg_2),
+                new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(BlueprintHammerSnapSearch), nameof(SortAutomaticPoints)))
+            });
             MethodInfo replacement = AccessTools.Method(typeof(BlueprintHammerSnapSearch), nameof(FindClosest));
             foreach (CodeInstruction instruction in code)
                 if (instruction.Calls(InnerMethod))
                 { instruction.opcode = OpCodes.Call; instruction.operand = replacement; }
             return code;
+        }
+
+        private static void SortAutomaticPoints(Player player, List<Transform> sources,
+            List<Transform> targets, int manual, float maximumDistance)
+        {
+            if (player != Player.m_localPlayer || manual >= 0 ||
+                float.IsNaN(maximumDistance) || float.IsInfinity(maximumDistance) || maximumDistance < 0 ||
+                HasForeignPatches(InnerMethod) || HasForeignPatches(OuterMethod)) return;
+            foreach (Transform point in sources) if (!point || !Finite(point.position)) return;
+            foreach (Transform point in targets) if (!point || !Finite(point.position)) return;
+            // Sort only native scratch lists, before its enumerator exists. Q/E indices and
+            // prefab/editor point order stay intact; strict distance and radius stay native.
+            sources.Sort(PointOrder);
+            targets.Sort(PointOrder);
+        }
+
+        internal static bool PairPrecedes(Vector3 source, Vector3 target, Vector3 bestSource, Vector3 bestTarget)
+        {
+            int order = ComparePosition(source, bestSource);
+            return order < 0 || order == 0 && ComparePosition(target, bestTarget) < 0;
+        }
+
+        private static int ComparePosition(Vector3 left, Vector3 right)
+        {
+            int order = left.x.CompareTo(right.x);
+            if (order == 0) order = left.y.CompareTo(right.y);
+            return order == 0 ? left.z.CompareTo(right.z) : order;
         }
 
         private static bool FindClosest(Player player, Vector3 point, List<Transform> points,

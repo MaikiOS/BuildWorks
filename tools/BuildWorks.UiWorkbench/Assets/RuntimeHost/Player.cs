@@ -22,7 +22,14 @@ public class Player : Humanoid
         System.Collections.Generic.List<Piece> pieces)
     {
         m_tempSnapPoints1.Clear(); ghost.GetComponent<Piece>().GetSnapPoints(m_tempSnapPoints1);
-        m_tempSnapPoints2.Clear(); m_tempSnapPoints2.AddRange(SnapTargets);
+        m_tempSnapPoints2.Clear();
+        var previousTargets = Piece.SnapTargetsOverride;
+        try
+        {
+            Piece.SnapTargetsOverride = SnapTargets;
+            Piece.GetSnapPoints(ghost.position, 10f, m_tempSnapPoints2, pieces);
+        }
+        finally { Piece.SnapTargetsOverride = previousTargets; }
         a = null; b = null; float best = 9999999f;
         if (m_manualSnapPoint >= 0)
         {

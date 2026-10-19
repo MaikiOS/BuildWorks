@@ -938,7 +938,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.228.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.229.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $fogResource = @($plugin.MainModule.Resources | Where-Object Name -eq 'BuildWorks.FogGhostV11')
 Assert-Contract ($fogResource.Count -eq 1 -and $fogResource[0] -is [Mono.Cecil.EmbeddedResource]) 'Compiled v11 fog resource is missing or duplicated.'
@@ -2679,7 +2679,8 @@ Assert-Contract ($passiveAutoJoin.Parameters.Count -eq 4 -and
         'if \(!aimedPiece \|\| aimedPiece\.transform == ghost\.transform[\s\S]*?return true;' -and
     $sessionSource -match
         'if \(bestSource && bestTarget\)[\s\S]*?else\s*\{\s*return true;\s*\}' -and
-    $sessionSource -match 'if \(distance > 0\.5f \|\| !\(distance < bestDistance\)\) continue;' -and
+    $sessionSource -match 'if \(distance > 0\.5f \|\| !\(distance < bestDistance \|\|' -and
+    $passiveAutoJoinOperands -match 'BlueprintHammerSnapSearch::PairPrecedes' -and
     $sessionSource -match 'blueprintPieceRegistry\.TryGetBlueprint\(selected, out _\)' -and
     $passiveAutoJoinOperands -match 'Player::get_AlternativePlacementActive' -and
     $passiveAutoJoinOperands -match 'Piece::GetSnapPoints' -and
@@ -3726,10 +3727,21 @@ Assert-Contract ($nativeSnapOuter.Count -eq 1 -and $nativeSnapInner.Count -eq 1 
     $nativeSnapInner[0].Parameters[3].ParameterType.FullName -eq 'UnityEngine.Transform&' -and
     $nativeSnapInner[0].Parameters[4].ParameterType.FullName -eq 'System.Single&') 'Native snap selector signatures changed.'
 $innerCalls = @($nativeSnapOuter[0].Body.Instructions | Where-Object { [string]$_.Operand -match 'Player::FindClosestSnappoint\(' })
+$gatherCalls = @($nativeSnapOuter[0].Body.Instructions | Where-Object { [string]$_.Operand -eq 'System.Void Piece::GetSnapPoints(UnityEngine.Vector3,System.Single,System.Collections.Generic.List`1<UnityEngine.Transform>,System.Collections.Generic.List`1<Piece>)' })
+Assert-Contract ($gatherCalls.Count -eq 1 -and $gatherCalls[0].OpCode.Name -eq 'call' -and
+    $gatherCalls[0].Next.OpCode.Name -eq 'ldc.r4' -and [float]$gatherCalls[0].Next.Operand -eq 9999999 -and
+    $gatherCalls[0].Offset -lt $innerCalls[0].Offset -and
+    @($nativeSnapOuter[0].Body.Instructions | Where-Object { $_.Operand -eq $gatherCalls[0].Next }).Count -eq 0) `
+    'Native automatic snap sorting must follow the complete gather, before enumeration/manual selection, without incoming branches.'
 Assert-Contract ($innerCalls.Count -eq 2 -and @($nativePlayer.Fields | Where-Object Name -eq 'm_tempSnapPoints2').Count -eq 1 -and
     @($nativePlayer.Fields | Where-Object Name -eq 'm_manualSnapPoint').Count -eq 1) 'Native two-call/manual/target-list snap contract changed.'
 $snapSelector = $pluginTypes | Where-Object Name -eq 'BlueprintHammerSnapSearch'
 Assert-Contract ($null -ne $snapSelector) 'Compiled Hammer snap adapter missing.'
+$canonicalSort = $snapSelector.Methods | Where-Object Name -eq 'SortAutomaticPoints'
+$sortCalls = @($canonicalSort.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($sortCalls -match 'List`1<UnityEngine.Transform>::Sort' -and $sortCalls -match 'Player::m_localPlayer' -and
+    $sortCalls -match 'HasForeignPatches' -and $sortCalls -notmatch 'set_rotation|set_position|SetPositionAndRotation') `
+    'Canonical snap ordering must retain local/manual/foreign guards and must not transform objects.'
 $selectorCalls = @($snapSelector.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($selectorCalls -match 'BlueprintNearestPartIndex::FindNearestByDistance' -and
     $selectorCalls -match 'BlueprintNearestPartIndex::.ctor' -and $selectorCalls -match 'Vector3::Distance' -and

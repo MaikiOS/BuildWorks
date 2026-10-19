@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using HarmonyLib;
 using OstrixMods.BuildWorks;
@@ -78,7 +79,7 @@ internal static class HammerSnapSearchAcceptance
 
             var saved = player.SnapTargets.ToArray();
             player.SnapTargets.Clear(); CompareReference(player, ghost.transform, 0.5f, -1, true);
-            // Rounded sqrt ties must retain first target, even if squared distance differs.
+            // Native rounded distances stay primary; geometric ordering resolves ties.
             ghost.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity); ghost.transform.localScale = Vector3.one;
             for (int i = 0; i < ghost.transform.childCount; ++i) ghost.transform.GetChild(i).localPosition = Vector3.zero;
             saved[0].position = new Vector3(1, 0.0003f, 0); saved[1].position = Vector3.right;
@@ -136,12 +137,18 @@ internal static class HammerSnapSearchAcceptance
     private static void CompareReference(Player player, Transform ghost, float radius, int manual, bool indexed)
     {
         var sources = new List<Transform>(); ghost.GetComponent<Piece>().GetSnapPoints(sources);
+        var targets = new List<Transform>(player.SnapTargets);
+        if (manual < 0 && player == Player.m_localPlayer && !float.IsNaN(radius) && !float.IsInfinity(radius) && radius >= 0)
+        {
+            sources = sources.OrderBy(p => p.position.x).ThenBy(p => p.position.y).ThenBy(p => p.position.z).ToList();
+            targets = targets.OrderBy(p => p.position.x).ThenBy(p => p.position.y).ThenBy(p => p.position.z).ToList();
+        }
         Transform expectedA = null, expectedB = null; float best = 9999999f;
         for (int i = 0; i < sources.Count; ++i)
         {
             if (manual >= 0 && i != manual) continue;
             Transform target = null; float distance = 999999f;
-            foreach (Transform candidate in player.SnapTargets)
+            foreach (Transform candidate in targets)
             {
                 float d = Vector3.Distance(candidate.position, sources[i].position);
                 if (!(d > radius) && d < distance) { target = candidate; distance = d; }
@@ -150,7 +157,9 @@ internal static class HammerSnapSearchAcceptance
         }
         player.ManualSnap = manual; player.NativeSnapCalls = 0;
         bool found = player.TestSnap(ghost, radius, out Transform a, out Transform b);
-        Require(found == (expectedA != null) && a == expectedA && b == expectedB, "Search differs from ordered Unity Distance reference");
+        Require(found == (expectedA != null) && (!found ||
+            a.position.Equals(expectedA.position) && b.position.Equals(expectedB.position)), "Search differs from geometric Unity Distance reference");
+        Require(manual < 0 || !found || a == expectedA, "Manual source identity changed");
         Require(indexed ? player.NativeSnapCalls == 0 : player.NativeSnapCalls > 0, "Wrong accelerated/fallback branch");
         Require(ClearContext(), "Context leaked between calls"); player.ManualSnap = -1;
     }

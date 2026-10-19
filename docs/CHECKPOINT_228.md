@@ -1,5 +1,7 @@
 # .228 — preserve F9 rotation; owner snap stand received
 
+> Follow-up19Oct: .228 was installed and native164 passed; both prepared bridges were restored. Order-dependent jumps were then fixed/tested in [.229](CHECKPOINT_229.md), now installed. The original checkpoint-time status below is historical.
+
 19 October 2026 · [Русский](CHECKPOINT_228_RU.md)
 
 This is a bounded F9 correction, not completion of the world snapping issue.

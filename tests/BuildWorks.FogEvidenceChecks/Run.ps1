@@ -1,5 +1,25 @@
 $ErrorActionPreference='Stop'
 $root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+$spatial=[IO.File]::ReadAllText((Join-Path $root 'tools/BuildWorks.UiWorkbench/Assets/Editor/FogSpatialLedgerCheck.cs'))
+$fixtureStart=$spatial.IndexOf('    internal static byte[] LegacyFixtureBytes(')
+$fixtureEnd=$spatial.IndexOf('    private static void Require(', $fixtureStart)
+if($fixtureStart -lt 0 -or $fixtureEnd -le $fixtureStart){throw 'Pinned legacy guard not found.'}
+$fixtureType='FogLegacyFixture'+[guid]::NewGuid().ToString('N')
+$fixtureCode='using System;using System.IO;using System.Security.Cryptography;public static class '+$fixtureType+'{'+$spatial.Substring($fixtureStart,$fixtureEnd-$fixtureStart)+'private static void Require(bool v,string m){if(!v)throw new InvalidOperationException(m);}public static byte[] Read(string root){return LegacyFixtureBytes(root);}}'
+$fixtureGuard=Add-Type -TypeDefinition $fixtureCode -PassThru
+$null=$fixtureGuard::Read($root)
+$invalidRoot=Join-Path $root 'artifacts/fog-evidence-fixtures/invalid-legacy'
+$invalidPath=Join-Path $invalidRoot 'tests/fixtures/fog-legacy-linear/buildworks-fog-v11'
+New-Item -ItemType Directory -Path (Split-Path $invalidPath) -Force | Out-Null
+$legacy=[IO.File]::ReadAllBytes((Join-Path $root 'tests/fixtures/fog-legacy-linear/buildworks-fog-v11'))
+$legacy[0]=$legacy[0] -bxor 1
+foreach($invalid in @($legacy, [IO.File]::ReadAllBytes((Join-Path $root 'artifacts/fog-runtime-assets-candidate/buildworks-fog-v11')))){
+    [IO.File]::WriteAllBytes($invalidPath,$invalid)
+    $rejected=$false
+    try{$null=$fixtureGuard::Read($invalidRoot)}catch{if($_.Exception.ToString() -match 'Pinned legacy fog fixture changed'){$rejected=$true}else{throw}}
+    if(!$rejected){throw 'A corrupt or candidate bundle passed the pinned legacy guard.'}
+}
+Write-Output 'PASS: actual pinned legacy guard; correct bytes accepted, same-size corruption and candidate rejected before AssetBundle loading. CPU only.'
 $tokens=$null;$errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $root 'scripts/Test-FogSimulation.ps1'),[ref]$tokens,[ref]$errors)
 if($errors.Count){throw ($errors|Out-String)}
@@ -14,7 +34,7 @@ $physics=@{velocityPagingComparisons=252;velocityPagingLogicalOwners=28;velocity
 $arena=@{passed=$true;shortageRollback=$true;packingRollback=$true;nonfiniteRollback=$true;pendingRemoval=$true;reusedSlot=$true;guttersExact=$true;freeBlocksConserved=$true;productionAllocatorTested=$false;fullWallTested=$false;wholeHouseSupported=$false;gameHostTested=$false;owners=8;capacityBlocks=27;committed=47;rejected=3;batchChecks=15;fieldComparisons=480;ledgerComparisons=360}
 $frames=@{velocityHouseSamples=2688;velocityHouseComparisons=196;velocityHouseContacts=6;velocityHouseSeconds=3.2;velocityOverlapRejected=$true;velocityPagingSeconds=3.2;velocityPagingFrames=96;velocityPagingSamples=288;velocityPagingComparisons=21;runtimeChannelsValidated=$true;queuedInputsReplayed=$true;capturedWhilePending=$true;metadataOnlyPending=$true;passed=$true;cachedRepliesAfterExpiry=$true;receiptFirstHandled=$true;pendingResubmitRejected=$true;pendingRetireRetained=$true;generationReuse=$true;lateReplyRejected=$true;pollingHasNoWait=$true;verificationBarriersBetweenBatches=$true;productionAllocatorTested=$false;rendererTested=$false;wholeHouseSupported=$false;gameHostTested=$false;gpuTimingsMeasured=$false;frames=33;owners=2;committed=54;rejected=0;fieldComparisons=232;ledgerComparisons=174;atlasComparisons=20;metadataComparisons=54}
 $published=@{preparationCases=15;preparationMaxStepMilliseconds=8.0;buildingAdapterValidated=$true;buildingComparisons=4;pageSamplingNegativeCases=15;hardwareFilteredPages=$true;coldIdleControlSensitive=$true;continuousV11Parity=$true;coldIdleMaxLocalDelta=.03;logicalVisualValidated=$true;logicalVisualDeferredDisposal=$true;dormantClockAndBodyValidated=$true;logicalVisualComparisons=18;continuousStateComparisons=56;logicalVisualMaxMeanDelta=0.0;logicalVisualMaxLocalDelta=0.0;runtimeVisualAtlasValidated=$true;staticSourceSeparated=$true;runtimeWrongMappingDelta=.001;runtimeVisualAtlasCaptures=30;runtimeVisualAtlasComparisons=14;runtimeMappingNegativeCases=7;runtimeStaticBytes=8122272;runtimeCombinedRenderBytes=22601184;runtimeMaxMeanDelta=0.0;runtimeMaxLocalDelta=0.0;runtimeChannelsValidated=$true;passed=$true;metadataOnly=$true;rejectedRetained=$true;geometryBeforeCpuConfirmation=$true;meshAndAtlasVolume=$true;productionSchedulerTested=$false;wholeHouseSupported=$false;gameHostTested=$false;gpuTimingsMeasured=$false;owners=2;captures=87;comparisons=62;negativeControls=26;legacyCaptures=16;legacyMeanDelta=0.0;maxMeanDelta=0.0;maxLocalDelta=0.0;poisonedCpuDelta=0.0;disabledKeywordDelta=.001;staleGenerationDelta=.001}
-$recovery=@{passed=$true;expiredHandleObserved=$true;delayedReadbackRetained=$true;staleRecoveryRejected=$true;pendingDisposeSafe=$true;snapshotRecoveryValidated=$true;snapshotWorkspaceIsolated=$true;snapshotGenerationReuse=$true;snapshotPendingRetirement=$true;snapshotSmokeAndSurfaceRetained=$true;snapshotReadbackFailureRetained=$true;logicalSourcesValidated=$true;sourceResidentEmptyState=$true;sourceAdmissionBounded=$true;sourceRecoveryReentry=$true;sourceExplicitRetireGuarded=$true;sourceRemovalAfterDrain=$true;sourceAcceptedTailReplayed=$true;sourceFailedAcquireRetained=$true;sourceFrames=42;gameHostTested=$false;frames=48}
+$recovery=@{faultReceiptCases=6;passed=$true;expiredHandleObserved=$true;delayedReadbackRetained=$true;staleRecoveryRejected=$true;pendingDisposeSafe=$true;snapshotRecoveryValidated=$true;snapshotWorkspaceIsolated=$true;snapshotGenerationReuse=$true;snapshotPendingRetirement=$true;snapshotSmokeAndSurfaceRetained=$true;snapshotReadbackFailureRetained=$true;logicalSourcesValidated=$true;sourceResidentEmptyState=$true;sourceAdmissionBounded=$true;sourceRecoveryReentry=$true;sourceExplicitRetireGuarded=$true;sourceRemovalAfterDrain=$true;sourceAcceptedTailReplayed=$true;sourceFailedAcquireRetained=$true;sourceFrames=42;gameHostTested=$false;frames=48}
 $negative=0
 $idle=@{collected=$true;exactReplayValidated=$true;runtimePolicyImplemented=$false;wholeHouseSupported=$false;gameHostTested=$false;scenarios=2;rows=@(foreach($scenario in 0..1){foreach($variant in @(0,2,4,8,12,240,400)){
     $checkpoint=if($variant -ge 240){$variant}else{0}; $window=if($checkpoint -eq 240){4}elseif($checkpoint -eq 400){0}else{$variant}

@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
             BuildWorksPlugin.RequireQaStorageIdle();
             var before = new ZPackage();
             player.GetInventory().Save(before);
-            int cases = 0;
+            int cases = CheckAutomaticOrdering(player);
             GameObject target = null;
             try
             {
@@ -92,6 +92,47 @@ namespace OstrixMods.BuildWorks
         private static void Require(bool condition, string message)
         {
             if (!condition) throw new InvalidOperationException(message);
+        }
+
+        private static int CheckAutomaticOrdering(Player player)
+        {
+            var root = new GameObject("BuildWorks_QA_TransientSnapOrder");
+            try
+            {
+                var sources = new List<Transform>();
+                var targets = new List<Transform>();
+                foreach (var list in new[] { sources, targets })
+                foreach (var position in new[] { Vector3.right, Vector3.up, Vector3.forward, Vector3.zero })
+                {
+                    var point = new GameObject("point"); point.transform.SetParent(root.transform, false);
+                    point.transform.position = position; list.Add(point.transform);
+                }
+                var sort = typeof(BlueprintHammerSnapSearch).GetMethod("SortAutomaticPoints", BindingFlags.Static | BindingFlags.NonPublic);
+                Transform[] originalSource = sources.ToArray(), originalTarget = targets.ToArray();
+                foreach (object[] args in new[] {
+                    new object[] { player, sources, targets, 0, .5f },
+                    new object[] { null, sources, targets, -1, .5f },
+                    new object[] { player, sources, targets, -1, float.NaN },
+                    new object[] { player, sources, targets, -1, -1f } })
+                {
+                    sort.Invoke(null, args);
+                    Require(sources.SequenceEqual(originalSource) && targets.SequenceEqual(originalTarget),
+                        "Manual, nonlocal or invalid-distance sorting changed point indices.");
+                }
+                sort.Invoke(null, new object[] { player, sources, targets, -1, .5f });
+                var orderedSource = sources.ToArray(); var orderedTarget = targets.ToArray();
+                Require(sources.Select(p => p.position).SequenceEqual(new[] {
+                    Vector3.zero, Vector3.forward, Vector3.up, Vector3.right }), "Automatic point order is not geometric.");
+                sources.Reverse(); targets.Reverse();
+                sort.Invoke(null, new object[] { player, sources, targets, -1, .5f });
+                Require(sources.SequenceEqual(orderedSource) && targets.SequenceEqual(orderedTarget), "Point order depends on enumeration.");
+                Require(BlueprintHammerSnapSearch.PairPrecedes(Vector3.zero, Vector3.forward, Vector3.right, Vector3.zero) &&
+                    BlueprintHammerSnapSearch.PairPrecedes(Vector3.zero, Vector3.zero, Vector3.zero, Vector3.forward) &&
+                    !BlueprintHammerSnapSearch.PairPrecedes(Vector3.zero, Vector3.zero, Vector3.zero, Vector3.zero),
+                    "F9/aimed tie ordering differs from the native automatic order.");
+                return 7;
+            }
+            finally { UnityEngine.Object.DestroyImmediate(root); }
         }
     }
 }

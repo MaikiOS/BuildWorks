@@ -2532,7 +2532,10 @@ namespace OstrixMods.BuildWorks
                     {
                         if (!target) continue;
                         float distance = Vector3.Distance(target.position, source.position);
-                        if (distance > 0.5f || !(distance < bestDistance)) continue;
+                        if (distance > 0.5f || !(distance < bestDistance ||
+                            distance == bestDistance && bestSource && bestTarget &&
+                            BlueprintHammerSnapSearch.PairPrecedes(source.position, target.position,
+                                bestSource.position, bestTarget.position))) continue;
                         bestDistance = distance;
                         bestSource = source;
                         bestTarget = target;
@@ -6184,6 +6187,7 @@ namespace OstrixMods.BuildWorks
             nativeSnapPoints.Clear();
             targetPiece.GetSnapPoints(nativeSnapPoints);
             float bestDistance = AutoSnapDistance * AutoSnapDistance;
+            Vector3 bestSourceWorld = Vector3.zero;
             bool found = false;
             for (int source = NativeAnchorStart; source < anchorLocalPoints.Length; ++source)
             {
@@ -6193,8 +6197,11 @@ namespace OstrixMods.BuildWorks
                 {
                     if (!target) continue;
                     float distance = (target.position - sourceWorld).sqrMagnitude;
-                    if (distance >= bestDistance) continue;
+                    if (!(distance < bestDistance || found && distance == bestDistance &&
+                        BlueprintHammerSnapSearch.PairPrecedes(sourceWorld, target.position,
+                            bestSourceWorld, targetWorld))) continue;
                     bestDistance = distance;
+                    bestSourceWorld = sourceWorld;
                     sourceLocal = candidateSource;
                     targetWorld = target.position;
                     found = true;

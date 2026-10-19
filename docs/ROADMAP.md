@@ -1,6 +1,6 @@
 # BuildWorks roadmap
 
-[Русский](ROADMAP_RU.md) · Updated 18 October 2026
+[Русский](ROADMAP_RU.md) · Updated 19 October 2026
 
 ## Product direction
 

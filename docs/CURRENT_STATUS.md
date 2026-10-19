@@ -2,7 +2,7 @@
 
 **2026-10-19 · [Русский](CURRENT_STATUS_RU.md) · [Roadmap](ROADMAP.md) · [Documentation](README.md)**
 
-**Candidate .228, not game-accepted:** normal/QA0/0, full Store/Geometry, host/localization and independent source review pass. F9 keeps player rotation; no pair leaves the pose unchanged. Owner stand18 received and file-imported twice into temporary stores. Intermediate .227 is installed; .228 awaits a closed game. Owner requested work without the game19Oct. [Evidence/queue/pending cleanup](CHECKPOINT_228.md). The general world snap issue remains open.
+**QA .229 installed:** exact-distance ties stabilized; Valheim171 plus stand576/2304, native/F9 order changes0/0, manual6/6, inventory unchanged. normal/QA0/0, Geometry, HostContract97, localization1118, Unity Harmony17125×128 and independent review pass. Legacy v11 baseline pinned; CPU1748+32 and Editor compilation pass. [Evidence/limits](CHECKPOINT_229.md). Camera/held tilt and complete world snapping remain open.
 
 **Last bounded game proof .226:** four-wall native continuation16/16 and world reload10/10, with exact debit/save evidence. Project fog, paid cancellation and server work remain open. [.226](CHECKPOINT_226.md).
 

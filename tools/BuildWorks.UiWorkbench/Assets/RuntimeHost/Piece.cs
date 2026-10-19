@@ -23,8 +23,10 @@ public sealed class Piece : MonoBehaviour
     }
     public static readonly List<Piece> NearbyPieces = new List<Piece>();
     public static System.Action<Piece> BeforeCollection;
+    public static List<Transform> SnapTargetsOverride;
     public static void GetSnapPoints(Vector3 point, float radius, List<Transform> points, List<Piece> pieces)
     {
+        if (SnapTargetsOverride != null) { points.AddRange(SnapTargetsOverride); return; }
         foreach (Piece piece in NearbyPieces.ToArray())
         {
             BeforeCollection?.Invoke(piece);

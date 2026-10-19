@@ -231,8 +231,8 @@ public static class FogPublishedRenderCheck
             if (pack) UnityEngine.Object.DestroyImmediate(pack); if (volume) UnityEngine.Object.DestroyImmediate(volume);
             UnityEngine.Object.DestroyImmediate(original); UnityEngine.Object.DestroyImmediate(prefab); UnityEngine.Object.DestroyImmediate(host);
         }
-        var oldImages = LegacyImages(Path.Combine(root, "src/BuildWorks/Assets/FogGhostRuntime/buildworks-fog-v11"), output, "legacy-installed");
-        var newImages = LegacyImages(Path.Combine(root, "artifacts/fog-runtime-assets-candidate/buildworks-fog-v11"), output, "legacy-candidate");
+        var oldImages = LegacyImages(FogSpatialLedgerCheck.LegacyFixtureBytes(root), output, "legacy-pinned");
+        var newImages = LegacyImages(File.ReadAllBytes(Path.Combine(root, "artifacts/fog-runtime-assets-candidate/buildworks-fog-v11")), output, "legacy-candidate");
         report.legacyCaptures = oldImages.Length + newImages.Length;
         for (int i = 0; i < oldImages.Length; ++i)
         {
@@ -498,7 +498,7 @@ public static class FogPublishedRenderCheck
             visual.Dispose(); visual.Dispose();
         }
     }
-    private static Color[][] LegacyImages(string bundle, string output, string prefix)
+    private static Color[][] LegacyImages(byte[] bundle, string output, string prefix)
     {
         var host = new GameObject("Legacy shader regression"); var camera = host.AddComponent<Camera>(); var probe = host.AddComponent<FogRenderProbe>();
         camera.transform.position = new Vector3(4, 2.3f, -5); camera.transform.LookAt(new Vector3(0, 1, 1.1f)); camera.fieldOfView = 49;
@@ -509,7 +509,7 @@ public static class FogPublishedRenderCheck
         var images = new System.Collections.Generic.List<Color[]>(); var owners = new BlueprintFogVisual[2]; var body = new Vector2(.3f, .95f);
         try
         {
-            using (var assets = new BlueprintFogAssets(File.ReadAllBytes(bundle)))
+            using (var assets = new BlueprintFogAssets(bundle))
             using (var volume = new BlueprintFogVolume(assets))
             using (var atlas = new BlueprintFogAtlas(assets))
             {

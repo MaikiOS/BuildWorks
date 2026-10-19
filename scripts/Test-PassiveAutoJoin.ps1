@@ -97,11 +97,15 @@ public static class Cases {
             var s=new Setup();var first=s.Aim(.25f,.000075f);var second=s.Aim(.25f);
             Require(Vector3.Distance(first.position,s.Source.position)==Vector3.Distance(second.position,s.Source.position),"fixture no longer has rounded distance tie");
             Require((first.position-s.Source.position).sqrMagnitude>(second.position-s.Source.position).sqrMagnitude,"fixture must distinguish squared ordering");
-            Require(s.Apply(s.AimedPiece)&&s.Target==first,"rounded sqrt tie did not retain first target");
+            Require(s.Apply(s.AimedPiece)&&s.Target==second,"rounded sqrt tie did not use geometric target order");
+            s.AimedPiece.points.Reverse();
+            Require(s.Apply(s.AimedPiece)&&s.Target==second,"rounded sqrt tie changed after permutation");
         }
         {
-            var s=new Setup();var first=s.Aim(.25f);s.Aim(-.25f);
-            Require(s.Apply(s.AimedPiece)&&s.Target==first,"exact tie did not retain first target");
+            var s=new Setup();s.Aim(.25f);var canonical=s.Aim(-.25f);
+            Require(s.Apply(s.AimedPiece)&&s.Target==canonical,"exact tie did not use geometric target order");
+            s.AimedPiece.points.Reverse();
+            Require(s.Apply(s.AimedPiece)&&s.Target==canonical,"exact tie changed after permutation");
         }
         {
             var s=new Setup();var candidate=s.Aim(.2f);var nearest=s.Aim(.15f);
@@ -130,5 +134,10 @@ public static class Cases {
 }
 '@
 $fixture += "`nnamespace PassiveAutoJoinChecks { public partial class Harness {`n"+$method+"`n} }"
+$selector = [IO.File]::ReadAllText((Join-Path $root 'src/BuildWorks/BlueprintHammerSnapSearch.cs'))
+$pairStart = $selector.IndexOf('        internal static bool PairPrecedes(')
+$pairEnd = $selector.IndexOf('        private static bool FindClosest(', $pairStart)
+if ($pairStart -lt 0 -or $pairEnd -le $pairStart) { throw 'Geometric pair ordering not found.' }
+$fixture += "`nnamespace PassiveAutoJoinChecks { public static class BlueprintHammerSnapSearch {`n" + $selector.Substring($pairStart, $pairEnd-$pairStart) + "`n} }"
 Add-Type -TypeDefinition $fixture
 [PassiveAutoJoinChecks.Cases]::Run()

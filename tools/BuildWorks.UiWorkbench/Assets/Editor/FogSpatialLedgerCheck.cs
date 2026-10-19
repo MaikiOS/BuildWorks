@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using OstrixMods.BuildWorks;
 using UnityEditor;
 using UnityEngine;
@@ -18,7 +19,7 @@ public static class FogSpatialLedgerCheck
         var report = new Report();
         try
         {
-            using (var old = new BlueprintFogAssets(File.ReadAllBytes(Path.Combine(root, "src/BuildWorks/Assets/FogGhostRuntime/buildworks-fog-v11"))))
+            using (var old = new BlueprintFogAssets(LegacyFixtureBytes(root)))
             {
                 bool rejected = false;
                 try { using (var invalid = BlueprintFogChannels.CreateArena(old, 1, 1, ledgerLayout: Spatial)) { } }
@@ -156,6 +157,14 @@ public static class FogSpatialLedgerCheck
             }
         }
         finally { UnityEngine.Object.DestroyImmediate(prefab); UnityEngine.Object.DestroyImmediate(material); }
+    }
+    internal static byte[] LegacyFixtureBytes(string root)
+    {
+        byte[] bytes = File.ReadAllBytes(Path.Combine(root, "tests/fixtures/fog-legacy-linear/buildworks-fog-v11"));
+        using (var sha = SHA256.Create())
+            Require(bytes.Length == 62061 && BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-", "") ==
+                "DD9576EC6925082A5B59615C7EB813CC8B93067FFCBAB5D926AACE29558C61DD", "Pinned legacy fog fixture changed.");
+        return bytes;
     }
     private static void Require(bool value, string message) { if (!value) throw new InvalidOperationException(message); }
     [Serializable] private sealed class Report

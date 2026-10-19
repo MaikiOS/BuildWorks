@@ -14,7 +14,7 @@
 
 ## Минимальная очередь без переделки эффекта
 
-1. Сохранить старый bundle как неизменяемый baseline. Перенаправить старые negative/comparison fixtures в `FogSpatialLedgerCheck` и `FogPublishedRenderCheck`: сейчас они читают embedded, предполагая, что он legacy. Сохранить отрицательные проверки, не удалить их.
+1. **Сделано в .229:** старый bundle закреплён в tests/fixtures/fog-legacy-linear; оба legacy caller проверяют SHA/62061B и загружают те же байты. CPU1748+32, corrupt/candidate rejection и Unity-компиляция прошли. Отрицательные spatial/pixel проверки сохранены. Это ещё не повтор GPU-сравнения.
 2. Перенести уже проверенные байты Linear candidate в embedded; проверить provenance, набор ресурсов, `RequireSpatialLedger`, затронутые negative/retirement и matched-render проверки. Не менять solver, шум, пороги или утверждённый внешний вид.
 3. Создавать визуал по сохранённому `Store.Part.WorldPose`. Не вычислять повторно мировую позу из относительного чертежа; исходный масштаб prefab учитывает `BlueprintFogVisual`.
 4. Добавить удаление/завершение одной части без пересоздания остальных, сброса их часов и v11-состояния. При нуле частей — обычный проход изображения, без пустого atlas.

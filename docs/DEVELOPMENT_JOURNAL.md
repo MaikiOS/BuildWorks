@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-20 — 255: exact saved pair before profile credit
+
+.247 adds durable credit intent, exact native empty-cell insertion, permanent receipt and saved inventory/customData pair verification. Receipt-only cannot settle an intent. Independent reviews caught and fixed generation/custody/save-pair boundary defects; BLOCKED evidence is retained. CPU/Store/Geometry/build/contracts pass; corrected QA installation preserved177 protected files. Native credit was not started: stale phase0 preflight expectation, followed by character death between temporary-protection scripts. Owner requested PassiveMobs; normal .247 package prepared, with no new snap fix. [Evidence and limits](CHECKPOINT_255.md).
+
 ## 2026-10-20 — owner-facing checklist wording
 
 At Ostrix's request, rechecked all 14 sections and 115 stable subpoints without changing completion states or acceptance boundaries. Reworded the current action and 8.7 as player outcomes, removed the stale .244 manual-queue target, and added explicit checklist/status/journal templates to [the rules](PROGRESS_RULES.md) and their AGENTS boundary. WORK_STATUS distinguishes the verified .246 snapshot from unfinished source edits. Documentation only; no build, deployment or game run.

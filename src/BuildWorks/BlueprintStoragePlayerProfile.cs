@@ -91,6 +91,9 @@ namespace OstrixMods.BuildWorks
         internal bool TryVerify(out NativePlayerProfileReadback.Evidence evidence, out string reason)
             => TryRead(path, out evidence, out reason);
 
+        internal bool TryVerifySavedCredit(out NativePlayerProfileReadback.Evidence evidence, out string reason)
+            => TryRead(path, out evidence, out reason, savedCredit: true);
+
         internal static bool TryReadSavedCustomData(Player player, Func<bool> context,
             out NativePlayerProfileReadback.CustomDataEvidence evidence, out string reason)
         {
@@ -154,7 +157,7 @@ namespace OstrixMods.BuildWorks
             catch (Exception error) { reason = error.Message; return false; }
         }
 
-        private bool TryRead(string filename, out NativePlayerProfileReadback.Evidence evidence, out string reason)
+        private bool TryRead(string filename, out NativePlayerProfileReadback.Evidence evidence, out string reason, bool savedCredit = false)
         {
             evidence = null; reason = null;
             try
@@ -164,7 +167,9 @@ namespace OstrixMods.BuildWorks
                 using (var file = new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read))
                 {
                     NativePlayerProfileReadback.Evidence result;
-                    bool passed = freshPlayerData == null
+                    bool passed = savedCredit
+                        ? NativePlayerProfileReadback.TryVerifyInventoryAndCustomData(file, playerId, name, expected, prefab => prefab.GetStableHashCode(), out result, out reason)
+                        : freshPlayerData == null
                         ? NativePlayerProfileReadback.TryVerify(file, playerId, name, expected, prefab => prefab.GetStableHashCode(), out result, out reason)
                         : NativePlayerProfileReadback.TryVerifyPlayerData(file, playerId, name, expected, prefab => prefab.GetStableHashCode(), freshPlayerData, out result, out reason);
                     if (!passed) return false;

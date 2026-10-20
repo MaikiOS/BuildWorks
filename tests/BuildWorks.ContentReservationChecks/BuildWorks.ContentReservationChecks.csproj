@@ -17,6 +17,8 @@
     <Compile Include="../../artifacts/content-reservations/StoragePersistenceSource.cs" Link="StoragePersistenceSource.cs" />
     <Compile Include="../../artifacts/content-reservations/StorageProfileWriteSource.cs" Link="StorageProfileWriteSource.cs" />
     <Compile Include="../../artifacts/content-reservations/StorageLoadedSource.cs" Link="StorageLoadedSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/PlayerSaveGuardSource.cs" Link="PlayerSaveGuardSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/CreditCustodySource.cs" Link="CreditCustodySource.cs" />
     <Reference Include="0Harmony"><HintPath>$(ProfileRoot)/BepInEx/core/0Harmony.dll</HintPath></Reference>
     <ProjectReference Include="../../src/BuildWorks.Geometry/BuildWorks.Geometry.csproj" />
   </ItemGroup>

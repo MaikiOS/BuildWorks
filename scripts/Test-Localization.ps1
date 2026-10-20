@@ -112,6 +112,7 @@ $nonLocalizationDottedLiterals = @(
     'editor.catalog.',
     'com.jotunn.jotunn',
     'ostrix.buildworks.refund.v1',
+    'ostrix.buildworks.collected.v1.',
     'ostrmod.buildworks'
 )
 $keyPattern = '"((?:[a-z][a-z0-9_-]*\.)+[A-Za-z0-9_.-]+)"'

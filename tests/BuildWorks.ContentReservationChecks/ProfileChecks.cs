@@ -9,7 +9,7 @@ using OstrixMods.BuildWorks.Geometry;
 namespace ReservationChecks
 {
     internal static partial class FileHelpers { internal enum FileSource { Auto = 1, Local = 2, Cloud = 4, Legacy = 8 } }
-    internal sealed class PlayerProfile
+    internal sealed partial class PlayerProfile
     {
         internal FileHelpers.FileSource m_fileSource = FileHelpers.FileSource.Local;
         internal string Filename = "test", Name = "QA", Path;

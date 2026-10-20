@@ -938,7 +938,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.246.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.247.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $fogResource = @($plugin.MainModule.Resources | Where-Object Name -eq 'BuildWorks.FogGhostV11')
 Assert-Contract ($fogResource.Count -eq 1 -and $fogResource[0] -is [Mono.Cecil.EmbeddedResource]) 'Compiled v11 fog resource is missing or duplicated.'
@@ -3630,6 +3630,13 @@ foreach ($entry in @(@(($profileType.Methods | Where-Object Name -eq 'SavePlayer
     Assert-Contract ((Get-NativeLayoutHash $entry[0]) -eq $entry[1]) "Native canonical-profile contract changed: $($entry[0].FullName)"
 }
 $profileAdapter = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintStoragePlayerProfile' -and $_.Name -ne 'TrySaveAndVerify' }
+$stagingCapture = @($profileType.Methods | Where-Object { $_.Name -eq 'SavePlayerData' -and $_.Parameters.Count -eq 1 -and $_.Parameters[0].ParameterType.FullName -eq 'Player' })
+Assert-Contract ($stagingCapture.Count -eq 1 -and (($stagingCapture[0].Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n") -match 'Player::Save') 'PlayerProfile staging capture no longer funnels through the guarded Player.Save.'
+$creditCell = @(($hostAssembly.MainModule.Types | Where-Object Name -eq 'Inventory').Methods | Where-Object {
+    $_.Name -eq 'AddItem' -and (($_.Parameters | ForEach-Object { $_.ParameterType.FullName }) -join ',') -eq 'ItemDrop/ItemData,System.Int32,System.Int32,System.Int32,System.Boolean'
+})
+Assert-Contract ($creditCell.Count -eq 1 -and $creditCell[0].IsPrivate -and $creditCell[0].ReturnType.FullName -eq 'System.Boolean' -and
+    (($creditCell[0].Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n") -match 'Inventory::Changed') 'Exact-cell credit API or native callback boundary changed.'
 $profileCalls = ($profileAdapter.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($profileCalls -match 'NativePlayerProfileReadback::TryVerify' -and $profileCalls -match '::TrySnapshotInventory' -and
     $profileCalls -match 'PlayerProfile::m_fileSource' -and $profileCalls -match 'PlayerProfile::GetPath' -and

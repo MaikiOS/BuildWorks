@@ -234,6 +234,8 @@ namespace ReservationChecks
                     new BlueprintItemStandPlacement.Reservation(wood, 1, held.Items[0].Snapshot) });
                 Check(!BlueprintItemStandPlacement.SuppliesAvailable(player, new List<BlueprintItemStandPlacement.Supply> { overflow }), "reservation overflow accepted");
                 TransferChecks.Run();
+                PlayerSaveGuardChecks.Run();
+                CreditCustodyChecks.Run();
                 Console.WriteLine("PASS " + assertions + " content reservation assertions: actual selectors/payment checks and native-record decoder with inert host/serializer; reservation subset only; no native game execution.");
                 return 0;
             }

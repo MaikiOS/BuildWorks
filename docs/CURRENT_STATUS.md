@@ -1,6 +1,6 @@
 # Current BuildWorks status
 
-2026-10-20. Installed QA **0.19.246** reads the canonical saved custom-data map independently of prior inventory. This is a collection dependency, not implemented collection. Latest in-game checkpoint remains252; paid cancellation, v11 house appearance, corpus coverage and networking stay open.
+2026-10-20. QA **0.19.247** installed: profile credit has source/CPU evidence, but native credit was not started because the QA character died between scripts and inventory remains in its tombstone. Native PassiveMobs was enabled and verified across reload. Paid cancellation, v11/house appearance, broader corpus and networking remain open.
 
 Requirements/current task: [owner checklist](LIVE_CHECKLIST_RU.md). Technical evidence/causes: [WORK_STATUS](WORK_STATUS_RU.md). History: [journal](DEVELOPMENT_JOURNAL.md). [Document rules](PROGRESS_RULES.md).
 
@@ -17,6 +17,6 @@ Requirements/current task: [owner checklist](LIVE_CHECKLIST_RU.md). Technical ev
 | World selection and heavy chain | Capture/volume foundations and targeted checks | Basic capture accepted; later coordinate/height UX issues reported | Editable volume/gizmos, boundary rules, full loaded-area and performance acceptance |
 | World objects and EarthWorks | No terrain integration dependency | None claimed | Admin-priced nonrecipe objects; EarthWorks is a later separate integration |
 
-Source, automated checks, installation, Valheim state, owner acceptance and host+remote evidence are separate. A narrow result does not complete a broader requirement. Latest change: [254](CHECKPOINT_254.md); latest in-game report: [252](CHECKPOINT_252.md). The parallel technical branch is checklist 8.7/8.8: controlled receipt of restitution, then terminal paid cancellation. Acceptance of v11/house appearance under 9.2–9.7 remains the primary open gate; numerical/cadence evidence does not replace it.
+Source, automated checks, installation, Valheim state, owner acceptance and host+remote evidence are separate. A narrow result does not complete a broader requirement. Latest change: [255](CHECKPOINT_255.md); native run255 did not reach credit. The parallel technical branch is checklist 8.7/8.8: controlled receipt of restitution, then terminal paid cancellation. Acceptance of v11/house appearance under 9.2–9.7 remains the primary open gate; numerical/cadence evidence does not replace it.
 
-Prior chronology and failures remain in [the historical snapshot](PROGRESS_SNAPSHOT_252_RU.md) and checkpoint reports; [the roadmap](ROADMAP.md) describes future product milestones. The goal mechanism text is unchanged; .246 installation is separate from in-game verification.
+Prior chronology and failures remain in [the historical snapshot](PROGRESS_SNAPSHOT_252_RU.md) and checkpoint reports; [the roadmap](ROADMAP.md) describes future product milestones. The goal mechanism text is unchanged; .247 installation is separate from in-game verification.

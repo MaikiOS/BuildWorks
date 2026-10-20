@@ -42,6 +42,11 @@ namespace OstrixMods.BuildWorks.Geometry
             Func<string, int> prefabHash, byte[] playerData, out Evidence evidence, out string reason)
             => Verify(file, player, name, expected, prefabHash, playerData ?? Array.Empty<byte>(), out evidence, out reason);
 
+        // Saved pair only: exact inventory and parsed tail, without claiming a fresh Player.Save request.
+        public static bool TryVerifyInventoryAndCustomData(Stream file, long player, string name, BlueprintForeignPartData expected,
+            Func<string, int> prefabHash, out Evidence evidence, out string reason)
+            => Verify(file, player, name, expected, prefabHash, null, out evidence, out reason, parseCustomData: true);
+
         public static bool TryReadCustomData(Stream file, long player, string name, out CustomDataEvidence evidence, out string reason)
         {
             evidence = null;
@@ -50,7 +55,7 @@ namespace OstrixMods.BuildWorks.Geometry
         }
 
         private static bool Verify(Stream file, long player, string name, BlueprintForeignPartData expected,
-            Func<string, int> prefabHash, byte[] playerData, out Evidence evidence, out string reason, bool savedCustomData = false)
+            Func<string, int> prefabHash, byte[] playerData, out Evidence evidence, out string reason, bool savedCustomData = false, bool parseCustomData = false)
         {
             evidence = null; reason = null;
             try
@@ -137,7 +142,7 @@ namespace OstrixMods.BuildWorks.Geometry
                         for (int i = 0; i < inventory.Length; i++)
                             if (reader.ReadByte() != inventory[i]) throw new InvalidDataException("Saved inventory differs from the provided items after transfer.");
                     }
-                    if (savedCustomData || playerData != null) customData = ReadPlayerTail(reader, playerVersion);
+                    if (savedCustomData || parseCustomData || playerData != null) customData = ReadPlayerTail(reader, playerVersion);
                     // Inventory-only callers keep their opaque-tail contract; no complete Player.Load claim.
                 }
                 using (var hash = SHA256.Create())

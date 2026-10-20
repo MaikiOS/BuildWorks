@@ -25,6 +25,26 @@ $profileSource = [IO.File]::ReadAllText($profilePath)
 $profileHash = (Get-FileHash -LiteralPath $profilePath).Hash
 $profileWritePath = Join-Path $root 'src/BuildWorks/BlueprintStorageProfileWrite.cs'
 $profileWriteHash = (Get-FileHash -LiteralPath $profileWritePath).Hash
+$saveGuardPath = Join-Path $root 'src/BuildWorks/BlueprintPlayerSaveGuard.cs'
+$saveGuardHash = (Get-FileHash -LiteralPath $saveGuardPath).Hash
+[IO.File]::WriteAllText((Join-Path $output 'PlayerSaveGuardSource.cs'),
+    [IO.File]::ReadAllText($saveGuardPath).Replace('namespace OstrixMods.BuildWorks', 'namespace ReservationChecks'), [Text.UTF8Encoding]::new($false))
+$creditPath = Join-Path $root 'src/BuildWorks/BlueprintConstructionPayoutCollection.cs'
+$creditSource = [IO.File]::ReadAllText($creditPath)
+$creditHash = (Get-FileHash -LiteralPath $creditPath).Hash
+$creditStart = $creditSource.IndexOf('        private bool SavedCustody()', [StringComparison]::Ordinal)
+$creditEnd = $creditSource.IndexOf('        private bool SourceMatches()', [StringComparison]::Ordinal)
+if ($creditStart -lt 0 -or $creditEnd -le $creditStart) { throw 'Credit custody predicate boundary changed.' }
+$creditPredicates = $creditSource.Substring($creditStart, $creditEnd - $creditStart).Replace('private bool', 'internal bool')
+foreach ($required in @('TryReadSavedCustomData(player, SavedCustody', '!SavedCustody())', 'if (SavedCustody() && Matches(after)',
+    'bool AfterCustody() => CreditedCustody(after)', 'if (saved && AfterCustody())', 'if (credit.Phase == Journal.ProfileCredited) journal.ConfirmCredit',
+    'bool UnsettledPair() => SavedCustody() && Matches(credited)', 'recovery.TryVerifySavedCredit(out full, out readError) && AfterCustody()')) {
+    if (-not $creditSource.Contains($required)) { throw "Credit confirmation fence/wiring changed: $required" }
+}
+if ([regex]::Matches($creditSource, 'journal\.Confirm(?:Saved)?Credit\(').Count -ne 4) { throw 'Review the new credit confirmation route.' }
+[IO.File]::WriteAllText((Join-Path $output 'CreditCustodySource.cs'),
+    "using OstrixMods.BuildWorks.Geometry; namespace ReservationChecks { internal sealed partial class CreditCustodyProbe {`n" +
+    $creditPredicates + "`n} }", [Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText((Join-Path $output 'StorageProfileWriteSource.cs'),
     [IO.File]::ReadAllText($profileWritePath).Replace('namespace OstrixMods.BuildWorks', 'namespace ReservationChecks'), [Text.UTF8Encoding]::new($false))
 $profileParserHash = (Get-FileHash -LiteralPath (Join-Path $root 'src/BuildWorks.Geometry/NativePlayerProfileReadback.cs')).Hash
@@ -87,5 +107,6 @@ if ($LASTEXITCODE -ne 0) { throw 'Reservation CPU checks failed. Native transfer
     batchAbsenceAdapterTestedWithHostSubstitutes = $true; paidCancellationImplemented = $false;
     pairedPersistenceSHA256 = $persistenceHash; pairedPersistenceHostSubstitutes = $true; profileWriteObserverSHA256 = $profileWriteHash;
     canonicalLocalProfileParserTested = $true; livePlayerProfileReadbackTested = $false;
+    playerSaveGuardSHA256 = $saveGuardHash; playerSaveGuardHostSubstitutes = $true; creditCustodySHA256 = $creditHash; creditCustodyPredicatesAndWiring = $true;
     journalIOTested = $true; explicitExactRecoveryTestedWithHostSubstitutes = $true; durableRecoveryImplemented = $false; populatedPlacementEnabled = $false; nativeTransferTested = $false; gameTested = $false } |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'verification-status.json') -Encoding utf8

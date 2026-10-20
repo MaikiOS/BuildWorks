@@ -12,6 +12,7 @@ namespace ReservationChecks
     internal sealed partial class Player
     {
         internal readonly Dictionary<string, string> m_customData = new Dictionary<string, string>();
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         internal void Save(ZPackage package)
         {
             BlueprintStorageCapture.TrySnapshotInventory(GetInventory(), out var inventory);

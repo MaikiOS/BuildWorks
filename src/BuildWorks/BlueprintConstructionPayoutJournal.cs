@@ -17,6 +17,8 @@ namespace OstrixMods.BuildWorks
     internal sealed class BlueprintConstructionPayoutJournal
     {
         internal const string CustodyKey = "ostrix.buildworks.refund.v1";
+        internal const string ReceiptPrefix = "ostrix.buildworks.collected.v1.";
+        internal const int CreditIntent = 1, ProfileCredited = 2;
         internal const int Prepared = 1, SaveIntent = 2, IssuedSaved = 3;
         internal const int Ready = 0, Attempted = 1, Observed = 2;
         private const int MaximumBytes = 16 * 1024 * 1024;
@@ -51,6 +53,21 @@ namespace OstrixMods.BuildWorks
             [DataMember(Order = 9)] internal string BeforeBytes;
             [DataMember(Order = 10)] internal Entry[] Items;
             [DataMember(Order = 11)] internal Proof Saved;
+            [DataMember(Order = 12, EmitDefaultValue = false)] internal Collection[] Collections;
+        }
+        [DataContract] internal sealed class Collection
+        {
+            [DataMember(Order = 0)] internal Guid Entry;
+            [DataMember(Order = 1)] internal int Phase;
+            [DataMember(Order = 2)] internal int X;
+            [DataMember(Order = 3)] internal int Y;
+            [DataMember(Order = 4)] internal string BeforeInfo;
+            [DataMember(Order = 5)] internal string BeforeBytes;
+            [DataMember(Order = 6)] internal string AfterInfo;
+            [DataMember(Order = 7)] internal string AfterBytes;
+            [DataMember(Order = 8)] internal string BeforeProfileHash;
+            [DataMember(Order = 9)] internal string SavedProfileHash;
+            [DataMember(Order = 10)] internal string ItemBlob;
         }
         internal BlueprintConstructionPayoutJournal(Plans plans) { this.plans = plans ?? throw new ArgumentNullException(nameof(plans)); }
         internal Parts.PaidRow[] Paid(Guid project)
@@ -133,6 +150,80 @@ namespace OstrixMods.BuildWorks
                 Write(current, true); return Read(project);
             }
         }
+        internal Record BeginCredit(Guid project, Guid operation, int index, BlueprintForeignPartData before,
+            string cleanItem, int x, int y, string beforeProfileHash)
+        {
+            using (plans.Lock(project))
+            {
+                var r = Require(project, operation);
+                if (r.Phase != IssuedSaved || index != (r.Collections?.Length ?? 0) || index >= r.Items.Length ||
+                    r.Collections?.Any(c => c.Phase != ProfileCredited) == true)
+                    throw new InvalidOperationException("Credit intent cannot be repeated, skipped or started after an uncertain row.");
+                var after = CreditInventory(before, cleanItem, Paid(project)[index], x, y);
+                var credit = new Collection { Entry = r.Items[index].Id, Phase = CreditIntent, X = x, Y = y,
+                    BeforeInfo = before.Info, BeforeBytes = before.Zdo, AfterInfo = after.Info, AfterBytes = after.Zdo,
+                    BeforeProfileHash = beforeProfileHash, ItemBlob = cleanItem };
+                r.Collections = (r.Collections ?? Array.Empty<Collection>()).Concat(new[] { credit }).ToArray();
+                r.Revision++; Write(r, true); return Read(project);
+            }
+        }
+        internal Record ConfirmCredit(Guid project, Guid operation, int index, NativePlayerProfileReadback.CustomDataEvidence proof)
+            => ConfirmCredit(project, operation, index, proof?.Player ?? 0, proof?.ProfileHash, proof?.CustomData);
+        internal Record ConfirmSavedCredit(Guid project, Guid operation, int index, NativePlayerProfileReadback.Evidence proof)
+            => ConfirmCredit(project, operation, index, proof?.Player ?? 0, proof?.ProfileHash, proof?.CustomData, proof);
+        private Record ConfirmCredit(Guid project, Guid operation, int index, long player, string hash, IReadOnlyDictionary<string, string> customData,
+            NativePlayerProfileReadback.Evidence full = null)
+        {
+            using (plans.Lock(project))
+            {
+                var r = Require(project, operation);
+                if (index < 0 || r.Collections == null || index >= r.Collections.Length || player != r.Player || customData == null ||
+                    !Hash(hash, 128) || !customData.TryGetValue(ReceiptKey(r.Items[index].Id), out string value) || value != ReceiptValue(r, index))
+                    throw new InvalidOperationException("Saved canonical receipt does not bind this payer and original payout row.");
+                if (full != null && (full.Inventory?.Info != r.Collections[index].AfterInfo || full.Inventory?.Zdo != r.Collections[index].AfterBytes))
+                    throw new InvalidOperationException("Fresh saved profile differs from the exact credited inventory.");
+                if (r.Collections[index].Phase == ProfileCredited) return r;
+                if (full == null) throw new InvalidOperationException("An unsettled credit requires its exact saved inventory and receipt pair.");
+                r.Collections[index].Phase = ProfileCredited; r.Collections[index].SavedProfileHash = hash;
+                r.Revision++; Write(r, true); return Read(project);
+            }
+        }
+        internal static string ReceiptKey(Guid entry) => ReceiptPrefix + entry.ToString("N");
+        internal static string ReceiptValue(Record r, int index)
+        {
+            using (var stream = new MemoryStream()) using (var writer = new BinaryWriter(stream))
+            {
+                writer.Write(r.World); writer.Write(r.Player); writer.Write(r.Project.ToByteArray()); writer.Write(r.Operation.ToByteArray());
+                writer.Write(r.RemovalHash); writer.Write(r.Items[index].Id.ToByteArray()); writer.Write(r.Items[index].Blob);
+                writer.Flush(); return Digest(stream.ToArray());
+            }
+        }
+        internal static BlueprintForeignPartData CreditInventory(BlueprintForeignPartData before, string cleanItem, Parts.PaidRow paid, int x, int y)
+        {
+            Parts.ValidateInventory(before?.Info, before?.Zdo);
+            var original = ParseItem(paid.Properties, paid.Prefab, 1);
+            var clean = ParseItem(cleanItem, paid.Prefab, paid.Paid);
+            if (original == null || clean == null || clean.SourceVersion != 110 || !clean.PickedUp || clean.Equipped || clean.X != x || clean.Y != y ||
+                !SameProperties(original, clean) || clean.CustomData.Count != original.CustomData.Count ||
+                original.CustomData.ContainsKey(CustodyKey) || clean.CustomData.ContainsKey(CustodyKey) ||
+                original.CustomData.Any(p => !clean.CustomData.TryGetValue(p.Key, out string value) || value != p.Value))
+                throw new InvalidDataException("Clean credit differs from the actual provided item properties.");
+            if (!BlueprintContainerInventory.TryRead(before, name => name.GetStableHashCode(), out var old))
+                throw new InvalidDataException("Credit baseline inventory is invalid.");
+            string[] fields = before.Info.Split('|')[0].Split(':');
+            int width = int.Parse(fields[0], CultureInfo.InvariantCulture), height = int.Parse(fields[1], CultureInfo.InvariantCulture);
+            byte[] bytes = Convert.FromBase64String(before.Zdo), item = Convert.FromBase64String(cleanItem);
+            if (bytes[0] != 110 || old.Count >= 4096 || x < 0 || y < 0 || x >= width || y >= height || old.Any(i => i.X == x && i.Y == y))
+                throw new InvalidDataException("An empty bounded native inventory cell is required.");
+            byte[] after = new byte[checked(bytes.Length + item.Length - 1)];
+            Array.Copy(bytes, after, bytes.Length); after[4] = (byte)(old.Count + 1); after[5] = (byte)((old.Count + 1) >> 8);
+            Array.Copy(item, 1, after, bytes.Length, item.Length - 1);
+            string info = string.Join(":", new[] { width, height, old.Count + 1, checked(old.Sum(i => i.Stack) + paid.Paid) }
+                .Select(n => n.ToString(CultureInfo.InvariantCulture)));
+            info += "|" + string.Join("|", old.Select(i => i.Prefab).Concat(new[] { paid.Prefab }).Distinct().OrderBy(n => n, StringComparer.Ordinal));
+            var result = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, info, Convert.ToBase64String(after), null);
+            Parts.ValidateInventory(result.Info, result.Zdo); return result;
+        }
         internal Record Read(Guid project)
         {
             string path = PathFor(project); if (!File.Exists(path)) return null; CheckFile(path);
@@ -181,7 +272,23 @@ namespace OstrixMods.BuildWorks
             var native = r.Items.Where(e => e.State == Observed).ToArray();
             if (native.Select(e => (e.ObjectUser, e.ObjectId)).Distinct().Count() != native.Length)
                 throw new InvalidDataException("Payout rows cannot share a native item identity.");
-            if (r.Revision != 1L + r.Items.Sum(e => e.State) + r.Phase - 1 || r.Phase != Prepared && r.Items.Any(e => e.State != Observed))
+            if (r.Collections != null)
+            {
+                if (r.Phase != IssuedSaved || r.Collections.Length == 0 || r.Collections.Length > r.Items.Length)
+                    throw new InvalidDataException("Credit records require saved issuance and a nonempty ordered prefix.");
+                for (int i = 0; i < r.Collections.Length; i++)
+                {
+                    var c = r.Collections[i];
+                    if (c == null || c.Entry != r.Items[i].Id || c.Phase < CreditIntent || c.Phase > ProfileCredited ||
+                        i < r.Collections.Length - 1 && c.Phase != ProfileCredited || !Hash(c.BeforeProfileHash, 128) ||
+                        (c.Phase == CreditIntent ? c.SavedProfileHash != null : !Hash(c.SavedProfileHash, 128)))
+                        throw new InvalidDataException("Credit identity, phase or profile proof differs.");
+                    var before = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, c.BeforeInfo, c.BeforeBytes, null);
+                    var after = CreditInventory(before, c.ItemBlob, paid[i], c.X, c.Y);
+                    if (after.Info != c.AfterInfo || after.Zdo != c.AfterBytes) throw new InvalidDataException("Credit is not the exact single-cell inventory delta.");
+                }
+            }
+            if (r.Revision != 1L + r.Items.Sum(e => e.State) + r.Phase - 1 + (r.Collections?.Sum(c => (long)c.Phase) ?? 0) || r.Phase != Prepared && r.Items.Any(e => e.State != Observed))
                 throw new InvalidDataException("Payout phase/revision differs.");
             if (r.Phase != IssuedSaved)
             { if (r.Saved != null) throw new InvalidDataException("Payout falsely claims persistence."); return; }
@@ -192,21 +299,8 @@ namespace OstrixMods.BuildWorks
         }
         private static void ValidateItem(Parts.PaidRow paid, Entry entry)
         {
-            BlueprintContainerInventory.Item Parse(string bytes, int quantity)
-            {
-                byte[] native = Convert.FromBase64String(bytes);
-                if (native.Length < 2 || native.Length > 65536 || native[0] != 109 && native[0] != 110) return null;
-                // Reuse the inventory codec: ItemStand intentionally rejects stacks larger than one.
-                using (var stream = new MemoryStream()) using (var writer = new BinaryWriter(stream))
-                {
-                    writer.Write((int)native[0]); writer.Write((ushort)1); writer.Write(native, 1, native.Length - 1);
-                    var data = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat,
-                        "256:256:1:" + quantity.ToString(CultureInfo.InvariantCulture) + "|" + paid.Prefab, Convert.ToBase64String(stream.ToArray()), null);
-                    return BlueprintContainerInventory.TryRead(data, name => name.GetStableHashCode(), out var items) ? items[0] : null;
-                }
-            }
             if (entry.Blob == null || entry.Blob.Length > 90000) throw new InvalidDataException("Payout item exceeds budget.");
-            var original = Parse(paid.Properties, 1); var returned = Parse(entry.Blob, paid.Paid);
+            var original = ParseItem(paid.Properties, paid.Prefab, 1); var returned = ParseItem(entry.Blob, paid.Prefab, paid.Paid);
             if (original == null || returned == null || original.CustomData.ContainsKey(CustodyKey) || returned.SourceVersion != 110 ||
                 returned.Stack != paid.Paid || returned.X != 0 || returned.Y != 0 || returned.Equipped || original.Prefab != returned.Prefab ||
                 original.DurabilityHundredths != returned.DurabilityHundredths || original.LegacyDurability != returned.LegacyDurability ||
@@ -217,6 +311,23 @@ namespace OstrixMods.BuildWorks
                 original.CustomData.Any(pair => !returned.CustomData.TryGetValue(pair.Key, out string value) || value != pair.Value))
                 throw new InvalidDataException("Payout differs from provided item properties or actual paid quantity.");
         }
+        private static BlueprintContainerInventory.Item ParseItem(string bytes, string prefab, int quantity)
+        {
+            if (bytes == null || bytes.Length > 90000) return null;
+            byte[] native = Convert.FromBase64String(bytes);
+            if (native.Length < 2 || native.Length > 65536 || native[0] != 109 && native[0] != 110) return null;
+            using (var stream = new MemoryStream()) using (var writer = new BinaryWriter(stream))
+            {
+                writer.Write((int)native[0]); writer.Write((ushort)1); writer.Write(native, 1, native.Length - 1);
+                var data = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat,
+                    "256:256:1:" + quantity.ToString(CultureInfo.InvariantCulture) + "|" + prefab, Convert.ToBase64String(stream.ToArray()), null);
+                return BlueprintContainerInventory.TryRead(data, name => name.GetStableHashCode(), out var items) ? items[0] : null;
+            }
+        }
+        private static bool SameProperties(BlueprintContainerInventory.Item a, BlueprintContainerInventory.Item b) =>
+            a.Prefab == b.Prefab && a.DurabilityHundredths == b.DurabilityHundredths && a.LegacyDurability == b.LegacyDurability &&
+            a.WorldLevel == b.WorldLevel && a.Quality == b.Quality && a.Variant == b.Variant && a.CrafterId == b.CrafterId &&
+            a.CrafterName == b.CrafterName && a.Cheated == b.Cheated;
         private void Write(Record r, bool replace)
         {
             Validate(r.Project, r); byte[] bytes = Encode(r); string target = PathFor(r.Project), temp = Path.Combine(plans.DirectoryPath, Guid.NewGuid().ToString("N") + ".preparing");

@@ -27,6 +27,10 @@ namespace ReservationChecks
                     saved.Player == 100 && saved.ProfileHash.Length == 128, "saved receipt read without live snapshot " + version);
                 Check(saved.GetType().GetProperty("Inventory") == null && saved.GetType().GetProperty("InventoryHash") == null,
                     "receipt proof can be mistaken for full inventory evidence");
+                using (var stream = new MemoryStream(file))
+                    Check(NativePlayerProfileReadback.TryVerifyInventoryAndCustomData(stream, 100, "QA", expected, s => s.GetStableHashCode(), out var pair, out _) &&
+                        pair.Inventory.Info == expected.Info && pair.Inventory.Zdo == expected.Zdo && pair.CustomData[TailFixture.Receipt] == "credited-once",
+                        "saved credit pair must prove both exact inventory and receipt without a fresh save");
                 Check(!ReadSavedReceipt(file, out _, 101) && !ReadSavedReceipt(file, out _, 100, "wrong"), "receipt player identity not bound");
                 bool readOnly = false;
                 try { ((IDictionary<string, string>)saved.CustomData)[TailFixture.Receipt] = "forged"; }
@@ -51,6 +55,9 @@ namespace ReservationChecks
                 Check(ReadSavedReceipt(spentProfile.File(), out var spentProof) && spentProof.CustomData[TailFixture.Receipt] == "credited-once",
                     "spending the returned inventory lost the permanent receipt");
                 Check(!Verify(spentProfile.File(), expected, out _), "receipt-only proof unexpectedly matched the old inventory");
+                using (var stream = new MemoryStream(spentProfile.File()))
+                    Check(!NativePlayerProfileReadback.TryVerifyInventoryAndCustomData(stream, 100, "QA", expected, s => s.GetStableHashCode(), out var wrongPair, out _) && wrongPair == null,
+                        "receipt present but old/wrong inventory must not settle an unconfirmed credit");
                 using (var stream = new MemoryStream(spentProfile.File()))
                     Check(!NativePlayerProfileReadback.TryVerifyPlayerData(stream, 100, "QA", expected, name => name.GetStableHashCode(),
                         fixture.PlayerData, out _, out _), "fresh exact Player.Save proof widened to receipt-only semantics");
@@ -120,6 +127,19 @@ namespace ReservationChecks
                 File.WriteAllBytes(profile.Path, fixture.Profile.File());
                 Check(BlueprintStoragePlayerProfile.TryReadSavedCustomData(frame.Player, () => true, out var proof, out var reason) &&
                     proof.CustomData[TailFixture.Receipt] == "credited-once", reason);
+                Check(BlueprintStorageCapture.TrySnapshotInventory(frame.Player.GetInventory(), out var live), "credit wrapper live fixture");
+                var exactPair = new TailFixture(Convert.FromBase64String(live.Zdo), 34);
+                File.WriteAllBytes(profile.Path, exactPair.Profile.File());
+                Check(BlueprintStoragePlayerProfile.TryCapture(frame.Player, Guid.NewGuid(), () => true, out var captured, out _) &&
+                    captured.TryVerifySavedCredit(out var paired, out _) && paired.CustomData[TailFixture.Receipt] == "credited-once" &&
+                    paired.Inventory.Zdo == live.Zdo, "saved credit wrapper did not read exact canonical pair");
+                byte[] empty = new byte[] { 110, 0, 0, 0, 0, 0 };
+                File.WriteAllBytes(profile.Path, new TailFixture(empty, 34).Profile.File());
+                Check(!captured.TryVerifySavedCredit(out var rejectedPair, out _) && rejectedPair == null &&
+                    BlueprintStoragePlayerProfile.TryReadSavedCustomData(frame.Player, () => true, out var receiptOnly, out _) &&
+                    receiptOnly.CustomData[TailFixture.Receipt] == "credited-once",
+                    "receipt-only lookup must not settle missing saved credited items");
+                File.WriteAllBytes(profile.Path, fixture.Profile.File());
                 frame.Player.m_customData[TailFixture.Receipt] = "not-saved";
                 frame.Player.GetInventory().Items.Clear();
                 Check(BlueprintStoragePlayerProfile.TryReadSavedCustomData(frame.Player, () => true, out var unchanged, out _) &&

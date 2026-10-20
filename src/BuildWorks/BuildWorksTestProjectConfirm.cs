@@ -17,6 +17,49 @@ namespace OstrixMods.BuildWorks
         private static Guid payoutTarget;
         private static BlueprintForeignPartData payoutInventory;
         public static bool PayoutFinished => BuildWorksPlugin.QaConstructionProjects?.Payout?.Finished == true;
+        public static bool CollectionFinished => BuildWorksPlugin.QaConstructionProjects?.Collection?.Finished == true;
+        public static string BeginCollection(int index)
+        {
+            var player = BuildWorksTestIsolation.RequireLoadedSession(); var runtime = BuildWorksPlugin.QaConstructionProjects;
+            if (payoutTarget == Guid.Empty || !runtime.Open(runtime.Board(payoutTarget), player))
+                throw new InvalidOperationException("Select the retained debt and approach its own board with the hammer.");
+            runtime.BeginCollection(payoutTarget, index); return CollectionStatus();
+        }
+        public static string CollectionStatus()
+        {
+            var player = BuildWorksTestIsolation.RequireLoadedSession(); var runtime = BuildWorksPlugin.QaConstructionProjects;
+            var plans = (Store)AccessTools.Field(typeof(BlueprintConstructionProjectRuntime), "store").GetValue(runtime);
+            var payout = new BlueprintConstructionPayoutJournal(plans).Read(payoutTarget);
+            if (payout == null) throw new InvalidOperationException("Select an issued retained debt first.");
+            bool read = BlueprintStoragePlayerProfile.TryReadSavedCustomData(player,
+                () => BlueprintConstructionProjectRuntime.IsPrivateLocalPlacement, out var disk, out string error);
+            int receipts = 0;
+            foreach (var entry in payout.Items.Select((item, index) => new { item, index }))
+            {
+                string key = BlueprintConstructionPayoutJournal.ReceiptKey(entry.item.Id);
+                string value = BlueprintConstructionPayoutJournal.ReceiptValue(payout, entry.index);
+                if (read && disk.CustomData.TryGetValue(key, out string saved) && saved == value &&
+                    player.m_customData.TryGetValue(key, out string loaded) && loaded == value) receipts++;
+            }
+            var last = payout.Collections?.LastOrDefault();
+            bool exact = last != null && BlueprintStorageCapture.TrySnapshotInventory(player.GetInventory(), out var current) &&
+                current.Info == last.AfterInfo && current.Zdo == last.AfterBytes;
+            var active = runtime.Collection;
+            return JsonUtility.ToJson(new CollectionReceipt { id = payoutTarget.ToString("N"), revision = payout.Revision,
+                credits = payout.Collections?.Count(c => c.Phase == BlueprintConstructionPayoutJournal.ProfileCredited) ?? 0,
+                savedReceipts = receipts, diskRead = read, diskError = error, exactLastInventory = exact,
+                wood = player.GetInventory().GetAllItems().Where(i => i.m_dropPrefab && i.m_dropPrefab.name == "Wood").Sum(i => i.m_stack),
+                status = active?.Project == payoutTarget ? active.Status : null, reason = active?.Project == payoutTarget ? active.Reason : null,
+                saveAttempts = active?.Project == payoutTarget ? active.SaveAttempts : 0,
+                blockedSaves = active?.Project == payoutTarget ? active.BlockedSaves : 0, cancelled = runtime.Read(payoutTarget).Cancelled });
+        }
+        [Serializable] private sealed class CollectionReceipt
+        {
+            public string id, status, reason, diskError;
+            public long revision;
+            public int credits, savedReceipts, wood, saveAttempts, blockedSaves;
+            public bool diskRead, exactLastInventory, cancelled;
+        }
         public static string SelectPayout(string id)
         {
             var player = BuildWorksTestIsolation.RequireLoadedSession(); BuildWorksPlugin.RequireQaStorageIdle();

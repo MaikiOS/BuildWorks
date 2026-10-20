@@ -2,6 +2,10 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Reflection;
+using System.Text;
 using OstrixMods.BuildWorks.Geometry;
 using Plans = OstrixMods.BuildWorks.BlueprintConstructionProjectStore;
 using Parts = OstrixMods.BuildWorks.BlueprintConstructionPartJournal;
@@ -91,10 +95,82 @@ namespace OstrixMods.BuildWorks.StoreTests
             File.WriteAllBytes(path, terminal.Concat(new byte[] { 0 }).ToArray()); Refuse<InvalidDataException>(() => journal.Read(plan.Id));
             File.WriteAllBytes(path, terminal);
             Check(journal.Paid(plan.Id).Sum(p => p.Paid) == 4 && journal.Read(plan.Id).Items.Length == 2, "Exact contribution set changed.");
+            Check(saved.Collections == null && !Encoding.UTF8.GetString(terminal).Contains("Collections"), "Additive credit changed legacy canonical bytes.");
+            CreditChecks(journal, plan.Id, operation, after, path);
             Console.WriteLine("PASS payout journal: " + assertions + " assertions; exact paid properties/quantity, durable one-shot intents, replay, corruption and paired-save binding. Native issuance/collection is not claimed.");
             Journal.Record Prepare(Journal.Entry[] rows) => journal.Prepare(plan.Id, operation, 17, 8, after, rows);
             Journal.Proof Proof() => new Journal.Proof { Generation = 9, ProfileHash = new string('A', 128),
                 InventoryHash = Digest(Convert.FromBase64String(after.Zdo)), ItemHashes = entries.Select(e => Digest(Convert.FromBase64String(e.Blob))).ToArray() };
+        }
+        private static void CreditChecks(Journal journal, Guid project, Guid operation, BlueprintForeignPartData before, string path)
+        {
+            string clean = Package(2, 2, Guid.Empty);
+            var paid = journal.Paid(project)[0];
+            Refuse<InvalidDataException>(() => Journal.CreditInventory(before, clean, paid, 0, 0));
+            Refuse<InvalidDataException>(() => Journal.CreditInventory(before, clean, paid, 8, 0));
+            Refuse<InvalidDataException>(() => Journal.CreditInventory(before, Package(2, 2, Guid.NewGuid()), paid, 2, 0));
+            Refuse<InvalidDataException>(() => Journal.CreditInventory(before, Package(2, 2, Guid.Empty, durability: 999), paid, 2, 0));
+            Refuse<InvalidDataException>(() => Journal.CreditInventory(before, Package(2, 2, Guid.Empty, custom: false), paid, 2, 0));
+            Refuse<InvalidOperationException>(() => journal.BeginCredit(project, operation, 1, before, clean, 2, 0, new string('A', 128)));
+            Refuse<InvalidDataException>(() => journal.BeginCredit(project, operation, 0, before, clean, 2, 0, "short"));
+            Check(journal.Read(project).Collections == null, "Rejected credit intent mutated legacy state.");
+            var intent = journal.BeginCredit(project, operation, 0, before, clean, 2, 0, new string('A', 128));
+            var credit = intent.Collections.Single();
+            Check(intent.Revision == 8 && credit.Phase == Journal.CreditIntent && credit.SavedProfileHash == null, "Credit prematurely claimed saved receipt.");
+            var after = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, credit.AfterInfo, credit.AfterBytes, null);
+            Check(BlueprintContainerInventory.TryRead(after, s => s.GetStableHashCode(), out var items) && items.Count == 3 && items.Sum(i => i.Stack) == 8 &&
+                items[0].Stack == 3 && items[1].Stack == 3 && items[2].Stack == 2 && items[2].X == 2 && items[2].CustomData["mod.attribute"] == "kept" &&
+                !items[2].CustomData.ContainsKey(Journal.CustodyKey), "Exact append merged/lost existing units or provided attributes.");
+            byte[] pending = File.ReadAllBytes(path);
+            Refuse<InvalidOperationException>(() => journal.BeginCredit(project, operation, 0, before, clean, 2, 0, new string('A', 128)));
+            Refuse<InvalidOperationException>(() => journal.BeginCredit(project, operation, 1, after, Package(2, 3, Guid.Empty), 3, 0, new string('A', 128)));
+            string key = Journal.ReceiptKey(intent.Items[0].Id), value = Journal.ReceiptValue(intent, 0);
+            Refuse<InvalidOperationException>(() => journal.ConfirmCredit(project, operation, 0, null));
+            Refuse<InvalidOperationException>(() => journal.ConfirmCredit(project, operation, 0, Proof(18, key, value)));
+            Refuse<InvalidOperationException>(() => journal.ConfirmCredit(project, operation, 0, Proof(17, key, "pending:" + value)));
+            Refuse<InvalidOperationException>(() => journal.ConfirmCredit(project, operation, 0, Proof(17, "wrong-key", value)));
+            Check(pending.SequenceEqual(File.ReadAllBytes(path)), "Rejected confirmation changed durable intent.");
+            // Recompute framing/hash too: semantic validation must reject a hostile but correctly hashed body.
+            string body = Encoding.UTF8.GetString(pending, 12, BitConverter.ToInt32(pending, 8));
+            string altered = body.Replace("\"AfterInfo\":\"" + credit.AfterInfo + "\"", "\"AfterInfo\":\"8:4:3:999|Wood\"");
+            Check(altered != body, "Credit corruption fixture did not alter its target.");
+            using (var file = new FileStream(path, FileMode.Create, FileAccess.Write))
+            using (var writer = new BinaryWriter(file))
+            using (var sha = SHA256.Create())
+            { byte[] bytes = Encoding.UTF8.GetBytes(altered); writer.Write(pending, 0, 8); writer.Write(bytes.Length); writer.Write(bytes); writer.Write(sha.ComputeHash(bytes)); }
+            Refuse<InvalidDataException>(() => journal.Read(project)); File.WriteAllBytes(path, pending);
+            Refuse<InvalidOperationException>(() => journal.ConfirmCredit(project, operation, 0, Proof(17, key, value)));
+            Check(pending.SequenceEqual(File.ReadAllBytes(path)), "Receipt-only proof settled or mutated an unconfirmed credit.");
+            var done = journal.ConfirmSavedCredit(project, operation, 0, FullProof(17, key, value, after));
+            Check(done.Revision == 9 && done.Collections[0].Phase == Journal.ProfileCredited && Journal.ReceiptValue(done, 0) == value,
+                "Receipt depends on mutable credit revision or confirmation was not durable.");
+            byte[] confirmed = File.ReadAllBytes(path);
+            Check(journal.ConfirmCredit(project, operation, 0, Proof(17, key, value)).Revision == 9 && confirmed.SequenceEqual(File.ReadAllBytes(path)),
+                "Permanent receipt replay mutated the journal.");
+            // The evidence API intentionally has no inventory field: spending later cannot authorize re-credit.
+            Check(typeof(NativePlayerProfileReadback.CustomDataEvidence).GetProperty("Inventory") == null, "Receipt evidence widened to inventory proof.");
+            Refuse<InvalidOperationException>(() => journal.BeginCredit(project, operation, 0, after, clean, 2, 0, new string('B', 128)));
+            var next = journal.BeginCredit(project, operation, 1, after, Package(2, 3, Guid.Empty), 3, 0, new string('B', 128));
+            Check(next.Revision == 10 && next.Collections.Length == 2 && next.Collections[0].Phase == Journal.ProfileCredited, "Next credit lost prior receipt.");
+            string secondKey = Journal.ReceiptKey(next.Items[1].Id), secondValue = Journal.ReceiptValue(next, 1);
+            Refuse<InvalidOperationException>(() => journal.ConfirmSavedCredit(project, operation, 1, FullProof(17, secondKey, secondValue, before)));
+            var secondAfter = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, next.Collections[1].AfterInfo, next.Collections[1].AfterBytes, null);
+            var second = journal.ConfirmSavedCredit(project, operation, 1, FullProof(17, secondKey, secondValue, secondAfter));
+            Check(second.Revision == 11 && second.Collections.All(c => c.Phase == Journal.ProfileCredited) && second.Phase == Journal.IssuedSaved,
+                "Collection falsely settled world cleanup/cancellation.");
+        }
+        // Test-only journal evidence substitute. Native file parsing is covered separately by ProfileReceiptChecks.
+        private static NativePlayerProfileReadback.CustomDataEvidence Proof(long player, string key, string value)
+        {
+            var evidence = FullProof(player, key, value, null);
+            return (NativePlayerProfileReadback.CustomDataEvidence)Activator.CreateInstance(typeof(NativePlayerProfileReadback.CustomDataEvidence),
+                BindingFlags.Instance | BindingFlags.NonPublic, null, new object[] { evidence }, null);
+        }
+        private static NativePlayerProfileReadback.Evidence FullProof(long player, string key, string value, BlueprintForeignPartData inventory)
+        {
+            var map = new ReadOnlyDictionary<string, string>(new Dictionary<string, string> { [key] = value });
+            return (NativePlayerProfileReadback.Evidence)Activator.CreateInstance(typeof(NativePlayerProfileReadback.Evidence),
+                BindingFlags.Instance | BindingFlags.NonPublic, null, new object[] { player, new string('C', 128), null, 0, inventory, map }, null);
         }
         private static Parts.PaidRow Paid(int x) => new Parts.PaidRow { Prefab = "Wood", Properties = Package(1, x, Guid.Empty),
             Before = 5, Paid = 2, X = x, Y = 0, Quality = 1 };

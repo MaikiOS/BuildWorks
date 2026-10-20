@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-20 — 249: full bounded async native house recording
+
+**Checkpoint 249, QA .241:** bounded async recording of the native GPU house passed: 520/520 PNGs over 51.90 s; independent 1,881-frame/52.28-s cadence at35.96 FPS, all26 windows35.5–36.5 FPS. Fog queue1–2, velocity CPU-copy0; max frame interval76.98 ms remains a limit. Contact24/24:9 parts/105,344 exact inner texels, all28 parts recovered. Pixels/early Stop/delayed worker destroy/two unfinished readbacks:5/7/8/8 checks. Earlier failures retained. Normal quit, bridge3/3 and actual installed bytes restored;4,137 ordinary-save paths/sizes/mtimes unchanged. This verifies the recorder workload/capped cadence, not v11 appearance, complete house readiness or paid cancellation. Next: working QA GPU budget/reference comparison, then paid cancellation/refund. [Evidence](CHECKPOINT_249.md).
+
 ## 2026-10-20 —248: native GPU house and blocking capture
 
 **Checkpoint248, QA .241:** bounded GPU candidate tested in the real28-part house:1859frames/51.61s/36FPS, queue0→2, zero velocity CPU copies. Contact24/24:12parts/288256 exact texels; all28 recovered.264-frame/51.78s recording saved, but cadence FAILED:25.38FPS/min2s24.5; synchronous capture70.28ms. No queue overflow. Own project closed, inventory unchanged, bridge3/3; ordinary QA .241 restored. House/animation not accepted. Next: remove synchronous recorder stalls and rerun the affected gate. [Evidence](CHECKPOINT_248.md).

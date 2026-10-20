@@ -1,6 +1,6 @@
 # BuildWorks
 
-**QA .249 installed; verified checkpoint261:** real unpaid fog house passed177/177checks/two directions;1040frames,contact/all28-part recovery recorded. v11 appearance and occasional stalls remain unaccepted. All4prior refund sources cleaned without repeat credit, but complete board cancellation/rollback/network remain open. [Status](docs/CURRENT_STATUS.md) · [Evidence261](docs/CHECKPOINT_261.md).
+**QA .249 installed; checkpoint262:** close fog-house control17/17/5stills passed. New long recording FAILED343/520 from backpressure and remains failed. Gameplay code/shader unchanged; v11 appearance,smoothness and full board cancellation remain open. [Status](docs/CURRENT_STATUS.md) · [Evidence262](docs/CHECKPOINT_262.md).
 
 **Historical checkpoint250, QA .242:** plain QA now uses the measured256MiB GPU budget without a candidate property. Native Valheim:resident32/VelocityUpload=null,prepare12/12,recorded72/72 with520/520frames,35.88FPS/52.37s,26windows34–36FPS,fog queue1–2/velocity CPU-copy0. Contact24/24:9parts/108160exact inner texels,all28 recovered. Max145.07ms coincides with the first synchronous reference capture; causality/perfect smoothness unproved. Builds/contracts/Geometry/localization1122/isolation pass. Normal quit/bridge3/3; .242 stays installed. Normal/ordinary Editor retain98,304,000bytes; shader/costs unchanged. v11 appearance,public GPU budget,heavy blueprints,paid cancellation/network remain open. [Evidence](docs/CHECKPOINT_250.md).
 

@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-20 — 262: close still control separate from recording failure
+
+Bounded CaptureAt added to existing external QA helper; build0/0,protocol6/6,3range guards and ownership/3frames verified. First attempt stopped on unsupported expected-failure batch form; second long capture truly FAILED backpressure343/520. Separate17-step/5still control passes:Clear house/after own cancel without broad band; another Misty run is not pixel parity. All3processes quit/restore3/pins restored; prior files/inventory/ordinary-save metadata preserved. .249/shader unchanged. Native cadence without PNG load/full capture next;v11/terminal/network open. [Report](CHECKPOINT_262.md).
+
 ## 2026-10-20 — 261: two new native fog-house traversals
 
 Unchanged QA .249 passed177/177 native checks and produced1040PNG/two VFR recordings along the other axis. Contact12parts/recovery28zero; maxhost135/109ms. Private-runner drain/cleanup and exact optional backpack-warning handling fixed; initial rejected preparation retained. Both owned unpaid plans canceled/verified on disk; prior projects/inventory/ordinary saves preserved, games closed/restore3. Distant framing/bright background haze limit appearance: v11 not accepted; closer clear comparison next. Gameplay DLL/shader unchanged; parallel terminal8.8 remains design. [Report](CHECKPOINT_261.md).

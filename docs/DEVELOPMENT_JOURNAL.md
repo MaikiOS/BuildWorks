@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-20 — separate requirements, technical status and history
+
+At Ostrix's request, repeated checkpoint history was removed from LIVE_CHECKLIST/WORK_STATUS. The owner list now follows the exact 14 goal sections with stable subpoint IDs, scoped statuses and a separate manual-acceptance queue. WORK_STATUS holds current evidence, limits, causes and dependencies using the same sections. [Progress rules](PROGRESS_RULES.md) and AGENTS.md define the update workflow; [the old text is archived](PROGRESS_SNAPSHOT_252_RU.md). This changes reporting structure, not scope or feature readiness. Installed QA .244 and the goal mechanism text stay unchanged; no game launch or DLL rebuild. Heading/ID/link checks and independent requirement-preservation review cover the documentation change.
+
 ## 2026-10-20 — 252: saved issuance before collection
 
 **QA .244 installed, checkpoint252:** original paid receipts now produce sealed items in the saved world. Two retained debts issued4stacks/8Wood in Valheim; inventory stays59Wood. Both9-step issuance scenarios,6 reload checks and6 post-replay checks pass; repeat issuance was refused. Collection remains sealed: **paid cancellation is not complete**. Next: permanent payer-profile consumption receipts, controlled collection and terminal cancellation, then faults/recovery/secondary collapse/networking. Normal quit and bridge3/3 restored. [Evidence](CHECKPOINT_252.md).

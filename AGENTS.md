@@ -90,11 +90,14 @@ remain separate; cards must result from explicit import or user creation.
 Preserve the catalog-reset backup in artifacts. Do not reset QA provisioning,
 tokens, worlds, or saves to recreate removed cards.
 
-Maintain `docs/LIVE_CHECKLIST_RU.md` for Ostrix. Update its current action at meaningful
-step starts, after verification, and when direction changes. Separate source/test
-completion, deployment and user game acceptance; mark only evidenced results.
-List pending user checks with their prerequisites. Keep the full requirements in
-`docs/WORK_STATUS_RU.md`; this checklist does not replace or update the goal API.
+Follow `docs/PROGRESS_RULES.md` and its Russian version when updating progress.
+`docs/LIVE_CHECKLIST_RU.md` owns the complete 14 goal sections and stable subpoint
+IDs: scoped completion, current/open work and prepared owner tests. Update existing
+items/current action; never prepend checkpoint history or replace open requirements
+with archive links. `docs/WORK_STATUS_RU.md` holds technical evidence, limitations,
+causes and dependencies; `docs/DEVELOPMENT_JOURNAL_RU.md` holds dated history.
+Separate source/tests/deployment/Valheim/owner/network proof. Documentation does
+not update the goal API; no DLL rebuild/deployment is needed for text-only work.
 
 # Working Commands
 

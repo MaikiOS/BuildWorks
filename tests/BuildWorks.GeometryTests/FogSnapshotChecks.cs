@@ -49,6 +49,12 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Require(BlueprintFogSnapshotState.EstimateFieldBytes(28, 8192, 8) == 99393316, "An eighth resident velocity hid a budget overflow.");
             Require(BlueprintFogSnapshotState.EstimateFieldBytes(28, 8192, 7, BlueprintFogLedgerLayout.Spatial3D) == 98041636, "Spatial owner/stage ledgers escaped the complete reserve.");
             Require(BlueprintFogSnapshotState.EstimateFieldBytes(28, 8192, 8, BlueprintFogLedgerLayout.Spatial3D) > 98304000, "Spatial eighth resident must exceed the budget.");
+            Require(BlueprintFogSnapshotState.EstimateFieldBytes(32, 32768, 4, BlueprintFogLedgerLayout.Spatial3D) == 97423684 &&
+                BlueprintFogSnapshotState.EstimateFieldBytes(32, 32768, 5, BlueprintFogLedgerLayout.Spatial3D) == 102338884,
+                "House reservation no longer selects four residents under the normal cap.");
+            Require(BlueprintFogSnapshotState.EstimateFieldBytes(32, 32768, 32, BlueprintFogLedgerLayout.Spatial3D) == 230134084,
+                "Full GPU residency must remove the shared upload reserve without losing owner fields.");
+            Reject(() => BlueprintFogSnapshotState.EstimateFieldBytes(32, 98304000 / 516 + 1, 32, BlueprintFogLedgerLayout.Spatial3D));
             Require(BlueprintFogSnapshotState.LedgerCells(BlueprintFogLedgerLayout.Spatial3D) == 16384 && BlueprintFogSnapshotState.LedgerCells(BlueprintFogLedgerLayout.LegacyYZ) == 1024, "Ledger layouts changed.");
             Reject(() => BlueprintFogSnapshotState.EstimateFieldBytes(1, 1, 1, (BlueprintFogLedgerLayout)123));
             Reject(() => BlueprintFogSnapshotState.EstimateFieldBytes(28, 8192, 29));

@@ -8,7 +8,7 @@ namespace OstrixMods.BuildWorks
     internal sealed partial class BlueprintFogChannels : IDisposable
     {
         internal const int Capacity = 2;
-        internal const long MaximumFieldBudget = Capacity * BlueprintFogSimulation.FieldBytes;
+        internal const long MaximumFieldBudget = BlueprintFogArena.MaximumFieldBytes;
         private readonly int capacity;
         private readonly long fieldBudget;
         private readonly bool sharedScratch;

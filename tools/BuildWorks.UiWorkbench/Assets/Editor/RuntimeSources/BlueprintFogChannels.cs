@@ -5,21 +5,23 @@ using UnityEngine;
 namespace OstrixMods.BuildWorks
 {
     // A larger compact-owner pool shares the same hard field-byte budget; no unrestored owner is evicted.
-    internal sealed class BlueprintFogChannels : IDisposable
+    internal sealed partial class BlueprintFogChannels : IDisposable
     {
         internal const int Capacity = 2;
-        internal const long MaximumFieldBudget = Capacity * BlueprintFogSimulation.FieldBytes;
+        internal const long MaximumFieldBudget = BlueprintFogArena.MaximumFieldBytes;
         private readonly int capacity;
         private readonly long fieldBudget;
         private readonly bool sharedScratch;
         private readonly Dictionary<string, BlueprintFogSimulation> channels = new Dictionary<string, BlueprintFogSimulation>(StringComparer.Ordinal);
         private readonly Dictionary<Vector3Int, BlueprintFogScratch> scratches = new Dictionary<Vector3Int, BlueprintFogScratch>();
         private bool disposed, creating;
-        internal int Count => channels.Count;
+        internal int Count => arena == null ? channels.Count : snapshotCount;
         internal long FieldBytes
         {
             get
             {
+                if (arena != null) return snapshotsDisposed ? 0 : arena.ReservedFieldBytes -
+                    (arena.ResidentCapacity - ResidentSnapshotCount) * (long)VelocityWords * 2 - (capacity - snapshotCount) * arena.LedgerBytes;
                 long bytes = 0;
                 foreach (BlueprintFogSimulation channel in channels.Values) bytes += channel.AllocatedFieldBytes;
                 foreach (BlueprintFogScratch scratch in scratches.Values) bytes += scratch.FieldBytes;
@@ -38,6 +40,7 @@ namespace OstrixMods.BuildWorks
         internal bool TryAcquire(string owner, Vector3Int grid, Func<BlueprintFogScratch, BlueprintFogSimulation> create,
             out BlueprintFogSimulation channel)
         {
+            RequireLegacy();
             if (disposed) throw new ObjectDisposedException(nameof(BlueprintFogChannels));
             if (creating) throw new InvalidOperationException("Fog channel factory must not re-enter its pool.");
             if (string.IsNullOrWhiteSpace(owner) || owner.Length > 256 || create == null) throw new ArgumentException("Fog owner/factory missing.");
@@ -82,6 +85,7 @@ namespace OstrixMods.BuildWorks
 
         internal bool TryAcquire(string owner, long reservedBytes, Func<BlueprintFogSimulation> create, out BlueprintFogSimulation channel)
         {
+            RequireLegacy();
             if (disposed) throw new ObjectDisposedException(nameof(BlueprintFogChannels));
             if (creating) throw new InvalidOperationException("Fog channel factory must not re-enter its pool.");
             if (string.IsNullOrWhiteSpace(owner) || owner.Length > 256 || create == null) throw new ArgumentException("Fog owner/factory missing.");
@@ -110,6 +114,7 @@ namespace OstrixMods.BuildWorks
 
         internal bool TryReleaseRecovered(string owner)
         {
+            RequireLegacy();
             if (disposed) throw new ObjectDisposedException(nameof(BlueprintFogChannels));
             if (creating) throw new InvalidOperationException("Fog channel factory must not mutate its pool.");
             if (!channels.TryGetValue(owner, out BlueprintFogSimulation channel)) return true;
@@ -120,6 +125,7 @@ namespace OstrixMods.BuildWorks
         // Only the construction owner decides that a built/removed part no longer needs its visual.
         internal void Remove(string owner, BlueprintFogSimulation expected = null)
         {
+            RequireLegacy();
             if (disposed) return;
             if (creating) throw new InvalidOperationException("Fog channel factory must not mutate its pool.");
             if (!channels.TryGetValue(owner, out BlueprintFogSimulation channel)) return;
@@ -132,6 +138,7 @@ namespace OstrixMods.BuildWorks
 
         public void Dispose()
         {
+            if (arena != null) { DisposeSnapshots(); return; }
             if (disposed) return;
             if (creating) throw new InvalidOperationException("Fog channel factory must not dispose its pool.");
             disposed = true;

@@ -1,5 +1,7 @@
 # Current BuildWorks status
 
+**Checkpoint247, QA .241:** an isolated256MiB candidate passed168 exact field/ledger and6750 scalar comparisons plus38 lifecycle checks.28 owners were allocated but only3 advanced, not a whole house. Velocity CPU-copy:3.33GB paged versus0 resident;675/675 receipts per path. Normal/plain QA retain94MiB; ordinary Editor restored. Installed DLL unchanged. Next:48s native house; house speed/appearance remain unproven. [Evidence](CHECKPOINT_247.md).
+
 **Checkpoint246, QA .241:** real stationary house measured:27/27 in18.5s, queue5→35.18.37s copied9.04GB velocity; CPU CallbackCopy3.69s/Upload1.37s. Four valid snapshots; GPU duration unknown.637frames/34.716FPS is short evidence, not48s stability. Own projects closed, inventory unchanged, bridge3/3. Next: compare bounded GPU-resident storage first; direct native readback remains a paging fallback. House unfixed; game DLL unchanged, goal active. [Evidence](CHECKPOINT_246.md).
 
 **Checkpoint245, QA .241:** native house without continuous capture FAILED:25/26 in35.4s; queue64 keeps growing after the route. Contact proven:9 parts/209600 exact inner texels; full recovery not proven in this run. Observer serialization fixed separately: native32/32,1810 frames/50.23s without a house. Inventory unchanged, own unpaid fixture closed,3 bridge DLLs restored. Goal active; game DLL unchanged. Next: stage counters for backlog/paging/receipts, then fix the measured cause. [Evidence](CHECKPOINT_245.md).

@@ -12,10 +12,16 @@
     <OutputPath>$(MSBuildThisFileDirectory)..\..\artifacts\bin\</OutputPath>
     <DefineConstants Condition="'$(BuildWorksTestStand)' == 'true'">$(DefineConstants);BUILDWORKS_TEST_STAND</DefineConstants>
     <DefineConstants Condition="'$(BuildWorksFogPageReuseCandidate)' == 'true'">$(DefineConstants);BUILDWORKS_FOG_PAGE_REUSE_CANDIDATE</DefineConstants>
+    <DefineConstants Condition="'$(BuildWorksFogGpuResidentCandidate)' == 'true' and '$(BuildWorksTestStand)' == 'true'">$(DefineConstants);BUILDWORKS_FOG_GPU_RESIDENT_CANDIDATE</DefineConstants>
     <OutputPath Condition="'$(BuildWorksTestStand)' == 'true'">$(MSBuildThisFileDirectory)..\..\artifacts\test-stand-bin\</OutputPath>
     <ProfileRoot Condition="'$(ProfileRoot)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..\'))</ProfileRoot>
     <ValheimManagedDir Condition="'$(ValheimManagedDir)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed</ValheimManagedDir>
   </PropertyGroup>
+
+  <Target Name="RequireFogGpuCandidateTestStand" BeforeTargets="CoreCompile"
+          Condition="'$(BuildWorksFogGpuResidentCandidate)' == 'true' and '$(BuildWorksTestStand)' != 'true'">
+    <Error Text="BuildWorksFogGpuResidentCandidate requires BuildWorksTestStand=true." />
+  </Target>
 
   <ItemGroup>
     <Reference Include="Unity.InputSystem" Condition="'$(BuildWorksTestStand)' == 'true'">

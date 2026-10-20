@@ -9,7 +9,14 @@ namespace OstrixMods.BuildWorks
     internal sealed class BlueprintFogArena : IDisposable
     {
         internal const int MapWords = 28800;
+#if BUILDWORKS_FOG_GPU_RESIDENT_CANDIDATE && !(UNITY_EDITOR || BUILDWORKS_TEST_STAND)
+#error GPU residency candidate requires an explicit editor or QA build.
+#endif
+#if BUILDWORKS_FOG_GPU_RESIDENT_CANDIDATE
+        internal const long MaximumFieldBytes = 256L * 1024 * 1024;
+#else
         internal const long MaximumFieldBytes = 98304000;
+#endif
         internal static readonly string[] KernelNames = { "InitArena", "BeginStep", "StageLedger", "IndexFields", "ValidateCurrent", "ReserveBlocks", "ResolveBlocks", "PackFields", "CheckPacking", "CommitVelocity", "CommitLedger", "PublishFields", "CommitMaps", "FinishStep", "RestoreFields", "ReleaseCurrent", "ClearOwnerMaps", "PackStaticSource" };
         private readonly Dictionary<string, int> kernels = new Dictionary<string, int>();
         private readonly Dictionary<string, ComputeBuffer> buffers = new Dictionary<string, ComputeBuffer>();

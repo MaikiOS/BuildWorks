@@ -4,6 +4,8 @@
 
 Connected journal257 to a private Local executor: one exact intent-bound native destruction, registry drain, world save/full absence scan and replay without effects. Normal/QA .248,22+31 targeted assertions, host/localization and two source reviews pass. Prepared12+9 native steps without grants. The owner is playing another profile; no deployment/game/GPU launch, installed .247 unchanged. Full cancellation and v11 remain open. [Report](CHECKPOINT_258.md).
 
+The current matched longwall4 Editor sources additionally compiled with bundled Unity Roslyn without launching Editor/GPU; original ProjectSettings/Editor DLL hashes remained unchanged. Rendering and appearance remain unverified.
+
 ## 2026-10-20 — 257: cleanup journal and matched v11 preparation
 
 Added receipt-bound cleanup intent/next-generation absence/replay guards; uncertain credit and cleanup cannot overlap. StoreTests/117 payout assertions, normal/QA0/0 and independent review passed. No deletion executor or deployment. In parallel, prepared a local matched longwall4 harness; stale Gamma hashes were rejected and a current bundle built. The new GPU probe was stopped before launch because Ostrix was playing another profile. No v11 visual acceptance. [Report](CHECKPOINT_257.md).

@@ -33,4 +33,6 @@ QA-адаптер вызывает тот же runtime, измеряет фак�
 
 Главная визуальная граница v11/дом9.2–9.7 остаётся открытой. Локальный matched longwall4 стенд257 не получил нового GPU-доказательства. Общая отмена, callback/crash/rollback-инъекции, все предметы/хранилища, большие возвраты и remote не проверены. В живом списке сохранены14 разделов и115 ID; технические проверки не добавляют галочки.
 
+Дополнительно проверена компиляция текущего Editor-кода стенда longwall4 без запуска Unity или GPU: штатный Roslyn Unity6000.0.61f1 и существующий response-файл, выходы перенаправлены только в artifacts. Компиляция прошла без сообщений; хеши ProjectSettings и трёх исходных Editor DLL не изменились. Локальное доказательство: `artifacts/checkpoint-258/v11-cpu-compile/verification.json`, `compiler.log`. Это не запуск симуляции или проверка кадров; локальный стенд ещё не включён в source-checkpoint до GPU-проверки.
+
 Локальные доказательства: `BuildWorks/artifacts/checkpoint-258/` — `normal-final.log`, `qa-final.log`, `cleanup-final.log`, `host-final.log`, `localization-final.log`, `verification.json`, source/review manifest. Игровых доказательств258 пока нет.

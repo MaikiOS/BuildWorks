@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.247";
+        internal const string PluginVersion = "0.19.248";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -1340,7 +1340,12 @@ namespace OstrixMods.BuildWorks
         { private static bool Prefix(GameObject __0) => !__0 || !BlueprintConstructionPayoutSeal.IsHeld(__0.GetComponent<ItemDrop>()); }
         [HarmonyPatch(typeof(ZDOMan), nameof(ZDOMan.DestroyZDO), new Type[] { typeof(ZDO) })]
         private static class BlueprintPayoutNetworkDestroyPatch
-        { private static bool Prefix(ZDO __0) => !BlueprintConstructionPayoutSeal.IsHeld(__0); }
+        {
+            private static bool Prefix(ZDO __0, out BlueprintConstructionPayoutCleanup.Witness __state) =>
+                BlueprintConstructionPayoutCleanup.AllowNetwork(__0, out __state);
+            private static Exception Finalizer(BlueprintConstructionPayoutCleanup.Witness __state, Exception __exception)
+            { BlueprintConstructionPayoutCleanup.ConfirmNetwork(__state, __exception); return __exception; }
+        }
 
         [HarmonyPatch(typeof(Player), "TakeInput")]
         private static class PrecisionEditorPlayerInputPatch

@@ -2,7 +2,7 @@
 
 2026-10-20. QA **0.19.247** remains installed. Bounded native credit256 passed45/45:59→67Wood, four permanent receipts, reload/replay without recredit. Existing tombstone items were recovered without grants; QA-world PassiveMobs persists. Old sources remain sealed; full paid cancellation, v11/house appearance, broader corpus and networking remain open.
 
-Source257 adds a CPU-checked cleanup journal:117 payout assertions, full StoreTests and normal/QA builds pass; native deletion is not connected. The new v11 GPU probe was stopped before launch because the owner was playing. [Scope](CHECKPOINT_257.md).
+Candidate **.248/258** connects cleanup to journal257: normal/QA builds0/0,22 native-call guard and31 state-machine assertions, host/localization and independent source reviews pass. It is not installed and native deletion has not run while Ostrix plays another profile. No new v11 GPU run. [Scope](CHECKPOINT_258.md).
 
 Requirements/current task: [owner checklist](LIVE_CHECKLIST_RU.md). Technical evidence/causes: [WORK_STATUS](WORK_STATUS_RU.md). History: [journal](DEVELOPMENT_JOURNAL.md). [Document rules](PROGRESS_RULES.md).
 

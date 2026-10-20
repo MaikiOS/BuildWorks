@@ -18,6 +18,36 @@ namespace OstrixMods.BuildWorks
         private static BlueprintForeignPartData payoutInventory;
         public static bool PayoutFinished => BuildWorksPlugin.QaConstructionProjects?.Payout?.Finished == true;
         public static bool CollectionFinished => BuildWorksPlugin.QaConstructionProjects?.Collection?.Finished == true;
+        public static bool CleanupFinished => BuildWorksPlugin.QaConstructionProjects?.Cleanup?.Finished == true;
+        public static string BeginCleanup(int index)
+        {
+            var player = BuildWorksTestIsolation.RequireLoadedSession(); var runtime = BuildWorksPlugin.QaConstructionProjects;
+            if (payoutTarget == Guid.Empty || !runtime.Open(runtime.Board(payoutTarget), player))
+                throw new InvalidOperationException("Select the retained debt and approach its own board with the hammer.");
+            runtime.BeginCleanup(payoutTarget, index); return CleanupStatus();
+        }
+        public static string CleanupStatus()
+        {
+            BuildWorksTestIsolation.RequireLoadedSession(); var runtime = BuildWorksPlugin.QaConstructionProjects;
+            var plans = (Store)AccessTools.Field(typeof(BlueprintConstructionProjectRuntime), "store").GetValue(runtime);
+            var payout = new BlueprintConstructionPayoutJournal(plans).Read(payoutTarget);
+            if (payout == null) throw new InvalidOperationException("Select an issued retained debt first.");
+            var active = runtime.Cleanup;
+            bool unchanged = BlueprintStorageCapture.TrySnapshotInventory(Player.m_localPlayer.GetInventory(), out var inventory) &&
+                inventory.Info == payoutInventory?.Info && inventory.Zdo == payoutInventory?.Zdo;
+            int sources = UnityEngine.Object.FindObjectsByType<ItemDrop>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                .Count(drop => payout.Items.Any(e => drop.GetComponent<ZNetView>()?.GetZDO()?.GetString(BlueprintConstructionPayoutSeal.MarkerKey, "") == e.Id.ToString("N")));
+            return JsonUtility.ToJson(new CleanupReceipt { credit = JsonUtility.FromJson<CollectionReceipt>(CollectionStatus()),
+                cleaned = payout.Collections?.Count(c => c.Removal?.Phase == BlueprintConstructionPayoutJournal.CleanupSaved) ?? 0,
+                pending = payout.Collections?.Count(c => c.Removal?.Phase == BlueprintConstructionPayoutJournal.CleanupIntent) ?? 0,
+                sources = sources, status = active?.Project == payoutTarget ? active.Status : null,
+                reason = active?.Project == payoutTarget ? active.Reason : null, index = active?.Project == payoutTarget ? active.Index : -1,
+                destroyCalls = active?.Project == payoutTarget ? active.DestroyCalls : 0,
+                worldSaveRequests = active?.Project == payoutTarget ? active.WorldSaveRequests : 0,
+                profileSaveRequests = active?.Project == payoutTarget ? active.ProfileSaveRequests : 0, inventoryUnchanged = unchanged });
+        }
+        [Serializable] private sealed class CleanupReceipt
+        { public CollectionReceipt credit; public int cleaned, pending, sources, index, destroyCalls, worldSaveRequests, profileSaveRequests; public string status, reason; public bool inventoryUnchanged; }
         public static string BeginCollection(int index)
         {
             var player = BuildWorksTestIsolation.RequireLoadedSession(); var runtime = BuildWorksPlugin.QaConstructionProjects;
@@ -88,12 +118,15 @@ namespace OstrixMods.BuildWorks
             var player = BuildWorksTestIsolation.RequireLoadedSession(); var runtime = BuildWorksPlugin.QaConstructionProjects;
             var plans = (Store)AccessTools.Field(typeof(BlueprintConstructionProjectRuntime), "store").GetValue(runtime);
             var record = runtime.Read(payoutTarget); var payout = new BlueprintConstructionPayoutJournal(plans).Read(payoutTarget);
-            var loaded = UnityEngine.Object.FindObjectsByType<ItemDrop>(FindObjectsSortMode.None);
+            var loaded = UnityEngine.Object.FindObjectsByType<ItemDrop>(FindObjectsInactive.Include, FindObjectsSortMode.None);
             int count = 0, units = 0; bool exact = true, sealedItems = true;
-            foreach (var entry in payout?.Items ?? Array.Empty<BlueprintConstructionPayoutJournal.Entry>())
+            foreach (var row in (payout?.Items ?? Array.Empty<BlueprintConstructionPayoutJournal.Entry>()).Select((entry, index) => new { entry, index }))
             {
+                var entry = row.entry;
                 var matches = loaded.Where(drop => drop.GetComponent<ZNetView>()?.GetZDO()?.GetString(BlueprintConstructionPayoutSeal.MarkerKey, "") == entry.Id.ToString("N")).ToArray();
                 count += matches.Length;
+                if (payout.Collections?.ElementAtOrDefault(row.index)?.Removal?.Phase == BlueprintConstructionPayoutJournal.CleanupSaved)
+                { exact &= matches.Length == 0; sealedItems &= matches.Length == 0; continue; }
                 if (matches.Length != 1) { exact = false; sealedItems = false; continue; }
                 var drop = matches[0]; var data = drop.GetComponent<ZNetView>().GetZDO(); units += drop.m_itemData.m_stack;
                 exact &= data.Persistent && data.GetLong(BlueprintConstructionPayoutSeal.OwnerKey, 0) == player.GetPlayerID() &&
@@ -116,10 +149,13 @@ namespace OstrixMods.BuildWorks
             var plans = (Store)AccessTools.Field(typeof(BlueprintConstructionProjectRuntime), "store").GetValue(runtime);
             var record = new BlueprintConstructionPayoutJournal(plans).Read(payoutTarget);
             if (record?.Phase != BlueprintConstructionPayoutJournal.IssuedSaved) throw new InvalidOperationException("Saved sealed issuance is required before guards.");
-            foreach (var entry in record.Items)
+            foreach (var row in record.Items.Select((entry, index) => new { entry, index }))
             {
-                var matches = UnityEngine.Object.FindObjectsByType<ItemDrop>(FindObjectsSortMode.None).Where(drop =>
+                var entry = row.entry;
+                var matches = UnityEngine.Object.FindObjectsByType<ItemDrop>(FindObjectsInactive.Include, FindObjectsSortMode.None).Where(drop =>
                     drop.GetComponent<ZNetView>()?.GetZDO()?.GetString(BlueprintConstructionPayoutSeal.MarkerKey, "") == entry.Id.ToString("N")).ToArray();
+                if (record.Collections?.ElementAtOrDefault(row.index)?.Removal?.Phase == BlueprintConstructionPayoutJournal.CleanupSaved)
+                { if (matches.Length != 0) throw new InvalidOperationException("A saved cleanup source is loaded again."); continue; }
                 if (matches.Length != 1) throw new InvalidOperationException("Payout identity is not unique and loaded.");
                 var drop = matches[0]; var data = drop.GetComponent<ZNetView>().GetZDO(); var uid = data.m_uid;
                 if (drop.CanPickup(false) || drop.RemoveOne()) throw new InvalidOperationException("Native pickup/consume gate allowed sealed custody.");

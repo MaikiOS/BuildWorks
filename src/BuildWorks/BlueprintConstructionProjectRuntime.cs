@@ -23,6 +23,7 @@ namespace OstrixMods.BuildWorks
         private BlueprintConstructionCancellationRemoval removal;
         private BlueprintConstructionPayoutIssuance payout;
         private BlueprintConstructionPayoutCollection collection;
+        private BlueprintConstructionPayoutCleanup cleanup;
         private Guid queued;
         private int queuedFrame;
         private bool recoveryOnly;
@@ -38,11 +39,12 @@ namespace OstrixMods.BuildWorks
         internal BlueprintConstructionCancellationRemoval Removal => removal;
         internal BlueprintConstructionPayoutIssuance Payout => payout;
         internal BlueprintConstructionPayoutCollection Collection => collection;
+        internal BlueprintConstructionPayoutCleanup Cleanup => cleanup;
         internal int BoardCount => boards.Count;
         internal long World => world;
         internal string Failure { get; private set; }
         internal BlueprintConstructionProjectBoard OpenBoard { get; private set; }
-        private bool PayoutBusy => payout != null && !payout.Finished || collection != null && !collection.Finished;
+        private bool PayoutBusy => payout != null && !payout.Finished || collection != null && !collection.Finished || cleanup != null && !cleanup.Finished;
         internal bool BlocksInput => view.IsOpen || execution?.Saving == true || removal != null && !removal.Finished || PayoutBusy;
         internal static bool IsPrivateLocalPlacement => ZNet.instance && Player.m_localPlayer && Game.instance &&
             !Game.instance.IsShuttingDown() && ZNet.instance.IsServer() && !ZNet.instance.IsDedicated() &&
@@ -59,10 +61,11 @@ namespace OstrixMods.BuildWorks
             if (disposed) return;
             ZNet current = ZNet.instance; long uid = WorldId(current);
             if (network != current || uid != world) { Suspend(); network = current; world = uid; }
-            if (!Allowed()) { execution?.Refuse("Construction context closed; evidence retained."); removal?.Refuse("Construction context closed; removal evidence retained."); payout?.Refuse("Construction context closed; payout evidence retained."); collection?.Refuse("Construction context closed; credit evidence retained."); execution = null; queued = Guid.Empty; ClearBoards(); store = null; return; }
+            if (!Allowed()) { execution?.Refuse("Construction context closed; evidence retained."); removal?.Refuse("Construction context closed; removal evidence retained."); payout?.Refuse("Construction context closed; payout evidence retained."); collection?.Refuse("Construction context closed; credit evidence retained."); cleanup?.Refuse("Construction context closed; cleanup evidence retained."); execution = null; queued = Guid.Empty; ClearBoards(); store = null; return; }
             removal?.Tick();
             payout?.Tick();
             collection?.Tick();
+            cleanup?.Tick();
             if (execution != null && !execution.Finished)
             {
                 execution.Tick();
@@ -203,6 +206,17 @@ namespace OstrixMods.BuildWorks
             Close(); collection = next;
         }
 
+        internal void BeginCleanup(Guid id, int index)
+        {
+            RequireContext();
+            if (!IsPrivateLocalPlacement || !OpenBoard || OpenBoard.Id != id || !HasHammer(Player.m_localPlayer) ||
+                Vector3.Distance(Player.m_localPlayer.transform.position, OpenBoard.transform.position) > 5 || queued != Guid.Empty ||
+                PayoutBusy || execution != null && !execution.Finished || removal != null && !removal.Finished)
+                throw new InvalidOperationException(BuildWorksLocalization.Text("project.unavailable"));
+            var next = new BlueprintConstructionPayoutCleanup(store, id, index);
+            Close(); cleanup = next;
+        }
+
         internal void CancelUnpaid(Guid id, long revision, Guid operation)
         {
             RequireContext();
@@ -277,7 +291,7 @@ namespace OstrixMods.BuildWorks
             catch (Exception error) { log?.Invoke(error); }
         }
         internal void Suspend()
-        { execution?.Refuse("Construction suspended; evidence retained."); removal?.Refuse("Construction suspended; removal evidence retained."); payout?.Refuse("Construction suspended; payout evidence retained."); collection?.Refuse("Construction suspended; credit evidence retained."); collection = null; payout = null; removal = null; execution = null; queued = Guid.Empty;
+        { execution?.Refuse("Construction suspended; evidence retained."); removal?.Refuse("Construction suspended; removal evidence retained."); payout?.Refuse("Construction suspended; payout evidence retained."); collection?.Refuse("Construction suspended; credit evidence retained."); cleanup?.Refuse("Construction suspended; cleanup evidence retained."); cleanup = null; collection = null; payout = null; removal = null; execution = null; queued = Guid.Empty;
             ClearBoards(); store = null; network = null; world = 0; failed = false; Failure = null; }
         public void Dispose() { if (disposed) return; Suspend(); disposed = true; }
     }

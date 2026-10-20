@@ -175,6 +175,7 @@ namespace OstrixMods.BuildWorks
 
         private Plan.Record ActivePlan(Guid project, Guid part)
         {
+            BlueprintConstructionCancellationJournal.RequireNotStarted(plans, project);
             var plan = plans.Load(project);
             if (plan.Cancelled || !plan.Parts.Any(p => p.Id == part)) throw new InvalidOperationException("Project/part is not active.");
             return plan;
@@ -323,6 +324,7 @@ namespace OstrixMods.BuildWorks
                 return output.ToArray();
             }
         }
+        internal static string Fingerprint(Record record) => Digest(Encode(record));
         private static byte[] Encode(Record record)
         {
             using (var stream = new MemoryStream())

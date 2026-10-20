@@ -100,6 +100,7 @@ namespace OstrixMods.BuildWorks
                     throw new InvalidOperationException("Project was already cancelled by another operation.");
                 }
                 if (current.Revision != expectedRevision) throw new InvalidOperationException("Project revision changed.");
+                BlueprintConstructionCancellationJournal.RequireNotStarted(this, id);
                 if (BlueprintConstructionPartJournal.HasExecutionEvidence(this, current))
                     throw new InvalidOperationException("Project has construction execution evidence; unpaid cancellation is refused.");
                 var cancelled = new Record(id, world, 2, operation, current.RootPose, current.BlueprintBytes, current.Parts.ToArray());

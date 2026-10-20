@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.242";
+        internal const string PluginVersion = "0.19.243";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -1268,6 +1268,23 @@ namespace OstrixMods.BuildWorks
                 PrecisionPlacementSession.ConfirmRollbackNetworkRemoval(__0, __state, __exception);
                 return __exception;
             }
+        }
+
+        [HarmonyPatch(typeof(WearNTear), "Destroy", new Type[] { typeof(HitData), typeof(bool) })]
+        private static class BlueprintCancellationRemovalPatch
+        {
+            private static void Prefix(WearNTear __instance, bool __1, out BlueprintConstructionCancellationRemoval.Witness __state) =>
+                __state = BlueprintConstructionCancellationRemoval.CaptureWear(__instance, __1);
+            private static Exception Finalizer(bool __1, BlueprintConstructionCancellationRemoval.Witness __state, Exception __exception)
+            { BlueprintConstructionCancellationRemoval.ConfirmWear(__state, __1, __exception); return __exception; }
+        }
+        [HarmonyPatch(typeof(ZDOMan), nameof(ZDOMan.DestroyZDO), new Type[] { typeof(ZDO) })]
+        private static class BlueprintCancellationNetworkRemovalPatch
+        {
+            private static void Prefix(ZDO __0, out BlueprintConstructionCancellationRemoval.Witness __state) =>
+                __state = BlueprintConstructionCancellationRemoval.CaptureNetwork(__0);
+            private static Exception Finalizer(BlueprintConstructionCancellationRemoval.Witness __state, Exception __exception)
+            { BlueprintConstructionCancellationRemoval.ConfirmNetwork(__state, __exception); return __exception; }
         }
 
         [HarmonyPatch(typeof(Player), "TakeInput")]

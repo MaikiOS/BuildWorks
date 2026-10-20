@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-20 — 251: removal before restitution
+
+**QA .243 installed, checkpoint251:** controlled removal of committed structural parts now precedes restitution. Prepared → RemovalIntent → RemovedSaved is durable, freezes construction and binds absence to the next world-save generation. 50 focused checks, full Store/Geometry and normal/QA builds pass. Native Valheim:17 paid/removal steps plus2 reload steps; generation160→161, exact removal inventory unchanged and no new native drops. Explicit Prepared resume after world reload also reached157→158; its drop observer failed because it compared network IDs across reload. Both harness failures are retained. Payout/pickup, ambiguous RemovalIntent recovery, secondary collapse, product UI and networking remain open. Two owned QA projects retain receipts for8Wood owed by the future restitution protocol; nothing was issued. Normal quit/bridge3/3 restored. [Evidence](CHECKPOINT_251.md).
+
 ## 2026-10-20 — 250: working QA .242 GPU residency
 
 **QA .242 installed, checkpoint250:** plain QA now uses the measured256MiB GPU budget without a candidate property. Native Valheim:resident32/VelocityUpload=null,prepare12/12,recorded72/72 with520/520frames,35.88FPS/52.37s,26windows34–36FPS,fog queue1–2/velocity CPU-copy0. Contact24/24:9parts/108160exact inner texels,all28 recovered. Max145.07ms coincides with the first synchronous reference capture; causality/perfect smoothness unproved. Builds/contracts/Geometry/localization1122/isolation pass. Normal quit/bridge3/3; .242 stays installed. Normal/ordinary Editor retain98,304,000bytes; shader/costs unchanged. v11 appearance,public GPU budget,heavy blueprints,paid cancellation/network remain open. [Evidence](CHECKPOINT_250.md).

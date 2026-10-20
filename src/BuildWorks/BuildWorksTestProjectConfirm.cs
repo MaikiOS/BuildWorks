@@ -2,6 +2,7 @@
 using System;
 using System.Linq;
 using HarmonyLib;
+using OstrixMods.BuildWorks.Geometry;
 using UnityEngine;
 using Store = OstrixMods.BuildWorks.BlueprintConstructionProjectStore;
 
@@ -11,6 +12,56 @@ namespace OstrixMods.BuildWorks
     {
         private static Guid created;
         private static Vector3 createdRoot;
+        private static BlueprintForeignPartData removalInventory;
+        private static string[] removalDrops;
+        public static bool RemovalFinished => BuildWorksPlugin.QaConstructionProjects?.Removal?.Finished == true;
+        public static string PrepareRemoval()
+        {
+            var player = BuildWorksTestIsolation.RequireLoadedSession(); var runtime = BuildWorksPlugin.QaConstructionProjects;
+            if (created == Guid.Empty || runtime.Read(created).Blueprint.id != "cc552d6270924447b3ebf51e66e09a5b" ||
+                runtime.Progress(created).Built != 2 || runtime.Execution?.Status != "committed" ||
+                !BlueprintStorageCapture.TrySnapshotInventory(player.GetInventory(), out removalInventory))
+                throw new InvalidOperationException("Removal fixture must be this process's own completed two-wall ordinary paid project.");
+            removalDrops = DropIdentities();
+            var plans = (Store)AccessTools.Field(typeof(BlueprintConstructionProjectRuntime), "store").GetValue(runtime);
+            new BlueprintConstructionCancellationJournal(plans).Prepare(created, runtime.Read(created).Revision, Guid.NewGuid(), player.GetPlayerID());
+            return RemovalStatus();
+        }
+        public static string BeginRemoval()
+        {
+            var player = BuildWorksTestIsolation.RequireLoadedSession(); var runtime = BuildWorksPlugin.QaConstructionProjects;
+            if (created == Guid.Empty || removalInventory == null) throw new InvalidOperationException("Prepare this process's owned removal fixture first.");
+            if (!runtime.Open(runtime.Board(created), player)) throw new InvalidOperationException("Own removal fixture board could not open.");
+            runtime.ResumePreparedRemoval(created, runtime.Read(created).Revision);
+            return RemovalStatus();
+        }
+        public static string RemovalStatus()
+        {
+            var player = BuildWorksTestIsolation.RequireLoadedSession(); var runtime = BuildWorksPlugin.QaConstructionProjects;
+            var plans = (Store)AccessTools.Field(typeof(BlueprintConstructionProjectRuntime), "store").GetValue(runtime);
+            var record = runtime.Read(created); var removal = new BlueprintConstructionCancellationJournal(plans).Read(created);
+            var rows = record.Parts.Select(part => runtime.ReadPart(created, part.Id)).ToArray();
+            bool inventoryUnchanged = removalInventory != null && BlueprintStorageCapture.TrySnapshotInventory(player.GetInventory(), out var current) &&
+                current.Info == removalInventory.Info && current.Zdo == removalInventory.Zdo;
+            return JsonUtility.ToJson(new RemovalReceipt { id = created.ToString("N"), status = runtime.Removal?.Status,
+                reason = runtime.Removal?.Reason, phase = removal?.Phase ?? 0, beforeGeneration = removal?.BeforeGeneration ?? 0,
+                savedGeneration = removal?.Saved?.Generation ?? 0, inventoryUnchanged = inventoryUnchanged,
+                dropsUnchanged = removalDrops != null && removalDrops.SequenceEqual(DropIdentities()),
+                paid = rows.Where(row => row != null).Sum(row => row.Paid.Sum(item => item.Paid)),
+                nativeAbsent = rows.All(row => row?.Phase == BlueprintConstructionPartJournal.Committed &&
+                    !BlueprintConstructionPartExecution.FindMarked(row.Operation, "woodwall")),
+                cancelled = record.Cancelled, board = runtime.Board(created), blocked = runtime.BlocksInput });
+        }
+        private static string[] DropIdentities() => UnityEngine.Object.FindObjectsByType<ItemDrop>(FindObjectsSortMode.None)
+            .Select(drop => drop.GetComponent<ZNetView>()).Where(view => view && view.IsValid())
+            .Select(view => view.GetZDO().m_uid.ToString()).OrderBy(id => id, StringComparer.Ordinal).ToArray();
+        [Serializable] private sealed class RemovalReceipt
+        {
+            public string id, status, reason;
+            public int phase, paid;
+            public uint beforeGeneration, savedGeneration;
+            public bool inventoryUnchanged, dropsUnchanged, nativeAbsent, cancelled, board, blocked;
+        }
         public static string Prepare(int site)
         {
             var player = BuildWorksTestIsolation.RequireLoadedSession();

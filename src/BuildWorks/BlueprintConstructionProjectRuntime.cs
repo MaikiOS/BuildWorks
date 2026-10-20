@@ -20,6 +20,7 @@ namespace OstrixMods.BuildWorks
         private readonly BlueprintConstructionProjectView view = new BlueprintConstructionProjectView();
         private bool failed, disposed;
         private BlueprintConstructionPartExecution execution;
+        private BlueprintConstructionCancellationRemoval removal;
         private Guid queued;
         private int queuedFrame;
         private bool recoveryOnly;
@@ -32,11 +33,12 @@ namespace OstrixMods.BuildWorks
         internal BlueprintConstructionProjectFog Fog => fog;
         internal string FogError(Guid id) => fog ? fog.Error(id) : null;
         internal BlueprintConstructionPartExecution Execution => execution;
+        internal BlueprintConstructionCancellationRemoval Removal => removal;
         internal int BoardCount => boards.Count;
         internal long World => world;
         internal string Failure { get; private set; }
         internal BlueprintConstructionProjectBoard OpenBoard { get; private set; }
-        internal bool BlocksInput => view.IsOpen || execution?.Saving == true;
+        internal bool BlocksInput => view.IsOpen || execution?.Saving == true || removal != null && !removal.Finished;
         internal static bool IsPrivateLocalPlacement => ZNet.instance && Player.m_localPlayer && Game.instance &&
             !Game.instance.IsShuttingDown() && ZNet.instance.IsServer() && !ZNet.instance.IsDedicated() &&
             !ZNet.IsOpenServer() && ZNet.instance.GetPeers().Count == 0 && ZNet.instance.LocalPlayerIsAdminOrHost() &&
@@ -52,7 +54,8 @@ namespace OstrixMods.BuildWorks
             if (disposed) return;
             ZNet current = ZNet.instance; long uid = WorldId(current);
             if (network != current || uid != world) { Suspend(); network = current; world = uid; }
-            if (!Allowed()) { execution?.Refuse("Construction context closed; evidence retained."); execution = null; queued = Guid.Empty; ClearBoards(); store = null; return; }
+            if (!Allowed()) { execution?.Refuse("Construction context closed; evidence retained."); removal?.Refuse("Construction context closed; removal evidence retained."); execution = null; queued = Guid.Empty; ClearBoards(); store = null; return; }
+            removal?.Tick();
             if (execution != null && !execution.Finished)
             {
                 execution.Tick();
@@ -122,6 +125,7 @@ namespace OstrixMods.BuildWorks
         }
         private Store.Part NextPart(Guid id)
         {
+            BlueprintConstructionCancellationJournal.RequireNotStarted(store, id);
             var plan = Read(id); if (plan.Cancelled) throw new InvalidOperationException("Construction project was cancelled.");
             if (Progress(id).NeedsReview) throw new InvalidOperationException(BuildWorksLocalization.Text("project.review"));
             return plan.Parts.FirstOrDefault(part => ReadPart(id, part.Id)?.Phase != BlueprintConstructionPartJournal.Committed);
@@ -139,6 +143,7 @@ namespace OstrixMods.BuildWorks
         internal void RecoverKnownObject(Guid project, Guid part, Guid operation)
         {
             RequireContext();
+            BlueprintConstructionCancellationJournal.RequireNotStarted(store, project);
             if (!OpenBoard || OpenBoard.Id != project || queued != Guid.Empty || execution != null && !execution.Finished ||
                 !HasHammer(Player.m_localPlayer) ||
                 Vector3.Distance(Player.m_localPlayer.transform.position, OpenBoard.transform.position) > 5)
@@ -147,6 +152,25 @@ namespace OstrixMods.BuildWorks
             execution = new BlueprintConstructionPartExecution(store, project, part, operation);
         }
         internal BlueprintConstructionProjectBoard Board(Guid id) => boards.TryGetValue(id, out var board) ? board : null;
+
+        // Internal operator path until the durable restitution protocol can complete paid cancellation.
+        internal void ResumePreparedRemoval(Guid id, long revision)
+        {
+            RequireContext();
+            var pending = new BlueprintConstructionCancellationJournal(store).Read(id);
+            if (pending?.Phase != BlueprintConstructionCancellationJournal.Prepared || pending.PlanRevision != revision ||
+                pending.Player != Player.m_localPlayer.GetPlayerID()) throw new InvalidOperationException("Only the same player's prepared cancellation can resume.");
+            BeginPaidRemoval(id, revision, pending.Operation);
+        }
+        internal void BeginPaidRemoval(Guid id, long revision, Guid operation)
+        {
+            RequireContext();
+            if (!IsPrivateLocalPlacement || !OpenBoard || OpenBoard.Id != id || !HasHammer(Player.m_localPlayer) ||
+                Vector3.Distance(Player.m_localPlayer.transform.position, OpenBoard.transform.position) > 5 || queued != Guid.Empty ||
+                execution != null && !execution.Finished || removal != null && !removal.Finished)
+                throw new InvalidOperationException(BuildWorksLocalization.Text("project.unavailable"));
+            Close(); removal = new BlueprintConstructionCancellationRemoval(store, id, revision, operation);
+        }
 
         internal void CancelUnpaid(Guid id, long revision, Guid operation)
         {
@@ -221,7 +245,7 @@ namespace OstrixMods.BuildWorks
             catch (Exception error) { log?.Invoke(error); }
         }
         internal void Suspend()
-        { execution?.Refuse("Construction suspended; evidence retained."); execution = null; queued = Guid.Empty;
+        { execution?.Refuse("Construction suspended; evidence retained."); removal?.Refuse("Construction suspended; removal evidence retained."); removal = null; execution = null; queued = Guid.Empty;
             ClearBoards(); store = null; network = null; world = 0; failed = false; Failure = null; }
         public void Dispose() { if (disposed) return; Suspend(); disposed = true; }
     }

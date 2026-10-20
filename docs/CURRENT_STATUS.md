@@ -1,5 +1,7 @@
 # Current BuildWorks status
 
+**Checkpoint245, QA .241:** native house without continuous capture FAILED:25/26 in35.4s; queue64 keeps growing after the route. Contact proven:9 parts/209600 exact inner texels; full recovery not proven in this run. Observer serialization fixed separately: native32/32,1810 frames/50.23s without a house. Inventory unchanged, own unpaid fixture closed,3 bridge DLLs restored. Goal active; game DLL unchanged. Next: stage counters for backlog/paging/receipts, then fix the measured cause. [Evidence](CHECKPOINT_245.md).
+
 **Native check244, installed .241:** real Forest Hut28: preparation6/6, unrecorded route14/14, contact snapshot/two sparse images24/24.12 active contact parts/354624 exact inner texels; all28 recovered to zero. Inventory unchanged; own unpaid fixture closed, normal exit/bridge3/3. Continuous capture,48s low cadence and visual acceptance remain open. Final Goal API read returned **paused**; agent did not change it, resume through the UI. [Evidence](CHECKPOINT_244.md).
 
 **Diagnostics242–243; game .241:** both candidates still overflowed queue64 (21.28s/22.78s); a fresh old-path control failed at38.70s. Exact checks passed; no speedup established. Two GPU timestamp probes returned only zeros and were stopped. Experiments are archived; working code restored to710bcb6. No deployment, Valheim run or save changes. Next: native house state/recovery with sparse images, separating continuous capture cost;48s/visual acceptance remain open. [Evidence](CHECKPOINT_243.md).

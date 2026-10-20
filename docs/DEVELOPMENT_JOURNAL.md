@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-20 —245: native backlog and observer repair
+
+**Checkpoint245, QA .241:** native house without continuous capture FAILED:25/26 in35.4s; queue64 keeps growing after the route. Contact proven:9 parts/209600 exact inner texels; full recovery not proven in this run. Observer serialization fixed separately: native32/32,1810 frames/50.23s without a house. Inventory unchanged, own unpaid fixture closed,3 bridge DLLs restored. Goal active; game DLL unchanged. Next: stage counters for backlog/paging/receipts, then fix the measured cause. [Evidence](CHECKPOINT_245.md).
+
 ## 2026-10-19 —244: native house with sparse capture
 
 **Native check244, installed .241:** real Forest Hut28: preparation6/6, unrecorded route14/14, contact snapshot/two sparse images24/24.12 active contact parts/354624 exact inner texels; all28 recovered to zero. Inventory unchanged; own unpaid fixture closed, normal exit/bridge3/3. Continuous capture,48s low cadence and visual acceptance remain open. Final Goal API read returned **paused**; agent did not change it, resume through the UI. [Evidence](CHECKPOINT_244.md).

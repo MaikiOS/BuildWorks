@@ -12,7 +12,8 @@ namespace OstrixMods.BuildWorks
 #if BUILDWORKS_FOG_GPU_RESIDENT_CANDIDATE && !(UNITY_EDITOR || BUILDWORKS_TEST_STAND)
 #error GPU residency candidate requires an explicit editor or QA build.
 #endif
-#if BUILDWORKS_FOG_GPU_RESIDENT_CANDIDATE
+#if BUILDWORKS_TEST_STAND || BUILDWORKS_FOG_GPU_RESIDENT_CANDIDATE
+        // Native QA house keeps its velocity history on GPU; the ordinary build budget is unchanged.
         internal const long MaximumFieldBytes = 256L * 1024 * 1024;
 #else
         internal const long MaximumFieldBytes = 98304000;

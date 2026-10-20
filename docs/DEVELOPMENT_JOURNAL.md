@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-20 — 250: working QA .242 GPU residency
+
+**QA .242 installed, checkpoint250:** plain QA now uses the measured256MiB GPU budget without a candidate property. Native Valheim:resident32/VelocityUpload=null,prepare12/12,recorded72/72 with520/520frames,35.88FPS/52.37s,26windows34–36FPS,fog queue1–2/velocity CPU-copy0. Contact24/24:9parts/108160exact inner texels,all28 recovered. Max145.07ms coincides with the first synchronous reference capture; causality/perfect smoothness unproved. Builds/contracts/Geometry/localization1122/isolation pass. Normal quit/bridge3/3; .242 stays installed. Normal/ordinary Editor retain98,304,000bytes; shader/costs unchanged. v11 appearance,public GPU budget,heavy blueprints,paid cancellation/network remain open. [Evidence](CHECKPOINT_250.md).
+
 ## 2026-10-20 — 249: full bounded async native house recording
 
 **Checkpoint 249, QA .241:** bounded async recording of the native GPU house passed: 520/520 PNGs over 51.90 s; independent 1,881-frame/52.28-s cadence at35.96 FPS, all26 windows35.5–36.5 FPS. Fog queue1–2, velocity CPU-copy0; max frame interval76.98 ms remains a limit. Contact24/24:9 parts/105,344 exact inner texels, all28 parts recovered. Pixels/early Stop/delayed worker destroy/two unfinished readbacks:5/7/8/8 checks. Earlier failures retained. Normal quit, bridge3/3 and actual installed bytes restored;4,137 ordinary-save paths/sizes/mtimes unchanged. This verifies the recorder workload/capped cadence, not v11 appearance, complete house readiness or paid cancellation. Next: working QA GPU budget/reference comparison, then paid cancellation/refund. [Evidence](CHECKPOINT_249.md).

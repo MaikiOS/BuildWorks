@@ -1,5 +1,7 @@
 # Current BuildWorks status
 
+**Checkpoint248, QA .241:** bounded GPU candidate tested in the real28-part house:1859frames/51.61s/36FPS, queue0→2, zero velocity CPU copies. Contact24/24:12parts/288256 exact texels; all28 recovered.264-frame/51.78s recording saved, but cadence FAILED:25.38FPS/min2s24.5; synchronous capture70.28ms. No queue overflow. Own project closed, inventory unchanged, bridge3/3; ordinary QA .241 restored. House/animation not accepted. Next: remove synchronous recorder stalls and rerun the affected gate. [Evidence](CHECKPOINT_248.md).
+
 **Checkpoint247, QA .241:** an isolated256MiB candidate passed168 exact field/ledger and6750 scalar comparisons plus38 lifecycle checks.28 owners were allocated but only3 advanced, not a whole house. Velocity CPU-copy:3.33GB paged versus0 resident;675/675 receipts per path. Normal/plain QA retain94MiB; ordinary Editor restored. Installed DLL unchanged. Next:48s native house; house speed/appearance remain unproven. [Evidence](CHECKPOINT_247.md).
 
 **Checkpoint246, QA .241:** real stationary house measured:27/27 in18.5s, queue5→35.18.37s copied9.04GB velocity; CPU CallbackCopy3.69s/Upload1.37s. Four valid snapshots; GPU duration unknown.637frames/34.716FPS is short evidence, not48s stability. Own projects closed, inventory unchanged, bridge3/3. Next: compare bounded GPU-resident storage first; direct native readback remains a paging fallback. House unfixed; game DLL unchanged, goal active. [Evidence](CHECKPOINT_246.md).

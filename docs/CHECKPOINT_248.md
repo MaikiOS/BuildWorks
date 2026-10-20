@@ -1,0 +1,17 @@
+# Checkpoint248 — native house GPU-residency trial
+
+20 October2026. Mixed result, not house/animation acceptance. One standing-authorized background ValheimQA run, only TerrainRamp-1.0-Test/existing BW_QA_43d3719a/cloud=false. Temporary .241 candidate256MiB SHA ADDB8600998F62502155742640F4A448402CCCB3C17B5672AC8757A51F2D9408. Native compiled cap268435456, actual28-owner fields209948980B/render111130320B; shader/history/queue64 unchanged.
+
+Preparation9/9 with two retained HarmonyX missing optional backpack-API warnings. Stationary idle49/49 and strict cadence PASS:1859 consecutive frames/51.6139s/35.998FPS,25 two-second windows36–36.5FPS,max frame38.54ms. Queue0/2/2/2,zero velocity CPU transfers. All snapshots valid, no request/rejection/unreadable/submission failures. No GPU-duration claim.
+
+Physical contact24/24:12 active parts,288256 exact published inner texels; after exit all28 smoke/surface pages,nonzero,max and ledger flags zero. One axis/two directions only; not all orientations/scales/heavy libraries. Own project remains nonphysical and inventory unchanged.
+
+Recorded scenario53/53 tool assertions, **separate cadence FAILED**:1320 host frames/51.9673s/25.381FPS, first failing2s window24.5FPS,max126.28ms.264 captured PNGs span51.7788s,228159816B; MP4 preserves actual timestamps rather than claiming requested10Hz. Queue0/2/1/2,zero velocity CPU copies,no queue64. Recorder synchronously performs Camera.Render/ReadPixels/PNG/write/flush on Unity main thread:mean70.28ms/max96.76ms per capture. This CPU wall time may include GPU waits; individual stages and GPU durations unmeasured. Workbench has an experimental AsyncCapture but no drop-in connected ValheimQA recorder was verified.
+
+Own unpaid project closed5/5; inventory exact,4137 regular save-file set/size/mtime unchanged(no content hashes). Only QA saves and own durable cancelled record879d74616aa546bebc3cf2834bd63a6f/lock changed; header/checksum/world/revision2/cancel operation verified. No grants,paid building,terrain/catalog/old-stand changes. Normal logout/Quit,PID32488 gone,bridge3DLL restored with hashes.
+
+Ordinary QA .241 mode restored through guarded deploy,cap98304000,SHA81CE055050890A8DACC8A0B6F3458E38A7271055DE77AA811B2188C2FA814226. This is the saved ordinary QA build artifact, **not byte-identical restoration of previous installed4E1B…**. Candidate disabled; normal cap verified from compiled installed DLL.
+
+Tooling mistakes: initial collector wrongly required zero recovery flags during active contact; corrected using shader bit semantics, while unknown bits and nonzero post-recovery flags remain forbidden. Strict cadence validator unchanged. Redirecting Restore output to its own restore.json caused a file-lock; idempotent rerun without redirect restored3/3. Player.log was sought at the wrong path; actual GABS run-local log retained. None is hidden as a game success.
+
+Local evidence: `../ValheimQA/artifacts/20261020-093655/` verification,five full test reports,eight performance snapshots,both raw cadence histories,contact metrics,recording analysis,house-pass.mp4,selectedPNG,logs,MCP/restore/cap records. Deployment logs and independent read-only review:`artifacts/checkpoint-248/`. Next: remove measured recorder stalls,rerun affected recorded cadence/contact/recovery,then decide production memory policy and continue paid cancellation/refund. House appearance not accepted; paid cancellation/network untested;14 goal blocks retained,Goal API active.

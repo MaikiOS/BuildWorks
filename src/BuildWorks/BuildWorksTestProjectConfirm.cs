@@ -37,7 +37,9 @@ namespace OstrixMods.BuildWorks
                 inventory.Info == payoutInventory?.Info && inventory.Zdo == payoutInventory?.Zdo;
             int sources = UnityEngine.Object.FindObjectsByType<ItemDrop>(FindObjectsInactive.Include, FindObjectsSortMode.None)
                 .Count(drop => payout.Items.Any(e => drop.GetComponent<ZNetView>()?.GetZDO()?.GetString(BlueprintConstructionPayoutSeal.MarkerKey, "") == e.Id.ToString("N")));
-            return JsonUtility.ToJson(new CleanupReceipt { credit = JsonUtility.FromJson<CollectionReceipt>(CollectionStatus()),
+            var credit = JsonUtility.FromJson<CollectionReceipt>(CollectionStatus());
+            return JsonUtility.ToJson(new CleanupReceipt { wood = credit.wood, credits = credit.credits,
+                savedReceipts = credit.savedReceipts, diskRead = credit.diskRead, cancelled = credit.cancelled,
                 cleaned = payout.Collections?.Count(c => c.Removal?.Phase == BlueprintConstructionPayoutJournal.CleanupSaved) ?? 0,
                 pending = payout.Collections?.Count(c => c.Removal?.Phase == BlueprintConstructionPayoutJournal.CleanupIntent) ?? 0,
                 sources = sources, status = active?.Project == payoutTarget ? active.Status : null,
@@ -47,7 +49,7 @@ namespace OstrixMods.BuildWorks
                 profileSaveRequests = active?.Project == payoutTarget ? active.ProfileSaveRequests : 0, inventoryUnchanged = unchanged });
         }
         [Serializable] private sealed class CleanupReceipt
-        { public CollectionReceipt credit; public int cleaned, pending, sources, index, destroyCalls, worldSaveRequests, profileSaveRequests; public string status, reason; public bool inventoryUnchanged; }
+        { public int wood, credits, savedReceipts, cleaned, pending, sources, index, destroyCalls, worldSaveRequests, profileSaveRequests; public string status, reason; public bool diskRead, cancelled, inventoryUnchanged; }
         public static string BeginCollection(int index)
         {
             var player = BuildWorksTestIsolation.RequireLoadedSession(); var runtime = BuildWorksPlugin.QaConstructionProjects;

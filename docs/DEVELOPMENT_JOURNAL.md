@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-20 — 259: first native cleanup and complete matched v11 footage
+
+Installed .249. First old-source cleanup and full application restart/replay passed12+9 steps:67Wood/4receipts, replay0/0/0,76 other project files unchanged. .248 stopped before effects on nested JsonUtility status; .249 flattens QA fields. An early replay stopped at native teleport cooldown; only the readiness precondition was corrected. Full Unity four-section/four-path footage contains1444triples. Single-wall control nearly matches; multi-owner published/sequential composition differs. Explicit laboratory buffer release removes the initial12-allocation warning in corrected single/directions/full runs. Remaining3sources, public cancellation, crash/rollback, native house appearance and network remain open. Game quit normally; bridge and Unity settings restored. [Report](CHECKPOINT_259.md).
+
 ## 2026-10-20 — 258: cleanup executor, no new native execution
 
 Connected journal257 to a private Local executor: one exact intent-bound native destruction, registry drain, world save/full absence scan and replay without effects. Normal/QA .248,22+31 targeted assertions, host/localization and two source reviews pass. Prepared12+9 native steps without grants. The owner is playing another profile; no deployment/game/GPU launch, installed .247 unchanged. Full cancellation and v11 remain open. [Report](CHECKPOINT_258.md).

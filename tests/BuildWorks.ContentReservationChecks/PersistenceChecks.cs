@@ -18,9 +18,7 @@ namespace ReservationChecks
             var writer = package.Writer;
             writer.Write(33); for (int i = 0; i < 4; i++) writer.Write(10f);
             writer.Write(""); writer.Write(0f); writer.Write(Convert.FromBase64String(inventory.Zdo));
-            // Opaque inert tail: identity to native serializer output is tested, not full Player.Load semantics.
-            writer.Write(m_customData.Count);
-            foreach (var pair in m_customData) { writer.Write(pair.Key); writer.Write(pair.Value); }
+            ProfileChecks.WriteEmptyNativeTail(writer, m_customData);
         }
     }
 

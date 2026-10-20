@@ -1,6 +1,6 @@
 # Current BuildWorks status
 
-2026-10-20. Installed QA **0.19.244**, latest native checkpoint252. The module is incomplete: sealed restitution items persist, but collection and paid cancellation are not finished. v11 house appearance, broad corpus coverage and networking remain open.
+2026-10-20. Installed QA **0.19.245** adds saved custom-data evidence for a future collection receipt. Latest in-game checkpoint remains252. Collection and paid cancellation are unfinished; v11 house appearance, corpus coverage and networking remain open.
 
 Requirements/current task: [owner checklist](LIVE_CHECKLIST_RU.md). Technical evidence/causes: [WORK_STATUS](WORK_STATUS_RU.md). History: [journal](DEVELOPMENT_JOURNAL.md). [Document rules](PROGRESS_RULES.md).
 
@@ -17,6 +17,6 @@ Requirements/current task: [owner checklist](LIVE_CHECKLIST_RU.md). Technical ev
 | World selection and heavy chain | Capture/volume foundations and targeted checks | Basic capture accepted; later coordinate/height UX issues reported | Editable volume/gizmos, boundary rules, full loaded-area and performance acceptance |
 | World objects and EarthWorks | No terrain integration dependency | None claimed | Admin-priced nonrecipe objects; EarthWorks is a later separate integration |
 
-Source, automated checks, installation, Valheim state, owner acceptance and host+remote evidence are separate. A narrow result does not complete a broader requirement. Latest report: [252](CHECKPOINT_252.md). The parallel technical branch is checklist 8.7/8.8: controlled receipt of restitution, then terminal paid cancellation. Acceptance of v11/house appearance under 9.2–9.7 remains the primary open gate; numerical/cadence evidence does not replace it.
+Source, automated checks, installation, Valheim state, owner acceptance and host+remote evidence are separate. A narrow result does not complete a broader requirement. Latest change: [253](CHECKPOINT_253.md); latest in-game report: [252](CHECKPOINT_252.md). The parallel technical branch is checklist 8.7/8.8: controlled receipt of restitution, then terminal paid cancellation. Acceptance of v11/house appearance under 9.2–9.7 remains the primary open gate; numerical/cadence evidence does not replace it.
 
-Prior chronology and failures remain in [the historical snapshot](PROGRESS_SNAPSHOT_252_RU.md) and checkpoint reports; [the roadmap](ROADMAP.md) describes future product milestones. This documentation change does not alter the goal mechanism text or installed DLL.
+Prior chronology and failures remain in [the historical snapshot](PROGRESS_SNAPSHOT_252_RU.md) and checkpoint reports; [the roadmap](ROADMAP.md) describes future product milestones. The goal mechanism text is unchanged; .245 installation is separate from in-game verification.

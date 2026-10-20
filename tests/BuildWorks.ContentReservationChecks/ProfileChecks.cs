@@ -21,7 +21,7 @@ namespace ReservationChecks
         internal long GetPlayerID() => Id;
     }
 
-    internal static class ProfileChecks
+    internal static partial class ProfileChecks
     {
         private static int assertions;
         private static void Check(bool value, string reason) { assertions++; if (!value) throw new Exception("Profile: " + reason); }
@@ -91,6 +91,8 @@ namespace ReservationChecks
             Check(frame.Begin() && frame.Transfer.MoveNext() == BlueprintStorageTransfer.Result.Transferred, "transfer setup");
             Check(BlueprintStorageCapture.TrySnapshotInventory(frame.Player.GetInventory(), out var expected), "snapshot setup");
             var fixture = new Fixture(Convert.FromBase64String(expected.Zdo)); byte[] valid = fixture.File();
+            Check(Verify(valid, expected, out var opaque) && opaque.CustomData == null, "opaque tail must not imply an empty verified map");
+            RunTail(expected);
             byte[] currentInventory = Convert.FromBase64String(expected.Zdo); currentInventory[0] = 110;
             var currentExpected = new BlueprintForeignPartData(expected.Format, expected.Info, Convert.ToBase64String(currentInventory), null);
             var currentFixture = new Fixture(currentInventory); currentFixture.Payload[0] = 47;

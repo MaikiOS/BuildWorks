@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-20 — 253: saved profile receipt-map evidence
+
+QA .245 adds immutable saved customData after full Player.Save identity; legacy inventory proof is unchanged.1023 targeted checks, content/Store/Geometry/builds/contracts pass. An existing QA profile was read without changes (empty map); nonempty maps are synthetic. Guarded .245 installation preserved177 protected files; no game launch. This advances8.7, not collection or terminal cancellation. [Evidence and limits](CHECKPOINT_253.md).
+
 ## 2026-10-20 — separate requirements, technical status and history
 
 At Ostrix's request, repeated checkpoint history was removed from LIVE_CHECKLIST/WORK_STATUS. The owner list now follows the exact 14 goal sections with stable subpoint IDs, scoped statuses and a separate manual-acceptance queue. WORK_STATUS holds current evidence, limits, causes and dependencies using the same sections. [Progress rules](PROGRESS_RULES.md) and AGENTS.md define the update workflow; [the old text is archived](PROGRESS_SNAPSHOT_252_RU.md). This changes reporting structure, not scope or feature readiness. Installed QA .244 and the goal mechanism text stay unchanged; no game launch or DLL rebuild. Heading/ID/link checks and independent requirement-preservation review cover the documentation change.

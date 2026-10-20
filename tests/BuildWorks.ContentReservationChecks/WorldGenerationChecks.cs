@@ -17,7 +17,7 @@ namespace ReservationChecks
             using (var memory = new MemoryStream())
             { using (var writer = new BinaryWriter(memory, Encoding.UTF8, true)) write(writer); return memory.ToArray(); }
         }
-        internal static void WriteWorld(TransferChecks.Frame frame, string root, uint generation = 7, int formatVersion = 41, int? chunkVersion = null)
+        internal static void WriteWorld(TransferChecks.Frame frame, string root, uint generation = 7, int formatVersion = 41, int? chunkVersion = null, int? markerKey = null)
         {
             Guid marker = frame.Operation;
             byte[] payload = Bytes(w => { w.Write(formatVersion); w.Write("QA"); w.Write("seed"); w.Write(10); w.Write(1L); w.Write(1); w.Write(true); w.Write(0); w.Write(0); });
@@ -30,7 +30,7 @@ namespace ReservationChecks
                 w.Write((short)(chunkVersion ?? formatVersion)); w.Write(1); w.Write((ushort)(256 | 32 | 64 | 128));
                 w.Write(0f); w.Write(0f); w.Write(0f); w.Write(123);
                 w.Write((byte)1); w.Write(ZDOVars.s_creator); w.Write(100L);
-                w.Write((byte)1); w.Write(BlueprintStorageCapture.TransferMarkerKey); w.Write(marker.ToString("N"));
+                w.Write((byte)1); w.Write(markerKey ?? BlueprintStorageCapture.TransferMarkerKey); w.Write(marker.ToString("N"));
                 w.Write((byte)1); w.Write(ZDOVars.s_items); w.Write(inventory.Length); w.Write(inventory);
             }));
         }
@@ -130,6 +130,7 @@ namespace ReservationChecks
                 Check(binding.TryStart(CancellationToken.None, out _), "Thread fixture start failed"); Wait(binding);
                 Check(binding.TryFinish(out _, out _) && !touchedWorker, "Unity custody callback ran on worker");
                 AbsenceCases(frame, root);
+                CompositeAbsenceCases(frame, root);
                 ExactBlobCases(frame, root);
                 Check(frame.Transfer.TryBeginReturn(out var returned, out string error), error);
                 Check(returned.MoveNext() == BlueprintStorageTransfer.Result.Transferred, "Return fixture failed"); WriteWorld(frame, root);
@@ -168,6 +169,53 @@ namespace ReservationChecks
             Check(!changed.TryFinish(out _, out _), "Changed payout generation accepted."); SaveSystem.Generation--;
             Check(!BlueprintStorageWorldGeneration.TryCaptureBlob(id, 123, 100, ownerKey, ownerKey, blobKey, payload,
                 () => true, out _, out _), "Colliding payout keys accepted.");
+            WriteWorld(frame, root);
+        }
+        private static void CompositeAbsenceCases(TransferChecks.Frame frame, string root)
+        {
+            WriteWorld(frame, root);
+            var parts = new[] { Guid.NewGuid() }; var refunds = new[] { Guid.NewGuid() };
+            Guid operation = Guid.NewGuid(), part = parts[0], refund = refunds[0];
+            var construction = new NativeWorldStorageReadback.AbsenceMarkerSet(BlueprintStorageCapture.TransferMarkerKey, parts);
+            var payout = new NativeWorldStorageReadback.AbsenceMarkerSet(764123, refunds);
+            bool custody = true, touchedWorker = false; int thread = Thread.CurrentThread.ManagedThreadId;
+            bool Capture(out BlueprintStorageWorldGeneration result) => BlueprintStorageWorldGeneration.TryCaptureAbsence(operation,
+                construction, payout, () => { touchedWorker |= Thread.CurrentThread.ManagedThreadId != thread; return custody; }, out result, out _);
+            BlueprintStorageWorldGeneration ReadComposite()
+            {
+                Check(Capture(out var result) && result.TryStart(CancellationToken.None, out _), "Composite capture/start failed");
+                Wait(result); return result;
+            }
+            Check(Capture(out var binding), "Composite capture failed");
+            parts[0] = refunds[0] = frame.Operation;
+            Check(binding.TryStart(CancellationToken.None, out _), "Frozen composite worker did not start"); Wait(binding);
+            Check(binding.TryFinishAbsence(out var proof, out _) && proof.World == 1 && proof.Generation == 7 &&
+                proof.MarkerSets.Count == 2 && proof.MarkerSets[0].Operations[0] == part && proof.MarkerSets[1].Operations[0] == refund &&
+                binding.Operation == operation && !touchedWorker, "Composite proof lost frozen sets/common generation/thread custody");
+            Check(!binding.TryStart(CancellationToken.None, out _), "Composite worker started twice");
+            binding = ReadComposite(); SaveSystem.Generation++;
+            Check(!binding.TryFinishAbsence(out proof, out _) && proof == null, "Composite accepted stale generation"); SaveSystem.Generation--;
+            Check(!binding.TryFinishAbsence(out _, out _), "Refused composite proof resurrected");
+            binding = ReadComposite(); custody = false;
+            Check(!binding.TryFinishAbsence(out proof, out _) && proof == null, "Composite accepted changed custody"); custody = true;
+            binding = ReadComposite(); var worker = binding;
+            Check(!Task.Run(() => worker.TryFinishAbsence(out _, out _)).Result && binding.TryFinishAbsence(out _, out _),
+                "Composite accepted wrong-thread finish or lost valid owner completion");
+            using (var cancel = new CancellationTokenSource())
+            {
+                Check(Capture(out binding) && binding.TryStart(cancel.Token, out _), "Composite cancellable start failed"); Wait(binding);
+                cancel.Cancel(); Check(!binding.TryFinishAbsence(out proof, out _) && proof == null, "Composite accepted cancelled read");
+            }
+            Check(!BlueprintStorageWorldGeneration.TryCaptureAbsence(operation, construction, null, () => true, out _, out _),
+                "Composite host adapter accepted missing payout set");
+            var present = new NativeWorldStorageReadback.AbsenceMarkerSet(764123, new[] { frame.Operation });
+            Check(BlueprintStorageWorldGeneration.TryCaptureAbsence(operation, construction, present, () => true, out binding, out _) &&
+                binding.TryStart(CancellationToken.None, out _), "Composite second marker fixture failed"); Wait(binding);
+            Check(binding.TryFinishAbsence(out _, out _), "Unrelated namespace unexpectedly matched payout GUID");
+            WriteWorld(frame, root, markerKey: 764123);
+            Check(BlueprintStorageWorldGeneration.TryCaptureAbsence(operation, construction, present, () => true, out binding, out _) &&
+                binding.TryStart(CancellationToken.None, out _), "Composite payout-present worker failed"); Wait(binding);
+            Check(!binding.TryFinishAbsence(out proof, out _) && proof == null, "Composite accepted a saved payout marker");
             WriteWorld(frame, root);
         }
         private static void AbsenceCases(TransferChecks.Frame frame, string root)

@@ -1,6 +1,6 @@
 # BuildWorks
 
-**QA .249 installed; checkpoint262:** close fog-house control17/17/5stills passed. New long recording FAILED343/520 from backpressure and remains failed. Gameplay code/shader unchanged; v11 appearance,smoothness and full board cancellation remain open. [Status](docs/CURRENT_STATUS.md) · [Evidence262](docs/CHECKPOINT_262.md).
+**QA .250 installed; checkpoint263:** one-generation construction/refund absence scan added and CPU-tested. Native .249 two-route cadence passed only for simulation: RenderFrames stayed0, so rendered smoothness/v11 remain unproved. Full board cancellation stays open. [Status](docs/CURRENT_STATUS.md) · [Evidence263](docs/CHECKPOINT_263.md).
 
 **Historical checkpoint250, QA .242:** plain QA now uses the measured256MiB GPU budget without a candidate property. Native Valheim:resident32/VelocityUpload=null,prepare12/12,recorded72/72 with520/520frames,35.88FPS/52.37s,26windows34–36FPS,fog queue1–2/velocity CPU-copy0. Contact24/24:9parts/108160exact inner texels,all28 recovered. Max145.07ms coincides with the first synchronous reference capture; causality/perfect smoothness unproved. Builds/contracts/Geometry/localization1122/isolation pass. Normal quit/bridge3/3; .242 stays installed. Normal/ordinary Editor retain98,304,000bytes; shader/costs unchanged. v11 appearance,public GPU budget,heavy blueprints,paid cancellation/network remain open. [Evidence](docs/CHECKPOINT_250.md).
 
@@ -10,7 +10,7 @@ BuildWorks extends Valheim's hammer with precise construction, a blueprint catal
 
 ![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
 
-**Current source:0.19.249; installed isolated QA:0.19.249.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
+**Current source:0.19.250; installed isolated QA:0.19.250.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
 
 Historical [.240](docs/CHECKPOINT_240.md) preserves two failed fog experiments. Memory reuse is **disabled** in normal/QA builds; whole-house fog remains unfixed. No .240 Valheim run.
 

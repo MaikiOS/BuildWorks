@@ -1,5 +1,9 @@
 # Журнал разработки BuildWorks
 
+## 2026-10-20 — 263: общий скан и граница фоновой cadence
+
+Установлена .250: composite absence двух групп за один scan/generation, старые callers прежние. Normal/QA0/0,Geometry597,content generation195,host/localization1122/1008,read-only review PASS. Native .249:два52с прохода/28recovery0/инвентарь прежний;36FPS относится только к simulation,RenderFrames0. Это выявленное ограничение, не доказательство плавности renderer/v11. Старые87файлов/ordinary-save metadata сохранны,normal quit/restore3. Далее render-only observer безPNG и durable terminal; полная отмена/внешний вид/сеть открыты. [Отчёт](CHECKPOINT_263_RU.md).
+
 ## 2026-10-20 — 262: близкий контроль отдельно от неудачной записи
 
 Добавлен ограниченный CaptureAt в существующий внешний QA-helper; build0/0,protocol6/6,3range guards и ownership/3frames подтверждены. Первая попытка остановлена неправильной формой expected failure в batch; вторая длинная запись действительно FAILED backpressure343/520. Отдельный17-step/5still контроль прошёл: Clear-дом/после отмены без широкой полосы, Misty-другой запуск не pixel parity. Все3процесса закрыты/restore3/pins возвращены, старые файлы/инвентарь/ordinary-save metadata прежние. .249/shader не менялись. Далее cadence без PNG-нагрузки/полная запись; v11/terminal/сеть открыты. [Отчёт](CHECKPOINT_262_RU.md).

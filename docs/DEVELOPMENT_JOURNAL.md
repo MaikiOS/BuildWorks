@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-20 — 263: shared scan and background cadence limit
+
+QA .250 installed: composite two-set absence in one scan/generation; legacy callers unchanged. Normal/QA0/0,Geometry597,content generation195,host/localization1122/1008,read-only review PASS. Native .249 two52s routes/28zero recovery/inventory unchanged:36FPS is simulation-only,RenderFrames0; no rendered smoothness/v11 claim.87old files and ordinary-save metadata preserved,normal quit/restore3. Next render-only observer withoutPNG and durable terminal; appearance/full board cancellation/network open. [Report](CHECKPOINT_263.md).
+
 ## 2026-10-20 — 262: close still control separate from recording failure
 
 Bounded CaptureAt added to existing external QA helper; build0/0,protocol6/6,3range guards and ownership/3frames verified. First attempt stopped on unsupported expected-failure batch form; second long capture truly FAILED backpressure343/520. Separate17-step/5still control passes:Clear house/after own cancel without broad band; another Misty run is not pixel parity. All3processes quit/restore3/pins restored; prior files/inventory/ordinary-save metadata preserved. .249/shader unchanged. Native cadence without PNG load/full capture next;v11/terminal/network open. [Report](CHECKPOINT_262.md).

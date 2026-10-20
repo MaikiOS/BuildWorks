@@ -65,6 +65,13 @@ namespace OstrixMods.BuildWorks
             => TryCapture(operation, custodyUnchanged, null, out expectation, out reason,
                 world => new NativeWorldStorageReadback.AbsenceExpectation(world, markerKey, parts));
 
+        internal static bool TryCaptureAbsence(Guid operation, NativeWorldStorageReadback.AbsenceMarkerSet construction,
+            NativeWorldStorageReadback.AbsenceMarkerSet payout, Func<bool> custodyUnchanged,
+            out BlueprintStorageWorldGeneration expectation, out string reason)
+            => TryCapture(operation, custodyUnchanged, null, out expectation, out reason,
+                world => new NativeWorldStorageReadback.AbsenceExpectation(world, construction,
+                    payout ?? throw new ArgumentException("Missing payout absence set.")));
+
         internal static bool TryCaptureBlob(Guid item, int prefab, long payer, int ownerKey, int markerKey, int blobKey, byte[] package, Func<bool> custodyUnchanged,
             out BlueprintStorageWorldGeneration expectation, out string reason)
             => TryCapture(item, custodyUnchanged, world => NativeWorldStorageReadback.Expectation.ForExactBlob(world, item, prefab,

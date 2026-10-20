@@ -65,20 +65,22 @@ namespace OstrixMods.BuildWorks.Geometry
                 using (var hash = SHA256.Create()) InventorySha256 = BitConverter.ToString(hash.ComputeHash(expected.Inventory)).Replace("-", "");
             }
         }
-        public sealed class AbsenceExpectation
+        public sealed class AbsenceMarkerSet
         {
-            public long World { get; }
+            public const int MaximumOperations = 65536;
             public int MarkerKey { get; }
             public IReadOnlyList<Guid> Operations { get; }
             private readonly HashSet<Guid> operations;
-            public AbsenceExpectation(long world, int markerKey, IEnumerable<Guid> operations)
+            public AbsenceMarkerSet(int markerKey, IEnumerable<Guid> operations)
+                : this(markerKey, operations, MaximumOperations) { }
+            internal AbsenceMarkerSet(int markerKey, IEnumerable<Guid> operations, int maximum)
             {
-                if (world == 0 || markerKey == 0 || operations == null) throw new ArgumentException("Missing operation absence context.");
-                Guid[] copy = operations.Take(BlueprintEditorDocument.MaximumParts + 1).ToArray();
+                if (markerKey == 0 || operations == null) throw new ArgumentException("Missing operation absence context.");
+                Guid[] copy = operations.Take(maximum + 1).ToArray();
                 this.operations = new HashSet<Guid>(copy);
-                if (copy.Length == 0 || copy.Length > BlueprintEditorDocument.MaximumParts || copy.Any(id => id == Guid.Empty) ||
+                if (copy.Length == 0 || copy.Length > maximum || copy.Any(id => id == Guid.Empty) ||
                     this.operations.Count != copy.Length) throw new ArgumentException("Invalid operation absence set.");
-                World = world; MarkerKey = markerKey; Operations = Array.AsReadOnly(copy);
+                MarkerKey = markerKey; Operations = Array.AsReadOnly(copy);
             }
             internal bool Contains(string marker)
             {
@@ -88,20 +90,43 @@ namespace OstrixMods.BuildWorks.Geometry
                 return operations.Contains(operation);
             }
         }
+        public sealed class AbsenceExpectation
+        {
+            public long World { get; }
+            public IReadOnlyList<AbsenceMarkerSet> MarkerSets { get; }
+            private AbsenceMarkerSet Single => MarkerSets.Count == 1 ? MarkerSets[0] :
+                throw new InvalidOperationException("Composite absence requires both marker sets.");
+            public int MarkerKey => Single.MarkerKey;
+            public IReadOnlyList<Guid> Operations => Single.Operations;
+            public AbsenceExpectation(long world, int markerKey, IEnumerable<Guid> operations)
+                : this(world, new AbsenceMarkerSet(markerKey, operations, BlueprintEditorDocument.MaximumParts), null) { }
+            // Construction and payout markers must be absent in the same committed world scan.
+            public AbsenceExpectation(long world, AbsenceMarkerSet construction, AbsenceMarkerSet payout)
+            {
+                if (world == 0 || construction == null || construction.Operations.Count > BlueprintEditorDocument.MaximumParts ||
+                    payout != null && (construction.MarkerKey == payout.MarkerKey || construction.Operations.Intersect(payout.Operations).Any()))
+                    throw new ArgumentException("Invalid composite operation absence context.");
+                World = world;
+                MarkerSets = Array.AsReadOnly(payout == null ? new[] { construction } : new[] { construction, payout });
+            }
+            internal bool IsMarkerKey(int key) => MarkerSets[0].MarkerKey == key || MarkerSets.Count == 2 && MarkerSets[1].MarkerKey == key;
+            internal bool Contains(int key, string marker) => (MarkerSets[0].MarkerKey == key ? MarkerSets[0] : MarkerSets[1]).Contains(marker);
+        }
         // A complete mapped-chunk scan, never positive-object or full DB2/native-load evidence.
         public sealed class AbsenceEvidence
         {
             private readonly AbsenceExpectation expectation;
             public long World { get; }
-            public int MarkerKey { get; }
-            public IReadOnlyList<Guid> Operations { get; }
+            public int MarkerKey => expectation.MarkerKey;
+            public IReadOnlyList<Guid> Operations => expectation.Operations;
+            public IReadOnlyList<AbsenceMarkerSet> MarkerSets => expectation.MarkerSets;
             public int FormatVersion { get; }
             public int Chunks { get; }
             public int Objects { get; }
             public bool CompleteMappedScan => true;
             public uint Generation { get; }
             internal AbsenceEvidence(AbsenceExpectation expected, int version, int chunks, int objects, uint generation = 0)
-            { expectation = expected; World = expected.World; MarkerKey = expected.MarkerKey; Operations = expected.Operations;
+            { expectation = expected; World = expected.World;
                 FormatVersion = version; Chunks = chunks; Objects = objects; Generation = generation; }
             internal AbsenceEvidence SavedAt(uint generation)
             {
@@ -224,7 +249,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 if ((first & 32768) == 0) reader.ReadUInt16();
             }
             if ((flags & 1) != 0) Skip(reader, 5);
-            long creator = 0; string marker = null; bool itemsPresent = false, itemsMatch = false;
+            long creator = 0; string marker = null; bool itemsPresent = false, itemsMatch = false, absentMatch = false;
             for (int map = 0; map < 7; ++map)
             {
                 if ((flags & (2 << map)) == 0) continue;
@@ -234,7 +259,7 @@ namespace OstrixMods.BuildWorks.Geometry
                     if ((i & 127) == 0) cancellation.ThrowIfCancellationRequested();
                     int key = reader.ReadInt32();
                     scratchKeys[i] = key;
-                    if (absent != null && key == absent.MarkerKey && map != 5)
+                    if (absent != null && absent.IsMarkerKey(key) && map != 5)
                         throw new InvalidDataException("Unexpected operation marker type prevents an absence proof.");
                     switch (map)
                     {
@@ -244,7 +269,8 @@ namespace OstrixMods.BuildWorks.Geometry
                         case 3: reader.ReadInt32(); break;
                         case 4: long value = reader.ReadInt64(); if (expected != null && key == expected.CreatorKey) creator = value; break;
                         case 5:
-                            if (key == (expected?.MarkerKey ?? absent.MarkerKey)) marker = Text(reader);
+                            if (expected != null && key == expected.MarkerKey) marker = Text(reader);
+                            else if (absent != null && absent.IsMarkerKey(key)) absentMatch |= absent.Contains(key, Text(reader));
                             else SkipText(reader);
                             break;
                         case 6:
@@ -271,7 +297,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 for (int i = 1; i < count; ++i)
                     if (scratchKeys[i] == scratchKeys[i - 1]) throw new InvalidDataException("Duplicate typed ZDO key.");
             }
-            if (absent != null) return absent.Contains(marker);
+            if (absent != null) return absentMatch;
             if (marker != expected.Marker) return false;
             if ((flags & 256) == 0 || prefab != expected.Prefab || creator != expected.Creator || !itemsPresent)
                 throw new InvalidDataException("Saved marked object's identity or contents differ.");

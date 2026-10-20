@@ -135,6 +135,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
             opaquePassed = fixture.Verify(out _); allocated = GC.GetAllocatedBytesForCurrentThread() - before;
             Check(opaquePassed && allocated < 512 * 1024, "Unrelated native string value was decoded/allocated or blocked: " + allocated);
             AbsenceChecks();
+            CompositeAbsenceChecks();
             Console.WriteLine("PASS saved-world41/42 presence and batch absence: " + assertions + " bounded structural/identity/contents/duplicate/truncation/cancel assertions; no native world save, settlement or network proof");
         }
         private static void AbsenceChecks()
@@ -202,6 +203,67 @@ namespace OstrixMods.BuildWorks.GeometryTests
             long before = GC.GetAllocatedBytesForCurrentThread();
             Check(fixture.Absent(query, out proof) && proof.Objects == 10001 && fixture.Opens == 1 &&
                 GC.GetAllocatedBytesForCurrentThread() - before < 4 * 1024 * 1024, "Batch absence rescanned or allocated per requested operation");
+        }
+        private static void CompositeAbsenceChecks()
+        {
+            Guid refund = Guid.NewGuid(), unrelated = Guid.NewGuid();
+            var source = new[] { Operation };
+            var first = new NativeWorldStorageReadback.AbsenceMarkerSet(2, source);
+            var second = new NativeWorldStorageReadback.AbsenceMarkerSet(4, new[] { refund });
+            var query = new NativeWorldStorageReadback.AbsenceExpectation(71, first, second);
+            source[0] = unrelated;
+            var fixture = new Fixture { Map = Mapping(2, chunks: 2), Chunk = Chunk(marker: unrelated.ToString("N"), opaqueText: unrelated.ToString("N")) };
+            Check(fixture.Absent(query, out var proof) && proof.MarkerSets.Count == 2 && proof.MarkerSets[0].Operations[0] == Operation &&
+                proof.MarkerSets[1].Operations[0] == refund && proof.Objects == 2 && fixture.Opens == 2 && proof.Generation == 0,
+                "Composite absence did not scan both immutable sets and all chunks once");
+            foreach (Action legacy in new Action[] { () => { _ = query.MarkerKey; }, () => { _ = query.Operations; },
+                () => { _ = proof.MarkerKey; }, () => { _ = proof.Operations; } })
+            {
+                bool rejected = false; try { legacy(); } catch (InvalidOperationException) { rejected = true; }
+                Check(rejected, "Composite proof silently exposed only one legacy marker set");
+            }
+            foreach (var pair in new[] { (Operation.ToString("N"), unrelated.ToString("N")),
+                (unrelated.ToString("N"), refund.ToString("N").ToUpperInvariant()), (Operation.ToString("N"), refund.ToString("N")),
+                (unrelated.ToString("N"), "malformed"), ("malformed", unrelated.ToString("N")) })
+            {
+                fixture = new Fixture { Map = Mapping(2, chunks: 2) };
+                fixture.AbsenceChunk = name => new MemoryStream(name.StartsWith("01_02", StringComparison.Ordinal)
+                    ? Chunk(marker: unrelated.ToString("N"), opaqueText: unrelated.ToString("N"))
+                    : Chunk(marker: pair.Item1, opaqueText: pair.Item2), false);
+                Check(!fixture.Absent(query, out var missing) && missing == null && fixture.Opens == 2,
+                    "A late target/malformed marker from either namespace was overlooked");
+            }
+            foreach (int key in new[] { 2, 4 })
+            {
+                byte[] bad = Chunk(marker: unrelated.ToString("N"), opaqueText: unrelated.ToString("N"), markerWrongType: true);
+                // First int-map entry after the fixed header has the tracked key.
+                Array.Copy(BitConverter.GetBytes(key), 0, bad, 25, 4);
+                fixture = new Fixture { Chunk = bad };
+                Check(!fixture.Absent(query, out var missing) && missing == null, "Wrong-typed composite marker accepted");
+            }
+            foreach (Action invalid in new Action[] {
+                () => new NativeWorldStorageReadback.AbsenceMarkerSet(0, new[] { Operation }),
+                () => new NativeWorldStorageReadback.AbsenceMarkerSet(2, Array.Empty<Guid>()),
+                () => new NativeWorldStorageReadback.AbsenceMarkerSet(2, new[] { Guid.Empty }),
+                () => new NativeWorldStorageReadback.AbsenceMarkerSet(2, new[] { Operation, Operation }),
+                () => new NativeWorldStorageReadback.AbsenceMarkerSet(2, Enumerable.Repeat(Operation, 65537)),
+                () => new NativeWorldStorageReadback.AbsenceExpectation(71, first, first),
+                () => new NativeWorldStorageReadback.AbsenceExpectation(71, first, new NativeWorldStorageReadback.AbsenceMarkerSet(4, new[] { Operation })),
+                () => new NativeWorldStorageReadback.AbsenceExpectation(0, first, second),
+                () => new NativeWorldStorageReadback.AbsenceExpectation(71, null, second) })
+            {
+                bool rejected = false; try { invalid(); } catch (ArgumentException) { rejected = true; }
+                Check(rejected, "Invalid composite marker context accepted");
+            }
+            var payout = Enumerable.Range(1, 65536).Select(i => new Guid(i, 1, 1, new byte[8])).ToArray();
+            var full = new NativeWorldStorageReadback.AbsenceMarkerSet(4, payout);
+            query = new NativeWorldStorageReadback.AbsenceExpectation(71, first, full);
+            payout[0] = Operation;
+            Check(query.MarkerSets[1].Operations.Count == 65536 && query.MarkerSets[1].Operations[0] != Operation,
+                "Legal payout budget rejected or aliased caller");
+            bool overflow = false;
+            try { new NativeWorldStorageReadback.AbsenceExpectation(71, full, first); } catch (ArgumentException) { overflow = true; }
+            Check(overflow, "Construction set exceeded its preserved part budget");
         }
         private sealed class Fixture
         {

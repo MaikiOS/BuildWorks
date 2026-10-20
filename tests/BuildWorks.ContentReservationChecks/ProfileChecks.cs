@@ -93,6 +93,7 @@ namespace ReservationChecks
             var fixture = new Fixture(Convert.FromBase64String(expected.Zdo)); byte[] valid = fixture.File();
             Check(Verify(valid, expected, out var opaque) && opaque.CustomData == null, "opaque tail must not imply an empty verified map");
             RunTail(expected);
+            RunSavedReceipts(expected);
             byte[] currentInventory = Convert.FromBase64String(expected.Zdo); currentInventory[0] = 110;
             var currentExpected = new BlueprintForeignPartData(expected.Format, expected.Info, Convert.ToBase64String(currentInventory), null);
             var currentFixture = new Fixture(currentInventory); currentFixture.Payload[0] = 47;

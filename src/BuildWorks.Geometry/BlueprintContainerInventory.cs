@@ -150,6 +150,12 @@ namespace OstrixMods.BuildWorks.Geometry
 
         // ItemStand and Inventory use the same native ItemData.Save record, with different envelopes.
         internal static Item ReadItem(BinaryReader reader, Dictionary<int, string> names, int version = 109)
+            => ReadItem(reader, names, version, discard: false);
+
+        // Locate later Player.Save fields without loading, naming or returning unresolved inventory items.
+        internal static void SkipItem(BinaryReader reader, int version) => ReadItem(reader, null, version, discard: true);
+
+        private static Item ReadItem(BinaryReader reader, Dictionary<int, string> names, int version, bool discard)
         {
             int durability = reader.ReadInt32(), x = reader.ReadByte(), y = reader.ReadByte();
             int worldLevel = reader.ReadByte(), flags = reader.ReadByte();
@@ -157,13 +163,24 @@ namespace OstrixMods.BuildWorks.Geometry
             int stack = (flags & 8) != 0 ? reader.ReadUInt16() : 1;
             int variant = (flags & 16) != 0 ? reader.ReadInt32() : 0;
             long crafterId = (flags & 32) != 0 ? reader.ReadInt64() : 0;
-            string crafterName = (flags & 32) != 0 ? ReadString(reader) : "";
+            bool skipStrings = discard && (flags & (32 | 128)) != 0;
+            var decoder = skipStrings ? new UTF8Encoding(false, true).GetDecoder() : null;
+            var buffer = skipStrings ? new byte[1024] : null;
+            var characters = skipStrings ? new char[1026] : null;
+            string crafterName = "";
+            if ((flags & 32) != 0)
+            {
+                if (discard) SkipString(reader, decoder, buffer, characters);
+                else crafterName = ReadString(reader);
+            }
             if ((flags & 4) != 0 && quality == 1 || (flags & 8) != 0 && stack == 1 ||
                 (flags & 16) != 0 && variant == 0 || (flags & 32) != 0 && crafterId == 0 || quality < 1 || stack < 1)
                 throw new InvalidDataException("Invalid native item defaults.");
-            if ((flags & 64) == 0 || !names.TryGetValue(reader.ReadInt32(), out string prefab))
+            int prefabHash = (flags & 64) != 0 ? reader.ReadInt32() : 0;
+            string prefab = null;
+            if (!discard && ((flags & 64) == 0 || !names.TryGetValue(prefabHash, out prefab)))
                 throw new InvalidDataException("Unknown native item prefab.");
-            var customData = new Dictionary<string, string>(StringComparer.Ordinal);
+            var customData = discard ? null : new Dictionary<string, string>(StringComparer.Ordinal);
             int customCount = 0;
             if ((flags & 128) != 0)
             {
@@ -178,18 +195,48 @@ namespace OstrixMods.BuildWorks.Geometry
             }
             for (int entry = 0; entry < customCount; ++entry)
             {
-                string key = ReadString(reader), value = ReadString(reader);
-                if (customData.ContainsKey(key)) throw new InvalidDataException("Duplicate native item key.");
-                customData.Add(key, value);
+                if (discard)
+                {
+                    SkipString(reader, decoder, buffer, characters);
+                    SkipString(reader, decoder, buffer, characters);
+                }
+                else
+                {
+                    string key = ReadString(reader), value = ReadString(reader);
+                    if (customData.ContainsKey(key)) throw new InvalidDataException("Duplicate native item key.");
+                    customData.Add(key, value);
+                }
             }
             int extraFlags = reader.ReadByte();
             if ((extraFlags & ~1) != 0) throw new InvalidDataException("Unknown native item flags.");
-            return new Item(prefab, durability, x, y, worldLevel, flags, quality, stack, variant,
+            return discard ? null : new Item(prefab, durability, x, y, worldLevel, flags, quality, stack, variant,
                 crafterId, crafterName, customData, version >= 110 && (extraFlags & 1) != 0, sourceVersion: version);
         }
 
         // BinaryWriter strings use a canonical 7-bit UTF-8 byte length. Bound it before allocating.
         internal static string ReadString(BinaryReader reader, int maximumBytes = int.MaxValue)
+        {
+            int length = ReadStringLength(reader, maximumBytes);
+            byte[] bytes = reader.ReadBytes(length);
+            return new UTF8Encoding(false, true).GetString(bytes);
+        }
+
+        private static void SkipString(BinaryReader reader, Decoder decoder, byte[] buffer, char[] characters)
+        {
+            int remaining = ReadStringLength(reader, int.MaxValue);
+            decoder.Reset();
+            while (remaining > 0)
+            {
+                int count = reader.Read(buffer, 0, Math.Min(remaining, buffer.Length));
+                if (count == 0) throw new EndOfStreamException("Truncated native item string.");
+                remaining -= count;
+                decoder.Convert(buffer, 0, count, characters, 0, characters.Length, remaining == 0,
+                    out int used, out _, out bool completed);
+                if (used != count || remaining == 0 && !completed) throw new InvalidDataException("Invalid native item UTF-8 string.");
+            }
+        }
+
+        private static int ReadStringLength(BinaryReader reader, int maximumBytes)
         {
             uint length = 0;
             for (int shift = 0; shift < 35; shift += 7)
@@ -200,8 +247,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 if ((part & 128) != 0) continue;
                 if (shift > 0 && part == 0 || length > maximumBytes || length > reader.BaseStream.Length - reader.BaseStream.Position)
                     throw new InvalidDataException("Invalid string length.");
-                byte[] bytes = reader.ReadBytes((int)length);
-                return new UTF8Encoding(false, true).GetString(bytes);
+                return (int)length;
             }
             throw new InvalidDataException("Invalid string length.");
         }

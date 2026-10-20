@@ -11,6 +11,15 @@ namespace OstrixMods.BuildWorks.Geometry
     public static class NativePlayerProfileReadback
     {
         public const int MaximumProfileBytes = 32 * 1024 * 1024;
+        // Receipt lookup is not evidence that the saved inventory matches a live or earlier inventory.
+        public sealed class CustomDataEvidence
+        {
+            internal CustomDataEvidence(Evidence parsed)
+            { Player = parsed.Player; ProfileHash = parsed.ProfileHash; CustomData = parsed.CustomData; }
+            public long Player { get; }
+            public string ProfileHash { get; }
+            public IReadOnlyDictionary<string, string> CustomData { get; }
+        }
         public sealed class Evidence
         {
             internal Evidence(long player, string profileHash, string inventoryHash, int inventoryBytes, BlueprintForeignPartData inventory,
@@ -33,19 +42,30 @@ namespace OstrixMods.BuildWorks.Geometry
             Func<string, int> prefabHash, byte[] playerData, out Evidence evidence, out string reason)
             => Verify(file, player, name, expected, prefabHash, playerData ?? Array.Empty<byte>(), out evidence, out reason);
 
+        public static bool TryReadCustomData(Stream file, long player, string name, out CustomDataEvidence evidence, out string reason)
+        {
+            evidence = null;
+            if (!Verify(file, player, name, null, null, null, out var parsed, out reason, savedCustomData: true)) return false;
+            evidence = new CustomDataEvidence(parsed); return true;
+        }
+
         private static bool Verify(Stream file, long player, string name, BlueprintForeignPartData expected,
-            Func<string, int> prefabHash, byte[] playerData, out Evidence evidence, out string reason)
+            Func<string, int> prefabHash, byte[] playerData, out Evidence evidence, out string reason, bool savedCustomData = false)
         {
             evidence = null; reason = null;
             try
             {
-                if (player == 0 || name == null || expected == null || expected.ContentsCleared ||
-                    !BlueprintContainerInventory.TryRead(expected, prefabHash, out _))
-                    throw new InvalidDataException("Invalid expected live inventory.");
-                byte[] inventory = Convert.FromBase64String(expected.Zdo);
+                if (player == 0 || name == null) throw new InvalidDataException("Invalid expected player identity.");
+                byte[] inventory = null;
+                if (!savedCustomData)
+                {
+                    if (expected == null || expected.ContentsCleared || !BlueprintContainerInventory.TryRead(expected, prefabHash, out _))
+                        throw new InvalidDataException("Invalid expected live inventory.");
+                    inventory = Convert.FromBase64String(expected.Zdo);
+                    if (inventory.Length < 6 || BitConverter.ToInt32(inventory, 0) != 109 && BitConverter.ToInt32(inventory, 0) != 110)
+                        throw new InvalidDataException("Only native inventories 109 and 110 are covered.");
+                }
                 IReadOnlyDictionary<string, string> customData = null;
-                if (inventory.Length < 6 || BitConverter.ToInt32(inventory, 0) != 109 && BitConverter.ToInt32(inventory, 0) != 110)
-                    throw new InvalidDataException("Only native inventories 109 and 110 are covered.");
                 if (file == null || !file.CanRead || !file.CanSeek || file.Position != 0 ||
                     file.Length < 72 || file.Length > MaximumProfileBytes)
                     throw new InvalidDataException("Profile file exceeds the supported framing or budget.");
@@ -109,20 +129,32 @@ namespace OstrixMods.BuildWorks.Geometry
                         throw new InvalidDataException("Invalid player-data framing or unsupported version.");
                     for (int i = 0; i < 4; i++) ReadFinite(reader);
                     ReadString(reader); ReadFinite(reader);
-                    if (inventory.Length > stream.Length - stream.Position)
-                        throw new InvalidDataException("Truncated saved inventory.");
-                    // The retained blob was validated as a complete inventory, so this exact span has a known end.
-                    for (int i = 0; i < inventory.Length; i++)
-                        if (reader.ReadByte() != inventory[i]) throw new InvalidDataException("Saved inventory differs from the provided items after transfer.");
-                    if (playerData != null) customData = ReadPlayerTail(reader, playerVersion);
+                    if (savedCustomData) ReadInventorySpan(reader);
+                    else
+                    {
+                        if (inventory.Length > stream.Length - stream.Position) throw new InvalidDataException("Truncated saved inventory.");
+                        // The retained blob was validated as a complete inventory, so this exact span has a known end.
+                        for (int i = 0; i < inventory.Length; i++)
+                            if (reader.ReadByte() != inventory[i]) throw new InvalidDataException("Saved inventory differs from the provided items after transfer.");
+                    }
+                    if (savedCustomData || playerData != null) customData = ReadPlayerTail(reader, playerVersion);
                     // Inventory-only callers keep their opaque-tail contract; no complete Player.Load claim.
                 }
                 using (var hash = SHA256.Create())
-                    evidence = new Evidence(player, Hex(checksum), Hex(hash.ComputeHash(inventory)), inventory.Length, expected, customData);
+                    evidence = new Evidence(player, Hex(checksum), inventory == null ? null : Hex(hash.ComputeHash(inventory)), inventory?.Length ?? 0, expected, customData);
                 return true;
             }
             catch (Exception error) when (error is IOException || error is InvalidDataException || error is ArgumentException || error is FormatException || error is OverflowException)
             { reason = error.Message; return false; }
+        }
+
+        private static void ReadInventorySpan(BinaryReader reader)
+        {
+            int version = reader.ReadInt32(), count = reader.ReadUInt16();
+            if (version != 109 && version != 110 || count > 4096 || count * 9L > reader.BaseStream.Length - reader.BaseStream.Position)
+                throw new InvalidDataException("Unsupported or truncated saved inventory span.");
+            // Decode only to locate the following fields. No prefab lookup, loading or inventory proof is returned.
+            for (int i = 0; i < count; i++) BlueprintContainerInventory.SkipItem(reader, version);
         }
 
         private static IReadOnlyDictionary<string, string> ReadPlayerTail(BinaryReader reader, int version)

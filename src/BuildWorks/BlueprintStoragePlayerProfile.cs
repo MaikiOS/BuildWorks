@@ -91,6 +91,35 @@ namespace OstrixMods.BuildWorks
         internal bool TryVerify(out NativePlayerProfileReadback.Evidence evidence, out string reason)
             => TryRead(path, out evidence, out reason);
 
+        internal static bool TryReadSavedCustomData(Player player, Func<bool> context,
+            out NativePlayerProfileReadback.CustomDataEvidence evidence, out string reason)
+        {
+            evidence = null; reason = null;
+            try
+            {
+                var game = Game.instance;
+                var profile = game ? game.GetPlayerProfile() : null;
+                string path = profile?.GetPath(), filename = profile?.GetFilename(), name = profile?.GetName();
+                long id = player ? player.GetPlayerID() : 0;
+                bool Valid() => player && player == Player.m_localPlayer &&
+                    Player.m_localPlayerExists && game && Game.instance == game && !game.IsShuttingDown() &&
+                    profile != null && ReferenceEquals(game.GetPlayerProfile(), profile) &&
+                    profile.m_fileSource == FileHelpers.FileSource.Local && id != 0 &&
+                    player.GetPlayerID() == id && profile.GetPlayerID() == id && profile.GetPath() == path &&
+                    profile.GetFilename() == filename && profile.GetName() == name &&
+                    !string.IsNullOrWhiteSpace(filename) && !string.IsNullOrWhiteSpace(name) && Path.IsPathRooted(path) &&
+                    Path.GetFileName(path) == filename + ".fch" && context != null && context();
+                if (!Valid()) throw new InvalidOperationException("Saved receipt lookup requires the same current Local character and context.");
+                using (var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+                {
+                    if (!NativePlayerProfileReadback.TryReadCustomData(file, id, name, out var parsed, out reason)) return false;
+                    if (!Valid()) throw new InvalidOperationException("Character or receipt context changed during canonical file read.");
+                    evidence = parsed; return true;
+                }
+            }
+            catch (Exception error) { reason = error.Message; return false; }
+        }
+
         internal static bool TryVerifyLoaded(Player player, BlueprintStorageTransferJournal.Persistence saved,
             Func<bool> context, out NativePlayerProfileReadback.Evidence evidence, out string reason)
         {

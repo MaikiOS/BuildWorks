@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-20 — 254: saved receipt after inventory changes
+
+QA .246 adds separate canonical saved-receipt lookup; exact inventory proofs remain strict.952 new checks and full content/Store/Geometry/builds/contracts pass. Retained native profile read only; nonempty maps/spending synthetic. Guarded .246 deployment preserves177 protected files; no game launch.8.7/8.8 stay open: no collector/cleanup/full recovery. [Report](CHECKPOINT_254.md).
+
 ## 2026-10-20 — 253: saved profile receipt-map evidence
 
 QA .245 adds immutable saved customData after full Player.Save identity; legacy inventory proof is unchanged.1023 targeted checks, content/Store/Geometry/builds/contracts pass. An existing QA profile was read without changes (empty map); nonempty maps are synthetic. Guarded .245 installation preserved177 protected files; no game launch. This advances8.7, not collection or terminal cancellation. [Evidence and limits](CHECKPOINT_253.md).

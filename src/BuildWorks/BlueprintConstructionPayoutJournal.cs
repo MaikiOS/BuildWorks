@@ -18,7 +18,9 @@ namespace OstrixMods.BuildWorks
     {
         internal const string CustodyKey = "ostrix.buildworks.refund.v1";
         internal const string ReceiptPrefix = "ostrix.buildworks.collected.v1.";
+        internal static readonly int ItemMarkerKey = "ostrix_buildworks_refund_item_v1".GetStableHashCode();
         internal const int CreditIntent = 1, ProfileCredited = 2;
+        internal const int CleanupIntent = 1, CleanupSaved = 2;
         internal const int Prepared = 1, SaveIntent = 2, IssuedSaved = 3;
         internal const int Ready = 0, Attempted = 1, Observed = 2;
         private const int MaximumBytes = 16 * 1024 * 1024;
@@ -68,6 +70,14 @@ namespace OstrixMods.BuildWorks
             [DataMember(Order = 8)] internal string BeforeProfileHash;
             [DataMember(Order = 9)] internal string SavedProfileHash;
             [DataMember(Order = 10)] internal string ItemBlob;
+            [DataMember(Order = 11, EmitDefaultValue = false)] internal Cleanup Removal;
+        }
+        [DataContract] internal sealed class Cleanup
+        {
+            [DataMember(Order = 0)] internal int Phase;
+            [DataMember(Order = 1)] internal uint BeforeGeneration;
+            [DataMember(Order = 2)] internal string ProfileHash;
+            [DataMember(Order = 3)] internal uint SavedGeneration;
         }
         internal BlueprintConstructionPayoutJournal(Plans plans) { this.plans = plans ?? throw new ArgumentNullException(nameof(plans)); }
         internal Parts.PaidRow[] Paid(Guid project)
@@ -157,7 +167,7 @@ namespace OstrixMods.BuildWorks
             {
                 var r = Require(project, operation);
                 if (r.Phase != IssuedSaved || index != (r.Collections?.Length ?? 0) || index >= r.Items.Length ||
-                    r.Collections?.Any(c => c.Phase != ProfileCredited) == true)
+                    r.Collections?.Any(c => c.Phase != ProfileCredited || c.Removal?.Phase == CleanupIntent) == true)
                     throw new InvalidOperationException("Credit intent cannot be repeated, skipped or started after an uncertain row.");
                 var after = CreditInventory(before, cleanItem, Paid(project)[index], x, y);
                 var credit = new Collection { Entry = r.Items[index].Id, Phase = CreditIntent, X = x, Y = y,
@@ -189,6 +199,50 @@ namespace OstrixMods.BuildWorks
             }
         }
         internal static string ReceiptKey(Guid entry) => ReceiptPrefix + entry.ToString("N");
+        internal Record BeginCleanup(Guid project, Guid operation, int index, uint generation, NativePlayerProfileReadback.CustomDataEvidence profile)
+        {
+            using (plans.Lock(project))
+            {
+                var r = Require(project, operation);
+                RequireCleanupReceipt(r, index, profile);
+                if (r.Collections.Any(c => c.Phase != ProfileCredited) || generation == 0 || generation == uint.MaxValue || generation < r.Saved.Generation ||
+                    r.Collections.Where((c, i) => i != index).Any(c => c.Removal?.Phase == CleanupIntent))
+                    throw new InvalidOperationException("Cleanup requires one current saved-world intent at a time.");
+                var c = r.Collections[index];
+                if (c.Removal != null)
+                {
+                    if (c.Removal.BeforeGeneration != generation || c.Removal.ProfileHash != profile.ProfileHash)
+                        throw new InvalidOperationException("Cleanup intent or paired profile changed; no repeated removal.");
+                    return r;
+                }
+                c.Removal = new Cleanup { Phase = CleanupIntent, BeforeGeneration = generation, ProfileHash = profile.ProfileHash };
+                r.Revision++; Write(r, true); return Read(project);
+            }
+        }
+        internal Record ConfirmCleanup(Guid project, Guid operation, int index, NativeWorldStorageReadback.AbsenceEvidence absence,
+            NativePlayerProfileReadback.CustomDataEvidence profile)
+        {
+            using (plans.Lock(project))
+            {
+                var r = Require(project, operation);
+                RequireCleanupReceipt(r, index, profile);
+                var cleanup = r.Collections[index].Removal;
+                if (cleanup == null || absence == null || absence.World != r.World || absence.MarkerKey != ItemMarkerKey ||
+                    !absence.CompleteMappedScan || absence.Operations.Count != 1 || absence.Operations[0] != r.Items[index].Id ||
+                    absence.Generation != cleanup.BeforeGeneration + 1 || profile.ProfileHash != cleanup.ProfileHash)
+                    throw new InvalidOperationException("Cleanup needs exact saved-world absence paired with the same permanent profile receipt.");
+                if (cleanup.Phase == CleanupSaved) return r;
+                cleanup.Phase = CleanupSaved; cleanup.SavedGeneration = absence.Generation;
+                r.Revision++; Write(r, true); return Read(project);
+            }
+        }
+        private static void RequireCleanupReceipt(Record r, int index, NativePlayerProfileReadback.CustomDataEvidence profile)
+        {
+            if (r.Phase != IssuedSaved || index < 0 || r.Collections == null || index >= r.Collections.Length ||
+                r.Collections[index].Phase != ProfileCredited || profile == null || profile.CustomData == null || profile.Player != r.Player || !Hash(profile.ProfileHash, 128) ||
+                !profile.CustomData.TryGetValue(ReceiptKey(r.Items[index].Id), out string value) || value != ReceiptValue(r, index))
+                throw new InvalidOperationException("Only a durably credited row with its payer's canonical receipt permits source cleanup.");
+        }
         internal static string ReceiptValue(Record r, int index)
         {
             using (var stream = new MemoryStream()) using (var writer = new BinaryWriter(stream))
@@ -286,9 +340,19 @@ namespace OstrixMods.BuildWorks
                     var before = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, c.BeforeInfo, c.BeforeBytes, null);
                     var after = CreditInventory(before, c.ItemBlob, paid[i], c.X, c.Y);
                     if (after.Info != c.AfterInfo || after.Zdo != c.AfterBytes) throw new InvalidDataException("Credit is not the exact single-cell inventory delta.");
+                    var cleanup = c.Removal;
+                    if (cleanup != null && (c.Phase != ProfileCredited || cleanup.Phase < CleanupIntent || cleanup.Phase > CleanupSaved ||
+                        cleanup.BeforeGeneration == 0 || cleanup.BeforeGeneration == uint.MaxValue || r.Saved == null ||
+                        cleanup.BeforeGeneration < r.Saved.Generation || !Hash(cleanup.ProfileHash, 128) ||
+                        (cleanup.Phase == CleanupIntent ? cleanup.SavedGeneration != 0 : cleanup.SavedGeneration != cleanup.BeforeGeneration + 1)))
+                        throw new InvalidDataException("Cleanup phase, credit or paired save proof differs.");
                 }
+                if (r.Collections.Count(c => c.Removal?.Phase == CleanupIntent) > 1)
+                    throw new InvalidDataException("Concurrent cleanup intents are not permitted.");
+                if (r.Collections.Any(c => c.Phase == CreditIntent) && r.Collections.Any(c => c.Removal?.Phase == CleanupIntent))
+                    throw new InvalidDataException("Unsettled credit and cleanup intents cannot overlap.");
             }
-            if (r.Revision != 1L + r.Items.Sum(e => e.State) + r.Phase - 1 + (r.Collections?.Sum(c => (long)c.Phase) ?? 0) || r.Phase != Prepared && r.Items.Any(e => e.State != Observed))
+            if (r.Revision != 1L + r.Items.Sum(e => e.State) + r.Phase - 1 + (r.Collections?.Sum(c => (long)c.Phase + (c.Removal?.Phase ?? 0)) ?? 0) || r.Phase != Prepared && r.Items.Any(e => e.State != Observed))
                 throw new InvalidDataException("Payout phase/revision differs.");
             if (r.Phase != IssuedSaved)
             { if (r.Saved != null) throw new InvalidDataException("Payout falsely claims persistence."); return; }

@@ -122,6 +122,8 @@ namespace OstrixMods.BuildWorks.StoreTests
                 items[0].Stack == 3 && items[1].Stack == 3 && items[2].Stack == 2 && items[2].X == 2 && items[2].CustomData["mod.attribute"] == "kept" &&
                 !items[2].CustomData.ContainsKey(Journal.CustodyKey), "Exact append merged/lost existing units or provided attributes.");
             byte[] pending = File.ReadAllBytes(path);
+            Refuse<InvalidOperationException>(() => journal.BeginCleanup(project, operation, 0, 9,
+                Proof(17, Journal.ReceiptKey(intent.Items[0].Id), Journal.ReceiptValue(intent, 0))));
             Refuse<InvalidOperationException>(() => journal.BeginCredit(project, operation, 0, before, clean, 2, 0, new string('A', 128)));
             Refuse<InvalidOperationException>(() => journal.BeginCredit(project, operation, 1, after, Package(2, 3, Guid.Empty), 3, 0, new string('A', 128)));
             string key = Journal.ReceiptKey(intent.Items[0].Id), value = Journal.ReceiptValue(intent, 0);
@@ -150,7 +152,14 @@ namespace OstrixMods.BuildWorks.StoreTests
             // The evidence API intentionally has no inventory field: spending later cannot authorize re-credit.
             Check(typeof(NativePlayerProfileReadback.CustomDataEvidence).GetProperty("Inventory") == null, "Receipt evidence widened to inventory proof.");
             Refuse<InvalidOperationException>(() => journal.BeginCredit(project, operation, 0, after, clean, 2, 0, new string('B', 128)));
+            // Fork this temporary fixture to prove the cleanup guard independently of the item-count bound.
+            journal.BeginCleanup(project, operation, 0, 9, Proof(17, key, value));
+            byte[] cleaning = File.ReadAllBytes(path);
+            Refuse<InvalidOperationException>(() => journal.BeginCredit(project, operation, 1, after, Package(2, 3, Guid.Empty), 3, 0, new string('B', 128)));
+            Check(cleaning.SequenceEqual(File.ReadAllBytes(path)), "A new credit changed an unsettled cleanup.");
+            File.WriteAllBytes(path, confirmed);
             var next = journal.BeginCredit(project, operation, 1, after, Package(2, 3, Guid.Empty), 3, 0, new string('B', 128));
+            Refuse<InvalidOperationException>(() => journal.BeginCleanup(project, operation, 0, 9, Proof(17, key, value)));
             Check(next.Revision == 10 && next.Collections.Length == 2 && next.Collections[0].Phase == Journal.ProfileCredited, "Next credit lost prior receipt.");
             string secondKey = Journal.ReceiptKey(next.Items[1].Id), secondValue = Journal.ReceiptValue(next, 1);
             Refuse<InvalidOperationException>(() => journal.ConfirmSavedCredit(project, operation, 1, FullProof(17, secondKey, secondValue, before)));
@@ -158,19 +167,83 @@ namespace OstrixMods.BuildWorks.StoreTests
             var second = journal.ConfirmSavedCredit(project, operation, 1, FullProof(17, secondKey, secondValue, secondAfter));
             Check(second.Revision == 11 && second.Collections.All(c => c.Phase == Journal.ProfileCredited) && second.Phase == Journal.IssuedSaved,
                 "Collection falsely settled world cleanup/cancellation.");
+            Check(!Encoding.UTF8.GetString(File.ReadAllBytes(path)).Contains("\"Removal\":"), "Unset cleanup changed prior canonical credit bytes.");
+            CleanupChecks(journal, project, operation, path);
+        }
+        private static void CleanupChecks(Journal journal, Guid project, Guid operation, string path)
+        {
+            var original = journal.Read(project);
+            string key = Journal.ReceiptKey(original.Items[0].Id), value = Journal.ReceiptValue(original, 0);
+            string key1 = Journal.ReceiptKey(original.Items[1].Id), value1 = Journal.ReceiptValue(original, 1);
+            var proof = Proof(17, key, value);
+            byte[] before = File.ReadAllBytes(path);
+            Refuse<InvalidOperationException>(() => journal.BeginCleanup(project, Guid.NewGuid(), 0, 9, proof));
+            Refuse<InvalidOperationException>(() => journal.BeginCleanup(project, operation, -1, 9, proof));
+            Refuse<InvalidOperationException>(() => journal.BeginCleanup(project, operation, 2, 9, proof));
+            foreach (uint generation in new uint[] { 0, 8, uint.MaxValue })
+                Refuse<InvalidOperationException>(() => journal.BeginCleanup(project, operation, 0, generation, proof));
+            Refuse<InvalidOperationException>(() => journal.BeginCleanup(project, operation, 0, 9, null));
+            Refuse<InvalidOperationException>(() => journal.BeginCleanup(project, operation, 0, 9, Proof(18, key, value)));
+            Refuse<InvalidOperationException>(() => journal.BeginCleanup(project, operation, 0, 9, Proof(17, key, "pending:" + value)));
+            Check(before.SequenceEqual(File.ReadAllBytes(path)), "Rejected cleanup mutated paid rows or profile credit.");
+            Refuse<InvalidOperationException>(() => journal.ConfirmCleanup(project, operation, 0, Absence(10), proof));
+            var intent = journal.BeginCleanup(project, operation, 0, 9, proof);
+            Check(intent.Revision == 12 && intent.Collections[0].Removal.Phase == Journal.CleanupIntent && intent.Collections[0].Removal.SavedGeneration == 0,
+                "Cleanup intent falsely claimed saved absence.");
+            byte[] pending = File.ReadAllBytes(path);
+            Check(journal.BeginCleanup(project, operation, 0, 9, proof).Revision == 12 && pending.SequenceEqual(File.ReadAllBytes(path)), "Exact cleanup intent replay mutated bytes.");
+            string body = Encoding.UTF8.GetString(pending, 12, BitConverter.ToInt32(pending, 8));
+            string altered = body.Replace("\"SavedGeneration\":0", "\"SavedGeneration\":10");
+            Check(body != altered, "Cleanup corruption fixture did not alter the target.");
+            using (var file = new FileStream(path, FileMode.Create, FileAccess.Write))
+            using (var writer = new BinaryWriter(file))
+            using (var sha = SHA256.Create())
+            { byte[] bytes = Encoding.UTF8.GetBytes(altered); writer.Write(pending, 0, 8); writer.Write(bytes.Length); writer.Write(bytes); writer.Write(sha.ComputeHash(bytes)); }
+            Refuse<InvalidDataException>(() => journal.Read(project)); File.WriteAllBytes(path, pending);
+            Refuse<InvalidOperationException>(() => journal.BeginCleanup(project, operation, 0, 10, proof));
+            Refuse<InvalidOperationException>(() => journal.BeginCleanup(project, operation, 0, 9, Proof(17, key, value, new string('D', 128))));
+            Refuse<InvalidOperationException>(() => journal.BeginCleanup(project, operation, 1, 9, Proof(17, key1, value1)));
+            Refuse<InvalidOperationException>(() => journal.ConfirmCleanup(project, operation, 0, null, proof));
+            foreach (uint generation in new uint[] { 0, 9, 11, uint.MaxValue })
+                Refuse<InvalidOperationException>(() => journal.ConfirmCleanup(project, operation, 0, Absence(generation), proof));
+            Refuse<InvalidOperationException>(() => journal.ConfirmCleanup(project, operation, 0, Absence(10, world: original.World + 1), proof));
+            Refuse<InvalidOperationException>(() => journal.ConfirmCleanup(project, operation, 0, Absence(10, marker: Journal.ItemMarkerKey + 1), proof));
+            Refuse<InvalidOperationException>(() => journal.ConfirmCleanup(project, operation, 0, Absence(10, ids: new[] { original.Items[1].Id }), proof));
+            Refuse<InvalidOperationException>(() => journal.ConfirmCleanup(project, operation, 0, Absence(10, ids: original.Items.Select(i => i.Id).ToArray()), proof));
+            Refuse<InvalidOperationException>(() => journal.ConfirmCleanup(project, operation, 0, Absence(10), Proof(18, key, value)));
+            Refuse<InvalidOperationException>(() => journal.ConfirmCleanup(project, operation, 0, Absence(10), Proof(17, key, value, new string('D', 128))));
+            Check(pending.SequenceEqual(File.ReadAllBytes(path)), "Rejected cleanup proof mutated intent.");
+            var saved = journal.ConfirmCleanup(project, operation, 0, Absence(10), proof);
+            Check(saved.Revision == 13 && saved.Collections[0].Removal.Phase == Journal.CleanupSaved && saved.Collections[0].Removal.SavedGeneration == 10 &&
+                saved.Collections.All(c => c.Phase == Journal.ProfileCredited) && saved.Phase == Journal.IssuedSaved,
+                "Cleanup lost credit proof or falsely settled project cancellation.");
+            byte[] terminal = File.ReadAllBytes(path);
+            Check(journal.ConfirmCleanup(project, operation, 0, Absence(10), proof).Revision == 13 && terminal.SequenceEqual(File.ReadAllBytes(path)), "Cleanup saved replay mutated bytes.");
+            Refuse<InvalidOperationException>(() => journal.ConfirmCleanup(project, operation, 0, Absence(11), proof));
+            Refuse<InvalidOperationException>(() => journal.ConfirmCleanup(project, operation, 0, Absence(10), Proof(17, key, value, new string('D', 128))));
+            Check(terminal.SequenceEqual(File.ReadAllBytes(path)), "Changed proof mutated settled cleanup.");
+            var next = journal.BeginCleanup(project, operation, 1, 10, Proof(17, key1, value1));
+            Check(next.Revision == 14 && next.Collections[0].Removal.Phase == Journal.CleanupSaved && next.Collections[1].Removal.Phase == Journal.CleanupIntent,
+                "Next cleanup lost prior saved absence.");
+            // Test-only evidence substitute; the complete mapped-world parser has separate checks.
+            NativeWorldStorageReadback.AbsenceEvidence Absence(uint generation, long? world = null, int? marker = null, Guid[] ids = null)
+                => (NativeWorldStorageReadback.AbsenceEvidence)Activator.CreateInstance(typeof(NativeWorldStorageReadback.AbsenceEvidence),
+                    BindingFlags.Instance | BindingFlags.NonPublic, null, new object[] {
+                        new NativeWorldStorageReadback.AbsenceExpectation(world ?? original.World, marker ?? Journal.ItemMarkerKey, ids ?? new[] { original.Items[0].Id }),
+                        36, 1, 0, generation }, null);
         }
         // Test-only journal evidence substitute. Native file parsing is covered separately by ProfileReceiptChecks.
-        private static NativePlayerProfileReadback.CustomDataEvidence Proof(long player, string key, string value)
+        private static NativePlayerProfileReadback.CustomDataEvidence Proof(long player, string key, string value, string hash = null)
         {
-            var evidence = FullProof(player, key, value, null);
+            var evidence = FullProof(player, key, value, null, hash);
             return (NativePlayerProfileReadback.CustomDataEvidence)Activator.CreateInstance(typeof(NativePlayerProfileReadback.CustomDataEvidence),
                 BindingFlags.Instance | BindingFlags.NonPublic, null, new object[] { evidence }, null);
         }
-        private static NativePlayerProfileReadback.Evidence FullProof(long player, string key, string value, BlueprintForeignPartData inventory)
+        private static NativePlayerProfileReadback.Evidence FullProof(long player, string key, string value, BlueprintForeignPartData inventory, string hash = null)
         {
             var map = new ReadOnlyDictionary<string, string>(new Dictionary<string, string> { [key] = value });
             return (NativePlayerProfileReadback.Evidence)Activator.CreateInstance(typeof(NativePlayerProfileReadback.Evidence),
-                BindingFlags.Instance | BindingFlags.NonPublic, null, new object[] { player, new string('C', 128), null, 0, inventory, map }, null);
+                BindingFlags.Instance | BindingFlags.NonPublic, null, new object[] { player, hash ?? new string('C', 128), null, 0, inventory, map }, null);
         }
         private static Parts.PaidRow Paid(int x) => new Parts.PaidRow { Prefab = "Wood", Properties = Package(1, x, Guid.Empty),
             Before = 5, Paid = 2, X = x, Y = 0, Quality = 1 };

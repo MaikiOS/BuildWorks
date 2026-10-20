@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-20 — 257: cleanup journal and matched v11 preparation
+
+Added receipt-bound cleanup intent/next-generation absence/replay guards; uncertain credit and cleanup cannot overlap. StoreTests/117 payout assertions, normal/QA0/0 and independent review passed. No deletion executor or deployment. In parallel, prepared a local matched longwall4 harness; stale Gamma hashes were rejected and a current bundle built. The new GPU probe was stopped before launch because Ostrix was playing another profile. No v11 visual acceptance. [Report](CHECKPOINT_257.md).
+
 ## 2026-10-20 — 256: retained refund credited and persisted
 
 Without changing .247, recovered the existing tombstone inventory and collected two retained4-Wood debts.45/45 native steps passed:59→67, four receipts/exact inventory, reload, replay without insertion/save. Independent extraction and review confirmed the bounded result. Normal quit and3DLL bridge restoration completed. Old sources remain sealed; cleanup/full cancellation/faults/network and v11 acceptance remain open. [Report](CHECKPOINT_256.md).

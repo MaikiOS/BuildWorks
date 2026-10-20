@@ -9,7 +9,7 @@ namespace OstrixMods.BuildWorks
     // Pending returns stay sealed through reload; only a later durable collection protocol may release custody.
     internal static class BlueprintConstructionPayoutSeal
     {
-        internal static readonly int MarkerKey = "ostrix_buildworks_refund_item_v1".GetStableHashCode();
+        internal static readonly int MarkerKey = Journal.ItemMarkerKey;
         internal static readonly int OwnerKey = "ostrix_buildworks_refund_owner_v1".GetStableHashCode();
         private static readonly HashSet<ItemDrop> held = new HashSet<ItemDrop>();
         private sealed class Spawn

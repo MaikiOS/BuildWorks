@@ -180,6 +180,7 @@ namespace OstrixMods.BuildWorks
         }
         private static void CheckFile(string path)
         { if (File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new InvalidDataException("Removal journal cannot be a reparse point."); }
+        internal static string Fingerprint(Record record) => Digest(Encode(record));
         private static byte[] Encode<T>(T value)
         {
             using (var stream = new MemoryStream())

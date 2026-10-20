@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-20 — 252: saved issuance before collection
+
+**QA .244 installed, checkpoint252:** original paid receipts now produce sealed items in the saved world. Two retained debts issued4stacks/8Wood in Valheim; inventory stays59Wood. Both9-step issuance scenarios,6 reload checks and6 post-replay checks pass; repeat issuance was refused. Collection remains sealed: **paid cancellation is not complete**. Next: permanent payer-profile consumption receipts, controlled collection and terminal cancellation, then faults/recovery/secondary collapse/networking. Normal quit and bridge3/3 restored. [Evidence](CHECKPOINT_252.md).
+
 ## 2026-10-20 — 251: removal before restitution
 
 **QA .243 installed, checkpoint251:** controlled removal of committed structural parts now precedes restitution. Prepared → RemovalIntent → RemovedSaved is durable, freezes construction and binds absence to the next world-save generation. 50 focused checks, full Store/Geometry and normal/QA builds pass. Native Valheim:17 paid/removal steps plus2 reload steps; generation160→161, exact removal inventory unchanged and no new native drops. Explicit Prepared resume after world reload also reached157→158; its drop observer failed because it compared network IDs across reload. Both harness failures are retained. Payout/pickup, ambiguous RemovalIntent recovery, secondary collapse, product UI and networking remain open. Two owned QA projects retain receipts for8Wood owed by the future restitution protocol; nothing was issued. Normal quit/bridge3/3 restored. [Evidence](CHECKPOINT_251.md).

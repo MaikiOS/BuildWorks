@@ -14,6 +14,96 @@ namespace OstrixMods.BuildWorks
         private static Vector3 createdRoot;
         private static BlueprintForeignPartData removalInventory;
         private static string[] removalDrops;
+        private static Guid payoutTarget;
+        private static BlueprintForeignPartData payoutInventory;
+        public static bool PayoutFinished => BuildWorksPlugin.QaConstructionProjects?.Payout?.Finished == true;
+        public static string SelectPayout(string id)
+        {
+            var player = BuildWorksTestIsolation.RequireLoadedSession(); BuildWorksPlugin.RequireQaStorageIdle();
+            if (id != "064a5fd538b442d98a4c1c0935a6d2ba" && id != "fe485bcc1a4041d591d5a1015060d913")
+                throw new InvalidOperationException("Only the two retained checkpoint251 debts are authorized for this scenario.");
+            var runtime = BuildWorksPlugin.QaConstructionProjects; var target = Guid.ParseExact(id, "N");
+            var plans = (Store)AccessTools.Field(typeof(BlueprintConstructionProjectRuntime), "store").GetValue(runtime);
+            var removed = new BlueprintConstructionCancellationJournal(plans).Read(target);
+            var record = runtime.Read(target); var rows = record.Parts.Select(part => runtime.ReadPart(target, part.Id)).ToArray();
+            if (removed?.Phase != BlueprintConstructionCancellationJournal.RemovedSaved || removed.Player != player.GetPlayerID() ||
+                record.Blueprint.id != "cc552d6270924447b3ebf51e66e09a5b" || rows.Length != 2 ||
+                rows.Any(row => row?.Phase != BlueprintConstructionPartJournal.Committed || row.Paid.Any(item => item.Prefab != "Wood")) ||
+                rows.Sum(row => row.Paid.Sum(item => item.Paid)) != 4 || !BlueprintStorageCapture.TrySnapshotInventory(player.GetInventory(), out payoutInventory))
+                throw new InvalidOperationException("Original retained Wood debt, payer or exact inventory differs.");
+            payoutTarget = target; return PayoutStatus();
+        }
+        public static string BeginPayout()
+        {
+            var player = BuildWorksTestIsolation.RequireLoadedSession(); var runtime = BuildWorksPlugin.QaConstructionProjects;
+            if (payoutTarget == Guid.Empty || !runtime.Open(runtime.Board(payoutTarget), player))
+                throw new InvalidOperationException("Select the retained payout and approach its own board with the hammer.");
+            runtime.BeginPayout(payoutTarget); return PayoutStatus();
+        }
+        public static string PayoutStatus()
+        {
+            var player = BuildWorksTestIsolation.RequireLoadedSession(); var runtime = BuildWorksPlugin.QaConstructionProjects;
+            var plans = (Store)AccessTools.Field(typeof(BlueprintConstructionProjectRuntime), "store").GetValue(runtime);
+            var record = runtime.Read(payoutTarget); var payout = new BlueprintConstructionPayoutJournal(plans).Read(payoutTarget);
+            var loaded = UnityEngine.Object.FindObjectsByType<ItemDrop>(FindObjectsSortMode.None);
+            int count = 0, units = 0; bool exact = true, sealedItems = true;
+            foreach (var entry in payout?.Items ?? Array.Empty<BlueprintConstructionPayoutJournal.Entry>())
+            {
+                var matches = loaded.Where(drop => drop.GetComponent<ZNetView>()?.GetZDO()?.GetString(BlueprintConstructionPayoutSeal.MarkerKey, "") == entry.Id.ToString("N")).ToArray();
+                count += matches.Length;
+                if (matches.Length != 1) { exact = false; sealedItems = false; continue; }
+                var drop = matches[0]; var data = drop.GetComponent<ZNetView>().GetZDO(); units += drop.m_itemData.m_stack;
+                exact &= data.Persistent && data.GetLong(BlueprintConstructionPayoutSeal.OwnerKey, 0) == player.GetPlayerID() &&
+                    Convert.ToBase64String(BlueprintConstructionPayoutSeal.Package(drop.m_itemData)) == entry.Blob &&
+                    data.GetByteArray(ZDOVars.s_itemData)?.SequenceEqual(Convert.FromBase64String(entry.Blob)) == true;
+                sealedItems &= BlueprintConstructionPayoutSeal.IsHeld(drop) && !drop.CanPickup(false) && !drop.m_autoPickup && !drop.m_autoDestroy;
+            }
+            bool same = BlueprintStorageCapture.TrySnapshotInventory(player.GetInventory(), out var current) &&
+                current.Info == (payout?.BeforeInfo ?? payoutInventory?.Info) && current.Zdo == (payout?.BeforeBytes ?? payoutInventory?.Zdo);
+            var active = runtime.Payout;
+            return JsonUtility.ToJson(new PayoutReceipt { id = payoutTarget.ToString("N"), phase = payout?.Phase ?? 0,
+                status = active?.Project == payoutTarget ? active.Status : null, reason = active?.Project == payoutTarget ? active.Reason : null,
+                generation = payout?.Saved?.Generation ?? 0, count = count, units = units, exact = exact, sealedItems = sealedItems,
+                inventoryUnchanged = same, board = runtime.Board(payoutTarget), cancelled = record.Cancelled, blocked = runtime.BlocksInput,
+                x = record.RootPose.Values[0], y = record.RootPose.Values[1], z = record.RootPose.Values[2] });
+        }
+        public static string CheckPayoutGuards()
+        {
+            var player = BuildWorksTestIsolation.RequireLoadedSession(); var runtime = BuildWorksPlugin.QaConstructionProjects;
+            var plans = (Store)AccessTools.Field(typeof(BlueprintConstructionProjectRuntime), "store").GetValue(runtime);
+            var record = new BlueprintConstructionPayoutJournal(plans).Read(payoutTarget);
+            if (record?.Phase != BlueprintConstructionPayoutJournal.IssuedSaved) throw new InvalidOperationException("Saved sealed issuance is required before guards.");
+            foreach (var entry in record.Items)
+            {
+                var matches = UnityEngine.Object.FindObjectsByType<ItemDrop>(FindObjectsSortMode.None).Where(drop =>
+                    drop.GetComponent<ZNetView>()?.GetZDO()?.GetString(BlueprintConstructionPayoutSeal.MarkerKey, "") == entry.Id.ToString("N")).ToArray();
+                if (matches.Length != 1) throw new InvalidOperationException("Payout identity is not unique and loaded.");
+                var drop = matches[0]; var data = drop.GetComponent<ZNetView>().GetZDO(); var uid = data.m_uid;
+                if (drop.CanPickup(false) || drop.RemoveOne()) throw new InvalidOperationException("Native pickup/consume gate allowed sealed custody.");
+                player.Pickup(drop.gameObject, false, false); drop.Pickup(player);
+                AccessTools.Method(typeof(ItemDrop), "AutoStackItems").Invoke(drop, null);
+                AccessTools.Method(typeof(ItemDrop), "TimedDestruction").Invoke(drop, null);
+                ZNetScene.instance.Destroy(drop.gameObject); ZDOMan.instance.DestroyZDO(data);
+                var changed = drop.m_itemData.Clone(); changed.m_stack++;
+                ItemDrop.SaveToZDO(changed, data);
+                bool refused = false;
+                try { ItemDrop.DropItem(drop.m_itemData, drop.m_itemData.m_stack, drop.transform.position, Quaternion.identity); }
+                catch (InvalidOperationException) { refused = true; }
+                if (!refused || ZDOMan.instance.GetZDO(uid) != data || !drop || !BlueprintConstructionPayoutSeal.IsHeld(drop) ||
+                    data.GetByteArray(ZDOVars.s_itemData)?.SequenceEqual(Convert.FromBase64String(entry.Blob)) != true ||
+                    Convert.ToBase64String(BlueprintConstructionPayoutSeal.Package(drop.m_itemData)) != entry.Blob)
+                    throw new InvalidOperationException("Sealed native state changed after negative pickup/consume/stack/destroy/save/drop calls.");
+            }
+            return PayoutStatus();
+        }
+        [Serializable] private sealed class PayoutReceipt
+        {
+            public string id, status, reason;
+            public int phase, count, units;
+            public uint generation;
+            public bool exact, sealedItems, inventoryUnchanged, board, cancelled, blocked;
+            public float x, y, z;
+        }
         public static bool RemovalFinished => BuildWorksPlugin.QaConstructionProjects?.Removal?.Finished == true;
         public static string PrepareRemoval()
         {

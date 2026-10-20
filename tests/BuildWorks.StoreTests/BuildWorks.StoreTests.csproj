@@ -19,6 +19,7 @@
     <Compile Include="..\..\src\BuildWorks\BlueprintConstructionProjectStore.cs" Link="BlueprintConstructionProjectStore.cs" />
     <Compile Include="..\..\src\BuildWorks\BlueprintConstructionPartJournal.cs" Link="BlueprintConstructionPartJournal.cs" />
     <Compile Include="..\..\src\BuildWorks\BlueprintConstructionCancellationJournal.cs" Link="BlueprintConstructionCancellationJournal.cs" />
+    <Compile Include="..\..\src\BuildWorks\BlueprintConstructionPayoutJournal.cs" Link="BlueprintConstructionPayoutJournal.cs" />
     <Compile Include="..\..\src\BuildWorks\ExternalBlueprintLibrary.cs" Link="ExternalBlueprintLibrary.cs" />
     <Compile Include="..\..\src\BuildWorks\BlueprintExchangeFormat.cs" Link="BlueprintExchangeFormat.cs" />
     <Compile Include="..\..\src\BuildWorks\PlanBuildExport.cs" Link="PlanBuildExport.cs" />

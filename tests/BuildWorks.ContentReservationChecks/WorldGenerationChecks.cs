@@ -130,6 +130,7 @@ namespace ReservationChecks
                 Check(binding.TryStart(CancellationToken.None, out _), "Thread fixture start failed"); Wait(binding);
                 Check(binding.TryFinish(out _, out _) && !touchedWorker, "Unity custody callback ran on worker");
                 AbsenceCases(frame, root);
+                ExactBlobCases(frame, root);
                 Check(frame.Transfer.TryBeginReturn(out var returned, out string error), error);
                 Check(returned.MoveNext() == BlueprintStorageTransfer.Result.Transferred, "Return fixture failed"); WriteWorld(frame, root);
                 Check(returned.TryPrepareWorldReadback(out binding, out error) && binding.Operation != frame.Operation, error ?? "Return operation identity lost");
@@ -140,6 +141,34 @@ namespace ReservationChecks
             }
             finally { frame.Transfer?.Dispose(); SaveSystem.Generation = 7; SaveSystem.Suffix = ""; Directory.Delete(root, true); }
             Console.WriteLine("PASS " + assertions + " generation/worker/custody/file-handle assertions; native host substituted, temporary fixtures only; no game save or settlement.");
+        }
+        private static void ExactBlobCases(TransferChecks.Frame frame, string root)
+        {
+            WriteWorld(frame, root);
+            const int ownerKey = 1234561, markerKey = 1234562, blobKey = 1234563;
+            Guid id = Guid.NewGuid(); byte[] payload = { 110, 7, 8, 9 };
+            File.WriteAllBytes(Path.Combine(root, "01_02__3_7.chunk"), Bytes(w => {
+                w.Write((short)41); w.Write(1); w.Write((ushort)(256 | 32 | 64 | 128));
+                w.Write(0f); w.Write(0f); w.Write(0f); w.Write(123);
+                w.Write((byte)1); w.Write(ownerKey); w.Write(100L);
+                w.Write((byte)1); w.Write(markerKey); w.Write(id.ToString("N"));
+                w.Write((byte)1); w.Write(blobKey); w.Write(payload.Length); w.Write(payload);
+            }));
+            BlueprintStorageWorldGeneration ReadBlob(long owner, byte[] bytes)
+            {
+                Check(BlueprintStorageWorldGeneration.TryCaptureBlob(id, 123, owner, ownerKey, markerKey, blobKey, bytes,
+                    () => true, out var binding, out string error), error);
+                Check(binding.TryStart(CancellationToken.None, out error), error); Wait(binding); return binding;
+            }
+            Check(ReadBlob(100, payload).TryFinish(out var proof, out _) && proof.Operation == id && proof.World == 1,
+                "Exact blob with custom owner/marker keys was not verified.");
+            Check(!ReadBlob(101, payload).TryFinish(out _, out _), "Foreign payout owner accepted.");
+            Check(!ReadBlob(100, new byte[] { 110, 7, 8, 10 }).TryFinish(out _, out _), "Changed payout package accepted.");
+            var changed = ReadBlob(100, payload); SaveSystem.Generation++;
+            Check(!changed.TryFinish(out _, out _), "Changed payout generation accepted."); SaveSystem.Generation--;
+            Check(!BlueprintStorageWorldGeneration.TryCaptureBlob(id, 123, 100, ownerKey, ownerKey, blobKey, payload,
+                () => true, out _, out _), "Colliding payout keys accepted.");
+            WriteWorld(frame, root);
         }
         private static void AbsenceCases(TransferChecks.Frame frame, string root)
         {

@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.243";
+        internal const string PluginVersion = "0.19.244";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -1286,6 +1286,61 @@ namespace OstrixMods.BuildWorks
             private static Exception Finalizer(BlueprintConstructionCancellationRemoval.Witness __state, Exception __exception)
             { BlueprintConstructionCancellationRemoval.ConfirmNetwork(__state, __exception); return __exception; }
         }
+
+        [HarmonyPatch(typeof(ItemDrop), nameof(ItemDrop.DropItem))]
+        private static class BlueprintPayoutCreatePatch
+        { private static void Prefix(ItemDrop.ItemData __0) => BlueprintConstructionPayoutSeal.BeforeDrop(__0); }
+        [HarmonyPatch(typeof(ItemDrop), "Awake")]
+        private static class BlueprintPayoutAwakePatch
+        {
+            private static void Prefix(ItemDrop __instance) => BlueprintConstructionPayoutSeal.BeforeAwake(__instance);
+            private static Exception Finalizer(ItemDrop __instance, Exception __exception)
+            { BlueprintConstructionPayoutSeal.AfterAwake(__instance, __exception); return __exception; }
+        }
+        [HarmonyPatch(typeof(ZNetView), "Awake")]
+        private static class BlueprintPayoutViewAwakePatch
+        {
+            private static void Prefix(ZNetView __instance)
+            { var drop = __instance.GetComponent<ItemDrop>(); if (drop) BlueprintConstructionPayoutSeal.BeforeAwake(drop); }
+            private static Exception Finalizer(ZNetView __instance, Exception __exception)
+            { var drop = __instance.GetComponent<ItemDrop>(); if (drop) BlueprintConstructionPayoutSeal.AfterAwake(drop, __exception); return __exception; }
+        }
+        [HarmonyPatch(typeof(ItemDrop), nameof(ItemDrop.SaveToZDO))]
+        private static class BlueprintPayoutSavePatch
+        { private static bool Prefix(ItemDrop.ItemData __0, ZDO __1, int __2) => BlueprintConstructionPayoutSeal.AllowSave(__0, __1, __2); }
+        [HarmonyPatch(typeof(ItemDrop), "OnDestroy")]
+        private static class BlueprintPayoutUnloadPatch
+        { private static void Prefix(ItemDrop __instance) => BlueprintConstructionPayoutSeal.Destroyed(__instance); }
+        [HarmonyPatch(typeof(Humanoid), nameof(Humanoid.Pickup), new Type[] { typeof(GameObject), typeof(bool), typeof(bool) })]
+        private static class BlueprintPayoutPickupPatch
+        { private static bool Prefix(GameObject __0) => !__0 || !BlueprintConstructionPayoutSeal.IsHeld(__0.GetComponent<ItemDrop>()); }
+        [HarmonyPatch(typeof(ItemDrop), nameof(ItemDrop.CanPickup))]
+        private static class BlueprintPayoutCanPickupPatch
+        { private static bool Prefix(ItemDrop __instance) => !BlueprintConstructionPayoutSeal.IsHeld(__instance); }
+        [HarmonyPatch(typeof(ItemDrop), nameof(ItemDrop.Pickup))]
+        private static class BlueprintPayoutRequestPickupPatch
+        { private static bool Prefix(ItemDrop __instance) => !BlueprintConstructionPayoutSeal.IsHeld(__instance); }
+        [HarmonyPatch(typeof(ItemDrop), nameof(ItemDrop.RemoveOne))]
+        private static class BlueprintPayoutConsumePatch
+        { private static bool Prefix(ItemDrop __instance) => !BlueprintConstructionPayoutSeal.IsHeld(__instance); }
+        [HarmonyPatch(typeof(ItemDrop), "AutoStackItems")]
+        private static class BlueprintPayoutStackPatch
+        { private static bool Prefix(ItemDrop __instance) => BlueprintConstructionPayoutSeal.AllowStack(__instance); }
+        [HarmonyPatch(typeof(ItemDrop), "TimedDestruction")]
+        private static class BlueprintPayoutExpiryPatch
+        { private static bool Prefix(ItemDrop __instance) => !BlueprintConstructionPayoutSeal.IsHeld(__instance); }
+        [HarmonyPatch(typeof(ItemDrop), "RPC_RequestOwn")]
+        private static class BlueprintPayoutOwnerPatch
+        { private static bool Prefix(ItemDrop __instance) => !BlueprintConstructionPayoutSeal.IsHeld(__instance); }
+        [HarmonyPatch(typeof(ItemDrop), nameof(ItemDrop.MakePiece))]
+        private static class BlueprintPayoutMakePiecePatch
+        { private static bool Prefix(ItemDrop __instance) => !BlueprintConstructionPayoutSeal.IsHeld(__instance); }
+        [HarmonyPatch(typeof(ZNetScene), nameof(ZNetScene.Destroy))]
+        private static class BlueprintPayoutSceneDestroyPatch
+        { private static bool Prefix(GameObject __0) => !__0 || !BlueprintConstructionPayoutSeal.IsHeld(__0.GetComponent<ItemDrop>()); }
+        [HarmonyPatch(typeof(ZDOMan), nameof(ZDOMan.DestroyZDO), new Type[] { typeof(ZDO) })]
+        private static class BlueprintPayoutNetworkDestroyPatch
+        { private static bool Prefix(ZDO __0) => !BlueprintConstructionPayoutSeal.IsHeld(__0); }
 
         [HarmonyPatch(typeof(Player), "TakeInput")]
         private static class PrecisionEditorPlayerInputPatch

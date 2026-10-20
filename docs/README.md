@@ -1,6 +1,6 @@
 # BuildWorks documentation
 
-[QA .243 / checkpoint251](CHECKPOINT_251.md) — controlled paid structural removal and saved absence verified; restitution/UI/network remain open. [Checkpoint250](CHECKPOINT_250.md) contains the unchanged GPU-house evidence; owner v11 appearance acceptance remains pending.
+[QA .244 / checkpoint252](CHECKPOINT_252.md) —4sealed stacks/8Wood saved and reloaded; collection/paid cancellation remain open. [Checkpoint250](CHECKPOINT_250.md) retains the prior GPU house evidence; v11 appearance is not accepted.
 
 [Русский](README_RU.md) · [Project home](../README.md)
 

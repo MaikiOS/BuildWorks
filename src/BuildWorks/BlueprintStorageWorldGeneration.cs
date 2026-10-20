@@ -65,6 +65,12 @@ namespace OstrixMods.BuildWorks
             => TryCapture(operation, custodyUnchanged, null, out expectation, out reason,
                 world => new NativeWorldStorageReadback.AbsenceExpectation(world, markerKey, parts));
 
+        internal static bool TryCaptureBlob(Guid item, int prefab, long payer, int ownerKey, int markerKey, int blobKey, byte[] package, Func<bool> custodyUnchanged,
+            out BlueprintStorageWorldGeneration expectation, out string reason)
+            => TryCapture(item, custodyUnchanged, world => NativeWorldStorageReadback.Expectation.ForExactBlob(world, item, prefab,
+                payer, ownerKey, markerKey, blobKey, package),
+                out expectation, out reason);
+
         private static bool TryCapture(Guid operation, Func<bool> custodyUnchanged, Func<long, NativeWorldStorageReadback.Expectation> factory,
             out BlueprintStorageWorldGeneration expectation, out string reason, Func<long, NativeWorldStorageReadback.AbsenceExpectation> absence = null)
         {

@@ -1,6 +1,6 @@
 # BuildWorks
 
-**QA .243 installed, checkpoint251:** controlled removal of committed structural parts now precedes restitution. Prepared → RemovalIntent → RemovedSaved is durable, freezes construction and binds absence to the next world-save generation. 50 focused checks, full Store/Geometry and normal/QA builds pass. Native Valheim:17 paid/removal steps plus2 reload steps; generation160→161, exact removal inventory unchanged and no new native drops. Explicit Prepared resume after world reload also reached157→158; its drop observer failed because it compared network IDs across reload. Both harness failures are retained. Payout/pickup, ambiguous RemovalIntent recovery, secondary collapse, product UI and networking remain open. Two owned QA projects retain receipts for8Wood owed by the future restitution protocol; nothing was issued. Normal quit/bridge3/3 restored. [Evidence](docs/CHECKPOINT_251.md).
+**QA .244 installed, checkpoint252:** original paid receipts now produce sealed items in the saved world. Two retained debts issued4stacks/8Wood in Valheim; inventory stays59Wood. Both9-step issuance scenarios,6 reload checks and6 post-replay checks pass; repeat issuance was refused. Collection remains sealed: **paid cancellation is not complete**. Next: permanent payer-profile consumption receipts, controlled collection and terminal cancellation, then faults/recovery/secondary collapse/networking. Normal quit and bridge3/3 restored. [Evidence](docs/CHECKPOINT_252.md).
 
 **Historical checkpoint250, QA .242:** plain QA now uses the measured256MiB GPU budget without a candidate property. Native Valheim:resident32/VelocityUpload=null,prepare12/12,recorded72/72 with520/520frames,35.88FPS/52.37s,26windows34–36FPS,fog queue1–2/velocity CPU-copy0. Contact24/24:9parts/108160exact inner texels,all28 recovered. Max145.07ms coincides with the first synchronous reference capture; causality/perfect smoothness unproved. Builds/contracts/Geometry/localization1122/isolation pass. Normal quit/bridge3/3; .242 stays installed. Normal/ordinary Editor retain98,304,000bytes; shader/costs unchanged. v11 appearance,public GPU budget,heavy blueprints,paid cancellation/network remain open. [Evidence](docs/CHECKPOINT_250.md).
 
@@ -10,7 +10,7 @@ BuildWorks extends Valheim's hammer with precise construction, a blueprint catal
 
 ![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
 
-**Current source:0.19.243; installed isolated QA:0.19.243.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
+**Current source:0.19.244; installed isolated QA:0.19.244.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
 
 Historical [.240](docs/CHECKPOINT_240.md) preserves two failed fog experiments. Memory reuse is **disabled** in normal/QA builds; whole-house fog remains unfixed. No .240 Valheim run.
 

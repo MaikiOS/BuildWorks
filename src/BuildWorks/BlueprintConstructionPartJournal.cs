@@ -294,7 +294,7 @@ namespace OstrixMods.BuildWorks
             (before.DurabilityHundredths == after.DurabilityHundredths && before.LegacyDurability == after.LegacyDurability ||
              allowWear && before.Equipped && (before.DurabilityHundredths.HasValue && after.DurabilityHundredths.HasValue && after.DurabilityHundredths <= before.DurabilityHundredths ||
              before.LegacyDurability.HasValue && after.LegacyDurability.HasValue && after.LegacyDurability <= before.LegacyDurability));
-        private static IReadOnlyList<BlueprintContainerInventory.Item> ValidateInventory(string info, string bytes)
+        internal static IReadOnlyList<BlueprintContainerInventory.Item> ValidateInventory(string info, string bytes)
         {
             if (info == null || bytes == null) throw new InvalidDataException("Exact inventory evidence is required.");
             var data = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, info, bytes, null);

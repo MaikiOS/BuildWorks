@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-20 — 256: retained refund credited and persisted
+
+Without changing .247, recovered the existing tombstone inventory and collected two retained4-Wood debts.45/45 native steps passed:59→67, four receipts/exact inventory, reload, replay without insertion/save. Independent extraction and review confirmed the bounded result. Normal quit and3DLL bridge restoration completed. Old sources remain sealed; cleanup/full cancellation/faults/network and v11 acceptance remain open. [Report](CHECKPOINT_256.md).
+
 ## 2026-10-20 — 255: exact saved pair before profile credit
 
 .247 adds durable credit intent, exact native empty-cell insertion, permanent receipt and saved inventory/customData pair verification. Receipt-only cannot settle an intent. Independent reviews caught and fixed generation/custody/save-pair boundary defects; BLOCKED evidence is retained. CPU/Store/Geometry/build/contracts pass; corrected QA installation preserved177 protected files. Native credit was not started: stale phase0 preflight expectation, followed by character death between temporary-protection scripts. Owner requested PassiveMobs; normal .247 package prepared, with no new snap fix. [Evidence and limits](CHECKPOINT_255.md).

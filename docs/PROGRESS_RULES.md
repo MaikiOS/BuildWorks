@@ -20,6 +20,16 @@ Document roles clarified at Ostrix's request on2026-10-20. [Русский](PROG
 7. Keep a separate owner-test queue linked to subpoint IDs. Before assigning a test, verify the installed build and provide ready files/fixtures/authorized supplies, initial state, Russian UI actions, expected outcome and failure signs. A stale manual report must be refreshed first.
 8. Distinguish source, automated checks, deployment, Valheim state, owner acceptance and host+remote evidence. Tool success/build success is not end-to-end proof. Retain failed reports unchanged.
 
+## Entry templates and document boundary
+
+A live item keeps its stable ID and observable player outcome: `- [ ] **8.7 В работе:** player outcome; what is available and what remains before this exact condition is met.` Keep internal classes, file-write protocols, hashes, assertion counts and checkpoint narratives in WORK_STATUS/reports. A technical subtask is not a newly completed goal requirement.
+
+For the same ID, WORK_STATUS records implementation → evidence and tested version → unconfirmed/broken behavior → cause/dependency → next technical action → evidence link. Separate the verified snapshot from unfinished source edits; a new source file alone is not working behavior.
+
+A journal entry records date → change and reason → verification result → report link. Append history there; update the current WORK_STATUS conclusions in place. Do not copy journal entries into the top of either current document.
+
+Before saving, check that Ostrix can see which goal item is done/open, what is being worked on and whether owner action is needed without reading internal protocols or build history. Simplify the checklist entry if this boundary has drifted.
+
 After a verified step, update its existing checklist items, current technical evidence, dated journal and test readiness. Verify14sections/IDs/links and scope preservation, then checkpoint/sync under existing authorization. Documentation-only corrections do not require a new DLL or game launch.
 
 Document edits do not change the Goal API. Do not claim a goal transition when only files changed. Pause/resume follows Ostrix; completion requires the full objective audit. The pre-reorganization text is retained in [a historical snapshot](PROGRESS_SNAPSHOT_252_RU.md), not another current checklist.

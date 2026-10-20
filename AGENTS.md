@@ -98,6 +98,9 @@ with archive links. `docs/WORK_STATUS_RU.md` holds technical evidence, limitatio
 causes and dependencies; `docs/DEVELOPMENT_JOURNAL_RU.md` holds dated history.
 Separate source/tests/deployment/Valheim/owner/network proof. Documentation does
 not update the goal API; no DLL rebuild/deployment is needed for text-only work.
+Write live items as observable player outcomes plus the remaining completion
+condition. Keep internal protocols/counters in WORK_STATUS and dated attempts in
+the journal; a technical subtask must not become a newly closed goal requirement.
 
 # Working Commands
 

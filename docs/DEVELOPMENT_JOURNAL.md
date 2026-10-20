@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-20 — owner-facing checklist wording
+
+At Ostrix's request, rechecked all 14 sections and 115 stable subpoints without changing completion states or acceptance boundaries. Reworded the current action and 8.7 as player outcomes, removed the stale .244 manual-queue target, and added explicit checklist/status/journal templates to [the rules](PROGRESS_RULES.md) and their AGENTS boundary. WORK_STATUS distinguishes the verified .246 snapshot from unfinished source edits. Documentation only; no build, deployment or game run.
+
 ## 2026-10-20 — 254: saved receipt after inventory changes
 
 QA .246 adds separate canonical saved-receipt lookup; exact inventory proofs remain strict.952 new checks and full content/Store/Geometry/builds/contracts pass. Retained native profile read only; nonempty maps/spending synthetic. Guarded .246 deployment preserves177 protected files; no game launch.8.7/8.8 stay open: no collector/cleanup/full recovery. [Report](CHECKPOINT_254.md).

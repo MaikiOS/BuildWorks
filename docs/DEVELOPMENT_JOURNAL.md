@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-20 — 261: two new native fog-house traversals
+
+Unchanged QA .249 passed177/177 native checks and produced1040PNG/two VFR recordings along the other axis. Contact12parts/recovery28zero; maxhost135/109ms. Private-runner drain/cleanup and exact optional backpack-warning handling fixed; initial rejected preparation retained. Both owned unpaid plans canceled/verified on disk; prior projects/inventory/ordinary saves preserved, games closed/restore3. Distant framing/bright background haze limit appearance: v11 not accepted; closer clear comparison next. Gameplay DLL/shader unchanged; parallel terminal8.8 remains design. [Report](CHECKPOINT_261.md).
+
 ## 2026-10-20 — 260: remaining sources cleaned; false capture fixed
 
 After explicit owner approval,24+24 native steps clean/persist the remaining3sources: both journals revision15/four CleanupSaved total,67Wood/4receipts,75other files unchanged; full restart/replay has no effects. Auto-review rejected the initial preparation before approval; no game launch and bridge restored. In parallel, a new four-owner dense control exposed swallowed OnRenderImage exceptions; its false capture is rejected. Local wrapper/regression now refuses before PNG; corrected two-owner joint control passes labels/overlap/budget checks. Gameplay .249/shader unchanged. Full cancellation, faults/rollback, native v11 and network remain open. [Report](CHECKPOINT_260.md).

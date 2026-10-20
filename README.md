@@ -1,6 +1,6 @@
 # BuildWorks
 
-**QA .250 installed; checkpoint263:** one-generation construction/refund absence scan added and CPU-tested. Native .249 two-route cadence passed only for simulation: RenderFrames stayed0, so rendered smoothness/v11 remain unproved. Full board cancellation stays open. [Status](docs/CURRENT_STATUS.md) · [Evidence263](docs/CHECKPOINT_263.md).
+**QA .250; checkpoint264 FAILED:** real rendering without PNG reproduced the house fog-input queue overflow;11–14FPS before failure. Earlier36FPS was simulation-only. Shader optimization remains a candidate;v11/full board cancellation open. [Status](docs/CURRENT_STATUS.md) · [Evidence264](docs/CHECKPOINT_264.md).
 
 **Historical checkpoint250, QA .242:** plain QA now uses the measured256MiB GPU budget without a candidate property. Native Valheim:resident32/VelocityUpload=null,prepare12/12,recorded72/72 with520/520frames,35.88FPS/52.37s,26windows34–36FPS,fog queue1–2/velocity CPU-copy0. Contact24/24:9parts/108160exact inner texels,all28 recovered. Max145.07ms coincides with the first synchronous reference capture; causality/perfect smoothness unproved. Builds/contracts/Geometry/localization1122/isolation pass. Normal quit/bridge3/3; .242 stays installed. Normal/ordinary Editor retain98,304,000bytes; shader/costs unchanged. v11 appearance,public GPU budget,heavy blueprints,paid cancellation/network remain open. [Evidence](docs/CHECKPOINT_250.md).
 

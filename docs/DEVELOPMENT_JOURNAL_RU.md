@@ -1,5 +1,9 @@
 # Журнал разработки BuildWorks
 
+## 2026-10-20 — 264: реальная отрисовка и исправление проекта отмены
+
+Внешний QA-helper получил render-only безPNG/readback;build0/0,Python7/7,earlyStop7/3ownership PASS. Native .250:854renders/52,072с, production493 наcleanup;11–14FPS до Fog input queue full,36FPS только после отказа. Сценарий FAILED, side3/recovery не запускались.89старых файлов/инвентарь/metadata4141сохранны; config только version comment,normal quit/restore3. Архитектор отверг ожидание подбора для завершения отмены: rev3pending/rev4settled пока Draft. Далее sparse lookup parity/оптимизация; gameplay DLL/shader не менялись. [Отчёт](CHECKPOINT_264_RU.md).
+
 ## 2026-10-20 — 263: общий скан и граница фоновой cadence
 
 Установлена .250: composite absence двух групп за один scan/generation, старые callers прежние. Normal/QA0/0,Geometry597,content generation195,host/localization1122/1008,read-only review PASS. Native .249:два52с прохода/28recovery0/инвентарь прежний;36FPS относится только к simulation,RenderFrames0. Это выявленное ограничение, не доказательство плавности renderer/v11. Старые87файлов/ordinary-save metadata сохранны,normal quit/restore3. Далее render-only observer безPNG и durable terminal; полная отмена/внешний вид/сеть открыты. [Отчёт](CHECKPOINT_263_RU.md).

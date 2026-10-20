@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-20 — 264: actual rendering and cancellation-order correction
+
+External QA helper gained render-only withoutPNG/readback;build0/0,Python7/7,earlyStop7/ownership3 PASS. Native .250:854renders/52.072s,493production atcleanup;11–14FPS until Fog input queue full,36FPS only afterward. Scenario FAILED,no side3/recovery.89old files/inventory/4141save metadata preserved;config version comment only,normal quit/restore3. Architect rejected collection-gated cancellation:rev3pending/rev4settled remain Draft. Next sparse lookup parity/optimization;gameplay DLL/shader unchanged. [Report](CHECKPOINT_264.md).
+
 ## 2026-10-20 — 263: shared scan and background cadence limit
 
 QA .250 installed: composite two-set absence in one scan/generation; legacy callers unchanged. Normal/QA0/0,Geometry597,content generation195,host/localization1122/1008,read-only review PASS. Native .249 two52s routes/28zero recovery/inventory unchanged:36FPS is simulation-only,RenderFrames0; no rendered smoothness/v11 claim.87old files and ordinary-save metadata preserved,normal quit/restore3. Next render-only observer withoutPNG and durable terminal; appearance/full board cancellation/network open. [Report](CHECKPOINT_263.md).

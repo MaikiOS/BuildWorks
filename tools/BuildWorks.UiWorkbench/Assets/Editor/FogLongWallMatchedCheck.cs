@@ -19,15 +19,20 @@ public static class FogLongWallMatchedCheck
     public static void RunProbe() => Capture(true, 4, 1);
     public static void RunSingleProbe() => Capture(true, 1, 1);
     public static void RunAllDirectionsProbe() => Capture(true, 4, 4);
+    public static void RunJointProbe()
+    {
+        CheckRenderFailure();
+        Capture(true, 2, 4, true);
+    }
     private static T Field<T>(object value, string name) => (T)value.GetType().GetField(name, Instance).GetValue(value);
     private static void Set(object value, string name, object data) => value.GetType().GetField(name, Instance).SetValue(value, data);
     private static void Call(object value, string name, params object[] args) => value.GetType().GetMethod(name, Instance).Invoke(value, args);
     private static void Require(bool condition, string reason) { if (!condition) throw new InvalidOperationException(reason); }
 
-    private static void Capture(bool probeOnly, int sections, int directions)
+    private static void Capture(bool probeOnly, int sections, int directions, bool jointControl = false)
     {
         string root = Path.GetFullPath(Path.Combine(Application.dataPath, "../../.."));
-        string output = Path.Combine(root, "artifacts/" + (sections == 1 ? "fog-singlewall-matched-259-probe"
+        string output = Path.Combine(root, "artifacts/" + (jointControl ? "fog-pair-matched-260-joint-v2" : sections == 1 ? "fog-singlewall-matched-259-probe"
             : probeOnly && directions == 4 ? "fog-longwall-matched-259-directions"
             : "fog-longwall-matched-257" + (probeOnly ? "-probe" : "")));
         Require(!Directory.Exists(output), "Comparison output already exists; preserve previous evidence.");
@@ -35,7 +40,10 @@ public static class FogLongWallMatchedCheck
         Directory.CreateDirectory(output);
         writtenBytes = 0;
         ColorSpace previous = PlayerSettings.colorSpace;
-        var report = new Report { probeOnly = probeOnly, sections = sections, directions = directions };
+        string middle = jointControl ? "current-dense-joint" : "current-dense-sequential";
+        var report = new Report { probeOnly = probeOnly, sections = sections, directions = directions, denseComposition = middle };
+        report.referenceScope = sections == 1 ? "Approved single-wall laboratory scene; candidate appearance still requires owner acceptance"
+            : "Diagnostic " + sections + "-owner sequential reference; order dependent and not an approved joint-volume baseline";
         try
         {
             PlayerSettings.colorSpace = ColorSpace.Gamma;
@@ -56,7 +64,7 @@ public static class FogLongWallMatchedCheck
             float width = geometry.size.z;
             Require(width > .5f && width < 5, "Long-wall section width is unexpected.");
             ghost.SetActive(false); solid.SetActive(false);
-            if (sections == 4)
+            if (sections > 1)
             {
                 camera.transform.position = new Vector3(-10, 5.5f, -width * 3);
                 camera.transform.LookAt(new Vector3(0, 1, 0)); camera.fieldOfView = 52;
@@ -76,6 +84,7 @@ public static class FogLongWallMatchedCheck
                     var dense = new List<BlueprintFogVisual>(); var current = new List<BlueprintFogVisual>();
                     using (var pool = BlueprintFogChannels.CreateArena(assets, sections, sections * 8192, ledgerLayout: BlueprintFogLedgerLayout.Spatial3D))
                     using (var atlas = new BlueprintFogAtlas(assets, pool))
+                    using (var denseAtlas = jointControl ? new BlueprintFogAtlas(assets) : null)
                     try
                     {
                         for (int section = 0; section < sections; section++)
@@ -102,8 +111,13 @@ public static class FogLongWallMatchedCheck
                                 report.sourceComparisons++;
                             }
                         }
-                        foreach (string stream in new[] { "reference-sequential", "current-dense-sequential", "current-published" })
+                        foreach (string stream in new[] { "reference-sequential", middle, "current-published" })
                             Directory.CreateDirectory(Path.Combine(output, "side" + side, stream));
+                        if (jointControl)
+                        {
+                            Require(dense.Count == 2 && dense[0].VolumeBounds.Intersects(dense[1].VolumeBounds), "Joint control requires overlapping owners.");
+                            report.overlapChecks++;
+                        }
                         for (int tick = 0; tick <= 360; tick++)
                         {
                             float time = tick * BlueprintFogSimulation.Step;
@@ -130,15 +144,20 @@ public static class FogLongWallMatchedCheck
                             render.Render = (image, target) => Sequential(image, target, labs.Count, (n, input, result) => Call(labs[n], "OnRenderImage", input, result));
                             var a = Render(camera, output, side, "reference-sequential", tick);
                             SetVisible(labs, dense, current, 1);
-                            render.Render = (image, target) => Sequential(image, target, dense.Count, (n, input, result) => dense[n].RenderVolume(camera, input, result, beam, direction, strength));
-                            var b = Render(camera, output, side, "current-dense-sequential", tick);
+                            render.Render = (image, target) =>
+                            {
+                                if (denseAtlas != null) denseAtlas.Render(camera, image, target, dense, beam, direction, strength);
+                                else Sequential(image, target, dense.Count, (n, input, result) => dense[n].RenderVolume(camera, input, result, beam, direction, strength));
+                            };
+                            var b = Render(camera, output, side, middle, tick);
+                            if (denseAtlas != null) report.denseAtlasBytes = Math.Max(report.denseAtlasBytes, denseAtlas.Bytes);
                             SetVisible(labs, dense, current, 2);
                             atlas.PreparePublished(current, snapshots);
                             render.Render = (image, target) => atlas.Render(camera, image, target, current, beam, direction, strength, snapshots);
                             var c = Render(camera, output, side, "current-published", tick);
                             report.frames.Add(new Frame { side = side, tick = tick, time = time, actor = actor.position,
                                 phase = time < 2 ? "approach" : time < 3 ? "enter" : time < 4 ? "hold" : time < 5 ? "exit" : "recovery",
-                                referenceDenseMean = Delta(a, b), sequentialPublishedMean = Delta(b, c) });
+                                referenceDenseMean = Delta(a, b), densePublishedMean = Delta(b, c) });
                         }
                     }
                     finally
@@ -151,6 +170,8 @@ public static class FogLongWallMatchedCheck
                     }
                 }
                 Require(report.frames.Count == (probeOnly ? 5 : 361) * directions && report.sourceComparisons == sections * directions * 3, "Incomplete matched recording.");
+                Require(!jointControl || report.overlapChecks == directions && report.denseAtlasBytes > 0 && report.denseAtlasBytes <= BlueprintFogAtlas.MaximumBytes,
+                    "Incomplete overlap or memory proof for the joint control.");
                 report.captureComplete = true;
                 File.WriteAllText(Path.Combine(output, "verification.json"), JsonUtility.ToJson(report, true));
                 Debug.Log("FOG_LONGWALL_MATCHED_CAPTURE_COMPLETE frames=" + report.frames.Count);
@@ -212,26 +233,62 @@ public static class FogLongWallMatchedCheck
     }
     private static Color32[] Render(Camera camera, string output, int side, string stream, int tick)
     {
+        var probe = camera.GetComponent<FogRenderProbe>();
+        Require(probe && probe.Render != null, "Matched camera callback missing.");
         var target = RenderTexture.GetTemporary(960, 540, 24, RenderTextureFormat.ARGB32);
         var before = camera.targetTexture; var active = RenderTexture.active; Texture2D copy = null;
+        var draw = probe.Render; Exception failure = null; int calls = 0;
         try
         {
-            camera.targetTexture = target; camera.Render(); RenderTexture.active = target;
+            probe.Render = (source, destination) =>
+            {
+                ++calls;
+                try { draw(source, destination); }
+                catch (Exception error) { failure = error; Graphics.Blit(source, destination); }
+            };
+            camera.targetTexture = target; camera.Render();
+            if (failure != null) throw new InvalidOperationException("Matched volume callback failed.", failure);
+            Require(calls == 1, "Matched camera callback did not run exactly once.");
+            RenderTexture.active = target;
             copy = new Texture2D(960, 540, TextureFormat.RGB24, false); copy.ReadPixels(new Rect(0, 0, 960, 540), 0, 0); copy.Apply();
             byte[] png = copy.EncodeToPNG(); writtenBytes = checked(writtenBytes + png.Length);
             Require(writtenBytes <= 2L * 1024 * 1024 * 1024, "Matched PNG output budget exceeded.");
             File.WriteAllBytes(Path.Combine(output, "side" + side, stream, tick.ToString("D5") + ".png"), png); return copy.GetPixels32();
         }
-        finally { camera.targetTexture = before; RenderTexture.active = active; if (copy) Object.DestroyImmediate(copy); RenderTexture.ReleaseTemporary(target); }
+        finally { probe.Render = draw; camera.targetTexture = before; RenderTexture.active = active; if (copy) Object.DestroyImmediate(copy); RenderTexture.ReleaseTemporary(target); }
+    }
+    private static void CheckRenderFailure()
+    {
+        string root = Path.GetFullPath(Path.Combine(Application.dataPath, "../../.."));
+        string output = Path.Combine(root, "artifacts/fog-render-failure-260-v2");
+        Require(!Directory.Exists(output), "Preserve previous render failure evidence.");
+        Directory.CreateDirectory(output);
+        var host = new GameObject("Matched callback failure check");
+        try
+        {
+            Camera camera = host.AddComponent<Camera>(); var probe = host.AddComponent<FogRenderProbe>();
+            const string marker = "Expected matched callback rejection";
+            probe.Render = (source, target) => throw new InvalidOperationException(marker);
+            bool rejected = false;
+            try { Render(camera, output, 0, "rejected", 0); }
+            catch (InvalidOperationException error) when (error.InnerException?.Message == marker) { rejected = true; }
+            Require(rejected && probe.Frames == 1 && Directory.GetFiles(output, "*.png", SearchOption.AllDirectories).Length == 0,
+                "Failed camera callback produced a frame or lost its exception.");
+            File.WriteAllText(Path.Combine(output, "verification.json"), "{\"callbackExceptionPropagated\":true,\"pngFiles\":0}");
+        }
+        finally { Object.DestroyImmediate(host); }
     }
     private static double Delta(Color32[] a, Color32[] b)
     { Require(a.Length == b.Length, "Frame size mismatch."); long sum = 0; for (int i = 0; i < a.Length; i++) sum += Math.Abs(a[i].r - b[i].r) + Math.Abs(a[i].g - b[i].g) + Math.Abs(a[i].b - b[i].b); return sum / (a.Length * 3d * 255); }
-    [Serializable] private sealed class Frame { public int side, tick; public float time; public Vector3 actor; public string phase; public double referenceDenseMean, sequentialPublishedMean; }
+    [Serializable] private sealed class Frame { public int side, tick; public float time; public Vector3 actor; public string phase; public double referenceDenseMean, densePublishedMean; }
     [Serializable] private sealed class Report
     {
         public bool captureComplete, probeOnly, nativeGameTested = false, ownerVisualAcceptance = false;
-        public string referenceScope = "Diagnostic four-owner extension; sequential overlap is order dependent and is not an approved joint-volume baseline";
+        public string referenceScope;
         public string timing = "Fixed simulation30Hz, not runtime FPS";
+        public string denseComposition;
+        public string densePublishedMetric = "Normalized whole-frame RGB MAE: denseComposition versus current-published";
+        public int overlapChecks; public long denseAtlasBytes;
         public int sourceComparisons, sections, directions, width = 960, height = 540; public float sectionWidth, fov;
         public Vector3 cameraPosition; public Quaternion cameraRotation; public Vector2 body; public List<Frame> frames = new List<Frame>();
     }

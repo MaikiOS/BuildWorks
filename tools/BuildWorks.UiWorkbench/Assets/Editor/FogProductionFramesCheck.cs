@@ -46,6 +46,10 @@ public static partial class FogProductionFramesCheck
     { SessionState.SetBool(Pending + ".ReuseCandidate", true); RunNativeCadence(); }
     public static void RunAsyncCaptureCandidate()
     { SessionState.SetBool(Pending + ".AsyncCaptureCandidate", true); RunNativeCadence(); }
+    public static void RunGpuTimingCapability()
+    { SessionState.SetBool(Pending + ".GpuTimingCapability", true); Run(); }
+    public static void RunFogGpuTiming()
+    { SessionState.SetBool(Pending + ".FogGpuTiming", true); Run(); }
     private static void Advance()
     {
         try
@@ -68,6 +72,16 @@ public static partial class FogProductionFramesCheck
     }
     private static IEnumerator Check()
     {
+        if (SessionState.GetBool(Pending + ".GpuTimingCapability", false) || SessionState.GetBool(Pending + ".FogGpuTiming", false))
+        {
+            bool fogTiming = SessionState.GetBool(Pending + ".FogGpuTiming", false);
+            SessionState.SetBool(Pending + ".GpuTimingCapability", false);
+            SessionState.SetBool(Pending + ".FogGpuTiming", false);
+            var capability = fogTiming ? CheckFogGpuTiming() : CheckGpuTimingCapability();
+            try { while (capability.MoveNext()) yield return null; }
+            finally { (capability as IDisposable)?.Dispose(); }
+            yield break;
+        }
         string root = Path.GetFullPath(Path.Combine(Application.dataPath, "../../.."));
         bool nativeCadence = SessionState.GetBool(Pending + ".NativeCadence", false); SessionState.SetBool(Pending + ".NativeCadence", false);
         bool controls = SessionState.GetBool(Pending + ".NativeControls", false); SessionState.SetBool(Pending + ".NativeControls", false);

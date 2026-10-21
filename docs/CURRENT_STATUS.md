@@ -1,8 +1,8 @@
 # Current BuildWorks status
 
-2026-10-21. Installed QA **.250 unchanged**. [270](CHECKPOINT_270.md): board-independent manual return interaction and subsequent cleanup implemented/CPU-tested; native E untested. [269](CHECKPOINT_269.md): local grouped GPU-receipt candidate prepared; GPU trial waits for Ostrix to finish playing.
+2026-10-21. Installed QA **.250 unchanged**. [270](CHECKPOINT_270.md): source-owned return/cleanup CPU-checked,native E open. [269](CHECKPOINT_269.md):33GPU guards/parity PASS,ABBA0.237%within scatter. [271](CHECKPOINT_271.md):explicit shader branch,14frozen RGB delta0,ABBA4.358%less elapsed.
 
-Full house/v11/paid cancellation remain open.267 established queue growth and a small shader gain;269 is unmeasured. Git receives only the independent source step270 and documentation; local fog/shader candidates are neither published nor installed.
+Full house/v11/paid cancellation remain open. [272](CHECKPOINT_272.md) measured actual atlas GPU time:30–31ms unlit/89–91ms lit versus~0.21ms CPU submit. This is not solver,total frame or native service headroom. Fog candidates remain local,neither embedded nor installed;only the diagnostic tool is published. Next exact shader hypothesis requires compiler/parity/timing before native house retries.
 
 Requirements/current task: [owner checklist](LIVE_CHECKLIST_RU.md). Technical evidence/causes: [WORK_STATUS](WORK_STATUS_RU.md). History: [journal](DEVELOPMENT_JOURNAL.md). [Document rules](PROGRESS_RULES.md).
 

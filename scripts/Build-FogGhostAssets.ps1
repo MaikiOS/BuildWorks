@@ -27,7 +27,7 @@ Copy-Item -LiteralPath (Join-Path $ported 'FogPublished.cginc') -Destination (Jo
 foreach($name in @('FogArena.compute','FogSnapshotMetadata.compute')){
     foreach($suffix in @('','.meta')){Copy-Item -LiteralPath (Join-Path $ported ($name+$suffix)) -Destination (Join-Path $runtime ($name+$suffix))}
 }
-foreach($name in @('BlueprintFogAssets.cs','BlueprintFogAssetLayout.cs','BlueprintFogArena.cs','BlueprintFogSimulation.cs','BlueprintFogSnapshotState.cs','BlueprintFogInputQueue.cs','BlueprintFogScratch.cs','BlueprintEditorMeshData.cs','BlueprintFogContactMesh.cs','BlueprintFogSource.cs','BlueprintFogVisual.cs','BlueprintFogChannels.cs','BlueprintFogChannels.Arena.cs','BlueprintFogChannels.Sources.cs','BlueprintFogVolume.cs','BlueprintFogAtlas.cs','BlueprintFogBuilding.cs')){
+foreach($name in @('BlueprintFogAssets.cs','BlueprintFogAssetLayout.cs','BlueprintFogArena.cs','BlueprintFogSimulation.cs','BlueprintFogSnapshotState.cs','BlueprintFogInputQueue.cs','BlueprintFogScratch.cs','BlueprintEditorMeshData.cs','BlueprintFogContactMesh.cs','BlueprintFogSource.cs','BlueprintFogVisual.cs','BlueprintFogChannels.cs','BlueprintFogChannels.Arena.cs','BlueprintFogChannels.Sources.cs','BlueprintFogChannels.Performance.cs','FogPerformanceCounters.cs','BlueprintFogVolume.cs','BlueprintFogAtlas.cs','BlueprintFogBuilding.cs')){
     Copy-Item -LiteralPath (Join-Path $root ('src/BuildWorks/'+$name)) -Destination (Join-Path $project ('Assets/Editor/RuntimeSources/'+$name))
     if((Get-FileHash -LiteralPath (Join-Path $root ('src/BuildWorks/'+$name))).Hash -cne (Get-FileHash -LiteralPath (Join-Path $project ('Assets/Editor/RuntimeSources/'+$name))).Hash){throw 'Fog runtime source copy differs.'}
 }

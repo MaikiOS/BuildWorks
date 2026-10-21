@@ -1,5 +1,13 @@
 # BuildWorks development journal
 
+## 2026-10-21 — 272: GPU work separated from CPU waiting
+
+GPU recorder capability passed30positive samples;actual atlas probe passed80samples/4frozen arms. GPU30–31ms unlit/89–91ms lit,CPU submit~0.21ms. Independent review passed;canonical launcher repeated,settings hash restored,Editor exited. First test-only CS0103 retained. Gameplay candidates/installed250 unchanged;diagnostic source published independently. Next exact integer brick-coordinate hypothesis is not implemented. [272](CHECKPOINT_272.md).
+
+## 2026-10-21 — GPU checks269/271 completed
+
+After Ostrix left the game:269guards33/33,affected parity PASS;ABBA0.237%within scatter,meaningful speedup unconfirmed.271uniform shader branch proved in DXBC,14frozen RGB delta0;ABBA4.358%less CPU+GPU+drain elapsed. Independent Astra evidence/complexity review passed. No native headroom,game run or deployment;installed250 unchanged. Evidence/source frozen before subsequent edits. Next separate GPU work from CPU/wait. [269](CHECKPOINT_269.md),[271](CHECKPOINT_271.md).
+
 ## 2026-10-21 — 269/270: receipt preparation, board-independent return interaction
 
 269: grouped GPU readback and18CPU type guards prepared;normal/QA0/0,geometry/host/localization PASS. NoUnity/GPU launch while Ostrix plays.270: manual Interact→existing credit and auto cleanup after saved credit;60actual-method CPU checks,cleanup22/31,normal/QA/host/localization PASS. Review found stale-hover distance, reproduced in tool output; original disk-log is empty, so a separate guard-removal negative control is retained. Entry/pre-credit reach fixed. Read-only correctness/complexity review passed;private Local/native E/full terminal remain open. Installed build unchanged. [269](CHECKPOINT_269.md),[270](CHECKPOINT_270.md).

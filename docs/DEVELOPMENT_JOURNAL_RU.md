@@ -1,5 +1,13 @@
 # Журнал разработки BuildWorks
 
+## 2026-10-21 — 272: GPU-работа отделена от ожидания CPU
+
+GPU recorder capability:30positive;atlas probe:80samples/4frozen плеча. GPU30–31мс без света/89–91мс со светом,CPU submit≈0,21мс. Независимый обзор PASS;canonical launcher повторён,settings hash восстановлен,Editor завершён. Первая тестовая CS0103 сохранена. Gameplay-кандидаты/установленная250 прежние;инструмент диагностики публикуется отдельно. Следующая точная гипотеза делений brick ещё не реализована. [272](CHECKPOINT_272_RU.md).
+
+## 2026-10-21 — завершены GPU-проверки269/271
+
+После выхода Ostrix из игры:269guards33/33,затронутая parity PASS;ABBA0,237%внутри разброса,ускорение не подтверждено.271uniform shader branch доказан DXBC,14frozen RGB delta0;ABBA−4,358%CPU+GPU+drain elapsed. Независимый Astra-обзор доказательств/сложности пройден. Native-запас,игровой запуск и установка не выполнялись;250 прежняя. Источники/доказательства заморожены до дальнейших изменений. Далее отделить GPU-работу от CPU/ожидания. [269](CHECKPOINT_269_RU.md),[271](CHECKPOINT_271_RU.md).
+
 ## 2026-10-21 — 269/270: подготовка квитанций, получение возврата без таблички
 
 269: группировка GPU-readback и18CPU type guards подготовлены; normal/QA0/0, geometry/host/localization PASS. Unity/GPU не запускались из-за игры Ostrix.270: ручной Interact→существующий credit, auto cleanup после сохранения;60actual-method CPU checks, cleanup22/31 и normal/QA/host/localization PASS. Обзор нашёл stale-hover дистанцию, воспроизведённую в tool-выводе; исходный disk-log пуст, поэтому сохранён отдельный успешный отрицательный контроль удалённого guard. Дистанция исправлена на входе и перед зачислением. Два read-only обзора пройдены; private Local/native E и full terminal открыты. Установка прежняя. [269](CHECKPOINT_269_RU.md), [270](CHECKPOINT_270_RU.md).

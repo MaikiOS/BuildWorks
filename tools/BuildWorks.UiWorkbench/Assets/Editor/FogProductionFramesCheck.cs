@@ -12,7 +12,7 @@ using UnityEngine.Rendering;
 
 // Production GPU budget/cadence with Editor-only RAM reuse; normal/QA builds retain the previous memory path.
 [InitializeOnLoad]
-public static class FogProductionFramesCheck
+public static partial class FogProductionFramesCheck
 {
     private const string Pending = "BuildWorks.FogProductionFrames.Pending";
     private static IEnumerator run;

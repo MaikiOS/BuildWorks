@@ -1,8 +1,8 @@
 # Current BuildWorks status
 
-2026-10-21. Installed QA **0.19.250** after guarded restoration. Local **0.19.251** candidate passed CPU/GPU parity but repeated the house queue failure and remains unpromoted. [265](CHECKPOINT_265.md).
+2026-10-21. QA **0.19.250 unchanged**, no Valheim launch. Frozen28-owner measurement established significant lighting cost; ineffective shader change removed. [266](CHECKPOINT_266.md).
 
-1565Camera.Render/52.0605s;production176 includes6earlyStop frames. Post-fault36FPS is not credited. Repetitions stopped; next isolate lighting cost across28owners. Full board cancellation remains open.
+Medians per8frames:281.868ms unlit/816.901ms lit. CPU+GPU+target wait/readback elapsed, not pure GPU time or native-house FPS. TwoDXBC variants obtained; next test ordered candidate traversal without indexable lists. v11/full cancellation remain open.
 
 Requirements/current task: [owner checklist](LIVE_CHECKLIST_RU.md). Technical evidence/causes: [WORK_STATUS](WORK_STATUS_RU.md). History: [journal](DEVELOPMENT_JOURNAL.md). [Document rules](PROGRESS_RULES.md).
 
@@ -14,7 +14,7 @@ Requirements/current task: [owner checklist](LIVE_CHECKLIST_RU.md). Technical ev
 | Catalog and file exchange | Categories, Save As, delete/hide, automatic portable file, Share, batch import/export | Limited batch .197 import/export/reentry proved | Full batch UI/dirty draft/restart; some owner checks remain |
 | Server library and sharing | Administrator publication; players/admin visibility, verified personal copies, provenance; in-process checks | Host+remote not accepted | Live access/reconnect/restart; direct player-to-player transfer |
 | Items and storage | Separate storage/mount inclusion; supplied-item preservation and journal foundations | Limited chest/inventory comparison only | Durable settlement, cancellation/refund/crash/replay, all holders/armor/admin restore and network authority |
-| v11 fog | Production renderer/unpaid28-part plan; external QA CaptureAt |265:candidate failed queue overflow;250 restored;264:real rendering FAILED11..14FPS/queue overflow;263:simulation-only;262:Clear still/FAILED343/520 | Matched v11/smoothness,measured render cadence,complete repeat recording,GPU budget/heavy houses/network |
+| v11 fog | Production renderer/unpaid28-part plan; external QA CaptureAt |266:lighting measured/ineffective change rejected;265:candidate failed queue overflow;250 restored;264:real rendering FAILED11..14FPS/queue overflow;263:simulation-only;262:Clear still/FAILED343/520 | Matched v11/smoothness,measured render cadence,complete repeat recording,GPU budget/heavy houses/network |
 | Unfinished construction | .232 Hammer/plan/board/ProjectPart; .244 sealed payout; .243 removal/Prepared resume/freeze | 260:24+24, remaining3 sources cleaned/four CleanupSaved total, fresh app/replay without effects;67Wood/4receipts; earlier payment/continuation/TRS remain scoped | All objects/contents,full restitution/cancellation/general recovery,secondary collapse,HUD/native E,server/remote |
 | World selection and heavy chain | Capture/volume foundations and targeted checks | Basic capture accepted; later coordinate/height UX issues reported | Editable volume/gizmos, boundary rules, full loaded-area and performance acceptance |
 | World objects and EarthWorks | No terrain integration dependency | None claimed | Admin-priced nonrecipe objects; EarthWorks is a later separate integration |

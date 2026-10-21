@@ -1,15 +1,43 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('Controls','NativeCadence','NativeControls','PollingCandidate','PostCaptureCandidate','TelemetryMeasurement','ReuseCandidate','AsyncCaptureCandidate')][string]$Mode='Controls',
+    [ValidateSet('Controls','NativeCadence','NativeControls','PollingCandidate','PostCaptureCandidate','TelemetryMeasurement','ReuseCandidate','AsyncCaptureCandidate','LightingMeasurement')][string]$Mode='Controls',
     [string]$UnityPath='C:/Program Files/Unity/Hub/Editor/6000.0.61f1/Editor/Unity.exe'
 )
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
 
+function Assert-FogLightingEvidence($result,[string]$RunId) {
+    if($result.passed -isnot [bool] -or !$result.passed -or $result.resourcesReleased -isnot [bool] -or !$result.resourcesReleased -or
+       $result.mode -cne 'LightingMeasurement' -or $result.runId -cne $RunId -or ![string]::IsNullOrEmpty($result.failure)) {throw 'Lighting identity/result failed.'}
+    foreach($flag in @('gameHostTested','nativeHouseGeometryTested','gpuTimingsMeasured')) {
+        if($result.$flag -isnot [bool] -or $result.$flag) {throw 'Unsupported lighting measurement scope.'}
+    }
+    foreach($pair in @(@('owners',28),@('residentCapacity',32),@('renderCalls',68),@('width',960),@('height',540))) {
+        $value=$result.($pair[0]); if($value.GetType() -notin @([int],[long]) -or $value -ne $pair[1]) {throw 'Lighting coverage differs.'}
+    }
+    foreach($key in @('fieldBytes','renderBytes')) {
+        $value=$result.$key; if($value.GetType() -notin @([int],[long]) -or $value -le 0 -or $value -gt 256MB) {throw 'Lighting resource accounting invalid.'}
+    }
+    if($result.meanLightingByteDelta.GetType() -notin @([int],[long],[double],[decimal]) -or
+       ![double]::IsFinite([double]$result.meanLightingByteDelta) -or $result.meanLightingByteDelta -le .0001) {throw 'Lighting control insensitive.'}
+    if(@($result.rows).Count -ne 6) {throw 'Lighting series missing.'}
+    $strengths=@(0,1.6,1.6,0,0,1.6)
+    for($i=0;$i -lt 6;$i++) {
+        $row=$result.rows[$i]
+        foreach($key in @('beamStrength','elapsedMilliseconds')) {
+            $value=$row.$key
+            if($value.GetType() -notin @([int],[long],[double],[decimal]) -or ![double]::IsFinite([double]$value)) {throw 'Lighting measurement invalid.'}
+        }
+        if($row.frames.GetType() -notin @([int],[long]) -or $row.frames -ne 8 -or [math]::Abs($row.beamStrength-$strengths[$i]) -gt .000001 -or
+           $row.elapsedMilliseconds -le 0 -or $row.elapsedMilliseconds -ge 30000) {throw 'Lighting series invalid.'}
+    }
+}
+
 # Pure receipt gate; CPU tests extract this function without launching Unity.
 function Assert-FogProductionFramesEvidence([string]$Path,[datetime]$StartedUtc,[string]$ExpectedMode,[string]$RunId) {
     if(!(Test-Path -LiteralPath $Path -PathType Leaf) -or (Get-Item -LiteralPath $Path).LastWriteTimeUtc -lt $StartedUtc){throw 'Fresh production-frame report missing.'}
     $result=Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+    if($ExpectedMode -ceq 'LightingMeasurement') { Assert-FogLightingEvidence $result $RunId; return }
     function Number($value,[bool]$integer=$false) {
         ($null -ne $value) -and ($value.GetType() -in @([int],[long],[double],[single],[decimal])) -and
         [double]::IsFinite([double]$value) -and (!$integer -or $value.GetType() -in @([int],[long]))
@@ -178,10 +206,14 @@ New-Item -ItemType Directory -Path $output | Out-Null
 Get-ChildItem -LiteralPath (Join-Path $project 'Assets/Editor') -Filter '*.cs' -Recurse | ForEach-Object {
     @{file=[IO.Path]::GetRelativePath($project,$_.FullName);sha256=(Get-FileHash -LiteralPath $_.FullName).Hash}
 } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'sources.json')
-$method=switch($Mode){'Controls'{'Run'}'NativeCadence'{'RunNativeCadence'}'NativeControls'{'RunNativeControls'}'PollingCandidate'{'RunPollingCandidate'}'PostCaptureCandidate'{'RunPostCaptureCandidate'}'TelemetryMeasurement'{'RunTelemetryMeasurement'}'ReuseCandidate'{'RunReuseCandidate'}'AsyncCaptureCandidate'{'RunAsyncCaptureCandidate'}}
+$method=switch($Mode){'Controls'{'Run'}'NativeCadence'{'RunNativeCadence'}'NativeControls'{'RunNativeControls'}'PollingCandidate'{'RunPollingCandidate'}'PostCaptureCandidate'{'RunPostCaptureCandidate'}'TelemetryMeasurement'{'RunTelemetryMeasurement'}'ReuseCandidate'{'RunReuseCandidate'}'AsyncCaptureCandidate'{'RunAsyncCaptureCandidate'}'LightingMeasurement'{'RunLightingMeasurement'}}
 $settings=Join-Path $project 'ProjectSettings/ProjectSettings.asset'; $saved=[IO.File]::ReadAllBytes($settings)
+$response=Join-Path $project 'Assets/csc.rsp'; $responseMeta=$response+'.meta'; $responseCreated=$false
+$responseText='-define:BUILDWORKS_FOG_GPU_RESIDENT_CANDIDATE'
+if($Mode -ceq 'LightingMeasurement' -and ((Test-Path -LiteralPath $response) -or (Test-Path -LiteralPath $responseMeta))) {throw 'Existing compiler response file; review it before a lighting run.'}
 $process=$null; $started=[datetime]::UtcNow
 try {
+    if($Mode -ceq 'LightingMeasurement') { [IO.File]::WriteAllText($response,$responseText); $responseCreated=$true }
     $arguments=@('-batchmode','-force-d3d11','-projectPath',('"'+$project+'"'),'-executeMethod',('FogProductionFramesCheck.'+$method),
         '-logFile',('"'+(Join-Path $output 'unity.log')+'"'),'-fogEvidenceId',$id,'-fogEvidenceOutput',('"'+$output+'"'))
     $process=Start-Process -FilePath $UnityPath -ArgumentList $arguments -WindowStyle Hidden -PassThru
@@ -194,6 +226,13 @@ try {
     Assert-FogProductionFramesEvidence (Join-Path $output 'verification.json') $started $Mode $id
     Write-Output ('PASS production-frame diagnostic only; no Valheim/native-house acceptance: '+$output)
 } finally {
-    if($null -eq $process -or $process.HasExited){[IO.File]::WriteAllBytes($settings,$saved)}
+    if($null -eq $process -or $process.HasExited){
+        [IO.File]::WriteAllBytes($settings,$saved)
+        if($responseCreated) {
+            if([IO.File]::ReadAllText($response) -cne $responseText) {throw 'Diagnostic response file changed; cleanup retained for review.'}
+            [IO.File]::Delete($response)
+            if(Test-Path -LiteralPath $responseMeta) {[IO.File]::Delete($responseMeta)}
+        }
+    }
     else {Write-Warning ('Unity PID'+$process.Id+' still live; settings cleanup pending. No forced termination.')}
 }

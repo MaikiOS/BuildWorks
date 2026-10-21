@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-21 — 266: lighting measurement and real DXBC
+
+Separate Editor28frozen/32resident/68render mode;CPU9modes/98negative PASS. Medians per8frames281.868/816.901ms:lighting2.898×includingCPU/GPU/drain. Early return passed14exact pixel comparisons but817.800ms showed no benefit;change removed/bundle restored. CompilerProbe:2DXBC/invalid refused;bufinfo alreadyhoisted,twoindexable32lists remain. Next ordered bitmap candidate. Installed250 unchanged,noValheim launch;v11/full cancellation open. [Report](CHECKPOINT_266.md).
+
 ## 2026-10-21 — 265: candidate checked, house failure retained
 
 CPU/GPU lookup parity PASS636417/65812/453;native .251 again FAILED queue overflow,1565renders/52.0605s,production176including6early frames. Repetitions stopped;91oldfiles/inventory/ordinary-save metadata preserved,normal quit/restore3. Installed250 restored;251remains a local unpromoted candidate. Next isolate lighting cost across28owners; old harness used beam0/4resident. Parallel review: rev3 and board-independent collection belong together or refunds become inaccessible. [Report](CHECKPOINT_265.md).

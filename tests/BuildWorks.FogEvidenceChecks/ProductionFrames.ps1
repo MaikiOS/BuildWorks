@@ -4,6 +4,8 @@ $root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $tokens=$null; $errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $root 'scripts/Test-FogProductionFrames.ps1'),[ref]$tokens,[ref]$errors)
 if($errors.Count){throw ($errors | Out-String)}
+$lightingGuard=$ast.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Assert-FogLightingEvidence'},$true)
+. ([scriptblock]::Create($lightingGuard.Extent.Text))
 $guard=$ast.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Assert-FogProductionFramesEvidence'},$true)
 . ([scriptblock]::Create($guard.Extent.Text))
 $directory=Join-Path $root ('artifacts/fog-evidence-fixtures/production-'+[guid]::NewGuid().ToString('N'))
@@ -28,6 +30,11 @@ function QueueTrace([string]$shape='steady') {
     }) | Set-Content -LiteralPath (Join-Path $folder 'frames.jsonl')
 }
 function Receipt([string]$mode='NativeCadence') {
+    if($mode -ceq 'LightingMeasurement') {
+        return @{passed=$true;resourcesReleased=$true;failure='';mode=$mode;runId=$id;gameHostTested=$false;nativeHouseGeometryTested=$false;gpuTimingsMeasured=$false;
+            owners=28;residentCapacity=32;renderCalls=68;width=960;height=540;fieldBytes=209948980;renderBytes=111130320;meanLightingByteDelta=.5;
+            rows=@(foreach($light in @(0,1.6,1.6,0,0,1.6)){@{beamStrength=$light;frames=8;elapsedMilliseconds=100.0}})}
+    }
     if($mode -ceq 'AsyncCaptureCandidate'){QueueTrace}
     $native=$mode -cne 'Controls'; $measurement=$mode -ceq 'TelemetryMeasurement'; $postCapture=$mode -ceq 'PostCaptureCandidate'; $polling=$postCapture -or $mode -ceq 'PollingCandidate'; $duration=if($measurement){20}elseif($native){48}else{22}
     $profiling=$measurement -or $mode -cin @('ReuseCandidate','AsyncCaptureCandidate')
@@ -60,10 +67,24 @@ function Reject([string]$name,[scriptblock]$edit,[string]$expected='NativeCadenc
     $script:rejections++
 }
 # Synthetic validator fixtures, never GPU/Valheim evidence.
-foreach($mode in @('Controls','NativeCadence','NativeControls','PollingCandidate','PostCaptureCandidate','TelemetryMeasurement','ReuseCandidate','AsyncCaptureCandidate')){
+foreach($mode in @('Controls','NativeCadence','NativeControls','PollingCandidate','PostCaptureCandidate','TelemetryMeasurement','ReuseCandidate','AsyncCaptureCandidate','LightingMeasurement')){
     Receipt $mode | ConvertTo-Json -Depth 9 | Set-Content -LiteralPath $path
     Assert-FogProductionFramesEvidence $path $started $mode $id
 }
+Reject 'lighting string bool' {param($v) $v.passed='true'} 'LightingMeasurement'
+Reject 'lighting wrong run' {param($v) $v.runId='old'} 'LightingMeasurement'
+Reject 'lighting unfinished cleanup' {param($v) $v.resourcesReleased=$false} 'LightingMeasurement'
+Reject 'lighting GPU timing overclaim' {param($v) $v.gpuTimingsMeasured=$true} 'LightingMeasurement'
+Reject 'lighting native overclaim' {param($v) $v.nativeHouseGeometryTested=$true} 'LightingMeasurement'
+Reject 'lighting string counter' {param($v) $v.owners='28'} 'LightingMeasurement'
+Reject 'lighting old residency' {param($v) $v.residentCapacity=4} 'LightingMeasurement'
+Reject 'lighting missing render' {param($v) $v.renderCalls=67} 'LightingMeasurement'
+Reject 'lighting budget' {param($v) $v.fieldBytes=300MB} 'LightingMeasurement'
+Reject 'lighting insensitive' {param($v) $v.meanLightingByteDelta=0} 'LightingMeasurement'
+Reject 'lighting missing series' {param($v) $v.rows=$v.rows[0..4]} 'LightingMeasurement'
+Reject 'lighting wrong order' {param($v) $v.rows[0].beamStrength=1.6} 'LightingMeasurement'
+Reject 'lighting changed sample count' {param($v) $v.rows[0].frames=7} 'LightingMeasurement'
+Reject 'lighting nonfinite elapsed' {param($v) $v.rows[0].elapsedMilliseconds=[double]::NaN} 'LightingMeasurement'
 Reject 'exit0/failed report' {param($v) $v.passed=$false}
 Reject 'string bool' {param($v) $v.passed='true'}
 Reject 'wrong run' {param($v) $v.runId='old'}
@@ -159,7 +180,7 @@ foreach($invalid in @('duplicate','missing','stringFlag')){
     $rejected=$false; try {& $manifestCheck}catch{$rejected=$true}
     if(!$rejected){throw ('Invalid shader manifest accepted: '+$invalid)}; $rejections++
 }
-@{passed=$true;syntheticValidatorOnly=$true;positiveModes=8;positiveManifests=1;rejected=$rejections;gpuStarted=$false;
+@{passed=$true;syntheticValidatorOnly=$true;positiveModes=9;positiveManifests=1;rejected=$rejections;gpuStarted=$false;
   validatorSha256=(Get-FileHash -LiteralPath (Join-Path $root 'scripts/Test-FogProductionFrames.ps1')).Hash;
   suiteSha256=(Get-FileHash -LiteralPath $PSCommandPath).Hash} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $directory 'verification.json')
-Write-Output ('PASS production-frame receipt gate:8 modes/1 manifest/'+$rejections+' negative cases; CPU only. '+$directory)
+Write-Output ('PASS production-frame receipt gate:9 modes/1 manifest/'+$rejections+' negative cases; CPU only. '+$directory)

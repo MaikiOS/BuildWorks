@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-21 — 287: active volume isolated from surfaces
+
+55/55 native3440×1440: active wake16.73FPS versus surface-only148.96. Stale Phase/short window rejected; analyzer guard and independent review pass. Normal exit/restore3; project hashes/ordinary-save metadata/cfg preserved. Candidate capture failed, final inventory unverified; no visual acceptance. Astra selected half-res wake/fullres composition; installed .264 unchanged. [287](CHECKPOINT_287.md).
+
 ## 2026-10-21 — 286: real renderer and partial candidate comparison
 
 Linear bundle/helper build0/0, Python7/7, Astra correctness/Ponytail. Two batch probes produced0renders; normal renderer confirmed3440×1440/target0 with no extra Camera.Render. Candidate138.18rest/44.27route,p95≈79ms; baseline23.89rest, next contact/main-thread timeout, surface-only not reached: full comparison FAILED. Owner-approved emergency exit67688/restore3;97project hashes/4141ordinary-save metadata/8cfg unchanged. Smoothness/visuals/final inventory remain open. [286](CHECKPOINT_286.md).

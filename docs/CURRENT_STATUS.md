@@ -1,6 +1,6 @@
 # Current BuildWorks status
 
-2026-10-21. **Local QA .264 installed, not accepted.** Owner rejected .262 for stalls/delayed fog. [286](CHECKPOINT_286.md): temporary wake-only candidate observed by the actual non-batch3440×1440renderer:138.18fps rest,44.27route, contact p95=79.29ms. Previous shader gave23.89rest; its next contact stopped answering, so full comparison FAILED. Separately approved emergency exit/restore3 completed. Appearance/smoothness/latency and surface-only control remain open; candidate not deployed, no new owner retest ready.
+21 October2026. **Installed local QA .264 remains unaccepted.** [287](CHECKPOINT_287.md):55/55 atomic renderer control isolates16.73FPS active wake versus148.96FPS surface-only with unchanged surfaces/simulation. Next: half-resolution wake with full-resolution composition. Appearance/delay remain unaccepted: candidate screenshots were not saved; final inventory is unverified. Normal exit/restore3 and preserved projects verified. No new owner test is ready.
 
 Owner review of [.252](CHECKPOINT_274.md) FAILED when fog input overflow hid the house. Later279/280 provide scoped service/contact evidence, not owner visual acceptance. Physical E, the full paid lifecycle/cancellation and multiplayer remain open. Local QA carries shader271; source-only Git publishes C# over its previous fog baseline; shader271 remains local.
 

@@ -1,5 +1,9 @@
 # Журнал разработки BuildWorks
 
+## 2026-10-21 — 287: активный объём отделён от поверхности
+
+55/55 native3440×1440: активный wake16,73FPS против surface-only148,96. Stale Phase/короткое окно отклонены, guard/независимый review PASS. Normal exit/restore3, проекты/обычные save metadata/cfg прежние. Candidate capture FAIL, итоговый inventory не подтверждён; вид не принят. Astra выбрала half-res wake/fullres composite; .264 прежняя. [287](CHECKPOINT_287_RU.md).
+
 ## 2026-10-21 — 286: настоящий renderer и частичное сравнение кандидата
 
 Linear bundle/helper build0/0, Python7/7, Astra correctness/Ponytail. Две batch пробы дали0renders; обычный renderer подтвердил3440×1440/target0 без Camera.Render. Кандидат138,18rest/44,27route,p95≈79мс; baseline23,89rest, следующий контакт/main thread timeout, surface-only не достигнут: сравнение FAILED. С разрешения Ostrix аварийный выход67688/restore3;97projectSHA/4141ordinary-save metadata/8cfg прежние. Плавность/вид/финальный inventory открыты. [286](CHECKPOINT_286_RU.md).

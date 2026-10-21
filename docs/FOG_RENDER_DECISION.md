@@ -1,6 +1,6 @@
 # Fog rendering decision
 
-Current follow-up: [286](CHECKPOINT_286.md) observed candidate through the real windowed renderer; rest/route completed, subsequent baseline contact prevented full comparison. Emergency exit separately approved, bridge restored. Neither release nor artistic acceptance; editor movie285 remains separate.
+Current follow-up: [287](CHECKPOINT_287.md) completes native candidate/surface-only: active segment16.73 versus148.96FPS with identical surfaces/solver. Astra selects half-resolution wake S/T with full-resolution source/composite and depth-aware reconstruction/fallback. This is not the previously deferred half-res old renderer. Real candidate images and visual acceptance remain required; installed .264 is unchanged.
 
 2026-10-21. Owner-requested independent read-only Astra review (`gpt-6-astra`, effort `ultra`). This selects the next experiment, **not a completed fix or accepted visual change**. Installed research QA .264 remains unchanged. [Русский](FOG_RENDER_DECISION_RU.md).
 

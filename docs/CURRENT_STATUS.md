@@ -1,6 +1,6 @@
 # Current BuildWorks status
 
-2026-10-21. **Local QA .264 installed, not accepted.** Owner rejected .262 for stalls and delayed fog. [282](CHECKPOINT_282.md): exact GPU pixel checks pass; full-size controlled render measures about22host frames/s at rest and15during contact. The regression remains open. Camera.Render/FOV55 cadence is not ordinary player camera/HUD, GPU timing or a measurement of20second latency. No owner retest requested. [283](CHECKPOINT_283.md): additional light shortcut rejected without deployment; local .264 retained.
+2026-10-21. **Local QA .264 installed, not accepted.** Owner rejected .262 for stalls and delayed fog. [284](CHECKPOINT_284.md): effect clock follows game time, but full-size controlled contact measures about12fps; extra Camera.Render is not ordinary camera/HUD or visible latency. [Independent Astra review](FOG_RENDER_DECISION.md) selects a wake-only volume candidate retaining v11 fields/surface/return. Candidate not implemented; appearance/performance remain unaccepted and no owner retest is ready.
 
 Owner review of [.252](CHECKPOINT_274.md) FAILED when fog input overflow hid the house. Later279/280 provide scoped service/contact evidence, not owner visual acceptance. Physical E, the full paid lifecycle/cancellation and multiplayer remain open. Local QA carries shader271; source-only Git publishes C# over its previous fog baseline; shader271 remains local.
 

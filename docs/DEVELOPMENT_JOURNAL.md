@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-21 — 284: clocks and independent Astra review
+
+Two15/15native runs on unchanged .264 distinguish effect/game clocks; no separate clock fix is justified, rendering remains slow. Observer review PASS; projects/inventory/ordinary-save metadata preserved, normal exit/restore3. Astra/ultra recommends wake-only volume instead of aggregate raymarch/nested light. Candidate not implemented; two decision gates and visual risks recorded. [284](CHECKPOINT_284.md), [decision](FOG_RENDER_DECISION.md).
+
 ## 2026-10-21 — 283: light shortcut did not improve rendering
 
 Candidate pixels remained exact, but GPU timing did not improve and strict compilation warned. Rejected without deployment; .264 restored and checked. Fixed metric-source mirror lists and compiler diagnostics. Performance/contact and owner acceptance remain open. [283](CHECKPOINT_283.md).

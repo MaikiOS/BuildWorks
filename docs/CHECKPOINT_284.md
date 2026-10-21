@@ -1,0 +1,15 @@
+# Checkpoint284 — clock evidence and independent Astra decision
+
+2026-10-21. **Diagnostic only; fog remains unfixed.** Installed QA .264/DLL/bundle unchanged. Owner requested an independent Astra review at effort `ultra`. It recommends an isolated wake-only volume renderer, preserving v11 simulation/surface/return, rather than continued micro-optimization of whole-house volume/light integration. [Decision and two gates](FOG_RENDER_DECISION.md); candidate not implemented. [Русский](CHECKPOINT_284_RU.md).
+
+The existing external `ValheimQA/render-probe/CadenceProbe.cs` now samples CPU HouseStatus before controlled rendering, bounded to4Hz/272observations/32768characters. Typed complete owner records and error/queue/tick guards are mandatory;16negative controls run natively. Second revision includes scaled/unscaled game clocks. No GPU readback/PNG, new controller or clock modification. Two builds0warnings/errors; existing Python tests7/7 and analyzer4negative controls pass. `verify` skill unavailable; independent read-only review is separate.
+
+Two native15/15scenarios, each24.6s: `ValheimQA/artifacts/20261021-165815` and `20261021-170841`. Second run rest22.26/22.15fps without/with CPU observer; contact12.44fps. These are controlled3440×1440/FOV55 extra Camera.Render cadence, not ordinary camera/HUD or GPU timings.
+
+Second contact54observations span15.8824real seconds,14.0514game seconds,14.0609effect seconds: game lags real by1.8310s; effect lags game by−0.0095s. No separate accumulated effect clock lag is shown in this window. Unity maximumDeltaTime=.2,timeScale1; no blind clock change is justified. Maximum captured-confirmed gap14ticks, queue10,pending7 and read16.515ms do not measure GPU publication or visible latency. The owner's20second delay remains unexplained; hold was at house centre, not sustained wall material contact.
+
+Both runs preserve97project hashes,23inventory entries/67Wood,8cfg values and4141ordinary-save membership/size/mtime. Ordinary save contents were not hashed; isolated QA chunks normally rotate. No BepInEx errors. Normal logout/menu/Quit/process gone;3bridge DLLs restored and hashes verified. No construction, resources, resets or terrain changes.
+
+Retained tooling failures: wrong `player/inventory` name corrected from bridge source to `player/get_inventory`; initial audit incorrectly hashed rotating QA chunks and stopped at missing `_main.206.chunks`, then checked cfg plus independent project/ordinary-save checks. No world restoration/deletion or weakened inventory check. Missing WORK_STATUS.md/prepare.json were not used as evidence; actual filenames were read.
+
+Evidence: `artifacts/checkpoint-284/clock-summary.json`, `clock-summary-game-clock.json`, raw cadence/native reports, `audit.json`, `audit.ps1`, build/restore/BepInEx logs and observer snapshots. Initial analyzer remains with first-format reports; current analyzer requires scaled/unscaled clock fields. Owner appearance acceptance, physical board input, paid lifecycle and multiplayer remain open. No new owner retest is ready.

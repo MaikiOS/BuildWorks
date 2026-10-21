@@ -15,11 +15,12 @@ namespace OstrixMods.BuildWorks
 #if BUILDWORKS_FOG_ORDINARY_BUDGET && (!BUILDWORKS_TEST_STAND || UNITY_EDITOR || BUILDWORKS_FOG_GPU_RESIDENT_CANDIDATE || BUILDWORKS_FOG_PAGE_REUSE_CANDIDATE)
 #error Ordinary budget probe requires QA and production allocation flags.
 #endif
-#if (BUILDWORKS_TEST_STAND && !BUILDWORKS_FOG_ORDINARY_BUDGET) || BUILDWORKS_FOG_GPU_RESIDENT_CANDIDATE
-        // Native QA house keeps its velocity history on GPU; the ordinary build budget is unchanged.
-        internal const long MaximumFieldBytes = 256L * 1024 * 1024;
-#else
+#if BUILDWORKS_FOG_ORDINARY_BUDGET
+        // Retain the old limit only to reproduce the measured paging failure in QA.
         internal const long MaximumFieldBytes = 98304000;
+#else
+        // Shared field cap, not total VRAM; render/source/driver allocations have separate lifetimes.
+        internal const long MaximumFieldBytes = 256L * 1024 * 1024;
 #endif
         internal static readonly string[] KernelNames = { "InitArena", "BeginStep", "StageLedger", "IndexFields", "ValidateCurrent", "ReserveBlocks", "ResolveBlocks", "PackFields", "CheckPacking", "CommitVelocity", "CommitLedger", "PublishFields", "CommitMaps", "FinishStep", "RestoreFields", "ReleaseCurrent", "ClearOwnerMaps", "PackStaticSource" };
         private readonly Dictionary<string, int> kernels = new Dictionary<string, int>();

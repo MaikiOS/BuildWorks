@@ -1,6 +1,6 @@
 # BuildWorks
 
-**QA .258: fog diagnosis.** The ordinary-memory short test exposed paging delay and stopped at the queue guard. The ordinary path is not fixed; the earlier long QA pass used expanded memory. The outward-facing board fix is retained. [Status](docs/CURRENT_STATUS.md).
+**QA .259: default house service retained.** Grouped service is now default; a bounded 256 MiB shared-field cap avoids constant paging. The long native run passed; outward-facing board retained. [Owner inspection](docs/MANUAL_QA_279_RU.md); traversal/v11 appearance, completion/cancellation and network remain open. [Status](docs/CURRENT_STATUS.md).
 
 **Historical checkpoint250, QA .242:** plain QA now uses the measured256MiB GPU budget without a candidate property. Native Valheim:resident32/VelocityUpload=null,prepare12/12,recorded72/72 with520/520frames,35.88FPS/52.37s,26windows34–36FPS,fog queue1–2/velocity CPU-copy0. Contact24/24:9parts/108160exact inner texels,all28 recovered. Max145.07ms coincides with the first synchronous reference capture; causality/perfect smoothness unproved. Builds/contracts/Geometry/localization1122/isolation pass. Normal quit/bridge3/3; .242 stays installed. Normal/ordinary Editor retain98,304,000bytes; shader/costs unchanged. v11 appearance,public GPU budget,heavy blueprints,paid cancellation/network remain open. [Evidence](docs/CHECKPOINT_250.md).
 

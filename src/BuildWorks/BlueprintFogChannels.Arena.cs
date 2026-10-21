@@ -28,7 +28,7 @@ namespace OstrixMods.BuildWorks
         }
         private List<ReceiptRead> receiptBatch;
 #if BUILDWORKS_TEST_STAND || UNITY_EDITOR
-        private bool immediateReceiptReads = true;
+        private bool immediateReceiptReads;
         internal bool QaImmediateReceiptReads
         {
             get => immediateReceiptReads;
@@ -379,9 +379,9 @@ namespace OstrixMods.BuildWorks
                 var stamp = token; owner.nativePending = true;
                 PerfBatch(owner.Inputs.PendingCount, token.Tick - owner.State.ConfirmedTick, metadataOnly);
                 PerfRequested(owner, FogPerformanceCounters.Kind.Receipt, stamp, capacity * 16L * 4);
-                bool defer = false;
+                bool defer = receiptBatch != null;
 #if BUILDWORKS_TEST_STAND || UNITY_EDITOR
-                defer = receiptBatch != null && !QaImmediateReceiptReads;
+                defer &= !QaImmediateReceiptReads;
 #endif
                 var read = new ReceiptRead(owner, stamp);
                 if (defer) receiptBatch.Add(read);

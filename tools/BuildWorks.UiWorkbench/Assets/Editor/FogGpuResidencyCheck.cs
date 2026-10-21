@@ -125,10 +125,10 @@ public static class FogGpuResidencyCheck
 
     public static void BaselineCompile()
     {
-        Require(BlueprintFogArena.MaximumFieldBytes == 98304000 && BlueprintFogChannels.MaximumFieldBudget == 98304000,
-            "Candidate cap leaked into the ordinary editor.");
+        Require(BlueprintFogArena.MaximumFieldBytes == 268435456 && BlueprintFogChannels.MaximumFieldBudget == 268435456,
+            "Ordinary editor field cap differs from the bounded resident default.");
         string root = Path.GetFullPath(Path.Combine(Application.dataPath, "../../.."));
-        File.WriteAllText(Path.Combine(root, "artifacts/checkpoint-247/editor-baseline.json"), "{\"passed\":true,\"fieldCap\":98304000}");
+        File.WriteAllText(Path.Combine(root, "artifacts/checkpoint-247/editor-baseline.json"), "{\"passed\":true,\"fieldCap\":268435456}");
     }
     private static void Require(bool value, string message) { if (!value) throw new InvalidOperationException(message); }
     [Serializable] private sealed class Row

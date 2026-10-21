@@ -1,6 +1,6 @@
 # Current BuildWorks status
 
-2026-10-21. Installed QA **.258 — ordinary memory-budget diagnosis**. [278](CHECKPOINT_278.md): ordinary-budget house service fell behind and the short test stopped at the queue guard. No long ordinary-budget run. Standard QA configuration restored after cleanup; default remains individual. The outward-facing [.255 board fix](CHECKPOINT_275.md) is retained; traversal/recovery and v11 appearance are not accepted.
+2026-10-21. Installed QA **.259 — grouped service by default**. [279](CHECKPOINT_279.md): the house retained for 52 seconds without paging, 1203 render calls, no QA receipt override. Shared field cap is now 256 MiB, not total VRAM. Outward-facing board retained. [Owner inspection prepared](MANUAL_QA_279_RU.md); traversal/recovery and approved-v11 parity remain open.
 
 Owner review of [.252](CHECKPOINT_274.md) remains FAILED: fog input overflow hid the house. Fog stability is not fixed or owner-accepted by this change. Physical E, the full paid lifecycle/cancellation and multiplayer remain open. Local QA carries candidate shader271; source-only Git publishes diagnostic C# over its previous fog baseline; shader271 remains local.
 

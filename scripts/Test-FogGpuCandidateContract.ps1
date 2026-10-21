@@ -23,7 +23,7 @@ foreach($kind in @('normal','qa','candidate')){
     try {
         $arena=$assembly.MainModule.GetType('OstrixMods.BuildWorks.BlueprintFogArena')
         $channels=$assembly.MainModule.GetType('OstrixMods.BuildWorks.BlueprintFogChannels')
-        $expected=if($kind -eq 'normal'){98304000L}else{268435456L}
+        $expected=268435456L
         foreach($pair in @(@($arena,'MaximumFieldBytes'),@($channels,'MaximumFieldBudget'))){
             $field=@($pair[0].Fields|Where-Object Name -CEQ $pair[1])
             if($field.Count -ne 1 -or !$field[0].HasConstant -or $field[0].Constant -ne $expected){throw ('Wrong compiled cap: '+$kind+'/'+$pair[1])}

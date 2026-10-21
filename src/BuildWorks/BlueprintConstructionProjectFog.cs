@@ -113,8 +113,8 @@ namespace OstrixMods.BuildWorks
             if (runtime.QaImmediateFogReceipts.HasValue)
             {
                 channels.QaImmediateReceiptReads = runtime.QaImmediateFogReceipts.Value;
-                channels.EnablePerformanceProbe();
             }
+            channels.EnablePerformanceProbe();
 #endif
             atlas = new BlueprintFogAtlas(assets, channels);
             oldDepth = view.depthTextureMode; ownedDepth = oldDepth | DepthTextureMode.Depth; view.depthTextureMode = ownedDepth;

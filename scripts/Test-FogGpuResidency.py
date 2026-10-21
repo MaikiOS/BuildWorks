@@ -80,7 +80,7 @@ finally:
     # Recompile after restoring, even if the candidate failed; its cap must not remain the editor baseline.
     launch("FogGpuResidencyCheck.BaselineCompile", "baseline")
     settings.write_bytes(settings_bytes)
-assert json.loads((OUT / "editor-baseline.json").read_text())["fieldCap"] == 98304000
+assert json.loads((OUT / "editor-baseline.json").read_text())["fieldCap"] == 268435456
 proof = json.loads((OUT / "gpu-oracle.json").read_text())
 assert proof["passed"] is True and proof["resident"]["residentCapacity"] == 32
 assert arena.read_bytes() == normal and settings.read_bytes() == settings_bytes

@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-21 — 279: default service without constant paging
+
+.259 enables grouped-default and a bounded256MiB shared-field cap. Short/long native default runs PASS without QA override:52.016s/1203renders, sampled queue≤10, no velocity requests. Unity receipt35/35 and builds/geometry/host/localization PASS. .259 installed;97project hashes/inventory/ordinary saves unchanged,normal exit/restore3. Owner house inspection prepared; automated contact and paid-terminal slices remain separate next steps. [279](CHECKPOINT_279.md).
+
 ## 2026-10-21 — 278: ordinary memory exposes paging limit
 
 .258 adds a QA-only ordinary-budget probe, incompatible-flag guards and actual allocation assertions. Native short run FAILED after1.747seconds:4resident, queue48; long run skipped. Full velocity paging after each batch identified; no unchanged repeat. Inventory/97project files/ordinary saves unchanged, normal exit/restore3. Standard QA configuration .258 restored; owner house acceptance not requested. [278](CHECKPOINT_278.md).

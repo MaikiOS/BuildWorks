@@ -25,6 +25,7 @@ namespace OstrixMods.BuildWorks
             public int renders, controlledRenders;
             public float clock, sunIntensity;
             public Vector3 sunDirection;
+            public long fieldBytes, arenaRenderBytes, velocityRamBytes, graphicsDriverBytes;
             public BlueprintFogChannels.ReceiptInput[] inputs;
             public FogPerformanceCounters.Snapshot counters;
         }
@@ -36,7 +37,7 @@ namespace OstrixMods.BuildWorks
             public long world;
             public long fieldBudget, reservedFieldBytes;
             public int residentCapacity;
-            public bool velocityUpload;
+            public bool velocityUpload, forcedReceiptMode;
             public bool inventoryUnchanged, completedWindow, written;
             public Frame baseline, final;
             public List<Frame> samples = new List<Frame>(212);
@@ -60,7 +61,7 @@ namespace OstrixMods.BuildWorks
 
         private static string Begin(string mode, string id, int windowSeconds)
         {
-            if (mode != "individual" && mode != "grouped") throw new ArgumentException("Choose individual or grouped receipts.");
+            if (mode != "individual" && mode != "grouped" && mode != "default") throw new ArgumentException("Choose individual, grouped or default receipts.");
             if (report != null && (report.state != "complete" && report.state != "failed" || !report.written))
                 throw new InvalidOperationException("Previous receipt arm is live or its report was not saved.");
             if (arms >= 4) throw new InvalidOperationException("Close the completed four-arm comparison first.");
@@ -78,11 +79,11 @@ namespace OstrixMods.BuildWorks
             string directory = Path.Combine(BepInEx.Paths.BepInExRootPath, "ValAgentBridge", "test-results");
             Directory.CreateDirectory(directory);
             // Reset presentation only; do not reload journals, boards, cleanup worksets or durable project data.
-            current.QaResetFogForReceipts(target, mode == "individual");
+            current.QaResetFogForReceipts(target, mode == "default" ? (bool?)null : mode == "individual");
             runtime = current; fog = runtime.Fog; player = owner; playerPosition = owner.transform.position;
             project = target; inventory = before;
             report = new Report { mode = mode, arm = ++arms, project = id, world = runtime.World, windowSeconds = windowSeconds,
-                fieldBudget = BlueprintFogChannels.MaximumFieldBudget,
+                fieldBudget = BlueprintFogChannels.MaximumFieldBudget, forcedReceiptMode = current.QaImmediateFogReceipts.HasValue,
                 path = Path.Combine(directory, "fog-receipt-arm-" + Guid.NewGuid().ToString("N") + ".json") };
             preparingAt = Time.realtimeSinceStartupAsDouble;
             return Status();
@@ -136,7 +137,8 @@ namespace OstrixMods.BuildWorks
                 if (channels.ReadReceiptInputs().Length != 28 || arena.ResidentCapacity != ExpectedResidents || arena.BlockCapacity != 32768 ||
                     report.fieldBudget != ExpectedBudget || arena.ReservedFieldBytes != ExpectedReservation ||
                     report.velocityUpload != (ExpectedResidents < 32) ||
-                    channels.QaImmediateReceiptReads != (report.mode == "individual"))
+                    channels.QaImmediateReceiptReads != (report.mode == "individual") ||
+                    runtime.QaImmediateFogReceipts.HasValue != (report.mode != "default"))
                     throw new InvalidOperationException("Receipt arm pool/mode differs from the frozen comparison.");
                 var now = Time.realtimeSinceStartupAsDouble;
                 if (report.state == "preparing")
@@ -176,6 +178,8 @@ namespace OstrixMods.BuildWorks
             Light sun = RenderSettings.sun;
             return new Frame { realtime = now, renders = fog.RenderFrames, controlledRenders = cadence.renderedFrames, clock = fog.Building(project).Clock,
                 inputs = channels.ReadReceiptInputs(), counters = counters, sunIntensity = sun ? sun.intensity : 0,
+                fieldBytes = channels.FieldBytes, arenaRenderBytes = channels.SnapshotArena.RenderBytes,
+                velocityRamBytes = channels.VelocityRamBytes, graphicsDriverBytes = UnityEngine.Profiling.Profiler.GetAllocatedMemoryForGraphicsDriver(),
                 sunDirection = sun ? sun.transform.forward : Vector3.down };
         }
         private static void Finish(string error)

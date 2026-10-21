@@ -27,7 +27,7 @@ if($hash -cne '7576245AB043F81F739F5232DD361D9BB56EBBEC9F49D0B30247AD0C01D87150'
 $frozenCompute=Join-Path $project 'Assets/FogGhostLab/AccumulatedSmoke.compute'
 $approved=Join-Path $root 'src/BuildWorks/Assets/FogGhostV11/AccumulatedSmoke.compute'
 if((Get-FileHash -LiteralPath $frozenCompute).Hash -cne (Get-FileHash -LiteralPath $approved).Hash){throw 'Frozen compute reference differs.'}
-foreach($name in @('BlueprintFogAssets.cs','BlueprintFogAssetLayout.cs','BlueprintFogArena.cs','BlueprintFogSimulation.cs','BlueprintFogSnapshotState.cs','BlueprintFogInputQueue.cs','BlueprintFogScratch.cs','BlueprintEditorMeshData.cs','BlueprintFogContactMesh.cs','BlueprintFogSource.cs','BlueprintFogVisual.cs','BlueprintFogChannels.cs','BlueprintFogChannels.Arena.cs','BlueprintFogChannels.Sources.cs','BlueprintFogChannels.Velocity.cs','BlueprintFogVolume.cs','BlueprintFogAtlas.cs','BlueprintFogBuilding.cs')){
+foreach($name in @('BlueprintFogAssets.cs','BlueprintFogAssetLayout.cs','BlueprintFogArena.cs','BlueprintFogSimulation.cs','BlueprintFogSnapshotState.cs','BlueprintFogInputQueue.cs','BlueprintFogScratch.cs','BlueprintEditorMeshData.cs','BlueprintFogContactMesh.cs','BlueprintFogSource.cs','BlueprintFogVisual.cs','BlueprintFogChannels.cs','BlueprintFogChannels.Arena.cs','BlueprintFogChannels.Sources.cs','BlueprintFogChannels.Velocity.cs','BlueprintFogChannels.Metrics.cs','BlueprintFogSparseMetrics.cs','BlueprintFogVolume.cs','BlueprintFogAtlas.cs','BlueprintFogBuilding.cs')){
     $source=Join-Path $root ('src/BuildWorks/'+$name)
     $dest=Join-Path $project ('Assets/Editor/RuntimeSources/'+$name)
     Copy-Item -LiteralPath $source -Destination $dest

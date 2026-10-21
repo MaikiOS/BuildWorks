@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-21 — 283: light shortcut did not improve rendering
+
+Candidate pixels remained exact, but GPU timing did not improve and strict compilation warned. Rejected without deployment; .264 restored and checked. Fixed metric-source mirror lists and compiler diagnostics. Performance/contact and owner acceptance remain open. [283](CHECKPOINT_283.md).
+
 ## 2026-10-21 — 282: proven empty fields and full-size contact
 
 LocalQA264 adds GPU empty-field proof and exact render shortcuts;14+14pixel comparisons unchanged. Native full-size cadence about22at rest/15during contact; all28parts recover, but performance/visual acceptance remain open. Saves/inventory unchanged; normalexit/restore3. [282](CHECKPOINT_282.md).

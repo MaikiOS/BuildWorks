@@ -38,7 +38,8 @@ public static partial class FogProductionFramesCheck
                 if (baseline) keywords.Add("BUILDWORKS_FOG_BOUNDS_BASELINE");
                 var result = pass.CompileVariant(ShaderType.Fragment, keywords.ToArray(), ShaderCompilerPlatform.D3D, BuildTarget.StandaloneWindows64, true);
                 Require(result.Success && result.Messages.Length == 0 && result.ShaderData != null && result.ShaderData.Length > 4,
-                    "Fragment variant failed or has compiler messages/empty data.");
+                    "Fragment variant failed or has compiler messages/empty data: success=" + result.Success +
+                    "; bytes=" + (result.ShaderData?.Length ?? 0) + "; " + string.Join("; ", result.Messages.Select(message => message.message)));
                 byte[] bytes = result.ShaderData;
                 Require(Encoding.ASCII.GetString(bytes, 0, 4) == "DXBC", "External compiler output is not a DXBC container; no header guessing allowed.");
                 string name = baseline ? "bounds-baseline" : "published";

@@ -1,6 +1,6 @@
 # Current BuildWorks status
 
-21 October2026. **Installed local QA .264 remains unaccepted.** [287](CHECKPOINT_287.md):55/55 atomic renderer control isolates16.73FPS active wake versus148.96FPS surface-only with unchanged surfaces/simulation. Next: half-resolution wake with full-resolution composition. Appearance/delay remain unaccepted: candidate screenshots were not saved; final inventory is unverified. Normal exit/restore3 and preserved projects verified. No new owner test is ready.
+21 October2026. **Installed diagnostic QA .265 retains the old ordinary fog, unaccepted.** [288](CHECKPOINT_288.md): half-wake implemented; scoped GPU/native56/56 pass, but active12.52FPS versus147.76 surface-only fails performance. Rain was unpinned; no clean comparison against287. Three native PNG and exact inventory confirmed; no visual acceptance. Normal logout/Quit; bridge restore awaits the end of the owner session. No new manual test ready.
 
 Owner review of [.252](CHECKPOINT_274.md) FAILED when fog input overflow hid the house. Later279/280 provide scoped service/contact evidence, not owner visual acceptance. Physical E, the full paid lifecycle/cancellation and multiplayer remain open. Local QA carries shader271; source-only Git publishes C# over its previous fog baseline; shader271 remains local.
 

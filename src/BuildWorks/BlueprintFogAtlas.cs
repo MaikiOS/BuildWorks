@@ -258,7 +258,36 @@ namespace OstrixMods.BuildWorks
             material.SetFloat("_Aspect", camera.aspect); material.SetFloat("_TanHalfFov", Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * .5f));
             material.SetVector("_BeamOrigin", beamOrigin - frame); material.SetVector("_BeamDirection", beamDirection.normalized);
             material.SetFloat("_BeamStrength", beamStrength); material.SetFloat("_BeamAttenuation", 1);
-            Graphics.Blit(image, target, material);
+            RenderImage(material, image, target);
+        }
+
+        internal static void RenderImage(Material volume, RenderTexture image, RenderTexture target)
+        {
+            int integrate = volume.FindPass("WAKE_INTEGRATE"), composite = volume.FindPass("WAKE_COMPOSITE");
+            if (integrate < 0 && composite < 0) { Graphics.Blit(image, target, volume); return; }
+            if (integrate < 0 || composite < 0) throw new InvalidOperationException("Incomplete wake rendering passes.");
+            if (!image || !SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.ARGBHalf))
+                throw new InvalidOperationException("Wake rendering requires an image and ARGBHalf support.");
+            int width = (image.width + 1) / 2, height = (image.height + 1) / 2;
+            if (width > SystemInfo.maxTextureSize || height > SystemInfo.maxTextureSize || (long)width * height * 8 > MaximumBytes)
+                throw new InvalidOperationException("Wake intermediate exceeds the render memory budget.");
+            var active = RenderTexture.active;
+            var wake = RenderTexture.GetTemporary(width, height, 0, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
+            try
+            {
+                wake.filterMode = FilterMode.Point; wake.wrapMode = TextureWrapMode.Clamp;
+                volume.SetVector("_FogLowSize", new Vector4(width, height, 1f / width, 1f / height));
+                volume.SetTexture("_FogLowTex", wake);
+                // Both passes retain the full-size source's UV convention and alpha.
+                Graphics.Blit(image, wake, volume, integrate);
+                Graphics.Blit(image, target, volume, composite);
+            }
+            finally
+            {
+                volume.SetTexture("_FogLowTex", null);
+                RenderTexture.active = active;
+                RenderTexture.ReleaseTemporary(wake);
+            }
         }
 
         internal void ChangeLayout(IReadOnlyList<Vector3Int> requested, int limit, Action<Vector3Int> allocate)

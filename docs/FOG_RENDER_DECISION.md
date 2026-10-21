@@ -1,6 +1,6 @@
 # Fog rendering decision
 
-Current follow-up: [287](CHECKPOINT_287.md) completes native candidate/surface-only: active segment16.73 versus148.96FPS with identical surfaces/solver. Astra selects half-resolution wake S/T with full-resolution source/composite and depth-aware reconstruction/fallback. This is not the previously deferred half-res old renderer. Real candidate images and visual acceptance remain required; installed .264 is unchanged.
+Current follow-up: [288](CHECKPOINT_288.md) implements half-resolution S/T; scoped composite/four-side/native56/56 controls pass, but active half12.52FPS versus147.76 surface-only fails performance. Rain unpinned. Astra identifies a flaw in the prior proposal: work is roughly N/4+f*N, with unmeasured full-resolution fallback fraction f. Small image differences may themselves reflect repeated full marches. Next single A/B: mask of the same predicate without fallback integration, only after the owner releases the game. Diagnostic QA .265 retains the ordinary bundle; no artistic acceptance.
 
 2026-10-21. Owner-requested independent read-only Astra review (`gpt-6-astra`, effort `ultra`). This selects the next experiment, **not a completed fix or accepted visual change**. Installed research QA .264 remains unchanged. [Русский](FOG_RENDER_DECISION_RU.md).
 

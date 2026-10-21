@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-21 — 288: half-wake implemented, performance failed
+
+Installed QA .265 adds a compatible C# hook with unchanged embedded bundle; half shader is temporary/local. GPU composite/four-side20sets/native56/56, three PNG and exact23item inventory verified. Active half12.52 versus surface147.76FPS fails performance; unpinned rain. Normal logout/Quit; restore3 deferred by new owner game, ordinary metadata audit incomplete. Astra reviews fullres fallback without a solver rewrite. [288](CHECKPOINT_288.md).
+
 ## 2026-10-21 — 287: active volume isolated from surfaces
 
 55/55 native3440×1440: active wake16.73FPS versus surface-only148.96. Stale Phase/short window rejected; analyzer guard and independent review pass. Normal exit/restore3; project hashes/ordinary-save metadata/cfg preserved. Candidate capture failed, final inventory unverified; no visual acceptance. Astra selected half-res wake/fullres composition; installed .264 unchanged. [287](CHECKPOINT_287.md).

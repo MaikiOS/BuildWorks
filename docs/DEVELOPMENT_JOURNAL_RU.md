@@ -1,5 +1,9 @@
 # Журнал разработки BuildWorks
 
+## 2026-10-21 — 288: half-wake реализован, скорость не прошла
+
+QA .265 устанавливает совместимый C#hook с прежним embedded bundle; half shader временный/local. GPU composite и4side20sets, native56/56,3PNG/exact23inventory подтверждены. Активный half12,52 против surface147,76FPS — performance FAILED, дождь не закреплён. Normal logout/Quit; restore3 отложен из-за новой игры Ostrix, ordinary metadata audit неполон. Astra проверяет fullres fallback без нового solver. [288](CHECKPOINT_288_RU.md).
+
 ## 2026-10-21 — 287: активный объём отделён от поверхности
 
 55/55 native3440×1440: активный wake16,73FPS против surface-only148,96. Stale Phase/короткое окно отклонены, guard/независимый review PASS. Normal exit/restore3, проекты/обычные save metadata/cfg прежние. Candidate capture FAIL, итоговый inventory не подтверждён; вид не принят. Astra выбрала half-res wake/fullres composite; .264 прежняя. [287](CHECKPOINT_287_RU.md).

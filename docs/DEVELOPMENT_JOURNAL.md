@@ -1,5 +1,17 @@
 # BuildWorks development journal
 
+## 2026-10-21 — 275: project board fix
+
+.255 installed;native23/23 and readable outward-facing wooden sign capture;inventory unchanged. Native hammer hover/Interact retains obstacles/reach. Fixture/environment failures retained;independent review passed. House/v11/full cancellation remain open. [275](CHECKPOINT_275.md).
+
+## 2026-10-21 — 274: owner inspection failed
+
+.252 house disappeared on fog queue overflow;boards were malformed/unusable. Initial ready was not stability proof. Logs retained;normal exit/restore3. [274](CHECKPOINT_274.md).
+
+## 2026-10-21 — 273: division candidate rejected
+
+Numerical checks passed;no timing improvement. Source/bundle restored. [273](CHECKPOINT_273.md).
+
 ## 2026-10-21 — 272: GPU work separated from CPU waiting
 
 GPU recorder capability passed30positive samples;actual atlas probe passed80samples/4frozen arms. GPU30–31ms unlit/89–91ms lit,CPU submit~0.21ms. Independent review passed;canonical launcher repeated,settings hash restored,Editor exited. First test-only CS0103 retained. Gameplay candidates/installed250 unchanged;diagnostic source published independently. Next exact integer brick-coordinate hypothesis is not implemented. [272](CHECKPOINT_272.md).

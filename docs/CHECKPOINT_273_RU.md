@@ -1,0 +1,9 @@
+# Этап273 — сокращение делений отклонено
+
+21.10.2026. Точное целочисленное преобразование страницы проверено на73616страницах/9сетках. DXBC published сократил `udiv`121→81;baseline DXBC побайтно прежний,temp28→29. PublishedOnly прошёл453exact GPU page comparisons/15negative/133mask и14frozen сравнений собственного bounds-варианта с delta0. Это **не** отдельное old/new pixel-доказательство для всего shared TexturedGhost helper. Сравнение233PNG разных запусков нашло29разных encoded files; причина/float-разница не исследовалась, полную old/new parity не заявляем.
+
+ABBA на прежних одинаковых входах: A5353,7762мс против B5374,7675мс/48renders;кандидат на0,392084%медленнее,размах52,402/56,117мс.784field/ledger+560scalar comparisons прошли. Ускорение не подтверждено; новый helper **отклонён**. Исходник,зеркало и bundle271 восстановлены с проверкойSHA;256отвергнутых файлов сохранены отдельно,256прежних generic proof файлов возвращены по хешам. `Move-Item` отказал `Access to the path is denied`,пустая целевая папка была проверена; завершено копированием без удаления доказательств.
+
+Доказательства: `artifacts/checkpoint-273/{integer-parity.json,compiler-comparison.json,timing-summary.json,restored.json,rejected-bundle/,rejected-published-render/}` и `shader-branch-measurement-20261021-100349-797f5a7f/`. Первый compiler launch отказал при ещё работающей сборкеUnity;после её exit0 выполнен последовательный запуск. Не было Valheim/установки от273.
+
+Параллельный read-only обзор уточнил8.7/8.8: все прежние4источника ужеCleanupSaved, поэтому native E на них не проверить без нового отдельного fixture. Старые67Wood/4receipt не восстанавливать. Следующий кодовый срез — строгое terminal-чтение rev1 journals против cancelled rev2,раздельные issuance и settlement mutators,затем связанный paid terminal/табличка. Это ещё не реализовано и не новый согласованный протокол. Ostrix переключил ближайшее действие на ручной осмотр дома в [274](CHECKPOINT_274_RU.md).

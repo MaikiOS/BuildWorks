@@ -938,7 +938,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.250.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.255.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $fogResource = @($plugin.MainModule.Resources | Where-Object Name -eq 'BuildWorks.FogGhostV11')
 Assert-Contract ($fogResource.Count -eq 1 -and $fogResource[0] -is [Mono.Cecil.EmbeddedResource]) 'Compiled v11 fog resource is missing or duplicated.'
@@ -3842,6 +3842,22 @@ try {
         'Optional cursor warp reflection contract changed; this check does not prove runtime backend/device availability.'
 }
 finally { $nativeInputSystem.Dispose() }
+
+$boardPlayer = $hostAssembly.MainModule.Types | Where-Object Name -eq 'Player'
+$boardSearch = @($boardPlayer.Methods | Where-Object {
+    $_.Name -eq 'FindHoverObject' -and ($_.Parameters.ParameterType.FullName -join ',') -eq 'UnityEngine.GameObject&,Character&'
+})
+Assert-Contract ($boardSearch.Count -eq 1 -and !$boardSearch[0].IsStatic -and $boardSearch[0].ReturnType.FullName -eq 'System.Void' -and
+    @($boardPlayer.Methods | Where-Object { $_.Name -eq 'UpdateHover' -and $_.Parameters.Count -eq 0 }).Count -eq 1 -and
+    @($boardPlayer.Fields | Where-Object { $_.Name -eq 'm_hovering' -and $_.FieldType.FullName -eq 'UnityEngine.GameObject' }).Count -eq 1 -and
+    @($boardPlayer.Fields | Where-Object { $_.Name -eq 'm_doodadController' -and $_.FieldType.FullName -eq 'IDoodadController' }).Count -eq 1) `
+    'Project board native hover search or Harmony field contract changed.'
+$boardHover = @($pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintConstructionProjectHover' -and $_.Name -eq 'Postfix' })
+$boardHoverCalls = ($boardHover.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($boardHover.Count -eq 1 -and $boardHoverCalls -match 'BlueprintConstructionProjectRuntime::HasHammer' -and
+    $boardHoverCalls -match 'BuildWorksPlugin::get_CanOpenConstructionProject' -and $boardHoverCalls -match 'BlueprintConstructionProjectRuntime::Board' -and
+    $boardHoverCalls -notmatch '::Open\(|Inventory::|::PlacePiece|Physics::Raycast') `
+    'Project board hover must preserve native search and leave interaction/payment to their existing entry points.'
 
 $steamBuild = 'unavailable'
 $steamManifest = Join-Path ([IO.Path]::GetFullPath((Join-Path $ValheimManagedDir '../../../..'))) 'appmanifest_892970.acf'

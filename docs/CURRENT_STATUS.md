@@ -1,8 +1,8 @@
 # Current BuildWorks status
 
-2026-10-21. Installed QA **.250 unchanged**. [270](CHECKPOINT_270.md): source-owned return/cleanup CPU-checked,native E open. [269](CHECKPOINT_269.md):33GPU guards/parity PASS,ABBA0.237%within scatter. [271](CHECKPOINT_271.md):explicit shader branch,14frozen RGB delta0,ABBA4.358%less elapsed.
+2026-10-21. Installed QA **.255 — board fix**. [275](CHECKPOINT_275.md):native23/23, readable wooden sign facing away from the house, grounded stake outside its footprint, hammer hover/Interact; inventory unchanged. Normal/QA0/0,host/localization,geometry135/StoreTests62 PASS.
 
-Full house/v11/paid cancellation remain open. [272](CHECKPOINT_272.md) measured actual atlas GPU time:30–31ms unlit/89–91ms lit versus~0.21ms CPU submit. This is not solver,total frame or native service headroom. Fog candidates remain local,neither embedded nor installed;only the diagnostic tool is published. Next exact shader hypothesis requires compiler/parity/timing before native house retries.
+Owner review of [.252](CHECKPOINT_274.md) remains FAILED: fog input overflow hid the house. Fog stability is not fixed or owner-accepted by this change. Physical E, the full paid lifecycle/cancellation and multiplayer remain open. Local QA carries candidate shader271; source-only Git publishes the board fix over its previous fog baseline.
 
 Requirements/current task: [owner checklist](LIVE_CHECKLIST_RU.md). Technical evidence/causes: [WORK_STATUS](WORK_STATUS_RU.md). History: [journal](DEVELOPMENT_JOURNAL.md). [Document rules](PROGRESS_RULES.md).
 

@@ -1,6 +1,6 @@
 # BuildWorks
 
-**QA .250 unchanged.** Manual return interaction and subsequent cleanup are implemented/CPU-tested; the native game path is untested. Grouped fog GPU receipts are prepared and await a GPU trial. v11/house/full cancellation remain open. [Status](docs/CURRENT_STATUS.md) · [Fog269](docs/CHECKPOINT_269.md) · [Returns270](docs/CHECKPOINT_270.md).
+**QA .255: project board fixed.** Native23/23;readable wooden sign facing away from the house, grounded stake outside its footprint and native hammer interaction;inventory unchanged. House fog/full cancellation/network remain unaccepted;.252 failed owner review. [Status](docs/CURRENT_STATUS.md).
 
 **Historical checkpoint250, QA .242:** plain QA now uses the measured256MiB GPU budget without a candidate property. Native Valheim:resident32/VelocityUpload=null,prepare12/12,recorded72/72 with520/520frames,35.88FPS/52.37s,26windows34–36FPS,fog queue1–2/velocity CPU-copy0. Contact24/24:9parts/108160exact inner texels,all28 recovered. Max145.07ms coincides with the first synchronous reference capture; causality/perfect smoothness unproved. Builds/contracts/Geometry/localization1122/isolation pass. Normal quit/bridge3/3; .242 stays installed. Normal/ordinary Editor retain98,304,000bytes; shader/costs unchanged. v11 appearance,public GPU budget,heavy blueprints,paid cancellation/network remain open. [Evidence](docs/CHECKPOINT_250.md).
 
@@ -10,7 +10,7 @@ BuildWorks extends Valheim's hammer with precise construction, a blueprint catal
 
 ![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
 
-**Git source:0.19.250; local0.19.251 candidate unpromoted; installed isolated QA:0.19.250.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
+**Source/isolated QA:0.19.255; board fix verified in a bounded native scenario.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
 
 Historical [.240](docs/CHECKPOINT_240.md) preserves two failed fog experiments. Memory reuse is **disabled** in normal/QA builds; whole-house fog remains unfixed. No .240 Valheim run.
 

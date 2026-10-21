@@ -1,6 +1,6 @@
 # Fog rendering decision
 
-Current follow-up: [285](CHECKPOINT_285.md) implements an isolated editor candidate and comparison movie. Native integration/performance and artistic acceptance remain open. This updates execution state, not the original read-only review findings.
+Current follow-up: [286](CHECKPOINT_286.md) observed candidate through the real windowed renderer; rest/route completed, subsequent baseline contact prevented full comparison. Emergency exit separately approved, bridge restored. Neither release nor artistic acceptance; editor movie285 remains separate.
 
 2026-10-21. Owner-requested independent read-only Astra review (`gpt-6-astra`, effort `ultra`). This selects the next experiment, **not a completed fix or accepted visual change**. Installed research QA .264 remains unchanged. [Русский](FOG_RENDER_DECISION_RU.md).
 

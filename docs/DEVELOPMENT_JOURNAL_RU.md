@@ -1,5 +1,9 @@
 # Журнал разработки BuildWorks
 
+## 2026-10-21 — 286: настоящий renderer и частичное сравнение кандидата
+
+Linear bundle/helper build0/0, Python7/7, Astra correctness/Ponytail. Две batch пробы дали0renders; обычный renderer подтвердил3440×1440/target0 без Camera.Render. Кандидат138,18rest/44,27route,p95≈79мс; baseline23,89rest, следующий контакт/main thread timeout, surface-only не достигнут: сравнение FAILED. С разрешения Ostrix аварийный выход67688/restore3;97projectSHA/4141ordinary-save metadata/8cfg прежние. Плавность/вид/финальный inventory открыты. [286](CHECKPOINT_286_RU.md).
+
 ## 2026-10-21 — 285: локальный туман контакта и сравнительная запись
 
 Изолированный editor shader исключает общий static-volume и вложенный свет, сохраняя поля/поверхность/возврат. Gamma build/probe PASS; полная повторная запись964sets/1928PNG с4сторон и повторным контактом, видео готово. Первый keyword-timeout и PNG-budget отказ сохранены; лимиты не ослаблены, cleanup race исправлена и проверена. .264/runtime bundle прежние; native скорость/вид не приняты. [285](CHECKPOINT_285_RU.md).

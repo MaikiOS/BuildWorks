@@ -1,6 +1,6 @@
 # Current BuildWorks status
 
-2026-10-21. **Local QA .264 installed, not accepted.** Owner rejected .262 for stalls/delayed fog. [285](CHECKPOINT_285.md): isolated wake-only editor candidate implemented following Astra review; four-direction return/recontact comparison movie captured. Actual game performance and artistic acceptance remain unverified. Candidate not deployed; no new owner game retest is ready.
+2026-10-21. **Local QA .264 installed, not accepted.** Owner rejected .262 for stalls/delayed fog. [286](CHECKPOINT_286.md): temporary wake-only candidate observed by the actual non-batch3440×1440renderer:138.18fps rest,44.27route, contact p95=79.29ms. Previous shader gave23.89rest; its next contact stopped answering, so full comparison FAILED. Separately approved emergency exit/restore3 completed. Appearance/smoothness/latency and surface-only control remain open; candidate not deployed, no new owner retest ready.
 
 Owner review of [.252](CHECKPOINT_274.md) FAILED when fog input overflow hid the house. Later279/280 provide scoped service/contact evidence, not owner visual acceptance. Physical E, the full paid lifecycle/cancellation and multiplayer remain open. Local QA carries shader271; source-only Git publishes C# over its previous fog baseline; shader271 remains local.
 

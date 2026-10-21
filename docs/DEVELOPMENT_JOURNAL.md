@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-21 — 286: real renderer and partial candidate comparison
+
+Linear bundle/helper build0/0, Python7/7, Astra correctness/Ponytail. Two batch probes produced0renders; normal renderer confirmed3440×1440/target0 with no extra Camera.Render. Candidate138.18rest/44.27route,p95≈79ms; baseline23.89rest, next contact/main-thread timeout, surface-only not reached: full comparison FAILED. Owner-approved emergency exit67688/restore3;97project hashes/4141ordinary-save metadata/8cfg unchanged. Smoothness/visuals/final inventory remain open. [286](CHECKPOINT_286.md).
+
 ## 2026-10-21 — 285: local wake candidate and comparison movie
 
 Isolated editor shader excludes static whole-volume/nested light while preserving fields/surface/return. Gamma build/probe pass; full v2 captures964sets/1928PNG across four return/recontact paths, movie encoded. Initial keyword timeout/PNG budget failures preserved; no caps relaxed, cleanup race fixed/tested. Installed .264/runtime bundle unchanged; no native performance or owner acceptance. [285](CHECKPOINT_285.md).

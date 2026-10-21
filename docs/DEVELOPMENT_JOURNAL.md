@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-21 — 267/268: measured queue deficit, hardened cancellation replay
+
+Local mask candidate:453/15/133/14exact,5.69%less lit elapsed. Short native250:82renders,queue56→508;93old project files/inventory unchanged,normal quit/restore3. Inherited probe path overwrote old265JSON; original byte/mtime loss and value reconstruction explicitly recorded.268:two reproduced unpaid replay defects fixed;project/52cancellation/117payout,normal/QA/host/localization PASS,no deployment. Next grouped receipts and source-owned collection before paid terminal. [267](CHECKPOINT_267.md),[268](CHECKPOINT_268.md).
+
 ## 2026-10-21 — 266: lighting measurement and real DXBC
 
 Separate Editor28frozen/32resident/68render mode;CPU9modes/98negative PASS. Medians per8frames281.868/816.901ms:lighting2.898×includingCPU/GPU/drain. Early return passed14exact pixel comparisons but817.800ms showed no benefit;change removed/bundle restored. CompilerProbe:2DXBC/invalid refused;bufinfo alreadyhoisted,twoindexable32lists remain. Next ordered bitmap candidate. Installed250 unchanged,noValheim launch;v11/full cancellation open. [Report](CHECKPOINT_266.md).

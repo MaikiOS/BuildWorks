@@ -94,13 +94,14 @@ namespace OstrixMods.BuildWorks
             using (Lock(id))
             {
                 Record current = Load(id);
+                BlueprintConstructionCancellationJournal.RequireNotStarted(this, id);
                 if (current.Cancelled)
                 {
-                    if (current.CancelOperation == operation) return current;
-                    throw new InvalidOperationException("Project was already cancelled by another operation.");
+                    if (current.CancelOperation == operation && expectedRevision == 1 &&
+                        !BlueprintConstructionPartJournal.HasExecutionEvidence(this, current)) return current;
+                    throw new InvalidOperationException("Cancelled project operation, original revision or unpaid evidence differs.");
                 }
                 if (current.Revision != expectedRevision) throw new InvalidOperationException("Project revision changed.");
-                BlueprintConstructionCancellationJournal.RequireNotStarted(this, id);
                 if (BlueprintConstructionPartJournal.HasExecutionEvidence(this, current))
                     throw new InvalidOperationException("Project has construction execution evidence; unpaid cancellation is refused.");
                 var cancelled = new Record(id, world, 2, operation, current.RootPose, current.BlueprintBytes, current.Parts.ToArray());

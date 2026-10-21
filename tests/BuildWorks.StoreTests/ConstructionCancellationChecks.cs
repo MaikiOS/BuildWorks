@@ -88,6 +88,15 @@ namespace OstrixMods.BuildWorks.StoreTests
             var unpaid = Create(); Refuse<InvalidOperationException>(() => journal.Prepare(unpaid.Id, 1, Guid.NewGuid(), 17));
             string extra = Path.Combine(plans.DirectoryPath, plan.Id.ToString("N") + "." + Guid.NewGuid().ToString("N") + ".bwpart");
             File.WriteAllText(extra, "unrelated receipt"); Refuse<InvalidDataException>(() => journal.Read(plan.Id)); File.Delete(extra);
+            // A terminal plan without its removal journal must never pass through the unpaid replay API.
+            var paidReplay = Create(); Commit(paidReplay, 0, 17); Guid paidOperation = Guid.NewGuid();
+            string paidFile = Path.Combine(plans.DirectoryPath, paidReplay.Id.ToString("N") + ".bwproject");
+            byte[] paidTerminal = File.ReadAllBytes(paidFile);
+            BitConverter.GetBytes(2L).CopyTo(paidTerminal, 32); paidOperation.ToByteArray().CopyTo(paidTerminal, 40);
+            using (var sha = SHA256.Create()) sha.ComputeHash(paidTerminal.Skip(8).Take(paidTerminal.Length - 40).ToArray()).CopyTo(paidTerminal, paidTerminal.Length - 32);
+            File.WriteAllBytes(paidFile, paidTerminal);
+            Refuse<InvalidOperationException>(() => plans.CancelUnpaid(paidReplay.Id, 1, paidOperation));
+            Check(paidTerminal.SequenceEqual(File.ReadAllBytes(paidFile)), "Rejected paid replay changed the terminal record.");
             Console.WriteLine("PASS construction cancellation journal: " + assertions + " assertions; durable phases, freeze, replay, exact linked receipts, mixed payer, unresolved, corrupt/truncated framing and next-generation binding. Save proofs are fixtures; no native deletion/refund is claimed.");
 
             Plans.Record Create() => plans.Create(Guid.NewGuid(), blueprint, pose, Enumerable.Repeat(pose, 3).ToArray());

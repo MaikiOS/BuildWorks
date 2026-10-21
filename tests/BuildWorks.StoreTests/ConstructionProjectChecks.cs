@@ -38,6 +38,16 @@ namespace OstrixMods.BuildWorks.StoreTests
             Guid operation = Guid.NewGuid(); var cancelled = store.CancelUnpaid(id, 1, operation);
             Require(cancelled.Cancelled && cancelled.Revision == 2 && cancelled.CancelOperation == operation && cancelled.BlueprintBytes.SequenceEqual(snapshot), "Unpaid cancellation lost its snapshot or operation identity.");
             Require(new Projects(directory, 42).CancelUnpaid(id, 1, operation).CancelOperation == operation, "Cancellation replay did not return its durable result.");
+            byte[] replayBytes = File.ReadAllBytes(file);
+            foreach(long revision in new long[] { 0, 2, long.MaxValue })
+                Refuse<InvalidOperationException>(() => store.CancelUnpaid(id, revision, operation));
+            string removal = Path.Combine(directory, id.ToString("N") + ".bwremoval");
+            File.WriteAllText(removal, "Unresolved removal evidence must freeze even a same-operation replay.");
+            Refuse<InvalidOperationException>(() => store.CancelUnpaid(id, 1, operation));
+            File.Delete(removal);
+            Require(replayBytes.SequenceEqual(File.ReadAllBytes(file)), "Rejected cancellation replay changed the terminal plan.");
+            Require(new Projects(directory, 42).CancelUnpaid(id, 1, operation).Revision == 2 && replayBytes.SequenceEqual(File.ReadAllBytes(file)),
+                "Exact unpaid replay lost its byte-stable terminal result.");
             Refuse<InvalidOperationException>(() => store.CancelUnpaid(id, 1, Guid.NewGuid()));
             Refuse<InvalidOperationException>(() => store.Create(id, reloaded.Blueprint, pose, poses));
             byte[] terminal = File.ReadAllBytes(file), corrupt = (byte[])terminal.Clone(); corrupt[50] ^= 1; File.WriteAllBytes(file, corrupt);

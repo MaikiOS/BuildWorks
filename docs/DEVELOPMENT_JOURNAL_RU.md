@@ -1,5 +1,9 @@
 # Журнал разработки BuildWorks
 
+## 2026-10-21 — 265: кандидат проверен, отказ дома сохранён
+
+CPU/GPU lookup parity PASS636417/65812/453;native .251 снова FAILED queue overflow,1565renders/52,0605с,production176сearlyStop6. Повторы остановлены,91oldfiles/инвентарь/сохранения по metadata прежние;normal quit/restore3. Установленная .250 восстановлена, .251 остаётся локальным непринятым кандидатом. Далее изолированный замер освещения28owners; старый harness использовал beam0/4resident. Параллельный обзор: rev3 и получение без таблички внедрять вместе, иначе возврат недоступен. [Отчёт](CHECKPOINT_265_RU.md).
+
 ## 2026-10-20 — 264: реальная отрисовка и исправление проекта отмены
 
 Внешний QA-helper получил render-only безPNG/readback;build0/0,Python7/7,earlyStop7/3ownership PASS. Native .250:854renders/52,072с, production493 наcleanup;11–14FPS до Fog input queue full,36FPS только после отказа. Сценарий FAILED, side3/recovery не запускались.89старых файлов/инвентарь/metadata4141сохранны; config только version comment,normal quit/restore3. Архитектор отверг ожидание подбора для завершения отмены: rev3pending/rev4settled пока Draft. Далее sparse lookup parity/оптимизация; gameplay DLL/shader не менялись. [Отчёт](CHECKPOINT_264_RU.md).

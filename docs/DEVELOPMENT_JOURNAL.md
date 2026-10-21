@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-21 — 265: candidate checked, house failure retained
+
+CPU/GPU lookup parity PASS636417/65812/453;native .251 again FAILED queue overflow,1565renders/52.0605s,production176including6early frames. Repetitions stopped;91oldfiles/inventory/ordinary-save metadata preserved,normal quit/restore3. Installed250 restored;251remains a local unpromoted candidate. Next isolate lighting cost across28owners; old harness used beam0/4resident. Parallel review: rev3 and board-independent collection belong together or refunds become inaccessible. [Report](CHECKPOINT_265.md).
+
 ## 2026-10-20 — 264: actual rendering and cancellation-order correction
 
 External QA helper gained render-only withoutPNG/readback;build0/0,Python7/7,earlyStop7/ownership3 PASS. Native .250:854renders/52.072s,493production atcleanup;11–14FPS until Fog input queue full,36FPS only afterward. Scenario FAILED,no side3/recovery.89old files/inventory/4141save metadata preserved;config version comment only,normal quit/restore3. Architect rejected collection-gated cancellation:rev3pending/rev4settled remain Draft. Next sparse lookup parity/optimization;gameplay DLL/shader unchanged. [Report](CHECKPOINT_264.md).

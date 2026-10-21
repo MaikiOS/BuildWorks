@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-21 — 280: four-direction house contact/recovery
+
+.26016/16 and .26148/48 used the existing native route on the preserved house. All28parts recovered to zero fields after exit. QA inputs serialization and legacy empty strings fixed; final .262 menu self-check PASS, installed.97project hashes/inventory/ordinary-save metadata/config values unchanged; three normal exits/restore3. Visual v11/sustained material contact,paid lifecycle/network remain open; owner inspection ready. [280](CHECKPOINT_280.md).
+
 ## 2026-10-21 — 279: default service without constant paging
 
 .259 enables grouped-default and a bounded256MiB shared-field cap. Short/long native default runs PASS without QA override:52.016s/1203renders, sampled queue≤10, no velocity requests. Unity receipt35/35 and builds/geometry/host/localization PASS. .259 installed;97project hashes/inventory/ordinary saves unchanged,normal exit/restore3. Owner house inspection prepared; automated contact and paid-terminal slices remain separate next steps. [279](CHECKPOINT_279.md).

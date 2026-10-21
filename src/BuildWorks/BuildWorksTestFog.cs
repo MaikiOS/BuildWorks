@@ -1,5 +1,8 @@
 #if BUILDWORKS_TEST_STAND
 using System;
+using System.IO;
+using System.Runtime.Serialization.Json;
+using System.Text;
 using UnityEngine;
 using UnityEngine.Rendering;
 using HarmonyLib;
@@ -14,7 +17,7 @@ namespace OstrixMods.BuildWorks
         {
             BuildWorksTestIsolation.RequireLoadedSession();
             var fog = CurrentProbe;
-            return JsonUtility.ToJson(new HouseReceipt {
+            return HouseJson(new HouseReceipt {
                 active = fog && fog.Active && fog.PublishedHouse, preparing = fog && fog.preparation != null, failure = fog?.Failure,
                 expectedParts = fog?.building?.PlannedParts ?? 0, preparedParts = fog?.building?.PreparedParts ?? 0,
                 preparationPhase = fog?.building?.PreparationPhase, preparationSteps = fog?.preparationSteps ?? 0,
@@ -28,10 +31,40 @@ namespace OstrixMods.BuildWorks
                 residentCapacity = fog?.channels?.SnapshotArena?.ResidentCapacity ?? 0,
                 ledgerCells = fog?.channels?.SnapshotArena?.LedgerCells ?? 0,
                 queuedSamples = fog?.building?.QueuedSamples ?? 0, minimumTick = fog?.building?.MinimumConfirmedTick ?? 0,
-                lastFlags = fog?.building?.LastFlags ?? 0, frames = fog?.RenderFrames ?? 0,
-                fieldBytes = fog?.FieldBytes ?? 0, renderBytes = fog?.AtlasBytes ?? 0, velocityRamBytes = fog?.VelocityRamBytes ?? 0,
-                origin = fog?.Origin ?? Vector3.zero, clock = fog?.clock ?? 0,
+                lastFlags = fog?.building?.LastFlags ?? 0, frames = fog?.borrowedProject?.Fog?.RenderFrames ?? fog?.RenderFrames ?? 0,
+                fieldBytes = fog?.FieldBytes ?? 0, renderBytes = fog?.borrowedProject?.Fog?.RenderBytes ?? fog?.AtlasBytes ?? 0, velocityRamBytes = fog?.VelocityRamBytes ?? 0,
+                inputs = fog?.channels?.ReadReceiptInputs() ?? Array.Empty<BlueprintFogChannels.ReceiptInput>(),
+                origin = fog?.Origin ?? Vector3.zero, clock = fog?.building?.Clock ?? fog?.clock ?? 0,
+                playerPosition = Player.m_localPlayer.transform.position,
                 processMemory = System.Diagnostics.Process.GetCurrentProcess().PrivateMemorySize64 });
+        }
+        private static string HouseJson(HouseReceipt value)
+        {
+            value.failure ??= ""; value.passFailure ??= "";
+            value.preparationPhase ??= ""; value.passPhase ??= ""; value.firstFaultJson ??= "";
+            using (var stream = new MemoryStream())
+            {
+                new DataContractJsonSerializer(typeof(HouseReceipt)).WriteObject(stream, value);
+                return Encoding.UTF8.GetString(stream.ToArray());
+            }
+        }
+        public static string CheckHouseSerialization()
+        {
+            var value = new HouseReceipt { frames = 43, clock = 1.25f, playerPosition = new Vector3(3, 4, 5),
+                inputs = new BlueprintFogChannels.ReceiptInput[28] };
+            for (int i = 0; i < value.inputs.Length; ++i)
+                value.inputs[i] = new BlueprintFogChannels.ReceiptInput { queued = i, capturedTick = i + 42, confirmedTick = i + 40 };
+            string json = HouseJson(value);
+            if (!json.Contains("\"failure\":\"\"") || !json.Contains("\"passFailure\":\"\""))
+                throw new InvalidOperationException("House receipt changed its successful string schema.");
+            using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(json)))
+            {
+                var saved = (HouseReceipt)new DataContractJsonSerializer(typeof(HouseReceipt)).ReadObject(stream);
+                if (saved.inputs?.Length != 28 || saved.inputs[27].queued != 27 || saved.inputs[27].capturedTick != 69 ||
+                    saved.inputs[27].confirmedTick != 67 || saved.frames != 43 || saved.clock != 1.25f || saved.playerPosition != value.playerPosition)
+                    throw new InvalidOperationException("House receipt lost nested source observations.");
+            }
+            return "house-receipt-28-source-roundtrip-passed";
         }
         [Serializable] private sealed class HouseReceipt
         {
@@ -47,7 +80,8 @@ namespace OstrixMods.BuildWorks
             public int blockCapacity, residentCapacity;
             public int ledgerCells;
             public long fieldBytes, renderBytes, velocityRamBytes, processMemory;
-            public Vector3 origin;
+            public Vector3 origin, playerPosition;
+            public BlueprintFogChannels.ReceiptInput[] inputs;
             public float clock;
         }
         // GABS can call handlers but cannot retain an internal constructor result for this resource-only probe.
@@ -194,6 +228,48 @@ namespace OstrixMods.BuildWorks
         public bool PassRunning => wallPass != null;
         private bool wallLine;
         private BlueprintFogChannels.MetricsProbe metrics;
+        public static string AttachExisting(string id)
+        {
+            var owner = BuildWorksTestIsolation.RequireLoadedSession(); BuildWorksPlugin.RequireQaStorageIdle();
+            var runtime = BuildWorksPlugin.QaConstructionProjects;
+            if (CurrentProbe || BuildWorksTestFogReceipts.OwnsFog || !BlueprintConstructionProjectRuntime.IsPrivateLocalPlacement ||
+                runtime == null || runtime.BlocksInput || runtime.OpenBoard)
+                throw new InvalidOperationException("Close the stationary receipt observer and other QA probes before borrowing a private project.");
+            var project = runtime.Read(Guid.ParseExact(id, "N")); var progress = runtime.Progress(project.Id);
+            if (project.Cancelled || progress.Built != 0 || progress.NeedsReview || progress.Total < 1 || progress.Total > 32 ||
+                runtime.Fog?.Building(project.Id)?.Ready != true || runtime.FogError(project.Id) != null)
+                throw new InvalidOperationException("A ready, wholly unpaid preserved project is required.");
+            var blueprint = project.Blueprint; bool first = true; Bounds bounds = default;
+            foreach (var part in project.Parts)
+            {
+                var prefab = ZNetScene.instance.GetPrefab(blueprint.parts[part.SourceIndex].prefabName);
+                if (!prefab || !BlueprintPrefabMetadataCapture.TryGetLocalVisualBounds(prefab, out var local, true))
+                    throw new InvalidOperationException("Preserved project has no native visual bounds.");
+                var pose = part.WorldPose.Values;
+                var matrix = Matrix4x4.TRS(new Vector3(pose[0], pose[1], pose[2]), new Quaternion(pose[3], pose[4], pose[5], pose[6]),
+                    Vector3.Scale(prefab.transform.localScale, new Vector3(pose[7], pose[8], pose[9])));
+                for (int corner = 0; corner < 8; ++corner)
+                {
+                    var point = matrix.MultiplyPoint3x4(new Vector3((corner & 1) == 0 ? local.min.x : local.max.x,
+                        (corner & 2) == 0 ? local.min.y : local.max.y, (corner & 4) == 0 ? local.min.z : local.max.z));
+                    if (first) { bounds = new Bounds(point, Vector3.zero); first = false; } else bounds.Encapsulate(point);
+                }
+            }
+            if (first || bounds.size.magnitude > 25 || Vector3.Distance(owner.transform.position, bounds.center) > 20)
+                throw new InvalidOperationException("Preserved project route exceeds the bounded loaded QA site.");
+            var probe = new GameObject("BuildWorks_QA_BorrowedProjectRoute").AddComponent<BuildWorksTestFog>();
+            try { probe.AttachProject(runtime, project.Id, bounds.center, new Vector2(bounds.extents.x + 2, bounds.extents.z + 2)); }
+            catch { UnityEngine.Object.DestroyImmediate(probe.gameObject); throw; }
+            return HouseStatus();
+        }
+        public static string DetachExisting()
+        {
+            BuildWorksTestIsolation.RequireLoadedSession(); var probe = CurrentProbe;
+            if (!probe || probe.borrowedProject == null || probe.PassRunning)
+                throw new InvalidOperationException("An idle borrowed route is required; the construction project is never cancelled here.");
+            UnityEngine.Object.DestroyImmediate(probe.gameObject);
+            return "borrowed-route-detached;project-retained";
+        }
         internal void AttachProject(BlueprintConstructionProjectRuntime runtime, Guid id, Vector3 centre, Vector2 distances)
         {
             player = BuildWorksTestIsolation.RequireLoadedSession(); network = ZNet.instance;

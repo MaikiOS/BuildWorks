@@ -53,6 +53,7 @@ namespace OstrixMods.BuildWorks
         private static int arms;
         private static PropertyInfo cadenceOwned;
         private static MethodInfo cadenceStatus;
+        internal static bool OwnsFog => fog != null;
         [Serializable] private sealed class CadenceStatus
         { public string state = ""; public bool rendersCamera = false; public int renderedFrames = 0; }
 

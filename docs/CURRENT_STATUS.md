@@ -1,8 +1,8 @@
 # Current BuildWorks status
 
-2026-10-21. Installed QA **.259 — grouped service by default**. [279](CHECKPOINT_279.md): the house retained for 52 seconds without paging, 1203 render calls, no QA receipt override. Shared field cap is now 256 MiB, not total VRAM. Outward-facing board retained. [Owner inspection prepared](MANUAL_QA_279_RU.md); traversal/recovery and approved-v11 parity remain open.
+2026-10-21. Installed QA **.262 — numerical house traversal checks**. [280](CHECKPOINT_280.md): four directions, contact and recovery of all28parts; .26016/16 and .26148/48. Final .262 passed the menu serialization self-check; movement was not separately repeated on .262. Outward-facing board retained. [Owner inspection](MANUAL_QA_279_RU.md) is ready; v11 appearance/smoothness remain unaccepted.
 
-Owner review of [.252](CHECKPOINT_274.md) remains FAILED: fog input overflow hid the house. Fog stability is not fixed or owner-accepted by this change. Physical E, the full paid lifecycle/cancellation and multiplayer remain open. Local QA carries candidate shader271; source-only Git publishes diagnostic C# over its previous fog baseline; shader271 remains local.
+Owner review of [.252](CHECKPOINT_274.md) FAILED when fog input overflow hid the house. Later279/280 provide scoped service/contact evidence, not owner visual acceptance. Physical E, the full paid lifecycle/cancellation and multiplayer remain open. Local QA carries shader271; source-only Git publishes C# over its previous fog baseline; shader271 remains local.
 
 Requirements/current task: [owner checklist](LIVE_CHECKLIST_RU.md). Technical evidence/causes: [WORK_STATUS](WORK_STATUS_RU.md). History: [journal](DEVELOPMENT_JOURNAL.md). [Document rules](PROGRESS_RULES.md).
 
@@ -14,7 +14,7 @@ Requirements/current task: [owner checklist](LIVE_CHECKLIST_RU.md). Technical ev
 | Catalog and file exchange | Categories, Save As, delete/hide, automatic portable file, Share, batch import/export | Limited batch .197 import/export/reentry proved | Full batch UI/dirty draft/restart; some owner checks remain |
 | Server library and sharing | Administrator publication; players/admin visibility, verified personal copies, provenance; in-process checks | Host+remote not accepted | Live access/reconnect/restart; direct player-to-player transfer |
 | Items and storage | Separate storage/mount inclusion; supplied-item preservation and journal foundations | Limited chest/inventory comparison only | Durable settlement, cancellation/refund/crash/replay, all holders/armor/admin restore and network authority |
-| v11 fog | Production sources/unpaid28; local shader candidates |277:52seconds grouped,1201renders,no overflow;ordinary default unaccepted | Ordinary4resident budget/player resolution,traversal/recovery/appearance,heavy builds/network |
+| v11 fog | Bounded256MiB field cap, grouped default, local shader candidate |279:52s default;280:four directions, numerical contact/recovery of28parts | v11 appearance/smoothness, sustained material contact,total memory,heavy builds/network |
 | Unfinished construction | .232 Hammer/plan/board/ProjectPart; .244 sealed payout; .243 removal/Prepared resume/freeze | 260:24+24, remaining3 sources cleaned/four CleanupSaved total, fresh app/replay without effects;67Wood/4receipts; earlier payment/continuation/TRS remain scoped | All objects/contents,full restitution/cancellation/general recovery,secondary collapse,HUD/native E,server/remote |
 | World selection and heavy chain | Capture/volume foundations and targeted checks | Basic capture accepted; later coordinate/height UX issues reported | Editable volume/gizmos, boundary rules, full loaded-area and performance acceptance |
 | World objects and EarthWorks | No terrain integration dependency | None claimed | Admin-priced nonrecipe objects; EarthWorks is a later separate integration |

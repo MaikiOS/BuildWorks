@@ -1,5 +1,7 @@
 # Fog rendering decision
 
+Current follow-up: [285](CHECKPOINT_285.md) implements an isolated editor candidate and comparison movie. Native integration/performance and artistic acceptance remain open. This updates execution state, not the original read-only review findings.
+
 2026-10-21. Owner-requested independent read-only Astra review (`gpt-6-astra`, effort `ultra`). This selects the next experiment, **not a completed fix or accepted visual change**. Installed research QA .264 remains unchanged. [Русский](FOG_RENDER_DECISION_RU.md).
 
 The approved v11 laboratory demonstrated one wall. The current whole-house renderer marches a combined bounds at fine steps, then performs nested light sampling. Canonical `BlueprintFogAtlas.cs:189–203,261` builds the aggregate bounds and full-size Blit; `FogVolumeAtlas.cginc:217–243,265–283` allows4096steps and24secondary light samples over sources. The laboratory used one source/512steps. Its three demonstration light beams also became player-relative game rendering (`FogGhostVolume.shader:72–86`, `BlueprintConstructionProjectFog.cs:209–211`). These are substantiated scaling problems, not proof of the sole cause of the owner's20second delay. Canonical local shaders differ from public Git.
@@ -26,4 +28,4 @@ Proposed engineering readiness threshold, not an owner-approved new requirement:
 
 If candidate approaches surface-only but the game remains slow, investigate surface/solver separately rather than reducing volume resolution again. If surface-only is fast but candidate is not, the experiment fails: retain evidence/control and reconsider the remaining cost. No open-ended shader micro-optimization chain.
 
-Candidate is not implemented. Large structures,32-part limit, full memory, physical board interaction, paid completion/cancellation and multiplayer remain open. This review does not close9.2–9.7.
+At the time of the original review the candidate was not implemented; follow-up state is linked above. Large structures,32-part limit, full memory, physical board interaction, paid completion/cancellation and multiplayer remain open. This review does not close9.2–9.7.

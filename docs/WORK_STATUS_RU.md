@@ -10,6 +10,8 @@
 
 [284](CHECKPOINT_284_RU.md): два native15/15 на неизменной .264; controlled3440×1440 rest22,26/22,15fps, contact12,44fps. В контактном окне15,8824с real /14,0514с game /14,0609с effect: отдельный clock fix не обоснован, GPU/видимая задержка не измерены. Независимый Astra/ultra выявил неудачное масштабирование общего raymarch и вложенных лабораторных beam/light расчётов; выбран [локальный туман контакта](FOG_RENDER_DECISION_RU.md), ещё без реализации. Correctness/Ponytail observer PASS,97projectSHA/инвентарь/cfg/ordinary-save metadata прежние, обе игры закрыты/restore3. Предыдущий план half-resolution не реализован и отложен.
 
+[285](CHECKPOINT_285_RU.md): local-wake editor-кандидат без static-volume/AtlasLight/beam/haze. Gamma assets5/28 PASS; probe20sets/100PNG и полный v2:964sets/1928PNG,4направления×24с, повторный контакт без сброса. Все5потоков отрисованы/измерены,2сохранены вPNG. Оба контакта положительны,в12/24с surfaceWakeMean0 во всех направлениях — совпадение с surface-only в8-битномRGB, не доказательство нулевых физических полей. Видео/ffprobe PASS; Astra read-only correctness/Ponytail PASS, timeout-cleanup regression PASS. Неудачные keyword build/PNGbudget сохранены отдельно. Обычные shader/C#Atlas и установленная264/bundle прежние. Это ещё не native FPS, полный visual gate или принятый runtime source.
+
 ## Проверенный снимок
 
 | Слой | Факт | Предел доказательства |
@@ -54,7 +56,7 @@
 
 **Native gate270 не выполнен.** Все4прежних источника CleanupSaved,реальную E на них не проверить. Не восстанавливать старые67Wood/4receipt. Нужны новый отдельно подготовленный sealed fixture и проверка exact payer/native hover→E→saved credit→cleanup/save→reload/no duplicate. До подготовки такого fixture не назначать повтор пустого сценария. Следующий кодовый срез8.7/8.8 — terminal-read compatibility и связанный paid terminal;обычный active issuance путь нельзя расширять разрешением cancelled-плана.
 
-**Следующий шаг:** по [решению Astra](FOG_RENDER_DECISION_RU.md) реализовать отдельно от установленной .264 локальный wake-only renderer без nested AtlasLight/static-volume/haze, сохранив v11 simulation/surface/owner return. Сначала качественное сравнение четырёхсекционной стены, затем один прогон штатной игровой камеры3440×1440 без дополнительного Camera.Render. Half-resolution старого renderer отложен. Кандидат ещё не реализован; два gate не пройдены. По8.7/8.8 прежние paid terminal/native fixture/достройка/отмена/сеть остаются открыты; новая архитектурная диагностика не закрывает требований.
+**Следующий шаг:** закончить визуальную оценку движения по записи [285](CHECKPOINT_285_RU.md), затем подготовить кандидат для настоящего Valheim и сравнить .264/candidate/surface-only штатной камерой3440×1440 с подтверждёнными production render/размером, без дополнительного Camera.Render. Это не новая цепочка микрооптимизаций. Half-resolution отложен. По8.7/8.8 прежние paid terminal/native fixture/достройка/отмена/сеть открыты; editor-запись не закрывает9.2–9.7.
 
 Два исходных проекта: `064a5fd538b442d98a4c1c0935a6d2ba` и `fe485bcc1a4041d591d5a1015060d913`. Квитанции на 4Wood каждый неизменны; заново строить, выдавать ресурсы или переписывать receipts для продолжения теста нельзя. Поколения выдачи 163→164 и 164→165. [Удаление 251](CHECKPOINT_251_RU.md), [защищённая выдача 252](CHECKPOINT_252_RU.md).
 

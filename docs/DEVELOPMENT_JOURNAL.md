@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-21 — 285: local wake candidate and comparison movie
+
+Isolated editor shader excludes static whole-volume/nested light while preserving fields/surface/return. Gamma build/probe pass; full v2 captures964sets/1928PNG across four return/recontact paths, movie encoded. Initial keyword timeout/PNG budget failures preserved; no caps relaxed, cleanup race fixed/tested. Installed .264/runtime bundle unchanged; no native performance or owner acceptance. [285](CHECKPOINT_285.md).
+
 ## 2026-10-21 — 284: clocks and independent Astra review
 
 Two15/15native runs on unchanged .264 distinguish effect/game clocks; no separate clock fix is justified, rendering remains slow. Observer review PASS; projects/inventory/ordinary-save metadata preserved, normal exit/restore3. Astra/ultra recommends wake-only volume instead of aggregate raymarch/nested light. Candidate not implemented; two decision gates and visual risks recorded. [284](CHECKPOINT_284.md), [decision](FOG_RENDER_DECISION.md).

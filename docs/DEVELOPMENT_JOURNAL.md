@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-21 — 282: proven empty fields and full-size contact
+
+LocalQA264 adds GPU empty-field proof and exact render shortcuts;14+14pixel comparisons unchanged. Native full-size cadence about22at rest/15during contact; all28parts recover, but performance/visual acceptance remain open. Saves/inventory unchanged; normalexit/restore3. [282](CHECKPOINT_282.md).
+
 ## 2026-10-21 — 281: owner regression and undersized QA rendering
 
 Owner rejected .262: whole-game stalls and roughly20-second fog response. Same-view render-size ABBA measured29–31host frames/s at860×360 and8at3440×1440; mod/shader unchanged. Prior numerical checks did not prove player-scale performance.23/23diagnostic steps do not mean the product passed. World/items unchanged,normalexit/restore3. Owner retest withdrawn. [281](CHECKPOINT_281.md).

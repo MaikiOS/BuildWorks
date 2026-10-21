@@ -111,7 +111,7 @@ namespace OstrixMods.BuildWorks
                         report.partsJson[i] = JsonUtility.ToJson(new PartMetric {
                             slot = owner.Slot, owner = owner.Identity, generation = owner.Generation,
                             sequence = BlueprintFogSparseMetrics.Long(metadata[m + 12], metadata[m + 13]), tick = (int)metadata[m + 14], ledgerFlags = ledgers[i][0],
-                            clock = clock,
+                            clock = clock, publicationFlags = metadata[m + 7],
                             smokeJson = JsonUtility.ToJson(smoke), surfaceJson = JsonUtility.ToJson(surface) });
                     }
                     report.success = true; report.bricksCompared = compareBricks; Succeeded = true;
@@ -139,7 +139,7 @@ namespace OstrixMods.BuildWorks
             {
                 public int slot, tick;
                 public long owner, generation, sequence;
-                public uint ledgerFlags;
+                public uint ledgerFlags, publicationFlags;
                 public float clock;
                 public string smokeJson, surfaceJson;
             }

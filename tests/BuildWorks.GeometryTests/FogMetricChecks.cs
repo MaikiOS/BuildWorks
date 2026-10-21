@@ -39,7 +39,12 @@ namespace OstrixMods.BuildWorks.GeometryTests
             metadata[12] = receipts[4] = 9; metadata[14] = receipts[6] = 10;
             metadata[7] = 3;
             BlueprintFogSparseMetrics.RequireBinding(metadata, bases, receipts, 0, 7, 3, 0);
-            foreach (uint flags in new[] { 0u, 1u, 2u, 4u, 7u })
+            metadata[7] = 7;
+            BlueprintFogSparseMetrics.RequireBinding(metadata, bases, receipts, 0, 7, 3, 0);
+            receipts[11] = 1;
+            Reject(() => BlueprintFogSparseMetrics.RequireBinding(metadata, bases, receipts, 0, 7, 3, 0));
+            receipts[11] = 0;
+            foreach (uint flags in new[] { 0u, 1u, 2u, 4u, 5u, 6u, 8u, 15u, uint.MaxValue })
             {
                 metadata[7] = flags;
                 Reject(() => BlueprintFogSparseMetrics.RequireBinding(metadata, bases, receipts, 0, 7, 3, 0));

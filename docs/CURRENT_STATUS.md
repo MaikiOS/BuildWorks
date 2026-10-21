@@ -1,6 +1,6 @@
 # Current BuildWorks status
 
-2026-10-21. **Owner rejected .262:** the whole game stalls and contact fog appears roughly20seconds late. [281](CHECKPOINT_281.md): render-size ABBA reproduced29–31host frames/s at860×360 versus8at3440×1440. This is a scoped diagnostic, not a complete player camera/HUD/latency reproduction. No fix claimed or new owner inspection requested; .262 remains installed.
+2026-10-21. **Local QA .264 installed, not accepted.** Owner rejected .262 for stalls and delayed fog. [282](CHECKPOINT_282.md): exact GPU pixel checks pass; full-size controlled render measures about22host frames/s at rest and15during contact. The regression remains open. Camera.Render/FOV55 cadence is not ordinary player camera/HUD, GPU timing or a measurement of20second latency. No owner retest requested.
 
 Owner review of [.252](CHECKPOINT_274.md) FAILED when fog input overflow hid the house. Later279/280 provide scoped service/contact evidence, not owner visual acceptance. Physical E, the full paid lifecycle/cancellation and multiplayer remain open. Local QA carries shader271; source-only Git publishes C# over its previous fog baseline; shader271 remains local.
 

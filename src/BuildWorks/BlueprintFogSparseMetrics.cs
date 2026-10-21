@@ -32,7 +32,9 @@ namespace OstrixMods.BuildWorks
                 metadata.Length != bases.Length * 16 || receipts.Length != metadata.Length || slot < 0 || slot >= bases.Length || owner <= 0 || generation <= 0)
                 throw new ArgumentException("Invalid published fog metric identity buffers.");
             int m = slot * 16;
-            if (metadata[m + 7] != 3 || Long(metadata[m + 8], metadata[m + 9]) != owner || Long(metadata[m + 10], metadata[m + 11]) != generation ||
+            if ((metadata[m + 7] != 3 && metadata[m + 7] != 7) ||
+                (metadata[m + 7] == 7 && receipts[m + 11] != 0) ||
+                Long(metadata[m + 8], metadata[m + 9]) != owner || Long(metadata[m + 10], metadata[m + 11]) != generation ||
                 Long(receipts[m], receipts[m + 1]) != owner || Long(receipts[m + 2], receipts[m + 3]) != generation ||
                 Long(metadata[m + 12], metadata[m + 13]) <= 0 || metadata[m + 12] != receipts[m + 4] || metadata[m + 13] != receipts[m + 5] ||
                 metadata[m + 14] != receipts[m + 6] || metadata[m + 15] != receipts[m + 7] || receipts[m + 8] != 0 || receipts[m + 9] != bases[slot] ||

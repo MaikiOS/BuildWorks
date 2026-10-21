@@ -1,6 +1,6 @@
 # BuildWorks
 
-**Owner rejected QA .262:** severe stalls and delayed fog response. Full-size frame diagnostics reproduced roughly8host frames/s. No fix claimed. [Evidence](docs/CHECKPOINT_281.md), [current status](docs/CURRENT_STATUS.md).
+**Local QA .264 installed, acceptance open:** exact empty-field shortcuts improved the full-size diagnostic, but contact still measures about15host frames/s. Stalls and delayed fog are not fully fixed. [Evidence](docs/CHECKPOINT_282.md), [current status](docs/CURRENT_STATUS.md).
 
 **Historical checkpoint250, QA .242:** plain QA now uses the measured256MiB GPU budget without a candidate property. Native Valheim:resident32/VelocityUpload=null,prepare12/12,recorded72/72 with520/520frames,35.88FPS/52.37s,26windows34–36FPS,fog queue1–2/velocity CPU-copy0. Contact24/24:9parts/108160exact inner texels,all28 recovered. Max145.07ms coincides with the first synchronous reference capture; causality/perfect smoothness unproved. Builds/contracts/Geometry/localization1122/isolation pass. Normal quit/bridge3/3; .242 stays installed. Normal/ordinary Editor retain98,304,000bytes; shader/costs unchanged. v11 appearance,public GPU budget,heavy blueprints,paid cancellation/network remain open. [Evidence](docs/CHECKPOINT_250.md).
 

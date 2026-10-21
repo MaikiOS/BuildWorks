@@ -12,6 +12,13 @@ namespace OstrixMods.BuildWorks
     // Observes the existing project pool. Rendering stays with the shared ValheimQA CadenceProbe.
     internal static class BuildWorksTestFogReceipts
     {
+#if BUILDWORKS_FOG_ORDINARY_BUDGET
+        private const int ExpectedResidents = 4;
+        private const long ExpectedBudget = 98304000, ExpectedReservation = 97423684;
+#else
+        private const int ExpectedResidents = 32;
+        private const long ExpectedBudget = 256L * 1024 * 1024, ExpectedReservation = 230134084;
+#endif
         [Serializable] private sealed class Frame
         {
             public double realtime;
@@ -27,6 +34,9 @@ namespace OstrixMods.BuildWorks
             public int arm;
             public int windowSeconds = 5;
             public long world;
+            public long fieldBudget, reservedFieldBytes;
+            public int residentCapacity;
+            public bool velocityUpload;
             public bool inventoryUnchanged, completedWindow, written;
             public Frame baseline, final;
             public List<Frame> samples = new List<Frame>(212);
@@ -72,6 +82,7 @@ namespace OstrixMods.BuildWorks
             runtime = current; fog = runtime.Fog; player = owner; playerPosition = owner.transform.position;
             project = target; inventory = before;
             report = new Report { mode = mode, arm = ++arms, project = id, world = runtime.World, windowSeconds = windowSeconds,
+                fieldBudget = BlueprintFogChannels.MaximumFieldBudget,
                 path = Path.Combine(directory, "fog-receipt-arm-" + Guid.NewGuid().ToString("N") + ".json") };
             preparingAt = Time.realtimeSinceStartupAsDouble;
             return Status();
@@ -119,7 +130,12 @@ namespace OstrixMods.BuildWorks
                 var building = fog.Building(project);
                 if (building?.Ready != true || fog.VisibleParts != 28) return;
                 var channels = fog.QaChannels;
-                if (channels.ReadReceiptInputs().Length != 28 || channels.SnapshotArena.ResidentCapacity != 32 || channels.SnapshotArena.BlockCapacity != 32768 ||
+                var arena = channels.SnapshotArena;
+                report.residentCapacity = arena.ResidentCapacity; report.reservedFieldBytes = arena.ReservedFieldBytes;
+                report.velocityUpload = arena.VelocityUpload;
+                if (channels.ReadReceiptInputs().Length != 28 || arena.ResidentCapacity != ExpectedResidents || arena.BlockCapacity != 32768 ||
+                    report.fieldBudget != ExpectedBudget || arena.ReservedFieldBytes != ExpectedReservation ||
+                    report.velocityUpload != (ExpectedResidents < 32) ||
                     channels.QaImmediateReceiptReads != (report.mode == "individual"))
                     throw new InvalidOperationException("Receipt arm pool/mode differs from the frozen comparison.");
                 var now = Time.realtimeSinceStartupAsDouble;
@@ -192,6 +208,9 @@ namespace OstrixMods.BuildWorks
 
         public static string CheckSerialization()
         {
+            if (BlueprintFogChannels.MaximumFieldBudget != ExpectedBudget ||
+                BlueprintFogSnapshotState.EstimateFieldBytes(32, 32768, ExpectedResidents, BlueprintFogLedgerLayout.Spatial3D) != ExpectedReservation)
+                throw new InvalidOperationException("Receipt probe did not compile the expected field budget/allocation.");
             var counters = new FogPerformanceCounters(System.Diagnostics.Stopwatch.Frequency).Read();
             counters.physicalReceiptRequests = 7; counters.flows[0].accepted = 8;
             var frame = new Frame { realtime = 1.25, renders = 2, controlledRenders = 2, clock = 3,

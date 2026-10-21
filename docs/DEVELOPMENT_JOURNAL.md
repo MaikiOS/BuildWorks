@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-21 — 278: ordinary memory exposes paging limit
+
+.258 adds a QA-only ordinary-budget probe, incompatible-flag guards and actual allocation assertions. Native short run FAILED after1.747seconds:4resident, queue48; long run skipped. Full velocity paging after each batch identified; no unchanged repeat. Inventory/97project files/ordinary saves unchanged, normal exit/restore3. Standard QA configuration .258 restored; owner house acceptance not requested. [278](CHECKPOINT_278.md).
+
 ## 2026-10-21 — 277: longer grouped house service
 
 .257 installed;52.003seconds/1201renders,batch10/10,no overflow,sampled queue≤10. Full evidence/screenshot saved;97project hashes/inventory/ordinary saves unchanged,normal exit/restore3. Default path,v11 and full paid lifecycle remain open. Separate read-only terminal proposal prepared. [277](CHECKPOINT_277.md).

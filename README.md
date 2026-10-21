@@ -1,6 +1,6 @@
 # BuildWorks
 
-**QA .256: native house fog diagnostics.** A/B/B/A40/40: grouped receipts reduced GPU requests; long-run stability and approved-v11 appearance remain unaccepted. The .255 fix is retained: readable outward-facing wooden board, grounded stake and native hammer interaction. Full cancellation/network remain open. [Status](docs/CURRENT_STATUS.md).
+**QA .257: longer fog service check.** Explicitly selected grouped service retained the QA house for52seconds without overflow. Ordinary default remains individual; traversal,v11 appearance,public budget/player resolution,full cancellation and network remain open. The outward-facing board fix is retained. [Status](docs/CURRENT_STATUS.md).
 
 **Historical checkpoint250, QA .242:** plain QA now uses the measured256MiB GPU budget without a candidate property. Native Valheim:resident32/VelocityUpload=null,prepare12/12,recorded72/72 with520/520frames,35.88FPS/52.37s,26windows34–36FPS,fog queue1–2/velocity CPU-copy0. Contact24/24:9parts/108160exact inner texels,all28 recovered. Max145.07ms coincides with the first synchronous reference capture; causality/perfect smoothness unproved. Builds/contracts/Geometry/localization1122/isolation pass. Normal quit/bridge3/3; .242 stays installed. Normal/ordinary Editor retain98,304,000bytes; shader/costs unchanged. v11 appearance,public GPU budget,heavy blueprints,paid cancellation/network remain open. [Evidence](docs/CHECKPOINT_250.md).
 

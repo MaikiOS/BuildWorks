@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-21 — 277: longer grouped house service
+
+.257 installed;52.003seconds/1201renders,batch10/10,no overflow,sampled queue≤10. Full evidence/screenshot saved;97project hashes/inventory/ordinary saves unchanged,normal exit/restore3. Default path,v11 and full paid lifecycle remain open. Separate read-only terminal proposal prepared. [277](CHECKPOINT_277.md).
+
 ## 2026-10-21 — 276: native house receipt comparison
 
 .256 installed; native A/B/B/A40/40 with complete nested evidence. Grouping reduced requests/latency; individual remains default. Preparation/cadence lifetime conflict and lost nested serialization fixed; failed attempts retained. All97project hashes/inventory/ordinary metadata unchanged;normal exit/restore3. Long-run house/v11/full paid lifecycle remain open. [276](CHECKPOINT_276.md).

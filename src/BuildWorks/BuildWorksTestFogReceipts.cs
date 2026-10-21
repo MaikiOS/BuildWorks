@@ -25,10 +25,11 @@ namespace OstrixMods.BuildWorks
         {
             public string state = "preparing", error = "", mode, project, path;
             public int arm;
+            public int windowSeconds = 5;
             public long world;
             public bool inventoryUnchanged, completedWindow, written;
             public Frame baseline, final;
-            public List<Frame> samples = new List<Frame>(24);
+            public List<Frame> samples = new List<Frame>(212);
         }
         private static BlueprintConstructionProjectRuntime runtime;
         private static BlueprintConstructionProjectFog fog;
@@ -44,7 +45,10 @@ namespace OstrixMods.BuildWorks
         [Serializable] private sealed class CadenceStatus
         { public string state = ""; public bool rendersCamera = false; public int renderedFrames = 0; }
 
-        public static string Prepare(string mode, string id)
+        public static string Prepare(string mode, string id) => Begin(mode, id, 5);
+        public static string PrepareLong(string mode, string id) => Begin(mode, id, 52);
+
+        private static string Begin(string mode, string id, int windowSeconds)
         {
             if (mode != "individual" && mode != "grouped") throw new ArgumentException("Choose individual or grouped receipts.");
             if (report != null && (report.state != "complete" && report.state != "failed" || !report.written))
@@ -67,7 +71,7 @@ namespace OstrixMods.BuildWorks
             current.QaResetFogForReceipts(target, mode == "individual");
             runtime = current; fog = runtime.Fog; player = owner; playerPosition = owner.transform.position;
             project = target; inventory = before;
-            report = new Report { mode = mode, arm = ++arms, project = id, world = runtime.World,
+            report = new Report { mode = mode, arm = ++arms, project = id, world = runtime.World, windowSeconds = windowSeconds,
                 path = Path.Combine(directory, "fog-receipt-arm-" + Guid.NewGuid().ToString("N") + ".json") };
             preparingAt = Time.realtimeSinceStartupAsDouble;
             return Status();
@@ -78,6 +82,9 @@ namespace OstrixMods.BuildWorks
             if (report?.state != "ready") throw new InvalidOperationException("Receipt preparation must be ready before arming.");
             Context();
             if (!(bool)cadenceOwned.GetValue(null)) throw new InvalidOperationException("Start ValheimQA CadenceProbe.StartRendered before arming.");
+            double remaining = 90 - (Time.realtimeSinceStartupAsDouble - preparingAt);
+            if (remaining < report.windowSeconds + 2)
+                throw new InvalidOperationException("Receipt window cannot fit the remaining preparation/window budget: " + remaining + "s.");
             report.state = "warming";
             return Status();
         }
@@ -125,17 +132,17 @@ namespace OstrixMods.BuildWorks
                     report.baseline = Read(now); report.state = "recording"; sampleAt = now;
                 }
                 if (channels.Count != 28) throw new InvalidOperationException("Receipt window lost a snapshot owner.");
-                if (now - sampleAt >= .25 || now - report.baseline.realtime >= 5)
+                if (now - sampleAt >= .25 || now - report.baseline.realtime >= report.windowSeconds)
                 {
                     var frame = Read(now); report.samples.Add(frame); sampleAt = now;
                     if (frame.inputs.Any(input => input.faulted)) throw new InvalidOperationException("Receipt source faulted.");
                     if (frame.inputs.Any(input => input.queued >= 48)) throw new InvalidOperationException("Receipt arm stopped before the 64-sample input limit.");
-                    if (now - report.baseline.realtime >= 5)
+                    if (now - report.baseline.realtime >= report.windowSeconds)
                     {
                         report.final = frame;
                         int rendered = frame.renders - report.baseline.renders;
                         if (rendered < 1 || rendered != frame.controlledRenders - report.baseline.controlledRenders ||
-                            frame.clock - report.baseline.clock < 4.5f)
+                            frame.clock - report.baseline.clock < report.windowSeconds * .9f)
                             throw new InvalidOperationException("Receipt window did not retain controlled rendering and the production clock.");
                         report.completedWindow = true; Finish(null);
                     }
@@ -185,17 +192,19 @@ namespace OstrixMods.BuildWorks
 
         public static string CheckSerialization()
         {
+            var counters = new FogPerformanceCounters(System.Diagnostics.Stopwatch.Frequency).Read();
+            counters.physicalReceiptRequests = 7; counters.flows[0].accepted = 8;
             var frame = new Frame { realtime = 1.25, renders = 2, controlledRenders = 2, clock = 3,
                 sunDirection = new Vector3(1, 2, 3), inputs = Enumerable.Range(0, 28).Select(index =>
                     new BlueprintFogChannels.ReceiptInput { queued = index + 4, confirmedTick = index + 5 }).ToArray(),
-                counters = new FogPerformanceCounters.Snapshot { valid = true, physicalReceiptRequests = 7,
-                    flows = new[] { new FogPerformanceCounters.Flow { accepted = 8 } } } };
-            var value = new Report { baseline = frame, final = frame }; value.samples.Add(frame); value.samples.Add(frame);
+                counters = counters };
+            var value = new Report { baseline = frame, final = frame, windowSeconds = 52 };
+            for (int i = 0; i < 210; ++i) value.samples.Add(frame);
             using (var stream = new MemoryStream())
             {
                 Serializer().WriteObject(stream, value); stream.Position = 0;
                 var saved = (Report)Serializer().ReadObject(stream);
-                if (saved.baseline?.realtime != 1.25 || saved.final?.sunDirection != frame.sunDirection || saved.samples.Count != 2 ||
+                if (saved.baseline?.realtime != 1.25 || saved.final?.sunDirection != frame.sunDirection || saved.samples.Count != 210 || saved.windowSeconds != 52 ||
                     saved.samples[0].inputs.Length != 28 || saved.samples[1].inputs[27].queued != 31 || saved.samples[1].inputs[27].confirmedTick != 32 ||
                     saved.final.counters.physicalReceiptRequests != 7 || saved.final.counters.flows[0].accepted != 8)
                     throw new InvalidOperationException("Nested receipt evidence did not survive serialization.");

@@ -12,7 +12,9 @@ if($Fog){
   if((Get-FileHash -LiteralPath (Join-Path $taskRoot ('src/BuildWorks/Assets/FogGhostRuntime/'+$taskSource.name))).Hash -cne $taskSource.sha256){throw 'Candidate source changed; rebuild bundle.'}
  }
  if((Get-FileHash -LiteralPath (Join-Path $taskRoot 'artifacts/fog-runtime-assets-candidate/buildworks-fog-v11')).Hash -cne $taskCandidate.sha256){throw 'Candidate bundle differs.'}
- foreach($taskMirror in Get-ChildItem -LiteralPath (Join-Path $taskProject 'Assets/Editor/RuntimeSources') -Filter 'BlueprintFog*.cs'){
+ $taskMirrors=@(Get-ChildItem -LiteralPath (Join-Path $taskProject 'Assets/Editor/RuntimeSources') -Filter 'BlueprintFog*.cs')+
+  @('FogPerformanceCounters.cs','BlueprintEditorMeshData.cs' | ForEach-Object {Get-Item -LiteralPath (Join-Path $taskProject ('Assets/Editor/RuntimeSources/'+$_))})
+ foreach($taskMirror in $taskMirrors){
   if((Get-FileHash -LiteralPath $taskMirror.FullName).Hash -cne (Get-FileHash -LiteralPath (Join-Path $taskRoot ('src/BuildWorks/'+$taskMirror.Name))).Hash){throw ('Runtime mirror differs; rebuild candidate: '+$taskMirror.Name)}
  }
 }
@@ -45,7 +47,9 @@ try {
    $taskRow=$taskProof.rows[$taskIndex]
    $taskLight=if($taskIndex -eq 0 -or $taskIndex -eq 3){0.0}else{1.6}
    if(($taskRow.renderCalls -isnot [int] -and $taskRow.renderCalls -isnot [long]) -or $taskRow.renderCalls -ne 26 -or
-      @($taskRow.samples).Count -ne 20 -or [math]::Abs($taskRow.beamStrength-$taskLight) -gt 0.00001){throw 'Fog GPU timing coverage/order incomplete.'}
+      @($taskRow.samples).Count -ne 20 -or
+      ($taskRow.beamStrength -isnot [int] -and $taskRow.beamStrength -isnot [long] -and $taskRow.beamStrength -isnot [double]) -or
+      ![double]::IsFinite([double]$taskRow.beamStrength) -or [math]::Abs($taskRow.beamStrength-$taskLight) -gt 0.00001){throw 'Fog GPU timing coverage/order incomplete.'}
    foreach($taskSample in $taskRow.samples){
     if(($taskSample.gpuNanoseconds -isnot [int] -and $taskSample.gpuNanoseconds -isnot [long]) -or $taskSample.gpuNanoseconds -le 0 -or
        ($taskSample.blocks -isnot [int] -and $taskSample.blocks -isnot [long]) -or $taskSample.blocks -ne 1){throw 'Fog GPU sample invalid.'}

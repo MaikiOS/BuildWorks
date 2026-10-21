@@ -1,5 +1,9 @@
 # Журнал разработки BuildWorks
 
+## 2026-10-21 — 269/270: подготовка квитанций, получение возврата без таблички
+
+269: группировка GPU-readback и18CPU type guards подготовлены; normal/QA0/0, geometry/host/localization PASS. Unity/GPU не запускались из-за игры Ostrix.270: ручной Interact→существующий credit, auto cleanup после сохранения;60actual-method CPU checks, cleanup22/31 и normal/QA/host/localization PASS. Обзор нашёл stale-hover дистанцию, воспроизведённую в tool-выводе; исходный disk-log пуст, поэтому сохранён отдельный успешный отрицательный контроль удалённого guard. Дистанция исправлена на входе и перед зачислением. Два read-only обзора пройдены; private Local/native E и full terminal открыты. Установка прежняя. [269](CHECKPOINT_269_RU.md), [270](CHECKPOINT_270_RU.md).
+
 ## 2026-10-21 — 267/268: очередь измерена, повтор отмены защищён
 
 267: локальные маски дали453/15/133/14exact и5,69% меньший lit elapsed. Короткая native .250:82renders, очередь56→508;93старых файла/инвентарь прежние, normal exit/restore3. Наследованный путь probe перезаписал старый265 JSON; утрата исходных bytes/mtime и восстановление значений явно записаны.268: два воспроизведённых дефекта unpaid replay исправлены, project/52cancellation/117payout и normal/QA/host/localization PASS; установка не менялась. Дальше grouped receipts и source-owned получение до paid terminal. [267](CHECKPOINT_267_RU.md), [268](CHECKPOINT_268_RU.md).

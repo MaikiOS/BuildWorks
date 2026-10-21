@@ -25,10 +25,10 @@ Rev3 does not recreate the board but must permit collection/cleanup without Open
 
 The initial single-rev3 proposal requiring all drops already collected was rejected because it violated player-visible ordering. Prove legacy compatibility, both atomic transitions/replay, board-independent collection and startup/fault/rollback with host substitutes before native verification. The two already-collected Wood debts are only a scoped QA case.
 
-## Revised recommendation — 2026-10-21, not implemented
+## Revised recommendation — 2026-10-21, partial source/CPU implementation; paid terminal unimplemented
 
 Two independent source reviews supersede the rev3/rev4 proposal above: retain the existing active1/cancelled2 plan shape; pending/settled delivery already belongs to payout Collections/Cleanup. Before writing paid rev2, require exact RemovedSaved + IssuedSaved and fresh construction absence under the project lock, without waiting for pickup. Cancelled journal reads must bind the same cancel operation, original revision1, unchanged world/plan/part fingerprints and immutable issuance hash. New issuance is forbidden after terminal; only existing collection/cleanup may advance.
 
 First implement explicit pickup on the sealed source without OpenBoard/hammer, with exact payer/world/unique marker/blob/distance/free cell, then automatic cleanup after saved credit and bounded startup reconciliation. Keep native pickup/merge blocked. Missing/rolled-back journals freeze; rev2 alone is not proof that returns settled. A coordinated rollback of all files remains undetectable without an external monotonic anchor under either design.
 
-268 implements only the prerequisite unpaid replay guard: original revision and no execution/removal evidence, including same-operation replay. Full paid terminal/UI/source interaction and zero-cost handling remain open.
+268 implements only the prerequisite unpaid replay guard: original revision and no execution/removal evidence, including same-operation replay. 270 adds source interaction and post-credit cleanup in source/CPU checks, including repeated native-range custody; this is not native E acceptance. Full paid terminal/UI, crash/rollback and zero-cost handling remain open. See [270](CHECKPOINT_270.md).

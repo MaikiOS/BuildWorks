@@ -1,6 +1,6 @@
 # BuildWorks
 
-**QA .250 unchanged; checkpoints267/268:** a small local shader gain does not solve queue backlog. Short Valheim diagnostics confirmed queue growth; unpaid cancellation replay is hardened in source/tests. v11/full cancellation remain open. [Status](docs/CURRENT_STATUS.md) · [Fog267](docs/CHECKPOINT_267.md) · [Cancellation268](docs/CHECKPOINT_268.md).
+**QA .250 unchanged.** Manual return interaction and subsequent cleanup are implemented/CPU-tested; the native game path is untested. Grouped fog GPU receipts are prepared and await a GPU trial. v11/house/full cancellation remain open. [Status](docs/CURRENT_STATUS.md) · [Fog269](docs/CHECKPOINT_269.md) · [Returns270](docs/CHECKPOINT_270.md).
 
 **Historical checkpoint250, QA .242:** plain QA now uses the measured256MiB GPU budget without a candidate property. Native Valheim:resident32/VelocityUpload=null,prepare12/12,recorded72/72 with520/520frames,35.88FPS/52.37s,26windows34–36FPS,fog queue1–2/velocity CPU-copy0. Contact24/24:9parts/108160exact inner texels,all28 recovered. Max145.07ms coincides with the first synchronous reference capture; causality/perfect smoothness unproved. Builds/contracts/Geometry/localization1122/isolation pass. Normal quit/bridge3/3; .242 stays installed. Normal/ordinary Editor retain98,304,000bytes; shader/costs unchanged. v11 appearance,public GPU budget,heavy blueprints,paid cancellation/network remain open. [Evidence](docs/CHECKPOINT_250.md).
 
@@ -16,9 +16,9 @@ Historical [.240](docs/CHECKPOINT_240.md) preserves two failed fog experiments. 
 
 [.239](docs/CHECKPOINT_239.md) adds bounded QA fog measurements:20s with exact comparisons passed, not a whole-house fix. Evidence directs the next experiment toward payload arrays rather than a texture-pool rewrite.
 
-[.237](docs/CHECKPOINT_237.md) adds saved-world batch absence evidence, a prerequisite for paid cancellation. Physical refund delivery and guarded pickup remain unfinished; see the [plan](docs/PROJECT_CANCELLATION_PROTOCOL.md).
+[.237](docs/CHECKPOINT_237.md) adds saved-world batch absence evidence, a prerequisite for paid cancellation. That .237 step did not implement physical issuance or guarded collection. Their later implementation does not complete paid cancellation; see [current step270](docs/CHECKPOINT_270.md) and the [plan](docs/PROJECT_CANCELLATION_PROTOCOL.md).
 
-[.236](docs/CHECKPOINT_236.md) archives native armor pose/slots;28 CPU capture cases, serialization and builds passed. Equipment restoration and whole-house fog remain unfinished; The archive is included in installed .240; native armor capture remains unverified; native armor capture itself remains untested.
+[.236](docs/CHECKPOINT_236.md) archives native armor pose/slots;28 CPU capture cases, serialization and builds passed. Equipment restoration and whole-house fog remain unfinished; the archive is present in source; native armor capture remains unverified.
 
 [Diagnostic checkpoint234](docs/CHECKPOINT_234.md) reproduces the lower-frame-rate fog queue failure and prepares a test-only experiment. It does not change the game DLL or establish whole-house support.
 

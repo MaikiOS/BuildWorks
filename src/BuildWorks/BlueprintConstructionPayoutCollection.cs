@@ -92,7 +92,7 @@ namespace OstrixMods.BuildWorks
             playerProfile.m_fileSource == FileHelpers.FileSource.Local && playerProfile.GetPlayerID() == record.Player &&
             playerProfile.GetPath() == profilePath && playerProfile.GetName() == profileName && playerProfile.GetFilename() == profileFilename &&
             network && network == ZNet.instance && ReferenceEquals(network.GetWorld(), world) && world != null &&
-            world.m_uid == record.World && player.GetPlayerID() == record.Player && PrecisionPlacementSession.HasUsableHammer(player) &&
+            world.m_uid == record.World && player.GetPlayerID() == record.Player &&
             !SaveSystem.HasSessionFlag(SaveSystemSessionFlags.DontSaveWorld) && !SaveSystem.HasSessionFlag(SaveSystemSessionFlags.DontSaveCharacter);
         private bool Matches(BlueprintForeignPartData expected) => BlueprintStorageCapture.TrySnapshotInventory(inventory, out var actual) &&
             actual.Info == expected.Info && actual.Zdo == expected.Zdo;
@@ -100,10 +100,19 @@ namespace OstrixMods.BuildWorks
         private bool CreditedCustody(BlueprintForeignPartData after) => SavedCustody() && Matches(after) &&
             player.m_customData.TryGetValue(key, out string marker) && marker == value;
         private bool BeforeCustody() => SavedCustody() && !player.m_customData.ContainsKey(key) && Matches(before);
+        internal static bool WithinReach(Player player, ItemDrop source)
+        {
+            if (!player || !source || !source.gameObject.activeInHierarchy) return false;
+            float distance = player.m_maxInteractDistance + source.GetHoverOffset();
+            if (!(distance > 0) || float.IsInfinity(distance)) return false;
+            Vector3 eye = player.GetEyePoint();
+            return source.GetComponentsInChildren<Collider>().Any(collider => collider && collider.enabled &&
+                collider.GetComponentInParent<ItemDrop>() == source && Vector3.Distance(eye, collider.ClosestPoint(eye)) < distance);
+        }
         private bool SourceMatches()
         {
             var view = source ? source.GetComponent<ZNetView>() : null; var data = view ? view.GetZDO() : null;
-            return source && view && view.IsValid() && view.IsOwner() && data != null && data.Persistent &&
+            return WithinReach(player, source) && view && view.IsValid() && view.IsOwner() && data != null && data.Persistent &&
                 source.m_itemData.m_dropPrefab && data.GetPrefab() == source.m_itemData.m_dropPrefab.name.GetStableHashCode() &&
                 BlueprintConstructionPayoutSeal.IsHeld(source) && data.GetString(BlueprintConstructionPayoutSeal.MarkerKey, "") == record.Items[index].Id.ToString("N") &&
                 data.GetLong(BlueprintConstructionPayoutSeal.OwnerKey, 0) == record.Player &&

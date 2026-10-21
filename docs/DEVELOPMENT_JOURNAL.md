@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-21 — 269/270: receipt preparation, board-independent return interaction
+
+269: grouped GPU readback and18CPU type guards prepared;normal/QA0/0,geometry/host/localization PASS. NoUnity/GPU launch while Ostrix plays.270: manual Interact→existing credit and auto cleanup after saved credit;60actual-method CPU checks,cleanup22/31,normal/QA/host/localization PASS. Review found stale-hover distance, reproduced in tool output; original disk-log is empty, so a separate guard-removal negative control is retained. Entry/pre-credit reach fixed. Read-only correctness/complexity review passed;private Local/native E/full terminal remain open. Installed build unchanged. [269](CHECKPOINT_269.md),[270](CHECKPOINT_270.md).
+
 ## 2026-10-21 — 267/268: measured queue deficit, hardened cancellation replay
 
 Local mask candidate:453/15/133/14exact,5.69%less lit elapsed. Short native250:82renders,queue56→508;93old project files/inventory unchanged,normal quit/restore3. Inherited probe path overwrote old265JSON; original byte/mtime loss and value reconstruction explicitly recorded.268:two reproduced unpaid replay defects fixed;project/52cancellation/117payout,normal/QA/host/localization PASS,no deployment. Next grouped receipts and source-owned collection before paid terminal. [267](CHECKPOINT_267.md),[268](CHECKPOINT_268.md).

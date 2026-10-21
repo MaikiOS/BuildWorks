@@ -24,6 +24,7 @@ namespace OstrixMods.BuildWorks
         private BlueprintConstructionPayoutIssuance payout;
         private BlueprintConstructionPayoutCollection collection;
         private BlueprintConstructionPayoutCleanup cleanup;
+        private readonly HashSet<Guid> cleanupProjects = new HashSet<Guid>();
         private Guid queued;
         private int queuedFrame;
         private bool recoveryOnly;
@@ -61,11 +62,10 @@ namespace OstrixMods.BuildWorks
             if (disposed) return;
             ZNet current = ZNet.instance; long uid = WorldId(current);
             if (network != current || uid != world) { Suspend(); network = current; world = uid; }
-            if (!Allowed()) { execution?.Refuse("Construction context closed; evidence retained."); removal?.Refuse("Construction context closed; removal evidence retained."); payout?.Refuse("Construction context closed; payout evidence retained."); collection?.Refuse("Construction context closed; credit evidence retained."); cleanup?.Refuse("Construction context closed; cleanup evidence retained."); execution = null; queued = Guid.Empty; ClearBoards(); store = null; return; }
+            if (!Allowed()) { execution?.Refuse("Construction context closed; evidence retained."); removal?.Refuse("Construction context closed; removal evidence retained."); payout?.Refuse("Construction context closed; payout evidence retained."); collection?.Refuse("Construction context closed; credit evidence retained."); cleanup?.Refuse("Construction context closed; cleanup evidence retained."); execution = null; queued = Guid.Empty; cleanupProjects.Clear(); ClearBoards(); store = null; return; }
             removal?.Tick();
             payout?.Tick();
-            collection?.Tick();
-            cleanup?.Tick();
+            TickPayoutCollection();
             if (execution != null && !execution.Finished)
             {
                 execution.Tick();
@@ -97,6 +97,7 @@ namespace OstrixMods.BuildWorks
                 {
                     Store.Record record = store.Load(id);
                     if (!record.Cancelled) AddBoard(record);
+                    cleanupProjects.Add(id);
                 }
             }
             catch (Exception error) { ClearBoards(); store = null; failed = true; Failure = error.Message; log?.Invoke(error); }
@@ -202,8 +203,83 @@ namespace OstrixMods.BuildWorks
                 Vector3.Distance(Player.m_localPlayer.transform.position, OpenBoard.transform.position) > 5 || queued != Guid.Empty ||
                 PayoutBusy || execution != null && !execution.Finished || removal != null && !removal.Finished)
                 throw new InvalidOperationException(BuildWorksLocalization.Text("project.unavailable"));
+            StartCollection(id, index);
+        }
+
+        private void StartCollection(Guid id, int index)
+        {
             var next = new BlueprintConstructionPayoutCollection(store, id, index);
             Close(); collection = next;
+            if (next.Status == "profile-credited") cleanupProjects.Add(id);
+        }
+
+        internal bool TryBeginCollection(ItemDrop source, Humanoid user)
+        {
+            try
+            {
+                RequireContext();
+                var player = Player.m_localPlayer;
+                if (!IsPrivateLocalPlacement || !source || !player || user != player || player.IsDead() ||
+                    !BlueprintConstructionPayoutSeal.IsHeld(source) ||
+                    !BlueprintConstructionPayoutCollection.WithinReach(player, source) ||
+                    player.GetHoverObject()?.GetComponentInParent<ItemDrop>() != source || queued != Guid.Empty ||
+                    PayoutBusy || execution != null && !execution.Finished || removal != null && !removal.Finished)
+                    return false;
+                var view = source.GetComponent<ZNetView>(); var data = view ? view.GetZDO() : null;
+                if (!view || !view.IsValid() || !view.IsOwner() || data == null || !data.IsValid() || !data.Persistent || data.m_uid.IsNone() ||
+                    data.GetLong(BlueprintConstructionPayoutSeal.OwnerKey, 0) != player.GetPlayerID() ||
+                    !Guid.TryParseExact(data.GetString(BlueprintConstructionPayoutSeal.MarkerKey, ""), "N", out Guid marker) || marker == Guid.Empty)
+                    return false;
+                Guid project = Guid.Empty; int index = -1;
+                var journal = new BlueprintConstructionPayoutJournal(store);
+                // Match durable item identity after reload; an old native ZDO ID is not an entitlement.
+                foreach (Guid id in store.Ids())
+                {
+                    var record = journal.Read(id);
+                    if (record?.Phase != BlueprintConstructionPayoutJournal.IssuedSaved) continue;
+                    for (int i = 0; i < record.Items.Length; ++i) if (record.Items[i].Id == marker)
+                    {
+                        if (index >= 0 || record.Player != player.GetPlayerID() || record.World != world) return false;
+                        project = id; index = i;
+                    }
+                }
+                if (index < 0) return false;
+                StartCollection(project, index); return true;
+            }
+            catch (Exception error) { Failure = error.Message; log?.Invoke(error); return false; }
+        }
+
+        private void TickPayoutCollection()
+        {
+            bool collecting = collection != null && !collection.Finished;
+            collection?.Tick();
+            if (collecting && collection.Finished)
+            {
+                if (collection.Status == "profile-credited") cleanupProjects.Add(collection.Project);
+                else { cleanupProjects.Remove(collection.Project); Failure = collection.Reason; log?.Invoke(new InvalidOperationException(Failure)); }
+            }
+            bool cleaning = cleanup != null && !cleanup.Finished;
+            cleanup?.Tick();
+            if (cleaning && cleanup.Finished)
+            {
+                if (cleanup.Status == "cleanup-saved") cleanupProjects.Add(cleanup.Project);
+                else { cleanupProjects.Remove(cleanup.Project); Failure = cleanup.Reason; log?.Invoke(new InvalidOperationException(Failure)); }
+            }
+            if (!IsPrivateLocalPlacement || store == null || cleanupProjects.Count == 0 || queued != Guid.Empty || PayoutBusy ||
+                execution != null && !execution.Finished || removal != null && !removal.Finished) return;
+            Guid id = cleanupProjects.First(); cleanupProjects.Remove(id);
+            try
+            {
+                var record = new BlueprintConstructionPayoutJournal(store).Read(id);
+                if (record?.Phase != BlueprintConstructionPayoutJournal.IssuedSaved || record.Player != Player.m_localPlayer.GetPlayerID() ||
+                    record.Collections == null || record.Collections.Any(c => c.Phase != BlueprintConstructionPayoutJournal.ProfileCredited)) return;
+                int index = Array.FindIndex(record.Collections, c => c.Removal?.Phase == BlueprintConstructionPayoutJournal.CleanupIntent);
+                if (index < 0) index = Array.FindIndex(record.Collections, c => c.Removal == null);
+                if (index < 0) return;
+                // Constructor/Tick alone own the exact source, saved receipt and N/N+1 recovery checks.
+                cleanup = new BlueprintConstructionPayoutCleanup(store, id, index);
+            }
+            catch (Exception error) { Failure = error.Message; log?.Invoke(error); }
         }
 
         internal void BeginCleanup(Guid id, int index)
@@ -292,7 +368,7 @@ namespace OstrixMods.BuildWorks
         }
         internal void Suspend()
         { execution?.Refuse("Construction suspended; evidence retained."); removal?.Refuse("Construction suspended; removal evidence retained."); payout?.Refuse("Construction suspended; payout evidence retained."); collection?.Refuse("Construction suspended; credit evidence retained."); cleanup?.Refuse("Construction suspended; cleanup evidence retained."); cleanup = null; collection = null; payout = null; removal = null; execution = null; queued = Guid.Empty;
-            ClearBoards(); store = null; network = null; world = 0; failed = false; Failure = null; }
+            cleanupProjects.Clear(); ClearBoards(); store = null; network = null; world = 0; failed = false; Failure = null; }
         public void Dispose() { if (disposed) return; Suspend(); disposed = true; }
     }
 }

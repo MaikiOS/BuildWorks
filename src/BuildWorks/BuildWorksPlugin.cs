@@ -1311,6 +1311,18 @@ namespace OstrixMods.BuildWorks
         [HarmonyPatch(typeof(ItemDrop), "OnDestroy")]
         private static class BlueprintPayoutUnloadPatch
         { private static void Prefix(ItemDrop __instance) => BlueprintConstructionPayoutSeal.Destroyed(__instance); }
+        [HarmonyPatch(typeof(ItemDrop), nameof(ItemDrop.Interact), new Type[] { typeof(Humanoid), typeof(bool), typeof(bool) })]
+        private static class BlueprintPayoutInteractPatch
+        {
+            private static bool Prefix(ItemDrop __instance, Humanoid __0, bool __1, bool __2, ref bool __result)
+            {
+                if (!BlueprintConstructionPayoutSeal.IsHeld(__instance)) return true;
+                __result = !__1;
+                if (!__1 && ConstructionProjects?.TryBeginCollection(__instance, __0) != true && __0 == Player.m_localPlayer && Player.m_localPlayer)
+                    Player.m_localPlayer.Message(MessageHud.MessageType.Center, BuildWorksLocalization.Text("project.review"));
+                return false;
+            }
+        }
         [HarmonyPatch(typeof(Humanoid), nameof(Humanoid.Pickup), new Type[] { typeof(GameObject), typeof(bool), typeof(bool) })]
         private static class BlueprintPayoutPickupPatch
         { private static bool Prefix(GameObject __0) => !__0 || !BlueprintConstructionPayoutSeal.IsHeld(__0.GetComponent<ItemDrop>()); }

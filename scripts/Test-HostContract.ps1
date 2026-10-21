@@ -3637,6 +3637,35 @@ $creditCell = @(($hostAssembly.MainModule.Types | Where-Object Name -eq 'Invento
 })
 Assert-Contract ($creditCell.Count -eq 1 -and $creditCell[0].IsPrivate -and $creditCell[0].ReturnType.FullName -eq 'System.Boolean' -and
     (($creditCell[0].Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n") -match 'Inventory::Changed') 'Exact-cell credit API or native callback boundary changed.'
+$payoutInteract = @($itemDropType.Methods | Where-Object {
+    $_.Name -eq 'Interact' -and (($_.Parameters | ForEach-Object { $_.ParameterType.FullName }) -join ',') -eq 'Humanoid,System.Boolean,System.Boolean'
+})
+$payoutHover = @(($hostAssembly.MainModule.Types | Where-Object Name -eq 'Player').Methods | Where-Object Name -eq 'GetHoverObject')
+Assert-Contract ($payoutInteract.Count -eq 1 -and $payoutInteract[0].IsPublic -and $payoutInteract[0].ReturnType.FullName -eq 'System.Boolean' -and
+    (($payoutInteract[0].Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n") -match 'ItemDrop::Pickup' -and
+    $payoutHover.Count -eq 1 -and $payoutHover[0].IsPublic -and $payoutHover[0].ReturnType.FullName -eq 'UnityEngine.GameObject') 'Manual return interaction or native hover API changed.'
+$payoutInteractPatch = @($pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintPayoutInteractPatch' -and $_.Name -eq 'Prefix' })
+$payoutInteractCalls = ($payoutInteractPatch.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($payoutInteractPatch.Count -eq 1 -and $payoutInteractCalls -match 'BlueprintConstructionPayoutSeal::IsHeld' -and
+    $payoutInteractCalls -match 'BlueprintConstructionProjectRuntime::TryBeginCollection' -and $payoutInteractCalls -notmatch 'ItemDrop::Pickup|Humanoid::Pickup|Inventory::AddItem') 'Sealed interaction must route to durable collection without native pickup.'
+foreach ($payoutContextType in 'BlueprintConstructionPayoutCollection','BlueprintConstructionPayoutCleanup') {
+    $payoutContext = @($pluginMethods | Where-Object { $_.DeclaringType.Name -eq $payoutContextType -and $_.Name -eq 'Context' })
+    $payoutContextCalls = ($payoutContext.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+    Assert-Contract ($payoutContext.Count -eq 1 -and $payoutContextCalls -notmatch '::HasUsableHammer' -and
+        $payoutContextCalls -match '::get_ManagedThreadId' -and $payoutContextCalls -match '::IsDead' -and
+        $payoutContextCalls -match '::GetInventory' -and $payoutContextCalls -match '::get_IsPrivateLocalPlacement' -and
+        $payoutContextCalls -match 'PlayerProfile::m_fileSource' -and $payoutContextCalls -match 'PlayerProfile::GetPath' -and
+        $payoutContextCalls -match 'PlayerProfile::GetName' -and $payoutContextCalls -match 'PlayerProfile::GetFilename' -and
+        $payoutContextCalls -match 'PlayerProfile::GetPlayerID' -and $payoutContextCalls -match 'Player::GetPlayerID' -and
+        $payoutContextCalls -match 'World::m_uid' -and $payoutContextCalls -match '::HasSessionFlag') "Return custody must preserve Local identity/save gates without requiring the removed board or a hammer: $payoutContextType"
+}
+& (Join-Path $projectRoot 'tests/BuildWorks.CaptureChecks/PayoutInteraction.ps1')
+$payoutReach = @($pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintConstructionPayoutCollection' -and $_.Name -eq 'WithinReach' })
+$payoutReachCalls = ($payoutReach.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($payoutReach.Count -eq 1 -and $payoutReachCalls -match 'Player::m_maxInteractDistance' -and
+    $payoutReachCalls -match 'ItemDrop::GetHoverOffset' -and $payoutReachCalls -match '::GetEyePoint' -and
+    $payoutReachCalls -match '::GetComponentsInChildren' -and
+    (($pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintConstructionPayoutCollection' -and $_.Name -eq 'SourceMatches' }).Body.Instructions.Operand -join "`n") -match '::WithinReach') 'Async collection must recheck physical native reach through SourceMatches before insertion.'
 $profileCalls = ($profileAdapter.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($profileCalls -match 'NativePlayerProfileReadback::TryVerify' -and $profileCalls -match '::TrySnapshotInventory' -and
     $profileCalls -match 'PlayerProfile::m_fileSource' -and $profileCalls -match 'PlayerProfile::GetPath' -and

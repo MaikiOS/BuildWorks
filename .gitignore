@@ -12,3 +12,4 @@ release/*.zip
 PUBLISH_CHECKLIST.md
 __pycache__/
 *.py[cod]
+artifacts/test-stand-bin/

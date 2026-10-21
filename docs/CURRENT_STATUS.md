@@ -1,8 +1,8 @@
 # Current BuildWorks status
 
-2026-10-21. Installed QA **.250 unchanged**. [267](CHECKPOINT_267.md): short stationary Valheim diagnostics confirm queue growth; local shader candidate saves5.69% isolated elapsed, not a house fix. [268](CHECKPOINT_268.md): unpaid cancellation replay hardened in source/tests, no deployment.
+2026-10-21. Installed QA **.250 unchanged**. [270](CHECKPOINT_270.md): board-independent manual return interaction and subsequent cleanup implemented/CPU-tested; native E untested. [269](CHECKPOINT_269.md): local grouped GPU-receipt candidate prepared; GPU trial waits for Ostrix to finish playing.
 
-Polling overhead is included; pure GPU time is unmeasured. Full house/v11/paid cancellation remain open. Shader/tool267 edits stay local; source-only268 publishes only the store/test fix and docs.
+Full house/v11/paid cancellation remain open.267 established queue growth and a small shader gain;269 is unmeasured. Git receives only the independent source step270 and documentation; local fog/shader candidates are neither published nor installed.
 
 Requirements/current task: [owner checklist](LIVE_CHECKLIST_RU.md). Technical evidence/causes: [WORK_STATUS](WORK_STATUS_RU.md). History: [journal](DEVELOPMENT_JOURNAL.md). [Document rules](PROGRESS_RULES.md).
 

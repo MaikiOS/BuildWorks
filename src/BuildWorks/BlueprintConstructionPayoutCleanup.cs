@@ -109,7 +109,7 @@ namespace OstrixMods.BuildWorks
             identity.GetPath() == path && identity.GetName() == name && identity.GetFilename() == filename &&
             network && network == ZNet.instance && ReferenceEquals(network.GetWorld(), world) && world != null && world.m_uid == record.World &&
             manager != null && ReferenceEquals(manager, ZDOMan.instance) && scene && scene == ZNetScene.instance &&
-            player.GetPlayerID() == record.Player && PrecisionPlacementSession.HasUsableHammer(player) &&
+            player.GetPlayerID() == record.Player &&
             !SaveSystem.HasSessionFlag(SaveSystemSessionFlags.DontSaveWorld) && !SaveSystem.HasSessionFlag(SaveSystemSessionFlags.DontSaveCharacter);
         private bool Custody() => Context() && BlueprintStorageCapture.TrySnapshotInventory(inventory, out var actual) &&
             actual.Info == beforeInventory.Info && actual.Zdo == beforeInventory.Zdo &&

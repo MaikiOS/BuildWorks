@@ -1,5 +1,9 @@
 # Журнал разработки BuildWorks
 
+## 2026-10-21 — 289: слой сохранения оплаченной отмены
+
+Локальная266, без установки: paid terminal до pickup, неизменная выдача, продолжение получения/cleanup и frozen intent между двумя commits. Regression исторического cleanup исправлен;172 CPU assertions/full StoreTests, normal/QA0/0, host/localization и два независимых review PASS. Fallback mask подготовлена, не GPU-испытана. Ostrix играет; игра/ресурсы/проекты не менялись. [289](CHECKPOINT_289_RU.md).
+
 ## 2026-10-21 — 288: half-wake реализован, скорость не прошла
 
 QA .265 устанавливает совместимый C#hook с прежним embedded bundle; half shader временный/local. GPU composite и4side20sets, native56/56,3PNG/exact23inventory подтверждены. Активный half12,52 против surface147,76FPS — performance FAILED, дождь не закреплён. Normal logout/Quit; restore3 отложен из-за новой игры Ostrix, ordinary metadata audit неполон. Astra проверяет fullres fallback без нового solver. [288](CHECKPOINT_288_RU.md).

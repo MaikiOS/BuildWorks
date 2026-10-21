@@ -96,11 +96,125 @@ namespace OstrixMods.BuildWorks.StoreTests
             File.WriteAllBytes(path, terminal);
             Check(journal.Paid(plan.Id).Sum(p => p.Paid) == 4 && journal.Read(plan.Id).Items.Length == 2, "Exact contribution set changed.");
             Check(saved.Collections == null && !Encoding.UTF8.GetString(terminal).Contains("Collections"), "Additive credit changed legacy canonical bytes.");
+            TerminalChecks(plans, journal, removal, plan.Id, operation, after, path);
             CreditChecks(journal, plan.Id, operation, after, path);
             Console.WriteLine("PASS payout journal: " + assertions + " assertions; exact paid properties/quantity, durable one-shot intents, replay, corruption and paired-save binding. Native issuance/collection is not claimed.");
             Journal.Record Prepare(Journal.Entry[] rows) => journal.Prepare(plan.Id, operation, 17, 8, after, rows);
             Journal.Proof Proof() => new Journal.Proof { Generation = 9, ProfileHash = new string('A', 128),
                 InventoryHash = Digest(Convert.FromBase64String(after.Zdo)), ItemHashes = entries.Select(e => Digest(Convert.FromBase64String(e.Blob))).ToArray() };
+        }
+        private static void TerminalChecks(Plans plans, Journal journal, Removal removal, Guid project, Guid operation, BlueprintForeignPartData inventory, string path)
+        {
+            string planPath = Path.Combine(plans.DirectoryPath, project.ToString("N") + ".bwproject");
+            string removalPath = Path.Combine(plans.DirectoryPath, project.ToString("N") + ".bwremoval");
+            byte[] planBytes = File.ReadAllBytes(planPath), issuedBytes = File.ReadAllBytes(path), removalBytes = File.ReadAllBytes(removalPath);
+            var issued = journal.Read(project); string hash = Journal.IssuanceFingerprint(issued), receipt = Journal.ReceiptValue(issued, 0);
+            var originalPlan = plans.Load(project);
+            var profile = Proof(17, "unrelated", "not-a-collection-receipt");
+            Guid[] parts = removal.Read(project).Parts.Where(p => p.Phase == Parts.Committed).Select(p => p.Operation).ToArray();
+            NativeWorldStorageReadback.AbsenceEvidence Absence(uint generation = 9, long world = 42, int? marker = null, Guid[] ids = null)
+                => (NativeWorldStorageReadback.AbsenceEvidence)Activator.CreateInstance(typeof(NativeWorldStorageReadback.AbsenceEvidence),
+                    BindingFlags.Instance | BindingFlags.NonPublic, null, new object[] {
+                        new NativeWorldStorageReadback.AbsenceExpectation(world, marker ?? Plans.ConstructionMarkerKey, ids ?? parts), 36, 1, 0, generation }, null);
+            try
+            {
+                Refuse<ArgumentException>(() => plans.CancelPaid(project, 2, operation, 9, Absence(), profile));
+                Refuse<ArgumentException>(() => plans.CancelPaid(project, 1, Guid.Empty, 9, Absence(), profile));
+                Refuse<InvalidOperationException>(() => plans.CancelPaid(project, 1, Guid.NewGuid(), 9, Absence(), profile));
+                Refuse<InvalidOperationException>(() => plans.CancelPaid(project, 1, operation, 8, Absence(), profile));
+                Refuse<InvalidOperationException>(() => plans.CancelPaid(project, 1, operation, 8, Absence(8), profile));
+                Refuse<InvalidOperationException>(() => plans.CancelPaid(project, 1, operation, 9, Absence(world: 43), profile));
+                Refuse<InvalidOperationException>(() => plans.CancelPaid(project, 1, operation, 9, Absence(marker: Journal.ItemMarkerKey), profile));
+                Refuse<InvalidOperationException>(() => plans.CancelPaid(project, 1, operation, 9, Absence(ids: issued.Items.Select(i => i.Id).ToArray()), profile));
+                Refuse<InvalidOperationException>(() => plans.CancelPaid(project, 1, operation, 9, Absence(), null));
+                Refuse<InvalidOperationException>(() => plans.CancelPaid(project, 1, operation, 9, Absence(), Proof(18, "unrelated", "value")));
+                Check(planBytes.SequenceEqual(File.ReadAllBytes(planPath)) && issuedBytes.SequenceEqual(File.ReadAllBytes(path)), "Refused terminal changed old files.");
+                journal.BeginCredit(project, operation, 0, inventory, Package(2, 2, Guid.Empty), 2, 0, new string('A', 128));
+                Refuse<InvalidOperationException>(() => plans.CancelPaid(project, 1, operation, 9, Absence(), profile));
+                File.WriteAllBytes(path, issuedBytes);
+                foreach (Action<Journal.Record> mutate in new Action<Journal.Record>[] {
+                    r => r.Project = Guid.NewGuid(), r => r.Operation = Guid.NewGuid(), r => r.Player++, r => r.World++,
+                    r => r.RemovalHash = new string('F', 64), r => r.BeforeGeneration++, r => r.BeforeInfo += "changed",
+                    r => r.BeforeBytes += "changed", r => r.Items[0].Id = Guid.NewGuid(), r => r.Items[0].Blob += "changed",
+                    r => r.Items[0].ObjectUser++, r => r.Items[0].ObjectId++, r => r.Items = r.Items.Reverse().ToArray(),
+                    r => r.Saved.Generation++, r => r.Saved.ProfileHash = new string('F',128), r => r.Saved.InventoryHash = new string('F',64),
+                    r => r.Saved.ItemHashes = r.Saved.ItemHashes.Reverse().ToArray() })
+                {
+                    var changed = journal.Read(project); mutate(changed);
+                    Check(Journal.IssuanceFingerprint(changed) != hash, "Immutable issuance change was not bound.");
+                }
+                var counter = journal.Read(project); counter.Revision++;
+                Check(Journal.IssuanceFingerprint(counter) == hash && issuedBytes.SequenceEqual(File.ReadAllBytes(path)), "Fingerprint depends on mutable revision or writes files.");
+                // Force the second file commit to fail, after the durable binding has been written.
+                using (var locked = new FileStream(planPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                    Refuse<IOException>(() => plans.CancelPaid(project, 1, operation, 9, Absence(), profile));
+                Check(!plans.Load(project).Cancelled && journal.Read(project).Terminal != null && planBytes.SequenceEqual(File.ReadAllBytes(planPath)), "Partial terminal commit lost its frozen intent.");
+                Refuse<InvalidOperationException>(() => journal.BeginCredit(project, operation, 0, inventory, Package(2, 2, Guid.Empty), 2, 0, new string('A', 128)));
+                var closed = plans.CancelPaid(project, 1, operation, 9, Absence(), profile);
+                Check(closed.Cancelled && closed.Revision == 2 && closed.CancelOperation == operation && closed.BlueprintBytes.SequenceEqual(originalPlan.BlueprintBytes) &&
+                    closed.RootPose.Values.SequenceEqual(originalPlan.RootPose.Values) && closed.Parts.Select(p => p.Id).SequenceEqual(originalPlan.Parts.Select(p => p.Id)) &&
+                    closed.Parts.Zip(originalPlan.Parts, (a,b) => a.WorldPose.Values.SequenceEqual(b.WorldPose.Values)).All(same => same), "Paid terminal identity/snapshot differs.");
+                Check(journal.Read(project).Collections == null && journal.Read(project).Terminal.IssuanceHash == hash &&
+                    removal.Read(project).Phase == Removal.RemovedSaved && Journal.ReceiptValue(journal.Read(project), 0) == receipt,
+                    "Terminal waited for collection or changed entitlement.");
+                byte[] closedPlan = File.ReadAllBytes(planPath), closedPayout = File.ReadAllBytes(path);
+                plans.CancelPaid(project, 1, operation, 9, Absence(), profile);
+                Check(closedPlan.SequenceEqual(File.ReadAllBytes(planPath)) && closedPayout.SequenceEqual(File.ReadAllBytes(path)), "Terminal replay changed persisted bytes.");
+                Refuse<InvalidOperationException>(() => removal.Prepare(project, 1, operation, 17));
+                Refuse<InvalidOperationException>(() => removal.BeginRemoval(project, operation, 7));
+                Refuse<InvalidOperationException>(() => removal.ConfirmRemovedSaved(project, operation, removal.Read(project).Saved));
+                Refuse<InvalidOperationException>(() => journal.Prepare(project, operation, 17, 9, inventory, issued.Items));
+                Refuse<InvalidOperationException>(() => journal.BeginItem(project, operation, 0));
+                Refuse<InvalidOperationException>(() => journal.Observe(project, operation, 0, 31, 4));
+                Refuse<InvalidOperationException>(() => journal.BeginSave(project, operation));
+                Refuse<InvalidOperationException>(() => journal.ConfirmSaved(project, operation, issued.Saved));
+                File.WriteAllBytes(path, issuedBytes);
+                Refuse<InvalidDataException>(() => journal.Read(project));
+                File.WriteAllBytes(path, closedPayout);
+                File.Delete(path); Refuse<InvalidOperationException>(() => plans.CancelPaid(project, 1, operation, 9, Absence(), profile));
+                File.WriteAllBytes(path, closedPayout);
+                var credit = journal.BeginCredit(project, operation, 0, inventory, Package(2, 2, Guid.Empty), 2, 0, new string('A', 128));
+                var creditedInventory = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, credit.Collections[0].AfterInfo, credit.Collections[0].AfterBytes, null);
+                string key = Journal.ReceiptKey(credit.Items[0].Id);
+                journal.ConfirmSavedCredit(project, operation, 0, FullProof(17, key, receipt, creditedInventory));
+                credit = journal.BeginCredit(project, operation, 1, creditedInventory, Package(2, 3, Guid.Empty), 3, 0, new string('B', 128));
+                var secondInventory = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, credit.Collections[1].AfterInfo, credit.Collections[1].AfterBytes, null);
+                journal.ConfirmSavedCredit(project, operation, 1, FullProof(17, Journal.ReceiptKey(credit.Items[1].Id), Journal.ReceiptValue(credit, 1), secondInventory));
+                journal.BeginCleanup(project, operation, 0, 9, Proof(17, key, receipt));
+                var absentPayout = (NativeWorldStorageReadback.AbsenceEvidence)Activator.CreateInstance(typeof(NativeWorldStorageReadback.AbsenceEvidence),
+                    BindingFlags.Instance | BindingFlags.NonPublic, null, new object[] {
+                        new NativeWorldStorageReadback.AbsenceExpectation(42, Journal.ItemMarkerKey, new[] { credit.Items[0].Id }), 36, 1, 0, (uint)10 }, null);
+                journal.ConfirmCleanup(project, operation, 0, absentPayout, Proof(17, key, receipt));
+                Check(Journal.IssuanceFingerprint(journal.Read(project)) == hash && plans.Load(project).Cancelled &&
+                    journal.Read(project).Collections[0].Removal.Phase == Journal.CleanupSaved, "Credit/cleanup invalidated terminal binding.");
+                // A legacy settled prefix must retain its historical generation after a later terminal.
+                var settled = journal.Read(project); settled.Terminal = null; settled.Revision--;
+                File.WriteAllBytes(planPath, planBytes);
+                using (var body = new MemoryStream())
+                {
+                    new System.Runtime.Serialization.Json.DataContractJsonSerializer(typeof(Journal.Record)).WriteObject(body, settled);
+                    byte[] bytes = body.ToArray();
+                    using (var file = new FileStream(path, FileMode.Create, FileAccess.Write))
+                    using (var writer = new BinaryWriter(file))
+                    using (var sha = SHA256.Create())
+                    { writer.Write(issuedBytes, 0, 8); writer.Write(bytes.Length); writer.Write(bytes); writer.Write(sha.ComputeHash(bytes)); }
+                }
+                Check(journal.Read(project).MinimumWorldGeneration == 10, "Known cleanup generation was lost.");
+                Refuse<InvalidOperationException>(() => plans.CancelPaid(project, 1, operation, 9, Absence(), profile));
+                plans.CancelPaid(project, 1, operation, 11, Absence(11), profile);
+                byte[] later = File.ReadAllBytes(path);
+                Check(journal.Read(project).Collections[0].Removal.BeforeGeneration == 9 && journal.Read(project).Terminal.Generation == 11,
+                    "Later terminal rewrote historical cleanup evidence.");
+                journal.BeginCleanup(project, operation, 0, 9, Proof(17, key, receipt));
+                Check(later.SequenceEqual(File.ReadAllBytes(path)), "Historical cleanup replay changed terminal or receipt bytes.");
+                string secondKey = Journal.ReceiptKey(credit.Items[1].Id), secondValue = Journal.ReceiptValue(credit, 1);
+                Refuse<InvalidOperationException>(() => journal.BeginCleanup(project, operation, 1, 9, Proof(17, secondKey, secondValue)));
+                Refuse<InvalidOperationException>(() => journal.BeginCleanup(project, operation, 1, 10, Proof(17, secondKey, secondValue)));
+                Check(journal.BeginCleanup(project, operation, 1, 11, Proof(17, secondKey, secondValue)).Collections[1].Removal.BeforeGeneration == 11,
+                    "New cleanup did not use current terminal generation.");
+                Check(removalBytes.SequenceEqual(File.ReadAllBytes(removalPath)) && !Directory.EnumerateFiles(plans.DirectoryPath, "*.preparing").Any(), "Terminal changed removal proof or leaked staging.");
+            }
+            finally { File.WriteAllBytes(planPath, planBytes); File.WriteAllBytes(path, issuedBytes); File.WriteAllBytes(removalPath, removalBytes); }
         }
         private static void CreditChecks(Journal journal, Guid project, Guid operation, BlueprintForeignPartData before, string path)
         {

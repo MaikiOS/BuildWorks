@@ -50,7 +50,7 @@ namespace OstrixMods.BuildWorks
             network = ZNet.instance; world = network ? network.GetWorld() : null; generation = SaveSystem.GetSaveNumber();
             journal = new Journal(plans); record = journal.Read(project); this.index = index;
             if (record?.Phase != Journal.IssuedSaved || index < 0 || index >= record.Items.Length || AddCell?.ReturnType != typeof(bool) ||
-                !Context() || network.IsSaving() || generation < record.Saved.Generation || generation == uint.MaxValue)
+                !Context() || network.IsSaving() || generation < record.MinimumWorldGeneration || generation == uint.MaxValue)
                 throw new InvalidOperationException("Credit requires saved issuance, its payer, idle private Local context and exact native cell API.");
             key = Journal.ReceiptKey(record.Items[index].Id); value = Journal.ReceiptValue(record, index);
             VerifySource();

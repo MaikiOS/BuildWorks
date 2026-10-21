@@ -11,7 +11,7 @@ namespace OstrixMods.BuildWorks
     // One native structural placement; ambiguous outcomes remain durable and never retry or refund here.
     internal sealed class BlueprintConstructionPartExecution
     {
-        internal static readonly int MarkerKey = "ostrix_buildworks_project_operation_v1".GetStableHashCode();
+        internal static readonly int MarkerKey = BlueprintConstructionProjectStore.ConstructionMarkerKey;
         internal static readonly int ReceiptKey = "ostrix_buildworks_project_receipt_v1".GetStableHashCode();
         private readonly Journal journal;
         private readonly Plans.Record plan;

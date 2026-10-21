@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-21 — 289: paid cancellation persistence
+
+Local266, not deployed: paid close before pickup, immutable issuance, continued collection/cleanup and a frozen intent across two commits. Historical cleanup regression fixed;172 CPU assertions/full StoreTests, normal/QA0/0, host/localization and two independent reviews PASS. Fallback mask prepared without GPU execution. No game/resource/project mutations during owner play. [289](CHECKPOINT_289.md).
+
 ## 2026-10-21 — 288: half-wake implemented, performance failed
 
 Installed QA .265 adds a compatible C# hook with unchanged embedded bundle; half shader is temporary/local. GPU composite/four-side20sets/native56/56, three PNG and exact23item inventory verified. Active half12.52 versus surface147.76FPS fails performance; unpinned rain. Normal logout/Quit; restore3 deferred by new owner game, ordinary metadata audit incomplete. Astra reviews fullres fallback without a solver rewrite. [288](CHECKPOINT_288.md).

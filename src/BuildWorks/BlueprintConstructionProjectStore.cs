@@ -4,16 +4,18 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using OstrixMods.BuildWorks.Geometry;
 
 namespace OstrixMods.BuildWorks
 {
-    // Unpaid plans only. This store cannot acknowledge payment, place objects or authorize a refund.
+    // Plan metadata only; paid cancellation consumes saved evidence and never issues resources.
     internal sealed class BlueprintConstructionProjectStore
     {
         private static readonly byte[] Magic = Encoding.ASCII.GetBytes("BWCP01\r\n");
         private const int MaximumBytes = BlueprintExchangeFormat.MaximumBytes + CompositeBlueprintStore.MaximumParts * 64 + 256;
         private readonly string directory;
         private readonly long world;
+        internal static readonly int ConstructionMarkerKey = "ostrix_buildworks_project_operation_v1".GetStableHashCode();
 #if BUILDWORKS_TEST_STAND
         internal static bool QaFailAfterCommit;
 #endif
@@ -110,6 +112,40 @@ namespace OstrixMods.BuildWorks
         }
 
         internal Record Load(Guid id) => Read(id, PathFor(id));
+
+        internal Record CancelPaid(Guid id, long expectedRevision, Guid operation, uint currentGeneration,
+            NativeWorldStorageReadback.AbsenceEvidence absence, NativePlayerProfileReadback.CustomDataEvidence profile)
+        {
+            if (operation == Guid.Empty || expectedRevision != 1) throw new ArgumentException("Original cancellation identity is required.");
+            using (Lock(id))
+            {
+                var plan = Load(id);
+                if (plan.Cancelled ? plan.Revision != 2 || plan.CancelOperation != operation : plan.Revision != expectedRevision)
+                    throw new InvalidOperationException("Cancellation operation or original plan changed.");
+                var removal = new BlueprintConstructionCancellationJournal(this).Read(id);
+                var payouts = new BlueprintConstructionPayoutJournal(this);
+                var issued = payouts.Read(id);
+                if (removal?.Phase != BlueprintConstructionCancellationJournal.RemovedSaved || issued?.Phase != BlueprintConstructionPayoutJournal.IssuedSaved ||
+                    removal.Operation != operation || issued.Operation != operation || absence == null || profile == null ||
+                    currentGeneration == 0 || currentGeneration == uint.MaxValue || absence.Generation != currentGeneration ||
+                    currentGeneration < issued.MinimumWorldGeneration || absence.World != world || !absence.CompleteMappedScan ||
+                    !plan.Cancelled && issued.Collections?.Any(c => c.Phase != BlueprintConstructionPayoutJournal.ProfileCredited ||
+                        c.Removal?.Phase == BlueprintConstructionPayoutJournal.CleanupIntent) == true ||
+                    absence.MarkerSets.Count != 1 || absence.MarkerKey != ConstructionMarkerKey ||
+                    !absence.Operations.SequenceEqual(removal.Parts.Where(p => p.Phase == BlueprintConstructionPartJournal.Committed).Select(p => p.Operation)) ||
+                    profile.Player != issued.Player || profile.ProfileHash == null || profile.ProfileHash.Length != 128 ||
+                    !profile.ProfileHash.All(c => c >= '0' && c <= '9' || c >= 'A' && c <= 'F'))
+                    throw new InvalidOperationException("Paid cancellation requires current construction absence and the saved payer profile.");
+                // Persist the binding first; a crash here leaves a frozen intent, never permission to reissue.
+                payouts.BindTerminalUnderLock(issued, currentGeneration, profile.ProfileHash);
+                if (plan.Cancelled) return plan;
+                Commit(new Record(id, world, 2, operation, plan.RootPose, plan.BlueprintBytes, plan.Parts.ToArray()), true);
+#if BUILDWORKS_TEST_STAND
+                if (QaFailAfterCommit) { QaFailAfterCommit = false; throw new IOException("QA deliberate post-commit observation failure."); }
+#endif
+                return Load(id);
+            }
+        }
 
         internal IEnumerable<Guid> Ids()
         {

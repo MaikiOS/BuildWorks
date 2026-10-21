@@ -57,6 +57,7 @@ namespace OstrixMods.BuildWorks
             if (operation == Guid.Empty || player == 0) throw new ArgumentException("Cancellation operation and player are required.");
             using (plans.Lock(project))
             {
+                RequireActive(project);
                 var plan = plans.Load(project);
                 var current = Read(project);
                 if (current != null)
@@ -77,6 +78,7 @@ namespace OstrixMods.BuildWorks
         {
             using (plans.Lock(project))
             {
+                RequireActive(project);
                 var current = RequireOperation(project, operation);
                 if (beforeGeneration == 0 || beforeGeneration == uint.MaxValue) throw new ArgumentException("Invalid removal save generation.");
                 if (current.Phase != Prepared)
@@ -92,6 +94,7 @@ namespace OstrixMods.BuildWorks
         {
             using (plans.Lock(project))
             {
+                RequireActive(project);
                 var current = RequireOperation(project, operation);
                 if (current.Phase == Prepared) throw new InvalidOperationException("Removal intent is required before saved absence.");
                 if (current.Phase == RemovedSaved)
@@ -131,6 +134,10 @@ namespace OstrixMods.BuildWorks
             if (record == null || operation == Guid.Empty || record.Operation != operation) throw new InvalidOperationException("Cancellation operation differs.");
             return record;
         }
+        private void RequireActive(Guid project)
+        {
+            if (plans.Load(project).Cancelled) throw new InvalidOperationException("Cancelled construction cannot restart removal.");
+        }
         private Entry[] Snapshot(Plan.Record plan, long player)
         {
             var journal = new Parts(plans);
@@ -144,8 +151,9 @@ namespace OstrixMods.BuildWorks
         private void Validate(Guid project, Record r)
         {
             var plan = plans.Load(project);
-            if (r == null || r.Project != project || r.Operation == Guid.Empty || r.Player == 0 || plan.Cancelled ||
-                r.World != plan.World || r.PlanRevision != plan.Revision || r.PlanHash != Digest(plan.BlueprintBytes) ||
+            if (r == null || r.Project != project || r.Operation == Guid.Empty || r.Player == 0 ||
+                (plan.Cancelled ? plan.Revision != 2 || plan.CancelOperation != r.Operation || r.PlanRevision != 1 || r.Phase != RemovedSaved : r.PlanRevision != plan.Revision) ||
+                r.World != plan.World || r.PlanHash != Digest(plan.BlueprintBytes) ||
                 r.Phase < Prepared || r.Phase > RemovedSaved || r.Revision != r.Phase || r.Parts == null ||
                 !r.Parts.Any(p => p?.Phase == Parts.Committed)) throw new InvalidDataException("Construction removal identity/state differs.");
             if (!Encode(r.Parts).SequenceEqual(Encode(Snapshot(plan, r.Player)))) throw new InvalidDataException("Linked construction receipts changed.");

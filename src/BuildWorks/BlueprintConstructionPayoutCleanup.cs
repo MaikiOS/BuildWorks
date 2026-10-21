@@ -64,6 +64,7 @@ namespace OstrixMods.BuildWorks
             journal = new Journal(plans); record = journal.Read(project); this.index = index;
             if (record?.Phase != Journal.IssuedSaved || record.Collections == null || index < 0 || index >= record.Collections.Length ||
                 record.Collections.Any(c => c.Phase != Journal.ProfileCredited) || !Context() || network.IsSaving() ||
+                SaveSystem.GetSaveNumber() < record.MinimumWorldGeneration ||
                 !BlueprintStorageCapture.TrySnapshotInventory(inventory, out beforeInventory))
                 throw new InvalidOperationException("Cleanup requires settled credit, an idle private Local payer and unchanged context.");
             key = Journal.ReceiptKey(record.Items[index].Id); value = Journal.ReceiptValue(record, index);

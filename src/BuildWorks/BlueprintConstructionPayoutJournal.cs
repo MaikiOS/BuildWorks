@@ -56,6 +56,15 @@ namespace OstrixMods.BuildWorks
             [DataMember(Order = 10)] internal Entry[] Items;
             [DataMember(Order = 11)] internal Proof Saved;
             [DataMember(Order = 12, EmitDefaultValue = false)] internal Collection[] Collections;
+            [DataMember(Order = 13, EmitDefaultValue = false)] internal TerminalBinding Terminal;
+            internal uint MinimumWorldGeneration => Math.Max(Math.Max(Terminal?.Generation ?? 0, Saved?.Generation ?? 0),
+                Collections?.Select(c => c?.Removal?.SavedGeneration ?? 0u).DefaultIfEmpty(0u).Max() ?? 0u);
+        }
+        [DataContract] internal sealed class TerminalBinding
+        {
+            [DataMember(Order = 0)] internal string IssuanceHash;
+            [DataMember(Order = 1)] internal uint Generation;
+            [DataMember(Order = 2)] internal string ProfileHash;
         }
         [DataContract] internal sealed class Collection
         {
@@ -91,6 +100,7 @@ namespace OstrixMods.BuildWorks
         {
             using (plans.Lock(project))
             {
+                RequireActive(project);
                 var removal = new BlueprintConstructionCancellationJournal(plans).Read(project);
                 if (removal?.Phase != BlueprintConstructionCancellationJournal.RemovedSaved || operation != removal.Operation || player != removal.Player ||
                     generation < removal.Saved.Generation || generation == uint.MaxValue) throw new InvalidOperationException("Payout requires the same saved removal, payer and current generation.");
@@ -111,6 +121,7 @@ namespace OstrixMods.BuildWorks
         {
             using (plans.Lock(project))
             {
+                RequireActive(project);
                 var current = Require(project, operation);
                 if (current.Phase != Prepared || index < 0 || index >= current.Items.Length || current.Items[index].State != Ready ||
                     current.Items.Take(index).Any(e => e.State != Observed)) throw new InvalidOperationException("Payout attempt cannot be repeated or reordered.");
@@ -122,6 +133,7 @@ namespace OstrixMods.BuildWorks
         {
             using (plans.Lock(project))
             {
+                RequireActive(project);
                 var current = Require(project, operation);
                 if (index < 0 || index >= current.Items.Length) throw new ArgumentOutOfRangeException(nameof(index));
                 var item = current.Items[index];
@@ -139,6 +151,7 @@ namespace OstrixMods.BuildWorks
         {
             using (plans.Lock(project))
             {
+                RequireActive(project);
                 var current = Require(project, operation);
                 if (current.Items.Any(e => e.State != Observed)) throw new InvalidOperationException("Unobserved payout cannot claim persistence.");
                 if (current.Phase != Prepared) return current;
@@ -149,6 +162,7 @@ namespace OstrixMods.BuildWorks
         {
             using (plans.Lock(project))
             {
+                RequireActive(project);
                 var current = Require(project, operation);
                 if (current.Phase == Prepared) throw new InvalidOperationException("Payout save intent is required.");
                 if (current.Phase == IssuedSaved)
@@ -215,6 +229,7 @@ namespace OstrixMods.BuildWorks
                         throw new InvalidOperationException("Cleanup intent or paired profile changed; no repeated removal.");
                     return r;
                 }
+                if (generation < r.MinimumWorldGeneration) throw new InvalidOperationException("New cleanup predates the known saved world.");
                 c.Removal = new Cleanup { Phase = CleanupIntent, BeforeGeneration = generation, ProfileHash = profile.ProfileHash };
                 r.Revision++; Write(r, true); return Read(project);
             }
@@ -300,11 +315,32 @@ namespace OstrixMods.BuildWorks
         {
             var current = Read(project);
             if (current == null || operation == Guid.Empty || current.Operation != operation) throw new InvalidOperationException("Payout operation differs.");
+            if (current.Terminal != null && !plans.Load(project).Cancelled)
+                throw new InvalidOperationException("Cancellation commit is pending; preserve terminal evidence before collection.");
             return current;
+        }
+        private void RequireActive(Guid project)
+        {
+            if (plans.Load(project).Cancelled) throw new InvalidOperationException("Cancelled construction cannot issue resources again.");
+        }
+        internal static string IssuanceFingerprint(Record record)
+        {
+            if (record?.Phase != IssuedSaved || record.Saved == null) throw new InvalidOperationException("Saved issuance is required.");
+            return Digest(Encode(new Record { Project = record.Project, Operation = record.Operation, Player = record.Player, World = record.World,
+                RemovalHash = record.RemovalHash, Phase = IssuedSaved, BeforeGeneration = record.BeforeGeneration,
+                BeforeInfo = record.BeforeInfo, BeforeBytes = record.BeforeBytes, Items = record.Items, Saved = record.Saved }));
+        }
+        // Only ProjectStore.CancelPaid calls this while holding the project lock.
+        internal void BindTerminalUnderLock(Record issued, uint generation, string profileHash)
+        {
+            if (issued.Terminal != null) return;
+            issued.Terminal = new TerminalBinding { IssuanceHash = IssuanceFingerprint(issued), Generation = generation, ProfileHash = profileHash };
+            issued.Revision++; Write(issued, true);
         }
         private void Validate(Guid project, Record r)
         {
             var removal = new BlueprintConstructionCancellationJournal(plans).Read(project);
+            var plan = plans.Load(project);
             if (r == null || removal?.Phase != BlueprintConstructionCancellationJournal.RemovedSaved || r.Project != project || r.Operation != removal.Operation ||
                 r.Player != removal.Player || r.World != removal.World || r.RemovalHash != BlueprintConstructionCancellationJournal.Fingerprint(removal) ||
                 r.BeforeGeneration < removal.Saved.Generation || r.BeforeGeneration == uint.MaxValue || r.Phase < Prepared || r.Phase > IssuedSaved ||
@@ -352,14 +388,19 @@ namespace OstrixMods.BuildWorks
                 if (r.Collections.Any(c => c.Phase == CreditIntent) && r.Collections.Any(c => c.Removal?.Phase == CleanupIntent))
                     throw new InvalidDataException("Unsettled credit and cleanup intents cannot overlap.");
             }
-            if (r.Revision != 1L + r.Items.Sum(e => e.State) + r.Phase - 1 + (r.Collections?.Sum(c => (long)c.Phase + (c.Removal?.Phase ?? 0)) ?? 0) || r.Phase != Prepared && r.Items.Any(e => e.State != Observed))
+            if (plan.Cancelled && (r.Terminal == null || plan.CancelOperation != r.Operation || r.Phase != IssuedSaved))
+                throw new InvalidDataException("Cancelled plan lacks its saved issuance binding.");
+            if (r.Revision != 1L + r.Items.Sum(e => e.State) + r.Phase - 1 + (r.Collections?.Sum(c => (long)c.Phase + (c.Removal?.Phase ?? 0)) ?? 0) + (r.Terminal == null ? 0 : 1) || r.Phase != Prepared && r.Items.Any(e => e.State != Observed))
                 throw new InvalidDataException("Payout phase/revision differs.");
             if (r.Phase != IssuedSaved)
-            { if (r.Saved != null) throw new InvalidDataException("Payout falsely claims persistence."); return; }
+            { if (r.Saved != null || r.Terminal != null) throw new InvalidDataException("Payout falsely claims persistence."); return; }
             if (r.Saved == null || r.Saved.Generation != r.BeforeGeneration + 1 || !Hash(r.Saved.ProfileHash, 128) ||
                 r.Saved.InventoryHash != Digest(Convert.FromBase64String(r.BeforeBytes)) || r.Saved.ItemHashes == null ||
                 !r.Saved.ItemHashes.SequenceEqual(r.Items.Select(e => Digest(Convert.FromBase64String(e.Blob)))))
                 throw new InvalidDataException("Payout paired save/items proof differs.");
+            if (r.Terminal != null && (!Hash(r.Terminal.IssuanceHash, 64) || r.Terminal.IssuanceHash != IssuanceFingerprint(r) ||
+                r.Terminal.Generation < r.Saved.Generation || r.Terminal.Generation == uint.MaxValue || !Hash(r.Terminal.ProfileHash, 128)))
+                throw new InvalidDataException("Terminal binding differs from immutable saved issuance.");
         }
         private static void ValidateItem(Parts.PaidRow paid, Entry entry)
         {

@@ -2,6 +2,8 @@
 
 21 October2026. **Installed diagnostic QA .265 retains the old ordinary fog, unaccepted.** [288](CHECKPOINT_288.md): half-wake implemented; scoped GPU/native56/56 pass, but active12.52FPS versus147.76 surface-only fails performance. Rain was unpinned; no clean comparison against287. Three native PNG and exact inventory confirmed; no visual acceptance. Normal logout/Quit; bridge restore awaits the end of the owner session. No new manual test ready.
 
+[289](CHECKPOINT_289.md): local .266 is not deployed. Paid cancellation before pickup has a verified persistence slice:172 CPU assertions, full StoreTests, normal/QA0/0, host/localization and independent reviews PASS. Native finalization/board/restart remain unwired. A local fallback diagnostic mask is prepared but not GPU tested; owner play is not interrupted.
+
 Owner review of [.252](CHECKPOINT_274.md) FAILED when fog input overflow hid the house. Later279/280 provide scoped service/contact evidence, not owner visual acceptance. Physical E, the full paid lifecycle/cancellation and multiplayer remain open. Local QA carries shader271; source-only Git publishes C# over its previous fog baseline; shader271 remains local.
 
 Requirements/current task: [owner checklist](LIVE_CHECKLIST_RU.md). Technical evidence/causes: [WORK_STATUS](WORK_STATUS_RU.md). History: [journal](DEVELOPMENT_JOURNAL.md). [Document rules](PROGRESS_RULES.md).

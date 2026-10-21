@@ -13,7 +13,41 @@ namespace OstrixMods.BuildWorks
             performance = new FogPerformanceCounters(Stopwatch.Frequency);
         }
         internal FogPerformanceCounters.Snapshot ReadPerformanceProbe() => performance?.Read();
+#if BUILDWORKS_TEST_STAND
+        [System.Serializable] internal sealed class ReceiptInput
+        {
+            public int queued, pending, confirmedTick, capturedTick;
+            public bool faulted;
+        }
+        internal ReceiptInput[] ReadReceiptInputs()
+        {
+            var result = new ReceiptInput[sources.Count];
+            for (int i = 0; i < sources.Count; ++i)
+            {
+                var source = sources[i]; var input = source.Inputs;
+                float lastClock = input.Count > 0 ? input.At(input.Count - 1).Clock : input.Committed.Clock;
+                result[i] = new ReceiptInput { queued = input.Count, pending = input.PendingCount,
+                    capturedTick = UnityEngine.Mathf.FloorToInt(lastClock / BlueprintFogSimulation.Step + .0001f),
+                    confirmedTick = source.Snapshot?.State.ConfirmedTick ?? 0,
+                    faulted = input.Faulted || source.Error != null || source.Snapshot?.Error != null };
+            }
+            return result;
+        }
+        internal bool ReceiptInputLimitReached()
+        {
+            foreach (var source in sources)
+                if (source.Inputs.Count >= 48 || source.Inputs.Faulted || source.Error != null || source.Snapshot?.Error != null) return true;
+            return false;
+        }
 #endif
+#endif
+        [Conditional("BUILDWORKS_TEST_STAND"), Conditional("UNITY_EDITOR")]
+        private void PerfReceiptReadback(long bytes)
+        {
+#if BUILDWORKS_TEST_STAND || UNITY_EDITOR
+            performance?.ReceiptReadback(bytes);
+#endif
+        }
         [Conditional("BUILDWORKS_TEST_STAND"), Conditional("UNITY_EDITOR")]
         private void PerfStart(ref long time)
         {

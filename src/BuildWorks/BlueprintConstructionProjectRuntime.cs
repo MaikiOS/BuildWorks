@@ -33,6 +33,24 @@ namespace OstrixMods.BuildWorks
         private string fogExecutionStatus;
 #if BUILDWORKS_TEST_STAND
         internal static bool QaFailNextBoard;
+        internal bool? QaImmediateFogReceipts { get; private set; }
+
+        internal void QaResetFogForReceipts(Guid project, bool? immediate)
+        {
+            BuildWorksTestIsolation.RequireLoadedSession(); RequireContext();
+            if (!IsPrivateLocalPlacement || BlocksInput || queued != Guid.Empty || OpenBoard ||
+                execution != null && !execution.Finished || removal != null && !removal.Finished || PayoutBusy)
+                throw new InvalidOperationException("Receipt comparison needs an idle private QA project.");
+            var plan = Read(project); var progress = Progress(project);
+            if (plan.Cancelled || progress.Built != 0 || progress.Total != 28 || progress.NeedsReview ||
+                boards.Values.Any(board => board && board.Id != project && Progress(board.Id).Built != board.PartCount))
+                throw new InvalidOperationException("Receipt comparison requires exactly one unfinished 28-part project.");
+            if (!ReferenceEquals(fog, null) && !fog.Close())
+                throw new InvalidOperationException("Previous fog pool did not confirm GPU teardown; receipt mode unchanged.");
+            fog = null; fogExecution = null; fogExecutionStatus = null;
+            QaImmediateFogReceipts = immediate;
+            TickFog();
+        }
 #endif
         internal BlueprintConstructionProjectFog Fog => fog;
         internal string FogError(Guid id) => fog ? fog.Error(id) : null;
@@ -367,7 +385,11 @@ namespace OstrixMods.BuildWorks
             catch (Exception error) { log?.Invoke(error); }
         }
         internal void Suspend()
-        { execution?.Refuse("Construction suspended; evidence retained."); removal?.Refuse("Construction suspended; removal evidence retained."); payout?.Refuse("Construction suspended; payout evidence retained."); collection?.Refuse("Construction suspended; credit evidence retained."); cleanup?.Refuse("Construction suspended; cleanup evidence retained."); cleanup = null; collection = null; payout = null; removal = null; execution = null; queued = Guid.Empty;
+        {
+#if BUILDWORKS_TEST_STAND
+            QaImmediateFogReceipts = null;
+#endif
+            execution?.Refuse("Construction suspended; evidence retained."); removal?.Refuse("Construction suspended; removal evidence retained."); payout?.Refuse("Construction suspended; payout evidence retained."); collection?.Refuse("Construction suspended; credit evidence retained."); cleanup?.Refuse("Construction suspended; cleanup evidence retained."); cleanup = null; collection = null; payout = null; removal = null; execution = null; queued = Guid.Empty;
             cleanupProjects.Clear(); ClearBoards(); store = null; network = null; world = 0; failed = false; Failure = null; }
         public void Dispose() { if (disposed) return; Suspend(); disposed = true; }
     }

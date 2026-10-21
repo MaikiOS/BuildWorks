@@ -13,6 +13,9 @@ namespace OstrixMods.BuildWorks.GeometryTests
             bool refused = false; try { new FogPerformanceCounters(0); } catch (ArgumentOutOfRangeException) { refused = true; }
             Check(refused, "Invalid clock frequency accepted.");
             var c = new FogPerformanceCounters(1000);
+            c.ReceiptReadback(2048);
+            Check(c.Read().physicalReceiptRequests == 1 && c.Read().physicalReceiptBytes == 2048 && c.Read().flows[0].requested == 0,
+                "Physical readback counters were confused with logical owner receipts.");
             var receipt = FogPerformanceCounters.Kind.Receipt; var velocity = FogPerformanceCounters.Kind.Velocity;
             c.Elapsed(FogPerformanceCounters.Stage.Submit, 100, 200); c.Elapsed(FogPerformanceCounters.Stage.SolverSubmission, 120, 180);
             c.Elapsed(FogPerformanceCounters.Stage.Submit, 210, 230);
@@ -44,6 +47,10 @@ namespace OstrixMods.BuildWorks.GeometryTests
             bad = new FogPerformanceCounters(1000); bad.Requested(31, 1, 1, 1, receipt, 1, 0); bad.Requested(31, 1, 1, 2, receipt, 1, 1);
             bad.Accepted(31, 1, 1, 1, receipt, true, 2);
             Check(!bad.Read().valid && bad.Read().invalid == 2 && bad.Read().flows[0].accepted == 0, "Duplicate submission/accept before callback accepted.");
+            var physical = new FogPerformanceCounters(1000);
+            physical.ReceiptReadback(0); physical.ReceiptReadback(63); physical.ReceiptReadback(2049);
+            Check(!physical.Read().valid && physical.Read().invalid == 3 && physical.Read().physicalReceiptRequests == 0,
+                "Invalid physical readback sizes were counted.");
             var unseen = new FogPerformanceCounters(1000); unseen.Received(0, 1, 1, 1, receipt, 1, 1);
             Check(unseen.Read().unobservedEvents == 1 && unseen.Read().flows[0].callbacks == 0, "Preexisting request latency invented.");
             var thread = new Thread(() => unseen.Elapsed(FogPerformanceCounters.Stage.Submit, 0, 1)); thread.Start(); thread.Join();

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -16,6 +17,104 @@ namespace OstrixMods.BuildWorks
             public string reason;
         }
         internal SnapshotFault FirstSnapshotFault { get; private set; }
+
+        internal readonly struct ReceiptRead
+        {
+            internal readonly SnapshotChannel Owner;
+            internal readonly int Slot;
+            internal readonly BlueprintFogSnapshotState.Submission Stamp;
+            internal ReceiptRead(SnapshotChannel owner, BlueprintFogSnapshotState.Submission stamp)
+            { Owner = owner; Slot = owner.Slot; Stamp = stamp; }
+        }
+        private List<ReceiptRead> receiptBatch;
+#if BUILDWORKS_TEST_STAND || UNITY_EDITOR
+        private bool immediateReceiptReads = true;
+        internal bool QaImmediateReceiptReads
+        {
+            get => immediateReceiptReads;
+            set
+            {
+                RequireSnapshots();
+                if (snapshotCount != 0 || sources.Count != 0 || pumpingSources || creating)
+                    throw new InvalidOperationException("Choose receipt mode before admitting any source.");
+                immediateReceiptReads = value;
+            }
+        }
+        internal bool QaFailNextReceiptRequest;
+#endif
+
+        private bool SameReceiptOwner(ReceiptRead entry) => entry.Owner != null && entry.Slot >= 0 && entry.Slot < capacity &&
+            ReferenceEquals(snapshotSlots[entry.Slot], entry.Owner) && entry.Owner.pendingBatch &&
+            SnapshotChannel.Same(entry.Owner.pending, entry.Stamp);
+        private bool CurrentReceipt(ReceiptRead entry) => SameReceiptOwner(entry) && entry.Owner.nativePending && !entry.Owner.received;
+
+        // Callback delivery never commits a bank/tick or removes observations; PollSnapshots owns that boundary.
+        internal void ReceiveReceiptBatch(ReceiptRead[] entries, Unity.Collections.NativeArray<uint> words)
+        {
+            foreach (var entry in entries)
+            {
+                if (!CurrentReceipt(entry)) continue;
+                var owner = entry.Owner; long copied = 0;
+                try
+                {
+                    if (!words.IsCreated || words.Length != capacity * 16) { snapshotTeardown = true; owner.Receive(entry.Stamp, null); continue; }
+                    var copy = new uint[16]; for (int i = 0; i < 16; ++i) copy[i] = words[entry.Slot * 16 + i];
+                    owner.Receive(entry.Stamp, copy); copied = 64;
+                    if ((copy[8] & 4) != 0) snapshotTeardown = true;
+                }
+                catch { snapshotTeardown = true; owner.Receive(entry.Stamp, null); }
+                finally
+                {
+                    PerfReceived(owner, FogPerformanceCounters.Kind.Receipt, entry.Stamp, copied);
+                    if (SameReceiptOwner(entry)) owner.nativePending = false;
+                }
+            }
+        }
+
+        private AsyncGPUReadbackRequest RequestReceiptBatch(ReceiptRead[] entries)
+        {
+#if BUILDWORKS_TEST_STAND || UNITY_EDITOR
+            if (QaFailNextReceiptRequest) { QaFailNextReceiptRequest = false; throw new InvalidOperationException("QA receipt request creation failed."); }
+#endif
+            var read = AsyncGPUReadback.Request(arena.Buffers["_Receipts"], request => {
+                bool current = false; foreach (var entry in entries) current |= CurrentReceipt(entry);
+                if (!current) return;
+                try { ReceiveReceiptBatch(entries, request.hasError ? default : request.GetData<uint>()); }
+                catch { ReceiveReceiptBatch(entries, default); }
+            });
+            PerfReceiptReadback(capacity * 16L * 4);
+            return read;
+        }
+
+        private void FailSnapshotSubmission(SnapshotChannel owner, BlueprintFogSnapshotState.Submission stamp, int expectedBase, Exception error)
+        {
+            if (!SameReceiptOwner(new ReceiptRead(owner, stamp))) return;
+            PerfFailed(owner, FogPerformanceCounters.Kind.Receipt, stamp);
+            RecordSnapshotFault(owner, stamp, null, false, expectedBase, "submission: " + error);
+            owner.nativePending = false; owner.Inputs.Complete(stamp, BlueprintFogSnapshotState.Completion.Unknown);
+            owner.pendingBatch = false; owner.Error = "Fog dispatch/readback submission failed."; snapshotTeardown = true;
+        }
+
+        private void FlushReceiptBatch()
+        {
+            if (receiptBatch == null || receiptBatch.Count == 0) return;
+            var entries = receiptBatch.ToArray(); receiptBatch.Clear();
+            try
+            {
+                var request = RequestReceiptBatch(entries);
+                foreach (var entry in entries) entry.Owner.request = request;
+            }
+            catch (Exception error)
+            {
+                snapshotTeardown = true;
+                foreach (var entry in entries)
+                {
+                    int bank = entry.Owner.Inputs.PendingMetadataOnly ? entry.Owner.Bank : 1 - entry.Owner.Bank;
+                    FailSnapshotSubmission(entry.Owner, entry.Stamp, (entry.Slot * 2 + bank) * BlueprintFogArena.MapWords, error);
+                }
+                throw;
+            }
+        }
 
         // Strict snapshots never expose the speculative solver as an ordinary committed simulation.
         internal sealed class SnapshotChannel
@@ -280,29 +379,18 @@ namespace OstrixMods.BuildWorks
                 var stamp = token; owner.nativePending = true;
                 PerfBatch(owner.Inputs.PendingCount, token.Tick - owner.State.ConfirmedTick, metadataOnly);
                 PerfRequested(owner, FogPerformanceCounters.Kind.Receipt, stamp, capacity * 16L * 4);
-                owner.request = AsyncGPUReadback.Request(arena.Buffers["_Receipts"], request => {
-                    long perfCopied = 0;
-                    try
-                    {
-                        if (request.hasError) { snapshotTeardown = true; owner.Receive(stamp, null); return; }
-                        var data = request.GetData<uint>();
-                        if (data.Length != capacity * 16) { snapshotTeardown = true; owner.Receive(stamp, null); return; }
-                        var copy = new uint[16]; for (int i = 0; i < 16; ++i) copy[i] = data[owner.Slot * 16 + i];
-                        owner.Receive(stamp, copy);
-                        perfCopied = 64;
-                        if ((copy[8] & 4) != 0) snapshotTeardown = true;
-                    }
-                    catch { snapshotTeardown = true; owner.Receive(stamp, null); }
-                    finally { PerfReceived(owner, FogPerformanceCounters.Kind.Receipt, stamp, perfCopied); owner.nativePending = false; }
-                });
+                bool defer = false;
+#if BUILDWORKS_TEST_STAND || UNITY_EDITOR
+                defer = receiptBatch != null && !QaImmediateReceiptReads;
+#endif
+                var read = new ReceiptRead(owner, stamp);
+                if (defer) receiptBatch.Add(read);
+                else owner.request = RequestReceiptBatch(new[] { read });
                 PerfElapsed(FogPerformanceCounters.Stage.Submit, perfSubmit);
             }
             catch (Exception error)
             {
-                PerfFailed(owner, FogPerformanceCounters.Kind.Receipt, token);
-                RecordSnapshotFault(owner, token, null, false, pendingBase, "submission: " + error);
-                owner.nativePending = false; owner.Inputs.Complete(token, BlueprintFogSnapshotState.Completion.Unknown);
-                owner.pendingBatch = false; owner.Error = "Fog dispatch/readback submission failed."; snapshotTeardown = true; throw;
+                FailSnapshotSubmission(owner, token, pendingBase, error); throw;
             }
             return true;
         }

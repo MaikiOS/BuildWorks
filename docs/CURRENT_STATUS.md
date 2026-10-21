@@ -1,8 +1,8 @@
 # Current BuildWorks status
 
-2026-10-21. Installed QA **.255 — board fix**. [275](CHECKPOINT_275.md):native23/23, readable wooden sign facing away from the house, grounded stake outside its footprint, hammer hover/Interact; inventory unchanged. Normal/QA0/0,host/localization,geometry135/StoreTests62 PASS.
+2026-10-21. Installed QA **.256 — fog diagnostics**. [276](CHECKPOINT_276.md): four short native A/B/B/A windows,40/40; grouped receipts reduce requests and modestly improve latency. Long-run stability and approved-v11 appearance remain unproved. The [.255 board fix](CHECKPOINT_275.md) is retained: readable outward-facing wooden sign, grounded stake outside the house and native hammer hover/Interact.
 
-Owner review of [.252](CHECKPOINT_274.md) remains FAILED: fog input overflow hid the house. Fog stability is not fixed or owner-accepted by this change. Physical E, the full paid lifecycle/cancellation and multiplayer remain open. Local QA carries candidate shader271; source-only Git publishes the board fix over its previous fog baseline.
+Owner review of [.252](CHECKPOINT_274.md) remains FAILED: fog input overflow hid the house. Fog stability is not fixed or owner-accepted by this change. Physical E, the full paid lifecycle/cancellation and multiplayer remain open. Local QA carries candidate shader271; source-only Git publishes diagnostic C# over its previous fog baseline; shader271 remains local.
 
 Requirements/current task: [owner checklist](LIVE_CHECKLIST_RU.md). Technical evidence/causes: [WORK_STATUS](WORK_STATUS_RU.md). History: [journal](DEVELOPMENT_JOURNAL.md). [Document rules](PROGRESS_RULES.md).
 

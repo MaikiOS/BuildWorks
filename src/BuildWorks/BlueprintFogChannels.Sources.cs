@@ -65,6 +65,9 @@ namespace OstrixMods.BuildWorks
         {
             RequireSnapshots();
             if (pumpingSources || snapshotTeardown) throw new InvalidOperationException("Fog source scheduling is stopped or re-entered.");
+#if BUILDWORKS_TEST_STAND || UNITY_EDITOR
+            receiptBatch = QaImmediateReceiptReads ? null : new List<ReceiptRead>(capacity);
+#endif
             pumpingSources = true;
             try
             {
@@ -111,9 +114,14 @@ namespace OstrixMods.BuildWorks
             }
             finally
             {
-                sources.RemoveAll(source => source.Released);
-                if (sources.Count == 0) sourceCursor = 0; else sourceCursor %= sources.Count;
-                pumpingSources = false;
+                try { FlushReceiptBatch(); }
+                finally
+                {
+                    receiptBatch = null;
+                    sources.RemoveAll(source => source.Released);
+                    if (sources.Count == 0) sourceCursor = 0; else sourceCursor %= sources.Count;
+                    pumpingSources = false;
+                }
             }
         }
 

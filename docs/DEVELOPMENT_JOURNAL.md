@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-21 — 276: native house receipt comparison
+
+.256 installed; native A/B/B/A40/40 with complete nested evidence. Grouping reduced requests/latency; individual remains default. Preparation/cadence lifetime conflict and lost nested serialization fixed; failed attempts retained. All97project hashes/inventory/ordinary metadata unchanged;normal exit/restore3. Long-run house/v11/full paid lifecycle remain open. [276](CHECKPOINT_276.md).
+
 ## 2026-10-21 — 275: project board fix
 
 .255 installed;native23/23 and readable outward-facing wooden sign capture;inventory unchanged. Native hammer hover/Interact retains obstacles/reach. Fixture/environment failures retained;independent review passed. House/v11/full cancellation remain open. [275](CHECKPOINT_275.md).

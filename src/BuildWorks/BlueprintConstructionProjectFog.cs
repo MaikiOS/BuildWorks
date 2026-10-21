@@ -109,6 +109,13 @@ namespace OstrixMods.BuildWorks
             if (!view || view.orthographic || view.stereoEnabled) throw new InvalidOperationException("Project fog needs the main perspective camera.");
             assets = BlueprintFogAssets.LoadEmbedded();
             channels = BlueprintFogChannels.CreateArena(assets, 32, 32768, ledgerLayout: BlueprintFogLedgerLayout.Spatial3D);
+#if BUILDWORKS_TEST_STAND
+            if (runtime.QaImmediateFogReceipts.HasValue)
+            {
+                channels.QaImmediateReceiptReads = runtime.QaImmediateFogReceipts.Value;
+                channels.EnablePerformanceProbe();
+            }
+#endif
             atlas = new BlueprintFogAtlas(assets, channels);
             oldDepth = view.depthTextureMode; ownedDepth = oldDepth | DepthTextureMode.Depth; view.depthTextureMode = ownedDepth;
         }
@@ -122,6 +129,13 @@ namespace OstrixMods.BuildWorks
         private void Update()
         {
             if (closing) { Close(); return; }
+#if BUILDWORKS_TEST_STAND
+            if (BuildWorksTestFogReceipts.Frozen(this))
+            {
+                if (failure == null) try { channels?.PumpSources(); } catch (Exception error) { Fail(error); }
+                BuildWorksTestFogReceipts.Observe(this); return;
+            }
+#endif
             if (failure != null || channels == null) return;
             try
             {
@@ -143,6 +157,10 @@ namespace OstrixMods.BuildWorks
                             if (owners.Count > 0) atlas.PreparePublishedLayout(owners);
                             entry.Clock = entry.Building.Clock;
                             entry.Admitted = true; layoutDirty = true; entry.Building.SetDisplayActive(true);
+#if BUILDWORKS_TEST_STAND
+                            BuildWorksTestFogReceipts.Observe(this);
+                            if (BuildWorksTestFogReceipts.Frozen(this)) return;
+#endif
                         }
                         catch (Exception error) { FailEntry(entry, error); }
                     }
@@ -156,6 +174,9 @@ namespace OstrixMods.BuildWorks
                     }
                 }
                 channels.PumpSources();
+#if BUILDWORKS_TEST_STAND
+                BuildWorksTestFogReceipts.Observe(this);
+#endif
             }
             catch (Exception error) { Fail(error); }
         }

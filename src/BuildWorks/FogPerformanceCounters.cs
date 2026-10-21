@@ -20,6 +20,7 @@ namespace OstrixMods.BuildWorks
             public bool valid;
             public int capacity;
             public long invalid, staleEvents, unobservedEvents, threadMismatches, batches, samples, ticks, metadataBatches, cachedPages, noVictim, waitingVelocity;
+            public long physicalReceiptRequests, physicalReceiptBytes;
             public Timing[] stages;
             public Flow[] flows;
             public string[] stageNames, flowNames;
@@ -32,6 +33,7 @@ namespace OstrixMods.BuildWorks
         private readonly int thread = Thread.CurrentThread.ManagedThreadId;
         private readonly double millisecondsPerTick;
         private long invalid, stale, unobserved, threadMismatches, batches, samples, ticks, metadataBatches, cachedPages, noVictim, waitingVelocity;
+        private long physicalReceiptRequests, physicalReceiptBytes;
         internal FogPerformanceCounters(long frequency)
         {
             if (frequency <= 0) throw new ArgumentOutOfRangeException(nameof(frequency));
@@ -107,6 +109,12 @@ namespace OstrixMods.BuildWorks
             ++batches; samples += count; ticks += deltaTicks; if (metadata) ++metadataBatches;
         }
         internal void CachedPage() { if (ThreadValid()) ++cachedPages; }
+        internal void ReceiptReadback(long bytes)
+        {
+            if (!ThreadValid()) return;
+            if (bytes < 64 || bytes > 32 * 64 || bytes % 64 != 0) { ++invalid; return; }
+            ++physicalReceiptRequests; physicalReceiptBytes += bytes;
+        }
         internal void NoVictim() { if (ThreadValid()) ++noVictim; }
         internal void WaitingVelocity() { if (ThreadValid()) ++waitingVelocity; }
         internal Snapshot Read()
@@ -116,6 +124,7 @@ namespace OstrixMods.BuildWorks
                 invalid = invalid, staleEvents = stale, unobservedEvents = unobserved, threadMismatches = threadMismatches,
                 batches = batches, samples = samples, ticks = ticks, metadataBatches = metadataBatches,
                 cachedPages = cachedPages, noVictim = noVictim, waitingVelocity = waitingVelocity,
+                physicalReceiptRequests = physicalReceiptRequests, physicalReceiptBytes = physicalReceiptBytes,
                 stages = new Timing[stages.Length], flows = new Flow[flows.Length], stageNames = new string[stages.Length], flowNames = new string[flows.Length] };
             for (int s = 0; s < stages.Length; ++s) { result.stageNames[s] = ((Stage)s).ToString(); result.stages[s] = new Timing { count = stages[s].count, totalMilliseconds = stages[s].totalMilliseconds, maxMilliseconds = stages[s].maxMilliseconds }; }
             for (int k = 0; k < 2; ++k)

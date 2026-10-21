@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-21 — 281: owner regression and undersized QA rendering
+
+Owner rejected .262: whole-game stalls and roughly20-second fog response. Same-view render-size ABBA measured29–31host frames/s at860×360 and8at3440×1440; mod/shader unchanged. Prior numerical checks did not prove player-scale performance.23/23diagnostic steps do not mean the product passed. World/items unchanged,normalexit/restore3. Owner retest withdrawn. [281](CHECKPOINT_281.md).
+
 ## 2026-10-21 — 280: four-direction house contact/recovery
 
 .26016/16 and .26148/48 used the existing native route on the preserved house. All28parts recovered to zero fields after exit. QA inputs serialization and legacy empty strings fixed; final .262 menu self-check PASS, installed.97project hashes/inventory/ordinary-save metadata/config values unchanged; three normal exits/restore3. Visual v11/sustained material contact,paid lifecycle/network remain open; owner inspection ready. [280](CHECKPOINT_280.md).

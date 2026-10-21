@@ -1,6 +1,6 @@
 # Current BuildWorks status
 
-2026-10-21. Installed QA **.262 — numerical house traversal checks**. [280](CHECKPOINT_280.md): four directions, contact and recovery of all28parts; .26016/16 and .26148/48. Final .262 passed the menu serialization self-check; movement was not separately repeated on .262. Outward-facing board retained. [Owner inspection](MANUAL_QA_279_RU.md) is ready; v11 appearance/smoothness remain unaccepted.
+2026-10-21. **Owner rejected .262:** the whole game stalls and contact fog appears roughly20seconds late. [281](CHECKPOINT_281.md): render-size ABBA reproduced29–31host frames/s at860×360 versus8at3440×1440. This is a scoped diagnostic, not a complete player camera/HUD/latency reproduction. No fix claimed or new owner inspection requested; .262 remains installed.
 
 Owner review of [.252](CHECKPOINT_274.md) FAILED when fog input overflow hid the house. Later279/280 provide scoped service/contact evidence, not owner visual acceptance. Physical E, the full paid lifecycle/cancellation and multiplayer remain open. Local QA carries shader271; source-only Git publishes C# over its previous fog baseline; shader271 remains local.
 

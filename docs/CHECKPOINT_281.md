@@ -1,0 +1,11 @@
+# Checkpoint281 — owner rejection of .262: severe stalls and delayed contact
+
+2026-10-21. Owner reports whole-game stalls, almost no contact fog until roughly20seconds later, and mismatch with approved laboratoryv11. **Acceptance FAILED; no fix claimed.** Installed mod0.19.262/localshader271unchanged.280numerical recovery does not establish immediate visible response or ordinary player performance.
+
+Prior Cadence rendering was960×540/FOV55; production Atlas.Render blits at full frame size. Its raymarch/owner/light loops scale with affected screen pixels. Production clock clamps advancement to8/30sperframe, potentially worsening wall-time lag during long frames; exact20seconds remain unmeasured.
+
+Existing ValheimQA CadenceProbe gained a bounded StartRenderedSized/size reporting; default960×540unchanged. Diagnostic build0warnings/0errors. Native run20261021-150422 used the same preserved28-part house, stationary actor, fixedcamera/FOV55, unchanged quality/shader. Equal-aspect ABBA860×360→3440×1440→3440×1440→860×360 measured31.17→8.08→8.18→29.45hostframes/s. Max frame intervals131.54/633.49/339.11/237.96ms.23/23steps means successful diagnostics, **not acceptable product performance**. Repeated failed-speed trials stopped. Rawframes saved; no PNG or diagnostic pixel readback inside windows; normal fog receipt readbacks remain active. This controlled-camera host cadence is not directGPUtime, playerHUD/camera/FOV reproduction or measured contact latency.
+
+97project SHA and23inventory entries/67Wood unchanged; no grants/projects/construction/cancellation/terrain/teleport. Camera/settings/resources restored each window. Normal logout/mainmenu/Quit,PIDgone,restore3verified. Ordinary QA saving retained.14sections/115IDs/checkstates and active fullgoal preserved. Owner retest withdrawn; paid-terminal work deferred. Next: native full-size response profiling and removal of unnecessary render work while preservingv11, not lowerquality/largerqueues/fasterclocks or timerholes.
+
+Raw evidence: `artifacts/checkpoint-281` and `ValheimQA/artifacts/20261021-150422`; [detailed limits and preparation failures](CHECKPOINT_281_RU.md). No gameplay changes/new mod build/deployment in this checkpoint.

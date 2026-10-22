@@ -1,5 +1,9 @@
 # Current BuildWorks status
 
+**Current scope316:** installed QA **0.19.279** and its DLL are unchanged. A new own two-wall E/board/payment/cancel/separate-issuance scenario reached a native full-inventory refusal with the actual HUD message.65Wood/32stacks/13customData, remaining source and journals retained; the real offline reader confirmed exact saved inventory/receipt. Free-cell merge and successful retry remain UNVERIFIED. Revised QA helper:25 targeted CPU checks, RenderProbe0/0 and independent preparation review PASS. [Limits and retained failed attempts316](CHECKPOINT_316.md).
+
+**Historical scope315:**
+
 Verified source-only checkpoint315 [eae41fd](https://github.com/MaikiOS/BuildWorks/commit/eae41fdbc057a7e90b332deb3f8e5b2f60e26ff5) pushed to main; remote SHA confirmed.46 source/test/doc files, no DLLs or saves.
 
 QA **0.19.279** installed, SHA256 `C7708CC1152E458AB7816C0E0AD4D7691A0B4F90090F838B385248C26C470D9B`. New own two-wall E/board paid/cancel/sealed-issuance scenario passed controlled interruption after profile save, fresh-process production recovery without reinsertion, cleanup and another fresh replay:67Wood/12receipts/no sources. All three processes exited normally and bridge3 was restored each time. Limited Local Wood proof, not power-loss, old-world, network or complete-module acceptance. [Fix/evidence315](CHECKPOINT_315.md); [separate .277 failure/QA recovery314](CHECKPOINT_314.md).
@@ -23,7 +27,7 @@ Requirements/current task: [owner checklist](LIVE_CHECKLIST_RU.md). Technical ev
 | Server library and sharing | Administrator publication; players/admin visibility, verified personal copies, provenance; in-process checks | Host+remote not accepted | Live access/reconnect/restart; direct player-to-player transfer |
 | Items and storage | Separate storage/mount inclusion; supplied-item preservation and journal foundations | Limited chest/inventory comparison only | Durable settlement, cancellation/refund/crash/replay, all holders/armor/admin restore and network authority |
 | v11 fog | Bounded256MiB field cap, grouped default, local shader candidate |279:52s default;280:four directions, numerical contact/recovery of28parts | v11 appearance/smoothness, sustained material contact,total memory,heavy builds/network |
-| Unfinished construction | .279: exact canonical pair and native Load projection for recovery; early guards311 | 315: E/board,4Wood paid/cancel/issued → saved Intent → fresh process/E without reinsertion → cleanup → fresh replay;67Wood/12receipts/31stacks/no sources | Full inventory/free-cell, targeted native preflight refusal, other items/faults/old-world, owner HUD/input, server/remote |
+| Unfinished construction | .279: exact canonical pair and native Load projection for recovery; early guards311 | 315: E/board/payment/cancel/issuance, interruption and fresh replay without duplicates;316: new full inventory safely refuses with native HUD, source and journals retained | Free-cell/retry, targeted native preflight refusal, other items/faults/old-world, owner acceptance, server/remote |
 | World selection and heavy chain | Capture/volume foundations and targeted checks | Basic capture accepted; later coordinate/height UX issues reported | Editable volume/gizmos, boundary rules, full loaded-area and performance acceptance |
 | World objects and EarthWorks | No terrain integration dependency | None claimed | Admin-priced nonrecipe objects; EarthWorks is a later separate integration |
 

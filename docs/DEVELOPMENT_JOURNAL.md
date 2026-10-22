@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-22 — 309: refund full-inventory feedback
+
+[309](CHECKPOINT_309.md): candidate .275 gives player feedback when refund collection needs one free inventory slot; previously the asynchronous refusal was only logged. The gate stays after baseline save and before credit intent/insertion; financial protocol unchanged. Clean old39bf582 source reproduces missing feedback; fixed block7PASS, normal/QA0warnings0errors, HostContract/localization1130 and independent correctness/Ponytail PASS. **Not installed or game-tested**; installed .273/hash unchanged. .275 also includes306 station/DLC reasons, superseding local .274 candidate. Owner PID57236 confirmed outside sandbox; no Deploy/Prepare. Next native slice covers pause reason, full inventory/free slot/retry and prepared saved-credit interruption/recovery/cleanup/replay. No grants/reset; full goal remains open.
+
 ## 2026-10-22 — 308: recovery branch and process visibility
 
 [308](CHECKPOINT_308.md): actual saved-credit recovery branch17 checks with substituted native boundaries, missing-exact-inventory negative control and HostContract PASS. No new native proof. Guarded .274 deployment refused BEFORE copying: original PID57236 still exists. Sandbox Get-Process falsely returned0; full-visibility check confirmed the same PID/start time. Installed QA.273/hash unchanged; no launch/bridge/save effects. Previous claim that the owner game exited was corrected. Next: native interruption/restart and pause reason after full-visibility absence check.

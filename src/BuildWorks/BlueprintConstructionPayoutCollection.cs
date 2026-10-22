@@ -162,7 +162,12 @@ namespace OstrixMods.BuildWorks
             for (int row = 0; row < inventory.GetHeight() && x < 0; row++)
                 for (int column = 0; column < inventory.GetWidth(); column++)
                     if (inventory.GetItemAt(column, row) == null) { x = column; y = row; break; }
-            if (x < 0) throw new InvalidOperationException("A free inventory cell is required; nothing was collected.");
+            if (x < 0)
+            {
+                string message = BuildWorksLocalization.Text("project.refund_inventory_full");
+                player.Message(MessageHud.MessageType.Center, message);
+                throw new InvalidOperationException(message);
+            }
             var clean = source.m_itemData.Clone();
             if (ReferenceEquals(clean, source.m_itemData) || ReferenceEquals(clean.m_customData, source.m_itemData.m_customData))
                 throw new InvalidOperationException("Native item clone shares source custody data.");

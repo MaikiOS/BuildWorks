@@ -231,6 +231,7 @@ project.payment_pending	The list above is the cost of remaining parts, not a ref
 project.refund	Issue refund
 project.refund_confirm	Press again to confirm. Returned items will appear by the board. Pick them up using Interact; they will not be issued again.
 project.refund_wait	The refund has been issued. Pick up the items by the board using Interact. Unconfirmed outcomes block repeated issuance.
+project.refund_inventory_full	Free one inventory slot to collect the refund. Nothing was collected.
 project.cancel_pending	Construction is stopped for cancellation. Refund items can be issued by the board after removal and saving are confirmed.
 project.continue	Continue construction
 project.progress	Built: {0} / {1} parts.

@@ -3662,6 +3662,7 @@ foreach ($payoutContextType in 'BlueprintConstructionPayoutCollection','Blueprin
 }
 & (Join-Path $projectRoot 'tests/BuildWorks.CaptureChecks/PayoutInteraction.ps1')
 & (Join-Path $projectRoot 'tests/BuildWorks.CaptureChecks/CreditAdmission.ps1')
+& (Join-Path $projectRoot 'tests/BuildWorks.CaptureChecks/SavedCreditRecovery.ps1')
 & (Join-Path $projectRoot 'tests/BuildWorks.CaptureChecks/RequirementsPause.ps1')
 & (Join-Path $projectRoot 'tests/BuildWorks.CaptureChecks/PaidCancellation.ps1')
 & (Join-Path $projectRoot 'tests/BuildWorks.CaptureChecks/BoardCancellation.ps1')

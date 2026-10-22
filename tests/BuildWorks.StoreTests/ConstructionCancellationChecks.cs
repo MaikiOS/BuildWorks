@@ -26,6 +26,8 @@ namespace OstrixMods.BuildWorks.StoreTests
             var plans = new Plans(Path.Combine(folder, "projects"), 42); var parts = new Parts(plans); var journal = new Journal(plans);
             var pose = new Plans.Pose(new float[] { 5, 2, 7, 0, 0, 0, 1, 1, 1, 1 });
             var plan = Create(); Commit(plan, 0, 17);
+            Check(Action(plan) == ConstructionCancellationAction.Remove, "Paid plan did not route to removal.");
+            Refuse<InvalidOperationException>(() => BlueprintConstructionCancellationAction.Read(plans, plan.Id, 2, 17));
             var noEffect = parts.Prepare(plan.Id, plan.Parts[1].Id, Guid.NewGuid(), 17, Inventory(3), out _);
             parts.RecordNoEffect(plan.Id, noEffect.Part, noEffect.Operation, Inventory(3), true);
             var operation = Guid.NewGuid(); string path = RemovalPath(plan);
@@ -33,6 +35,8 @@ namespace OstrixMods.BuildWorks.StoreTests
             Refuse<ArgumentException>(() => journal.Prepare(plan.Id, 1, Guid.Empty, 17));
             Check(!File.Exists(path), "Rejected preparation wrote a journal.");
             var prepared = journal.Prepare(plan.Id, 1, operation, 17);
+            Check(Action(plan) == ConstructionCancellationAction.ResumeRemoval, "Prepared removal cannot resume.");
+            Refuse<InvalidOperationException>(() => BlueprintConstructionCancellationAction.Read(plans, plan.Id, 1, 18));
             Check(prepared.Phase == Journal.Prepared && prepared.Parts.Length == 2 && prepared.BeforeGeneration == 0, "Prepared receipt set differs.");
             byte[] preparedBytes = File.ReadAllBytes(path);
             prepared.Parts[0].Hash = "mutated";
@@ -50,6 +54,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 Refuse<IOException>(() => journal.BeginRemoval(plan.Id, operation, 7));
             Check(preparedBytes.SequenceEqual(File.ReadAllBytes(path)) && !Directory.EnumerateFiles(plans.DirectoryPath, "*.preparing").Any(), "Failed atomic replace changed state or leaked staging files.");
             var intent = journal.BeginRemoval(plan.Id, operation, 7);
+            Check(Action(plan) == ConstructionCancellationAction.Review, "Uncertain removal offered replay.");
             Check(intent.Phase == Journal.RemovalIntent && new Journal(plans).Read(plan.Id).Revision == 2, "Removal intent did not survive reload.");
             byte[] intentBytes = File.ReadAllBytes(path);
             Check(journal.BeginRemoval(plan.Id, operation, 7).Revision == 2, "Intent replay advanced revision.");
@@ -61,6 +66,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             Refuse<InvalidDataException>(() => journal.ConfirmRemovedSaved(plan.Id, operation, invalid));
             Check(intentBytes.SequenceEqual(File.ReadAllBytes(path)), "Rejected save proof mutated removal intent.");
             var terminal = journal.ConfirmRemovedSaved(plan.Id, operation, Proof(7, 8));
+            Check(Action(plan) == ConstructionCancellationAction.IssueRefund, "Saved removal did not offer refund.");
             Check(terminal.Phase == Journal.RemovedSaved && terminal.Revision == 3 && !plans.Load(plan.Id).Cancelled, "Removal falsely completed cancellation.");
             byte[] terminalBytes = File.ReadAllBytes(path);
             Check(new Journal(plans).Read(plan.Id).Saved.Generation == 8, "Saved removal did not survive reload.");
@@ -82,10 +88,24 @@ namespace OstrixMods.BuildWorks.StoreTests
             byte[] originalPart = File.ReadAllBytes(partPath); var changedPart = (byte[])originalPart.Clone(); changedPart[20] ^= 1;
             File.WriteAllBytes(partPath, changedPart); Refuse<InvalidDataException>(() => journal.Read(plan.Id)); File.WriteAllBytes(partPath, originalPart);
             var unresolved = Create(); parts.Prepare(unresolved.Id, unresolved.Parts[0].Id, Guid.NewGuid(), 17, Inventory(3), out _);
+            Check(Action(unresolved) == ConstructionCancellationAction.Review, "Uncertain construction offered cancellation.");
             Refuse<InvalidOperationException>(() => journal.Prepare(unresolved.Id, 1, Guid.NewGuid(), 17));
             var mixed = Create(); Commit(mixed, 0, 17); Commit(mixed, 1, 18);
+            Check(Action(mixed) == ConstructionCancellationAction.Review, "Mixed payer plan offered cancellation.");
             Refuse<InvalidOperationException>(() => journal.Prepare(mixed.Id, 1, Guid.NewGuid(), 17));
-            var unpaid = Create(); Refuse<InvalidOperationException>(() => journal.Prepare(unpaid.Id, 1, Guid.NewGuid(), 17));
+            var unpaid = Create();
+            var foreignNoEffect = parts.Prepare(unpaid.Id, unpaid.Parts[0].Id, Guid.NewGuid(), 18, Inventory(3), out _);
+            parts.RecordNoEffect(unpaid.Id, foreignNoEffect.Part, foreignNoEffect.Operation, Inventory(3), true);
+            Check(Action(unpaid) == ConstructionCancellationAction.Unpaid, "Foreign NoEffect prevented unpaid cancellation or offered a refund.");
+            string unpaidPath = Path.Combine(plans.DirectoryPath, unpaid.Id.ToString("N") + ".bwproject");
+            byte[] unpaidBytes = File.ReadAllBytes(unpaidPath); int fileCount = Directory.GetFiles(plans.DirectoryPath).Length;
+            Refuse<InvalidOperationException>(() => BlueprintConstructionCancellationAction.Read(plans, unpaid.Id, 1, 0));
+            Check(unpaidBytes.SequenceEqual(File.ReadAllBytes(unpaidPath)) && fileCount == Directory.GetFiles(plans.DirectoryPath).Length,
+                "Invalid player changed durable state.");
+            plans.CancelUnpaid(unpaid.Id, 1, Guid.NewGuid());
+            Refuse<InvalidOperationException>(() => Action(unpaid));
+            Refuse<InvalidOperationException>(() => journal.Prepare(unpaid.Id, 1, Guid.NewGuid(), 17));
+            ConstructionCancellationAction Action(Plans.Record current) => BlueprintConstructionCancellationAction.Read(plans, current.Id, 1, 17);
             string extra = Path.Combine(plans.DirectoryPath, plan.Id.ToString("N") + "." + Guid.NewGuid().ToString("N") + ".bwpart");
             File.WriteAllText(extra, "unrelated receipt"); Refuse<InvalidDataException>(() => journal.Read(plan.Id)); File.Delete(extra);
             // A terminal plan without its removal journal must never pass through the unpaid replay API.

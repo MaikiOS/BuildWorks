@@ -1,5 +1,13 @@
 # BuildWorks development journal
 
+## 2026-10-22 — 302–303: board route / surface without volume
+
+Connected durable paid-board cancellation/refund (.270):30router,64/175journal checks, normal/QA/host/localization/review pass. Then owner explicitly authorized disabling only separate volume rendering (.271); Update/OnPreCull IL and shader/compute remain unchanged. Main-monitor3440×1440 launch corrected. Full native paid UI and surface visual acceptance remain open. [302](CHECKPOINT_302.md), [303](CHECKPOINT_303.md).
+
+## 2026-10-22 — 301: native scenario passed; comparison analysis failed
+
+88/88; shortened route receipts lost origin/position, so comparison was not accepted. Original report retained; normal Quit/restore3,97project hashes/4141ordinary metadata unchanged. Compact receipt prepared, no full replay. [Details](CHECKPOINT_302.md).
+
 ## 2026-10-22 — 300: three native fallback samples; no speed fix yet
 
 QA .269 adds measurement-only hook. GPU14/builds/geometry/host/localization/review pass; native full fallback covers16.99–17.07% viewport, zero unknown/nonfinite. This is not stage cost/FPS. Original package FAILED on expected duplicate arm;24steps and3samples passed, separate tail15/15. Normal exit/restore3/97project SHA/4141ordinary metadata verified. Ordinary fog unchanged. Parallel read-only review prepared the next paid-board UI source slice, not implemented. Corrected full package in fresh PID49676:39/39, three more samples, second normalQuit/restore3/97/4141audit pass; original FAILED preserved. [Evidence](CHECKPOINT_300.md).

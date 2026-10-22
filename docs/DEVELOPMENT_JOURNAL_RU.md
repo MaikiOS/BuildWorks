@@ -1,5 +1,13 @@
 # Журнал разработки BuildWorks
 
+## 2026-10-22 — 302–303: board route / surface without volume
+
+Подключена кнопка оплаченной отмены/возврата (.270):30проверок маршрута,64/175журналов, normal/QA/host/localization/review PASS. Затем по явному решению Ostrix отключён только отдельный объёмный проход (.271); Update/OnPreCull IL и shader/compute прежние. Исправлен запуск на основном3440×1440. Полный paid native UI и визуальная приёмка поверхности открыты. [302](CHECKPOINT_302_RU.md), [303](CHECKPOINT_303_RU.md).
+
+## 2026-10-22 — 301: native scenario passed; comparison analysis failed
+
+88/88; shortened route receipts lost origin/position, so comparison was not accepted. Original report retained; normal Quit/restore3,97project hashes/4141ordinary metadata unchanged. Compact receipt prepared, no full replay. [Details](CHECKPOINT_302_RU.md).
+
 ## 2026-10-22 — 300: три native-выборки fallback; ускорение ещё не получено
 
 QA .269 добавляет только измерительный hook. GPU14/build/geometry/host/localization/review PASS; в игре16,99–17,07% viewport вызывает full fallback, unknown/nonfinite0. Это не стоимость/FPS. Исходный пакет FAILED на ожидаемом duplicate-arm;24шага и3выборки прошли, отдельный хвост15/15. Normal exit/restore3/97project SHA/4141ordinary metadata подтверждены. Обычный туман прежний. Параллельно подготовлен источник следующего paid-board UI-среза, без реализации. Исправленный полный пакет в новом процессе49676:39/39, ещё3выборки, второйnormalQuit/restore3/97/4141audit PASS; исходный FAILED сохранён. [Evidence](CHECKPOINT_300_RU.md).

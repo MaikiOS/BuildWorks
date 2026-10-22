@@ -220,11 +220,16 @@ project.name	Construction project
 project.interact	[Use] Inspect construction project
 project.hammer	Equip a usable hammer to manage this project.
 project.close	Close
-project.cancel	Cancel unpaid project
+project.cancel	Cancel project
 project.unpaid	Unbuilt parts: {0}. No resources contributed.
-project.cancel_confirm	Press Cancel again to remove the unpaid project. Nothing will be granted.
+project.cancel_confirm	Press again to confirm cancellation. Built parts will be removed. After saving, reopen the board to return actually spent resources. Nothing is granted if nothing was paid.
+project.cancel_unpaid_confirm	Press again to confirm cancellation. No resources were spent: the ghost and board will disappear and nothing will be refunded.
 project.missing	Some required prefabs are unavailable.
-project.payment_pending	Continue uses your inventory and normal Valheim placement rules. Paid-project cancellation and mounted/container contents are not available at this development stage. Closing keeps the project.
+project.payment_pending	The list above is the cost of remaining parts, not a refund quote. Continue uses your inventory and normal Valheim placement rules. Mounted/container contents remain unavailable. Closing keeps the project.
+project.refund	Issue refund
+project.refund_confirm	Press again to confirm. Returned items will appear by the board. Pick them up using Interact; they will not be issued again.
+project.refund_wait	The refund has been issued. Pick up the items by the board using Interact. Unconfirmed outcomes block repeated issuance.
+project.cancel_pending	Construction is stopped for cancellation. Refund items can be issued by the board after removal and saving are confirmed.
 project.continue	Continue construction
 project.progress	Built: {0} / {1} parts.
 project.review	An operation needs verification. Repeating construction or an automatic refund is blocked.

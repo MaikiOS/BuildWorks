@@ -9,6 +9,19 @@ try {
     $service = [array]::LastIndexOf($calls, 'System.Void OstrixMods.BuildWorks.BlueprintFogChannels::PumpSources()')
     $capture = [array]::IndexOf($calls, 'System.Void OstrixMods.BuildWorks.BlueprintFogBuilding::AdvanceTo(System.Single,UnityEngine.Vector3,UnityEngine.Vector2,System.Boolean)')
     if ($service -lt 0 -or $capture -lt 0 -or $service -ge $capture) { throw 'Project fog must service accepted receipts before capturing another observation.' }
+    $project = $module.GetType('OstrixMods.BuildWorks.BlueprintConstructionProjectFog')
+    $present = $project.Methods | Where-Object Name -eq 'OnRenderImage'
+    $presentCalls = @($present.Body.Instructions | Where-Object { $_.Operand -is [Mono.Cecil.MethodReference] } | ForEach-Object { $_.Operand.FullName })
+    $expectedPresentCalls = @(
+        'System.Void UnityEngine.Graphics::Blit(UnityEngine.Texture,UnityEngine.RenderTexture)',
+        'System.Int32 System.Collections.Generic.List`1<OstrixMods.BuildWorks.BlueprintFogVisual>::get_Count()',
+        'System.Int32 OstrixMods.BuildWorks.BlueprintConstructionProjectFog::get_RenderFrames()',
+        'System.Void OstrixMods.BuildWorks.BlueprintConstructionProjectFog::set_RenderFrames(System.Int32)')
+    if (($presentCalls -join "`n") -cne ($expectedPresentCalls -join "`n")) {
+        throw 'Ordinary projects must present the existing surface without a volume pass.'
+    }
+    $preCullCalls = (($project.Methods | Where-Object Name -eq 'OnPreCull').Body.Instructions.Operand -join "`n")
+    if ($preCullCalls -notmatch 'BlueprintFogAtlas::PreparePublished\(') { throw 'Surface flow lost its pre-draw publication binding.' }
     $atlas = $module.GetType('OstrixMods.BuildWorks.BlueprintFogAtlas')
     $hook = @($atlas.Fields | Where-Object Name -eq 'QaCompositeObserver')
     $render = $atlas.Methods | Where-Object Name -eq 'RenderImage'

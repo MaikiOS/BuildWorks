@@ -38,7 +38,7 @@ External library or world capture → editing → construction. A personal libra
 
 ### 3. Construction projects
 
-Insufficient materials leave a recognizable, pass-through v11 fog ghost. A stake and board let players equip a hammer, inspect shortages, supply materials, continue, or cancel. Finished parts become real objects; projects survive world visits; cancellation refunds actual spending without repeated payouts. **Outcome:** unfinished houses are convenient to return to. Connect the durable project/board to confirmed payment and actual construction, then unfinished-part fog and whole-house acceptance; laboratory approval alone does not establish readiness of the mechanic. Returned fog must restore the correct surface independently of prefab orientation and nearby damaged parts.
+Insufficient materials leave a recognizable, pass-through ghost based on v11: surface flow, held holes and recovery without separate white volume haze. A stake and board let players equip a hammer, inspect shortages, supply materials, continue, or cancel. Finished parts become real objects; projects survive world visits; cancellation refunds actual spending without repeated payouts. **Outcome:** unfinished houses are convenient to return to. Connect the durable project/board to confirmed payment and actual construction, then unfinished-part fog and whole-house acceptance; laboratory approval alone does not establish readiness of the mechanic. The returning surface must restore its correct form independently of prefab orientation and nearby damaged parts.
 
 Cancellation requires durable deletion, physical refund issuance and collection records; an ambiguous crash outcome must never automatically replay delivery. [Technical plan](PROJECT_CANCELLATION_PROTOCOL.md).
 

@@ -938,7 +938,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.269.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.271.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 & (Join-Path $PSScriptRoot 'Test-FogCaptureOrder.ps1') -Assembly $pluginPath | Out-Null
 $fogResource = @($plugin.MainModule.Resources | Where-Object Name -eq 'BuildWorks.FogGhostV11')
@@ -3662,6 +3662,10 @@ foreach ($payoutContextType in 'BlueprintConstructionPayoutCollection','Blueprin
 }
 & (Join-Path $projectRoot 'tests/BuildWorks.CaptureChecks/PayoutInteraction.ps1')
 & (Join-Path $projectRoot 'tests/BuildWorks.CaptureChecks/PaidCancellation.ps1')
+& (Join-Path $projectRoot 'tests/BuildWorks.CaptureChecks/BoardCancellation.ps1')
+$boardCancellationCalls = ($pluginMethods | Where-Object { $_.DeclaringType.FullName -like '*BlueprintConstructionProjectView*' } |
+    ForEach-Object { if ($_.HasBody) { $_.Body.Instructions.Operand } }) -join "`n"
+Assert-Contract ($boardCancellationCalls -match '::RequestCancellationFromBoard' -and $boardCancellationCalls -notmatch '::CancelUnpaid') 'Project UI must use the guarded cancellation router.'
 $payoutReach = @($pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintConstructionPayoutCollection' -and $_.Name -eq 'WithinReach' })
 $payoutReachCalls = ($payoutReach.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($payoutReach.Count -eq 1 -and $payoutReachCalls -match 'Player::m_maxInteractDistance' -and

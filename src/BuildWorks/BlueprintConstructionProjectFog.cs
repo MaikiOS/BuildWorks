@@ -203,15 +203,9 @@ namespace OstrixMods.BuildWorks
         }
         private void OnRenderImage(RenderTexture source, RenderTexture target)
         {
-            if (closing || failure != null || atlas == null || owners.Count == 0) { Graphics.Blit(source, target); return; }
-            try
-            {
-                Light sun = RenderSettings.sun; Vector3 direction = sun ? sun.transform.forward : Vector3.down;
-                atlas.Render(view, source, target, owners, Player.m_localPlayer.transform.position - direction * 8,
-                    direction, sun ? Mathf.Max(0, sun.intensity) * 1.6f : 0, snapshots);
-                ++RenderFrames;
-            }
-            catch (Exception error) { Fail(error); Graphics.Blit(source, target); }
+            // Surface flow/holes still use Update and OnPreCull; the separate volume haze is disabled by the owner.
+            Graphics.Blit(source, target);
+            if (!closing && failure == null && atlas != null && owners.Count > 0) ++RenderFrames;
         }
         private void FailEntry(Entry entry, Exception error)
         {

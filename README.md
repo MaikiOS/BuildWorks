@@ -1,6 +1,8 @@
+**Current local QA0.19.271:** separate white volume haze disabled at the owner’s request; surface dissolve, held holes and recovery remain. Durable board cancellation/refund is connected; full native acceptance remains open. [Current status](docs/CURRENT_STATUS.md), [owner checklist](docs/LIVE_CHECKLIST_RU.md).
+
 # BuildWorks
 
-**Local QA .264 installed, acceptance open:** exact empty-field shortcuts improved the full-size diagnostic, but contact still measures about15host frames/s. Stalls and delayed fog are not fully fixed. [Evidence](docs/CHECKPOINT_282.md), [current status](docs/CURRENT_STATUS.md).
+**Historical QA .264, rejected acceptance:** exact empty-field shortcuts improved the full-size diagnostic, but contact still measures about15host frames/s. Stalls and delayed fog are not fully fixed. [Evidence](docs/CHECKPOINT_282.md), [current status](docs/CURRENT_STATUS.md).
 
 **Historical checkpoint250, QA .242:** plain QA now uses the measured256MiB GPU budget without a candidate property. Native Valheim:resident32/VelocityUpload=null,prepare12/12,recorded72/72 with520/520frames,35.88FPS/52.37s,26windows34–36FPS,fog queue1–2/velocity CPU-copy0. Contact24/24:9parts/108160exact inner texels,all28 recovered. Max145.07ms coincides with the first synchronous reference capture; causality/perfect smoothness unproved. Builds/contracts/Geometry/localization1122/isolation pass. Normal quit/bridge3/3; .242 stays installed. Normal/ordinary Editor retain98,304,000bytes; shader/costs unchanged. v11 appearance,public GPU budget,heavy blueprints,paid cancellation/network remain open. [Evidence](docs/CHECKPOINT_250.md).
 
@@ -10,7 +12,7 @@ BuildWorks extends Valheim's hammer with precise construction, a blueprint catal
 
 ![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
 
-**Source/isolated QA:0.19.255; board fix verified in a bounded native scenario.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
+**Source/isolated QA:0.19.271; surface-only native route passes, full paid UI remains open.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
 
 Historical [.240](docs/CHECKPOINT_240.md) preserves two failed fog experiments. Memory reuse is **disabled** in normal/QA builds; whole-house fog remains unfixed. No .240 Valheim run.
 

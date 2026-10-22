@@ -14,6 +14,8 @@ namespace OstrixMods.BuildWorks
     {
         private GameObject root;
         private TMP_Text summary;
+        private UnityEngine.UI.Button continueButton, cancelButton;
+        private ConstructionCancellationAction confirmedAction;
         private CursorLockMode oldLock;
         private bool oldVisible, confirming;
         private Guid project, cancelOperation;
@@ -56,16 +58,21 @@ namespace OstrixMods.BuildWorks
                 scroll.viewport = viewport; scroll.content = summary.rectTransform; scroll.horizontal = false;
                 scroll.movementType = ScrollRect.MovementType.Clamped; scroll.scrollSensitivity = 40;
                 Button(panel, template, "project.close", new Vector2(184, 36), new Vector2(174, 166), runtime.Close);
-                Button(panel, template, "project.continue", new Vector2(250, 44), new Vector2(-135, -170), () =>
+                continueButton = Button(panel, template, "project.continue", new Vector2(250, 44), new Vector2(-135, -170), () =>
                 {
                     try { runtime.Continue(board.Id); }
                     catch (Exception error) { operationError = BuildWorksLocalization.Text("project.error", error.Message); nextRefresh = 0; }
                 });
-                Button(panel, template, "project.cancel", new Vector2(250, 44), new Vector2(135, -170), () =>
+                cancelButton = Button(panel, template, "project.cancel", new Vector2(250, 44), new Vector2(135, -170), () =>
                 {
-                    if (!confirming) { confirming = true; cancelOperation = Guid.NewGuid(); nextRefresh = 0; return; }
                     operationError = null;
-                    try { runtime.CancelUnpaid(board.Id, board.Revision, cancelOperation); runtime.Close(); }
+                    try
+                    {
+                        var action = runtime.CancellationAction(board.Id, board.Revision);
+                        if (!confirming || confirmedAction != action)
+                        { confirming = true; confirmedAction = action; cancelOperation = Guid.NewGuid(); nextRefresh = 0; return; }
+                        runtime.RequestCancellationFromBoard(board.Id, board.Revision, cancelOperation);
+                    }
                     catch (Exception error) { operationError = BuildWorksLocalization.Text("project.error", error.Message); nextRefresh = 0; }
                 });
                 cursorOwned = true; Cursor.lockState = CursorLockMode.None; Cursor.visible = true;
@@ -73,13 +80,23 @@ namespace OstrixMods.BuildWorks
             if (Time.unscaledTime < nextRefresh) return;
             nextRefresh = Time.unscaledTime + .5f;
             var text = new StringBuilder();
-            if (confirming) text.AppendLine().AppendLine(BuildWorksLocalization.Text("project.cancel_confirm"));
             try
             {
+                var action = runtime.CancellationAction(board.Id, board.Revision);
+                bool building = action == ConstructionCancellationAction.Unpaid || action == ConstructionCancellationAction.Remove;
+                continueButton.interactable = building;
+                cancelButton.interactable = action != ConstructionCancellationAction.Review && action != ConstructionCancellationAction.AwaitCollection;
+                cancelButton.GetComponentInChildren<TMP_Text>().text = BuildWorksLocalization.Text(
+                    action == ConstructionCancellationAction.IssueRefund ? "project.refund" : "project.cancel");
+                if (confirming && confirmedAction != action) confirming = false;
+                if (confirming) text.AppendLine().AppendLine(BuildWorksLocalization.Text(ConfirmationKey(action)));
                 var progress = runtime.Progress(board.Id);
-                text.Insert(0, BuildWorksLocalization.Text("project.progress", progress.Built, progress.Total));
+                if (building) text.Insert(0, BuildWorksLocalization.Text("project.progress", progress.Built, progress.Total));
                 if (progress.NeedsReview) text.AppendLine().AppendLine(BuildWorksLocalization.Text("project.review"));
-                if (missing) text.AppendLine().AppendLine(BuildWorksLocalization.Text("project.missing"));
+                if (!building) text.AppendLine().AppendLine(BuildWorksLocalization.Text(
+                    action == ConstructionCancellationAction.Review ? "project.review" :
+                    action == ConstructionCancellationAction.AwaitCollection ? "project.refund_wait" : "project.cancel_pending"));
+                else if (missing) text.AppendLine().AppendLine(BuildWorksLocalization.Text("project.missing"));
                 else foreach (var cost in costs)
                 {
                     int amount = checked((BlueprintResourceHudView.Free(GlobalKeys.NoBuildCost) ? 0 : cost.BuildAmount) +
@@ -87,25 +104,34 @@ namespace OstrixMods.BuildWorks
                     int have = Player.m_localPlayer.GetInventory().CountItems(cost.Item.m_itemData.m_shared.m_name, -1, true);
                     text.AppendLine().Append(cost.Name).Append(": ").Append(have).Append(" / ").Append(amount);
                 }
-                text.AppendLine().AppendLine(BuildWorksLocalization.Text("project.payment_pending"));
+                if (building) text.AppendLine().AppendLine(BuildWorksLocalization.Text("project.payment_pending"));
                 if (runtime.Failure != null || runtime.Execution?.Reason != null)
                     text.AppendLine().AppendLine(BuildWorksLocalization.Text("project.error", runtime.Failure ?? runtime.Execution.Reason));
                 if (operationError != null) text.AppendLine().AppendLine(operationError);
                 string fogError = runtime.FogError(board.Id);
                 if (fogError != null) text.AppendLine().AppendLine(BuildWorksLocalization.Text("project.fog_error", fogError));
                 summary.text = text.ToString();
+                summary.rectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, Mathf.Max(260, summary.preferredHeight + 8));
             }
-            catch (Exception error) { summary.text = BuildWorksLocalization.Text("project.error", error.Message); }
+            catch (Exception error)
+            {
+                continueButton.interactable = cancelButton.interactable = false;
+                summary.text = BuildWorksLocalization.Text("project.error", error.Message);
+            }
         }
 
         internal void Close()
         {
             if (!root && !cursorOwned) return;
             if (root) { root.SetActive(false); UnityEngine.Object.Destroy(root); }
-            root = null; summary = null;
+            root = null; summary = null; continueButton = cancelButton = null;
             if (cursorOwned) { Cursor.lockState = oldLock; Cursor.visible = oldVisible; cursorOwned = false; }
             confirming = false; operationError = null; nextRefresh = 0; closingFrame = Time.frameCount;
         }
+        private static string ConfirmationKey(ConstructionCancellationAction action) =>
+            action == ConstructionCancellationAction.Unpaid ? "project.cancel_unpaid_confirm" :
+            action == ConstructionCancellationAction.IssueRefund ? "project.refund_confirm" : "project.cancel_confirm";
+
         private static RectTransform Rect(string name, Transform parent, Vector2 size, Vector2 position)
         {
             var rect = new GameObject(name, typeof(RectTransform)).GetComponent<RectTransform>(); rect.SetParent(parent, false);
@@ -118,12 +144,13 @@ namespace OstrixMods.BuildWorks
             label.font = template.font; label.text = text; label.fontSize = size; label.color = new Color(.94f, .91f, .84f);
             label.alignment = TextAlignmentOptions.TopLeft; label.raycastTarget = false; rect.gameObject.SetActive(true); return label;
         }
-        private static void Button(Transform parent, TMP_Text template, string key, Vector2 size, Vector2 position, Action action)
+        private static UnityEngine.UI.Button Button(Transform parent, TMP_Text template, string key, Vector2 size, Vector2 position, Action action)
         {
             var rect = Rect(key, parent, size, position); var image = rect.gameObject.AddComponent<Image>(); image.color = new Color(.28f, .23f, .16f);
             var button = rect.gameObject.AddComponent<UnityEngine.UI.Button>(); button.targetGraphic = image; button.onClick.AddListener(() => action());
             var label = Label(rect, template, BuildWorksLocalization.Text(key), 17, size - new Vector2(12, 6), Vector2.zero);
             label.alignment = TextAlignmentOptions.Center;
+            return button;
         }
     }
 }

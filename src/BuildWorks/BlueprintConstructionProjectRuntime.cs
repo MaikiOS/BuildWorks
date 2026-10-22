@@ -191,7 +191,31 @@ namespace OstrixMods.BuildWorks
         }
         internal BlueprintConstructionProjectBoard Board(Guid id) => boards.TryGetValue(id, out var board) ? board : null;
 
-        // Internal operator path until the durable restitution protocol can complete paid cancellation.
+        internal ConstructionCancellationAction CancellationAction(Guid id, long revision)
+        {
+            RequireContext();
+            return BlueprintConstructionCancellationAction.Read(store, id, revision, Player.m_localPlayer.GetPlayerID());
+        }
+        internal void RequestCancellationFromBoard(Guid id, long revision, Guid operation)
+        {
+            RequireContext();
+            var player = Player.m_localPlayer;
+            if (!IsPrivateLocalPlacement || !player || player.IsDead() || !OpenBoard || OpenBoard.Id != id || Board(id) != OpenBoard ||
+                !BuildWorksPlugin.CanOpenConstructionProject || !HasHammer(player) ||
+                Vector3.Distance(player.transform.position, OpenBoard.transform.position) > 5 || queued != Guid.Empty ||
+                PayoutBusy || execution != null && !execution.Finished || removal != null && !removal.Finished || operation == Guid.Empty)
+                throw new InvalidOperationException(BuildWorksLocalization.Text("project.unavailable"));
+            switch (CancellationAction(id, revision))
+            {
+                case ConstructionCancellationAction.Unpaid: CancelUnpaid(id, revision, operation); return;
+                case ConstructionCancellationAction.Remove: BeginPaidRemoval(id, revision, operation); return;
+                case ConstructionCancellationAction.ResumeRemoval: ResumePreparedRemoval(id, revision); return;
+                case ConstructionCancellationAction.IssueRefund: BeginPayout(id); return;
+                case ConstructionCancellationAction.AwaitCollection: cancellationProjects.Add(id); Close(); return;
+                default: throw new InvalidOperationException(BuildWorksLocalization.Text("project.review"));
+            }
+        }
+
         internal void ResumePreparedRemoval(Guid id, long revision)
         {
             RequireContext();
@@ -207,7 +231,8 @@ namespace OstrixMods.BuildWorks
                 Vector3.Distance(Player.m_localPlayer.transform.position, OpenBoard.transform.position) > 5 || queued != Guid.Empty ||
                 PayoutBusy || execution != null && !execution.Finished || removal != null && !removal.Finished)
                 throw new InvalidOperationException(BuildWorksLocalization.Text("project.unavailable"));
-            Close(); removal = new BlueprintConstructionCancellationRemoval(store, id, revision, operation);
+            var next = new BlueprintConstructionCancellationRemoval(store, id, revision, operation);
+            Close(); removal = next;
         }
 
         internal void BeginPayout(Guid id)

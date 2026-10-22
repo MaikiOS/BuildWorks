@@ -55,6 +55,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             changed.Blob = Package(2, 1, changed.Id); Refuse<InvalidDataException>(() => Prepare(new[] { changed, entries[1] }));
             Check(!File.Exists(path), "Rejected preparation created payout state.");
             var prepared = Prepare(entries); byte[] original = File.ReadAllBytes(path);
+            Check(Action() == ConstructionCancellationAction.IssueRefund, "Ready payout did not allow guarded recovery.");
             Check(prepared.Phase == Journal.Prepared && prepared.Items.All(e => e.State == Journal.Ready), "Payout was prematurely attempted.");
             Check(Prepare(entries).Revision == 1 && original.SequenceEqual(File.ReadAllBytes(path)), "Ready replay changed payout.");
             prepared.Items[0].Blob = "mutated"; Check(new Journal(plans).Read(plan.Id).Items[0].Blob == entries[0].Blob, "Read aliases disk state.");
@@ -65,6 +66,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 Refuse<IOException>(() => journal.BeginItem(plan.Id, operation, 0));
             Check(original.SequenceEqual(File.ReadAllBytes(path)) && !Directory.EnumerateFiles(plans.DirectoryPath, "*.preparing").Any(), "Failed replace lost state/staging.");
             journal.BeginItem(plan.Id, operation, 0);
+            Check(Action() == ConstructionCancellationAction.Review, "Attempted payout offered duplicate issuance.");
             Check(new Journal(plans).Read(plan.Id).Items[0].State == Journal.Attempted, "Native intent did not persist.");
             Refuse<InvalidOperationException>(() => journal.BeginItem(plan.Id, operation, 0));
             Refuse<InvalidOperationException>(() => Prepare(entries));
@@ -84,6 +86,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             bad = Proof(); bad.ItemHashes = bad.ItemHashes.Reverse().ToArray(); Refuse<InvalidDataException>(() => journal.ConfirmSaved(plan.Id, operation, bad));
             bad = Proof(); bad.ProfileHash = new string('A', 64); Refuse<InvalidDataException>(() => journal.ConfirmSaved(plan.Id, operation, bad));
             var saved = journal.ConfirmSaved(plan.Id, operation, Proof()); byte[] terminal = File.ReadAllBytes(path);
+            Check(Action() == ConstructionCancellationAction.AwaitCollection, "Saved payout offered duplicate issuance.");
             Check(saved.Phase == Journal.IssuedSaved && saved.Revision == 7 && !plans.Load(plan.Id).Cancelled, "Issuance falsely settled cancellation.");
             Check(new Journal(plans).Read(plan.Id).Saved.ItemHashes.Length == 2, "Saved item proofs lost after reload.");
             Check(journal.ConfirmSaved(plan.Id, operation, Proof()).Revision == 7 && terminal.SequenceEqual(File.ReadAllBytes(path)), "Proof replay mutated state.");
@@ -100,6 +103,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             CreditChecks(journal, plan.Id, operation, after, path);
             Console.WriteLine("PASS payout journal: " + assertions + " assertions; exact paid properties/quantity, durable one-shot intents, replay, corruption and paired-save binding. Native issuance/collection is not claimed.");
             Journal.Record Prepare(Journal.Entry[] rows) => journal.Prepare(plan.Id, operation, 17, 8, after, rows);
+            ConstructionCancellationAction Action() => BlueprintConstructionCancellationAction.Read(plans, plan.Id, 1, 17);
             Journal.Proof Proof() => new Journal.Proof { Generation = 9, ProfileHash = new string('A', 128),
                 InventoryHash = Digest(Convert.FromBase64String(after.Zdo)), ItemHashes = entries.Select(e => Digest(Convert.FromBase64String(e.Blob))).ToArray() };
         }

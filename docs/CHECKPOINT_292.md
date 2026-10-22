@@ -8,7 +8,7 @@ CPU17math+4contract checks; independent Astra reviews without blockers. GPU comp
 
 Run `ValheimQA/artifacts/20261022-070429`, existing isolated identities/world1137745799, non-batch backgroundDX11,3440×1440,target0. No grants/construction/terrain changes. First73-step attempt failed at8: original fog overflowed before candidate attachment, invalidating Ready. Guard retained; override removed, cleanup7/7 and normal logout.
 
-Re-entry with immediate candidate setup before weather wait and actual Building.Ready guard completed **85/85**, optional0. No world/receipt reset or queue enlargement. Four routes, plane–half–half–plane, Clear/hour12/fixed camera; independent validator checked render counters,24negative controls,4camera/shader closures and all3inventory snapshots.
+Automatic re-entry without idle time and with the actual Building.Ready guard completed **85/85**, optional0. The bundle was loaded before the weather wait; candidate mode was activated afterwards. No world/receipt reset or queue enlargement. Four routes, plane–half–half–plane, Clear/hour12/fixed camera; independent validator checked render counters,24negative controls,4camera/shader closures and all3inventory snapshots.
 
 | Window | Active2–9s FPS | Interval p95 |
 | --- | --- | --- |

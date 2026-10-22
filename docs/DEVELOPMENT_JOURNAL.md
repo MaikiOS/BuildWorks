@@ -1,8 +1,12 @@
 # BuildWorks development journal
 
+## 2026-10-22 — 294–296: native depth and settled refund reload
+
+31/31observed3440×1440/Point texture metadata and startup closure of two already collected debts; independent semantic review PASS. Fresh process16/16:97project hashes unchanged,4receipts/0sources/exact inventory, normal exit/restore3. Local295failed twice on its baseline precondition; repeats stopped. Separate address audit disproved Y flip and measured a full/tap depth coincidence. Corrected fixture(1,1) then rejected295 rescue; helper CS0136 fixed, logs retained. Candidate/tolerances unchanged; installed267unchanged, v11/full paid UI/network open. [294](CHECKPOINT_294.md), [295](CHECKPOINT_295.md), [296](CHECKPOINT_296.md).
+
 ## 2026-10-22 — 292/293: candidate rejected, next falsifiable cause
 
-Owner-authorized291exit/restore3/97projects/4141metadata verified. Plane292passed CPU/GPU/20wall samples, native85/85 and normal cleanup, but no useful speedup:12.94/13.05FPS versus12.48/12.65. First start failed before override due to old queue overflow; immediate setup/real Ready guard enabled full run without relaxing checks. Astra identified sample-center assumptions; analytic GPU293confirms Point/Bilinear divergence, native sampler still unknown. QA267finalizer290 deployed through guarded script after exit; fog candidate not installed. Module/v11/paid UI/network remain open. [292](CHECKPOINT_292.md), [293](CHECKPOINT_293.md).
+Owner-authorized291exit/restore3/97projects/4141metadata verified. Plane292passed CPU/GPU/20wall samples, native85/85 and normal cleanup, but no useful speedup:12.94/13.05FPS versus12.48/12.65. First start failed before override due to old queue overflow; automatic setup without idle/real Ready guard enabled full run without relaxing checks. Astra identified sample-center assumptions; analytic GPU293confirms Point/Bilinear divergence, native sampler still unknown. QA267finalizer290 deployed through guarded script after exit; fog candidate not installed. Module/v11/paid UI/network remain open. [292](CHECKPOINT_292.md), [293](CHECKPOINT_293.md).
 
 ## 2026-10-22 — resumed; diagnostic291 and separate candidate292
 

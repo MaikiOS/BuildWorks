@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-22 — 306: source pause reason; native recovery prepared
+
+Candidate.274 distinguishes station/DLC/resources after unchanged native refusal;9actual checks/builds0/0/host/localization1129/review PASS. Separate saved-credit interruption helper:23PASS/review, no native injection. Not installed: owner plays Default-Compat-Test; no process/profile intervention or second launch. QA.273 remains verified. [Scope306](CHECKPOINT_306.md).
+
 ## 2026-10-22 — 305: exact refund pickup in either order
 
 QA.273 removes the collection-prefix restriction while preserving immutable item indices, receipts and one-intent guards. Independent review caught an early baseline-save gap; fixed before launch, covered by admission7/negative control and journal200. Native row1→fresh process→row0→another fresh process retains67Wood/eight receipts/zero sources/115hashes; two independent .fch inventory proofs. Three normal quits/bridge restores;109old hashes/4141ordinary metadata unchanged. Other items/faults/UX/network remain open. [Evidence305](CHECKPOINT_305.md).

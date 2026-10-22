@@ -2,6 +2,8 @@
 
 22 October2026. **Installed QA0.19.273 allows refund pickup in either order.** [305](CHECKPOINT_305.md): native E/buttons completed two-wall4Wood payment, saved removal without native drops and separate issuance; row1 was collected first, a full restart retained row0, then row0 was collected. Another fresh process passed9/9 with exact27inventory records/67Wood/eight receipts/zero sources/no board and115unchanged project hashes. New code reads legacy prefixes; the .272 reader rejects sparse journals, so downgrade needs a separate compatibility check. Physical overlap is unchanged; owner UX, other properties/fault windows and networking remain open. Surface303 is unchanged.
 
+Local **.274 candidate is not installed**: missing-station pause reason clarified; actual-method9/normal+QA0/0/HostContract/localization1129/review PASS. Interruption23PASS is preparation, not native proof. [Scope306](CHECKPOINT_306.md).
+
 Historical290–296 snapshot before304: [290](CHECKPOINT_290.md) installed the finalizer inQA267; [294](CHECKPOINT_294.md) closed two already collected old debts; [296](CHECKPOINT_296.md) fresh-process16/16 retained97file hashes/four receipts/zero sources/67Wood and normal exit/restore3. Before-pickup lifecycle and paid UI were untested in that snapshot. The new bounded cycle and current installation are described above and in304.
 
 Historical owner review of [.252](CHECKPOINT_274.md) FAILED when fog input overflow hid the house. Later279/280 provide scoped service/contact evidence; owner visual acceptance remains open. Ostrix's physical keyboard/mouse, other paid cases and multiplayer remain unverified. Local QA carries shader271; source-only Git publishes C# over its previous fog baseline; shader271 remains local.

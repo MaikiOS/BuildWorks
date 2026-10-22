@@ -1,5 +1,9 @@
 # Журнал разработки BuildWorks
 
+## 2026-10-22 — 306: причина паузы в исходниках, native recovery подготовлен
+
+Кандидат.274 различает станцию/DLC/ресурсы после прежнего native refusal;9actual checks/сборки0/0/host/localization1129/review PASS. Отдельный saved-credit interruption helper:23PASS/review, без native injection. Не установлен: владелец играет в Default-Compat-Test; его процесс/профиль не трогали, второго запуска не было. QA.273 остаётся проверенной. [Объём306](CHECKPOINT_306_RU.md).
+
 ## 2026-10-22 — 305: точный возврат в любом порядке
 
 QA.273 снимает prefix-ограничение только для collection; immutable item indices, receipts и one-intent guards сохранены. Независимый обзор нашёл ранний baseline-save пробел, исправлен до запуска игры; admission7/negative control, journal200 и остальные проверки PASS. Native:row1→новый процесс→row0→ещё новый процесс,67Wood/8receipts/0sources/115SHA, два независимых .fch inventory proof. Три normalQuit/restore3;109old hashes/4141ordinary metadata прежние. Объём цели сохранён, другие предметы/crash/UX/сеть открыты. [Доказательства305](CHECKPOINT_305_RU.md).

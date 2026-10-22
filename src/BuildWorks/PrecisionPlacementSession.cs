@@ -2730,8 +2730,7 @@ namespace OstrixMods.BuildWorks
                     selectedPiece,
                     Player.RequirementMode.CanBuild))
                 {
-                    PauseAutomaticPlacement(player, BuildWorksLocalization.Text(
-                        "placement.pause.resources"));
+                    PauseAutomaticPlacement(player, RequirementsPauseReason(player));
                     takeInput = false;
                     return;
                 }
@@ -3178,6 +3177,17 @@ namespace OstrixMods.BuildWorks
             currentBlueprintPlacements.Clear();
             Finish(preserveContinuation: true);
             if (signFailed) ShowStatus(player, BuildWorksLocalization.Text("blueprint.sign_apply_failed"));
+        }
+
+        private string RequirementsPauseReason(Player player)
+        {
+            var station = selectedPiece.m_craftingStation;
+            if (station && !CraftingStation.HaveBuildStationInRange(station.m_name, player.transform.position) &&
+                !ZoneSystem.instance.GetGlobalKey(GlobalKeys.NoWorkbench))
+                return BuildWorksLocalization.Text("placement.pause.station", Localization.instance?.Localize(station.m_name) ?? station.m_name);
+            if (selectedPiece.m_dlc.Length > 0 && !DLCMan.instance.IsDLCInstalled(selectedPiece.m_dlc))
+                return BuildWorksLocalization.Text("placement.pause.dlc");
+            return BuildWorksLocalization.Text("placement.pause.resources");
         }
 
         private void PauseAutomaticPlacement(Player player, string reason)

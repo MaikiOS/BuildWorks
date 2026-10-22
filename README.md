@@ -12,7 +12,7 @@ BuildWorks extends Valheim's hammer with precise construction, a blueprint catal
 
 ![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
 
-**Source/isolated QA:0.19.273; bounded paid UI and either-order pickup pass, general acceptance is open.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. No new public binary release.
+**Source .274 is a local uninstalled candidate; verified QA remains .273.** Missing-station pause reason is source/test proof only. [Scope306](docs/CHECKPOINT_306.md). Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. No new public binary release.
 
 Historical [.240](docs/CHECKPOINT_240.md) preserves two failed fog experiments. Memory reuse is **disabled** in normal/QA builds; whole-house fog remains unfixed. No .240 Valheim run.
 

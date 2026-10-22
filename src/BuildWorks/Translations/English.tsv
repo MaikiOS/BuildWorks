@@ -216,6 +216,8 @@ placement.blueprint_precision_hint	BuildWorks: F9 edits the whole blueprint posi
 placement.blueprint_prepare_failed	BuildWorks: the blueprint could not be prepared for placement.
 placement.pause.scale	part does not support Valheim scale persistence
 placement.pause.resources	not enough resources
+placement.pause.station	the required crafting station is out of range: {0}
+placement.pause.dlc	the required downloadable content is not installed
 project.name	Construction project
 project.interact	[Use] Inspect construction project
 project.hammer	Equip a usable hammer to manage this project.

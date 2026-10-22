@@ -938,7 +938,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.273.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.274.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 & (Join-Path $PSScriptRoot 'Test-FogCaptureOrder.ps1') -Assembly $pluginPath | Out-Null
 $fogResource = @($plugin.MainModule.Resources | Where-Object Name -eq 'BuildWorks.FogGhostV11')
@@ -3662,6 +3662,7 @@ foreach ($payoutContextType in 'BlueprintConstructionPayoutCollection','Blueprin
 }
 & (Join-Path $projectRoot 'tests/BuildWorks.CaptureChecks/PayoutInteraction.ps1')
 & (Join-Path $projectRoot 'tests/BuildWorks.CaptureChecks/CreditAdmission.ps1')
+& (Join-Path $projectRoot 'tests/BuildWorks.CaptureChecks/RequirementsPause.ps1')
 & (Join-Path $projectRoot 'tests/BuildWorks.CaptureChecks/PaidCancellation.ps1')
 & (Join-Path $projectRoot 'tests/BuildWorks.CaptureChecks/BoardCancellation.ps1')
 $boardCancellationCalls = ($pluginMethods | Where-Object { $_.DeclaringType.FullName -like '*BlueprintConstructionProjectView*' } |

@@ -1,5 +1,21 @@
 # Продолжение BuildWorks после произвольного порядка возврата305
 
+## Текущая подготовка306, без нового игрового прогона
+
+Последний проверенный игровой срез — установленная QA.273/305; source baseline2a4faaf.
+Локальный кандидат .274 НЕ установлен: причина паузы station/DLC/resources после
+прежнего HaveRequirements;9actual/normal+QA0/0/host/localization1129/reviews PASS.
+Нового native сообщения ещё нет. [Срез306](CHECKPOINT_306_RU.md). В ValheimQA/render-probe
+подготовлена scoped one-shot перехватка перед подтверждением уже сохранённого
+credit; actual-prefix/status/disarm23PASS и независимый review PASS. Native
+injection/restart ещё не доказаны. План/evidence — artifacts/checkpoint-306/PREPARATION_RU.md.
+Найден чужой PID57236, Ostrix подтвердил игру в Default-Compat-Test; не трогать.
+По его вопросу исследован parallel QA: DirectPath может обойтись безstopProcessName,
+но текущие Prepare/Restore guards не снимать. Нужны exactPID/createtime ownership,
+запретgames_stop/games_kill и отдельная проверкаSteam/Unityprefs/фокуса/нагрузки.
+Никакого второго запуска/Prepare/Deploy306 не было. Если процесс уже закрыт,
+сначала проверить это живым источником; штатный single-QA workflow сохраняется.
+
 ## Актуально после305, 22.10.2026
 
 Весь GOAL_FULL_RU.md остаётся активной целью;115ID/16галочек/14разделов сохранены.

@@ -216,6 +216,8 @@ placement.blueprint_precision_hint	BuildWorks: F9 — точное положе�
 placement.blueprint_prepare_failed	BuildWorks: чертёж не удалось подготовить к установке.
 placement.pause.scale	деталь не поддерживает сохранение масштаба Valheim
 placement.pause.resources	не хватает ресурсов
+placement.pause.station	рядом нет нужной ремесленной станции: {0}
+placement.pause.dlc	не установлено требуемое дополнение
 project.name	Строительный проект
 project.interact	[Взаимодействовать] Открыть строительный проект
 project.hammer	Возьмите исправный молоток для управления проектом.

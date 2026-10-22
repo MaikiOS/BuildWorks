@@ -59,9 +59,9 @@ namespace OstrixMods.BuildWorks.StoreTests
             var store = new CompositeBlueprintStore(Path.Combine(folder, "library.json"));
             Require(store.TryGetOrCreatePlacementCopy(migratedExternal, out var own, out string error), error);
             string library = File.ReadAllText(Path.Combine(folder, "library.json"));
-            Require(library.Contains("\"version\":26") && new CompositeBlueprintStore(Path.Combine(folder, "library.json")).All().Single().parts[0].originalPrefabName == BlueprintPrefabMigration.OldRoof,
+            Require(library.Contains("\"version\":27") && new CompositeBlueprintStore(Path.Combine(folder, "library.json")).All().Single().parts[0].originalPrefabName == BlueprintPrefabMigration.OldRoof,
                 "Native migration not saved/reopened");
-            File.WriteAllText(Path.Combine(folder, "old-library.json"), library.Replace("\"version\":26", "\"version\":23"));
+            File.WriteAllText(Path.Combine(folder, "old-library.json"), library.Replace("\"version\":27", "\"version\":23"));
             Require(new CompositeBlueprintStore(Path.Combine(folder, "old-library.json")).All().Count == 0, "Native23 accepted new migration field");
             var part = migrated.parts[0];
             var editorPart = new BlueprintEditorPart(part.stableId, part.prefabName, part.displayName, new Point3(1, 2, 3), new Rotation3(0, 0, 0, 1),

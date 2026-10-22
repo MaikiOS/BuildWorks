@@ -52,10 +52,10 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(!store.TryUpdateDocument(saved, new[] { part }, saved.groups, saved.anchors, out error) &&
                 File.ReadAllText(Path.Combine(directory, "library.json")) == native, "Invalid seed changed the native file");
             string oldPath = Path.Combine(directory, "old.json");
-            File.WriteAllText(oldPath, native.Replace(",\"hiddenSources\":[]", "").Replace("\"version\":26", "\"version\":19"));
+            File.WriteAllText(oldPath, native.Replace(",\"hiddenSources\":[]", "").Replace("\"version\":27", "\"version\":19"));
             var oldStore = new CompositeBlueprintStore(oldPath);
             Require(oldStore.All().Count == 0 && !oldStore.TrySave("Invalid", saved.parts, saved.anchors, out _, out _) &&
-                File.ReadAllText(oldPath) == native.Replace(",\"hiddenSources\":[]", "").Replace("\"version\":26", "\"version\":19"), "Old schema accepted or rewrote an appearance field");
+                File.ReadAllText(oldPath) == native.Replace(",\"hiddenSources\":[]", "").Replace("\"version\":27", "\"version\":19"), "Old schema accepted or rewrote an appearance field");
             part.materialSeed = null;
             Require(store.TryUpdateParts(saved, new[] { part }, saved.anchors, out error) && saved.parts.Single().materialSeed == int.MaxValue,
                 "Legacy part-only update lost its retained appearance recipe");
@@ -77,7 +77,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(!CompositeBlueprintStore.HasForeignData(saved), "Unspecified seed left an appearance blocker");
             foreach (int version in new[] { 18, 19 })
             {
-                string legacy = File.ReadAllText(Path.Combine(directory, "library.json")).Replace(",\"hiddenSources\":[]", "").Replace("\"version\":26", "\"version\":" + version);
+                string legacy = File.ReadAllText(Path.Combine(directory, "library.json")).Replace(",\"hiddenSources\":[]", "").Replace("\"version\":27", "\"version\":" + version);
                 File.WriteAllText(oldPath, legacy);
                 Require(new CompositeBlueprintStore(oldPath).All().Single().parts.Single().materialSeed == null && File.ReadAllText(oldPath) == legacy,
                     "Legacy native without appearance changed on read");

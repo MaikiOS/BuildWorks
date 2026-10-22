@@ -26,7 +26,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(store.TryGetOrCreatePlacementCopy(prepared, out var saved, out string error), error);
             string native = File.ReadAllText(path);
             string portable = Encoding.UTF8.GetString(BlueprintExchangeFormat.Encode(saved));
-            Require(native.Contains("\"version\":26") && portable.Contains("\"version\":15"), "Large-list versions missing");
+            Require(native.Contains("\"version\":27") && portable.Contains("\"version\":15"), "Large-list versions missing");
             Compare(saved, new CompositeBlueprintStore(path).All().Single());
             Compare(saved, BlueprintExchangeFormat.Decode(portable));
             var document = Document(saved);
@@ -62,7 +62,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 File.ReadAllText(damagedPath) == damaged, "Oversized native list was rewritten");
             Refuse(() => BlueprintExchangeFormat.Decode(portable.Replace("\"version\":15", "\"version\":10")));
             string legacyPath = Path.Combine(directory, "legacy-invalid.json");
-            string legacy = native.Replace("\"version\":26", "\"version\":21");
+            string legacy = native.Replace("\"version\":27", "\"version\":21");
             File.WriteAllText(legacyPath, legacy);
             var blocked = new CompositeBlueprintStore(legacyPath);
             Require(!blocked.TryAddCategory("Denied", out error) && File.ReadAllText(legacyPath) == legacy,
@@ -75,7 +75,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(oldStore.TrySaveDocument("Legacy", small.category, small.parts, small.groups, small.anchors,
                 small.primaryPartId, small.primaryGroupId, small.supports, small.placementSupportId, out _, out error,
                 small.customSnapPoints, small, small.sourceDocuments), "Legacy fixture save: " + error);
-            File.WriteAllText(oldPath, File.ReadAllText(oldPath).Replace("\"version\":26", "\"version\":21"));
+            File.WriteAllText(oldPath, File.ReadAllText(oldPath).Replace("\"version\":27", "\"version\":21"));
             Require(new CompositeBlueprintStore(oldPath).All().Single().customSnapPoints.Count == 512, "Legacy512 failed migration");
             string anchors = string.Join(",", Enumerable.Repeat("{\"x\":0,\"y\":0,\"z\":0}", 513));
             Refuse(() => BlueprintExchangeFormat.Decode(portable.Replace("\"anchors\":[]", "\"anchors\":[" + anchors + "]")));

@@ -24,11 +24,11 @@ namespace OstrixMods.BuildWorks.StoreTests
             var legacyPortable = BlueprintExchangeFormat.DecodeWithVersion(Encoding.UTF8.GetString(original).Replace("\"version\":15", "\"version\":11"), out int legacyVersion);
             Require(legacyVersion == 11 && legacyPortable.libraryOrigins == null && legacyPortable.parts.Count == 2, "Installed .183 portable compatibility lost");
             string legacyPath = Path.Combine(folder, "legacy-22.json");
-            string legacyNative = File.ReadAllText(path).Replace("\"version\":26", "\"version\":22");
+            string legacyNative = File.ReadAllText(path).Replace("\"version\":27", "\"version\":22");
             File.WriteAllText(legacyPath, legacyNative);
             var legacyStore = new B(legacyPath);
             Require(legacyStore.All().Count == 1 && File.ReadAllText(legacyPath) == legacyNative && legacyStore.TryAddCategory("Legacy", out error) &&
-                File.ReadAllText(legacyPath).Contains("\"version\":26"), "Installed .183 native22 compatibility/migration lost");
+                File.ReadAllText(legacyPath).Contains("\"version\":27"), "Installed .183 native22 compatibility/migration lost");
             var origin = new B.LibraryOrigin("server.test:2456", 71, source.id, 3, 1, "Steam_admin", Hash(original), formatVersion);
             Require(store.TrySaveAcceptedCopy(decoded, origin, out B.Blueprint copy, out error), error);
             Require(copy.id != source.id && copy.libraryOrigins.Count == 1 && decoded.libraryOrigins == null && source.libraryOrigins == null,
@@ -66,9 +66,9 @@ namespace OstrixMods.BuildWorks.StoreTests
             Refuse(accepted.Replace(Hash(original), Hash(original).ToLowerInvariant()));
             string native = File.ReadAllText(path);
             string invalidOld = Path.Combine(folder, "invalid-old.json");
-            File.WriteAllText(invalidOld, native.Replace("\"version\":26", "\"version\":22"));
+            File.WriteAllText(invalidOld, native.Replace("\"version\":27", "\"version\":22"));
             var old = new B(invalidOld);
-            Require(old.All().Count == 0 && !old.TryAddCategory("Blocked", out _) && File.ReadAllText(invalidOld) == native.Replace("\"version\":26", "\"version\":22"),
+            Require(old.All().Count == 0 && !old.TryAddCategory("Blocked", out _) && File.ReadAllText(invalidOld) == native.Replace("\"version\":27", "\"version\":22"),
                 "Old native schema accepted provenance or rewrote refused source");
             var bounded = decoded.ImportCopy();
             bounded.libraryOrigins = Enumerable.Range(1, B.MaximumLibraryOrigins).Select(index => new B.LibraryOrigin("server", 71, source.id, index, 0, "admin", Hash(original), 12)).ToList();

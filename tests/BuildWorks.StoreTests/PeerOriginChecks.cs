@@ -56,10 +56,10 @@ namespace OstrixMods.BuildWorks.StoreTests
             foreach (string value in new[] { "null", "[]" })
                 Refuse(old.Replace("\"blueprint\":{", "\"blueprint\":{\"peerOrigins\":" + value + ","));
             string native = File.ReadAllText(path); string oldPath = Path.Combine(folder, "old.json");
-            File.WriteAllText(oldPath, native.Replace("\"version\":26", "\"version\":25"));
+            File.WriteAllText(oldPath, native.Replace("\"version\":27", "\"version\":25"));
             var oldStore = new B(oldPath);
             Require(oldStore.All().Count == 0 && !oldStore.TryAddCategory("blocked", out _) &&
-                File.ReadAllText(oldPath) == native.Replace("\"version\":26", "\"version\":25"), "Legacy native accepted peer fields or rewrote refused file.");
+                File.ReadAllText(oldPath) == native.Replace("\"version\":27", "\"version\":25"), "Legacy native accepted peer fields or rewrote refused file.");
             var editorPart = new BlueprintEditorPart("a", "woodwall", "Wall", new Point3(), new Rotation3(0, 0, 0, 1));
             var editor = new BlueprintEditorDocument(null, "Destination", "QA", new[] { editorPart });
             var incoming = new BlueprintEditorDocument(null, "Incoming", "QA", new[] { editorPart }, sourcePeerOrigins: copy.peerOrigins.Select(value => value.ToGeometry()));

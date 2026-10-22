@@ -38,12 +38,12 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(decoded.parts[1].foreignData.zdo == state.Zdo && decoded.parts[1].foreignData.info == state.Info &&
                 decoded.parts[1].position.x == 1 && CompositeBlueprintStore.HasForeignData(decoded), "Save/portable roundtrip lost armor state.");
             Require(portable.Contains("\"requiredPrefabIds\":[\"ArmorStand\",\"SwordIron\",\"woodwall\"]") &&
-                portable.Contains("\"version\":15") && File.ReadAllText(path).Contains("\"version\":26"),
+                portable.Contains("\"version\":15") && File.ReadAllText(path).Contains("\"version\":27"),
                 "Unknown/stale item became a prefab dependency or versions were not advanced.");
             try { BlueprintExchangeFormat.Decode(portable.Replace("\"version\":15", "\"version\":13"));
                 throw new Exception("Armor state accepted under legacy portable version."); }
             catch (InvalidDataException) { }
-            string old = File.ReadAllText(path).Replace("\"version\":26", "\"version\":24");
+            string old = File.ReadAllText(path).Replace("\"version\":27", "\"version\":24");
             string oldPath = Path.Combine(directory, "old.json"); File.WriteAllText(oldPath, old);
             var blocked = new CompositeBlueprintStore(oldPath);
             Require(blocked.All().Count == 0 && !blocked.TryAddCategory("Refuse", out _) && File.ReadAllText(oldPath) == old,

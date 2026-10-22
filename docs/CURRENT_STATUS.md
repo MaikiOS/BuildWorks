@@ -1,8 +1,10 @@
 # Current BuildWorks status
 
+**Source317 / candidate .280, NOT installed:** durable local acceptance now returns the original copy ID without another card/write on an exact retry; deleted accepted copies remain deleted. Card+receipt use one atomic Save, native27/portable15.50 targeted file checks, Store/Geometry/EditorBridge, normal+QA0/0, HostContract/localization1135 PASS. No working wire/UI caller yet; this is not authentication or network acceptance. [Result and limits317](CHECKPOINT_317.md). Verified installed QA remains **.279**.
+
 Verified source-only checkpoint316 [5ccb523](https://github.com/MaikiOS/BuildWorks/commit/5ccb5232a7978baabc756900233ade3f7e9ffec4) pushed to main; remote SHA confirmed.13 QA source/test/doc files, no DLLs or saves. Native free-cell/retry remains unverified.
 
-**Current scope316:** installed QA **0.19.279** and its DLL are unchanged. A new own two-wall E/board/payment/cancel/separate-issuance scenario reached a native full-inventory refusal with the actual HUD message.65Wood/32stacks/13customData, remaining source and journals retained; the real offline reader confirmed exact saved inventory/receipt. Free-cell merge and successful retry remain UNVERIFIED. Revised QA helper:25 targeted CPU checks, RenderProbe0/0 and independent preparation review PASS. [Limits and retained failed attempts316](CHECKPOINT_316.md).
+**Native scope316:** installed QA **0.19.279** and its DLL are unchanged. A new own two-wall E/board/payment/cancel/separate-issuance scenario reached a native full-inventory refusal with the actual HUD message.65Wood/32stacks/13customData, remaining source and journals retained; the real offline reader confirmed exact saved inventory/receipt. Free-cell merge and successful retry remain UNVERIFIED. Revised QA helper:25 targeted CPU checks, RenderProbe0/0 and independent preparation review PASS. [Limits and retained failed attempts316](CHECKPOINT_316.md).
 
 **Historical scope315:**
 
@@ -24,7 +26,7 @@ Requirements/current task: [owner checklist](LIVE_CHECKLIST_RU.md). Technical ev
 | --- | --- | --- | --- |
 | Precision placement and editor | XYZ, paired axes, 1–1000% component scale, groups, anchors, Undo/Redo, Save As, filters and interior camera | Owner accepted specific scale/save/camera/catalog cases; ordinary snap checked in .193 | Broader rotated/modded contacts, pointer wrapping edge cases and full visual acceptance |
 | Imported construction | Explicit prefab migration, supported text/material paths, real native pieces | Forest Hut (28) paid pieces and exact transform/inventory reload in [.195](ROTATION_PERSISTENCE_195.md) | All formats/prefabs, constructive state, large buildings and networking |
-| Formats and missing parts | Native store25/portable14; supported .blueprint/.vbuild import, reviewed export, missing records/bounds/copy alignment | Limited import/editor cases accepted | Unknown models/behavior are not restored by archiving; wider native corpus acceptance |
+| Formats and missing parts | Candidate native27/portable15; installed279 native26/portable15; supported .blueprint/.vbuild import, reviewed export, missing records/bounds/copy alignment | Limited import/editor cases accepted | Unknown models/behavior are not restored by archiving; wider native corpus acceptance |
 | Catalog and file exchange | Categories, Save As, delete/hide, automatic portable file, Share, batch import/export | Limited batch .197 import/export/reentry proved | Full batch UI/dirty draft/restart; some owner checks remain |
 | Server library and sharing | Administrator publication; players/admin visibility, verified personal copies, provenance; in-process checks | Host+remote not accepted | Live access/reconnect/restart; direct player-to-player transfer |
 | Items and storage | Separate storage/mount inclusion; supplied-item preservation and journal foundations | Limited chest/inventory comparison only | Durable settlement, cancellation/refund/crash/replay, all holders/armor/admin restore and network authority |

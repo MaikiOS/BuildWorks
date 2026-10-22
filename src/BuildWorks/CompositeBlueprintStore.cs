@@ -35,7 +35,8 @@ namespace OstrixMods.BuildWorks
         internal const string DefaultCategory = "OTHER";
         private const string LegacyDefaultCategory = "ПРОЧЕЕ";
         private const string LocalizationPrefix = "$buildworks_";
-        private const int FormatVersion = 26;
+        private const int FormatVersion = 27;
+        internal const int MaximumPeerReceipts = 4096;
         internal const int MaximumLibraryOrigins = Geometry.BlueprintLibraryOrigin.MaximumCount;
         private const int MaximumBlueprints = 32;
         private const int MaximumCategories = 12;
@@ -1197,7 +1198,8 @@ namespace OstrixMods.BuildWorks
             IReadOnlyList<Support> supports, string placementSupportId,
             out Blueprint blueprint, out string error, IReadOnlyList<VectorData> customSnapPoints = null,
             Blueprint previewTemplate = null, IReadOnlyList<SourceDocument> sourceDocuments = null,
-            IReadOnlyList<LibraryOrigin> libraryOrigins = null, IReadOnlyList<PeerOrigin> peerOrigins = null)
+            IReadOnlyList<LibraryOrigin> libraryOrigins = null, IReadOnlyList<PeerOrigin> peerOrigins = null,
+            PeerOrigin acceptedPeerOrigin = null)
         {
             blueprint = null;
             error = null;
@@ -1205,6 +1207,15 @@ namespace OstrixMods.BuildWorks
             peerOrigins = peerOrigins ?? previewTemplate?.peerOrigins;
             if (!ValidLibraryOrigins(libraryOrigins) || !ValidPeerOrigins(peerOrigins))
             { error = UserError("store.invalid_composition"); return false; }
+            acceptedPeerOrigin = acceptedPeerOrigin?.Copy();
+            if (acceptedPeerOrigin != null)
+            {
+                if (!ValidPeerOrigins(new[] { acceptedPeerOrigin }) || data.peerReceipts?.Any(receipt =>
+                    receipt.origin.ToGeometry().SameKey(acceptedPeerOrigin.ToGeometry())) == true)
+                { error = UserError("peer.offer_conflict"); return false; }
+                if ((data.peerReceipts?.Count ?? 0) >= MaximumPeerReceipts)
+                { error = UserError("peer.receipt_limit"); return false; }
+            }
             name = (name ?? string.Empty).Trim();
             category = NormalizeCategory(category);
             primaryPartId = string.IsNullOrWhiteSpace(primaryPartId) ? null : primaryPartId.Trim();
@@ -1300,6 +1311,10 @@ namespace OstrixMods.BuildWorks
                 peerOrigins = ClonePeerOrigins(peerOrigins)
             };
             if (!Valid(blueprint)) { blueprint = null; error = UserError("store.verify_data_failed"); return false; }
+            // The local acceptance and new card share the same atomic library commit.
+            var receipt = acceptedPeerOrigin == null ? null : new PeerReceipt { origin = acceptedPeerOrigin, copyId = blueprint.id };
+            bool newReceiptList = data.peerReceipts == null;
+            if (receipt != null) (data.peerReceipts ?? (data.peerReceipts = new List<PeerReceipt>())).Add(receipt);
             if (addCategory) data.categories.Add(category);
             data.blueprints.Add(blueprint);
             try
@@ -1309,6 +1324,11 @@ namespace OstrixMods.BuildWorks
             catch (Exception exception)
             {
                 data.blueprints.Remove(blueprint);
+                if (receipt != null)
+                {
+                    data.peerReceipts.Remove(receipt);
+                    if (newReceiptList) data.peerReceipts = null;
+                }
                 if (addCategory) data.categories.Remove(category);
                 blueprint = null;
                 error = exception.Message;
@@ -1760,7 +1780,10 @@ namespace OstrixMods.BuildWorks
                     allowAbsoluteScaleFields: loaded.version >= 15, allowPlacementImportFields: loaded.version >= 16,
                     allowBaseScaleFields: loaded.version >= 17, allowMetadataFields: loaded.version >= 19,
                     allowMaterialSeedFields: loaded.version >= 20, allowHiddenSources: loaded.version >= 21,
-                    allowLibraryOriginFields: loaded.version >= 23, allowPrefabMigrationFields: loaded.version >= 24, allowPeerOriginFields: loaded.version >= 26);
+                    allowLibraryOriginFields: loaded.version >= 23, allowPrefabMigrationFields: loaded.version >= 24,
+                    allowPeerOriginFields: loaded.version >= 26, allowPeerReceiptFields: loaded.version >= 27);
+                if (!ValidPeerReceipts(loaded.peerReceipts))
+                    throw new InvalidDataException(UserError("store.invalid_composition"));
                 loaded.blueprints = loaded.blueprints ?? new List<Blueprint>();
                 if (loaded.version < 25 && loaded.blueprints.Any(BlueprintExchangeFormat.HasNativeArmorState))
                     throw new InvalidDataException(UserError("store.unknown_version"));
@@ -1850,6 +1873,7 @@ namespace OstrixMods.BuildWorks
 
         private void Save()
         {
+            if (!ValidPeerReceipts(data.peerReceipts)) throw new InvalidDataException(UserError("store.verify_data_failed"));
             string directory = Path.GetDirectoryName(path);
             Directory.CreateDirectory(directory);
             string temporary = path + ".tmp";
@@ -1864,7 +1888,8 @@ namespace OstrixMods.BuildWorks
                     verified.blueprints == null || verified.categories == null ||
                     verified.blueprints.Count != data.blueprints.Count ||
                     verified.categories.Count != data.categories.Count || !ValidHiddenSources(verified.hiddenSources) ||
-                    !verified.hiddenSources.SequenceEqual(data.hiddenSources, StringComparer.Ordinal))
+                    !verified.hiddenSources.SequenceEqual(data.hiddenSources, StringComparer.Ordinal) ||
+                    !ValidPeerReceipts(verified.peerReceipts) || !SamePeerReceipts(data.peerReceipts, verified.peerReceipts))
                     throw new InvalidDataException(UserError("store.verify_file_failed"));
                 var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (Blueprint blueprint in verified.blueprints)
@@ -2034,6 +2059,7 @@ namespace OstrixMods.BuildWorks
         internal bool TrySaveAcceptedPeerCopy(byte[] portable, PeerOrigin origin, out Blueprint copy, out string error)
         {
             copy = null; error = UserError("store.invalid_composition");
+            if (!string.IsNullOrEmpty(writeBlockReason)) { error = writeBlockReason; return false; }
             origin = origin?.Copy();
             if (!ValidPeerOrigins(new[] { origin }) || portable == null || portable.Length > BlueprintExchangeFormat.MaximumBytes) return false;
             portable = (byte[])portable.Clone();
@@ -2046,6 +2072,14 @@ namespace OstrixMods.BuildWorks
                         source.id != origin.documentId || version != origin.formatVersion) return false;
             }
             catch (Exception failure) when (failure is ArgumentException || failure is InvalidDataException) { return false; }
+            var receipt = data.peerReceipts?.FirstOrDefault(value => value.origin.ToGeometry().SameKey(origin.ToGeometry()));
+            if (receipt != null)
+            {
+                if (!receipt.origin.ToGeometry().SameValue(origin.ToGeometry())) { error = UserError("peer.offer_conflict"); return false; }
+                copy = data.blueprints.FirstOrDefault(value => value.id == receipt.copyId);
+                error = copy == null ? UserError("peer.accepted_deleted") : null;
+                return copy != null;
+            }
             var template = source.ImportCopy();
             template.peerOrigins = template.peerOrigins ?? new List<PeerOrigin>();
             var existing = template.peerOrigins.FirstOrDefault(value => value.ToGeometry().SameKey(origin.ToGeometry()));
@@ -2057,8 +2091,24 @@ namespace OstrixMods.BuildWorks
                 template.peerOrigins.Add(origin.Copy());
             }
             return TrySaveDocument(source.name, source.category, source.parts, source.groups, source.anchors, source.primaryPartId,
-                source.primaryGroupId, source.supports, source.placementSupportId, out copy, out error, source.customSnapPoints, template, source.sourceDocuments);
+                source.primaryGroupId, source.supports, source.placementSupportId, out copy, out error, source.customSnapPoints, template,
+                source.sourceDocuments, acceptedPeerOrigin: origin);
         }
+
+        private static bool ValidPeerReceipts(IReadOnlyList<PeerReceipt> receipts)
+        {
+            if (receipts == null) return true;
+            if (receipts.Count > MaximumPeerReceipts) return false;
+            var keys = new HashSet<(string, long, string)>(); var copies = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var receipt in receipts)
+                if (receipt == null || !ValidPeerOrigins(new[] { receipt.origin }) ||
+                    !Guid.TryParseExact(receipt.copyId, "N", out Guid id) || id == Guid.Empty || receipt.copyId != id.ToString("N") ||
+                    !copies.Add(receipt.copyId) || !keys.Add((receipt.origin.server, receipt.origin.worldUid, receipt.origin.offerId))) return false;
+            return true;
+        }
+        private static bool SamePeerReceipts(IReadOnlyList<PeerReceipt> a, IReadOnlyList<PeerReceipt> b) =>
+            a == null || b == null ? a == b : a.Count == b.Count && a.Select((value, index) =>
+                value.copyId == b[index].copyId && value.origin.ToGeometry().SameValue(b[index].origin.ToGeometry())).All(value => value);
 
         internal static bool ValidLibraryOrigins(IReadOnlyList<LibraryOrigin> origins)
         {
@@ -2423,6 +2473,16 @@ namespace OstrixMods.BuildWorks
             public List<string> categories = new List<string> { DefaultCategory };
             [DataMember(Order = 3, EmitDefaultValue = false)]
             public List<string> hiddenSources = new List<string>();
+            [DataMember(Order = 4, EmitDefaultValue = false)]
+            public List<PeerReceipt> peerReceipts;
+        }
+
+        // Local duplicate protection; not exported provenance, peer authentication or server authority.
+        [DataContract]
+        internal sealed class PeerReceipt
+        {
+            [DataMember(Order = 0)] public PeerOrigin origin;
+            [DataMember(Order = 1)] public string copyId;
         }
 
         [DataContract]

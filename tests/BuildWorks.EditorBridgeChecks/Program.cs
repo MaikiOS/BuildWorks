@@ -98,9 +98,9 @@ internal static class Program
         parts = controllerType.GetMethod("BuildStoreParts", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(controller, null);
         object sourceData = controllerType.GetMethod("BuildStoreSources", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(controller, null);
         object originData = controllerType.GetMethod("BuildStoreLibraryOrigins", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(controller, null);
-        MethodInfo supportSave = storeType.GetMethods().Single(m => m.Name == "TrySaveDocument" && m.GetParameters().Length == 16);
+        MethodInfo supportSave = storeType.GetMethods().Single(m => m.Name == "TrySaveDocument" && m.GetParameters().Length == 17);
         object[] supportCall = { "Support bridge", "OTHER", parts, call[3], call[4], null, null,
-            supportData, payload.PlacementSupportId, null, null, null, null, sourceData, originData, controllerType.GetMethod("BuildStorePeerOrigins", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(controller, null) };
+            supportData, payload.PlacementSupportId, null, null, null, null, sourceData, originData, controllerType.GetMethod("BuildStorePeerOrigins", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(controller, null), null };
         Require((bool)supportSave.Invoke(store, supportCall), "Store rejected support bridge: " + supportCall[10]);
         object reloadedStore = Activator.CreateInstance(storeType, BindingFlags.NonPublic | BindingFlags.Instance,
             null, new object[] { pathOut }, null);

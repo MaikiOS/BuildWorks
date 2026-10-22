@@ -1136,3 +1136,6 @@ exchange.plan_migrations	Part migration records: {0}. The foreign file contains 
 exchange.native_armor_archive	Armor stands: {0}. Uninspected active item records in the archive: {1}. Pose and slot records are preserved; equipment and pose are not yet previewed or restored. Placement of this blueprint is unavailable, including with equipment disabled.
 peer.origin_limit	Cannot save this copy: the peer transfer provenance limit was reached. No history was removed.
 peer.origin_conflict	The documents disagree about the same peer transfer. Merge cancelled.
+peer.offer_conflict	This offer was already accepted with different details. No new copy was created.
+peer.accepted_deleted	This offer was already accepted, and its personal copy was deleted. Repeating it cannot restore the copy; ask the sender for a new offer.
+peer.receipt_limit	Cannot accept another offer: the saved acceptance history is full. Existing receipts were retained.

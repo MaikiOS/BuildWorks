@@ -32,3 +32,7 @@ Astra рекомендует отдельную проверку плоскос�
 Локальный кандидат292 подготовлен отдельно: CPU17проверок формул+4контракта shader PASS; GPU-контроли плоскости/тонкого перекрытия/ступеньки/четырёх поворотов неплоского квадрата подготовлены, **ещё не запускались**. Это не production-исправление и не повод обновлять установленный bundle.
 
 Доказательства: `artifacts/checkpoint-291/{Composite-verification.json,Bundle-verification.json,warmup-report.json,native-report-failed.json,partial-native-validation.json,partial-timings.json,candidate-hold.png,normal-close-request.json,post-owner-cleanup.json}`. Текущая очистка будет записана отдельным результатом, без изменения этого провала на PASS.
+
+## Последующая очистка22.10
+
+После явного разрешения Ostrix завершён только PID8768 с проверкой creation FileTime134371237158943896. Клиент закрыт, три DLL моста восстановлены и повторно проверены.97project-хешей и metadata всех4141обычных файлов совпали с baseline нового запуска. Из250config-root файлов поменялись только служебные `qa-control/response.json` и `session.json`; настройки не откатывались. Установленная265 прежняя. Финальный inventory, возврат временных camera/weather/protection и штатный выход291 по-прежнему не доказаны. `forced-exit-audit.json`, `force-exit-request.json`, `force-exit-result.json`. Это завершённая очистка принудительного выхода, не успешный игровой сценарий.

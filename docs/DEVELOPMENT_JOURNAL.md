@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-22 — 292/293: candidate rejected, next falsifiable cause
+
+Owner-authorized291exit/restore3/97projects/4141metadata verified. Plane292passed CPU/GPU/20wall samples, native85/85 and normal cleanup, but no useful speedup:12.94/13.05FPS versus12.48/12.65. First start failed before override due to old queue overflow; immediate setup/real Ready guard enabled full run without relaxing checks. Astra identified sample-center assumptions; analytic GPU293confirms Point/Bilinear divergence, native sampler still unknown. QA267finalizer290 deployed through guarded script after exit; fog candidate not installed. Module/v11/paid UI/network remain open. [292](CHECKPOINT_292.md), [293](CHECKPOINT_293.md).
+
 ## 2026-10-22 — resumed; diagnostic291 and separate candidate292
 
 290 verified/synchronized37582dd; local267 not deployed. Previous3bridge DLLs restored,97project hashes unchanged;6ordinary metadata differences after owner play were not rolled back. GPU mask289 PASS; native Clear/hour12 supplied two verified13.21/37.97FPS windows, but complete scenario FAILED38/39of64 and QA8768 hung after PNG. Quit/window close failed; force-exit permission pending, further game/GPU runs stopped. Astra reviewed separate plane candidate292; CPU17+4PASS, GPU not run. v11 acceptance/paid cancellation/networking remain open. [Evidence and limits](CHECKPOINT_291.md).

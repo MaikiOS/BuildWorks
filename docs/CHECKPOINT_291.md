@@ -24,3 +24,7 @@ No mask PNG/coverage, final inventory, camera/weather/protection restoration, no
 Astra recommends one local plane-aware candidate292: symmetric reciprocal-depth agreement at all four corners plus actual full-resolution center-depth validation, retaining existing tolerances and exact fallback for sky/occlusions/uncertain edges. Integrator, low pass/source alpha and289baseline stay unchanged. CPU17math+4shader-contract checks pass; rendered controls are prepared but not run. No production bundle deployment.
 
 Evidence: `artifacts/checkpoint-291/{Composite-verification.json,Bundle-verification.json,warmup-report.json,native-report-failed.json,partial-native-validation.json,partial-timings.json,candidate-hold.png,normal-close-request.json,post-owner-cleanup.json}`. Later cleanup must be recorded separately without turning this failed scenario into PASS.
+
+## Subsequent cleanup22October
+
+After explicit owner permission, only PID8768 was terminated, creation FileTime134371237158943896 verified. Client closed;3bridge DLLs restored/rechecked.97project hashes and all4141ordinary-file metadata match the new-run baseline. Of250config-root files, only `qa-control/response.json` and `session.json` changed; no settings rollback. Installed265 unchanged. Final inventory, transient camera/weather/protection restoration and normal exit291 remain unverified. See `forced-exit-audit.json`, `force-exit-request.json`, `force-exit-result.json`. Cleanup completed; the game scenario remains FAILED.

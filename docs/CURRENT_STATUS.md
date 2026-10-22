@@ -1,8 +1,8 @@
 # Current BuildWorks status
 
-22 October2026. **Installed diagnostic QA .265 retains the old ordinary fog, unaccepted.** [291](CHECKPOINT_291.md): GPU fallback mask PASS; two completed Clear/hour12 native windows measured13.21FPS with repeated integration versus37.97FPS with the mask. This diagnoses cost, not a production fix. Complete native FAILED38/39of64; QA8768 hung, current exit/bridge restore unconfirmed. A separate plane candidate has only CPU/static review evidence. No new manual test ready. Previous288 bridge restoration verified3DLLs; current cleanup remains separate.
+22October2026. **Installed diagnostic QA .267 retains the old ordinary fog, unaccepted.** [292](CHECKPOINT_292.md): GPU controls/native85/85 pass, but plane performance rejected:12.94/13.05FPS versus12.48/12.65. Inventory/97projects/4141ordinary metadata unchanged, normal exit/restore3. [293](CHECKPOINT_293.md) proves Point/Bilinear sensitivity; actual native sampler remains unknown. No new manual test ready. Hung291 was terminated with owner permission and cleaned up; its failure remains recorded.
 
-[290](CHECKPOINT_290.md): local .267 is not deployed. Paid finalization is wired after issuance/on startup, preserving collection/cleanup;56 actual-code CPU assertions/61interaction, normal/QA0/0, host/localization and reviews PASS. Native test boundaries are substitutes: game reload/retirement and paid UI remain open. Installed265/fog and owner play are untouched.
+[290](CHECKPOINT_290.md): paid finalizer deployed inQA .267 after292checks.56actual-code CPU/61interaction, normal/QA0/0, host/localization/reviews PASS. Native startup/reload/retirement and paid UI remain open; plane292 is not installed.
 
 Owner review of [.252](CHECKPOINT_274.md) FAILED when fog input overflow hid the house. Later279/280 provide scoped service/contact evidence, not owner visual acceptance. Physical E, the full paid lifecycle/cancellation and multiplayer remain open. Local QA carries shader271; source-only Git publishes C# over its previous fog baseline; shader271 remains local.
 

@@ -1,6 +1,6 @@
 # Current BuildWorks status
 
-22October2026. **Installed diagnostic QA267 retains the old unaccepted ordinary fog.** Candidate292 gave no useful speedup. [294](CHECKPOINT_294.md) observed native3440×1440/Point depth metadata; [295](CHECKPOINT_295.md) stopped at an invalid fixture assumption, then a separate audit measured an actual tap/full-pixel coincidence. The corrected fixture also rejected295 itself; it is not promoted to the game. No appearance/performance fix or new manual acceptance is claimed.
+22October2026. **Installed diagnostic QA267 retains the old unaccepted ordinary fog.** [297](CHECKPOINT_297.md): isolated explicit-depth candidate passes75GPU assertions, bundle and four-direction/20-frame wall comparison; not installed. Native ABBA never executed: two GABS atomic-rename failures before Valheim spawn. Bridge restored,97project/250config hashes unchanged. FS-only test reproduces Windows open-reader conflict; actual holder remains unknown. No manual acceptance ready.
 
 [290](CHECKPOINT_290.md): finalizer installed inQA267. [294](CHECKPOINT_294.md) closed two already collected old debts; [296](CHECKPOINT_296.md) fresh-process16/16:97unchanged file hashes,4receipts/0sources/67Wood, normal exit/restore3. Before-pickup lifecycle, physical E, crash window, wider items, paid UI and remote remain open; fog candidate not installed.
 

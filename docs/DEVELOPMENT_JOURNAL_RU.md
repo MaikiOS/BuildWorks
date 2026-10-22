@@ -1,5 +1,9 @@
 # Журнал разработки BuildWorks
 
+## 2026-10-22 — 297: GPU-кандидат готов к измерению, GABS отказывает до игры
+
+Общая integer depth-адресация low/composite, неизменные ray/jitter/weights/fallback.75GPU assertions/Linear reload2/4side20frames48source comparisons PASS; compiler warning signed divide устранён uint без ослабления проверок. Astra correctness/Ponytail PASS. Два игровых старта отказали на atomic rename runtime.json; повторения остановлены, restore3/97project/250config hashes подтверждены. FS-only actual Claim/Save воспроизвёл errno5 с открытым Go reader, после Close запись проходит. Источник конкурирующего чтения ещё не установлен; candidate/скорость/v11 не приняты и не установлены. [Доказательства](CHECKPOINT_297_RU.md).
+
 ## 2026-10-22 — 294–296: native depth и повторная загрузка возвратов
 
 31/31 подтвердили реальную3440×1440/Point texture metadata и startup-закрытие двух уже полученных долгов; независимый semantic review PASS. Новый процесс16/16:97проектных SHA прежние,4квитанции/0источников/точный инвентарь, normal exit/restore3. Локальный295 дважды отказал на предпосылке; повторения остановлены, отдельный address audit опроверг Y flip и показал совпавший full/tap depth. Исправленный fixture(1,1) затем отклонил сам295 на rescue; CS0136 helper исправлена, логи сохранены. Candidate/допуски не подгонялись. .267 прежняя; v11/полный paid UI/сеть открыты. [294](CHECKPOINT_294_RU.md), [295](CHECKPOINT_295_RU.md), [296](CHECKPOINT_296_RU.md).

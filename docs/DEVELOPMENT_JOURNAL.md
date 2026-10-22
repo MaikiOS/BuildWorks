@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-22 — 297: GPU candidate ready for measurement; GABS fails before spawn
+
+Shared integer depth addressing retains ray/jitter/weights/fallback.75GPU assertions/Linear reload2/four-side20frames48source comparisons PASS; signed-divide compiler warning fixed with uint, no weakened guards. Astra correctness/Ponytail PASS. Two starts failed at runtime.json atomic rename; repeats stopped, restore3/97project/250config hashes verified. Actual FS-only Claim/Save reproduces errno5 with held Go reader and succeeds after Close. Actual conflicting holder unknown; no native performance/v11 acceptance or installation. [Evidence](CHECKPOINT_297.md).
+
 ## 2026-10-22 — 294–296: native depth and settled refund reload
 
 31/31observed3440×1440/Point texture metadata and startup closure of two already collected debts; independent semantic review PASS. Fresh process16/16:97project hashes unchanged,4receipts/0sources/exact inventory, normal exit/restore3. Local295failed twice on its baseline precondition; repeats stopped. Separate address audit disproved Y flip and measured a full/tap depth coincidence. Corrected fixture(1,1) then rejected295 rescue; helper CS0136 fixed, logs retained. Candidate/tolerances unchanged; installed267unchanged, v11/full paid UI/network open. [294](CHECKPOINT_294.md), [295](CHECKPOINT_295.md), [296](CHECKPOINT_296.md).

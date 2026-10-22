@@ -938,7 +938,7 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.266.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.267.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
 $fogResource = @($plugin.MainModule.Resources | Where-Object Name -eq 'BuildWorks.FogGhostV11')
 Assert-Contract ($fogResource.Count -eq 1 -and $fogResource[0] -is [Mono.Cecil.EmbeddedResource]) 'Compiled v11 fog resource is missing or duplicated.'
@@ -3660,6 +3660,7 @@ foreach ($payoutContextType in 'BlueprintConstructionPayoutCollection','Blueprin
         $payoutContextCalls -match 'World::m_uid' -and $payoutContextCalls -match '::HasSessionFlag') "Return custody must preserve Local identity/save gates without requiring the removed board or a hammer: $payoutContextType"
 }
 & (Join-Path $projectRoot 'tests/BuildWorks.CaptureChecks/PayoutInteraction.ps1')
+& (Join-Path $projectRoot 'tests/BuildWorks.CaptureChecks/PaidCancellation.ps1')
 $payoutReach = @($pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintConstructionPayoutCollection' -and $_.Name -eq 'WithinReach' })
 $payoutReachCalls = ($payoutReach.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($payoutReach.Count -eq 1 -and $payoutReachCalls -match 'Player::m_maxInteractDistance' -and

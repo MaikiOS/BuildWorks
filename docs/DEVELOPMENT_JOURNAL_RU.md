@@ -1,5 +1,13 @@
 # Журнал разработки BuildWorks
 
+## 2026-10-22 — пауза по просьбе Ostrix
+
+Существующие CPU-сборки267/56assertions получены0/0/PASS; новых тестов/игры/GPU после запроса нет. Goal paused.290 сохранён как WIP; последнее опубликованное84f5fcf. Установленная265 прежняя. [Передача](PAUSE_2026-10-22_RU.md).
+
+## 2026-10-21 — 290: подключён финализатор оплаченной отмены
+
+Локальная267 без установки: новый read-only финализатор связывает native helpers с paid commit289; scheduler после выдачи/startup, pending recovery и cleanup после terminal.56 CPU actual-code/61interaction, negative distance, cleanup22+31, normal/QA0/0, host/localization и два review SHIP. Два отказа нового test fixture исправлены (shared reference/count accumulation); production не ослаблялась. Native/кнопка ещё открыты, игры/GPU не было. [290](CHECKPOINT_290_RU.md).
+
 ## 2026-10-21 — 289: слой сохранения оплаченной отмены
 
 Локальная266, без установки: paid terminal до pickup, неизменная выдача, продолжение получения/cleanup и frozen intent между двумя commits. Regression исторического cleanup исправлен;172 CPU assertions/full StoreTests, normal/QA0/0, host/localization и два независимых review PASS. Fallback mask подготовлена, не GPU-испытана. Ostrix играет; игра/ресурсы/проекты не менялись. [289](CHECKPOINT_289_RU.md).

@@ -1,0 +1,23 @@
+# 290 — финализация оплаченной отмены после выдачи и при загрузке
+
+21.10.2026. **Локальная0.19.267, не установлена; QA остаётся265.** Ostrix играет: запусков Valheim/Unity/GPU, игрового ввода, изменения DLL/моста/сохранений не было. Предыдущий289 — progress: проверен и опубликован persistence-срез84f5fcf. [English](CHECKPOINT_290.md).
+
+`BlueprintConstructionPaidCancellation` соединяет существующие native helpers с `Store.CancelPaid`: тот же private Local payer, identity/path/name/filename, мир, generation, неизменный inventory; canonical профиль до/после async construction-only absence. Существующие credit receipts должны совпадать на диске и в RAM. Перед commit повторно сверяются revision/immutable issuance. Ошибка после атомарной записи проверяется чтением exact terminal, без повторной выдачи.
+
+Runtime запускает один финализатор после IssuedSaved или из startup workset, до collection/cleanup. При pending CreditIntent/CleanupIntent попытка не зацикливается и не блокирует существующий recovery; успешный credit/cleanup снова ставит проект на финализацию. Активная проверка сериализована через PayoutBusy; смена контекста/Suspend отменяет её. После подтверждения вызывается общий retirement fog/board; журналы и получение/cleanup сохраняются. QA-only PayoutStatus получил read-only cancellationStatus/cancellationReason/terminalBound. UI-кнопка оплаченной отмены не включена.
+
+## Доказательства и предел
+
+- Новый `PaidCancellation.ps1`: **56 assertions**, компилирует настоящий класс и scheduler с заменёнными native scan/profile/commit-границами. Покрыты ожидание, однократность, неверный payer/world/source/generation, pending intents, profile/inventory/path/network/player/revision/fingerprint change, suspend, отказ commit, ошибка после commit, неверный terminal, saved/loaded receipts, startup queue/retirement/cleanup и requeue после intent.
+- `PayoutInteraction.ps1`: **61 assertions**, теперь компилирует настоящий PayoutBusy getter и проверяет запрет collection во время финализации. Negative distance control PASS. Cleanup guard22/actual Tick31 PASS. Новый тест включён в Test-HostContract.
+- Normal/QA267: **0 warnings/0 errors**, HostContract PASS (host build25909357), localization1122keys/1008references PASS. `verify` skill отсутствует; прямое чтение и два независимых read-only correctness/Ponytail review — SHIP. Store/journal не менялись: полный StoreTests и172payout из289 сохраняют свой ограниченный охват, не заявляются новым native тестом.
+- Первый новый fixture упал `Journal revision changed`: возвращал тот же Record reference, а настоящий Read декодирует новый. Исправлен copy-on-read. После включения теста в общий HostContract повторный вызов в одном PowerShell дал `Finalization coverage differs:112`; fixture-счётчик сбрасывается в начале Run. Полный HostContract затем PASS. Первая попытка поиска двух source-файлов по сокращённым именам и одного fixture дала file-not-found; реальные имена найдены через rg --files. Один запрос с Windows wildcard дал os error123; последующие запросы используют точный файл/папку. Проверки не ослаблялись.
+- OstrixMemory вернул пусто; MemPalace — нерелевантные historical snippets. Решения взяты из текущего протокола и исходников. SocratiCode Default green59531/watcher active (incremental graph update); impact Runtime вернул0 без C#references, это не доказательство отсутствия callers. Вызовы сверены прямым поиском, reindex не запускался.
+
+Настоящие async readback/generation change, перезапуск между binding/plan commit, disappearance fog/board и полный before-pickup paid-cycle ещё требуют Valheim. Отказ завершает одну попытку; recovery events/reload могут поставить её снова, явный пользовательский retry ещё не готов. Ошибка GPU retirement не откатывает записанный terminal; отдельная визуальная проверка освобождения обязательна. Paid UI, неподдержанные предметы/нулевая цена/сеть остаются открыты.
+
+В тумане новых изменений нет: fallback-mask289 лишь подготовлена, GPU не собрана/не запускалась. Скорость и вид v11 не приняты; дождь288 учтён, но причинный вклад не измерен. Restore3/ordinary-save audit288 по-прежнему отложены до закрытия игры. Все115 ID/галочки живого списка сохранены.
+
+Артефакты: `artifacts/checkpoint-290/{finalizer.json,interaction.json,verification.json,build-normal.log,build-qa.log,host-contract.log,localization.log,REVIEW_RU.md,NEXT_NATIVE_RU.md}`.
+
+22.10 после возобновления: source-only копия сверена с последней canonical линейной правкой. Последние56assertions и normal/QA2670/0 сохранены; HostContract повторён и PASS (`host-contract-resumed.log`). Это всё ещё source/CPU checkpoint, без native приёмки и установки267. Пауза/передача — отдельный исторический файл; работа возобновлена командой Ostrix.

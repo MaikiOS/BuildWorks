@@ -24,7 +24,9 @@ namespace OstrixMods.BuildWorks
         private BlueprintConstructionPayoutIssuance payout;
         private BlueprintConstructionPayoutCollection collection;
         private BlueprintConstructionPayoutCleanup cleanup;
+        private BlueprintConstructionPaidCancellation paidCancellation;
         private readonly HashSet<Guid> cleanupProjects = new HashSet<Guid>();
+        private readonly HashSet<Guid> cancellationProjects = new HashSet<Guid>();
         private Guid queued;
         private int queuedFrame;
         private bool recoveryOnly;
@@ -59,11 +61,13 @@ namespace OstrixMods.BuildWorks
         internal BlueprintConstructionPayoutIssuance Payout => payout;
         internal BlueprintConstructionPayoutCollection Collection => collection;
         internal BlueprintConstructionPayoutCleanup Cleanup => cleanup;
+        internal BlueprintConstructionPaidCancellation PaidCancellation => paidCancellation;
         internal int BoardCount => boards.Count;
         internal long World => world;
         internal string Failure { get; private set; }
         internal BlueprintConstructionProjectBoard OpenBoard { get; private set; }
-        private bool PayoutBusy => payout != null && !payout.Finished || collection != null && !collection.Finished || cleanup != null && !cleanup.Finished;
+        private bool PayoutBusy => payout != null && !payout.Finished || collection != null && !collection.Finished || cleanup != null && !cleanup.Finished ||
+            paidCancellation != null && !paidCancellation.Finished;
         internal bool BlocksInput => view.IsOpen || execution?.Saving == true || removal != null && !removal.Finished || PayoutBusy;
         internal static bool IsPrivateLocalPlacement => ZNet.instance && Player.m_localPlayer && Game.instance &&
             !Game.instance.IsShuttingDown() && ZNet.instance.IsServer() && !ZNet.instance.IsDedicated() &&
@@ -80,9 +84,12 @@ namespace OstrixMods.BuildWorks
             if (disposed) return;
             ZNet current = ZNet.instance; long uid = WorldId(current);
             if (network != current || uid != world) { Suspend(); network = current; world = uid; }
-            if (!Allowed()) { execution?.Refuse("Construction context closed; evidence retained."); removal?.Refuse("Construction context closed; removal evidence retained."); payout?.Refuse("Construction context closed; payout evidence retained."); collection?.Refuse("Construction context closed; credit evidence retained."); cleanup?.Refuse("Construction context closed; cleanup evidence retained."); execution = null; queued = Guid.Empty; cleanupProjects.Clear(); ClearBoards(); store = null; return; }
+            if (!Allowed()) { execution?.Refuse("Construction context closed; evidence retained."); removal?.Refuse("Construction context closed; removal evidence retained."); payout?.Refuse("Construction context closed; payout evidence retained."); collection?.Refuse("Construction context closed; credit evidence retained."); cleanup?.Refuse("Construction context closed; cleanup evidence retained."); paidCancellation?.Refuse("Construction context closed; cancellation evidence retained."); execution = null; queued = Guid.Empty; cleanupProjects.Clear(); cancellationProjects.Clear(); ClearBoards(); store = null; return; }
             removal?.Tick();
+            bool paying = payout != null && !payout.Finished;
             payout?.Tick();
+            if (paying && payout.Finished && payout.Status == "issued-saved") cancellationProjects.Add(payout.Project);
+            TickPaidCancellation();
             TickPayoutCollection();
             if (execution != null && !execution.Finished)
             {
@@ -116,6 +123,7 @@ namespace OstrixMods.BuildWorks
                     Store.Record record = store.Load(id);
                     if (!record.Cancelled) AddBoard(record);
                     cleanupProjects.Add(id);
+                    if (!record.Cancelled) cancellationProjects.Add(id);
                 }
             }
             catch (Exception error) { ClearBoards(); store = null; failed = true; Failure = error.Message; log?.Invoke(error); }
@@ -228,7 +236,32 @@ namespace OstrixMods.BuildWorks
         {
             var next = new BlueprintConstructionPayoutCollection(store, id, index);
             Close(); collection = next;
-            if (next.Status == "profile-credited") cleanupProjects.Add(id);
+            if (next.Status == "profile-credited") { cleanupProjects.Add(id); cancellationProjects.Add(id); }
+        }
+
+        private void TickPaidCancellation()
+        {
+            bool finishing = paidCancellation != null && !paidCancellation.Finished;
+            paidCancellation?.Tick();
+            if (finishing && paidCancellation.Finished)
+            {
+                if (paidCancellation.Status == "cancelled") { RetireProject(paidCancellation.Project); cleanupProjects.Add(paidCancellation.Project); }
+                else { Failure = paidCancellation.Reason; log?.Invoke(new InvalidOperationException(Failure)); }
+            }
+            if (!IsPrivateLocalPlacement || store == null || cancellationProjects.Count == 0 || queued != Guid.Empty || PayoutBusy ||
+                execution != null && !execution.Finished || removal != null && !removal.Finished) return;
+            Guid id = cancellationProjects.First(); cancellationProjects.Remove(id);
+            try
+            {
+                if (store.Load(id).Cancelled) return;
+                var record = new BlueprintConstructionPayoutJournal(store).Read(id);
+                if (record?.Phase != BlueprintConstructionPayoutJournal.IssuedSaved || record.Player != Player.m_localPlayer.GetPlayerID() ||
+                    record.Collections?.Any(c => c.Phase != BlueprintConstructionPayoutJournal.ProfileCredited ||
+                        c.Removal?.Phase == BlueprintConstructionPayoutJournal.CleanupIntent) == true) return;
+                // An existing credit/cleanup intent completes through its own recovery path, then queues this read-only finalizer.
+                paidCancellation = new BlueprintConstructionPaidCancellation(store, id);
+            }
+            catch (Exception error) { Failure = error.Message; log?.Invoke(error); }
         }
 
         internal bool TryBeginCollection(ItemDrop source, Humanoid user)
@@ -273,14 +306,14 @@ namespace OstrixMods.BuildWorks
             collection?.Tick();
             if (collecting && collection.Finished)
             {
-                if (collection.Status == "profile-credited") cleanupProjects.Add(collection.Project);
+                if (collection.Status == "profile-credited") { cleanupProjects.Add(collection.Project); cancellationProjects.Add(collection.Project); }
                 else { cleanupProjects.Remove(collection.Project); Failure = collection.Reason; log?.Invoke(new InvalidOperationException(Failure)); }
             }
             bool cleaning = cleanup != null && !cleanup.Finished;
             cleanup?.Tick();
             if (cleaning && cleanup.Finished)
             {
-                if (cleanup.Status == "cleanup-saved") cleanupProjects.Add(cleanup.Project);
+                if (cleanup.Status == "cleanup-saved") { cleanupProjects.Add(cleanup.Project); cancellationProjects.Add(cleanup.Project); }
                 else { cleanupProjects.Remove(cleanup.Project); Failure = cleanup.Reason; log?.Invoke(new InvalidOperationException(Failure)); }
             }
             if (!IsPrivateLocalPlacement || store == null || cleanupProjects.Count == 0 || queued != Guid.Empty || PayoutBusy ||
@@ -317,11 +350,15 @@ namespace OstrixMods.BuildWorks
             if (PayoutBusy) throw new InvalidOperationException(BuildWorksLocalization.Text("project.unavailable"));
             // Commit the terminal record before removing any world presentation; cancellation cannot refund an unpaid plan.
             store.CancelUnpaid(id, revision, operation);
+            RetireProject(id);
+        }
+        private void RetireProject(Guid id)
+        {
             try { fog?.Remove(id); }
             catch (Exception error) { log?.Invoke(error); }
             if (boards.TryGetValue(id, out var board))
             {
-                if (OpenBoard == board) OpenBoard = null;
+                if (OpenBoard == board) Close();
                 board.Retire(); boards.Remove(id);
             }
         }
@@ -389,8 +426,8 @@ namespace OstrixMods.BuildWorks
 #if BUILDWORKS_TEST_STAND
             QaImmediateFogReceipts = null;
 #endif
-            execution?.Refuse("Construction suspended; evidence retained."); removal?.Refuse("Construction suspended; removal evidence retained."); payout?.Refuse("Construction suspended; payout evidence retained."); collection?.Refuse("Construction suspended; credit evidence retained."); cleanup?.Refuse("Construction suspended; cleanup evidence retained."); cleanup = null; collection = null; payout = null; removal = null; execution = null; queued = Guid.Empty;
-            cleanupProjects.Clear(); ClearBoards(); store = null; network = null; world = 0; failed = false; Failure = null; }
+            execution?.Refuse("Construction suspended; evidence retained."); removal?.Refuse("Construction suspended; removal evidence retained."); payout?.Refuse("Construction suspended; payout evidence retained."); collection?.Refuse("Construction suspended; credit evidence retained."); cleanup?.Refuse("Construction suspended; cleanup evidence retained."); paidCancellation?.Refuse("Construction suspended; cancellation evidence retained."); paidCancellation = null; cleanup = null; collection = null; payout = null; removal = null; execution = null; queued = Guid.Empty;
+            cleanupProjects.Clear(); cancellationProjects.Clear(); ClearBoards(); store = null; network = null; world = 0; failed = false; Failure = null; }
         public void Dispose() { if (disposed) return; Suspend(); disposed = true; }
     }
 }

@@ -29,6 +29,7 @@ foreach ($taskMember in @(
 $taskPatch = Extract-Block $taskPlugin 'private static class BlueprintPayoutInteractPatch'
 $taskCode = $taskCode.Replace('__PREFIX__', (Extract-Block $taskPatch 'private static bool Prefix('))
 $taskCode = $taskCode.Replace('__REACH__', (Extract-Block $taskCollection 'internal static bool WithinReach('))
+$taskCode = $taskCode.Replace('__BUSY__', [regex]::Match($taskRuntime, 'private bool PayoutBusy\s*=>[^;]+;').Value)
 if ($DistanceNegativeControl) {
     $taskGuard = '!BlueprintConstructionPayoutCollection.WithinReach(player, source) ||'
     if (!$taskCode.Contains($taskGuard)) { throw 'Distance negative control has no actual guard to remove.' }
@@ -43,7 +44,7 @@ if ($DistanceNegativeControl) {
 }
 Add-Type -TypeDefinition $taskCode
 $taskChecks = [PayoutInteractionChecks.BlueprintConstructionProjectRuntime]::Run()
-if ($taskChecks -ne 60) { throw ('Interaction coverage incomplete: '+$taskChecks) }
+if ($taskChecks -ne 61) { throw ('Interaction coverage incomplete: '+$taskChecks) }
 $taskTick = Extract-Block $taskRuntime 'internal void Tick()'
 $taskSuspend = Extract-Block $taskRuntime 'internal void Suspend()'
 if ($taskTick -notmatch 'TickPayoutCollection\(\)' -or $taskTick -notmatch 'cleanupProjects.Add\(id\)' -or

@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-21 — 290: paid finalizer wired
+
+Local267, not deployed: read-only native finalizer uses paid commit289; scheduler handles issuance/startup, pending recovery and collection after closure.56 actual-code CPU/61interaction, distance negative control, cleanup22+31, builds0/0, host/localization and two reviews SHIP. Two new-fixture errors corrected (shared record/count accumulation), without weakening production. Native/paid UI remain open; no game/GPU. [290](CHECKPOINT_290.md).
+
 ## 2026-10-21 — 289: paid cancellation persistence
 
 Local266, not deployed: paid close before pickup, immutable issuance, continued collection/cleanup and a frozen intent across two commits. Historical cleanup regression fixed;172 CPU assertions/full StoreTests, normal/QA0/0, host/localization and two independent reviews PASS. Fallback mask prepared without GPU execution. No game/resource/project mutations during owner play. [289](CHECKPOINT_289.md).

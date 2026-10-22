@@ -138,10 +138,12 @@ namespace OstrixMods.BuildWorks
             }
             bool same = BlueprintStorageCapture.TrySnapshotInventory(player.GetInventory(), out var current) &&
                 current.Info == (payout?.BeforeInfo ?? payoutInventory?.Info) && current.Zdo == (payout?.BeforeBytes ?? payoutInventory?.Zdo);
-            var active = runtime.Payout;
+            var active = runtime.Payout; var closing = runtime.PaidCancellation;
             return JsonUtility.ToJson(new PayoutReceipt { id = payoutTarget.ToString("N"), phase = payout?.Phase ?? 0,
                 status = active?.Project == payoutTarget ? active.Status : null, reason = active?.Project == payoutTarget ? active.Reason : null,
                 generation = payout?.Saved?.Generation ?? 0, count = count, units = units, exact = exact, sealedItems = sealedItems,
+                cancellationStatus = closing?.Project == payoutTarget ? closing.Status : null,
+                cancellationReason = closing?.Project == payoutTarget ? closing.Reason : null, terminalBound = payout?.Terminal != null,
                 inventoryUnchanged = same, board = runtime.Board(payoutTarget), cancelled = record.Cancelled, blocked = runtime.BlocksInput,
                 x = record.RootPose.Values[0], y = record.RootPose.Values[1], z = record.RootPose.Values[2] });
         }
@@ -179,10 +181,10 @@ namespace OstrixMods.BuildWorks
         }
         [Serializable] private sealed class PayoutReceipt
         {
-            public string id, status, reason;
+            public string id, status, reason, cancellationStatus, cancellationReason;
             public int phase, count, units;
             public uint generation;
-            public bool exact, sealedItems, inventoryUnchanged, board, cancelled, blocked;
+            public bool exact, sealedItems, inventoryUnchanged, board, cancelled, blocked, terminalBound;
             public float x, y, z;
         }
         public static bool RemovalFinished => BuildWorksPlugin.QaConstructionProjects?.Removal?.Finished == true;

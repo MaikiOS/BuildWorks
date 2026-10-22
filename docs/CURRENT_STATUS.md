@@ -1,6 +1,6 @@
 # Current BuildWorks status
 
-22October2026. **Installed diagnostic QA267 retains the old unaccepted ordinary fog.** [297](CHECKPOINT_297.md): isolated explicit-depth candidate passes75GPU assertions, bundle and four-direction/20-frame wall comparison; not installed. Native ABBA never executed: two GABS atomic-rename failures before Valheim spawn. Bridge restored,97project/250config hashes unchanged. FS-only test reproduces Windows open-reader conflict; actual holder remains unknown. No manual acceptance ready.
+22October2026. **Installed diagnostic QA267 retains the old unaccepted ordinary fog.** [298](CHECKPOINT_298.md): Windows QA startup fixed and exercised in Valheim; process tests/vet pass, full Go suite retains23 baseline-matched failures. Native fog comparison remains FAILED: requested3440×1440 became3440×1351; after cleanup the original shader hit input-queue overflow and the next guarded Attach rejected the project. No cadence windows completed. Normal exit/bridge restore3,97project hashes/4141ordinary-save metadata unchanged. [297 local GPU evidence](CHECKPOINT_297.md) does not establish native speed or v11 acceptance. No manual acceptance ready.
 
 [290](CHECKPOINT_290.md): finalizer installed inQA267. [294](CHECKPOINT_294.md) closed two already collected old debts; [296](CHECKPOINT_296.md) fresh-process16/16:97unchanged file hashes,4receipts/0sources/67Wood, normal exit/restore3. Before-pickup lifecycle, physical E, crash window, wider items, paid UI and remote remain open; fog candidate not installed.
 

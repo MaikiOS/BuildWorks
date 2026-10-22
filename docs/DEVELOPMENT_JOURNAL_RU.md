@@ -1,5 +1,9 @@
 # Журнал разработки BuildWorks
 
+## 2026-10-22 — 298: запуск Windows QA исправлен, игровой замер тумана не состоялся
+
+Ограниченный повтор атомарной записи прошёл воспроизведённый reader-тест/process/vet; полный набор сохраняет23baseline-отказа Windows. Локальный GABS7aee48b оставлен с резервной копией оригинала, без upstream push. Настоящий Valheim запускается, но297 отказал из-за3440×1351 вместо1440; затем298 отказал после переполнения очереди прежнего shader. Окон скорости нет, отчёты отказов сохранены, сбросов/ослабления guards нет. Штатный logout/Quit/restore3,97project hashes/4141ordinary metadata прежние; .267/туман прежние. [Доказательства](CHECKPOINT_298_RU.md).
+
 ## 2026-10-22 — 297: GPU-кандидат готов к измерению, GABS отказывает до игры
 
 Общая integer depth-адресация low/composite, неизменные ray/jitter/weights/fallback.75GPU assertions/Linear reload2/4side20frames48source comparisons PASS; compiler warning signed divide устранён uint без ослабления проверок. Astra correctness/Ponytail PASS. Два игровых старта отказали на atomic rename runtime.json; повторения остановлены, restore3/97project/250config hashes подтверждены. FS-only actual Claim/Save воспроизвёл errno5 с открытым Go reader, после Close запись проходит. Источник конкурирующего чтения ещё не установлен; candidate/скорость/v11 не приняты и не установлены. [Доказательства](CHECKPOINT_297_RU.md).

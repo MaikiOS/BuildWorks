@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-22 — 298: Windows QA startup fixed; native fog setup rejected
+
+Bounded atomic-save retries pass reproduced-reader regression/process package/vet; full suite retains23baseline-matched Windows failures. Local GABS7aee48b retained with original backed up; no upstream push. Real Valheim starts/connects, but297 rejects clamped3440×1351, then298 rejects faulted project after original-shader queue overflow. Zero cadence windows; failed reports retained, no reset/guard weakening. Normal logout/Quit/restore3,97project hashes/4141ordinary metadata unchanged; .267/fog unchanged. [Evidence](CHECKPOINT_298.md).
+
 ## 2026-10-22 — 297: GPU candidate ready for measurement; GABS fails before spawn
 
 Shared integer depth addressing retains ray/jitter/weights/fallback.75GPU assertions/Linear reload2/four-side20frames48source comparisons PASS; signed-divide compiler warning fixed with uint, no weakened guards. Astra correctness/Ponytail PASS. Two starts failed at runtime.json atomic rename; repeats stopped, restore3/97project/250config hashes verified. Actual FS-only Claim/Save reproduces errno5 with held Go reader and succeeds after Close. Actual conflicting holder unknown; no native performance/v11 acceptance or installation. [Evidence](CHECKPOINT_297.md).

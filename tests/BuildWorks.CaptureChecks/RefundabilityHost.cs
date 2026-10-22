@@ -53,14 +53,18 @@ namespace RefundabilityChecks {
   public Record Read(Guid project,Guid part)=>plans.Receipts[part];
  }
  public static class Journal {
-  public const string CustodyKey="custody";public static int Validated;public static bool RejectProperties;
+  public const string CustodyKey="custody";public static int Validated,CapacityChecks;public static bool RejectProperties,RejectCapacity;
   public sealed class Entry { public Guid Id;public string Blob; }
+  public static void RequireIssuanceBudget(BlueprintForeignPartData inventory,IEnumerable<Entry> entries) {
+   var copy=entries.ToArray();CapacityChecks++;if(inventory==null||RejectCapacity)throw new InvalidDataException("Issuance budget refused");
+  }
   public static void ValidateItem(BlueprintConstructionPartJournal.PaidRow row,Entry entry) {
    if(RejectProperties)throw new InvalidDataException("Exact property guard refused");
    if(entry.Id==Guid.Empty||entry.Blob!=Convert.ToBase64String(new byte[]{110}))throw new Exception("Preflight skipped packaged entry");Validated++;
   }
  }
  public static class BlueprintConstructionPayoutSeal { public static byte[] Package(ItemDrop.ItemData item)=>new byte[]{110}; }
+ public sealed class BlueprintForeignPartData {}
  public static class BuildWorksLocalization { public static string Text(string key)=>key; }
  public static class SaveSystem { public static uint GetSaveNumber()=>5; }
  public sealed class RemovalJournal {
@@ -74,6 +78,8 @@ namespace RefundabilityChecks {
  public static class BlueprintConstructionPayoutIssuance {
   __PREFLIGHT__
   __RESTORE__
+  static readonly BlueprintForeignPartData beforeInventory=new BlueprintForeignPartData();
+  static void RequireRefundable(Plans plans,Guid project,long player)=>RequireRefundable(plans,project,player,beforeInventory);
   sealed class Data { public bool IsValid()=>true; }
   sealed class Witness { public WearNTear Wear=new WearNTear();public Data Data=new Data();public bool WearConfirmed,NetworkConfirmed; }
   sealed class Payer { public long GetPlayerID()=>7; }
@@ -94,6 +100,7 @@ __REMOVAL__
    ObjectDB.instance.Prefabs["Wood"]=prefab;drop.m_itemData.m_dropPrefab=prefab;drop.m_itemData.m_customData["original"]="kept";
    ItemDrop.ItemData.Clones=ItemDrop.ItemData.Loads=0;ItemDrop.ItemData.LoadHash=ItemDrop.ItemData.LoadQuality=1;
    ItemDrop.ItemData.LoadVariant=0;ItemDrop.ItemData.LoadCustody=false;Journal.Validated=0;Journal.RejectProperties=false;
+   Journal.CapacityChecks=0;Journal.RejectCapacity=false;
    RemovalJournal.Prepares=RemovalJournal.Intents=RemovalJournal.Deletes=0;Status=null;
    var plans=new Plans();plans.Plan.Parts=new[]{new Plans.Part(),new Plans.Part()};
    foreach(var part in plans.Plan.Parts)plans.Receipts[part.Id]=new BlueprintConstructionPartJournal.Record();
@@ -144,6 +151,9 @@ __REMOVAL__
    Check(RemovalJournal.Prepares==0&&RemovalJournal.Intents==0&&RemovalJournal.Deletes==0,"Last unsupported row entered cancellation/deletion");
    f=Fresh();StartRemoval(f.plans,Guid.NewGuid());
    Check(RemovalJournal.Prepares==1&&RemovalJournal.Intents==1&&RemovalJournal.Deletes==2&&Status=="queued-removal","Valid refundability blocked the actual removal sequence");
+   f=Fresh();Journal.RejectCapacity=true;try {StartRemoval(f.plans,Guid.NewGuid());}catch(InvalidDataException){}
+   Check(RemovalJournal.Prepares==0&&RemovalJournal.Intents==0&&RemovalJournal.Deletes==0,"Known over-budget issuance entered cancellation/deletion");
+   Check(Journal.Validated==2&&Journal.CapacityChecks==1,"Budget refused before validating the exact returned entries");
    Refuse((p,g,d)=>p.Receipts[p.Plan.Parts[0].Id].Paid=Enumerable.Repeat(new BlueprintConstructionPartJournal.PaidRow(),65537).ToArray(),"existing row budget",true);
    return checks;
   }

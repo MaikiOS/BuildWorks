@@ -89,6 +89,30 @@ namespace OstrixMods.BuildWorks
             [DataMember(Order = 3)] internal uint SavedGeneration;
         }
         internal BlueprintConstructionPayoutJournal(Plans plans) { this.plans = plans ?? throw new ArgumentNullException(nameof(plans)); }
+        internal static void RequireIssuanceBudget(BlueprintForeignPartData inventory, IEnumerable<Entry> entries)
+        {
+            if (inventory?.Info == null || inventory.Zdo == null || entries == null)
+                throw new InvalidDataException("Payout capacity requires the current inventory and exact returned items.");
+            var items = new List<Entry>();
+            long rawBytes = (long)inventory.Info.Length + inventory.Zdo.Length;
+            if (rawBytes > MaximumBytes) throw new InvalidDataException("Payout exceeds budget before removal or issuance.");
+            foreach (var entry in entries)
+            {
+                if (entry?.Blob == null || items.Count >= 65536)
+                    throw new InvalidDataException("Payout item/row budget is invalid before removal or issuance.");
+                rawBytes += entry.Blob.Length;
+                if (rawBytes > MaximumBytes) throw new InvalidDataException("Payout exceeds budget before removal or issuance.");
+                items.Add(new Entry { Id = entry.Id, Blob = entry.Blob, State = Observed, ObjectUser = 1, ObjectId = 1 });
+            }
+            // A lower bound only: real native IDs, later inventory and collection/terminal fields may need more room.
+            var minimum = new Record { Project = Guid.Empty, Operation = Guid.Empty, Player = 1, World = 1,
+                RemovalHash = new string('0', 64), Revision = 2L * items.Count + 3, Phase = IssuedSaved, BeforeGeneration = 1,
+                BeforeInfo = inventory.Info, BeforeBytes = inventory.Zdo, Items = items.ToArray(),
+                Saved = new Proof { Generation = 1, ProfileHash = new string('0', 128), InventoryHash = new string('0', 64),
+                    ItemHashes = Enumerable.Repeat(new string('0', 64), items.Count).ToArray() } };
+            Encode(minimum);
+        }
+
         internal Parts.PaidRow[] Paid(Guid project)
         {
             var parts = new Parts(plans);
@@ -104,6 +128,7 @@ namespace OstrixMods.BuildWorks
                 var removal = new BlueprintConstructionCancellationJournal(plans).Read(project);
                 if (removal?.Phase != BlueprintConstructionCancellationJournal.RemovedSaved || operation != removal.Operation || player != removal.Player ||
                     generation < removal.Saved.Generation || generation == uint.MaxValue) throw new InvalidOperationException("Payout requires the same saved removal, payer and current generation.");
+                RequireIssuanceBudget(inventory, entries);
                 var candidate = new Record { Project = project, Operation = operation, Player = player, World = removal.World,
                     RemovalHash = BlueprintConstructionCancellationJournal.Fingerprint(removal), Revision = 1, Phase = Prepared,
                     BeforeGeneration = generation, BeforeInfo = inventory?.Info, BeforeBytes = inventory?.Zdo, Items = entries };

@@ -63,7 +63,7 @@ namespace OstrixMods.BuildWorks
             if (!StartAbsence(initialGeneration, out string error)) throw new InvalidOperationException(error);
         }
 
-        internal static void RequireRefundable(Plans plans, Guid project, long player)
+        internal static void RequireRefundable(Plans plans, Guid project, long player, BlueprintForeignPartData inventory)
         {
             var parts = new BlueprintConstructionPartJournal(plans);
             var records = plans.Load(project).Parts.Select(part => parts.Read(project, part.Id)).Where(row => row != null).ToArray();
@@ -72,12 +72,18 @@ namespace OstrixMods.BuildWorks
             var paid = records.Where(row => row.Phase == BlueprintConstructionPartJournal.Committed)
                 .SelectMany(row => row.Paid).Take(65537).ToArray();
             if (paid.Length > 65536) throw new InvalidOperationException("Payout row budget exceeded; removal cannot start.");
-            foreach (var row in paid)
+            System.Collections.Generic.IEnumerable<Journal.Entry> Restored()
             {
-                Guid id = Guid.NewGuid();
-                var item = Restore(row, id);
-                Journal.ValidateItem(row, new Journal.Entry { Id = id, Blob = Convert.ToBase64String(BlueprintConstructionPayoutSeal.Package(item)) });
+                foreach (var row in paid)
+                {
+                    Guid id = Guid.NewGuid();
+                    var item = Restore(row, id);
+                    var entry = new Journal.Entry { Id = id, Blob = Convert.ToBase64String(BlueprintConstructionPayoutSeal.Package(item)) };
+                    Journal.ValidateItem(row, entry);
+                    yield return entry;
+                }
             }
+            Journal.RequireIssuanceBudget(inventory, Restored());
         }
 
         private static ItemDrop.ItemData Restore(BlueprintConstructionPartJournal.PaidRow paid, Guid id)

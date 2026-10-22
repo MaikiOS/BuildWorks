@@ -34,7 +34,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 if (args.Length == 1 && args[0] == "--construction-cancellation")
                 { ConstructionCancellationChecks.Run(Path.Combine(directory, "construction-cancellation")); return 0; }
                 if (args.Length == 1 && args[0] == "--construction-payout")
-                { ConstructionPayoutChecks.Run(Path.Combine(directory, "construction-payout")); ConstructionPayoutPropertyChecks.Run(Path.Combine(directory, "payout-properties")); return 0; }
+                { ConstructionPayoutChecks.Run(Path.Combine(directory, "construction-payout")); ConstructionPayoutPropertyChecks.Run(Path.Combine(directory, "payout-properties")); ConstructionPayoutCapacityChecks.Run(); return 0; }
                 if (args.Length == 1 && args[0] == "--construction-projects")
                 { ConstructionProjectChecks.Run(Path.Combine(directory, "construction-projects")); return 0; }
                 if (args.Length == 1 && args[0] == "--library-origin")
@@ -45,6 +45,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 ConstructionCancellationChecks.Run(Path.Combine(directory, "construction-cancellation"));
                 ConstructionPayoutChecks.Run(Path.Combine(directory, "construction-payout"));
                 ConstructionPayoutPropertyChecks.Run(Path.Combine(directory, "payout-properties"));
+                ConstructionPayoutCapacityChecks.Run();
                 PlanBuildSnapTailChecks.Run(Path.Combine(directory, "snap-tails"));
                 SourceEvidenceCacheChecks.Run();
                 PrefabMigrationChecks.Run(Path.Combine(directory, "prefab-migration"));

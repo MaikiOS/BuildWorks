@@ -1,0 +1,13 @@
+# Checkpoint311 — refuse known issuance overflow before removal
+
+22 October2026. **Candidate0.19.277 is not installed or game-tested.** Verified installed QA remains **0.19.273**, SHA `2A5F8CBAB7D540592BDB0F8F2712913D6FDFE772B9AAAFEEEF5AFA029155CBD4`.
+
+Individually valid paid items can exceed the existing16MiB payout limit together. Prepared alone is insufficient: mandatory saved proof/item hashes arrive later. `RequireIssuanceBudget` uses the same Encode on a temporary lower-bound IssuedSaved frame: actual entries/current inventory, fixed-width mandatory hashes, known2n+3 revision and minimal unknown scalar identities. This is no authority/save evidence; it is never validated, written or returned. Input entries stay unchanged. Raw string length enforces the same16MiB bound while accumulating; existing row/serializer limits remain.
+
+Pre-removal refundability passes current beforeInventory and lazy restored/validated entries, stopping on overflow. Payout.Prepare repeats the guard before file creation/replacement, covering already-removed old projects before issuance. No format, limit, permission or financial-phase changes.
+
+Real ValidateDebits/ValidateItem/Encode tests9PASS:1000 individually valid items overflow; a700-row Prepared frame16768163bytes fits but mandatory IssuedSaved refuses. Both source property shapes pass actual before5→after3/Paid2 validation/item-stand32768 constraints. Actual preflight/Restore/removal-tail40PASS uses substituted native/receipt/Package/property/budget boundaries; budget refusal reaches0Prepare/0Intent/0Delete. Two negative controls detect missing early/budget guards. Payout200+properties289/cancellation64, normal/QA0errors0warnings, HostContract/localization1130 PASS; independent correctness/Ponytail PASS and reruns. `verify` absent.
+
+Initial fixtures exceeded source Properties32768 and were unreachable; review rejected them. Smaller packets/more rows and actual debit validation replaced that evidence; old log retained as `payout-unreachable-fixture.log`, not readiness proof. Independent file tests needed unsandboxed execution after access denial, without game launch. Evidence: `artifacts/checkpoint-311/` tests/build/host/localization logs and candidate hash report.
+
+Passing this lower bound does not guarantee future native-ID lengths, terminal/collection/cleanup, changed inventory/prefabs, callbacks or writes. Native financial acceptance stays open. .277 includes310/prior messages; installed DLLs/game saves unchanged, no Deploy/Prepare. Next native306/refusal/Wood regression requires full-visibility process absence first.

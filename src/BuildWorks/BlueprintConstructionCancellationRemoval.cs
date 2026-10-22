@@ -58,7 +58,7 @@ namespace OstrixMods.BuildWorks
                 .Where(row => row.Receipt?.Phase == Parts.Committed).Select(row => Resolve(plan, row.Part, row.Receipt)).ToArray();
             if (targets.Length == 0 || NativeDestroyQueue?.GetValue(ZDOMan.instance) is not List<ZDOID>)
                 throw new InvalidOperationException("No supported committed targets or native removal queue is unavailable.");
-            BlueprintConstructionPayoutIssuance.RequireRefundable(plans, project, player.GetPlayerID());
+            BlueprintConstructionPayoutIssuance.RequireRefundable(plans, project, player.GetPlayerID(), beforeInventory);
             record = journal.Prepare(project, revision, operation, player.GetPlayerID());
             operations = record.Parts.Where(p => p.Phase == Parts.Committed).Select(p => p.Operation).ToArray();
             if (targets.Length != operations.Length || !Custody()) throw new InvalidOperationException("Removal preflight changed.");

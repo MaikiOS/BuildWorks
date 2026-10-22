@@ -1,5 +1,7 @@
 # 315 — .279 saved-credit recovery across fresh processes
 
+Verified source-only checkpoint315 [eae41fd](https://github.com/MaikiOS/BuildWorks/commit/eae41fdbc057a7e90b332deb3f8e5b2f60e26ff5) pushed to main; remote SHA confirmed.46 source/test/doc files, no DLLs or saves.
+
 Pending recovery now accepts exact raw live inventory or its exact native Load projection,
 while the canonical Local profile must match the original journal AfterInfo/AfterBytes and
 full customData. Identity/thread/profile/inventory/source/generation/receipt guards remain.

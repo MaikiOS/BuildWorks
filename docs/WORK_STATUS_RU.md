@@ -1,5 +1,7 @@
 # BuildWorks — техническое состояние и доказательства
 
+Проверенный source-only checkpoint315 [eae41fd](https://github.com/MaikiOS/BuildWorks/commit/eae41fdbc057a7e90b332deb3f8e5b2f60e26ff5) отправлен в main; remote SHA сверён.46 файлов кода/тестов/документов, без DLL и сохранений.
+
 Обновлено: 22.10.2026. Требования и галочки находятся в [живом списке](LIVE_CHECKLIST_RU.md), по тем же номерам 1–14. Здесь — факты, ограничения, причины и следующий технический шаг. Хронология — в [журнале](DEVELOPMENT_JOURNAL_RU.md); [правила](PROGRESS_RULES_RU.md).
 
 ## Текущая неисправность и правка

@@ -1,5 +1,7 @@
 # Current BuildWorks status
 
+Verified source-only checkpoint315 [eae41fd](https://github.com/MaikiOS/BuildWorks/commit/eae41fdbc057a7e90b332deb3f8e5b2f60e26ff5) pushed to main; remote SHA confirmed.46 source/test/doc files, no DLLs or saves.
+
 QA **0.19.279** installed, SHA256 `C7708CC1152E458AB7816C0E0AD4D7691A0B4F90090F838B385248C26C470D9B`. New own two-wall E/board paid/cancel/sealed-issuance scenario passed controlled interruption after profile save, fresh-process production recovery without reinsertion, cleanup and another fresh replay:67Wood/12receipts/no sources. All three processes exited normally and bridge3 was restored each time. Limited Local Wood proof, not power-loss, old-world, network or complete-module acceptance. [Fix/evidence315](CHECKPOINT_315.md); [separate .277 failure/QA recovery314](CHECKPOINT_314.md).
 
 **Historical checkpoint307, before .279 deployment:** prior200 + new289 payout assertions PASS. Six synthetic paid rows/five prefabs, distinct same-Wood properties, Unicode/custom data,109→110, sparse indices and exact inventory after each credit/reload. No production change; format fixtures do not prove native prefab variants, payment or profile saving. At that time .273 was installed and .274 awaited deployment; the interruption queue was subsequently exercised by315. [Scope307](CHECKPOINT_307.md).

@@ -2,6 +2,8 @@
 
 ## 2026-10-22 — 313–315: copy provenance and saved-credit recovery
 
+Verified source-only checkpoint315 [eae41fd](https://github.com/MaikiOS/BuildWorks/commit/eae41fdbc057a7e90b332deb3f8e5b2f60e26ff5) pushed to main; remote SHA confirmed.46 source/test/doc files, no DLLs or saves.
+
 QA **0.19.279** installed, SHA256 `C7708CC1152E458AB7816C0E0AD4D7691A0B4F90090F838B385248C26C470D9B`. New own two-wall E/board paid/cancel/sealed-issuance scenario passed controlled interruption after profile save, fresh-process production recovery without reinsertion, cleanup and another fresh replay:67Wood/12receipts/no sources. All three processes exited normally and bridge3 was restored each time. Limited Local Wood proof, not power-loss, old-world, network or complete-module acceptance. [Fix/evidence315](CHECKPOINT_315.md); [separate .277 failure/QA recovery314](CHECKPOINT_314.md).
 
 Passive peer provenance: [313](CHECKPOINT_313.md), file scope only. The .277 QA finalizer is separate from new-binary acceptance. Verified source/tests/docs use standing source-only push permission; no DLL or saves.

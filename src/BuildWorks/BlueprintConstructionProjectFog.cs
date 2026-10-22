@@ -140,6 +140,7 @@ namespace OstrixMods.BuildWorks
             try
             {
                 Body(out var actor, out var capsule);
+                channels.PumpSources();
                 bool preparedOne = false;
                 foreach (var entry in entries.Values)
                 {
@@ -173,7 +174,6 @@ namespace OstrixMods.BuildWorks
                         else entry.Building.Pump();
                     }
                 }
-                channels.PumpSources();
 #if BUILDWORKS_TEST_STAND
                 BuildWorksTestFogReceipts.Observe(this);
 #endif

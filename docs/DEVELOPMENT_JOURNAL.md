@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-22 — 299: service-before-capture; native85/85, no shader speed gain
+
+Moved the existing project PumpSources before observations, preserving post-capture submission.40GPU guards/compiled RED267→GREEN268/builds/geometry/host/localization/Astra review pass; QA268 installed through guarded deploy. Native3440×1351:85/85/24negative controls/3exact inventories/4closures, no overflow, but297/289/289/297 remains13.23/13.40/13.33/13.38FPS. Candidate rejected; ordinary shader unchanged. Normal exit/restore3,97project hashes/4141ordinary metadata unchanged; only config version comment changed. Next actual-branch measurement, no new owner task. [Evidence](CHECKPOINT_299.md).
+
 ## 2026-10-22 — 298: Windows QA startup fixed; native fog setup rejected
 
 Bounded atomic-save retries pass reproduced-reader regression/process package/vet; full suite retains23baseline-matched Windows failures. Local GABS7aee48b retained with original backed up; no upstream push. Real Valheim starts/connects, but297 rejects clamped3440×1351, then298 rejects faulted project after original-shader queue overflow. Zero cadence windows; failed reports retained, no reset/guard weakening. Normal logout/Quit/restore3,97project hashes/4141ordinary metadata unchanged; .267/fog unchanged. [Evidence](CHECKPOINT_298.md).

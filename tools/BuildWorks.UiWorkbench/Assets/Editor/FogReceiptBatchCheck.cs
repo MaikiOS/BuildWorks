@@ -147,6 +147,29 @@ public static class FogReceiptBatchCheck
                     pool.PumpSources(); var owners = sources.Select(s => s.Snapshot).ToArray(); pool.Dispose();
                     Check(pool.Count == 0 && pool.FieldBytes == 0 && owners.All(o => !o.nativePending && o.State.CanReleaseResources), "Grouped pending Dispose released before drain or leaked resources.");
                 }
+                foreach (bool serviceFirst in new[] { false, true }) using (var pool = Pool(1))
+                {
+                    var source = Register(pool);
+                    for (int i = 0; i < BlueprintFogInputQueue.Capacity; ++i) pool.CaptureSource(source, Sample(.005f));
+                    pool.PumpSources(); AsyncGPUReadback.WaitAllRequests();
+                    Check(source.Snapshot.HasReceipt && source.Inputs.Count == BlueprintFogInputQueue.Capacity &&
+                        source.Inputs.PendingCount == BlueprintFogInputQueue.MaximumBatchSamples,
+                        "Boundary fixture must hold a full queue and an already delivered GPU receipt.");
+                    if (serviceFirst)
+                    {
+                        pool.PumpSources(); pool.CaptureSource(source, Sample(.006f));
+                        Check(!source.Inputs.Faulted && source.Inputs.Count == BlueprintFogInputQueue.Capacity -
+                            BlueprintFogInputQueue.MaximumBatchSamples + 1 && source.Inputs.At(source.Inputs.Count - 1).Clock == .006f,
+                            "Service before capture must preserve the remaining history and accept the new observation.");
+                    }
+                    else
+                    {
+                        Reject(() => pool.CaptureSource(source, Sample(.006f)));
+                        Check(source.Inputs.Faulted && source.Inputs.Count == BlueprintFogInputQueue.Capacity,
+                            "Capture before service must reject overflow without discarding accepted history.");
+                    }
+                    ++report.boundaryCases;
+                }
                 report.passed = true;
             }
         }
@@ -158,7 +181,7 @@ public static class FogReceiptBatchCheck
     [Serializable] private sealed class Report
     {
         public bool passed, gameHostTested = false, gpuTimingsMeasured = false;
-        public int checks, groupOwners, groupPhysicalReads, failedReadCases;
+        public int checks, groupOwners, groupPhysicalReads, failedReadCases, boundaryCases;
         public string failure = "", scope = "Actual shared receipt callback/scheduler GPU guards; not native house cadence or appearance";
     }
 }

@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-22 — 310: validate refundability before removal
+
+[310](CHECKPOINT_310.md): candidate .276 checks every committed contribution for exact restitution before cancellation preparation/deletion, reusing Restore/Package/ValidateItem. Unsettled receipts and mixed committed payers refuse; NoEffect contributes nothing. Shared prefab clones refuse before Load.38actual-fragment checks + negative control, payout200+289/cancellation64/normal+QA0/0/HostContract/localization1130/independent correctness and Ponytail PASS. Mocked last-row refusal reaches0Prepare/0Intent/0Delete. **Not installed or Valheim-tested**; verified .273/hash unchanged. .276 includes306/309 messages and supersedes .275. Future aggregate journal size, later prefab/inventory changes and native callbacks remain outside this guarantee. Next native slice: refusal before deletion, existing Wood cycle and306 controlled interruption/recovery. Owner game confirmed outside sandbox; no Deploy/Prepare.
+
 ## 2026-10-22 — 309: refund full-inventory feedback
 
 [309](CHECKPOINT_309.md): candidate .275 gives player feedback when refund collection needs one free inventory slot; previously the asynchronous refusal was only logged. The gate stays after baseline save and before credit intent/insertion; financial protocol unchanged. Clean old39bf582 source reproduces missing feedback; fixed block7PASS, normal/QA0warnings0errors, HostContract/localization1130 and independent correctness/Ponytail PASS. **Not installed or game-tested**; installed .273/hash unchanged. .275 also includes306 station/DLC reasons, superseding local .274 candidate. Owner PID57236 confirmed outside sandbox; no Deploy/Prepare. Next native slice covers pause reason, full inventory/free slot/retry and prepared saved-credit interruption/recovery/cleanup/replay. No grants/reset; full goal remains open.

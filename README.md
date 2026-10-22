@@ -1,6 +1,6 @@
 **Current local QA0.19.273:** two-wall refunds collected in reverse order through E, with a fresh process between items and after completion. Other properties/faults/UX/network remain open. [Evidence305](docs/CHECKPOINT_305.md), [full checklist](docs/LIVE_CHECKLIST_RU.md).
 
-**Source candidate0.19.275, not installed:** station/DLC pause reasons and full-inventory refund feedback pass targeted/host checks; native messages/interruption/restart remain pending. [Scope309](docs/CHECKPOINT_309.md).
+**Source candidate0.19.276, not installed:** refundability checks precede removal; station/DLC and full-inventory feedback included. Targeted/host checks pass; native refusal/interruption/restart pending. [Scope310](docs/CHECKPOINT_310.md).
 
 # BuildWorks
 

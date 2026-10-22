@@ -405,7 +405,7 @@ namespace OstrixMods.BuildWorks
                 r.Terminal.Generation < r.Saved.Generation || r.Terminal.Generation == uint.MaxValue || !Hash(r.Terminal.ProfileHash, 128)))
                 throw new InvalidDataException("Terminal binding differs from immutable saved issuance.");
         }
-        private static void ValidateItem(Parts.PaidRow paid, Entry entry)
+        internal static void ValidateItem(Parts.PaidRow paid, Entry entry)
         {
             if (entry.Blob == null || entry.Blob.Length > 90000) throw new InvalidDataException("Payout item exceeds budget.");
             var original = ParseItem(paid.Properties, paid.Prefab, 1); var returned = ParseItem(entry.Blob, paid.Prefab, paid.Paid);

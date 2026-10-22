@@ -1,0 +1,11 @@
+# Checkpoint310 — verify exact refundability before removal
+
+22 October2026. **Candidate0.19.276 is not installed or Valheim-tested.** Verified installed QA stays **0.19.273**, SHA `2A5F8CBAB7D540592BDB0F8F2712913D6FDFE772B9AAAFEEEF5AFA029155CBD4`.
+
+Source audit found paid construction could be removed before existing `Restore` checks discovered an unsupported refund prefab/callback/stack/variant. No real QA deletion was used to reproduce that failure.
+
+`RequireRefundable` now runs before cancellation Prepare, BeginRemoval and native deletion. It reads validated part records in plan order, rejects unsettled/mixed committed payers, ignores NoEffect contributions and passes all committed rows through existing Restore/Package/ValidateItem and existing row/item budgets. Temporary clones only; no journal write, issuance or deletion. Shared ItemData/custom dictionary clones refuse before Load. Later issuance still reruns Restore. Journal formats/payment protocol unchanged.
+
+Actual preflight/Restore and removal-constructor-tail checks38PASS. Last unsupported row produces0Prepare/0Intent/0Delete; valid two-row path retains1/1/2. Host/receipt/Package/ValidateItem boundaries are substituted. Removing the early call reaches mocked deletion and the negative control detects it. Existing real journal checks payout200+properties289/cancellation64, normal/QA builds0errors0warnings, HostContract/localization1130 PASS. Independent correctness/Ponytail PASS; reviewer reran38/negative control. `verify` absent. Evidence: `artifacts/checkpoint-310/` test/build/host/localization logs and candidate hash report.
+
+This refuses currently known unsupported inputs before removal; it does not guarantee future aggregate journal size, later prefab/inventory changes or native callback behavior. Other items/faults/runtime acceptance remain open. .276 includes306/309 messages and supersedes .275. Owner game remains live outside sandbox; no Deploy/Prepare, installed-DLL/game-save writes or launch. Next native slice: refusal before removal, existing paid Wood cycle, messages and prepared306 controlled interruption/fresh recovery/cleanup/replay. Do not forge prior receipts/reset QA. Item layout unchanged; any-row collection works after305 and visual bounds alone do not justify a new grid.

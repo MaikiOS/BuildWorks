@@ -63,6 +63,23 @@ namespace OstrixMods.BuildWorks
             if (!StartAbsence(initialGeneration, out string error)) throw new InvalidOperationException(error);
         }
 
+        internal static void RequireRefundable(Plans plans, Guid project, long player)
+        {
+            var parts = new BlueprintConstructionPartJournal(plans);
+            var records = plans.Load(project).Parts.Select(part => parts.Read(project, part.Id)).Where(row => row != null).ToArray();
+            if (records.Any(row => row.RequiresReconciliation || row.Phase == BlueprintConstructionPartJournal.Committed && row.Player != player))
+                throw new InvalidOperationException(BuildWorksLocalization.Text("project.review"));
+            var paid = records.Where(row => row.Phase == BlueprintConstructionPartJournal.Committed)
+                .SelectMany(row => row.Paid).Take(65537).ToArray();
+            if (paid.Length > 65536) throw new InvalidOperationException("Payout row budget exceeded; removal cannot start.");
+            foreach (var row in paid)
+            {
+                Guid id = Guid.NewGuid();
+                var item = Restore(row, id);
+                Journal.ValidateItem(row, new Journal.Entry { Id = id, Blob = Convert.ToBase64String(BlueprintConstructionPayoutSeal.Package(item)) });
+            }
+        }
+
         private static ItemDrop.ItemData Restore(BlueprintConstructionPartJournal.PaidRow paid, Guid id)
         {
             var prefab = ObjectDB.instance ? ObjectDB.instance.GetItemPrefab(paid.Prefab) : null;
@@ -70,7 +87,10 @@ namespace OstrixMods.BuildWorks
             if (!drop || !view || !view.m_persistent || !prefab.GetComponent<Rigidbody>() || prefab.GetComponent<Piece>() ||
                 prefab.GetComponent<WearNTear>() || drop.m_onDrop != null || paid.Paid < 1 || paid.Paid > drop.m_itemData.m_shared.m_maxStackSize)
                 throw new InvalidOperationException("Payout prefab/callback/persistence/stack is unsupported; nothing was issued.");
-            var item = drop.m_itemData.Clone(); var package = new ZPackage(Convert.FromBase64String(paid.Properties));
+            var item = drop.m_itemData.Clone();
+            if (item == null || ReferenceEquals(item, drop.m_itemData) || ReferenceEquals(item.m_customData, drop.m_itemData.m_customData))
+                throw new InvalidOperationException("Native item clone shares prefab state; exact restitution is unsupported.");
+            var package = new ZPackage(Convert.FromBase64String(paid.Properties));
             var version = (Version.Item)package.ReadByte();
             int hash = ItemDrop.ItemData.Load(package, item, version);
             if (hash != paid.Prefab.GetStableHashCode() || item.m_quality != paid.Quality || item.m_variant != paid.Variant ||

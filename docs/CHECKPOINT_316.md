@@ -1,5 +1,7 @@
 # 316 — native full-inventory refusal; free-cell retry preparation
 
+Verified source-only checkpoint316 [5ccb523](https://github.com/MaikiOS/BuildWorks/commit/5ccb5232a7978baabc756900233ade3f7e9ffec4) pushed to main; remote SHA confirmed.13 QA source/test/doc files, no DLLs or saves. Native free-cell/retry remains unverified.
+
 Installed .279 unchanged, QA SHA256
 `C7708CC1152E458AB7816C0E0AD4D7691A0B4F90090F838B385248C26C470D9B`.
 No production DLL build/deploy. Run185641/PID32616, existing isolated Local QA identities.

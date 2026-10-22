@@ -1,5 +1,7 @@
 # Current BuildWorks status
 
+Verified source-only checkpoint316 [5ccb523](https://github.com/MaikiOS/BuildWorks/commit/5ccb5232a7978baabc756900233ade3f7e9ffec4) pushed to main; remote SHA confirmed.13 QA source/test/doc files, no DLLs or saves. Native free-cell/retry remains unverified.
+
 **Current scope316:** installed QA **0.19.279** and its DLL are unchanged. A new own two-wall E/board/payment/cancel/separate-issuance scenario reached a native full-inventory refusal with the actual HUD message.65Wood/32stacks/13customData, remaining source and journals retained; the real offline reader confirmed exact saved inventory/receipt. Free-cell merge and successful retry remain UNVERIFIED. Revised QA helper:25 targeted CPU checks, RenderProbe0/0 and independent preparation review PASS. [Limits and retained failed attempts316](CHECKPOINT_316.md).
 
 **Historical scope315:**

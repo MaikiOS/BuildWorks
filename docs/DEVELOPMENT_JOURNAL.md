@@ -2,6 +2,8 @@
 
 ## 2026-10-22 — 316: native full-inventory refusal and retry preparation
 
+Verified source-only checkpoint316 [5ccb523](https://github.com/MaikiOS/BuildWorks/commit/5ccb5232a7978baabc756900233ade3f7e9ffec4) pushed to main; remote SHA confirmed.13 QA source/test/doc files, no DLLs or saves. Native free-cell/retry remains unverified.
+
 **Current scope316:** installed QA **0.19.279** and its DLL are unchanged. A new own two-wall E/board/payment/cancel/separate-issuance scenario reached a native full-inventory refusal with the actual HUD message.65Wood/32stacks/13customData, remaining source and journals retained; the real offline reader confirmed exact saved inventory/receipt. Free-cell merge and successful retry remain UNVERIFIED. Revised QA helper:25 targeted CPU checks, RenderProbe0/0 and independent preparation review PASS. [Limits and retained failed attempts316](CHECKPOINT_316.md).
 
 **Before next QA:** own PID32616 exited normally; Ostrix started Default-Compat-Test (observed PID9264). Leave that game untouched. Bridge3 run `20261022-185641` restore is still pending: its guard requires every Valheim closed. Restore that run FIRST after owner exit, then Prepare; never back up patched DLLs as the new original. Resume existing project `5fb62f0d5c9a4400bbdf9113951844bf`: Arm resume/E full-refusal/FreeOneCell/E retry/normal exit and restore/fresh replay. Index0 safely holds2Wood with no credit intent. Do not reissue old projects. All14 goal sections remain active.

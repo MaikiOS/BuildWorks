@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-22 — 300: three native fallback samples; no speed fix yet
+
+QA .269 adds measurement-only hook. GPU14/builds/geometry/host/localization/review pass; native full fallback covers16.99–17.07% viewport, zero unknown/nonfinite. This is not stage cost/FPS. Original package FAILED on expected duplicate arm;24steps and3samples passed, separate tail15/15. Normal exit/restore3/97project SHA/4141ordinary metadata verified. Ordinary fog unchanged. Parallel read-only review prepared the next paid-board UI source slice, not implemented. Corrected full package in fresh PID49676:39/39, three more samples, second normalQuit/restore3/97/4141audit pass; original FAILED preserved. [Evidence](CHECKPOINT_300.md).
+
 ## 2026-10-22 — 299: service-before-capture; native85/85, no shader speed gain
 
 Moved the existing project PumpSources before observations, preserving post-capture submission.40GPU guards/compiled RED267→GREEN268/builds/geometry/host/localization/Astra review pass; QA268 installed through guarded deploy. Native3440×1351:85/85/24negative controls/3exact inventories/4closures, no overflow, but297/289/289/297 remains13.23/13.40/13.33/13.38FPS. Candidate rejected; ordinary shader unchanged. Normal exit/restore3,97project hashes/4141ordinary metadata unchanged; only config version comment changed. Next actual-branch measurement, no new owner task. [Evidence](CHECKPOINT_299.md).

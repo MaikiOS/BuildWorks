@@ -1,5 +1,9 @@
 # Журнал разработки BuildWorks
 
+## 2026-10-22 — 300: три native-выборки fallback; ускорение ещё не получено
+
+QA .269 добавляет только измерительный hook. GPU14/build/geometry/host/localization/review PASS; в игре16,99–17,07% viewport вызывает full fallback, unknown/nonfinite0. Это не стоимость/FPS. Исходный пакет FAILED на ожидаемом duplicate-arm;24шага и3выборки прошли, отдельный хвост15/15. Normal exit/restore3/97project SHA/4141ordinary metadata подтверждены. Обычный туман прежний. Параллельно подготовлен источник следующего paid-board UI-среза, без реализации. Исправленный полный пакет в новом процессе49676:39/39, ещё3выборки, второйnormalQuit/restore3/97/4141audit PASS; исходный FAILED сохранён. [Evidence](CHECKPOINT_300_RU.md).
+
 ## 2026-10-22 — 299: сервис до capture; native85/85, ускорения shader нет
 
 Существующий PumpSources перенесён до наблюдений, последующая отправка сохранена.40GPU guards/compiled RED267→GREEN268/build/geometry/host/localization/Astra review PASS; QA268 установлена guarded deploy. Native3440×1351:85/85/24negative controls/3точных инвентаря/4закрытия, без переполнения, но297/289/289/297 остаются13,23/13,40/13,33/13,38FPS. Кандидат отклонён, обычный shader прежний. Штатный выход/restore3,97project hashes/4141ordinary metadata прежние; в cfg только комментарий версии. Далее замер настоящей ветки, ручного задания нет. [Доказательства](CHECKPOINT_299_RU.md).

@@ -24,6 +24,7 @@ namespace OstrixMods.BuildWorks
                 preparationMilliseconds = fog?.PreparationMilliseconds ?? 0, maxPreparationStepMilliseconds = fog?.maxPreparationStepMilliseconds ?? 0,
                 passPhase = fog?.PassPhase, passSide = fog?.PassSide ?? -1, passFailure = fog?.PassFailure,
                 passRunning = fog && fog.PassRunning,
+                passStartedRealtime = fog?.PassStartedRealtime ?? 0,
                 firstFaultJson = fog?.FirstFaultJson,
                 parts = fog?.PartCount ?? 0, owners = fog?.ActiveOwners ?? 0, residentOwners = fog?.ResidentOwners ?? 0,
                 visibleParts = fog?.building?.VisibleCount ?? 0, assets = fog?.assets?.AssetCount ?? 0, kernels = fog?.assets?.KernelCount ?? 0,
@@ -74,6 +75,7 @@ namespace OstrixMods.BuildWorks
             public int passSide;
             public int expectedParts, preparedParts, preparationSteps;
             public double preparationMilliseconds, maxPreparationStepMilliseconds;
+            public double passStartedRealtime;
             public int parts, owners, residentOwners, queuedSamples, minimumTick, frames, visibleParts, assets, kernels;
             public uint lastFlags;
             public string firstFaultJson;
@@ -226,6 +228,7 @@ namespace OstrixMods.BuildWorks
         public int PassSide { get; private set; } = -1;
         public string PassFailure { get; private set; }
         public bool PassRunning => wallPass != null;
+        public double PassStartedRealtime { get; private set; }
         private bool wallLine;
         private BlueprintFogChannels.MetricsProbe metrics;
         public static string AttachExisting(string id)
@@ -355,7 +358,8 @@ namespace OstrixMods.BuildWorks
             var fog = CurrentProbe;
             if (!fog || !fog.wallLine || !fog.Active || fog.wallPass != null || side < 0 || side > 3)
                 throw new InvalidOperationException("Prepared idle four-section wall and side 0..3 required.");
-            fog.PassFailure = null; fog.PassSide = side; fog.wallPass = fog.WallPass(side).GetEnumerator(); movementOwner = fog;
+            fog.PassFailure = null; fog.PassSide = side; fog.PassStartedRealtime = 0;
+            fog.wallPass = fog.WallPass(side).GetEnumerator(); movementOwner = fog;
             return "wall-pass-started";
         }
 
@@ -366,6 +370,7 @@ namespace OstrixMods.BuildWorks
             Vector3 centre = Origin;
             try
             {
+                PassStartedRealtime = Time.realtimeSinceStartupAsDouble;
                 PassPhase = "approach";
                 foreach (var step in WalkTo(centre - direction * distance)) yield return step;
                 PassPhase = "enter";

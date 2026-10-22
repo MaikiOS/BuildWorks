@@ -40,6 +40,7 @@ namespace OstrixMods.BuildWorks
             noiseOffset = new Vector4[MaximumOwners];
         internal long Bytes => shape ? (long)size.x * size.y * size.z * (publishedPool == null ? 18 : 2) : 0;
 #if BUILDWORKS_TEST_STAND || UNITY_EDITOR
+        internal static Action<Material, RenderTexture, RenderTexture> QaCompositeObserver = null;
         internal void SetRenderBoundsBaselineForCheck(bool enabled)
         {
             if (!material) throw new ObjectDisposedException(nameof(BlueprintFogAtlas));
@@ -281,6 +282,9 @@ namespace OstrixMods.BuildWorks
                 // Both passes retain the full-size source's UV convention and alpha.
                 Graphics.Blit(image, wake, volume, integrate);
                 Graphics.Blit(image, target, volume, composite);
+#if BUILDWORKS_TEST_STAND || UNITY_EDITOR
+                QaCompositeObserver?.Invoke(volume, image, wake);
+#endif
             }
             finally
             {

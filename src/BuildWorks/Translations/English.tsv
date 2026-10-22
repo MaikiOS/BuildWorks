@@ -1086,7 +1086,7 @@ server.invalid	Invalid server blueprint library data.
 server.unauthenticated	No authenticated server connection.
 server.unavailable	Server blueprint unavailable or access denied.
 server.origin_limit	Cannot save this copy: the document already contains 16 library origin records. No history was removed.
-exchange.plan_origins	Library provenance records: {0}. PlanBuild does not store them; the full adjacent BuildWorks file retains them.
+exchange.plan_origins	Library and peer provenance records: {0}. PlanBuild does not store them; the full adjacent BuildWorks file retains them.
 server.tab	Server
 server.library	Server library
 server.help	Save a personal copy to use a blueprint. Saving does not start construction.
@@ -1134,3 +1134,5 @@ server.origin_conflict	The inserted blueprint has conflicting origin records. No
 exchange.prefab_migration	Legacy part replacement: {0} — {1} parts. Original ID retained; construction follows the current part rules.
 exchange.plan_migrations	Part migration records: {0}. The foreign file contains current IDs; original IDs and migration history remain in the adjacent full BuildWorks file only.
 exchange.native_armor_archive	Armor stands: {0}. Uninspected active item records in the archive: {1}. Pose and slot records are preserved; equipment and pose are not yet previewed or restored. Placement of this blueprint is unavailable, including with equipment disabled.
+peer.origin_limit	Cannot save this copy: the peer transfer provenance limit was reached. No history was removed.
+peer.origin_conflict	The documents disagree about the same peer transfer. Merge cancelled.

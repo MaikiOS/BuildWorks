@@ -35,7 +35,7 @@ namespace OstrixMods.BuildWorks
         internal const string DefaultCategory = "OTHER";
         private const string LegacyDefaultCategory = "ПРОЧЕЕ";
         private const string LocalizationPrefix = "$buildworks_";
-        private const int FormatVersion = 25;
+        private const int FormatVersion = 26;
         internal const int MaximumLibraryOrigins = Geometry.BlueprintLibraryOrigin.MaximumCount;
         private const int MaximumBlueprints = 32;
         private const int MaximumCategories = 12;
@@ -1197,12 +1197,13 @@ namespace OstrixMods.BuildWorks
             IReadOnlyList<Support> supports, string placementSupportId,
             out Blueprint blueprint, out string error, IReadOnlyList<VectorData> customSnapPoints = null,
             Blueprint previewTemplate = null, IReadOnlyList<SourceDocument> sourceDocuments = null,
-            IReadOnlyList<LibraryOrigin> libraryOrigins = null)
+            IReadOnlyList<LibraryOrigin> libraryOrigins = null, IReadOnlyList<PeerOrigin> peerOrigins = null)
         {
             blueprint = null;
             error = null;
             libraryOrigins = libraryOrigins ?? previewTemplate?.libraryOrigins;
-            if (!ValidLibraryOrigins(libraryOrigins))
+            peerOrigins = peerOrigins ?? previewTemplate?.peerOrigins;
+            if (!ValidLibraryOrigins(libraryOrigins) || !ValidPeerOrigins(peerOrigins))
             { error = UserError("store.invalid_composition"); return false; }
             name = (name ?? string.Empty).Trim();
             category = NormalizeCategory(category);
@@ -1295,7 +1296,8 @@ namespace OstrixMods.BuildWorks
                 previewZoom = previewTemplate?.previewZoom ?? 1f,
                 sourceDocuments = CloneSources(sourceDocuments ?? previewTemplate?.sourceDocuments),
                 placementImportId = previewTemplate?.placementImportId,
-                libraryOrigins = CloneLibraryOrigins(libraryOrigins)
+                libraryOrigins = CloneLibraryOrigins(libraryOrigins),
+                peerOrigins = ClonePeerOrigins(peerOrigins)
             };
             if (!Valid(blueprint)) { blueprint = null; error = UserError("store.verify_data_failed"); return false; }
             if (addCategory) data.categories.Add(category);
@@ -1539,7 +1541,7 @@ namespace OstrixMods.BuildWorks
             IReadOnlyList<Group> groups, IReadOnlyList<VectorData> anchors, string primaryPartId,
             string primaryGroupId, IReadOnlyList<Support> supports, string placementSupportId,
             out string error, IReadOnlyList<VectorData> customSnapPoints = null,
-            IReadOnlyList<SourceDocument> sourceDocuments = null, IReadOnlyList<LibraryOrigin> libraryOrigins = null)
+            IReadOnlyList<SourceDocument> sourceDocuments = null, IReadOnlyList<LibraryOrigin> libraryOrigins = null, IReadOnlyList<PeerOrigin> peerOrigins = null)
         {
             error = null;
             name = (name ?? string.Empty).Trim();
@@ -1549,7 +1551,8 @@ namespace OstrixMods.BuildWorks
             customSnapPoints = customSnapPoints ?? blueprint?.customSnapPoints;
             sourceDocuments = sourceDocuments ?? blueprint?.sourceDocuments;
             libraryOrigins = libraryOrigins ?? blueprint?.libraryOrigins;
-            if (!ValidLibraryOrigins(libraryOrigins))
+            peerOrigins = peerOrigins ?? blueprint?.peerOrigins;
+            if (!ValidLibraryOrigins(libraryOrigins) || !ValidPeerOrigins(peerOrigins))
             { error = UserError("store.invalid_composition"); return false; }
             if (!ValidSources(parts, sourceDocuments))
             { error = UserError("store.invalid_composition"); return false; }
@@ -1616,6 +1619,7 @@ namespace OstrixMods.BuildWorks
             List<Support> previousSupports = blueprint.supports;
             List<SourceDocument> previousSources = blueprint.sourceDocuments;
             List<LibraryOrigin> previousOrigins = blueprint.libraryOrigins;
+            List<PeerOrigin> previousPeerOrigins = blueprint.peerOrigins;
             string previousPlacementImportId = blueprint.placementImportId;
             string previousPlacementSupportId = blueprint.placementSupportId;
             string previousName = blueprint.name;
@@ -1633,6 +1637,7 @@ namespace OstrixMods.BuildWorks
             blueprint.supports = CloneSupports(supports);
             blueprint.sourceDocuments = CloneSources(sourceDocuments);
             blueprint.libraryOrigins = CloneLibraryOrigins(libraryOrigins);
+            blueprint.peerOrigins = ClonePeerOrigins(peerOrigins);
             // An edited copy must not replace the external original on the next placement.
             blueprint.placementImportId = null;
             blueprint.placementSupportId = placementSupportId;
@@ -1648,6 +1653,7 @@ namespace OstrixMods.BuildWorks
                 blueprint.supports = previousSupports;
                 blueprint.sourceDocuments = previousSources;
                 blueprint.libraryOrigins = previousOrigins;
+                blueprint.peerOrigins = previousPeerOrigins;
                 blueprint.placementImportId = previousPlacementImportId;
                 blueprint.placementSupportId = previousPlacementSupportId;
                 blueprint.name = previousName;
@@ -1754,7 +1760,7 @@ namespace OstrixMods.BuildWorks
                     allowAbsoluteScaleFields: loaded.version >= 15, allowPlacementImportFields: loaded.version >= 16,
                     allowBaseScaleFields: loaded.version >= 17, allowMetadataFields: loaded.version >= 19,
                     allowMaterialSeedFields: loaded.version >= 20, allowHiddenSources: loaded.version >= 21,
-                    allowLibraryOriginFields: loaded.version >= 23, allowPrefabMigrationFields: loaded.version >= 24);
+                    allowLibraryOriginFields: loaded.version >= 23, allowPrefabMigrationFields: loaded.version >= 24, allowPeerOriginFields: loaded.version >= 26);
                 loaded.blueprints = loaded.blueprints ?? new List<Blueprint>();
                 if (loaded.version < 25 && loaded.blueprints.Any(BlueprintExchangeFormat.HasNativeArmorState))
                     throw new InvalidDataException(UserError("store.unknown_version"));
@@ -1984,7 +1990,7 @@ namespace OstrixMods.BuildWorks
                 blueprint.anchors.Count > MaximumAnchors || blueprint.groups == null ||
                 blueprint.groups.Count > MaximumGroups ||
                 !ValidDocument(blueprint.parts, blueprint.groups, blueprint.supports) ||
-                !ValidSources(blueprint.parts, blueprint.sourceDocuments) || !ValidLibraryOrigins(blueprint.libraryOrigins) ||
+                !ValidSources(blueprint.parts, blueprint.sourceDocuments) || !ValidLibraryOrigins(blueprint.libraryOrigins) || !ValidPeerOrigins(blueprint.peerOrigins) ||
                 !ValidPlacementSupport(blueprint.supports, blueprint.placementSupportId) ||
                 !ValidCustomSnapPoints(blueprint.customSnapPoints) ||
                 !ValidPrimaryPart(blueprint.parts, blueprint.primaryPartId) ||
@@ -2009,6 +2015,50 @@ namespace OstrixMods.BuildWorks
             source?.Copy()).ToList();
 
         internal static List<LibraryOrigin> CloneLibraryOrigins(IReadOnlyList<LibraryOrigin> origins) => origins?.Select(origin => origin?.Copy()).ToList();
+
+        internal static List<PeerOrigin> ClonePeerOrigins(IReadOnlyList<PeerOrigin> origins) => origins?.Select(origin => origin?.Copy()).ToList();
+        internal static bool ValidPeerOrigins(IReadOnlyList<PeerOrigin> origins)
+        {
+            if (origins == null) return true;
+            try
+            {
+                if (origins.Count > Geometry.BlueprintPeerOrigin.MaximumCount) return false;
+                var values = origins.Select(origin => origin?.ToGeometry() ?? throw new ArgumentException("Null peer origin.")).ToList();
+                for (int i = 0; i < values.Count; ++i)
+                    for (int j = 0; j < i; ++j) if (values[i].SameKey(values[j])) return false;
+                return true;
+            }
+            catch (ArgumentException) { return false; }
+        }
+
+        internal bool TrySaveAcceptedPeerCopy(byte[] portable, PeerOrigin origin, out Blueprint copy, out string error)
+        {
+            copy = null; error = UserError("store.invalid_composition");
+            origin = origin?.Copy();
+            if (!ValidPeerOrigins(new[] { origin }) || portable == null || portable.Length > BlueprintExchangeFormat.MaximumBytes) return false;
+            portable = (byte[])portable.Clone();
+            Blueprint source;
+            try
+            {
+                source = BlueprintExchangeFormat.DecodeWithVersion(new UTF8Encoding(false, true).GetString(portable), out int version);
+                using (var sha = System.Security.Cryptography.SHA256.Create())
+                    if (BitConverter.ToString(sha.ComputeHash(portable)).Replace("-", "") != origin.sha256 ||
+                        source.id != origin.documentId || version != origin.formatVersion) return false;
+            }
+            catch (Exception failure) when (failure is ArgumentException || failure is InvalidDataException) { return false; }
+            var template = source.ImportCopy();
+            template.peerOrigins = template.peerOrigins ?? new List<PeerOrigin>();
+            var existing = template.peerOrigins.FirstOrDefault(value => value.ToGeometry().SameKey(origin.ToGeometry()));
+            if (existing != null)
+            { if (!existing.ToGeometry().SameValue(origin.ToGeometry())) return false; }
+            else
+            {
+                if (template.peerOrigins.Count == Geometry.BlueprintPeerOrigin.MaximumCount) { error = UserError("peer.origin_limit"); return false; }
+                template.peerOrigins.Add(origin.Copy());
+            }
+            return TrySaveDocument(source.name, source.category, source.parts, source.groups, source.anchors, source.primaryPartId,
+                source.primaryGroupId, source.supports, source.placementSupportId, out copy, out error, source.customSnapPoints, template, source.sourceDocuments);
+        }
 
         internal static bool ValidLibraryOrigins(IReadOnlyList<LibraryOrigin> origins)
         {
@@ -2389,6 +2439,7 @@ namespace OstrixMods.BuildWorks
                 copy.parts = CloneParts(parts);
                 copy.sourceDocuments = CloneSources(sourceDocuments);
                 copy.libraryOrigins = CloneLibraryOrigins(libraryOrigins);
+                copy.peerOrigins = ClonePeerOrigins(peerOrigins);
                 return copy;
             }
             public string importSource;
@@ -2431,6 +2482,8 @@ namespace OstrixMods.BuildWorks
             public string placementImportId;
             [DataMember(Order = 17, EmitDefaultValue = false)]
             public List<LibraryOrigin> libraryOrigins;
+            [DataMember(Order = 18, EmitDefaultValue = false)]
+            public List<PeerOrigin> peerOrigins;
         }
 
         // Informational provenance only. Serialized metadata never establishes server authority.
@@ -2459,6 +2512,29 @@ namespace OstrixMods.BuildWorks
             }
             internal static LibraryOrigin FromGeometry(Geometry.BlueprintLibraryOrigin origin) => new LibraryOrigin(
                 origin.Server, origin.WorldUid, origin.DocumentId, origin.Revision, origin.Access, origin.Publisher, origin.Sha256, origin.FormatVersion);
+        }
+
+        [DataContract]
+        internal sealed class PeerOrigin
+        {
+            [DataMember(Order = 0)] public int version = 1;
+            [DataMember(Order = 1)] public string server;
+            [DataMember(Order = 2)] public long worldUid;
+            [DataMember(Order = 3)] public string sender;
+            [DataMember(Order = 4)] public string recipient;
+            [DataMember(Order = 5)] public string offerId;
+            [DataMember(Order = 6)] public string documentId;
+            [DataMember(Order = 7)] public string sha256;
+            [DataMember(Order = 8)] public int formatVersion;
+            internal PeerOrigin Copy() => (PeerOrigin)MemberwiseClone();
+            internal Geometry.BlueprintPeerOrigin ToGeometry()
+            {
+                if (formatVersion > BlueprintExchangeFormat.Version) throw new ArgumentException("Unsupported peer origin format.");
+                return new Geometry.BlueprintPeerOrigin(server, worldUid, sender, recipient, offerId, documentId, sha256, formatVersion, version);
+            }
+            internal static PeerOrigin FromGeometry(Geometry.BlueprintPeerOrigin value) => new PeerOrigin {
+                version = value.Version, server = value.Server, worldUid = value.WorldUid, sender = value.Sender, recipient = value.Recipient,
+                offerId = value.OfferId, documentId = value.DocumentId, sha256 = value.Sha256, formatVersion = value.FormatVersion };
         }
 
         [DataContract]

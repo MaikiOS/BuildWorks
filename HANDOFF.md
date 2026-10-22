@@ -1,6 +1,6 @@
 # BuildWorks continuation
 
-Current handoff after312: [HANDOFF_NEXT_SESSION_RU](docs/HANDOFF_NEXT_SESSION_RU.md). Exact saved-credit/receipt verifier prepared before confirmation; no new game run. Candidate .277 unchanged/not installed; verified QA .273. Older history remains below.
+Current handoff315: [HANDOFF_NEXT_SESSION_RU](docs/HANDOFF_NEXT_SESSION_RU.md). QA **0.19.279** installed, SHA256 `C7708CC1152E458AB7816C0E0AD4D7691A0B4F90090F838B385248C26C470D9B`. New own two-wall E/board paid/cancel/sealed-issuance scenario passed controlled interruption after profile save, fresh-process production recovery without reinsertion, cleanup and another fresh replay:67Wood/12receipts/no sources. All three processes exited normally and bridge3 was restored each time. Limited Local Wood proof, not power-loss, old-world, network or complete-module acceptance. [Fix/evidence315](docs/CHECKPOINT_315.md); [separate .277 failure/QA recovery314](docs/CHECKPOINT_314.md).
 
 **QA .241 installed:** shader reuses validated state/clock;14 RGB comparisons against the previous path are exactly zero. ValheimQA passed7/7+59/59:4 passes through a four-section wall,482 frames,467456 exact inner texels; all16 recovered parts have zero fields/flags. Inventory unchanged, own fixture closed, normal exit and bridge3/3 restored. **Whole-house fog remains unfixed:** two48s GPU attempts failed at queue64 after37.01s/39.85s; repetitions stopped. RAM reuse remains disabled in the game. [Evidence](docs/CHECKPOINT_241.md).
 

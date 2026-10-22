@@ -111,7 +111,8 @@ namespace ReservationChecks
 
         internal static void WriteItem(BinaryWriter writer, ItemDrop.ItemData item)
         {
-            writer.Write((int)(item.m_durability * 100)); writer.Write((byte)item.m_gridPos.x); writer.Write((byte)item.m_gridPos.y); writer.Write((byte)item.m_worldLevel);
+            // Mono's observed mul/conv.i4 keeps precision until truncation (native QA9412→9411).
+            writer.Write((int)((double)item.m_durability * 100)); writer.Write((byte)item.m_gridPos.x); writer.Write((byte)item.m_gridPos.y); writer.Write((byte)item.m_worldLevel);
             int flags = 64 | (item.m_customData.Count != 0 ? 128 : 0) | (item.m_pickedUp ? 1 : 0) | (item.m_equipped ? 2 : 0) | (item.m_quality != 1 ? 4 : 0) | (item.m_stack != 1 ? 8 : 0) | (item.m_variant != 0 ? 16 : 0) | (item.m_crafterID != 0 ? 32 : 0);
             writer.Write((byte)flags);
             if (item.m_quality != 1) writer.Write((ushort)item.m_quality);

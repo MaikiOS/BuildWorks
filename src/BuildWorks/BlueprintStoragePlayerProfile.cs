@@ -94,6 +94,40 @@ namespace OstrixMods.BuildWorks
         internal bool TryVerifySavedCredit(out NativePlayerProfileReadback.Evidence evidence, out string reason)
             => TryRead(path, out evidence, out reason, savedCredit: true);
 
+        internal static bool TryReadSavedCredit(Player player, BlueprintForeignPartData expected, Func<bool> context,
+            out NativePlayerProfileReadback.Evidence evidence, out string reason)
+        {
+            evidence = null; reason = null;
+            try
+            {
+                int thread = Thread.CurrentThread.ManagedThreadId;
+                var game = Game.instance;
+                var profile = game ? game.GetPlayerProfile() : null;
+                var inventory = player ? player.GetInventory() : null;
+                string path = profile?.GetPath(), filename = profile?.GetFilename(), name = profile?.GetName();
+                long id = player ? player.GetPlayerID() : 0;
+                bool InventoryMatches() => (BlueprintStorageCapture.TrySnapshotInventory(inventory, out var current) &&
+                    current.Info == expected.Info && current.Zdo == expected.Zdo) || BlueprintStorageLoadedInventory.Matches(inventory, expected);
+                bool Valid() => Thread.CurrentThread.ManagedThreadId == thread && player && player == Player.m_localPlayer && Player.m_localPlayerExists && game &&
+                    Game.instance == game && !game.IsShuttingDown() && ReferenceEquals(game.GetPlayerProfile(), profile) &&
+                    profile != null && profile.m_fileSource == FileHelpers.FileSource.Local && id != 0 &&
+                    player.GetPlayerID() == id && profile.GetPlayerID() == id && profile.GetPath() == path &&
+                    profile.GetFilename() == filename && profile.GetName() == name &&
+                    !string.IsNullOrWhiteSpace(filename) && !string.IsNullOrWhiteSpace(name) && Path.IsPathRooted(path) &&
+                    Path.GetFileName(path) == filename + ".fch" && ReferenceEquals(player.GetInventory(), inventory) && context() && InventoryMatches();
+                if (expected == null || context == null || !Valid())
+                    throw new InvalidOperationException("Saved credit requires its exact live pair or native loaded projection.");
+                using (var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+                {
+                    if (!NativePlayerProfileReadback.TryVerifyInventoryAndCustomData(file, id, name, expected,
+                        prefab => prefab.GetStableHashCode(), out var parsed, out reason)) return false;
+                    if (!Valid()) throw new InvalidOperationException("Character, inventory or credit custody changed during saved readback.");
+                    evidence = parsed; return true;
+                }
+            }
+            catch (Exception error) { reason = error.Message; return false; }
+        }
+
         internal static bool TryReadSavedCustomData(Player player, Func<bool> context,
             out NativePlayerProfileReadback.CustomDataEvidence evidence, out string reason)
         {

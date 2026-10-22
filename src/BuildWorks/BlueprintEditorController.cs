@@ -2384,7 +2384,7 @@ namespace OstrixMods.BuildWorks
             var copy = new BlueprintEditorDocument(source.SourceBlueprintId, source.Name,
                 source.Category, source.Parts, source.Groups, source.PrimaryPartId,
                 source.PrimaryGroupId, source.CustomSnapPoints, source.Supports,
-                source.PlacementSupportId, source.Sources, source.LibraryOrigins);
+                source.PlacementSupportId, source.Sources, source.LibraryOrigins, source.PeerOrigins);
             foreach (string id in source.Selection) copy.ToggleSelection(id);
             copy.SelectSupport(source.ActiveSupportId);
             return copy;
@@ -3389,7 +3389,7 @@ namespace OstrixMods.BuildWorks
                 source.supports?.Select(support => new BlueprintEditorSupport(support.stableId, support.name,
                     ToPoint(support.position.ToVector3()), ToRotation(support.rotation.ToQuaternion()))),
                 source.placementSupportId, source.sourceDocuments?.Select(evidence => evidence.ToGeometry()),
-                source.libraryOrigins?.Select(origin => origin.ToGeometry()));
+                source.libraryOrigins?.Select(origin => origin.ToGeometry()), source.peerOrigins?.Select(origin => origin.ToGeometry()));
         }
 
         private void ApplyInspector(
@@ -4148,7 +4148,8 @@ namespace OstrixMods.BuildWorks
                             previewYaw = template.previewYaw,
                             previewPitch = template.previewPitch,
                             previewZoom = template.previewZoom,
-                            libraryOrigins = CompositeBlueprintStore.CloneLibraryOrigins(template.libraryOrigins)
+                            libraryOrigins = CompositeBlueprintStore.CloneLibraryOrigins(template.libraryOrigins),
+                            peerOrigins = CompositeBlueprintStore.ClonePeerOrigins(template.peerOrigins)
                         };
                     success = store.TrySaveDocument(
                         copyName ?? document.Name,
@@ -4161,7 +4162,7 @@ namespace OstrixMods.BuildWorks
                         supports,
                         document.PlacementSupportId,
                         out savedBlueprint,
-                        out error, customPoints, template, BuildStoreSources(), BuildStoreLibraryOrigins());
+                        out error, customPoints, template, BuildStoreSources(), BuildStoreLibraryOrigins(), BuildStorePeerOrigins());
                 }
                 else
                     success = store.TryUpdateDocument(
@@ -4175,7 +4176,7 @@ namespace OstrixMods.BuildWorks
                         document.PrimaryGroupId,
                         supports,
                         document.PlacementSupportId,
-                        out error, customPoints, BuildStoreSources(), BuildStoreLibraryOrigins());
+                        out error, customPoints, BuildStoreSources(), BuildStoreLibraryOrigins(), BuildStorePeerOrigins());
                 if (!success)
                 {
                     state = EditorState.Editing;
@@ -4263,12 +4264,17 @@ namespace OstrixMods.BuildWorks
         private List<CompositeBlueprintStore.SourceDocument> BuildStoreSources() => document.Sources
             .Select(CompositeBlueprintStore.SourceDocument.FromGeometry).ToList();
 
+        private List<CompositeBlueprintStore.PeerOrigin> BuildStorePeerOrigins() => document.PeerOrigins
+            .Select(CompositeBlueprintStore.PeerOrigin.FromGeometry).ToList();
+
         private List<CompositeBlueprintStore.LibraryOrigin> BuildStoreLibraryOrigins() => document.LibraryOrigins
             .Select(CompositeBlueprintStore.LibraryOrigin.FromGeometry).ToList();
 
         private static string OriginError(string message) => message == BlueprintLibraryOrigin.LimitError
             ? BuildWorksLocalization.Text("server.origin_limit") : message == BlueprintLibraryOrigin.ConflictError
-            ? BuildWorksLocalization.Text("server.origin_conflict") : message;
+            ? BuildWorksLocalization.Text("server.origin_conflict") : message == BlueprintPeerOrigin.LimitError
+            ? BuildWorksLocalization.Text("peer.origin_limit") : message == BlueprintPeerOrigin.ConflictError
+            ? BuildWorksLocalization.Text("peer.origin_conflict") : message;
 
         private List<CompositeBlueprintStore.Support> BuildStoreSupports() => document.Supports
             .Select(support => new CompositeBlueprintStore.Support

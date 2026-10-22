@@ -18,7 +18,7 @@ namespace OstrixMods.BuildWorks
         private bool cancelled;
         internal readonly SortedDictionary<string, int> OmittedSigns = new SortedDictionary<string, int>(StringComparer.Ordinal);
         internal readonly SortedDictionary<string, int> OmittedState = new SortedDictionary<string, int>(StringComparer.Ordinal);
-        internal int Parts, Groups, Supports, Anchors, Metadata, Sources, MaterialSeeds, CustomSnaps, LibraryOrigins;
+        internal int Parts, Groups, Supports, Anchors, Metadata, Sources, MaterialSeeds, CustomSnaps, LibraryOrigins, PeerOrigins;
         internal int IgnoredSnapPointRows;
         internal int PrefabMigrations;
 
@@ -58,6 +58,7 @@ namespace OstrixMods.BuildWorks
                 Metadata = document.parts.Count(part => part.metadata != null),
                 Sources = document.sourceDocuments?.Count ?? 0,
                 LibraryOrigins = document.libraryOrigins?.Count ?? 0,
+                PeerOrigins = document.peerOrigins?.Count ?? 0,
                 PrefabMigrations = document.parts.Count(part => part.originalPrefabName != null),
                 MaterialSeeds = document.parts.Count(part => part.materialSeed.HasValue),
                 CustomSnaps = document.customSnapPoints?.Count ?? 0,

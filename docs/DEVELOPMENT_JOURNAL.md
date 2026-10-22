@@ -1,5 +1,11 @@
 # BuildWorks development journal
 
+## 2026-10-22 — 313–315: copy provenance and saved-credit recovery
+
+QA **0.19.279** installed, SHA256 `C7708CC1152E458AB7816C0E0AD4D7691A0B4F90090F838B385248C26C470D9B`. New own two-wall E/board paid/cancel/sealed-issuance scenario passed controlled interruption after profile save, fresh-process production recovery without reinsertion, cleanup and another fresh replay:67Wood/12receipts/no sources. All three processes exited normally and bridge3 was restored each time. Limited Local Wood proof, not power-loss, old-world, network or complete-module acceptance. [Fix/evidence315](CHECKPOINT_315.md); [separate .277 failure/QA recovery314](CHECKPOINT_314.md).
+
+Passive peer provenance: [313](CHECKPOINT_313.md), file scope only. The .277 QA finalizer is separate from new-binary acceptance. Verified source/tests/docs use standing source-only push permission; no DLL or saves.
+
 ## 2026-10-22 — 312: saved-credit pair verifier before confirmation
 
 [312](CHECKPOINT_312.md): prepared saved-credit file verification before journal confirmation. Actual Journal.Read and ProfileReadback verify the selected phase, exact inventory, canonical receipt and captured payload SHA512; inputs remain unchanged.11 targeted checks plus missing-argument refusal PASS; real retained .273 confirmed pair is separate from synthetic Intent. StoreTests0/0, payout200+289+9, interruption23 PASS. No new game run. Candidate .277 unchanged/not installed; verified QA .273. Next native refusal/Wood regression/prepared306 interruption after owner game closes. [Candidate boundary311](CHECKPOINT_311.md).

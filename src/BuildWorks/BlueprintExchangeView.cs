@@ -585,7 +585,7 @@ namespace OstrixMods.BuildWorks
             string target = Path.Combine(directory.text, fileName.text);
             contentsDetails.text = T("exchange.plan_review", target, fileName.text, planReview.Parts, planReview.CustomSnaps,
                 planReview.Groups, planReview.Supports, planReview.Anchors, planReview.Metadata, planReview.Sources, planReview.MaterialSeeds);
-            if (planReview.LibraryOrigins > 0) contentsDetails.text += "\n" + T("exchange.plan_origins", planReview.LibraryOrigins);
+            if (planReview.LibraryOrigins + planReview.PeerOrigins > 0) contentsDetails.text += "\n" + T("exchange.plan_origins", planReview.LibraryOrigins + planReview.PeerOrigins);
             if (planReview.PrefabMigrations > 0) contentsDetails.text += "\n" + T("exchange.plan_migrations", planReview.PrefabMigrations);
             if (planReview.IgnoredSnapPointRows > 0)
                 contentsDetails.text += "\n" + T("exchange.snap_trailing_fields", planReview.IgnoredSnapPointRows);

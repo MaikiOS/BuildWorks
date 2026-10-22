@@ -587,7 +587,8 @@ namespace OstrixMods.BuildWorks
                 previewPitch = source.previewPitch,
                 previewZoom = source.previewZoom,
                 sourceDocuments = CompositeBlueprintStore.CloneSources(source.sourceDocuments),
-                libraryOrigins = CompositeBlueprintStore.CloneLibraryOrigins(source.libraryOrigins)
+                libraryOrigins = CompositeBlueprintStore.CloneLibraryOrigins(source.libraryOrigins),
+                peerOrigins = CompositeBlueprintStore.ClonePeerOrigins(source.peerOrigins)
             };
             var ids = source.parts.Select(part => part.stableId).Concat(source.groups.Select(group => group.stableId))
                 .Concat((source.supports ?? new List<CompositeBlueprintStore.Support>()).Select(support => support.stableId))

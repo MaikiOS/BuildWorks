@@ -66,9 +66,8 @@ namespace OstrixMods.BuildWorks
                 else
                 {
                     var credited = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, credit.AfterInfo, credit.AfterBytes, null);
-                    bool UnsettledPair() => SavedCustody() && Matches(credited) && player.m_customData.TryGetValue(key, out string receipt) && receipt == value;
-                    if (!BlueprintStoragePlayerProfile.TryCapture(player, record.Items[index].Id, UnsettledPair, out var recovery, out error) ||
-                        !recovery.TryVerifySavedCredit(out var proof, out error))
+                    bool UnsettledPair() => SavedCustody() && player.m_customData.TryGetValue(key, out string receipt) && receipt == value;
+                    if (!BlueprintStoragePlayerProfile.TryReadSavedCredit(player, credited, UnsettledPair, out var proof, out error))
                         throw new InvalidOperationException(error ?? "Unsettled receipt requires its exact saved credited inventory; no re-credit.");
                     journal.ConfirmSavedCredit(project, record.Operation, index, proof);
                 }

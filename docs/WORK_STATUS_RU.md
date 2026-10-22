@@ -4,7 +4,17 @@
 
 ## Текущая неисправность и правка
 
-[312](CHECKPOINT_312_RU.md): подготовлена файловая сверка сохранённого возврата до подтверждения журнала. Настоящие Journal.Read и ProfileReadback проверяют выбранную фазу, точный инвентарь, каноническую квитанцию и captured payload SHA512; исходники файлов не меняются.11 адресных проверок и отказ при неполной команде PASS; реальная подтверждённая пара .273 отделена от синтетического Intent. StoreTests0/0, payout200+289+9, interruption23 PASS. Это не новый игровой прогон. Кандидат .277 не менялся/не установлен; проверенная QA .273. Далее native ранний отказ/Wood regression/прерывание306 после закрытия игры владельца. [Границы кандидата311](CHECKPOINT_311_RU.md).
+Установлена QA **0.19.279**, SHA256 `C7708CC1152E458AB7816C0E0AD4D7691A0B4F90090F838B385248C26C470D9B`. На новом двухстенном проекте проверены E/табличка, оплата, отмена без native drops, отдельная sealed выдача, контролируемое прерывание после сохранения кредита, полный перезапуск, штатное подтверждение без повторной вставки, cleanup и ещё один полный запуск: Wood67/12receipts/оба источника отсутствуют. Все три процесса штатно закрыты, мост восстановлен. Это ограниченный Local Wood-сценарий, не power-loss/старый мир/сеть или приёмка всего модуля. [Исправление и доказательства315](CHECKPOINT_315_RU.md); [найденный сбой .277 и его отдельное QA-восстановление314](CHECKPOINT_314_RU.md).
+
+**8.7 Причина и решение:** pending recovery сравнивала повторную сериализацию live inventory с первоначальной After-парой. На .277 read-only native наблюдение: Hammer9412→94.1199951→9411 при точном первом Load. Новый reader принимает прежнюю raw pair либо точную native Load-проекцию в памяти, но canonical .fch сверяет только с оригинальными AfterInfo/AfterBytes и полной customData. Сохранены Local identity/thread/profile/inventory reference, source/generation/custody и loaded/disk receipt guards; нет Save/AddItem/допуска. Actual reader/parser/comparator CPU harness:51 load assertions,17 actual recovery-branch checks и отрицательный контроль снятия inventory fence PASS. Отдельный9412 fixture воспроизводит наблюдавшийся Mono mul/conv.i4; это модель данного случая, не полная эквивалентность serializer. Normal/QA0/0, Store/Geometry/EditorBridge/HostContract/localization1132 и независимые correctness/Ponytail PASS. `verify` отсутствует.
+
+**13.7 Файловая часть:** [313](CHECKPOINT_313_RU.md) добавляет пассивное peer provenance в native26/portable15. Store/editor/Undo/экспорт и27 адресных проверок PASS; UI/транспорт/authentication/server receipt/повторные доставки/сеть ещё отсутствуют. Происхождение не является разрешением. Старые бинарники могут не читать новые версии; QA-каталог не мигрировали.
+
+**Следующий шаг:**8.6–8.8 — адресные native ранние отказы отмены и полный инвентарь с освобождением ячейки/повтором; 31 занятая ячейка/1 свободная — предусловие, не разрешение grants/reset или слепой новой выдачи. Затем остальные1–14.
+
+## Прежние доказательства и ограничения
+
+Подготовка312 дала read-only verifier saved inventory+receipt, применённый в314/315; исходные отчёты сохранены.
 
 Первый payout запуск312 отказал из-за sandbox-доступа; тот же тест вне sandbox прошёл, исходный failure log сохранён. SocratiCode:green63841chunks/активный watcher, ArmSavedCreditInterruption найден с0статическими callers; это reflection entry point, не отсутствие реализации. MemPalace вернул прежнее ограничение receipt-only: pending credit требует exact pair, текущий код/новая проверка сверены напрямую. `verify` отсутствует. Production-код/DLL не менялись.
 

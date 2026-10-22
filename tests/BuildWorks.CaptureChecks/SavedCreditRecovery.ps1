@@ -1,12 +1,26 @@
 [CmdletBinding()]
 param([string]$ReportPath = '', [switch]$InventoryNegativeControl)
 $ErrorActionPreference = 'Stop'
+if ($InventoryNegativeControl) {
+    $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+    $output = Join-Path $root 'artifacts/saved-credit-recovery-negative'
+    New-Item -ItemType Directory -Path $output -Force | Out-Null
+    $profile = [IO.File]::ReadAllText((Join-Path $root 'src/BuildWorks/BlueprintStoragePlayerProfile.cs'))
+    $bad = [regex]::Replace($profile, '(?s)bool InventoryMatches\(\) => .*?;', 'bool InventoryMatches() => true;')
+    if ($bad -eq $profile) { throw 'Actual inventory predicate mutation missing.' }
+    $badPath = Join-Path $output 'MissingInventoryFence.cs'
+    [IO.File]::WriteAllText($badPath, $bad)
+    $observed = & pwsh.exe -NoLogo -NoProfile -File (Join-Path $root 'tests/BuildWorks.ContentReservationChecks/Run.ps1') -ProfileSourcePath $badPath 2>&1 | Out-String
+    $observed | Set-Content (Join-Path $output 'negative.log')
+    if (!$observed.Contains('9412 fixture accepted extra wear')) { throw ('Negative control failed: ' + $observed) }
+    'PASS saved-credit recovery negative control: actual reader without inventory fence accepts altered durability and is detected.'
+    return
+}
 $taskSource = Get-Content (Join-Path $PSScriptRoot '../../src/BuildWorks/BlueprintConstructionPayoutCollection.cs') -Raw
 $taskStart = $taskSource.IndexOf('            bool saved = disk.CustomData.TryGetValue', [StringComparison]::Ordinal)
 $taskEnd = $taskSource.IndexOf('            if (loaded || credit != null ||', $taskStart, [StringComparison]::Ordinal)
 if ($taskStart -lt 0 -or $taskEnd -lt $taskStart) { throw 'Actual saved-credit recovery block missing.' }
 $taskBlock = $taskSource.Substring($taskStart, $taskEnd - $taskStart)
-if ($InventoryNegativeControl) { $taskBlock = $taskBlock.Replace('SavedCustody() && Matches(credited) &&', 'SavedCustody() &&') }
 $taskCode = @'
 using System;
 using System.Collections.Generic;
@@ -30,12 +44,11 @@ public static class SavedCreditRecoveryChecks {
  }
  static class BlueprintStoragePlayerProfile {
   public static int Captures,Verifications; public static bool Capture=true,Verify=true;
-  public static Action DuringCapture;public static object Proof=new object();
-  public static bool TryCapture(Player player,Guid entry,Func<bool> guard,out Snapshot recovery,out string error) {
-   Captures++;DuringCapture?.Invoke();recovery=new Snapshot();error="capture refused";return Capture&&guard();
-  }
-  public sealed class Snapshot {
-   public bool TryVerifySavedCredit(out object proof,out string error) { Verifications++;proof=Proof;error="saved proof refused";return Verify; }
+  public static Action DuringCapture;public static object Proof=new object();public static Func<BlueprintForeignPartData,bool> Matches;
+  public static bool TryReadSavedCredit(Player player,BlueprintForeignPartData expected,Func<bool> guard,out object proof,out string error) {
+   Captures++;DuringCapture?.Invoke();proof=Proof;error="saved proof refused";
+   if(!Capture||!guard()||!Matches(expected))return false;
+   Verifications++;return Verify;
   }
  }
  class Item { public Guid Id=Guid.NewGuid(); }
@@ -48,10 +61,10 @@ public static class SavedCreditRecoveryChecks {
    disk.CustomData[key]=value;player.m_customData[key]=value;
   }
   bool SavedCustody()=>Custody;
-  bool Matches(BlueprintForeignPartData expected)=>expected.Info==ActualInfo&&expected.Zdo==ActualBytes;
+  public bool Matches(BlueprintForeignPartData expected)=>expected.Info==ActualInfo&&expected.Zdo==ActualBytes;
   public void Recover() {
    string error;
-   // The actual branch also reads record.Items[index].Id; fixtures only replace host boundaries.
+   // Actual constructor branch; profile reader and journal are host-boundary substitutes.
 __BLOCK__
    throw new InvalidOperationException("No saved receipt/recovery branch");
   }
@@ -60,7 +73,7 @@ __BLOCK__
  static Fixture Fresh() {
   BlueprintStoragePlayerProfile.Captures=BlueprintStoragePlayerProfile.Verifications=0;
   BlueprintStoragePlayerProfile.Capture=BlueprintStoragePlayerProfile.Verify=true;BlueprintStoragePlayerProfile.DuringCapture=null;
-  return new Fixture();
+  var fixture=new Fixture();BlueprintStoragePlayerProfile.Matches=fixture.Matches;return fixture;
  }
  static void Check(bool valid,string message) { checks++;if(!valid)throw new Exception(message); }
  static void Refuse(Action<Fixture> change,string name) {
@@ -94,11 +107,6 @@ __BLOCK__
 Add-Type -TypeDefinition $taskCode.Replace('__BLOCK__', $taskBlock)
 $taskObserved = ''
 try { $taskChecks = [SavedCreditRecoveryChecks]::Run() } catch { $taskObserved = $_.Exception.ToString() }
-if ($InventoryNegativeControl) {
-    if (!$taskObserved.Contains('Unsafe recovery accepted: exact inventory summary')) { throw ('Negative control failed: ' + $taskObserved) }
-    'PASS saved-credit recovery negative control: missing exact inventory comparison detected.'
-    return
-}
 if ($taskObserved) { throw $taskObserved }
 if ($taskChecks -ne 17) { throw ('Recovery coverage differs: ' + $taskChecks) }
 if ($ReportPath) { @{passed=$true;checks=$taskChecks;actualRecoveryBranchCompiled=$true;nativeBoundariesSubstituted=$true;gameHostTested=$false} | ConvertTo-Json | Set-Content $ReportPath }

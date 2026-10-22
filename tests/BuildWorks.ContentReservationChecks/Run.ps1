@@ -2,7 +2,8 @@ param(
     [string]$SourcePath = (Join-Path $PSScriptRoot '../../src/BuildWorks/BlueprintItemStandPlacement.cs'),
     [string]$PreviewSourcePath = (Join-Path $PSScriptRoot '../../src/BuildWorks/PlacementGhostPreviewView.cs'),
     [string]$TransferSourcePath = (Join-Path $PSScriptRoot '../../src/BuildWorks/BlueprintStorageTransfer.cs'),
-    [string]$JournalSourcePath = (Join-Path $PSScriptRoot '../../src/BuildWorks/BlueprintStorageTransferJournal.cs')
+    [string]$JournalSourcePath = (Join-Path $PSScriptRoot '../../src/BuildWorks/BlueprintStorageTransferJournal.cs'),
+    [string]$ProfileSourcePath = (Join-Path $PSScriptRoot '../../src/BuildWorks/BlueprintStoragePlayerProfile.cs')
 )
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -20,7 +21,7 @@ $captureHash = (Get-FileHash -LiteralPath $capturePath).Hash
 $journalPath = (Resolve-Path -LiteralPath $JournalSourcePath).Path
 $journal = [IO.File]::ReadAllText($journalPath)
 $journalHash = (Get-FileHash -LiteralPath $journalPath).Hash
-$profilePath = Join-Path $root 'src/BuildWorks/BlueprintStoragePlayerProfile.cs'
+$profilePath = (Resolve-Path -LiteralPath $ProfileSourcePath).Path
 $profileSource = [IO.File]::ReadAllText($profilePath)
 $profileHash = (Get-FileHash -LiteralPath $profilePath).Hash
 $profileWritePath = Join-Path $root 'src/BuildWorks/BlueprintStorageProfileWrite.cs'
@@ -33,12 +34,13 @@ $creditPath = Join-Path $root 'src/BuildWorks/BlueprintConstructionPayoutCollect
 $creditSource = [IO.File]::ReadAllText($creditPath)
 $creditHash = (Get-FileHash -LiteralPath $creditPath).Hash
 $creditStart = $creditSource.IndexOf('        private bool SavedCustody()', [StringComparison]::Ordinal)
-$creditEnd = $creditSource.IndexOf('        private bool SourceMatches()', [StringComparison]::Ordinal)
+$creditEnd = $creditSource.IndexOf('        internal static bool WithinReach(', [StringComparison]::Ordinal)
 if ($creditStart -lt 0 -or $creditEnd -le $creditStart) { throw 'Credit custody predicate boundary changed.' }
 $creditPredicates = $creditSource.Substring($creditStart, $creditEnd - $creditStart).Replace('private bool', 'internal bool')
 foreach ($required in @('TryReadSavedCustomData(player, SavedCustody', '!SavedCustody())', 'if (SavedCustody() && Matches(after)',
     'bool AfterCustody() => CreditedCustody(after)', 'if (saved && AfterCustody())', 'if (credit.Phase == Journal.ProfileCredited) journal.ConfirmCredit',
-    'bool UnsettledPair() => SavedCustody() && Matches(credited)', 'recovery.TryVerifySavedCredit(out full, out readError) && AfterCustody()')) {
+    'bool UnsettledPair() => SavedCustody() && player.m_customData.TryGetValue(key, out string receipt) && receipt == value',
+    'TryReadSavedCredit(player, credited, UnsettledPair', 'recovery.TryVerifySavedCredit(out full, out readError) && AfterCustody()')) {
     if (-not $creditSource.Contains($required)) { throw "Credit confirmation fence/wiring changed: $required" }
 }
 if ([regex]::Matches($creditSource, 'journal\.Confirm(?:Saved)?Credit\(').Count -ne 4) { throw 'Review the new credit confirmation route.' }

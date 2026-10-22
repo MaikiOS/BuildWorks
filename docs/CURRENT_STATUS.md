@@ -1,5 +1,7 @@
 # Current BuildWorks status
 
+File-only checkpoint307: prior200 + new289 payout assertions PASS. Six synthetic paid rows/five prefabs, distinct same-Wood properties, Unicode/custom data,109→110, sparse indices and exact inventory after each credit/reload. No production change; format fixtures do not prove native prefab variants, payment or profile saving. Verified .273 remains installed; candidate .274 is not installed. Next: native pause reason and prepared saved-credit interruption. [Scope307](CHECKPOINT_307.md).
+
 22 October2026. **Installed QA0.19.273 allows refund pickup in either order.** [305](CHECKPOINT_305.md): native E/buttons completed two-wall4Wood payment, saved removal without native drops and separate issuance; row1 was collected first, a full restart retained row0, then row0 was collected. Another fresh process passed9/9 with exact27inventory records/67Wood/eight receipts/zero sources/no board and115unchanged project hashes. New code reads legacy prefixes; the .272 reader rejects sparse journals, so downgrade needs a separate compatibility check. Physical overlap is unchanged; owner UX, other properties/fault windows and networking remain open. Surface303 is unchanged.
 
 Local **.274 candidate is not installed**: missing-station pause reason clarified; actual-method9/normal+QA0/0/HostContract/localization1129/review PASS. Interruption23PASS is preparation, not native proof. [Scope306](CHECKPOINT_306.md).

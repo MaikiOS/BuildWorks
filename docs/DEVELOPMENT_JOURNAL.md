@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-22 — 307: exact refund properties, file corpus
+
+File-only checkpoint307: prior200 + new289 payout assertions PASS. Six synthetic paid rows/five prefabs, distinct same-Wood properties, Unicode/custom data,109→110, sparse indices and exact inventory after each credit/reload. No production change; format fixtures do not prove native prefab variants, payment or profile saving. Verified .273 remains installed; candidate .274 is not installed. Next: native pause reason and prepared saved-credit interruption. [Scope307](CHECKPOINT_307.md).
+
 ## 2026-10-22 — 306: source pause reason; native recovery prepared
 
 Candidate.274 distinguishes station/DLC/resources after unchanged native refusal;9actual checks/builds0/0/host/localization1129/review PASS. Separate saved-credit interruption helper:23PASS/review, no native injection. Not installed: owner plays Default-Compat-Test; no process/profile intervention or second launch. QA.273 remains verified. [Scope306](CHECKPOINT_306.md).

@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-22 — 304: board cancellation fixed; bounded paid Wood lifecycle
+
+Native E/buttons reproduced the board self-blocking input gate; .272 changes only its synchronous preflight. Old-source RED/new16PASS, builds/contracts/geometry/localization/reviews pass. Two walls:67→63→67Wood via actual QA input/UI, saved removal/issuance, reload, E pickup/cleanup; independent .fch proof and fresh-process10/10/109unchanged hashes. Three normal exits/restores,97old hashes/4141ordinary metadata unchanged. Overlapping refunds hide a required order: next open8.7–8.8 slice, not accepted UX. [Evidence and retained failed setups](CHECKPOINT_304.md).
+
 ## 2026-10-22 — 302–303: board route / surface without volume
 
 Connected durable paid-board cancellation/refund (.270):30router,64/175journal checks, normal/QA/host/localization/review pass. Then owner explicitly authorized disabling only separate volume rendering (.271); Update/OnPreCull IL and shader/compute remain unchanged. Main-monitor3440×1440 launch corrected. Full native paid UI and surface visual acceptance remain open. [302](CHECKPOINT_302.md), [303](CHECKPOINT_303.md).

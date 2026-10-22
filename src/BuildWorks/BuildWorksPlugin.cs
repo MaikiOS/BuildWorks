@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.271";
+        internal const string PluginVersion = "0.19.272";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -733,7 +733,7 @@ namespace OstrixMods.BuildWorks
 
         private static bool ShouldBlockPlayerInput(Player player)
         {
-            if (instance?.constructionProjects?.BlocksInput == true) return true;
+            if (instance?.constructionProjects?.BlocksInput == true && instance?.session?.ProbingNativeInput != true) return true;
             if (HammerCatalogView.BlocksExchangeInput) return true;
             if (instance?.blueprintEditor?.BlocksWorldInput == true) return true;
             return instance?.session?.ShouldBlockPlayerInput(player) == true;

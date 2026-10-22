@@ -456,6 +456,7 @@ namespace OstrixMods.BuildWorks
         private object externalBuildCameraYaw;
         private object externalBuildCameraPitch;
         private bool probingNativeInput;
+        internal bool ProbingNativeInput => probingNativeInput;
         private bool allowNativeGhostUpdate;
         private bool requestAutomaticPlacement;
         private bool automaticPlacementRunning;

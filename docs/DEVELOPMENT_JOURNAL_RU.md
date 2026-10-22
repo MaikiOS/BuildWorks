@@ -1,5 +1,9 @@
 # Журнал разработки BuildWorks
 
+## 2026-10-22 — 304: исправлена отмена через табличку, полный локальный цикл Wood
+
+В .271 native E/кнопки воспроизвели отказ из-за собственного input guard; .272 исправляет только синхронный preflight. Old-source RED/new16PASS, сборки/контракты/geometry/localization/review PASS. Две стены:67→63→67Wood через настоящий UI, saved removal/issuance, reload, guarded E-подбор иcleanup; независимое .fch proof и новый процесс10/10/109SHA без дублей. Три normal exits/bridge restores,97old SHA/4141ordinary metadata прежние. Найден скрытый порядок перекрывающихся возвратов — следующий открытый срез8.7–8.8, не готовый UX. [Подробности и сохранённые неудачи](CHECKPOINT_304_RU.md).
+
 ## 2026-10-22 — 302–303: board route / surface without volume
 
 Подключена кнопка оплаченной отмены/возврата (.270):30проверок маршрута,64/175журналов, normal/QA/host/localization/review PASS. Затем по явному решению Ostrix отключён только отдельный объёмный проход (.271); Update/OnPreCull IL и shader/compute прежние. Исправлен запуск на основном3440×1440. Полный paid native UI и визуальная приёмка поверхности открыты. [302](CHECKPOINT_302_RU.md), [303](CHECKPOINT_303_RU.md).

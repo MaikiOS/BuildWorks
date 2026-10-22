@@ -17,6 +17,11 @@ namespace OstrixMods.BuildWorks.StoreTests
             Directory.CreateDirectory(directory);
             try
             {
+                if (args.Length > 0 && args[0] == "--saved-credit-evidence")
+                {
+                    if (args.Length != 9) throw new ArgumentException("--saved-credit-evidence projects world project profile name index intent|credited profilePayloadSHA512");
+                    SavedCreditEvidence.Run(args, directory); return 0;
+                }
                 if (args.Length == 2 && args[0] == "--roundtrip-corpus")
                 { CorpusRoundTripChecks.Run(args[1], directory); return 0; }
                 if ((args.Length == 2 || args.Length == 3) && args[0] == "--import-timings")

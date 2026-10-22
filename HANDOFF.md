@@ -1,6 +1,6 @@
 # BuildWorks continuation
 
-Current handoff after311: [HANDOFF_NEXT_SESSION_RU](docs/HANDOFF_NEXT_SESSION_RU.md). Local .277 candidate is not installed; verified QA remains .273. Known issuance overflow and refund properties are checked before removal; native recovery pending. Older history remains below.
+Current handoff after312: [HANDOFF_NEXT_SESSION_RU](docs/HANDOFF_NEXT_SESSION_RU.md). Exact saved-credit/receipt verifier prepared before confirmation; no new game run. Candidate .277 unchanged/not installed; verified QA .273. Older history remains below.
 
 **QA .241 installed:** shader reuses validated state/clock;14 RGB comparisons against the previous path are exactly zero. ValheimQA passed7/7+59/59:4 passes through a four-section wall,482 frames,467456 exact inner texels; all16 recovered parts have zero fields/flags. Inventory unchanged, own fixture closed, normal exit and bridge3/3 restored. **Whole-house fog remains unfixed:** two48s GPU attempts failed at queue64 after37.01s/39.85s; repetitions stopped. RAM reuse remains disabled in the game. [Evidence](docs/CHECKPOINT_241.md).
 

@@ -1,0 +1,11 @@
+# Checkpoint312 — saved-credit file evidence
+
+2026-10-22. Production code and candidate **.277** are unchanged; installed verified QA remains **.273**. Owner Valheim PID57236/Default-Compat-Test was confirmed outside the sandbox. No Deploy, Prepare or launch.
+
+StoreTests now provides `--saved-credit-evidence projects world project profile name index intent|credited profilePayloadSHA512`. It validates temporary copies with the actual PayoutJournal.Read and compares the profile using actual NativePlayerProfileReadback.TryVerifyInventoryAndCustomData: exact AfterInfo/AfterBytes, canonical receipt and the externally captured uppercase payload SHA512. Inputs are rechecked unchanged; no credit confirmation, source cleanup or game calls occur. The old one-off extraction305 only accepted an already confirmed row.
+
+Build StoreTests first. For the prepared306 interruption, use a NEW current QA project, `intent` after hook triggers=1 and its `savedProfileHash`. Never substitute a full-file SHA256 or old run hash. Verify the retained pair before E in the fresh unpatched process; then collect normally without another insertion, verify cleanup and another fresh replay. Caller parameter provenance, PID/profile/cloud, hook trigger, native input and restart remain separate evidence. Never reissue settled305 or edit old journals. [Commands and exact boundary](CHECKPOINT_312_RU.md).
+
+StoreTests build0/0;11 targeted checks plus missing-argument negative passed. Real retained .273 confirmed pair passed. Opposite stage/hash/name/index, a valid receipt with a different exact inventory, corrupt payout/profile and missing canonical receipt refused. A canonically serialized temporary synthetic CreditIntent passed only as intent; it is not native interruption proof. Original files remained unchanged.
+
+Payout200+property289+capacity9 and interruption guard23 passed. First payout attempt failed with sandbox access denied; retained `payout-sandbox-denied.log`, same check passed outside sandbox. `verify` is absent; direct review and targeted checks were used. Evidence: `artifacts/checkpoint-312/` logs/reports. No mod DLL rebuild/deploy was needed. Native refusal/interruption/recovery for .277 and the full14-section goal remain unverified.

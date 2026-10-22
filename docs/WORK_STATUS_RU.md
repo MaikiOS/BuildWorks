@@ -1,6 +1,6 @@
 # BuildWorks — техническое состояние и доказательства
 
-Проверенный source-only checkpoint316 [5ccb523](https://github.com/MaikiOS/BuildWorks/commit/5ccb5232a7978baabc756900233ade3f7e9ffec4) отправлен в main; remote SHA сверён.13 файлов QA-исходников/теста/документов, без DLL и сохранений. Native освобождение ячейки/повтор ещё не выполнены.
+Проверенный source-only checkpoint317 [d46bbd1](https://github.com/MaikiOS/BuildWorks/commit/d46bbd1327cac38813372a5b9f6394bbb2b27e37) отправлен в main; remote SHA сверён.30 файлов кода/тестов/документов, без DLL и сохранений. Кандидат .280 не установлен; проверенная QA .279 прежняя.
 
 Обновлено: 22.10.2026. Требования и галочки находятся в [живом списке](LIVE_CHECKLIST_RU.md), по тем же номерам 1–14. Здесь — факты, ограничения, причины и следующий технический шаг. Хронология — в [журнале](DEVELOPMENT_JOURNAL_RU.md); [правила](PROGRESS_RULES_RU.md).
 

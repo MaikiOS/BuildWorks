@@ -1,5 +1,7 @@
 # 317 — durable local accepted-copy receipts
 
+Verified source-only checkpoint317 [d46bbd1](https://github.com/MaikiOS/BuildWorks/commit/d46bbd1327cac38813372a5b9f6394bbb2b27e37) pushed to main; remote SHA confirmed.30 source/test/doc files, no DLLs or saves. Candidate280 is not installed; verified QA279 remains unchanged.
+
 Candidate **0.19.280 is NOT installed**. Verified installed QA **0.19.279** retains SHA256
 `C7708CC1152E458AB7816C0E0AD4D7691A0B4F90090F838B385248C26C470D9B`.
 No game/network317 run. All14 goal sections remain required.

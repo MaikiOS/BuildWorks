@@ -2,6 +2,8 @@
 
 ## 2026-10-22 — 317: durable accepted-copy receipts
 
+Verified source-only checkpoint317 [d46bbd1](https://github.com/MaikiOS/BuildWorks/commit/d46bbd1327cac38813372a5b9f6394bbb2b27e37) pushed to main; remote SHA confirmed.30 source/test/doc files, no DLLs or saves. Candidate280 is not installed; verified QA279 remains unchanged.
+
 **Source317 / candidate .280, NOT installed:** durable local acceptance now returns the original copy ID without another card/write on an exact retry; deleted accepted copies remain deleted. Card+receipt use one atomic Save, native27/portable15.50 targeted file checks, Store/Geometry/EditorBridge, normal+QA0/0, HostContract/localization1135 PASS. No working wire/UI caller yet; this is not authentication or network acceptance. [Result and limits317](CHECKPOINT_317.md). Verified installed QA remains **.279**.
 
 **QA order:** finish316 on installed279 first. After owner exit restore bridge run185641 before Prepare. Do not deploy280 over the pending316 refund retry; its helper is pinned279. The QA catalogue was not migrated to27. Existing316 instructions below remain in force; all14 goal sections stay active.

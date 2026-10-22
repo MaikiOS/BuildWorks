@@ -1,4 +1,4 @@
-**Current local QA0.19.272:** board cancellation fixed; a bounded two-wall paid cycle passes through pickup/cleanup and a fresh process. Pickup-order UX, other items/faults/networking remain open. Surface303 is unchanged. [Evidence304](docs/CHECKPOINT_304.md), [full checklist](docs/LIVE_CHECKLIST_RU.md).
+**Current local QA0.19.273:** two-wall refunds collected in reverse order through E, with a fresh process between items and after completion. Other properties/faults/UX/network remain open. [Evidence305](docs/CHECKPOINT_305.md), [full checklist](docs/LIVE_CHECKLIST_RU.md).
 
 # BuildWorks
 
@@ -12,7 +12,7 @@ BuildWorks extends Valheim's hammer with precise construction, a blueprint catal
 
 ![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
 
-**Source/isolated QA:0.19.272; bounded paid UI passes, pickup-order UX and general acceptance remain open.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. Its ZIP does not contain the newer source features. No new public binary release has been published.
+**Source/isolated QA:0.19.273; bounded paid UI and either-order pickup pass, general acceptance is open.** Latest public binary: [0.19.37 alpha](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.37-alpha), a historical prerelease. No new public binary release.
 
 Historical [.240](docs/CHECKPOINT_240.md) preserves two failed fog experiments. Memory reuse is **disabled** in normal/QA builds; whole-house fog remains unfixed. No .240 Valheim run.
 

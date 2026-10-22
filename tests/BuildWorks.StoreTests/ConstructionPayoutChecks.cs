@@ -100,6 +100,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             Check(journal.Paid(plan.Id).Sum(p => p.Paid) == 4 && journal.Read(plan.Id).Items.Length == 2, "Exact contribution set changed.");
             Check(saved.Collections == null && !Encoding.UTF8.GetString(terminal).Contains("Collections"), "Additive credit changed legacy canonical bytes.");
             TerminalChecks(plans, journal, removal, plan.Id, operation, after, path);
+            ReverseCreditChecks(journal, plan.Id, operation, after, path);
             CreditChecks(journal, plan.Id, operation, after, path);
             Console.WriteLine("PASS payout journal: " + assertions + " assertions; exact paid properties/quantity, durable one-shot intents, replay, corruption and paired-save binding. Native issuance/collection is not claimed.");
             Journal.Record Prepare(Journal.Entry[] rows) => journal.Prepare(plan.Id, operation, 17, 8, after, rows);
@@ -229,7 +230,8 @@ namespace OstrixMods.BuildWorks.StoreTests
             Refuse<InvalidDataException>(() => Journal.CreditInventory(before, Package(2, 2, Guid.NewGuid()), paid, 2, 0));
             Refuse<InvalidDataException>(() => Journal.CreditInventory(before, Package(2, 2, Guid.Empty, durability: 999), paid, 2, 0));
             Refuse<InvalidDataException>(() => Journal.CreditInventory(before, Package(2, 2, Guid.Empty, custom: false), paid, 2, 0));
-            Refuse<InvalidOperationException>(() => journal.BeginCredit(project, operation, 1, before, clean, 2, 0, new string('A', 128)));
+            Refuse<InvalidOperationException>(() => journal.BeginCredit(project, operation, -1, before, clean, 2, 0, new string('A', 128)));
+            Refuse<InvalidOperationException>(() => journal.BeginCredit(project, operation, 2, before, clean, 2, 0, new string('A', 128)));
             Refuse<InvalidDataException>(() => journal.BeginCredit(project, operation, 0, before, clean, 2, 0, "short"));
             Check(journal.Read(project).Collections == null, "Rejected credit intent mutated legacy state.");
             var intent = journal.BeginCredit(project, operation, 0, before, clean, 2, 0, new string('A', 128));
@@ -287,6 +289,74 @@ namespace OstrixMods.BuildWorks.StoreTests
                 "Collection falsely settled world cleanup/cancellation.");
             Check(!Encoding.UTF8.GetString(File.ReadAllBytes(path)).Contains("\"Removal\":"), "Unset cleanup changed prior canonical credit bytes.");
             CleanupChecks(journal, project, operation, path);
+        }
+        private static void ReverseCreditChecks(Journal journal, Guid project, Guid operation, BlueprintForeignPartData before, string path)
+        {
+            byte[] original = File.ReadAllBytes(path);
+            try
+            {
+                var pending = journal.BeginCredit(project, operation, 1, before, Package(2, 2, Guid.Empty), 2, 0, new string('A', 128));
+                Check(pending.Collections.Length == 2 && pending.Collections[0] == null && pending.Collections[1].Phase == Journal.CreditIntent,
+                    "Second hovered row did not reserve its own index with an empty first slot.");
+                Check(journal.Read(project).Collections[0] == null, "Reload filled an uncollected slot.");
+                string key = Journal.ReceiptKey(pending.Items[1].Id), value = Journal.ReceiptValue(pending, 1);
+                var firstAfter = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, pending.Collections[1].AfterInfo, pending.Collections[1].AfterBytes, null);
+                byte[] intent = File.ReadAllBytes(path);
+                Refuse<InvalidOperationException>(() => journal.BeginCredit(project, operation, 0, firstAfter, Package(2, 3, Guid.Empty), 3, 0, new string('A', 128)));
+                Refuse<InvalidOperationException>(() => journal.ConfirmCredit(project, operation, 0, Proof(17, key, value)));
+                Refuse<InvalidOperationException>(() => journal.BeginCleanup(project, operation, 0, 9, Proof(17, key, value)));
+                Refuse<InvalidOperationException>(() => journal.BeginCleanup(project, operation, 1, 9, Proof(17, key, value)));
+                Check(intent.SequenceEqual(File.ReadAllBytes(path)), "Refused sparse operation changed its intent.");
+                Refuse<InvalidOperationException>(() => journal.ConfirmSavedCredit(project, operation, 1, FullProof(17, key, value, before)));
+                var credited = journal.ConfirmSavedCredit(project, operation, 1, FullProof(17, key, value, firstAfter));
+                Check(credited.Revision == 9 && credited.Collections[0] == null, "Sparse credit changed the wrong row or revision.");
+                journal.BeginCleanup(project, operation, 1, 9, Proof(17, key, value));
+                Refuse<InvalidOperationException>(() => journal.BeginCredit(project, operation, 0, firstAfter, Package(2, 3, Guid.Empty), 3, 0, new string('B', 128)));
+                var absence = (NativeWorldStorageReadback.AbsenceEvidence)Activator.CreateInstance(typeof(NativeWorldStorageReadback.AbsenceEvidence),
+                    BindingFlags.Instance | BindingFlags.NonPublic, null, new object[] {
+                        new NativeWorldStorageReadback.AbsenceExpectation(42, Journal.ItemMarkerKey, new[] { pending.Items[1].Id }), 36, 1, 0, (uint)10 }, null);
+                journal.ConfirmCleanup(project, operation, 1, absence, Proof(17, key, value));
+                var second = journal.BeginCredit(project, operation, 0, firstAfter, Package(2, 3, Guid.Empty), 3, 0, new string('B', 128));
+                Check(second.Collections[0].Phase == Journal.CreditIntent && second.Collections[1].Removal.Phase == Journal.CleanupSaved,
+                    "Lower-index pending credit lost the already cleaned higher row.");
+                string key0 = Journal.ReceiptKey(second.Items[0].Id), value0 = Journal.ReceiptValue(second, 0);
+                var finalInventory = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, second.Collections[0].AfterInfo, second.Collections[0].AfterBytes, null);
+                journal.ConfirmSavedCredit(project, operation, 0, FullProof(17, key0, value0, finalInventory));
+                var done = journal.Read(project); byte[] settled = File.ReadAllBytes(path);
+                Check(done.Revision == 13 && done.Collections.All(c => c.Phase == Journal.ProfileCredited), "Reverse-order reload did not retain both saved credits.");
+                Refuse<InvalidOperationException>(() => journal.BeginCredit(project, operation, 1, finalInventory, Package(2, 4, Guid.Empty), 4, 0, new string('C', 128)));
+                journal.ConfirmCredit(project, operation, 1, Proof(17, key, value));
+                Check(settled.SequenceEqual(File.ReadAllBytes(path)), "Reverse-order receipt replay changed durable bytes.");
+                Malformed(r => { r.Collections = new Journal.Collection[2]; r.Revision = 7; });
+                Malformed(r => r.Collections[0].Entry = r.Items[1].Id);
+                Malformed(r => r.Revision++);
+                Malformed(r => {
+                    foreach (var c in r.Collections) { c.Phase = Journal.CreditIntent; c.SavedProfileHash = null; }
+                    r.Collections[1].Removal = null; r.Revision = 9;
+                });
+                Malformed(r => {
+                    r.Collections[0].Phase = Journal.CreditIntent; r.Collections[0].SavedProfileHash = null;
+                    r.Collections[1].Removal.Phase = Journal.CleanupIntent; r.Collections[1].Removal.SavedGeneration = 0; r.Revision = 11;
+                });
+                void Malformed(Action<Journal.Record> change)
+                {
+                    var record = journal.Read(project); change(record);
+                    using (var body = new MemoryStream())
+                    {
+                        new System.Runtime.Serialization.Json.DataContractJsonSerializer(typeof(Journal.Record)).WriteObject(body, record);
+                        byte[] bytes = body.ToArray();
+                        using (var file = new FileStream(path, FileMode.Create, FileAccess.Write))
+                        using (var writer = new BinaryWriter(file))
+                        using (var sha = SHA256.Create())
+                        { writer.Write(original, 0, 8); writer.Write(bytes.Length); writer.Write(bytes); writer.Write(sha.ComputeHash(bytes)); }
+                    }
+                    byte[] hostile = File.ReadAllBytes(path);
+                    Refuse<InvalidDataException>(() => journal.Read(project));
+                    Check(hostile.SequenceEqual(File.ReadAllBytes(path)), "Malformed sparse read mutated its file.");
+                    File.WriteAllBytes(path, settled);
+                }
+            }
+            finally { File.WriteAllBytes(path, original); }
         }
         private static void CleanupChecks(Journal journal, Guid project, Guid operation, string path)
         {

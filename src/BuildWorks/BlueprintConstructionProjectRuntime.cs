@@ -260,7 +260,7 @@ namespace OstrixMods.BuildWorks
         private void StartCollection(Guid id, int index)
         {
             var next = new BlueprintConstructionPayoutCollection(store, id, index);
-            Close(); collection = next;
+            Close(); collection = next; Failure = null;
             if (next.Status == "profile-credited") { cleanupProjects.Add(id); cancellationProjects.Add(id); }
         }
 
@@ -281,8 +281,8 @@ namespace OstrixMods.BuildWorks
                 if (store.Load(id).Cancelled) return;
                 var record = new BlueprintConstructionPayoutJournal(store).Read(id);
                 if (record?.Phase != BlueprintConstructionPayoutJournal.IssuedSaved || record.Player != Player.m_localPlayer.GetPlayerID() ||
-                    record.Collections?.Any(c => c.Phase != BlueprintConstructionPayoutJournal.ProfileCredited ||
-                        c.Removal?.Phase == BlueprintConstructionPayoutJournal.CleanupIntent) == true) return;
+                    record.Collections?.Any(c => c != null && (c.Phase != BlueprintConstructionPayoutJournal.ProfileCredited ||
+                        c.Removal?.Phase == BlueprintConstructionPayoutJournal.CleanupIntent)) == true) return;
                 // An existing credit/cleanup intent completes through its own recovery path, then queues this read-only finalizer.
                 paidCancellation = new BlueprintConstructionPaidCancellation(store, id);
             }
@@ -348,9 +348,9 @@ namespace OstrixMods.BuildWorks
             {
                 var record = new BlueprintConstructionPayoutJournal(store).Read(id);
                 if (record?.Phase != BlueprintConstructionPayoutJournal.IssuedSaved || record.Player != Player.m_localPlayer.GetPlayerID() ||
-                    record.Collections == null || record.Collections.Any(c => c.Phase != BlueprintConstructionPayoutJournal.ProfileCredited)) return;
-                int index = Array.FindIndex(record.Collections, c => c.Removal?.Phase == BlueprintConstructionPayoutJournal.CleanupIntent);
-                if (index < 0) index = Array.FindIndex(record.Collections, c => c.Removal == null);
+                    record.Collections == null || record.Collections.Any(c => c != null && c.Phase != BlueprintConstructionPayoutJournal.ProfileCredited)) return;
+                int index = Array.FindIndex(record.Collections, c => c?.Removal?.Phase == BlueprintConstructionPayoutJournal.CleanupIntent);
+                if (index < 0) index = Array.FindIndex(record.Collections, c => c != null && c.Removal == null);
                 if (index < 0) return;
                 // Constructor/Tick alone own the exact source, saved receipt and N/N+1 recovery checks.
                 cleanup = new BlueprintConstructionPayoutCleanup(store, id, index);

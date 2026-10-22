@@ -1,4 +1,36 @@
-# Продолжение BuildWorks после проверки таблички и возврата304
+# Продолжение BuildWorks после произвольного порядка возврата305
+
+## Актуально после305, 22.10.2026
+
+Весь GOAL_FULL_RU.md остаётся активной целью;115ID/16галочек/14разделов сохранены.
+Установлена QA0.19.273, SHA `2A5F8CBAB7D540592BDB0F8F2712913D6FDFE772B9AAAFEEEF5AFA029155CBD4`; guarded deploy, artifacts/checkpoint-305.
+Новый9d2568de03664632ac211e673fa1db2d прошёл E/табличку:2стены/4Wood67→63,
+removed-saved без native drops, отдельный issued-saved/terminal. Второй предмет
+ee14fc4f991f43f5b45d4fd724b8855f получен первым63→65/CleanupSaved/nullrow0.
+НовыйPID57920:9/9,115SHA прежние; первый6ca6341b953144c580a2d46ce28c70c0
+получен последним65→67/обаCleanupSaved. НовыйPID50652:9/9/exact27inventory
+records/8receipts/67Wood/0sources/нет таблички/115SHA прежние. Два независимых
+.fch extraction exact AfterBytes index1/index0. Проект terminal; не перевыдавать.
+109старых project-файлов прежние,6новых только этого проекта;4141ordinary metadata
+иeffective cfg прежние. Три normalQuit/restore3, PID43308/57920/50652 отсутствуют,
+Hammer восстановлен. Runs142218/143123/143544 закрыты; перед QA снова Prepare.
+Collections сохраняет immutable Items indices с null holes; old prefixes читаются
+без миграции. .272 sparse не понимает и отказывает: не делать blind downgrade.
+Один unsettled credit/cleanup, без overlap; fresh ctor отказывает до baseline save.
+Payout200/cancellation64/admission7+negative control/interaction63/finalizer57/
+board16/router30/normal+QA0/0/host/geometry/localization1127/reviews PASS.
+verify отсутствует. Полная цель не выполнена. Следующий8.7–8.8 — разные свойства
+предметов и значимые save/credit/cleanup interruption windows. Старые долги и новые
+settled304–305 не восстанавливать; никаких grants/reset/terrain edits. Перекрытие
+источников физически прежнее, скрытого обязательного порядка уже нет. Owner UX,
+общий recovery/secondary collapse/host+remote открыты. HaveRequirements всё ещё
+ошибочно называет отсутствие верстака нехваткой ресурсов; отдельная маленькая правка.
+Surface303 без volume прежняя, EarthWorks не подключать. Детали:CHECKPOINT_305_RU.md.
+
+## Историческая передача304
+
+Ниже — прежний снимок. Предложение показывать обязательный порядок устарело:
+305 разрешает получение в любом порядке при прежних денежных проверках.
 
 ## Актуально после304, 22.10.2026
 

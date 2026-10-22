@@ -40,8 +40,8 @@ namespace OstrixMods.BuildWorks
             var credit = JsonUtility.FromJson<CollectionReceipt>(CollectionStatus());
             return JsonUtility.ToJson(new CleanupReceipt { wood = credit.wood, credits = credit.credits,
                 savedReceipts = credit.savedReceipts, diskRead = credit.diskRead, cancelled = credit.cancelled,
-                cleaned = payout.Collections?.Count(c => c.Removal?.Phase == BlueprintConstructionPayoutJournal.CleanupSaved) ?? 0,
-                pending = payout.Collections?.Count(c => c.Removal?.Phase == BlueprintConstructionPayoutJournal.CleanupIntent) ?? 0,
+                cleaned = payout.Collections?.Count(c => c?.Removal?.Phase == BlueprintConstructionPayoutJournal.CleanupSaved) ?? 0,
+                pending = payout.Collections?.Count(c => c?.Removal?.Phase == BlueprintConstructionPayoutJournal.CleanupIntent) ?? 0,
                 sources = sources, status = active?.Project == payoutTarget ? active.Status : null,
                 reason = active?.Project == payoutTarget ? active.Reason : null, index = active?.Project == payoutTarget ? active.Index : -1,
                 destroyCalls = active?.Project == payoutTarget ? active.DestroyCalls : 0,
@@ -73,13 +73,12 @@ namespace OstrixMods.BuildWorks
                 if (read && disk.CustomData.TryGetValue(key, out string saved) && saved == value &&
                     player.m_customData.TryGetValue(key, out string loaded) && loaded == value) receipts++;
             }
-            var last = payout.Collections?.LastOrDefault();
-            bool exact = last != null && BlueprintStorageCapture.TrySnapshotInventory(player.GetInventory(), out var current) &&
-                current.Info == last.AfterInfo && current.Zdo == last.AfterBytes;
+            bool exact = BlueprintStorageCapture.TrySnapshotInventory(player.GetInventory(), out var current) &&
+                payout.Collections?.Any(c => c?.Phase == BlueprintConstructionPayoutJournal.ProfileCredited && current.Info == c.AfterInfo && current.Zdo == c.AfterBytes) == true;
             var active = runtime.Collection;
             return JsonUtility.ToJson(new CollectionReceipt { id = payoutTarget.ToString("N"), revision = payout.Revision,
-                credits = payout.Collections?.Count(c => c.Phase == BlueprintConstructionPayoutJournal.ProfileCredited) ?? 0,
-                savedReceipts = receipts, diskRead = read, diskError = error, exactLastInventory = exact,
+                credits = payout.Collections?.Count(c => c?.Phase == BlueprintConstructionPayoutJournal.ProfileCredited) ?? 0,
+                savedReceipts = receipts, diskRead = read, diskError = error, exactCreditedInventory = exact,
                 wood = player.GetInventory().GetAllItems().Where(i => i.m_dropPrefab && i.m_dropPrefab.name == "Wood").Sum(i => i.m_stack),
                 status = active?.Project == payoutTarget ? active.Status : null, reason = active?.Project == payoutTarget ? active.Reason : null,
                 saveAttempts = active?.Project == payoutTarget ? active.SaveAttempts : 0,
@@ -90,7 +89,7 @@ namespace OstrixMods.BuildWorks
             public string id, status, reason, diskError;
             public long revision;
             public int credits, savedReceipts, wood, saveAttempts, blockedSaves;
-            public bool diskRead, exactLastInventory, cancelled;
+            public bool diskRead, exactCreditedInventory, cancelled;
         }
         public static string SelectPayout(string id)
         {

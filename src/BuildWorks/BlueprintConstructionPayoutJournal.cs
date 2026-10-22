@@ -180,14 +180,17 @@ namespace OstrixMods.BuildWorks
             using (plans.Lock(project))
             {
                 var r = Require(project, operation);
-                if (r.Phase != IssuedSaved || index != (r.Collections?.Length ?? 0) || index >= r.Items.Length ||
-                    r.Collections?.Any(c => c.Phase != ProfileCredited || c.Removal?.Phase == CleanupIntent) == true)
-                    throw new InvalidOperationException("Credit intent cannot be repeated, skipped or started after an uncertain row.");
+                if (r.Phase != IssuedSaved || index < 0 || index >= r.Items.Length ||
+                    r.Collections?.ElementAtOrDefault(index) != null ||
+                    r.Collections?.Any(c => c != null && (c.Phase != ProfileCredited || c.Removal?.Phase == CleanupIntent)) == true)
+                    throw new InvalidOperationException("Credit intent cannot be repeated or started while another row is unsettled.");
                 var after = CreditInventory(before, cleanItem, Paid(project)[index], x, y);
                 var credit = new Collection { Entry = r.Items[index].Id, Phase = CreditIntent, X = x, Y = y,
                     BeforeInfo = before.Info, BeforeBytes = before.Zdo, AfterInfo = after.Info, AfterBytes = after.Zdo,
                     BeforeProfileHash = beforeProfileHash, ItemBlob = cleanItem };
-                r.Collections = (r.Collections ?? Array.Empty<Collection>()).Concat(new[] { credit }).ToArray();
+                // Slots bind immutable payout rows; an empty slot has never begun credit.
+                if (r.Collections == null || r.Collections.Length <= index) Array.Resize(ref r.Collections, index + 1);
+                r.Collections[index] = credit;
                 r.Revision++; Write(r, true); return Read(project);
             }
         }
@@ -201,7 +204,7 @@ namespace OstrixMods.BuildWorks
             using (plans.Lock(project))
             {
                 var r = Require(project, operation);
-                if (index < 0 || r.Collections == null || index >= r.Collections.Length || player != r.Player || customData == null ||
+                if (index < 0 || r.Collections == null || index >= r.Collections.Length || r.Collections[index] == null || player != r.Player || customData == null ||
                     !Hash(hash, 128) || !customData.TryGetValue(ReceiptKey(r.Items[index].Id), out string value) || value != ReceiptValue(r, index))
                     throw new InvalidOperationException("Saved canonical receipt does not bind this payer and original payout row.");
                 if (full != null && (full.Inventory?.Info != r.Collections[index].AfterInfo || full.Inventory?.Zdo != r.Collections[index].AfterBytes))
@@ -219,8 +222,8 @@ namespace OstrixMods.BuildWorks
             {
                 var r = Require(project, operation);
                 RequireCleanupReceipt(r, index, profile);
-                if (r.Collections.Any(c => c.Phase != ProfileCredited) || generation == 0 || generation == uint.MaxValue || generation < r.Saved.Generation ||
-                    r.Collections.Where((c, i) => i != index).Any(c => c.Removal?.Phase == CleanupIntent))
+                if (r.Collections.Any(c => c != null && c.Phase != ProfileCredited) || generation == 0 || generation == uint.MaxValue || generation < r.Saved.Generation ||
+                    r.Collections.Where((c, i) => i != index).Any(c => c?.Removal?.Phase == CleanupIntent))
                     throw new InvalidOperationException("Cleanup requires one current saved-world intent at a time.");
                 var c = r.Collections[index];
                 if (c.Removal != null)
@@ -254,7 +257,7 @@ namespace OstrixMods.BuildWorks
         private static void RequireCleanupReceipt(Record r, int index, NativePlayerProfileReadback.CustomDataEvidence profile)
         {
             if (r.Phase != IssuedSaved || index < 0 || r.Collections == null || index >= r.Collections.Length ||
-                r.Collections[index].Phase != ProfileCredited || profile == null || profile.CustomData == null || profile.Player != r.Player || !Hash(profile.ProfileHash, 128) ||
+                r.Collections[index]?.Phase != ProfileCredited || profile == null || profile.CustomData == null || profile.Player != r.Player || !Hash(profile.ProfileHash, 128) ||
                 !profile.CustomData.TryGetValue(ReceiptKey(r.Items[index].Id), out string value) || value != ReceiptValue(r, index))
                 throw new InvalidOperationException("Only a durably credited row with its payer's canonical receipt permits source cleanup.");
         }
@@ -364,13 +367,13 @@ namespace OstrixMods.BuildWorks
                 throw new InvalidDataException("Payout rows cannot share a native item identity.");
             if (r.Collections != null)
             {
-                if (r.Phase != IssuedSaved || r.Collections.Length == 0 || r.Collections.Length > r.Items.Length)
-                    throw new InvalidDataException("Credit records require saved issuance and a nonempty ordered prefix.");
+                if (r.Phase != IssuedSaved || r.Collections.Length == 0 || r.Collections.Length > r.Items.Length || r.Collections.All(c => c == null))
+                    throw new InvalidDataException("Credit records require saved issuance and at least one bound row.");
                 for (int i = 0; i < r.Collections.Length; i++)
                 {
                     var c = r.Collections[i];
-                    if (c == null || c.Entry != r.Items[i].Id || c.Phase < CreditIntent || c.Phase > ProfileCredited ||
-                        i < r.Collections.Length - 1 && c.Phase != ProfileCredited || !Hash(c.BeforeProfileHash, 128) ||
+                    if (c == null) continue;
+                    if (c.Entry != r.Items[i].Id || c.Phase < CreditIntent || c.Phase > ProfileCredited || !Hash(c.BeforeProfileHash, 128) ||
                         (c.Phase == CreditIntent ? c.SavedProfileHash != null : !Hash(c.SavedProfileHash, 128)))
                         throw new InvalidDataException("Credit identity, phase or profile proof differs.");
                     var before = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, c.BeforeInfo, c.BeforeBytes, null);
@@ -383,14 +386,14 @@ namespace OstrixMods.BuildWorks
                         (cleanup.Phase == CleanupIntent ? cleanup.SavedGeneration != 0 : cleanup.SavedGeneration != cleanup.BeforeGeneration + 1)))
                         throw new InvalidDataException("Cleanup phase, credit or paired save proof differs.");
                 }
-                if (r.Collections.Count(c => c.Removal?.Phase == CleanupIntent) > 1)
-                    throw new InvalidDataException("Concurrent cleanup intents are not permitted.");
-                if (r.Collections.Any(c => c.Phase == CreditIntent) && r.Collections.Any(c => c.Removal?.Phase == CleanupIntent))
+                if (r.Collections.Count(c => c?.Removal?.Phase == CleanupIntent) > 1 || r.Collections.Count(c => c?.Phase == CreditIntent) > 1)
+                    throw new InvalidDataException("Concurrent credit or cleanup intents are not permitted.");
+                if (r.Collections.Any(c => c?.Phase == CreditIntent) && r.Collections.Any(c => c?.Removal?.Phase == CleanupIntent))
                     throw new InvalidDataException("Unsettled credit and cleanup intents cannot overlap.");
             }
             if (plan.Cancelled && (r.Terminal == null || plan.CancelOperation != r.Operation || r.Phase != IssuedSaved))
                 throw new InvalidDataException("Cancelled plan lacks its saved issuance binding.");
-            if (r.Revision != 1L + r.Items.Sum(e => e.State) + r.Phase - 1 + (r.Collections?.Sum(c => (long)c.Phase + (c.Removal?.Phase ?? 0)) ?? 0) + (r.Terminal == null ? 0 : 1) || r.Phase != Prepared && r.Items.Any(e => e.State != Observed))
+            if (r.Revision != 1L + r.Items.Sum(e => e.State) + r.Phase - 1 + (r.Collections?.Sum(c => (long)(c?.Phase ?? 0) + (c?.Removal?.Phase ?? 0)) ?? 0) + (r.Terminal == null ? 0 : 1) || r.Phase != Prepared && r.Items.Any(e => e.State != Observed))
                 throw new InvalidDataException("Payout phase/revision differs.");
             if (r.Phase != IssuedSaved)
             { if (r.Saved != null || r.Terminal != null) throw new InvalidDataException("Payout falsely claims persistence."); return; }

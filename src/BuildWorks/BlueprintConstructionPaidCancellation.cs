@@ -40,7 +40,7 @@ namespace OstrixMods.BuildWorks
             network = ZNet.instance; world = network ? network.GetWorld() : null; generation = SaveSystem.GetSaveNumber();
             if (record?.Phase != Journal.IssuedSaved || plans.Load(project).Cancelled || !Context() ||
                 generation == 0 || generation == uint.MaxValue || generation < record.MinimumWorldGeneration ||
-                record.Collections?.Any(c => c.Phase != Journal.ProfileCredited || c.Removal?.Phase == Journal.CleanupIntent) == true ||
+                record.Collections?.Any(c => c != null && (c.Phase != Journal.ProfileCredited || c.Removal?.Phase == Journal.CleanupIntent)) == true ||
                 !BlueprintStorageCapture.TrySnapshotInventory(inventory, out before))
                 throw new InvalidOperationException("Paid close requires saved issuance, settled existing intents and its idle private Local payer.");
             issuanceHash = Journal.IssuanceFingerprint(record);
@@ -69,6 +69,7 @@ namespace OstrixMods.BuildWorks
             if (!BlueprintStoragePlayerProfile.TryReadSavedCustomData(player, Custody, out profile, out error)) return false;
             for (int index = 0; index < (record.Collections?.Length ?? 0); index++)
             {
+                if (record.Collections[index] == null) continue;
                 string key = Journal.ReceiptKey(record.Items[index].Id), value = Journal.ReceiptValue(record, index);
                 if (!profile.CustomData.TryGetValue(key, out var saved) || saved != value ||
                     !player.m_customData.TryGetValue(key, out var live) || live != value)

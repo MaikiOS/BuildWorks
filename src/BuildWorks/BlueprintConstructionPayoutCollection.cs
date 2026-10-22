@@ -74,7 +74,9 @@ namespace OstrixMods.BuildWorks
                 }
                 Status = "profile-credited"; return;
             }
-            if (loaded || credit != null || index != (record.Collections?.Length ?? 0) || player.m_customData.Count >= 65535 ||
+            if (loaded || credit != null ||
+                record.Collections?.Any(c => c != null && (c.Phase != Journal.ProfileCredited || c.Removal?.Phase == Journal.CleanupIntent)) == true ||
+                player.m_customData.Count >= 65535 ||
                 !BlueprintStorageCapture.TrySnapshotInventory(inventory, out before))
                 throw new InvalidOperationException("An earlier credit attempt or loaded-only receipt requires reconciliation, never another insertion.");
             // Native pickup marks every existing inventory item picked-up. Do not hide an unrelated delta.

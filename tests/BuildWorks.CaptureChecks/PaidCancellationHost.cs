@@ -89,7 +89,7 @@ namespace OstrixMods.BuildWorks {
   public Record Read(Guid project) {
    var r=store.Payout;return new Record{Project=r.Project,Operation=r.Operation,Phase=r.Phase,Player=r.Player,World=r.World,Revision=r.Revision,
     MinimumWorldGeneration=r.MinimumWorldGeneration,Hash=r.Hash,Terminal=r.Terminal,Items=r.Items,
-    Collections=r.Collections?.Select(c=>new Collection{Entry=c.Entry,Phase=c.Phase,Removal=c.Removal==null?null:new Cleanup{Phase=c.Removal.Phase}}).ToArray()};
+    Collections=r.Collections?.Select(c=>c==null?null:new Collection{Entry=c.Entry,Phase=c.Phase,Removal=c.Removal==null?null:new Cleanup{Phase=c.Removal.Phase}}).ToArray()};
   }
   public static string IssuanceFingerprint(Record record)=>record.Hash;
   public static string ReceiptKey(Guid id)=>id.ToString("N");public static string ReceiptValue(Record record,int index)=>record.Items[index].Id.ToString("N")+"receipt";
@@ -164,6 +164,12 @@ namespace OstrixMods.BuildWorks {
    s=Reset();r=new BlueprintConstructionProjectRuntime(s);s.Payout.Collections=new[]{new BlueprintConstructionPayoutJournal.Collection{Phase=1}};
    r.cancellationProjects.Add(s.Payout.Project);r.TickPaidCancellation();Check(r.paidCancellation==null&&!r.PayoutBusy&&r.cancellationProjects.Count==0,"Pending intent locked recovery or scheduled infinite retries");
    s.Payout.Collections=null;r.cancellationProjects.Add(s.Payout.Project);r.TickPaidCancellation();Check(r.paidCancellation!=null,"Settled intent did not requeue finalization");
+   s=Reset();item=Guid.NewGuid();s.Payout.Items=new[]{s.Payout.Items[0],new BlueprintConstructionPayoutJournal.Entry{Id=item}};
+   key=BlueprintConstructionPayoutJournal.ReceiptKey(item);value=BlueprintConstructionPayoutJournal.ReceiptValue(s.Payout,1);
+   s.Payout.Collections=new[]{null,new BlueprintConstructionPayoutJournal.Collection{Entry=item}};
+   BlueprintStoragePlayerProfile.Evidence.CustomData[key]=value;Player.m_localPlayer.m_customData[key]=value;
+   f=new BlueprintConstructionPaidCancellation(s,s.Payout.Project);BlueprintStorageWorldGeneration.Complete=true;f.Tick();
+   Check(f.Status=="cancelled"&&s.Commits==1,"Uncollected hole demanded a receipt or blocked finalization");
    return checks;
   }
  }

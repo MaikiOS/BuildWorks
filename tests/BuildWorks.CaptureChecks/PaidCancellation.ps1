@@ -23,7 +23,7 @@ $taskCode = $taskCode.Replace('__FINALIZER__', (Extract-Block $taskFinalizer 'in
 $taskCode = $taskCode.Replace('__SCHEDULER__', (Extract-Block $taskRuntime 'private void TickPaidCancellation()'))
 Add-Type -TypeDefinition $taskCode
 $taskChecks = [PaidCancellationChecks.OstrixMods.BuildWorks.BlueprintConstructionProjectRuntime]::Run()
-if ($taskChecks -ne 56) { throw ('Finalization coverage differs: '+$taskChecks) }
+if ($taskChecks -ne 57) { throw ('Finalization coverage differs: '+$taskChecks) }
 $taskTick = Extract-Block $taskRuntime 'internal void Tick()'
 if ($taskTick.IndexOf('payout?.Tick()') -gt $taskTick.IndexOf('TickPaidCancellation()') -or
     $taskTick.IndexOf('TickPaidCancellation()') -gt $taskTick.IndexOf('TickPayoutCollection()') -or

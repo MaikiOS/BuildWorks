@@ -44,7 +44,7 @@ if ($DistanceNegativeControl) {
 }
 Add-Type -TypeDefinition $taskCode
 $taskChecks = [PayoutInteractionChecks.BlueprintConstructionProjectRuntime]::Run()
-if ($taskChecks -ne 61) { throw ('Interaction coverage incomplete: '+$taskChecks) }
+if ($taskChecks -ne 63) { throw ('Interaction coverage incomplete: '+$taskChecks) }
 $taskTick = Extract-Block $taskRuntime 'internal void Tick()'
 $taskSuspend = Extract-Block $taskRuntime 'internal void Suspend()'
 if ($taskTick -notmatch 'TickPayoutCollection\(\)' -or $taskTick -notmatch 'cleanupProjects.Add\(id\)' -or

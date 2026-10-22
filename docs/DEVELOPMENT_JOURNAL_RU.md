@@ -1,5 +1,9 @@
 # Журнал разработки BuildWorks
 
+## 2026-10-22 — 305: точный возврат в любом порядке
+
+QA.273 снимает prefix-ограничение только для collection; immutable item indices, receipts и one-intent guards сохранены. Независимый обзор нашёл ранний baseline-save пробел, исправлен до запуска игры; admission7/negative control, journal200 и остальные проверки PASS. Native:row1→новый процесс→row0→ещё новый процесс,67Wood/8receipts/0sources/115SHA, два независимых .fch inventory proof. Три normalQuit/restore3;109old hashes/4141ordinary metadata прежние. Объём цели сохранён, другие предметы/crash/UX/сеть открыты. [Доказательства305](CHECKPOINT_305_RU.md).
+
 ## 2026-10-22 — 304: исправлена отмена через табличку, полный локальный цикл Wood
 
 В .271 native E/кнопки воспроизвели отказ из-за собственного input guard; .272 исправляет только синхронный preflight. Old-source RED/new16PASS, сборки/контракты/geometry/localization/review PASS. Две стены:67→63→67Wood через настоящий UI, saved removal/issuance, reload, guarded E-подбор иcleanup; независимое .fch proof и новый процесс10/10/109SHA без дублей. Три normal exits/bridge restores,97old SHA/4141ordinary metadata прежние. Найден скрытый порядок перекрывающихся возвратов — следующий открытый срез8.7–8.8, не готовый UX. [Подробности и сохранённые неудачи](CHECKPOINT_304_RU.md).

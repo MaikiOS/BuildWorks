@@ -198,6 +198,12 @@ namespace PayoutInteractionChecks {
    t.R.queued=Guid.Empty;IsPrivateLocalPlacement=false;t.R.TickPayoutCollection();Check(BlueprintConstructionPayoutCleanup.Created==0,"Remote scheduler admitted cleanup");
    t=Reset();t.R.cleanupProjects.Add(t.Id);t.R.TickPayoutCollection();int reads=t.R.store.Reads;
    for(int i=0;i<10;i++)t.R.TickPayoutCollection();Check(t.R.store.Reads==reads,"Idle frames reread all project journals");
+   t=Reset();record=t.R.store.Records[t.Id];record.Collections=new[]{null,new BlueprintConstructionPayoutJournal.Credit()};
+   t.R.cleanupProjects.Add(t.Id);t.R.TickPayoutCollection();
+   Check(BlueprintConstructionPayoutCleanup.Created==1&&t.R.cleanup.Index==1,"Sparse higher-row cleanup selected the uncollected hole");
+   record.Collections[1].Removal=new BlueprintConstructionPayoutJournal.Removal{Phase=2};t.R.cleanup.TickResult="cleanup-saved";
+   t.R.TickPayoutCollection();t.R.TickPayoutCollection();
+   Check(BlueprintConstructionPayoutCleanup.Created==1&&t.R.cleanupProjects.Count==0,"Sparse settled cleanup selected an empty slot");
    return count;
   }
  }

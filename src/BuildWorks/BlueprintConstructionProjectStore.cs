@@ -129,8 +129,8 @@ namespace OstrixMods.BuildWorks
                     removal.Operation != operation || issued.Operation != operation || absence == null || profile == null ||
                     currentGeneration == 0 || currentGeneration == uint.MaxValue || absence.Generation != currentGeneration ||
                     currentGeneration < issued.MinimumWorldGeneration || absence.World != world || !absence.CompleteMappedScan ||
-                    !plan.Cancelled && issued.Collections?.Any(c => c.Phase != BlueprintConstructionPayoutJournal.ProfileCredited ||
-                        c.Removal?.Phase == BlueprintConstructionPayoutJournal.CleanupIntent) == true ||
+                    !plan.Cancelled && issued.Collections?.Any(c => c != null && (c.Phase != BlueprintConstructionPayoutJournal.ProfileCredited ||
+                        c.Removal?.Phase == BlueprintConstructionPayoutJournal.CleanupIntent)) == true ||
                     absence.MarkerSets.Count != 1 || absence.MarkerKey != ConstructionMarkerKey ||
                     !absence.Operations.SequenceEqual(removal.Parts.Where(p => p.Phase == BlueprintConstructionPartJournal.Committed).Select(p => p.Operation)) ||
                     profile.Player != issued.Player || profile.ProfileHash == null || profile.ProfileHash.Length != 128 ||

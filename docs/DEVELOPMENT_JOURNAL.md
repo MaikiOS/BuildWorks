@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-22 — 305: exact refund pickup in either order
+
+QA.273 removes the collection-prefix restriction while preserving immutable item indices, receipts and one-intent guards. Independent review caught an early baseline-save gap; fixed before launch, covered by admission7/negative control and journal200. Native row1→fresh process→row0→another fresh process retains67Wood/eight receipts/zero sources/115hashes; two independent .fch inventory proofs. Three normal quits/bridge restores;109old hashes/4141ordinary metadata unchanged. Other items/faults/UX/network remain open. [Evidence305](CHECKPOINT_305.md).
+
 ## 2026-10-22 — 304: board cancellation fixed; bounded paid Wood lifecycle
 
 Native E/buttons reproduced the board self-blocking input gate; .272 changes only its synchronous preflight. Old-source RED/new16PASS, builds/contracts/geometry/localization/reviews pass. Two walls:67→63→67Wood via actual QA input/UI, saved removal/issuance, reload, E pickup/cleanup; independent .fch proof and fresh-process10/10/109unchanged hashes. Three normal exits/restores,97old hashes/4141ordinary metadata unchanged. Overlapping refunds hide a required order: next open8.7–8.8 slice, not accepted UX. [Evidence and retained failed setups](CHECKPOINT_304.md).

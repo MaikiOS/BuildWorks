@@ -1,5 +1,9 @@
 # BuildWorks development journal
 
+## 2026-10-22 — resumed; diagnostic291 and separate candidate292
+
+290 verified/synchronized37582dd; local267 not deployed. Previous3bridge DLLs restored,97project hashes unchanged;6ordinary metadata differences after owner play were not rolled back. GPU mask289 PASS; native Clear/hour12 supplied two verified13.21/37.97FPS windows, but complete scenario FAILED38/39of64 and QA8768 hung after PNG. Quit/window close failed; force-exit permission pending, further game/GPU runs stopped. Astra reviewed separate plane candidate292; CPU17+4PASS, GPU not run. v11 acceptance/paid cancellation/networking remain open. [Evidence and limits](CHECKPOINT_291.md).
+
 ## 2026-10-21 — 290: paid finalizer wired
 
 Local267, not deployed: read-only native finalizer uses paid commit289; scheduler handles issuance/startup, pending recovery and collection after closure.56 actual-code CPU/61interaction, distance negative control, cleanup22+31, builds0/0, host/localization and two reviews SHIP. Two new-fixture errors corrected (shared record/count accumulation), without weakening production. Native/paid UI remain open; no game/GPU. [290](CHECKPOINT_290.md).

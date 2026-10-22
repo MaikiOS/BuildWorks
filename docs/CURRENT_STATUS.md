@@ -1,6 +1,6 @@
 # Current BuildWorks status
 
-21 October2026. **Installed diagnostic QA .265 retains the old ordinary fog, unaccepted.** [288](CHECKPOINT_288.md): half-wake implemented; scoped GPU/native56/56 pass, but active12.52FPS versus147.76 surface-only fails performance. Rain was unpinned; no clean comparison against287. Three native PNG and exact inventory confirmed; no visual acceptance. Normal logout/Quit; bridge restore awaits the end of the owner session. No new manual test ready.
+22 October2026. **Installed diagnostic QA .265 retains the old ordinary fog, unaccepted.** [291](CHECKPOINT_291.md): GPU fallback mask PASS; two completed Clear/hour12 native windows measured13.21FPS with repeated integration versus37.97FPS with the mask. This diagnoses cost, not a production fix. Complete native FAILED38/39of64; QA8768 hung, current exit/bridge restore unconfirmed. A separate plane candidate has only CPU/static review evidence. No new manual test ready. Previous288 bridge restoration verified3DLLs; current cleanup remains separate.
 
 [290](CHECKPOINT_290.md): local .267 is not deployed. Paid finalization is wired after issuance/on startup, preserving collection/cleanup;56 actual-code CPU assertions/61interaction, normal/QA0/0, host/localization and reviews PASS. Native test boundaries are substitutes: game reload/retirement and paid UI remain open. Installed265/fog and owner play are untouched.
 

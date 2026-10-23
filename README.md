@@ -1,75 +1,61 @@
-**Current local QA0.19.273:** two-wall refunds collected in reverse order through E, with a fresh process between items and after completion. Other properties/faults/UX/network remain open. [Evidence305](docs/CHECKPOINT_305.md), [full checklist](docs/LIVE_CHECKLIST_RU.md).
-
-**Source candidate0.19.277, not installed:** known issuance overflow and refund properties checked before removal; prior messages included. Targeted/host checks pass; native refusal/interruption/restart pending. [Scope311](docs/CHECKPOINT_311.md).
-
 # BuildWorks
-
-**Historical QA .264, rejected acceptance:** exact empty-field shortcuts improved the full-size diagnostic, but contact still measures about15host frames/s. Stalls and delayed fog are not fully fixed. [Evidence](docs/CHECKPOINT_282.md), [current status](docs/CURRENT_STATUS.md).
-
-**Historical checkpoint250, QA .242:** plain QA now uses the measured256MiB GPU budget without a candidate property. Native Valheim:resident32/VelocityUpload=null,prepare12/12,recorded72/72 with520/520frames,35.88FPS/52.37s,26windows34–36FPS,fog queue1–2/velocity CPU-copy0. Contact24/24:9parts/108160exact inner texels,all28 recovered. Max145.07ms coincides with the first synchronous reference capture; causality/perfect smoothness unproved. Builds/contracts/Geometry/localization1122/isolation pass. Normal quit/bridge3/3; .242 stays installed. Normal/ordinary Editor retain98,304,000bytes; shader/costs unchanged. v11 appearance,public GPU budget,heavy blueprints,paid cancellation/network remain open. [Evidence](docs/CHECKPOINT_250.md).
 
 **English · [Русский](README_RU.md)**
 
-BuildWorks extends Valheim's hammer with precise construction, a blueprint catalog and a dedicated editor. Import a supported building, edit its real pieces, place it through Valheim's normal construction path, and keep its supported transforms after reload. Capture and edit your own buildings too.
+Precision-building tools and reusable blueprints for Valheim: capture a build, refine its individual parts, and keep your own variations.
 
-![BuildWorks concept cover](docs/images/buildworks-hero-concept.png)
+![BuildWorks concept cover: a Nordic timber hall transitioning from blueprint to construction](docs/images/buildworks/cover-concept.png)
 
-Historical [.240](docs/CHECKPOINT_240.md) preserves two failed fog experiments. Memory reuse is **disabled** in normal/QA builds; whole-house fog remains unfixed. No .240 Valheim run.
+*Original promotional concept art. It is not a Valheim screenshot or a demonstration of a finished building workflow.*
 
-[.239](docs/CHECKPOINT_239.md) adds bounded QA fog measurements:20s with exact comparisons passed, not a whole-house fix. Evidence directs the next experiment toward payload arrays rather than a texture-pool rewrite.
+## What you can do
 
-[.237](docs/CHECKPOINT_237.md) adds saved-world batch absence evidence, a prerequisite for paid cancellation. That .237 step did not implement physical issuance or guarded collection. Their later implementation does not complete paid cancellation; see [current step270](docs/CHECKPOINT_270.md) and the [plan](docs/PROJECT_CANCELLATION_PROTOCOL.md).
+- Position and rotate parts with XYZ controls, snapping, numeric values, and positive component scale.
+- Edit blueprints with an object tree, groups, anchors, visibility controls, a dedicated camera, and Undo/Redo.
+- Capture loaded building parts or import supported `.blueprint` and `.vbuild` files; review missing parts instead of silently replacing them.
+- Organise variants with categories and Save As, then share saved portable files.
+- Create repetitions with Array and Contour. Persistently editable repetition operations are future work.
 
-[.236](docs/CHECKPOINT_236.md) archives native armor pose/slots;28 CPU capture cases, serialization and builds passed. Equipment restoration and whole-house fog remain unfinished; the archive is present in source; native armor capture remains unverified.
+BuildWorks is under active development. The editor and blueprint tools have limited accepted cases; construction projects and the complete multiplayer workflow are still being validated. A public package may have fewer features than the development tree. [Current evidence](docs/CURRENT_STATUS.md).
 
-[Diagnostic checkpoint234](docs/CHECKPOINT_234.md) reproduces the lower-frame-rate fog queue failure and prepares a test-only experiment. It does not change the game DLL or establish whole-house support.
+## See the tools
 
-**Historical .233 checkpoint:** a real unpaid wall project passed7/7+59/59, four directions/481 frames, all four parts recovered to zero. Exact immutable shape sharing removed the28-part house atlas refusal; Unity14 comparisons passed. **House passage remains FAILED:** healthy10s idle then queue overflow during recording/contact; repetitions stopped. [Evidence and next slice](docs/CHECKPOINT_233.md). Payment/reload .232 remain separate proof; appearance, refund/recovery and network are not accepted.
+![Real BuildWorks editor showing the object tree, two wall pieces, tool controls, and camera viewport](docs/images/buildworks/editor-native-280-ru.png)
 
+*Real .280 editor, Russian UI. Controlled rendering of the running editor camera and actual Canvas, not an OS screenshot. This shows the interface; it does not prove payment, reload, or multiplayer.*
 
-## Capabilities
+![Workflow illustration from import or capture through editing and saved files to permitted construction](docs/images/buildworks/workflow-overview.png)
 
-- Hammer categories, search, recents, favorites and blueprint cards.
-- Blueprint editor with object tree, groups, independent anchors, user snap points, Undo/Redo and interior camera.
-- XYZ translation/rotation and component scaling1–1000%, numeric entry, single/paired axes, Array and Contour tools.
-- Supported `.blueprint` / `.vbuild` imports, reviewed exports, categories, Save As, delete/hide, automatic portable files, Share and batch operations.
-- Missing-part records retain transforms; explicit alignment copies leave originals intact. Unknown models are not invented.
-- Native piece construction with survival resources and checks. A28-part Forest Hut and exact reload were verified; this does not prove every imported building or multiplayer.
-- English fallback and Russian runtime catalog.
+*Illustration of the workflow, not a gameplay capture. Construction remains subject to resources, permissions, supported parts, and the limitations below.*
 
-Further development brings editable assemblies and repetitions, construction guides, and original adaptive pieces. See the [plugin roadmap](docs/ROADMAP.md) for the full progression.
+## Start with a small blueprint
 
-## In progress
+1. Import a supported file or select your own loaded building parts.
+2. Review the composition, edit a separate copy, and use Save As to keep a variant.
+3. Inspect the placement preview and costs before confirming construction.
 
-Approved **v11 → whole unfinished house → persistent stake/board → material continuation/cancel/refund/reload** remains the priority. [.212](docs/FOG_RECOVERY_212.md) fixes a reproduced cross-frame error that removed the house after passage. The native house passed both directions without disappearing; the owner rejected dissolution/recovery and passage performance. Full-house appearance/speed and the persistent board remain open.
+The [English wiki](https://github.com/MaikiOS/BuildWorks/wiki/Home) explains the controls, missing parts, categories, sharing, and experimental projects. The [Russian wiki](https://github.com/MaikiOS/BuildWorks/wiki/Home-RU) covers the same topics.
 
-Storage/mount/admin restoration, direct player sharing, full server acceptance, volume-selection UX and heavy-building performance remain incomplete. Production interactive/editor budget is512 parts; isolated QA can exercise higher limits. No promise that arbitrary huge/modded builds work.
+## Install and update safely
 
-[Current evidence and limits](docs/CURRENT_STATUS.md) · [Forward roadmap](docs/ROADMAP.md) · [Development journal](docs/DEVELOPMENT_JOURNAL.md)
+Use an explicitly published package compatible with your Valheim and BepInExPack Valheim 5.4.x versions. Close the game/server and back up your world, character, and BuildWorks data before updating.
 
-## Documentation
+Install the matching `BuildWorks.dll` and `BuildWorks.Geometry.dll` pair in `BepInEx/plugins/Ostrix-BuildWorks/`; remove duplicate installations. Check the loaded version in `BepInEx/LogOutput.log`. Do not mix DLL builds or assume a downgrade can read newer saved data. See [Installation](docs/INSTALL.md).
 
-[Documentation index](docs/README.md) · [Features](docs/FEATURES.md) · [Controls](docs/CONTROLS.md) · [Installation](docs/INSTALL.md) · [Formats](specs/roadmap/blueprint-format.md) · [Architecture](docs/ARCHITECTURE.md) · [Localization](docs/LOCALIZATION.md)
+## Current limits
 
-Historical test reports keep their original version and scope. Build success, deployment, native game checks, owner acceptance and host+remote are separate evidence levels.
+Construction projects, staged materials, cancellation, and refunds are experimental, with limited local evidence. Full survival, item-property preservation, fault recovery, and host+remote acceptance remain open. File sharing is available; direct in-game player transfer is not connected. Capture uses loaded objects, not forced distant-zone streaming.
 
-## Dependencies and source build
+Large/modded buildings, contents restoration, volume-selection interaction, and ordinary mouse/visual edge cases need further validation. OBJ/FBX/glTF and terrain transfer are outside this blueprint module. EarthWorks is a separate future integration, not a dependency.
 
-Valheim and BepInExPack Valheim5.4.x are required. Jotunn, TerrainRamp and EarthWorks are not runtime dependencies. Current host compatibility is recorded in [status](docs/CURRENT_STATUS.md).
+## Guides and development
 
-Use .NET SDK and local host assemblies; never commit game DLLs:
+[Controls](docs/CONTROLS.md) · [Documentation](docs/README.md) · [Roadmap](docs/ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
-```powershell
-dotnet build .\src\BuildWorks\BuildWorks.csproj -c Release `
-  -p:ProfileRoot="C:\path\to\BepInEx-profile" `
-  -p:ValheimManagedDir="C:\path\to\Valheim\valheim_Data\Managed"
-dotnet run --project .\tests\BuildWorks.GeometryTests\BuildWorks.GeometryTests.csproj -c Release
-```
+Future directions include editable assemblies/repetition, construction guides, and original adaptive pieces. They are not promises for the first release. [README maintenance standard](docs/README_STANDARD.md).
 
-Default automated QA uses local ValheimQA, `../ValheimQA/RUNBOOK_RU.md`: direct GABS launch with TerrainRamp-1.0-Test BepInEx, existing isolated QA identities, state checks, normal exit and bridge restore. Standing18Oct2026 permission replaces Modded-only for these tests; never interrupt the owner session. Resets/new grants/unrelated world edits/other profiles/network need their own scope. The local stand is not distributed in GitHub.
+## Help and licence
 
-## License
+For an issue, include versions, the relevant log, steps, and a permitted example file. Keep private saves and tokens out of public reports. [Report an issue](https://github.com/MaikiOS/BuildWorks/issues).
 
-BuildWorks is proprietary/source-available, not open-source. Official binaries may be used for personal non-commercial testing. Source access/forking is permitted solely to prepare a pull request; reuse, redistribution or commercial use requires the owner's prior written permission. [LICENSE](LICENSE) governs; [Russian translation](LICENSE_RU.md) is for convenience. See [CONTRIBUTING](CONTRIBUTING.md).
-
-The cover is concept art, not a gameplay screenshot. [Image provenance](docs/IMAGES.md). OBJ/FBX/glTF and terrain transfer are outside this module; EarthWorks integration is later work.
+BuildWorks is proprietary/source-available, not open-source. Personal non-commercial testing of official binaries and contribution access follow the [licence](LICENSE); redistribution and other reuse require the owner's written permission.

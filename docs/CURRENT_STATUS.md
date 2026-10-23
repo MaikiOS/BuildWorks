@@ -1,5 +1,7 @@
 # Current BuildWorks status
 
+**Native scope319,23 October2026:** installed **QA279** completed the existing316 refund. Full inventory refused safely with native HUD; a native merge of two owned equivalent Wood2 stacks freed a cell while retaining all other live properties/receipts. Actual E retry reached67Wood/32stacks/14customData, both sources absent and cleanup saved. Fresh process:10/10, all133 project files unchanged,32 full bridge inventory records identical; not all native properties after Load.8reports/39steps PASS, no optional failures. Both normal exits and bridge restores completed, including old185641 restore. No mod deployment;280 uninstalled,318 unverified. [Evidence319](CHECKPOINT_319.md).
+
 Verified source-only checkpoint317 [d46bbd1](https://github.com/MaikiOS/BuildWorks/commit/d46bbd1327cac38813372a5b9f6394bbb2b27e37) pushed to main; remote SHA confirmed.30 source/test/doc files, no DLLs or saves. Candidate280 is not installed; verified QA279 remains unchanged.
 
 **Source317 / candidate .280, NOT installed:** durable local acceptance now returns the original copy ID without another card/write on an exact retry; deleted accepted copies remain deleted. Card+receipt use one atomic Save, native27/portable15.50 targeted file checks, Store/Geometry/EditorBridge, normal+QA0/0, HostContract/localization1135 PASS. No working wire/UI caller yet; this is not authentication or network acceptance. [Result and limits317](CHECKPOINT_317.md). Verified installed QA remains **.279**.

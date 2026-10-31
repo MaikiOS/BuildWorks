@@ -396,3 +396,11 @@ This records changes and evidence, not future milestones. Historical results ret
 | [.193](WORLD_SNAP_193_RU.md) | Ordinary native snap pair/rotation and paid placements/reload | Limited native cases |
 
 [Full earlier checkpoint log](ROADMAP_HISTORY_206.md) · [Full requirement/evidence history](WORK_STATUS_HISTORY_206_RU.md) · [Inventory of every document](DOCUMENT_INDEX.tsv). Manuals and dated reports describe their original builds; only the current live list selects pending checks.
+
+## 31 October 2026 — private alpha0.19.328 documentation
+
+EN/RU installation, controls, limits and all 137IDs/33 scoped accepted/104 open are reconciled. Future milestones and Confirmed/Draft remain. Issued328 has the known27prefab-spelling issue; the fix and251/502 belong only to the 0.19.329 candidate. Its8native scalar cases are accepted separately; four direct producer-profile checks have passed; independent acceptance is pending,2.17OPEN/2.16HOLD and networking remain open. This is documentation, not a new game run or release. Private identities, identifiers and original messages are not published.
+
+## 31 October 2026 — scoped acceptance of 2.17
+
+Requirement 2.17 is accepted only for codec/profile data in the internal 0.19.329 candidate: four direct producer profiles passed independent review together with the previously accepted evidence. All 137 IDs remain: 34 scoped accepted, 103 open. Next is 2.18. Issued alpha 0.19.328 still has the known 27-name defect. The 2.16 HOLD, full gameplay sections 3–13, networking and the whole module remain open. This note supplements earlier history without replacing it.

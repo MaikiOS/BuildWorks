@@ -1,5 +1,6 @@
 # BuildWorks
 
+
 **English · [Русский](README_RU.md)**
 
 Precision-building tools and reusable blueprints for Valheim: capture a build, refine its individual parts, and keep your own variations.
@@ -16,7 +17,7 @@ Precision-building tools and reusable blueprints for Valheim: capture a build, r
 - Organise variants with categories and Save As, then share saved portable files.
 - Create repetitions with Array and Contour. Persistently editable repetition operations are future work.
 
-BuildWorks is under active development. The editor and blueprint tools have limited accepted cases; construction projects and the complete multiplayer workflow are still being validated. A public package may have fewer features than the development tree. [Current evidence](docs/CURRENT_STATUS.md).
+The current private manual-test alpha is **0.19.328**. Alt-drag copy and an optional assumed-ground structural estimate are included; full-module and multiplayer acceptance remain open. The 0.19.329 candidate is not the issued alpha. [Version and limits](docs/ALPHA_0.19.328.md).
 
 ## See the tools
 
@@ -43,6 +44,8 @@ Use an explicitly published package compatible with your Valheim and BepInExPack
 Install the matching `BuildWorks.dll` and `BuildWorks.Geometry.dll` pair in `BepInEx/plugins/Ostrix-BuildWorks/`; remove duplicate installations. Check the loaded version in `BepInEx/LogOutput.log`. Do not mix DLL builds or assume a downgrade can read newer saved data. See [Installation](docs/INSTALL.md).
 
 ## Current limits
+
+**Known issue in alpha 0.19.328:** 27 producer prefab names differ in letter case from the native registry. This is not fixed in the issued package; review missing parts on import. The correction and successful 251/502-part catalogue checks belong only to the internal 0.19.329 candidate. Eight bounded native data checks are accepted for that candidate. Four direct producer-profile checks (.blueprint/.vbuild) have passed independent review. Acceptance of 2.17 covers codec/profile data only in the internal 0.19.329 candidate. Gameplay sections 3–13 and multiplayer remain open.
 
 Construction projects, staged materials, cancellation, and refunds are experimental, with limited local evidence. Full survival, item-property preservation, fault recovery, and host+remote acceptance remain open. File sharing is available; direct in-game player transfer is not connected. Capture uses loaded objects, not forced distant-zone streaming.
 

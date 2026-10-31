@@ -1,23 +1,27 @@
-# Installing and verifying BuildWorks
+# Install private alpha 0.19.328
 
-[Русский](INSTALL_RU.md) · [Current source/QA/public versions](CURRENT_STATUS.md)
+[Русский](INSTALL_RU.md)
 
-Public installation: use an explicitly published package from [GitHub Releases](https://github.com/MaikiOS/BuildWorks/releases), with Valheim and BepInExPack Valheim5.4.x. Latest public ZIP is0.19.37 alpha and is historical; do not expect .206 source features in it. Compatibility must be checked for the chosen package/host; .206 host proof does not certify .37 on a newer game.
+BuildWorks 0.19.328 — PRIVATE TEST CANDIDATE
+Private alpha for manual testing on a second PC or a collaborator profile.
 
-Close the game/server and back up your own world/character before a public installation. Keep the matching pair together:
+Use a working Valheim profile with BepInEx 5. The verified host is Steam build 26249040. Valheim and BepInEx are not included.
 
-```text
-BepInEx/plugins/Ostrix-BuildWorks/BuildWorks.dll
-BepInEx/plugins/Ostrix-BuildWorks/BuildWorks.Geometry.dll
-```
+1. Close Valheim completely.
+2. Open the profile folder that contains BepInEx. With a mod manager, use the selected profile folder; with a manual installation, use the game's existing BepInEx folder.
+3. Back up BepInEx/plugins/Ostrix-BuildWorks OUTSIDE every plugins folder. Back up existing BuildWorks configuration and blueprint data before upgrading.
+4. Extract the archive's BepInEx folder into that profile folder and merge. Replace all four supplied files in BepInEx/plugins/Ostrix-BuildWorks together: BuildWorks.dll, BuildWorks.Geometry.dll, YamlDotNet.dll and THIRD_PARTY_NOTICES.md.
+5. Keep one active BuildWorks installation. Keep your existing configuration, blueprint library, worlds and characters. Do not copy a QA profile, bridge, test-only DLLs or isolation tokens.
+6. Start that modded profile. Verify that BepInEx/LogOutput.log loads BuildWorks 0.19.328 once. For the second PC, repeat these steps in its own profile.
 
-Never leave a second older DLL elsewhere in plugins. Startup `BepInEx/LogOutput.log` must show `BuildWorks <installed-version> loaded.`; verify the actual version, not this example. UI absence needs the full log, host version and mod list.
+This is a manual-install private ZIP, not a Thunderstore package or a public beta. No files are installed automatically.
 
-## Developer QA on Ostrix's workstation
+To remove or roll back: close Valheim and remove only Ostrix-BuildWorks, or restore its backup. Leave player data in place. Older binaries may require the matching pre-upgrade blueprint-data backup.
 
-Only `TerrainRamp-1.0-Test` is authorized. `Default/BuildWorks` is the source tree; `Default/BepInEx/plugins` must not contain BuildWorks. Use `scripts/Deploy-TestBuild.ps1 -TargetProfile TerrainRamp-1.0-Test` first with `-WhatIf`. The existing isolated stand uses `-QaStandToken <existing-token>` after building with `-p:BuildWorksTestStand=true`; never create/reset a token or saves to repopulate cards. The script verifies hashes and refuses running Valheim and other profiles. Deployment does not itself authorize game/world actions.
+See QA_SCOPE_EN.txt for the accepted tests and their limits. Source/build/isolated gameplay do not establish compatibility with every mod stack or multiplayer. Please return a fresh LogOutput.log, the exact game/mod version and the blueprint that reproduces any placement issue.
 
-Default automated QA uses local ValheimQA, `../ValheimQA/RUNBOOK_RU.md`: direct GABS launch with TerrainRamp-1.0-Test BepInEx, existing isolated QA identities, state checks, normal exit and bridge restore. Standing18Oct2026 permission replaces Modded-only for these tests; never interrupt the owner session. Resets/new grants/unrelated world edits/other profiles/network need their own scope. The local stand is not distributed in GitHub. See CURRENT_STATUS for the current installation; never replace DLLs while Valheim runs.
+
+[Full version/evidence limits](ALPHA_0.19.328.md).
 
 ## Data and removal
 

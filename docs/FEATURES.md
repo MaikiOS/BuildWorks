@@ -2,7 +2,10 @@
 
 [Русский](FEATURES_RU.md) · [Evidence by level](CURRENT_STATUS.md) · [Controls](CONTROLS.md)
 
-This guide describes source/QA .206, not the historical .37 download. Each implemented feature still has its own acceptance scope.
+**Known issue in alpha 0.19.328:** 27 producer prefab names differ in letter case from the native registry. This is not fixed in the issued package; review missing parts on import. The correction and successful 251/502-part catalogue checks belong only to the internal 0.19.329 candidate. Eight bounded native data checks are accepted for that candidate. Four direct producer-profile checks (.blueprint/.vbuild) have passed independent review. Acceptance of 2.17 covers codec/profile data only in the internal 0.19.329 candidate. Gameplay sections 3–13 and multiplayer remain open.
+
+
+Guide for private alpha 0.19.328; each feature has its own acceptance scope. [Version/limits](ALPHA_0.19.328.md).
 
 ## Hammer and catalog
 
@@ -15,6 +18,9 @@ The isolated viewport has grid, camera/light settings, catalog, object tree, gro
 Move/rotate use XYZ frames; scale supports independent positive components1–1000%, proportional mode, numeric input and axis/pair constraints. Reaching a supported limit clamps the preview. Pointer wrapping and fine input exist but remaining edge cases are not declared perfectly accepted. One completed operation is one Undo step; cancellation restores the prior document.
 
 Array repeats a piece/group in line/plane with Pack/Fit/exact step, rise, heading/pitch/roll, scale and symmetry. Contour repeats along a connected support chain. Arbitrary editable spline guides/adaptive original pieces remain later work.
+
+
+Alt+drag a Move arrow/plane moves a copy; Esc cancels, release is one Undo. Display provides manual groundY and an optional structural estimate (off). Grey is Unknown; red can meet the minimum; this is not real-site validation. Full5.7/5.8 remain open.
 
 ## Anchors and snapping
 

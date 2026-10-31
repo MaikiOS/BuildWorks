@@ -55,6 +55,8 @@ menus and dragging show their own hints instead. The Inspector keeps its height.
 | Show everything except selected | Ctrl+H |
 | Show all | Alt+H |
 | Toggle see-through occluders | F7 or Display → See-through |
+| Editor reference ground height | Display → Ground level Y (m); starts at 0, accepts negative/fractional values. Fixed during edits/Undo/Redo; does not change world terrain. |
+| Conditional structural estimate | Display → Check structural support; off by default. Uses the chosen flat ground. Blue is maximum support; red can still meet the minimum; grey is unverified. The panel reports support/source or the reason it cannot be verified. Editing/saving remain available; Valheim checks the real world separately. |
 | Delete | Delete |
 
 See-through starts off and is editor-only. Unselected mesh parts blocking sampled
@@ -91,7 +93,7 @@ cannot be picked. The collapsible footer keeps a highlighted next-action strip.
 | Action | Control |
 | --- | --- |
 | Translate/rotate | Drag an arrow or ring with the left mouse button |
-| Duplicate while moving | Alt + drag arrow |
+| Duplicate while moving | Hold Alt + drag an arrow or plane handle; release commits once, Esc cancels |
 | Temporary magnetic move | Ctrl + drag |
 | Constrain anchor by axis | X/Y/Z |
 | Precise numeric scrub | Drag value; Shift for finer, Ctrl for faster |

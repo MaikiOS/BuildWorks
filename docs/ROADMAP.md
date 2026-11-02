@@ -1,12 +1,12 @@
 # BuildWorks roadmap
 
-[Русский](ROADMAP_RU.md) ·31October2026
+[Русский](ROADMAP_RU.md) · 2 November 2026
 
 ## Current work and scoped results
 
-Private alpha 0.19.328 is issued for manual testing. Section 1 and requirements 2.1–2.15 are accepted only within their stated bounds. Requirement 2.17 is accepted only for codec/profile data in the internal 0.19.329 candidate. Next is 2.18. Requirements 2.18–2.23 follow; 2.16 remains mandatory before release. Work on 5.7/5.8 is partial, and the earlier paid/cold-reload checks for two blueprints have separate limits. All 14 sections and 137 stable IDs remain: 34 scoped accepted, 103 open. [Version and limits](ALPHA_0.19.328.md). Future milestones do not replace the current module.
+Private alpha0.19.329 is issued for manual testing. Section1 and2.1–2.15 keep their scoped acceptance;2.17/2.18 are accepted only for format/capture data.2.19 Unbound file/state encoding is accepted as source/CPU, while its UI and original-consumer validation remain open and are not part of the issued archive.2.16 remains mandatory before release. All14sections and137stableIDs remain:35scoped accepted,102open. Future milestones do not replace the current module. [Version and limits](ALPHA_0.19.329.md).
 
-**Known issue in alpha 0.19.328:** 27 producer prefab names differ in letter case from the native registry. This is not fixed in the issued package; review missing parts on import. The correction and successful 251/502-part catalogue checks belong only to the internal 0.19.329 candidate. Eight bounded native data checks are accepted for that candidate. Four direct producer-profile checks (.blueprint/.vbuild) have passed independent review. Acceptance of 2.17 covers codec/profile data only in the internal 0.19.329 candidate. Gameplay sections 3–13 and multiplayer remain open.
+**Alpha 0.19.329 limits:** paid placement and cold reload are confirmed for one wall-overlap chest and one rotated wall cookingstation; the chest opens. Cooking with food/fire/fuel and the sufficient-resources negative case remain untested. Placement does not waive operating requirements, resources, permissions or station checks. A chest cannot provide attachment support for another chest. Producer-name corrections are included; review missing parts and test your own mod stack. Unbound export UI is later source work and is not included in this issued archive.
 
 ## Product direction
 
@@ -76,7 +76,7 @@ Explicit cooperation between a separate terrain-preparation project and the buil
 
 ## Priorities and progression
 
-The current queue is 2.18–2.23, then later sections; 2.16 remains required before release. The complete paid board/v11 project and remaining milestones2–5 stay mandatory. Later tools in milestones 6–9 do not replace this work. Regressions in the working core take priority over feature expansion.
+The current queue is 2.19–2.23, then later sections; 2.16 remains required before release. The complete paid board/v11 project and remaining milestones2–5 stay mandatory. Later tools in milestones 6–9 do not replace this work. Regressions in the working core take priority over feature expansion.
 
 Controls, Russian UI, performance, data preservation, and network authority apply at every milestone. Guides need saved assemblies; adaptive pieces need proven geometry and snapping; EarthWorks cooperation needs working construction projects. Public-release readiness requires game evidence and separate owner authorization to release.
 
@@ -110,7 +110,7 @@ Statuses mirror LIVE; no new checkmarks. English entries are editorial summaries
 | 2.15 | Scoped accepted | BetterBuilding BBP1-4 archive/export; state application remains separate |
 | 2.16 | Open | Legacy BetterBuilding original-v1 consumer, capture and strict-state gaps |
 | 2.17 | Scoped accepted | Planner JSON codec and pinned profile-data fidelity, including layers, source preservation, original consumer and four direct producer checks, accepted in internal 0.19.329. The issued 0.19.328 is not fixed; full gameplay sections 3–13 and networking remain mandatory. |
-| 2.18 | Open | Innangard authentic sample, writer/schema and preservation |
+| 2.18 | Scoped accepted | Innangard writer/schema/authentic capture data; older preservation UNKNOWN retained, gameplay3–13 still mandatory |
 | 2.19 | Open | Unbound authentic external contract and building/state metadata |
 | 2.20 | Open | ValheimStudio authentic writer/reader and schema fidelity |
 | 2.21 | Open | ValheimRAFT linked moving structures, frames and state |
@@ -225,3 +225,4 @@ Statuses mirror LIVE; no new checkmarks. English entries are editorial summaries
 | 14.7 | Scoped accepted | Preserve assemblies, guides, adaptive pieces and EarthWorks future directions |
 | 14.8 | Open | Full completion audit before goal completion; docs do not change goal state |
 | 14.9 | Open | Bilingual docs/wiki and truthful media; Thunderstore upload still withheld |
+

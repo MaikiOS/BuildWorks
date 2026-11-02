@@ -2,10 +2,14 @@
 
 [Русский](FEATURES_RU.md) · [Evidence by level](CURRENT_STATUS.md) · [Controls](CONTROLS.md)
 
-**Known issue in alpha 0.19.328:** 27 producer prefab names differ in letter case from the native registry. This is not fixed in the issued package; review missing parts on import. The correction and successful 251/502-part catalogue checks belong only to the internal 0.19.329 candidate. Eight bounded native data checks are accepted for that candidate. Four direct producer-profile checks (.blueprint/.vbuild) have passed independent review. Acceptance of 2.17 covers codec/profile data only in the internal 0.19.329 candidate. Gameplay sections 3–13 and multiplayer remain open.
+**Alpha 0.19.329 limits:** paid placement and cold reload are confirmed for one wall-overlap chest and one rotated wall cookingstation; the chest opens. Cooking with food/fire/fuel and the sufficient-resources negative case remain untested. Placement does not waive operating requirements, resources, permissions or station checks. A chest cannot provide attachment support for another chest. Producer-name corrections are included; review missing parts and test your own mod stack. Unbound export UI is later source work and is not included in this issued archive.
 
 
-Guide for private alpha 0.19.328; each feature has its own acceptance scope. [Version/limits](ALPHA_0.19.328.md).
+Guide for private alpha 0.19.329; each feature has its own acceptance scope. [Version/limits](ALPHA_0.19.329.md).
+
+## Furniture and crafting placement
+
+Eligible furniture, chests and crafting pieces may rotate and overlap in BuildWorks F9/blueprint placement when they have real contact with an eligible support. A typed Container never supplies attachment support; another chest may overlap only when a separate eligible surface supports it. Other WearNTear donors retain their native support flag and valid-view requirement; static surfaces without WearNTear may qualify. Structural walls, beams and roofs retain load-bearing strength rules. Ordinary placement outside BuildWorks keeps native restrictions. No free building, global lifetime exemption or admin air placement is included. Fire, fuel, roof and other operating requirements are separate from placement.
 
 ## Hammer and catalog
 
@@ -45,3 +49,4 @@ Approved v11 is being integrated: native two walls/.203, Unity common three-sour
 Production interactive/editor limit512; QA/Unity editor50000; document part limit50000; owned library32 entries/12 categories/100000 aggregate parts. File guards and memory limits remain. This is not a performance promise for any maximum-size building.
 
 English fallback and complete Russian catalogs are implemented and checked. [Roadmap](ROADMAP.md) tracks remaining selection/heavy/world-object/admin/network work. EarthWorks/terrain and OBJ/FBX/glTF are outside this module.
+

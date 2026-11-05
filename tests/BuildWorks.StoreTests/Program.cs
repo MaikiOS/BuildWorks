@@ -21,8 +21,14 @@ namespace OstrixMods.BuildWorks.StoreTests
                 { ContactProfileChecks.Run(args[1],args[2]); return 0; }
                 if (args.Length == 1 && args[0] == "--unbound-projection")
                 { UnboundProjectionChecks.Run(Path.Combine(directory, "unbound-projection")); return 0; }
+                if (args.Length == 2 && args[0] == "--unbound-itemstand")
+                { UnboundItemStandChecks.Run(args[1]); return 0; }
+                if (args.Length == 1 && args[0] == "--unbound-export")
+                { UnboundExportChecks.Run(Path.Combine(directory, "unbound-export")); return 0; }
                 if (args.Length == 1 && args[0] == "--unbound-import")
                 { UnboundImportChecks.Run(Path.Combine(directory, "unbound-import")); return 0; }
+                if (args.Length == 4 && args[0] == "--unbound-file-cycle")
+                { UnboundImportChecks.FileCycle(args[1], args[2], args[3]); return 0; }
                 if (args.Length == 1 && args[0] == "--unbound-source")
                 { UnboundSourceChecks.Run(Path.Combine(directory, "unbound-source")); return 0; }
                 if (args.Length == 3 && args[0] == "--innangard-writer-state")
@@ -100,6 +106,8 @@ namespace OstrixMods.BuildWorks.StoreTests
                 { ConstructionPayoutChecks.Run(Path.Combine(directory, "construction-payout")); ConstructionPayoutPropertyChecks.Run(Path.Combine(directory, "payout-properties")); ConstructionPayoutCapacityChecks.Run(); return 0; }
                 if (args.Length == 1 && args[0] == "--construction-projects")
                 { ConstructionProjectChecks.Run(Path.Combine(directory, "construction-projects")); return 0; }
+                if (args.Length == 1 && args[0] == "--construction-mount-journal")
+                { ConstructionMountJournalChecks.Run(Path.Combine(directory, "mount-journal")); return 0; }
                 if (args.Length == 1 && args[0] == "--library-origin")
                 { LibraryOriginChecks.Run(Path.Combine(directory, "library-origin")); return 0; }
                 if (args.Length == 1 && args[0] == "--peer-origin")
@@ -121,6 +129,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 BetterBuildingJsonImportChecks.Run(Path.Combine(directory,"bb-json"));
                 PlannerImportChecks.Run(Path.Combine(directory, "planner-import"));
                 PlannerExportChecks.Run(Path.Combine(directory, "planner-export"));
+                UnboundExportChecks.Run(Path.Combine(directory, "unbound-export"));
                 BetterBuildingImportChecks.Run(Path.Combine(directory,"bbp"));
                 KgExportChecks.Run(Path.Combine(directory,"kg-export"));
                 PlanBuildV1Checks.Run(Path.Combine(directory, "planbuild-v1"));

@@ -25,11 +25,28 @@ namespace OstrixMods.BuildWorks.StoreTests
             string text="Name: KG export\nAuthor: original author\nDescription: original description\nBoxRotation: {x: 10, y: 45, z: 20}\nObjects:\n- Id: sign\n  RelativePosition: {x: 1, y: 2, z: 3}\n  Rotation: {x: 90, y: 37}\n  ZDOData: "+raw+"\n- Id: Piece_grausten_floor_1x1\n  RelativePosition: {x: -1}\n";
             var source=ExternalBlueprintLibrary.Parse(text,"source.yml");
             Require(source.importError==null,source.importError);
+            source.customSnapPoints = new List<CompositeBlueprintStore.VectorData> {
+                new CompositeBlueprintStore.VectorData { x = 13, y = 2, z = -7 },
+                new CompositeBlueprintStore.VectorData { x = -4, y = 5, z = 9 } };
             var review=KgExport.Review(source,Unit);
+            Require(source.anchors.Count == 0 && review.Anchors == 2, "KG review omitted custom snap losses");
             Require(review.Blockers.Count==0 && review.ArchivedFields==2,"Original KG export refused or old project markers retained");
             Require(review.TryWrite(source,Unit,directory,"original",out string result,out string error),error);
             var model=KgBlueprint.Parse(File.ReadAllText(Path.Combine(result,"original.yml")));
             var native=BlueprintExchangeFormat.Decode(File.ReadAllText(Path.Combine(result,"original.buildworks.json")));
+            Require(native.customSnapPoints.SequenceEqual(source.customSnapPoints), "KG native sidecar lost custom snaps");
+            var withAnchor = source.ImportCopy();
+            withAnchor.anchors = new List<CompositeBlueprintStore.VectorData> { new CompositeBlueprintStore.VectorData { x = 7 } };
+            Require(KgExport.Review(withAnchor, Unit).Anchors == 3, "KG review did not add anchors and custom snaps");
+            withAnchor.customSnapPoints = null;
+            Require(KgExport.Review(withAnchor, Unit).Anchors == 1, "KG null snap list changed anchor count");
+            withAnchor.customSnapPoints = new List<CompositeBlueprintStore.VectorData>();
+            Require(KgExport.Review(withAnchor, Unit).Anchors == 1, "KG empty snap list changed anchor count");
+            var changedSnaps = source.ImportCopy();
+            changedSnaps.customSnapPoints = source.customSnapPoints.Concat(new[] { new CompositeBlueprintStore.VectorData { x = 99 } }).ToList();
+            Require(!review.TryWrite(changedSnaps, Unit, directory, "stale-snaps", out _, out error) &&
+                error == "$buildworks_exchange.plan_changed" && !Directory.Exists(Path.Combine(directory, "stale-snaps")),
+                "KG exported after reviewed custom snaps changed");
             Require(model.Author=="original author" && model.Description=="original description" && model.Objects.Count==2 &&
                 model.Objects[0].Euler.X==90 && native.sourceDocuments.Single().text==text &&
                 native.parts[0].foreignData.zdo==raw,"KG metadata/original Euler/full native source changed");

@@ -520,6 +520,8 @@ namespace OstrixMods.BuildWorks
                         unbound.HasPartAddress(part.sourceLine, part.sourceRecord, part.originalPrefabName ?? part.prefabName))
                     {
                         unboundNames.Add(name);
+                        if (originalUnbound.State.TryGet<int>("item".GetStableHashCode(), out int attached) && attached != 0 && !resolved.ContainsKey(attached))
+                            resolved.Add(attached, importPrefabName?.Invoke(attached));
                         if (originalUnbound.State.TryGet<byte[]>("items".GetStableHashCode(), out var bytes) &&
                             Geometry.BlueprintContainerInventory.TryGetNativePrefabHashes(Convert.ToBase64String(bytes), out var itemHashes))
                             foreach (int id in itemHashes)
@@ -961,6 +963,12 @@ namespace OstrixMods.BuildWorks
                 name.EndsWith(".", StringComparison.Ordinal) || name.Any(c => char.IsControl(c) || "<>:\"/\\|?*".Contains(c)) ||
                 name == "." || name == "..")
                 throw new InvalidDataException("$buildworks_exchange.invalid_name");
+            // Windows device names remain reserved when followed by a file extension.
+            string device = name.Split('.')[0].TrimEnd(' ').ToUpperInvariant();
+            if (device == "CON" || device == "PRN" || device == "AUX" || device == "NUL" ||
+                device.Length == 4 && (device.StartsWith("COM", StringComparison.Ordinal) || device.StartsWith("LPT", StringComparison.Ordinal)) &&
+                "123456789\u00b9\u00b2\u00b3".IndexOf(device[3]) >= 0)
+                throw new InvalidDataException("$buildworks_exchange.invalid_name");
         }
 
         internal Task<PlanBuildExport> ReviewPlanBuildExport(Blueprint blueprint)
@@ -1015,6 +1023,29 @@ namespace OstrixMods.BuildWorks
             var copy = blueprint.ImportCopy();
             var scales = OpenKeepScaleSnapshot(copy);
             return Task.Run(() => KgExport.Review(copy, id => scales.TryGetValue(id, out var scale) ? scale : null));
+        }
+
+        // Capture all native export facts on the Unity thread before starting a worker.
+        private Dictionary<string, Geometry.UnboundImportContext> UnboundExportSnapshot(Blueprint blueprint) =>
+            blueprint.parts.Select(part => part.prefabName).Distinct(StringComparer.Ordinal).ToDictionary(name => name,
+                name => importHostContext == null || importHostContext() != null ? importUnboundContext?.Invoke(name) : null,
+                StringComparer.Ordinal);
+
+        internal Task<UnboundExport> ReviewUnboundExport(Blueprint blueprint)
+        {
+            var copy = blueprint.ImportCopy(); var facts = UnboundExportSnapshot(copy);
+            return Task.Run(() => UnboundExport.Review(copy, name => facts.TryGetValue(name, out var profile) ? profile : null));
+        }
+
+        internal Task<string> ExportUnbound(UnboundExport review, Blueprint blueprint, string directory, string name)
+        {
+            var copy = blueprint.ImportCopy(); var facts = UnboundExportSnapshot(copy);
+            return Task.Run(() =>
+            {
+                if (!review.TryWrite(copy, id => facts.TryGetValue(id, out var profile) ? profile : null,
+                    directory, name, out string result, out string error)) throw new IOException(error);
+                return result;
+            });
         }
 
         private Dictionary<string, VectorData?> PlannerScaleSnapshot(Blueprint blueprint) =>

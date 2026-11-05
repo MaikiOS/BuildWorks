@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public class Game { public static int m_worldLevel; public static Game instance = new Game(); public bool IsShuttingDown() => false; public static bool operator !(Game value) => value == null; }
+// Fixtures use literal prefab names; this is not native clone/name-resolution proof.
+public static class Utils { public static string GetPrefabName(GameObject prefab) => prefab.name; }
 
 namespace BepInEx
 {

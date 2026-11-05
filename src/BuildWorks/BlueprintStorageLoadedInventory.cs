@@ -31,21 +31,29 @@ namespace OstrixMods.BuildWorks
             }
             foreach (var row in rows)
             {
-                if (row.SourceVersion != 109 && row.SourceVersion != 110 || !row.DurabilityHundredths.HasValue ||
-                    row.DurabilityHundredths.Value < 0) return false;
-                if (!cells.TryGetValue(row.Y * live.GetWidth() + row.X, out var current)) return false;
-                if (current.m_shared == null || !current.m_dropPrefab || current.m_dropPrefab.name != row.Prefab ||
-                    current.m_stack != row.Stack || current.m_quality != row.Quality || current.m_variant != row.Variant ||
-                    current.m_worldLevel != row.WorldLevel || current.m_pickedUp != row.PickedUp || current.m_equipped != row.Equipped ||
-                    current.m_cheated != row.Cheated || current.m_crafterID != row.CrafterId || current.m_crafterName != row.CrafterName ||
-                    current.m_stack > current.m_shared.m_maxStackSize || current.m_quality > current.m_shared.m_maxQuality ||
-                    row.Variant < 0 || row.Variant >= Math.Max(1, current.m_shared.m_variants) ||
-                    // Match native stfld Single; Mono may otherwise compare an extended-precision product.
-                    current.m_durability != (float)((float)row.DurabilityHundredths.Value * 0.01f) ||
-                    current.m_customData == null || current.m_customData.Count != row.CustomData.Count ||
-                    row.CustomData.Any(pair => !current.m_customData.TryGetValue(pair.Key, out string value) || value != pair.Value)) return false;
+                if (!cells.TryGetValue(row.Y * live.GetWidth() + row.X, out var current) || !MatchesItem(current, row)) return false;
             }
             return true;
         }
+
+        // Comparison only: the return caller must separately prove actual holder/drop custody.
+        internal static bool MatchesMountedItem(ItemDrop.ItemData live, BlueprintForeignPartData mounted) =>
+            mounted != null && !mounted.ContentsCleared && BlueprintItemStandContents.TryRead(mounted, name => name.GetStableHashCode(), out var item) &&
+            MatchesItem(live, item);
+
+        private static bool MatchesItem(ItemDrop.ItemData current, BlueprintContainerInventory.Item row) =>
+            current != null && row != null && (row.SourceVersion == 109 || row.SourceVersion == 110) &&
+            row.DurabilityHundredths.HasValue && row.DurabilityHundredths.Value >= 0 &&
+            current.m_shared != null && current.m_dropPrefab && current.m_dropPrefab.name == row.Prefab &&
+            current.m_gridPos.x == row.X && current.m_gridPos.y == row.Y &&
+            current.m_stack == row.Stack && current.m_quality == row.Quality && current.m_variant == row.Variant &&
+            current.m_worldLevel == row.WorldLevel && current.m_pickedUp == row.PickedUp && current.m_equipped == row.Equipped &&
+            current.m_cheated == row.Cheated && current.m_crafterID == row.CrafterId && current.m_crafterName == row.CrafterName &&
+            current.m_stack <= current.m_shared.m_maxStackSize && current.m_quality <= current.m_shared.m_maxQuality &&
+            row.Variant >= 0 && row.Variant < Math.Max(1, current.m_shared.m_variants) &&
+            // Match native stfld Single; Mono may otherwise compare an extended-precision product.
+            current.m_durability == (float)((float)row.DurabilityHundredths.Value * 0.01f) &&
+            current.m_customData != null && current.m_customData.Count == row.CustomData.Count &&
+            row.CustomData.All(pair => current.m_customData.TryGetValue(pair.Key, out string value) && value == pair.Value);
     }
 }

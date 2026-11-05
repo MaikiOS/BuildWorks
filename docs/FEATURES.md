@@ -52,4 +52,6 @@ English fallback and complete Russian catalogs are implemented and checked. [Roa
 
 
 
-This tag preserves the archive source: checkpoint `5a095eb81967e074c29c8588161e0495325c4b6d`. It freezes the 2 November alpha; later development is not included in the ZIP. 2.19 Unbound and the full module remain open. See [main](https://github.com/MaikiOS/BuildWorks/blob/main/docs/CURRENT_STATUS.md) for subsequent development.
+## Development after the archive
+
+Accepted development source: `32f70d3293f9ccfebcedbf2f60083e23fdd92b84`; documentation checkpoint: `6569cfff05c0ba8a7f4d288b41b9ff58bfb5c041`. These later changes are not in the installable archive. Durable mounted-item return cleanup, saved absence, terminal state and recovery have SOURCE/CPU acceptance only. Production controller/admission remains closed; paid gameplay/restart/network validation is still required. The full scope remains 137 stable IDs / 35 scoped accepted / 102 open. 2.16 and 2.19–2.23 remain open; all 14 sections and future milestones remain required.

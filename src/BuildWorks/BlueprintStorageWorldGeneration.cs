@@ -60,6 +60,16 @@ namespace OstrixMods.BuildWorks
             => TryCapture(operation, custodyUnchanged, world => NativeWorldStorageReadback.Expectation.ForExactBlob(world, operation, prefab,
                 creator, ZDOVars.s_creator, markerKey, receiptKey, receipt), out expectation, out reason);
 
+        internal static bool TryCaptureMount(Guid parentOperation, int prefab, long creator, int markerKey, int receiptKey, byte[] receipt,
+            BlueprintForeignPartData mounted, Func<bool> custodyUnchanged, out BlueprintStorageWorldGeneration expectation, out string reason)
+            => TryCapture(parentOperation, custodyUnchanged, world => NativeWorldStorageReadback.Expectation.ForItemStand(world,
+                parentOperation, prefab, creator, ZDOVars.s_creator, markerKey, receiptKey, receipt, mounted), out expectation, out reason);
+
+        internal static bool TryCaptureEmptyStand(Guid parentOperation, int prefab, long creator, int markerKey, int receiptKey, byte[] receipt,
+            Func<bool> custodyUnchanged, out BlueprintStorageWorldGeneration expectation, out string reason)
+            => TryCapture(parentOperation, custodyUnchanged, world => NativeWorldStorageReadback.Expectation.ForEmptyItemStand(world,
+                parentOperation, prefab, creator, ZDOVars.s_creator, markerKey, receiptKey, receipt), out expectation, out reason);
+
         internal static bool TryCaptureAbsence(Guid operation, int markerKey, IEnumerable<Guid> parts, Func<bool> custodyUnchanged,
             out BlueprintStorageWorldGeneration expectation, out string reason)
             => TryCapture(operation, custodyUnchanged, null, out expectation, out reason,

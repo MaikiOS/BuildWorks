@@ -25,10 +25,10 @@ if (-not (Test-Path -LiteralPath (Join-Path $ProjectPath 'ProjectSettings\Projec
 $geometryProject = Join-Path $repositoryRoot 'src\BuildWorks.Geometry\BuildWorks.Geometry.csproj'
 $geometryDll = Join-Path $repositoryRoot 'src\BuildWorks.Geometry\bin\Release\netstandard2.0\BuildWorks.Geometry.dll'
 $pluginsPath = Join-Path $projectPath 'Assets\Plugins'
-$logPath = Join-Path $repositoryRoot $(if ($PlannerOnly) { 'artifacts\point-2.17-20261029\ui-planner324-v1\unity.log' } elseif ($ExchangeOnly) { 'artifacts\point-2.16-20261028\ui-legacy321\unity.log' } elseif ($ReleaseOnly) { 'artifacts\release-regression\unity.log' } elseif ($ContactOnly) { 'artifacts\placement-contact\unity.log' } else { 'artifacts\unity-workbench-capture.log' })
+$logPath = Join-Path $repositoryRoot $(if ($PlannerOnly) { 'artifacts\point-2.17-20261029\ui-planner324-v1\unity.log' } elseif ($ExchangeOnly) { 'artifacts\point-2.19-unbound-20261031\export-ui-20261102\engine\unity.log' } elseif ($ReleaseOnly) { 'artifacts\release-regression\unity.log' } elseif ($ContactOnly) { 'artifacts\placement-contact\unity.log' } else { 'artifacts\unity-workbench-capture.log' })
 $outputPath = Join-Path $repositoryRoot 'artifacts\ui-workbench'
 $startedAt = [DateTime]::UtcNow
-$statusPath = Join-Path $repositoryRoot $(if ($PlannerOnly) { 'artifacts\point-2.17-20261029\ui-planner324-v1\verification-status.json' } elseif ($ExchangeOnly) { 'artifacts\point-2.16-20261028\ui-legacy321\verification-status.json' } elseif ($ReleaseOnly) { 'artifacts\release-regression\verification-status.json' } elseif ($ContactOnly) { 'artifacts\placement-contact\verification-status.json' } else { 'artifacts\ui-runtime\verification-status.json' })
+$statusPath = Join-Path $repositoryRoot $(if ($PlannerOnly) { 'artifacts\point-2.17-20261029\ui-planner324-v1\verification-status.json' } elseif ($ExchangeOnly) { 'artifacts\point-2.19-unbound-20261031\export-ui-20261102\engine\verification-status.json' } elseif ($ReleaseOnly) { 'artifacts\release-regression\verification-status.json' } elseif ($ContactOnly) { 'artifacts\placement-contact\verification-status.json' } else { 'artifacts\ui-runtime\verification-status.json' })
 New-Item -ItemType Directory -Path (Split-Path -Parent $statusPath) -Force | Out-Null
 $runningStatus = if ($PlannerOnly) { 'running_planner_exports' } elseif ($ExchangeOnly) { 'running_exchange_exports' } elseif ($ReleaseOnly) { 'running_release_regression' } elseif ($ContactOnly) { 'running_placement_contact' } else { 'running_runtime_workbench' }
 if ($ControllerInputOnly) {
@@ -95,7 +95,7 @@ $runtimeFiles = @('BlueprintRotationState.cs', 'BlueprintSignPreview.cs', 'Bluep
     'BlueprintEditorScene.cs', 'BlueprintEditorScene.Structural.cs', 'BlueprintEditorMeshData.cs', 'BlueprintEditorIconLibrary.cs', 'BlueprintStructuralSnapshot.cs', 'BlueprintStructuralAnalysis.cs', 'BlueprintSurfaceContact.cs', 'BlueprintTriangleContact.cs',
     'TransformGizmoView.cs', 'PlacementGhostPreviewView.cs', 'BlueprintBatchedPreview.cs', 'BlueprintWorldSnapPoints.cs', 'BlueprintItemStandPreview.cs', 'BlueprintItemStandCapture.cs', 'BlueprintItemStandPlacement.cs', 'BlueprintStorageCapture.cs', 'BlueprintStorageTransferJournal.cs', 'BlueprintMaterialState.cs', 'BlueprintThumbnailRenderer.cs', 'BlueprintPlacementFrame.cs', 'BlueprintHammerSnapSearch.cs', 'CompositeBlueprintStore.cs', 'BlueprintPrefabMetadataCapture.cs', 'ExternalBlueprintLibrary.cs', 'BlueprintExchangeFormat.cs',
     'BlueprintExchangeServerView.cs', 'BlueprintExchangePeerView.cs', 'BlueprintTransferBudget.cs', 'BlueprintPeerProtocol.cs', 'BlueprintPeerClient.cs', 'BlueprintServerClient.cs', 'BlueprintServerProtocol.cs', 'BlueprintServerEndpoint.cs', 'ServerBlueprintLibrary.cs', 'BlueprintUnboundImport.cs',
-    'PrecisionPlacementHudView.cs', 'WorldSelectionHud.cs', 'BlueprintResourceHudView.cs', 'WorldSelectionHighlight.cs', 'BuildWorksPlacementValidation.cs', 'BuildWorksTestPlacementDiagnostics.cs', 'BlueprintSignText.cs', 'BlueprintExchangeView.cs', 'BlueprintExchangeBatchView.cs', 'PlanBuildExport.cs', 'BlueprintExportPair.cs', 'OpenKeepExport.cs', 'KgExport.cs', 'BetterBuildingExport.cs', 'PlannerExport.cs', 'BlueprintSourcePresentation.cs', 'VanillaMidpointSnapPoints.cs')
+    'PrecisionPlacementHudView.cs', 'WorldSelectionHud.cs', 'BlueprintResourceHudView.cs', 'WorldSelectionHighlight.cs', 'BuildWorksPlacementValidation.cs', 'BuildWorksTestPlacementDiagnostics.cs', 'BlueprintSignText.cs', 'BlueprintExchangeView.cs', 'BlueprintExchangeBatchView.cs', 'PlanBuildExport.cs', 'BlueprintExportPair.cs', 'OpenKeepExport.cs', 'KgExport.cs', 'UnboundExport.cs', 'BetterBuildingExport.cs', 'PlannerExport.cs', 'BlueprintSourcePresentation.cs', 'VanillaMidpointSnapPoints.cs')
 $sourceProof = foreach ($name in $runtimeFiles) {
     $source = Join-Path $repositoryRoot ('src\BuildWorks\' + $name)
     $destination = Join-Path $runtimeSources $name
@@ -174,13 +174,25 @@ if ($PlannerOnly) {
 }
 
 if ($ExchangeOnly) {
-    $proofPath = Join-Path $repositoryRoot 'artifacts/point-2.16-20261028/ui-legacy321/acceptance.json'
+    $proofPath = Join-Path $repositoryRoot 'artifacts/point-2.19-unbound-20261031/export-ui-20261102/engine/acceptance.json'
     if (!(Test-Path -LiteralPath $proofPath) -or (Get-Item -LiteralPath $proofPath).LastWriteTimeUtc -lt $startedAt) { throw 'Fresh exchange export proof missing.' }
     $proof = Get-Content -LiteralPath $proofPath -Raw | ConvertFrom-Json
     if ($proof.passed -isnot [bool] -or !$proof.passed -or $proof.gameHostTested -isnot [bool] -or $proof.gameHostTested -or
         $proof.languages -ne 2 -or $proof.targets -ne 2 -or $proof.existingExchangeLifecycle -ne $true -or
         $proof.nativeScrollEvent -ne $true -or $proof.freshDeferredScreenshots -ne 2 -or
         !(Select-String -LiteralPath $logPath -SimpleMatch 'BUILDWORKS_EXCHANGE_EXPORTS_OK' -Quiet)) { throw 'Exchange export UI coverage incomplete.' }
+    $unboundProofPath = Join-Path (Split-Path -Parent $proofPath) 'unbound-ui-acceptance.json'
+    if (!(Test-Path -LiteralPath $unboundProofPath) -or (Get-Item -LiteralPath $unboundProofPath).LastWriteTimeUtc -lt $startedAt) { throw 'Fresh Unbound UI proof missing.' }
+    $unboundProof = Get-Content -LiteralPath $unboundProofPath -Raw | ConvertFrom-Json
+    foreach ($flag in @('passed','cycle','batchReset','pairedFiles','backNoWrite','staleSource','deferredReview','closeCancels','lateCompletionIgnored','sourceImmutable')) {
+        if ($unboundProof.$flag -isnot [bool] -or !$unboundProof.$flag) { throw "Unbound UI coverage missing: $flag" }
+    }
+    if ($unboundProof.languages -ne 2 -or $unboundProof.blockers -ne 7 -or $unboundProof.screenshots -ne 4 -or
+        $unboundProof.gameHostTested -isnot [bool] -or $unboundProof.gameHostTested) { throw 'Unbound UI coverage incomplete.' }
+    foreach ($name in 'unbound-en.png','unbound-ru.png','unbound-blocked-en.png','unbound-blocked-ru.png') {
+        $image = Get-Item -LiteralPath (Join-Path (Split-Path -Parent $proofPath) $name)
+        if ($image.Length -lt 10000 -or $image.LastWriteTimeUtc -lt $startedAt) { throw "Fresh Unbound frame missing: $name" }
+    }
     $bbpProofPath = Join-Path (Split-Path -Parent $proofPath) 'bbp-ui-acceptance.json'
     if (!(Test-Path -LiteralPath $bbpProofPath) -or (Get-Item -LiteralPath $bbpProofPath).LastWriteTimeUtc -lt $startedAt) { throw 'Fresh BBP export proof missing.' }
     $bbpProof = Get-Content -LiteralPath $bbpProofPath -Raw | ConvertFrom-Json

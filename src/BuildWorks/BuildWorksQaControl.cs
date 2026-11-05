@@ -127,6 +127,8 @@ namespace OstrixMods.BuildWorks
                 BuildWorksTestIsolation.RequireLoadedSession();
             });
 
+        public string ReadUnboundItemStandProfiles() => BuildWorksTestItemStandProfiles.Snapshot(RequireStorageIdle);
+
         public string ReadPlacementGhost() => BuildWorksTestContactProfiles.CurrentGhost(() => {
             if (ownerThread == 0 || System.Threading.Thread.CurrentThread.ManagedThreadId != ownerThread ||
                 running != null || capture != null || fog || StoragePersistenceBusy() || !Application.isFocused ||

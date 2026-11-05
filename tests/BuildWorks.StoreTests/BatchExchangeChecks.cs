@@ -41,6 +41,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             Ready(store);
             committedStop.Cancel();
             var imported = store.CatalogAll().ToArray();
+            ExportNames(Path.Combine(folder, "names"), store, imported, File.ReadAllBytes(a));
             Require(imported.Select(item => item.importSource).SequenceEqual(Enumerable.Range(0, 2).Select(index =>
                 Path.GetFileName(store.ImportResultPath) + "/document_" + index + ".buildworks.json")) &&
                 review.Documents.Select(item => item.importSource).SequenceEqual(new[] { "a.blueprint", "b.blueprint" }),
@@ -133,6 +134,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             WritingCancellation(folder, imported[0]);
             PublicationFailure(folder, imported[0]);
             ContentsPolicies(folder, imported[0]);
+            FilteredDocuments(Path.Combine(folder, "filtered-documents"), imported[0]);
             Console.WriteLine("PASS batch exchange: multi-file/malformed/duplicates, common and per-document categories, exact originals+manifest, reload, source-change atomic refusal, pre-cancel, full ZIP roundtrip and no overwrite/card/temp leak.");
         }
 
@@ -288,6 +290,127 @@ namespace OstrixMods.BuildWorks.StoreTests
                     "Batch export conflated policies or changed source");
             }
             Console.WriteLine("PASS batch storage/mount import/export 4 policy combinations and immutable originals");
+        }
+
+        private static void ExportNames(string folder, CompositeBlueprintStore store,
+            CompositeBlueprintStore.Blueprint[] documents, byte[] foreign)
+        {
+            var reserved = new[] { "CON", "PRN", "AUX", "NUL" }.Concat(
+                "123456789\u00b9\u00b2\u00b3".SelectMany(digit => new[] { "COM" + digit, "LPT" + digit })).ToArray();
+            foreach (string name in reserved.SelectMany(name => new[] { name, name.ToLowerInvariant() + ".draft" }))
+            {
+                bool rejected = false;
+                try { CompositeBlueprintStore.ValidateExportName(name); }
+                catch (InvalidDataException error) { rejected = error.Message == "$buildworks_exchange.invalid_name"; }
+                Require(rejected, "Reserved Windows export name accepted: " + name);
+            }
+            var snapshot = BlueprintExportPair.Snapshot(documents[0]);
+            foreach (string name in new[] { "CON", "nul.draft", "LPT\u00b2" })
+            {
+                string blocked = Path.Combine(folder, "must-not-create");
+                foreach (bool archive in new[] { false, true })
+                    Require(!store.TryExportFile(documents[0], blocked, name, archive, out _, out string error) &&
+                        error == "$buildworks_exchange.invalid_name", "Single export lost invalid-name reason");
+                bool rejected = false;
+                try { store.ExportBatch(documents, blocked, name, false, false, ForeignZdoChecks.Hash).GetAwaiter().GetResult(); }
+                catch (InvalidDataException error) { rejected = error.Message == "$buildworks_exchange.invalid_name"; }
+                Require(rejected, "Batch export lost invalid-name reason");
+                var pair = new BlueprintExportPair(snapshot.Native, foreign, ".blueprint");
+                Require(!pair.TryWrite(() => (snapshot.Native, foreign), blocked, name, out _, out string pairError) &&
+                    pairError == "$buildworks_exchange.invalid_name" && !Directory.Exists(blocked),
+                    "Paired export lost invalid-name reason or created output");
+            }
+            foreach (string name in new[] { "COM10", "LPT10", "auxiliary", ".hidden", "report.v2", new string('a', 120) })
+                CompositeBlueprintStore.ValidateExportName(name);
+            foreach (string name in new[] { "Выбранное имя", "CONstruction" })
+            {
+                string chosen = Path.Combine(folder, name);
+                foreach (bool archive in new[] { false, true })
+                {
+                    Require(store.TryExportFile(documents[0], chosen, name, archive, out string output, out string error), error);
+                    Require(output == Path.Combine(chosen, name + (archive ? ".zip" : ".buildworks.json")) &&
+                        ExternalBlueprintLibrary.LoadFile(output).Count == 1, "Single export ignored chosen name/folder/format");
+                }
+                string batchFolder = Path.Combine(chosen, "batch");
+                string batch = store.ExportBatch(documents, batchFolder, name, false, false, ForeignZdoChecks.Hash).GetAwaiter().GetResult();
+                Require(batch == Path.Combine(batchFolder, name + ".zip") && ExternalBlueprintLibrary.LoadFile(batch).Count == documents.Length,
+                    "Batch export ignored chosen name/folder or omitted a selected document");
+                var pair = new BlueprintExportPair(snapshot.Native, foreign, ".blueprint");
+                string pairedFolder = Path.Combine(chosen, "pair");
+                Require(pair.TryWrite(() => (snapshot.Native, foreign), pairedFolder, name, out string paired, out string pairError), pairError);
+                Require(paired == Path.Combine(pairedFolder, name) &&
+                    File.ReadAllBytes(Path.Combine(paired, name + ".blueprint")).SequenceEqual(foreign) &&
+                    File.ReadAllBytes(Path.Combine(paired, name + ".buildworks.json")).SequenceEqual(snapshot.Native),
+                    "Paired export ignored name/folder or changed reviewed bytes");
+            }
+            Console.WriteLine("PASS export names/folders: 56 reserved Windows names rejected, JSON/ZIP/batch/pair boundaries and chosen Unicode/near-device names; CPU only, no catalog UI or foreign reader proof.");
+        }
+
+        private static void FilteredDocuments(string folder, CompositeBlueprintStore.Blueprint source)
+        {
+            Directory.CreateDirectory(folder);
+            var documents = new[] { "A", "B", "C" }.Select(name =>
+            {
+                var copy = ExternalBlueprintLibrary.DetachedCopy(source);
+                copy.id = Guid.NewGuid().ToString("N"); copy.name = name; copy.category = name + " ORIGINAL";
+                return copy;
+            }).ToArray();
+            documents[1].parts[0].foreignData = new CompositeBlueprintStore.ForeignPartData {
+                format = OstrixMods.BuildWorks.Geometry.BlueprintForeignPartData.NativeItemStandFormat,
+                info = "SwordIron:0:1:0", zdo = StandPackage() };
+            var files = documents.Select(document => Path.Combine(folder, document.name + ".buildworks.json")).ToArray();
+            for (int i = 0; i < files.Length; ++i) File.WriteAllBytes(files[i], BlueprintExchangeFormat.Encode(documents[i]));
+            var originals = files.Select(File.ReadAllBytes).ToArray();
+            var raw = CompositeBlueprintStore.ReviewImportFiles(files, ForeignZdoChecks.Hash, 0);
+            var analysis = NewStore(Path.Combine(folder, "analysis"));
+            var full = analysis.PrepareImportReview(raw, ForeignZdoChecks.Hash).GetAwaiter().GetResult();
+            Require(full.Documents.Count == 3 && full.Contents.Mounts == 1, "A/B/C fixture lost the middle document's mount warning");
+            var selected = new CompositeBlueprintStore.ImportReview {
+                Source = raw.Source, Bytes = raw.Bytes, Sources = raw.Sources, FileErrors = raw.FileErrors,
+                Documents = new List<CompositeBlueprintStore.Blueprint> { raw.Documents[0], raw.Documents[2] } };
+            foreach (bool originalCategory in new[] { false, true })
+            {
+                string label = originalCategory ? "original" : "custom";
+                var store = NewStore(Path.Combine(folder, label));
+                var review = store.PrepareImportReview(selected, ForeignZdoChecks.Hash).GetAwaiter().GetResult();
+                Require(review.Documents.Select(document => document.name).SequenceEqual(new[] { "A", "C" }) &&
+                    review.Contents.Mounts == 0 && full.Contents.Mounts == 1, "Filtered preparation retained excluded contents or changed the prior review");
+                var overrides = new Dictionary<int, string> { [1] = originalCategory ? null : " custom c " };
+                Require(store.TryImportReviewed(review, false, false, ForeignZdoChecks.Hash, out string error,
+                    importCategory: " common ", documentCategories: overrides), error);
+                Ready(store);
+                var imported = store.CatalogAll().ToArray();
+                string[] expectedCategories = { "COMMON", originalCategory ? "C ORIGINAL" : "CUSTOM C" };
+                Require(imported.Select(document => document.name).SequenceEqual(new[] { "A", "C" }) &&
+                    imported.Select(document => document.category).SequenceEqual(expectedCategories), "Filtered import misapplied common/custom/original categories");
+                string zip = store.ExportBatch(imported, Path.Combine(folder, label, "out"), "selected", false, false, ForeignZdoChecks.Hash).GetAwaiter().GetResult();
+                var exported = ExternalBlueprintLibrary.LoadFile(zip);
+                Require(exported.Select(document => document.name).SequenceEqual(new[] { "A", "C" }) &&
+                    exported.Select(document => document.category).SequenceEqual(expectedCategories) && store.CatalogAll().Count == 2,
+                    "Filtered export lost categories or inserted the excluded document/card");
+                if (!originalCategory)
+                {
+                    Require(CompositeBlueprintStore.TryNormalizeImportCategory(" custom c ", out string canonical) && canonical == "CUSTOM C",
+                        "Category input with surrounding spaces was not valid after normalization");
+                    var unnormalized = imported.Select(document => document.ImportCopy()).ToArray();
+                    unnormalized[1].category = " custom c ";
+                    string invalidFolder = Path.Combine(folder, label, "raw-category");
+                    bool refused = false;
+                    try { store.ExportBatch(unnormalized, invalidFolder, "rejected", false, false, ForeignZdoChecks.Hash).GetAwaiter().GetResult(); }
+                    catch (InvalidDataException exception) { refused = exception.Message.Contains("document_invalid"); }
+                    Require(refused && !Directory.Exists(invalidFolder), "Unnormalized UI category reached export publication");
+                }
+            }
+            analysis.ConfigureImportScale(_ => throw new InvalidOperationException("profile snapshot unavailable"));
+            bool synchronousFailure = false, returnedTask = false;
+            try { analysis.PrepareImportReview(selected, ForeignZdoChecks.Hash); returnedTask = true; }
+            catch (InvalidOperationException exception) { synchronousFailure = exception.Message == "profile snapshot unavailable"; }
+            Require(synchronousFailure && !returnedTask && analysis.ImportResultPath == null &&
+                !File.Exists(Path.Combine(folder, "analysis", "library.json")), "Profile failure did not occur before task return or changed stored state");
+            Require(files.Select((file, index) => File.ReadAllBytes(file).SequenceEqual(originals[index])).All(equal => equal),
+                "Filtered batch import/export changed an original source file");
+            Console.WriteLine("PASS actual preparation provider failure before task return: no result/library/source mutation; no game proof.");
+            Console.WriteLine("PASS actual A/C batch subset: middle mount warning removed, common/custom/original categories, exact source files and two-document import/export; no UI/native game proof.");
         }
 
         private static CompositeBlueprintStore NewStore(string folder)

@@ -38,6 +38,15 @@ namespace OstrixMods.BuildWorks.Geometry
 
         public bool HasHash(int key) => values.Keys.Any(value => value.Key == key);
 
+        public static BlueprintForeignZdo CreateNative(int prefabHash, bool persistent, bool distant, byte objectType)
+        {
+            if (objectType > 3) throw new ArgumentOutOfRangeException(nameof(objectType));
+            return new BlueprintForeignZdo {
+                NativeFlags = (ushort)((persistent ? 256 : 0) | (distant ? 512 : 0) | (objectType << 10)),
+                NativePrefabHash = prefabHash, Persistent = persistent, Distant = distant
+            };
+        }
+
         // Unbound38 stores the pinned game's ZDO.Serialize projection, not Save chunks or DataEntry.
         public static bool TryReadNative(string base64, int expectedPrefabHash, out BlueprintForeignZdo data)
         {
@@ -103,6 +112,93 @@ namespace OstrixMods.BuildWorks.Geometry
             }
             catch (Exception error) when (error is IOException || error is InvalidDataException || error is FormatException || error is ArgumentException)
             { return false; }
+        }
+
+        // Inert source-backed rewrite; export policy must separately remove runtime authority and stale references.
+        public string WriteNative(IEnumerable<KeyValuePair<int, object>> updates = null,
+            IEnumerable<KeyValuePair<int, Type>> omit = null)
+        {
+            if (!NativeFlags.HasValue || !NativePrefabHash.HasValue)
+                throw new InvalidOperationException("Not a native state packet.");
+            var changed = new Dictionary<KeyValuePair<int, Type>, object>(values);
+            int operations = 0;
+            long updateBytes = 0;
+            if (omit != null) foreach (var key in omit)
+            {
+                if (++operations > BlueprintForeignPartData.MaximumContainerBytes / 4)
+                    throw new ArgumentException("Too many native state updates.");
+                changed.Remove(key);
+            }
+            if (updates != null) foreach (var update in updates)
+            {
+                if (++operations > BlueprintForeignPartData.MaximumContainerBytes / 4 || update.Value == null)
+                    throw new ArgumentException("Invalid native state update.");
+                Type type = update.Value.GetType();
+                if (type != typeof(float) && type != typeof(Point3) && type != typeof(Rotation3) && type != typeof(int) &&
+                    type != typeof(long) && type != typeof(string) && type != typeof(byte[]))
+                    throw new ArgumentException("Unsupported native state type.");
+                updateBytes += update.Value is byte[] array ? array.LongLength :
+                    update.Value is string text ? new UTF8Encoding(false, true).GetByteCount(text) :
+                    type == typeof(Point3) ? 12 : type == typeof(Rotation3) ? 16 : type == typeof(long) ? 8 : 4;
+                // Bound input before cloning; many individually valid arrays must not allocate an unbounded pending map.
+                if (updateBytes > BlueprintForeignPartData.MaximumContainerBytes)
+                    throw new ArgumentException("Native state updates are too large.");
+                changed[new KeyValuePair<int, Type>(update.Key, type)] = update.Value is byte[] bytes ? bytes.Clone() : update.Value;
+            }
+            Type[] types = { typeof(float), typeof(Point3), typeof(Rotation3), typeof(int), typeof(long), typeof(string), typeof(byte[]) };
+            var sections = types.Select(type => changed.Where(pair => pair.Key.Value == type).OrderBy(pair => pair.Key.Key).ToArray()).ToArray();
+            ushort flags = (ushort)(NativeFlags.Value & 0x1f01);
+            for (int i = 0; i < sections.Length; ++i)
+            {
+                if (sections[i].Length > 32767) throw new ArgumentException("Native state section is too large.");
+                if (sections[i].Length != 0) flags |= (ushort)(2 << i);
+            }
+            using (var stream = new MemoryStream())
+            using (var writer = new BinaryWriter(stream, new UTF8Encoding(false, true)))
+            {
+                writer.Write(flags); writer.Write(NativePrefabHash.Value);
+                if (NativeRotationEuler.HasValue) Vector(NativeRotationEuler.Value);
+                if (ConnectionType.HasValue)
+                {
+                    writer.Write(ConnectionType.Value); writer.Write(NativeConnectionUserId.Value); writer.Write(NativeConnectionId.Value);
+                }
+                foreach (var section in sections)
+                {
+                    if (section.Length == 0) continue;
+                    if (section.Length < 128) writer.Write((byte)section.Length);
+                    else { writer.Write((byte)(128 | (section.Length >> 8))); writer.Write((byte)section.Length); }
+                    foreach (var pair in section)
+                    {
+                        writer.Write(pair.Key.Key);
+                        switch (pair.Value)
+                        {
+                            case float f: writer.Write(Finite(f)); break;
+                            case Point3 p: Vector(p); break;
+                            case Rotation3 q:
+                                writer.Write(Finite((float)q.X)); writer.Write(Finite((float)q.Y));
+                                writer.Write(Finite((float)q.Z)); writer.Write(Finite((float)q.W)); break;
+                            case int n: writer.Write(n); break;
+                            case long n: writer.Write(n); break;
+                            case string text:
+                                int length = new UTF8Encoding(false, true).GetByteCount(text);
+                                int prefix = 1; for (int n = length; n >= 128; n >>= 7) ++prefix;
+                                RequireRoom((long)length + prefix); writer.Write(text); break;
+                            case byte[] bytes: RequireRoom((long)bytes.Length + 4); writer.Write(bytes.Length); writer.Write(bytes); break;
+                        }
+                        RequireRoom(0);
+                    }
+                }
+                string result = Convert.ToBase64String(stream.ToArray());
+                if (!TryReadNative(result, NativePrefabHash.Value, out _)) throw new ArgumentException("Invalid native state output.");
+                return result;
+
+                void Vector(Point3 p) { writer.Write(Finite((float)p.X)); writer.Write(Finite((float)p.Y)); writer.Write(Finite((float)p.Z)); }
+                void RequireRoom(long count)
+                {
+                    if (count > BlueprintForeignPartData.MaximumContainerBytes - stream.Length)
+                        throw new ArgumentException("Native state packet is too large.");
+                }
+            }
         }
 
         // KG 1.7.1 has seven presence/count sections, not DataEntry's bitmask.

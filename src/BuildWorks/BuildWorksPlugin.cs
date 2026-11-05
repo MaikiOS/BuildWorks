@@ -1510,6 +1510,19 @@ namespace OstrixMods.BuildWorks
         [HarmonyPatch(typeof(ItemDrop), nameof(ItemDrop.SaveToZDO))]
         private static class BlueprintPayoutSavePatch
         { private static bool Prefix(ItemDrop.ItemData __0, ZDO __1, int __2) => BlueprintConstructionPayoutSeal.AllowSave(__0, __1, __2); }
+        [HarmonyPatch(typeof(ZNet), "ServerLoadWorld")]
+        private static class BlueprintMountWorldLoadPatch
+        {
+            private static void Prefix() => BlueprintConstructionMountContext.BeginReturnWorldLoad();
+            private static Exception Finalizer(Exception __exception)
+            { BlueprintConstructionMountContext.EndReturnWorldLoad(__exception); return __exception; }
+        }
+        [HarmonyPatch(typeof(ItemDrop), nameof(ItemDrop.Load))]
+        private static class BlueprintMountSourceLoadPatch
+        {
+            private static Exception Finalizer(ItemDrop __instance, Exception __exception)
+            { BlueprintConstructionMountContext.ReturnSourceNativeLoaded(__instance, __exception); return __exception; }
+        }
         [HarmonyPatch(typeof(ItemDrop), "OnDestroy")]
         private static class BlueprintPayoutUnloadPatch
         { private static void Prefix(ItemDrop __instance) => BlueprintConstructionPayoutSeal.Destroyed(__instance); }
@@ -1531,6 +1544,23 @@ namespace OstrixMods.BuildWorks
         [HarmonyPatch(typeof(ItemDrop), nameof(ItemDrop.CanPickup))]
         private static class BlueprintPayoutCanPickupPatch
         { private static bool Prefix(ItemDrop __instance) => !BlueprintConstructionPayoutSeal.IsHeld(__instance); }
+
+        [HarmonyPatch(typeof(ItemStand), "RPC_DropItem")]
+        private static class BlueprintMountReturnHandlerPatch
+        {
+            private static bool Prefix(ItemStand __instance, out BlueprintConstructionPayoutSeal.MountDropObservation __state) =>
+                BlueprintConstructionPayoutSeal.BeginMountDropHandler(__instance, out __state);
+            private static Exception Finalizer(BlueprintConstructionPayoutSeal.MountDropObservation __state, Exception __exception) =>
+                BlueprintConstructionPayoutSeal.EndMountDropHandler(__state, __exception);
+        }
+        [HarmonyPatch(typeof(ItemDrop), nameof(ItemDrop.LoadFromExternalZDO))]
+        private static class BlueprintMountReturnLoadPatch
+        {
+            private static void Prefix(ItemDrop __instance, ZDO __0, out BlueprintConstructionPayoutSeal.MountDropObservation __state) =>
+                __state = BlueprintConstructionPayoutSeal.BeginMountDropLoad(__instance, __0);
+            private static Exception Finalizer(ItemDrop __instance, BlueprintConstructionPayoutSeal.MountDropObservation __state, Exception __exception) =>
+                BlueprintConstructionPayoutSeal.EndMountDropLoad(__state, __instance, __exception);
+        }
         [HarmonyPatch(typeof(ItemDrop), nameof(ItemDrop.Pickup))]
         private static class BlueprintPayoutRequestPickupPatch
         { private static bool Prefix(ItemDrop __instance) => !BlueprintConstructionPayoutSeal.IsHeld(__instance); }

@@ -886,7 +886,7 @@ exchange.format_zip	ZIP + BuildWorks
 exchange.copy_path	Copy full path
 exchange.empty	No supported files here. Try Downloads, another folder, or paste a folder path above.
 exchange.folder	Folder:
-exchange.invalid_name	Enter a file name without path separators or <>:"/\\|?*. The format extension is added automatically.
+exchange.invalid_name	Enter a file name without path separators or <>:"/\\|?*. The format extension is added automatically. Avoid reserved Windows names such as CON, NUL or COM1.
 exchange.imported	A separate source copy is saved at: {0}
 import.format	Unsupported blueprint file format.
 editor.support.add_short	+ Support
@@ -1234,7 +1234,7 @@ exchange.openkeep_block_devbridgeprefab	Blocked: DevBridge cannot safely pass pr
 exchange.format_kg	KG + full copy
 exchange.kg_help	KG preserves the source format (.yml or .oprint), supported transforms and state; a full BuildWorks copy is saved alongside it. Review the file names before writing.
 exchange.kg_title	KG export review
-exchange.kg_review	Destination: {0}\nFiles: {1}{11} and {1}.buildworks.json\nKG: {2} pieces, {3} sign texts, {4} material seeds, {5} preserved raw states, {6} original source images.\nFull copy only: {7} groups, {8} supports, {9} anchors, {10} other source documents. Source author, description and original images are preserved; images may show the original building before edits.
+exchange.kg_review	Destination: {0}\nFiles: {1}{11} and {1}.buildworks.json\nKG: {2} pieces, {3} sign texts, {4} material seeds, {5} preserved raw states, {6} original source images.\nFull copy only: {7} groups, {8} supports, {9} anchors/custom snap points, {10} other source documents. Source author, description and original images are preserved; images may show the original building before edits.
 exchange.kg_archived	Previous BuildWorks project identifiers, payment receipts and placement witnesses are kept only in the full copy: {0} fields. They are not replayed through KG. Full source bytes remain in the copy. Other consumers may interpret raw state differently.
 exchange.kg_warning	Confirm to write both files. The full copy retains BuildWorks construction data; KG does not encode that data.
 exchange.kg_block_sources	Blocked: multiple independent KG sources cannot be merged without choosing their metadata ({0}).
@@ -1252,7 +1252,7 @@ catalog.kg_original_image	Embedded images belong to the original KG source and m
 exchange.format_bbp	BetterBuilding .bbp
 exchange.bbp_help	Export BetterBuilding geometry, signs, display-item descriptors and scale. An unchanged terrain grid can be retained. Review the limits and both file names before writing.
 exchange.bbp_title	BetterBuilding .bbp export
-exchange.bbp_review	Destination: {0}\nFiles: {1}.bbp and {1}.buildworks.json\nBBP: {2} pieces, {3} sign texts, {4} display-item descriptors, {5} scales, {6} terrain height samples.\nFull copy only: {7} other sources, {8} pieces with other state, {9} groups, {10} supports and {11} anchors. BBP stores no full inventories or arbitrary object state. A terrain grid is retained only while its source geometry and frame remain unchanged.
+exchange.bbp_review	Destination: {0}\nFiles: {1}.bbp and {1}.buildworks.json\nBBP: {2} pieces, {3} sign texts, {4} display-item descriptors, {5} scales, {6} terrain height samples.\nFull copy only: {7} other sources, {8} pieces with other state, {9} groups, {10} supports and {11} anchors/custom snap points. BBP stores no full inventories or arbitrary object state. A terrain grid is retained only while its source geometry and frame remain unchanged.
 exchange.bbp_warning	Confirm to write both files. Display-item descriptors are not complete inventories. The full copy retains original sources and BuildWorks construction data. Export does not apply terrain or create items.
 exchange.bbp_block_binding	Blocked: a piece no longer matches its interpreted BetterBuilding source address. Affected pieces: {0}.
 exchange.bbp_block_terrain	Blocked: the retained terrain grid no longer matches the document, or several grids need reconciliation. Affected cases: {0}.
@@ -1266,7 +1266,7 @@ exchange.bbp_json_help	Export the supported legacy BetterBuilding JSON schema, s
 exchange.bbp_json_title	Legacy BetterBuilding JSON export
 exchange.bbp_unknown	Unrecognised source fields: {0}. They stay in the original JSON inside the full BuildWorks copy and are omitted from the edited foreign file.
 catalog.bbp_json_metadata	BetterBuilding source data ({5}): {0} pieces, {1} sign texts, {2} display-item descriptors, {3} scales, {4} terrain height samples and {6} unrecognised fields. Retaining data does not mean applying it in game.
-exchange.bbp_json_review	Destination: {0}\nFiles: {1}.json and {1}.buildworks.json\nBetterBuilding JSON: {2} pieces, {3} sign texts, {4} display-item descriptors, {5} scales, {6} terrain height samples.\nFull copy only: {7} other sources, {8} pieces with other state, {9} groups, {10} supports and {11} anchors. BetterBuilding JSON stores no full inventories or arbitrary object state. A terrain grid is retained only while its source geometry and frame remain unchanged.
+exchange.bbp_json_review	Destination: {0}\nFiles: {1}.json and {1}.buildworks.json\nBetterBuilding JSON: {2} pieces, {3} sign texts, {4} display-item descriptors, {5} scales, {6} terrain height samples.\nFull copy only: {7} other sources, {8} pieces with other state, {9} groups, {10} supports and {11} anchors/custom snap points. BetterBuilding JSON stores no full inventories or arbitrary object state. A terrain grid is retained only while its source geometry and frame remain unchanged.
 exchange.format_planner	Planner JSON v3
 exchange.planner_title	Valheim Base Builder JSON v3 export
 exchange.planner_help	Exports planner JSON v3 with layers and an adjacent complete BuildWorks copy. Review scale, rotations and data kept only in the full copy before saving.
@@ -1279,3 +1279,16 @@ exchange.planner_block_scale	Parts outside absolute unit scale: {0}. Planner JSO
 exchange.planner_block_rotation	Parts with pitch or roll: {0}. Planner JSON cannot represent them.
 exchange.planner_block_format	Some data cannot be written within the supported planner profile: {0}. Use a complete BuildWorks export.
 catalog.planner_metadata	Archived planner source: {0} pieces, {1} layers, {2} unknown fields. This describes the source, not later edits.
+exchange.format_unbound	Unbound .vtbp
+exchange.unbound_title	Unbound vtbp 2 export
+exchange.unbound_help	Exports .vtbp and a complete BuildWorks copy. Review supported object state and restrictions before saving.
+exchange.unbound_review	Folder: {0}\nFiles: {1}.vtbp + {1}.buildworks.json\nParts: {2}; signs: {3}; material variants: {4}; containers: {5}, cleared: {6}; terrain height samples: {7}; item stands: {9}, cleared: {10}.\nOther archived sources: {8}. The complete copy retains original source data, groups, supports and editor settings. The .vtbp contains supported working object state; unsupported data blocks export. Terrain data is retained without changing the ground. BuildWorks survival uses the supplied item's properties; exported item snapshots do not grant free items or attribute restoration.\nParts with changed native flags: {11}. The .vtbp uses the current game values for object persistence, distant loading and network category. Original values remain in the companion .buildworks.json.
+exchange.unbound_warning	Check the review, then save both files. Placement behavior and requirements depend on the mod that reads the .vtbp.
+exchange.unbound_block_multiplesources	Cannot merge multiple Unbound sources into one .vtbp: {0}. Keep the full BuildWorks copy.
+exchange.unbound_block_sourcebinding	Unverified source addresses or placement frames: {0}. Recheck the imported source.
+exchange.unbound_block_hostprofile	Fresh prefab properties are unavailable: {0}. Review again when the required prefabs are available.
+exchange.unbound_block_stateadapter	Object states cannot be represented safely: {0}. Export is blocked; the full BuildWorks copy retains the data.
+exchange.unbound_block_terrainframe	A layout with terrain data has changed placement or composition: {0}. Use its original arrangement or the full BuildWorks copy.
+exchange.unbound_block_precision	Requested transforms or object state cannot be written exactly: {0}. Use the full BuildWorks copy.
+exchange.unbound_block_format	Documents outside the supported Unbound format: {0}. Use the full BuildWorks copy.
+exchange.unbound_blocked	This document cannot be exported safely as .vtbp. See the reasons above; Back allows a full BuildWorks export.

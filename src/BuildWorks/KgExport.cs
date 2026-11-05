@@ -29,7 +29,7 @@ namespace OstrixMods.BuildWorks
                 .Where(item=>KgBlueprint.IsFormat(item.format)).ToArray();
             var review=new KgExport{native=snapshot.Native,Parts=document.parts.Count,Sources=document.sourceDocuments?.Count ?? 0,
                 OtherSources=(document.sourceDocuments?.Count ?? 0)-roots.Length,Groups=document.groups.Count,
-                Supports=document.supports?.Count ?? 0,Anchors=document.anchors.Count,
+                Supports=document.supports?.Count ?? 0,Anchors=document.anchors.Count+(document.customSnapPoints?.Count ?? 0),
                 Signs=document.parts.Count(part=>part.signText!=null),MaterialSeeds=document.parts.Count(part=>part.materialSeed.HasValue),
                 NumericCulture=CultureInfo.CurrentCulture.Name};
             if(roots.Length>1){review.Blockers.Add((BlockReason.MultipleSources,roots.Length.ToString(CultureInfo.InvariantCulture)));return review;}

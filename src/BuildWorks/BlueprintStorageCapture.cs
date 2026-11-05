@@ -65,8 +65,9 @@ namespace OstrixMods.BuildWorks
         }
 
         // Exact types only: a new behaviour requires its own state contract before admission.
+        // Native mesh batching is prefab data, not an additional ZDO restore capability.
         internal static bool KgOrdinaryComponent(Type type)=>type==typeof(Piece) || type==typeof(ZNetView) ||
-            type==typeof(WearNTear) || type==typeof(Sign) || type==typeof(RandomMaterialValues) ||
+            type==typeof(WearNTear) || type==typeof(Sign) || type==typeof(RandomMaterialValues) || type==typeof(SimpleMeshCombine) ||
             type==typeof(TMPro.TextMeshPro) || type==typeof(TMPro.TextMeshProUGUI) || type==typeof(UnityEngine.UI.CanvasScaler);
 
         // Only construction compatibility; do not load, clear or alter a live inventory.

@@ -33,8 +33,26 @@ namespace OstrixMods.BuildWorks.StoreTests
             Check(zipped.importError==null && zipped.sourceDocuments.Single().id==source.sourceDocuments.Single().id,"ZIP source identity differs");
             RoundTrip(source,Path.Combine(directory,"roundtrip"));
             var original=source.sourceDocuments.Single().ToGeometry().BetterBuilding;
+            source.customSnapPoints = new System.Collections.Generic.List<CompositeBlueprintStore.VectorData> {
+                new CompositeBlueprintStore.VectorData { x = 13, y = 2, z = -7 },
+                new CompositeBlueprintStore.VectorData { x = -4, y = 5, z = 9 } };
             var review=BetterBuildingExport.Review(source,Basis);Check(review.Blockers.Count==0 && review.Attachments==1 && review.Scales==1,"BBP review fields");
+            Check(source.anchors.Count == 0 && review.Anchors == 2, "BBP review omitted custom snap losses");
             Check(review.TryWrite(source,Basis,directory,"unchanged",out string result,out string error),error);
+            Check(BlueprintExchangeFormat.Decode(File.ReadAllText(Path.Combine(result, "unchanged.buildworks.json"))).customSnapPoints.SequenceEqual(source.customSnapPoints),
+                "BBP native sidecar lost custom snaps");
+            var withAnchor = source.ImportCopy();
+            withAnchor.anchors = new System.Collections.Generic.List<CompositeBlueprintStore.VectorData> { new CompositeBlueprintStore.VectorData { x = 7 } };
+            Check(BetterBuildingExport.Review(withAnchor, Basis).Anchors == 3, "BBP review did not add anchors and custom snaps");
+            withAnchor.customSnapPoints = null;
+            Check(BetterBuildingExport.Review(withAnchor, Basis).Anchors == 1, "BBP null snap list changed anchor count");
+            withAnchor.customSnapPoints = new System.Collections.Generic.List<CompositeBlueprintStore.VectorData>();
+            Check(BetterBuildingExport.Review(withAnchor, Basis).Anchors == 1, "BBP empty snap list changed anchor count");
+            var changedSnaps = source.ImportCopy();
+            changedSnaps.customSnapPoints = source.customSnapPoints.Concat(new[] { new CompositeBlueprintStore.VectorData { x = 99 } }).ToList();
+            Check(!review.TryWrite(changedSnaps, Basis, directory, "stale-snaps", out _, out error) &&
+                error == "$buildworks_exchange.plan_changed" && !Directory.Exists(Path.Combine(directory, "stale-snaps")),
+                "BBP exported after reviewed custom snaps changed");
             var written=Bbp.ParseBinary(File.ReadAllBytes(Path.Combine(result,"unchanged.bbp")));
             Check(written.Pieces[0].Rotation.X==original.Pieces[0].Rotation.X && written.Pieces[0].Rotation.W==original.Pieces[0].Rotation.W,"Unedited raw quaternion changed");
             var edited=source.ImportCopy();edited.parts.Reverse();edited.parts[0].position.x+=.25f;

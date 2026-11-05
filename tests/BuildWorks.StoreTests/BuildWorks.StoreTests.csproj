@@ -25,6 +25,10 @@
     <Compile Include="..\..\src\BuildWorks\BuildWorksTestConstructionProject.ContentsFixture.cs" Link="BuildWorksTestConstructionProject.ContentsFixture.cs" />
     <Compile Include="..\..\src\BuildWorks\BlueprintConstructionProjectStore.cs" Link="BlueprintConstructionProjectStore.cs" />
     <Compile Include="..\..\src\BuildWorks\BlueprintConstructionPartJournal.cs" Link="BlueprintConstructionPartJournal.cs" />
+    <Compile Include="..\..\src\BuildWorks\BlueprintConstructionPartJournal.Mount.cs" Link="BlueprintConstructionPartJournal.Mount.cs" />
+    <Compile Include="..\..\src\BuildWorks\BlueprintConstructionPartJournal.MountReturn.cs" Link="BlueprintConstructionPartJournal.MountReturn.cs" />
+    <Compile Include="..\..\src\BuildWorks\BlueprintConstructionPartJournal.MountCredit.cs" Link="BlueprintConstructionPartJournal.MountCredit.cs" />
+    <Compile Include="..\..\src\BuildWorks\BlueprintConstructionPartJournal.MountCleanup.cs" Link="BlueprintConstructionPartJournal.MountCleanup.cs" />
     <Compile Include="..\..\src\BuildWorks\BlueprintConstructionPartJournal.Sources.cs" Link="BlueprintConstructionPartJournal.Sources.cs" />
     <Compile Include="..\..\src\BuildWorks\BlueprintConstructionPartJournal.Outcome.cs" Link="BlueprintConstructionPartJournal.Outcome.cs" />
     <Compile Include="..\..\src\BuildWorks\BlueprintConstructionPaymentOutcome.cs" Link="BlueprintConstructionPaymentOutcome.cs" />
@@ -37,6 +41,7 @@
     <Compile Include="..\..\src\BuildWorks\BlueprintExportPair.cs" Link="BlueprintExportPair.cs" />
     <Compile Include="..\..\src\BuildWorks\OpenKeepExport.cs" Link="OpenKeepExport.cs" />
     <Compile Include="..\..\src\BuildWorks\KgExport.cs" Link="KgExport.cs" />
+    <Compile Include="..\..\src\BuildWorks\UnboundExport.cs" Link="UnboundExport.cs" />
     <Compile Include="..\..\src\BuildWorks\BetterBuildingExport.cs" Link="BetterBuildingExport.cs" />
     <Compile Include="..\..\src\BuildWorks\PlannerExport.cs" Link="PlannerExport.cs" />
     <Compile Include="..\..\src\BuildWorks\ServerBlueprintLibrary.cs" Link="ServerBlueprintLibrary.cs" />

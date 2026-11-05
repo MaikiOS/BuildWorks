@@ -75,7 +75,8 @@ internal static partial class ControllerInputAcceptance
                     if(legacyJson && mode==0)
                     {
                         NativeClick(view,null,"ExchangeFormat");Require(Field<bool>(exchange,"plannerFormat"),"Planner option missing after legacy JSON");
-                        NativeClick(view,null,"ExchangeFormat");Require(!Field<BetterBuildingExport.Target?>(exchange,"bbpTarget").HasValue && !Field<bool>(exchange,"archive") && !Field<bool>(exchange,"plannerFormat"),"Legacy/planner format cycle did not return to native JSON");
+                        NativeClick(view,null,"ExchangeFormat");Require(Field<bool>(exchange,"unboundFormat") && !Field<bool>(exchange,"plannerFormat"),"Unbound option missing after Planner");
+                        NativeClick(view,null,"ExchangeFormat");Require(!Field<BetterBuildingExport.Target?>(exchange,"bbpTarget").HasValue && !Field<bool>(exchange,"archive") && !Field<bool>(exchange,"plannerFormat") && !Field<bool>(exchange,"unboundFormat"),"Legacy/planner/Unbound format cycle did not return to native JSON");
                         for(int i=0;i<7;++i)NativeClick(view,null,"ExchangeFormat");
                         Field<TMP_InputField>(exchange,"fileName").SetTextWithoutNotify("reserved.buildworks");
                         NativeClick(view,null,"ExchangeSubmit");yield return null;

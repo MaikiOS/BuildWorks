@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using OstrixMods.BuildWorks;
@@ -11,6 +12,96 @@ namespace OstrixMods.BuildWorks.StoreTests
 {
     internal static class UnboundImportChecks
     {
+        internal static void FileCycle(string file, string expectedHash, string directory)
+        {
+            file = Path.GetFullPath(file); directory = Path.GetFullPath(directory);
+            byte[] original = File.ReadAllBytes(file);
+            using (var hash = SHA256.Create())
+                Check(BitConverter.ToString(hash.ComputeHash(original)).Replace("-", "") == expectedHash, "Genuine input SHA mismatch");
+            Check(!Directory.Exists(directory) && !File.Exists(directory), "Output must be a new artifact directory");
+            var source = ExternalBlueprintLibrary.LoadFile(file).Single();
+            Check(source.importError == null && source.parts.Count == 1 && source.parts[0].prefabName == "wood_floor" &&
+                source.sourceDocuments.Single().format == UnboundBlueprint.Format, "Expected pinned single-floor capture");
+            CheckFloor(source);
+            string library = Path.Combine(directory, "library.json");
+            var store = new CompositeBlueprintStore(library, backgroundImports: true);
+            // Unit prefab bases only; no native capability/profile is inferred from the captured packet.
+            store.ConfigureImportScale(_ => new CompositeBlueprintStore.VectorData { x = 1, y = 1, z = 1 },
+                prefabHash: ForeignZdoChecks.Hash, worldLevel: () => 0);
+            Ready(store);
+            var review = store.PrepareImportReview(CompositeBlueprintStore.ReviewImportFile(file, ForeignZdoChecks.Hash),
+                ForeignZdoChecks.Hash).GetAwaiter().GetResult();
+            Check(!Directory.Exists(store.ImportDirectory), "Review wrote an import archive");
+            Check(store.TryImportReviewed(review, false, false, ForeignZdoChecks.Hash, out string error), error); Ready(store);
+            Check(store.ImportError == null, "Genuine import failed: " + store.ImportError);
+            var catalog = store.CatalogAll().Single();
+            Check(CompositeBlueprintStore.HasForeignData(catalog) && catalog.parts[0].foreignData?.format == UnboundBlueprint.Format &&
+                catalog.parts[0].foreignData.zdo == source.parts[0].foreignData.zdo &&
+                catalog.parts[0].sourceDocumentId == source.parts[0].sourceDocumentId && catalog.parts[0].sourceLine == 2 &&
+                catalog.parts[0].sourceRecord == 0 && catalog.parts[0].sourceFrameApplied &&
+                catalog.sourceDocuments.Single().ToGeometry().OriginalBytes().SequenceEqual(original),
+                "Raw state/source changed or became implicitly supported");
+            using (var zip = ZipFile.OpenRead(store.ImportResultPath))
+            using (var bytes = new MemoryStream())
+            {
+                using (var input = zip.GetEntry("original/source.bin").Open()) input.CopyTo(bytes);
+                Check(bytes.ToArray().SequenceEqual(original), "Genuine import archive changed original bytes");
+            }
+            Check(store.TryGetOrCreatePlacementCopy(catalog, out var saved, out error), error);
+            var reopened = new CompositeBlueprintStore(library).All().Single();
+            Check(BlueprintExchangeFormat.Encode(saved).SequenceEqual(BlueprintExchangeFormat.Encode(reopened)), "Native reopen changed fields");
+            UnboundSourceChecks.Editor(reopened);
+            CorpusRoundTripChecks.RunSaved(library, saved.id);
+            File.WriteAllBytes(Path.Combine(directory, "portable.buildworks.json"), BlueprintExchangeFormat.Encode(saved));
+            var capturedHeader = source.sourceDocuments.Single().ToGeometry().Unbound.Pieces.Single().State;
+            Check(capturedHeader.Persistent == true && capturedHeader.Distant == false && capturedHeader.NativeObjectType == 2, "Captured native header changed");
+            var context = new UnboundImportContext(new BlueprintPrefabMetadata(1, "wood_floor", "wood_floor", "Piece",
+                "substituted-cpu-host", new Point3(1, 1, 1)), false, true, false, false, null,
+                (ForeignZdoChecks.Hash("wood_floor"), true, false, (byte)0));
+            var projected = ExternalBlueprintLibrary.PrepareForHost(reopened, _ => null, ForeignZdoChecks.Hash,
+                unboundContext: _ => context);
+            Check(projected.importError == null && !CompositeBlueprintStore.HasForeignData(projected) &&
+                projected.parts.Single().baseScale.HasValue, "Substituted profile could not project captured fields");
+            CheckFloor(projected);
+            var export = UnboundExport.Review(projected, _ => context);
+            Check(export.HeaderChanges == 1, "Genuine type2 to current prefab type0 conversion was not disclosed");
+            Check(export.Blockers.Count == 0, "Genuine paired export review blocked: " + string.Join(",", export.Blockers) +
+                "; captured header " + capturedHeader.Persistent + "/" + capturedHeader.Distant + "/" + capturedHeader.NativeObjectType);
+            Check(export.TryWrite(projected, _ => context, directory, "pair", out string pair, out error), "Genuine paired export failed: " + error);
+            var companion = BlueprintExchangeFormat.Decode(File.ReadAllText(Path.Combine(pair, "pair.buildworks.json")));
+            Check(companion.sourceDocuments.Single().ToGeometry().OriginalBytes().SequenceEqual(original) &&
+                companion.sourceDocuments.Single().ToGeometry().Unbound.Pieces.Single().State.NativeObjectType == 2,
+                "Companion lost original capture or instance header");
+            var foreign = ExternalBlueprintLibrary.LoadFile(Path.Combine(pair, "pair.vtbp")).Single();
+            Check(foreign.sourceDocuments.Single().ToGeometry().Unbound.Pieces.Single().State.NativeObjectType == 0,
+                "Foreign export replayed the historical instance type instead of the trusted prefab type");
+            var again = ExternalBlueprintLibrary.PrepareForHost(foreign, _ => null, ForeignZdoChecks.Hash, unboundContext: _ => context);
+            Check(again.importError == null && !CompositeBlueprintStore.HasForeignData(again) && again.parts.Single().baseScale.HasValue &&
+                again.parts[0].baseScale.Value.x == 1 && again.parts[0].baseScale.Value.y == 1 && again.parts[0].baseScale.Value.z == 1,
+                "Paired foreign file changed working state/scale");
+            CheckFloor(again);
+            Check(source.sourceDocuments.Single().ToGeometry().Unbound.Pieces.Single().State.HasHash(ForeignZdoChecks.Hash("creator")) &&
+                !foreign.sourceDocuments.Single().ToGeometry().Unbound.Pieces.Single().State.HasHash(ForeignZdoChecks.Hash("creator")),
+                "Creator authority was replayed or the genuine source control is missing");
+            var changed = new UnboundImportContext(new BlueprintPrefabMetadata(1, "wood_floor", "wood_floor", "Piece",
+                "changed-cpu-host", new Point3(1, 1, 1)), false, true, false, false, null, context.NativeHeader);
+            Check(!export.TryWrite(projected, _ => changed, directory, "stale", out _, out error) &&
+                error == "$buildworks_exchange.plan_changed" && !Directory.Exists(Path.Combine(directory, "stale")),
+                "Changed profile wrote a paired result");
+            Check(File.ReadAllBytes(file).SequenceEqual(original), "Genuine producer file changed");
+            Console.WriteLine("PASS pinned genuine one-floor Unbound file: import/archive/catalog/native36/editor model/portable24/full-field reimport; raw stays blocked without context. Paired export/reimport, independent pose, creator sanitization/full companion and stale profile refusal passed with substituted CPU facts only. No foreign writer, live UI, placement or game reload.");
+        }
+
+        private static void CheckFloor(CompositeBlueprintStore.Blueprint blueprint)
+        {
+            Check(blueprint.parts.Count == 1, "One captured floor required");
+            var part = blueprint.parts[0];
+            Check(part.prefabName == "wood_floor" && part.position.x == 0 && part.position.y == 0 && part.position.z == 0 &&
+                part.rotation.x == 0 && part.rotation.z == 0 && Math.Abs(part.rotation.y - .9999905f) < 1e-7f &&
+                Math.Abs(part.rotation.w - .00436336035f) < 1e-7f && part.signText == null && !part.materialSeed.HasValue,
+                "Captured local pose or working fields differ from the native observation");
+        }
+
         internal static void Run(string directory)
         {
             Directory.CreateDirectory(directory);

@@ -25,7 +25,21 @@
     <Compile Include="../../artifacts/content-reservations/StorageLoadedSource.cs" Link="StorageLoadedSource.cs" />
     <Compile Include="../../artifacts/content-reservations/PlayerSaveGuardSource.cs" Link="PlayerSaveGuardSource.cs" />
     <Compile Include="../../artifacts/content-reservations/CreditCustodySource.cs" Link="CreditCustodySource.cs" />
+    <Compile Include="../../artifacts/content-reservations/MountExecutionSource.cs" Link="MountExecutionSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/MountContextSource.cs" Link="MountContextSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/MountReturnBindingSource.cs" Link="MountReturnBindingSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/MountDetachSource.cs" Link="MountDetachSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/MountCreditExecutionSource.cs" Link="MountCreditExecutionSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/MountResumeSource.cs" Link="MountResumeSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/MountCleanupSource.cs" Link="MountCleanupSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/ExactDestroySource.cs" Link="ExactDestroySource.cs" />
+
+    <Compile Include="../../artifacts/content-reservations/MountCreditProjectionSource.cs" Link="MountCreditProjectionSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/ProjectPersistenceSource.cs" Link="ProjectPersistenceSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/PayoutSealSource.cs" Link="PayoutSealSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/MountSealSource.cs" Link="MountSealSource.cs" />
     <Reference Include="0Harmony"><HintPath>$(ProfileRoot)/BepInEx/core/0Harmony.dll</HintPath></Reference>
     <ProjectReference Include="../../src/BuildWorks.Geometry/BuildWorks.Geometry.csproj" />
+    <ProjectReference Include="../BuildWorks.StoreTests/BuildWorks.StoreTests.csproj" />
   </ItemGroup>
 </Project>

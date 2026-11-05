@@ -96,5 +96,50 @@ namespace ReservationChecks
             File.WriteAllBytes(profilePath, ProfileChecks.FileFor(player));
             Check(!BlueprintStoragePlayerProfile.TryReadSavedCredit(player, expected, () => true, out _, out _), "9412 fixture accepted 9411 disk replacement");
         }
+
+        internal static void RunMountedItems()
+        {
+            int before = assertions;
+            var supplied = Program.Item("ShieldBanded", 1, "actual 🪵"); supplied.m_quality = 2; supplied.m_variant = 1;
+            supplied.m_gridPos = new Vector2i(5,4); supplied.m_worldLevel = 3; supplied.m_pickedUp = true;
+            supplied.m_crafterID = 888; supplied.m_crafterName = "Острикс"; supplied.m_durability = 94.12f;
+            foreach(int version in new[]{109,110})
+            {
+                supplied.m_cheated = version == 110;
+                byte[] packet = Convert.FromBase64String(BlueprintItemStandPlacement.SnapshotItem(supplied)); packet[0]=(byte)version;
+                var source = new BlueprintForeignPartData(BlueprintForeignPartData.NativeItemStandFormat,"ShieldBanded:1:2:0",Convert.ToBase64String(packet),null);
+                Check(BlueprintItemStandContents.TryRead(source,name=>name.GetStableHashCode(),out var row),"mounted fixture invalid");
+                var loaded = supplied.Clone(); loaded.m_durability=(float)row.DurabilityHundredths.Value*0.01f;
+                Check(BlueprintStorageLoadedInventory.MatchesMountedItem(loaded,source),"actual native loaded item rejected");
+                Check(!BlueprintStorageLoadedInventory.MatchesMountedItem(supplied,source),"pre-load float substituted for exact first-load projection");
+                foreach(Action<ItemDrop.ItemData> mutate in new Action<ItemDrop.ItemData>[] {
+                    i=>i.m_durability-=0.0001f,i=>i.m_stack++,i=>i.m_quality++,i=>i.m_variant++,i=>i.m_worldLevel++,
+                    i=>i.m_pickedUp=!i.m_pickedUp,i=>i.m_equipped=!i.m_equipped,i=>i.m_cheated=!i.m_cheated,
+                    i=>i.m_crafterID++,i=>i.m_crafterName="other",i=>i.Custom="other",i=>i.m_customData.Add("extra","value"),
+                    i=>i.m_gridPos.x++,i=>i.m_gridPos.y++,i=>i.m_dropPrefab=new Prefab{name="SwordIron"},
+                    i=>i.m_customData=null,i=>i.m_shared=null,i=>i.m_dropPrefab=null
+                }) {
+                    var changed=loaded.Clone(); mutate(changed);
+                    Check(!BlueprintStorageLoadedInventory.MatchesMountedItem(changed,source),"changed mounted property accepted");
+                }
+                Check(!BlueprintStorageLoadedInventory.MatchesMountedItem(null,source),"missing live item accepted");
+                Check(!BlueprintStorageLoadedInventory.MatchesMountedItem(loaded,new BlueprintForeignPartData(source.Format,source.Info,source.Zdo,null,true)),"cleared item grants a match");
+                Check(source.Zdo==Convert.ToBase64String(packet) && supplied.Custom=="actual 🪵" && loaded.Custom=="actual 🪵","matcher mutated packet or supplied item");
+            }
+            supplied.m_cheated=false; supplied.m_durability=0.05f;
+            string nearPacket=BlueprintItemStandPlacement.SnapshotItem(supplied);
+            var near=new BlueprintForeignPartData(BlueprintForeignPartData.NativeItemStandFormat,"ShieldBanded:1:2:0",nearPacket,null);
+            Check(BlueprintItemStandContents.TryRead(near,name=>name.GetStableHashCode(),out var boundary) && boundary.DurabilityHundredths==5,"near-cent fixture invalid");
+            var nearLoaded=supplied.Clone();nearLoaded.m_durability=(float)boundary.DurabilityHundredths.Value*0.01f;
+            Check(BlueprintStorageLoadedInventory.MatchesMountedItem(nearLoaded,near) && BlueprintItemStandPlacement.SnapshotItem(nearLoaded)!=nearPacket,
+                "native first-load comparison incorrectly requires reserialized byte identity");
+            int bits=BitConverter.ToInt32(BitConverter.GetBytes(nearLoaded.m_durability),0);
+            nearLoaded.m_durability=BitConverter.ToSingle(BitConverter.GetBytes(bits+1),0);
+            Check(!BlueprintStorageLoadedInventory.MatchesMountedItem(nearLoaded,near),"one-bit durability difference was hidden by tolerance");
+            Check(!BlueprintStorageLoadedInventory.MatchesMountedItem(supplied,null),"missing packet accepted");
+            Check(!BlueprintStorageLoadedInventory.MatchesMountedItem(supplied,new BlueprintForeignPartData(near.Format,near.Info,null,null)),"authoring recipe accepted as actual snapshot");
+            Check(!BlueprintStorageLoadedInventory.MatchesMountedItem(supplied,Program.Container(8,supplied)),"inventory package accepted as mounted item");
+            Console.WriteLine("PASS mounted native-load matching: "+(assertions-before)+" exact-property assertions; full109/110, near-cent and one-bit controls; no authority, mutation, native Load or return execution");
+        }
     }
 }

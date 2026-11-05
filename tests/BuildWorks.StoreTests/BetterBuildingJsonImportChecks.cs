@@ -52,13 +52,23 @@ namespace OstrixMods.BuildWorks.StoreTests
             var ambiguous=ExternalBlueprintLibrary.Parse("{\"pieces\":[{\"prefab\":\"wood_floor\",\"position\":{\"x\":100,\"y\":2,\"z\":3}}]}","other.json");
             Check(ambiguous.importError!=null && ambiguous.parts.Count==0,"Other object schema became zero-position legacy parts");
             RoundTrip(source,Path.Combine(directory,"roundtrip"));
+            source.customSnapPoints = new System.Collections.Generic.List<CompositeBlueprintStore.VectorData> {
+                new CompositeBlueprintStore.VectorData { x = 13, y = 2, z = -7 },
+                new CompositeBlueprintStore.VectorData { x = -4, y = 5, z = 9 } };
             var review=BetterBuildingExport.Review(source,Basis,BetterBuildingExport.Target.LegacyJson);
+            Check(source.anchors.Count == 0 && review.Anchors == 2, "BetterBuilding JSON review omitted custom snap losses");
             Check(review.Blockers.Count==0 && review.UnknownFields==1 && review.Attachments==1 && review.Scales==1,"Legacy review counts");
             Check(!review.TryWrite(source,Basis,directory,"house.buildworks",out _,out string error) &&
                 error=="$buildworks_exchange.bbp_json_reserved_name" && !Directory.Exists(Path.Combine(directory,"house.buildworks")),"Reserved native suffix exported");
             Check(review.TryWrite(source,Basis,directory,"pair",out string pair,out error),error);
             var foreign=Bbp.ParseJson(File.ReadAllText(Path.Combine(pair,"pair.json")));
             var complete=BlueprintExchangeFormat.Decode(File.ReadAllText(Path.Combine(pair,"pair.buildworks.json")));
+            Check(complete.customSnapPoints.SequenceEqual(source.customSnapPoints), "BetterBuilding JSON sidecar lost custom snaps");
+            var changedSnaps = source.ImportCopy();
+            changedSnaps.customSnapPoints = source.customSnapPoints.Concat(new[] { new CompositeBlueprintStore.VectorData { x = 99 } }).ToList();
+            Check(!review.TryWrite(changedSnaps, Basis, directory, "stale-snaps", out _, out error) &&
+                error == "$buildworks_exchange.plan_changed" && !Directory.Exists(Path.Combine(directory, "stale-snaps")),
+                "BetterBuilding JSON exported after reviewed custom snaps changed");
             Check(foreign.Pieces.Count==2 && foreign.Pieces[0].DisplayItem.Orientation==3 && foreign.UnknownPaths.Count==0 &&
                 complete.sourceDocuments.Single().ToGeometry().OriginalBytes().SequenceEqual(original),"Legacy target/full copy/unknown archive");
             Check(ExternalBlueprintLibrary.LoadFile(Path.Combine(pair,"pair.json")).Single().sourceDocuments.Single().format==Bbp.JsonFormat,"Exported filename dispatched as another profile");

@@ -88,6 +88,8 @@ $nonLocalizationDottedLiterals = @(
     'fogghostvolume.shader', 'texturedghost.shader',
     'blueprints.json',
     'planner.json',
+    'attempt.json', 'before.json', 'capture.vtbp', 'result.json',
+    'point-2.19-unbound-20261031',
     'world-capture.txt',
     'manifest.tsv',
     'access.json', 'blueprint.buildworks.json',
@@ -117,6 +119,7 @@ $nonLocalizationDottedLiterals = @(
     'augusdogus.Buildheim.hammer',
     'ostrix.buildworks.refund.v1',
     'ostrix.buildworks.collected.v1.',
+    'ostrix.buildworks.mount.collected.v1.',
     'ostrmod.buildworks'
 )
 $keyPattern = '"((?:[a-z][a-z0-9_-]*\.)+[A-Za-z0-9_.-]+)"'

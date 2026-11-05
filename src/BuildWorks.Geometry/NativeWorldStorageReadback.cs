@@ -19,6 +19,9 @@ namespace OstrixMods.BuildWorks.Geometry
         public const int MaximumObjects = 4000000;
         public const int MaximumChunks = 65536;
         private static readonly Encoding Utf8 = new UTF8Encoding(false, true);
+        private static readonly int ItemKey = KgBlueprint.StablePrefabHash("item"), VariantKey = KgBlueprint.StablePrefabHash("variant"),
+            QualityKey = KgBlueprint.StablePrefabHash("quality"), OrientationKey = KgBlueprint.StablePrefabHash("type"),
+            ItemDataKey = KgBlueprint.StablePrefabHash("itemData");
         internal static bool SupportedVersion(int version) => version == 41 || version == 42;
         public sealed class Expectation
         {
@@ -29,6 +32,10 @@ namespace OstrixMods.BuildWorks.Geometry
             internal readonly int CreatorKey, MarkerKey, ItemsKey;
             internal readonly byte[] Inventory;
             internal readonly string Marker;
+            internal readonly byte[] MountedBytes;
+            internal readonly int MountedItem, MountedVariant, MountedQuality, MountedOrientation;
+            internal readonly bool EmptyStand;
+            internal bool ChecksItemStand => EmptyStand || MountedBytes != null;
             public Expectation(long world, Guid operation, int prefab, long creator, int creatorKey, int markerKey, int itemsKey, byte[] inventory)
                 : this(world, operation, prefab, creator, creatorKey, markerKey, itemsKey, inventory, true) { }
 
@@ -36,7 +43,19 @@ namespace OstrixMods.BuildWorks.Geometry
                 int creatorKey, int markerKey, int receiptKey, byte[] receipt) =>
                 new Expectation(world, operation, prefab, creator, creatorKey, markerKey, receiptKey, receipt, false);
 
-            private Expectation(long world, Guid operation, int prefab, long creator, int creatorKey, int markerKey, int itemsKey, byte[] inventory, bool nativeInventory)
+            // The parent marker survives reload; the separate receipt binds the child mount operation.
+            public static Expectation ForItemStand(long world, Guid parentOperation, int prefab, long creator,
+                int creatorKey, int markerKey, int receiptKey, byte[] receipt, BlueprintForeignPartData mounted) =>
+                new Expectation(world, parentOperation, prefab, creator, creatorKey, markerKey, receiptKey, receipt, false, mounted ??
+                    throw new ArgumentException("Missing supplied mounted item."));
+
+            // Native HaveAttachment uses item==0; stale itemData/variant/quality/type do not restore an attachment.
+            public static Expectation ForEmptyItemStand(long world, Guid parentOperation, int prefab, long creator,
+                int creatorKey, int markerKey, int receiptKey, byte[] receipt) =>
+                new Expectation(world, parentOperation, prefab, creator, creatorKey, markerKey, receiptKey, receipt, false, emptyStand: true);
+
+            private Expectation(long world, Guid operation, int prefab, long creator, int creatorKey, int markerKey, int itemsKey, byte[] inventory,
+                bool nativeInventory, BlueprintForeignPartData mounted = null, bool emptyStand = false)
             {
                 if (world == 0 || operation == Guid.Empty || prefab == 0 || creator == 0 || creatorKey == markerKey || markerKey == itemsKey || creatorKey == itemsKey ||
                     inventory == null || (nativeInventory ? inventory.Length < 6 || inventory.Length > 1024 * 1024 ||
@@ -45,6 +64,23 @@ namespace OstrixMods.BuildWorks.Geometry
                 World = world; Operation = operation; Prefab = prefab; Creator = creator;
                 CreatorKey = creatorKey; MarkerKey = markerKey; ItemsKey = itemsKey; Inventory = (byte[])inventory.Clone();
                 Marker = operation.ToString("N");
+                EmptyStand = emptyStand;
+                if (mounted != null || emptyStand)
+                {
+                    var keys = new[] { creatorKey, markerKey, itemsKey, ItemKey, VariantKey, QualityKey, OrientationKey, ItemDataKey };
+                    if (keys.Any(key => key == 0) || keys.Distinct().Count() != keys.Length)
+                        throw new ArgumentException("Item-stand expectation keys must be distinct and nonzero.");
+                }
+                if (mounted != null)
+                {
+                    if (mounted.ContentsCleared ||
+                        !BlueprintItemStandContents.TryRead(mounted, KgBlueprint.StablePrefabHash, out var item) ||
+                        item.SourceVersion != 110 || item.Equipped)
+                        throw new ArgumentException("Invalid supplied mounted-item expectation.");
+                    MountedBytes = Convert.FromBase64String(mounted.Zdo);
+                    MountedItem = KgBlueprint.StablePrefabHash(item.Prefab); MountedVariant = item.Variant; MountedQuality = item.Quality;
+                    MountedOrientation = int.Parse(mounted.Info.Split(':')[3], CultureInfo.InvariantCulture);
+                }
             }
         }
         public sealed class Evidence
@@ -250,6 +286,8 @@ namespace OstrixMods.BuildWorks.Geometry
             }
             if ((flags & 1) != 0) Skip(reader, 5);
             long creator = 0; string marker = null; bool itemsPresent = false, itemsMatch = false, absentMatch = false;
+            int mountedItem = 0, mountedVariant = 0, mountedQuality = 1, mountedOrientation = 0;
+            bool mountedPresent = false, mountedMatch = false, mountTypeMismatch = false;
             for (int map = 0; map < 7; ++map)
             {
                 if ((flags & (2 << map)) == 0) continue;
@@ -261,12 +299,27 @@ namespace OstrixMods.BuildWorks.Geometry
                     scratchKeys[i] = key;
                     if (absent != null && absent.IsMarkerKey(key) && map != 5)
                         throw new InvalidDataException("Unexpected operation marker type prevents an absence proof.");
+                    if (expected?.ChecksItemStand == true)
+                    {
+                        int wantedType = key == ItemKey || key == VariantKey || key == QualityKey || key == OrientationKey ? 3 :
+                            key == ItemDataKey || key == expected.ItemsKey ? 6 : key == expected.MarkerKey ? 5 : key == expected.CreatorKey ? 4 : -1;
+                        mountTypeMismatch |= wantedType != -1 && wantedType != map;
+                    }
                     switch (map)
                     {
                         case 0: Finite(reader, 1); break;
                         case 1: Finite(reader, 3); break;
                         case 2: Finite(reader, 4); break;
-                        case 3: reader.ReadInt32(); break;
+                        case 3:
+                            int integer = reader.ReadInt32();
+                            if (expected?.ChecksItemStand == true)
+                            {
+                                if (key == ItemKey) mountedItem = integer;
+                                else if (key == VariantKey) mountedVariant = integer;
+                                else if (key == QualityKey) mountedQuality = integer;
+                                else if (key == OrientationKey) mountedOrientation = integer;
+                            }
+                            break;
                         case 4: long value = reader.ReadInt64(); if (expected != null && key == expected.CreatorKey) creator = value; break;
                         case 5:
                             if (expected != null && key == expected.MarkerKey) marker = Text(reader);
@@ -277,18 +330,10 @@ namespace OstrixMods.BuildWorks.Geometry
                             int length = Count(reader, MaximumChunkBytes, 1);
                             if (expected != null && key == expected.ItemsKey && marker == expected.Marker)
                             {
-                                itemsPresent = true; itemsMatch = length == expected.Inventory.Length;
-                                if (length > 1024 * 1024) throw new InvalidDataException("Marked inventory exceeds supported budget.");
-                                for (int start = 0; start < length;)
-                                {
-                                    cancellation.ThrowIfCancellationRequested();
-                                    int take = Math.Min(8192, length - start); byte[] data = reader.ReadBytes(take);
-                                    if (data.Length != take) throw new EndOfStreamException();
-                                    if (itemsMatch)
-                                        for (int n = 0; n < take; ++n) if (data[n] != expected.Inventory[start + n]) { itemsMatch = false; break; }
-                                    start += take;
-                                }
+                                itemsPresent = true; itemsMatch = ExactBytes(reader, length, expected.Inventory, cancellation);
                             }
+                            else if (expected?.MountedBytes != null && key == ItemDataKey && marker == expected.Marker)
+                            { mountedPresent = true; mountedMatch = ExactBytes(reader, length, expected.MountedBytes, cancellation); }
                             else Skip(reader, length);
                             break;
                     }
@@ -302,7 +347,28 @@ namespace OstrixMods.BuildWorks.Geometry
             if ((flags & 256) == 0 || prefab != expected.Prefab || creator != expected.Creator || !itemsPresent)
                 throw new InvalidDataException("Saved marked object's identity or contents differ.");
             if (!itemsMatch) throw new InvalidDataException("Saved marked inventory differs.");
+            if (expected.EmptyStand && (mountTypeMismatch || mountedItem != 0))
+                throw new InvalidDataException("Saved marked holder is not a supported empty item stand.");
+            if (expected.MountedBytes != null && (mountTypeMismatch || !mountedPresent || !mountedMatch ||
+                mountedItem != expected.MountedItem || mountedVariant != expected.MountedVariant ||
+                mountedQuality != expected.MountedQuality || mountedOrientation != expected.MountedOrientation))
+                throw new InvalidDataException("Saved marked holder differs from the actual supplied item.");
             return true;
+        }
+        private static bool ExactBytes(BinaryReader reader, int length, byte[] expected, CancellationToken cancellation)
+        {
+            if (length > 1024 * 1024) throw new InvalidDataException("Marked payload exceeds supported budget.");
+            bool match = length == expected.Length;
+            for (int start = 0; start < length;)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                int take = Math.Min(8192, length - start); byte[] data = reader.ReadBytes(take);
+                if (data.Length != take) throw new EndOfStreamException();
+                if (match)
+                    for (int n = 0; n < take; ++n) if (data[n] != expected[start + n]) { match = false; break; }
+                start += take;
+            }
+            return match;
         }
         private static BinaryReader Reader(Stream stream, long cap)
         {

@@ -440,6 +440,16 @@ $humanoid = $hostAssembly.MainModule.Types | Where-Object FullName -eq 'Humanoid
 Assert-Contract ($null -ne $humanoid) 'Humanoid type is missing.'
 $itemDrop = $hostAssembly.MainModule.Types | Where-Object FullName -eq 'ItemDrop'
 Assert-Contract ($null -ne $itemDrop) 'ItemDrop type is missing.'
+$itemDropLoad = @($itemDrop.Methods | Where-Object { $_.Name -eq 'Load' -and -not $_.IsStatic -and $_.Parameters.Count -eq 0 -and $_.ReturnType.FullName -eq 'System.Void' })
+Assert-Contract ($itemDropLoad.Count -eq 1 -and @($itemDropLoad[0].Body.Instructions | Where-Object { $_.Operand -is [Mono.Cecil.MethodReference] -and $_.Operand.DeclaringType.Name -eq 'ItemDrop' -and $_.Operand.Name -eq 'LoadFromZDO' }).Count -eq 1) 'Mounted return Load witness no longer observes the native item loader.'
+$mountWorldHost = $hostAssembly.MainModule.Types | Where-Object Name -eq 'ZNet'
+$mountWorldLoad = @($mountWorldHost.Methods | Where-Object { $_.Name -eq 'ServerLoadWorld' -and -not $_.IsStatic -and $_.Parameters.Count -eq 0 -and $_.ReturnType.FullName -eq 'System.Void' })
+$mountLoadError = @($mountWorldHost.Fields | Where-Object { $_.Name -eq 'm_loadError' -and $_.IsStatic -and $_.IsPublic -and $_.FieldType.FullName -eq 'System.Boolean' })
+Assert-Contract ($mountWorldLoad.Count -eq 1 -and $mountLoadError.Count -eq 1) 'Mounted return world boundary/error flag changed.'
+foreach ($loader in @('LoadWorld', 'LoadOldWorld')) {
+    Assert-Contract (@($mountWorldLoad[0].Body.Instructions | Where-Object { $_.Operand -is [Mono.Cecil.MethodReference] -and $_.Operand.DeclaringType.Name -eq 'ZNet' -and $_.Operand.Name -eq $loader }).Count -eq 1) 'Mounted return world boundary no longer covers both native loaders.'
+}
+
 $itemData = $itemDrop.NestedTypes | Where-Object Name -eq 'ItemData'
 Assert-Contract ($null -ne $itemData) 'ItemDrop.ItemData type is missing.'
 $sharedData = $itemData.NestedTypes | Where-Object Name -eq 'SharedData'
@@ -1051,6 +1061,15 @@ $prepareEditorBlueprint = $pluginMethods | Where-Object { $_.DeclaringType.Name 
 $editorUnboundCallbacks = @($prepareEditorBlueprint.Body.Instructions | Where-Object { $_.OpCode.Code -eq [Mono.Cecil.Cil.Code]::Ldftn } |
     ForEach-Object { $_.Operand.Resolve() } | Where-Object { ($_.Body.Instructions.Operand -join "`n") -match 'BlueprintUnboundImport::Capture' })
 Assert-Contract ($editorUnboundCallbacks.Count -eq 1) 'Opening a projected Unbound blueprint must provide fresh prefab context to the editor preparation path.'
+$unboundCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintUnboundImport' -and $_.Name -eq 'Capture' }
+$unboundCaptureOperands = ($unboundCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+foreach ($field in @('m_persistent','m_distant','m_type')) {
+    Assert-Contract ($unboundCaptureOperands -match ('ZNetView::' + $field)) "Unbound fresh native header lost $field."
+}
+Assert-Contract ($unboundCaptureOperands -match 'Utils::GetPrefabName' -and $unboundCaptureOperands -match 'GetStableHashCode' -and
+    $unboundCaptureOperands -notmatch 'ZDO::|InvokeRPC|Object::Instantiate|Inventory::Load' -and
+    @($unboundCapture.Body.Instructions | Where-Object { $_.OpCode.Name -in @('stfld','stsfld') }).Count -eq 0) `
+    'Unbound header capture must read native prefab identity and flags without world writes.'
 function Assert-VoidPlaceGuard($native, $prefix) {
     Assert-Contract ($native.ReturnType.FullName -eq 'System.Void' -and $prefix.ReturnType.FullName -eq 'System.Boolean' -and
         @($prefix.Parameters | Where-Object Name -eq '__result').Count -eq 0 -and
@@ -4028,7 +4047,11 @@ $loadedCalls = ($loadedInventory.Methods.Body.Instructions | ForEach-Object { [s
 Assert-Contract ($loadedCalls -match 'BlueprintContainerInventory::TryRead' -and $loadedCalls -match 'ItemData::m_durability' -and
     $loadedCalls -match 'ItemData::m_cheated' -and $loadedCalls -match 'ItemData::m_crafterID' -and
     $loadedCalls -notmatch '\bInventory::Save|\bInventory::Load|ItemData::Save|ZDO::Set|DropItem|MoveItem') 'Loaded comparison must read exact native fields without reserialization or mutation.'
-$loadedMatch = $loadedInventory.Methods | Where-Object Name -eq 'Matches'
+$inventoryMatchCalls = ($loadedInventory.Methods | Where-Object Name -eq 'Matches').Body.Instructions.Operand -join "`n"
+$mountedMatchCalls = ($loadedInventory.Methods | Where-Object Name -eq 'MatchesMountedItem').Body.Instructions.Operand -join "`n"
+Assert-Contract ($inventoryMatchCalls -match '::MatchesItem' -and $mountedMatchCalls -match 'BlueprintItemStandContents::TryRead' -and
+    $mountedMatchCalls -match '::MatchesItem') 'Inventory and mounted-item reads must share exact first-load property validation.'
+$loadedMatch = $loadedInventory.Methods | Where-Object Name -eq 'MatchesItem'
 $loadDurabilityProduct = @($loadedMatch.Body.Instructions | Where-Object {
     $_.OpCode.Code -eq 'Mul' -and $_.Previous.OpCode.Code -eq 'Ldc_R4' -and [single]$_.Previous.Operand -eq [single]0.01
 })
@@ -4534,7 +4557,7 @@ $kgFixture = @"
 using System;
 namespace BuildWorksKgAdmissionFixture {
     public class Piece {} public class ZNetView {} public class WearNTear {}
-    public class Sign {} public class RandomMaterialValues {}
+    public class Sign {} public class RandomMaterialValues {} public class SimpleMeshCombine {}
     public class Container {} public class ItemStand {} public class ArmorStand {}
     public class TerrainModifier {} public class CustomStateBehaviour {} public class DerivedPiece : Piece {}
     namespace TMPro { public class TextMeshPro {} public class TextMeshProUGUI {} }
@@ -4545,7 +4568,7 @@ namespace BuildWorksKgAdmissionFixture {
 $kgFixtureTypes = @(Add-Type -TypeDefinition $kgFixture -PassThru)
 $kgFixtureType = $kgFixtureTypes | Where-Object FullName -eq 'BuildWorksKgAdmissionFixture.Admission'
 $kgMethod = $kgFixtureType.GetMethod('Check')
-foreach ($name in @('Piece','ZNetView','WearNTear','Sign','RandomMaterialValues','TMPro.TextMeshPro','TMPro.TextMeshProUGUI','UnityEngine.UI.CanvasScaler')) {
+foreach ($name in @('Piece','ZNetView','WearNTear','Sign','RandomMaterialValues','SimpleMeshCombine','TMPro.TextMeshPro','TMPro.TextMeshProUGUI','UnityEngine.UI.CanvasScaler')) {
     $candidateType = $kgFixtureType.Assembly.GetType('BuildWorksKgAdmissionFixture.' + $name)
     Assert-Contract ($null -ne $candidateType -and $kgMethod.Invoke($null, [object[]]@($candidateType))) "Known KG state component rejected: $name"
 }
@@ -4553,7 +4576,7 @@ foreach ($name in @('Container','ItemStand','ArmorStand','TerrainModifier','Cust
     $candidateType = $kgFixtureType.Assembly.GetType('BuildWorksKgAdmissionFixture.' + $name)
     Assert-Contract (-not $kgMethod.Invoke($null, [object[]]@($candidateType))) "Unknown/special KG state component admitted: $name"
 }
-Write-Output 'PASS KG exact-type admission: 8 known types; storage/holders/terrain/custom/derived/null fail closed. Actual method extracted with substituted type boundaries; no game proof.'
+Write-Output 'PASS KG exact-type admission: 9 known types; storage/holders/terrain/custom/derived/null fail closed. Actual method extracted with substituted type boundaries; no game proof.'
 & (Join-Path $PSScriptRoot 'Test-ItemStandPackageRoles.ps1')
 Write-Output "PASS: current Valheim host contract matches BuildWorks $($plugin.Name.Version); Steam manifest build $steamBuild; assembly_valheim SHA256 $hostSha."
 

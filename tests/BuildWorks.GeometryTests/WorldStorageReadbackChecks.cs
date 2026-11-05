@@ -136,7 +136,124 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Check(opaquePassed && allocated < 512 * 1024, "Unrelated native string value was decoded/allocated or blocked: " + allocated);
             AbsenceChecks();
             CompositeAbsenceChecks();
+            MountChecks();
             Console.WriteLine("PASS saved-world41/42 presence and batch absence: " + assertions + " bounded structural/identity/contents/duplicate/truncation/cancel assertions; no native world save, settlement or network proof");
+        }
+        private static void MountChecks()
+        {
+            int Hash(string name) => name switch {
+                "item" => -1126421579, "variant" => 1759467715, "quality" => 917906861,
+                "type" => 1421151742, "itemData" => 949524933, "SwordIron" => -110263489,
+                _ => throw new InvalidOperationException("Unpinned native fixture hash")
+            };
+            int itemKey = Hash("item"), variantKey = Hash("variant"), qualityKey = Hash("quality"), typeKey = Hash("type"), packetKey = Hash("itemData");
+            byte[] receipt = Encoding.UTF8.GetBytes("parent/child/actual-supplied-item-receipt");
+            byte[] packet = ItemStandContentsTests.Packet(Hash("SwordIron"));
+            packet[0] = 110; packet[8] &= 253; // Native mounted clone is unequipped.
+            packet = packet.Take(11).Concat(packet.Skip(15)).ToArray(); packet[8] &= 239; // Native variant0 omits the field.
+            BlueprintForeignPartData State(byte[] bytes, string info = "SwordIron:0:3:0", bool cleared = false) =>
+                new BlueprintForeignPartData(BlueprintForeignPartData.NativeItemStandFormat, info, Convert.ToBase64String(bytes), null, cleared);
+            var mounted = State(packet);
+            Check(BlueprintItemStandContents.TryRead(mounted, Hash, out var actual) && actual.SourceVersion == 110 &&
+                actual.Quality == 3 && actual.Variant == 0 && !actual.Equipped, "Mounted native fixture itself is invalid");
+            var expected = NativeWorldStorageReadback.Expectation.ForItemStand(71, Operation, 43, 100, 1, 2, 3, receipt, mounted);
+            var fields = new Dictionary<int, int> { [itemKey] = Hash("SwordIron"), [variantKey] = 0, [qualityKey] = 3, [typeKey] = 0 };
+            byte[] MountedChunk(Dictionary<int, int> values = null, byte[] data = null, byte[] proof = null,
+                bool includeData = true, bool includeProof = true, bool reverseBlobs = false, int wrongType = 0, bool includeInts = true) => Bytes(w =>
+            {
+                w.Write((short)41); w.Write(1); w.Write((ushort)(256 | (includeInts ? 16 : 0) | 32 | 64 | 128 | (wrongType == 0 ? 0 : 2)));
+                w.Write(0f); w.Write(1f); w.Write(0f); w.Write(43);
+                if (wrongType != 0) { w.Write((byte)1); w.Write(wrongType); w.Write(1f); }
+                if (includeInts) {
+                    var ints = values ?? fields; w.Write((byte)ints.Count);
+                    foreach (var value in ints) { w.Write(value.Key); w.Write(value.Value); }
+                }
+                w.Write((byte)1); w.Write(1); w.Write(100L);
+                w.Write((byte)1); w.Write(2); w.Write(Operation.ToString("N"));
+                int blobs = (includeData ? 1 : 0) + (includeProof ? 1 : 0);
+                if (blobs == 0) throw new InvalidOperationException("Fixture needs at least one byte-array entry.");
+                w.Write((byte)blobs);
+                void Blob(int key, byte[] bytes) { w.Write(key); w.Write(bytes.Length); w.Write(bytes); }
+                if (reverseBlobs && includeData) Blob(packetKey, data ?? packet);
+                if (includeProof) Blob(3, proof ?? receipt);
+                if (!reverseBlobs && includeData) Blob(packetKey, data ?? packet);
+            });
+            bool Verify(byte[] chunk, NativeWorldStorageReadback.Expectation query = null) =>
+                new Fixture { Chunk = chunk }.Verify(out _, query ?? expected);
+            Check(Verify(MountedChunk()), "Saved attachment/receipt pair rejected");
+            Check(Verify(MountedChunk(reverseBlobs: true)), "Attachment depends on byte-array dictionary order");
+            var alias = (byte[])receipt.Clone();
+            var frozen = NativeWorldStorageReadback.Expectation.ForItemStand(71, Operation, 43, 100, 1, 2, 3, alias, mounted);
+            alias[0] ^= 1;
+            Check(Verify(MountedChunk(), frozen), "Mount expectation aliases receipt bytes");
+            foreach (int key in fields.Keys)
+            {
+                var changed = new Dictionary<int, int>(fields); changed[key]++;
+                Check(!Verify(MountedChunk(changed)), "Wrong saved attachment integer accepted: " + key);
+            }
+            byte[] changedPacket = (byte[])packet.Clone(); changedPacket[changedPacket.Length - 1] ^= 1;
+            Check(!Verify(MountedChunk(data: changedPacket)), "Changed full mounted properties accepted");
+            Check(!Verify(MountedChunk(proof: Encoding.UTF8.GetBytes("other child receipt"))), "Wrong mount receipt accepted");
+            Check(!Verify(MountedChunk(includeData: false)), "Receipt alone proves an attachment");
+            Check(!Verify(MountedChunk(includeProof: false)), "Attachment alone proves a mount operation");
+            foreach (int key in fields.Keys.Concat(new[] { packetKey, 1, 2, 3 }))
+                Check(!Verify(MountedChunk(wrongType: key)), "Wrong typed mount key accepted: " + key);
+            byte[] twice = MountedChunk().Concat(MountedChunk().Skip(6)).ToArray();
+            Array.Copy(BitConverter.GetBytes(2), 0, twice, 2, 4);
+            Check(!new Fixture { Chunk = twice, Map = Mapping(2, objects: 2) }.Verify(out _, expected), "Duplicate parent marker proves a mount");
+            var defaults = new Dictionary<int, int> { [itemKey] = fields[itemKey] };
+            byte[] defaultPacket = Bytes(w => { w.Write((byte)110); w.Write(10000); w.Write((byte)0); w.Write((byte)0); w.Write((byte)0);
+                w.Write((byte)64); w.Write(fields[itemKey]); w.Write((byte)0); });
+            var defaultExpected = NativeWorldStorageReadback.Expectation.ForItemStand(71, Operation, 43, 100, 1, 2, 3, receipt,
+                State(defaultPacket, "SwordIron:0:1:0"));
+            Check(Verify(MountedChunk(defaults, defaultPacket), defaultExpected), "Omitted native variant/quality/type defaults rejected");
+            Check(!Verify(MountedChunk(defaults)), "Missing nondefault quality/variant accepted");
+            byte[] old = (byte[])packet.Clone(); old[0] = 109;
+            byte[] equipped = (byte[])packet.Clone(); equipped[8] |= 2;
+            foreach (var invalid in new[] { State(old), State(equipped), State(packet, cleared: true),
+                State(packet, "ShieldBanded:0:3:0") })
+            {
+                bool refused = false;
+                try { NativeWorldStorageReadback.Expectation.ForItemStand(71, Operation, 43, 100, 1, 2, 3, receipt, invalid); }
+                catch (ArgumentException) { refused = true; }
+                Check(refused, "Nonactual/cleared/equipped/legacy mount expectation accepted");
+            }
+            foreach (int collision in fields.Keys.Concat(new[] { packetKey }))
+            {
+                bool refused = false;
+                try { NativeWorldStorageReadback.Expectation.ForItemStand(71, Operation, 43, 100, 1, 2, collision, receipt, mounted); }
+                catch (ArgumentException) { refused = true; }
+                Check(refused, "Mount receipt key collides with native attachment data");
+            }
+            Console.WriteLine("PASS mount saved-world reader: exact receipt + full110 item, integers, native defaults, typed keys, duplicate marker and immutable inputs; detached fixtures only");
+            var empty = NativeWorldStorageReadback.Expectation.ForEmptyItemStand(71, Operation, 43, 100, 1, 2, 3, receipt);
+            var stale = new Dictionary<int, int> { [itemKey] = 0, [variantKey] = 1, [qualityKey] = 3, [typeKey] = 7 };
+            Check(Verify(MountedChunk(stale), empty), "Native empty stand with stale attachment fields rejected");
+            Check(Verify(MountedChunk(stale, data: new byte[] { 255, 1, 2 }), empty), "Stale unused itemData was decoded as an attachment");
+            Check(Verify(MountedChunk(stale, includeData: false), empty), "Empty stand requires stale itemData");
+            stale.Remove(itemKey);
+            Check(Verify(MountedChunk(stale), empty), "Native default item0 rejected");
+            Check(Verify(MountedChunk(includeInts: false, includeData: false), empty), "Omitted native integer map rejected");
+            Check(!Verify(MountedChunk(), empty), "Filled stand accepted as empty");
+            Check(!Verify(MountedChunk(stale)), "Empty stand accepted as filled");
+            Check(!Verify(MountedChunk(stale, proof: new byte[] { 9 }), empty), "Empty stand accepted with foreign receipt");
+            Check(!Verify(MountedChunk(stale, includeProof: false), empty), "Unreceipted empty stand accepted");
+            foreach (int key in fields.Keys.Concat(new[] { packetKey, 1, 2, 3 }))
+                Check(!Verify(MountedChunk(stale, wrongType: key), empty), "Wrong typed empty-stand key accepted: " + key);
+            byte[] twiceEmpty = MountedChunk(stale).Concat(MountedChunk(stale).Skip(6)).ToArray();
+            Array.Copy(BitConverter.GetBytes(2), 0, twiceEmpty, 2, 4);
+            Check(!new Fixture { Chunk = twiceEmpty, Map = Mapping(2, objects: 2) }.Verify(out _, empty), "Duplicate marker proves empty stand");
+            alias = (byte[])receipt.Clone();
+            var frozenEmpty = NativeWorldStorageReadback.Expectation.ForEmptyItemStand(71, Operation, 43, 100, 1, 2, 3, alias);
+            alias[0] ^= 1;
+            Check(Verify(MountedChunk(stale), frozenEmpty), "Empty-stand expectation aliases receipt bytes");
+            foreach (int collision in fields.Keys.Concat(new[] { packetKey, 0, 1, 2 })) {
+                bool refused = false;
+                try { NativeWorldStorageReadback.Expectation.ForEmptyItemStand(71, Operation, 43, 100, 1, 2, collision, receipt); }
+                catch (ArgumentException) { refused = true; }
+                Check(refused, "Empty-stand receipt key is zero or collides with native/identity data");
+            }
+            Console.WriteLine("PASS empty-stand saved-world reader: native item0/default, stale unused fields, exact immutable receipt, typed keys and duplicate refusal; no source/drop pair or refund proof");
         }
         private static void AbsenceChecks()
         {

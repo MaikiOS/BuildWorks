@@ -30,7 +30,7 @@ namespace OstrixMods.BuildWorks
             var review = new BetterBuildingExport(target) { native = snapshot.Native, Parts = document.parts.Count, Sources = roots.Count,
                 OtherSources = sources.Count - roots.Count, Signs = document.parts.Count(p => p.signText != null),
                 ArchivedState = document.parts.Count(p => p.foreignData != null || p.materialSeed.HasValue),
-                Groups = document.groups.Count, Supports = document.supports?.Count ?? 0, Anchors = document.anchors.Count,
+                Groups = document.groups.Count, Supports = document.supports?.Count ?? 0, Anchors = document.anchors.Count + (document.customSnapPoints?.Count ?? 0),
                 PayloadVersion = roots.Count == 0 ? 1 : roots.Values.Max(s => s.BetterBuilding.PayloadVersion),
                 UnknownFields = roots.Values.Sum(s => s.BetterBuilding.UnknownPaths.Count) };
             var terrainRoots = roots.Values.Where(s => s.BetterBuilding.Terrain != null).ToArray();

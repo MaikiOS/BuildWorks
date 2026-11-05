@@ -270,7 +270,7 @@ namespace OstrixMods.BuildWorks
                 r.Saved.InventoryHash != Digest(Convert.FromBase64String(r.AfterBytes)) ||
                 r.Saved.WorldPayloadHash != Digest(r.Receipt))) throw new InvalidDataException("Missing or mismatched paired-save evidence.");
         }
-        private static void ValidateDebits(Record r)
+        private static void ValidateDebits(Record r, bool unequippedCopy = false)
         {
             var before = ValidateInventory(r.BeforeInfo, r.BeforeBytes);
             var after = ValidateInventory(r.AfterInfo, r.AfterBytes);
@@ -287,7 +287,7 @@ namespace OstrixMods.BuildWorks
                     throw new InvalidDataException("Debit does not identify an original inventory stack.");
                 var properties = new BlueprintForeignPartData(BlueprintForeignPartData.NativeItemStandFormat,
                     row.Prefab + ":" + row.Variant.ToString(CultureInfo.InvariantCulture) + ":" + row.Quality.ToString(CultureInfo.InvariantCulture) + ":0", row.Properties, null);
-                if (!BlueprintItemStandContents.TryRead(properties, name => name.GetStableHashCode(), out var item) || !SameItem(original, item, false))
+                if (!BlueprintItemStandContents.TryRead(properties, name => name.GetStableHashCode(), out var item) || !SameItem(original, item, false, unequippedCopy))
                     throw new InvalidDataException("Debit properties differ from the original item.");
                 debits.Add((row.X, row.Y), row);
             }
@@ -301,12 +301,16 @@ namespace OstrixMods.BuildWorks
             }
             if (remaining.Keys.Any(slot => !originals.ContainsKey(slot))) throw new InvalidDataException("Construction added an unrecorded inventory stack.");
         }
-        private static bool SameItem(BlueprintContainerInventory.Item before, BlueprintContainerInventory.Item after, bool allowWear) =>
+        private static bool SameItem(BlueprintContainerInventory.Item before, BlueprintContainerInventory.Item after, bool allowWear, bool unequippedCopy = false,
+            bool nativeLoadSave = false) =>
             before.Prefab == after.Prefab && before.X == after.X && before.Y == after.Y && before.WorldLevel == after.WorldLevel &&
-            before.PickedUp == after.PickedUp && before.Equipped == after.Equipped && before.Quality == after.Quality && before.Variant == after.Variant &&
+            before.PickedUp == after.PickedUp && (before.Equipped == after.Equipped || unequippedCopy && !after.Equipped) && before.Quality == after.Quality && before.Variant == after.Variant &&
             before.CrafterId == after.CrafterId && before.CrafterName == after.CrafterName && before.Cheated == after.Cheated &&
             before.CustomData.Count == after.CustomData.Count && before.CustomData.All(pair => after.CustomData.TryGetValue(pair.Key, out var value) && pair.Value == value) &&
-            (before.DurabilityHundredths == after.DurabilityHundredths && before.LegacyDurability == after.LegacyDurability ||
+            (nativeLoadSave ? before.DurabilityHundredths.HasValue && after.DurabilityHundredths.HasValue &&
+                // Current Mono Save retains its IL stack precision until conv.i4 (native 9412 → loaded Single → 9411).
+                after.DurabilityHundredths == (int)((double)(float)((float)before.DurabilityHundredths.Value * 0.01f) * 100d) :
+             before.DurabilityHundredths == after.DurabilityHundredths && before.LegacyDurability == after.LegacyDurability ||
              allowWear && before.Equipped && (before.DurabilityHundredths.HasValue && after.DurabilityHundredths.HasValue && after.DurabilityHundredths <= before.DurabilityHundredths ||
              before.LegacyDurability.HasValue && after.LegacyDurability.HasValue && after.LegacyDurability <= before.LegacyDurability));
         internal static IReadOnlyList<BlueprintContainerInventory.Item> ValidateInventory(string info, string bytes)

@@ -8,17 +8,39 @@ using OstrixMods.BuildWorks.Geometry;
 namespace ReservationChecks
 {
     internal struct Vector2i { internal int x, y; internal Vector2i(int x, int y) { this.x = x; this.y = y; } }
-    internal struct Vector3 { }
-    internal sealed class Transform { internal Vector3 position = new Vector3(); }
+    internal struct Vector3 {
+        internal float x,y,z;
+        internal Vector3(float x,float y,float z) { this.x=x; this.y=y; this.z=z; }
+        internal static float Distance(Vector3 a,Vector3 b) => (float)Math.Sqrt((a.x-b.x)*(a.x-b.x)+(a.y-b.y)*(a.y-b.y)+(a.z-b.z)*(a.z-b.z));
+        internal static Vector3 Scale(Vector3 a,Vector3 b) => new Vector3(a.x*b.x,a.y*b.y,a.z*b.z);
+    }
+    internal struct Quaternion {
+        internal float x,y,z,w;
+        internal Quaternion(float x,float y,float z,float w) { this.x=x;this.y=y;this.z=z;this.w=w; }
+        internal static Quaternion identity => new Quaternion(0,0,0,1);
+        internal static float Angle(Quaternion a,Quaternion b) => a.Equals(b) ? 0 : 180;
+    }
+    internal sealed class Transform {
+        internal Vector3 position = new Vector3(), localScale = new Vector3(1,1,1);
+        internal Quaternion rotation = new Quaternion(0,0,0,1);
+    }
     internal sealed class GameObject : Obj
     {
+        internal bool activeInHierarchy=true;
         internal string name = "piece_chest_wood";
         internal readonly Transform transform = new Transform();
         internal Piece Piece;
         internal Container Container;
         internal ZNetView RootView;
+        internal ItemStand Stand;
+        internal ItemDrop Drop;
+        internal Rigidbody Body;
+        internal Collider[] Colliders=Array.Empty<Collider>();
+        internal T[] GetComponentsInChildren<T>() where T:class => Colliders.OfType<T>().ToArray();
+        internal T GetComponentInParent<T>() where T:class => GetComponent<T>();
         internal T GetComponent<T>() where T : class => typeof(T) == typeof(Piece) ? Piece as T :
-            typeof(T) == typeof(ZNetView) ? RootView as T : Container as T;
+            typeof(T) == typeof(ZNetView) ? RootView as T : typeof(T) == typeof(ItemStand) ? Stand as T :
+            typeof(T) == typeof(ItemDrop) ? Drop as T : typeof(T) == typeof(Rigidbody) ? Body as T : Container as T;
     }
     internal sealed partial class Piece
     {
@@ -35,6 +57,13 @@ namespace ReservationChecks
         internal ItemDrop.ItemData Equipped;
         internal Action BeforeUnequip;
         internal long GetPlayerID() => 100;
+        internal bool Dead;
+        internal float m_maxInteractDistance=3.5f;
+        internal GameObject Hover;
+        internal Vector3 Eye=new Vector3();
+        internal GameObject GetHoverObject()=>Hover;
+        internal Vector3 GetEyePoint()=>Eye;
+        internal bool IsDead() => Dead;
         internal bool IsEquipActionQueued(ItemDrop.ItemData item) => Queue.Contains(item);
         internal bool IsItemEquiped(ItemDrop.ItemData item) => ReferenceEquals(Equipped, item);
         internal void RemoveEquipAction(ItemDrop.ItemData item) => Queue.Remove(item);
@@ -73,21 +102,37 @@ namespace ReservationChecks
             }
         }
     }
-    internal struct ZDOID { internal long Id, User; internal long UserID => User == 0 ? 99 : User; internal uint ID => (uint)Id; internal bool IsNone() => Id == 0; }
-    internal static class ZDOVars { internal const int s_items = 1, s_creator = 2; }
+    internal struct ZDOID { internal long Id, User; internal long UserID => User == 0 ? 99 : User; internal uint ID => (uint)Id; internal bool IsNone() => Id == 0;
+        internal static ZDOID None => default;
+        public static bool operator ==(ZDOID a,ZDOID b) => a.Id==b.Id && a.User==b.User;
+        public static bool operator !=(ZDOID a,ZDOID b) => !(a==b);
+        public override bool Equals(object value) => value is ZDOID other && this==other;
+        public override int GetHashCode() => Id.GetHashCode() ^ User.GetHashCode();
+    }
+    internal static class ZDOVars { internal const int s_items = 1, s_creator = 2, s_itemData = 949524933; }
     internal static class BlueprintConstructionPartExecution
     {
         internal static readonly int MarkerKey = "ostrix_buildworks_project_operation_v1".GetStableHashCode();
         internal static readonly int ReceiptKey = "ostrix_buildworks_project_receipt_v1".GetStableHashCode();
+        internal static GameObject MountTarget;
+        internal static bool StorageUnresolved;
+        internal static void RequireStoragePreflight(long _) { if(StorageUnresolved) throw new InvalidOperationException("unresolved storage"); }
+        internal static GameObject FindMarked(Guid _,string prefab) => MountTarget;
     }
     internal sealed class ZDO { internal ZDOID m_uid = new ZDOID { Id = 1 }; internal uint DataRevision; internal byte[] Raw;
+        internal bool Persistent = true;
+        internal int PrefabHash = 123;
+        internal readonly Dictionary<int,long> Longs = new Dictionary<int,long>();
+        internal long GetLong(int key,long fallback) => Longs.TryGetValue(key,out var value)?value:fallback;
+        internal void Set(int key,long value) { Longs[key]=value;DataRevision++; }
         internal readonly Dictionary<int, string> Strings = new Dictionary<int, string>();
         internal readonly Dictionary<int, byte[]> ByteArrays = new Dictionary<int, byte[]>();
         internal Action BeforeSet, AfterSet;
         internal string GetString(int key, string fallback) => Strings.TryGetValue(key, out string value) ? value : fallback;
         internal void Set(int key, string value) { BeforeSet?.Invoke(); if (GetString(key, null) != value) { Strings[key] = value; DataRevision++; } AfterSet?.Invoke(); }
-        internal int GetPrefab() => 123;
-        internal byte[] GetByteArray(int key, byte[] fallback) => key == ZDOVars.s_items ? Raw ?? fallback : ByteArrays.TryGetValue(key, out var value) ? value : fallback; }
+        internal void Set(int key,byte[] value) { BeforeSet?.Invoke(); ByteArrays[key]=(byte[])value.Clone(); DataRevision++; AfterSet?.Invoke(); }
+        internal int GetPrefab() => PrefabHash;
+        internal byte[] GetByteArray(int key, byte[] fallback = null) => key == ZDOVars.s_items ? Raw ?? fallback : ByteArrays.TryGetValue(key, out var value) ? value : fallback; }
     internal sealed class ZNetView : Obj
     {
         internal readonly ZDO Data = new ZDO(); internal bool Valid = true, Owner = true;
@@ -105,7 +150,7 @@ namespace ReservationChecks
         internal static ZNet instance = new ZNet(); internal World World = new World();
         internal bool Server = true, Saving;
         internal bool Dedicated;
-        internal static bool Open;
+        internal static bool Open; internal static bool m_loadError;
         internal readonly List<object> Peers = new List<object>();
         internal Action SaveAction;
         internal bool IsDedicated() => Dedicated;
@@ -130,7 +175,7 @@ namespace ReservationChecks
         internal static string MainDb2FileName() => "_main." + Generation + ".db2" + Suffix;
     }
     [Flags] internal enum SaveSystemSessionFlags { DontSaveCharacter = 1, DontSaveWorld = 2 }
-    internal sealed class ZDOMan { internal static ZDOMan instance = new ZDOMan(); }
+    internal sealed partial class ZDOMan { internal static ZDOMan instance = new ZDOMan(); }
     internal static class InventoryGui { internal static bool Visible; internal static bool IsVisible() => Visible; }
     internal static class PrivateArea { internal static bool Allowed = true; internal static bool CheckAccess(Vector3 _, float radius, bool flash, bool ward) => Allowed; }
     internal class WearNTear : Obj

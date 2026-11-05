@@ -70,6 +70,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(store.Load(id).Blueprint.parts.Select(p => p.stableId).SequenceEqual(new[] { "a", "b" }), "Source stable IDs were lost.");
             Console.WriteLine("PASS unpaid project store: immutable portable snapshot/TRS/part IDs, atomic reload/cancel replay, world/revision/conflict/corruption/extra-data/IO failures. No native construction, payment, refunds, board or server authorization executed.");
             ConstructionPartJournalChecks.Run(Path.Combine(folder, "part-journal"));
+            ConstructionMountJournalChecks.Run(Path.Combine(folder, "mount-journal"));
             ConstructionPartJournalLegacyChecks.Run(Path.Combine(folder, "legacy-journal"));
             ConstructionSourceJournalChecks.Run(Path.Combine(folder, "sources"));
             PaymentOutcomeBoundary.Checks.Run(Path.Combine(folder, "partial"));

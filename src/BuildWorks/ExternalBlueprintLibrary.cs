@@ -843,7 +843,11 @@ namespace OstrixMods.BuildWorks
                 if (!part.baseScale.HasValue || part.baseScale.Value.x != (float)projection.RootScale.X ||
                     part.baseScale.Value.y != (float)projection.RootScale.Y || part.baseScale.Value.z != (float)projection.RootScale.Z ||
                     (current == null) != (projection.Contents == null) || current != null &&
-                    (current.Format != projection.Contents.Format || current.Info != projection.Contents.Info || current.Zdo != projection.Contents.Zdo))
+                    (current.Format != projection.Contents.Format || current.Zdo != projection.Contents.Zdo ||
+                        (current.Format == Geometry.BlueprintForeignPartData.NativeItemStandFormat
+                            ? !current.Info.Split(':').Take(3).SequenceEqual(projection.Contents.Info.Split(':').Take(3)) ||
+                                !Geometry.BlueprintItemStandContents.TryRead(current, name => name.GetStableHashCode(), out _)
+                            : current.Info != projection.Contents.Info)))
                     throw new InvalidDataException("$buildworks_placement.contents_stale");
             }
             else

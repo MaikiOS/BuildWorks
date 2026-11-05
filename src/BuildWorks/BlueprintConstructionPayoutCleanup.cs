@@ -206,15 +206,21 @@ namespace OstrixMods.BuildWorks
                 cleanup.ProfileHash != record.Collections[index].Removal.ProfileHash || Journal.ReceiptValue(durable, index) != value)
                 throw new InvalidOperationException("Cleanup durable intent changed before native effect.");
             ZDO data = source.GetComponent<ZNetView>().GetZDO();
-            var queue = DestroyQueue.GetValue(manager) as List<ZDOID>;
-            if (queue == null || queue.Contains(data.m_uid)) throw new InvalidOperationException("Cleanup target is already queued or native queue is unavailable.");
-            var witness = new Witness { Data = data, Id = data.m_uid, Manager = manager, BeforeCount = queue.Count,
-                Custody = () => BeforeCustody() && ReferenceEquals(source.GetComponent<ZNetView>().GetZDO(), data) };
+            removedId = data.m_uid; DestroyCalls++;
+            DestroyExact(data, () => BeforeCustody() && ReferenceEquals(source.GetComponent<ZNetView>().GetZDO(), data));
+            Status = "queued-removal";
+        }
+        internal static void DestroyExact(ZDO data, Func<bool> custody)
+        {
+            var manager = ZDOMan.instance;
+            var queue = DestroyQueue?.GetValue(manager) as List<ZDOID>;
+            if (active != null || data == null || data.m_uid.IsNone() || custody == null || !custody() || queue == null || queue.Contains(data.m_uid))
+                throw new InvalidOperationException("Exact destruction requires unchanged custody and an unqueued source.");
+            var witness = new Witness { Data = data, Id = data.m_uid, Manager = manager, BeforeCount = queue.Count, Custody = custody };
             active = witness;
-            try { DestroyCalls++; manager.DestroyZDO(data); }
+            try { manager.DestroyZDO(data); }
             finally { active = null; }
-            if (!witness.Attempted || !witness.Confirmed) throw new InvalidOperationException("Cleanup native call did not prove one exact queued destruction.");
-            removedId = witness.Id; Status = "queued-removal";
+            if (!witness.Attempted || !witness.Confirmed) throw new InvalidOperationException("Native call did not prove one exact queued destruction.");
         }
         internal static bool AllowNetwork(ZDO data, out Witness witness)
         {

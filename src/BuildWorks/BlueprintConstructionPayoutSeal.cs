@@ -7,7 +7,7 @@ using Journal = OstrixMods.BuildWorks.BlueprintConstructionPayoutJournal;
 namespace OstrixMods.BuildWorks
 {
     // Pending returns stay sealed through reload; only a later durable collection protocol may release custody.
-    internal static class BlueprintConstructionPayoutSeal
+    internal static partial class BlueprintConstructionPayoutSeal
     {
         internal static readonly int MarkerKey = Journal.ItemMarkerKey;
         internal static readonly int OwnerKey = "ostrix_buildworks_refund_owner_v1".GetStableHashCode();
@@ -27,7 +27,7 @@ namespace OstrixMods.BuildWorks
         internal static ItemDrop Create(Journal journal, Journal.Record record, int index, ItemDrop.ItemData item, Vector3 position)
         {
             var durable = journal.Read(record.Project);
-            if (active != null || !BlueprintConstructionProjectRuntime.IsPrivateLocalPlacement || durable?.Operation != record.Operation ||
+            if (active != null || mountRequest != null || mountHandler != null || !BlueprintConstructionProjectRuntime.IsPrivateLocalPlacement || durable?.Operation != record.Operation ||
                 durable.Player != Player.m_localPlayer.GetPlayerID() || durable.Phase != Journal.Prepared || index < 0 || index >= durable.Items.Length ||
                 durable.Items[index].State != Journal.Attempted || durable.Items[index].Id != record.Items[index].Id ||
                 Convert.ToBase64String(Package(item)) != durable.Items[index].Blob) throw new InvalidOperationException("A matching durable payout intent is required before native creation.");
@@ -49,7 +49,7 @@ namespace OstrixMods.BuildWorks
         internal static byte[] Package(ItemDrop.ItemData item)
         { var package = new ZPackage(); package.Write((byte)110); item.Save(package); return package.GetArray(); }
         internal static bool Tagged(ItemDrop.ItemData item) => item?.m_customData?.ContainsKey(Journal.CustodyKey) == true;
-        internal static bool IsHeld(ZDO data) => data != null && (!string.IsNullOrEmpty(data.GetString(MarkerKey, "")) ||
+        internal static bool IsHeld(ZDO data) => data != null && (MountHeld(data) || !string.IsNullOrEmpty(data.GetString(MarkerKey, "")) ||
             active != null && active.Candidates.Any(drop => drop && ReferenceEquals(drop.GetComponent<ZNetView>()?.GetZDO(), data)));
         internal static bool IsHeld(ItemDrop drop) => drop && (held.Contains(drop) || Tagged(drop.m_itemData) || IsHeld(drop.GetComponent<ZNetView>()?.GetZDO()));
         internal static bool AllowStack(ItemDrop drop)
@@ -69,6 +69,7 @@ namespace OstrixMods.BuildWorks
         }
         internal static void BeforeAwake(ItemDrop drop)
         {
+            ObserveMountAwake(drop);
             if (active == null || !active.Attempted || Utils.GetPrefabName(drop.gameObject) != active.Source.m_dropPrefab.name) return;
             held.Add(drop); active.Candidates.Add(drop);
             if (active.Drop && !ReferenceEquals(active.Drop, drop)) { active.Error = "Payout instantiated more than one matching item."; return; }
@@ -77,6 +78,8 @@ namespace OstrixMods.BuildWorks
         internal static void AfterAwake(ItemDrop drop, Exception failure)
         {
             if (!drop) return;
+            ObserveMountAwake(drop);
+            BindMountAwake(drop, failure);
             try
             {
                 BeforeAwake(drop);
@@ -96,7 +99,8 @@ namespace OstrixMods.BuildWorks
                 if (!IsHeld(drop)) return;
                 Hold(drop);
                 // Either Awake may run first. Restore the native package before Start can save prefab defaults.
-                if (data != null && data.GetByteArray(ZDOVars.s_itemData) != null) ItemDrop.LoadFromZDO(drop.m_itemData, data);
+                if (data != null && data.GetByteArray(ZDOVars.s_itemData) != null)
+                { ItemDrop.LoadFromZDO(drop.m_itemData, data); BlueprintConstructionMountContext.ReturnSourceNativeLoaded(drop, null); }
             }
             catch (Exception error)
             {
@@ -106,6 +110,7 @@ namespace OstrixMods.BuildWorks
         }
         internal static bool AllowSave(ItemDrop.ItemData item, ZDO data, int index)
         {
+            if (index == -1 && MountHeld(data)) return AllowMountSave(item, data);
             if (index != -1 || !IsHeld(data) && !Tagged(item)) return true;
             try
             {
@@ -122,6 +127,6 @@ namespace OstrixMods.BuildWorks
             held.Add(drop); drop.m_autoPickup = false; drop.m_autoDestroy = false;
             var body = drop.GetComponent<Rigidbody>(); if (body) body.isKinematic = true;
         }
-        internal static void Destroyed(ItemDrop drop) { held.Remove(drop); }
+        internal static void Destroyed(ItemDrop drop) { held.Remove(drop); BlueprintConstructionMountContext.ReturnSourceUnloaded(drop); }
     }
 }

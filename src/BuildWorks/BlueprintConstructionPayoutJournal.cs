@@ -296,10 +296,15 @@ namespace OstrixMods.BuildWorks
             }
         }
         internal static BlueprintForeignPartData CreditInventory(BlueprintForeignPartData before, string cleanItem, Parts.PaidRow paid, int x, int y)
+            => CreditInventory(before, paid.Properties, cleanItem, paid.Prefab, paid.Paid, x, y);
+
+        internal static BlueprintForeignPartData CreditInventory(BlueprintForeignPartData before, string sourceItem, string cleanItem,
+            string prefab, int quantity, int x, int y)
         {
+            if (string.IsNullOrEmpty(prefab) || quantity < 1) throw new InvalidDataException("Missing actual credit item.");
             Parts.ValidateInventory(before?.Info, before?.Zdo);
-            var original = ParseItem(paid.Properties, paid.Prefab, 1);
-            var clean = ParseItem(cleanItem, paid.Prefab, paid.Paid);
+            var original = ParseItem(sourceItem, prefab, 1);
+            var clean = ParseItem(cleanItem, prefab, quantity);
             if (original == null || clean == null || clean.SourceVersion != 110 || !clean.PickedUp || clean.Equipped || clean.X != x || clean.Y != y ||
                 !SameProperties(original, clean) || clean.CustomData.Count != original.CustomData.Count ||
                 original.CustomData.ContainsKey(CustodyKey) || clean.CustomData.ContainsKey(CustodyKey) ||
@@ -315,9 +320,9 @@ namespace OstrixMods.BuildWorks
             byte[] after = new byte[checked(bytes.Length + item.Length - 1)];
             Array.Copy(bytes, after, bytes.Length); after[4] = (byte)(old.Count + 1); after[5] = (byte)((old.Count + 1) >> 8);
             Array.Copy(item, 1, after, bytes.Length, item.Length - 1);
-            string info = string.Join(":", new[] { width, height, old.Count + 1, checked(old.Sum(i => i.Stack) + paid.Paid) }
+            string info = string.Join(":", new[] { width, height, old.Count + 1, checked(old.Sum(i => i.Stack) + quantity) }
                 .Select(n => n.ToString(CultureInfo.InvariantCulture)));
-            info += "|" + string.Join("|", old.Select(i => i.Prefab).Concat(new[] { paid.Prefab }).Distinct().OrderBy(n => n, StringComparer.Ordinal));
+            info += "|" + string.Join("|", old.Select(i => i.Prefab).Concat(new[] { prefab }).Distinct().OrderBy(n => n, StringComparer.Ordinal));
             var result = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, info, Convert.ToBase64String(after), null);
             Parts.ValidateInventory(result.Info, result.Zdo); return result;
         }

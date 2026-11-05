@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -22,13 +23,17 @@ public sealed class ExchangeTickChecks
         public static readonly Vector3 one = new Vector3();
         public static Vector3 operator *(Vector3 value, float scale) { return value; }
     }
+    private struct Vector2 { public float x, y; public Vector2(float x, float y) { this.x = x; this.y = y; } }
     private sealed class Rect { public float width = 1920, height = 1080; }
     private sealed class RectTransform
     {
         public RectTransform parent;
         public Rect rect = new Rect();
         public Vector3 localScale = Vector3.one;
+        public Vector2 sizeDelta;
         public GameObject gameObject = new GameObject();
+        public RectTransform Find(string name) => this;
+        public T GetComponent<T>() where T : class => this as T;
     }
     private static class Mathf { public static float Min(params float[] values) { return values.Min(); } }
     private sealed class Root
@@ -49,7 +54,7 @@ public sealed class ExchangeTickChecks
         public void SetActive(bool value) { activeSelf = value; }
         public static implicit operator bool(GameObject value) { return value != null; }
     }
-    private sealed class PlanReview { public void CancelWrite() { } }
+    private sealed class PlanReview { public List<object> Blockers = new List<object>(); public void CancelWrite() { } }
     private sealed class Skin { public void Dispose() { } }
     private static class UnityEngine { public static class Object { public static void Destroy(object value) { } } }
     private sealed class EventSystem
@@ -58,11 +63,11 @@ public sealed class ExchangeTickChecks
         public static implicit operator bool(EventSystem value) { return value != null; }
         public void SetSelectedGameObject(GameObject value) { }
     }
-    private sealed class Input { public GameObject gameObject = new GameObject(); }
+    private sealed class Input { public GameObject gameObject = new GameObject(); public string text = ""; }
     private static class CompositeBlueprintStore
     {
-        internal sealed class Blueprint { public string importSource = "result.zip", importError = null, name = "Document", category = "OTHER"; }
-        internal sealed class ContentsSummary { public int NativeArmorStates = 0; }
+        internal sealed class Blueprint { public string importSource = "result.zip", importError = null, name = "Document", category = "OTHER"; public List<int> parts = new List<int> { 1 }; }
+        internal sealed class ContentsSummary { public int NativeArmorStates = 0, Mounts = 0; }
         internal sealed class MissingPartsReview { public bool CanOmit = true; public int EmptyDocuments = 0; }
         internal sealed class ImportReview
         {
@@ -71,7 +76,12 @@ public sealed class ExchangeTickChecks
             public Func<bool> IsHostCurrent;
             public ContentsSummary Contents = new ContentsSummary();
             public MissingPartsReview Missing = new MissingPartsReview();
+            public string Source;
+            public byte[] Bytes;
+            public object Sources;
         }
+        // PRODUCTION_CATEGORY_CONSTANTS
+        // PRODUCTION_CATEGORY_NORMALIZATION
     }
     private sealed class FakeStore
     {
@@ -97,8 +107,12 @@ public sealed class ExchangeTickChecks
             CompositeBlueprintStore.ImportReview review, Func<string, int> hash)
         {
             PrepareCalls++;
+            PreparedInput = review;
+            if (PreparationException != null) throw PreparationException;
             return preparation.Task;
         }
+        public CompositeBlueprintStore.ImportReview PreparedInput;
+        public Exception PreparationException;
     }
     private static class BuildWorksLocalization
     {
@@ -121,6 +135,10 @@ public sealed class ExchangeTickChecks
     private Task<CompositeBlueprintStore.ContentsSummary> contentsInspection = null;
     private Task<CompositeBlueprintStore.ImportReview> importInspection = null, importPreparation = null;
     private Task<PlanReview> planInspection = null;
+    private Task<PlanReview> openKeepInspection = null, kgInspection = null, bbpInspection = null, plannerInspection = null, unboundInspection = null;
+    private PlanReview openKeepReview = null, kgReview = null, bbpReview = null, plannerReview = null, unboundReview = null;
+    private int? openKeepTarget = null, bbpTarget = null;
+    private bool kgFormat = false, plannerFormat = false, unboundFormat = false;
     private Task<string> planExport = null;
     private CompositeBlueprintStore.Blueprint blueprint = null;
     private CompositeBlueprintStore.ImportReview importReview = null;
@@ -158,14 +176,37 @@ public sealed class ExchangeTickChecks
     private CompositeBlueprintStore.Blueprint[] batchExported;
     private CompositeBlueprintStore.Blueprint[] batchImported;
     private CompositeBlueprintStore.ImportReview batchRawReview;
+    private CompositeBlueprintStore.Blueprint[] batchAllDocuments;
+    private readonly HashSet<string> batchIncluded = new HashSet<string>();
+    private readonly Dictionary<string, string> batchCategories = new Dictionary<string, string>();
+    private readonly Input categoryInput = new Input();
+    private bool categoryOverride;
+    private readonly Text contentsDetails = new Text();
+    private Selectable batchDocumentsButton;
+    private RectTransform batchPicker;
+    private Selectable Button(string name, string text, float x, float y, float width, Action action, RectTransform parent)
+        => new Selectable { name = name };
+    private void OpenBatchDocuments() => throw new InvalidOperationException("Picker rendering is outside this CPU harness");
     private void TickBatch() { }
     private void UpdateBatchControls(bool busy) { }
-    private void RenderContents() { renderedContents++; }
+    private void RenderContents()
+    {
+        renderedContents++;
+        if (batchMode && importReview != null)
+        { contentsDetails.text = "mounts:" + contentsSummary?.Mounts; AppendBatchReview(); }
+    }
     private void RefreshMissing() { refreshedMissing++; missingReview = new CompositeBlueprintStore.MissingPartsReview(); }
     private void RenderPlanReview() { }
+    // Foreign review rendering belongs to engine acceptance, never a successful CPU substitute.
+    private void RenderOpenKeepReview() => throw new InvalidOperationException("Foreign review rendering is outside this harness");
+    private void RenderKgReview() => throw new InvalidOperationException("Foreign review rendering is outside this harness");
+    private void RenderBbpReview() => throw new InvalidOperationException("Foreign review rendering is outside this harness");
+    private void RenderPlannerReview() => throw new InvalidOperationException("Foreign review rendering is outside this harness");
+    private void RenderUnboundReview() => throw new InvalidOperationException("Foreign review rendering is outside this harness");
     private void ShowResult(string text) { shownResults++; result = text; }
     private void UpdateImportProgress() { }
-    private bool ImportCategoryIsValid() => true;
+    // PRODUCTION_CATEGORY_VALIDITY
+    // PRODUCTION_PREPARE_DOCUMENTS
     private void UpdateCategoryControls(bool busy) { }
     private void ShowSavedCatalogFailure(string error)
     { completed = catalogRetry = true; resultPath = store.ImportResultPath; ShowResult("saved: " + error); }
@@ -176,6 +217,10 @@ public sealed class ExchangeTickChecks
 
     // PRODUCTION_METHOD
     // PRODUCTION_BATCH_SUMMARY
+    // PRODUCTION_BATCH_CATEGORIES
+    // PRODUCTION_BATCH_PREVIEW
+    private void ApplyBatchDocuments()
+    // PRODUCTION_BATCH_APPLY
     // PRODUCTION_DISPOSE
     private void Back()
     // PRODUCTION_BACK
@@ -368,6 +413,97 @@ public sealed class ExchangeTickChecks
         scrolling.root.controls = scrolling.root.controls.Concat(new Selectable[] { scrollbar }).ToArray();
         scrolling.Tick();
         Assert(scrollbar.interactable && !scrolling.primary.interactable, "Busy import blocked read-only report scrolling or enabled writes");
+        FilteredBatchPreview();
+        PreparationFailures();
+    }
+
+    private static void PreparationFailures()
+    {
+        ExchangeTickChecks Fresh()
+        {
+            var document = new CompositeBlueprintStore.Blueprint { name = "A" };
+            var raw = new CompositeBlueprintStore.ImportReview { Documents = new List<CompositeBlueprintStore.Blueprint> { document } };
+            var check = new ExchangeTickChecks { batchMode = true, reviewingContents = true, batchAllDocuments = new[] { document },
+                batchRawReview = raw, batchPicker = new RectTransform(),
+                contentsSummary = new CompositeBlueprintStore.ContentsSummary { Mounts = 7 },
+                importReview = new CompositeBlueprintStore.ImportReview { IsHostCurrent = () => true },
+                missingReview = new CompositeBlueprintStore.MissingPartsReview() };
+            check.batchIncluded.Add("0"); check.contentsDetails.text = "obsolete warning";
+            return check;
+        }
+        var sync = Fresh();
+        sync.importPreparation = Task.FromResult(new CompositeBlueprintStore.ImportReview { IsHostCurrent = () => true });
+        sync.store.PreparationException = new InvalidOperationException("profile snapshot unavailable");
+        bool escaped = false;
+        try { sync.ApplyBatchDocuments(); } catch (InvalidOperationException) { escaped = true; }
+        Assert(!escaped, "Synchronous batch preparation exception escaped instead of a visible recoverable error");
+        sync.Tick();
+        Assert(sync.message.text == "profile snapshot unavailable" && sync.importPreparation == null && sync.importReview == null &&
+            sync.contentsSummary == null && sync.missingReview == null && !sync.primary.interactable && sync.contentsBack.interactable &&
+            sync.contentsDetails.text == "" && sync.resultPath == null && sync.store.Writes == 0 && sync.shownResults == 0,
+            "Failed preparation retained stale approval/task or lost the actual cause");
+        sync.Back();
+        Assert(!sync.reviewingContents && sync.message.text == "" && sync.IsOpen, "Back could not recover after synchronous preparation failure");
+        var asyncFailure = Fresh(); asyncFailure.ApplyBatchDocuments();
+        asyncFailure.store.preparation.SetException(new IOException("worker unavailable")); asyncFailure.Tick(); asyncFailure.Tick();
+        Assert(asyncFailure.message.text == "worker unavailable" && asyncFailure.importPreparation == null && !asyncFailure.primary.interactable &&
+            asyncFailure.store.Writes == 0 && asyncFailure.shownResults == 0, "Async preparation error lost cause or claimed publication");
+        var cancelled = Fresh(); cancelled.ApplyBatchDocuments(); cancelled.store.preparation.SetCanceled(); cancelled.Tick();
+        Assert(cancelled.importPreparation == null && !cancelled.primary.interactable && cancelled.store.Writes == 0 &&
+            cancelled.shownResults == 0 && cancelled.resultPath == null, "Cancelled preparation left confirmation or success enabled");
+        var late = Fresh(); late.ApplyBatchDocuments(); late.Back();
+        late.store.preparation.SetResult(new CompositeBlueprintStore.ImportReview { IsHostCurrent = () => true }); late.Tick();
+        Assert(!late.reviewingContents && late.importReview == null && late.store.Writes == 0 && late.shownResults == 0,
+            "Late preparation after Back restored a discarded review or wrote files");
+        Console.WriteLine("PASS preparation failure/recovery: synchronous cause, stale task refusal, async/cancel, Back and late completion; host UI/provider substituted, no writes.");
+    }
+
+    private static void FilteredBatchPreview()
+    {
+        var a = new CompositeBlueprintStore.Blueprint { name = "A", category = "A ORIGINAL" };
+        var b = new CompositeBlueprintStore.Blueprint { name = "Excluded B", category = "B ORIGINAL" };
+        var c = new CompositeBlueprintStore.Blueprint { name = "C", category = "C ORIGINAL" };
+        var raw = new CompositeBlueprintStore.ImportReview { Source = "group.zip", Bytes = new byte[] { 1, 2 }, Sources = new object(),
+            Documents = new List<CompositeBlueprintStore.Blueprint> { a, b, c }, FileErrors = new List<(string, string)> { ("private/bad.blueprint", "bad file") } };
+        var check = new ExchangeTickChecks { batchMode = true, reviewingContents = true, categoryOverride = true,
+            batchAllDocuments = raw.Documents.ToArray(), batchRawReview = raw, importReview = raw,
+            contentsSummary = new CompositeBlueprintStore.ContentsSummary { Mounts = 1 }, missingReview = new CompositeBlueprintStore.MissingPartsReview(),
+            batchPicker = new RectTransform() };
+        check.categoryInput.text = " common "; check.batchIncluded.UnionWith(new[] { "0", "2" });
+        check.batchCategories["1"] = "<invalid excluded>"; check.batchCategories["2"] = " custom c ";
+        check.contentsDetails.text = "old B mount warning"; check.batchPicker.gameObject.SetActive(true);
+        check.ApplyBatchDocuments();
+        bool pendingCleared = check.contentsDetails.text == "" && check.message.text == T("exchange.loading");
+        Assert(check.store.PrepareCalls == 1 && check.store.PreparedInput.Documents.SequenceEqual(new[] { a, c }) &&
+            ReferenceEquals(check.store.PreparedInput.Bytes, raw.Bytes) && ReferenceEquals(check.store.PreparedInput.Sources, raw.Sources) &&
+            ReferenceEquals(check.store.PreparedInput.FileErrors, raw.FileErrors) && check.contentsSummary == null &&
+            check.importReview == null && check.missingReview == null && !check.primary.interactable,
+            "Applying batch selection lost selected order/source evidence or retained stale confirmation");
+        check.store.preparation.SetResult(new CompositeBlueprintStore.ImportReview {
+            Documents = new List<CompositeBlueprintStore.Blueprint> { a, c }, IsHostCurrent = () => true,
+            Contents = new CompositeBlueprintStore.ContentsSummary { Mounts = 0 } });
+        check.Tick();
+        bool commonNormalized = check.contentsDetails.text.Contains(T("exchange.batch_document", "A", 1, "COMMON"));
+        bool overrideNormalized = check.BatchCategoryOverrides().Count == 1 && check.BatchCategoryOverrides()[1] == "CUSTOM C" &&
+            check.contentsDetails.text.Contains(T("exchange.batch_document", "C", 1, "CUSTOM C"));
+        Assert(pendingCleared && commonNormalized && overrideNormalized,
+            "Batch review retained stale details or unnormalized accepted categories: pendingCleared=" + pendingCleared +
+            ", commonNormalized=" + commonNormalized + ", overrideNormalized=" + overrideNormalized);
+        Assert(check.primary.interactable && check.contentsDetails.text.Contains("mounts:0") &&
+            !check.contentsDetails.text.Contains("Excluded B") && !check.contentsDetails.text.Contains("old B mount warning") &&
+            check.contentsDetails.text.Contains("bad.blueprint") && !check.contentsDetails.text.Contains("private/"),
+            "Filtered batch preview retained an excluded document/warning or lost skipped-file disclosure");
+        check.batchCategories["2"] = null; check.RenderContents();
+        Assert(check.BatchCategoryOverrides().ContainsKey(1) && check.BatchCategoryOverrides()[1] == null &&
+            check.contentsDetails.text.Contains(T("exchange.batch_document", "C", 1, "C ORIGINAL")), "Explicit original category became common category");
+        check.batchCategories["2"] = "<invalid selected>";
+        Assert(!check.ImportCategoryIsValid() && check.BatchCategoryOverrides()[1] == "<invalid selected>", "Invalid selected category was silently dropped");
+        check.batchCategories["2"] = "custom c";
+        Assert(check.ImportCategoryIsValid(), "Excluded invalid category blocked the selected group");
+        check.batchIncluded.Add("1"); Assert(!check.ImportCategoryIsValid(), "Included invalid category allowed confirmation");
+        check.batchIncluded.Remove("1"); check.batchIncluded.Remove("0");
+        Assert(check.BatchCategoryOverrides().Single().Key == 0 && check.BatchCategoryOverrides()[0] == "CUSTOM C", "Filtered category indices were not remapped");
+        Console.WriteLine("PASS actual batch picker Apply/category mapping/preview: A-C filter, pending clear, canonical/common/original categories, excluded/invalid guards and source evidence; host UI/preparation substituted.");
     }
 }
 internal static class StableHashStub

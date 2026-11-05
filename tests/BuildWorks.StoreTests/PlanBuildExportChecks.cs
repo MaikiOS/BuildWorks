@@ -17,6 +17,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             {
                 id = Guid.NewGuid().ToString("N"), name = "Plan test", prefabName = "test", category = "OTHER",
                 primaryPartId = "wall", placementSupportId = "support",
+                previewYaw = 19, previewPitch = -12, previewZoom = 1.7f,
                 supports = new System.Collections.Generic.List<CompositeBlueprintStore.Support> {
                     new CompositeBlueprintStore.Support { stableId = "support", name = "Entry",
                         position = new CompositeBlueprintStore.VectorData { x = 4, y = 2, z = 3 },
@@ -30,6 +31,12 @@ namespace OstrixMods.BuildWorks.StoreTests
             wall.position = new CompositeBlueprintStore.VectorData { x = 3.25f, y = -2.5f, z = .75f };
             wall.rotation = new CompositeBlueprintStore.QuaternionData { y = .70710677f, w = .70710677f };
             wall.materialSeed = 7;
+            wall.displayName = "Личная подпись детали"; wall.editorVisible = false; wall.editorLocked = true;
+            wall.metadata = new CompositeBlueprintStore.PrefabMetadata {
+                prefabId = wall.prefabName, name = "Fixture wall", kind = "Piece", hostId = "fixture-only",
+                prefabScale = wall.baseScale.Value, sourceId = "fixture.mod", sourceVersion = "0.0.1",
+                minimum = new CompositeBlueprintStore.VectorData { x = -1, y = -2, z = -3 },
+                maximum = new CompositeBlueprintStore.VectorData { x = 1, y = 2, z = 3 } };
             var sign = Part("sign", "sign"); sign.signText = "Привет\n\"Ostrix\"\\путь";
             var unsafeSign = Part("sign", "comma"); unsafeSign.signText = "One, two; three";
             var emptySign = Part("sign", "empty"); emptySign.signText = "";
@@ -37,7 +44,9 @@ namespace OstrixMods.BuildWorks.StoreTests
             chest.foreignData = new CompositeBlueprintStore.ForeignPartData {
                 format = Geometry.BlueprintForeignPartData.NativeContainerFormat, info = "5:2:0:0", zdo = "bQAAAAAA" };
             source.parts.AddRange(new[] { wall, sign, unsafeSign, emptySign, chest });
-            source.groups.Add(new CompositeBlueprintStore.Group { stableId = "group", name = "Walls", pivotPartId = "wall" });
+            source.groups.Add(new CompositeBlueprintStore.Group { stableId = "group", name = "Walls", pivotPartId = "wall",
+                editorVisible = false, editorLocked = true });
+            source.anchors.Add(new CompositeBlueprintStore.VectorData { x = 11, y = -2, z = 7 });
             wall.parentGroupId = "group";
             byte[] original = BlueprintExchangeFormat.Encode(source);
             var culture = CultureInfo.CurrentCulture;
@@ -47,7 +56,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("ru-RU");
                 review = store.ReviewPlanBuildExport(source).GetAwaiter().GetResult();
                 Require(!Directory.Exists(store.ExportDirectory), "Review wrote files");
-                Require(review.Parts == 5 && review.Groups == 1 && review.Supports == 1 && review.CustomSnaps == 1 &&
+                Require(review.Parts == 5 && review.Groups == 1 && review.Supports == 1 && review.Anchors == 1 && review.Metadata == 1 && review.CustomSnaps == 1 &&
                     review.MaterialSeeds == 1 && review.OmittedState["piece_chest / " + Geometry.BlueprintForeignPartData.NativeContainerFormat] == 1 &&
                     review.OmittedSigns.Count == 2, "Loss review omitted a supported category");
                 Require(store.TryExportPlanBuild(review, source, directory, "test", out string result, out string error), error);
@@ -68,6 +77,17 @@ namespace OstrixMods.BuildWorks.StoreTests
                 Require(reopened.parts[4].foreignData.zdo == chest.foreignData.zdo && reopened.parts[2].signText == unsafeSign.signText &&
                     reopened.parts[3].signText == "" && reopened.supports.Count == 1 && reopened.groups.Count == 1 && reopened.parts[0].materialSeed == 7,
                     "Full backup cannot reopen omitted data");
+                Require(reopened.parts[0].displayName == wall.displayName && !reopened.parts[0].editorVisible && reopened.parts[0].editorLocked &&
+                    reopened.parts[0].metadata.sourceId == "fixture.mod" && reopened.parts[0].metadata.sourceVersion == "0.0.1" &&
+                    reopened.parts[0].metadata.minimum.Value.z == -3 && reopened.parts[0].metadata.maximum.Value.y == 2 &&
+                    !reopened.groups[0].editorVisible && reopened.groups[0].editorLocked && reopened.groups[0].pivotPartId == "wall" &&
+                    reopened.anchors.Single().x == 11 && reopened.placementSupportId == "support" && reopened.primaryPartId == "wall" &&
+                    reopened.previewYaw == 19 && reopened.previewPitch == -12 && reopened.previewZoom == 1.7f,
+                    "Native sidecar lost declared metadata, editor flags, anchors, placement center or preview settings");
+                Require(read.parts[0].metadata == null && read.parts[0].displayName != wall.displayName && read.parts[0].editorVisible &&
+                    !read.parts[0].editorLocked && read.parts[0].materialSeed == null && read.groups.Count == 0 && read.anchors.Count == 0 &&
+                    string.IsNullOrEmpty(read.placementSupportId), "PlanBuild output unexpectedly retained BuildWorks-only fields");
+                Console.WriteLine("PASS PlanBuild declared losses: hidden/locked geometry exported; metadata/bounds/mod provenance, names, groups, anchors, placement center and preview retained in exact native sidecar only; no rendered review or original reader proof.");
                 Require(!store.TryExportPlanBuild(review, source, directory, "test", out _, out error) && error.Contains("exists") &&
                     File.ReadAllText(Path.Combine(result, "test.blueprint")) == foreign, "Collision overwrote bundle");
             }
@@ -145,6 +165,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             foreach (string unsafeId in new[] { "unsafe;id", "unsafe,id", "unsafe(id", "#unsafe" })
             {
                 source.parts[0].prefabName = unsafeId;
+                source.parts[0].metadata.prefabId = unsafeId;
                 refused = false;
                 try { store.ReviewPlanBuildExport(source).GetAwaiter().GetResult(); }
                 catch (InvalidDataException error) { refused = error.Message.Contains("plan_identifier"); }

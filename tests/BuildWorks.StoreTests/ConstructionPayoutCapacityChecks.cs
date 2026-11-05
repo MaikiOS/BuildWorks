@@ -87,7 +87,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             var before = Inventory(payload, 5); var after = Inventory(payload, 3);
             var record = new Parts.Record { BeforeInfo = before.Info, BeforeBytes = before.Zdo, AfterInfo = after.Info, AfterBytes = after.Zdo,
                 CostFree = false, Paid = new[] { paid } };
-            try { typeof(Parts).GetMethod("ValidateDebits", BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, new object[] { record }); }
+            try { typeof(Parts).GetMethod("ValidateDebits", BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, new object[] { record, false }); }
             catch (TargetInvocationException error) when (error.InnerException != null) { throw error.InnerException; }
             checks++;
         }

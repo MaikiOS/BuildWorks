@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace OstrixMods.BuildWorks.Geometry
@@ -9,6 +10,39 @@ namespace OstrixMods.BuildWorks.Geometry
     // Full read-only native v109/v110 item package. A null package is a legacy/authoring recipe, not a snapshot.
     public static class BlueprintItemStandContents
     {
+        internal static readonly IReadOnlyDictionary<int, Type> NativeFields = new Dictionary<int, Type> {
+            [KgBlueprint.StablePrefabHash("item")] = typeof(int), [KgBlueprint.StablePrefabHash("variant")] = typeof(int),
+            [KgBlueprint.StablePrefabHash("quality")] = typeof(int), [KgBlueprint.StablePrefabHash("type")] = typeof(int),
+            [KgBlueprint.StablePrefabHash("itemData")] = typeof(byte[])
+        };
+
+        // Data conversion only; caller must prove holder capability and classify every remaining outer field.
+        public static bool TryConvertNative(BlueprintForeignZdo source, Func<int, string> resolveItem,
+            out BlueprintForeignPartData converted)
+        {
+            converted = null;
+            if (source == null || !source.NativeObjectType.HasValue || source.Keys.Any(field =>
+                NativeFields.TryGetValue(field.Key, out var type) && field.Value != type)) return false;
+            int Read(string name, int fallback) => source.TryGet<int>(KgBlueprint.StablePrefabHash(name), out int value) ? value : fallback;
+            int id = Read("item", 0);
+            if (id == 0) return true; // Native empty attachment ignores stale itemData; source bytes remain archived.
+            if (resolveItem == null || !source.TryGet<byte[]>(KgBlueprint.StablePrefabHash("itemData"), out var packet) ||
+                packet.Length > 24576) return false;
+            try
+            {
+                string prefab = resolveItem(id);
+                if (prefab == null || KgBlueprint.StablePrefabHash(prefab) != id) return false;
+                string info = prefab + ":" + Read("variant", 0).ToString(CultureInfo.InvariantCulture) + ":" +
+                    Read("quality", 1).ToString(CultureInfo.InvariantCulture) + ":" + Read("type", 0).ToString(CultureInfo.InvariantCulture);
+                var result = new BlueprintForeignPartData(BlueprintForeignPartData.NativeItemStandFormat,
+                    info, Convert.ToBase64String(packet), null);
+                if (!TryRead(result, KgBlueprint.StablePrefabHash, out _)) return false;
+                converted = result; return true;
+            }
+            catch (Exception error) when (error is ArgumentException || error is FormatException || error is IOException)
+            { return false; }
+        }
+
         // EWD legacy loose fields -> verified native record, never ZDO.Deserialize.
         // Caller must classify EVERY unconsumed outer field before enabling placement.
         public static bool TryConvertLegacy(BlueprintForeignZdo source, Func<string, int> hash, int? defaultWorldLevel,

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -30,6 +31,13 @@ namespace OstrixMods.BuildWorks.GeometryTests
                 One(w, 107); w.Write(3); w.Write(new byte[] { 1, 2, 3 });
             });
             var data = Read(all);
+            Require(Convert.FromBase64String(empty.WriteNative()).SequenceEqual(minimal), "Native literal prefix write");
+            Require(Convert.FromBase64String(data.WriteNative()).SequenceEqual(all), "All7maps/header/connection independent wire write");
+            var negativeZero = Packet(2, w => { One(w, 9); w.Write(BitConverter.Int32BitsToSingle(int.MinValue)); });
+            Require(Convert.FromBase64String(Read(negativeZero).WriteNative()).SequenceEqual(negativeZero), "Native float negative zero bits");
+            var unsorted = Read(Packet(16, w => { w.Write((byte)2); w.Write(9); w.Write(3); w.Write(-2); w.Write(7); }));
+            Require(Convert.FromBase64String(unsorted.WriteNative()).SequenceEqual(Packet(16, w =>
+                { w.Write((byte)2); w.Write(-2); w.Write(7); w.Write(9); w.Write(3); })), "Deterministic signed-key ordering");
             Require(data.Count == 7 && data.Persistent == true && data.Distant == true && data.NativeObjectType == 2 &&
                 data.NativeRotationEuler.Value.Y == 20 && data.ConnectionType == 19 &&
                 data.NativeConnectionUserId == 0x1020304050607080L && data.NativeConnectionId == 0xeeddccbbU, "Header/rotation/connection");
@@ -52,6 +60,12 @@ namespace OstrixMods.BuildWorks.GeometryTests
                     for (int i = 0; i < count; ++i) { w.Write(i); w.Write((float)i); }
                 }));
                 Require(many.Count == count && many.TryGet<float>(count - 1, out var last) && last == count - 1, "Count boundary " + count);
+                Require(Convert.FromBase64String(many.WriteNative()).SequenceEqual(Packet(2, w =>
+                {
+                    if (count < 128) w.Write((byte)count);
+                    else { w.Write((byte)(128 | (count >> 8))); w.Write((byte)count); }
+                    for (int i = 0; i < count; ++i) { w.Write(i); w.Write((float)i); }
+                })), "Native writer independent count encoding " + count);
             }
             int refused = 0;
             void Reject(byte[] bytes)
@@ -83,6 +97,41 @@ namespace OstrixMods.BuildWorks.GeometryTests
                 "Connection without data maps/None target");
             bool kgRejected = false; try { data.WriteKg(); } catch (InvalidOperationException) { kgRejected = true; }
             Require(kgRejected, "Native projection mislabelled as KG writer input");
+            var changed = data.WriteNative(new[] { new KeyValuePair<int, object>(106, "edited") },
+                new[] { new KeyValuePair<int, Type>(107, typeof(byte[])) });
+            var edited = Read(Convert.FromBase64String(changed));
+            Require(!edited.HasHash(107) && edited.TryGet<string>(106, out var edit) && edit == "edited" &&
+                edited.ConnectionType == 19 && edited.NativeObjectType == 2 && edited.NativeRotationEuler.Value.Y == 20 &&
+                data.TryGet<byte[]>(107, out _) && data.TryGet<string>(106, out var oldText) && oldText == "сундук ♞",
+                "Native typed omission/updates altered header or source");
+            string onlyInt = typed.WriteNative(omit: new[] { new KeyValuePair<int, Type>(5, typeof(float)) });
+            Require(Convert.FromBase64String(onlyInt).SequenceEqual(Packet(16, w => { One(w, 5); w.Write(2); })),
+                "Native typed omission/presence recomputation");
+            Require(Convert.FromBase64String(connectionOnly.WriteNative()).SequenceEqual(Packet(1, w =>
+                { w.Write((byte)17); w.Write(0L); w.Write(0U); })), "Native connection-only preservation");
+            void BadWrite(Action write)
+            {
+                bool failed = false;
+                try { write(); } catch (Exception e) when (e is ArgumentException || e is InvalidDataException || e is InvalidOperationException) { failed = true; }
+                Require(failed, "Invalid native write accepted");
+            }
+            foreach (object bad in new object[] { null, true, 1d, float.NaN, float.PositiveInfinity,
+                new Point3(double.MaxValue, 0, 0), new Rotation3(0, double.MaxValue, 0, 1), "\ud800",
+                new byte[BlueprintForeignPartData.MaximumContainerBytes + 1] })
+                BadWrite(() => empty.WriteNative(new[] { new KeyValuePair<int, object>(1, bad) }));
+            BadWrite(() => empty.WriteNative(Enumerable.Range(0, 32768).Select(i => new KeyValuePair<int, object>(i, 1))));
+            BadWrite(() => empty.WriteNative(Enumerable.Repeat(new KeyValuePair<int, object>(1, 1), BlueprintForeignPartData.MaximumContainerBytes / 4 + 1)));
+            var maximum = new byte[BlueprintForeignPartData.MaximumContainerBytes - 15]; maximum[0] = 99;
+            string full = empty.WriteNative(new[] { new KeyValuePair<int, object>(7, maximum) });
+            Require(Convert.FromBase64String(full).Length == BlueprintForeignPartData.MaximumContainerBytes, "Native packet exact size boundary");
+            maximum[0] = 3;
+            Require(Read(Convert.FromBase64String(full)).TryGet<byte[]>(7, out var preserved) && preserved[0] == 99 && empty.Count == 0,
+                "Native update byte ownership/source immutability");
+            BadWrite(() => empty.WriteNative(new[] { new KeyValuePair<int, object>(7, new byte[maximum.Length + 1]) }));
+            BadWrite(() => empty.WriteNative(new[] { new KeyValuePair<int, object>(1, new string('x', 600000)), new KeyValuePair<int, object>(2, new string('x', 600000)) }));
+            Require(BlueprintForeignZdo.TryReadKg(Convert.ToBase64String(new byte[7]), out var kg), "KG empty fixture");
+            BadWrite(() => kg.WriteNative());
+            Console.WriteLine("PASS native inert writer: independent7map bytes/header/connection/count boundaries/typed edits/source immutability/budgets/UTF8/finite/dialect negatives. No exporter UI or native execution proof.");
             Console.WriteLine("PASS native ZDO.Serialize projection:literal prefix/all7maps/IDs/Euler/count1..32767/immutability;" + refused + " malformed controls rejected. Synthetic wire controls only;no game or producer output proof.");
         }
         private static BlueprintForeignZdo Read(byte[] bytes)

@@ -55,6 +55,9 @@ namespace OstrixMods.BuildWorks
         private bool plannerFormat;
         private Task<PlannerExport> plannerInspection;
         private PlannerExport plannerReview;
+        private bool unboundFormat;
+        private Task<UnboundExport> unboundInspection;
+        private UnboundExport unboundReview;
         private CompositeBlueprintStore.ImportReview importReview;
         private CompositeBlueprintStore.ContentsSummary contentsSummary;
         private CompositeBlueprintStore.MissingPartsReview missingReview;
@@ -174,10 +177,11 @@ namespace OstrixMods.BuildWorks
                     else if (kgFormat) { kgFormat = false; bbpTarget = BetterBuildingExport.Target.Bbp; }
                     else if (bbpTarget == BetterBuildingExport.Target.Bbp) bbpTarget = BetterBuildingExport.Target.LegacyJson;
                     else if (bbpTarget.HasValue) { bbpTarget = null; plannerFormat = true; }
-                    else if (plannerFormat) plannerFormat = false;
+                    else if (plannerFormat) { plannerFormat = false; unboundFormat = true; }
+                    else if (unboundFormat) unboundFormat = false;
                     else archive = true;
                     format.GetComponentInChildren<TMP_Text>().text = ExportFormatLabel();
-                    panel.Find("ExchangeHelp").GetComponent<TMP_Text>().text = T(plannerFormat ? "exchange.planner_help" : LegacyBbpJson ? "exchange.bbp_json_help" : bbpTarget.HasValue ? "exchange.bbp_help" : kgFormat ? "exchange.kg_help" : openKeepTarget.HasValue ? "exchange.openkeep_help" : planBuild ? "exchange.plan_help" : "exchange.export_help");
+                    panel.Find("ExchangeHelp").GetComponent<TMP_Text>().text = T(unboundFormat ? "exchange.unbound_help" : plannerFormat ? "exchange.planner_help" : LegacyBbpJson ? "exchange.bbp_json_help" : bbpTarget.HasValue ? "exchange.bbp_help" : kgFormat ? "exchange.kg_help" : openKeepTarget.HasValue ? "exchange.openkeep_help" : planBuild ? "exchange.plan_help" : "exchange.export_help");
                 });
             }
             message = Label("ExchangeMessage", "", 20, 446, 740, 70, 14);
@@ -320,7 +324,7 @@ namespace OstrixMods.BuildWorks
                 try
                 {
                     var review = importInspection.GetAwaiter().GetResult();
-                    if (reviewingContents) importPreparation = store.PrepareImportReview(review, name => name.GetStableHashCode());
+                    if (reviewingContents) PrepareImportDocuments(review);
                 }
                 catch (Exception error) { if (reviewingContents) SetError(error); }
                 importInspection = null;
@@ -375,11 +379,17 @@ namespace OstrixMods.BuildWorks
                 catch (Exception error) { if (reviewingContents && plannerFormat) SetError(error); }
                 plannerInspection = null;
             }
+            if (unboundInspection != null && unboundInspection.IsCompleted)
+            {
+                try { unboundReview = unboundInspection.GetAwaiter().GetResult(); if (reviewingContents && unboundFormat) RenderUnboundReview(); }
+                catch (Exception error) { if (reviewingContents && unboundFormat) SetError(error); }
+                unboundInspection = null;
+            }
             bool busy = importing || planExport != null || placementPreparation != null;
             if (sharing) { primary.interactable = true; return; }
             primary.interactable = catalogRetry && !busy || !completed && !busy && ImportCategoryIsValid() && listing == null && !directory.gameObject.activeSelf &&
                 (blueprint != null || selected != null) && (!reviewingContents ||
-                (plannerFormat ? plannerReview != null && plannerReview.Blockers.Count == 0 : bbpTarget.HasValue ? bbpReview != null && bbpReview.Blockers.Count == 0 : kgFormat ? kgReview != null && kgReview.Blockers.Count == 0 : openKeepTarget.HasValue ? openKeepReview != null && openKeepReview.Blockers.Count == 0 : planBuild ? planReview != null : contentsSummary != null && missingReview != null &&
+                (unboundFormat ? unboundReview != null && unboundReview.Blockers.Count == 0 : plannerFormat ? plannerReview != null && plannerReview.Blockers.Count == 0 : bbpTarget.HasValue ? bbpReview != null && bbpReview.Blockers.Count == 0 : kgFormat ? kgReview != null && kgReview.Blockers.Count == 0 : openKeepTarget.HasValue ? openKeepReview != null && openKeepReview.Blockers.Count == 0 : planBuild ? planReview != null : contentsSummary != null && missingReview != null &&
                 (blueprint != null || missingReview.EmptyDocuments == 0) && (!omitMissingParts || missingReview.CanOmit) &&
                 (place == null || contentsSummary.NativeArmorStates == 0)));
             copyPath.interactable = !busy;
@@ -497,6 +507,13 @@ namespace OstrixMods.BuildWorks
                 message.text = T("exchange.loading"); Tick(); return;
             }
             if (!reviewingContents) { if (blueprint != null || selected != null) ReviewContents(); return; }
+            if (unboundFormat)
+            {
+                if (unboundReview == null || unboundReview.Blockers.Count != 0) return;
+                try { planExport = store.ExportUnbound(unboundReview, blueprint, directory.text, fileName.text); message.text = T("exchange.loading"); }
+                catch (Exception error) { SetError(error); }
+                Tick(); return;
+            }
             if (plannerFormat)
             {
                 if (plannerReview == null || plannerReview.Blockers.Count != 0) return;
@@ -569,7 +586,7 @@ namespace OstrixMods.BuildWorks
         private void ReviewContents()
         {
             operationStarted = Time.realtimeSinceStartup;
-            reviewingContents = true; contentsSummary = null; importReview = null; missingReview = null; planReview = null; openKeepReview = null; kgReview = null; bbpReview = null; plannerReview = null;
+            reviewingContents = true; contentsSummary = null; importReview = null; missingReview = null; planReview = null; openKeepReview = null; kgReview = null; bbpReview = null; plannerReview = null; unboundReview = null;
             clearStorage = clearMounts = omitArmorState = omitMissingParts = false;
             SetFileControls(false); copyPath.gameObject.SetActive(false);
             if (!contentsPanel)
@@ -610,6 +627,7 @@ namespace OstrixMods.BuildWorks
                     kgInspection = null; kgReview?.CancelWrite(); kgReview = null;
                     bbpInspection = null; bbpReview?.CancelWrite(); bbpReview = null;
                     plannerInspection = null; plannerReview?.CancelWrite(); plannerReview = null;
+                    unboundInspection = null; unboundReview?.CancelWrite(); unboundReview = null;
                     CloseCategoryPicker();
                     planReview = null; contentsPanel.gameObject.SetActive(false);
                     contentsBack.gameObject.SetActive(false); copyPath.gameObject.SetActive(true);
@@ -624,13 +642,14 @@ namespace OstrixMods.BuildWorks
             primary.GetComponentInChildren<TMP_Text>().text = T(place != null ? "placement.contents_confirm" : blueprint == null ? "exchange.confirm_import" : "exchange.confirm_export");
             if (place != null) contentsBack.GetComponentInChildren<TMP_Text>().text = T("editor.view.cancel");
             message.text = T("exchange.loading");
-            if (planBuild || openKeepTarget.HasValue || kgFormat || bbpTarget.HasValue || plannerFormat)
+            if (planBuild || openKeepTarget.HasValue || kgFormat || bbpTarget.HasValue || plannerFormat || unboundFormat)
             {
                 storageChoice.gameObject.SetActive(false); mountChoice.gameObject.SetActive(false);
                 contentsDetails.text = "";
                 try
                 {
-                    if (plannerFormat)
+                    if (unboundFormat) unboundInspection = store.ReviewUnboundExport(blueprint);
+                    else if (plannerFormat)
                     {
                         if (fileName.text.EndsWith(".buildworks", StringComparison.OrdinalIgnoreCase))
                             throw new InvalidDataException("$buildworks_exchange.invalid_name");
@@ -654,7 +673,7 @@ namespace OstrixMods.BuildWorks
             {
                 if (batchMode)
                 {
-                    importPreparation = store.PrepareImportReview(batchRawReview, name => name.GetStableHashCode());
+                    PrepareImportDocuments(batchRawReview);
                     return;
                 }
                 var supports = store.MaterialSeedSupportSnapshot(new[] { blueprint });
@@ -697,6 +716,15 @@ namespace OstrixMods.BuildWorks
             message.text = T("exchange.plan_warning");
         }
 
+        private void PrepareImportDocuments(CompositeBlueprintStore.ImportReview review)
+        {
+            importPreparation = null;
+            contentsSummary = null; missingReview = null; importReview = null;
+            contentsDetails.text = ""; message.text = T("exchange.loading");
+            try { importPreparation = store.PrepareImportReview(review, name => name.GetStableHashCode()); }
+            catch (Exception error) { SetError(error); }
+        }
+
         private void RefreshMissing()
         {
             try
@@ -707,9 +735,40 @@ namespace OstrixMods.BuildWorks
             catch (Exception error) { missingReview = null; SetError(error); }
         }
 
-        private string ExportFormatLabel() => T(plannerFormat ? "exchange.format_planner" : LegacyBbpJson ? "exchange.format_bbp_json" : bbpTarget.HasValue ? "exchange.format_bbp" : kgFormat ? "exchange.format_kg" : openKeepTarget.HasValue
+        private string ExportFormatLabel() => T(unboundFormat ? "exchange.format_unbound" : plannerFormat ? "exchange.format_planner" : LegacyBbpJson ? "exchange.format_bbp_json" : bbpTarget.HasValue ? "exchange.format_bbp" : kgFormat ? "exchange.format_kg" : openKeepTarget.HasValue
             ? openKeepTarget == OpenKeepExport.Consumer.OpenKeep ? "exchange.format_openkeep" : "exchange.format_devbridge"
             : planBuild ? "exchange.format_plan" : archive ? "exchange.format_zip" : "exchange.format_json");
+
+        private void RenderUnboundReview()
+        {
+            contentsPanel.Find("ExchangeContentsTitle").GetComponent<TMP_Text>().text = T("exchange.unbound_title");
+            contentsDetails.text = T("exchange.unbound_review", Path.Combine(directory.text, fileName.text), fileName.text,
+                unboundReview.Parts, unboundReview.Signs, unboundReview.MaterialSeeds, unboundReview.Storages,
+                unboundReview.ClearedStorages, unboundReview.TerrainSamples, unboundReview.OtherSources,
+                unboundReview.Mounts, unboundReview.ClearedMounts, unboundReview.HeaderChanges);
+            foreach (var group in unboundReview.Blockers.GroupBy(block => block.Reason))
+            {
+                string key;
+                switch (group.Key)
+                {
+                    case UnboundExport.BlockReason.MultipleSources: key = "exchange.unbound_block_multiplesources"; break;
+                    case UnboundExport.BlockReason.SourceBinding: key = "exchange.unbound_block_sourcebinding"; break;
+                    case UnboundExport.BlockReason.HostProfile: key = "exchange.unbound_block_hostprofile"; break;
+                    case UnboundExport.BlockReason.StateAdapter: key = "exchange.unbound_block_stateadapter"; break;
+                    case UnboundExport.BlockReason.TerrainFrame: key = "exchange.unbound_block_terrainframe"; break;
+                    case UnboundExport.BlockReason.Precision: key = "exchange.unbound_block_precision"; break;
+                    default: key = "exchange.unbound_block_format"; break;
+                }
+                contentsDetails.text += "\n\n" + T(key, group.Key == UnboundExport.BlockReason.MultipleSources ? unboundReview.Sources : group.Count());
+            }
+            var viewport = (RectTransform)contentsDetails.transform.parent;
+            viewport.sizeDelta = new Vector2(716, 206);
+            contentsDetails.rectTransform.sizeDelta = new Vector2(700, Mathf.Max(206, contentsDetails.GetPreferredValues(contentsDetails.text, 700, 0).y));
+            viewport.GetComponent<ScrollRect>().verticalNormalizedPosition = 1;
+            contentsPanel.sizeDelta = new Vector2(740, 266);
+            primary.GetComponentInChildren<TMP_Text>().text = T("exchange.export");
+            message.text = T(unboundReview.Blockers.Count == 0 ? "exchange.unbound_warning" : "exchange.unbound_blocked");
+        }
 
         private void RenderPlannerReview()
         {
@@ -1082,6 +1141,7 @@ namespace OstrixMods.BuildWorks
             kgReview?.CancelWrite();
             bbpReview?.CancelWrite();
             plannerReview?.CancelWrite();
+            unboundReview?.CancelWrite();
             root.SetActive(false); UnityEngine.Object.Destroy(root); skin.Dispose();
             if (EventSystem.current && previousFocus && previousFocus.activeInHierarchy)
                 EventSystem.current.SetSelectedGameObject(previousFocus);

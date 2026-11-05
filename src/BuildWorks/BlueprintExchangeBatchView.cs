@@ -36,7 +36,11 @@ namespace OstrixMods.BuildWorks
             for (int i = 0; i < batchAllDocuments.Length; ++i)
                 if (batchIncluded.Contains(BatchKey(i)))
                 {
-                    if (batchCategories.TryGetValue(BatchKey(i), out string value)) result.Add(current, value);
+                    if (batchCategories.TryGetValue(BatchKey(i), out string value))
+                    {
+                        if (CompositeBlueprintStore.TryNormalizeImportCategory(value, out string normalized)) value = normalized;
+                        result.Add(current, value);
+                    }
                     ++current;
                 }
             return result;
@@ -53,7 +57,9 @@ namespace OstrixMods.BuildWorks
                 if (batchMode && blueprint != null)
                 {
                     batchExportChoices = store.CatalogAll().ToArray();
-                    batchExportIncluded.Add(blueprint.id); planBuild = false; openKeepTarget = null; kgFormat = false; archive = true;
+                    batchExportIncluded.Add(blueprint.id); planBuild = false; openKeepTarget = null; kgFormat = false;
+                    bbpTarget = null; plannerFormat = unboundFormat = false; archive = true;
+                    panel.Find("ExchangeHelp").GetComponent<TMP_Text>().text = T("exchange.export_help");
                 }
                 batchToggle.GetComponentInChildren<TMP_Text>().text = T(batchMode ? "exchange.batch_single" : "exchange.batch_choose");
                 if (format) { format.interactable = !batchMode; format.GetComponentInChildren<TMP_Text>().text = ExportFormatLabel(); }
@@ -209,10 +215,13 @@ namespace OstrixMods.BuildWorks
         {
             if (!batchMode || batchAllDocuments == null) return;
             var categories = BatchCategoryOverrides();
+            string commonCategory = categoryOverride ? categoryInput.text : null;
+            if (commonCategory != null && CompositeBlueprintStore.TryNormalizeImportCategory(commonCategory, out string normalizedCategory))
+                commonCategory = normalizedCategory;
             contentsDetails.text = BatchErrors().TrimStart('\n') + "\n" + contentsDetails.text + "\n" + T("exchange.batch_atomic") +
                 (blueprint == null ? "\n" + T("exchange.batch_destination", importReview.Documents.FirstOrDefault()?.name ?? "—") : "") +
                 "\n" + string.Join("\n", importReview.Documents.Select((document, index) => T("exchange.batch_document", document.name, document.parts.Count,
-                    categories.TryGetValue(index, out string specific) ? specific ?? document.category : categoryOverride ? categoryInput.text : document.category)));
+                    categories.TryGetValue(index, out string specific) ? specific ?? document.category : commonCategory ?? document.category)));
             if (!batchDocumentsButton)
             {
                 batchDocumentsButton = Button("ExchangeBatchDocuments", T("exchange.batch_documents"), 516, 8, 212, OpenBatchDocuments, contentsPanel);
@@ -241,8 +250,7 @@ namespace OstrixMods.BuildWorks
                         FileErrors = batchRawReview.FileErrors,
                         Documents = selectedDocuments
                     };
-                    contentsSummary = null; missingReview = null; importReview = null;
-                    importPreparation = store.PrepareImportReview(review, name => name.GetStableHashCode()); Tick();
+                    PrepareImportDocuments(review); Tick();
                 }, batchPicker);
                 Label("ExchangeBatchPickerHelp", T("exchange.batch_categories_help"), 12, 44, 716, 40, 14, batchPicker);
                 batchRows = Rect("ExchangeBatchRows", batchPicker, 12, 88, 716, 188);

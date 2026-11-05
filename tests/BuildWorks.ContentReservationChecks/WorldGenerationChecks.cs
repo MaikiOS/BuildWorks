@@ -18,10 +18,10 @@ namespace ReservationChecks
             { using (var writer = new BinaryWriter(memory, Encoding.UTF8, true)) write(writer); return memory.ToArray(); }
         }
         internal static void WriteWorld(TransferChecks.Frame frame, string root, uint generation = 7, int formatVersion = 41, int? chunkVersion = null, int? markerKey = null,
-            byte[] receipt = null, bool separateReceipt = false)
+            byte[] receipt = null, bool separateReceipt = false, BlueprintForeignPartData mounted = null, byte[] mountReceipt = null, long worldId = 1)
         {
             Guid marker = frame.Operation;
-            byte[] payload = Bytes(w => { w.Write(formatVersion); w.Write("QA"); w.Write("seed"); w.Write(10); w.Write(1L); w.Write(1); w.Write(true); w.Write(0); w.Write(0); });
+            byte[] payload = Bytes(w => { w.Write(formatVersion); w.Write("QA"); w.Write("seed"); w.Write(10); w.Write(worldId); w.Write(1); w.Write(true); w.Write(0); w.Write(0); });
             File.WriteAllBytes(Path.Combine(root, "_main." + generation + ".fwl2"), Bytes(w => { w.Write(payload.Length); w.Write(payload); }));
             int objects = receipt != null && separateReceipt ? 2 : 1;
             File.WriteAllBytes(Path.Combine(root, "_main." + generation + ".chunks"), Bytes(w => { w.Write((short)formatVersion); w.Write(objects); w.Write(1); w.Write((ushort)258); w.Write((byte)3); w.Write(generation); w.Write(objects); }));
@@ -32,16 +32,28 @@ namespace ReservationChecks
                 w.Write((short)(chunkVersion ?? formatVersion)); w.Write(objects);
                 void Object(bool storage, bool construction)
                 {
-                    w.Write((ushort)(256 | 32 | 64 | 128)); w.Write(0f); w.Write(0f); w.Write(0f); w.Write(123);
+                    bool mount = construction && mounted != null;
+                    w.Write((ushort)(256 | 32 | 64 | 128 | (mount ? 16 : 0))); w.Write(0f); w.Write(0f); w.Write(0f); w.Write(123);
+                    if(mount) {
+                        var info=mounted.Info.Split(':'); w.Write((byte)4);
+                        w.Write("item".GetStableHashCode()); w.Write(info[0].GetStableHashCode());
+                        foreach(var pair in new[] { new {Key="variant",Index=1},new {Key="quality",Index=2},new {Key="type",Index=3} }) {
+                            w.Write(pair.Key.GetStableHashCode()); w.Write(int.Parse(info[pair.Index],System.Globalization.CultureInfo.InvariantCulture));
+                        }
+                    }
                     w.Write((byte)1); w.Write(ZDOVars.s_creator); w.Write(100L);
                     w.Write((byte)((storage ? 1 : 0) + (construction ? 1 : 0)));
                     if (storage) { w.Write(markerKey ?? BlueprintStorageCapture.TransferMarkerKey); w.Write(marker.ToString("N")); }
                     if (construction) { w.Write(BlueprintConstructionPartExecution.MarkerKey); w.Write(marker.ToString("N")); }
-                    w.Write((byte)((storage ? 1 : 0) + (construction ? 1 : 0)));
+                    w.Write((byte)((storage ? 1 : 0) + (construction ? 1 : 0) + (mount ? 2 : 0)));
                     if (storage) { w.Write(ZDOVars.s_items); w.Write(inventory.Length); w.Write(inventory); }
                     if (construction) { w.Write(BlueprintConstructionPartExecution.ReceiptKey); w.Write(receipt.Length); w.Write(receipt); }
+                    if(mount) {
+                        w.Write(BlueprintConstructionMountExecution.ReceiptKey); w.Write(mountReceipt.Length); w.Write(mountReceipt);
+                        byte[] packet=Convert.FromBase64String(mounted.Zdo); w.Write("itemData".GetStableHashCode()); w.Write(packet.Length); w.Write(packet);
+                    }
                 }
-                Object(true, receipt != null && !separateReceipt);
+                Object(mounted == null, receipt != null && !separateReceipt);
                 if (receipt != null && separateReceipt) Object(false, true);
             }));
         }
@@ -143,6 +155,7 @@ namespace ReservationChecks
                 AbsenceCases(frame, root);
                 CompositeAbsenceCases(frame, root);
                 ExactBlobCases(frame, root);
+                EmptyStandCases(frame, root);
                 Check(frame.Transfer.TryBeginReturn(out var returned, out string error), error);
                 Check(returned.MoveNext() == BlueprintStorageTransfer.Result.Transferred, "Return fixture failed"); WriteWorld(frame, root);
                 Check(returned.TryPrepareWorldReadback(out binding, out error) && binding.Operation != frame.Operation, error ?? "Return operation identity lost");
@@ -153,6 +166,42 @@ namespace ReservationChecks
             }
             finally { frame.Transfer?.Dispose(); SaveSystem.Generation = 7; SaveSystem.Suffix = ""; Directory.Delete(root, true); }
             Console.WriteLine("PASS " + assertions + " generation/worker/custody/file-handle assertions; native host substituted, temporary fixtures only; no game save or settlement.");
+        }
+        private static void EmptyStandCases(TransferChecks.Frame frame, string root)
+        {
+            WriteWorld(frame, root);
+            const int markerKey = 1234562, receiptKey = 1234563;
+            byte[] receipt = { 7, 8, 9 };
+            void WriteStand(int item) => File.WriteAllBytes(Path.Combine(root, "01_02__3_7.chunk"), Bytes(w => {
+                w.Write((short)41); w.Write(1); w.Write((ushort)(256 | 16 | 32 | 64 | 128));
+                w.Write(0f); w.Write(0f); w.Write(0f); w.Write(123);
+                w.Write((byte)2); w.Write("item".GetStableHashCode()); w.Write(item);
+                w.Write("quality".GetStableHashCode()); w.Write(3);
+                w.Write((byte)1); w.Write(ZDOVars.s_creator); w.Write(100L);
+                w.Write((byte)1); w.Write(markerKey); w.Write(frame.Operation.ToString("N"));
+                w.Write((byte)2); w.Write(receiptKey); w.Write(receipt.Length); w.Write(receipt);
+                w.Write("itemData".GetStableHashCode()); w.Write(2); w.Write(new byte[] { 255, 1 });
+            }));
+            bool custody = true;
+            bool Capture(out BlueprintStorageWorldGeneration binding) => BlueprintStorageWorldGeneration.TryCaptureEmptyStand(
+                frame.Operation, 123, 100, markerKey, receiptKey, receipt, () => custody, out binding, out _);
+            BlueprintStorageWorldGeneration ReadStand()
+            {
+                Check(Capture(out var binding) && binding.TryStart(CancellationToken.None, out _), "Empty stand capture/start failed");
+                Wait(binding); return binding;
+            }
+            WriteStand(0);
+            Check(ReadStand().TryFinish(out var proof, out _) && proof.Operation == frame.Operation && proof.World == 1,
+                "Empty stand with stale itemData rejected by real file adapter");
+            WriteStand(123);
+            Check(!ReadStand().TryFinish(out _, out _), "Filled stand accepted by empty-stand adapter");
+            WriteStand(0);
+            custody = false; Check(!Capture(out _), "Empty stand captured without custody"); custody = true;
+            var changed = ReadStand(); custody = false;
+            Check(!changed.TryFinish(out _, out _), "Changed empty-stand custody accepted"); custody = true;
+            changed = ReadStand(); SaveSystem.Generation++;
+            Check(!changed.TryFinish(out _, out _), "Changed empty-stand generation accepted"); SaveSystem.Generation--;
+            WriteWorld(frame, root);
         }
         private static void ExactBlobCases(TransferChecks.Frame frame, string root)
         {

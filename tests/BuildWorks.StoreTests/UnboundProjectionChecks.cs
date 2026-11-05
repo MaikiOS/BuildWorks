@@ -13,6 +13,7 @@ namespace OstrixMods.BuildWorks.StoreTests
     {
         internal static void Run(string directory)
         {
+            UnboundItemStandChecks.Run(Path.Combine(directory, "itemstand"));
             Directory.CreateDirectory(directory);
             string source = Source();
             var raw = ExternalBlueprintLibrary.Parse(source, "projection.vtbp");

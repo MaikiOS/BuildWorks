@@ -3,7 +3,8 @@ param(
     [string]$PreviewSourcePath = (Join-Path $PSScriptRoot '../../src/BuildWorks/PlacementGhostPreviewView.cs'),
     [string]$TransferSourcePath = (Join-Path $PSScriptRoot '../../src/BuildWorks/BlueprintStorageTransfer.cs'),
     [string]$JournalSourcePath = (Join-Path $PSScriptRoot '../../src/BuildWorks/BlueprintStorageTransferJournal.cs'),
-    [string]$ProfileSourcePath = (Join-Path $PSScriptRoot '../../src/BuildWorks/BlueprintStoragePlayerProfile.cs')
+    [string]$ProfileSourcePath = (Join-Path $PSScriptRoot '../../src/BuildWorks/BlueprintStoragePlayerProfile.cs'),
+    [switch]$NoRestore
 )
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -81,8 +82,44 @@ $start += $prefix.Length
 $end = $preview.IndexOf('), liveSupplies', $start, [StringComparison]::Ordinal)
 if ($end -le $start) { throw 'Preview selection end missing.' }
 $selector = $preview.Substring($start, $end - $start)
-$generated = "using System; using System.Collections.Generic; using System.Globalization; using OstrixMods.BuildWorks.Geometry;`nnamespace ReservationChecks { internal static class BlueprintItemStandPlacement {`n" + $methods + "`n} internal static class PreviewSelector { internal static BlueprintForeignPartData Select(TransformSnapshot pose) => " + $selector + "; } }"
+$ownedView = Segment '        internal static bool OwnsView(' '        internal static bool CanSupply('
+$generated = "using System; using System.Collections.Generic; using System.Globalization; using OstrixMods.BuildWorks.Geometry;`nnamespace ReservationChecks { internal static partial class BlueprintItemStandPlacement {`n" + $methods + $ownedView + "`n} internal static class PreviewSelector { internal static BlueprintForeignPartData Select(TransformSnapshot pose) => " + $selector + "; } }"
 [IO.File]::WriteAllText((Join-Path $output 'ReservationSource.cs'), $generated, [Text.UTF8Encoding]::new($false))
+$mountHashes = @{}
+function ExactSegment([string]$body, [string]$startText, [string]$endText) {
+    $start = $body.IndexOf($startText, [StringComparison]::Ordinal)
+    $end = $body.IndexOf($endText, $start + 1, [StringComparison]::Ordinal)
+    if ($start -lt 0 -or $end -le $start) { throw 'Credit projection source boundary changed.' }
+    $body.Substring($start, $end - $start)
+}
+$payoutBody = [IO.File]::ReadAllText((Join-Path $root 'src/BuildWorks/BlueprintConstructionPayoutJournal.cs'))
+$partBody = [IO.File]::ReadAllText((Join-Path $root 'src/BuildWorks/BlueprintConstructionPartJournal.cs'))
+$mountCreditBody = [IO.File]::ReadAllText((Join-Path $root 'src/BuildWorks/BlueprintConstructionPartJournal.MountCredit.cs'))
+$projection = ExactSegment $payoutBody '        internal static BlueprintForeignPartData CreditInventory(BlueprintForeignPartData before, string sourceItem' '        internal Record Read(Guid project)'
+$projection += ExactSegment $payoutBody '        private static BlueprintContainerInventory.Item ParseItem(' '        private void Write(Record r, bool replace)'
+$validation = ExactSegment $partBody '        internal static IReadOnlyList<BlueprintContainerInventory.Item> ValidateInventory(' '        private static byte[] Receipt('
+$receipt = ExactSegment $mountCreditBody '        internal static string MountCreditKey(' '        private static void ValidateMountReturnCredit('
+$reach = ExactSegment $creditSource '        internal static bool WithinReach(' '        private bool SourceMatches('
+$digest = [regex]::Match($partBody, '(?m)^        private static string Digest\(byte\[\] bytes\)[^\r\n]*').Value
+if ([string]::IsNullOrEmpty($digest)) { throw 'Part journal digest boundary changed.' }
+[IO.File]::WriteAllText((Join-Path $output 'MountCreditProjectionSource.cs'),
+    "using System; using System.IO; using System.Linq; using System.Globalization; using System.Collections.Generic; using System.Security.Cryptography; using OstrixMods.BuildWorks.Geometry; using Parts=ReservationChecks.BlueprintConstructionPartJournal; namespace ReservationChecks { internal sealed partial class BlueprintConstructionPayoutJournal {`n" +
+    $projection + "`n} internal sealed partial class BlueprintConstructionPartJournal {`n" + $validation + $receipt + $digest +
+    "`n} internal static class BlueprintConstructionPayoutCollection {`n" + $reach + "`n} }", [Text.UTF8Encoding]::new($false))
+foreach ($entry in @(@('BlueprintConstructionMountExecution.cs','MountExecutionSource.cs'), @('BlueprintConstructionMountContext.cs','MountContextSource.cs'), @('BlueprintConstructionMountContext.ReturnSource.cs','MountReturnBindingSource.cs'),
+    @('BlueprintConstructionMountDetachExecution.cs','MountDetachSource.cs'), @('BlueprintConstructionMountDetachExecution.Credit.cs','MountCreditExecutionSource.cs'), @('BlueprintConstructionMountDetachExecution.Resume.cs','MountResumeSource.cs'), @('BlueprintConstructionMountDetachExecution.Cleanup.cs','MountCleanupSource.cs'), @('BlueprintConstructionProjectPersistence.cs','ProjectPersistenceSource.cs'),
+    @('BlueprintConstructionPayoutSeal.cs','PayoutSealSource.cs'), @('BlueprintConstructionPayoutSeal.Mount.cs','MountSealSource.cs'))) {
+    $path = Join-Path $root ('src/BuildWorks/' + $entry[0])
+    $mountHashes[$entry[0]] = (Get-FileHash -LiteralPath $path).Hash
+    $body = [IO.File]::ReadAllText($path).Replace('using UnityEngine;', '').Replace('namespace OstrixMods.BuildWorks', 'namespace ReservationChecks').
+        Replace('using Plans = OstrixMods.BuildWorks.', 'using Plans = ReservationChecks.').Replace('using Journal = OstrixMods.BuildWorks.', 'using Journal = ReservationChecks.').
+        Replace('global::Player', 'global::ReservationChecks.Player')
+    [IO.File]::WriteAllText((Join-Path $output $entry[1]), $body, [Text.UTF8Encoding]::new($false))
+}
+$cleanupBody=[IO.File]::ReadAllText((Join-Path $root 'src/BuildWorks/BlueprintConstructionPayoutCleanup.cs'))
+$witness=ExactSegment $cleanupBody '        internal sealed class Witness' '        private readonly Journal journal;'
+$seam=ExactSegment $cleanupBody '        internal static void DestroyExact(' '        internal void Refuse('
+[IO.File]::WriteAllText((Join-Path $output 'ExactDestroySource.cs'), "using System; using System.Collections.Generic; using System.Reflection; namespace ReservationChecks { internal sealed class BlueprintConstructionPayoutCleanup {`n"+$witness+$seam+"`n} }",[Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText((Join-Path $output 'StorageTransferSource.cs'),
     $transferSource.Replace('using UnityEngine;', '').Replace('namespace OstrixMods.BuildWorks', 'namespace ReservationChecks'),
     [Text.UTF8Encoding]::new($false))
@@ -129,12 +166,14 @@ if ($callbackStart -lt 0 -or $callbackEnd -le $callbackStart) { throw 'Native ca
 [IO.File]::WriteAllText((Join-Path $output 'ContainerCallbacksSource.cs'),
     "using System; using System.Reflection; namespace ReservationChecks { internal static class BlueprintConstructionContainerGuard {`n" +
     $callbackSource.Substring($callbackStart, $callbackEnd - $callbackStart) + "`n} }", [Text.UTF8Encoding]::new($false))
-$captureEnd = $capture.IndexOf('        // Only construction compatibility', [StringComparison]::Ordinal)
+$captureEnd = $capture.IndexOf('        // Unity-thread classification;', [StringComparison]::Ordinal)
 if ($captureStart -lt 0 -or $captureEnd -le $captureStart) { throw 'Capture cancellation guard boundary missing.' }
 [IO.File]::WriteAllText((Join-Path $output 'StorageRemovalSource.cs'),
     "using System; using System.Reflection; using OstrixMods.BuildWorks.Geometry; namespace ReservationChecks { internal static partial class BlueprintStorageCapture {`n" +
     $capture.Substring($captureStart, $captureEnd - $captureStart) + "`n} }", [Text.UTF8Encoding]::new($false))
-& dotnet build (Join-Path $PSScriptRoot 'BuildWorks.ContentReservationChecks.csproj') -c Release --nologo
+$buildArgs = @('build', (Join-Path $PSScriptRoot 'BuildWorks.ContentReservationChecks.csproj'), '-c', 'Release', '--nologo', '-m:1')
+if ($NoRestore) { $buildArgs += '--no-restore' }
+& dotnet @buildArgs
 if ($LASTEXITCODE -ne 0) { throw 'Reservation CPU harness build failed.' }
 & (Join-Path $PSScriptRoot 'bin/Release/net472/BuildWorks.ContentReservationChecks.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Reservation CPU checks failed. Native transfer is not exercised.' }
@@ -144,5 +183,10 @@ if ($LASTEXITCODE -ne 0) { throw 'Reservation CPU checks failed. Native transfer
     pairedPersistenceSHA256 = $persistenceHash; pairedPersistenceHostSubstitutes = $true; profileWriteObserverSHA256 = $profileWriteHash;
     canonicalLocalProfileParserTested = $true; livePlayerProfileReadbackTested = $false;
     playerSaveGuardSHA256 = $saveGuardHash; playerSaveGuardHostSubstitutes = $true; creditCustodySHA256 = $creditHash; creditCustodyPredicatesAndWiring = $true;
+    mountExecutionSHA256 = $mountHashes['BlueprintConstructionMountExecution.cs']; projectPersistenceSHA256 = $mountHashes['BlueprintConstructionProjectPersistence.cs'];
+    mountCreditExecutionSHA256 = $mountHashes['BlueprintConstructionMountDetachExecution.Credit.cs'];
+    creditProjectionSourceSHA256 = (Get-FileHash (Join-Path $root 'src/BuildWorks/BlueprintConstructionPayoutJournal.cs')).Hash;
+    mountCreditJournalSHA256 = (Get-FileHash (Join-Path $root 'src/BuildWorks/BlueprintConstructionPartJournal.MountCredit.cs')).Hash;
+    mountActorAndPairOrchestrationWithHostSubstitutes = $true; nativeMountTested = $false;
     journalIOTested = $true; explicitExactRecoveryTestedWithHostSubstitutes = $true; durableRecoveryImplemented = $false; populatedPlacementEnabled = $false; nativeTransferTested = $false; gameTested = $false } |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'verification-status.json') -Encoding utf8

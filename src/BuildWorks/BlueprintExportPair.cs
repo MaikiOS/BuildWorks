@@ -16,7 +16,7 @@ namespace OstrixMods.BuildWorks
         private bool cancelled;
         internal BlueprintExportPair(byte[] native, byte[] foreign, string extension, Action<string> afterForeignWrite = null)
         {
-            if (native == null || foreign == null || extension != ".blueprint" && extension != ".json" && extension != ".yml" && extension != ".oprint" && extension != ".bbp")
+            if (native == null || foreign == null || extension != ".blueprint" && extension != ".json" && extension != ".yml" && extension != ".oprint" && extension != ".bbp" && extension != ".vtbp")
                 throw new ArgumentException("Invalid paired export.");
             this.native = native; this.foreign = foreign; this.extension = extension; this.afterForeignWrite = afterForeignWrite;
         }

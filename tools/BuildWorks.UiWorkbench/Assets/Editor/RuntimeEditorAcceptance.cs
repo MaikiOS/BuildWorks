@@ -230,7 +230,7 @@ public static class RuntimeEditorAcceptance
         var template = new GameObject("HostCamera", typeof(Camera)).GetComponent<Camera>(); template.enabled = false;
         var font = new GameObject("Font", typeof(RectTransform)).AddComponent<TextMeshProUGUI>();
         font.font = TMP_FontAsset.CreateFontAsset(Font.CreateDynamicFontFromOSFont("Arial", 20)); font.gameObject.SetActive(false);
-        string output = Path.GetFullPath(Path.Combine(Application.dataPath, plannerOnly ? "../../../artifacts/point-2.17-20261029/ui-planner324-v1" : "../../../artifacts/point-2.16-20261028/ui-legacy321"));
+        string output = Path.GetFullPath(Path.Combine(Application.dataPath, plannerOnly ? "../../../artifacts/point-2.17-20261029/ui-planner324-v1" : "../../../artifacts/point-2.19-unbound-20261031/export-ui-20261102/engine"));
         Directory.CreateDirectory(output);
         var restore = UseGameViewSize(1280, 720);
         try
@@ -251,6 +251,7 @@ public static class RuntimeEditorAcceptance
             foreach (object step in ControllerInputAcceptance.RunBbpExports(template, font, output)) yield return step;
             foreach (object step in ControllerInputAcceptance.RunBbpExports(template, font, output, true)) yield return step;
             foreach (object step in ControllerInputAcceptance.RunKgPresentation(template, font, output)) yield return step;
+            foreach (object step in ControllerInputAcceptance.RunUnboundExports(template, font, output)) yield return step;
             Require(runtimeErrors.Count == 0, "Exchange runtime errors: " + string.Join("\n", runtimeErrors));
             File.WriteAllText(Path.Combine(output, "acceptance.json"), "{\"passed\":true,\"gameHostTested\":false,\"languages\":2,\"targets\":2,\"existingExchangeLifecycle\":true,\"nativeScrollEvent\":true,\"freshDeferredScreenshots\":2}");
             Debug.Log("BUILDWORKS_EXCHANGE_EXPORTS_OK");

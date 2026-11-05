@@ -137,6 +137,7 @@ namespace OstrixMods.BuildWorks
         private void RequireActive(Guid project)
         {
             if (plans.Load(project).Cancelled) throw new InvalidOperationException("Cancelled construction cannot restart removal.");
+            Parts.RequireNoOutstandingMounts(plans, project);
         }
         private Entry[] Snapshot(Plan.Record plan, long player)
         {

@@ -272,6 +272,16 @@ namespace OstrixMods.BuildWorks
                 (!forceDestroy || !stand.HaveAttachment() && QueuedItem?.GetValue(stand) == null);
         }
 
+        internal static bool OwnsView(GameObject placed, ZNetView view)
+        {
+            ItemStand stand = placed ? placed.GetComponent<ItemStand>() : null;
+            return stand && stand.GetType() == typeof(ItemStand) && StandView != null && view && view.IsValid() && view.IsOwner() &&
+                ReferenceEquals(placed.GetComponent<ZNetView>(), view) && ReferenceEquals(StandView.GetValue(stand), view);
+        }
+
+        internal static bool IsIdleStand(ItemStand stand) => stand && QueuedItem != null && QueuedItem.GetValue(stand) == null &&
+            !stand.IsInvoking("UpdateAttach") && !stand.IsInvoking("UpdateOrientation");
+
         internal static bool CanSupply(Player player, IEnumerable<BlueprintForeignPartData> contents)
         {
             return SelectSupplies(player, contents, new List<Supply>());

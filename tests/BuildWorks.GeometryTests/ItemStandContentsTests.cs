@@ -77,6 +77,72 @@ namespace OstrixMods.BuildWorks.GeometryTests
             var recipe = new BlueprintForeignPartData(BlueprintForeignPartData.NativeItemStandFormat, "SwordIron:0:1:0", null, null);
             Require(!BlueprintItemStandContents.TryRead(recipe, _ => -101, out _) && recipe.WithoutContents(null).ContentsCleared);
             Require(source.WithoutContents(_ => -101).Zdo == source.Zdo);
+            NativeConversion();
+        }
+
+        private static void NativeConversion()
+        {
+            int Hash(string name) => name switch {
+                "itemstand" => -1235119491, "SwordIron" => -110263489, "item" => -1126421579,
+                "variant" => 1759467715, "quality" => 917906861, "type" => 1421151742, "itemData" => 949524933,
+                _ => throw new InvalidOperationException("Unpinned holder fixture hash")
+            };
+            string Resolve(int id) => id == Hash("SwordIron") ? "SwordIron" : null;
+            BlueprintForeignZdo State(params (string Key, object Value)[] fields)
+            {
+                string packet = BlueprintForeignZdo.CreateNative(Hash("itemstand"), true, false, 2).WriteNative(
+                    fields.Select(field => new KeyValuePair<int, object>(Hash(field.Key), field.Value)));
+                if (!BlueprintForeignZdo.TryReadNative(packet, Hash("itemstand"), out var parsed)) throw new InvalidOperationException("Native holder fixture invalid");
+                return parsed;
+            }
+            void Check(bool value, string why) { if (!value) throw new InvalidOperationException(why); }
+            var bytes = Packet(Hash("SwordIron"));
+            using (var stream = new MemoryStream())
+            {
+                using (var writer = new BinaryWriter(stream, Encoding.UTF8, true))
+                {
+                    writer.Write((byte)110); writer.Write(10000); writer.Write((byte)0); writer.Write((byte)0);
+                    writer.Write((byte)0); writer.Write((byte)64); writer.Write(Hash("SwordIron")); writer.Write((byte)0);
+                }
+                Check(BlueprintItemStandContents.TryConvertNative(State(("item", Hash("SwordIron")), ("itemData", stream.ToArray())),
+                    Resolve, out var defaultsOnly) && defaultsOnly.Info == "SwordIron:0:1:0", "Native variant/quality/orientation defaults changed");
+            }
+            foreach (byte version in new byte[] { 109, 110 })
+            {
+                var current = (byte[])bytes.Clone(); current[0] = version;
+                var source = State(("item", Hash("SwordIron")), ("variant", 2), ("quality", 3), ("type", 1), ("itemData", current));
+                Check(BlueprintItemStandContents.TryConvertNative(source, Resolve, out var converted) &&
+                    converted.Info == "SwordIron:2:3:1" && converted.Zdo == Convert.ToBase64String(current) &&
+                    BlueprintItemStandContents.TryRead(converted, Hash, out var item) && item.Stack == 1 && item.Quality == 3 &&
+                    item.Variant == 2 && item.WorldLevel == 3 && item.DurabilityHundredths == 12505 && item.CrafterId == -123 &&
+                    item.CustomData["mod:key0"] == "exact\0payload\r\n🪵", "Native holder conversion changed complete item properties");
+            }
+            var stale = State(("item", 0), ("variant", 99), ("quality", -2), ("itemData", new byte[] { 255 }));
+            Check(BlueprintItemStandContents.TryConvertNative(stale, null, out var empty) && empty == null,
+                "Native empty attachment resurrected stale itemData");
+            Check(BlueprintItemStandContents.TryConvertNative(State(), null, out empty) && empty == null, "Missing native item default is not empty");
+            var valid = State(("item", Hash("SwordIron")), ("variant", 2), ("quality", 3), ("itemData", bytes));
+            Check(BlueprintItemStandContents.TryConvertNative(valid, Resolve, out var defaults) && defaults.Info == "SwordIron:2:3:0",
+                "Native orientation default changed");
+            foreach (var invalid in new[] {
+                State(("item", Hash("SwordIron"))),
+                State(("item", Hash("SwordIron")), ("itemData", bytes)),
+                State(("item", Hash("SwordIron")), ("variant", 1), ("quality", 3), ("itemData", bytes)),
+                State(("item", Hash("SwordIron")), ("variant", 2), ("quality", 4), ("itemData", bytes)),
+                State(("item", Hash("SwordIron")), ("item", "SwordIron"), ("itemData", bytes)),
+                State(("item", Hash("SwordIron")), ("itemData", 1)),
+                State(("item", 0), ("itemData", 1)),
+                State(("item", Hash("SwordIron")), ("variant", 2), ("quality", 3), ("type", -1), ("itemData", bytes)),
+                State(("item", Hash("SwordIron")), ("itemData", new byte[24577])),
+                State(("item", Hash("SwordIron")), ("variant", 2), ("quality", 3), ("itemData", Packet(Hash("SwordIron"), stack: 2))),
+                State(("item", Hash("SwordIron")), ("variant", 2), ("quality", 3), ("itemData", bytes.Concat(new byte[] { 0 }).ToArray())) })
+                Check(!BlueprintItemStandContents.TryConvertNative(invalid, Resolve, out var partial) && partial == null,
+                    "Invalid native holder created partial item data");
+            Check(!BlueprintItemStandContents.TryConvertNative(valid, _ => "Wood", out _) &&
+                !BlueprintItemStandContents.TryConvertNative(valid, _ => null, out _) &&
+                !BlueprintItemStandContents.TryConvertNative(valid, null, out _) &&
+                !BlueprintItemStandContents.TryConvertNative(null, Resolve, out _), "Unresolved native holder item was guessed");
+            Console.WriteLine("PASS native ItemStand data conversion: exact109/110 package, independent properties, empty/default/stale semantics, typed/hash/metadata/size/stack/trailing controls; no host capability or placement proof");
         }
     }
 }

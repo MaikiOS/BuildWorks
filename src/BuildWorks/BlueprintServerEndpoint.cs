@@ -15,6 +15,7 @@ namespace OstrixMods.BuildWorks
         private readonly ServerBlueprintLibrary library;
         private readonly long world;
         private readonly long maximumTransferBytes;
+        private readonly BlueprintTransferBudget transferBudget;
         private readonly Func<object, (string Principal, bool Administrator)> resolve;
         private readonly Action<object, byte[]> send;
         private readonly Action<Exception> log;
@@ -42,12 +43,13 @@ namespace OstrixMods.BuildWorks
         }
         internal BlueprintServerEndpoint(ServerBlueprintLibrary library, long world,
             Func<object, (string Principal, bool Administrator)> resolve, Action<object, byte[]> send, Action<Exception> log = null,
-            long maximumTransferBytes = MaximumTransferBytes)
+            long maximumTransferBytes = MaximumTransferBytes, BlueprintTransferBudget transferBudget = null)
         {
             if (library == null || world == 0 || resolve == null || send == null) throw new ArgumentException("Invalid server endpoint.");
             if (maximumTransferBytes < 1 || maximumTransferBytes > MaximumTransferBytes) throw new ArgumentOutOfRangeException(nameof(maximumTransferBytes));
             this.library = library; this.world = world; this.resolve = resolve; this.send = send; this.log = log;
             this.maximumTransferBytes = maximumTransferBytes;
+            this.transferBudget = transferBudget ?? new BlueprintTransferBudget(maximumTransferBytes);
             initialization = library.InitializeAsync();
         }
         internal bool HasPendingWork => !initialization.IsCompleted || retired.Any(peer => !WorkFinished(peer)) ||
@@ -227,7 +229,8 @@ namespace OstrixMods.BuildWorks
         }
         private void Reserve(Peer peer, long bytes)
         {
-            if (bytes < 0 || bytes > maximumTransferBytes - ReservedBytes) throw new InvalidDataException("$buildworks_server.capacity");
+            if (bytes < 0 || bytes > maximumTransferBytes - ReservedBytes || !transferBudget.TryReserve(bytes))
+                throw new InvalidDataException("$buildworks_server.capacity");
             Interlocked.Add(ref reserved, bytes); peer.Reserved = bytes;
         }
         private static void Start(Peer peer, P.Message message)
@@ -249,7 +252,8 @@ namespace OstrixMods.BuildWorks
             if (peer.Publication?.Status == TaskStatus.RanToCompletion) peer.Publication.Result.Dispose();
             if (peer.Reading?.Status == TaskStatus.RanToCompletion) peer.Reading.Result.Bytes = null;
             var publicationError = peer.Publication?.Exception; var readError = peer.Reading?.Exception;
-            Interlocked.Add(ref reserved, -Interlocked.Exchange(ref peer.Reserved, 0)); peer.Stop?.Dispose();
+            long released = Interlocked.Exchange(ref peer.Reserved, 0);
+            Interlocked.Add(ref reserved, -released); transferBudget.Release(released); peer.Stop?.Dispose();
         }
         private static P.Item Item(ServerBlueprintLibrary.Info info) => new P.Item
         {

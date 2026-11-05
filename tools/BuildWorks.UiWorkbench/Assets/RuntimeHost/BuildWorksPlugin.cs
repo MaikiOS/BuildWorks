@@ -8,5 +8,7 @@ namespace OstrixMods.BuildWorks
         internal static readonly DockSetting EditorHudDock = new DockSetting();
         internal static readonly DockSetting InterfaceScalePercent = new DockSetting { Value = 80 };
         internal static object ServerLibraryClient;
+        // The isolated host has no peer connection; its runtime assembly cannot reference editor-only client types.
+        internal static dynamic PeerBlueprintClient => null;
     }
 }

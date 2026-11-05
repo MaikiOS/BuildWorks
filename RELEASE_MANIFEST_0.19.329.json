@@ -1,0 +1,13 @@
+{
+  "archiveSha256": "3C91113CB4D601A843317DA251BB60BF191107EC5D7E15D74983279373934E41",
+  "normalDll": {
+    "name": "BepInEx/plugins/Ostrix-BuildWorks/BuildWorks.dll",
+    "bytes": 7119872,
+    "sha256": "4B0FF36297E2185534B21ECB4F4B52F4152D19A15000A64458AC801760739A28"
+  },
+  "issuedSource": "5a095eb81967e074c29c8588161e0495325c4b6d",
+  "rebuilt": false,
+  "version": "0.19.329",
+  "channel": "alpha",
+  "prerelease": true
+}

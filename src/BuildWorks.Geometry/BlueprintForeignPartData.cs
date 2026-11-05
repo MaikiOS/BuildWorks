@@ -14,15 +14,21 @@ namespace OstrixMods.BuildWorks.Geometry
         public const int MaximumContainerBase64 = ((MaximumContainerBytes + 2) / 3) * 4;
         public BlueprintForeignPartData(string format, string info, string zdo, string chance, bool contentsCleared = false)
         {
-            if (format != "blueprint" && format != "vbuild" && format != NativeItemStandFormat && format != NativeContainerFormat && format != NativeArmorStandFormat)
+            if (format != "blueprint" && format != "vbuild" && format != UnboundBlueprint.Format && format != NativeItemStandFormat && format != NativeContainerFormat && format != NativeArmorStandFormat && !KgBlueprint.IsFormat(format))
                 throw new ArgumentException("Unknown part-state format.");
             if (contentsCleared && format != NativeItemStandFormat && format != NativeContainerFormat && format != NativeArmorStandFormat)
                 throw new ArgumentException("Cannot clear unknown object contents.");
             foreach (string value in new[] { info, chance })
                 if (value != null && value.Length > 32768) throw new ArgumentException("Foreign data is too large.");
-            if (zdo != null && zdo.Length > (format == NativeContainerFormat || format == NativeArmorStandFormat ? MaximumContainerBase64 : 32768))
+            if (zdo != null && zdo.Length > (format == NativeContainerFormat || format == NativeArmorStandFormat || format == UnboundBlueprint.Format || KgBlueprint.IsFormat(format) ? MaximumContainerBase64 : 32768))
                 throw new ArgumentException("Foreign data is too large.");
             if (info == null && zdo == null && chance == null) throw new ArgumentException("Empty foreign data.");
+            if (format == UnboundBlueprint.Format && (string.IsNullOrWhiteSpace(info) || info.Length > 256 || info != info.Trim() ||
+                info.Any(c => char.IsControl(c) || c == '\uFEFF' || "/\\<>|".Contains(c)) || chance != null ||
+                !BlueprintForeignZdo.TryReadNative(zdo, KgBlueprint.StablePrefabHash(info), out _)))
+                throw new ArgumentException("Invalid inert Unbound state or prefab identity.");
+            if (KgBlueprint.IsFormat(format) && (info != null || chance != null || !BlueprintForeignZdo.TryReadKg(zdo, out _)))
+                throw new ArgumentException("Invalid inert KG state.");
             if (format == NativeArmorStandFormat) BlueprintArmorStandState.Decode(info, zdo, chance);
             if (format == NativeItemStandFormat)
             {

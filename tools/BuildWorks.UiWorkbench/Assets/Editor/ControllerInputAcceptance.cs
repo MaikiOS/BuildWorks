@@ -1641,6 +1641,9 @@ internal static partial class ControllerInputAcceptance
             Require(doc.Parts.Count == 4 && Field<IList>(scene, "duplicatePreviews").Count == 0 &&
                 V(doc.Parts[0].Position) == original, "Esc copy cancellation changed source or leaked preview");
 
+            foreach (object tick in TestCopyDragIdentity(controller, input, scene, view, uiCamera, target, output))
+                yield return tick;
+
             Frame(controller, input, left, 0, KeyCode.LeftControl, KeyCode.A); yield return null;
             Frame(controller, input, left); yield return null;
             Frame(controller, input, left, 0, KeyCode.LeftControl, KeyCode.G); yield return null;
@@ -1705,7 +1708,7 @@ internal static partial class ControllerInputAcceptance
             Frame(controller, input, scaleMouse); yield return null;
             Require(Math.Abs(doc.Parts[0].Scale.X - 1.3) < .00001, "Cancelled free scale changed committed 130%");
 
-            foreach (object tick in TestViewportToolbar(controller, input, scene, view, uiCamera))
+            foreach (object tick in TestViewportToolbar(controller, input, scene, view, uiCamera, target, output, source))
                 yield return tick;
             foreach (object tick in TestInteriorCamera(controller, input, scene, view, uiCamera, output))
                 yield return tick;
@@ -1923,11 +1926,18 @@ internal static partial class ControllerInputAcceptance
 
     internal static IEnumerable RunExchangeLifecycle(Camera template, TMP_Text font, string output)
     {
-        string folder = Path.Combine(output, "exchange-input-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(folder);
+        // Scratch data stays short; the long/short bundle boundary below is verified before UI actions.
+        string folder = Path.GetFullPath(Path.Combine(Application.dataPath,"../../../artifacts/ui319",
+            "exchange-input-" + Guid.NewGuid().ToString("N")));
+        Require(!Directory.Exists(folder),"Exchange fixture folder already exists"); Directory.CreateDirectory(folder);
         string sourcePath = Path.Combine(folder, "atlas.blueprint");
         const string text = "#Name:Atlas\n#Pieces\nwall;;0;0;0;0;0;0;1;\"\";1;1;1\nwall;;2;0;0;0;0;0;1;\"\";1;1;1";
         File.WriteAllText(sourcePath, text);
         var store = new CompositeBlueprintStore(Path.Combine(folder, "native-" + Guid.NewGuid().ToString("N") + ".json"));
+        string staging=Path.Combine(store.ExportDirectory,new string('0',32)+".tmp");
+        Require(Path.Combine(staging,"plan_"+new string('0',32)+".buildworks.json").Length>=260 &&
+            Path.Combine(staging,"plan_"+new string('0',8)+".buildworks.json").Length<260,
+            "Exchange fixture path must bracket long/short 260-char bundle cases");
         store.ConfigureImportScale(_ => new CompositeBlueprintStore.VectorData { x = 2, y = .5f, z = 3 });
         GameObject source = GameObject.CreatePrimitive(PrimitiveType.Cube); source.transform.localScale = new Vector3(2, .5f, 3); source.SetActive(false);
         var input = new InputFrames();
@@ -2062,7 +2072,7 @@ internal static partial class ControllerInputAcceptance
                     Field<IList>(draft, "undo").Count == draftHistory && draft.Selection.SequenceEqual(new[] { "draft" }) &&
                     draft.Parts.Single().Position.X == 8 && File.ReadAllText(sourcePath) == text,
                     "Import failed to auto-close, or modified dirty draft/original: review=" + Field<bool>(exchange, "reviewingContents") +
-                    "; importing=" + Field<bool>(exchange, "importing"));
+                    "; importing=" + Field<bool>(exchange, "importing") + "; message=" + Field<TMP_Text>(exchange,"message").text + "; error=" + store.ImportError);
                 string importedPath = Field<string>(exchange, "resultPath");
                 Require(File.Exists(importedPath), "Persistent result path is not the copied file");
                 var prepared = store.CatalogAll().First(item => item.importSource.StartsWith(Path.GetFileName(importedPath) + "/", StringComparison.Ordinal));
@@ -2207,7 +2217,7 @@ internal static partial class ControllerInputAcceptance
                 NativeClick(view, null, "ExchangeClose"); yield return null;
                 var policy = CompositeBlueprintStore.CopyWithContentsPolicy(prepared, false, false, null);
                 // New native test objects, not the original foreign wall rows.
-                foreach (var part in policy.parts) { part.sourceDocumentId = null; part.sourceLine = 0; }
+                foreach (var part in policy.parts) { part.sourceDocumentId = null; part.sourceLine = 0; part.sourceFrameApplied = false; }
                 policy.parts[0].prefabName = "piece_chest";
                 policy.parts[0].foreignData = new CompositeBlueprintStore.ForeignPartData {
                     format = BlueprintForeignPartData.NativeContainerFormat, info = "5:2:0:0", zdo = "bQAAAAAA" };
@@ -2818,8 +2828,10 @@ internal static partial class ControllerInputAcceptance
     }
 
     private static IEnumerable TestViewportToolbar(BlueprintEditorController controller, InputFrames input,
-        BlueprintEditorScene scene, BlueprintEditorView view, Camera uiCamera)
+        BlueprintEditorScene scene, BlueprintEditorView view, Camera uiCamera, RenderTexture target, string output, GameObject source)
     {
+        foreach (object tick in TestGroundHeight(controller, scene, view, uiCamera, target, output)) yield return tick;
+        foreach (object tick in TestStructuralOverlay(controller, input, scene, view, uiCamera, target, output, source)) yield return tick;
         BlueprintEditorDocument doc = controller.Document;
         string selection = string.Join("|", doc.Selection);
         Vector3 position = V(doc.Parts[0].Position);
@@ -2881,6 +2893,70 @@ internal static partial class ControllerInputAcceptance
         NativeClick(view, uiCamera, "ProjectionToggle"); yield return null;
         Require(fov.interactable && fovInput.interactable && template.fieldOfView == worldFov,
             "Perspective did not restore editor FOV controls or changed world camera");
+        view.HideViewportSettings();
+    }
+
+    private static IEnumerable TestGroundHeight(BlueprintEditorController controller,
+        BlueprintEditorScene scene, BlueprintEditorView view, Camera uiCamera, RenderTexture target, string output)
+    {
+        BlueprintEditorDocument original = controller.Document;
+        var revision = original.RevisionToken;
+        Require(scene.GroundHeight == 0f, "Editor reference ground must start at Y=0");
+        var lower = new BlueprintEditorDocument(null, "Ground fixture", "Test", new[] {
+            new BlueprintEditorPart("lower", "fixture", "Lower", new Point3(0, -5, 0), new Rotation3(0, 0, 0, 1)) });
+        Require(scene.TrySync(lower, out _) && scene.GroundHeight == 0f,
+            "Adding geometry below zero moved the editor ground");
+        Require(scene.TrySync(original, out _), "Could not restore the toolbar fixture");
+        view.HideViewportSettings();
+        NativeClick(view, uiCamera, "ViewportSectionButton1"); yield return null;
+        TMP_InputField field = Field<TMP_InputField>(view, "groundHeightInput");
+        RectTransform panel = (RectTransform)Field<GameObject>(view, "viewportSettings").transform;
+        Vector3[] corners = new Vector3[4]; field.GetComponent<RectTransform>().GetWorldCorners(corners);
+        Require(corners.All(corner => RectTransformUtility.RectangleContainsScreenPoint(panel,
+                RectTransformUtility.WorldToScreenPoint(uiCamera, corner), uiCamera)),
+            "Ground height control is clipped by its Display panel");
+        var culture = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("ru-RU");
+            field.SetTextWithoutNotify("-1,25"); field.onEndEdit.Invoke(field.text);
+            Require(scene.GroundHeight == -1.25f, "Signed comma-decimal editor ground was rejected");
+            foreach (string invalid in new[] { "NaN", "Infinity", "1e1000", "-", "invalid" })
+            {
+                field.SetTextWithoutNotify(invalid); field.onEndEdit.Invoke(field.text);
+                Require(scene.GroundHeight == -1.25f && field.text == "-1,25",
+                    "Invalid ground input did not preserve the last valid height: " + invalid);
+            }
+            field.SetTextWithoutNotify("-1.25"); field.onEndEdit.Invoke(field.text);
+            Require(scene.GroundHeight == -1.25f, "Invariant decimal ground fallback failed");
+        }
+        finally { System.Globalization.CultureInfo.CurrentCulture = culture; }
+        Require(lower.AddPart(new BlueprintEditorPart("deeper", "fixture", "Deeper",
+            new Point3(0, -10, 0), new Rotation3(0, 0, 0, 1))), "Lower ground fixture edit failed");
+        Require(scene.TrySync(lower, out _) && scene.GroundHeight == -1.25f &&
+            lower.Undo() && scene.TrySync(lower, out _) && scene.GroundHeight == -1.25f &&
+            lower.Redo() && scene.TrySync(lower, out _) && scene.GroundHeight == -1.25f,
+            "Lower geometry edit/Undo/Redo moved the manual ground");
+        foreach (string name in new[] { "minorGrid", "majorGrid", "ground" })
+            Require(Field<Transform>(scene, name).localPosition.y == -1.25f,
+                "Editor grid and ground reference heights disagree: " + name);
+        Require(scene.TryCursorSurface(view.ViewportScreenRect().center,
+                lower.Parts.Select(part => part.StableId).ToArray(), out Vector3 groundPoint, out _) &&
+            Mathf.Abs(groundPoint.y + 1.25f) < .0001f,
+            "Editor placement fallback did not use the manual ground plane");
+        Vector3 cameraPosition = scene.Camera.transform.position;
+        Quaternion cameraRotation = scene.Camera.transform.rotation;
+        Vector3 fixturePosition = new Vector3(6, 5, -12);
+        scene.SetCameraPose(fixturePosition, Quaternion.LookRotation(new Vector3(0, -7.5f, 0) - fixturePosition));
+        Save(scene, view, uiCamera, target, Path.Combine(output, "input-ground-below-plane.png"));
+        scene.SetCameraPose(cameraPosition, cameraRotation);
+        Require(scene.TrySync(original, out _) && original.RevisionToken.Equals(revision),
+            "Ground settings changed document contents or history");
+        Call(controller, "Bind", "Ground fixture");
+        Require(scene.GroundHeight == -1.25f, "Document Bind reset the manual ground");
+        Save(scene, view, uiCamera, target, Path.Combine(output, "input-ground-height.png"));
+        field.SetTextWithoutNotify("0"); field.onEndEdit.Invoke(field.text);
+        Require(scene.GroundHeight == 0f, "Ground could not return to zero");
         view.HideViewportSettings();
     }
 
@@ -4263,6 +4339,145 @@ internal static partial class ControllerInputAcceptance
         doc.SelectOnly("left");
         Require(scene.TrySync(doc, out error), error);
         view.Bind(doc, true, null, null);
+    }
+
+    private static IEnumerable TestCopyDragIdentity(BlueprintEditorController controller, InputFrames input,
+        BlueprintEditorScene scene, BlueprintEditorView view, Camera uiCamera, RenderTexture target, string output)
+    {
+        var doc = controller.Document;
+        bool savedModel = scene.ModelSpaceGizmo;
+        Vector3 cameraPosition = scene.Camera.transform.position;
+        Quaternion cameraRotation = scene.Camera.transform.rotation;
+        try
+        {
+            foreach (bool model in new[] { false, true })
+            foreach (int planeIndex in new[] { -1, 0, 1, 2 })
+            {
+                scene.ModelSpaceGizmo = model;
+                Frame(controller, input, Vector2.zero); yield return null;
+                object[] basis = { Vector3.zero, Quaternion.identity, new List<string>() };
+                Require((bool)controller.GetType().GetMethod("TrySelectionPivot", Private).Invoke(controller, basis),
+                    "Copy fixture has no selection pivot");
+                Vector3 pivot = (Vector3)basis[0]; Quaternion orientation = (Quaternion)basis[1];
+                scene.Camera.transform.position = pivot + new Vector3(-5, 4, -6);
+                scene.Camera.transform.LookAt(pivot);
+                Frame(controller, input, Vector2.zero); yield return null;
+                Vector2 start;
+                GizmoHandleKind kind = planeIndex < 0 ? GizmoHandleKind.Move : GizmoHandleKind.MovePlane;
+                if (planeIndex < 0) start = MoveHandle(scene, pivot, GizmoAxis.X);
+                else
+                {
+                    var line = Field<LineRenderer[]>(Field<TransformGizmoView>(scene, "gizmo"), "movePlanes")[planeIndex];
+                    Vector3 center = Vector3.zero;
+                    Require(line.enabled && line.positionCount > 1, "Copy plane is not rendered");
+                    for (int j = 0; j < line.positionCount - 1; j++) center += line.GetPosition(j);
+                    center /= line.positionCount - 1;
+                    if (!line.useWorldSpace) center = line.transform.TransformPoint(center);
+                    start = scene.Camera.WorldToScreenPoint(center);
+                }
+                Require(scene.HitTestGizmo(BlueprintEditorTool.Transform, pivot, orientation,
+                    Field<bool>(controller, "localSpace"), start, out _) == kind, "Copy fixture missed actual handle");
+                string[] ids = doc.Parts.Select(part => part.StableId).ToArray();
+                Vector3 original = V(doc.Parts[0].Position);
+                int undo = Field<IList>(doc, "undo").Count, redo = Field<IList>(doc, "redo").Count;
+                bool dirty = doc.IsDirty;
+                void Unchanged()
+                {
+                    Require(doc.Parts.Select(part => part.StableId).SequenceEqual(ids) &&
+                        V(doc.Parts[0].Position) == original && doc.IsPartSelected("left") && doc.Selection.Count == 1 &&
+                        doc.IsDirty == dirty && Field<IList>(doc, "undo").Count == undo && Field<IList>(doc, "redo").Count == redo &&
+                        Field<IList>(scene, "duplicatePreviews").Count == 0 &&
+                        Vector3.Distance(VisualRoot(scene, "left").transform.position, original) < .0001f,
+                        "Alt no-op changed document/history/selection or leaked preview");
+                }
+                Vector2 Destination(float distance)
+                {
+                    if (planeIndex < 0) return start + Field<Vector2>(controller, "dragScreenDirection") *
+                        (distance / Field<float>(controller, "dragWorldUnitsPerPixel"));
+                    Vector3 normal = Field<Plane>(controller, "dragAnchorPlane").normal;
+                    Vector3 direction = Vector3.ProjectOnPlane(Vector3.right, normal);
+                    if (direction.sqrMagnitude < .01f) direction = Vector3.ProjectOnPlane(Vector3.forward, normal);
+                    return scene.Camera.WorldToScreenPoint(Field<Vector3>(controller, "dragPlaneStart") + direction.normalized * distance);
+                }
+                Frame(controller, input, start, 0, KeyCode.LeftAlt); yield return null; Unchanged();
+                Frame(controller, input, start, 1, KeyCode.LeftAlt); yield return null;
+                Require(Field<bool>(controller, "dragDuplicate") && Field<GizmoHandleKind>(controller, "dragHandle") == kind,
+                    "Alt did not latch copy for actual handle");
+                Frame(controller, input, start, 1, KeyCode.LeftAlt); yield return null; Unchanged();
+                Frame(controller, input, start); yield return null; Unchanged();
+                Frame(controller, input, start, 1, KeyCode.LeftAlt); yield return null;
+                Vector2 tiny = Destination(Field<float>(controller, "translationStep") * .1f);
+                Frame(controller, input, tiny, 1, KeyCode.LeftAlt); yield return null; Unchanged();
+                Frame(controller, input, tiny); yield return null; Unchanged();
+                Frame(controller, input, start, 1, KeyCode.LeftAlt); yield return null;
+                tiny = Destination(.0001f);
+                Frame(controller, input, tiny, 1, KeyCode.LeftAlt, KeyCode.LeftShift); yield return null;
+                Require(Field<Vector3>(controller, "dragTranslation").sqrMagnitude < .0000001f, "Tiny free move fixture exceeded identity threshold");
+                Unchanged(); Frame(controller, input, tiny); yield return null; Unchanged();
+                if (planeIndex < 0)
+                {
+                    Frame(controller, input, start, 1, KeyCode.LeftAlt); yield return null;
+                    Vector2 highMouse = Destination(.000320f), lowMouse = Destination(.000315f);
+                    Frame(controller, input, highMouse, 1, KeyCode.LeftAlt, KeyCode.LeftShift); yield return null;
+                    Vector3 high = Field<Vector3>(controller, "dragTranslation");
+                    Require(high.sqrMagnitude >= .0000001f && Field<IList>(scene, "duplicatePreviews").Count == 1,
+                        "Threshold crossing high fixture did not preview");
+                    Frame(controller, input, lowMouse, 1, KeyCode.LeftAlt, KeyCode.LeftShift); yield return null;
+                    Vector3 low = Field<Vector3>(controller, "dragTranslation");
+                    Require(low.sqrMagnitude < .0000001f && high == low,
+                        "Threshold crossing fixture did not straddle identity inside approximate equality");
+                    Require(Field<IList>(scene, "duplicatePreviews").Count == 0,
+                        "Approximate equality retained duplicate preview below commit threshold");
+                    Frame(controller, input, lowMouse, 0, KeyCode.LeftShift); yield return null; Unchanged();
+                    Frame(controller, input, start); yield return null;
+                    Frame(controller, input, start, 1, KeyCode.LeftAlt); yield return null;
+                    lowMouse = Destination(.000315f); highMouse = Destination(.000320f);
+                    Frame(controller, input, lowMouse, 1, KeyCode.LeftAlt, KeyCode.LeftShift); yield return null; Unchanged();
+                    Frame(controller, input, highMouse, 1, KeyCode.LeftAlt, KeyCode.LeftShift); yield return null;
+                    high = Field<Vector3>(controller, "dragTranslation");
+                    Require(high.sqrMagnitude >= .0000001f && Field<IList>(scene, "duplicatePreviews").Count == 1,
+                        "Approximate equality omitted duplicate preview above commit threshold");
+                    Frame(controller, input, highMouse, 0, KeyCode.LeftShift); yield return null;
+                    Require(doc.Parts.Count == ids.Length + 1, "Above-threshold release did not commit copy");
+                    Frame(controller, input, highMouse); yield return null;
+                    Frame(controller, input, highMouse, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
+                    Frame(controller, input, start); yield return null;
+                }
+                Frame(controller, input, start, 1, KeyCode.LeftAlt); yield return null;
+                Vector2 end = Destination(.6f);
+                Frame(controller, input, end, 1, KeyCode.LeftAlt); yield return null;
+                Require(doc.Parts.Count == ids.Length && Field<IList>(scene, "duplicatePreviews").Count == 1 &&
+                    V(doc.Parts[0].Position) == original, "Moving copy changed original before commit");
+                Frame(controller, input, start, 1, KeyCode.LeftAlt); yield return null; Unchanged();
+                Frame(controller, input, start); yield return null; Unchanged();
+                Frame(controller, input, start, 1, KeyCode.LeftAlt); yield return null;
+                end = Destination(.6f); Frame(controller, input, end, 1, KeyCode.LeftAlt); yield return null;
+                Frame(controller, input, end, 1, KeyCode.LeftAlt, KeyCode.Escape); yield return null;
+                Frame(controller, input, end); yield return null; Unchanged();
+                Frame(controller, input, start, 1, KeyCode.LeftAlt); yield return null;
+                end = Destination(.6f); Frame(controller, input, end, 1, KeyCode.LeftAlt); yield return null;
+                Vector3 delta = Field<Vector3>(controller, "dragTranslation");
+                Require(delta.magnitude > .1f, "Copy fixture produced no meaningful displacement");
+                if (model && planeIndex == 2) Save(scene, view, uiCamera, target, Path.Combine(output, "input-alt-plane-preview.png"));
+                Frame(controller, input, end, 1); yield return null;
+                Frame(controller, input, end); yield return null;
+                var copy = doc.Parts.Single(part => !ids.Contains(part.StableId));
+                string copyId = copy.StableId;
+                Require(V(doc.Parts[0].Position) == original && Vector3.Distance(V(copy.Position), original + delta) < .0001f &&
+                    copy.Rotation.Equals(doc.Parts[0].Rotation) && copy.Scale.Equals(doc.Parts[0].Scale) &&
+                    Field<IList>(doc, "undo").Count == undo + 1 && Field<IList>(doc, "redo").Count == 0,
+                    "Alt copy commit lost pose/identity or was not atomic");
+                Frame(controller, input, end, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
+                Require(doc.Parts.Count == ids.Length && V(doc.Parts[0].Position) == original, "One Undo did not remove copy");
+                Frame(controller, input, end); yield return null;
+                Frame(controller, input, end, 0, KeyCode.LeftControl, KeyCode.Y); yield return null;
+                Require(doc.Parts.Single(part => part.StableId == copyId).Position.Equals(copy.Position), "Redo changed copy identity/pose");
+                Frame(controller, input, end); yield return null;
+                Frame(controller, input, end, 0, KeyCode.LeftControl, KeyCode.Z); yield return null;
+                Frame(controller, input, end); yield return null;
+            }
+        }
+        finally { scene.ModelSpaceGizmo = savedModel; scene.Camera.transform.SetPositionAndRotation(cameraPosition, cameraRotation); }
     }
 
     private static object Call(object target, string name, params object[] arguments) =>

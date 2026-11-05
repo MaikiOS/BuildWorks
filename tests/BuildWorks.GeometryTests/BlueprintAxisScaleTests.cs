@@ -103,6 +103,31 @@ internal static class BlueprintAxisScaleTests
         catch (ArgumentOutOfRangeException) { overflowRejected = true; }
         Require(overflowRejected && !overflow.IsDirty);
         Near(new Point3(1, 1, 1), unchanged.Scale);
+        QuaternionSignsInNestedSelection();
+    }
+
+    private static void QuaternionSignsInNestedSelection()
+    {
+        foreach (int sourceSign in new[] { 1, -1 })
+        foreach (int deltaSign in new[] { 1, -1 })
+        {
+            var original = new BlueprintEditorPart("p", "wall", "P", new Point3(1, 0, 0),
+                new Rotation3(0, sourceSign, 0, sourceSign), "inner", baseScale: new Point3(.5, 2, 1));
+            var document = new BlueprintEditorDocument(null, "Quaternion", "Other", new[] { original }, new[] {
+                new BlueprintEditorGroup("outer", "Outer"),
+                new BlueprintEditorGroup("inner", "Inner", parentGroupId: "outer") });
+            document.SelectOnly("outer");
+            Require(document.ApplyTransformDelta(new Point3(4, 5, 6),
+                new Rotation3(0, deltaSign, 0, deltaSign), new Point3(), 2));
+            Near(new Point3(4, 5, 4), document.Parts[0].Position);
+            Near(new Point3(2, 2, 2), document.Parts[0].Scale);
+            Near(new Point3(.5, 2, 1), document.Parts[0].BaseScale.Value);
+            Near(new Point3(3, 13, -2), document.Parts[0].Position +
+                document.Parts[0].Rotation.Rotate(new Point3(1, 8, 6)));
+            Require(document.Undo() && document.Redo());
+            Near(new Point3(4, 5, 4), document.Parts[0].Position);
+            Near(new Point3(1, 1, 1), original.Scale);
+        }
     }
 
     private static void Require(bool condition)

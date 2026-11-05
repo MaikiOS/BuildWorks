@@ -27,6 +27,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             var journal = new Journal(plans); var before = Inventory(3); var after = Inventory(1);
             var prepared = journal.Prepare(plan.Id, part, operation, 17, before, out bool created);
             Check(created && prepared.Phase == Journal.Intent && prepared.RequiresReconciliation, "Fresh intent missing.");
+            Refuse<InvalidOperationException>(() => journal.RequireSavedPayment(plan.Id, part, 17));
             Check(journal.Prepare(plan.Id, part, operation, 17, before, out created).Phase == Journal.Intent && !created, "Intent replay became a new execution.");
             Refuse<InvalidOperationException>(() => journal.Prepare(plan.Id, part, Guid.NewGuid(), 17, before, out _));
             Refuse<InvalidOperationException>(() => plans.CancelUnpaid(plan.Id, 1, Guid.NewGuid()));
@@ -47,6 +48,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             Check(intent.SequenceEqual(File.ReadAllBytes(path)), "Rejected debit mutated the intent.");
             var observed = Observe(after, new[] { Paid() });
             Check(observed.Phase == Journal.Observed && observed.Revision == 2 && observed.RequiresReconciliation, "Observed evidence was not persisted.");
+            Refuse<InvalidOperationException>(() => journal.RequireSavedPayment(plan.Id, part, 17));
             observed.Paid[0].Paid = 99; observed.Receipt[0] ^= 1;
             Check(journal.Read(plan.Id, part).Paid[0].Paid == 2, "Returned DTO aliases durable state.");
             Check(Observe(after, new[] { Paid() }).Revision == 2, "Exact observation replay advanced revision.");
@@ -61,8 +63,15 @@ namespace OstrixMods.BuildWorks.StoreTests
             Refuse<InvalidDataException>(() => journal.ConfirmSaved(plan.Id, part, operation, badProof));
             var committed = journal.ConfirmSaved(plan.Id, part, operation, proof);
             Check(committed.Phase == Journal.Committed && committed.Revision == 3 && !committed.RequiresReconciliation, "Commit evidence not durable.");
+            var paidParent = journal.RequireSavedPayment(plan.Id, part, 17);
+            Check(Journal.Fingerprint(paidParent) == Journal.Fingerprint(committed), "Contents authority did not reread the committed parent.");
+            Refuse<InvalidOperationException>(() => journal.RequireSavedPayment(plan.Id, part, 18));
+            paidParent.Paid[0].Paid = 99;
+            Check(journal.RequireSavedPayment(plan.Id, part, 17).Paid[0].Paid == 2, "Detached contents authority mutated stored payment.");
             Check(journal.ConfirmSaved(plan.Id, part, operation, proof).Revision == 3, "Save replay advanced revision.");
             Refuse<InvalidOperationException>(() => plans.CancelUnpaid(plan.Id, 1, Guid.NewGuid()));
+            new BlueprintConstructionCancellationJournal(plans).Prepare(plan.Id, plan.Revision, Guid.NewGuid(), 17);
+            Refuse<InvalidOperationException>(() => journal.RequireSavedPayment(plan.Id, part, 17));
             byte[] terminal = File.ReadAllBytes(path); terminal[20] ^= 1; File.WriteAllBytes(path, terminal);
             Refuse<InvalidDataException>(() => journal.Read(plan.Id, part));
 
@@ -71,8 +80,17 @@ namespace OstrixMods.BuildWorks.StoreTests
             Refuse<InvalidOperationException>(() => journal.RecordNoEffect(second.Id, secondPart, secondOp, before, false));
             Refuse<InvalidOperationException>(() => journal.RecordNoEffect(second.Id, secondPart, secondOp, after, true));
             Check(journal.RecordNoEffect(second.Id, secondPart, secondOp, before, true).Phase == Journal.NoEffect, "No-effect outcome missing.");
+            Refuse<InvalidOperationException>(() => journal.RequireSavedPayment(second.Id, secondPart, 17));
             journal.Prepare(second.Id, secondPart, Guid.NewGuid(), 17, before, out created);
             Check(created, "Proven no-effect refused a new operation.");
+            var free = plans.Create(Guid.NewGuid(), blueprint, pose, new[] { pose });
+            Guid freePart = free.Parts[0].Id, freeOperation = Guid.NewGuid();
+            journal.Prepare(free.Id, freePart, freeOperation, 17, before, out _);
+            var freeObserved = journal.Observe(free.Id, freePart, freeOperation, 31, 9, "woodwall".GetStableHashCode(), 17,
+                before, true, Array.Empty<Journal.PaidRow>());
+            journal.ConfirmSaved(free.Id, freePart, freeOperation, new Journal.SavePair { BeforeGeneration = 7, Generation = 8,
+                ProfileHash = new string('A', 128), InventoryHash = Digest(Convert.FromBase64String(before.Zdo)), WorldPayloadHash = Digest(freeObserved.Receipt) });
+            Refuse<InvalidOperationException>(() => journal.RequireSavedPayment(free.Id, freePart, 17));
             // Wood record captured from the failed native .226 intent; after has only its 50 -> 48 debit.
             var nativeBefore = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat,
                 "8:4:1:50|Wood", "bgAAAAEAECcAAAMDAEkyAMMk8/YB", null);

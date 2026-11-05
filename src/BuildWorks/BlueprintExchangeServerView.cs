@@ -42,11 +42,12 @@ namespace OstrixMods.BuildWorks
 
         internal static BlueprintExchangeView ForServer(Transform parent, TMP_Text font, CompositeBlueprintStore store,
             CompositeBlueprintStore.Blueprint selectedLocal, Func<BlueprintServerClient> provider, Action closed,
-            Action<CompositeBlueprintStore.Blueprint[]> accepted = null, bool frontCanvas = false)
+            Action<CompositeBlueprintStore.Blueprint[]> accepted = null, bool frontCanvas = false,
+            Func<BlueprintPeerClient> peers = null)
         {
             var view = new BlueprintExchangeView(parent, font, store, null, closed, frontCanvas, report: "", imported: accepted);
             view.serverMode = true; view.serverProvider = provider; view.serverLocalSource = selectedLocal;
-            view.BuildServerPanel(); view.TickServer(); return view;
+            view.BuildServerPanel(); view.InitializePeerPanel(peers); view.TickServer(); return view;
         }
         private void BuildServerPanel()
         {
@@ -94,6 +95,7 @@ namespace OstrixMods.BuildWorks
         {
             var parent = (RectTransform)root.transform.parent;
             panel.localScale = Vector3.one * Mathf.Min(1, (parent.rect.width - 24) / 780, (parent.rect.height - 24) / 580);
+            if (peerMode) { TickPeer(); return; }
             var current = serverProvider?.Invoke();
             if (!ReferenceEquals(current, serverClient))
             {
@@ -230,6 +232,7 @@ namespace OstrixMods.BuildWorks
         }
         private void DisposeServerOperation()
         {
+            DisposePeerOperation();
             if (serverTask != null) { serverClient?.Cancel(serverTask); serverTask.ContinueWith(task => { var observed = task.Exception; }, TaskScheduler.Default); }
             serverTask = null; serverDecode = null; serverHostPreparation = null; serverPublication = null;
             serverPrepared = null; serverPreparedBytes = null; serverOrigin = null; serverReceived = null;
@@ -264,6 +267,7 @@ namespace OstrixMods.BuildWorks
         }
         private void SetServerDetails(string text)
         {
+            if (peerProvider != null && text == T("server.choose")) text = T("server.help") + "\n" + text;
             serverDetails.text = text;
             serverDetails.rectTransform.sizeDelta = new Vector2(360, Mathf.Max(244, serverDetails.GetPreferredValues(text, 360, 0).y + 16));
             serverDetails.GetComponentInParent<ScrollRect>().verticalNormalizedPosition = 1;
@@ -271,6 +275,7 @@ namespace OstrixMods.BuildWorks
         private void RenderServer()
         {
             bool busy = ServerBusy, idle = !busy && serverReview == ServerReview.None;
+            if (peerTab && !peerMode) peerTab.interactable = !busy && !ServerWorkerBusy;
             bool admin = serverRoleKnown && serverClient?.IsAdministrator == true;
             serverPublish.gameObject.SetActive(admin); serverUpdate.gameObject.SetActive(admin);
             serverDelete.gameObject.SetActive(admin); serverVisibility.gameObject.SetActive(admin);

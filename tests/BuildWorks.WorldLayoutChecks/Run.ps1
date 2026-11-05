@@ -24,6 +24,11 @@ if ((Get-Item -LiteralPath $UnityPath).VersionInfo.ProductVersion -notlike '6000
 & dotnet 'C:\Program Files\dotnet\sdk\10.0.201\Roslyn\bincore\csc.dll' -nologo -target:exe '-langversion:latest' "-out:$executable" '-nostdlib+' "-reference:$referenceRoot\mscorlib.dll" "-reference:$referenceRoot\System.dll" "-reference:$referenceRoot\System.Core.dll" "-reference:$referenceRoot\Facades\netstandard.dll" "-reference:$geometryDll" "-reference:$unityCore" (Join-Path $PSScriptRoot 'Program.cs')
 if ($LASTEXITCODE -ne 0) { throw 'World layout check compile failed.' }
 Copy-Item -LiteralPath $geometryDll -Destination $output -Force
+$projectGeometry = Join-Path $ProjectPath 'Assets/Plugins/BuildWorks.Geometry.dll'
+Copy-Item -LiteralPath $geometryDll -Destination $projectGeometry -Force
+if ((Get-FileHash -LiteralPath $projectGeometry).Hash -ne (Get-FileHash -LiteralPath $geometryDll).Hash) {
+    throw 'Workbench geometry dependency differs from the checked plugin build.'
+}
 $runner = Join-Path $BuildWorksRoot 'tools\BuildWorks.UiWorkbench\Assets\Editor\WorldLayoutRunner.cs'
 $targetRunner = Join-Path $ProjectPath 'Assets\Editor\WorldLayoutRunner.cs'
 if ($runner -ine $targetRunner) { Copy-Item -LiteralPath $runner -Destination $targetRunner -Force }

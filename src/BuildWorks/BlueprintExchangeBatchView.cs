@@ -19,7 +19,7 @@ namespace OstrixMods.BuildWorks
         private readonly HashSet<string> batchIncluded = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> batchExportIncluded = new HashSet<string>(StringComparer.Ordinal);
         private readonly Dictionary<string, string> batchCategories = new Dictionary<string, string>(StringComparer.Ordinal);
-        private CompositeBlueprintStore.Blueprint[] batchAllDocuments, batchExportChoices, batchImported;
+        private CompositeBlueprintStore.Blueprint[] batchAllDocuments, batchExportChoices, batchImported, batchExported;
         private CompositeBlueprintStore.ImportReview batchRawReview;
         private CancellationTokenSource batchCancellation;
         private RectTransform batchPicker, batchRows;
@@ -53,10 +53,10 @@ namespace OstrixMods.BuildWorks
                 if (batchMode && blueprint != null)
                 {
                     batchExportChoices = store.CatalogAll().ToArray();
-                    batchExportIncluded.Add(blueprint.id); planBuild = false; archive = true;
+                    batchExportIncluded.Add(blueprint.id); planBuild = false; openKeepTarget = null; kgFormat = false; archive = true;
                 }
                 batchToggle.GetComponentInChildren<TMP_Text>().text = T(batchMode ? "exchange.batch_single" : "exchange.batch_choose");
-                if (format) { format.interactable = !batchMode; format.GetComponentInChildren<TMP_Text>().text = T(archive ? "exchange.format_zip" : "exchange.format_json"); }
+                if (format) { format.interactable = !batchMode; format.GetComponentInChildren<TMP_Text>().text = ExportFormatLabel(); }
                 RenderRows(); Tick();
             });
         }
@@ -156,6 +156,7 @@ namespace OstrixMods.BuildWorks
                 }).ToArray();
                 planExport = store.ExportBatch(documents, directory.text, fileName.text, clearStorage, clearMounts,
                     name => name.GetStableHashCode(), omitArmorState, batchCancellation.Token);
+                batchExported = documents;
                 message.text = T("exchange.loading");
             }
             catch (Exception error) { SetError(error); }
@@ -166,9 +167,22 @@ namespace OstrixMods.BuildWorks
         {
             if (!batchMode) return "";
             batchImported = imported;
-            return "\n" + string.Join("\n", imported.Select(document => T("exchange.batch_done", document.name,
-                BuildWorksLocalization.BlueprintCategoryLabel(document.category)))) + BatchErrors();
+            var sources = importReview?.Documents?.Select((document, index) => new {
+                Entry = Path.GetFileName(resultPath) + "/document_" + index + ".buildworks.json", Source = document.importSource
+            }).ToDictionary(entry => entry.Entry, entry => entry.Source, StringComparer.Ordinal);
+            return "\n" + string.Join("\n", imported.Select(document =>
+            {
+                string source = null;
+                sources?.TryGetValue(document.importSource ?? "", out source);
+                string category = BuildWorksLocalization.BlueprintCategoryLabel(document.category);
+                return source == null ? T("exchange.batch_done", document.name, category) :
+                    T("exchange.batch_imported", Path.IsPathRooted(source) ? Path.GetFileName(source) : source, document.name, category);
+            })) + BatchErrors();
         }
+
+        private string BatchExportResultSummary() => !batchMode || batchExported == null ? "" : "\n" + string.Join("\n",
+            batchExported.Select((document, index) => T("exchange.batch_exported", "document_" + index + ".buildworks.json",
+                document.name, BuildWorksLocalization.BlueprintCategoryLabel(document.category))));
 
         private string BatchErrors() => batchRawReview?.FileErrors == null ? "" : "\n" + string.Join("\n",
             batchRawReview.FileErrors.Select(entry => T("exchange.batch_skipped", Path.GetFileName(entry.Source), BuildWorksLocalization.ResolveUserText(entry.Error))));

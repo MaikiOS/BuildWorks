@@ -15,6 +15,10 @@ namespace OstrixMods.BuildWorks
             piece.GetComponentsInChildren<TerrainModifier>(true).Length == 0 && !piece.GetComponent<Container>() &&
             !piece.GetComponent<ItemStand>() && !piece.GetComponent<ArmorStand>();
 
+        // Storage keeps its native water/tilt checks at the transformed placement contact.
+        internal static bool SupportsStorageProjectPart(Piece piece) => SupportsPrecisionPlacementBase(piece) &&
+            piece.GetComponentsInChildren<TerrainModifier>(true).Length == 0 && BlueprintStorageCapture.PrefabGrid(piece.gameObject).HasValue;
+
         // Consume the confirmation here; only the queued ProjectPart session may reach native placement.
         private bool TryCreateConstructionProject(Player player)
         {

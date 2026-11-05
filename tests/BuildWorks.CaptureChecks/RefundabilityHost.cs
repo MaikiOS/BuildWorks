@@ -81,15 +81,16 @@ namespace RefundabilityChecks {
   static readonly BlueprintForeignPartData beforeInventory=new BlueprintForeignPartData();
   static void RequireRefundable(Plans plans,Guid project,long player)=>RequireRefundable(plans,project,player,beforeInventory);
   sealed class Data { public bool IsValid()=>true; }
-  sealed class Witness { public WearNTear Wear=new WearNTear();public Data Data=new Data();public bool WearConfirmed,NetworkConfirmed; }
+  sealed class Witness { public WearNTear Wear=new WearNTear();public Data Data=new Data();public bool WearConfirmed,NetworkConfirmed;public Func<bool> Current=()=>TargetsCurrent; }
   sealed class Payer { public long GetPlayerID()=>7; }
   static Witness active;static RemovalJournal.Record record;static Guid[] operations;static string Status;
+  static bool TargetsCurrent=true,InvalidateAfterFirst;
   static bool Custody()=>true;
   static void Refuse(string reason){Status="reconciliation";}
   static void StartRemoval(Plans plans,Guid project) {
    long revision=1;Guid operation=Guid.NewGuid();var player=new Payer();var journal=new RemovalJournal(plans);
    var targets=plans.Receipts.Values.Where(r=>r.Phase==Parts.Committed).Select(r=>new Witness()).ToArray();
-   foreach(var target in targets)target.Wear.Removed=()=>{target.WearConfirmed=target.NetworkConfirmed=true;};
+   foreach(var target in targets)target.Wear.Removed=()=>{target.WearConfirmed=target.NetworkConfirmed=true;if(InvalidateAfterFirst&&RemovalJournal.Deletes==1)TargetsCurrent=false;};
 __REMOVAL__
   }
   static int checks;
@@ -101,7 +102,7 @@ __REMOVAL__
    ItemDrop.ItemData.Clones=ItemDrop.ItemData.Loads=0;ItemDrop.ItemData.LoadHash=ItemDrop.ItemData.LoadQuality=1;
    ItemDrop.ItemData.LoadVariant=0;ItemDrop.ItemData.LoadCustody=false;Journal.Validated=0;Journal.RejectProperties=false;
    Journal.CapacityChecks=0;Journal.RejectCapacity=false;
-   RemovalJournal.Prepares=RemovalJournal.Intents=RemovalJournal.Deletes=0;Status=null;
+   RemovalJournal.Prepares=RemovalJournal.Intents=RemovalJournal.Deletes=0;Status=null;TargetsCurrent=true;InvalidateAfterFirst=false;
    var plans=new Plans();plans.Plan.Parts=new[]{new Plans.Part(),new Plans.Part()};
    foreach(var part in plans.Plan.Parts)plans.Receipts[part.Id]=new BlueprintConstructionPartJournal.Record();
    return (plans,prefab,drop);
@@ -151,6 +152,10 @@ __REMOVAL__
    Check(RemovalJournal.Prepares==0&&RemovalJournal.Intents==0&&RemovalJournal.Deletes==0,"Last unsupported row entered cancellation/deletion");
    f=Fresh();StartRemoval(f.plans,Guid.NewGuid());
    Check(RemovalJournal.Prepares==1&&RemovalJournal.Intents==1&&RemovalJournal.Deletes==2&&Status=="queued-removal","Valid refundability blocked the actual removal sequence");
+   f=Fresh();TargetsCurrent=false;StartRemoval(f.plans,Guid.NewGuid());
+   Check(RemovalJournal.Intents==1&&RemovalJournal.Deletes==0&&Status=="reconciliation","Invalid current target reached native removal");
+   f=Fresh();InvalidateAfterFirst=true;StartRemoval(f.plans,Guid.NewGuid());
+   Check(RemovalJournal.Intents==1&&RemovalJournal.Deletes==1&&Status=="reconciliation","A prior removal callback bypassed the next target recheck");
    f=Fresh();Journal.RejectCapacity=true;try {StartRemoval(f.plans,Guid.NewGuid());}catch(InvalidDataException){}
    Check(RemovalJournal.Prepares==0&&RemovalJournal.Intents==0&&RemovalJournal.Deletes==0,"Known over-budget issuance entered cancellation/deletion");
    Check(Journal.Validated==2&&Journal.CapacityChecks==1,"Budget refused before validating the exact returned entries");

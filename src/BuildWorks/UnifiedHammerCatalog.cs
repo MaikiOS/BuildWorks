@@ -2360,7 +2360,7 @@ namespace OstrixMods.BuildWorks
                         if (!ReferenceEquals(blueprintStore, expectedStore) || imported.Length == 0) return;
                         blueprintImportPending = true;
                         pendingImportedBlueprint = imported[0]; pendingImportedCount = imported.Length;
-                    }, frontCanvas: true);
+                    }, frontCanvas: true, peers: () => BuildWorksPlugin.PeerBlueprintClient);
                 return;
             }
             if (share)
@@ -2418,6 +2418,15 @@ namespace OstrixMods.BuildWorks
             var report = new StringBuilder();
             report.AppendLine("BuildWorks " + typeof(BuildWorksPlugin).Assembly.GetName().Version);
             report.AppendLine(blueprint.name + " | " + blueprint.importSource);
+            report.AppendLine(BuildWorksLocalization.Text("exchange.evidence_levels",
+                CompositeBlueprintStore.FormatVersion, BlueprintExchangeFormat.Version));
+            if ((blueprint.sourceDocuments?.Count ?? 0) == 0)
+                report.AppendLine(BuildWorksLocalization.Text("exchange.evidence_no_source"));
+            foreach (var source in blueprint.sourceDocuments ?? new List<CompositeBlueprintStore.SourceDocument>())
+            {
+                report.AppendLine(BuildWorksLocalization.Text("exchange.evidence_source", source.name, source.format, source.id));
+                if (source.format == Geometry.BlueprintSourceDocument.WorldCaptureFormat) report.AppendLine(source.text);
+            }
             report.AppendLine("Parts: " + blueprint.parts.Count + " | Source parts: " + blueprint.importPartCount);
             foreach (bool editor in new[] { true, false })
             {
@@ -2425,13 +2434,17 @@ namespace OstrixMods.BuildWorks
                 report.AppendLine((editor ? "Editor: " : "World: ") + (available ? "OK" : reason));
             }
             report.AppendLine("Custom snap points: " + (blueprint.customSnapPoints?.Count ?? 0));
-            report.AppendLine("Opaque source sections: " + (blueprint.sourceDocuments?.Count(source => source.ToGeometry().HasOpaqueSections) ?? 0));
+            report.AppendLine("Opaque source sections: " + CompositeBlueprintStore.UnresolvedSources(blueprint).Count());
             report.AppendLine("Prefab | count | ZNetScene local/lossy | Hammer local/lossy | " +
                 (blueprint.parts.Count == 0 ? "original absolute scale (conversion rejected)" : "document base × multiplier / pending absolute"));
             // Failed atomic normalization clears usable parts, not the inert source evidence.
             IEnumerable<CompositeBlueprintStore.Part> reportParts = blueprint.parts.Count != 0 ? blueprint.parts :
                 (blueprint.sourceDocuments ?? new List<CompositeBlueprintStore.SourceDocument>())
-                .SelectMany(source => ExternalBlueprintLibrary.Parse(source.text, source.name).parts);
+                .Where(source => source.format != Geometry.BlueprintSourceDocument.WorldCaptureFormat)
+                .SelectMany(source => ExternalBlueprintLibrary.Parse(source.text,
+                    source.format == Geometry.KgBlueprint.BinaryFormat ? System.IO.Path.ChangeExtension(source.name,".oprint") :
+                    source.format == Geometry.BetterBuildingBlueprint.BinaryFormat ? System.IO.Path.ChangeExtension(source.name,".bbp") :
+                    source.format == Geometry.BetterBuildingBlueprint.JsonFormat ? System.IO.Path.ChangeExtension(source.name,".json") : source.name).parts);
             foreach (var parts in reportParts.GroupBy(part => part.prefabName).OrderBy(group => group.Key, StringComparer.Ordinal))
             {
                 GameObject registered = ZNetScene.instance ? ZNetScene.instance.GetPrefab(parts.Key) : null;
@@ -2828,6 +2841,17 @@ namespace OstrixMods.BuildWorks
             parent = content.transform;
             float y = 0;
             float buttonWidth = width - 32f;
+            TMP_Text policy = AddRailText(hud, parent, BuildWorksLocalization.Text("import.state_policy") + "\n\n" + BlueprintSourcePresentation.Metadata(blueprint),
+                new Vector2(16, y), 13, Color.white, FontStyles.Normal, width: buttonWidth);
+            if (policy)
+            {
+                policy.gameObject.name = Prefix + "ImportPolicy";
+                policy.enableAutoSizing = false; policy.textWrappingMode = TextWrappingModes.Normal;
+                policy.alignment = TextAlignmentOptions.TopLeft;
+                float policyHeight = Mathf.Max(24, policy.GetPreferredValues(policy.text, buttonWidth, 0).y + 8);
+                policy.rectTransform.sizeDelta = new Vector2(buttonWidth, policyHeight);
+                y -= policyHeight; scroll.content.sizeDelta += new Vector2(0, policyHeight);
+            }
             if (blueprintRegistry.CanPlace(blueprint) && PrecisionPlacementSession.RequiresContentsChoice(blueprint))
             {
                 AddRailText(hud, parent, BuildWorksLocalization.Text("placement.contents_required"),
@@ -3335,6 +3359,11 @@ namespace OstrixMods.BuildWorks
                 Invalidate();
                 return;
             }
+            if (!restore && !blueprintRegistry.SelectSafePieceBeforeDelete(player, blueprint))
+            {
+                ShowStatus(BuildWorksLocalization.Text("placement.blueprint_ghost_prepare_failed"));
+                return;
+            }
             string error;
             bool success = blueprint.IsExternal ? blueprintStore.TrySetHidden(blueprint, !restore, out error) :
                 blueprintStore.TryDelete(blueprint, out error);
@@ -3346,7 +3375,6 @@ namespace OstrixMods.BuildWorks
                 Invalidate();
                 return;
             }
-            if (!restore) blueprintRegistry.SelectSafePieceBeforeDelete(player, blueprint);
             blueprintRegistry.DeleteThumbnail(blueprint.id);
             ShowStatus(BuildWorksLocalization.Text(restore ? "catalog.restored" : blueprint.IsExternal ? "catalog.hidden" : "catalog.deleted"));
             selectedBlueprint = null;
@@ -3492,7 +3520,7 @@ namespace OstrixMods.BuildWorks
                 stretch: true);
         }
 
-        private static void AddRailText(
+        private static TMP_Text AddRailText(
             Hud hud,
             Transform parent,
             string value,
@@ -3506,7 +3534,7 @@ namespace OstrixMods.BuildWorks
         {
             TMP_Text template = hud.m_pieceDescription ? hud.m_pieceDescription :
                 hud.m_buildSelection;
-            if (!template) return;
+            if (!template) return null;
             TMP_Text text = UnityEngine.Object.Instantiate(template, parent, false);
             text.gameObject.name = Prefix + "Text";
             text.gameObject.SetActive(true);
@@ -3535,6 +3563,7 @@ namespace OstrixMods.BuildWorks
             text.fontStyle = style;
             text.overflowMode = TextOverflowModes.Ellipsis;
             text.raycastTarget = false;
+            return text;
         }
 
         private sealed class RectState

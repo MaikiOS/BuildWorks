@@ -5,6 +5,9 @@ using UnityEngine;
 // in native snap fixtures; the actual editor implementation remains unchanged.
 public sealed class Piece : MonoBehaviour
 {
+    [System.Flags] public enum UsageTagFlags
+    { Crafting = 2, Building = 4, Floor = 8, Wall = 16, Roof = 32, Architecture = 64,
+      Furniture = 128, Storage = 1024, Transport = 2048, Stairs = 131072, Doors = 262144 }
     public long GetCreator() => 17;
     public string m_name;
     public Requirement[] m_resources = System.Array.Empty<Requirement>();

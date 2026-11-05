@@ -24,7 +24,9 @@ namespace OstrixMods.BuildWorks.Geometry
             Point3? baseScale = null,
             BlueprintPrefabMetadata metadata = null,
             int? materialSeed = null,
-            string originalPrefabName = null)
+            string originalPrefabName = null,
+            bool sourceFrameApplied = false,
+            int sourceRecord = 0)
         {
             StableId = Required(stableId, nameof(stableId));
             PrefabName = Required(prefabName, nameof(prefabName));
@@ -44,10 +46,15 @@ namespace OstrixMods.BuildWorks.Geometry
             if (!IsValidSignText(signText))
                 throw new ArgumentOutOfRangeException(nameof(signText));
             SignText = signText;
-            if (sourceDocumentId == null ? sourceLine != 0 : sourceLine < 1)
+            if (sourceLine < 0 || sourceRecord < 0 || (sourceDocumentId == null
+                ? sourceLine != 0 || sourceRecord != 0 : (sourceLine == 0) == (sourceRecord == 0)))
                 throw new ArgumentException("Invalid source reference.");
             SourceDocumentId = sourceDocumentId;
             SourceLine = sourceLine;
+            SourceRecord = sourceRecord;
+            if (sourceFrameApplied && sourceDocumentId == null)
+                throw new ArgumentException("A consumed source frame requires source evidence.");
+            SourceFrameApplied = sourceFrameApplied;
             if (!BlueprintPrefabMigration.IsRecordedPair(originalPrefabName, prefabName) ||
                 originalPrefabName != null && sourceDocumentId == null)
                 throw new ArgumentException("Invalid prefab migration provenance.");
@@ -77,7 +84,9 @@ namespace OstrixMods.BuildWorks.Geometry
         public string SignText { get; }
         public string SourceDocumentId { get; }
         public int SourceLine { get; }
+        public int SourceRecord { get; }
         public string OriginalPrefabName { get; }
+        public bool SourceFrameApplied { get; }
         public BlueprintForeignPartData ForeignData { get; internal set; }
         public static bool IsValidSignText(string value)
         {
@@ -98,7 +107,7 @@ namespace OstrixMods.BuildWorks.Geometry
             Visible,
             Locked,
             Scale,
-            SignText, SourceDocumentId, SourceLine, ForeignData, ScaleIsAbsolute, BaseScale, Metadata, MaterialSeed, OriginalPrefabName);
+            SignText, SourceDocumentId, SourceLine, ForeignData, ScaleIsAbsolute, BaseScale, Metadata, MaterialSeed, OriginalPrefabName, SourceFrameApplied, SourceRecord);
 
         public Point3 ResolveScale(Point3 prefabScale)
         {
@@ -175,6 +184,10 @@ namespace OstrixMods.BuildWorks.Geometry
             bool locked = false,
             string parentGroupId = null,
             string pivotPartId = null)
+            : this(stableId, name, visible, locked, parentGroupId, pivotPartId, null, null) { }
+
+        public BlueprintEditorGroup(string stableId, string name, bool visible, bool locked,
+            string parentGroupId, string pivotPartId, string sourceDocumentId, string sourceLayerId)
         {
             StableId = BlueprintEditorPart.Required(stableId, nameof(stableId));
             Name = BlueprintEditorPart.Required(name, nameof(name));
@@ -182,6 +195,8 @@ namespace OstrixMods.BuildWorks.Geometry
             Locked = locked;
             ParentGroupId = parentGroupId;
             PivotPartId = string.IsNullOrWhiteSpace(pivotPartId) ? null : pivotPartId.Trim();
+            if ((sourceDocumentId == null) != (sourceLayerId == null)) throw new ArgumentException("Incomplete layer source binding.");
+            SourceDocumentId = sourceDocumentId; SourceLayerId = sourceLayerId;
         }
 
         public string StableId { get; }
@@ -190,9 +205,11 @@ namespace OstrixMods.BuildWorks.Geometry
         public bool Locked { get; internal set; }
         public string ParentGroupId { get; internal set; }
         public string PivotPartId { get; internal set; }
+        public string SourceDocumentId { get; }
+        public string SourceLayerId { get; }
 
         internal BlueprintEditorGroup Clone() =>
-            new BlueprintEditorGroup(StableId, Name, Visible, Locked, ParentGroupId, PivotPartId);
+            new BlueprintEditorGroup(StableId, Name, Visible, Locked, ParentGroupId, PivotPartId, SourceDocumentId, SourceLayerId);
     }
 
     // Root-owned frame, not a part, snap socket or scaled object.
@@ -1012,7 +1029,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 if (pivotPartId != null && partIds.TryGetValue(pivotPartId, out string copyPivot))
                     pivotPartId = copyPivot;
                 groupCopies.Add(new BlueprintEditorGroup(copyId, group.Name + " " + copyLabel,
-                    group.Visible, group.Locked, parentId, pivotPartId));
+                    group.Visible, group.Locked, parentId, pivotPartId, group.SourceDocumentId, group.SourceLayerId));
             }
             var copies = new List<BlueprintEditorPart>(targets.Count);
             var copiedRoots = new List<string>();
@@ -1034,7 +1051,7 @@ namespace OstrixMods.BuildWorks.Geometry
                     parentId,
                     part.Visible,
                     part.Locked,
-                    part.Scale, part.SignText, part.SourceDocumentId, part.SourceLine, part.ForeignData, part.ScaleIsAbsolute, part.BaseScale, part.Metadata, part.MaterialSeed, part.OriginalPrefabName));
+                    part.Scale, part.SignText, part.SourceDocumentId, part.SourceLine, part.ForeignData, part.ScaleIsAbsolute, part.BaseScale, part.Metadata, part.MaterialSeed, part.OriginalPrefabName, part.SourceFrameApplied, part.SourceRecord));
                 if (rootIds.Contains(part.StableId)) copiedRoots.Add(copyId);
             }
             return Commit(() =>
@@ -1106,7 +1123,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 if (!copiedGroupIds.Contains(group.StableId)) continue;
                 copiedGroups.Add(new BlueprintEditorGroup(group.StableId, group.Name, group.Visible, group.Locked,
                     group.ParentGroupId != null && copiedGroupIds.Contains(group.ParentGroupId) ? group.ParentGroupId : null,
-                    group.PivotPartId != null && copiedPartIds.Contains(group.PivotPartId) ? group.PivotPartId : null));
+                    group.PivotPartId != null && copiedPartIds.Contains(group.PivotPartId) ? group.PivotPartId : null, group.SourceDocumentId, group.SourceLayerId));
             }
             var copiedParts = new List<BlueprintEditorPart>(replacements.Count);
             foreach (BlueprintEditorPart part in replacements)
@@ -1186,14 +1203,14 @@ namespace OstrixMods.BuildWorks.Geometry
                 newGroups.Add(new BlueprintEditorGroup(groupIds[group.StableId], group.Name,
                     group.Visible, group.Locked,
                     group.ParentGroupId == null ? rootId : groupIds[group.ParentGroupId],
-                    group.PivotPartId == null ? null : partIds[group.PivotPartId]));
+                    group.PivotPartId == null ? null : partIds[group.PivotPartId], group.SourceDocumentId, group.SourceLayerId));
             var newParts = new List<BlueprintEditorPart>(source.parts.Count);
             foreach (BlueprintEditorPart part in source.parts)
                 newParts.Add(new BlueprintEditorPart(partIds[part.StableId],
                     part.PrefabName, part.DisplayName, position + orientation.Rotate(part.Position),
                     Multiply(orientation, part.Rotation).Normalized(),
                     part.ParentGroupId == null ? rootId : groupIds[part.ParentGroupId],
-                    part.Visible, part.Locked, part.Scale, part.SignText, part.SourceDocumentId, part.SourceLine, part.ForeignData, part.ScaleIsAbsolute, part.BaseScale, part.Metadata, part.MaterialSeed, part.OriginalPrefabName));
+                    part.Visible, part.Locked, part.Scale, part.SignText, part.SourceDocumentId, part.SourceLine, part.ForeignData, part.ScaleIsAbsolute, part.BaseScale, part.Metadata, part.MaterialSeed, part.OriginalPrefabName, part.SourceFrameApplied, part.SourceRecord));
             return Commit(() =>
             {
                 groups.AddRange(newGroups);
@@ -1502,7 +1519,7 @@ namespace OstrixMods.BuildWorks.Geometry
                             sample.Position + stepY * logicalY +
                                 turn.Rotate((source.Position - pivot) * sample.UniformScale),
                             Multiply(turn, source.Rotation).Normalized(), source.ParentGroupId,
-                            source.Visible, source.Locked, copyScale, source.SignText, source.SourceDocumentId, source.SourceLine, source.ForeignData, source.ScaleIsAbsolute, source.BaseScale, source.Metadata, source.MaterialSeed, source.OriginalPrefabName));
+                            source.Visible, source.Locked, copyScale, source.SignText, source.SourceDocumentId, source.SourceLine, source.ForeignData, source.ScaleIsAbsolute, source.BaseScale, source.Metadata, source.MaterialSeed, source.OriginalPrefabName, source.SourceFrameApplied, source.SourceRecord));
                     }
                 }
             }
@@ -1590,7 +1607,7 @@ namespace OstrixMods.BuildWorks.Geometry
                         source.ParentGroupId,
                         source.Visible,
                         source.Locked,
-                        copyScale, source.SignText, source.SourceDocumentId, source.SourceLine, source.ForeignData, source.ScaleIsAbsolute, source.BaseScale, source.Metadata, source.MaterialSeed, source.OriginalPrefabName));
+                        copyScale, source.SignText, source.SourceDocumentId, source.SourceLine, source.ForeignData, source.ScaleIsAbsolute, source.BaseScale, source.Metadata, source.MaterialSeed, source.OriginalPrefabName, source.SourceFrameApplied, source.SourceRecord));
                 }
             }
             return copies;
@@ -1601,10 +1618,22 @@ namespace OstrixMods.BuildWorks.Geometry
             BlueprintLibraryOrigin.Validate(libraryOrigins);
             BlueprintPeerOrigin.Validate(peerOrigins);
             Dictionary<string, BlueprintSourceDocument> sourceIndex = BlueprintSourceDocument.Index(sources);
+            foreach (BlueprintEditorGroup group in groups)
+                if ((group.SourceDocumentId == null) != (group.SourceLayerId == null) || group.SourceDocumentId != null &&
+                    (!sourceIndex.TryGetValue(group.SourceDocumentId, out var groupSource) || !groupSource.HasLayerAddress(group.SourceLayerId)))
+                    throw new ArgumentException("Missing or incorrect layer source reference.");
             foreach (BlueprintEditorPart part in parts)
+            {
+                if (part.SourceDocumentId == null && part.ForeignData?.Format == UnboundBlueprint.Format)
+                    throw new ArgumentException("Unbound state requires source evidence.");
                 if (part.SourceDocumentId != null && (!sourceIndex.TryGetValue(part.SourceDocumentId, out var evidence) ||
-                    !evidence.HasPartAt(part.SourceLine, part.OriginalPrefabName ?? part.PrefabName)))
+                    PlannerPrefabNames.IsPair(part.OriginalPrefabName, part.PrefabName) && !PlannerPrefabNames.SupportsSource(evidence) ||
+                    !evidence.HasPartAddress(part.SourceLine, part.SourceRecord, part.OriginalPrefabName ?? part.PrefabName) ||
+                    !evidence.HasPartState(part.SourceLine, part.SourceRecord, part.OriginalPrefabName ?? part.PrefabName, part.ForeignData,
+                        part.Metadata, part.BaseScale, part.ScaleIsAbsolute, part.SignText, part.MaterialSeed) ||
+                    part.SourceFrameApplied && !evidence.HasPlacementFrame))
                     throw new ArgumentException("Missing or incorrect source reference.");
+            }
             if (customSnapPoints.Count > MaximumCustomSnapPoints) throw new InvalidOperationException("Maximum custom snap points reached.");
             foreach (Point3 point in customSnapPoints) BlueprintEditorPart.Validate(point, nameof(CustomSnapPoints));
             if (parts.Count > MaximumParts || groups.Count > MaximumGroups)
@@ -1842,7 +1871,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 if (left.StableId != right.StableId || left.PrefabName != right.PrefabName ||
                     left.DisplayName != right.DisplayName || left.ParentGroupId != right.ParentGroupId ||
                     left.Visible != right.Visible || left.Locked != right.Locked || left.SignText != right.SignText ||
-                    left.SourceDocumentId != right.SourceDocumentId || left.SourceLine != right.SourceLine || left.OriginalPrefabName != right.OriginalPrefabName || left.ForeignData != right.ForeignData ||
+                    left.SourceDocumentId != right.SourceDocumentId || left.SourceLine != right.SourceLine || left.SourceRecord != right.SourceRecord || left.SourceFrameApplied != right.SourceFrameApplied || left.OriginalPrefabName != right.OriginalPrefabName || left.ForeignData != right.ForeignData ||
                     !Same(left.Position, right.Position) || !Same(left.Rotation, right.Rotation) ||
                     !Same(left.Scale, right.Scale) || left.ScaleIsAbsolute != right.ScaleIsAbsolute ||
                     left.Metadata != right.Metadata || left.MaterialSeed != right.MaterialSeed || left.BaseScale.HasValue != right.BaseScale.HasValue ||

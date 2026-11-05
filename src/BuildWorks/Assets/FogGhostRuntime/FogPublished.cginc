@@ -1,6 +1,13 @@
 #ifndef BUILDWORKS_FOG_PUBLISHED_INCLUDED
 #define BUILDWORKS_FOG_PUBLISHED_INCLUDED
 #if defined(BUILDWORKS_FOG_PUBLISHED)
+// Preserve the list's ascending owner order, including bit 31; callers pass only nonzero masks.
+uint FogTakeCandidate(inout uint remaining)
+{
+    uint owner = firstbitlow(remaining);
+    remaining &= remaining - 1u;
+    return owner;
+}
 // Immutable bindings: slot, owner low/high, generation low/high. Publication precedes every draw.
 #if !defined(SHADER_TARGET_SURFACE_ANALYSIS)
 StructuredBuffer<uint> _FogBindings, _PublishedMetadata;
@@ -16,7 +23,7 @@ struct FogPublishedState
 {
     float4 actorRadius;
     float halfHeight, clock, weight;
-    bool valid, active, dormant;
+    bool valid, active, dormant, dynamicEmpty;
 };
 FogPublishedState FogReadPublished(int region)
 {
@@ -39,6 +46,7 @@ FogPublishedState FogReadPublished(int region)
         || _PublishedMetadata[base + 10] != _FogBindings[binding + 3]
         || _PublishedMetadata[base + 11] != _FogBindings[binding + 4]) return state;
     state.valid = true; state.active = (flags & 2) != 0;
+    state.dynamicEmpty = (flags & 4) != 0;
     state.actorRadius = asfloat(uint4(_PublishedMetadata[base], _PublishedMetadata[base + 1], _PublishedMetadata[base + 2], _PublishedMetadata[base + 3]));
     state.halfHeight = asfloat(_PublishedMetadata[base + 4]);
     state.clock = asfloat(_PublishedMetadata[base + 5]); state.weight = asfloat(_PublishedMetadata[base + 6]);
@@ -63,9 +71,12 @@ float4 FogPackedSample(int region, uint field, float3 uv, FogPublishedState stat
     uint capacity = (uint)(_PublishedBrickGrid.x * _PublishedBrickGrid.y * _PublishedBrickGrid.z);
     if (_PublishedBlockCapacity < 1 || (uint)_PublishedBlockCapacity > capacity) return 0;
     // Any occupied neighbour page contains all eight taps, including across an empty block.
+    uint3 firstBlock = (uint3)clamp(cell,int3(0,0,0),int3(95,79,79))/4;
+    uint3 lastBlock = (uint3)clamp(cell+1,int3(0,0,0),int3(95,79,79))/4;
     [unroll] for(int z=0;z<2;++z) [unroll] for(int y=0;y<2;++y) [unroll] for(int x=0;x<2;++x)
     {
-        uint3 block = (uint3)clamp(cell+int3(x,y,z),int3(0,0,0),int3(95,79,79))/4;
+        if((x==1 && firstBlock.x==lastBlock.x) || (y==1 && firstBlock.y==lastBlock.y) || (z==1 && firstBlock.z==lastBlock.z)) continue;
+        uint3 block = uint3(x==0?firstBlock.x:lastBlock.x,y==0?firstBlock.y:lastBlock.y,z==0?firstBlock.z:lastBlock.z);
         uint page = _PublishedMaps[base + field * 9600 + block.x + 24*(block.y+20*block.z)];
         if(page == 0xffffffffu) continue;
         if(page >= (uint)_PublishedBlockCapacity) return 0;

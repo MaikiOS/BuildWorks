@@ -19,7 +19,9 @@ Precision-building tools and reusable blueprints for Valheim: capture a build, r
 - Organise variants with categories and Save As, then share saved portable files.
 - Create repetitions with Array and Contour. Persistently editable repetition operations are future work.
 
-The current issued private manual-test alpha is **0.19.329**. F9 and blueprint placement allow eligible furniture, storage and crafting objects to rotate and overlap with real support. Two paid placement cases and fresh-process reload have bounded acceptance; full-module and multiplayer checks remain open. Obtain the authorized archive from the owner; no public beta or Thunderstore package is published. [Version and limits](docs/ALPHA_0.19.329.md).
+**Installable alpha: 0.19.329.** [Download and release notes](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.329-alpha). The original 2 November ZIP is unchanged; its internal “private test candidate” wording describes its manual-test origin. This is an alpha prerelease; beta follows completion of the full agreed goal. No Thunderstore upload is included.
+
+[Installation](docs/INSTALL.md) · [Development boundaries](docs/CURRENT_STATUS.md).
 
 ## See the tools
 
@@ -64,4 +66,3 @@ Future directions include editable assemblies/repetition, construction guides, a
 For an issue, include versions, the relevant log, steps, and a permitted example file. Keep private saves and tokens out of public reports. [Report an issue](https://github.com/MaikiOS/BuildWorks/issues).
 
 BuildWorks is proprietary/source-available, not open-source. Personal non-commercial testing of official binaries and contribution access follow the [licence](LICENSE); redistribution and other reuse require the owner's written permission.
-

@@ -345,7 +345,6 @@ namespace OstrixMods.BuildWorks
         {
             if (publishedPool == null || owners == null || owners.Count < 1 || owners.Count > MaximumOwners)
                 throw new ArgumentException("Published fog layout owner count invalid.");
-            Bounds bounds = default;
             bool unchanged = layoutSourceCount == owners.Count && layoutLimit == SystemInfo.maxTexture3DSize;
             for (int i = 0; i < owners.Count; ++i)
             {
@@ -353,11 +352,8 @@ namespace OstrixMods.BuildWorks
                 if (owner?.Source == null || !owner.Source.Shape) throw new ArgumentException("Fog layout source missing.");
                 var texture = owner.Source.Shape;
                 unchanged &= ReferenceEquals(layoutSources[i], texture);
-                if (i == 0) bounds = owner.VolumeBounds; else bounds.Encapsulate(owner.VolumeBounds);
             }
-            int steps = Mathf.CeilToInt(bounds.size.magnitude / .025f) + 162;
-            if (bounds.size.magnitude > 64 || (long)steps * owners.Count > 32768)
-                throw new InvalidOperationException("Fog projects exceed the bounded visible integration domain.");
+            // Surface packing is local to each shape; only Render needs the shared volume-work guard.
             if (unchanged) return;
             var requested = new List<Vector3Int>(owners.Count);
             var distinct = new List<BlueprintFogSource>(owners.Count);

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 namespace BoardCancellationChecks {
  public class HostObject { public static implicit operator bool(HostObject value)=>value!=null; }
  public class Transform { public float position; }
@@ -10,7 +11,7 @@ namespace BoardCancellationChecks {
  }
  public class Board:HostObject { public Guid Id=Guid.NewGuid(); public Transform transform=new Transform(); }
  public static class BuildWorksPlugin { public static bool CanOpenConstructionProject=true; }
- public static class BuildWorksLocalization { public static string Text(string key)=>key; }
+ public static class BuildWorksLocalization { public static string Text(string key,params object[] args)=>key; }
  public class BlueprintConstructionProjectStore {}
  public class BlueprintConstructionCancellationJournal {
   public const int Prepared=1; public static Record Pending;
@@ -37,11 +38,20 @@ namespace BoardCancellationChecks {
   private ConstructionCancellationAction CancellationAction(Guid id,long revision)=>action;
   private void CancelUnpaid(Guid id,long revision,Guid operation) { calls.Add("unpaid");dispatchedOperation=operation; }
   private void BeginPaidRemoval(Guid id,long revision,Guid operation) { calls.Add("remove");dispatchedOperation=operation;dispatchedRevision=revision; }
+  private void BeginNativePaidRemoval(Guid id,long revision,Guid operation) { calls.Add("resume");dispatchedOperation=operation;dispatchedRevision=revision; }
   private void BeginPayout(Guid id) { calls.Add("payout"); }
   private void Close() { calls.Add("close"); }
   __ROUTER__
   __RESUME__
   __CONFIRMATION__
+  private bool summaryNeedsReview;
+  private (int Built,int Total,bool NeedsReview) Progress(Guid id)=>(1,2,summaryNeedsReview);
+  private static string Summary(ConstructionCancellationAction action,bool needsReview) {
+   var runtime=Reset();runtime.summaryNeedsReview=needsReview;var board=runtime.OpenBoard;var text=new StringBuilder();
+   __BUILDING__
+   __SUMMARY__
+   return string.Join("|",text.ToString().Split(new[]{'\r','\n'},StringSplitOptions.RemoveEmptyEntries));
+  }
   private static int checks;
   private static void Check(bool value,string message) { checks++;if(!value)throw new Exception(message); }
   private static BlueprintConstructionProjectRuntime Reset() {
@@ -55,7 +65,7 @@ namespace BoardCancellationChecks {
     ConstructionCancellationAction.ResumeRemoval,ConstructionCancellationAction.IssueRefund,ConstructionCancellationAction.AwaitCollection}) {
     var r=Reset();r.action=kind;var fresh=Guid.NewGuid();r.RequestCancellationFromBoard(r.OpenBoard.Id,1,fresh);
     string expected=kind==ConstructionCancellationAction.Unpaid?"unpaid":kind==ConstructionCancellationAction.IssueRefund?"payout":
-     kind==ConstructionCancellationAction.AwaitCollection?"close":"remove";
+     kind==ConstructionCancellationAction.AwaitCollection?"close":kind==ConstructionCancellationAction.ResumeRemoval?"resume":"remove";
     Check(r.calls.Count==1&&r.calls[0]==expected,"Wrong branch "+kind);
     if(kind==ConstructionCancellationAction.ResumeRemoval)
      Check(r.dispatchedOperation==BlueprintConstructionCancellationJournal.Pending.Operation&&r.dispatchedRevision==1,"Prepared operation was replaced");
@@ -87,6 +97,15 @@ namespace BoardCancellationChecks {
    Check(ConfirmationKey(ConstructionCancellationAction.Remove)=="project.cancel_confirm","Paid removal confirmation differs");
    Check(ConfirmationKey(ConstructionCancellationAction.ResumeRemoval)=="project.cancel_confirm","Removal recovery confirmation differs");
    Check(ConfirmationKey(ConstructionCancellationAction.IssueRefund)=="project.refund_confirm","Refund confirmation differs");
+   foreach(var kind in new[]{ConstructionCancellationAction.IssueRefund,ConstructionCancellationAction.Unpaid,
+    ConstructionCancellationAction.Remove,ConstructionCancellationAction.ResumeRemoval,ConstructionCancellationAction.AwaitCollection,
+    ConstructionCancellationAction.Review}) foreach(bool needsReview in new[]{true,false}) {
+    bool building=kind==ConstructionCancellationAction.Unpaid||kind==ConstructionCancellationAction.Remove;
+    string expected=building?"project.progress"+(needsReview?"|project.review":""):
+     kind==ConstructionCancellationAction.Review?"project.review":
+     kind==ConstructionCancellationAction.AwaitCollection?"project.refund_wait":"project.cancel_pending";
+    Check(Summary(kind,needsReview)==expected,"Wrong phase summary "+kind+"/NeedsReview="+needsReview);
+   }
    return checks;
   }
  }

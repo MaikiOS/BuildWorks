@@ -16,7 +16,9 @@ namespace ReservationChecks
         internal readonly Transform transform = new Transform();
         internal Piece Piece;
         internal Container Container;
-        internal T GetComponent<T>() where T : class => typeof(T) == typeof(Piece) ? Piece as T : Container as T;
+        internal ZNetView RootView;
+        internal T GetComponent<T>() where T : class => typeof(T) == typeof(Piece) ? Piece as T :
+            typeof(T) == typeof(ZNetView) ? RootView as T : Container as T;
     }
     internal sealed partial class Piece
     {
@@ -42,6 +44,7 @@ namespace ReservationChecks
     {
         internal int Width = 8, Height = 8, MoveCalls;
         internal Action Changed, BeforeMove, AfterCredit, AfterSave;
+        internal Action m_onChanged;
         internal bool NoChange, ReturnFalse;
         internal int? PartialAmount;
         internal int GetWidth() => Width;
@@ -72,12 +75,19 @@ namespace ReservationChecks
     }
     internal struct ZDOID { internal long Id, User; internal long UserID => User == 0 ? 99 : User; internal uint ID => (uint)Id; internal bool IsNone() => Id == 0; }
     internal static class ZDOVars { internal const int s_items = 1, s_creator = 2; }
+    internal static class BlueprintConstructionPartExecution
+    {
+        internal static readonly int MarkerKey = "ostrix_buildworks_project_operation_v1".GetStableHashCode();
+        internal static readonly int ReceiptKey = "ostrix_buildworks_project_receipt_v1".GetStableHashCode();
+    }
     internal sealed class ZDO { internal ZDOID m_uid = new ZDOID { Id = 1 }; internal uint DataRevision; internal byte[] Raw;
         internal readonly Dictionary<int, string> Strings = new Dictionary<int, string>();
+        internal readonly Dictionary<int, byte[]> ByteArrays = new Dictionary<int, byte[]>();
         internal Action BeforeSet, AfterSet;
         internal string GetString(int key, string fallback) => Strings.TryGetValue(key, out string value) ? value : fallback;
         internal void Set(int key, string value) { BeforeSet?.Invoke(); if (GetString(key, null) != value) { Strings[key] = value; DataRevision++; } AfterSet?.Invoke(); }
-        internal int GetPrefab() => 123; internal byte[] GetByteArray(int key, byte[] fallback) => Raw ?? fallback; }
+        internal int GetPrefab() => 123;
+        internal byte[] GetByteArray(int key, byte[] fallback) => key == ZDOVars.s_items ? Raw ?? fallback : ByteArrays.TryGetValue(key, out var value) ? value : fallback; }
     internal sealed class ZNetView : Obj
     {
         internal readonly ZDO Data = new ZDO(); internal bool Valid = true, Owner = true;
@@ -103,6 +113,7 @@ namespace ReservationChecks
         internal List<object> GetPeers() => Peers;
         internal void Save(bool sync, bool saveOtherPlayerProfiles, bool waitForNextFrame) { SaveAction?.Invoke(); }
         internal World GetWorld() => World;
+        internal long GetWorldUID() => World.m_uid;
         internal bool IsServer() => Server;
         internal bool IsSaving() => Saving;
     }
@@ -122,16 +133,27 @@ namespace ReservationChecks
     internal sealed class ZDOMan { internal static ZDOMan instance = new ZDOMan(); }
     internal static class InventoryGui { internal static bool Visible; internal static bool IsVisible() => Visible; }
     internal static class PrivateArea { internal static bool Allowed = true; internal static bool CheckAccess(Vector3 _, float radius, bool flash, bool ward) => Allowed; }
-    internal sealed class Container : Obj
+    internal class WearNTear : Obj
+    {
+        internal Action m_onDestroyed;
+        private ZNetView m_nview;
+        internal WearNTear(ZNetView view = null) { m_nview = view; }
+    }
+    internal class Container : Obj
     {
         private ZNetView m_nview = new ZNetView();
         private bool m_loading;
         private uint m_lastRevision;
         internal readonly Inventory Inventory;
+        internal ZNetView m_rootObjectOverride;
         internal bool Allowed = true, InUse, Supported = true, CaptureAllowed = true;
         internal ZNetView View => m_nview;
         internal Container(int width) { Inventory = new Inventory { Width = width, Height = 1 }; Inventory.Changed = Save; Save(); }
         internal Inventory GetInventory() => Inventory;
+        internal WearNTear NativeCallbacksForTest()
+        { Inventory.m_onChanged = OnContainerChanged; return new WearNTear(View) { m_onDestroyed = OnDestroyed }; }
+        private void OnContainerChanged() { }
+        private void OnDestroyed() { }
         internal bool IsInUse() => InUse;
         private bool CheckAccess(long _) => Allowed;
         internal void SetLoading(bool value) => m_loading = value;

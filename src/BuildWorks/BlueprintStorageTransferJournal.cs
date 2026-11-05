@@ -13,6 +13,7 @@ namespace OstrixMods.BuildWorks
     {
         private const int MaximumBytes = 16 * 1024 * 1024;
         private static readonly byte[] Magic = Encoding.ASCII.GetBytes("BWSTJ5\r\n");
+        private static readonly byte[] ConstructionMagic = Encoding.ASCII.GetBytes("BWSTJ6\r\n");
         private static readonly byte[] LegacyMagic4 = Encoding.ASCII.GetBytes("BWSTJ4\r\n");
         private static readonly byte[] LegacyMagic3 = Encoding.ASCII.GetBytes("BWSTJ3\r\n");
         private static readonly byte[] LegacyMagic2 = Encoding.ASCII.GetBytes("BWSTJ2\r\n");
@@ -37,6 +38,9 @@ namespace OstrixMods.BuildWorks
             internal string PieceName;
             internal Item[] Items;
             internal Payment[] Paid = Array.Empty<Payment>();
+            internal Guid ConstructionProject, ConstructionPart;
+            internal string ConstructionFingerprint;
+            internal bool HasConstructionBinding => ConstructionProject != Guid.Empty;
             internal Guid TargetMarker => Route == Direction.ToContainer ? Operation : Parent;
         }
         internal sealed class Payment { internal string Prefab, Properties; internal int Before, Paid, X, Y; }
@@ -66,8 +70,12 @@ namespace OstrixMods.BuildWorks
             internal Attempt Pending;
             internal bool Terminal;
             internal Persistence SavedPair;
-            // Even fully observed local moves need source/target persistence and server reconciliation.
-            internal bool RequiresReconciliation => true;
+            internal bool Settled;
+            internal int Frames;
+            internal long Length;
+            internal byte[] TailHash;
+            // Legacy/local move completion alone never releases custody.
+            internal bool RequiresReconciliation => !Settled;
         }
         internal sealed class Persistence
         {
@@ -83,19 +91,66 @@ namespace OstrixMods.BuildWorks
         private readonly FileStream stream;
         private int sequence, next;
         private bool stopped;
-        private bool complete, pairRecorded;
+        private bool complete, pairRecorded, settled;
         private string lastZdoHash;
         private Plan prepared;
         private Attempt pending;
         private readonly int count;
         private readonly Guid operation;
+        private readonly int schema;
         private byte[] previousHash = new byte[32];
         internal string Path { get; }
 
-        private BlueprintStorageTransferJournal(string path, FileStream stream, int count, Guid operation)
-        { Path = path; this.stream = stream; this.count = count; this.operation = operation; }
+        private BlueprintStorageTransferJournal(string path, FileStream stream, int count, Guid operation, int schema)
+        { Path = path; this.stream = stream; this.count = count; this.operation = operation; this.schema = schema; }
 
         internal static string Root => System.IO.Path.Combine(BepInEx.Paths.ConfigPath, "BuildWorks", "Transfers");
+
+        // A saved paid shell alone is not a completed populated project part.
+        internal static Snapshot ReadConstruction(Guid project, Guid part, Guid operation, long world, long player,
+            string fingerprint, Payment[] paid)
+        {
+            if (HasReturnEvidence(operation))
+                throw new InvalidOperationException("Contents return evidence requires the cancellation workflow; forward completion cannot be reused.");
+            return ReadPaidForward(project, part, operation, world, player, fingerprint, paid);
+        }
+
+        internal static (Snapshot Forward, Snapshot Returned) ReadCancellation(Guid project, Guid part, Guid operation,
+            long world, long player, string fingerprint, Payment[] paid)
+        {
+            var forward = ReadPaidForward(project, part, operation, world, player, fingerprint, paid);
+            if (!HasReturnEvidence(operation)) return (forward, null);
+            var returned = Read(System.IO.Path.Combine(Root, ReturnOperationId(operation).ToString("N") + ".bwtransfer"));
+            var plan = returned.Prepared;
+            if (returned.Schema != 6 || plan.Route != Direction.ToPlayer || plan.Parent != operation ||
+                plan.Operation != ReturnOperationId(operation) || plan.World != world || plan.Player != player ||
+                plan.ConstructionProject != project || plan.ConstructionPart != part || plan.ConstructionFingerprint != fingerprint || plan.Paid.Length != 0)
+                throw new InvalidDataException("Contents return differs from its saved construction parent.");
+            return (forward, returned);
+        }
+
+        private static Snapshot ReadPaidForward(Guid project, Guid part, Guid operation, long world, long player,
+            string fingerprint, Payment[] paid)
+        {
+            if (project == Guid.Empty || part == Guid.Empty || operation == Guid.Empty || world == 0 || player == 0 ||
+                !Digest(fingerprint) || paid == null || paid.Length == 0)
+                throw new InvalidDataException("Saved construction payment is required for the contents outcome.");
+            string path = System.IO.Path.Combine(Root, operation.ToString("N") + ".bwtransfer");
+            CheckParents(System.IO.Path.GetFullPath(path));
+            Snapshot snapshot;
+            try { snapshot = Read(path); }
+            catch (FileNotFoundException) { return null; }
+            catch (DirectoryNotFoundException) { return null; }
+            Plan plan = snapshot.Prepared;
+            if (snapshot.Schema != 6 || plan.Route != Direction.ToContainer || plan.Parent != Guid.Empty ||
+                plan.ConstructionProject != project || plan.ConstructionPart != part || plan.Operation != operation ||
+                plan.World != world || plan.Player != player || plan.ConstructionFingerprint != fingerprint ||
+                plan.Paid.Length != paid.Length || plan.Paid.Where((row, i) => paid[i] == null ||
+                    row.Prefab != paid[i].Prefab || row.Properties != paid[i].Properties || row.Before != paid[i].Before ||
+                    row.Paid != paid[i].Paid || row.X != paid[i].X || row.Y != paid[i].Y).Any())
+                throw new InvalidDataException("Contents journal differs from its saved construction payment.");
+            return snapshot;
+        }
 
         internal static bool HasUnresolved(long world, string marker = null)
         {
@@ -112,7 +167,8 @@ namespace OstrixMods.BuildWorks
                     Snapshot record = Read(path, preparedOnly: true);
                     // Native IDs are remapped on world load. Unmarked/legacy targets cannot be distinguished safely.
                     if (record.Prepared.World == world && (record.Schema < 3 || string.IsNullOrEmpty(marker) ||
-                        record.Prepared.TargetMarker.ToString("N") == marker)) return true;
+                        record.Prepared.TargetMarker.ToString("N") == marker) &&
+                        (record.Schema < 6 || Read(path).RequiresReconciliation)) return true;
                 }
                 catch (Exception) { return true; } // Corrupt/unknown evidence cannot authorize destructive cleanup.
             }
@@ -182,12 +238,78 @@ namespace OstrixMods.BuildWorks
                     writer.Write(item.Amount); writer.Write(item.X); writer.Write(item.Y);
                     writer.Write(item.SourceSnapshot); writer.Write(item.Properties);
                 }
+                if (plan.HasConstructionBinding)
+                {
+                    writer.Write(plan.ConstructionProject.ToByteArray()); writer.Write(plan.ConstructionPart.ToByteArray());
+                    writer.Write(plan.ConstructionFingerprint);
+                }
             });
             // CreateNew and a retained write handle exclude duplicate IDs and concurrent writers.
             var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
-            var journal = new BlueprintStorageTransferJournal(path, file, plan.Items.Length, plan.Operation);
-            try { file.Write(Magic, 0, Magic.Length); journal.Append(1, prepared); journal.prepared = Read(path, preparedOnly: true).Prepared; return journal; }
+            var journal = new BlueprintStorageTransferJournal(path, file, plan.Items.Length, plan.Operation, plan.HasConstructionBinding ? 6 : 5);
+            byte[] magic = plan.HasConstructionBinding ? ConstructionMagic : Magic;
+            try { file.Write(magic, 0, magic.Length); journal.Append(1, prepared); journal.prepared = Read(path, preparedOnly: true).Prepared; return journal; }
             catch { journal.Dispose(); throw; } // Preserve even a partial file for inspection; do not retry its ID.
+        }
+
+        // Only an exact clean linked return can reopen; a pending native call can never be inferred or retried.
+        internal static BlueprintStorageTransferJournal ResumeReturn(Snapshot expected) => ResumeExistingReturn(expected, paired: false);
+        internal static BlueprintStorageTransferJournal ResumePairedReturn(Snapshot expected) => ResumeExistingReturn(expected, paired: true);
+
+        private static BlueprintStorageTransferJournal ResumeExistingReturn(Snapshot expected, bool paired)
+        {
+            if (expected?.Prepared == null) throw new InvalidOperationException("Missing return evidence.");
+            string path = System.IO.Path.Combine(Root, expected.Prepared.Operation.ToString("N") + ".bwtransfer");
+            CheckParents(System.IO.Path.GetFullPath(path));
+            var file = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.Read);
+            try
+            {
+                var saved = Read(path);
+                if (saved.Schema != 6 || saved.Prepared.Route != Direction.ToPlayer || !saved.Prepared.HasConstructionBinding ||
+                    saved.InFlight.HasValue || (saved.SavedPair != null) != paired || saved.Settled ||
+                    paired && (!saved.Terminal || saved.Observations.Count != saved.Prepared.Items.Length) || saved.Observations.Any(row => row.State != 2) ||
+                    saved.Length != expected.Length || saved.Frames != expected.Frames || expected.TailHash == null ||
+                    !saved.TailHash.SequenceEqual(expected.TailHash))
+                    throw new InvalidOperationException("Return changed or does not match the requested clean/persisted recovery state.");
+                file.Position = file.Length;
+                return new BlueprintStorageTransferJournal(path, file, saved.Prepared.Items.Length, saved.Prepared.Operation, saved.Schema) {
+                    prepared = saved.Prepared, next = saved.Observations.Count, sequence = saved.Frames,
+                    previousHash = (byte[])saved.TailHash.Clone(), stopped = saved.Terminal, complete = saved.Terminal, pairRecorded = paired,
+                    lastZdoHash = saved.Observations.LastOrDefault()?.ZdoHash };
+            }
+            catch { file.Dispose(); throw; }
+        }
+
+        internal bool OnlyUnresolvedReturn()
+        {
+            try
+            {
+                if (schema != 6 || prepared.Route != Direction.ToPlayer || !prepared.HasConstructionBinding) return false;
+                CheckParents(System.IO.Path.GetFullPath(Root));
+                string[] paths = Directory.EnumerateFileSystemEntries(Root).Take(129).ToArray();
+                if (paths.Length > 128) return false;
+                bool found = false;
+                foreach (string path in paths)
+                {
+                    var saved = Read(path);
+                    if (System.IO.Path.GetFullPath(path) == System.IO.Path.GetFullPath(Path))
+                    {
+                        if (saved.Schema != 6 || saved.Prepared.Operation != operation || saved.Length != stream.Length ||
+                            saved.Frames != sequence || !saved.TailHash.SequenceEqual(previousHash)) return false;
+                        found = true;
+                    }
+                    else if (saved.Prepared.World == prepared.World && saved.RequiresReconciliation) return false;
+                }
+                return found;
+            }
+            catch (Exception) { return false; }
+        }
+
+        internal void CompleteRecoveredReturn()
+        {
+            if (schema != 6 || prepared.Route != Direction.ToPlayer || pending != null || next != count || complete || stopped || !OnlyUnresolvedReturn())
+                throw new InvalidOperationException("Clean completed return custody is required before its terminal record.");
+            Append(4, Encode(writer => writer.Write(true))); stopped = true; complete = true;
         }
 
         internal void BeforeMove(Attempt attempt)
@@ -244,6 +366,31 @@ namespace OstrixMods.BuildWorks
             pairRecorded = true;
         }
 
+        // The caller must revalidate the paid parent and live custody before this durable handoff.
+        internal void RecordSettlement(string constructionFingerprint)
+        {
+            if (schema != 6 || !complete || !pairRecorded || constructionFingerprint != prepared.ConstructionFingerprint)
+                throw new InvalidOperationException("Settlement requires the linked paid parent and completed paired save.");
+            if (settled) return;
+            var snapshot = Read(Path);
+            if (snapshot.SavedPair == null || snapshot.RequiresReconciliation == false ||
+                snapshot.Prepared.ConstructionFingerprint != constructionFingerprint)
+                throw new InvalidOperationException("Transfer evidence changed before settlement.");
+            Append(6, Encode(writer => { writer.Write(constructionFingerprint); writer.Write(PersistenceFingerprint(snapshot.SavedPair)); }), afterComplete: true);
+            settled = true;
+        }
+
+        private static string PersistenceFingerprint(Persistence pair)
+        {
+            byte[] bytes = Encode(writer => {
+                writer.Write(pair.BeforeGeneration); writer.Write(pair.Generation); writer.Write(pair.World); writer.Write(pair.Player);
+                writer.Write(pair.Marker.ToByteArray()); writer.Write(pair.ProfileHash); writer.Write(pair.PlayerInventoryHash); writer.Write(pair.WorldInventoryHash);
+                writer.Write(pair.SourceSession.ToByteArray()); writer.Write(pair.SourcePlayerInstance);
+                writer.Write(pair.PlayerInventory.Info); writer.Write(pair.PlayerInventory.Zdo);
+            });
+            using (var hash = SHA256.Create()) return BitConverter.ToString(hash.ComputeHash(bytes)).Replace("-", "");
+        }
+
         private static void ValidatePersistence(Plan plan, string zdoHash, Persistence pair)
         {
             if (pair.BeforeGeneration == 0 || pair.BeforeGeneration == uint.MaxValue || pair.Generation != pair.BeforeGeneration + 1 ||
@@ -269,8 +416,9 @@ namespace OstrixMods.BuildWorks
 
         private void Append(byte kind, byte[] payload, bool afterComplete = false)
         {
-            if (stopped && !(afterComplete && complete && !pairRecorded)) throw new InvalidOperationException("Transfer journal is stopped.");
-            byte[] body = Encode(writer => { writer.Write(5); writer.Write(operation.ToByteArray()); writer.Write(sequence); writer.Write(kind); writer.Write(previousHash); writer.Write(payload); });
+            if (stopped && !(afterComplete && complete && !settled && (kind == 5 && !pairRecorded || kind == 6 && pairRecorded)))
+                throw new InvalidOperationException("Transfer journal is stopped.");
+            byte[] body = Encode(writer => { writer.Write(schema); writer.Write(operation.ToByteArray()); writer.Write(sequence); writer.Write(kind); writer.Write(previousHash); writer.Write(payload); });
             if (body.Length > MaximumBytes || stream.Length + body.Length + 36 > MaximumBytes)
                 throw new InvalidDataException("Transfer journal exceeds its byte budget.");
             try
@@ -291,7 +439,7 @@ namespace OstrixMods.BuildWorks
             {
                 long length = file.Length;
                 byte[] magic = reader.ReadBytes(Magic.Length);
-                if (length < Magic.Length + 36 || length > MaximumBytes || !magic.SequenceEqual(Magic) && !magic.SequenceEqual(LegacyMagic4) && !magic.SequenceEqual(LegacyMagic3) && !magic.SequenceEqual(LegacyMagic2) && !magic.SequenceEqual(LegacyMagic))
+                if (length < Magic.Length + 36 || length > MaximumBytes || !magic.SequenceEqual(ConstructionMagic) && !magic.SequenceEqual(Magic) && !magic.SequenceEqual(LegacyMagic4) && !magic.SequenceEqual(LegacyMagic3) && !magic.SequenceEqual(LegacyMagic2) && !magic.SequenceEqual(LegacyMagic))
                     throw new InvalidDataException("Unknown or incomplete transfer journal.");
                 int schema = magic[5] - '0';
                 var result = new Snapshot { Schema = schema }; int sequence = 0; byte[] previous = new byte[32]; Guid operation = Guid.Empty;
@@ -299,7 +447,7 @@ namespace OstrixMods.BuildWorks
                 {
                     if (length - file.Position < 36) throw new InvalidDataException("Partial transfer journal frame.");
                     int size = reader.ReadInt32();
-                    if (size < 57 || size > MaximumBytes || size > length - file.Position - 32 || sequence > 8194)
+                    if (size < 57 || size > MaximumBytes || size > length - file.Position - 32 || sequence > (schema >= 6 ? 8195 : 8194))
                         throw new InvalidDataException("Invalid transfer journal frame length.");
                     byte[] body = reader.ReadBytes(size), expected = reader.ReadBytes(32);
                     using (var hash = SHA256.Create())
@@ -313,7 +461,8 @@ namespace OstrixMods.BuildWorks
                         if (frameOperation == Guid.Empty || frameOperation != operation || fields.ReadInt32() != sequence++)
                             throw new InvalidDataException("Transfer journal identity/sequence mismatch.");
                         byte kind = fields.ReadByte();
-                        if (result.Terminal && (schema < 4 || kind != 5 || result.SavedPair != null))
+                        if (result.Terminal && !(schema >= 4 && kind == 5 && result.SavedPair == null && !result.Settled ||
+                            schema >= 6 && kind == 6 && result.SavedPair != null && !result.Settled))
                             throw new InvalidDataException("Unexpected record after completed local transfer.");
                         if (!fields.ReadBytes(32).SequenceEqual(previous)) throw new InvalidDataException("Transfer journal chain mismatch.");
                         previous = expected;
@@ -334,6 +483,12 @@ namespace OstrixMods.BuildWorks
                             for (int i = 0; i < count; i++) plan.Items[i] = new Item { Prefab = fields.ReadString(), SourceX = fields.ReadInt32(),
                                 SourceY = fields.ReadInt32(), SourceQuantity = fields.ReadInt32(), Amount = fields.ReadInt32(), X = fields.ReadInt32(), Y = fields.ReadInt32(),
                                 SourceSnapshot = fields.ReadString(), Properties = fields.ReadString() };
+                            if (schema >= 6)
+                            {
+                                plan.ConstructionProject = new Guid(fields.ReadBytes(16)); plan.ConstructionPart = new Guid(fields.ReadBytes(16));
+                                plan.ConstructionFingerprint = fields.ReadString();
+                                if (!plan.HasConstructionBinding) throw new InvalidDataException("Missing paid construction binding.");
+                            }
                             Validate(plan);
                             if (plan.Operation != operation || System.IO.Path.GetFileName(path) != operation.ToString("N") + ".bwtransfer")
                                 throw new InvalidDataException("Transfer journal filename/plan identity mismatch.");
@@ -387,12 +542,20 @@ namespace OstrixMods.BuildWorks
                             }
                             result.SavedPair = pair;
                         }
+                        else if (schema >= 6 && kind == 6 && result.Terminal && result.InFlight == null && result.SavedPair != null && !result.Settled &&
+                            result.Observations.Count == result.Prepared.Items.Length && result.Observations.All(value => value.State == 2))
+                        {
+                            if (fields.ReadString() != result.Prepared.ConstructionFingerprint || fields.ReadString() != PersistenceFingerprint(result.SavedPair))
+                                throw new InvalidDataException("Settlement differs from its paid parent or paired save.");
+                            result.Settled = true;
+                        }
                         else throw new InvalidDataException("Unknown or reordered transfer journal record.");
                         if (packet.Position != packet.Length) throw new InvalidDataException("Unexpected transfer journal fields.");
                         if (preparedOnly && result.Prepared != null) return result;
                     }
                 }
                 if (result.Prepared == null || file.Length != length) throw new InvalidDataException("Transfer journal changed while reading.");
+                result.Frames = sequence; result.Length = length; result.TailHash = (byte[])previous.Clone();
                 return result;
             }
         }
@@ -407,8 +570,14 @@ namespace OstrixMods.BuildWorks
                 plan.Width < 1 || plan.Width > 256 || plan.Height < 1 || plan.Height > 256 || plan.Items == null ||
                 plan.Items.Length < 1 || plan.Items.Length > 4096 || plan.Items.Length > plan.Width * plan.Height)
                 throw new InvalidDataException("Invalid transfer journal plan.");
+            if ((plan.ConstructionProject != Guid.Empty || plan.ConstructionPart != Guid.Empty || plan.ConstructionFingerprint != null) &&
+                (plan.ConstructionProject == Guid.Empty || plan.ConstructionPart == Guid.Empty || !Digest(plan.ConstructionFingerprint) ||
+                 plan.Route == Direction.ToContainer && plan.Paid.Length == 0))
+                throw new InvalidDataException("Incomplete paid construction binding.");
             var cells = new HashSet<int>();
             long budget = 2048 + Utf8.GetByteCount(plan.PieceName);
+            // Reserve the complete native player projection and linked terminal before any move.
+            if (plan.HasConstructionBinding) budget += BlueprintForeignPartData.MaximumContainerBase64 + 4L * 32768 + 1024;
             foreach (Payment paid in plan.Paid)
             {
                 if (paid == null || string.IsNullOrEmpty(paid.Prefab) || string.IsNullOrEmpty(paid.Properties) || paid.Paid < 1 || paid.Before > ushort.MaxValue || paid.Before < paid.Paid ||

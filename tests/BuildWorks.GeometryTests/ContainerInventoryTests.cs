@@ -93,7 +93,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
                 large[0].CustomData["key0"].Length == 40000);
         }
 
-        private static byte[] Packet(byte[] custom = null, int firstHash = -101)
+        internal static byte[] Packet(byte[] custom = null, int firstHash = -101, int secondHash = 100)
         {
             using (var stream = new MemoryStream())
             using (var writer = new BinaryWriter(stream, Encoding.UTF8, true))
@@ -105,7 +105,7 @@ namespace OstrixMods.BuildWorks.GeometryTests
                 writer.Write(custom ?? CustomPairs(2));
                 writer.Write((byte)1);
                 writer.Write(0); writer.Write((byte)0); writer.Write((byte)0); writer.Write((byte)0); writer.Write((byte)64);
-                writer.Write(100); writer.Write((byte)0);
+                writer.Write(secondHash); writer.Write((byte)0);
                 writer.Flush(); return stream.ToArray();
             }
         }

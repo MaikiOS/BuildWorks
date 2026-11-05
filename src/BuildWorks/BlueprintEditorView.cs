@@ -516,6 +516,11 @@ namespace OstrixMods.BuildWorks
         private readonly Button edgeButton;
         private readonly Button pointRevealButton;
         private readonly Button gridButton;
+        private readonly TMP_InputField groundHeightInput;
+        private float groundHeight;
+        private readonly Button structuralCheckButton;
+        private readonly TMP_Text structuralStatus;
+        private bool structuralCheck;
         private readonly Button projectionButton;
         private readonly IBlueprintEditorInput input;
         private readonly GameObject modal;
@@ -1422,6 +1427,24 @@ namespace OstrixMods.BuildWorks
                 RepositionViewControl(gridButton.transform, 1, 12f, 44f, 294f, 32f);
                 SetButtonLabel(gridButton, T("editor.view.grid_tooltip"));
                 RepositionViewControl(interfaceScaleButton.transform, 1, 12f, 84f, 294f, 32f);
+                TMP_Text groundHeightLabel = CreateText("GroundHeightLabel", viewportSections[1].transform,
+                    T("editor.view.ground_height"), 12f, FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+                SetTopLeft(groundHeightLabel.rectTransform, 12f, 124f, 160f, 36f);
+                groundHeightInput = CreateInput("GroundHeight", viewportSections[1].transform,
+                    new Vector2(180f, -124f), 126f, .05f, resetValue: 0f);
+                AddTooltip(groundHeightLabel.rectTransform, T("editor.view.ground_height_help"));
+                AddTooltip((RectTransform)groundHeightInput.transform, T("editor.view.ground_height_help"));
+                groundHeightInput.onEndEdit.AddListener(_ => PublishGroundHeight());
+                SetGroundHeight(0f);
+                structuralCheckButton = CreateButton("StructuralCheck", viewportSections[1].transform,
+                    T("editor.support.toggle"), 294f, () =>
+                    { structuralCheck = !structuralCheck; SetSelected(structuralCheckButton, structuralCheck); StructuralCheckChanged?.Invoke(structuralCheck); });
+                SetTopLeft((RectTransform)structuralCheckButton.transform, 12f, 164f, 294f, 32f);
+                AddTooltip((RectTransform)structuralCheckButton.transform, T("editor.support.help"));
+                structuralStatus = CreateText("StructuralStatus", viewportSections[1].transform,
+                    T("editor.support.off"), 11f, FontStyles.Normal, TextAlignmentOptions.TopLeft);
+                structuralStatus.textWrappingMode = TextWrappingModes.Normal;
+                SetTopLeft(structuralStatus.rectTransform, 12f, 204f, 294f, 84f);
                 GizmoFamily[] families = { GizmoFamily.Move, GizmoFamily.Rotate, GizmoFamily.Points, GizmoFamily.Scale };
                 string[] familyKeys = { "editor.view.family_move", "editor.view.family_rotate", "editor.view.points", "editor.view.family_scale" };
                 for (int index = 0; index < families.Length; ++index)
@@ -1675,6 +1698,8 @@ namespace OstrixMods.BuildWorks
         internal event Action<BlueprintEditorTool> ToolSelected;
         internal event Action<BlueprintEditorLightingPreset> LightingChanged;
         internal event Action<float, float, float, float, float, bool> ViewportSettingsChanged;
+        internal event Action<float> GroundHeightChanged;
+        internal event Action<bool> StructuralCheckChanged;
         internal event Action<GizmoFamily> GizmoFamilySelected;
         internal event Action<GizmoAxis> PreviewAxisRequested;
         internal event Action<int> CursorSourceRequested;
@@ -1809,6 +1834,7 @@ namespace OstrixMods.BuildWorks
         internal void Tick()
         {
             if (disposed) return;
+            RefreshCatalogTextPermission();
             exchangeView?.Tick();
             if (statusMessageUntil > 0f && Time.unscaledTime >= statusMessageUntil)
             {
@@ -2412,6 +2438,30 @@ namespace OstrixMods.BuildWorks
             HideDialog(); accepted?.Invoke(name, category);
         }
 
+        internal void SetGroundHeight(float value)
+        {
+            groundHeight = value;
+            groundHeightInput.SetTextWithoutNotify(value.ToString("G9", CultureInfo.CurrentCulture));
+        }
+
+        internal void SetStructuralCheck(bool enabled, string status)
+        {
+            structuralCheck = enabled;
+            SetSelected(structuralCheckButton, enabled);
+            if (structuralStatus.text != status) structuralStatus.text = status;
+        }
+
+        private void PublishGroundHeight()
+        {
+            if (!TryRead(groundHeightInput, out float value) || float.IsNaN(value) || float.IsInfinity(value))
+            {
+                SetGroundHeight(groundHeight);
+                return;
+            }
+            SetGroundHeight(value);
+            GroundHeightChanged?.Invoke(value);
+        }
+
         internal void SetViewportSettings(float move, float rotation, float array,
             float points, float uniformScaleHandle, bool grid)
         {
@@ -2499,7 +2549,7 @@ namespace OstrixMods.BuildWorks
                 SetSelected(viewportSectionButtons[index], open && index == section);
             }
             SetTopRight((RectTransform)viewportSettings.transform, 8f, 48f, 320f,
-                section == 0 ? 380f : section == 1 ? 176f : section == 3 ? 416f : 480f);
+                section == 0 ? 380f : section == 1 ? 348f : section == 3 ? 416f : 480f);
             FitViewportSettings();
             EndTooltip();
         }

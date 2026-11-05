@@ -227,7 +227,7 @@ project.unpaid	Unbuilt parts: {0}. No resources contributed.
 project.cancel_confirm	Press again to confirm cancellation. Built parts will be removed. After saving, reopen the board to return actually spent resources. Nothing is granted if nothing was paid.
 project.cancel_unpaid_confirm	Press again to confirm cancellation. No resources were spent: the ghost and board will disappear and nothing will be refunded.
 project.missing	Some required prefabs are unavailable.
-project.payment_pending	The list above is the cost of remaining parts, not a refund quote. Continue uses your inventory and normal Valheim placement rules. Mounted/container contents remain unavailable. Closing keeps the project.
+project.payment_pending	The list above is the cost of remaining parts, not a refund quote. Continue uses your inventory and normal Valheim placement rules. Closing keeps the project.
 project.refund	Issue refund
 project.refund_confirm	Press again to confirm. Returned items will appear by the board. Pick them up using Interact; they will not be issued again.
 project.refund_wait	The refund has been issued. Pick up the items by the board using Interact. Unconfirmed outcomes block repeated issuance.
@@ -236,12 +236,14 @@ project.cancel_pending	Construction is stopped for cancellation. Refund items ca
 project.continue	Continue construction
 project.progress	Built: {0} / {1} parts.
 project.review	An operation needs verification. Repeating construction or an automatic refund is blocked.
+project.contents_pending	The paid container is saved. Provide its contents from your inventory, then continue the project. Construction materials will not be charged again.
 project.unavailable	The construction project is not ready for this operation.
 project.error	Project operation failed: {0}
 project.fog_error	Preview unavailable: {0}. Your project and construction records are retained.
 project.created	Project saved. Construction uses your materials; if it stops, return to its board with a hammer.
 project.saved_error	Project {0} is saved, but its board is unavailable: {1}. Construction has not started.
 placement.pause.validation	the next part did not pass Valheim validation
+placement.pause.support_missing	the remaining parts have no validated contact; add support or adjust the blueprint
 placement.pause.tool_missing	the required part is unavailable in the current hammer
 placement.pause.native_start	Valheim did not start placement; check the hammer and stamina
 placement.pause.native_rejected	Valheim rejected the next part
@@ -254,7 +256,7 @@ placement.cell_skipped	BuildWorks: cell {0} is occupied by the character — ski
 placement.error	BuildWorks: placement error. Inspect the world before retrying.
 placement.select_build_piece	BuildWorks: select a construction part with the hammer.
 placement.snap_visible_first	BuildWorks: first aim a visible part at a snap point.
-placement.special_unsupported	BuildWorks: this special part is not supported yet.
+placement.special_unsupported	BuildWorks: precision placement is unavailable for this tool action.
 layout.row_ready	BuildWorks: row {0}×1 is ready. Drag the other gold arrow to add width.
 layout.plane_ready	BuildWorks: grid {0}×{1} is ready.
 layout.scale_positive	ARRAY: reduce the scale step or count — every copy scale must be positive
@@ -353,7 +355,7 @@ editor.hint.array_ready	ARRAY: wheel — count · Enter — create · Esc — ca
 editor.hint.array_begin	ARRAY: drag gold arrow — first row · another — second row · Esc — cancel
 editor.hint.contour_ready	CONTOUR: LMB — another chain · Enter — create · Ctrl+2 — gizmo · Esc — cancel
 editor.hint.contour_begin	CONTOUR: hover an unselected support edge — guide only · LMB — preview copies · Enter — create · Esc — cancel
-editor.hint.transform	Click point — pivot A · G — surface move from A · X/Y/Z — constrain · R — rotate · S — scale · drag handle — edit · Alt+arrow — copy
+editor.hint.transform	Click point — pivot A · G — surface move from A · X/Y/Z — constrain · R — rotate · S — scale · drag handle — edit · Alt+drag — copy
 editor.hint.empty	Tab — add part · MMB — camera
 editor.hint.select	LMB — select · Ctrl/Shift+LMB — add/remove · empty drag — box · MMB click/Delete — remove · G — open gizmo
 editor.hint.modes_selected	Ctrl+1 — select · Ctrl+2 — gizmo · Ctrl+3 — array · Ctrl+4 — contour · Space/F3 — tools · Tab — catalog
@@ -499,6 +501,27 @@ editor.view.free_rotation_tooltip	Free rotation of the selected point around the
 editor.view.free_short	FREE
 editor.view.gizmo_size	GIZMO SIZE · %
 editor.view.grid_tooltip	Show / hide grid
+editor.view.ground_height	Ground level Y (m)
+editor.view.ground_height_help	Fixed editor reference plane. Editing parts does not move it. No world terrain is changed.
+editor.support.toggle	Check structural support
+editor.support.help	Optional estimate for the chosen flat ground. Blue: maximum; red: low support, not always collapse. Grey: not verified. World placement is checked separately. Editing and saving remain available.
+editor.support.off	Structural estimate is off. Ground Y stays fixed.
+editor.support.ground	Assumed flat ground Y={0} m · world checked separately
+editor.support.progress	Checking support: {0}/{1}
+editor.support.failed	Could not verify support. No stability claim.
+editor.support.summary	Supported: {0} · weak: {1} · unverified: {2}
+editor.support.unknown	Selected: no verified structural model or support chain.
+editor.support.value	Selected support: {0} · minimum: {1}
+editor.support.fall	collapse risk
+editor.support.no_wear	this object does not decay from lack of support
+editor.support.assumed_ground	assumed ground
+editor.support.source	Support source: {0}
+editor.support.reason.static	No standard collapse model is available for this static object.
+editor.support.reason.capacity	Too many overlapping colliders for a complete native query.
+editor.support.reason.budget	Calculation budget reached; stability is not confirmed.
+editor.support.reason.chain	A supporting part has an unverified model or support chain.
+editor.support.reason.geometry	Prefab or collision geometry is missing or unverified.
+editor.support.reason.model	Native structural material or computed support data is unverified.
 editor.view.group	GROUP
 editor.view.group_info	Group · {0} parts\n◇ Pivot: {1}\nEye/Lock are inherited by child parts.
 editor.view.group_pivot	GROUP PIVOT: {0}
@@ -810,7 +833,8 @@ editor.support.centre_role	Transform centre
 editor.support.modes	Ctrl+1 — select · Ctrl+2 — gizmo · Space/F3 — tools · Tab — catalog
 exchange.import	Import file
 exchange.export	Export file
-exchange.path_help	Full path to .buildworks.json, .blueprint, .vbuild or .zip. A separate copy goes to BuildWorks/imports; the original stays unchanged.
+exchange.path_help	Path to .buildworks.json, .blueprint, .vbuild, OpenKeep or BetterBuilding legacy .json, KG .yml/.oprint, .bbp, Unbound .vtbp or .zip. Import adds a separate copy and keeps the original.
+catalog.unbound_metadata	Unbound: {0} parts, {1} saved object-state fields and {2} terrain height samples. Terrain is retained without changing the ground. Unsupported object state prevents construction.
 exchange.loading	Loading blueprint library in the background…
 exchange.ready	Blueprint library updated. Use ⋯ to edit/export; click a card to place.
 exchange.exported	Export saved: {0}
@@ -831,7 +855,7 @@ exchange.documents	Documents
 exchange.desktop	Desktop
 exchange.filename	File name
 exchange.contents_title	Contents of the exported copy
-exchange.contents_counts	Verified storages: {0}; items: {1}\nMounted items: {2}\nUnknown or unsupported records: {3}; previously cleared objects: {4}
+exchange.contents_counts	Parsed storages: {0}; items: {1}\nMounted items: {2}\nUnknown or unsupported records: {3}; previously cleared objects: {4}
 exchange.storage_keep	Storage inventories: KEEP
 exchange.storage_clear	Storage inventories: CLEAR IN COPY
 exchange.mounts_keep	Mounted items: KEEP
@@ -1139,3 +1163,119 @@ peer.origin_conflict	The documents disagree about the same peer transfer. Merge 
 peer.offer_conflict	This offer was already accepted with different details. No new copy was created.
 peer.accepted_deleted	This offer was already accepted, and its personal copy was deleted. Repeating it cannot restore the copy; ask the sender for a new offer.
 peer.receipt_limit	Cannot accept another offer: the saved acceptance history is full. Existing receipts were retained.
+selection.loaded_resize_status	Selected: {1}. Unloaded zones: {0}. Loaded objects only. Drag a bottom corner to resize.
+exchange.batch_exported	Exported: {1} [{2}] → {0} in the archive
+exchange.batch_imported	Imported: {0} → {1} [{2}]
+
+peer.tab	Send between players
+peer.players	Players
+peer.inbox	Inbox
+peer.decline	Decline offer
+peer.withdraw	Withdraw last offer
+peer.ready	Choose a player or open Inbox.
+peer.help	Both players must open this tab to appear in the list. Select a recipient and review your offer. Offers expire and do not survive reconnect or server restart. Reading a document does not accept it.
+peer.inbox_help	Choose an offer to preview before accepting.
+peer.context_changed	Connection or review changed. Refresh and review again.
+peer.offered	Offer sent. The recipient decides whether to save a copy.
+peer.consent	Review the contents, then explicitly save your personal copy.
+peer.copy_review	From: {0}\nBlueprint: {1}\nParts: {2}; format: {3}\nMissing parts: {4}\nStorage objects: {5}; stored items: {6}; mounts: {7}; unknown state: {8}\nSaving a copy does not grant building or administrator rights.
+peer.send_review	Offer blueprint «{0}» to player «{1}»? Your original stays unchanged. The recipient must explicitly accept a personal copy.
+peer.send_consent	Confirm this recipient and blueprint before sending.
+peer.saved_unknown	Personal copy saved; receipt confirmation is unknown.
+peer.saved_details	Saved personal copy: {0}. It remains saved if confirmation fails.
+peer.saved_confirmed	Personal copy saved and receipt confirmed.
+peer.saved_terminal	Personal copy remains saved. Offer state: {0}.
+peer.terminal	Offer state: {0}.
+peer.outgoing_terminal	Sent offer «{0}»: {1}.
+peer.accept_copy	Save this personal copy
+peer.check_ack	Check receipt confirmation
+peer.offer	Send this offer
+peer.preview	Preview this offer
+peer.prepare_send	Review offer to player
+peer.offer_details	From: {0}\nBlueprint: {1}\nParts: {2}; format: {3}\nPreview to review contents before deciding.
+peer.recipient	Recipient: {0}\nThe selected catalogue blueprint will be offered after your confirmation.
+peer.failure.Invalid	Invalid transfer data. Refresh the offer.
+peer.failure.Unavailable	Transfer unavailable. Refresh after reconnecting.
+peer.failure.Denied	The server denied this action.
+peer.failure.Conflict	The offer changed or expired.
+peer.failure.Capacity	Transfer limit reached.
+peer.failure.Busy	Another transfer is in progress.
+peer.failure.Cancelled	Transfer request cancelled.
+peer.failure.Failed	Transfer failed. Check the result before repeating.
+peer.failure.Timeout	No response. Check the result before repeating.
+peer.state.Pending	Pending
+peer.state.Accepted	Accepted
+peer.state.Declined	Declined
+peer.state.Withdrawn	Withdrawn
+peer.state.Expired	Expired
+peer.inbox_source	Receiving a personal copy does not change your current document or building rights.
+exchange.evidence_levels	Archived: confirming file import will retain the exact original, including its declared version and origin, in the import archive. World capture retains a data snapshot. Archived unknown fields are not format support.\nParsed: the records and supported fields listed here; counts do not prove gameplay. Output formats: catalogue {0}, portable document {1}. The source version remains in the original; it is not inferred from the extension.\nRestored behavior: this window does not verify it. Construction, survival permissions and save/reload require separate game checks.
+blueprint.capture_origin_failed	Could not record the world capture origin; no blueprint was saved.
+exchange.evidence_source	Source: {0}; format: {1}; content ID: {2}
+exchange.evidence_no_source	No embedded source file or capture-origin record. Missing source information is not reconstructed by guessing.
+import.state_policy	Terrain data is not applied. New construction uses normal Valheim rules: original damage/structural-support state, invulnerability, AI settings and ownership are not restored. The original source is unchanged. Parsing does not grant restoration rights.
+exchange.format_openkeep	OpenKeep JSON
+exchange.format_devbridge	DevBridge JSON
+exchange.openkeep_help	Review the receiving format and its limits; export JSON together with the full BuildWorks document.
+exchange.openkeep_title	{0}: export review
+exchange.openkeep_review	Folder: {0}\n{1}.json — {2} prefab records with position and yaw.\n{1}.buildworks.json — full construction document and original sources.\n\nJSON cannot carry BuildWorks signs ({3}), object state/contents ({4}), material seeds ({5}), groups ({6}), supports ({7}), anchors ({8}), per-piece metadata/mod dependencies ({9}) or other source documents ({10}). Custom snap points, record IDs, labels, visibility/locks, document placement frame, author/usage metadata and editor settings remain only in the full native file. Original root/site metadata and source record tails are preserved when present; this does not convert them to BuildWorks object state.\nOnly yaw and unchanged prefab root scale are representable. The receiving mod controls costs, terrain actions, permissions and persistence; export does not guarantee these actions.
+exchange.openkeep_original_site	The original site/terrain/relief/water/clearance plan and annotations keep their original coordinate frame. They are not moved, rotated or resized with edited pieces. Inspect the JSON before using terrain actions in the receiving tool. BuildWorks does not execute those actions.
+exchange.openkeep_derived_site	No original site plan is available. OpenKeep will derive its own defaults; a new DevBridge document gets declared clearance/standing defaults from the exported footprint. These are planning hints, not a surveyed safe site or permission to alter terrain.
+exchange.openkeep_warning	Check the format limits and site plan above. Confirmation creates both files together without overwriting existing files.
+exchange.openkeep_blocked	This document cannot be represented safely by this JSON profile. See the reasons above; Back allows a full BuildWorks export.
+exchange.openkeep_block_multiplesites	Blocked: multiple independent OpenKeep site/source documents cannot be merged into one site ({0}).
+exchange.openkeep_block_rotation	Blocked: pitch/roll cannot be represented by the yaw-only profile. Affected pieces: {0}.
+exchange.openkeep_block_scale	Blocked: custom root scale cannot be represented. Affected pieces: {0}.
+exchange.openkeep_block_prefabscaleunknown	Blocked: the receiving prefab root scale could not be verified. Affected prefab IDs: {0}.
+exchange.openkeep_block_devbridgesite	Blocked: the existing source lacks required DevBridge clearance/standing/terrain fields. Original data is not silently replaced ({0}).
+exchange.openkeep_block_devbridgeextra	Blocked: DevBridge requires exactly five fields per piece; unknown source fields would be lost. Affected pieces: {0}.
+exchange.openkeep_block_devbridgerelief	Blocked: DevBridge ignores the known relief height grid and may apply a flat fallback instead. Use OpenKeep or the full BuildWorks file ({0}).
+exchange.openkeep_block_devbridgeprefab	Blocked: DevBridge cannot safely pass prefab IDs containing quotes or line breaks into its command. Affected pieces: {0}.
+exchange.format_kg	KG + full copy
+exchange.kg_help	KG preserves the source format (.yml or .oprint), supported transforms and state; a full BuildWorks copy is saved alongside it. Review the file names before writing.
+exchange.kg_title	KG export review
+exchange.kg_review	Destination: {0}\nFiles: {1}{11} and {1}.buildworks.json\nKG: {2} pieces, {3} sign texts, {4} material seeds, {5} preserved raw states, {6} original source images.\nFull copy only: {7} groups, {8} supports, {9} anchors, {10} other source documents. Source author, description and original images are preserved; images may show the original building before edits.
+exchange.kg_archived	Previous BuildWorks project identifiers, payment receipts and placement witnesses are kept only in the full copy: {0} fields. They are not replayed through KG. Full source bytes remain in the copy. Other consumers may interpret raw state differently.
+exchange.kg_warning	Confirm to write both files. The full copy retains BuildWorks construction data; KG does not encode that data.
+exchange.kg_block_sources	Blocked: multiple independent KG sources cannot be merged without choosing their metadata ({0}).
+exchange.kg_block_scale	Blocked: KG cannot represent this root scale. Affected pieces: {0}.
+exchange.kg_block_basis	Blocked: the native prefab scale could not be verified. Affected pieces: {0}.
+exchange.kg_block_binding	Blocked: a piece no longer matches its recorded KG source address. Affected pieces: {0}.
+exchange.kg_block_state	Blocked: this state has no verified KG conversion or source binding. Affected pieces: {0}. Use the full BuildWorks format.
+exchange.kg_block_type	Blocked: source state uses an incompatible type for an edited field. Affected fields: {0}.
+exchange.kg_block_precision	Blocked: KG float coordinates or Euler rotation would change the edited pose beyond tolerance. Affected pieces: {0}.
+catalog.source_hidden	Source description and images are hidden by the user content permission.
+catalog.source_unavailable	Source metadata could not be verified.
+catalog.kg_multiple	KG sources: {0}. Their authors and images are not merged.
+catalog.kg_metadata	Author: {0}\nDescription: {1}
+catalog.kg_original_image	Embedded images belong to the original KG source and may precede edits. Signs, unknown state or restricted content use a generated preview instead.
+exchange.format_bbp	BetterBuilding .bbp
+exchange.bbp_help	Export BetterBuilding geometry, signs, display-item descriptors and scale. An unchanged terrain grid can be retained. Review the limits and both file names before writing.
+exchange.bbp_title	BetterBuilding .bbp export
+exchange.bbp_review	Destination: {0}\nFiles: {1}.bbp and {1}.buildworks.json\nBBP: {2} pieces, {3} sign texts, {4} display-item descriptors, {5} scales, {6} terrain height samples.\nFull copy only: {7} other sources, {8} pieces with other state, {9} groups, {10} supports and {11} anchors. BBP stores no full inventories or arbitrary object state. A terrain grid is retained only while its source geometry and frame remain unchanged.
+exchange.bbp_warning	Confirm to write both files. Display-item descriptors are not complete inventories. The full copy retains original sources and BuildWorks construction data. Export does not apply terrain or create items.
+exchange.bbp_block_binding	Blocked: a piece no longer matches its interpreted BetterBuilding source address. Affected pieces: {0}.
+exchange.bbp_block_terrain	Blocked: the retained terrain grid no longer matches the document, or several grids need reconciliation. Affected cases: {0}.
+exchange.bbp_block_basis	Blocked: the native prefab scale is unknown for this absolute scale. Affected pieces: {0}.
+exchange.bbp_block_item	Blocked: a displayed item is bound to a different original prefab. Affected pieces: {0}.
+exchange.bbp_block_format	Blocked: BetterBuilding cannot represent this name, transform, scale, state or file size within the supported limits. Affected cases: {0}.
+catalog.bbp_metadata	BBP source data: {0} pieces, {1} sign texts, {2} display-item descriptors, {3} scales and {4} terrain height samples. Retaining data does not mean applying it in game.
+exchange.bbp_json_reserved_name	A legacy JSON file name cannot end in .buildworks: that suffix belongs to the full BuildWorks copy. Choose another name.
+exchange.format_bbp_json	BetterBuilding JSON
+exchange.bbp_json_help	Export the supported legacy BetterBuilding JSON schema, separately from OpenKeep JSON and BBPF .bbp. Review both files and excluded data before writing.
+exchange.bbp_json_title	Legacy BetterBuilding JSON export
+exchange.bbp_unknown	Unrecognised source fields: {0}. They stay in the original JSON inside the full BuildWorks copy and are omitted from the edited foreign file.
+catalog.bbp_json_metadata	BetterBuilding source data ({5}): {0} pieces, {1} sign texts, {2} display-item descriptors, {3} scales, {4} terrain height samples and {6} unrecognised fields. Retaining data does not mean applying it in game.
+exchange.bbp_json_review	Destination: {0}\nFiles: {1}.json and {1}.buildworks.json\nBetterBuilding JSON: {2} pieces, {3} sign texts, {4} display-item descriptors, {5} scales, {6} terrain height samples.\nFull copy only: {7} other sources, {8} pieces with other state, {9} groups, {10} supports and {11} anchors. BetterBuilding JSON stores no full inventories or arbitrary object state. A terrain grid is retained only while its source geometry and frame remain unchanged.
+exchange.format_planner	Planner JSON v3
+exchange.planner_title	Valheim Base Builder JSON v3 export
+exchange.planner_help	Exports planner JSON v3 with layers and an adjacent complete BuildWorks copy. Review scale, rotations and data kept only in the full copy before saving.
+exchange.planner_review	Folder: {0}\nFiles: {1}.json + {1}.buildworks.json\nParts: {2}; layers: {3}, empty: {4}. Source-bound layers: {5}; new or copied layers: {6}.\nOnly in the full copy: other sources {7}, signs {8}, object state {9}, prefab metadata {10}, supports {11}, anchors/snaps {12}, parent links {13}, editor flags/pivots {14}.\nUnknown fields in archived planner sources: {15}. Root fields and retained piece/layer records stay with their source; deleted records are not recreated.
+exchange.planner_warning	Check the review, then save both files. Planner JSON supports yaw and absolute unit scale; use the full copy to retain the complete BuildWorks document.
+exchange.planner_block_multiplesources	Cannot merge the original data of multiple planner projects into one JSON: {0}.
+exchange.planner_block_sourcebinding	Unverified source addresses or placement frames: {0}.
+exchange.planner_block_prefabscaleunknown	Unknown intrinsic prefab scales: {0}. Export is blocked.
+exchange.planner_block_scale	Parts outside absolute unit scale: {0}. Planner JSON cannot represent them.
+exchange.planner_block_rotation	Parts with pitch or roll: {0}. Planner JSON cannot represent them.
+exchange.planner_block_format	Some data cannot be written within the supported planner profile: {0}. Use a complete BuildWorks export.
+catalog.planner_metadata	Archived planner source: {0} pieces, {1} layers, {2} unknown fields. This describes the source, not later edits.

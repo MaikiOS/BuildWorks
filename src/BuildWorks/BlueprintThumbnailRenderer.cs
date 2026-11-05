@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using BepInEx;
 using UnityEngine;
 
@@ -40,13 +43,28 @@ namespace OstrixMods.BuildWorks
         private readonly HashSet<string> queued = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> incomplete = new HashSet<string>(StringComparer.Ordinal);
         private bool textAllowed = BlueprintSignPreview.Allowed;
+        private readonly HashSet<string> importedAttempted = new HashSet<string>(StringComparer.Ordinal);
+        private readonly Dictionary<string,(string Signature,string Hash)> sourceKeys =
+            new Dictionary<string,(string,string)>(StringComparer.Ordinal);
 
-        private void RefreshTextPermission()
+        internal bool RefreshTextPermission()
         {
             bool allowed = BlueprintSignPreview.Allowed;
-            if (allowed == textAllowed) return;
+            if (allowed == textAllowed) return false;
             Dispose();
             textAllowed = allowed;
+            return true;
+        }
+
+        private void RefreshSourceKey(CompositeBlueprintStore.Blueprint blueprint)
+        {
+            string signature=string.Join("|",(blueprint.sourceDocuments ?? new List<CompositeBlueprintStore.SourceDocument>()).Select(source=>source.id))+
+                "|sign:"+(blueprint.parts?.Any(part=>part.signText!=null)==true)+"|raw:"+(blueprint.parts?.Any(part=>part.foreignData!=null)==true);
+            if(sourceKeys.TryGetValue(blueprint.id,out var prior) && prior.Signature==signature)return;
+            RemoveCached(blueprint.id);failures.Remove(blueprint.id);importedAttempted.Remove(blueprint.id);
+            queued.Remove(blueprint.id);RemovePending(blueprint.id);incomplete.Remove(blueprint.id);
+            using(var hash=SHA256.Create())
+                sourceKeys[blueprint.id]=(signature,BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(signature))).Replace("-","").Substring(0,32));
         }
 
         private static Type ResolveImageConversionType()
@@ -75,6 +93,8 @@ namespace OstrixMods.BuildWorks
                 blueprint.parts == null || pieces == null ||
                 blueprint.parts.Count != pieces.Count || CompositeBlueprintStore.InteractiveError(blueprint.parts.Count) != null)
                 return null;
+            RefreshTextPermission();
+            RefreshSourceKey(blueprint);
             bool partial = PrepareResolutionCache(blueprint, pieces);
             Sprite available = partial ? null : GetCached(blueprint);
             if (available) return available;
@@ -90,19 +110,24 @@ namespace OstrixMods.BuildWorks
         {
             RefreshTextPermission();
             if (blueprint == null || string.IsNullOrWhiteSpace(blueprint.id)) return null;
+            RefreshSourceKey(blueprint);
             if (sprites.TryGetValue(blueprint.id, out Sprite cached)) return cached;
             if (failures.Contains(blueprint.id)) return null;
-            // Imported images may show stale or unfiltered text. Render saved signs ourselves.
-            bool hasSign = blueprint.parts != null && blueprint.parts.Exists(part => part.signText != null);
-            byte[] importedPreview = hasSign ? null : blueprint.importPreview;
-            Sprite loaded = Load(blueprint.id, importedPreview);
+            Sprite loaded=null;
+            if(importedAttempted.Add(blueprint.id))
+                foreach(byte[] png in BlueprintSourcePresentation.Images(blueprint))
+                {
+                    loaded=Load(blueprint.id,png);
+                    if(loaded)break;
+                }
+            if(!loaded)loaded=Load(blueprint.id);
             if (loaded) sprites[blueprint.id] = loaded;
-            else if (importedPreview != null) failures.Add(blueprint.id);
             return loaded;
         }
 
         public bool ProcessOne(out string blueprintId, out Sprite sprite)
         {
+            RefreshTextPermission();
             blueprintId = null;
             sprite = null;
             while (pending.Count > 0)
@@ -133,12 +158,16 @@ namespace OstrixMods.BuildWorks
             if (string.IsNullOrWhiteSpace(blueprintId)) return;
             RemoveCached(blueprintId);
             failures.Remove(blueprintId);
+            importedAttempted.Remove(blueprintId);
             incomplete.Remove(blueprintId);
             queued.Remove(blueprintId);
             RemovePending(blueprintId);
-            foreach (bool allowed in new[] { false, true })
+            string prefix=CacheId(blueprintId)+"-contents-v";
+            string legacyPrefix=Path.GetFileName(blueprintId)+"-contents-v";
+            if(!Directory.Exists(directory))return;
+            foreach (string path in Directory.EnumerateFiles(directory,"*.png").Where(file=>
+                Path.GetFileName(file).StartsWith(prefix,StringComparison.Ordinal) || Path.GetFileName(file).StartsWith(legacyPrefix,StringComparison.Ordinal)))
             {
-                string path = ThumbnailPathFor(blueprintId, allowed);
                 try { if (File.Exists(path)) File.Delete(path); }
                 catch (Exception exception)
                 {
@@ -174,6 +203,7 @@ namespace OstrixMods.BuildWorks
             error = null;
             if (blueprint == null || blueprint.parts == null || pieces == null ||
                 blueprint.parts.Count != pieces.Count || CompositeBlueprintStore.InteractiveError(blueprint.parts.Count) != null) return null;
+            RefreshSourceKey(blueprint);
             bool partial = PrepareResolutionCache(blueprint, pieces);
 
             Sprite rendered = null;
@@ -243,6 +273,8 @@ namespace OstrixMods.BuildWorks
             pending.Clear();
             queued.Clear();
             incomplete.Clear();
+            importedAttempted.Clear();
+            sourceKeys.Clear();
         }
 
         private Sprite Load(string blueprintId, byte[] importedPng = null)
@@ -253,7 +285,8 @@ namespace OstrixMods.BuildWorks
             {
                 if (importedPng == null && (!File.Exists(path) || new FileInfo(path).Length > ExternalBlueprintLibrary.MaximumPreviewBytes)) return null;
                 byte[] png = importedPng ?? File.ReadAllBytes(path);
-                if (!ExternalBlueprintLibrary.ValidPreview(png)) return null;
+                if (!ExternalBlueprintLibrary.ValidPreview(png) || png.Length<57 ||
+                    !png.Skip(png.Length-12).SequenceEqual(new byte[]{0,0,0,0,73,69,78,68,174,66,96,130})) return null;
                 texture = new Texture2D(2, 2, TextureFormat.RGBA32, false)
                 {
                     hideFlags = HideFlags.HideAndDontSave,
@@ -313,9 +346,16 @@ namespace OstrixMods.BuildWorks
 
         private string ThumbnailPath(string blueprintId) => ThumbnailPathFor(blueprintId, textAllowed);
 
+        private static string CacheId(string id)
+        {
+            using(var hash=SHA256.Create())
+                return BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(id))).Replace("-","").Substring(0,32);
+        }
+
         private string ThumbnailPathFor(string blueprintId, bool allowed) => Path.Combine(
             directory,
-            Path.GetFileName(blueprintId) + "-contents-v4-ugc" + (allowed ? "1" : "0") + ".png");
+            CacheId(blueprintId) + "-contents-v5-" +
+            (sourceKeys.TryGetValue(blueprintId,out var key)?key.Hash:"none") + "-ugc" + (allowed ? "1" : "0") + ".png");
 
         private bool PrepareResolutionCache(CompositeBlueprintStore.Blueprint blueprint, IReadOnlyList<Piece> pieces)
         {

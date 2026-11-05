@@ -34,6 +34,14 @@ internal static class WorldSelectionVolumeChecks
         volume = new WorldSelectionVolume(new Point3(0, 100, 0), new Point3(2, 200, 2));
         Check(volume.TrySelect(new[] { 0, 1, 2 }, Position, included, excluded, 3, out selected) &&
             selected.SequenceEqual(new[] { 4, 2 }), "Changing height discarded manual decisions.");
+        // Resize the same footprint across an excluded origin and an explicitly included outside origin.
+        volume = new WorldSelectionVolume(new Point3(3, 0, 2), new Point3(0, 2, 0));
+        Check(volume.TrySelect(new[] { 0, 1, 2, 2, 3, 3 }, Position, included, excluded, 4, out selected) &&
+            selected.SequenceEqual(new[] { 0, 2, 3, 4 }), "Expanded footprint lost manual decisions or duplicated entries.");
+        volume = new WorldSelectionVolume(new Point3(3, 0, 2), new Point3(2.5, 2, 0));
+        Check(volume.TrySelect(new[] { 0, 1, 2, 3 }, Position, included, excluded, 3, out selected) &&
+            selected.SequenceEqual(new[] { 3, 4, 2 }), "Shrunk footprint discarded explicit inclusions.");
+        Check(included.SetEquals(new[] { 4, 2 }) && excluded.SetEquals(new[] { 1 }), "Footprint edit mutated manual decisions.");
         Check(volume.TrySelect(Array.Empty<int>(), Position, Array.Empty<int>(), new HashSet<int>(), 1, out selected) &&
             selected.Count == 0, "Empty selection failed.");
         Reject(() => volume.TrySelect(Array.Empty<int>(), Position, included, excluded, 0, out _));

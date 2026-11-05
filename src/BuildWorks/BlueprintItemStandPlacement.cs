@@ -38,9 +38,11 @@ namespace OstrixMods.BuildWorks
         }
 
         internal static bool SelectSupplies(Player player, IEnumerable<BlueprintForeignPartData> contents,
-            List<Supply> result)
+            List<Supply> result, Piece payingPiece = null)
         {
             var reserved = new Dictionary<ItemDrop.ItemData, int>();
+            if (payingPiece && !TryPredictNativeInventoryDebits(player, payingPiece, out reserved))
+            { result.Clear(); return false; }
             var snapshots = new Dictionary<ItemDrop.ItemData, string>();
             bool complete = true;
             int index = 0;
@@ -122,6 +124,27 @@ namespace OstrixMods.BuildWorks
                     }
                 }
                 if (reserved.Count == 0 || !payingPiece) return true;
+                if (!TryPredictNativeInventoryDebits(player, payingPiece, out var debits)) return false;
+                foreach (var entry in reserved)
+                {
+                    debits.TryGetValue(entry.Key, out int debit);
+                    if (entry.Key.m_stack - debit < entry.Value) return false;
+                }
+                return true;
+            }
+            catch (Exception error) when (error is ArgumentException || error is InvalidOperationException ||
+                error is NullReferenceException || error is OverflowException)
+            { return false; }
+        }
+
+        // shortcut: native inventory-only prediction; external debits require a provider-aware source ledger.
+        private static bool TryPredictNativeInventoryDebits(Player player, Piece payingPiece,
+            out Dictionary<ItemDrop.ItemData, int> debits)
+        {
+            debits = new Dictionary<ItemDrop.ItemData, int>();
+            try
+            {
+                if (!player || !payingPiece) return false;
                 if (!ZoneSystem.instance) return false;
                 if (ZoneSystem.instance.GetGlobalKey(payingPiece.FreeBuildKey())) return true;
 
@@ -147,14 +170,17 @@ namespace OstrixMods.BuildWorks
                     {
                         if (item.m_shared.m_name != name || item.m_worldLevel < Game.m_worldLevel) continue;
                         int debit = Math.Min(amount, remaining[item]);
+                        if (debit > 0)
+                        {
+                            debits.TryGetValue(item, out int paid);
+                            debits[item] = checked(paid + debit);
+                        }
                         remaining[item] -= debit;
                         amount -= debit;
                         if (amount == 0) break;
                     }
                     if (amount != 0) return false;
                 }
-                foreach (var entry in reserved)
-                    if (!remaining.TryGetValue(entry.Key, out int count) || count < entry.Value) return false;
                 return true;
             }
             catch (Exception error) when (error is ArgumentException || error is InvalidOperationException ||
@@ -335,10 +361,15 @@ namespace OstrixMods.BuildWorks
             int before = item.m_stack;
             bool complete = false;
             string expectedPackage = null;
+            string expectedMountedPackage = null;
             string expectedInfo = null;
             try
             {
                 expectedPackage = SnapshotItem(item);
+                // The native holder clears equipped on its saved clone; reservation bytes stay unchanged.
+                var mountedItem = item.Clone();
+                mountedItem.m_equipped = false;
+                expectedMountedPackage = SnapshotItem(mountedItem);
                 int wanted = int.Parse(data.Info.Split(':')[3], CultureInfo.InvariantCulture);
                 expectedInfo = item.m_dropPrefab.name + ":" + item.m_variant.ToString(CultureInfo.InvariantCulture) + ":" +
                     item.m_quality.ToString(CultureInfo.InvariantCulture) + ":" + wanted.ToString(CultureInfo.InvariantCulture);
@@ -374,7 +405,7 @@ namespace OstrixMods.BuildWorks
                 }
                 complete = BlueprintItemStandCapture.TryCapture(placed.GetComponent<Piece>(), out var captured) &&
                     captured != null && captured.Info == expectedInfo &&
-                    captured.Zdo == expectedPackage;
+                    captured.Zdo == expectedMountedPackage;
                 return complete;
             }
             catch (Exception error)
@@ -383,7 +414,7 @@ namespace OstrixMods.BuildWorks
                 complete = view && view.IsValid() && view.IsOwner() && ReferenceEquals(StandView.GetValue(stand), view) &&
                     before - (inventory.ContainsItem(item) ? item.m_stack : 0) == 1 &&
                     BlueprintItemStandCapture.TryCapture(placed.GetComponent<Piece>(), out var captured) &&
-                    captured != null && captured.Info == expectedInfo && captured.Zdo == expectedPackage;
+                    captured != null && captured.Info == expectedInfo && captured.Zdo == expectedMountedPackage;
                 return complete;
             }
             finally
@@ -399,7 +430,7 @@ namespace OstrixMods.BuildWorks
                     int consumed = before - remaining;
                     rollbackSafe = consumed == 0 && !stand.HaveAttachment() || consumed == 1 &&
                         BlueprintItemStandCapture.TryCapture(placed.GetComponent<Piece>(), out var held) &&
-                        held != null && held.Zdo == expectedPackage;
+                        held != null && held.Zdo == expectedMountedPackage;
                     if (!complete && consumed == 0 && stand.HaveAttachment() && view && view.IsValid() && view.IsOwner() &&
                         ReferenceEquals(StandView.GetValue(stand), view) && QueuedItem.GetValue(stand) == null &&
                         PrivateArea.CheckAccess(placed.transform.position, 0f, false, false) &&

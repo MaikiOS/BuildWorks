@@ -5,7 +5,7 @@
 **Alpha 0.19.329 limits:** paid placement and cold reload are confirmed for one wall-overlap chest and one rotated wall cookingstation; the chest opens. Cooking with food/fire/fuel and the sufficient-resources negative case remain untested. Placement does not waive operating requirements, resources, permissions or station checks. A chest cannot provide attachment support for another chest. Producer-name corrections are included; review missing parts and test your own mod stack. Unbound export UI is later source work and is not included in this issued archive.
 
 
-Guide for private alpha 0.19.329; each feature has its own acceptance scope. [Version/limits](ALPHA_0.19.329.md).
+Guide for alpha 0.19.329; each feature has its own acceptance scope. [Version/limits](ALPHA_0.19.329.md).
 
 ## Furniture and crafting placement
 
@@ -50,3 +50,6 @@ Production interactive/editor limit512; QA/Unity editor50000; document part limi
 
 English fallback and complete Russian catalogs are implemented and checked. [Roadmap](ROADMAP.md) tracks remaining selection/heavy/world-object/admin/network work. EarthWorks/terrain and OBJ/FBX/glTF are outside this module.
 
+
+
+This tag preserves the archive source: checkpoint `5a095eb81967e074c29c8588161e0495325c4b6d`. It freezes the 2 November alpha; later development is not included in the ZIP. 2.19 Unbound and the full module remain open. See [main](https://github.com/MaikiOS/BuildWorks/blob/main/docs/CURRENT_STATUS.md) for subsequent development.

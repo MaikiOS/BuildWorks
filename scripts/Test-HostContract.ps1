@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string] $ValheimManagedDir = 'C:\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed',
-    [string] $ProfileRoot = ''
+    [string] $ProfileRoot = '',
+    [string] $BuildOutputPath = ''
 )
 
 Set-StrictMode -Version Latest
@@ -15,8 +16,9 @@ $profileRoot = [IO.Path]::GetFullPath($ProfileRoot)
 $cecilPath = Join-Path $profileRoot 'BepInEx\core\Mono.Cecil.dll'
 $hostPath = Join-Path $ValheimManagedDir 'assembly_valheim.dll'
 $utilsPath = Join-Path $ValheimManagedDir 'assembly_utils.dll'
-$pluginPath = Join-Path $projectRoot 'artifacts\bin\BuildWorks.dll'
-$geometryPath = Join-Path $projectRoot 'artifacts\bin\BuildWorks.Geometry.dll'
+if ([string]::IsNullOrWhiteSpace($BuildOutputPath)) { $BuildOutputPath = Join-Path $projectRoot 'artifacts\bin' }
+$pluginPath = Join-Path $BuildOutputPath 'BuildWorks.dll'
+$geometryPath = Join-Path $BuildOutputPath 'BuildWorks.Geometry.dll'
 $pluginSourcePath = Join-Path $projectRoot 'src\BuildWorks\BuildWorksPlugin.cs'
 $sessionSourcePath = Join-Path $projectRoot 'src\BuildWorks\PrecisionPlacementSession.cs'
 $hudSourcePath = Join-Path $projectRoot 'src\BuildWorks\PrecisionPlacementHudView.cs'
@@ -255,7 +257,9 @@ Assert-Contract ($editorSceneSource -match 'BlueprintEditorRenderIsolation' -and
     $editorSceneSource -match 'customReflectionTexture = customReflection' -and
     $editorSceneSource -match 'CreateStudioLight' -and
     $editorSceneSource -match 'Resources\.FindObjectsOfTypeAll<Component>' -and
-    $editorSceneSource -match 'component\.gameObject\.scene\.IsValid\(\)' -and
+    $editorSceneSource -match 'if \(!component \|\| !IsCameraRenderable\(component\)\) continue;' -and
+    $editorSceneSource -match 'GameObject owner = component\.gameObject;' -and
+    $editorSceneSource -match 'if \(owner && owner\.scene\.IsValid\(\)\) used\[owner\.layer\] = true;' -and
     $editorSceneSource -match 'component is Renderer \|\| component is CanvasRenderer' -and
     $editorSceneSource -match 'UnityEngine\.Terrain' -and
     $editorSceneSource -match 'UnityEngine\.Projector' -and
@@ -769,9 +773,13 @@ Assert-Contract ($unresolvedHostMembers.Count -eq 0) `
         (($unresolvedHostMembers | Select-Object -First 12) -join "`n"))
 $pluginType = $plugin.MainModule.Types | Where-Object Name -eq 'BuildWorksPlugin'
 $scalePatch = $pluginType.NestedTypes | Where-Object Name -eq 'NativePieceScalePlacementPatch'
-$scaleWrapper = $scalePatch.Methods | Where-Object Name -eq 'InstantiatePiece'
+$scaleWrapper = $scalePatch.Methods | Where-Object Name -eq 'CompleteNativeInstantiation'
+$scalePreparation = $scalePatch.Methods | Where-Object Name -eq 'PrepareNativeInstantiation'
+$scalePreparationCalls = @($scalePreparation.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 $scaleWrapperCalls = @($scaleWrapper.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
-Assert-Contract ($scaleWrapperCalls -match 'Object::Instantiate<UnityEngine.GameObject>' -and
+Assert-Contract ($scalePreparationCalls -match 'RequireNativePlacementMaterialCreation' -and
+    $scalePreparationCalls -match 'TerrainModifier::SetTriggerOnPlaced' -and
+    $scalePreparation.Body.ExceptionHandlers.Count -gt 0 -and
     $scaleWrapperCalls -match 'PrecisionPlacementSession::ApplyNativePlacementScale' -and
     $scaleWrapperCalls -match 'ZNetScene::Destroy' -and
     $scaleWrapperCalls -match 'TerrainModifier::SetTriggerOnPlaced' -and
@@ -780,6 +788,10 @@ Assert-Contract ($scaleWrapperCalls -match 'Object::Instantiate<UnityEngine.Game
         $scaleWrapperCalls.IndexOf('ZNetScene::Destroy') -and
     $scaleWrapper.Body.ExceptionHandlers.Count -gt 0) `
     'Native scale wrapper must clean up an instantiated piece on failure.'
+$factoryFinalizer = $scalePatch.Methods | Where-Object Name -eq 'Finalizer'
+Assert-Contract ($factoryFinalizer.ReturnType.FullName -eq 'System.Exception' -and
+    (@($factoryFinalizer.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n") -match 'TerrainModifier::SetTriggerOnPlaced') `
+    'Original or foreign factory exceptions must reset the native terrain trigger without suppressing the exception.'
 $precisionSessionType = $plugin.MainModule.Types | Where-Object {
     $_.Name -eq 'PrecisionPlacementSession'
 }
@@ -828,13 +840,18 @@ Assert-Contract ($beginPaymentCalls.IndexOf('BlueprintRotationState::RequireFres
 $projectExecutionType = $plugin.MainModule.Types | Where-Object Name -eq 'BlueprintConstructionPartExecution'
 $projectCtor = $projectExecutionType.Methods | Where-Object Name -eq '.ctor'
 $projectCtorCalls = @($projectCtor.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+$projectResolvePiece = $projectExecutionType.Methods | Where-Object Name -eq 'ResolvePiece'
+$projectResolveCalls = @($projectResolvePiece.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 $projectEnd = $projectExecutionType.Methods | Where-Object Name -eq 'EndNative'
 $projectEndCalls = @($projectEnd.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 $projectObserve = $projectExecutionType.Methods | Where-Object Name -eq 'Observe'
 $projectObserveCalls = @($projectObserve.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 $endPayment = $precisionSessionType.Methods | Where-Object Name -eq 'EndConstructionPayment'
 $endPaymentCalls = @($endPayment.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
-Assert-Contract ($projectCtorCalls.IndexOf('PrecisionPlacementSession::SupportsProjectPart') -ge 0 -and
+Assert-Contract ($projectCtorCalls.IndexOf('BlueprintConstructionPartExecution::ResolvePiece') -ge 0 -and
+    $projectResolveCalls.IndexOf('PrecisionPlacementSession::SupportsProjectPart') -ge 0 -and
+    $projectResolveCalls.IndexOf('PrecisionPlacementSession::SupportsStorageProjectPart') -ge 0 -and
+    $projectCtorCalls.IndexOf('BlueprintConstructionPartExecution::ResolvePiece') -lt $projectCtorCalls.IndexOf('BlueprintConstructionPartJournal::RequireCapacity') -and
     $projectCtorCalls.IndexOf('BlueprintConstructionPartJournal::RequireCapacity') -ge 0 -and
     $projectCtorCalls.IndexOf('BlueprintConstructionPartJournal::RequireCapacity') -lt $projectCtorCalls.IndexOf('BlueprintConstructionPartJournal::Prepare') -and
     $projectEndCalls.IndexOf('BlueprintConstructionRefund::DescribePaid') -ge 0 -and
@@ -861,9 +878,8 @@ Assert-Contract ($materialCalls -match 'ZNetView::IsOwner' -and $materialCalls -
     $materialCalls -match 'ZDO::GetInt' -and $materialCalls -match 'BlueprintMaterialState::SharesData' -and
     $materialCalls -notmatch 'ClaimOwnership|SetOwner|Deserialize|Load') `
     'Material restoration must write/read only an owned distinct ZDO without importing identity or foreign state.'
-Assert-Contract ($scaleWrapperCalls.IndexOf('RequireNativePlacementMaterialCreation') -ge 0 -and
-    $scaleWrapperCalls.IndexOf('RequireNativePlacementMaterialCreation') -lt
-        $scaleWrapperCalls.IndexOf('Object::Instantiate<UnityEngine.GameObject>') -and
+Assert-Contract ($scalePreparationCalls -match 'RequireNativePlacementMaterialCreation' -and
+    $scaleWrapperCalls -match 'ApplyNativePlacementScale' -and
     $applyPlacementScaleOperands.IndexOf('BlueprintMaterialState::ApplyCreated') -ge 0 -and
     $applyPlacementScaleOperands.IndexOf('BlueprintMaterialState::ApplyCreated') -lt
         $applyPlacementScaleOperands.IndexOf('currentBlueprintPlacements')) `
@@ -938,9 +954,9 @@ Assert-Contract ($destroyQueue.IsPrivate -and $destroyQueue.FieldType.FullName -
     $sendDestroyed.IsPrivate -and $sendDestroyed.Parameters.Count -eq 0 -and
     $sendDestroyedCalls -match 'ZRoutedRpc::InvokeRoutedRPC') `
     'Native owned network removal queue/flush contract changed; disable construction rollback.'
-Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.280.0') `
+Assert-Contract ($plugin.Name.Version.ToString() -eq '0.19.329.0') `
     "Unexpected BuildWorks artifact version: $($plugin.Name.Version)"
-& (Join-Path $PSScriptRoot 'Test-FogCaptureOrder.ps1') -Assembly $pluginPath | Out-Null
+& (Join-Path $PSScriptRoot 'Test-FogCaptureOrder.ps1') -Assembly $pluginPath -ProfileRoot $profileRoot | Out-Null
 $fogResource = @($plugin.MainModule.Resources | Where-Object Name -eq 'BuildWorks.FogGhostV11')
 Assert-Contract ($fogResource.Count -eq 1 -and $fogResource[0] -is [Mono.Cecil.EmbeddedResource]) 'Compiled v11 fog resource is missing or duplicated.'
 $fogHash = [Security.Cryptography.SHA256]::Create()
@@ -971,9 +987,16 @@ $runtimeTick = $serverRuntime.Methods | Where-Object Name -eq 'Tick'
 $runtimeSend = $serverRuntime.Methods | Where-Object Name -eq 'Send'
 $runtimeCalls = @($serverRuntime.Methods | Where-Object HasBody | ForEach-Object { $_.Body.Instructions | ForEach-Object { [string]$_.Operand } })
 foreach ($call in 'ZRpc::Register<ZPackage>', 'ZRpc::Unregister(System.String)', 'ZNet::GetWorldUID()',
-    'ZNet::GetServerPeer()', 'ZNet::GetServerRPC()', 'ZNet::LocalPlayerIsAdminOrHost()', 'ZPackage::Size()', 'ZPackage::GetArray()') {
+    'ZNet::GetServerPeer()', 'ZNet::GetServerRPC()', 'ZNet::LocalPlayerIsAdminOrHost()', 'ZPackage::Size()', 'ZPackage::GetArray()',
+    'Player::GetPlayerName()', 'ZNetPeer::m_playerName', 'BlueprintPeerEndpoint::Receive', 'BlueprintPeerEndpoint::Disconnect',
+    'BlueprintPeerEndpoint::Tick', 'BlueprintPeerEndpoint::Dispose', 'BlueprintPeerClient::Receive', 'BlueprintPeerClient::Dispose') {
     Assert-Contract (@($runtimeCalls | Where-Object { $_.Contains($call) }).Count -gt 0) "Direct server runtime host API changed: $call"
 }
+$peerName = $hostAssembly.MainModule.GetType('ZNetPeer').Fields | Where-Object Name -eq 'm_playerName'
+$localName = $hostAssembly.MainModule.GetType('Player').Methods | Where-Object { $_.Name -eq 'GetPlayerName' -and $_.Parameters.Count -eq 0 }
+Assert-Contract ($peerName.IsPublic -and $peerName.FieldType.FullName -eq 'System.String' -and
+    $localName.IsPublic -and -not $localName.IsStatic -and $localName.ReturnType.FullName -eq 'System.String') `
+    'Peer display names must use the current native fields/method, never request-supplied identity.'
 Assert-Contract (@($runtimeCalls | Where-Object { $_ -match 'ZRoutedRpc' }).Count -eq 0) 'Server library must not trust a routed sender.'
 $sendCalls = @($runtimeSend.Body.Instructions | ForEach-Object { [string]$_.Operand })
 Assert-Contract (@($sendCalls | Where-Object { $_.Contains('ZPackage::.ctor(System.Byte[])') }).Count -eq 1 -and
@@ -1024,6 +1047,171 @@ foreach ($type in $plugin.MainModule.Types) {
     $pluginTypes += @(Get-AllPluginTypes $type)
 }
 $pluginMethods = @($pluginTypes | ForEach-Object Methods)
+$prepareEditorBlueprint = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintEditorController' -and $_.Name -eq 'PrepareEditorBlueprint' }
+$editorUnboundCallbacks = @($prepareEditorBlueprint.Body.Instructions | Where-Object { $_.OpCode.Code -eq [Mono.Cecil.Cil.Code]::Ldftn } |
+    ForEach-Object { $_.Operand.Resolve() } | Where-Object { ($_.Body.Instructions.Operand -join "`n") -match 'BlueprintUnboundImport::Capture' })
+Assert-Contract ($editorUnboundCallbacks.Count -eq 1) 'Opening a projected Unbound blueprint must provide fresh prefab context to the editor preparation path.'
+function Assert-VoidPlaceGuard($native, $prefix) {
+    Assert-Contract ($native.ReturnType.FullName -eq 'System.Void' -and $prefix.ReturnType.FullName -eq 'System.Boolean' -and
+        @($prefix.Parameters | Where-Object Name -eq '__result').Count -eq 0 -and
+        $prefix.Parameters.Count -eq 1 -and $prefix.Parameters[0].Name -eq '__instance' -and
+        $prefix.Parameters[0].ParameterType.FullName -eq 'Player') `
+        'PlacePiece is void: its blocking Prefix must return the Harmony run-original flag, never request __result.'
+}
+$nativePlaceGuardTarget = $player.Methods | Where-Object Name -eq 'PlacePiece'
+$nativePlaceGuard = $pluginMethods | Where-Object { $_.Name -eq 'Prefix' -and $_.DeclaringType.Name -eq 'NativePieceScalePlacementPatch' }
+Assert-VoidPlaceGuard $nativePlaceGuardTarget $nativePlaceGuard
+$badResult = [Mono.Cecil.ParameterDefinition]::new('__result', [Mono.Cecil.ParameterAttributes]::None,
+    [Mono.Cecil.ByReferenceType]::new($plugin.MainModule.TypeSystem.Boolean))
+try {
+    $nativePlaceGuard.Parameters.Add($badResult)
+    $refused = $false; try { Assert-VoidPlaceGuard $nativePlaceGuardTarget $nativePlaceGuard } catch { $refused = $true }
+    Assert-Contract $refused 'Void PlacePiece __result regression was accepted.'
+} finally { [void]$nativePlaceGuard.Parameters.Remove($badResult) }
+function Assert-ChestTiltSite($method, [string]$fieldName = 'm_notOnTiltingSurface') {
+    $sites = @($method.Body.Instructions | Where-Object {
+        $_.OpCode.Code -eq [Mono.Cecil.Cil.Code]::Ldfld -and
+        [string]$_.Operand -eq "System.Boolean Piece::$fieldName"
+    })
+    Assert-Contract ($sites.Count -eq 1 -and
+        $sites[0].Next.OpCode.Code -in @([Mono.Cecil.Cil.Code]::Brfalse, [Mono.Cecil.Cil.Code]::Brfalse_S)) `
+        'Native chest tilt clause must be a unique bool field read followed by its false branch.'
+}
+$chestTiltTarget = $player.Methods | Where-Object Name -eq 'UpdatePlacementGhost'
+Assert-ChestTiltSite $chestTiltTarget
+foreach ($fieldName in @('m_inCeilingOnly', 'm_notOnFloor', 'm_notOnWood', 'm_noClipping')) { Assert-ChestTiltSite $chestTiltTarget $fieldName }
+function Assert-SurfaceGuardDispatch($method) {
+    $expected = @('m_notOnTiltingSurface', 'm_inCeilingOnly', 'm_notOnFloor', 'm_notOnWood', 'm_noClipping')
+    foreach ($fieldName in $expected) {
+        Assert-Contract (@($method.Body.Instructions | Where-Object {
+            $_.OpCode.Code -eq [Mono.Cecil.Cil.Code]::Ldstr -and [string]$_.Operand -eq $fieldName
+        }).Count -eq 1) "Functional surface guard dispatch missing/duplicated: $fieldName"
+    }
+}
+$surfaceTranspiler = @($pluginMethods | Where-Object {
+    $_.DeclaringType.Name -eq 'TransformGhostBeforeNativeValidationPatch' -and $_.Name -eq 'Transpiler'
+})
+Assert-Contract ($surfaceTranspiler.Count -eq 1) 'Functional surface transpiler must be unique.'
+Assert-SurfaceGuardDispatch $surfaceTranspiler[0]
+$woodDispatch = $surfaceTranspiler[0].Body.Instructions | Where-Object {
+    $_.OpCode.Code -eq [Mono.Cecil.Cil.Code]::Ldstr -and [string]$_.Operand -eq 'm_notOnWood'
+}
+try {
+    $woodDispatch.Operand = 'm_notOnFloor'
+    $refused = $false; try { Assert-SurfaceGuardDispatch $surfaceTranspiler[0] } catch { $refused = $true }
+    Assert-Contract $refused 'Missing wood surface dispatch was accepted.'
+} finally { $woodDispatch.Operand = 'm_notOnWood' }
+$supportLoads = @($chestTiltTarget.Body.Instructions | Where-Object { $_.OpCode.Code -eq [Mono.Cecil.Cil.Code]::Ldfld -and [string]$_.Operand -eq 'System.Boolean WearNTear::m_supports' })
+Assert-Contract ($supportLoads.Count -eq 1 -and $supportLoads[0].Next.OpCode.Code -in @([Mono.Cecil.Cil.Code]::Brtrue,[Mono.Cecil.Cil.Code]::Brtrue_S)) 'Functional contact must scope the native support bool at its actual unique branch.'
+foreach ($pair in @{m_spaceRequirement=1;m_blockRadius=2}.GetEnumerator()) {
+    $loads = @($chestTiltTarget.Body.Instructions | Where-Object { $_.OpCode.Code -eq [Mono.Cecil.Cil.Code]::Ldfld -and [string]$_.Operand -eq "System.Single Piece::$($pair.Key)" })
+    Assert-Contract ($loads.Count -eq $pair.Value) "Native placement clearance read count changed: $($pair.Key)"
+}
+$contactGrant = $pluginMethods | Where-Object Name -eq 'RecordNativeChestAttachmentContact'
+Assert-Contract (@($contactGrant.Body.Instructions | Where-Object { [string]$_.Operand -eq 'System.Boolean WearNTear::m_supports' }).Count -eq 0) 'Functional contact must not require load-bearing target strength.'
+foreach ($helperName in @('ApplySurfaceAttachmentSupportRule','ApplySurfaceAttachmentClearance')) {
+    $helper = @($pluginMethods | Where-Object Name -eq $helperName)
+    Assert-Contract ($helper.Count -eq 1 -and @($helper[0].Body.Instructions | Where-Object { [string]$_.Operand -match 'HasNativeChestAttachmentContact' }).Count -eq 1) "Functional geometry helper needs the fresh-contact gate: $helperName"
+    $expectedDispatches = if ($helperName -eq 'ApplySurfaceAttachmentSupportRule') { 2 } else { 1 }
+    Assert-Contract (@($surfaceTranspiler[0].Body.Instructions | Where-Object { [string]$_.Operand -eq $helperName }).Count -eq $expectedDispatches) "Native geometry hook missing or duplicated: $helperName"
+}
+foreach ($pair in @{m_groundPiece=5;m_groundOnly=2;m_cultivatedGroundOnly=2;m_vegetationGroundOnly=1;
+    m_waterPiece=3;m_noInWater=2;m_onlyInTeleportArea=1;m_requireDeepSnow=1;m_allowedInDeepSnow=1;m_allowedInDungeons=1;
+    m_onlyInBiome=2;m_mustConnectTo=2}.GetEnumerator()) {
+    $loads = @($chestTiltTarget.Body.Instructions | Where-Object { $_.OpCode.Code -eq [Mono.Cecil.Cil.Code]::Ldfld -and $_.Operand.DeclaringType.Name -eq 'Piece' -and $_.Operand.Name -eq $pair.Key })
+    Assert-Contract ($loads.Count -eq $pair.Value) "Native functional environment layout changed: $($pair.Key)"
+    Assert-Contract (@($surfaceTranspiler[0].Body.Instructions | Where-Object { $_.OpCode.Code -eq [Mono.Cecil.Cil.Code]::Ldstr -and [string]$_.Operand -eq $pair.Key }).Count -ge 1) "Functional environment dispatch missing: $($pair.Key)"
+}
+foreach ($helperName in @('ApplySurfaceAttachmentBiome','ApplySurfaceAttachmentConnection','ApplySurfaceAttachmentStationRule')) {
+    $helper = @($pluginMethods | Where-Object Name -eq $helperName)
+    Assert-Contract ($helper.Count -eq 1 -and @($helper[0].Body.Instructions | Where-Object { [string]$_.Operand -match 'HasNativeChestAttachmentContact' }).Count -eq 1) "Environment helper needs fresh contact: $helperName"
+    Assert-Contract (@($surfaceTranspiler[0].Body.Instructions | Where-Object { [string]$_.Operand -eq $helperName }).Count -eq 1) "Environment hook missing: $helperName"
+}
+$stationDenial = @($chestTiltTarget.Body.Instructions | Where-Object { $_.OpCode.Code -eq [Mono.Cecil.Cil.Code]::Stfld -and $_.Operand.Name -eq 'm_placementStatus' -and $_.Previous.OpCode.Code -eq [Mono.Cecil.Cil.Code]::Ldc_I4_7 })
+Assert-Contract ($stationDenial.Count -eq 1) 'The missing-extension exception must target only its unique native stage, never the final status.'
+$stationRule = $pluginMethods | Where-Object Name -eq 'ApplySurfaceAttachmentStationRule'
+Assert-Contract (@($stationRule.Body.Instructions | Where-Object { [string]$_.Operand -match 'Player::GetPlacementStatus' }).Count -eq 1 -and
+    @($stationRule.Body.Instructions | Where-Object { $_.OpCode.Code -eq [Mono.Cecil.Cil.Code]::Stfld }).Count -eq 0) 'Missing-extension placement must retain current native denials without writing status directly.'
+$usageType = $pieceType.NestedTypes | Where-Object Name -eq 'UsageTagFlags'
+foreach ($pair in @{Crafting=2;Building=4;Floor=8;Wall=16;Roof=32;Architecture=64;Furniture=128;Storage=1024;Transport=2048;Stairs=131072;Doors=262144}.GetEnumerator()) {
+    $field = @($usageType.Fields | Where-Object Name -eq $pair.Key)
+    Assert-Contract ($field.Count -eq 1 -and $field[0].Constant -eq $pair.Value) "Native attachment role tag changed: $($pair.Key)"
+}
+foreach ($callerName in @('ApplyBlueprintValidationContact','RecordNativeChestAttachmentContact')) {
+    $caller = $pluginMethods | Where-Object Name -eq $callerName
+    Assert-Contract (@($caller.Body.Instructions | Where-Object { [string]$_.Operand -match 'BuildWorksPlacementValidation::UsesSurfaceAttachment' }).Count -eq 1) `
+        "Placement and fresh-contact guards must share attachment role policy: $callerName"
+}
+$strictContact = @($pluginMethods | Where-Object {
+    $_.DeclaringType.Name -eq 'BuildWorksPlacementValidation' -and $_.Name -eq 'TryFindContact' -and $_.Parameters.Count -eq 9
+})
+Assert-Contract ($strictContact.Count -eq 1 -and $strictContact[0].Parameters[8].Name -eq 'surfaceAttachment' -and
+    $strictContact[0].Parameters[8].ParameterType.FullName -eq 'System.Boolean' -and
+    $strictContact[0].Parameters[8].IsOptional -and $strictContact[0].Parameters[8].Constant -eq $false) `
+    'Functional contact must opt into strict geometry while legacy native callers retain their default.'
+$contactCaller = $pluginMethods | Where-Object Name -eq 'ApplyBlueprintValidationContact'
+Assert-Contract (@($contactCaller.Body.Instructions | Where-Object {
+    $_.Operand -is [Mono.Cecil.MethodReference] -and $_.Operand.Name -eq 'TryFindContact' -and
+    $_.Operand.DeclaringType.Name -eq 'BuildWorksPlacementValidation' -and $_.Operand.Parameters.Count -eq 9
+}).Count -eq 1) 'Shared placement validation must call the functional-aware contact overload.'
+$surfaceCallerOperands = @($contactCaller.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+foreach ($requirement in @('BlueprintSurfaceContact::NeedsAdapter', 'PrecisionPlacementSession::TryFindSurfaceContact')) {
+    Assert-Contract ($surfaceCallerOperands -match [regex]::Escape($requirement)) "Non-box furniture lost its native geometry adapter: $requirement"
+}
+foreach ($cleanup in @(@('Cancel','Clear'), @('Dispose','Dispose'), @('DisposeForHostTransition','Dispose'))) {
+    $method = @($pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'PrecisionPlacementSession' -and $_.Name -eq $cleanup[0] })
+    Assert-Contract ($method.Count -eq 1 -and @($method[0].Body.Instructions | Where-Object {
+        [string]$_.Operand -match ('BlueprintSurfaceContact::' + $cleanup[1])
+    }).Count -eq 1) "Surface geometry cache lost session cleanup: $($cleanup[0])"
+}
+$chestTiltLoad = $chestTiltTarget.Body.Instructions | Where-Object {
+    $_.OpCode.Code -eq [Mono.Cecil.Cil.Code]::Ldfld -and
+    [string]$_.Operand -eq 'System.Boolean Piece::m_notOnTiltingSurface'
+}
+$savedTiltOpcode = $chestTiltLoad.OpCode; $savedTiltOperand = $chestTiltLoad.Operand
+try {
+    $chestTiltLoad.OpCode = [Mono.Cecil.Cil.OpCodes]::Nop; $chestTiltLoad.Operand = $null
+    $refused = $false; try { Assert-ChestTiltSite $chestTiltTarget } catch { $refused = $true }
+    Assert-Contract $refused 'Missing native chest tilt clause was accepted.'
+} finally { $chestTiltLoad.OpCode = $savedTiltOpcode; $chestTiltLoad.Operand = $savedTiltOperand }
+$chestTiltRule = $pluginMethods | Where-Object Name -eq 'ApplyChestAttachmentTiltRule'
+Assert-Contract ($chestTiltRule.ReturnType.FullName -eq 'System.Boolean' -and
+    $chestTiltRule.Parameters.Count -eq 2 -and
+    $chestTiltRule.Parameters[0].ParameterType.FullName -eq 'System.Boolean' -and
+    $chestTiltRule.Parameters[1].ParameterType.FullName -eq 'Player') `
+    'Chest tilt replacement must preserve the bool stack value and receive the current Player.'
+$supplySelector = $pluginMethods | Where-Object { $_.Name -eq 'SelectSupplies' -and $_.DeclaringType.Name -eq 'BlueprintItemStandPlacement' }
+$debitPrediction = $pluginMethods | Where-Object { $_.Name -eq 'TryPredictNativeInventoryDebits' -and $_.DeclaringType.Name -eq 'BlueprintItemStandPlacement' }
+Assert-Contract ($supplySelector.Parameters.Count -eq 4 -and $supplySelector.Parameters[3].ParameterType.FullName -eq 'Piece' -and
+    $supplySelector.Parameters[3].IsOptional -and $null -eq $supplySelector.Parameters[3].Constant -and $debitPrediction.IsPrivate) `
+    'Native payment-aware selection must retain the contents-only default and one private debit predictor.'
+foreach ($methodName in @('.ctor','BeginContents')) {
+    $method = $pluginMethods | Where-Object { $_.Name -eq $methodName -and $_.DeclaringType.Name -eq 'BlueprintConstructionPartExecution' }
+    $selectionCall = @($method.Body.Instructions | Where-Object { $_.Operand -is [Mono.Cecil.MethodReference] -and
+        [string]$_.Operand -match 'BlueprintItemStandPlacement::SelectSupplies\(' })
+    Assert-Contract ($selectionCall.Count -eq 1) "Construction $methodName must select supplies exactly once."
+    if ($methodName -eq '.ctor') {
+        Assert-Contract ($selectionCall[0].Previous.OpCode.Name -eq 'ldfld' -and
+            [string]$selectionCall[0].Previous.Operand -match 'BlueprintConstructionPartExecution::Piece$') `
+            'Construction must select from the real post-debit budget before preparing its intent.'
+    } else {
+        Assert-Contract ($selectionCall[0].Previous.OpCode.Name -eq 'ldnull') 'Committed shell must not budget its already paid cost again.'
+    }
+}
+$strictAdmission = $pluginMethods | Where-Object { $_.Name -eq 'SupportsPrecisionPlacement' -and $_.DeclaringType.Name -eq 'PrecisionPlacementSession' }
+$storageAdmission = $pluginMethods | Where-Object { $_.Name -eq 'SupportsStorageProjectPart' -and $_.DeclaringType.Name -eq 'PrecisionPlacementSession' }
+$baseAdmission = $pluginMethods | Where-Object { $_.Name -eq 'SupportsPrecisionPlacementBase' -and $_.DeclaringType.Name -eq 'PrecisionPlacementSession' }
+$strictAdmissionOperands = @($strictAdmission.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+$storageAdmissionOperands = @($storageAdmission.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($baseAdmission.IsPrivate -and $strictAdmissionOperands -match '::SupportsPrecisionPlacementBase\(' -and
+    $strictAdmissionOperands -match 'Piece::m_noInWater' -and $strictAdmissionOperands -match 'Piece::m_notOnTiltingSurface' -and
+    $storageAdmissionOperands -match '::SupportsPrecisionPlacementBase\(' -and
+    $storageAdmissionOperands -notmatch '::SupportsPrecisionPlacement\(' -and
+    $storageAdmissionOperands -match 'GetComponentsInChildren<TerrainModifier>' -and $storageAdmissionOperands -match '::PrefabGrid\(') `
+    'Storage/project/carrier admission retains its common and strict policies independently of wider F9 object admission.'
+Assert-Contract (@(@($strictAdmission, $storageAdmission, $baseAdmission) | ForEach-Object { $_.Body.Instructions } | Where-Object {
+    $_.OpCode.Name -eq 'stfld' -and [string]$_.Operand -match 'Piece::m_'
+}).Count -eq 0) 'Admission must not mutate native Piece restrictions.'
 $awake = $pluginMethods | Where-Object {
     $_.Name -eq 'Awake' -and $_.DeclaringType.Name -eq 'BuildWorksPlugin'
 }
@@ -1039,6 +1227,17 @@ Assert-Contract ($awakeOperands -match 'HasRegisteredPlacementTranspiler' -and
     $registrationOperands -match 'Patches::Transpilers' -and
     $registrationOperands -match 'Patch::get_PatchMethod') `
     'Startup must verify the registered placement transpiler, not its eager execution.'
+$patchCalls = @($awake.Body.Instructions | Where-Object {
+    $_.OpCode.Name -match '^call' -and $_.Operand.DeclaringType.FullName -eq 'HarmonyLib.Harmony' -and
+    $_.Operand.Name -eq 'PatchAll'
+})
+Assert-Contract ($patchCalls.Count -eq 1) 'Startup must retain its Harmony owner before PatchAll can throw.'
+$ownerStores = @($awake.Body.Instructions | Where-Object {
+    $_.OpCode.Name -eq 'stfld' -and $_.Operand.Name -eq 'harmony' -and
+    $_.Offset -lt $patchCalls[0].Offset
+})
+Assert-Contract ($ownerStores.Count -eq 1 -and $awakeOperands -match 'Harmony::UnpatchSelf') `
+    'Failed patch registration must leave an owner available for the existing cleanup.'
 $geometry = [Mono.Cecil.AssemblyDefinition]::ReadAssembly($geometryPath)
 $documentLimits = $geometry.MainModule.GetType('OstrixMods.BuildWorks.Geometry.BlueprintEditorDocument')
 $worldSnapCodec = $geometry.MainModule.GetType('OstrixMods.BuildWorks.Geometry.BlueprintSnapPointCodec')
@@ -1061,6 +1260,11 @@ $transpiler = $pluginMethods | Where-Object {
     $_.DeclaringType.Name -eq 'TransformGhostBeforeNativeValidationPatch'
 }
 Assert-Contract ($null -ne $transpiler) 'Compiled placement transpiler is missing.'
+$beforeIds = @($transpiler.CustomAttributes | Where-Object {
+    $_.AttributeType.FullName -eq 'HarmonyLib.HarmonyBefore'
+} | ForEach-Object { $_.ConstructorArguments[0].Value | ForEach-Object { $_.Value } })
+Assert-Contract ($beforeIds -contains 'augusdogus.Buildheim.hammer') `
+    'Native placement anchors must be located before the Buildheim setter wrapper transpiler.'
 $transpilerOperands = @($transpiler.Body.Instructions | ForEach-Object { [string]$_.Operand })
 foreach ($hook in $requiredHooks) {
     Assert-Contract (@($pluginMethods | Where-Object Name -eq $hook).Count -eq 1) `
@@ -1093,7 +1297,7 @@ for ($contactArgument = 0; $contactArgument -lt $contactSignature.Count; ++$cont
         "Blueprint contact hook parameter changed: $contactArgument"
 }
 $contactOperands = @($contactHook.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
-foreach ($contactRequirement in @('TryPrepareBlueprintValidation', 'TryGetBounds', 'TryFindContact',
+foreach ($contactRequirement in @('RequiresPlacementContact', 'TryPrepareBlueprintValidation', 'TryTakeNativePlacementRayDistance', 'TryGetBounds', 'TryFindContact',
     'Character::GetEyePoint', 'Piece::m_extraPlacementDistance', 'Floating::GetLiquidLevel',
     'Floating::GetWaterLevel', 'GetComponentInParent<Piece>', 'GetComponent<Heightmap>')) {
     Assert-Contract ($contactOperands -match [regex]::Escape($contactRequirement)) `
@@ -1107,7 +1311,7 @@ $contactPrepare = $pluginMethods | Where-Object {
     $_.Name -eq 'TryPrepareBlueprintValidation' -and $_.DeclaringType.Name -eq 'PrecisionPlacementSession'
 }
 $contactPrepareOperands = @($contactPrepare.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
-foreach ($contactRequirement in @('activeBlueprint', 'allowNativeGhostUpdate', 'SupportsPrecisionPlacement',
+foreach ($contactRequirement in @('RequiresPlacementContact',
     'PlacementSelectionStillValid', 'placementPlanPieces', 'placementPlanIndex',
     'Transform::SetPositionAndRotation', 'Transform::set_localScale')) {
     Assert-Contract ($contactPrepareOperands -match [regex]::Escape($contactRequirement)) `
@@ -1115,17 +1319,87 @@ foreach ($contactRequirement in @('activeBlueprint', 'allowNativeGhostUpdate', '
 }
 Assert-Contract ($contactPrepareOperands -notmatch 'ContextStillValid') `
     'Inactive invalid-contact ghost must still be revalidated on retry.'
+$worldAdmission = $precisionSessionType.Methods | Where-Object Name -eq 'SupportsWorldPrecisionPlacement'
+$worldAdmissionOperands = @($worldAdmission.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($worldAdmissionOperands -match 'SupportsBlueprintWorkspacePiece' -and
+    $worldAdmissionOperands -match 'GetComponent<WearNTear>' -and $worldAdmissionOperands -match 'GetComponent<Fireplace>' -and
+    $worldAdmissionOperands -match 'GetComponentsInChildren<TerrainModifier>' -and
+    $worldAdmissionOperands -match 'GetComponentsInChildren<TerrainOp>' -and
+    $worldAdmissionOperands -notmatch 'Piece::m_groundPiece|m_cultivatedGroundOnly|m_vegetationGroundOnly|m_noInWater|m_notOnTiltingSurface|m_groundOnly|m_notOnWood|m_inCeilingOnly|m_notOnFloor|m_mustConnectTo|m_blockRadius|StationExtension') `
+    'F9 must admit ordinary furniture/objects while native contact restrictions remain final validation, not admission bans.'
+Assert-Contract (@($worldAdmission.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'stfld' }).Count -eq 0) `
+    'F9 admission must not change any native Piece flags.'
+$contactApplicability = $precisionSessionType.Methods | Where-Object Name -eq 'RequiresPlacementContact'
+$contactApplicabilityOperands = @($contactApplicability.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($contactApplicabilityOperands -match 'allowNativeGhostUpdate' -and
+    $contactApplicabilityOperands -match 'm_localPlayer' -and $contactApplicabilityOperands -match 'sessionMode') `
+    'Fresh contact must retain local/native-update/mode applicability guards.'
+$distanceCapture = $pluginType.Methods | Where-Object Name -eq 'CaptureNativePlacementRayDistance'
+$distanceCaptureOperands = @($distanceCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($distanceCaptureOperands -match 'MaximumPlaceDistanceField' -and
+    $distanceCaptureOperands -match 'RecordNativePlacementRayDistance' -and
+    $distanceCaptureOperands -notmatch 'ConfigEntry|SetValue') `
+    'Transformed contact must observe the actual scoped native distance, without copying config or overriding range.'
+$cameraArm = $precisionSessionType.Methods | Where-Object Name -eq 'ArmPlacement'
+$cameraArmCalls = @($cameraArm.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($cameraArmCalls.IndexOf('::EndFreeView') -ge 0 -and
+    $cameraArmCalls.IndexOf('::RestoreExternalBuildCamera') -ge 0 -and
+    $cameraArmCalls.IndexOf('::ValidateCurrentPlacement') -ge 0 -and
+    $cameraArmCalls.IndexOf('::EndFreeView') -lt $cameraArmCalls.IndexOf('::RestoreExternalBuildCamera') -and
+    $cameraArmCalls.IndexOf('::RestoreExternalBuildCamera') -lt $cameraArmCalls.IndexOf('::ValidateCurrentPlacement')) `
+    'F9 must restore the external camera policy after releasing its own view and before native validation.'
+$cameraReopen = $precisionSessionType.Methods | Where-Object Name -eq 'ReopenEditor'
+$cameraReopenCalls = @($cameraReopen.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($cameraReopenCalls.IndexOf('::TrySuspendExternalBuildCamera') -ge 0 -and
+    $cameraReopenCalls.IndexOf('::TrySuspendExternalBuildCamera') -lt $cameraReopenCalls.IndexOf('::BeginFreeView')) `
+    'Rejected placement must reacquire the camera before reopening F9.'
 $contactGeometry = $pluginTypes | Where-Object Name -eq 'BuildWorksPlacementValidation'
 $nativeWearSetup = $hostAssembly.MainModule.GetType('WearNTear').Methods | Where-Object Name -eq 'SetupColliders'
+function Assert-StructuralProfileApi($native) {
+    foreach ($entry in @{
+        m_comOffset = 'UnityEngine.Vector3'; m_forceCorrectCOMCalculation = 'System.Boolean';
+        m_noSupportWear = 'System.Boolean'; m_supports = 'System.Boolean';
+        s_rayMask = 'System.Int32'; s_tempColliders = 'UnityEngine.Collider[]'
+    }.GetEnumerator()) {
+        $field = @($native.Fields | Where-Object Name -eq $entry.Key)
+        Assert-Contract ($field.Count -eq 1 -and $field[0].FieldType.FullName -eq $entry.Value) `
+            "Structural profile field changed: $($entry.Key)"
+    }
+    $method = @($native.Methods | Where-Object { $_.Name -eq 'GetMaterialProperties' -and $_.Parameters.Count -eq 4 })
+    Assert-Contract ($method.Count -eq 1 -and !$method[0].IsStatic -and $method[0].ReturnType.FullName -eq 'System.Void' -and
+        @($method[0].Parameters | Where-Object { $_.ParameterType.FullName -cne 'System.Single&' }).Count -eq 0 -and
+        @($method[0].Body.Instructions | Where-Object { $_.OpCode.Code.ToString() -in @('Stfld','Stsfld','Call','Callvirt','Newobj') }).Count -eq 0) `
+        'Structural profile reader needs the current pure four-float-out material method.'
+}
+$nativeStructuralType = $hostAssembly.MainModule.GetType('WearNTear')
+Assert-StructuralProfileApi $nativeStructuralType
+$forceComField = $nativeStructuralType.Fields | Where-Object Name -eq 'm_forceCorrectCOMCalculation'
+$savedFieldType = $forceComField.FieldType
+try {
+    $forceComField.FieldType = $hostAssembly.MainModule.TypeSystem.Int32
+    $rejected = $false
+    try { Assert-StructuralProfileApi $nativeStructuralType } catch { $rejected = $true }
+    Assert-Contract $rejected 'Structural API negative control accepted a changed COM flag type.'
+} finally { $forceComField.FieldType = $savedFieldType }
+Write-Host 'PASS structural profile API: actual native fields/pure material method and changed-field negative control.'
 Assert-Contract ((Get-NativeLayoutHash $nativeWearSetup) -eq '8A99C4811FC2286E20BDB211390B02D224D36A9D68D826FC4BC4F516AF829143') `
     'Native WearNTear collider/support envelope changed; review the geometry and .15m contact context before shipping.'
-$contactDispatch = $contactGeometry.Methods | Where-Object Name -eq 'TryFindContact'
+$contactDispatch = $contactGeometry.Methods | Where-Object { $_.Name -eq 'TryFindContact' -and $_.Parameters.Count -eq 9 }
 $contactDispatchOperands = @($contactDispatch.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 foreach ($contactRequirement in @('GetComponent<WearNTear>', 'GetComponentsInChildren<UnityEngine.Collider>',
-    'Collider::get_enabled', 'Collider::get_isTrigger', 'TryGetColliderBounds', 'FindShapeContact')) {
+    'UsableCollider', 'TryGetColliderBounds', 'FindShapeContact')) {
     Assert-Contract ($contactDispatchOperands -match [regex]::Escape($contactRequirement)) `
         "Collider contact dispatch lost a shape/native-support requirement: $contactRequirement"
 }
+$usableCollider = $contactGeometry.Methods | Where-Object Name -eq 'UsableCollider'
+$usableColliderOperands = @($usableCollider.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+foreach ($contactRequirement in @('Collider::get_enabled', 'Collider::get_isTrigger', 'Collider::get_attachedRigidbody',
+    'GameObject::get_activeSelf', 'Transform::get_parent')) {
+    Assert-Contract ($usableColliderOperands -match [regex]::Escape($contactRequirement)) `
+        "Contact collider filter lost a native exclusion: $contactRequirement"
+}
+Assert-Contract ($contactDispatchOperands.IndexOf('::UsableCollider') -lt $contactDispatchOperands.IndexOf('::FindShapeContact')) `
+    'Contact must apply the collider exclusions before probing the shape.'
 Assert-Contract ([bool]($contactDispatch.Body.Instructions | Where-Object {
     $_.OpCode.Name -eq 'ldc.r4' -and [Math]::Abs([double]$_.Operand - 0.15) -lt 0.00001
 })) 'WearNTear contact envelope no longer matches the current native .15m per side.'
@@ -1140,11 +1414,52 @@ Assert-Contract ($contactBoundsOperands -notmatch 'Collider::get_bounds|SyncTran
     'Contact geometry must not use stale/empty native collider bounds or activate/move the ghost.'
 $contactSearch = $contactGeometry.Methods | Where-Object Name -eq 'FindShapeContact'
 $contactSearchOperands = @($contactSearch.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
-foreach ($contactRequirement in @('Physics::RaycastNonAlloc', 'Physics::RaycastAll', 'Transform::IsChildOf',
+foreach ($contactRequirement in @('Physics::RaycastNonAlloc', 'Physics::RaycastAll', 'TryFirstHit',
     'Collider::get_attachedRigidbody', 'Vector3::Distance', 'Quaternion::Inverse', 'TryShapeBoundary')) {
     Assert-Contract ($contactSearchOperands -match [regex]::Escape($contactRequirement)) `
         "Actual contact probes lost a surface/range/self exclusion: $contactRequirement"
 }
+$firstContactHit = $contactGeometry.Methods | Where-Object Name -eq 'TryFirstHit'
+Assert-Contract ($firstContactHit.Parameters.Count -eq 6 -and
+    $firstContactHit.Parameters[5].Name -eq 'attachmentSupportOnly' -and
+    $firstContactHit.Parameters[5].IsOptional -and $firstContactHit.Parameters[5].Constant -eq $false) `
+    'Native-donor attachment filtering must preserve legacy callers by default.'
+$attachmentSupport = $contactGeometry.Methods | Where-Object Name -eq 'IsSurfaceAttachmentSupport'
+$attachmentSupportOperands = @($attachmentSupport.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+foreach ($requirement in @('GetComponentInParent<Container>', 'WearNTear::m_supports', 'ZNetView::IsValid',
+    'Collider::get_enabled', 'GameObject::get_activeInHierarchy', 'Collider::get_isTrigger', 'Collider::get_attachedRigidbody')) {
+    Assert-Contract ($attachmentSupportOperands -match [regex]::Escape($requirement)) "Attachment support eligibility lost $requirement."
+}
+Assert-Contract ($attachmentSupportOperands -notmatch '::set_|::Set\(|::Destroy|::UpdateSupport') `
+    'Attachment eligibility must not change donor strength, ownership or lifetime.'
+foreach ($pair in @(@('BuildWorksPlacementValidation','TryFirstHit'), @('BlueprintSurfaceContact','TryFindCore'),
+    @('PrecisionPlacementSession','RecordNativeChestAttachmentContact'))) {
+    $caller = @($pluginMethods | Where-Object { $_.DeclaringType.Name -eq $pair[0] -and $_.Name -eq $pair[1] })
+    Assert-Contract ($caller.Count -eq 1 -and @($caller[0].Body.Instructions | Where-Object {
+        [string]$_.Operand -match 'BuildWorksPlacementValidation::IsSurfaceAttachmentSupport'
+    }).Count -eq 1) "Attachment donor gate missing from $($pair -join '::')."
+}
+function Assert-FirstContactHit($method) {
+    $operands = @($method.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+    Assert-Contract ($operands -match 'Transform::IsChildOf' -and $operands -match 'RaycastHit::get_distance') `
+        'Shared nearest-hit lookup lost self exclusion or distance ordering.'
+}
+Assert-FirstContactHit $firstContactHit
+$selfCall = $firstContactHit.Body.Instructions | Where-Object { [string]$_.Operand -match 'Transform::IsChildOf' }
+$savedSelfOpcode = $selfCall.OpCode; $savedSelfOperand = $selfCall.Operand
+try {
+    $selfCall.OpCode = [Mono.Cecil.Cil.OpCodes]::Nop; $selfCall.Operand = $null
+    $refused = $false; try { Assert-FirstContactHit $firstContactHit } catch { $refused = $true }
+    Assert-Contract $refused 'Removed shared self-exclusion was accepted.'
+} finally { $selfCall.OpCode = $savedSelfOpcode; $selfCall.Operand = $savedSelfOperand }
+$envelopeContact = $contactGeometry.Methods | Where-Object Name -eq 'TryFindNativeEnvelopeContact'
+$envelopeOperands = @($envelopeContact.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+foreach ($requirement in @('Physics::OverlapBox', 'Collider::ClosestPoint', 'Physics::RaycastNonAlloc',
+    'Physics::RaycastAll', 'TryFirstHit', 'Bounds::Contains', 'Vector3::Distance', 'WearNTear::m_supports')) {
+    Assert-Contract ($envelopeOperands -match [regex]::Escape($requirement)) "Native support envelope lost $requirement."
+}
+Assert-Contract ($envelopeOperands -notmatch '::set_|::SetActive|Physics::IgnoreCollision') `
+    'Native support lookup must not alter the pose, activation or collisions.'
 Assert-Contract ($pluginSource -match 'contactInjection = code\.FindIndex\(instruction => instruction\.Calls\(rayTestMethod\)\) \+ 1' -and
     $pluginSource -match 'code\.InsertRange\(contactInjection, contactCode\)' -and
     $pluginSource -match 'contactInjection - 1 - argument') `
@@ -1541,7 +1856,7 @@ Assert-Contract ($blueprintRegistrySource -match
     'The blueprint category can expose its marker or put Repair after blueprints.'
 Assert-Contract ($blueprintRegistrySource -match
     'selectedReplacement \? selectedReplacement : selectedPiece' -and
-    $blueprintRegistrySource -match 'player\.SetSelectedPiece\(replacement\)') `
+    $blueprintRegistrySource -match 'SelectPiece\(player, replacement\)') `
     'Blueprint registration no longer preserves the current Hammer selection.'
 Assert-Contract ($blueprintRegistrySource -match
     'BuildSignature\(store\.All\(\), table\)' -and
@@ -2007,7 +2322,7 @@ Assert-Contract ($rootScaleCalls -match 'Part::baseScale' -and $rootScaleCalls -
     $placementScaleCalls -match 'Part::RootScale' -and $placementScaleCalls -match 'CompositeBlueprintStore::RelativeScale') `
     'Visual and world scales must share the pinned root scale and validated native-relative conversion.'
 foreach ($fieldName in @('prefabName', 'stableId', 'displayName', 'parentGroupId',
-    'editorVisible', 'editorLocked', 'sourceDocumentId', 'sourceLine')) {
+    'editorVisible', 'editorLocked', 'sourceDocumentId', 'sourceLine', 'sourceRecord')) {
     Assert-Contract (@($blueprintPart.Fields | Where-Object Name -eq $fieldName).Count -eq 1) `
         "Blueprint part field is missing: $fieldName"
 }
@@ -2057,7 +2372,7 @@ Assert-Contract ($updateDocumentMethods.Count -eq 5 -and
         @($_.Parameters | Where-Object Name -eq 'placementSupportId').Count -eq 1
     }).Count -eq 1) `
     'Blueprint frame update overload or a compatibility overload is missing.'
-Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion = 27' -and
+Assert-Contract ($blueprintStoreSource -match 'internal const int FormatVersion = 36' -and
     $blueprintStoreSource -match 'loaded\.version < 6' -and
     $blueprintStoreSource -match 'ValidScale\(part\.scale\)' -and
     $blueprintStoreSource -match 'if \(loaded\.version < 4\)' -and
@@ -2079,7 +2394,8 @@ Assert-Contract ($blueprintStoreSource -match 'private const int FormatVersion =
     $thumbnailSource -match 'Math\.Abs\(pixel\.r - background\.r\)' -and
     $thumbnailSource -match 'internal const int ThumbnailLayer = 31' -and
     $editorSceneSource -match 'used\[BlueprintThumbnailRenderer.ThumbnailLayer\] = true' -and
-    $thumbnailSource -match '-contents-v4-ugc' -and
+    $thumbnailSource -match '-contents-v5-' -and $thumbnailSource -match 'key.Hash' -and
+    $thumbnailSource -match 'allowed \? "1" : "0"' -and
     $thumbnailSource -match 'RefreshTextPermission\(\)') `
     'Blueprint v3/v4 migration, nested groups, or isolated persistent previews are missing.'
 $catalogManagement = $catalogView.Methods | Where-Object Name -eq 'DeleteBlueprint'
@@ -2435,7 +2751,7 @@ Assert-Contract ($null -ne $worldCapture -and
     $worldCaptureCalls -notmatch '::Destroy|::ClaimOwnership|::SetPositionAndRotation|::set_position|::set_rotation|::SetLocalScale' -and
     $sessionSource -match 'pendingWorldBlueprintSelection && GameplayInputAvailable' -and
     $sessionSource -match
-        'private void Finish\([^)]*\)\s*\{\s*HammerCatalogView\.CancelPlacementContents\(\); ClearContentsRecipe\(\);[\s\S]{0,180}?pendingWorldBlueprintSelection = false;' -and
+        'private void Finish\([^)]*\)\s*\{\s*nativePlacementRayDistance = null;\s*HammerCatalogView\.CancelPlacementContents\(\); ClearContentsRecipe\(\);[\s\S]{0,180}?pendingWorldBlueprintSelection = false;' -and
     $hudSource -match 'confirmText\.text = selectingBlueprint \? BuildWorksLocalization\.Text\("hud\.save"\)' -and
     $sessionSource -match 'if \(selectingBlueprint\)\s*\{\s*SaveCurrentBlueprint\(\);\s*return;' -and
     $sessionSource -match 'TrySaveWorldSelection[\s\S]*?Finish\(\);\s*RefreshBlueprintEditorLibrary' -and
@@ -2465,7 +2781,7 @@ Assert-Contract ($null -ne $beginWorldSelection -and
     $sessionSource -match
         'restoreWorldSelectionGhost[\s\S]*?UpdatePlacementGhostMethod\.Invoke' -and
     $sessionSource -match
-        'if \(sessionMode == SessionMode\.BlueprintWorldSelection\)\s*\{\s*Finish\(\);') `
+        'if \(sessionMode == SessionMode\.BlueprintWorldSelection\)\s*\{\s*consumedWorldSelectionEscapeFrame = Time\.frameCount;\s*Finish\(\);') `
     'World selection can still depend on a Hammer ghost, leak placement input, or survive Escape.'
 Assert-Contract ($sessionSource -match
     'player\.GetSelectedPiece\(\) != piece &&\s*!blueprintPieceRegistry\.SelectPiece\(player, piece\)') `
@@ -3093,6 +3409,26 @@ $armPlacement = $pluginMethods | Where-Object {
 $armPlacementOperands = @(
     $armPlacement.Body.Instructions | ForEach-Object { [string]$_.Operand }
 ) -join "`n"
+function Assert-SupportResumeRoute($session) {
+    $resume = $session.Methods | Where-Object Name -eq 'ResumeAutomaticPlacement'
+    $resumeCalls = ($resume.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+    Assert-Contract ($resumeCalls -match '::BeginSupportSelection') 'Automatic resume must restart native support selection.'
+    foreach ($name in 'ConfirmEditor', 'ContinueAutomaticPlacement') {
+        $calls = (($session.Methods | Where-Object Name -eq $name).Body.Instructions |
+            ForEach-Object { [string]$_.Operand }) -join "`n"
+        Assert-Contract ($calls -match '::ResumeAutomaticPlacement') "Support selection resume is disconnected from $name."
+    }
+}
+Assert-SupportResumeRoute $precisionSessionType
+$hudResume = ($precisionSessionType.Methods | Where-Object Name -eq 'ConfirmEditor').Body.Instructions |
+    Where-Object { [string]$_.Operand -match '::ResumeAutomaticPlacement' }
+$hudResumeOpcode = $hudResume.OpCode; $hudResumeOperand = $hudResume.Operand
+try {
+    $hudResume.OpCode = [Mono.Cecil.Cil.OpCodes]::Nop; $hudResume.Operand = $null
+    $refused = $false
+    try { Assert-SupportResumeRoute $precisionSessionType } catch { $refused = $true }
+    Assert-Contract $refused 'HUD resume bypassed unpaid support selection without failing its regression.'
+} finally { $hudResume.OpCode = $hudResumeOpcode; $hudResume.Operand = $hudResumeOperand }
 Assert-Contract ($armPlacementOperands -match 'requestAutomaticPlacement') `
     'The HUD Install action no longer starts the native placement series directly.'
 Assert-Contract ($sessionSource -match 'placement\.complete\.blueprint') `
@@ -3181,7 +3517,7 @@ $finishOperands = @($finish.Body.Instructions | ForEach-Object { [string]$_.Oper
 $endFreeView = [Array]::IndexOf($finishOperands,
     'System.Void OstrixMods.BuildWorks.PrecisionPlacementSession::EndFreeView(System.Boolean)')
 $restoreCamera = [Array]::IndexOf($finishOperands,
-    'System.Void OstrixMods.BuildWorks.PrecisionPlacementSession::RestoreExternalBuildCamera()')
+    'System.Boolean OstrixMods.BuildWorks.PrecisionPlacementSession::RestoreExternalBuildCamera()')
 Assert-Contract ($endFreeView -ge 0 -and $restoreCamera -gt $endFreeView) `
     'BuildWorks does not restore its captured camera before resuming the external build camera.'
 foreach ($methodName in @('TrySuspendExternalBuildCamera', 'RestoreExternalBuildCamera',
@@ -3252,7 +3588,10 @@ Assert-Contract ($editorResolveCall.Count -eq 1 -and
     'Opening the isolated editor must use forEditor=true, not world placement gates.'
 $resolveCalls = ($resolveBlueprint.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($resolveCalls -match 'BlueprintItemStandPlacement::CanRestore' -and
-    $sessionSource -match 'sourceDocuments\?\.Any\(source => source.ToGeometry\(\).HasOpaqueSections\)' -and
+    $resolveCalls -match 'CompositeBlueprintStore::UnresolvedSources' -and
+    $sessionSource -match '!forEditor && CompositeBlueprintStore.UnresolvedSources\(blueprint\).Any\(\)' -and
+    $blueprintStoreSource -match 'Geometry.BlueprintSourceDocument.Unresolved\(' -and
+    $blueprintStoreSource -match 'FrameApplied: part.sourceFrameApplied' -and
     $resolveCalls -match 'BlueprintMaterialState::CanRestore') `
     'Only supported material recipes and allowlisted native ItemStand state may pass world placement; opaque sections remain blocked.'
 
@@ -3365,10 +3704,20 @@ Assert-Contract ($nativePlacementOrder[$spendIndex - 3].OpCode.Name -eq 'ldc.i4.
 $supplyGate = $mountMethods | Where-Object Name -eq 'SuppliesAvailable'
 $supplyGateCalls = ($supplyGate.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 foreach ($pattern in 'BlueprintItemStandPlacement::SnapshotItem', 'Inventory::ContainsItem', 'Supply::Items',
-        'Reservation::Amount', 'Reservation::Snapshot', 'Inventory::GetAllItems', 'Player::GetCurrentCraftingStation',
-        'Piece::FreeBuildKey', 'ZoneSystem::GetGlobalKey', 'Piece/Requirement::GetAmount', '::m_upgraderResource', '::m_worldLevel') {
-    Assert-Contract ($supplyGateCalls -match $pattern) "Supply reservation omits native payment gate: $pattern"
+        'Reservation::Amount', 'Reservation::Snapshot') {
+    Assert-Contract ($supplyGateCalls -match $pattern) "Supply reservation omits exact held-item gate: $pattern"
 }
+$selectorCalls = ($supplySelector.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($supplyGateCalls -match '::TryPredictNativeInventoryDebits\(' -and
+    $selectorCalls -match '::TryPredictNativeInventoryDebits\(') 'Selection and revalidation must use the same native debit model.'
+$debitPredictionCalls = ($debitPrediction.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+foreach ($pattern in 'Inventory::GetAllItems', 'Player::GetCurrentCraftingStation',
+        'Piece::FreeBuildKey', 'ZoneSystem::GetGlobalKey', 'Piece/Requirement::GetAmount', '::m_upgraderResource', '::m_worldLevel') {
+    Assert-Contract ($debitPredictionCalls -match $pattern) "Shared native prediction omits payment rule: $pattern"
+}
+Assert-Contract ($debitPredictionCalls -notmatch 'Inventory::Remove|Player::ConsumeResources|::Save\(' -and
+    @($debitPrediction.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'stfld' -and [string]$_.Operand -match 'ItemData::m_' }).Count -eq 0) `
+    'Native debit prediction must not consume resources or mutate provided items.'
 Assert-Contract (@($supplyGate.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'add.ovf' }).Count -gt 0) `
     'Shared contents quantities must reject integer overflow.'
 $containerReservation = $mountMethods | Where-Object Name -eq 'ReserveContainer'
@@ -3469,6 +3818,9 @@ $itemSnapshot = $plugin.MainModule.GetType('OstrixMods.BuildWorks.BlueprintItemS
 Assert-Contract (@($itemSnapshot.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'ldc.i4.s' -and [int]$_.Operand -eq 110 }).Count -eq 1) `
     'Native item snapshots must use the v110 envelope matching Inventory.Save and preserve cheated provenance.'
 $nativeContainerSave = $containerType.Methods | Where-Object Name -eq 'Save'
+$nativeContainerLoad = $containerType.Methods | Where-Object Name -eq 'Load'
+Assert-Contract ((Get-NativeLayoutHash $nativeContainerLoad) -eq 'E42C0B1DBC05A9CAA58BCAFD3CA75E9DBA6A907318C9D2AA026A0A03118D9C5D') `
+    'Native Container.Load revision/cache reload changed; revalidate marker-only ItemData reference replacement.'
 $nativeContainerSaveCalls = ($nativeContainerSave.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($nativeContainerSaveCalls -match 'ZDOVars::s_items' -and $nativeContainerSaveCalls -match 'ZDO::Set\(System.Int32,System.Byte\[\]\)') 'Native Container no longer persists its exact byte package.'
 # A future survival transfer must use exact empty cells, then acknowledge both inventories;
@@ -3555,9 +3907,13 @@ $returnBegin = $transferType.Methods | Where-Object Name -eq 'TryBeginReturn'
 $returnCalls = ($returnBegin.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 $returnShared = $transferType.Methods | Where-Object Name -eq 'BeginReturn'
 $returnSharedCalls = ($returnShared.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+$returnFactory = $transferType.Methods | Where-Object Name -eq 'PrepareReturn'
+$returnFactoryCalls = ($returnFactory.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($returnCalls -match '::ReturnOperationId' -and $returnCalls -match '::CanStartReturn' -and
     $returnCalls -match 'BlueprintStorageTransferJournal::Read' -and $returnCalls -match '::cancelling' -and
-    $returnCalls -match '::BeginReturn' -and $returnSharedCalls -match 'BlueprintStorageTransferJournal::Begin' -and $returnSharedCalls -match '::cancelling' -and
+    $returnCalls -match '::BeginReturn' -and $returnSharedCalls -match '::PrepareReturn' -and $returnSharedCalls -match '::cancelling' -and
+    $returnFactoryCalls -match 'BlueprintStorageTransferJournal::Begin' -and $returnFactoryCalls -match '::ContextValid' -and
+    $returnFactoryCalls -match '::RemainingAvailable' -and $returnFactoryCalls -notmatch 'Inventory::MoveItem|ItemData::Load|RPC|DropItem' -and
     $moveCalls -match '::ReceiverItemsIntact' -and
     $moveCalls -match '::cancelling' -and $returnCalls -notmatch 'Inventory::MoveItem|ItemData::Load|RPC|DropItem') 'Return must bind current evidence, freeze its parent and reuse the observed native mover.'
 $recoveryRead = $transferType.Methods | Where-Object Name -eq 'ReadRecovery'
@@ -3567,11 +3923,102 @@ $recoveryMatchCalls = ($recoveryMatch.Body.Instructions | ForEach-Object { [stri
 Assert-Contract ($recoveryCalls -match '::TransferMarker' -and $recoveryCalls -match '::CanStartReturn' -and $recoveryCalls -match '::MatchesRecovery' -and
     $recoveryCalls -notmatch 'ZDO::Set|Inventory::Move|Inventory::Load|RPC|DropItem' -and
     $recoveryMatchCalls -match '::InventoryDigest' -and $recoveryMatchCalls -match '::BytesDigest' -and $recoveryMatchCalls -notmatch 'Observation::Revision') 'Recovery must bind the persistent marker/current full state, never old revision or mutating replay.'
-$prepare = $transferType.Methods | Where-Object Name -eq 'TryBegin'
+$prepare = $transferType.Methods | Where-Object Name -eq 'TryBeginCore'
 $prepareJournal = @($prepare.Body.Instructions | Where-Object { [string]$_.Operand -match 'BlueprintStorageTransferJournal::Begin' })
 $prepareMarker = @($prepare.Body.Instructions | Where-Object { [string]$_.Operand -match 'ZDO::Set\(System.Int32,System.String\)' })
 Assert-Contract ($prepareJournal.Count -eq 1 -and $prepareMarker.Count -eq 1 -and $prepareJournal[0].Offset -lt $prepareMarker[0].Offset -and
     $moveCalls -match '::waitingForMarker' -and $moveCalls -match 'Stopwatch::GetTimestamp') 'Persistent marker must follow WAL preparation and wait boundedly for native cache synchronization.'
+function Assert-StorageParentProducer($transfer) {
+    $producer = @($transfer.Methods | Where-Object Name -eq 'TryBeginFromProject')
+    Assert-Contract ($producer.Count -eq 1) 'Saved-parent storage producer is missing.'
+    $calls = ($producer[0].Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+    foreach ($required in 'BlueprintConstructionPartJournal::RequireSavedPayment', 'BlueprintConstructionPartJournal::Fingerprint',
+        'BlueprintConstructionProjectRuntime::get_IsPrivateLocalPlacement', 'BlueprintConstructionPartExecution::FindMarked',
+        'BlueprintStorageTransfer::ConstructionTargetMatches', 'BlueprintStorageTransfer::TryBeginCore') {
+        Assert-Contract ($calls.Contains($required)) "Saved-parent storage producer lost authority boundary: $required"
+    }
+    Assert-Contract ($calls -notmatch 'BlueprintConstructionRefund::\.ctor|ItemData::Load|Inventory::Load') 'Saved parent was converted into a fabricated memory payment/archive item.'
+}
+Assert-StorageParentProducer $transferType
+$parentProducer = $transferType.Methods | Where-Object Name -eq 'TryBeginFromProject'
+$parentRead = @($parentProducer.Body.Instructions | Where-Object { [string]$_.Operand -match 'BlueprintConstructionPartJournal::RequireSavedPayment' })
+Assert-Contract ($parentRead.Count -eq 1) 'Saved parent read is ambiguous.'
+$savedOpCode = $parentRead[0].OpCode; $savedOperand = $parentRead[0].Operand
+try {
+    $parentRead[0].OpCode = [Mono.Cecil.Cil.OpCodes]::Nop; $parentRead[0].Operand = $null
+    $refused = $false
+    try { Assert-StorageParentProducer $transferType } catch { $refused = $true }
+    Assert-Contract $refused 'Saved-parent producer accepted a disconnected payment read.'
+} finally { $parentRead[0].OpCode = $savedOpCode; $parentRead[0].Operand = $savedOperand }
+Assert-StorageParentProducer $transferType
+$legacyPrepare = $transferType.Methods | Where-Object Name -eq 'TryBegin'
+$legacyPrepareCalls = ($legacyPrepare.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($legacyPrepareCalls -match 'BlueprintConstructionRefund::get_Recorded' -and
+    $legacyPrepareCalls -match 'BlueprintConstructionRefund::IsFor' -and $legacyPrepareCalls -match 'BlueprintStorageTransfer::TryBeginCore') 'Existing memory-payment transfer lost its recorded inventory fence.'
+$settlement = $transferType.Methods | Where-Object Name -eq 'TrySettleConstruction'
+$settlementCalls = ($settlement.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($settlementCalls -match '::get_PersistenceCustodyValid' -and $settlementCalls -match 'BlueprintStoragePersistence::TryVerifyCurrent' -and
+    $settlementCalls -match 'BlueprintStorageTransferJournal::RecordSettlement') 'Linked settlement lost its current custody/save-proof boundary.'
+$projectPart = $plugin.MainModule.GetType('OstrixMods.BuildWorks.BlueprintConstructionPartExecution')
+$projectRuntime = $plugin.MainModule.GetType('OstrixMods.BuildWorks.BlueprintConstructionProjectRuntime')
+function Assert-ContentsResumeRoute($runtime) {
+    $start = $runtime.Methods | Where-Object Name -eq 'StartPartExecution'
+    $tickCalls = ($runtime.Methods.Where({ $_.Name -eq 'Tick' }).Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+    $pendingCalls = ($runtime.Methods.Where({ $_.Name -eq 'BeginPendingPart' }).Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+    Assert-Contract ($tickCalls -match '::BeginPendingPart' -and $pendingCalls -match '::StartPartExecution' -and
+        $pendingCalls -match '::BeginConstructionSupportSelection') 'The checked execution entry is disconnected from pending selection.'
+    $guard = @($start.Body.Instructions | Where-Object { [string]$_.Operand -match 'PartExecution::get_RequiresPlacement' })
+    $place = @($start.Body.Instructions | Where-Object { [string]$_.Operand -match 'BuildWorksPlugin::BeginConstructionProjectPart' })
+    Assert-Contract ($guard.Count -eq 1 -and $place.Count -eq 1 -and $guard[0].Offset -lt $place[0].Offset -and
+        $guard[0].Next.OpCode.Name -match '^brfalse' -and $guard[0].Next.Operand.Offset -gt $place[0].Offset) `
+        'Contents-only resume must branch past native placement using the execution intent.'
+}
+Assert-ContentsResumeRoute $projectRuntime
+$resumeGuard = $projectRuntime.Methods.Where({ $_.Name -eq 'StartPartExecution' }).Body.Instructions | Where-Object {
+    [string]$_.Operand -match 'PartExecution::get_RequiresPlacement' }
+$resumeOpcode = $resumeGuard.OpCode; $resumeOperand = $resumeGuard.Operand
+try {
+    $resumeGuard.OpCode = [Mono.Cecil.Cil.OpCodes]::Nop; $resumeGuard.Operand = $null
+    $refused = $false
+    try { Assert-ContentsResumeRoute $projectRuntime } catch { $refused = $true }
+    Assert-Contract $refused 'Disconnected native-resume guard was accepted.'
+} finally { $resumeGuard.OpCode = $resumeOpcode; $resumeGuard.Operand = $resumeOperand }
+Assert-ContentsResumeRoute $projectRuntime
+$createProject = $projectRuntime.Methods | Where-Object Name -eq 'Create'
+$storagePreflight = @($createProject.Body.Instructions | Where-Object { [string]$_.Operand -match 'PartExecution::RequireStoragePreflight' })
+$createPlan = @($createProject.Body.Instructions | Where-Object { [string]$_.Operand -match 'ProjectStore::Create' })
+Assert-Contract ($storagePreflight.Count -eq 1 -and $createPlan.Count -eq 1 -and $storagePreflight[0].Offset -lt $createPlan[0].Offset) `
+    'Known storage holds must be checked before creating a project that can charge its first structural part.'
+$partConstructor = $projectPart.Methods | Where-Object Name -eq '.ctor'
+$resumeContents = @($partConstructor.Body.Instructions | Where-Object { [string]$_.Operand -match 'PartExecution::BeginContents' })
+$preparePart = @($partConstructor.Body.Instructions | Where-Object { [string]$_.Operand -match 'PartJournal::Prepare' })
+Assert-Contract ($resumeContents.Count -eq 1 -and $preparePart.Count -eq 1 -and
+    $resumeContents[0].Offset -lt $preparePart[0].Offset -and $resumeContents[0].Next.OpCode.Name -eq 'ret') `
+    'Committed contents-only construction must return before preparing another payment.'
+$beginContentsCalls = (($projectPart.Methods | Where-Object Name -eq 'BeginContents').Body.Instructions |
+    ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($beginContentsCalls -match 'PartJournal::RequireSavedPayment' -and $beginContentsCalls -match '::RequireStoragePreflight' -and
+    $beginContentsCalls -match 'BlueprintStorageTransfer::TryBeginFromProject' -and $beginContentsCalls -notmatch 'PartJournal::Prepare|Inventory::Move|Object::Instantiate') `
+    'Contents-only execution must reuse the saved parent and guarded producer without placing/paying directly.'
+$contentsTickCalls = (($projectPart.Methods | Where-Object Name -eq 'TickContents').Body.Instructions |
+    ForEach-Object { [string]$_.Operand }) -join "`n"
+foreach ($required in 'BlueprintStorageTransfer::MoveNext', 'BlueprintStorageTransfer::TryBeginPersistence',
+    'BlueprintStoragePersistence::Tick', 'BlueprintStorageTransfer::TrySettleConstruction') {
+    Assert-Contract ($contentsTickCalls.Contains($required)) "Project contents pipeline is disconnected: $required"
+}
+$completeCalls = (($projectPart.Methods | Where-Object Name -eq 'Complete').Body.Instructions |
+    ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($completeCalls -match 'BlueprintStorageTransferJournal::ReadConstruction' -and $completeCalls -match 'Snapshot::Settled') `
+    'Populated project completion must join its saved payment and exact settled child.'
+$progressCalls = (($projectRuntime.Methods | Where-Object Name -eq 'Progress').Body.Instructions |
+    ForEach-Object { [string]$_.Operand }) -join "`n"
+$nextCalls = (@(Get-AllPluginTypes $projectRuntime).Methods | Where-Object { $_.Name -match 'PendingParts' } |
+    ForEach-Object { $_.Body.Instructions } | ForEach-Object { [string]$_.Operand }) -join "`n"
+$nextWrapperCalls = (($projectRuntime.Methods | Where-Object Name -eq 'NextPart').Body.Instructions |
+    ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($progressCalls -match 'PartExecution::Complete' -and $nextCalls -match 'PartExecution::Complete' -and
+    $nextWrapperCalls -match '::PendingParts') `
+    'Progress and next-part routing must use the same paid-parent/contents outcome.'
 $journalCalls = ($journalType.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ($journalCalls -match 'FileStream::Flush\(System.Boolean\)' -and $journalCalls -match 'SHA256::Create' -and
     $journalCalls -match '::CheckParents' -and $journalCalls -notmatch 'File::Delete|\bInventory::|ZDO::Set|RPC|DropItem') 'Persisted evidence must flush and validate without replay, deletion or world mutation.'
@@ -3609,10 +4056,209 @@ $rollbackCalls = ($rollback.Body.Instructions | ForEach-Object { [string]$_.Oper
 Assert-Contract ($rollbackCalls -match 'GetComponent<Container>' -and $rollbackCalls -match 'BlueprintStorageCapture::CanRemoveEmpty') 'Both normal and forced rollback must refuse filled/unverified storage.'
 $removal = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintStorageCapture' -and $_.Name -eq 'CanRemoveEmpty' }
 $removalCalls = ($removal.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
-Assert-Contract ($removalCalls -match '::TryCapture' -and $removalCalls -match 'Inventory::GetAllItems' -and
-    $removalCalls -match 'Piece::GetCreator' -and $removalCalls -match 'ZNetView::IsOwner' -and
-    $removalCalls -notmatch 'Container::Save|Inventory::Load|ZDO::Set|RPC|DropAllItems|Destroy') 'Empty-storage cancellation guard must stay read-only.'
+$emptyState = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintStorageCapture' -and $_.Name -eq 'EmptyState' }
+$emptyStateCalls = ($emptyState.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($removalCalls -match '::EmptyState' -and $removalCalls -match '::TransferMarker' -and $removalCalls -match '::HasUnresolved' -and
+    $emptyStateCalls -match '::TryCapture' -and $emptyStateCalls -match 'Inventory::GetAllItems' -and
+    $emptyStateCalls -match 'Piece::GetCreator' -and $emptyStateCalls -match 'ZNetView::IsOwner' -and
+    ($removalCalls + $emptyStateCalls) -notmatch 'Container::Save|Inventory::Load|ZDO::Set|RPC|DropAllItems|Destroy') 'Empty-storage cancellation guard must stay read-only.'
+$containerGuard = $plugin.MainModule.GetType('OstrixMods.BuildWorks.BlueprintConstructionContainerGuard')
+$containerRootOverride = $containerType.Fields | Where-Object Name -eq 'm_rootObjectOverride'
+Assert-Contract ($containerRootOverride.IsPublic -and $containerRootOverride.FieldType.FullName -eq 'ZNetView') `
+    'Container root override type changed; revalidate the callback guard and its host substitute.'
+$containerCallbacks = $containerGuard.Methods | Where-Object Name -eq 'CallbacksOnly'
+Assert-Contract (@($containerCallbacks.Body.Instructions | Where-Object {
+    $_.OpCode.Name -eq 'ldtoken' -and [string]$_.Operand -ceq $containerRootOverride.FieldType.FullName
+}).Count -eq 1) 'Container callback guard must require the actual native root override type.'
+function Assert-ContainerNativeRoot($guard) {
+    $method = $guard.Methods | Where-Object Name -eq 'NativeRoot'
+    $calls = ($method.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+    Assert-Contract ($calls -match '::ViewsMatch' -and $calls -match '::CallbacksOnly' -and $calls -match 'GetComponentsInChildren' -and
+        @($method.Body.Instructions | Where-Object { $_.OpCode.Name -eq 'ldc.i4.4' }).Count -eq 1) `
+        'Container removal must require matching views/native callbacks and the exact four root behaviours.'
+}
+Assert-ContainerNativeRoot $containerGuard
+$emptyCall = ($containerGuard.Methods | Where-Object Name -eq 'NativeRoot').Body.Instructions | Where-Object {
+    [string]$_.Operand -match '::CallbacksOnly' }
+$emptyOpcode = $emptyCall.OpCode; $emptyOperand = $emptyCall.Operand
+try {
+    $emptyCall.OpCode = [Mono.Cecil.Cil.OpCodes]::Nop; $emptyCall.Operand = $null
+    $refused = $false
+    try { Assert-ContainerNativeRoot $containerGuard } catch { $refused = $true }
+    Assert-Contract $refused 'Disconnected native callback guard was accepted.'
+} finally { $emptyCall.OpCode = $emptyOpcode; $emptyCall.Operand = $emptyOperand }
+Assert-ContainerNativeRoot $containerGuard
+$callbackOneCalls = (($containerGuard.Methods | Where-Object Name -eq 'One').Body.Instructions |
+    ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($callbackOneCalls -match 'Delegate::GetInvocationList' -and $callbackOneCalls -match 'Delegate::get_Target' -and
+    $callbackOneCalls -match 'Delegate::get_Method' -and $callbackOneCalls -match '::get_DeclaringType') `
+    'Callback admission must bind the one exact native method to this container, not only a delegate name.'
+$guardCalls = (@(Get-AllPluginTypes $containerGuard).Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($guardCalls -notmatch 'DynamicInvoke|MethodBase::Invoke|FieldInfo::SetValue|Container::Save|Inventory::Load|ZDO::Set|WearNTear::Remove|Object::Destroy') `
+    'Container eligibility must inspect callbacks without invoking them or mutating native state.'
+function Assert-StorageRootView($transfer) {
+    $method = $transfer.Methods | Where-Object Name -eq 'OwnedAccess'
+    $root = @($method.Body.Instructions | Where-Object { [string]$_.Operand -match 'GameObject::GetComponent<ZNetView>' })
+    # Release lowers ReferenceEquals(rootView, view) to a direct reference-inequality branch returning false.
+    Assert-Contract ($root.Count -eq 1 -and $root[0].Next.OpCode.Name -eq 'ldarg.3' -and
+        $root[0].Next.Next.OpCode.Name -match '^bne.un' -and
+        $root[0].Next.Next.Operand.OpCode.Name -eq 'ldc.i4.0' -and $root[0].Next.Next.Operand.Next.OpCode.Name -eq 'ret') `
+        'Transfer access must reject a different private/root view before effects.'
+}
+Assert-StorageRootView $transferType
+$viewBranch = (($transferType.Methods | Where-Object Name -eq 'OwnedAccess').Body.Instructions | Where-Object {
+    [string]$_.Operand -match 'GameObject::GetComponent<ZNetView>' }).Next.Next
+$viewOpcode = $viewBranch.OpCode; $viewOperand = $viewBranch.Operand
+try {
+    $viewBranch.OpCode = [Mono.Cecil.Cil.OpCodes]::Nop; $viewBranch.Operand = $null
+    $refused = $false
+    try { Assert-StorageRootView $transferType } catch { $refused = $true }
+    Assert-Contract $refused 'Disconnected root-view rejection branch was accepted.'
+} finally { $viewBranch.OpCode = $viewOpcode; $viewBranch.Operand = $viewOperand }
+Assert-StorageRootView $transferType
+$projectRemoval = $plugin.MainModule.GetType('OstrixMods.BuildWorks.BlueprintConstructionCancellationRemoval')
+$removalConstructor = $projectRemoval.Methods | Where-Object Name -eq '.ctor'
+$currentCheck = @($removalConstructor.Body.Instructions | Where-Object { [string]$_.Operand -match 'Witness::Current' })
+$nativeRemoval = @($removalConstructor.Body.Instructions | Where-Object { [string]$_.Operand -match 'WearNTear::Remove' })
+Assert-Contract ($currentCheck.Count -eq 1 -and $nativeRemoval.Count -eq 1 -and $currentCheck[0].Offset -lt $nativeRemoval[0].Offset) `
+    'Removal must revalidate each exact target/empty/callback state immediately before native removal.'
+$projectRemovalCalls = (@(Get-AllPluginTypes $projectRemoval).Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($projectRemovalCalls -match 'BlueprintConstructionContainerGuard::NativeRoot' -and $projectRemovalCalls -match 'BlueprintStorageTransfer::ProjectEmpty' -and
+    $projectRemovalCalls -match '::SupportsProjectPart' -and $projectRemovalCalls -match '::SupportsStorageProjectPart') `
+    'Narrow container cancellation must preserve the structural path and use its separate empty guard.'
 $storageCapture = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintStorageCapture' -and $_.Name -eq 'TryCapture' }
+function Assert-ProjectEmptyHistory($transfer) {
+    $method = $transfer.Methods | Where-Object Name -eq 'ProjectEmpty'
+    $calls = ($method.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+    $history = $method.Body.Instructions | Where-Object { [string]$_.Operand -match '::CancellationHistory' }
+    Assert-Contract ($history.Previous.OpCode.Name -eq 'ldc.i4.0' -and $calls -match 'BlueprintConstructionPartJournal::Read' -and $calls -match '::ConstructionTargetMatches' -and
+        $calls -match '::CancellationHistory' -and $calls -match '::HasUnresolved' -and $calls -match 'BlueprintStorageCapture::EmptyState' -and
+        $calls -notmatch 'Inventory::Move|Inventory::Load|ZDO::Set|WearNTear::Remove') 'Project empty state must be joined to the actual paid parent and settled history.'
+}
+Assert-ProjectEmptyHistory $transferType
+$historyArgument = (($transferType.Methods | Where-Object Name -eq 'ProjectEmpty').Body.Instructions | Where-Object {
+    [string]$_.Operand -match '::CancellationHistory' }).Previous
+$historyArgumentOpcode = $historyArgument.OpCode
+try {
+    $historyArgument.OpCode = [Mono.Cecil.Cil.OpCodes]::Ldc_I4_1
+    $refused = $false
+    try { Assert-ProjectEmptyHistory $transferType } catch { $refused = $true }
+    Assert-Contract $refused 'Unsettled return history authorized destructive empty state.'
+} finally { $historyArgument.OpCode = $historyArgumentOpcode }
+Assert-ProjectEmptyHistory $transferType
+$historyCall = ($transferType.Methods | Where-Object Name -eq 'ProjectEmpty').Body.Instructions | Where-Object {
+    [string]$_.Operand -match '::CancellationHistory' }
+$historyOpcode = $historyCall.OpCode; $historyOperand = $historyCall.Operand
+try {
+    $historyCall.OpCode = [Mono.Cecil.Cil.OpCodes]::Nop; $historyCall.Operand = $null
+    $refused = $false
+    try { Assert-ProjectEmptyHistory $transferType } catch { $refused = $true }
+    Assert-Contract $refused 'Disconnected paid-parent return history was accepted.'
+} finally { $historyCall.OpCode = $historyOpcode; $historyCall.Operand = $historyOperand }
+Assert-ProjectEmptyHistory $transferType
+$bindReturnCalls = (@(Get-AllPluginTypes $transferType).Methods | Where-Object { $_.Name -eq 'BindReturn' -or $_.Name -match '<BindReturn>' } |
+    ForEach-Object { $_.Body.Instructions } | ForEach-Object { [string]$_.Operand }) -join "`n"
+foreach ($required in '::RequireSavedPayment', '::Fingerprint', '::FindMarked', '::ConstructionTargetMatches', '::get_IsPrivateLocalPlacement') {
+    Assert-Contract ($bindReturnCalls.Contains($required)) "Return lost saved-parent authority: $required"
+}
+$historyCalls = (($transferType.Methods | Where-Object Name -eq 'CancellationHistory').Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($historyCalls -match '::ReadCancellation' -and $historyCalls -match 'Snapshot::Settled') 'Return/removal must refuse unsettled forward or return history.'
+$returnProducerCalls = (($transferType.Methods | Where-Object Name -eq 'TryBeginProjectReturn').Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+foreach ($required in '::BindReturn', '::CancellationHistory', '::ProjectEmpty', '::HasUnresolved', '::TryCapture', '::PrepareReturn', '::ResumeCurrentReturn', '::ResumePairedReturn') {
+    Assert-Contract ($returnProducerCalls.Contains($required)) "Current contents producer lost boundary: $required"
+}
+function Assert-LockedReturnWriter($journal) {
+    $resume = $journal.Methods | Where-Object Name -eq 'ResumeExistingReturn'
+    $open = @($resume.Body.Instructions | Where-Object { [string]$_.Operand -match 'FileStream::.ctor' })
+    $calls = ($resume.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+    Assert-Contract ($open.Count -eq 1 -and $open[0].Previous.OpCode.Name -eq 'ldc.i4.1' -and
+        $open[0].Previous.Previous.OpCode.Name -eq 'ldc.i4.2' -and $open[0].Previous.Previous.Previous.OpCode.Name -eq 'ldc.i4.3' -and
+        $calls -match '::Read' -and $calls -match 'Snapshot::TailHash' -and $calls -match 'Snapshot::Frames' -and
+        $calls -match 'Snapshot::Length' -and $calls -match 'Snapshot::InFlight' -and $calls -match 'Snapshot::SavedPair') `
+        'Resume must retain an Open/write/read-share lock and fully replay unchanged evidence in its strict clean/paired mode.'
+    foreach ($entry in @(@('ResumeReturn', 'ldc.i4.0'), @('ResumePairedReturn', 'ldc.i4.1'))) {
+        $call = ($journal.Methods | Where-Object Name -eq $entry[0]).Body.Instructions | Where-Object { [string]$_.Operand -match '::ResumeExistingReturn' }
+        Assert-Contract ($null -ne $call -and $call.Previous.OpCode.Name -eq $entry[1]) "Wrong strict recovery state: $($entry[0])"
+    }
+}
+Assert-LockedReturnWriter $journalType
+$openMode = (($journalType.Methods | Where-Object Name -eq 'ResumeExistingReturn').Body.Instructions | Where-Object {
+    [string]$_.Operand -match 'FileStream::.ctor' }).Previous.Previous.Previous
+$openModeOpcode = $openMode.OpCode
+try {
+    $openMode.OpCode = [Mono.Cecil.Cil.OpCodes]::Ldc_I4_6
+    $refused = $false
+    try { Assert-LockedReturnWriter $journalType } catch { $refused = $true }
+    Assert-Contract $refused 'Blind Append mode was accepted for return recovery.'
+} finally { $openMode.OpCode = $openModeOpcode }
+Assert-LockedReturnWriter $journalType
+$cleanMode = (($journalType.Methods | Where-Object Name -eq 'ResumeReturn').Body.Instructions | Where-Object {
+    [string]$_.Operand -match '::ResumeExistingReturn' }).Previous
+$cleanModeOpcode = $cleanMode.OpCode
+try {
+    $cleanMode.OpCode = [Mono.Cecil.Cil.OpCodes]::Ldc_I4_1
+    $refused = $false
+    try { Assert-LockedReturnWriter $journalType } catch { $refused = $true }
+    Assert-Contract $refused 'Clean replay was allowed to reopen an already saved pair.'
+} finally { $cleanMode.OpCode = $cleanModeOpcode }
+Assert-LockedReturnWriter $journalType
+$resumeCurrent = $transferType.Methods | Where-Object Name -eq 'ResumeCurrentReturn'
+$resumeCurrentCalls = (@($resumeCurrent.Body.Instructions) + @((Get-AllPluginTypes $transferType).Methods |
+    Where-Object Name -match '<ResumeCurrentReturn>' | ForEach-Object { $_.Body.Instructions }) | ForEach-Object { [string]$_.Operand }) -join "`n"
+foreach ($required in '::ResumeReturn', '::OnlyUnresolvedReturn', '::InventoryDigest', '::BytesDigest', '::CompleteRecoveredReturn', '::DestinationReady', '::RemainingAvailable') {
+    Assert-Contract ($resumeCurrentCalls.Contains($required)) "Return resume lost custody boundary: $required"
+}
+Assert-Contract ($resumeCurrentCalls -notmatch 'ItemData::Load|Inventory::Load|Inventory::MoveItem|::Begin\(') 'Return resume cannot create a new journal, item or native move.'
+$rebind = $transferType.Methods | Where-Object Name -eq 'RebindPreparedReturnSources'
+$rebindCalls = ($rebind.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($moveCalls -match '::RebindPreparedReturnSources' -and $rebindCalls -match '::Read' -and
+    $rebindCalls -match 'Snapshot::InFlight' -and $rebindCalls -match '::BindCurrent' -and $rebindCalls -match '::RemainingAvailable' -and
+    $rebindCalls -notmatch 'ItemData::Load|Inventory::Load|Inventory::MoveItem|ZDO::Set') 'Marker cache rebind must validate only real current source items before any move.'
+$contentsReturn = $plugin.MainModule.GetType('OstrixMods.BuildWorks.BlueprintConstructionContentsReturn')
+$paired = $transferType.NestedTypes | Where-Object Name -eq 'PairedReturnRecovery'
+function Assert-PairedReturnProofs($type) {
+    $tick = $type.Methods | Where-Object Name -eq 'Tick'
+    $calls = ($tick.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+    Assert-Contract (@($tick.Body.Instructions | Where-Object { [string]$_.Operand -match '::get_Chunk' }).Count -eq 2 -and
+        @($tick.Body.Instructions | Where-Object { [string]$_.Operand -match '::get_ObjectOffset' }).Count -eq 2 -and
+        @($tick.Body.Instructions | Where-Object { [string]$_.Operand -match 'BlueprintStorageWorldGeneration::TryFinish' }).Count -eq 2 -and
+        $calls -match '::TryVerifyLoaded' -and $calls -match '::profileHash' -and $calls -match '::RecordSettlement' -and
+        $calls -match '::Current') 'Recovered pair must prove both current durable markers on one saved object, fresh profile and current custody before Kind6.'
+}
+Assert-PairedReturnProofs $paired
+$chunkCall = ($paired.Methods | Where-Object Name -eq 'Tick').Body.Instructions | Where-Object { [string]$_.Operand -match '::get_Chunk' } | Select-Object -First 1
+$chunkOpcode = $chunkCall.OpCode; $chunkOperand = $chunkCall.Operand
+try {
+    $chunkCall.OpCode = [Mono.Cecil.Cil.OpCodes]::Nop; $chunkCall.Operand = $null
+    $refused = $false
+    try { Assert-PairedReturnProofs $paired } catch { $refused = $true }
+    Assert-Contract $refused 'Two separate saved chunks were accepted as one object.'
+} finally { $chunkCall.OpCode = $chunkOpcode; $chunkCall.Operand = $chunkOperand }
+Assert-PairedReturnProofs $paired
+$pairedAllCalls = ($paired.Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($pairedAllCalls -notmatch '::MoveNext|Inventory::MoveItem|Inventory::Load|ItemData::Load|::TryBeginPersistence|::RecordPersistence|::Save\(|::SavePlayerProfile|ZDO::Set' -and
+    $pairedAllCalls -match '::TryCaptureReceipt' -and $pairedAllCalls -match '::EmptyState' -and $pairedAllCalls -match '::InventoryDigest') `
+    'Saved pair recovery must read both durable outcomes and append only settlement, without another native move/save.'
+$pairedFactoryCalls = (@(($transferType.Methods | Where-Object Name -eq 'ResumePairedReturn').Body.Instructions) +
+    @((Get-AllPluginTypes $transferType).Methods | Where-Object Name -match '<ResumePairedReturn>' | ForEach-Object { $_.Body.Instructions }) |
+    ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($pairedFactoryCalls -match 'BlueprintStorageTransferJournal::ResumePairedReturn' -and $pairedFactoryCalls -match '::ProcessSession' -and
+    $pairedFactoryCalls -match 'Persistence::SourceSession' -and $pairedFactoryCalls -match '::OnlyUnresolvedReturn' -and
+    $pairedFactoryCalls -match 'PairedReturnRecovery::Start') 'Saved pair factory must preserve its distinct process and retained writer/paid-parent boundary.'
+$beginPersistenceCalls = (($transferType.Methods | Where-Object Name -eq 'TryBeginPersistence').Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($moveCalls -match '::get_RecoveringSavedPair' -and $beginPersistenceCalls -match '::get_RecoveringSavedPair') 'Recovered pair must stay outside the ordinary native mover/save pipeline.'
+$contentsTickCalls = (($contentsReturn.Methods | Where-Object Name -eq 'Tick').Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+foreach ($required in '::RequireCurrent', '::MoveNext', '::TryBeginPersistence', 'BlueprintStoragePersistence::Tick', '::TrySettleConstruction', '::Advance', '::TickPairedReturnRecovery') {
+    Assert-Contract ($contentsTickCalls.Contains($required)) "Return coordinator lost persistence ordering boundary: $required"
+}
+$contentsCalls = (@(Get-AllPluginTypes $contentsReturn).Methods.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($contentsCalls -notmatch 'CancellationJournal::Prepare|::BeginRemoval|WearNTear::Remove|PayoutIssuance::.ctor') 'Contents return must precede any cancellation/deletion/refund intent.'
+$runtime = $plugin.MainModule.GetType('OstrixMods.BuildWorks.BlueprintConstructionProjectRuntime')
+$beginReturnCalls = (($runtime.Methods | Where-Object Name -eq 'BeginPaidRemoval').Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($beginReturnCalls -match 'BlueprintConstructionContentsReturn::.ctor' -and $beginReturnCalls -match '::RequireRemovalRequest' -and
+    $beginReturnCalls -match '::BeginNativePaidRemoval' -and $beginReturnCalls -notmatch 'CancellationRemoval::.ctor') 'Board cancellation must enter contents return before native deletion.'
+$beginNativeCalls = (($runtime.Methods | Where-Object Name -eq 'BeginNativePaidRemoval').Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($beginNativeCalls -match '::RequireRemovalRequest' -and $beginNativeCalls -match 'CancellationRemoval::.ctor') 'After-return removal must repeat the fresh board/context preflight.'
 $inventorySnapshot = $pluginMethods | Where-Object { $_.DeclaringType.Name -eq 'BlueprintStorageCapture' -and $_.Name -eq 'TrySnapshotInventory' }
 $storageCalls = (@($storageCapture.Body.Instructions) + @($inventorySnapshot.Body.Instructions) | ForEach-Object { [string]$_.Operand }) -join "`n"
 Assert-Contract ((($storageCapture.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n") -match '::TrySnapshotInventory') 'Container capture must use the shared bounded native snapshot.'
@@ -3668,6 +4314,7 @@ foreach ($payoutContextType in 'BlueprintConstructionPayoutCollection','Blueprin
 & (Join-Path $projectRoot 'tests/BuildWorks.CaptureChecks/RequirementsPause.ps1')
 & (Join-Path $projectRoot 'tests/BuildWorks.CaptureChecks/PaidCancellation.ps1')
 & (Join-Path $projectRoot 'tests/BuildWorks.CaptureChecks/BoardCancellation.ps1')
+& (Join-Path $projectRoot 'tests/BuildWorks.CaptureChecks/PaymentRead.ps1')
 $boardCancellationCalls = ($pluginMethods | Where-Object { $_.DeclaringType.FullName -like '*BlueprintConstructionProjectView*' } |
     ForEach-Object { if ($_.HasBody) { $_.Body.Instructions.Operand } }) -join "`n"
 Assert-Contract ($boardCancellationCalls -match '::RequestCancellationFromBoard' -and $boardCancellationCalls -notmatch '::CancelUnpaid') 'Project UI must use the guarded cancellation router.'
@@ -3746,7 +4393,7 @@ foreach ($entry in @(@($itemSave, 'DAA9052430B2B766A8F15E221AB0D24C63FD55A6723EE
         @($standItemSaveLayout, '2AA920721B18F2C92DF93A183B8B4A2CF822516700DF8384208D31365DFADFB7'),
         @($nativeItemLoad, '63E24A305F38DB26E0D0AEEA4922D5421799DA1AB162641999F1541BF85C9475'),
         @($standItemLoadLayout, '4115D3B4262E05B05634A1117801E96E4A9162CAA176B0CB7D1A227DC46EA8FA'),
-        @($standAttachLayout, '0E107474A83CB6A695BCC5FEBD2792760CB85264CFFA0F2172EA9F1A62CCCAE2'),
+        @($standAttachLayout, 'F7FBCF12DEDB240379F42BA64273627AC93C5DBE4D5696F712AEC6783ADAF5C3'),
         @($numItemsSave, 'EFCB67745DEF1986C47B3526000AC07C0114FDA19AF57F0DABCDE653A6DC456E'),
         @($inventoryLoadLayout, 'E0E6FF90F203C6FFE961DE66768CDEDF609B896945E637A8166B121911BEF935'),
         @(($inventoryType.Methods | Where-Object Name -eq 'LoadOld'), '1A33375F234E0650DB11140173303220E957FB25A68275EB82E2848118482EE7'),
@@ -3880,4 +4527,36 @@ if (Test-Path -LiteralPath $steamManifest -PathType Leaf) {
     $steamBuild = $buildIds[0].Groups[1].Value
 }
 $hostSha = (Get-FileHash -LiteralPath $hostPath -Algorithm SHA256).Hash
+$kgAdmission = [regex]::Match([IO.File]::ReadAllText((Join-Path $projectRoot 'src/BuildWorks/BlueprintStorageCapture.cs')),
+    'internal static bool KgOrdinaryComponent\(Type type\)=>([\s\S]*?);')
+Assert-Contract $kgAdmission.Success 'KG exact-type state admission method is missing.'
+$kgFixture = @"
+using System;
+namespace BuildWorksKgAdmissionFixture {
+    public class Piece {} public class ZNetView {} public class WearNTear {}
+    public class Sign {} public class RandomMaterialValues {}
+    public class Container {} public class ItemStand {} public class ArmorStand {}
+    public class TerrainModifier {} public class CustomStateBehaviour {} public class DerivedPiece : Piece {}
+    namespace TMPro { public class TextMeshPro {} public class TextMeshProUGUI {} }
+    namespace UnityEngine.UI { public class CanvasScaler {} }
+    public static class Admission { public static bool Check(Type type) { return $($kgAdmission.Groups[1].Value); } }
+}
+"@
+$kgFixtureTypes = @(Add-Type -TypeDefinition $kgFixture -PassThru)
+$kgFixtureType = $kgFixtureTypes | Where-Object FullName -eq 'BuildWorksKgAdmissionFixture.Admission'
+$kgMethod = $kgFixtureType.GetMethod('Check')
+foreach ($name in @('Piece','ZNetView','WearNTear','Sign','RandomMaterialValues','TMPro.TextMeshPro','TMPro.TextMeshProUGUI','UnityEngine.UI.CanvasScaler')) {
+    $candidateType = $kgFixtureType.Assembly.GetType('BuildWorksKgAdmissionFixture.' + $name)
+    Assert-Contract ($null -ne $candidateType -and $kgMethod.Invoke($null, [object[]]@($candidateType))) "Known KG state component rejected: $name"
+}
+foreach ($name in @('Container','ItemStand','ArmorStand','TerrainModifier','CustomStateBehaviour','DerivedPiece','absent')) {
+    $candidateType = $kgFixtureType.Assembly.GetType('BuildWorksKgAdmissionFixture.' + $name)
+    Assert-Contract (-not $kgMethod.Invoke($null, [object[]]@($candidateType))) "Unknown/special KG state component admitted: $name"
+}
+Write-Output 'PASS KG exact-type admission: 8 known types; storage/holders/terrain/custom/derived/null fail closed. Actual method extracted with substituted type boundaries; no game proof.'
+& (Join-Path $PSScriptRoot 'Test-ItemStandPackageRoles.ps1')
 Write-Output "PASS: current Valheim host contract matches BuildWorks $($plugin.Name.Version); Steam manifest build $steamBuild; assembly_valheim SHA256 $hostSha."
+
+& (Join-Path $projectRoot 'tests/BuildWorks.EditorLayerChecks/Run.ps1')
+& (Join-Path $projectRoot 'tests/BuildWorks.StorageLookupChecks/Run.ps1')
+& (Join-Path $projectRoot 'tests/BuildWorks.PresentationChecks/Run.ps1')

@@ -25,16 +25,21 @@ $taskView = Get-Content -LiteralPath (Join-Path $taskRoot 'src/BuildWorks/Bluepr
 $taskConfirmation = [regex]::Match($taskView, 'private static string ConfirmationKey\([^;]+;').Value
 if (!$taskConfirmation) { throw 'Confirmation mapping missing.' }
 $taskCode = $taskCode.Replace('__CONFIRMATION__', $taskConfirmation)
+$taskBuilding = [regex]::Match($taskView, 'bool building = [^;]+;').Value
+$taskSummaryStart = $taskView.IndexOf('var progress = runtime.Progress(board.Id);', [StringComparison]::Ordinal)
+$taskSummaryEnd = $taskView.IndexOf('else if (missing)', [Math]::Max(0, $taskSummaryStart), [StringComparison]::Ordinal)
+if (!$taskBuilding -or $taskSummaryStart -lt 0 -or $taskSummaryEnd -le $taskSummaryStart) { throw 'Phase summary source fragment missing.' }
+$taskCode = $taskCode.Replace('__BUILDING__', $taskBuilding).Replace('__SUMMARY__', $taskView.Substring($taskSummaryStart, $taskSummaryEnd-$taskSummaryStart))
 Add-Type -TypeDefinition $taskCode
 $taskChecks = [BoardCancellationChecks.BlueprintConstructionProjectRuntime]::Run()
-if ($taskChecks -ne 30) { throw ('Board cancellation coverage differs: '+$taskChecks) }
+if ($taskChecks -ne 42) { throw ('Board cancellation coverage differs: '+$taskChecks) }
 if ($taskView -match 'runtime.CancelUnpaid\(' -or $taskView -notmatch 'runtime.RequestCancellationFromBoard\(') { throw 'Board view bypasses cancellation router.' }
 if ($taskView -notmatch 'bool building = action == ConstructionCancellationAction.Unpaid \|\| action == ConstructionCancellationAction.Remove;' -or
     $taskView -notmatch 'continueButton.interactable = building;' -or
     $taskView -notmatch 'cancelButton.interactable = action != ConstructionCancellationAction.Review && action != ConstructionCancellationAction.AwaitCollection;' -or
     $taskView -notmatch 'BuildWorksLocalization.Text\(ConfirmationKey\(action\)\)') { throw 'View mutation availability or confirmation wiring differs.' }
 if ($ReportPath) {
-    @{passed=$true;checks=$taskChecks;actualRouterAndResumeCompiled=$true;fakeHost=$true;gameHostTested=$false;
+    @{passed=$true;checks=$taskChecks;routerChecks=30;phaseSummaryChecks=12;actualPhaseSummaryCompiled=$true;actualRouterAndResumeCompiled=$true;fakeHost=$true;gameHostTested=$false;
       runtimeSha256=(Get-FileHash -LiteralPath $taskRuntimePath).Hash} | ConvertTo-Json | Set-Content -LiteralPath $ReportPath
 }
-"PASS board cancellation: $taskChecks actual-router assertions; native operations substituted, no game/payment/refund proof."
+"PASS board cancellation: 30 actual-router assertions +12 actual phase-summary cases; native operations substituted, no game/payment/refund proof."

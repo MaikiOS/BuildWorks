@@ -374,7 +374,7 @@ namespace OstrixMods.BuildWorks
                 }
                 shader.SetInt("_PendingBase", pendingBase);
                 var last = owner.Inputs.At(owner.Inputs.PendingCount - 1);
-                arena.PublishMetadata(owner.Slot, token, Actor(last), Body(last), last.Clock, last.Nearby ? 1 : 0, mapBase: pendingBase); arena.Dispatch("FinishStep");
+                arena.PublishMetadata(owner.Slot, token, Actor(last), Body(last), last.Clock, last.Nearby ? 1 : 0, mapBase: pendingBase, fieldsIndexed: !metadataOnly); arena.Dispatch("FinishStep");
                 if (arena.VelocityUpload && !metadataOnly) RequestSnapshotVelocity(owner, token, false);
                 var stamp = token; owner.nativePending = true;
                 PerfBatch(owner.Inputs.PendingCount, token.Tick - owner.State.ConfirmedTick, metadataOnly);

@@ -1,11 +1,10 @@
-# Install private alpha 0.19.329
+# Install alpha .329
 
 [Русский](INSTALL_RU.md)
 
-BuildWorks 0.19.329 — PRIVATE TEST CANDIDATE
-Private alpha for manual testing on a second PC or a collaborator profile.
+[Download / Скачать](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.329-alpha)
 
-Use a working Valheim profile with BepInEx 5. The verified host is Steam build 26249040. Valheim and BepInEx are not included.
+The archive is not rebuilt; internal private labels describe its original issue. Use existing Valheim with BepInEx 5. Verified host: Steam build 26249040 / QA BepInEx5.4.23.6 / Unity6000.0.75f1. Other host versions are not established by this evidence.
 
 1. Close Valheim completely.
 2. Open the profile folder that contains BepInEx. With a mod manager, use the selected profile folder; with a manual installation, use the game's existing BepInEx folder.
@@ -14,19 +13,10 @@ Use a working Valheim profile with BepInEx 5. The verified host is Steam build 2
 5. Keep one active BuildWorks installation. Keep your existing configuration, blueprint library, worlds and characters. Do not copy a QA profile, bridge, test-only DLLs or isolation tokens.
 6. Start that modded profile. Verify that BepInEx/LogOutput.log loads BuildWorks 0.19.329 once. For the second PC, repeat these steps in its own profile.
 
-This is a manual-install private ZIP, not a Thunderstore package or a public beta. No files are installed automatically.
+ZIP SHA256: `3C91113CB4D601A843317DA251BB60BF191107EC5D7E15D74983279373934E41`.
 
-To remove or roll back: close Valheim and remove only Ostrix-BuildWorks, or restore its backup. Leave player data in place. Older binaries may require the matching pre-upgrade blueprint-data backup.
+## Updating, data and removal
 
-See QA_SCOPE_EN.txt for the accepted tests and their limits. Source/build/isolated gameplay do not establish compatibility with every mod stack or multiplayer. Please return a fresh LogOutput.log, the exact game/mod version and the blueprint that reproduces any placement issue.
+Close the game before updating. Keep backups outside plugins. Replace all four supplied files together; do not mix DLL builds. Valheim/BepInEx are not included. To uninstall, remove only BepInEx/plugins/Ostrix-BuildWorks; existing world pieces/worlds/characters are not rolled back. Preserve configuration and BepInEx/config/BuildWorks, including blueprints.json and share. Binary rollback may require the matching library backup. Do not copy a QA profile, bridge or tokens.
 
-
-[Full version/evidence limits](ALPHA_0.19.329.md).
-
-## Data and removal
-
-Normal library: `BepInEx/config/BuildWorks/blueprints.json`; managed portable files: the same BuildWorks directory under `share/<id>.buildworks.json`. QA redirects these into the existing isolated save root. Use the in-game Share path instead of guessing a profile. The share folder is not automatically imported or server-published.
-
-Close the game before removing only `BepInEx/plugins/Ostrix-BuildWorks`. Back up blueprints/share files first; plugin removal does not undo already built world objects. Never delete worlds/characters or another profile to uninstall.
-
-Verify the supplied SHA256SUMS.txt: a version number alone does not identify earlier329 test iterations. Use only the owner-issued private archive; no public download is claimed.
+[Version / Ограничения](ALPHA_0.19.329.md).

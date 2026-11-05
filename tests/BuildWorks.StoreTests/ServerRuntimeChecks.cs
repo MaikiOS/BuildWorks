@@ -43,12 +43,14 @@ internal sealed class ZNetPeer
     public ZRpc m_rpc;
     public Socket m_socket;
     public long m_uid;
+    public string m_playerName = "Player";
     public bool Ready = true;
     public bool IsReady() => Ready;
 }
 internal sealed class Player
 {
     internal static Player m_localPlayer;
+    public string GetPlayerName() => "Host";
     public static implicit operator bool(Player player) => player != null;
 }
 internal sealed class ZNet

@@ -119,3 +119,6 @@ F9, F10, Alt, N, HUD position, and UI scale can be changed in the BepInEx config
 A short MMB click without motion deletes the hovered unlocked piece in selection/placement; dragging MMB orbits the camera. Delete during placement removes the hovered piece; outside placement it removes selected pieces. These are distinct states.
 
 Viewport pointer wrapping exists, but focus/windows and some edges still need regression acceptance. Interior camera is available through Camera; use contextual hints. It does not grant admin permissions.
+
+
+Controls reference for alpha .329. Later Unbound windows are not included in this archive.

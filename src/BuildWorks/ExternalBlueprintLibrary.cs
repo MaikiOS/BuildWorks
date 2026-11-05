@@ -82,7 +82,11 @@ namespace OstrixMods.BuildWorks
                             if (result.Count >= MaximumFiles) throw new InvalidDataException("$buildworks_import.library_limit");
                             string source = (sourceName ?? Path.GetFileName(path)) + "/" + entry.FullName;
                             using (Stream data = entry.Open())
-                                result.Add(Read(data, entry.Length, source, ref budget, validationReads));
+                            {
+                                var document = Read(data, entry.Length, source, ref budget, validationReads);
+                                if (document == null) continue;
+                                result.Add(document);
+                            }
                             ZipArchiveEntry preview = zip.GetEntry(Path.ChangeExtension(entry.FullName, ".png"));
                             if (preview != null && preview.Length <= MaximumPreviewBytes && preview.Length <= budget)
                             {
@@ -99,7 +103,10 @@ namespace OstrixMods.BuildWorks
                     }
                 }
                 else using (Stream stream = File.OpenRead(path))
-                    result.Add(Read(stream, stream.Length, sourceName ?? Path.GetFileName(path), ref budget, validationReads));
+                {
+                    var document = Read(stream, stream.Length, sourceName ?? Path.GetFileName(path), ref budget, validationReads);
+                    if (document != null) result.Add(document);
+                }
             }
             catch (Exception exception) when (exception is IOException || exception is InvalidDataException || exception is UnauthorizedAccessException || exception is ArgumentException)
             {
@@ -139,7 +146,26 @@ namespace OstrixMods.BuildWorks
         internal static bool Supported(string name) =>
             name.EndsWith(".blueprint", StringComparison.OrdinalIgnoreCase) ||
             name.EndsWith(".vbuild", StringComparison.OrdinalIgnoreCase) ||
-            name.EndsWith(".buildworks.json", StringComparison.OrdinalIgnoreCase);
+            name.EndsWith(".yml", StringComparison.OrdinalIgnoreCase) ||
+            name.EndsWith(".oprint", StringComparison.OrdinalIgnoreCase) ||
+            name.EndsWith(".bbp", StringComparison.OrdinalIgnoreCase) ||
+            name.EndsWith(".vtbp", StringComparison.OrdinalIgnoreCase) ||
+            name.EndsWith(".json", StringComparison.OrdinalIgnoreCase);
+
+        internal static bool BrowsableFile(string path, ref long budget)
+        {
+            if (!Supported(path)) return false;
+            if (!path.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ||
+                path.EndsWith(".buildworks.json", StringComparison.OrdinalIgnoreCase)) return true;
+            if (new FileInfo(path).Length > budget) throw new InvalidDataException("$buildworks_import.file_limit");
+            var documents = LoadFile(path, ref budget);
+            if (documents.Any(document => document.importError == "$buildworks_import.file_limit"))
+                throw new InvalidDataException("$buildworks_import.file_limit");
+            return documents.Any(document => document.importError == null &&
+                (document.sourceDocuments?.SingleOrDefault()?.format == Geometry.OpenKeepBlueprint.Format ||
+                 document.sourceDocuments?.SingleOrDefault()?.format == Geometry.BetterBuildingBlueprint.JsonFormat ||
+                 document.sourceDocuments?.SingleOrDefault()?.format == Geometry.PlannerBlueprint.Format));
+        }
 
         private static CompositeBlueprintStore.Blueprint Read(Stream stream, long length, string source, ref long budget,
             Dictionary<string, CompositeBlueprintStore.Blueprint> validationReads = null)
@@ -160,11 +186,27 @@ namespace OstrixMods.BuildWorks
                         if (bytes.Length + read > length) throw new InvalidDataException("$buildworks_import.file_limit");
                         bytes.Write(buffer, 0, read);
                     }
-                    string text = new UTF8Encoding(false, true).GetString(bytes.ToArray());
-                    if (validationReads != null && validationReads.TryGetValue(source, out var cached) &&
+                    byte[] content = bytes.ToArray();
+                    bool bbp = source.EndsWith(".bbp", StringComparison.OrdinalIgnoreCase);
+                    // Charge the declared expansion before decoding or reusing a cached BBP model.
+                    if (bbp && content.Length >= 48)
+                    {
+                        int expanded = content[8] | content[9] << 8 | content[10] << 16 | content[11] << 24;
+                        long extra = Math.Max(0, expanded - length);
+                        if (expanded > MaximumFileBytes || extra > budget) throw new InvalidDataException("$buildworks_import.file_limit");
+                        budget -= extra;
+                    }
+                    // Binary files must never pass through a UTF-8 decoder.
+                    string text = source.EndsWith(".oprint", StringComparison.OrdinalIgnoreCase) || bbp
+                        ? Convert.ToBase64String(content) : new UTF8Encoding(false, true).GetString(content);
+                    if (source.EndsWith(".json", StringComparison.OrdinalIgnoreCase) &&
+                        !source.EndsWith(".buildworks.json", StringComparison.OrdinalIgnoreCase) &&
+                        !Geometry.OpenKeepBlueprint.IsJsonBlueprint(text) && !Geometry.BetterBuildingBlueprint.IsJsonBlueprint(text) &&
+                        !Geometry.PlannerBlueprint.IsJsonBlueprint(text)) return null;
+                    if (validationReads != null && !source.EndsWith(".buildworks.json", StringComparison.OrdinalIgnoreCase) && validationReads.TryGetValue(source, out var cached) &&
                         cached.sourceDocuments[0].text == text)
                         return cached.ValidationReadCopy();
-                    var parsed = Parse(text, source);
+                    var parsed = ParseWithinBudget(text, source, ref budget);
                     // One import worker only; exact text is already retained in foreign source evidence.
                     if (validationReads != null && !source.EndsWith(".buildworks.json", StringComparison.OrdinalIgnoreCase) &&
                         parsed.sourceDocuments?.Count == 1)
@@ -175,7 +217,7 @@ namespace OstrixMods.BuildWorks
                     return parsed;
                 }
             }
-            catch (Exception exception) when (exception is IOException || exception is InvalidDataException || exception is DecoderFallbackException)
+            catch (Exception exception) when (exception is IOException || exception is InvalidDataException || exception is DecoderFallbackException || exception is FormatException || exception is ArgumentException)
             { return Blocked(source, exception.Message); }
         }
 
@@ -197,11 +239,17 @@ namespace OstrixMods.BuildWorks
 
         internal static CompositeBlueprintStore.Blueprint Parse(string text, string source)
         {
+            long budget = MaximumTotalBytes;
+            return ParseWithinBudget(text, source, ref budget);
+        }
+
+        private static CompositeBlueprintStore.Blueprint ParseWithinBudget(string text, string source, ref long budget)
+        {
             if (source.EndsWith(".buildworks.json", StringComparison.OrdinalIgnoreCase))
             {
                 try
                 {
-                    var native = BlueprintExchangeFormat.Decode(text);
+                    var native = BlueprintExchangeFormat.DecodeWithinBudget(text, ref budget);
                     native.id = Identity(source + "\n" + text);
                     native.importSource = source;
                     native.importPartCount = native.parts.Count;
@@ -209,6 +257,22 @@ namespace OstrixMods.BuildWorks
                 }
                 catch (InvalidDataException exception) { return Blocked(source, exception.Message); }
             }
+            if (source.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    bool planner = Geometry.PlannerBlueprint.IsJsonBlueprint(text);
+                    bool betterBuilding = Geometry.BetterBuildingBlueprint.IsJsonBlueprint(text);
+                    if (planner && betterBuilding) return Blocked(source, "$buildworks_import.document_invalid");
+                    return planner ? ParsePlanner(text, source) : betterBuilding ? ParseBbp(text, source, true) : ParseOpenKeep(text, source);
+                }
+                catch (Exception error) when (error is ArgumentException || error is FormatException)
+                { return Blocked(source, "$buildworks_import.document_invalid"); }
+            }
+            if (source.EndsWith(".yml", StringComparison.OrdinalIgnoreCase)) return ParseKg(text, source);
+            if (source.EndsWith(".oprint", StringComparison.OrdinalIgnoreCase)) return ParseKg(text, source, true);
+            if (source.EndsWith(".bbp", StringComparison.OrdinalIgnoreCase)) return ParseBbp(text, source);
+            if (source.EndsWith(".vtbp", StringComparison.OrdinalIgnoreCase)) return ParseUnbound(text, source);
             var blueprint = Blocked(source, null);
             blueprint.importAbsoluteScale = true;
             blueprint.id = Identity(source + "\n" + text);
@@ -218,8 +282,11 @@ namespace OstrixMods.BuildWorks
             catch (ArgumentException) { return Blocked(source, "$buildworks_import.file_limit"); }
             blueprint.sourceDocuments = new List<CompositeBlueprintStore.SourceDocument>
             { CompositeBlueprintStore.SourceDocument.FromGeometry(evidence) };
-            bool pieces = vbuild, seenPieces = vbuild, snapPoints = false;
-            int lineNumber = 0;
+            if (evidence.NamedCenterPrefab != null)
+                blueprint.id = Identity(source + "\n" + text + "\nsource-center-v1");
+            // PlanBuild V1 starts with piece rows, before any explicit section header.
+            bool pieces = true, seenPieces = vbuild, snapPoints = false;
+            int lineNumber = 0, homesteadHeaders = 0;
             using (var reader = new StringReader(text.TrimStart('\uFEFF')))
             {
                 string line;
@@ -237,7 +304,9 @@ namespace OstrixMods.BuildWorks
                         else if (line == "#SnapPoints") { pieces = false; snapPoints = true; }
                         else if (line == "#Terrain") { pieces = false; snapPoints = false; }
                         else if (!line.StartsWith("#Creator:", StringComparison.Ordinal) &&
-                            !line.StartsWith("#Description:", StringComparison.Ordinal))
+                            !line.StartsWith("#Description:", StringComparison.Ordinal) &&
+                            (vbuild || !line.StartsWith("#Icon:", StringComparison.Ordinal)) &&
+                            (vbuild || seenPieces || !Geometry.BlueprintSourceDocument.HomesteadMetadataHeader(line, ref homesteadHeaders)))
                         { pieces = false; snapPoints = false; } // Unknown sections are retained, never executed or parsed as pieces.
                         continue;
                     }
@@ -262,6 +331,7 @@ namespace OstrixMods.BuildWorks
                         continue;
                     }
                     if (!pieces) continue; // terrain has no execution path
+                    seenPieces = true;
                     ++blueprint.importPartCount;
                     try
                     {
@@ -271,7 +341,7 @@ namespace OstrixMods.BuildWorks
                         // semicolon dialect. Both share the same eight core fields.
                         bool legacyVbuild = vbuild && !line.Contains(";");
                         string[] fields = PartFields(line, legacyVbuild);
-                        int basic = vbuild ? 8 : 10;
+                        int basic = vbuild ? 8 : 9;
                         if (fields.Length < basic || fields.Length > (vbuild ? 10 : 15) ||
                             (!vbuild && (fields.Length == 11 || fields.Length == 12)))
                             throw new InvalidDataException("$buildworks_import.document_invalid");
@@ -281,9 +351,9 @@ namespace OstrixMods.BuildWorks
                                 if (index != 9) fields[index] = fields[index].Replace(',', '.');
                         string prefab = fields[0].Trim();
                         // Decode only the known sign adapter; every other object payload remains inert and part-bound.
-                        string signText = !vbuild && prefab == "sign" ? BlueprintExchangeFormat.DecodeSignText(fields[9], allowLegacyLiteral: true) : null;
+                        string signText = !vbuild && fields.Length > 9 && prefab == "sign" ? BlueprintExchangeFormat.DecodeSignText(fields[9], allowLegacyLiteral: true) : null;
                         int dataIndex = vbuild ? 8 : 13;
-                        string info = !vbuild && prefab != "sign" && HasData(fields[9]) ? fields[9] : null;
+                        string info = !vbuild && fields.Length > 9 && prefab != "sign" && HasData(fields[9]) ? fields[9] : null;
                         string zdo = fields.Length > dataIndex && HasData(fields[dataIndex]) ? fields[dataIndex] : null;
                         string chance = fields.Length > dataIndex + 1 && fields[dataIndex + 1] != "" &&
                             fields[dataIndex + 1] != "1" ? fields[dataIndex + 1] : null;
@@ -345,9 +415,253 @@ namespace OstrixMods.BuildWorks
             if (blueprint.name.Length == 0 || blueprint.name.Length > 48 || blueprint.category.Length == 0 || blueprint.category.Length > 24 ||
                 (blueprint.name + blueprint.category).Any(c => char.IsControl(c) || c == '<' || c == '>'))
                 blueprint.importError = "$buildworks_store.invalid_metadata";
+            if (blueprint.importError == null && evidence.NamedCenterPrefab != null)
+            {
+                try { ApplyNamedCenter(blueprint, evidence.NamedCenterPrefab); }
+                catch (ArgumentException) { blueprint.importError = "$buildworks_import.transform"; }
+            }
             if (blueprint.importError != null) blueprint.parts.Clear(); // no partial construction can be used
             else blueprint.prefabName = blueprint.parts[0].prefabName;
             return blueprint;
+        }
+
+        private static CompositeBlueprintStore.Blueprint ParsePlanner(string text, string source)
+        {
+            var blueprint = Blocked(source, null);
+            try
+            {
+                var evidence = new Geometry.BlueprintSourceDocument(Geometry.PlannerBlueprint.Format, Path.GetFileName(source), text);
+                var model = evidence.Planner;
+                blueprint.id = Identity(source + "\n" + text);
+                blueprint.name = model.Title;
+                blueprint.sourceDocuments = new List<CompositeBlueprintStore.SourceDocument> { CompositeBlueprintStore.SourceDocument.FromGeometry(evidence) };
+                blueprint.importPartCount = model.Pieces.Count;
+                if (model.Layers.Count > Geometry.BlueprintEditorDocument.MaximumGroups)
+                    throw new InvalidDataException("$buildworks_import.document_invalid");
+                foreach (string label in model.Layers.Select(layer => layer.Name).Prepend(model.Title))
+                    if (string.IsNullOrWhiteSpace(label) || label.Length > 48 || label != label.Trim() ||
+                        label.Any(c => char.IsControl(c) || c == '<' || c == '>'))
+                        throw new InvalidDataException("$buildworks_store.invalid_metadata");
+                var layers = new Dictionary<string, string>(StringComparer.Ordinal);
+                foreach (var layer in model.Layers)
+                {
+                    string id = blueprint.id + "_layer_" + blueprint.groups.Count;
+                    layers.Add(layer.Id, id);
+                    blueprint.groups.Add(new CompositeBlueprintStore.Group { stableId = id, name = layer.Name,
+                        sourceDocumentId = evidence.Id, sourceLayerId = layer.Id });
+                }
+                // The producer's native exports specify absolute unit scale, not an unknown prefab basis.
+                blueprint.importAbsoluteScale = true;
+                foreach (var piece in model.Pieces)
+                {
+                    var position = piece.Position; var rotation = piece.Rotation.Normalized();
+                    if (Math.Abs(position.X) > 512 || Math.Abs(position.Y) > 512 || Math.Abs(position.Z) > 512)
+                        throw new InvalidDataException("$buildworks_import.transform");
+                    blueprint.parts.Add(new CompositeBlueprintStore.Part {
+                        stableId = blueprint.id + "_" + piece.Record, prefabName = piece.Prefab, displayName = piece.Prefab,
+                        position = new CompositeBlueprintStore.VectorData { x = (float)position.X, y = (float)position.Y, z = (float)position.Z },
+                        rotation = new CompositeBlueprintStore.QuaternionData { x = (float)rotation.X, y = (float)rotation.Y, z = (float)rotation.Z, w = (float)rotation.W },
+                        parentGroupId = layers[piece.LayerId], sourceDocumentId = evidence.Id,
+                        sourceRecord = piece.Record, sourceFrameApplied = true
+                    });
+                }
+                blueprint.prefabName = blueprint.parts[0].prefabName;
+            }
+            catch (Exception error) when (error is ArgumentException || error is FormatException || error is InvalidDataException)
+            { blueprint.importError = error is ArgumentException ? "$buildworks_import.document_invalid" : error.Message; blueprint.parts.Clear(); blueprint.groups.Clear(); }
+            return blueprint;
+        }
+
+        private static CompositeBlueprintStore.Blueprint ParseBbp(string text, string source, bool json = false)
+        {
+            var blueprint = Blocked(source, null);
+            try
+            {
+                var evidence = new Geometry.BlueprintSourceDocument(json ? Geometry.BetterBuildingBlueprint.JsonFormat : Geometry.BetterBuildingBlueprint.BinaryFormat, Path.GetFileName(source), text);
+                var model = evidence.BetterBuilding;
+                blueprint.id = Identity(source + "\n" + text);
+                blueprint.name = model.Name;
+                blueprint.sourceDocuments = new List<CompositeBlueprintStore.SourceDocument> { CompositeBlueprintStore.SourceDocument.FromGeometry(evidence) };
+                blueprint.importPartCount = model.Pieces.Count;
+                if (string.IsNullOrWhiteSpace(blueprint.name) || blueprint.name.Length > 48 || blueprint.name.Any(c => char.IsControl(c) || c == '<' || c == '>'))
+                    throw new InvalidDataException("$buildworks_store.invalid_metadata");
+                foreach (var piece in model.Pieces)
+                {
+                    if (piece.Prefab.Length > 128 || piece.Prefab.Any(c => char.IsControl(c) || "/\\<>".Contains(c)) || !Geometry.BlueprintEditorPart.IsValidSignText(piece.SignText))
+                        throw new InvalidDataException("$buildworks_import.document_invalid");
+                    var rotation = piece.Rotation.Normalized();
+                    var scale = piece.Scale ?? new Geometry.Point3(1, 1, 1);
+                    blueprint.parts.Add(new CompositeBlueprintStore.Part {
+                        stableId = blueprint.id + "_" + piece.Record, prefabName = piece.Prefab, displayName = piece.Prefab,
+                        position = new CompositeBlueprintStore.VectorData { x = (float)piece.Position.X, y = (float)piece.Position.Y, z = (float)piece.Position.Z },
+                        rotation = new CompositeBlueprintStore.QuaternionData { x = (float)rotation.X, y = (float)rotation.Y, z = (float)rotation.Z, w = (float)rotation.W },
+                        scale = new CompositeBlueprintStore.VectorData { x = (float)scale.X, y = (float)scale.Y, z = (float)scale.Z },
+                        signText = piece.SignText, sourceDocumentId = evidence.Id, sourceRecord = piece.Record, sourceFrameApplied = true
+                    });
+                }
+                blueprint.prefabName = blueprint.parts[0].prefabName;
+            }
+            catch (Exception error) when (error is ArgumentException || error is FormatException || error is InvalidDataException)
+            { blueprint.importError = error is ArgumentException ? "$buildworks_import.document_invalid" : error.Message; blueprint.parts.Clear(); }
+            return blueprint;
+        }
+
+        private static CompositeBlueprintStore.Blueprint ParseUnbound(string text, string source)
+        {
+            var blueprint = Blocked(source, null);
+            try
+            {
+                var evidence = new Geometry.BlueprintSourceDocument(Geometry.UnboundBlueprint.Format, Path.GetFileName(source), text);
+                var model = evidence.Unbound;
+                blueprint.id = Identity(source + "\n" + text + "\nunbound-v2");
+                blueprint.name = Path.GetFileNameWithoutExtension(source);
+                if (string.IsNullOrWhiteSpace(blueprint.name) || blueprint.name.Length > 48 ||
+                    blueprint.name.Any(c => char.IsControl(c) || c == '<' || c == '>'))
+                    throw new InvalidDataException("$buildworks_store.invalid_metadata");
+                blueprint.sourceDocuments = new List<CompositeBlueprintStore.SourceDocument> { CompositeBlueprintStore.SourceDocument.FromGeometry(evidence) };
+                blueprint.importPartCount = model.Pieces.Count;
+                if (model.Pieces.Count == 0) throw new InvalidDataException("$buildworks_import.part_limit");
+                foreach (var piece in model.Pieces)
+                {
+                    if (piece.PrefabName.Length > 128 || Math.Abs(piece.Position.X) > 512 || Math.Abs(piece.Position.Y) > 512 || Math.Abs(piece.Position.Z) > 512)
+                        throw new InvalidDataException("$buildworks_import.transform");
+                    var rotation = piece.Rotation.Normalized();
+                    blueprint.parts.Add(new CompositeBlueprintStore.Part {
+                        stableId = blueprint.id + "_" + piece.Line, prefabName = piece.PrefabName, displayName = piece.PrefabName,
+                        position = new CompositeBlueprintStore.VectorData { x = (float)piece.Position.X, y = (float)piece.Position.Y, z = (float)piece.Position.Z },
+                        rotation = new CompositeBlueprintStore.QuaternionData { x = (float)rotation.X, y = (float)rotation.Y, z = (float)rotation.Z, w = (float)rotation.W },
+                        sourceDocumentId = evidence.Id, sourceLine = piece.Line, sourceFrameApplied = true,
+                        foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(new Geometry.BlueprintForeignPartData(
+                            evidence.Format, piece.PrefabName, piece.ZdoData, null))
+                    });
+                }
+                blueprint.prefabName = blueprint.parts[0].prefabName;
+            }
+            catch (Exception error) when (error is ArgumentException || error is FormatException || error is InvalidDataException)
+            { blueprint.importError = error is ArgumentException || error is FormatException ? "$buildworks_import.document_invalid" : error.Message; blueprint.parts.Clear(); }
+            return blueprint;
+        }
+
+        private static CompositeBlueprintStore.Blueprint ParseKg(string text, string source, bool binary = false)
+        {
+            var blueprint=Blocked(source,null);
+            try
+            {
+                var evidence=new Geometry.BlueprintSourceDocument(binary ? Geometry.KgBlueprint.BinaryFormat : Geometry.KgBlueprint.Format,Path.GetFileName(source),text);
+                var model=evidence.Kg;
+                blueprint.id=Identity(source+"\n"+text);
+                blueprint.name=model.Name;
+                if (string.IsNullOrWhiteSpace(blueprint.name) || blueprint.name.Length>48 ||
+                    blueprint.name.Any(c=>char.IsControl(c) || c=='<' || c=='>'))
+                    throw new InvalidDataException("$buildworks_store.invalid_metadata");
+                blueprint.sourceDocuments=new List<CompositeBlueprintStore.SourceDocument>{CompositeBlueprintStore.SourceDocument.FromGeometry(evidence)};
+                blueprint.importPartCount=model.Objects.Count;
+                foreach(var piece in model.Objects)
+                {
+                    var pose=Geometry.KgBlueprintFrame.Canonical(piece,model.BoxRotation);
+                    if (piece.ReferenceName.Length>128 || piece.ReferenceName.Any(c=>c=='/' || c=='\\') ||
+                        Math.Abs(pose.Position.X)>512 || Math.Abs(pose.Position.Y)>512 || Math.Abs(pose.Position.Z)>512)
+                        throw new InvalidDataException("$buildworks_import.transform");
+                    blueprint.parts.Add(new CompositeBlueprintStore.Part {
+                        stableId=blueprint.id+"_"+piece.Record,prefabName=piece.ReferenceName,displayName=piece.ReferenceName,
+                        position=new CompositeBlueprintStore.VectorData{x=(float)pose.Position.X,y=(float)pose.Position.Y,z=(float)pose.Position.Z},
+                        rotation=new CompositeBlueprintStore.QuaternionData{x=(float)pose.Rotation.X,y=(float)pose.Rotation.Y,z=(float)pose.Rotation.Z,w=(float)pose.Rotation.W},
+                        sourceDocumentId=evidence.Id,sourceRecord=piece.Record,sourceFrameApplied=true,
+                        foreignData=piece.ZdoData==null?null:CompositeBlueprintStore.ForeignPartData.FromGeometry(
+                            new Geometry.BlueprintForeignPartData(evidence.Format,null,piece.ZdoData,null))
+                    });
+                }
+                blueprint.prefabName=blueprint.parts[0].prefabName;
+            }
+            catch(Exception error) when(error is ArgumentException || error is FormatException || error is InvalidDataException)
+            { blueprint.importError=error is ArgumentException ? "$buildworks_import.document_invalid" : error.Message;blueprint.parts.Clear(); }
+            return blueprint;
+        }
+
+        private static CompositeBlueprintStore.Blueprint ParseOpenKeep(string text, string source)
+        {
+            var blueprint = Blocked(source, null);
+            try
+            {
+                var evidence = new Geometry.BlueprintSourceDocument(Geometry.OpenKeepBlueprint.Format, Path.GetFileName(source), text);
+                var document = evidence.OpenKeep;
+                blueprint.id = Identity(source + "\n" + text);
+                blueprint.name = document.Name;
+                blueprint.sourceDocuments = new List<CompositeBlueprintStore.SourceDocument>
+                { CompositeBlueprintStore.SourceDocument.FromGeometry(evidence) };
+                blueprint.importPartCount = document.Pieces.Count;
+                if (document.Pieces.Count == 0) throw new InvalidDataException("$buildworks_import.part_limit");
+                if (string.IsNullOrWhiteSpace(blueprint.name) || blueprint.name.Length > 48 ||
+                    blueprint.name.Any(c => char.IsControl(c) || c == '<' || c == '>'))
+                    throw new InvalidDataException("$buildworks_store.invalid_metadata");
+                foreach (var piece in document.Pieces)
+                {
+                    if (piece.Prefab.Length > 128 || piece.Prefab.Any(c => c == '/' || c == '\\') ||
+                        Math.Abs(piece.Position.X) > 512 || Math.Abs(piece.Position.Y) > 512 || Math.Abs(piece.Position.Z) > 512)
+                        throw new InvalidDataException("$buildworks_import.transform");
+                    Geometry.Rotation3 rotation = piece.Rotation;
+                    blueprint.parts.Add(new CompositeBlueprintStore.Part {
+                        stableId = blueprint.id + "_" + piece.Record, prefabName = piece.Prefab, displayName = piece.Prefab,
+                        position = new CompositeBlueprintStore.VectorData { x = (float)piece.Position.X, y = (float)piece.Position.Y, z = (float)piece.Position.Z },
+                        rotation = new CompositeBlueprintStore.QuaternionData { x = (float)rotation.X, y = (float)rotation.Y, z = (float)rotation.Z, w = (float)rotation.W },
+                        sourceDocumentId = evidence.Id, sourceRecord = piece.Record
+                    });
+                }
+                blueprint.prefabName = blueprint.parts[0].prefabName;
+            }
+            catch (Exception error) when (error is ArgumentException || error is FormatException || error is InvalidDataException)
+            { blueprint.importError = error is ArgumentException ? "$buildworks_import.document_invalid" : error.Message; blueprint.parts.Clear(); }
+            return blueprint;
+        }
+
+        private static void ApplyNamedCenter(CompositeBlueprintStore.Blueprint blueprint, string centerPrefab)
+        {
+            var selected = blueprint.parts.FirstOrDefault(part => part.prefabName == centerPrefab);
+            Geometry.Point3 center;
+            var inverse = new Geometry.Rotation3(0, 0, 0, 1);
+            if (selected != null)
+            {
+                center = new Geometry.Point3(selected.position.x, selected.position.y, selected.position.z);
+                inverse = new Geometry.Rotation3(-selected.rotation.x, -selected.rotation.y,
+                    -selected.rotation.z, selected.rotation.w).Normalized();
+            }
+            else
+            {
+                // The producer's fallback bounds include zero and use piece origins, never prefab bounds.
+                double minX = 0, minZ = 0, maxX = 0, maxZ = 0, minY = double.PositiveInfinity;
+                foreach (var part in blueprint.parts)
+                {
+                    minX = Math.Min(minX, part.position.x); maxX = Math.Max(maxX, part.position.x);
+                    minZ = Math.Min(minZ, part.position.z); maxZ = Math.Max(maxZ, part.position.z);
+                    minY = Math.Min(minY, part.position.y);
+                }
+                center = new Geometry.Point3((minX + maxX) / 2, minY, (minZ + maxZ) / 2);
+            }
+            var poses = blueprint.parts.Select(part => Geometry.BlueprintEditorDocument.TransformPart(
+                new Geometry.BlueprintEditorPart(part.stableId, part.prefabName, part.prefabName,
+                    new Geometry.Point3(part.position.x, part.position.y, part.position.z),
+                    new Geometry.Rotation3(part.rotation.x, part.rotation.y, part.rotation.z, part.rotation.w)),
+                center * -1, inverse, center, new Geometry.Point3(1, 1, 1), new Geometry.Rotation3(0, 0, 0, 1))).ToArray();
+            var snaps = (blueprint.customSnapPoints ?? new List<CompositeBlueprintStore.VectorData>())
+                .Select(point => inverse.Rotate(new Geometry.Point3(point.x, point.y, point.z) - center)).ToArray();
+            foreach (var pose in poses)
+                if (Math.Abs(pose.Position.X) > 512 || Math.Abs(pose.Position.Y) > 512 || Math.Abs(pose.Position.Z) > 512)
+                    throw new ArgumentOutOfRangeException(nameof(center));
+            foreach (var point in snaps)
+                if (Math.Abs(point.X) > 512 || Math.Abs(point.Y) > 512 || Math.Abs(point.Z) > 512)
+                    throw new ArgumentOutOfRangeException(nameof(snaps));
+            for (int index = 0; index < blueprint.parts.Count; ++index)
+            {
+                var part = blueprint.parts[index]; var pose = poses[index];
+                part.position = new CompositeBlueprintStore.VectorData {
+                    x = (float)pose.Position.X, y = (float)pose.Position.Y, z = (float)pose.Position.Z };
+                part.rotation = new CompositeBlueprintStore.QuaternionData {
+                    x = (float)pose.Rotation.X, y = (float)pose.Rotation.Y, z = (float)pose.Rotation.Z, w = (float)pose.Rotation.W };
+                part.sourceFrameApplied = true;
+            }
+            if (blueprint.customSnapPoints != null)
+                blueprint.customSnapPoints = snaps.Select(point => new CompositeBlueprintStore.VectorData {
+                    x = (float)point.X, y = (float)point.Y, z = (float)point.Z }).ToList();
         }
 
         internal static CompositeBlueprintStore.Blueprint MigrateLegacyRoof(CompositeBlueprintStore.Blueprint source, bool verifiedHost)
@@ -357,7 +671,7 @@ namespace OstrixMods.BuildWorks
             bool Eligible(CompositeBlueprintStore.Part part) => part.prefabName == Geometry.BlueprintPrefabMigration.OldRoof &&
                 part.originalPrefabName == null && !part.scaleIsAbsolute && part.foreignData == null && !part.materialSeed.HasValue &&
                 part.sourceDocumentId != null && evidence.TryGetValue(part.sourceDocumentId, out var document) &&
-                document.HasPartAt(part.sourceLine, part.prefabName);
+                document.HasPartAddress(part.sourceLine, part.sourceRecord, part.prefabName);
             if (!source.parts.Any(Eligible)) return source;
             var copy = source.ImportCopy();
             foreach (var part in copy.parts.Where(Eligible))
@@ -372,21 +686,93 @@ namespace OstrixMods.BuildWorks
             return copy;
         }
 
+        internal static string ProducerPrefabName(CompositeBlueprintStore.Part part,
+            IReadOnlyDictionary<string, Geometry.BlueprintSourceDocument> sources, Func<string, bool> exists)
+        {
+            string name = part.prefabName, target = Geometry.PlannerPrefabNames.Native(name);
+            return part.originalPrefabName == null && target != name && part.sourceDocumentId != null &&
+                sources.TryGetValue(part.sourceDocumentId, out var source) && Geometry.PlannerPrefabNames.SupportsSource(source) &&
+                source.HasPartAddress(part.sourceLine, part.sourceRecord, name) && !exists(name) && exists(target) ? target : name;
+        }
+
+        private static CompositeBlueprintStore.Blueprint PrepareProducerPrefabNames(CompositeBlueprintStore.Blueprint source,
+            Func<string, CompositeBlueprintStore.VectorData?> resolvePrefabScale)
+        {
+            if (source == null || source.importError != null || !source.parts.Any(part =>
+                part.originalPrefabName == null && Geometry.PlannerPrefabNames.Native(part.prefabName) != part.prefabName)) return source;
+            var evidence = Geometry.BlueprintSourceDocument.Index(source.sourceDocuments?.Select(document => document.ToGeometry()));
+            var known = new Dictionary<string, bool>(StringComparer.Ordinal);
+            bool Exists(string name)
+            {
+                if (!known.TryGetValue(name, out bool value)) known.Add(name, value = resolvePrefabScale?.Invoke(name).HasValue == true);
+                return value;
+            }
+            bool Eligible(CompositeBlueprintStore.Part part) => ProducerPrefabName(part, evidence, Exists) != part.prefabName;
+            if (!source.parts.Any(Eligible)) return source;
+            var copy = source.ImportCopy();
+            foreach (var part in copy.parts.Where(Eligible))
+            {
+                part.originalPrefabName = part.prefabName;
+                part.prefabName = Geometry.PlannerPrefabNames.Native(part.prefabName);
+                if (part.displayName == part.originalPrefabName) part.displayName = part.prefabName;
+                part.metadata = null;
+            }
+            copy.prefabName = (copy.parts.FirstOrDefault(part => part.stableId == copy.primaryPartId) ?? copy.parts[0]).prefabName;
+            copy.importPreview = null;
+            if (source.IsExternal) copy.id = Identity(source.id + "\nproducer-native-case-v1");
+            return copy;
+        }
+
         internal static CompositeBlueprintStore.Blueprint PrepareForHost(CompositeBlueprintStore.Blueprint source,
             Func<string, CompositeBlueprintStore.VectorData?> resolvePrefabScale, Func<string, int> hash = null, int? worldLevel = null,
-            Func<string, bool> supportsMaterialSeed = null, Func<string, (int Width, int Height)?> containerGrid = null)
+            Func<string, bool> supportsMaterialSeed = null, Func<string, (int Width, int Height)?> containerGrid = null,
+            Func<int, string> resolvePrefabHash = null, Func<string, bool?> supportsKgState = null,
+            Func<string, Geometry.UnboundImportContext> unboundContext = null)
         {
+            source = PrepareProducerPrefabNames(source, resolvePrefabScale);
             if (source == null || source.importError != null || !source.importAbsoluteScale && !source.parts.Any(part => part.scaleIsAbsolute) &&
-                (hash == null || !source.parts.Any(part => part.foreignData?.format == "blueprint" || part.foreignData?.format == "vbuild"))) return source;
+                (hash == null || !BlueprintExchangeFormat.HasKgData(source) && !BlueprintExchangeFormat.HasUnboundData(source) &&
+                    !source.parts.Any(part => part.foreignData?.format == "blueprint" || part.foreignData?.format == "vbuild"))) return source;
             var copy = source.ImportCopy();
             string currentPrefab = null;
             try
             {
                 var scales = new Dictionary<string, CompositeBlueprintStore.VectorData?>(StringComparer.Ordinal);
                 Dictionary<int, Type> ordinaryStateFields = null;
+                Dictionary<int, Type> kgArchiveFields = null;
                 var evidenceIndex = hash == null ? null : Geometry.BlueprintSourceDocument.Index(copy.sourceDocuments?.Select(evidence => evidence.ToGeometry()));
                 foreach (CompositeBlueprintStore.Part part in copy.parts)
                 {
+                    if (hash != null && part.sourceDocumentId != null && evidenceIndex.TryGetValue(part.sourceDocumentId, out var unbound) && unbound.Unbound != null)
+                    {
+                        var context = unboundContext?.Invoke(part.prefabName);
+                        ConvertUnboundState(part, unbound, context, resolvePrefabHash);
+                        if (context != null) scales[part.prefabName] = new CompositeBlueprintStore.VectorData {
+                            x = (float)context.Metadata.PrefabScale.X, y = (float)context.Metadata.PrefabScale.Y, z = (float)context.Metadata.PrefabScale.Z };
+                        continue;
+                    }
+                    if (hash != null && part.sourceDocumentId != null && evidenceIndex.TryGetValue(part.sourceDocumentId, out var kgSource) && kgSource.Kg != null &&
+                        part.sourceRecord >= 1 && part.sourceRecord <= kgSource.Kg.Objects.Count)
+                    {
+                        var original=kgSource.Kg.Objects[part.sourceRecord-1];
+                        if (!original.MatchesPrefab(part.originalPrefabName ?? part.prefabName))
+                            throw new InvalidDataException("$buildworks_import.document_invalid");
+                        if (original.PrefabHash.HasValue && part.prefabName==original.ReferenceName && resolvePrefabHash!=null)
+                        {
+                            string resolved=resolvePrefabHash(original.PrefabHash.Value);
+                            if (resolved!=null)
+                            {
+                                if (string.IsNullOrWhiteSpace(resolved) || resolved.Length>128 || resolved.Any(c=>char.IsControl(c) || "/\\<>".Contains(c)) ||
+                                    hash(resolved)!=original.PrefabHash.Value) throw new InvalidDataException("$buildworks_import.document_invalid");
+                                part.prefabName=resolved;part.displayName=resolved;part.metadata=null;
+                            }
+                        }
+                        bool? supportedState=supportsKgState?.Invoke(part.prefabName);
+                        if (supportedState==false && original.ZdoData==null)
+                            throw new InvalidDataException("$buildworks_placement.contents_unsupported\t"+part.prefabName);
+                        if (supportedState==true)
+                            ConvertKgKnownState(part,kgSource,hash,supportsMaterialSeed,ref kgArchiveFields);
+                    }
                     currentPrefab = part.prefabName;
                     if (source.importAbsoluteScale || part.scaleIsAbsolute)
                     {
@@ -411,8 +797,14 @@ namespace OstrixMods.BuildWorks
                     }
                 }
                 copy.importAbsoluteScale = false;
+                string cacheIdentity=source.id;
+                if (source.IsExternal && BlueprintExchangeFormat.HasKgData(copy))
+                {
+                    copy.prefabName=(copy.parts.FirstOrDefault(part=>part.stableId==copy.primaryPartId) ?? copy.parts[0]).prefabName;
+                    cacheIdentity=Identity(source.id+"\nkg-resolved-prefabs-v1\n"+string.Join("\n",copy.parts.Select(part=>part.prefabName)));
+                }
                 // Derived cache identity must not reuse pre-normalization thumbnails or another prefab revision.
-                if (source.IsExternal) copy.id = Identity(source.id + "\npinned-scale-v1-pending-parts\n" + (hash == null ? "inert" : worldLevel?.ToString(CultureInfo.InvariantCulture) ?? "pending-world") + "\n" + string.Join("\n", scales.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                if (source.IsExternal) copy.id = Identity(cacheIdentity + "\npinned-scale-v1-pending-parts\n" + (hash == null ? "inert" : worldLevel?.ToString(CultureInfo.InvariantCulture) ?? "pending-world") + "\n" + string.Join("\n", scales.OrderBy(pair => pair.Key, StringComparer.Ordinal)
                     .Select(pair => pair.Key + "\t" + (pair.Value.HasValue ? pair.Value.Value.x.ToString("R", CultureInfo.InvariantCulture) + "\t" +
                         pair.Value.Value.y.ToString("R", CultureInfo.InvariantCulture) + "\t" + pair.Value.Value.z.ToString("R", CultureInfo.InvariantCulture) : "unknown"))));
                 if (source.IsExternal && copy.parts.Any(part => part.materialSeed.HasValue))
@@ -428,6 +820,87 @@ namespace OstrixMods.BuildWorks
                 copy.parts.Clear(); // Atomic conversion: never publish mixed absolute/relative scales.
             }
             return copy;
+        }
+
+        private static void ConvertUnboundState(CompositeBlueprintStore.Part part, Geometry.BlueprintSourceDocument evidence,
+            Geometry.UnboundImportContext context, Func<int, string> resolveItem)
+        {
+            var original = evidence.UnboundPartAt(part.sourceLine);
+            var current = part.foreignData?.ToGeometry();
+            if (!evidence.HasPartAddress(part.sourceLine, part.sourceRecord, part.originalPrefabName ?? part.prefabName) ||
+                !evidence.HasPartState(part.sourceLine, part.sourceRecord, part.originalPrefabName ?? part.prefabName, current,
+                    part.metadata?.ToGeometry(), part.baseScale.HasValue ? new Geometry.Point3(part.baseScale.Value.x, part.baseScale.Value.y, part.baseScale.Value.z) :
+                    (Geometry.Point3?)null, part.scaleIsAbsolute, part.signText, part.materialSeed))
+                throw new InvalidDataException("$buildworks_import.document_invalid");
+            bool raw = current?.Format == Geometry.UnboundBlueprint.Format;
+            if (context == null || part.scaleIsAbsolute || !Geometry.UnboundStateProjection.TryProject(original, context, resolveItem, out var projection))
+            {
+                if (!raw) throw new InvalidDataException("$buildworks_placement.contents_stale");
+                return;
+            }
+            if (!raw)
+            {
+                if (!part.baseScale.HasValue || part.baseScale.Value.x != (float)projection.RootScale.X ||
+                    part.baseScale.Value.y != (float)projection.RootScale.Y || part.baseScale.Value.z != (float)projection.RootScale.Z ||
+                    (current == null) != (projection.Contents == null) || current != null &&
+                    (current.Format != projection.Contents.Format || current.Info != projection.Contents.Info || current.Zdo != projection.Contents.Zdo))
+                    throw new InvalidDataException("$buildworks_placement.contents_stale");
+            }
+            else
+            {
+                part.baseScale = new CompositeBlueprintStore.VectorData {
+                    x = (float)projection.RootScale.X, y = (float)projection.RootScale.Y, z = (float)projection.RootScale.Z };
+                part.signText = part.signText ?? projection.SignText;
+                part.materialSeed = part.materialSeed ?? projection.MaterialSeed;
+                part.foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(projection.Contents);
+            }
+            part.metadata = CompositeBlueprintStore.PrefabMetadata.FromGeometry(context.Metadata);
+        }
+
+        private static void ConvertKgKnownState(CompositeBlueprintStore.Part part, Geometry.BlueprintSourceDocument evidence,
+            Func<string,int> hash,Func<string,bool> supportsMaterialSeed,ref Dictionary<int,Type> archiveFields)
+        {
+            var original=part.foreignData;
+            if(original?.format!=evidence.Format || evidence.Kg==null || !part.sourceFrameApplied ||
+                !evidence.HasPartAddress(part.sourceLine,part.sourceRecord,part.originalPrefabName ?? part.prefabName) ||
+                evidence.Kg.Objects[part.sourceRecord-1].ZdoData!=original.zdo ||
+                !Geometry.BlueprintForeignZdo.TryReadKg(original.zdo,out var state)) return;
+            var consumed=new HashSet<KeyValuePair<int,Type>>();
+            string text=part.signText; int? seed=part.materialSeed;
+            if(part.prefabName=="sign")
+            {
+                foreach(string key in new[]{"text","author","authorPlatformDisplayName"})
+                {
+                    int id=hash(key);
+                    if(!state.HasHash(id)) continue;
+                    if(!state.TryGet<string>(id,out string value)) return;
+                    if(key=="text")
+                    {
+                        if(!Geometry.BlueprintEditorPart.IsValidSignText(value)) return;
+                        if(text==null) text=value;
+                    }
+                    consumed.Add(new KeyValuePair<int,Type>(id,typeof(string)));
+                }
+            }
+            int material=hash("RandMatSeed");
+            if(state.HasHash(material))
+            {
+                if(supportsMaterialSeed?.Invoke(part.prefabName)!=true || !state.TryGet<int>(material,out int value) || value<0) return;
+                if(!seed.HasValue) seed=value;
+                consumed.Add(new KeyValuePair<int,Type>(material,typeof(int)));
+            }
+            // Exact source keeps these typed provenance fields. New construction assigns its own identity,
+            // rotation witness, operation and payment receipt; none of the old bytes are executed or replayed.
+            var archived=archiveFields ?? (archiveFields=new Dictionary<int,Type>{
+                [hash("creator")]=typeof(long),[hash("creatorIndex")]=typeof(int),[hash("cheated")]=typeof(int),
+                [hash("BuildWorks_ExactRotation_v1")]=typeof(Geometry.Rotation3),
+                [hash("BuildWorks_ExactRotationWitness_v1")]=typeof(Geometry.Rotation3),
+                [hash("ostrix_buildworks_project_operation_v1")]=typeof(string),
+                [hash("ostrix_buildworks_project_receipt_v1")]=typeof(byte[])
+            });
+            foreach(var key in state.Keys)
+                if(!consumed.Contains(key) && (!archived.TryGetValue(key.Key,out Type expected) || key.Value!=expected)) return;
+            part.signText=text;part.materialSeed=seed;part.foreignData=null;
         }
 
         private static void ConvertLegacyStorage(CompositeBlueprintStore.Part part, Geometry.BlueprintSourceDocument evidence,
@@ -456,7 +929,7 @@ namespace OstrixMods.BuildWorks
         {
             var state = part?.foreignData;
             if (part?.prefabName != "ArmorStand" || state?.format != "blueprint" || state.info == null ||
-                state.zdo != null || state.chance != null || evidence?.Format != "blueprint" || evidence.HasOpaqueSections ||
+                state.zdo != null || state.chance != null || evidence?.Format != "blueprint" || evidence.HasUnsupportedSections(part.sourceFrameApplied) ||
                 evidence.Id != part.sourceDocumentId || !evidence.HasPartAt(part.sourceLine, part.prefabName)) return false;
             string[] row = evidence.PartRow(part.sourceLine).Split(';');
             if (row.Length != 10 && row.Length != 13 && row.Length != 14 && row.Length != 15 || row[9] != state.info ||
@@ -607,7 +1080,8 @@ namespace OstrixMods.BuildWorks
                     editorVisible = group.editorVisible,
                     editorLocked = group.editorLocked,
                     parentGroupId = group.parentGroupId == null ? null : ids[group.parentGroupId],
-                    pivotPartId = group.pivotPartId == null ? null : ids[group.pivotPartId]
+                    pivotPartId = group.pivotPartId == null ? null : ids[group.pivotPartId],
+                    sourceDocumentId = group.sourceDocumentId, sourceLayerId = group.sourceLayerId
                 });
             foreach (CompositeBlueprintStore.Part part in source.parts)
                 result.parts.Add(new CompositeBlueprintStore.Part
@@ -628,6 +1102,8 @@ namespace OstrixMods.BuildWorks
                     signText = part.signText,
                     sourceDocumentId = part.sourceDocumentId,
                     sourceLine = part.sourceLine,
+                    sourceRecord = part.sourceRecord,
+                    sourceFrameApplied = part.sourceFrameApplied,
                     originalPrefabName = part.originalPrefabName,
                     foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(part.foreignData?.ToGeometry())
                 });

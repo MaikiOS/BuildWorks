@@ -92,6 +92,7 @@ namespace PayoutInteractionChecks {
   private readonly HashSet<Guid> cleanupProjects=new HashSet<Guid>();
   private readonly HashSet<Guid> cancellationProjects=new HashSet<Guid>();
   private Operation paidCancellation;
+  private Operation contentsReturn;
   private string Failure; private Action<Exception> log=error=>{}; private int closed;
   __BUSY__
   private void RequireContext() { if(!context)throw new InvalidOperationException("Context closed"); }
@@ -151,6 +152,7 @@ namespace PayoutInteractionChecks {
    Refused((r,d,id)=>r.removal=new Operation(),"Active removal admitted collection");
    Refused((r,d,id)=>r.payout=new Operation(),"Active issuance admitted collection");
    Refused((r,d,id)=>r.paidCancellation=new Operation(),"Active terminal scan admitted collection");
+   Refused((r,d,id)=>r.contentsReturn=new Operation(),"Active contents return admitted collection");
    Refused((r,d,id)=>d.View=null,"Missing view admitted");
    Refused((r,d,id)=>d.View.Valid=false,"Invalid view admitted");
    Refused((r,d,id)=>d.View.Owner=false,"Unowned view admitted");

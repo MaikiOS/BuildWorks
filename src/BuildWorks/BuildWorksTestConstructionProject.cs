@@ -7,7 +7,7 @@ using Store = OstrixMods.BuildWorks.BlueprintConstructionProjectStore;
 
 namespace OstrixMods.BuildWorks
 {
-    internal static class BuildWorksTestConstructionProject
+    internal static partial class BuildWorksTestConstructionProject
     {
         private static Guid lastId, cancelOperation;
         private static byte[] snapshot;

@@ -46,6 +46,7 @@ namespace OstrixMods.BuildWorks
         private string registeredSignature = string.Empty;
         private int registeredRevision = -1, registeredPieceCount = -1;
         private string registeredAvailability;
+        private bool presentationAllowed=BlueprintSignPreview.Allowed;
 
         public HammerBlueprintPieceRegistry(CompositeBlueprintStore store)
         {
@@ -54,6 +55,7 @@ namespace OstrixMods.BuildWorks
 
         public void Update(Player player)
         {
+            RefreshPresentationPermission();
             if (!UnifiedHammerCatalog.BlueprintCategoryReady)
             {
                 if (registeredTable)
@@ -166,9 +168,7 @@ namespace OstrixMods.BuildWorks
                     table,
                     replacement))
                 {
-                    player.SetSelectedPiece(replacement);
-                    if (selectedReplacement && SetupPlacementGhostMethod != null)
-                        SetupPlacementGhostMethod.Invoke(player, null);
+                    SelectPiece(player, replacement);
                 }
             }
         }
@@ -225,19 +225,31 @@ namespace OstrixMods.BuildWorks
         public bool SelectPiece(Player player, Piece piece)
         {
             if (!player || !piece) return false;
-            if (!player.SetSelectedPiece(piece)) return false;
+            PieceTable table = PrecisionPlacementSession.GetBuildPieceTable(player);
+            if (!table || !HammerCatalogOrganizer.EnsureVisible(table, piece)) return false;
+            // Changing category rebuilds the catalogue, so resolve the cell afterwards.
+            player.SetBuildCategory(piece.m_category);
+            if (!HammerCatalogOrganizer.EnsureVisible(table, piece) ||
+                table.GetSelectedCategory() != piece.m_category) return false;
+            int index = PrecisionPlacementSession.AvailableBuildPieces(table,
+                table.GetSelectedCategory())?.IndexOf(piece) ?? -1;
+            if (index < 0) return false;
+            player.SetSelectedPiece(new Vector2Int(index % PieceTable.m_gridWidth,
+                index / PieceTable.m_gridWidth));
+            if (player.GetSelectedPiece() != piece) return false;
             SetupPlacementGhostMethod?.Invoke(player, null);
             return true;
         }
 
-        public void SelectSafePieceBeforeDelete(
+        public bool SelectSafePieceBeforeDelete(
             Player player,
             CompositeBlueprintStore.Blueprint blueprint)
         {
-            if (!player || blueprint == null || !TryGetBlueprint(
+            if (!player || blueprint == null) return false;
+            if (!TryGetBlueprint(
                 player.GetSelectedPiece(),
                 out CompositeBlueprintStore.Blueprint selected) ||
-                selected != blueprint) return;
+                selected != blueprint) return true;
             PieceTable table = PrecisionPlacementSession.GetBuildPieceTable(player);
             foreach (GameObject prefab in table?.m_pieces ?? new List<GameObject>())
             {
@@ -246,11 +258,9 @@ namespace OstrixMods.BuildWorks
                     StringComparison.Ordinal) ||
                     !PrecisionPlacementSession.IsBuildPieceAvailable(table, candidate))
                     continue;
-                HammerCatalogOrganizer.EnsureVisible(table, candidate);
-                player.SetSelectedPiece(candidate);
-                SetupPlacementGhostMethod?.Invoke(player, null);
-                return;
+                if (SelectPiece(player, candidate)) return true;
             }
+            return false;
         }
 
         public IReadOnlyList<ResourceInfo> Resources(
@@ -292,10 +302,25 @@ namespace OstrixMods.BuildWorks
 
         internal string Description(CompositeBlueprintStore.Blueprint blueprint)
             => "BuildWorks: " + BuildWorksLocalization.Text(
-                "blueprint.piece.description", blueprint?.parts.Count ?? 0);
+                "blueprint.piece.description", blueprint?.parts.Count ?? 0) + "\n\n" +
+                BuildWorksLocalization.Text("import.state_policy") + "\n\n" + BlueprintSourcePresentation.Metadata(blueprint);
+
+        private void RefreshPresentationPermission()
+        {
+            bool allowed=BlueprintSignPreview.Allowed;
+            bool changed=allowed!=presentationAllowed;
+            presentationAllowed=allowed;
+            thumbnailRenderer.RefreshTextPermission();
+            if(!changed)return;
+            foreach(var pair in blueprintsByPiece)
+                if(pair.Key){pair.Key.m_icon=null;pair.Key.m_description=Description(pair.Value);HammerCatalogView.UpdateThumbnail(pair.Value.id,null);}
+            registeredRevision=-1;registeredSignature="";
+            HammerCatalogView.Invalidate();
+        }
 
         internal bool ProcessThumbnail(out string id, out Sprite thumbnail)
         {
+            RefreshPresentationPermission();
             if (!thumbnailRenderer.ProcessOne(out id, out thumbnail) || !thumbnail) return false;
             if (piecesByBlueprintId.TryGetValue(id, out Piece iconPiece)) iconPiece.m_icon = thumbnail;
             HammerCatalogView.UpdateThumbnail(id, thumbnail);
@@ -333,6 +358,7 @@ namespace OstrixMods.BuildWorks
 
         internal Sprite Icon(CompositeBlueprintStore.Blueprint blueprint)
         {
+            RefreshPresentationPermission();
             if (TryGetPiece(blueprint, out Piece piece)) return piece.m_icon;
             return TrySources(blueprint, out IReadOnlyList<Piece> pieces)
                 ? thumbnailRenderer.GetOrQueue(blueprint, pieces) : thumbnailRenderer.GetCached(blueprint);
@@ -341,6 +367,7 @@ namespace OstrixMods.BuildWorks
         public Sprite RefreshThumbnail(
             CompositeBlueprintStore.Blueprint blueprint, out string error)
         {
+            RefreshPresentationPermission();
             error = null;
             if (!TrySources(blueprint, out IReadOnlyList<Piece> pieces)) return null;
             Sprite sprite = thumbnailRenderer.Refresh(blueprint, pieces, out error);
@@ -438,8 +465,7 @@ namespace OstrixMods.BuildWorks
 
             Piece piece = prefab.AddComponent<Piece>();
             piece.m_name = blueprint.name;
-            piece.m_description = "BuildWorks: " + BuildWorksLocalization.Text(
-                "blueprint.piece.description", blueprint.parts.Count);
+            piece.m_description = Description(blueprint);
             piece.m_category = UnifiedHammerCatalog.BlueprintCategory;
             piece.m_usage = Piece.UsageTagFlags.Misc;
             piece.m_canRotate = true;
@@ -649,6 +675,8 @@ namespace OstrixMods.BuildWorks
                 AppendText(signature, blueprint?.primaryPartId);
                 AppendText(signature, blueprint?.primaryGroupId);
                 AppendText(signature, blueprint?.placementSupportId);
+                foreach(var source in blueprint?.sourceDocuments ?? new List<CompositeBlueprintStore.SourceDocument>())
+                    AppendText(signature,source.id);
                 if (blueprint != null)
                 {
                     AppendFloat(signature, blueprint.previewYaw);

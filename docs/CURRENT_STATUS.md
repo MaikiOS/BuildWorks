@@ -2,11 +2,11 @@
 
 [Русский](CURRENT_STATUS_RU.md)
 
-The current issued private manual-test alpha is **0.19.329**. F9 and blueprint placement allow eligible furniture, storage and crafting objects to rotate and overlap with real support. Two paid placement cases and fresh-process reload have bounded acceptance; full-module and multiplayer checks remain open. Obtain the authorized archive from the owner; no public beta or Thunderstore package is published. [Version and limits](ALPHA_0.19.329.md).
+**Installable alpha: 0.19.329.** [Download and release notes](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.329-alpha). The original 2 November ZIP is unchanged; its internal “private test candidate” wording describes its manual-test origin. This is an alpha prerelease; beta follows completion of the full agreed goal. No Thunderstore upload is included.
 
-**Alpha 0.19.329 limits:** paid placement and cold reload are confirmed for one wall-overlap chest and one rotated wall cookingstation; the chest opens. Cooking with food/fire/fuel and the sufficient-resources negative case remain untested. Placement does not waive operating requirements, resources, permissions or station checks. A chest cannot provide attachment support for another chest. Producer-name corrections are included; review missing parts and test your own mod stack. Unbound export UI is later source work and is not included in this issued archive.
+This tag preserves the archive source: checkpoint `5a095eb81967e074c29c8588161e0495325c4b6d`. It freezes the 2 November alpha; later development is not included in the ZIP. 2.19 Unbound and the full module remain open. See [main](https://github.com/MaikiOS/BuildWorks/blob/main/docs/CURRENT_STATUS.md) for subsequent development.
 
-The full agreed scope remains137IDs:35 scoped accepted and102 open. Current2.19 source work includes independently accepted file/state encoding; its new UI is being prepared, not runtime-accepted or included in the issued329 archive. Requirement2.16 HOLD, all remaining1–14 conditions and host+remote checks remain mandatory.
+The .329 archive has bounded acceptance for one wall-overlap chest costing 10 Wood and a wall cooking station rotated 90 degrees costing 2 Wood, followed by a new-process reload; the chest opens. Poses were set with virtual transform fields and confirmed through native placement. Physical mouse/gizmo input was not re-proved. The container-only NoContact negative had 2 Wood; a sufficiently funded negative and cooking/fire/food/fuel remain untested. Old 329h preservation UNKNOWN/HOLD and planner strictPlayerStateSame=false are retained. Full module and host+remote acceptance remain open.
 
 ## Historical status before 2 November 2026
 
@@ -20,4 +20,3 @@ Version, evidence for two paid/cold-reloaded blueprints, Alt-copy and bounded R1
 [All-item roadmap](ROADMAP.md) · Exact live requirements (evidence retained locally; not published) · Technical evidence (evidence retained locally; not published) · [History](DEVELOPMENT_JOURNAL.md)
 
 Earlier checkpoint reports keep their own versions/limits. QA279/304/313 are not the current alpha. Documentation does not update the goal or authorize a binary/Thunderstore release.
-

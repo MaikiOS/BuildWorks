@@ -1,8 +1,15 @@
+> Исправление309: заявленный PlanBuild V1 может начинаться сразу с деталей; parser и source-row index теперь согласованы. Неизвестная секция по-прежнему останавливает строки до #Pieces; фактическая первая деталь закрывает окно доверия pre-piece происхождению. Поля28/16 прежние. Доприёмка (local development reference; [public status](../../docs/CURRENT_STATUS_RU.md)).
+
+> Уточнение26.10.2026: действующие28/16 сохранены. Реестр профилей (local development reference; [public status](../../docs/CURRENT_STATUS_RU.md)) фиксирует Tomrer9/Homestead gaps и неподдержанные KG/BBP/OpenKeep candidates; план (local development reference; [public status](../../docs/CURRENT_STATUS_RU.md)). Новый codec не равен добавлению extension; binary evidence требует отдельного bytes/migration contract.
+
 # Текущий контракт формата и обмена
 
 [English](blueprint-format.md) · [Границы приёмки](../../docs/CURRENT_STATUS_RU.md)
 
-Схема основной библиотеки **24** (`CompositeBlueprintStore`); переносимая схема **13** (`BlueprintExchangeFormat`). Номер схемы не равен версии пакета.
+Схема основной библиотеки **35** (`CompositeBlueprintStore`); переносимая схема **23** (`BlueprintExchangeFormat`). Номер схемы не равен версии пакета.
+
+
+> Source candidate0.19.324 uses native35/portable23 for optional Group.sourceDocumentId/sourceLayerId; old34/22 reject field presence and planner sources. InstalledQA323 remains34/22. Planner JSON file import is independently accepted (03FDFFFA);planner paired export/UI accepted in Workbench scope (8D691B88); original consumer/game remain open.
 
 | Вход/выход | Поддерживаемая граница |
 | --- | --- |
@@ -22,3 +29,6 @@ Prefab scale/вложенные TRS отделены от относительн
 Пределы: документ50000 деталей; обычный interactive/editor512, изолированный QA/Unity editor50000; своя библиотека32 карточки/12 категорий/100000 деталей суммарно. Ограничения байтов/вложенности/архивов/памяти сохраняются. Точные проверки — в константах исходников; максимумы не гарантируют FPS.
 
 [Происхождение/условия корпусов](../../docs/EXTERNAL_CORPUS_REGISTER_RU.md) · [История формата](blueprint-format-history-206_RU.md). Поддержка всех внешних файлов/неизвестных диалектов не обещается.
+
+
+Запись исходника `world-capture-v1` — ограниченный, строго проверяемый, пассивный TSV: известный UID мира либо явное unknown, исходные мировые позиция/кватернион, MVID игрового модуля и версия BuildWorks. Этот frame не преобразует локальные детали и не даёт полномочий. Запись сохраняется через store/editor/copy/portable. Для неё нужны native28/portable16; подмена версии на27/15 отвергается. Старые27/15 без неё читаются без выдумывания отсутствующего происхождения.

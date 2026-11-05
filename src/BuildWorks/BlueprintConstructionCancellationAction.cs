@@ -17,17 +17,19 @@ namespace OstrixMods.BuildWorks
             if (player == 0 || plan.Cancelled || plan.Revision != revision)
                 throw new InvalidOperationException("Construction project revision or player changed.");
             var removal = new Removal(plans).Read(id);
+            if (removal != null && (removal.Player != player || removal.PlanRevision != revision))
+                throw new InvalidOperationException("Only the original payer can continue cancellation.");
+            var parts = new BlueprintConstructionPartJournal(plans);
+            var payments = plan.Parts.Select(part => parts.ReadPayment(id, part.Id)).ToArray();
+            if (payments.Any(payment => payment.Sources != null || payment.Outcome != null)) return ConstructionCancellationAction.Review;
             if (removal == null)
             {
-                var parts = new BlueprintConstructionPartJournal(plans);
-                if (plan.Parts.Select(part => parts.Read(id, part.Id)).Any(part => part != null &&
+                if (payments.Select(payment => payment.Legacy).Any(part => part != null &&
                     (part.RequiresReconciliation || part.Phase == BlueprintConstructionPartJournal.Committed && part.Player != player)))
                     return ConstructionCancellationAction.Review;
                 return BlueprintConstructionPartJournal.HasExecutionEvidence(plans, plan)
                     ? ConstructionCancellationAction.Remove : ConstructionCancellationAction.Unpaid;
             }
-            if (removal.Player != player || removal.PlanRevision != revision)
-                throw new InvalidOperationException("Only the original payer can continue cancellation.");
             if (removal.Phase == Removal.Prepared) return ConstructionCancellationAction.ResumeRemoval;
             if (removal.Phase != Removal.RemovedSaved) return ConstructionCancellationAction.Review;
             var payout = new Payout(plans).Read(id);

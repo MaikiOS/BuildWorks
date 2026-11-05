@@ -18,6 +18,7 @@ namespace OstrixMods.BuildWorks
         internal static bool IsPrepared { get; private set; }
         private static bool previousDaylight;
         private static float previousTime;
+        private static string previousWeather;
         private static int environmentId;
 
         internal static float Plane(float minimum, float maximum, float water)
@@ -37,10 +38,12 @@ namespace OstrixMods.BuildWorks
             {
                 previousDaylight = environment.m_debugTimeOfDay;
                 previousTime = environment.m_debugTime;
+                previousWeather = environment.m_debugEnv;
                 environmentId = environment.GetInstanceID();
             }
             environment.m_debugTimeOfDay = true;
             environment.m_debugTime = 0.5f;
+            environment.m_debugEnv = "Clear";
         }
 
         internal static void RestoreDaylight()
@@ -49,6 +52,7 @@ namespace OstrixMods.BuildWorks
             {
                 EnvMan.instance.m_debugTimeOfDay = previousDaylight;
                 EnvMan.instance.m_debugTime = previousTime;
+                EnvMan.instance.m_debugEnv = previousWeather;
             }
             environmentId = 0;
             IsPrepared = false;

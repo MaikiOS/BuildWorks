@@ -88,7 +88,7 @@ namespace OstrixMods.BuildWorks
                 if (upload == null) Send(operation, header);
                 else operation.Hash = SHA256.Create();
             }
-            catch (Exception exception) { CancelActive(exception); }
+            catch (Exception exception) { CancelActive(operation, exception); }
             return operation.Completion.Task;
         }
         internal void Tick(double time)
@@ -96,7 +96,7 @@ namespace OstrixMods.BuildWorks
             now = time;
             var operation = active;
             if (operation == null) return;
-            if (time - operation.LastActivity > 30) { CancelActive(new Failure(P.Failure.Timeout)); return; }
+            if (time - operation.LastActivity > 30) { CancelActive(operation, new Failure(P.Failure.Timeout)); return; }
             try
             {
                 if (operation.Upload == null || operation.Committed) return;
@@ -122,7 +122,7 @@ namespace OstrixMods.BuildWorks
                 }
                 else { operation.Committed = true; Send(operation, new P.Message { Kind = P.Command.Commit }); }
             }
-            catch (Exception exception) { CancelActive(exception); }
+            catch (Exception exception) { CancelActive(operation, exception); }
         }
         internal void Receive(byte[] frame, double time)
         {
@@ -141,8 +141,8 @@ namespace OstrixMods.BuildWorks
                 operation.LastActivity = time;
                 if (message.Kind == P.Command.Error)
                 {
+                    if (message.Error == P.Failure.Invalid) Forget();
                     Finish(operation, new Failure(message.Error));
-                    if (message.Error == P.Failure.Invalid) { session = Guid.Empty; IsAdministrator = false; }
                     return;
                 }
                 switch (operation.Header.Kind)
@@ -180,20 +180,20 @@ namespace OstrixMods.BuildWorks
             catch (Exception exception)
             {
                 if (exception is InvalidDataException || exception is OverflowException) exception = Invalid();
-                CancelActive(exception);
-                if (!(exception is Failure failure) || failure.Code == P.Failure.Invalid)
-                { session = Guid.Empty; IsAdministrator = false; }
+                CancelActive(operation, exception, !(exception is Failure failure) || failure.Code == P.Failure.Invalid);
             }
         }
         internal void Cancel(Task<Result> task)
-        { if (active != null && ReferenceEquals(active.Completion.Task, task)) CancelActive(new Failure(P.Failure.Cancelled)); }
-        private void CancelActive(Exception exception)
+        { if (active != null && ReferenceEquals(active.Completion.Task, task)) CancelActive(active, new Failure(P.Failure.Cancelled)); }
+        private void CancelActive(Operation operation, Exception exception, bool forget = false)
         {
-            var operation = active;
-            if (operation == null) return;
-            bool notify = operation.Sent && session != Guid.Empty;
+            if (operation == null || !ReferenceEquals(active, operation)) return;
+            Guid nonce = session;
             active = null; // A synchronous adapter must not deliver the old response into this operation.
-            if (notify) try { Send(operation, new P.Message { Kind = P.Command.Cancel }); } catch { /* Connection may already be gone. */ }
+            if (forget) Forget();
+            if (operation.Sent && nonce != Guid.Empty)
+                try { send(P.Encode(new P.Message { Kind = P.Command.Cancel, World = world, Request = operation.Header.Request, Session = nonce })); }
+                catch { /* Connection may already be gone. */ }
             Finish(operation, exception);
         }
         private void Send(Operation operation, P.Message message)
@@ -209,7 +209,8 @@ namespace OstrixMods.BuildWorks
             else operation.Completion.TrySetException(exception);
         }
         public void Dispose()
-        { if (disposed) return; CancelActive(new Failure(P.Failure.Unavailable)); disposed = true; session = Guid.Empty; IsAdministrator = false; }
+        { if (disposed) return; disposed = true; CancelActive(active, new Failure(P.Failure.Unavailable), forget: true); Forget(); }
+        private void Forget() { session = Guid.Empty; IsAdministrator = false; }
         private static bool SameDocument(P.Item a, P.Item b) => a.Id == b.Id && a.Revision == b.Revision && a.Bytes == b.Bytes && a.Sha256 == b.Sha256 && a.Access == b.Access;
         private static P.Item Snapshot(P.Item item)
         {

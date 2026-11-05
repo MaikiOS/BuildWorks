@@ -1,3 +1,5 @@
+> Current26Oct2026 assessment: profile register (local development reference; [public status](../../docs/CURRENT_STATUS.md)), external review/plan (local development reference; [public status](../../docs/CURRENT_STATUS.md)). Historical0.19.56/2–128 figures below are not current limits/support claims.
+
 <!-- docs-role: design record; reviewed 2026-10-17 -->
 > Design/specification record: requirements below are not blanket implementation or acceptance claims. [Current state and queue](../../docs/CURRENT_STATUS.md).
 

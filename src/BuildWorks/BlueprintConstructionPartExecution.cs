@@ -14,11 +14,13 @@ namespace OstrixMods.BuildWorks
         internal static readonly int MarkerKey = BlueprintConstructionProjectStore.ConstructionMarkerKey;
         internal static readonly int ReceiptKey = "ostrix_buildworks_project_receipt_v1".GetStableHashCode();
         private readonly Journal journal;
+        private readonly Plans store;
         private readonly Plans.Record plan;
         private readonly Plans.Part part;
         private readonly Player player;
         private readonly Inventory inventory;
         private readonly BlueprintForeignPartData before;
+        private readonly BlueprintForeignPartData contents;
         private readonly long playerId;
         private readonly Guid operation;
         private GameObject created;
@@ -26,11 +28,14 @@ namespace OstrixMods.BuildWorks
         private ZDOID nativeId;
         private Journal.Record observed;
         private BlueprintConstructionProjectPersistence persistence;
+        private BlueprintStorageTransfer storageTransfer;
+        private BlueprintStoragePersistence storagePersistence;
         private bool nativeAttempt, nativeSuccess, signFailed;
         internal readonly Piece Piece;
         internal readonly PrecisionPlacementSession.TransformSnapshot Pose;
         internal bool Finished { get; private set; }
-        internal bool Saving => persistence != null && !Finished;
+        internal bool RequiresPlacement { get; }
+        internal bool Saving => (persistence != null || storageTransfer != null) && !Finished;
         internal string Status { get; private set; } = "prepared";
         internal string Reason { get; private set; }
         internal Guid Project => plan.Id;
@@ -39,23 +44,30 @@ namespace OstrixMods.BuildWorks
 
         internal BlueprintConstructionPartExecution(Plans store, Guid project, Guid partId, Guid recoveryOperation = default)
         {
+            this.store = store;
             player = Player.m_localPlayer; playerId = player ? player.GetPlayerID() : 0;
             inventory = player ? player.GetInventory() : null;
             plan = store.Load(project); part = plan.Parts.First(p => p.Id == partId); journal = new Journal(store);
             var blueprint = plan.Blueprint; var source = blueprint.parts[part.SourceIndex];
-            if (!Context() || plan.Cancelled || !PrecisionPlacementSession.HasUsableHammer(player) ||
-                !PrecisionPlacementSession.TryResolveBuildPiece(player, source.prefabName, out Piece) ||
-                !PrecisionPlacementSession.SupportsProjectPart(Piece) ||
-                source.foreignData != null || !BlueprintSignText.CanApply(Piece, source.signText))
+            if (!Context() || plan.Cancelled || !PrecisionPlacementSession.HasUsableHammer(player))
                 throw new InvalidOperationException("Project part is unavailable or requires a separate contents workflow.");
+            Piece = ResolvePiece(player, source);
+            contents = StorageDemand(source);
             var pieces = blueprint.parts.Select(p => ZNetScene.instance.GetPrefab(p.prefabName)?.GetComponent<Piece>()).ToArray();
             if (pieces.Any(p => !p)) throw new InvalidOperationException("Project still contains missing pieces; choose an explicit supported copy first.");
             var points = BlueprintPlacementFrame.SnapLocalSets(blueprint, pieces)[part.SourceIndex];
-            float[] pose = part.WorldPose.Values;
-            Pose = new PrecisionPlacementSession.TransformSnapshot(new Vector3(pose[0], pose[1], pose[2]),
-                new Quaternion(pose[3], pose[4], pose[5], pose[6]), new Vector3(pose[7], pose[8], pose[9]), source.signText,
-                customSnapPoints: points, materialSeed: source.materialSeed);
+            Pose = ResolvePose(part, source, points);
             if (!BlueprintStorageCapture.TrySnapshotInventory(inventory, out var currentInventory)) throw new InvalidOperationException("Could not snapshot exact construction inventory.");
+            var payment = journal.ReadPayment(project, partId);
+            if (payment.Sources != null || payment.Outcome != null) throw new InvalidOperationException("Unsettled/source-aware construction requires reconciliation before continuation.");
+            var existing = payment.Legacy;
+            if (existing?.Phase == Journal.Committed)
+            {
+                if (contents == null || recoveryOperation != Guid.Empty)
+                    throw new InvalidOperationException("Committed native construction cannot be placed or paid again.");
+                operation = existing.Operation;
+                BeginContents(); return;
+            }
             if (recoveryOperation != Guid.Empty)
             {
                 // Bounded recovery cannot infer whether special construction state was applied before the interruption.
@@ -90,6 +102,14 @@ namespace OstrixMods.BuildWorks
                 Observe(currentInventory, false, paid); return;
             }
             before = currentInventory;
+            if (contents != null)
+            {
+                RequireStoragePreflight(plan.World);
+                var supplies = new List<BlueprintItemStandPlacement.Supply>();
+                if (!BlueprintItemStandPlacement.SelectSupplies(player, new[] { contents }, supplies, Piece) ||
+                    !BlueprintItemStandPlacement.SuppliesAvailable(player, supplies, Piece))
+                    throw new InvalidOperationException("Construction materials and the actual contents must both be available before placement.");
+            }
             var costs = (Piece.m_resources ?? Array.Empty<Piece.Requirement>()).Where(r => r?.m_resItem)
                 .Select(r => r.m_resItem.m_itemData.m_shared.m_name).ToHashSet(StringComparer.Ordinal);
             Journal.RequireCapacity(before, inventory.GetAllItems().Where(item => costs.Contains(item.m_shared.m_name))
@@ -97,6 +117,91 @@ namespace OstrixMods.BuildWorks
             operation = Guid.NewGuid();
             journal.Prepare(project, partId, operation, playerId, before, out bool prepared);
             if (!prepared) throw new InvalidOperationException("Construction operation was already prepared; native replay refused.");
+            RequiresPlacement = true;
+        }
+
+        internal static Piece ResolvePiece(Player player, CompositeBlueprintStore.Part source)
+        {
+            if (!PrecisionPlacementSession.TryResolveBuildPiece(player, source.prefabName, out Piece piece) ||
+                !(PrecisionPlacementSession.SupportsProjectPart(piece) || PrecisionPlacementSession.SupportsStorageProjectPart(piece)) ||
+                source.foreignData != null && !PrecisionPlacementSession.SupportsStorageProjectPart(piece) ||
+                !BlueprintSignText.CanApply(piece, source.signText))
+                throw new InvalidOperationException("Project part is unavailable or requires a separate contents workflow.");
+            return piece;
+        }
+
+        internal static PrecisionPlacementSession.TransformSnapshot ResolvePose(Plans.Part part,
+            CompositeBlueprintStore.Part source, Point3[] points)
+        {
+            float[] pose = part.WorldPose.Values;
+            return new PrecisionPlacementSession.TransformSnapshot(new Vector3(pose[0], pose[1], pose[2]),
+                new Quaternion(pose[3], pose[4], pose[5], pose[6]), new Vector3(pose[7], pose[8], pose[9]), source.signText,
+                customSnapPoints: points, materialSeed: source.materialSeed);
+        }
+
+        internal static BlueprintForeignPartData StorageDemand(CompositeBlueprintStore.Part source)
+        {
+            var data = source.foreignData?.ToGeometry();
+            if (data == null) return null;
+            if (data.Format != BlueprintForeignPartData.NativeContainerFormat ||
+                !BlueprintContainerInventory.TryRead(data, name => name.GetStableHashCode(), out var items))
+                throw new InvalidOperationException("This project part requires a separate supported contents workflow.");
+            return data.ContentsCleared || items.Count == 0 ? null : data;
+        }
+
+        internal static void RequireStoragePreflight(long world)
+        {
+            if (BlueprintStorageTransferJournal.HasUnresolved(world))
+                throw new InvalidOperationException("Unresolved storage evidence must be reconciled before another construction payment or contents transfer.");
+        }
+
+        internal static bool Complete(Plans.Record plan, Plans.Part part, Journal.Record parent, CompositeBlueprintStore.Part source)
+        {
+            if (parent?.Phase != Journal.Committed) return false;
+            if (StorageDemand(source) == null) return true;
+            var saved = BlueprintStorageTransferJournal.ReadConstruction(plan.Id, part.Id, parent.Operation, parent.World, parent.Player,
+                Journal.Fingerprint(parent), parent.Paid.Select(row => new BlueprintStorageTransferJournal.Payment {
+                    Prefab = row.Prefab, Properties = row.Properties, Before = row.Before, Paid = row.Paid, X = row.X, Y = row.Y }).ToArray());
+            if (saved != null && !saved.Settled)
+                throw new InvalidOperationException("Interrupted contents evidence requires reconciliation; the paid object must not be rebuilt.");
+            return saved?.Settled == true;
+        }
+
+        private void BeginContents()
+        {
+            var parent = journal.RequireSavedPayment(plan.Id, part.Id, playerId);
+            if (Complete(plan, part, parent, plan.Blueprint.parts[part.SourceIndex])) { Finished = true; Status = "committed"; return; }
+            RequireStoragePreflight(plan.World);
+            var supplies = new List<BlueprintItemStandPlacement.Supply>();
+            if (!BlueprintItemStandPlacement.SelectSupplies(player, new[] { contents }, supplies))
+            { Finished = true; Status = "awaiting-contents"; Reason = BuildWorksLocalization.Text("project.contents_pending"); return; }
+            if (!BlueprintStorageTransfer.TryBeginFromProject(store, plan.Id, part.Id, player, supplies[0], supplies,
+                out storageTransfer, out string reason)) throw new InvalidOperationException(reason);
+            Status = "filling";
+        }
+
+        private void TickContents()
+        {
+            if (Finished || storageTransfer == null) return;
+            try
+            {
+                if (storagePersistence == null)
+                {
+                    var move = storageTransfer.MoveNext();
+                    if (move == BlueprintStorageTransfer.Result.Uncertain || move == BlueprintStorageTransfer.Result.Unchanged)
+                        throw new InvalidOperationException(storageTransfer.JournalError ?? "Contents transfer stopped; retained evidence requires review.");
+                    if (!storageTransfer.CompleteInMemory) return;
+                    if (!storageTransfer.TryBeginPersistence(out storagePersistence, out string reason))
+                        throw new InvalidOperationException(reason);
+                    Status = "saving-contents";
+                }
+                var state = storagePersistence.Tick();
+                if (state == BlueprintStoragePersistence.Result.Refused) throw new InvalidOperationException(storagePersistence.Reason);
+                if (state != BlueprintStoragePersistence.Result.Verified) return;
+                if (!storageTransfer.TrySettleConstruction(out string error)) throw new InvalidOperationException(error);
+                storageTransfer.Dispose(); Finished = true; Status = "committed";
+            }
+            catch (Exception error) { Refuse(error.Message); }
         }
 
         private bool Context() => player && player == Player.m_localPlayer && !player.IsDead() && player.GetPlayerID() == playerId &&
@@ -119,11 +224,12 @@ namespace OstrixMods.BuildWorks
             return matches.Length == 1 ? ZNetScene.instance.FindInstance(matches[0].m_uid) : null;
         }
 
-        internal void BeforeNative()
+        internal void BeforeNative(BlueprintConstructionRefund payment)
         {
-            if (Finished || persistence != null || !Context() || nativeAttempt ||
+            if (Finished || !RequiresPlacement || persistence != null || storageTransfer != null || !Context() || nativeAttempt ||
                 !BlueprintStorageCapture.TrySnapshotInventory(inventory, out var current) || current.Info != before.Info || current.Zdo != before.Zdo)
                 throw new InvalidOperationException("Construction context or before-inventory changed; native attempt refused.");
+            journal.RequireOutcomeCapacity(plan.Id, part.Id, operation, payment.CaptureOutcome());
             nativeAttempt = true; Status = "placing";
         }
         internal void Created(GameObject instance)
@@ -149,15 +255,26 @@ namespace OstrixMods.BuildWorks
                 if (!nativeSuccess)
                 {
                     if (created || zdo != null || paid.Length != 0) throw new InvalidOperationException("Native failure retains object or payment evidence.");
-                    journal.RecordNoEffect(plan.Id, part.Id, operation, after, freshObjectAbsent: true);
-                    Status = "no-effect"; Finished = true; return;
+                    throw new InvalidOperationException("Native failure cannot prove unenrolled external sources or target absence.");
                 }
                 if (signFailed || !ObjectValid()) throw new InvalidOperationException("Native construction pose/sign/identity differs from the plan.");
                 bool free = paid.Length == 0 && (player.NoCostCheat() || BlueprintResourceHudView.Free(GlobalKeys.NoBuildCost) ||
                     !(Piece.m_resources ?? Array.Empty<Piece.Requirement>()).Any(r => r?.m_resItem && r.m_amount > 0));
                 Observe(after, free, paid);
             }
-            catch (Exception failure) { Refuse(failure.Message); }
+            catch (Exception failure)
+            {
+                string reason = failure.Message;
+                try
+                {
+                    if (nativeAttempt)
+                        journal.RecordOutcome(plan.Id, part.Id, operation, payment?.CaptureOutcome() ??
+                            new BlueprintConstructionPaymentOutcome { Sources = new[] { new BlueprintConstructionPaymentOutcome.Source() } },
+                            reason.Length > 1024 ? reason.Substring(0, 1024) : reason);
+                }
+                catch (Exception writeFailure) { reason += " Partial outcome could not be saved; retained journal requires review: " + writeFailure.Message; }
+                Refuse(reason);
+            }
         }
 
         private void Observe(BlueprintForeignPartData after, bool free, Journal.PaidRow[] paid)
@@ -183,9 +300,18 @@ namespace OstrixMods.BuildWorks
             BlueprintStorageCapture.TrySnapshotInventory(inventory, out var current) && current.Info == observed.AfterInfo && current.Zdo == observed.AfterBytes;
         internal void Tick()
         {
+            if (storageTransfer != null) { TickContents(); return; }
             if (Finished || persistence == null) return;
             var state = persistence.Tick();
-            if (state == BlueprintConstructionProjectPersistence.Result.Verified) { Finished = true; Status = "committed"; }
+            if (state == BlueprintConstructionProjectPersistence.Result.Verified)
+            {
+                try
+                {
+                    if (contents != null) BeginContents();
+                    else { Finished = true; Status = "committed"; }
+                }
+                catch (Exception error) { Refuse(error.Message); }
+            }
             else if (state == BlueprintConstructionProjectPersistence.Result.Refused) Refuse(persistence.Reason);
         }
         internal void StopBeforeNative(string reason)
@@ -200,7 +326,7 @@ namespace OstrixMods.BuildWorks
             }
             catch (Exception failure) { Refuse(failure.Message); }
         }
-        internal void Refuse(string reason) { persistence?.Cancel(); Finished = true; Status = "reconciliation"; Reason = reason; }
+        internal void Refuse(string reason) { persistence?.Cancel(); storageTransfer?.Dispose(); Finished = true; Status = "reconciliation"; Reason = reason; }
         private static Journal.PaidRow Row(ItemDrop.ItemData item, int before, int paid) => new Journal.PaidRow {
             Prefab = item.m_dropPrefab.name, Properties = BlueprintItemStandPlacement.SnapshotItem(item), Before = before, Paid = paid,
             X = item.m_gridPos.x, Y = item.m_gridPos.y, Variant = item.m_variant, Quality = item.m_quality };

@@ -38,6 +38,7 @@ namespace ReservationChecks
                 Player.Inventory.Width = Original.Player.Inventory.Width; Player.Inventory.Height = Original.Player.Inventory.Height;
                 Player.Inventory.Items.AddRange(Original.Player.Inventory.Items.Select(value => value.Clone()));
                 Placed.Piece = new Piece { gameObject = Placed }; Placed.Container = new Container(3);
+                Placed.RootView = Placed.Container.View;
                 Placed.Container.Inventory.Items.AddRange(Original.Placed.Container.Inventory.Items.Select(value => value.Clone()));
                 Placed.Container.View.Data.m_uid = new ZDOID { User = 1, Id = 77 };
                 Placed.Container.LoadForTest(Original.Operation.ToString("N"));

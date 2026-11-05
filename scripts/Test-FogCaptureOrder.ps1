@@ -1,6 +1,6 @@
-param([string]$Assembly = (Join-Path $PSScriptRoot '../artifacts/bin/BuildWorks.dll'), [switch]$QaCompositeObserver)
+param([string]$Assembly = (Join-Path $PSScriptRoot '../artifacts/bin/BuildWorks.dll'), [switch]$QaCompositeObserver, [string]$ProfileRoot = (Join-Path $PSScriptRoot '../../../TerrainRamp-1.0-Test'))
 $ErrorActionPreference = 'Stop'
-$profile = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../../TerrainRamp-1.0-Test'))
+$profile = [IO.Path]::GetFullPath($ProfileRoot)
 Add-Type -LiteralPath (Join-Path $profile 'BepInEx/core/Mono.Cecil.dll')
 $module = [Mono.Cecil.ModuleDefinition]::ReadModule([IO.Path]::GetFullPath($Assembly))
 try {

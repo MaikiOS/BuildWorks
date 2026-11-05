@@ -104,7 +104,7 @@ namespace OstrixMods.BuildWorks
     /// Owns editor-only cameras, temporary piece instances, picking, surface
     /// contact, snap candidates, and transform gizmo projection.
     /// </summary>
-    internal sealed class BlueprintEditorScene : IDisposable
+    internal sealed partial class BlueprintEditorScene : IDisposable
     {
         private const float GroundExtent = 1000f;
         private const float ContourEdgeScreenDistance = 30f;
@@ -123,6 +123,8 @@ namespace OstrixMods.BuildWorks
 
         private sealed class VisualNode
         {
+            public string StructuralId;
+            public string DisplayName;
             public string PrefabName;
             public BlueprintForeignPartData ForeignData;
             public BlueprintPrefabMetadata Metadata;
@@ -233,7 +235,6 @@ namespace OstrixMods.BuildWorks
         internal Quaternion SnapTargetRotation => activeSnapVisual?.Root
             ? activeSnapVisual.Root.transform.rotation : Quaternion.identity;
         internal Quaternion PlacementFinalRotation { get; private set; }
-        private Vector3 placementSnapSourceWorld;
         private Mesh targetOutlineMesh;
         private GameObject targetOutline;
         internal bool OccluderFadeEnabled { get; private set; }
@@ -342,6 +343,14 @@ namespace OstrixMods.BuildWorks
             gizmo.ModelSize = Mathf.Max(minimum, diagonal * .4f);
         }
         internal float GroundHeight => groundHeight;
+
+        internal void SetGroundHeight(float value)
+        {
+            if (!IsFinite(value)) throw new ArgumentOutOfRangeException(nameof(value));
+            groundHeight = value;
+            InvalidateStructuralAnalysis();
+            RecenterEnvironment(camera.transform.position);
+        }
 
         internal void EnsureWorldCamerasExcludeEditorLayer()
         {
@@ -1070,19 +1079,6 @@ namespace OstrixMods.BuildWorks
                 foreach (VisualNode visual in duplicatePreviews)
                     AccumulatePlacementSnapOffset(
                         visual, manualSnapPoint, ref sourceIndex, ref best, ref snapOffset);
-                if (PlacementSnapTarget.HasValue)
-                {
-                    Quaternion alignment = SnapTargetRotation;
-                    Vector3 pivot = surfacePoint + offset;
-                    snapOffset = PlacementSnapTarget.Value - (pivot + alignment * (placementSnapSourceWorld - pivot));
-                    foreach (VisualNode visual in duplicatePreviews)
-                    {
-                        Transform root = visual.Root.transform;
-                        root.position = pivot + alignment * (root.position - pivot);
-                        root.rotation = alignment * root.rotation;
-                    }
-                    PlacementFinalRotation = alignment * PlacementFinalRotation;
-                }
                 foreach (VisualNode visual in duplicatePreviews)
                     visual.Root.transform.position += snapOffset;
                 offset += snapOffset;
@@ -1595,13 +1591,8 @@ namespace OstrixMods.BuildWorks
                     int sourceIndex = 0;
                     AccumulatePlacementSnapOffset(
                         placementPreview, manualSnapPoint, ref sourceIndex, ref best, ref offset);
-                    if (PlacementSnapTarget.HasValue)
-                    {
-                        Vector3 sourceLocal = placementPreview.Root.transform.InverseTransformPoint(placementSnapSourceWorld);
-                        PlacementFinalRotation = SnapTargetRotation * rotation;
-                        placementPreview.Root.transform.rotation = PlacementFinalRotation;
-                        position += PlacementSnapTarget.Value - placementPreview.Root.transform.TransformPoint(sourceLocal);
-                    }
+                    // Ordinary snapping translates sockets without changing the chosen orientation.
+                    position += offset;
                 }
                 placementPreview.Root.transform.localPosition = position;
                 finalPosition = position;
@@ -1652,7 +1643,6 @@ namespace OstrixMods.BuildWorks
                         best = distance;
                         offset = targetWorld - sourceWorld;
                         PlacementSnapTarget = targetWorld;
-                        placementSnapSourceWorld = sourceWorld;
                         activeSnapVisual = visual;
                     }
                 }
@@ -2015,6 +2005,7 @@ namespace OstrixMods.BuildWorks
         public void Dispose()
         {
             if (disposed) return;
+            CancelStructuralAnalysis();
             InvalidateGizmoAnchors();
             renderIsolation?.RestoreNow();
             if (root) root.SetActive(false);
@@ -2109,7 +2100,8 @@ namespace OstrixMods.BuildWorks
             mesh.triangles = new[] { 0, 1, 2, 0, 2, 3 };
             mesh.RecalculateNormals();
             groundObject.AddComponent<MeshFilter>().sharedMesh = mesh;
-            Material material = CreateColorMaterial("Ground", new Color(0.12f, 0.14f, 0.16f, 1f), false);
+            // A fixed reference plane must not hide parts authored below it.
+            Material material = CreateColorMaterial("Ground", new Color(0.12f, 0.14f, 0.16f, .18f), true);
             if (material.HasProperty("_Metallic")) material.SetFloat("_Metallic", 0f);
             if (material.HasProperty("_Glossiness")) material.SetFloat("_Glossiness", 0f);
             if (material.HasProperty("_SpecularHighlights"))
@@ -2198,6 +2190,7 @@ namespace OstrixMods.BuildWorks
             if (part.ScaleIsAbsolute) source = null;
             var result = new VisualNode
             {
+                DisplayName = part.DisplayName,
                 PrefabName = part.PrefabName,
                 ForeignData = part.ForeignData,
                 Metadata = part.Metadata,
@@ -2213,6 +2206,7 @@ namespace OstrixMods.BuildWorks
                         source, "Part_" + part.StableId, editorLayer,
                         part.MaterialSeed.HasValue && BlueprintMaterialVariation.IsSupported(source) ? part.MaterialSeed : null)
                     : CreatePlaceholder(part.StableId, part.Metadata, result.OwnedAssets, editorLayer);
+                result.StructuralId = selectable ? part.StableId : "@preview/" + part.StableId + "/" + result.Root.GetInstanceID();
                 result.Root.transform.SetParent(root.transform, false);
                 if (source) result.Root.transform.localScale = source.transform.localScale;
                 if (source) BlueprintItemStandPreview.TryAdd(source, result.Root,
@@ -2501,13 +2495,16 @@ namespace OstrixMods.BuildWorks
                 else
                 {
                     renderer.SetPropertyBlock(visual.MaterialProperties[index]);
-                    if (properties == null) continue;
-                    renderer.GetPropertyBlock(appearanceProperties);
-                    appearanceProperties.SetColor("_Color", properties.GetColor("_Color"));
-                    appearanceProperties.SetColor("_BaseColor", properties.GetColor("_BaseColor"));
-                    appearanceProperties.SetColor("_EmissionColor", properties.GetColor("_EmissionColor"));
-                    renderer.SetPropertyBlock(appearanceProperties);
+                    if (properties != null)
+                    {
+                        renderer.GetPropertyBlock(appearanceProperties);
+                        appearanceProperties.SetColor("_Color", properties.GetColor("_Color"));
+                        appearanceProperties.SetColor("_BaseColor", properties.GetColor("_BaseColor"));
+                        appearanceProperties.SetColor("_EmissionColor", properties.GetColor("_EmissionColor"));
+                        renderer.SetPropertyBlock(appearanceProperties);
+                    }
                 }
+                ApplyStructuralAppearance(visual, renderer);
             }
         }
 
@@ -2547,6 +2544,7 @@ namespace OstrixMods.BuildWorks
             bool effectivelyLocked)
         {
             TryUnityTransform(part, out Vector3 position, out Quaternion rotation);
+            visual.DisplayName = part.DisplayName;
             visual.Root.transform.SetLocalPositionAndRotation(position, rotation);
             visual.Root.transform.localScale = VisualScale(visual, part);
             visual.Root.SetActive(effectivelyVisible);
@@ -2997,9 +2995,7 @@ namespace OstrixMods.BuildWorks
 
         private void UpdateGroundHeight()
         {
-            groundHeight = TryGetContentBounds(includeHidden: true, out Bounds bounds)
-                ? bounds.min.y
-                : 0f;
+            // The editor reference plane stays where the user put it, including during Undo/Redo.
             RecenterEnvironment(camera.transform.position);
         }
 
@@ -3040,9 +3036,9 @@ namespace OstrixMods.BuildWorks
             used[BlueprintThumbnailRenderer.ThumbnailLayer] = true;
             foreach (Component component in Resources.FindObjectsOfTypeAll<Component>())
             {
-                if (component && component.gameObject.scene.IsValid() &&
-                    IsCameraRenderable(component))
-                    used[component.gameObject.layer] = true;
+                if (!component || !IsCameraRenderable(component)) continue;
+                GameObject owner = component.gameObject;
+                if (owner && owner.scene.IsValid()) used[owner.layer] = true;
             }
             for (int layer = 31; layer >= 8; --layer)
                 if (!used[layer]) return layer;

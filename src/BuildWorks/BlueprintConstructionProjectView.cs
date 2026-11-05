@@ -37,7 +37,7 @@ namespace OstrixMods.BuildWorks
                 TMP_Text template = Hud.instance ? Hud.instance.m_pieceDescription : null;
                 if (!template || !template.font) throw new InvalidOperationException("Native project UI font is missing.");
                 var record = runtime.Read(board.Id); var blueprint = record.Blueprint;
-                var pieces = record.Parts.Where(part => runtime.ReadPart(record.Id, part.Id)?.Phase != BlueprintConstructionPartJournal.Committed)
+                var pieces = record.Parts.Where(part => runtime.ReadPartPhase(record.Id, part.Id) != BlueprintConstructionPartJournal.Committed)
                     .Select(part => ZNetScene.instance.GetPrefab(blueprint.parts[part.SourceIndex].prefabName)?.GetComponent<Piece>()).ToArray();
                 missing = pieces.Any(p => !p); costs = HammerBlueprintPieceRegistry.ResourceCosts(pieces);
                 oldLock = Cursor.lockState; oldVisible = Cursor.visible;
@@ -92,7 +92,7 @@ namespace OstrixMods.BuildWorks
                 if (confirming) text.AppendLine().AppendLine(BuildWorksLocalization.Text(ConfirmationKey(action)));
                 var progress = runtime.Progress(board.Id);
                 if (building) text.Insert(0, BuildWorksLocalization.Text("project.progress", progress.Built, progress.Total));
-                if (progress.NeedsReview) text.AppendLine().AppendLine(BuildWorksLocalization.Text("project.review"));
+                if (building && progress.NeedsReview) text.AppendLine().AppendLine(BuildWorksLocalization.Text("project.review"));
                 if (!building) text.AppendLine().AppendLine(BuildWorksLocalization.Text(
                     action == ConstructionCancellationAction.Review ? "project.review" :
                     action == ConstructionCancellationAction.AwaitCollection ? "project.refund_wait" : "project.cancel_pending"));

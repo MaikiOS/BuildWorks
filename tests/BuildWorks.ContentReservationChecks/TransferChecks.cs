@@ -32,6 +32,7 @@ namespace ReservationChecks
                 Game.instance = new Game(); ZNet.instance = new ZNet(); ZDOMan.instance = new ZDOMan();
                 ReservationChecks.Player.m_localPlayer = Player; ReservationChecks.Player.m_localPlayerExists = true; InventoryGui.Visible = false; PrivateArea.Allowed = true;
                 Placed.Piece = new Piece { gameObject = Placed }; Placed.Container = new Container(3);
+                Placed.RootView = Placed.Container.View;
                 Item = Program.Item("Wood", sourceAmount, "provided"); Item.m_quality = 2; Item.m_durability = 7.53f; Item.m_gridPos = new Vector2i(5, 4);
                 Player.Inventory.Items.Add(Item);
                 var archived = Program.Item("Wood", requested, "archive-admin"); archived.m_quality = 3; archived.m_durability = 999;
@@ -55,6 +56,14 @@ namespace ReservationChecks
         }
         internal static void Run()
         {
+            var wrongRoot = new Frame(); wrongRoot.Placed.RootView = new ZNetView();
+            Check(!wrongRoot.Begin() && wrongRoot.Item.m_stack == 3 && wrongRoot.Placed.Container.Inventory.MoveCalls == 0 &&
+                !System.IO.Directory.Exists(BlueprintStorageTransferJournal.Root), "foreign root view prepared a transfer journal or moved contents");
+            var changedRoot = new Frame(); Check(changedRoot.Begin(), changedRoot.Error);
+            changedRoot.Placed.RootView = new ZNetView(); changedRoot.Transfer.MoveNext();
+            Check(changedRoot.Item.m_stack == 3 && changedRoot.Placed.Container.Inventory.MoveCalls == 0 &&
+                BlueprintStorageTransferJournal.Read(changedRoot.Transfer.JournalPath).RequiresReconciliation,
+                "root view changed after preparation but transfer continued");
             var normal = new Frame(); normal.Item.m_equipped = true; normal.Player.Equipped = normal.Item; normal.Player.Queue.Add(normal.Item);
             // Explicit re-preparation after changing the equipped flag keeps the immutable source binding honest.
             normal.Supply = new BlueprintItemStandPlacement.Supply(new List<BlueprintItemStandPlacement.Reservation> {
@@ -223,8 +232,10 @@ namespace ReservationChecks
             ReturnChecks.Run();
             RecoveryChecks.Run();
             ProfileChecks.Run();
+            ConstructionTransferBindingChecks.Run();
             WorldGenerationChecks.Run();
             PersistenceChecks.Run();
+            ContainerCallbackChecks.Run();
             Console.WriteLine("PASS " + assertions + " transfer assertions: actual adapter, inert native/capture services; bool/exception custody, no replay, own properties, equip, payment/context guards. No game/native API/server/disk proof.");
         }
     }

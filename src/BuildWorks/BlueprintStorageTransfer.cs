@@ -8,7 +8,7 @@ using UnityEngine;
 namespace OstrixMods.BuildWorks
 {
     // Local native transfer primitive. World placement stays blocked until durable recovery/server acknowledgement exists.
-    internal sealed class BlueprintStorageTransfer : IDisposable
+    internal sealed partial class BlueprintStorageTransfer : IDisposable
     {
         private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
         private static readonly FieldInfo ViewField = typeof(Container).GetField("m_nview", Private);
@@ -20,7 +20,7 @@ namespace OstrixMods.BuildWorks
         internal enum RecoveryState { NeedsReconciliation, ExactDelivered }
         internal sealed class Entry
         {
-            internal readonly BlueprintItemStandPlacement.Reservation Input;
+            internal BlueprintItemStandPlacement.Reservation Input { get; private set; }
             internal readonly int X, Y;
             internal readonly string ProvidedProperties;
             internal Result State;
@@ -32,6 +32,14 @@ namespace OstrixMods.BuildWorks
             internal string Error;
             internal Entry(BlueprintItemStandPlacement.Reservation input, int x, int y)
             { Input = input; X = x; Y = y; ProvidedProperties = BlueprintItemStandPlacement.SnapshotItem(input.Item, true); }
+            internal void BindCurrent(ItemDrop.ItemData item)
+            {
+                if (State != Result.Ready || Attempted || item == null || item.m_stack != Input.Amount ||
+                    BlueprintItemStandPlacement.SnapshotItem(item) != Input.Snapshot ||
+                    BlueprintItemStandPlacement.SnapshotItem(item, true) != ProvidedProperties)
+                    throw new InvalidOperationException("Prepared return source changed during native cache reload.");
+                Input = new BlueprintItemStandPlacement.Reservation(item, Input.Amount, Input.Snapshot);
+            }
         }
 
         private readonly Player player;
@@ -47,6 +55,15 @@ namespace OstrixMods.BuildWorks
         private readonly IReadOnlyList<Entry> entries;
         private readonly IReadOnlyList<BlueprintItemStandPlacement.Supply> otherSupplies;
         private readonly bool returning;
+        private readonly ConstructionBinding construction;
+        private sealed class ConstructionBinding
+        {
+            internal readonly Guid Project, Part;
+            internal readonly string Fingerprint;
+            internal readonly Func<bool> Current;
+            internal ConstructionBinding(Guid project, Guid part, string fingerprint, Func<bool> current)
+            { Project = project; Part = part; Fingerprint = fingerprint; Current = current; }
+        }
         private readonly Dictionary<ItemDrop.ItemData, int> receiverBefore;
         private readonly Dictionary<ItemDrop.ItemData, string> receiverProperties;
         private readonly int receiverWidth, receiverHeight;
@@ -62,13 +79,13 @@ namespace OstrixMods.BuildWorks
         internal string JournalError { get; private set; }
         internal readonly Guid OperationId;
         internal IReadOnlyList<Entry> Entries => entries;
-        internal bool CompleteInMemory => !cancelling && JournalError == null && entries.All(entry => entry.State == Result.Transferred);
+        internal bool CompleteInMemory => pairedRecovery == null && !cancelling && JournalError == null && entries.All(entry => entry.State == Result.Transferred);
         internal bool PersistenceCustodyValid => System.Threading.Thread.CurrentThread.ManagedThreadId == ownerThread && PlayerReadbackCustodyValid();
 
         internal bool TryBeginPersistence(out BlueprintStoragePersistence verification, out string reason)
         {
             verification = null; reason = null;
-            if (System.Threading.Thread.CurrentThread.ManagedThreadId != ownerThread || persistenceRequested)
+            if (System.Threading.Thread.CurrentThread.ManagedThreadId != ownerThread || persistenceRequested || RecoveringSavedPair)
             { reason = "Persistence must start once on the transfer's owning thread."; return false; }
             persistenceRequested = true;
             return BlueprintStoragePersistence.TryBegin(this, out persistence, out reason) && (verification = persistence) != null;
@@ -114,10 +131,12 @@ namespace OstrixMods.BuildWorks
         }
 
         private BlueprintStorageTransfer(Guid operationId, Player player, Piece piece, Container container,
-            ZNetView view, List<Entry> entries, IEnumerable<BlueprintItemStandPlacement.Supply> otherSupplies, bool returning = false, Guid marker = default(Guid))
+            ZNetView view, List<Entry> entries, IEnumerable<BlueprintItemStandPlacement.Supply> otherSupplies, bool returning = false, Guid marker = default(Guid),
+            ConstructionBinding construction = null)
         {
             OperationId = operationId; this.player = player; this.piece = piece; this.container = container; this.view = view;
             this.returning = returning;
+            this.construction = construction;
             targetMarker = (marker == Guid.Empty ? operationId : marker).ToString("N"); markerRequired = returning;
             source = returning ? container.GetInventory() : player.GetInventory();
             destination = returning ? player.GetInventory() : container.GetInventory(); zdo = view.GetZDO(); targetId = zdo.m_uid;
@@ -187,6 +206,8 @@ namespace OstrixMods.BuildWorks
                 System.IO.Path.GetFileName(path))) throw new InvalidOperationException("Recovery journal is outside the active transfer directory.");
             persisted = BlueprintStorageTransferJournal.Read(path);
             var plan = persisted.Prepared;
+            if (plan.HasConstructionBinding)
+                throw new InvalidOperationException("Paid project storage requires its construction-aware resume path.");
             if (persisted.Schema < 3 || plan.Route != BlueprintStorageTransferJournal.Direction.ToContainer || persisted.InFlight.HasValue ||
                 persisted.Observations.Count == 0 || persisted.Observations.Any(value => value.State != (int)Result.Transferred))
                 throw new InvalidOperationException("Recovery requires a fully observed forward prefix; legacy, pending or uncertain evidence stays held.");
@@ -253,44 +274,88 @@ namespace OstrixMods.BuildWorks
 
         private BlueprintStorageTransfer BeginReturn(BlueprintStorageTransferJournal.Snapshot persisted, Entry[] delivered, bool recovered)
         {
-            Guid operationId = BlueprintStorageTransferJournal.ReturnOperationId(OperationId);
+            var inputs = new List<BlueprintItemStandPlacement.Reservation>();
+            for (int i = 0; i < delivered.Length; i++)
+            {
+                Entry original = delivered[i]; ItemDrop.ItemData item = original.DestinationItem;
+                if (item == null || !ReferenceEquals(container.GetInventory().GetItemAt(original.X, original.Y), item) ||
+                    item.m_stack != original.Input.Amount || original.Input.Amount != persisted.Prepared.Items[i].Amount ||
+                    original.X != persisted.Prepared.Items[i].X || original.Y != persisted.Prepared.Items[i].Y ||
+                    item.m_dropPrefab.name != persisted.Prepared.Items[i].Prefab)
+                    throw new InvalidOperationException("Delivered native item identity or quantity changed; explicit reconciliation is required.");
+                inputs.Add(new BlueprintItemStandPlacement.Reservation(item, item.m_stack, BlueprintItemStandPlacement.SnapshotItem(item)));
+            }
+            if (recovered && !MatchesRecovery(persisted, out _)) throw new InvalidOperationException("Recovery inventories changed before return.");
+            try
+            {
+                var result = PrepareReturn(OperationId, player, piece, container, view, inputs, construction);
+                cancelling = true; return result;
+            }
+            catch { if (BlueprintStorageTransferJournal.HasReturnEvidence(OperationId)) cancelling = true; throw; }
+        }
+
+        private static BlueprintStorageTransfer PrepareReturn(Guid parentOperation, Player player, Piece piece, Container container,
+            ZNetView view, IReadOnlyList<BlueprintItemStandPlacement.Reservation> inputs, ConstructionBinding construction)
+        {
+            Guid operationId = BlueprintStorageTransferJournal.ReturnOperationId(parentOperation);
+            if (inputs == null || inputs.Count < 1 || inputs.Count > 4096 ||
+                BlueprintStorageTransferJournal.HasReturnEvidence(parentOperation) || container.GetInventory().GetAllItems().Count != inputs.Count)
+                throw new InvalidOperationException("Return requires all current native stacks and no earlier child operation.");
             Inventory receiver = player.GetInventory();
             int width = receiver.GetWidth(), height = receiver.GetHeight();
             if (width < 1 || width > 256 || height < 1 || height > 256) throw new InvalidOperationException("Unsupported return inventory grid.");
             var occupied = ReceiverCells(receiver);
             var cells = new List<(int X, int Y)>();
-            for (int y = 0; y < height && cells.Count < delivered.Length; y++)
-                for (int x = 0; x < width && cells.Count < delivered.Length; x++)
+            for (int y = 0; y < height && cells.Count < inputs.Count; y++)
+                for (int x = 0; x < width && cells.Count < inputs.Count; x++)
                     if (!occupied.Contains(y * width + x)) cells.Add((x, y));
-            if (cells.Count != delivered.Length) throw new InvalidOperationException("Return needs separate empty player inventory cells; no item is dropped or merged.");
+            if (cells.Count != inputs.Count) throw new InvalidOperationException("Return needs separate empty player inventory cells; no item is dropped or merged.");
             var returns = new List<Entry>();
-            for (int i = 0; i < delivered.Length; i++)
+            var unique = new HashSet<ItemDrop.ItemData>();
+            for (int i = 0; i < inputs.Count; i++)
             {
-                Entry original = delivered[i]; ItemDrop.ItemData item = original.DestinationItem;
-                if (item == null || !ReferenceEquals(container.GetInventory().GetItemAt(original.X, original.Y), item) ||
-                    item.m_stack != original.Input.Amount || item.m_shared.m_maxStackSize < 1 || item.m_stack > item.m_shared.m_maxStackSize ||
+                var input = inputs[i]; ItemDrop.ItemData item = input.Item;
+                if (item == null || !unique.Add(item) || !container.GetInventory().ContainsItem(item) || input.Amount != item.m_stack ||
+                    input.Snapshot != BlueprintItemStandPlacement.SnapshotItem(item) ||
+                    item.m_stack < 1 || item.m_shared.m_maxStackSize < 1 || item.m_stack > item.m_shared.m_maxStackSize ||
                     item.m_shared.m_questItem || item.m_equipped ||
-                    player.IsItemEquiped(item) || player.IsEquipActionQueued(item) ||
-                    original.Input.Amount != persisted.Prepared.Items[i].Amount || original.X != persisted.Prepared.Items[i].X || original.Y != persisted.Prepared.Items[i].Y ||
-                    item.m_dropPrefab.name != persisted.Prepared.Items[i].Prefab)
+                    player.IsItemEquiped(item) || player.IsEquipActionQueued(item))
                     throw new InvalidOperationException("Delivered native item identity or quantity changed; explicit reconciliation is required.");
                 // Return its current attributes, including damage; never reconstruct the archived/initial state.
                 returns.Add(new Entry(new BlueprintItemStandPlacement.Reservation(item, item.m_stack,
                     BlueprintItemStandPlacement.SnapshotItem(item)), cells[i].X, cells[i].Y));
             }
             var candidate = new BlueprintStorageTransfer(operationId, player, piece, container, view, returns,
-                Array.Empty<BlueprintItemStandPlacement.Supply>(), returning: true, marker: OperationId);
-            if (!candidate.ContextValid() || !candidate.DestinationReady() || !candidate.RemainingAvailable() || recovered && !MatchesRecovery(persisted, out _))
+                Array.Empty<BlueprintItemStandPlacement.Supply>(), returning: true, marker: parentOperation, construction: construction);
+            string marker = BlueprintStorageCapture.TransferMarker(candidate.zdo);
+            if (!string.IsNullOrEmpty(marker) && marker != parentOperation.ToString("N")) throw new InvalidOperationException("Return marker changed.");
+            candidate.markerRequired = !string.IsNullOrEmpty(marker);
+            if (!candidate.ContextValid() || !candidate.DestinationReady() || !candidate.RemainingAvailable() ||
+                !BlueprintStorageCapture.TryCapture(piece, player, out _))
                 throw new InvalidOperationException("Return inventories changed while preparing.");
-            cancelling = true; // Even a partial/uncertain child Prepare must never allow forward continuation.
             candidate.journal = BlueprintStorageTransferJournal.Begin(BlueprintStorageTransferJournal.Root, new BlueprintStorageTransferJournal.Plan {
-                Operation = operationId, Parent = OperationId, Route = BlueprintStorageTransferJournal.Direction.ToPlayer,
-                World = worldId, Player = player.GetPlayerID(), Creator = piece.GetCreator(), TargetUser = targetId.UserID, TargetId = targetId.ID,
-                Width = width, Height = height, PieceName = piece.gameObject.name, PrefabHash = zdo.GetPrefab(),
+                Operation = operationId, Parent = parentOperation, Route = BlueprintStorageTransferJournal.Direction.ToPlayer,
+                ConstructionProject = construction?.Project ?? Guid.Empty, ConstructionPart = construction?.Part ?? Guid.Empty,
+                ConstructionFingerprint = construction?.Fingerprint,
+                World = candidate.worldId, Player = player.GetPlayerID(), Creator = piece.GetCreator(), TargetUser = candidate.targetId.UserID, TargetId = candidate.targetId.ID,
+                Width = width, Height = height, PieceName = piece.gameObject.name, PrefabHash = candidate.zdo.GetPrefab(),
                 Items = returns.Select(entry => new BlueprintStorageTransferJournal.Item { Prefab = entry.Input.Item.m_dropPrefab.name,
                     SourceX = entry.Input.Item.m_gridPos.x, SourceY = entry.Input.Item.m_gridPos.y, SourceQuantity = entry.Input.Item.m_stack,
                     Amount = entry.Input.Amount, X = entry.X, Y = entry.Y, SourceSnapshot = entry.Input.Snapshot, Properties = entry.ProvidedProperties }).ToArray() });
-            return candidate;
+            try
+            {
+                if (!candidate.ContextValid() || BlueprintStorageCapture.TransferMarker(candidate.zdo) != marker)
+                    throw new InvalidOperationException("Return context changed before marking its write-ahead evidence.");
+                if (string.IsNullOrEmpty(marker))
+                {
+                    candidate.zdo.Set(BlueprintStorageCapture.TransferMarkerKey, parentOperation.ToString("N"));
+                    candidate.waitingForMarker = true; candidate.markerStarted = System.Diagnostics.Stopwatch.GetTimestamp();
+                }
+                candidate.markerRequired = true;
+                if (!candidate.ContextValid()) throw new InvalidOperationException("Return marker could not be verified.");
+                return candidate;
+            }
+            catch { candidate.Dispose(); throw; }
         }
 
         private static HashSet<int> ReceiverCells(Inventory receiver)
@@ -312,8 +377,26 @@ namespace OstrixMods.BuildWorks
             transfer = null; error = null;
             try
             {
-                if (operationId == Guid.Empty || !player || !placed || payment == null || !payment.Recorded || payment.Error != null ||
-                    !payment.IsFor(player.GetInventory()) || supply == null || supply.Item != null || supply.Items.Count == 0 ||
+                if (!player || payment == null || !payment.Recorded || payment.Error != null || !payment.IsFor(player.GetInventory()))
+                    throw new InvalidOperationException("Transfer requires a recorded payment and a complete container reservation.");
+                var paid = payment.DescribePaid().Select(debit => new BlueprintStorageTransferJournal.Payment {
+                    Prefab = debit.Item.m_dropPrefab.name, Properties = BlueprintItemStandPlacement.SnapshotItem(debit.Item),
+                    Before = debit.Before, Paid = debit.Paid, X = debit.Item.m_gridPos.x, Y = debit.Item.m_gridPos.y }).ToArray();
+                return TryBeginCore(operationId, player, placed, data, supply, paid, heldSupplies, null, out transfer, out error);
+            }
+            catch (Exception exception) { error = exception.Message; return false; }
+        }
+
+        private static bool TryBeginCore(Guid operationId, Player player, GameObject placed, BlueprintForeignPartData data,
+            BlueprintItemStandPlacement.Supply supply, BlueprintStorageTransferJournal.Payment[] paid,
+            IReadOnlyList<BlueprintItemStandPlacement.Supply> heldSupplies, ConstructionBinding construction,
+            out BlueprintStorageTransfer transfer, out string error)
+        {
+            transfer = null; error = null;
+            try
+            {
+                if (operationId == Guid.Empty || !player || !placed || paid == null || construction != null && !construction.Current() ||
+                    supply == null || supply.Item != null || supply.Items.Count == 0 ||
                     heldSupplies == null || heldSupplies.Count(value => ReferenceEquals(value, supply)) != 1 ||
                     supply.Items.Count > 4096 || data == null || data.ContentsCleared ||
                     !BlueprintContainerInventory.TryRead(data, name => name.GetStableHashCode(), out var demands))
@@ -344,7 +427,7 @@ namespace OstrixMods.BuildWorks
                 }
                 if (wanted.Values.Any(count => count != 0)) throw new InvalidOperationException("Container reservation is incomplete.");
                 var candidate = new BlueprintStorageTransfer(operationId, player, piece, container, view, entries,
-                    heldSupplies.Where(value => value != null && !ReferenceEquals(value, supply)));
+                    heldSupplies.Where(value => value != null && !ReferenceEquals(value, supply)), construction: construction);
                 if (!candidate.ContextValid() || !candidate.RemainingAvailable() || !BlueprintStorageCapture.TryCapture(piece, player, out _))
                     throw new InvalidOperationException("Native container state or access could not be verified.");
                 if (!string.IsNullOrEmpty(BlueprintStorageCapture.TransferMarker(candidate.zdo)) ||
@@ -352,11 +435,11 @@ namespace OstrixMods.BuildWorks
                     throw new InvalidOperationException("Target container already has unresolved transfer evidence.");
                 candidate.journal = BlueprintStorageTransferJournal.Begin(BlueprintStorageTransferJournal.Root, new BlueprintStorageTransferJournal.Plan {
                     Operation = operationId, World = candidate.worldId, Player = player.GetPlayerID(), Creator = piece.GetCreator(),
+                    ConstructionProject = construction?.Project ?? Guid.Empty, ConstructionPart = construction?.Part ?? Guid.Empty,
+                    ConstructionFingerprint = construction?.Fingerprint,
                     TargetUser = candidate.targetId.UserID, TargetId = candidate.targetId.ID, Width = grid.Value.Width, Height = grid.Value.Height,
                     PieceName = piece.gameObject.name, PrefabHash = candidate.zdo.GetPrefab(),
-                    Paid = payment.DescribePaid().Select(debit => new BlueprintStorageTransferJournal.Payment {
-                        Prefab = debit.Item.m_dropPrefab.name, Properties = BlueprintItemStandPlacement.SnapshotItem(debit.Item),
-                        Before = debit.Before, Paid = debit.Paid, X = debit.Item.m_gridPos.x, Y = debit.Item.m_gridPos.y }).ToArray(),
+                    Paid = paid,
                     Items = entries.Select(entry => new BlueprintStorageTransferJournal.Item { Prefab = entry.Input.Item.m_dropPrefab.name,
                         SourceX = entry.Input.Item.m_gridPos.x, SourceY = entry.Input.Item.m_gridPos.y, SourceQuantity = entry.Input.Item.m_stack,
                         Amount = entry.Input.Amount, X = entry.X, Y = entry.Y, SourceSnapshot = entry.Input.Snapshot, Properties = entry.ProvidedProperties }).ToArray() });
@@ -382,13 +465,15 @@ namespace OstrixMods.BuildWorks
             LoadingField != null && !(bool)LoadingField.GetValue(container) && Access != null &&
             (bool)Access.Invoke(container, new object[] { player.GetPlayerID() }) &&
             PrivateArea.CheckAccess(piece.transform.position, 0f, false, false) && view && view.IsValid() && view.IsOwner() &&
+            ReferenceEquals(piece.gameObject.GetComponent<ZNetView>(), view) &&
             ReferenceEquals(ViewField.GetValue(container), view) && view.GetZDO() != null && !view.GetZDO().m_uid.IsNone() && RevisionField != null;
 
         private bool ContextValid() => OwnedAccess(player, piece, container, view) && ReferenceEquals(ZNet.instance, network) &&
             ReferenceEquals(ZDOMan.instance, objects) && network && network.GetWorld()?.m_uid == worldId &&
             ReferenceEquals(player.GetInventory(), returning ? destination : source) && ReferenceEquals(container.GetInventory(), returning ? source : destination) &&
             ReferenceEquals(view.GetZDO(), zdo) && zdo.m_uid.Equals(targetId) &&
-            (!markerRequired || BlueprintStorageCapture.TransferMarker(zdo) == targetMarker);
+            (!markerRequired || BlueprintStorageCapture.TransferMarker(zdo) == targetMarker) &&
+            (construction == null || construction.Current());
 
         // Read backing lists into detached maps before any callbacks can mutate them.
         private static Dictionary<ItemDrop.ItemData, int> Counts(Inventory inventory)
@@ -443,6 +528,7 @@ namespace OstrixMods.BuildWorks
 
         internal Result MoveNext()
         {
+            if (RecoveringSavedPair) return Result.Unchanged;
             if (JournalError != null) return Result.Uncertain;
             if (!returning && BlueprintStorageTransferJournal.HasReturnEvidence(OperationId)) cancelling = true;
             if (cancelling) return Result.Unchanged;
@@ -457,6 +543,7 @@ namespace OstrixMods.BuildWorks
                             throw new InvalidOperationException("Native container synchronization timed out; prepared transfer remains held.");
                         return Result.Ready; // Preparation only: no BeforeMove, unequip or item mutation has happened.
                     }
+                    if (returning) RebindPreparedReturnSources();
                     waitingForMarker = false;
                     return Result.Ready;
                 }
@@ -600,6 +687,6 @@ namespace OstrixMods.BuildWorks
                 hash.TransformFinalBlock(Array.Empty<byte>(), 0, 0); return BitConverter.ToString(hash.Hash).Replace("-", "");
             }
         }
-        public void Dispose() { persistence?.Cancel(); JournalError = JournalError ?? "Transfer journal closed; reconciliation is required before reuse."; journal?.Dispose(); }
+        public void Dispose() { pairedRecovery?.Cancel(); persistence?.Cancel(); JournalError = JournalError ?? "Transfer journal closed; reconciliation is required before reuse."; journal?.Dispose(); }
     }
 }

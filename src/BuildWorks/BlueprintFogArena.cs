@@ -133,13 +133,14 @@ namespace OstrixMods.BuildWorks
             if (!texture.Create()) { UnityEngine.Object.DestroyImmediate(texture); throw new InvalidOperationException("Fog arena atlas allocation failed."); }
             return texture;
         }
-        internal void PublishMetadata(int slot, BlueprintFogSnapshotState.Submission token, Vector3 actor, Vector2 capsule, float clock, float weight, uint flags = 3, int mapBase = -1)
+        internal void PublishMetadata(int slot, BlueprintFogSnapshotState.Submission token, Vector3 actor, Vector2 capsule, float clock, float weight, uint flags = 3, int mapBase = -1, bool fieldsIndexed = false)
         {
             if (disposed) throw new ObjectDisposedException(nameof(BlueprintFogArena));
             if (slot < 0 || slot >= ownerCount) throw new ArgumentOutOfRangeException(nameof(slot));
             if (mapBase == -1) mapBase = slot * 2 * MapWords;
             if (mapBase != slot * 2 * MapWords && mapBase != (slot * 2 + 1) * MapWords) throw new ArgumentException("Fog published map belongs to another slot.");
             metadataShader.SetInt("_PublishMapBase", mapBase);
+            metadataShader.SetInt("_FieldsIndexed", fieldsIndexed ? 1 : 0);
             metadataShader.SetInt("_Slot", slot); metadataShader.SetInt("_Tick", token.Tick); metadataShader.SetInt("_EmissionRevision", token.EmissionRevision); metadataShader.SetInt("_PublishFlags", (int)flags);
             metadataShader.SetInts("_OwnerBits", unchecked((int)token.Owner), (int)(token.Owner >> 32));
             metadataShader.SetInts("_GenerationBits", unchecked((int)token.Generation), (int)(token.Generation >> 32));

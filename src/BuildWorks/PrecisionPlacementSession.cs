@@ -29,6 +29,7 @@ namespace OstrixMods.BuildWorks
     {
         private static readonly List<ZNetView> scaleEnabledPrefabs = new List<ZNetView>();
         private readonly NativePlacementMaterialPreview materialPreview = new NativePlacementMaterialPreview();
+        private readonly BlueprintSurfaceContact surfaceContacts = new BlueprintSurfaceContact();
         private bool materialPreviewFailureShown;
 
         private void UpdateNativeMaterialPreview(GameObject source, GameObject ghost, int? seed)
@@ -254,6 +255,7 @@ namespace OstrixMods.BuildWorks
         private static bool externalBuildCameraResolved;
         private static bool externalBuildCameraDetected;
         private static MethodInfo externalBuildCameraInModeMethod;
+        private static MethodInfo externalBuildCameraCanUseMethod;
         private static MethodInfo externalBuildCameraDisableMethod;
         private static MethodInfo externalBuildCameraEnableMethod;
         private static FieldInfo externalBuildCameraViewField;
@@ -468,6 +470,7 @@ namespace OstrixMods.BuildWorks
         private bool automaticCooldownOverridden;
         private float automaticPreviousLastToolUseTime;
         private int suppressPlacementFrame = -1;
+        private int consumedWorldSelectionEscapeFrame = -1;
         private readonly List<TransformSnapshot> placementPlan = new List<TransformSnapshot>();
         private Point3[][] blueprintSnapLocalSets;
         private readonly List<Piece> placementPlanPieces = new List<Piece>();
@@ -483,6 +486,8 @@ namespace OstrixMods.BuildWorks
         private readonly Dictionary<GameObject, BlueprintConstructionRefund> constructionPayments =
             new Dictionary<GameObject, BlueprintConstructionRefund>();
         private BlueprintConstructionRefund nativeConstructionPayment;
+        private BlueprintConstructionPartExecution nativeConstructionPart;
+        private bool nativeConstructionFailed;
         private bool pendingConstructionCompletion, pendingConstructionSignFailed;
 
         internal BlueprintConstructionRefund BeginConstructionPayment(Player player)
@@ -493,20 +498,29 @@ namespace OstrixMods.BuildWorks
             if (nativeConstructionPayment != null)
                 throw new InvalidOperationException("Recursive blueprint placement is not supported.");
             BlueprintRotationState.RequireFreshCreation();
-            projectPart?.BeforeNative();
-            return nativeConstructionPayment = new BlueprintConstructionRefund(player.GetInventory(), selectedPiece.m_resources);
+            var payment = new BlueprintConstructionRefund(player.GetInventory(), selectedPiece.m_resources, sessionMode == SessionMode.ProjectPart);
+            projectPart?.BeforeNative(payment);
+            nativeConstructionPart = sessionMode == SessionMode.ProjectPart ? projectPart : null;
+            nativeConstructionFailed = false;
+            return nativeConstructionPayment = payment;
         }
 
         internal void EndConstructionPayment(Player player, BlueprintConstructionRefund payment, Exception error)
         {
             if (payment == null) return;
+            var execution = ReferenceEquals(nativeConstructionPayment, payment) ? nativeConstructionPart : null;
+            bool failed = nativeConstructionFailed;
             try { payment.Complete(); }
             finally
-            { if (ReferenceEquals(nativeConstructionPayment, payment)) nativeConstructionPayment = null; }
-            if (sessionMode == SessionMode.ProjectPart)
             {
-                projectPart.EndNative(payment, error);
-                projectPart = null; Finish(); return;
+                if (ReferenceEquals(nativeConstructionPayment, payment))
+                { nativeConstructionPayment = null; nativeConstructionPart = null; nativeConstructionFailed = false; }
+            }
+            if (execution != null)
+            {
+                execution.EndNative(payment, error ?? (failed ? new InvalidOperationException("Native construction callback failed.") : null));
+                if (ReferenceEquals(projectPart, execution)) projectPart = null;
+                Finish(); return;
             }
             if (error != null || payment.Error != null)
             {
@@ -666,7 +680,10 @@ namespace OstrixMods.BuildWorks
             }, () => ZNetScene.instance, name => name.GetStableHashCode(), () => Game.m_worldLevel,
                 name => BlueprintMaterialState.Supports(ZNetScene.instance ? ZNetScene.instance.GetPrefab(name) : null),
                 name => BlueprintStorageCapture.PrefabGrid(ZNetScene.instance ? ZNetScene.instance.GetPrefab(name) : null),
-                BlueprintNativePrefabMigration.CanMigrateRoof);
+                BlueprintNativePrefabMigration.CanMigrateRoof,
+                value => { GameObject prefab=ZNetScene.instance ? ZNetScene.instance.GetPrefab(value) : null; return prefab ? prefab.name : null; },
+                name => BlueprintStorageCapture.SupportsKgStateProjection(ZNetScene.instance ? ZNetScene.instance.GetPrefab(name) : null),
+                name => BlueprintUnboundImport.Capture(ZNetScene.instance ? ZNetScene.instance.GetPrefab(name) : null));
             blueprintStore.ConfigurePrefabMetadata(name => BlueprintPrefabMetadataCapture.Capture(
                 ZNetScene.instance ? ZNetScene.instance.GetPrefab(name) : null));
             blueprintPieceRegistry = new HammerBlueprintPieceRegistry(blueprintStore);
@@ -982,6 +999,8 @@ namespace OstrixMods.BuildWorks
                 return;
             }
 
+            if (selectingPlacementSupport) { TickSupportSelection(player); return; }
+
             if (state == PlacementState.Inactive)
             {
                 blueprintPieceRegistry.Update(player);
@@ -1088,6 +1107,7 @@ namespace OstrixMods.BuildWorks
                 {
                     if (sessionMode == SessionMode.BlueprintWorldSelection)
                     {
+                        consumedWorldSelectionEscapeFrame = Time.frameCount;
                         Finish();
                         ShowStatus(player, BuildWorksLocalization.Text(
                             "placement.selection_cancelled"));
@@ -2154,6 +2174,7 @@ namespace OstrixMods.BuildWorks
 
         public void LateUpdate()
         {
+            if (selectingPlacementSupport) return;
             if (state == PlacementState.Inactive)
             {
                 ShowPassiveAssist();
@@ -2337,7 +2358,7 @@ namespace OstrixMods.BuildWorks
             if (continuationPending && piece != continuationPiece) ClearContinuation();
             hud.ShowPassive(continuationPending);
             if (!camera || !ghost || !ghost.activeInHierarchy ||
-                !SupportsPrecisionPlacement(piece))
+                !SupportsWorldPrecisionPlacement(piece))
             {
                 gizmo.Hide();
                 return;
@@ -2461,21 +2482,21 @@ namespace OstrixMods.BuildWorks
                 ? blueprintEditPartIndex
                 : CompositeBlueprintStore.FramePartIndex(activeBlueprint);
             TransformSnapshot transform = activeBlueprint != null &&
-                (state == PlacementState.Editing || state == PlacementState.Frozen) &&
+                !selectingPlacementSupport && (state == PlacementState.Editing || state == PlacementState.Frozen) &&
                 blueprintGhostIndex < placementPlan.Count
                 ? placementPlan[blueprintGhostIndex]
                 : new TransformSnapshot(currentPosition, currentRotation);
             placementGhost.transform.SetPositionAndRotation(
                 transform.Position,
                 transform.Rotation);
-            Vector3 scale = state == PlacementState.Armed &&
+            Vector3 scale = (state == PlacementState.Armed || selectingPlacementSupport) &&
                 placementPlanIndex < placementPlan.Count
                 ? placementPlan[placementPlanIndex].Scale
                 : activeBlueprint != null && blueprintGhostIndex < activeBlueprint.parts.Count
                     ? activeBlueprint.parts[blueprintGhostIndex].PlacementScale(selectedPiece.transform.localScale)
                 : transform.Scale;
             placementGhost.transform.localScale = Vector3.Scale(selectedPiece.transform.localScale, scale);
-            int? materialSeed = state == PlacementState.Armed && placementPlanIndex < placementPlan.Count
+            int? materialSeed = (state == PlacementState.Armed || selectingPlacementSupport) && placementPlanIndex < placementPlan.Count
                 ? placementPlan[placementPlanIndex].MaterialSeed
                 : activeBlueprint != null && blueprintGhostIndex < activeBlueprint.parts.Count
                     ? activeBlueprint.parts[blueprintGhostIndex].materialSeed : null;
@@ -2559,6 +2580,7 @@ namespace OstrixMods.BuildWorks
 
         public void ApplyValidationPoint(Player player, ref Vector3 point)
         {
+            if (RequiresPlacementContact(player)) return;
             // Surface-dependent blueprint parts get a fresh contact at their pose.
             if (activeBlueprint != null && !SupportsPrecisionPlacement(selectedPiece)) return;
             if (sessionMode != SessionMode.BlueprintEditor &&
@@ -2568,12 +2590,59 @@ namespace OstrixMods.BuildWorks
             }
         }
 
+        private float? nativePlacementRayDistance;
+        private int nativeChestAttachmentFrame = -1;
+        internal PlacementContactFailure? LastPlacementContactFailure { get; private set; }
+        internal void RecordPlacementContactFailure(PlacementContactFailure failure) => LastPlacementContactFailure = failure;
+
+        internal bool TryFindSurfaceContact(GameObject ghost, int mask, Vector3 eye, float maximumDistance,
+            out RaycastHit hit, out PlacementContactFailure failure) =>
+            surfaceContacts.TryFind(ghost, mask, eye, maximumDistance, out hit, out failure);
+
+        internal bool RequiresPlacementContact(Player player) =>
+            player && player == Player.m_localPlayer && allowNativeGhostUpdate &&
+            state != PlacementState.Inactive &&
+            (sessionMode == SessionMode.WorldPrecision || sessionMode == SessionMode.ProjectPart ||
+                sessionMode == SessionMode.BlueprintWorldPlacement);
+
+        internal void BeginNativePlacementRay()
+        {
+            nativePlacementRayDistance = null;
+            nativeChestAttachmentFrame = -1;
+        }
+
+        internal bool HasNativeChestAttachmentContact(Player player) =>
+            RequiresPlacementContact(player) && nativeChestAttachmentFrame == Time.frameCount;
+
+        internal void RecordNativeChestAttachmentContact(Player player, Piece source, RaycastHit contact)
+        {
+            nativeChestAttachmentFrame = -1;
+            if (!RequiresPlacementContact(player) || !source ||
+                !BuildWorksPlacementValidation.UsesSurfaceAttachment(source.m_usage) ||
+                !BuildWorksPlacementValidation.IsSurfaceAttachmentSupport(contact.collider)) return;
+            // Overlap does not grant support; retain the target's native donor eligibility.
+            nativeChestAttachmentFrame = Time.frameCount;
+        }
+
+        internal void RecordNativePlacementRayDistance(Player player, float distance)
+        {
+            nativePlacementRayDistance = RequiresPlacementContact(player) && distance > 0f &&
+                !float.IsNaN(distance) && !float.IsInfinity(distance) ? distance : (float?)null;
+        }
+
+        internal bool TryTakeNativePlacementRayDistance(out float distance)
+        {
+            distance = nativePlacementRayDistance ?? 0f;
+            bool found = nativePlacementRayDistance.HasValue;
+            nativePlacementRayDistance = null;
+            return found;
+        }
+
         internal bool TryPrepareBlueprintValidation(Player player, out GameObject ghost, out Piece source)
         {
             ghost = null;
             source = null;
-            if (sessionMode != SessionMode.ProjectPart && (activeBlueprint == null || SupportsPrecisionPlacement(selectedPiece)) || !allowNativeGhostUpdate ||
-                state == PlacementState.Inactive || !PlacementSelectionStillValid(player) ||
+            if (!RequiresPlacementContact(player) || !PlacementSelectionStillValid(player) ||
                 placementPlanIndex >= placementPlan.Count ||
                 placementPlanIndex >= placementPlanPieces.Count ||
                 placementPlanPieces[placementPlanIndex] != selectedPiece) return false;
@@ -2602,6 +2671,7 @@ namespace OstrixMods.BuildWorks
 
         public bool ShouldBlockNativePlacement(Player player, Piece piece)
         {
+            if (BlocksPlacementForSupport(player)) return true;
             if (player == Player.m_localPlayer &&
                 (pendingWorldBlueprintSelection || selectingBlueprint ||
                 sessionMode == SessionMode.BlueprintWorldSelection)) return true;
@@ -2648,6 +2718,7 @@ namespace OstrixMods.BuildWorks
 
         public void PrepareNativePlacementUpdate(Player player, ref bool takeInput)
         {
+            if (BlocksPlacementForSupport(player)) { takeInput = false; return; }
             if (player != Player.m_localPlayer)
             {
                 return;
@@ -2790,7 +2861,7 @@ namespace OstrixMods.BuildWorks
             }
             GameObject ghost = PlacementGhostField.GetValue(player) as GameObject;
             Piece piece = player.GetSelectedPiece();
-            if (!ghost || !ghost.activeInHierarchy || !SupportsPrecisionPlacement(piece))
+            if (!ghost || !ghost.activeInHierarchy || !SupportsWorldPrecisionPlacement(piece))
             {
                 return false;
             }
@@ -2861,9 +2932,7 @@ namespace OstrixMods.BuildWorks
                 if (!GameplayInputAvailable(player) ||
                     (!Input.GetKeyDown(KeyCode.Return) && !Input.GetKeyDown(KeyCode.KeypadEnter)))
                     return;
-                automaticPlacementPaused = false;
-                automaticPauseReason = null;
-                RestoreCursor();
+                if (!ResumeAutomaticPlacement(player)) return;
             }
             if (pendingItemStandContents != null)
             {
@@ -3045,6 +3114,14 @@ namespace OstrixMods.BuildWorks
                     camera, currentPosition, currentRotation, localSpace, mouse) != GizmoAxis.None;
         }
 
+        internal bool ShouldBlockMenuEscape()
+        {
+            // Menu.Update may run before or after selection cancellation in the same frame.
+            return Input.GetKeyDown(KeyCode.Escape) &&
+                (sessionMode == SessionMode.BlueprintWorldSelection && state != PlacementState.Inactive ||
+                    consumedWorldSelectionEscapeFrame == Time.frameCount);
+        }
+
         public bool ShouldBlockPlayerInput(Player player)
         {
             return state != PlacementState.Inactive && state != PlacementState.Armed &&
@@ -3154,8 +3231,13 @@ namespace OstrixMods.BuildWorks
         {
             automaticCooldownOverridden = false;
             if (placementPlanIndex < placementSupplies.Count) heldPlacementSupplies.Remove(placementSupplies[placementPlanIndex]);
-            ++placementPlanIndex;
-            Debug.Log("BuildWorks series placed " + placementPlanIndex + "/" + placementPlan.Count + ".");
+            if (supportOrder != null)
+            {
+                supportOrder.Commit(placementPlanIndex);
+                placementPlanIndex = supportOrder.Complete ? placementPlan.Count : supportOrder.Current;
+            }
+            else ++placementPlanIndex;
+            Debug.Log("BuildWorks series placed " + PlacementResolvedCount + "/" + placementPlan.Count + ".");
             if (placementPlanIndex < placementPlan.Count)
             {
                 TransformSnapshot next = placementPlan[placementPlanIndex];
@@ -3164,6 +3246,12 @@ namespace OstrixMods.BuildWorks
                 if (signFailed)
                 {
                     PauseAutomaticPlacement(player, BuildWorksLocalization.Text("blueprint.sign_apply_failed"));
+                    return;
+                }
+                if (supportOrder != null)
+                {
+                    if (!BeginSupportSelection(player))
+                        PauseAutomaticPlacement(player, BuildWorksLocalization.Text("placement.pause.validation"));
                     return;
                 }
                 requestAutomaticPlacement = true;
@@ -3203,7 +3291,7 @@ namespace OstrixMods.BuildWorks
             UpdateHud();
             ShowStatus(player, BuildWorksLocalization.Text(
                 "placement.paused",
-                placementPlanIndex - automaticSkippedPlacements,
+                PlacementResolvedCount - automaticSkippedPlacements,
                 placementPlan.Count,
                 reason,
                 placementPlanIndex + 1));
@@ -3221,7 +3309,12 @@ namespace OstrixMods.BuildWorks
             int skipped = placementPlanIndex + 1;
             ++automaticSkippedPlacements;
             if (placementPlanIndex < placementSupplies.Count) heldPlacementSupplies.Remove(placementSupplies[placementPlanIndex]);
-            ++placementPlanIndex;
+            if (supportOrder != null)
+            {
+                supportOrder.SkipPlayerBlocked(placementPlanIndex);
+                placementPlanIndex = supportOrder.Complete ? placementPlan.Count : supportOrder.Current;
+            }
+            else ++placementPlanIndex;
             Debug.LogWarning("BuildWorks series skipped player-blocked placement " + skipped +
                 "/" + placementPlan.Count + ".");
             if (placementPlanIndex >= placementPlan.Count)
@@ -3235,6 +3328,12 @@ namespace OstrixMods.BuildWorks
             TransformSnapshot next = placementPlan[placementPlanIndex];
             currentPosition = next.Position;
             currentRotation = next.Rotation;
+            if (supportOrder != null)
+            {
+                if (!BeginSupportSelection(player))
+                    PauseAutomaticPlacement(player, BuildWorksLocalization.Text("placement.pause.validation"));
+                return true;
+            }
             requestAutomaticPlacement = true;
             ShowStatus(player, BuildWorksLocalization.Text("placement.cell_skipped", skipped));
             return true;
@@ -3243,7 +3342,11 @@ namespace OstrixMods.BuildWorks
         public void OnNativePlacementException(Player player, Piece piece)
         {
             if (sessionMode == SessionMode.ProjectPart)
-            { projectPart?.Refuse("Native construction failed; project evidence retained."); projectPart = null; Finish(); return; }
+            {
+                if (nativeConstructionPayment != null && ReferenceEquals(nativeConstructionPart, projectPart))
+                { nativeConstructionFailed = true; return; }
+                projectPart?.Refuse("Native construction failed; project evidence retained."); projectPart = null; Finish(); return;
+            }
             if (player == Player.m_localPlayer)
             {
                 pendingNativePiece = null;
@@ -3284,6 +3387,7 @@ namespace OstrixMods.BuildWorks
             blueprintResourceHud.Dispose();
             precisionEnabled = false;
             Cancel();
+            surfaceContacts.Dispose();
             HammerCatalogView.Unconfigure(blueprintStore);
             blueprintPieceRegistry.Dispose();
             blueprintVolumeView.Dispose();
@@ -3298,6 +3402,7 @@ namespace OstrixMods.BuildWorks
             blueprintResourceHud.Dispose();
             precisionEnabled = false;
             Cancel(restoreCursor: false);
+            surfaceContacts.Dispose();
             HammerCatalogView.Unconfigure(blueprintStore);
             blueprintPieceRegistry.Dispose();
             blueprintVolumeView.Dispose();
@@ -3326,7 +3431,7 @@ namespace OstrixMods.BuildWorks
                     ShowStatus(player, BuildWorksLocalization.Text("placement.snap_visible_first"));
                 return false;
             }
-            if (!SupportsPrecisionPlacement(piece))
+            if (!SupportsWorldPrecisionPlacement(piece))
             {
                 if (showErrors)
                     ShowStatus(player, BuildWorksLocalization.Text("placement.special_unsupported"));
@@ -5193,6 +5298,19 @@ namespace OstrixMods.BuildWorks
                 if (anchors.Count >= MaximumBlueprintSourceNativeSnapPoints) break;
                 anchors.Add(new CompositeBlueprintStore.VectorData(ToUnity(point)));
             }
+            Geometry.BlueprintSourceDocument capturedOrigin;
+            try
+            {
+                capturedOrigin = Geometry.BlueprintSourceDocument.CaptureWorld(
+                    ZNet.instance ? ZNet.instance.GetWorld()?.m_uid ?? 0 : 0,
+                    ToGeometry(origin), ToGeometry(rotation), typeof(Piece).Assembly.ManifestModule.ModuleVersionId.ToString("N"),
+                    BuildWorksPlugin.PluginVersion);
+            }
+            catch (ArgumentException)
+            {
+                error = BuildWorksLocalization.Text("blueprint.capture_origin_failed");
+                return false;
+            }
             return blueprintStore.TrySaveDocument(
                 BuildWorksLocalization.Text(
                     "blueprint.default_name", blueprintStore.All().Count + 1),
@@ -5200,10 +5318,11 @@ namespace OstrixMods.BuildWorks
                 parts,
                 Array.Empty<CompositeBlueprintStore.Group>(),
                 anchors,
-                null, null,
+                null, null, null, null,
                 out saved,
                 out error, customPoints.Points.Select(point =>
-                    new CompositeBlueprintStore.VectorData(ToUnity(point))).ToList());
+                    new CompositeBlueprintStore.VectorData(ToUnity(point))).ToList(),
+                sourceDocuments: new[] { CompositeBlueprintStore.SourceDocument.FromGeometry(capturedOrigin) });
         }
 
         internal static Vector3 RelativeBlueprintScale(Vector3 worldScale, Vector3 sourceScale) =>
@@ -5539,7 +5658,7 @@ namespace OstrixMods.BuildWorks
             if (!player || blueprint?.parts == null) return false;
             if (!string.IsNullOrEmpty(blueprint.importError))
             { missingPrefab = BuildWorksLocalization.ResolveUserText(blueprint.importError); return false; }
-            if (!forEditor && blueprint.sourceDocuments?.Any(source => source.ToGeometry().HasOpaqueSections) == true)
+            if (!forEditor && CompositeBlueprintStore.UnresolvedSources(blueprint).Any())
             { missingPrefab = BuildWorksLocalization.Text("import.foreign_pending"); return false; }
             if (forEditor && CompositeBlueprintStore.InteractiveError(blueprint.parts.Count) is string budgetError)
             { missingPrefab = BuildWorksLocalization.ResolveUserText(budgetError); return false; }
@@ -5747,6 +5866,8 @@ namespace OstrixMods.BuildWorks
             if (!ghost) return false;
             selectedPiece = piece;
             placementGhost = ghost;
+            // Native NoRayHits hides the ghost; the next part can reuse the same prefab.
+            ghost.SetActive(true);
             if (isolatedEditorView) ApplyEditorGhostLayer(ghost);
             return true;
         }
@@ -5833,6 +5954,9 @@ namespace OstrixMods.BuildWorks
 
         private void ClearLayout()
         {
+            selectingPlacementSupport = false;
+            supportOrder = null;
+            supportProjectResult = null;
             pendingNativePiece = null;
             pendingNativePlanIndex = -1;
             placementPlan.Clear();
@@ -6238,7 +6362,7 @@ namespace OstrixMods.BuildWorks
             if (state == PlacementState.Armed)
             {
                 hud.ShowArmed(
-                    placementPlanIndex,
+                    PlacementResolvedCount,
                     placementPlan.Count,
                     automaticWaitingForStamina,
                     automaticWaitingForTool,
@@ -6400,9 +6524,7 @@ namespace OstrixMods.BuildWorks
             }
             if (state == PlacementState.Armed && automaticPlacementPaused)
             {
-                automaticPlacementPaused = false;
-                automaticPauseReason = null;
-                RestoreCursor();
+                ResumeAutomaticPlacement(Player.m_localPlayer);
                 UpdateHud();
                 return;
             }
@@ -6502,6 +6624,8 @@ namespace OstrixMods.BuildWorks
                     materialSeed = workspacePart.SourceData?.materialSeed,
                     sourceDocumentId = workspacePart.SourceData?.sourceDocumentId,
                     sourceLine = workspacePart.SourceData?.sourceLine ?? 0,
+                    sourceRecord = workspacePart.SourceData?.sourceRecord ?? 0,
+                    sourceFrameApplied = workspacePart.SourceData?.sourceFrameApplied ?? false,
                     originalPrefabName = workspacePart.SourceData?.originalPrefabName,
                     foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(workspacePart.SourceData?.foreignData?.ToGeometry())
                 });
@@ -6602,6 +6726,8 @@ namespace OstrixMods.BuildWorks
             }
             editorRootBeforePlacement = new TransformSnapshot(currentPosition, currentRotation);
             if (TryCreateConstructionProject(player)) return false;
+            supportOrder = sessionMode == SessionMode.BlueprintWorldPlacement
+                ? new PendingPlacementOrder(placementPlan.Count) : null;
             placementPlanIndex = 0;
             automaticSkippedPlacements = 0;
             if (sessionMode == SessionMode.BlueprintWorldPlacement)
@@ -6616,6 +6742,11 @@ namespace OstrixMods.BuildWorks
             currentRotation = placementPlan[0].Rotation;
 
             EndFreeView(restoreCamera: true);
+            if (!RestoreExternalBuildCamera())
+            {
+                Finish();
+                return false;
+            }
             RestoreCursor();
             dragAxis = GizmoAxis.None;
             dragHandle = GizmoHandleKind.None;
@@ -6623,6 +6754,7 @@ namespace OstrixMods.BuildWorks
             ClearSnapDrag();
             gizmo.Hide();
 
+            if (supportOrder != null) return BeginSupportSelection(player);
             if (ValidateCurrentPlacement(player))
             {
                 state = PlacementState.Armed;
@@ -6638,6 +6770,14 @@ namespace OstrixMods.BuildWorks
                 return false;
             }
 
+            Debug.LogWarning("BuildWorks placement confirmation rejected: observedStatus=" +
+                player.GetPlacementStatus() + "; blueprint=" + (activeBlueprint?.id ?? "<single-piece>") +
+                "; contactFailure=" + (LastPlacementContactFailure?.ToString() ?? "<unobserved>") +
+                "; planIndex=" + placementPlanIndex + "; planCount=" + placementPlan.Count +
+                "; prefab=" + (selectedPiece ? selectedPiece.name : "<missing>") +
+                "; position=" + currentPosition.ToString("G9") +
+                "; rotation=" + currentRotation.ToString("G9") +
+                "; ghostActive=" + (placementGhost && placementGhost.activeInHierarchy));
             ReopenEditor(player, BuildWorksLocalization.Text("placement.position_rejected"),
                 preserveLayout: true);
             return false;
@@ -6645,6 +6785,7 @@ namespace OstrixMods.BuildWorks
 
         private bool ValidateCurrentPlacement(Player player)
         {
+            LastPlacementContactFailure = null;
             try
             {
                 allowNativeGhostUpdate = true;
@@ -6695,6 +6836,12 @@ namespace OstrixMods.BuildWorks
             {
                 placementGhost.SetActive(true);
                 ApplyEditingGhostTransform();
+            }
+            if (!TrySuspendExternalBuildCamera())
+            {
+                ShowStatus(player, BuildWorksLocalization.Text("placement.build_camera_disable_failed"));
+                Finish();
+                return;
             }
             SaveAndUnlockCursor();
             Camera camera = Camera.main;
@@ -6814,6 +6961,7 @@ namespace OstrixMods.BuildWorks
 
         private void Cancel(bool restoreCursor = true)
         {
+            surfaceContacts.Clear();
             if (sessionMode == SessionMode.ProjectPart)
             { projectPart?.StopBeforeNative("Construction stopped; project retained."); projectPart = null; Finish(restoreCursor); return; }
             if (sessionMode == SessionMode.BlueprintEditor &&
@@ -7042,6 +7190,7 @@ namespace OstrixMods.BuildWorks
 
         private void Finish(bool restoreCursor = true, bool preserveContinuation = false)
         {
+            nativePlacementRayDistance = null;
             HammerCatalogView.CancelPlacementContents(); ClearContentsRecipe();
             bool restoreWorldSelectionGhost =
                 sessionMode == SessionMode.BlueprintWorldSelection;
@@ -7207,7 +7356,7 @@ namespace OstrixMods.BuildWorks
             if (sessionMode == SessionMode.BlueprintEditor ||
                 sessionMode == SessionMode.BlueprintWorldSelection)
                 return player && player == Player.m_localPlayer;
-            return PlacementSelectionStillValid(player) && placementGhost.activeInHierarchy;
+            return PlacementSelectionStillValid(player) && (selectingPlacementSupport || placementGhost.activeInHierarchy);
         }
 
         private bool PlacementSelectionStillValid(Player player)
@@ -7577,11 +7726,11 @@ namespace OstrixMods.BuildWorks
             return false;
         }
 
-        private void RestoreExternalBuildCamera()
+        private bool RestoreExternalBuildCamera()
         {
             if (!externalBuildCameraSuspended)
             {
-                return;
+                return true;
             }
 
             externalBuildCameraSuspended = false;
@@ -7591,12 +7740,17 @@ namespace OstrixMods.BuildWorks
                 externalBuildCameraView = null;
                 externalBuildCameraYaw = null;
                 externalBuildCameraPitch = null;
-                return;
+                return false;
             }
 
             try
             {
+                if (externalBuildCameraCanUseMethod != null &&
+                    (!(externalBuildCameraCanUseMethod.Invoke(null, null) is bool permitted) || !permitted))
+                    throw new InvalidOperationException("Build Camera no longer permits entering its mode.");
                 externalBuildCameraEnableMethod.Invoke(null, null);
+                if (!(externalBuildCameraInModeMethod?.Invoke(null, null) is bool active) || !active)
+                    throw new InvalidOperationException("Build Camera did not accept restoring its mode.");
                 if (externalBuildCameraView != null && externalBuildCameraViewField != null)
                 {
                     externalBuildCameraViewField.SetValue(null, externalBuildCameraView);
@@ -7609,6 +7763,7 @@ namespace OstrixMods.BuildWorks
                 {
                     externalBuildCameraPitchField.SetValue(null, externalBuildCameraPitch);
                 }
+                return true;
             }
             catch (Exception exception)
             {
@@ -7616,6 +7771,7 @@ namespace OstrixMods.BuildWorks
                     (exception.InnerException ?? exception));
                 ShowStatus(player, BuildWorksLocalization.Text(
                     "placement.restore_build_camera_manually"));
+                return false;
             }
             finally
             {
@@ -7646,6 +7802,8 @@ namespace OstrixMods.BuildWorks
                     BindingFlags.NonPublic;
                 externalBuildCameraInModeMethod = utils.GetMethod(
                     "InBuildMode", methods, null, Type.EmptyTypes, null);
+                externalBuildCameraCanUseMethod = utils.GetMethod(
+                    "CanUseCamera", methods, null, Type.EmptyTypes, null);
                 externalBuildCameraDisableMethod = utils.GetMethod(
                     "DisableBuildMode", methods, null, Type.EmptyTypes, null);
                 externalBuildCameraEnableMethod = utils.GetMethod(
@@ -7673,6 +7831,20 @@ namespace OstrixMods.BuildWorks
 
         private static bool SupportsPrecisionPlacement(Piece piece)
         {
+            return SupportsPrecisionPlacementBase(piece) && !piece.m_noInWater && !piece.m_notOnTiltingSurface;
+        }
+
+        private static bool SupportsWorldPrecisionPlacement(Piece piece)
+        {
+            if (!SupportsBlueprintWorkspacePiece(piece)) return false;
+            // Ground flags also belong to real objects such as a bonfire, not only tool actions.
+            return piece.GetComponent<WearNTear>() || piece.GetComponent<Fireplace>() ||
+                piece.GetComponentsInChildren<TerrainModifier>(true).Length == 0 &&
+                piece.GetComponentsInChildren<TerrainOp>(true).Length == 0;
+        }
+
+        private static bool SupportsPrecisionPlacementBase(Piece piece)
+        {
             return piece &&
                 !piece.m_repairPiece &&
                 !piece.m_removePiece &&
@@ -7681,9 +7853,7 @@ namespace OstrixMods.BuildWorks
                 !piece.m_cultivatedGroundOnly &&
                 !piece.m_vegetationGroundOnly &&
                 !piece.m_waterPiece &&
-                !piece.m_noInWater &&
                 !piece.m_notOnWood &&
-                !piece.m_notOnTiltingSurface &&
                 !piece.m_inCeilingOnly &&
                 !piece.m_notOnFloor &&
                 !piece.m_mustConnectTo &&
@@ -7873,4 +8043,3 @@ namespace OstrixMods.BuildWorks
 
     }
 }
-

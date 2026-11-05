@@ -20,6 +20,7 @@ namespace OstrixMods.BuildWorks
             internal ZDO Data;
             internal ZDOID Id;
             internal bool WearConfirmed, NetworkConfirmed;
+            internal Func<bool> Current;
         }
         private static Witness active;
         private static readonly FieldInfo NativeDestroyQueue = typeof(ZDOMan).GetField("m_destroySendList", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -55,7 +56,7 @@ namespace OstrixMods.BuildWorks
                 throw new InvalidOperationException("Removal needs an idle private Local context and exact inventory; uncertain removal intent cannot be replayed.");
             var plan = plans.Load(project); var parts = new Parts(plans);
             targets = plan.Parts.Select(part => (Part: part, Receipt: parts.Read(project, part.Id)))
-                .Where(row => row.Receipt?.Phase == Parts.Committed).Select(row => Resolve(plan, row.Part, row.Receipt)).ToArray();
+                .Where(row => row.Receipt?.Phase == Parts.Committed).Select(row => Resolve(plans, plan, row.Part, row.Receipt)).ToArray();
             if (targets.Length == 0 || NativeDestroyQueue?.GetValue(ZDOMan.instance) is not List<ZDOID>)
                 throw new InvalidOperationException("No supported committed targets or native removal queue is unavailable.");
             BlueprintConstructionPayoutIssuance.RequireRefundable(plans, project, player.GetPlayerID(), beforeInventory);
@@ -67,7 +68,8 @@ namespace OstrixMods.BuildWorks
             {
                 foreach (var target in targets)
                 {
-                    if (!Custody() || !target.Wear || !target.Data.IsValid()) throw new InvalidOperationException("Removal target/context changed.");
+                    if (!Custody() || !target.Wear || !target.Data.IsValid() || target.Current?.Invoke() != true)
+                        throw new InvalidOperationException("Removal target, empty state or callbacks changed.");
                     active = target;
                     try { target.Wear.Remove(true); }
                     finally { active = null; }
@@ -78,7 +80,7 @@ namespace OstrixMods.BuildWorks
             }
             catch (Exception error) { Refuse(error.Message); }
         }
-        private Witness Resolve(Plans.Record plan, Plans.Part part, Parts.Record receipt)
+        private Witness Resolve(Plans plans, Plans.Record plan, Plans.Part part, Parts.Record receipt)
         {
             var source = plan.Blueprint.parts[part.SourceIndex];
             var prefab = ZNetScene.instance.GetPrefab(source.prefabName); var piece = prefab ? prefab.GetComponent<Piece>() : null;
@@ -86,18 +88,28 @@ namespace OstrixMods.BuildWorks
             var view = instance ? instance.GetComponent<ZNetView>() : null;
             var data = view ? view.GetZDO() : null; var wear = instance ? instance.GetComponent<WearNTear>() : null;
             float[] pose = part.WorldPose.Values;
-            if (receipt.Player != player.GetPlayerID() || !piece || !PrecisionPlacementSession.SupportsProjectPart(piece) ||
-                !instance || !view || !view.IsValid() || !view.IsOwner() || data == null || !data.IsValid() || data.m_uid.IsNone() ||
-                data.GetPrefab() != receipt.PrefabHash || !instance.GetComponent<Piece>() || instance.GetComponent<Piece>().GetCreator() != receipt.Creator ||
-                data.GetString(BlueprintConstructionPartExecution.MarkerKey, "") != receipt.Operation.ToString("N") ||
-                data.GetByteArray(BlueprintConstructionPartExecution.ReceiptKey)?.SequenceEqual(receipt.Receipt) != true ||
-                !wear || wear.m_onDestroyed != null || instance.GetComponentsInChildren<MonoBehaviour>(true).Any(component => component is IRemoved) ||
-                source.foreignData != null ||
-                Vector3.Distance(instance.transform.position, new Vector3(pose[0], pose[1], pose[2])) > .001f ||
-                Quaternion.Angle(instance.transform.rotation, new Quaternion(pose[3], pose[4], pose[5], pose[6])) > .01f ||
-                Vector3.Distance(instance.transform.localScale, Vector3.Scale(prefab.transform.localScale, new Vector3(pose[7], pose[8], pose[9]))) > .001f)
-                throw new InvalidOperationException("Removal requires one loaded, owned structural object with exact receipt, creator and pose; removal callbacks are unsupported.");
-            return new Witness { Wear = wear, Data = data, Id = data.m_uid };
+            bool storage = piece && piece.GetComponent<Container>();
+            if (storage) BlueprintConstructionPartExecution.StorageDemand(source);
+            bool Current()
+            {
+                if (receipt.Player != player.GetPlayerID() || !piece ||
+                    !(storage ? PrecisionPlacementSession.SupportsStorageProjectPart(piece) : PrecisionPlacementSession.SupportsProjectPart(piece)) ||
+                    !instance || !view || !view.IsValid() || !view.IsOwner() || data == null || !data.IsValid() || data.m_uid.IsNone() ||
+                    !ReferenceEquals(instance.GetComponent<ZNetView>(), view) || !ReferenceEquals(view.GetZDO(), data) ||
+                    !ReferenceEquals(instance.GetComponent<WearNTear>(), wear) ||
+                    data.GetPrefab() != receipt.PrefabHash || !instance.GetComponent<Piece>() || instance.GetComponent<Piece>().GetCreator() != receipt.Creator ||
+                    data.GetString(BlueprintConstructionPartExecution.MarkerKey, "") != receipt.Operation.ToString("N") ||
+                    data.GetByteArray(BlueprintConstructionPartExecution.ReceiptKey)?.SequenceEqual(receipt.Receipt) != true ||
+                    !wear || instance.GetComponentsInChildren<MonoBehaviour>(true).Any(component => component is IRemoved) ||
+                    Vector3.Distance(instance.transform.position, new Vector3(pose[0], pose[1], pose[2])) > .001f ||
+                    Quaternion.Angle(instance.transform.rotation, new Quaternion(pose[3], pose[4], pose[5], pose[6])) > .01f ||
+                    Vector3.Distance(instance.transform.localScale, Vector3.Scale(prefab.transform.localScale, new Vector3(pose[7], pose[8], pose[9]))) > .001f) return false;
+                return storage ? BlueprintConstructionContainerGuard.NativeRoot(instance, wear) &&
+                    BlueprintStorageTransfer.ProjectEmpty(plans, plan.Id, part.Id, player, instance) :
+                    source.foreignData == null && wear.m_onDestroyed == null && BlueprintConstructionContainerGuard.ViewsMatch(null, wear, view);
+            }
+            if (!Current()) throw new InvalidOperationException("Removal requires an exact owned receipt/pose and supported callbacks; storage must be verified empty and unmarked.");
+            return new Witness { Wear = wear, Data = data, Id = data.m_uid, Current = Current };
         }
         private bool Context() => Thread.CurrentThread.ManagedThreadId == thread && network && ReferenceEquals(network, ZNet.instance) &&
             BlueprintConstructionProjectRuntime.IsPrivateLocalPlacement && ReferenceEquals(network.GetWorld(), world) && world != null &&

@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
 using System.IO;
+using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.Serialization;
 using UnityEngine;
@@ -43,7 +45,7 @@ internal static class Program
             pieceType = sessionType.GetField("selectedPiece", Instance).FieldType;
             TestNativeBuildAvailability(asm);
             TestNativeMaterialVariation(asm);
-            TestNativeMaterialState(asm);
+            TestNativeMaterialState(asm, root);
             TestMaterialPreviewFailure(asm);
             TestMaterialSeedPlan();
             TestGridComposition();
@@ -63,6 +65,8 @@ internal static class Program
             TestUnavailablePieceIsAtomic();
             TestPrimaryPartSelection();
             TestSinglePartBlueprint();
+            TestProducerTransformBasis(asm, root);
+            TestNamedCenterEditorAndLayout(asm);
             Console.WriteLine("All actual Session root-composition checks passed; no game placement executed.");
             return 0;
         }
@@ -214,7 +218,7 @@ internal static class Program
         finally { UnityEngine.Object.DestroyImmediate(source); UnityEngine.Object.DestroyImmediate(copy); }
     }
 
-    private static void TestNativeMaterialState(Assembly plugin)
+    private static void TestNativeMaterialState(Assembly plugin, string repositoryRoot)
     {
         const BindingFlags Static = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
         Assembly host = pieceType.Assembly;
@@ -227,11 +231,13 @@ internal static class Program
         object oldMaterialMan = materialInstance.GetValue(null);
         FieldInfo netInstance = netType.GetField("m_instance", Static);
         FieldInfo server = netType.GetField("m_isServer", Static);
+        FieldInfo worldField = netType.GetField("m_world", Static);
+        object oldWorld = worldField.GetValue(null);
         FieldInfo managerInstance = managerType.GetField("s_instance", Static);
         FieldInfo init = viewType.GetField("m_initZDO", Static), useInit = viewType.GetField("m_useInitZDO", Static);
         object oldNet = netInstance.GetValue(null), oldServer = server.GetValue(null);
         object oldManager = managerInstance.GetValue(null), oldInit = init.GetValue(null), oldUse = useInit.GetValue(null);
-        Require(oldNet == null && oldManager == null && oldInit == null && oldMaterialMan == null, "Material state fixture requires an isolated host");
+        Require(oldNet == null && oldWorld == null && oldManager == null && oldInit == null && oldMaterialMan == null, "Material state fixture requires an isolated host");
         var roots = new System.Collections.Generic.List<GameObject>();
         GameObject materialRoot = null;
         var data = new System.Collections.Generic.List<object>();
@@ -354,6 +360,140 @@ internal static class Program
                 (bool)canRestore.Invoke(null, new object[] { source, 0 }) &&
                 (bool)canRestore.Invoke(null, new object[] { source, int.MaxValue }) &&
                 !(bool)canRestore.Invoke(null, new object[] { source, -1 }), "Material readiness lost supported/null/unsupported distinctions");
+            Type playerType = host.GetType("Player", true), tableType = host.GetType("PieceTable", true);
+            Type signType = host.GetType("Sign", true), storeType = blueprintType.DeclaringType;
+            FieldInfo localPlayer = playerType.GetField("m_localPlayer", Static);
+            object previousPlayer = localPlayer.GetValue(null);
+            Require(previousPlayer == null, "Linked capture requires an empty workbench player context");
+            // Previous negative cases deliberately leave an init-ZDO; this fixture owns fresh source data.
+            init.SetValue(null, null); useInit.SetValue(null, false);
+            try
+            {
+                var playerRoot = new GameObject("Inert capture player"); playerRoot.SetActive(false); roots.Add(playerRoot);
+                object player = playerRoot.AddComponent(playerType);
+                localPlayer.SetValue(null, player);
+                var tableRoot = new GameObject("Inert capture table"); tableRoot.SetActive(false); roots.Add(tableRoot);
+                object table = tableRoot.AddComponent(tableType);
+                var prefab = Root("bw_linked_capture", Data());
+                prefab.transform.localScale = new Vector3(1, 2, .5f);
+                Set(prefab.GetComponent(viewType), "m_syncInitialScale", true);
+                prefab.AddComponent(signType);
+                Set(table, "m_pieces", new System.Collections.Generic.List<GameObject> { prefab });
+                Get(table, "m_availablePieces").GetType().GetMethod("Add").Invoke(Get(table, "m_availablePieces"),
+                    new[] { prefab.GetComponent(pieceType) });
+                ((FieldInfo)sessionType.GetField("BuildPiecesField", Static).GetValue(null)).SetValue(player, table);
+
+                object firstData = Data(), secondData = Data();
+                var first = Root("bw_linked_capture(Clone)", firstData);
+                var second = Root("bw_linked_capture(Clone)", secondData);
+                object firstSign = first.AddComponent(signType), secondSign = second.AddComponent(signType);
+                int textKey = (int)host.GetType("ZDOVars", true).GetField("s_text", Static).GetValue(null);
+                MethodInfo setText = dataType.GetMethod("Set", new[] { typeof(int), typeof(string) });
+                const string signText = "Дом Ostrix\nВход → здесь";
+                Type snapType = plugin.GetType("OstrixMods.BuildWorks.BlueprintWorldSnapPoints", true);
+                int snapKey = (int)snapType.GetField("Key", Static).GetValue(null);
+                var nativeSnap = new GameObject("native snap");
+                nativeSnap.transform.SetParent(first.transform, false); nativeSnap.tag = "snappoint";
+                nativeSnap.transform.localPosition = new Vector3(-.5f, .25f, 2);
+                first.transform.SetPositionAndRotation(new Vector3(10, 4, 20), Quaternion.Euler(0, 90, 0));
+                first.transform.localScale = new Vector3(2, 1, .5f);
+                second.transform.SetPositionAndRotation(new Vector3(11, 6, 17), Quaternion.identity);
+                second.transform.localScale = new Vector3(1.5f, .75f, .625f);
+                first.SetActive(true); second.SetActive(true);
+                Require(ReferenceEquals(Get(first.GetComponent(viewType), "m_zdo"), firstData) &&
+                    ReferenceEquals(Get(second.GetComponent(viewType), "m_zdo"), secondData), "Capture fixture source ZDO changed during activation");
+                Require((bool)state.GetMethod("Supports", Static).Invoke(null, new object[] { first }) &&
+                    (bool)state.GetMethod("Supports", Static).Invoke(null, new object[] { second }), "Capture fixture material components are unsupported");
+                Set(firstSign, "m_isViewable", true); Set(secondSign, "m_isViewable", true);
+                setText.Invoke(firstData, new object[] { textKey, signText });
+                setText.Invoke(secondData, new object[] { textKey, "Second sign" });
+                MethodInfo setSeed = dataType.GetMethod("Set", new[] { typeof(int), typeof(int), typeof(bool) });
+                setSeed.Invoke(firstData, new object[] { key, 1234, false });
+                setSeed.Invoke(secondData, new object[] { key, 5678, false });
+                dataType.GetMethod("Set", new[] { typeof(int), typeof(byte[]) }).Invoke(firstData,
+                    new object[] { snapKey, BlueprintSnapPointCodec.Encode(new[] { new Point3(1, .5, -1), new Point3(.25, -1, .5) }) });
+                Require(Read(firstData) == 1234 && Read(secondData) == 5678, "Capture fixture integer seeds were not stored exactly");
+
+                object linked = Session(0);
+                IList selection = (IList)Activator.CreateInstance(sessionType.GetField("blueprintSelection", Instance).FieldType);
+                selection.Add(first.GetComponent(pieceType)); selection.Add(second.GetComponent(pieceType));
+                Set(linked, "blueprintSelection", selection);
+                string directory = Path.Combine(repositoryRoot, "artifacts", "point-2.1-linked-capture", Guid.NewGuid().ToString("N"));
+                Directory.CreateDirectory(directory);
+                string path = Path.Combine(directory, "library.json");
+                object store = Activator.CreateInstance(storeType, Instance, null, new object[] { path }, null);
+                Set(linked, "blueprintStore", store);
+                object captureWorld = FormatterServices.GetUninitializedObject(worldField.FieldType);
+                Set(captureWorld, "m_uid", 77L); worldField.SetValue(null, captureWorld);
+                MethodInfo saveWorld = sessionType.GetMethod("TrySaveWorldSelection", Instance);
+                object[] captureArgs = { null, null };
+                Require((bool)saveWorld.Invoke(linked, captureArgs), "Whole capture failed: " + captureArgs[1]);
+                object captured = captureArgs[0];
+                Type registryType = plugin.GetType("OstrixMods.BuildWorks.HammerBlueprintPieceRegistry", true);
+                object descriptionRegistry = FormatterServices.GetUninitializedObject(registryType);
+                string description = (string)registryType.GetMethod("Description", Instance).Invoke(descriptionRegistry, new[] { captured });
+                Require(!(bool)sessionType.GetMethod("RequiresContentsChoice", Static).Invoke(null, new[] { captured }) &&
+                    description.Contains("Terrain") && description.Contains("ownership"),
+                    "Native hammer description does not warn before construction");
+                IList originSources = (IList)Get(captured, "sourceDocuments");
+                Require(originSources != null && originSources.Count == 1 &&
+                    (string)Get(originSources[0], "format") == BlueprintSourceDocument.WorldCaptureFormat,
+                    "World capture did not retain its source origin");
+                string originText = (string)Get(originSources[0], "text");
+                string[] recordedRotation = originText.Split('\n')[3].Split('\t');
+                Require(Math.Abs(double.Parse(recordedRotation[2], System.Globalization.CultureInfo.InvariantCulture) - Math.Sqrt(.5)) < 1e-6 &&
+                    Math.Abs(double.Parse(recordedRotation[4], System.Globalization.CultureInfo.InvariantCulture) - Math.Sqrt(.5)) < 1e-6,
+                    "World capture origin lost its original quaternion");
+                Require(originText.Contains("world\t77\n") && originText.Contains("position\t10\t4\t20\n") &&
+                    originText.Contains("host\t" + pieceType.Assembly.ManifestModule.ModuleVersionId.ToString("N")) &&
+                    originText.Contains("buildworks\t" + plugin.GetName().Version.ToString(3)),
+                    "Inert world capture lost its known native world/frame/host/version");
+                object saved = captureArgs[0];
+                IList savedParts = (IList)Get(saved, "parts");
+                Require(savedParts.Count == 2 && (string)Get(savedParts[0], "signText") == signText &&
+                    (string)Get(savedParts[1], "signText") == "Second sign" &&
+                    (int)Get(savedParts[0], "materialSeed") == 1234 && (int)Get(savedParts[1], "materialSeed") == 5678,
+                    "Whole capture lost sign/material fields");
+                CheckVector(Get(savedParts[0], "position"), new Point3(0, 0, 0));
+                CheckVector(Get(savedParts[1], "position"), new Point3(3, 2, 1));
+                CheckRotation(Get(savedParts[0], "rotation"), 0, 0, 0, 1);
+                CheckRotation(Get(savedParts[1], "rotation"), 0, -(float)Math.Sqrt(.5), 0, (float)Math.Sqrt(.5));
+                CheckVector(Get(savedParts[0], "baseScale"), new Point3(2, 1, .5));
+                CheckVector(Get(savedParts[1], "baseScale"), new Point3(1.5, .75, .625));
+                foreach (object part in savedParts) CheckVector(Get(part, "scale"), new Point3(1, 1, 1));
+                Guid parsedId;
+                Require(savedParts.Cast<object>().All(p => Guid.TryParseExact((string)Get(p, "stableId"), "N", out parsedId)) &&
+                    (string)Get(savedParts[0], "stableId") != (string)Get(savedParts[1], "stableId"), "Capture identities are not fresh/unique");
+                IList custom = (IList)Get(saved, "customSnapPoints"), anchors = (IList)Get(saved, "anchors");
+                Require(custom.Count == 2 && anchors.Count == 1, "Whole capture lost custom/native point channels");
+                CheckVector(custom[0], new Point3(2, .5, -.5)); CheckVector(custom[1], new Point3(.5, -1, .25));
+                CheckVector(anchors[0], new Point3(-1, .25, 1));
+
+                Type exchange = plugin.GetType("OstrixMods.BuildWorks.BlueprintExchangeFormat", true);
+                MethodInfo encode = exchange.GetMethod("Encode", Static);
+                byte[] portable = (byte[])encode.Invoke(null, new[] { saved });
+                object reopenedStore = Activator.CreateInstance(storeType, Instance, null, new object[] { path }, null);
+                IList reopened = (IList)storeType.GetMethod("All", Instance).Invoke(reopenedStore, null);
+                Require(reopened.Count == 1 && portable.SequenceEqual((byte[])encode.Invoke(null, new[] { reopened[0] })),
+                    "Whole capture changed during actual Store reopen");
+                string text = System.Text.Encoding.UTF8.GetString(portable);
+                Require(text.Contains("\"requiredPrefabIds\":[\"bw_linked_capture\"]"), "Captured dependencies are incorrect");
+                object decoded = exchange.GetMethod("Decode", Static).Invoke(null, new object[] { text });
+                object imported = plugin.GetType("OstrixMods.BuildWorks.ExternalBlueprintLibrary", true).GetMethod("Parse", Static)
+                    .Invoke(null, new object[] { text, "linked.buildworks.json" });
+                Require(Get(imported, "importError") == null, "Whole capture reimport was refused");
+                Set(imported, "id", Get(saved, "id"));
+                Require(portable.SequenceEqual((byte[])encode.Invoke(null, new[] { decoded })) &&
+                    portable.SequenceEqual((byte[])encode.Invoke(null, new[] { imported })), "Whole capture portable fields changed");
+                byte[] original = File.ReadAllBytes(path);
+                Set(secondSign, "m_isViewable", false);
+                object[] rejected = { null, null };
+                Require(!(bool)saveWorld.Invoke(linked, rejected) && rejected[0] == null &&
+                    original.SequenceEqual(File.ReadAllBytes(path)) &&
+                    ((IList)storeType.GetMethod("All", Instance).Invoke(store, null)).Count == 1, "Failed capture partially saved a card");
+                Console.WriteLine("PASS actual Session whole capture: positive sign/material/custom+native snaps/nonunit base scale, exact TRS/new IDs/dependencies, Store/portable/reimport, atomic capture refusal; inert native components in Unity, no game/world proof. Fixture: " + path);
+            }
+            finally { localPlayer.SetValue(null, previousPlayer); }
             Console.WriteLine("PASS actual host material state: native Set/Get and in-memory packet round-trip, zero/Max, capture, null no-op, owner/identity/init-ZDO guards; inert data only, no placement/save/network run");
             Console.WriteLine("PASS actual host CheckMaterial/MaterialMan: applied zero/Max seed reaches renderer block without replacement; explicit inactive bindings, no Start/frame scheduling/game lifecycle proof");
         }
@@ -369,7 +509,7 @@ internal static class Program
             foreach (object value in data) dataType.GetMethod("Reset").Invoke(value, null);
             if (materialRoot) UnityEngine.Object.DestroyImmediate(materialRoot);
             materialInstance.SetValue(null, oldMaterialMan);
-            netInstance.SetValue(null, oldNet); server.SetValue(null, oldServer); managerInstance.SetValue(null, oldManager);
+            netInstance.SetValue(null, oldNet); server.SetValue(null, oldServer); worldField.SetValue(null, oldWorld); managerInstance.SetValue(null, oldManager);
         }
     }
 
@@ -826,12 +966,186 @@ internal static class Program
         Console.WriteLine("PASS actual Session: missing Piece and disabled native scale persistence reject whole group atomically");
     }
 
+    private static void TestProducerTransformBasis(Assembly plugin, string root)
+    {
+        Type library = plugin.GetType("OstrixMods.BuildWorks.ExternalBlueprintLibrary", true);
+        MethodInfo parse = library.GetMethod("Parse", BindingFlags.Static | BindingFlags.NonPublic);
+        MethodInfo prepare = library.GetMethod("PrepareForHost", BindingFlags.Static | BindingFlags.NonPublic);
+        Type resolverType = prepare.GetParameters()[1].ParameterType;
+        Type nullableVector = resolverType.GetGenericArguments()[1];
+        var prefabName = Expression.Parameter(typeof(string), "prefab");
+        var missing = Expression.Lambda(resolverType, Expression.Constant(null, nullableVector), prefabName).Compile();
+        object pinnedBasis = StoredVector(2, .5f, 3);
+        var resolved = Expression.Lambda(resolverType,
+            Expression.Convert(Expression.Constant(pinnedBasis, pinnedBasis.GetType()), nullableVector), prefabName).Compile();
+        var captures = new[] {
+            new[] { "BW_QA_Buildheim13_20261026_145147.blueprint", "EE4B8FBB57F223A02C569846E9F72CB4B32FEA6472227F7851D8FBE75C40F301" },
+            new[] { "H03.blueprint", "20D71D7AC92962A55B1A0F049F7660DA86FCC2C71451158514FD69C5588472C9" } };
+        for (int capture = 0; capture < captures.Length; ++capture)
+        {
+            string path = Path.Combine(root, "tests", "fixtures", "producer-transforms", captures[capture][0]);
+            byte[] bytes = File.ReadAllBytes(path);
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+                Require(BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-", "") == captures[capture][1],
+                    "Producer fixture no longer matches its accepted original");
+            object raw = parse.Invoke(null, new object[] { File.ReadAllText(path), captures[capture][0] });
+            Require(Get(raw, "importError") == null, "Real producer fixture failed parse");
+            object[] arguments = new object[prepare.GetParameters().Length];
+            arguments[0] = raw; arguments[1] = missing;
+            object pending = prepare.Invoke(null, arguments);
+            IList pendingParts = (IList)Get(pending, "parts");
+            object pendingBench = pendingParts.Cast<object>().Single(part => (string)Get(part, "prefabName") == "piece_workbench");
+            Require((bool)Get(pendingBench, "scaleIsAbsolute") && Get(pendingBench, "baseScale") == null,
+                "Missing producer prefab invented an intrinsic scale");
+            arguments[0] = pending; arguments[1] = resolved;
+            object prepared = prepare.Invoke(null, arguments);
+            IList parts = (IList)Get(prepared, "parts");
+            object bench = parts.Cast<object>().Single(part => (string)Get(part, "prefabName") == "piece_workbench");
+            // Select the same workbench whose native position/anchor was recorded in the QA receipts.
+            Vector3 nativePosition = new Vector3(2561.95483f, 41.17127f, 134.04866f);
+            Vector3 expectedLocal = capture == 0 ? nativePosition - new Vector3(2560, 40, 132) : Vector3.zero;
+            CheckVector(Get(bench, "position"), new Point3(expectedLocal.x, expectedLocal.y, expectedLocal.z));
+            Require(!(bool)Get(bench, "scaleIsAbsolute"), "Late producer prefab resolution remained pending");
+            CheckVector(Get(bench, "baseScale"), new Point3(1, 1, 1));
+            parts.Clear(); parts.Add(bench);
+            object session = Session(1);
+            Set(session, "activeBlueprint", prepared);
+            var source = ((Component)NativePiece(0)).transform;
+            Vector3 previousScale = source.localScale;
+            var visual = new GameObject("Inert producer matrix visual"); visual.SetActive(false);
+            var child = new GameObject("Offset rotated producer mesh"); child.transform.SetParent(visual.transform, false);
+            child.transform.localPosition = new Vector3(.25f, 1.5f, -.75f);
+            child.transform.localRotation = Quaternion.Euler(0, 0, 90);
+            child.transform.localScale = new Vector3(.5f, 2, 1);
+            try
+            {
+                foreach (Vector3 basis in new[] { new Vector3(2, .5f, 3), new Vector3(.25f, 5, .125f) })
+                foreach (int sign in new[] { 1, -1 })
+                {
+                    source.localScale = basis;
+                    ((IList)Get(session, "placementPlan")).Clear();
+                    ((IList)Get(session, "placementPlanPieces")).Clear();
+                    float q = sign * (float)Math.Sqrt(.5);
+                    Require(Add(session, new Point3(17, 29, -13), Rotation(0, q, 0, q)),
+                        "Real producer layout rejected a representable rotated root");
+                    object entry = ((IList)Get(session, "placementPlan"))[0];
+                    Vector3 position = (Vector3)Property(entry, "Position");
+                    Quaternion rotation = (Quaternion)Property(entry, "Rotation");
+                    Vector3 multiplier = (Vector3)Property(entry, "Scale");
+                    visual.transform.SetPositionAndRotation(position, rotation);
+                    visual.transform.localScale = Vector3.Scale(basis, multiplier);
+                    // Child TRS maps (1,-.5,2) to (1.25,2,1.25); the root turns (x,y,z) into (z,y,-x).
+                    Vector3 expected = new Vector3(17 + expectedLocal.z + 1.25f,
+                        29 + expectedLocal.y + 2, -13 - expectedLocal.x - 1.25f);
+                    Require(Vector3.Distance(child.transform.TransformPoint(new Vector3(1, -.5f, 2)), expected) < .0001f &&
+                        Quaternion.Angle(rotation, Quaternion.Euler(0, 90, 0)) < .001f &&
+                        Vector3.Distance(visual.transform.localScale, Vector3.one) < .00001f,
+                        "Producer basis, nested child, quaternion sign or native prefab multiplier changed physical geometry");
+                }
+            }
+            finally { source.localScale = previousScale; UnityEngine.Object.DestroyImmediate(visual); }
+            Require(File.ReadAllBytes(path).SequenceEqual(bytes), "Producer geometry checks changed the original fixture");
+        }
+        var guardPlayer = new GameObject("Inert opaque-frame guard player"); guardPlayer.SetActive(false);
+        try
+        {
+            object player = guardPlayer.AddComponent(pieceType.Assembly.GetType("Player", true));
+            object namedFrame = parse.Invoke(null, new object[] {
+                "#Center:woodwall\n#Pieces\nwoodwall;;3;4;5;0;0;0;1;\"\";1;1;1\n", "named-frame.blueprint" });
+            object interpretedFrame = parse.Invoke(null, new object[] {
+                "#Center:woodwall\n#Pieces\nwoodwall;;3;4;5;0;0;0;1;\"\";1;1;1\n", "named-frame.blueprint" });
+            foreach (object part in (IList)Get(namedFrame, "parts")) Set(part, "sourceFrameApplied", false);
+            object opaqueMetadata = parse.Invoke(null, new object[] {
+                File.ReadAllText(Path.Combine(root, "tests", "fixtures", "producer-transforms", "H03.blueprint")), "H03.blueprint" });
+            MethodInfo guard = sessionType.GetMethod("TryResolveBlueprintPieces", BindingFlags.Static | BindingFlags.NonPublic);
+            object expected = plugin.GetType("OstrixMods.BuildWorks.BuildWorksLocalization", true)
+                .GetMethod("Text", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { "import.foreign_pending", new object[0] });
+            foreach (object document in new[] { namedFrame, opaqueMetadata })
+            {
+                object[] arguments = { player, document, null, null, false, false };
+                Require(!(bool)guard.Invoke(null, arguments) && (string)arguments[3] == (string)expected &&
+                    ((IList)arguments[2]).Count == 0,
+                    "Unsupported named frame/metadata passed the actual native admission guard");
+            }
+            object[] knownArguments = { player, interpretedFrame, null, null, false, false };
+            string scaleMissing = (string)plugin.GetType("OstrixMods.BuildWorks.BuildWorksLocalization", true)
+                .GetMethod("Text", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { "import.scale_missing", new object[] { "woodwall" } });
+            Require(!(bool)guard.Invoke(null, knownArguments) && (string)knownArguments[3] == scaleMissing &&
+                ((IList)knownArguments[2]).Count == 0,
+                "Consumed named frame bypassed the independent missing-base guard or stayed opaque");
+        }
+        finally { UnityEngine.Object.DestroyImmediate(guardPlayer); }
+        Console.WriteLine("PASS actual plugin producer basis: pinned Buildheim/Homestead captures, missing/late base, two intrinsic scales, q/-q rotated roots and independently expected nested child; actual opaque admission refusal; no build/terrain");
+    }
+
     private static object StoredVector(float x, float y, float z)
     {
         object value = Activator.CreateInstance(partType.GetField("position").FieldType);
         Set(value, "x", x); Set(value, "y", y); Set(value, "z", z);
         return value;
     }
+    private static void TestNamedCenterEditorAndLayout(Assembly plugin)
+    {
+        Type library = plugin.GetType("OstrixMods.BuildWorks.ExternalBlueprintLibrary", true);
+        object raw = library.GetMethod("Parse", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] {
+            "#Center:wood_floor\n#SnapPoints\n3;1;0\n#Pieces\n" +
+            "wood_floor;;2;1;0;0;.707;0;.707;\"\";2;.5;1.25\nwood_wall;;5;2;4;0;0;0;1;\"\";1;2;3\n", "frame.blueprint" });
+        MethodInfo prepare = library.GetMethod("PrepareForHost", BindingFlags.Static | BindingFlags.NonPublic);
+        Type resolverType = prepare.GetParameters()[1].ParameterType;
+        var prefabName = Expression.Parameter(typeof(string), "prefab");
+        object basis = StoredVector(2, .5f, 3);
+        var resolver = Expression.Lambda(resolverType, Expression.Convert(Expression.Constant(basis, basis.GetType()),
+            resolverType.GetGenericArguments()[1]), prefabName).Compile();
+        object[] arguments = new object[prepare.GetParameters().Length]; arguments[0] = raw; arguments[1] = resolver;
+        object prepared = prepare.Invoke(null, arguments);
+        Type controllerType = plugin.GetType("OstrixMods.BuildWorks.BlueprintEditorController", true);
+        var document = (BlueprintEditorDocument)controllerType.GetMethod("DocumentFromBlueprint", BindingFlags.Static | BindingFlags.NonPublic)
+            .Invoke(null, new[] { prepared });
+        Require(document.Parts.All(part => part.SourceFrameApplied) &&
+            (document.Parts[1].Position - new Point3(-4, 1, 3)).LengthSquared < 1e-10 &&
+            (document.CustomSnapPoints.Single() - new Point3(0, 0, 1)).LengthSquared < 1e-10,
+            "Actual editor import lost the interpreted frame or snaps");
+        object controller = FormatterServices.GetUninitializedObject(controllerType);
+        Set(controller, "document", document);
+        IList parts = (IList)controllerType.GetMethod("BuildStoreParts", Instance).Invoke(controller, null);
+        Require(parts.Cast<object>().All(part => (bool)Get(part, "sourceFrameApplied")), "Actual editor save lost frame markers");
+        Set(prepared, "parts", parts);
+        object session = Session(2); Set(session, "activeBlueprint", prepared);
+        var visual = new GameObject("Inert named-frame nested visual"); visual.SetActive(false);
+        var child = new GameObject("Named-frame child"); child.transform.SetParent(visual.transform, false);
+        child.transform.localPosition = new Vector3(.25f, 1.5f, -.75f);
+        child.transform.localRotation = Quaternion.Euler(0, 0, 90); child.transform.localScale = new Vector3(.5f, 2, 1);
+        Vector3[] previous = fixtureObjects.Select(item => item.transform.localScale).ToArray();
+        try
+        {
+            foreach (Vector3 intrinsic in new[] { new Vector3(2, .5f, 3), new Vector3(.25f, 5, .5f) })
+            foreach (int sign in new[] { 1, -1 })
+            {
+                foreach (var item in fixtureObjects) item.transform.localScale = intrinsic;
+                ((IList)Get(session, "placementPlan")).Clear(); ((IList)Get(session, "placementPlanPieces")).Clear();
+                float q = sign * (float)Math.Sqrt(.5);
+                Require(Add(session, new Point3(17, 29, -13), Rotation(0, q, 0, q)),
+                    "Named-frame layout rejected valid geometry: " + Get(session, "repeatPlanError"));
+                object wall = ((IList)Get(session, "placementPlan"))[1];
+                CheckVector(Property(wall, "Position"), new Point3(20, 30, -9));
+                Quaternion rotation = (Quaternion)Property(wall, "Rotation");
+                Require(Quaternion.Angle(rotation, Quaternion.identity) < .001f, "Root and source frame rotations disagree");
+                visual.transform.SetPositionAndRotation((Vector3)Property(wall, "Position"), rotation);
+                visual.transform.localScale = Vector3.Scale(intrinsic, (Vector3)Property(wall, "Scale"));
+                Require(Vector3.Distance(child.transform.TransformPoint(new Vector3(1, -.5f, 2)),
+                    new Vector3(21.25f, 34, -5.25f)) < .0001f, "Named-frame nested physical point differs from independent expectation");
+            }
+        }
+        finally
+        {
+            for (int i = 0; i < fixtureObjects.Length; ++i) fixtureObjects[i].transform.localScale = previous[i];
+            UnityEngine.Object.DestroyImmediate(visual);
+        }
+        Console.WriteLine("PASS actual named-center editor import/save and Session: consumed flags/snaps, two prefab bases, q/-q roots and independent nested point");
+    }
+
     private static object Rotation(float x, float y, float z, float w) =>
         Activator.CreateInstance(rotationType, x,y,z,w);
     private static bool Add(object session, Point3 position, object rotation, float uniformScale = 1f) =>

@@ -14,7 +14,7 @@ namespace ReservationChecks
             try { action(); } catch (IOException) { refused = true; } catch (InvalidDataException) { refused = true; } catch (ArgumentException) { refused = true; }
             Check(refused, message);
         }
-        private static byte[] ReadBytes(string path)
+        internal static byte[] ReadBytes(string path)
         {
             using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             using (var reader = new BinaryReader(stream)) return reader.ReadBytes(checked((int)stream.Length));

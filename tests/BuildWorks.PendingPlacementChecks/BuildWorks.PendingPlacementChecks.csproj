@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><LangVersion>latest</LangVersion></PropertyGroup>
+  <ItemGroup><Compile Include="../../src/BuildWorks/PendingPlacementOrder.cs" Link="PendingPlacementOrder.cs" /></ItemGroup>
+</Project>

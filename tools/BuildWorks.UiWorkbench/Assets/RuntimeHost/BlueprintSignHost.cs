@@ -6,6 +6,7 @@ public sealed class ZNetView : MonoBehaviour
 {
     public static bool m_useInitZDO;
     public static ZDO m_initZDO;
+    public bool m_syncInitialScale;
     public bool Valid = true;
     public bool Owner = true;
     private readonly ZDO data = new ZDO();

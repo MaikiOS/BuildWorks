@@ -11,10 +11,49 @@ namespace OstrixMods.BuildWorks.GeometryTests
 
         private static int Main(string[] args)
         {
+            if (args.Length == 1 && args[0] == "--triangle-candidates")
+            { TriangleCandidateChecks.Run(); return 0; }
+            if (args.Length == 1 && args[0] == "--triangle-distance")
+            { TriangleDistanceChecks.Run(); return 0; }
+            if (args.Length == 1 && args[0] == "--unbound-semantics")
+            { UnboundSemanticChecks.Run(); return 0; }
+            if (args.Length == 1 && args[0] == "--native-container-projection")
+            { NativeContainerProjectionChecks.Run(); return 0; }
+            if (args.Length == 1 && args[0] == "--unbound-file")
+            { UnboundBlueprintChecks.Run(); return 0; }
+            if (args.Length == 1 && args[0] == "--native-zdo-projection")
+            { NativeZdoProjectionChecks.Run(); return 0; }
+            if (args.Length == 2 && args[0] == "--planner-bindings")
+            { PlannerLayerBindingChecks.Run(args[1]); return 0; }
+            if (args.Length == 2 && args[0] == "--planner-json")
+            { PlannerBlueprintChecks.Run(args[1]); return 0; }
             if (args.Length > 0 && args[0] == "--benchmark")
                 return BlueprintDocumentBenchmark.Run(args);
             if (args.Length > 0 && args[0] == "--snap-benchmark")
                 return NearestPartBenchmark.Run(args);
+            if (args.Length == 2 && args[0] == "--openkeep-contract")
+                return OpenKeepContractChecks.Corpus(args[1]);
+            if (args.Length == 3 && args[0] == "--openkeep-writer-corpus")
+                return OpenKeepWriterChecks.Corpus(args[1], args[2]);
+            if ((args.Length == 2 || args.Length == 3) && args[0] == "--kg-yaml-capture")
+                return KgYamlChecks.Capture(args[1], args.Length == 3 ? args[2] : null);
+            if (args.Length == 1 && args[0] == "--kg-yaml-writer-budget")
+                return KgYamlChecks.WriterBudget();
+            if (args.Length == 3 && args[0] == "--kg-binary-capture")
+                return KgBinaryChecks.Capture(args[1], args[2]);
+            if (args.Length == 1 && args[0] == "--kg-binary")
+            { KgBinaryChecks.Run(); Console.WriteLine("KG binary bounds/EOF/UTF8/identity/immutability/culture PASS"); return 0; }
+            if (args.Length == 1 && args[0] == "--bb-json")
+            { BetterBuildingJsonChecks.Run(); Console.WriteLine("BetterBuilding legacy JSON/defaults/unknown/float/limits PASS"); return 0; }
+            if (args.Length == 3 && args[0] == "--bb-json-corpus") return BetterBuildingJsonChecks.Corpus(args[1],args[2]);
+            if (args.Length == 1 && args[0] == "--bbp")
+            { BetterBuildingChecks.Run(); Console.WriteLine("BBPF envelope/payload1-4/limits/EOF/fields PASS"); return 0; }
+            if (args.Length == 3 && args[0] == "--bbp-corpus") return BetterBuildingChecks.Corpus(args[1],args[2]);
+            Run("Planner JSONv3 data contract", PlannerBlueprintChecks.Core);
+            Run("BetterBuilding legacy JSON/defaults/unknown/float/limits", BetterBuildingJsonChecks.Run);
+            Run("BBPF envelope/payload1-4/limits/EOF/fields", BetterBuildingChecks.Run);
+            Run("KG binary bounds/EOF/UTF8/identity/immutability/culture", KgBinaryChecks.Run);
+            Run("KG YAML fields/cultures/unknown retention and seven-section ZDO guards", KgYamlChecks.Run);
             Run("Cubic curve keeps exact endpoints", CurveEndpointsAreExact);
             Run("Cubic curve midpoint is exact", CurveMidpointIsExact);
             Run("Cubic curve sampling is deterministic", CurveSamplingIsDeterministic);
@@ -53,6 +92,9 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Run("World snap-point packages are bounded, exact and reject corrupt coordinates", WorldSnapPointPackages);
             Run("Nearest part index preserves full float scan IDs, ties and bounded immutable origins", NearestPartChecks.Run);
             Run("Captured snap dedup preserves float tolerance, first coordinates, order and capacity", SnapPointSetChecks.Run);
+            Run("Structural receiver support preserves native attenuation, bridge pairs and red stable boundary", StructuralSupportChecks.Run);
+            Run("Triangle closest pairs preserve faces, edges, gaps and hollow geometry", TriangleDistanceChecks.Run);
+            Run("Triangle candidate bounds match exhaustive pairs and share finite work budgets", TriangleCandidateChecks.Run);
             Run("Foreign ZDO reader is typed, immutable, bounded and rejects malformed packages", ForeignZdoChecks.Run);
             Run("Construction cancellation refunds actual paid item stacks only", ConstructionRefundTests.Run);
             Run("Fog snapshots confirm exact receipts and retain uncertain or pending owners", FogSnapshotChecks.Run);
@@ -91,8 +133,11 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Run("Guide pairing rejects mismatches and collisions", GuidePairingRejectsMismatchesAndCollisions);
             Run("Invalid anchor values are rejected", InvalidAnchorValuesAreRejected);
             Run("Blueprint document deep copies source", BlueprintDocumentDeepCopiesSource);
+            Run("OpenKeep decodes complete source contract", OpenKeepContractChecks.Run);
+            Run("OpenKeep writer retains complete source metadata", OpenKeepWriterChecks.Run);
             Run("Blueprint payload survives insertion and cached history", BlueprintPayloadSurvivesHistory);
             Run("Source identity retains exact hash with bounded temporary memory", SourceIdentityUsesBoundedTemporaryMemory);
+            Run("World capture origin stays inert, exact, bounded and distinct from local transforms", WorldCaptureOrigin);
             Run("ItemStand authoring preserves contents in history and rejects opaque/locked edits", ItemStandContentsHistory);
             Run("Native Container payload preserves history and rejects invalid manifests/packages", NativeContainerState);
             Run("Native Container inspection reads all fields and refuses corrupt records without mutation", ContainerInventoryTests.Run);
@@ -2174,6 +2219,35 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Throws<ArgumentException>(() => document.SetItemStandContents("stand", opaque));
         }
 
+        private static void WorldCaptureOrigin()
+        {
+            string host = "11111111222233334444555555555555";
+            var source = BlueprintSourceDocument.CaptureWorld(77, new Point3(10000, 4, -2000),
+                new Rotation3(0, 0, 0, 1), host, "0.19.307");
+            Equal(BlueprintSourceDocument.WorldCaptureFormat, source.Format);
+            Equal(true, source.Text.Contains("world\t77\nposition\t10000\t4\t-2000\n"));
+            Equal(false, source.HasPartAt(3, "position"));
+            Equal(false, source.HasOpaqueSections);
+            Equal(0, source.IgnoredSnapPointRows);
+            Equal(source.Id, new BlueprintSourceDocument(source.Format, source.Name, source.Text).Id);
+            Equal(true, BlueprintSourceDocument.CaptureWorld(0, new Point3(), new Rotation3(0, 0, 0, 1), host, "0.19.307").Text.Contains("world\tunknown\n"));
+            foreach (string invalid in new[] { source.Text + "\n", source.Text.Replace("capture\t1", "capture\t2"),
+                source.Text.Replace("world\t77", "world\t0"), source.Text.Replace("world\t77", "world\t077"),
+                source.Text.Replace("10000", "NaN"), source.Text.Replace("10000", "Infinity"),
+                source.Text.Replace("rotation\t0\t0\t0\t1", "rotation\t0\t0\t0\t0"),
+                source.Text.Replace(host, "00000000000000000000000000000000"), source.Text.Replace("0.19.307", "unknown"),
+                source.Text.Replace("0.19.307", new string('9', 1025)) })
+                Throws<ArgumentException>(() => new BlueprintSourceDocument(source.Format, source.Name, invalid));
+            var original = new BlueprintEditorDocument(null, "Capture", "OTHER", new[] { EditorPart("wall", 1, 2, 3) },
+                sourceDocuments: new[] { source });
+            var target = EditorDocument(EditorPart("base", 0, 0, 0));
+            Equal(true, target.InsertBlueprint(original, new Point3(10, 0, 0), new Rotation3(0, 0, 0, 1)));
+            Equal(source.Text, target.Sources.Single().Text);
+            Near(new Point3(11, 2, 3), target.Parts.Single(part => part.PrefabName == "prefab-wall").Position);
+            Equal(true, target.Undo()); Equal(0, target.Sources.Count);
+            Equal(true, target.Redo()); Equal(source.Text, target.Sources.Single().Text);
+        }
+
         private static void SourceIdentityUsesBoundedTemporaryMemory()
         {
             foreach (var sample in new[] {
@@ -2265,8 +2339,8 @@ namespace OstrixMods.BuildWorks.GeometryTests
             Equal(false, evidence.HasPartAt(2, "wall"));
             Equal(true, other.HasPartAt(1, "wall"));
             var sections = new BlueprintSourceDocument("blueprint", "sections.blueprint",
-                "wall;before\r#Pieces\nwall;piece\r\n#Terrain\r\nwall;terrain\n#SnapPoints\nwall;snap");
-            Equal(false, sections.HasPartAt(1, "wall"));
+                "wall;;0;0;0;0;0;0;1;\r#Pieces\nwall;piece\r\n#Terrain\r\nwall;terrain\n#SnapPoints\nwall;snap");
+            Equal(true, sections.HasPartAt(1, "wall")); // Legacy V1 starts with rows; terrain/snap rows remain excluded.
             Equal(true, sections.HasPartAt(3, "wall"));
             Equal(false, sections.HasPartAt(5, "wall"));
             Equal(false, sections.HasPartAt(7, "wall"));

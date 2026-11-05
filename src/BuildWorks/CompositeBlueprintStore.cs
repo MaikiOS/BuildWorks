@@ -35,7 +35,7 @@ namespace OstrixMods.BuildWorks
         internal const string DefaultCategory = "OTHER";
         private const string LegacyDefaultCategory = "ПРОЧЕЕ";
         private const string LocalizationPrefix = "$buildworks_";
-        private const int FormatVersion = 27;
+        internal const int FormatVersion = 36;
         internal const int MaximumPeerReceipts = 4096;
         internal const int MaximumLibraryOrigins = Geometry.BlueprintLibraryOrigin.MaximumCount;
         private const int MaximumBlueprints = 32;
@@ -62,6 +62,9 @@ namespace OstrixMods.BuildWorks
         private Func<string, VectorData?> importPrefabScale;
         private Func<string, PrefabMetadata> prefabMetadata;
         private Func<string, int> importPrefabHash;
+        private Func<int, string> importPrefabName;
+        private Func<string, bool?> importKgStateSupport;
+        private Func<string, Geometry.UnboundImportContext> importUnboundContext;
         private Func<int> importWorldLevel;
         private Func<string, bool> importMaterialSeedSupport;
         private Func<string, (int Width, int Height)?> importContainerGrid;
@@ -102,11 +105,16 @@ namespace OstrixMods.BuildWorks
         // Called on the Unity thread only; prefabHash must be a pure stable string hash.
         internal void ConfigureImportScale(Func<string, VectorData?> resolve, Func<object> context = null,
             Func<string, int> prefabHash = null, Func<int> worldLevel = null, Func<string, bool> supportsMaterialSeed = null,
-            Func<string, (int Width, int Height)?> containerGrid = null, Func<bool> migrateLegacyRoof = null)
+            Func<string, (int Width, int Height)?> containerGrid = null, Func<bool> migrateLegacyRoof = null,
+            Func<int, string> resolvePrefabHash = null, Func<string, bool?> supportsKgState = null,
+            Func<string, Geometry.UnboundImportContext> unboundContext = null)
         {
             importPrefabScale = resolve;
             importHostContext = context;
             importPrefabHash = prefabHash;
+            importPrefabName = resolvePrefabHash;
+            importKgStateSupport = supportsKgState;
+            importUnboundContext = unboundContext;
             importWorldLevel = worldLevel;
             importMaterialSeedSupport = supportsMaterialSeed;
             importContainerGrid = containerGrid;
@@ -162,21 +170,22 @@ namespace OstrixMods.BuildWorks
                     if (preparedExternalBlueprints == null)
                     {
                         // Snapshot Unity values once; conversion of the library never touches Unity.
-                        var scales = externalBlueprints.SelectMany(source => source.parts).Select(part => part.prefabName)
+                        var kg = KgHostSnapshot(externalBlueprints);
+                        var scales = kg.Names.Values
                             .Distinct(StringComparer.Ordinal).ToDictionary(name => name, name => importPrefabScale?.Invoke(name), StringComparer.Ordinal);
                         var sources = externalBlueprints;
                         var materialSupport = scales.Keys.ToDictionary(name => name,
                             name => importMaterialSeedSupport?.Invoke(name) == true, StringComparer.Ordinal);
-                        var grids = ContainerGridSnapshot(sources);
+                        var grids = ContainerGridSnapshot(sources, kg.Names.Values);
                         var hash = importPrefabHash;
                         preparationGeneration = importGeneration;
                         preparationTask = Task.Run(() => sources.Select(source => ExternalBlueprintLibrary.PrepareForHost(
                             source, name => scales.TryGetValue(name, out var scale) ? scale : null, hash, worldLevel,
-                            name => materialSupport.TryGetValue(name, out bool supported) && supported, grids)).ToList());
+                            name => materialSupport.TryGetValue(name, out bool supported) && supported, grids, kg.Resolve, kg.State, kg.Unbound)).ToList());
                         return data.blueprints;
                     }
                 }
-                else preparedExternalBlueprints = externalBlueprints.Select(source => ExternalBlueprintLibrary.PrepareForHost(source, importPrefabScale, importPrefabHash, worldLevel, importMaterialSeedSupport, importContainerGrid)).ToList();
+                else preparedExternalBlueprints = externalBlueprints.Select(source => ExternalBlueprintLibrary.PrepareForHost(source, importPrefabScale, importPrefabHash, worldLevel, importMaterialSeedSupport, importContainerGrid, importPrefabName, importKgStateSupport, importUnboundContext)).ToList();
             }
             var result = new List<Blueprint>(data.blueprints);
             result.AddRange(preparedExternalBlueprints);
@@ -382,8 +391,9 @@ namespace OstrixMods.BuildWorks
             var entries = Directory.EnumerateFileSystemEntries(full)
                 .Take(2001).ToArray();
             if (entries.Length > 2000) throw new InvalidDataException("$buildworks_import.library_limit");
+            long jsonBudget = ExternalBlueprintLibrary.MaximumTotalBytes;
             return entries.Where(entry => (File.GetAttributes(entry) & FileAttributes.ReparsePoint) == 0 &&
-                (Directory.Exists(entry) || ExternalBlueprintLibrary.Supported(entry) ||
+                (Directory.Exists(entry) || ExternalBlueprintLibrary.BrowsableFile(entry, ref jsonBudget) ||
                     entry.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)))
                 .OrderBy(entry => Directory.Exists(entry) ? 0 : 1)
                 .ThenBy(entry => Path.GetFileName(entry), StringComparer.CurrentCultureIgnoreCase).ToArray();
@@ -473,9 +483,61 @@ namespace OstrixMods.BuildWorks
         }
 
         // Unity thread only; workers receive the resulting pure name lookup.
-        internal Func<string, bool> MaterialSeedSupportSnapshot(IEnumerable<Blueprint> documents)
+        private (Dictionary<Part,string> Names, Func<int,string> Resolve, Func<string,bool?> State,
+            Func<string, Geometry.UnboundImportContext> Unbound) KgHostSnapshot(IEnumerable<Blueprint> documents)
         {
-            var supported = documents.SelectMany(document => document.parts).Select(part => part.prefabName)
+            var resolved = new Dictionary<int,string>();
+            var names = new Dictionary<Part,string>();
+            var unboundNames = new HashSet<string>(StringComparer.Ordinal);
+            var available = new Dictionary<string, bool>(StringComparer.Ordinal);
+            bool Exists(string name)
+            {
+                if (!available.TryGetValue(name, out bool value)) available.Add(name, value = importPrefabScale?.Invoke(name).HasValue == true);
+                return value;
+            }
+            foreach (var document in documents)
+            {
+                var sources = Geometry.BlueprintSourceDocument.Index(document.sourceDocuments?
+                    .Select(source=>source.ToGeometry()));
+                foreach (var part in document.parts)
+                {
+                    string name = part.prefabName;
+                    if (part.sourceDocumentId!=null && sources.TryGetValue(part.sourceDocumentId,out var source) &&
+                        source.Kg != null && source.HasPartAddress(part.sourceLine,part.sourceRecord,part.originalPrefabName ?? name))
+                    {
+                        var original=source.Kg.Objects[part.sourceRecord-1];
+                        if (original.PrefabHash.HasValue && name==original.ReferenceName)
+                        {
+                            int id=original.PrefabHash.Value;
+                            if (!resolved.TryGetValue(id,out string actual)) resolved.Add(id,actual=importPrefabName?.Invoke(id));
+                            if (actual!=null) name=actual;
+                        }
+                    }
+                    string producerName = ExternalBlueprintLibrary.ProducerPrefabName(part, sources, Exists);
+                    names[part] = producerName != part.prefabName ? producerName : name;
+                    if (part.sourceDocumentId != null && sources.TryGetValue(part.sourceDocumentId, out var unbound) &&
+                        unbound.UnboundPartAt(part.sourceLine) is Geometry.UnboundBlueprint.Piece originalUnbound &&
+                        unbound.HasPartAddress(part.sourceLine, part.sourceRecord, part.originalPrefabName ?? part.prefabName))
+                    {
+                        unboundNames.Add(name);
+                        if (originalUnbound.State.TryGet<byte[]>("items".GetStableHashCode(), out var bytes) &&
+                            Geometry.BlueprintContainerInventory.TryGetNativePrefabHashes(Convert.ToBase64String(bytes), out var itemHashes))
+                            foreach (int id in itemHashes)
+                                if (!resolved.ContainsKey(id)) resolved.Add(id, importPrefabName?.Invoke(id));
+                    }
+                }
+            }
+            var state=names.Values.Distinct(StringComparer.Ordinal).ToDictionary(name=>name,
+                name=>importKgStateSupport?.Invoke(name),StringComparer.Ordinal);
+            var contexts = unboundNames.ToDictionary(name => name, name => importUnboundContext?.Invoke(name), StringComparer.Ordinal);
+            return (names, id=>resolved.TryGetValue(id,out string name)?name:null,
+                name=>state.TryGetValue(name,out bool? supported)?supported:null,
+                name=>contexts.TryGetValue(name,out var context)?context:null);
+        }
+
+        internal Func<string, bool> MaterialSeedSupportSnapshot(IEnumerable<Blueprint> documents, IEnumerable<string> names = null)
+        {
+            var supported = (names ?? documents.SelectMany(document => document.parts).Select(part => part.prefabName))
                 .Distinct(StringComparer.Ordinal).ToDictionary(name => name, SupportsMaterialSeed, StringComparer.Ordinal);
             return name => supported.TryGetValue(name, out bool value) && value;
         }
@@ -483,9 +545,9 @@ namespace OstrixMods.BuildWorks
         internal bool SupportsMaterialSeed(string name) =>
             (importHostContext == null || importHostContext() != null) && importMaterialSeedSupport?.Invoke(name) == true;
 
-        internal Func<string, (int Width, int Height)?> ContainerGridSnapshot(IEnumerable<Blueprint> documents)
+        internal Func<string, (int Width, int Height)?> ContainerGridSnapshot(IEnumerable<Blueprint> documents, IEnumerable<string> names = null)
         {
-            var grids = documents.SelectMany(document => document.parts).Select(part => part.prefabName)
+            var grids = (names ?? documents.SelectMany(document => document.parts).Select(part => part.prefabName))
                 .Distinct(StringComparer.Ordinal).ToDictionary(name => name, name =>
                     importHostContext == null || importHostContext() != null ? importContainerGrid?.Invoke(name) : null, StringComparer.Ordinal);
             return name => grids.TryGetValue(name, out var grid) ? grid : null;
@@ -499,10 +561,11 @@ namespace OstrixMods.BuildWorks
             int? worldLevel = importWorldLevel?.Invoke();
             bool migrateRoof = review.Documents.SelectMany(document => document.parts)
                 .Any(part => part.prefabName == Geometry.BlueprintPrefabMigration.OldRoof) && canMigrateLegacyRoof?.Invoke() == true;
-            var scales = review.Documents.SelectMany(document => document.parts).Select(part => part.prefabName)
+            var kg = KgHostSnapshot(review.Documents);
+            var scales = kg.Names.Values
                 .Distinct(StringComparer.Ordinal).ToDictionary(name => name, name => importPrefabScale?.Invoke(name), StringComparer.Ordinal);
-            var supports = MaterialSeedSupportSnapshot(review.Documents);
-            var grids = ContainerGridSnapshot(review.Documents);
+            var supports = MaterialSeedSupportSnapshot(review.Documents, kg.Names.Values);
+            var grids = ContainerGridSnapshot(review.Documents, kg.Names.Values);
             var missing = new MissingPartsReview
             {
                 HostContext = context,
@@ -527,7 +590,7 @@ namespace OstrixMods.BuildWorks
                     IsHostCurrent = current,
                     Documents = review.Documents.Select(document => ExternalBlueprintLibrary.MigrateLegacyRoof(
                         ExternalBlueprintLibrary.PrepareForHost(document,
-                            name => scales.TryGetValue(name, out var scale) ? scale : null, prefabHash, worldLevel, supports, grids), migrateRoof)).ToList()
+                            name => scales.TryGetValue(name, out var scale) ? scale : null, prefabHash, worldLevel, supports, grids, kg.Resolve, kg.State, kg.Unbound), migrateRoof)).ToList()
                 };
                 var summaries = new Dictionary<Blueprint, ContentsSummary>();
                 foreach (Blueprint document in result.Documents)
@@ -635,13 +698,14 @@ namespace OstrixMods.BuildWorks
                     throw new InvalidDataException(UserError("placement.contents_stale"));
                 CatalogAll();
                 if (omitMissing != null) ValidateMissingReview(review.Documents, omitMissing, prefabHash);
-                var names = review.Documents.SelectMany(document => document.parts).Select(part => part.prefabName).Distinct(StringComparer.Ordinal).ToArray();
+                var kg = KgHostSnapshot(review.Documents);
+                var names = kg.Names.Values.Distinct(StringComparer.Ordinal).ToArray();
                 var scales = names.ToDictionary(name => name, name => importPrefabScale?.Invoke(name), StringComparer.Ordinal);
                 if (omitMissing == null && importPrefabScale != null && (importHostContext == null || importHostContext() != null) &&
-                    review.Documents.Any(document => document.parts.All(part => !scales[part.prefabName].HasValue)))
+                    review.Documents.Any(document => document.parts.All(part => !scales[kg.Names[part]].HasValue)))
                     throw new InvalidDataException("$buildworks_exchange.missing_import_empty");
-                var supports = MaterialSeedSupportSnapshot(review.Documents);
-                var grids = ContainerGridSnapshot(review.Documents);
+                var supports = MaterialSeedSupportSnapshot(review.Documents, kg.Names.Values);
+                var grids = ContainerGridSnapshot(review.Documents, kg.Names.Values);
                 var metadata = prefabMetadata == null ? null : names.ToDictionary(name => name, name => prefabMetadata(name)?.Copy(), StringComparer.Ordinal);
                 var hash = importPrefabHash;
                 int? worldLevel = importWorldLevel?.Invoke();
@@ -657,7 +721,7 @@ namespace OstrixMods.BuildWorks
                     var prepared = review.Documents.Select(document =>
                     {
                         var copy = ExternalBlueprintLibrary.PrepareForHost(document,
-                            name => scales.TryGetValue(name, out var scale) ? scale : null, hash, worldLevel, supports, grids);
+                            name => scales.TryGetValue(name, out var scale) ? scale : null, hash, worldLevel, supports, grids, kg.Resolve, kg.State, kg.Unbound);
                         // PrepareForHost may return the input when it is already normalized.
                         return ReferenceEquals(copy, document) ? copy.ImportCopy() : copy;
                     }).ToArray();
@@ -775,7 +839,7 @@ namespace OstrixMods.BuildWorks
             {
                 ValidateMissingReview(new[] { blueprint }, omitMissing, prefabHash);
                 blueprint = CopyWithoutMissing(ExternalBlueprintLibrary.PrepareForHost(blueprint,
-                    importPrefabScale, importPrefabHash, importWorldLevel?.Invoke(), importMaterialSeedSupport, importContainerGrid), omitMissing.PrefabIds);
+                    importPrefabScale, importPrefabHash, importWorldLevel?.Invoke(), importMaterialSeedSupport, importContainerGrid, importPrefabName, importKgStateSupport, importUnboundContext), omitMissing.PrefabIds);
             }
             blueprint = blueprint.ImportCopy();
             CaptureMetadata(blueprint.parts, metadataSnapshot ?? prefabMetadata);
@@ -923,6 +987,87 @@ namespace OstrixMods.BuildWorks
         internal bool TryExportPlanBuild(PlanBuildExport review, Blueprint blueprint, string directory, string name,
             out string exportedPath, out string error) => review.TryWrite(blueprint, importPrefabScale, directory, name, out exportedPath, out error);
 
+        internal Task<OpenKeepExport> ReviewOpenKeepExport(Blueprint blueprint, OpenKeepExport.Consumer target)
+        {
+            var copy = blueprint.ImportCopy();
+            var scales = OpenKeepScaleSnapshot(copy);
+            return Task.Run(() => OpenKeepExport.Review(copy, target, id => scales.TryGetValue(id, out var scale) ? scale : null));
+        }
+        private Dictionary<string, VectorData?> OpenKeepScaleSnapshot(Blueprint blueprint) =>
+            blueprint.parts.Where(part => part.scaleIsAbsolute || part.baseScale.HasValue ||
+                part.scale.x != 1 || part.scale.y != 1 || part.scale.z != 1)
+                .Select(part => part.prefabName).Distinct(StringComparer.Ordinal)
+                .ToDictionary(id => id, id => importPrefabScale?.Invoke(id), StringComparer.Ordinal);
+        internal Task<string> ExportOpenKeep(OpenKeepExport review, Blueprint blueprint, string directory, string name)
+        {
+            var copy = blueprint.ImportCopy();
+            var scales = OpenKeepScaleSnapshot(copy); // Host prefab values must not be read by the file worker.
+            return Task.Run(() =>
+            {
+                if (!review.TryWrite(copy, id => scales.TryGetValue(id, out var scale) ? scale : null,
+                    directory, name, out string result, out string error)) throw new IOException(error);
+                return result;
+            });
+        }
+
+        internal Task<KgExport> ReviewKgExport(Blueprint blueprint)
+        {
+            var copy = blueprint.ImportCopy();
+            var scales = OpenKeepScaleSnapshot(copy);
+            return Task.Run(() => KgExport.Review(copy, id => scales.TryGetValue(id, out var scale) ? scale : null));
+        }
+
+        private Dictionary<string, VectorData?> PlannerScaleSnapshot(Blueprint blueprint) =>
+            blueprint.parts.Select(part => part.prefabName).Distinct(StringComparer.Ordinal)
+                .ToDictionary(id => id, id => importPrefabScale?.Invoke(id), StringComparer.Ordinal);
+
+        internal Task<PlannerExport> ReviewPlannerExport(Blueprint blueprint)
+        {
+            var copy = blueprint.ImportCopy(); var scales = PlannerScaleSnapshot(copy);
+            return Task.Run(() => PlannerExport.Review(copy, id => scales.TryGetValue(id, out var scale) ? scale : null));
+        }
+
+        internal Task<string> ExportPlanner(PlannerExport review, Blueprint blueprint, string directory, string name)
+        {
+            var copy = blueprint.ImportCopy(); var scales = PlannerScaleSnapshot(copy);
+            return Task.Run(() =>
+            {
+                if (!review.TryWrite(copy, id => scales.TryGetValue(id, out var scale) ? scale : null,
+                    directory, name, out string result, out string error)) throw new IOException(error);
+                return result;
+            });
+        }
+
+        internal Task<BetterBuildingExport> ReviewBbpExport(Blueprint blueprint, BetterBuildingExport.Target target = BetterBuildingExport.Target.Bbp)
+        {
+            var copy = blueprint.ImportCopy();
+            var scales = OpenKeepScaleSnapshot(copy);
+            return Task.Run(() => BetterBuildingExport.Review(copy, id => scales.TryGetValue(id, out var scale) ? scale : null, target));
+        }
+        internal Task<string> ExportBbp(BetterBuildingExport review, Blueprint blueprint, string directory, string name)
+        {
+            var copy = blueprint.ImportCopy();
+            var scales = OpenKeepScaleSnapshot(copy);
+            return Task.Run(() =>
+            {
+                if (!review.TryWrite(copy, id => scales.TryGetValue(id, out var scale) ? scale : null,
+                    directory, name, out string result, out string error)) throw new IOException(error);
+                return result;
+            });
+        }
+
+        internal Task<string> ExportKg(KgExport review, Blueprint blueprint, string directory, string name)
+        {
+            var copy = blueprint.ImportCopy();
+            var scales = OpenKeepScaleSnapshot(copy);
+            return Task.Run(() =>
+            {
+                if (!review.TryWrite(copy, id => scales.TryGetValue(id, out var scale) ? scale : null,
+                    directory, name, out string result, out string error)) throw new IOException(error);
+                return result;
+            });
+        }
+
         public IReadOnlyList<string> Categories() => data.categories;
 
         internal sealed class ContentsSummary
@@ -967,6 +1112,14 @@ namespace OstrixMods.BuildWorks
         internal MissingPartsReview InspectMissing(IReadOnlyList<Blueprint> documents, Func<string, int> prefabHash,
             bool inspectRetainedContents = true)
         {
+            if (documents.Any(document => BlueprintExchangeFormat.HasKgData(document) || BlueprintExchangeFormat.HasUnboundData(document)))
+            {
+                documents=documents.Select(document=>ExternalBlueprintLibrary.PrepareForHost(document,
+                    importPrefabScale, importPrefabHash, importWorldLevel?.Invoke(), importMaterialSeedSupport,
+                    importContainerGrid, importPrefabName, importKgStateSupport, importUnboundContext)).ToArray();
+                if (documents.Any(document=>document.importError!=null))
+                    throw new InvalidDataException(documents.First(document=>document.importError!=null).importError);
+            }
             var result = new MissingPartsReview { HostContext = importHostContext?.Invoke() };
             if (importPrefabScale == null || importHostContext != null && result.HostContext == null) return result;
             foreach (string prefab in documents.SelectMany(document => document.parts).Select(part => part.prefabName).Distinct(StringComparer.Ordinal))
@@ -1034,7 +1187,7 @@ namespace OstrixMods.BuildWorks
             if (source == null || !string.IsNullOrEmpty(source.importError))
                 throw new InvalidDataException(source?.importError ?? "$buildworks_import.format");
             var evidenceIndex = Geometry.BlueprintSourceDocument.Index(source.sourceDocuments?.Select(document => document.ToGeometry()));
-            result.Unknown = evidenceIndex.Values.Count(document => document.HasOpaqueSections);
+            result.Unknown = UnresolvedSources(source).Count();
             result.IgnoredSnapPointRows = evidenceIndex.Values.Sum(document => document.IgnoredSnapPointRows);
             foreach (Part part in source.parts)
             {
@@ -1098,7 +1251,7 @@ namespace OstrixMods.BuildWorks
                 source.IsExternal ? ExternalBlueprintLibrary.DetachedCopy(source) : source)));
             if (!clearStorage && !clearMounts && !omitArmorState) return copy;
             var evidenceIndex = Geometry.BlueprintSourceDocument.Index(copy.sourceDocuments?.Select(document => document.ToGeometry()));
-            if ((clearStorage || clearMounts) && evidenceIndex.Values.Any(document => document.HasOpaqueSections))
+            if ((clearStorage || clearMounts) && UnresolvedSources(copy).Any())
                 throw new InvalidDataException("$buildworks_import.object_data");
             foreach (Part part in copy.parts)
             {
@@ -1488,6 +1641,8 @@ namespace OstrixMods.BuildWorks
                     prepared[index].editorLocked = blueprint.parts[index].editorLocked;
                     prepared[index].sourceDocumentId = blueprint.parts[index].sourceDocumentId;
                     prepared[index].sourceLine = blueprint.parts[index].sourceLine;
+                    prepared[index].sourceRecord = blueprint.parts[index].sourceRecord;
+                    prepared[index].sourceFrameApplied = blueprint.parts[index].sourceFrameApplied;
                     prepared[index].originalPrefabName = blueprint.parts[index].originalPrefabName;
                     prepared[index].baseScale = prepared[index].baseScale ?? blueprint.parts[index].baseScale;
                     prepared[index].metadata = prepared[index].metadata ?? PrefabMetadata.FromGeometry(blueprint.parts[index].metadata?.ToGeometry());
@@ -1574,7 +1729,7 @@ namespace OstrixMods.BuildWorks
             peerOrigins = peerOrigins ?? blueprint?.peerOrigins;
             if (!ValidLibraryOrigins(libraryOrigins) || !ValidPeerOrigins(peerOrigins))
             { error = UserError("store.invalid_composition"); return false; }
-            if (!ValidSources(parts, sourceDocuments))
+            if (!ValidSources(parts, sourceDocuments, groups))
             { error = UserError("store.invalid_composition"); return false; }
             if (!CanWrite(blueprint, out error) || parts == null || groups == null ||
                 anchors == null ||
@@ -1714,6 +1869,8 @@ namespace OstrixMods.BuildWorks
                     signText = part.signText,
                     sourceDocumentId = part.sourceDocumentId,
                     sourceLine = part.sourceLine,
+                    sourceRecord = part.sourceRecord,
+                    sourceFrameApplied = part.sourceFrameApplied,
                     originalPrefabName = part.originalPrefabName,
                     foreignData = CloneForeignData(part.foreignData)
                 });
@@ -1739,7 +1896,8 @@ namespace OstrixMods.BuildWorks
                     parentGroupId = group.parentGroupId,
                     pivotPartId = group.pivotPartId,
                     editorVisible = group.editorVisible,
-                    editorLocked = group.editorLocked
+                    editorLocked = group.editorLocked,
+                    sourceDocumentId = group.sourceDocumentId, sourceLayerId = group.sourceLayerId
                 });
             }
             return clone;
@@ -1781,10 +1939,28 @@ namespace OstrixMods.BuildWorks
                     allowBaseScaleFields: loaded.version >= 17, allowMetadataFields: loaded.version >= 19,
                     allowMaterialSeedFields: loaded.version >= 20, allowHiddenSources: loaded.version >= 21,
                     allowLibraryOriginFields: loaded.version >= 23, allowPrefabMigrationFields: loaded.version >= 24,
-                    allowPeerOriginFields: loaded.version >= 26, allowPeerReceiptFields: loaded.version >= 27);
+                    allowPeerOriginFields: loaded.version >= 26, allowPeerReceiptFields: loaded.version >= 27,
+                    allowSourceFrameFields: loaded.version >= 29, allowSourceRecordFields: loaded.version >= 30, allowGroupSourceFields: loaded.version >= 35);
                 if (!ValidPeerReceipts(loaded.peerReceipts))
                     throw new InvalidDataException(UserError("store.invalid_composition"));
                 loaded.blueprints = loaded.blueprints ?? new List<Blueprint>();
+                if (loaded.version < 28 && loaded.blueprints.Any(BlueprintExchangeFormat.HasWorldCaptureOrigin))
+                    throw new InvalidDataException(UserError("store.unknown_version"));
+                if (loaded.version < 30 && loaded.blueprints.Any(BlueprintExchangeFormat.HasOpenKeepSource))
+                    throw new InvalidDataException(UserError("store.unknown_version"));
+                if (loaded.version < 31 && loaded.blueprints.Any(BlueprintExchangeFormat.HasKgData))
+                    throw new InvalidDataException(UserError("store.unknown_version"));
+                if (loaded.version < 32 && loaded.blueprints.Any(BlueprintExchangeFormat.HasKgBinaryData))
+                    throw new InvalidDataException(UserError("store.unknown_version"));
+                if (loaded.version < 33 && loaded.blueprints.Any(BlueprintExchangeFormat.HasBbpSource))
+                    throw new InvalidDataException(UserError("store.unknown_version"));
+                if (loaded.version < 34 && loaded.blueprints.Any(BlueprintExchangeFormat.HasBetterBuildingJsonSource))
+                    throw new InvalidDataException(UserError("store.unknown_version"));
+                if (loaded.version < 35 && loaded.blueprints.Any(BlueprintExchangeFormat.HasPlannerData))
+                    throw new InvalidDataException(UserError("store.unknown_version"));
+                if (loaded.version < 36 && loaded.blueprints.Any(BlueprintExchangeFormat.HasUnboundData))
+                    throw new InvalidDataException(UserError("store.unknown_version"));
+                BlueprintExchangeFormat.ValidateLibrarySourceBudget(loaded.blueprints);
                 if (loaded.version < 25 && loaded.blueprints.Any(BlueprintExchangeFormat.HasNativeArmorState))
                     throw new InvalidDataException(UserError("store.unknown_version"));
                 loaded.categories = loaded.categories ?? new List<string>();
@@ -1874,6 +2050,7 @@ namespace OstrixMods.BuildWorks
         private void Save()
         {
             if (!ValidPeerReceipts(data.peerReceipts)) throw new InvalidDataException(UserError("store.verify_data_failed"));
+            BlueprintExchangeFormat.ValidateLibrarySourceBudget(data.blueprints);
             string directory = Path.GetDirectoryName(path);
             Directory.CreateDirectory(directory);
             string temporary = path + ".tmp";
@@ -2015,7 +2192,7 @@ namespace OstrixMods.BuildWorks
                 blueprint.anchors.Count > MaximumAnchors || blueprint.groups == null ||
                 blueprint.groups.Count > MaximumGroups ||
                 !ValidDocument(blueprint.parts, blueprint.groups, blueprint.supports) ||
-                !ValidSources(blueprint.parts, blueprint.sourceDocuments) || !ValidLibraryOrigins(blueprint.libraryOrigins) || !ValidPeerOrigins(blueprint.peerOrigins) ||
+                !ValidSources(blueprint.parts, blueprint.sourceDocuments, blueprint.groups) || !ValidLibraryOrigins(blueprint.libraryOrigins) || !ValidPeerOrigins(blueprint.peerOrigins) ||
                 !ValidPlacementSupport(blueprint.supports, blueprint.placementSupportId) ||
                 !ValidCustomSnapPoints(blueprint.customSnapPoints) ||
                 !ValidPrimaryPart(blueprint.parts, blueprint.primaryPartId) ||
@@ -2147,20 +2324,28 @@ namespace OstrixMods.BuildWorks
                 source.supports, source.placementSupportId, out copy, out error, source.customSnapPoints, template, source.sourceDocuments);
         }
 
-        internal static bool ValidSources(IReadOnlyList<Part> parts, IReadOnlyList<SourceDocument> sources)
+        internal static bool ValidSources(IReadOnlyList<Part> parts, IReadOnlyList<SourceDocument> sources, IReadOnlyList<Group> groups = null)
         {
             try
             {
                 if (parts == null) return false;
                 var index = Geometry.BlueprintSourceDocument.Index(sources?.Select(source => source?.ToGeometry()));
+                foreach (Group group in groups ?? Array.Empty<Group>())
+                    if (group == null || (group.sourceDocumentId == null) != (group.sourceLayerId == null) || group.sourceDocumentId != null &&
+                        (!index.TryGetValue(group.sourceDocumentId, out var source) || !source.HasLayerAddress(group.sourceLayerId))) return false;
                 foreach (Part part in parts)
                 {
                     if (part == null) return false;
                     if (!Geometry.BlueprintPrefabMigration.IsRecordedPair(part.originalPrefabName, part.prefabName)) return false;
                     if (part.sourceDocumentId == null)
-                    { if (part.sourceLine != 0 || part.originalPrefabName != null) return false; }
+                    { if (part.sourceLine != 0 || part.sourceRecord != 0 || part.originalPrefabName != null || part.sourceFrameApplied || part.foreignData?.format == Geometry.UnboundBlueprint.Format) return false; }
                     else if (!index.TryGetValue(part.sourceDocumentId, out var evidence) ||
-                        !evidence.HasPartAt(part.sourceLine, part.originalPrefabName ?? part.prefabName)) return false;
+                        Geometry.PlannerPrefabNames.IsPair(part.originalPrefabName, part.prefabName) && !Geometry.PlannerPrefabNames.SupportsSource(evidence) ||
+                        !evidence.HasPartAddress(part.sourceLine, part.sourceRecord, part.originalPrefabName ?? part.prefabName) ||
+                        !evidence.HasPartState(part.sourceLine, part.sourceRecord, part.originalPrefabName ?? part.prefabName, part.foreignData?.ToGeometry(),
+                            part.metadata?.ToGeometry(), part.baseScale.HasValue ? new Geometry.Point3(part.baseScale.Value.x, part.baseScale.Value.y, part.baseScale.Value.z) :
+                            (Geometry.Point3?)null, part.scaleIsAbsolute, part.signText, part.materialSeed) ||
+                        part.sourceFrameApplied && !evidence.HasPlacementFrame) return false;
                 }
                 return true;
             }
@@ -2168,7 +2353,12 @@ namespace OstrixMods.BuildWorks
         }
 
         internal static bool HasForeignData(Blueprint blueprint) => blueprint?.parts?.Any(part => part?.foreignData != null || part?.materialSeed != null) == true ||
-            blueprint?.sourceDocuments?.Any(source => source.ToGeometry().HasOpaqueSections) == true;
+            UnresolvedSources(blueprint).Any();
+
+        internal static IEnumerable<Geometry.BlueprintSourceDocument> UnresolvedSources(Blueprint blueprint) =>
+            Geometry.BlueprintSourceDocument.Unresolved(blueprint?.sourceDocuments?.Select(source => source?.ToGeometry()),
+                blueprint?.parts?.Where(part => part != null).Select(part =>
+                    (SourceId: part.sourceDocumentId, FrameApplied: part.sourceFrameApplied)));
 
         private static ForeignPartData CloneForeignData(ForeignPartData value) => value == null ? null :
             new ForeignPartData
@@ -2497,6 +2687,7 @@ namespace OstrixMods.BuildWorks
             {
                 var copy = (Blueprint)MemberwiseClone();
                 copy.parts = CloneParts(parts);
+                copy.groups = CloneGroups(groups);
                 copy.sourceDocuments = CloneSources(sourceDocuments);
                 copy.libraryOrigins = CloneLibraryOrigins(libraryOrigins);
                 copy.peerOrigins = ClonePeerOrigins(peerOrigins);
@@ -2724,6 +2915,10 @@ namespace OstrixMods.BuildWorks
             public int? materialSeed;
             [DataMember(Order = 17, EmitDefaultValue = false)]
             public string originalPrefabName;
+            [DataMember(Order = 18, EmitDefaultValue = false)]
+            public bool sourceFrameApplied;
+            [DataMember(Order = 19, EmitDefaultValue = false)]
+            public int sourceRecord;
 
             internal Vector3 RootScale(Vector3 prefabScale)
             {
@@ -2757,6 +2952,10 @@ namespace OstrixMods.BuildWorks
             public string parentGroupId;
             [DataMember(Order = 5, EmitDefaultValue = false)]
             public string pivotPartId;
+            [DataMember(Order = 6, EmitDefaultValue = false)]
+            public string sourceDocumentId;
+            [DataMember(Order = 7, EmitDefaultValue = false)]
+            public string sourceLayerId;
         }
 
         [DataContract]

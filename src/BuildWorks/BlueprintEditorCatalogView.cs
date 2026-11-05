@@ -14,6 +14,17 @@ namespace OstrixMods.BuildWorks
         private GameObject catalog;
         private RectTransform catalogPanel, catalogGrid, catalogNavigation, catalogContext, catalogPreview, catalogPicker;
         private BlueprintEditorCatalogItem catalogPreviewItem;
+        private bool catalogTextAllowed=BlueprintSignPreview.Allowed;
+
+        private void RefreshCatalogTextPermission()
+        {
+            bool allowed=BlueprintSignPreview.Allowed;
+            if(allowed==catalogTextAllowed)return;
+            catalogTextAllowed=allowed;
+            foreach(var item in shownCatalogItems)if(item.IsBlueprint)item.Icon=null;
+            EndTooltip();
+            if(HasCatalog)RebuildCatalog();
+        }
         private bool catalogReplacementMode;
         private bool catalogPositioningMode;
 
@@ -313,7 +324,8 @@ namespace OstrixMods.BuildWorks
             }
             BlueprintEditorHoverTarget hover = button.gameObject.AddComponent<BlueprintEditorHoverTarget>();
             hover.Initialize(item.DisplayName + "\n" + (item.UnavailableReason ?? item.WarningReason ?? item.PrefabName + " · #" + (item.Index + 1)),
-                (rect, text) => { PreviewCatalogItem(captured); BeginTooltip(rect, text); }, EndTooltip);
+                (rect, text) => { PreviewCatalogItem(captured); BeginTooltip(rect, text +
+                    (item.IsBlueprint ? "\n\n" + BlueprintSourcePresentation.Metadata(item.Blueprint) : "")); }, EndTooltip);
             return button;
         }
         private void AddCatalogImage(Transform parent, string name, Sprite sprite, float x, float y, float w, float h)
@@ -414,6 +426,8 @@ namespace OstrixMods.BuildWorks
                 description = BuildWorksLocalization.Text("import.read_only") + "\n" + item.Blueprint.importSource +
                     "\n" + BuildWorksLocalization.Text("catalog.card.parts", item.Blueprint.importPartCount);
             if (item.ItemContents != null) description = T("editor.item.defaults") + "\n\n" + item.PrefabName;
+            if (item.IsBlueprint) description += "\n\n" + T("import.state_policy");
+            if (item.IsBlueprint) description += "\n\n" + BlueprintSourcePresentation.Metadata(item.Blueprint);
             if (!string.IsNullOrEmpty(item.UnavailableReason)) description += "\n\n" + item.UnavailableReason;
             else if (!string.IsNullOrEmpty(item.WarningReason)) description += "\n\n" + item.WarningReason +
                 (item.IsBlueprint ? "\n" + T("catalog.thumbnail_markers") : "");

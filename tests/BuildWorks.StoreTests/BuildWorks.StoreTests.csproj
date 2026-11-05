@@ -5,27 +5,46 @@
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
+    <DefineConstants>$(DefineConstants);BUILDWORKS_CONTENTS_FIXTURE_TESTS</DefineConstants>
     <ProfileRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..\'))</ProfileRoot>
     <ValheimManagedDir>C:\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed</ValheimManagedDir>
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="..\fixtures\openkeep\*.json" Link="fixtures\openkeep\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\fixtures\planner\*.json" Link="fixtures\planner\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\fixtures\homestead\*.blueprint" Link="fixtures\homestead\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\fixtures\tomrer\*.blueprint" Link="fixtures\tomrer\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\fixtures\construction\bwpp01-legacy-vectors.tsv" Link="fixtures\construction\bwpp01-legacy-vectors.tsv" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\fixtures\contents\*.buildworks.json" Link="fixtures\contents\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\fixtures\planbuild\27-planbuild-snap-tail.blueprint" Link="fixtures\planbuild\27-planbuild-snap-tail.blueprint" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\fixtures\planbuild\28-planbuild-hashed-mounts.blueprint" Link="fixtures\planbuild\28-planbuild-hashed-mounts.blueprint" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\fixtures\planbuild\29-planbuild-storage106.blueprint" Link="fixtures\planbuild\29-planbuild-storage106.blueprint" CopyToOutputDirectory="PreserveNewest" />
     <ProjectReference Include="..\..\src\BuildWorks.Geometry\BuildWorks.Geometry.csproj" />
     <Compile Include="..\..\src\BuildWorks\CompositeBlueprintStore.cs" Link="CompositeBlueprintStore.cs" />
+    <Compile Include="..\..\src\BuildWorks\BuildWorksTestConstructionProject.ContentsFixture.cs" Link="BuildWorksTestConstructionProject.ContentsFixture.cs" />
     <Compile Include="..\..\src\BuildWorks\BlueprintConstructionProjectStore.cs" Link="BlueprintConstructionProjectStore.cs" />
     <Compile Include="..\..\src\BuildWorks\BlueprintConstructionPartJournal.cs" Link="BlueprintConstructionPartJournal.cs" />
+    <Compile Include="..\..\src\BuildWorks\BlueprintConstructionPartJournal.Sources.cs" Link="BlueprintConstructionPartJournal.Sources.cs" />
+    <Compile Include="..\..\src\BuildWorks\BlueprintConstructionPartJournal.Outcome.cs" Link="BlueprintConstructionPartJournal.Outcome.cs" />
+    <Compile Include="..\..\src\BuildWorks\BlueprintConstructionPaymentOutcome.cs" Link="BlueprintConstructionPaymentOutcome.cs" />
     <Compile Include="..\..\src\BuildWorks\BlueprintConstructionCancellationJournal.cs" Link="BlueprintConstructionCancellationJournal.cs" />
     <Compile Include="..\..\src\BuildWorks\BlueprintConstructionCancellationAction.cs" Link="BlueprintConstructionCancellationAction.cs" />
     <Compile Include="..\..\src\BuildWorks\BlueprintConstructionPayoutJournal.cs" Link="BlueprintConstructionPayoutJournal.cs" />
     <Compile Include="..\..\src\BuildWorks\ExternalBlueprintLibrary.cs" Link="ExternalBlueprintLibrary.cs" />
     <Compile Include="..\..\src\BuildWorks\BlueprintExchangeFormat.cs" Link="BlueprintExchangeFormat.cs" />
     <Compile Include="..\..\src\BuildWorks\PlanBuildExport.cs" Link="PlanBuildExport.cs" />
+    <Compile Include="..\..\src\BuildWorks\BlueprintExportPair.cs" Link="BlueprintExportPair.cs" />
+    <Compile Include="..\..\src\BuildWorks\OpenKeepExport.cs" Link="OpenKeepExport.cs" />
+    <Compile Include="..\..\src\BuildWorks\KgExport.cs" Link="KgExport.cs" />
+    <Compile Include="..\..\src\BuildWorks\BetterBuildingExport.cs" Link="BetterBuildingExport.cs" />
+    <Compile Include="..\..\src\BuildWorks\PlannerExport.cs" Link="PlannerExport.cs" />
     <Compile Include="..\..\src\BuildWorks\ServerBlueprintLibrary.cs" Link="ServerBlueprintLibrary.cs" />
     <Compile Include="..\..\src\BuildWorks\BlueprintServerProtocol.cs" Link="BlueprintServerProtocol.cs" />
+    <Compile Include="..\..\src\BuildWorks\BlueprintTransferBudget.cs" Link="BlueprintTransferBudget.cs" />
+    <Compile Include="..\..\src\BuildWorks\BlueprintPeerProtocol.cs" Link="BlueprintPeerProtocol.cs" />
+    <Compile Include="..\..\src\BuildWorks\BlueprintPeerEndpoint.cs" Link="BlueprintPeerEndpoint.cs" />
+    <Compile Include="..\..\src\BuildWorks\BlueprintPeerClient.cs" Link="BlueprintPeerClient.cs" />
     <Compile Include="..\..\src\BuildWorks\BlueprintServerEndpoint.cs" Link="BlueprintServerEndpoint.cs" />
     <Compile Include="..\..\src\BuildWorks\BlueprintServerClient.cs" Link="BlueprintServerClient.cs" />
     <Compile Include="..\..\src\BuildWorks\BlueprintServerRuntime.cs" Link="BlueprintServerRuntime.cs" />
@@ -47,4 +66,12 @@
       <HintPath>$(ValheimManagedDir)\UnityEngine.CoreModule.dll</HintPath>
     </Reference>
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="obj/PeerUiProduction.generated.cs" />
+    <Compile Include="obj/PaymentOutcome.generated.cs" />
+  </ItemGroup>
+  <Target Name="ExtractProductionPeerUiChecks" BeforeTargets="CoreCompile">
+    <Exec Command="pwsh.exe -NoLogo -NoProfile -File &quot;$(MSBuildProjectDirectory)/Generate-PeerUiMethods.ps1&quot;" />
+    <Exec Command="pwsh.exe -NoLogo -NoProfile -File &quot;$(MSBuildProjectDirectory)/Generate-PaymentOutcomeMethods.ps1&quot;" />
+  </Target>
 </Project>

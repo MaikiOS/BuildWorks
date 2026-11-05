@@ -45,6 +45,7 @@ namespace OstrixMods.BuildWorks
         private Coroutine capture;
         private long captureId;
         private int releaseFrame = -1;
+        private int ownerThread;
         private BuildWorksTestFog fog;
         private float manualFogUntil;
 
@@ -102,6 +103,44 @@ namespace OstrixMods.BuildWorks
         public string StoragePersistenceStatus() => GetComponent<BuildWorksTestStorage>()?.Status ?? "idle";
         public bool StoragePersistenceBusy() => GetComponent<BuildWorksTestStorage>()?.Busy ?? false;
 
+        internal void RequireStorageIdle()
+        {
+            if (ownerThread == 0 || System.Threading.Thread.CurrentThread.ManagedThreadId != ownerThread)
+                throw new InvalidOperationException("Storage QA requires the initialized Unity owner thread.");
+            if (running != null || capture != null || fog || StoragePersistenceBusy() ||
+                !Application.isFocused || UnityEngine.Input.GetKey(KeyCode.F12) || File.Exists(PathFor("stop.flag")))
+                throw new InvalidOperationException("Storage QA needs focused idle input, fog and storage work without an emergency stop.");
+            BuildWorksPlugin.RequireQaStorageIdle();
+            if (BuildWorksPlugin.QaConstructionProjects?.QaReadonlyIdle != true)
+                throw new InvalidOperationException("Storage QA requires idle construction projects.");
+        }
+
+        public string LookupStorageMarker(string operation, string prefabName)
+        {
+            RequireStorageIdle();
+            return JsonUtility.ToJson(BuildWorksTestStorage.LookupStorageMarker(operation, prefabName, RequireStorageIdle));
+        }
+
+        public string ReadContactProfiles(int offset, int count) =>
+            BuildWorksTestContactProfiles.Snapshot(offset, count, () => {
+                RequireStorageIdle();
+                BuildWorksTestIsolation.RequireLoadedSession();
+            });
+
+        public string ReadPlacementGhost() => BuildWorksTestContactProfiles.CurrentGhost(() => {
+            if (ownerThread == 0 || System.Threading.Thread.CurrentThread.ManagedThreadId != ownerThread ||
+                running != null || capture != null || fog || StoragePersistenceBusy() || !Application.isFocused ||
+                UnityEngine.Input.GetKey(KeyCode.F12) || File.Exists(PathFor("stop.flag")))
+                throw new InvalidOperationException("Ghost observation requires idle QA input on the Unity owner thread.");
+            BuildWorksTestIsolation.RequireLoadedSession();
+            if (BuildWorksPlugin.QaConstructionProjects?.QaReadonlyIdle != true)
+                throw new InvalidOperationException("Ghost observation requires idle construction execution.");
+            // Observation is allowed during F9 editing; storage and input commands retain their existing guards.
+        });
+
+        public string CreatePaidContentsProject() => BuildWorksTestConstructionProject.CreatePaidContentsProject(RequireStorageIdle);
+        public string AdoptPaidContentsProject() => BuildWorksTestConstructionProject.AdoptPaidContentsProject(RequireStorageIdle);
+
         public string CheckFogGhostAssets()
         {
             player = BuildWorksTestIsolation.RequireLoadedSession(); network = ZNet.instance;
@@ -146,6 +185,7 @@ namespace OstrixMods.BuildWorks
 
         internal void Initialize()
         {
+            ownerThread = System.Threading.Thread.CurrentThread.ManagedThreadId;
             directory = BuildWorksTestIsolation.ControlDirectory;
             BuildWorksTestIsolation.ValidateSavePath(Path.Combine(directory, "session.json"));
             Directory.CreateDirectory(directory);
@@ -231,10 +271,7 @@ namespace OstrixMods.BuildWorks
                 }
                 player = BuildWorksTestIsolation.RequireLoadedSession(); network = ZNet.instance;
                 if (!SafeSession()) throw new InvalidOperationException("Game must be focused in the isolated living QA session.");
-                uiTarget = request.steps[0].uiTarget == null ? null : uiTargets.Resolve(request.steps[0].uiTarget);
-                uiReleased = false;
-                if (uiTarget != null && request.steps[0].pointer)
-                { request.steps[0].x = uiTarget.entry.x; request.steps[0].y = uiTarget.entry.y; }
+                SelectUiTarget(request.steps[0], request.InventoryPair, request.FocusThenText);
                 running = request; started = stepStarted = Time.realtimeSinceStartup; stepIndex = 0; stepFrame = releaseFrame = -1; stepFinished = false;
                 pointerStart = UnityEngine.Input.mousePosition;
                 input.Begin(gameObject);
@@ -255,6 +292,26 @@ namespace OstrixMods.BuildWorks
 
         private bool WithinDeadline() => BuildWorksQaControlProtocol.CanContinue(running,
             DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), (Time.realtimeSinceStartup - started) * 1000d);
+
+        private void SelectUiTarget(BuildWorksQaControlProtocol.Step step, bool inventoryPair, bool focusThenText)
+        {
+            uiTarget = step.uiTarget == null ? null : uiTargets.Resolve(step.uiTarget);
+            uiReleased = false;
+            if (focusThenText && (uiTarget == null || !uiTarget.entry.writable))
+                throw new InvalidOperationException("Paired QA focus/text requires the same observed writable TMP/UGUI field.");
+            if (uiTarget == null) return;
+            if (inventoryPair)
+            {
+                var gui = InventoryGui.instance;
+                var grid = gui ? gui.m_playerGrid : null;
+                if (!gui || !grid || !InventoryGui.IsVisible() || ZInput.IsTouchActive() ||
+                    !player || grid.GetInventory() != player.GetInventory() ||
+                    uiTarget.control.GetComponentInParent<InventoryGrid>() != grid ||
+                    !uiTarget.control.GetComponent<UIInputHandler>())
+                    throw new InvalidOperationException("Paired QA clicks require observed native player inventory cells in mouse mode.");
+            }
+            if (step.pointer) { step.x = uiTarget.entry.x; step.y = uiTarget.entry.y; }
+        }
 
         private void AfterInput()
         {
@@ -293,6 +350,7 @@ namespace OstrixMods.BuildWorks
                 if (first)
                 {
                     BuildWorksTestIsolation.RequireLoadedSession();
+                    if (step.uiTarget != null) SelectUiTarget(step, running.InventoryPair, running.FocusThenText);
                     stepFrame = Time.frameCount;
                     if (step.pointer && (step.scroll != 0 || step.buttons != 0 &&
                         !BuildWorksQaInput.GetMouseButton(0) && !BuildWorksQaInput.GetMouseButton(1) && !BuildWorksQaInput.GetMouseButton(2)))
@@ -305,7 +363,8 @@ namespace OstrixMods.BuildWorks
                 }
                 input.Feed(step, first, pointerStart, Mathf.Clamp01(elapsed * 1000 / step.milliseconds), Mathf.Min(Time.unscaledDeltaTime, 0.1f));
                 SubmitFocusedText(step, first);
-                if (uiTarget != null && first && (stepIndex == 1 || step.text != null)) uiReleased = true;
+                // Inventory commits on pointer-down and may change its label before release.
+                if (uiTarget != null && first && (stepIndex % 2 == 1 || step.text != null || running.InventoryPair)) uiReleased = true;
             }
             catch (Exception error) { Stop(error.GetBaseException().Message); }
         }

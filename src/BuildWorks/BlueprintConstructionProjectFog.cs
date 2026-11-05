@@ -17,7 +17,7 @@ namespace OstrixMods.BuildWorks
             internal BlueprintFogBuilding Building;
             internal IEnumerator<object> Preparation;
             internal string Error;
-            internal bool Admitted;
+            internal bool Admitted, WaitingForCapacity;
             internal float Clock;
         }
         private readonly Dictionary<Guid, Entry> entries = new Dictionary<Guid, Entry>();
@@ -33,6 +33,7 @@ namespace OstrixMods.BuildWorks
         private string failure;
         private bool closing;
         private bool layoutDirty = true;
+        private int lastReserved;
         internal int RenderFrames { get; private set; }
         internal int VisibleParts => entries.Values.Sum(entry => entry.Building?.VisibleCount ?? 0);
         internal long FieldBytes => channels?.FieldBytes ?? 0;
@@ -59,11 +60,17 @@ namespace OstrixMods.BuildWorks
             entries.Add(record.Id, entry);
             try
             {
-                entry.Parts = record.Parts.Where(part => runtime.ReadPart(record.Id, part.Id)?.Phase != Journal.Committed).ToArray();
+                entry.Parts = record.Parts.Where(part => runtime.ReadPartPhase(record.Id, part.Id) != Journal.Committed).ToArray();
                 if (entry.Parts.Length == 0) return;
-                int reserved = entries.Values.Sum(item => item.Building?.PlannedParts ?? 0) + (channels?.RetiringSources ?? 0);
+                int reserved = ReservedParts();
+                lastReserved = Math.Max(lastReserved, reserved);
                 if (entry.Parts.Length > BlueprintFogAtlas.MaximumOwners - reserved)
-                    throw new InvalidOperationException("Fog shared owner capacity is full; project and existing visuals retained.");
+                {
+                    entry.WaitingForCapacity = true;
+                    throw new InvalidOperationException("Fog shared owner capacity is full (pending=" + entry.Parts.Length +
+                        ", reserved=" + reserved + ", retiring=" + (channels?.RetiringSources ?? 0) +
+                        "); project and existing visuals retained.");
+                }
                 if (failure != null) throw new InvalidOperationException(failure);
                 EnsureResources();
                 var blueprint = record.Blueprint;
@@ -90,18 +97,39 @@ namespace OstrixMods.BuildWorks
 
         internal void Refresh(Guid id)
         {
-            if (!entries.TryGetValue(id, out var entry) || entry.Building == null || entry.Error != null) return;
+            if (!entries.TryGetValue(id, out var entry)) return;
             try
             {
+                if (entry.WaitingForCapacity)
+                {
+                    if (closing || failure != null || entry.Building != null) return;
+                    int pending = entry.Record.Parts.Count(part => runtime.ReadPartPhase(id, part.Id) != Journal.Committed);
+                    if (pending > BlueprintFogAtlas.MaximumOwners - ReservedParts()) return;
+                    entries.Remove(id);
+                    Add(entry.Record);
+                    return;
+                }
+                if (entry.Building == null || entry.Error != null) return;
                 for (int i = 0; i < entry.Parts.Length; ++i)
                 {
-                    int phase = runtime.ReadPart(id, entry.Parts[i].Id)?.Phase ?? 0;
+                    int phase = runtime.ReadPartPhase(id, entry.Parts[i].Id) ?? 0;
                     if (phase == Journal.Committed) entry.Building.RemovePart(i);
                     else entry.Building.SetPartVisible(i, phase == 0 || phase == Journal.NoEffect);
                 }
                 layoutDirty = true;
             }
-            catch (Exception error) { FailEntry(entry, error); }
+            catch (Exception error) { entry.WaitingForCapacity = false; FailEntry(entry, error); }
+        }
+        private int ReservedParts() => entries.Values.Sum(item => item.Building?.PlannedParts ?? 0) +
+            (channels?.RetiringSources ?? 0);
+
+        private void RetryCapacityAfterBudgetDecrease()
+        {
+            if (closing || failure != null) return;
+            if (ReservedParts() < lastReserved)
+                foreach (Guid id in entries.Where(item => item.Value.WaitingForCapacity).Select(item => item.Key).ToArray())
+                    Refresh(id);
+            lastReserved = ReservedParts();
         }
         private void EnsureResources()
         {
@@ -141,6 +169,7 @@ namespace OstrixMods.BuildWorks
             {
                 Body(out var actor, out var capsule);
                 channels.PumpSources();
+                RetryCapacityAfterBudgetDecrease();
                 bool preparedOne = false;
                 foreach (var entry in entries.Values)
                 {

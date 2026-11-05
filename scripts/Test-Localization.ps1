@@ -87,6 +87,8 @@ $nonLocalizationDottedLiterals = @(
     'accumulatedsmoke.compute', 'fogarena.compute', 'fogsnapshotmetadata.compute',
     'fogghostvolume.shader', 'texturedghost.shader',
     'blueprints.json',
+    'planner.json',
+    'world-capture.txt',
     'manifest.tsv',
     'access.json', 'blueprint.buildworks.json',
     'buildworks-qa-root.txt',
@@ -111,6 +113,8 @@ $nonLocalizationDottedLiterals = @(
     'catalog.group.',
     'editor.catalog.',
     'com.jotunn.jotunn',
+    'com.yololo.innangard',
+    'augusdogus.Buildheim.hammer',
     'ostrix.buildworks.refund.v1',
     'ostrix.buildworks.collected.v1.',
     'ostrmod.buildworks'

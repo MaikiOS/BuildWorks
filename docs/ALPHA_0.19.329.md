@@ -1,10 +1,6 @@
-# BuildWorks private alpha 0.19.329 — scope and manual testing
+# BuildWorks alpha 0.19.329 — scope and manual testing
 
-Issued private manual-test package, 2 November 2026. Request the authorized ZIP from the owner. No public beta, binary release or Thunderstore upload is announced.
-
-## Availability
-
-The current issued private manual-test alpha is **0.19.329**. F9 and blueprint placement allow eligible furniture, storage and crafting pieces to rotate and overlap with real support. Two paid placement cases and their fresh-process reload have bounded native acceptance. Full module sections 1–14, all mod stacks and multiplayer remain open. Obtain the authorized archive from the owner; this is not public beta or a Thunderstore package.
+**Installable alpha: 0.19.329.** [Download and release notes](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.329-alpha). The original 2 November ZIP is unchanged; its internal “private test candidate” wording describes its manual-test origin. This is an alpha prerelease; beta follows completion of the full agreed goal. No Thunderstore upload is included.
 
 ## Placement and operating requirements
 

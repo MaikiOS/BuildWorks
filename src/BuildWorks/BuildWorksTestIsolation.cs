@@ -24,8 +24,8 @@ namespace OstrixMods.BuildWorks
             token = ReadToken(marker);
             string selectedRoot = ResolveRoot(configDirectory, token);
             RequireColdStorage();
-            RequireHost(typeof(World), "94998885B103D6E5F5480123EAEE0A093E82AF2DDEEEE37536C15BF555F24F3A");
-            RequireHost(typeof(Utils), "771D59CBF3EF704007267E8EAF89AAC231C172B052BD93F9C273A18381BD6D59");
+            RequireHost(typeof(World), "9F959C0396EC4240D47FCBE5D0D062C428CC627244506DB5EA567F9D77B2B769");
+            RequireHost(typeof(Utils), "843946B3DF81FB0A3060A6EBEDD34BCACF71CF62B78B74F0DA4653872BAF25F9");
             EnsureOwnedRoot(selectedRoot, token);
 
             // Validate all targets before any patch or native root change.

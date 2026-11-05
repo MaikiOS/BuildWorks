@@ -102,6 +102,20 @@ namespace OstrixMods.BuildWorks
             if (State != Result.Verified && State != Result.Refused) Refuse("Persistence verification cancelled; reconciliation remains required.");
         }
 
+        internal bool TryVerifyCurrent(out string reason)
+        {
+            reason = null;
+            try
+            {
+                if (State != Result.Verified || !Current() || network.IsSaving() || SaveSystem.GetSaveNumber() != before + 1 ||
+                    !profile.TryVerify(out var playerEvidence, out reason) || playerEvidence.ProfileHash != savedProfile.ProfileHash ||
+                    playerEvidence.InventoryHash != savedProfile.InventoryHash || generation == null || !generation.TryFinish(out _, out reason) || !Current())
+                    throw new InvalidOperationException(reason ?? "The verified profile/world pair is no longer current.");
+                return true;
+            }
+            catch (Exception error) { reason = error.Message; return false; }
+        }
+
         private void Refuse(string reason) { Reason = reason; State = Result.Refused; cancellation.Cancel(); Release(); }
         private void Release() { if (ReferenceEquals(active, this)) active = null; }
     }

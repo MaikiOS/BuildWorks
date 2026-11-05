@@ -2,6 +2,7 @@ param([string]$BuildWorksRoot = (Join-Path $PSScriptRoot '../..'))
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $root = (Resolve-Path -LiteralPath $BuildWorksRoot).Path
+& (Join-Path $PSScriptRoot 'MenuEscape.ps1') -BuildWorksRoot $root
 $source = [IO.File]::ReadAllText((Join-Path $root 'src/BuildWorks/PrecisionPlacementSession.cs'))
 $start = $source.IndexOf('        private void SelectBlueprintArea(', [StringComparison]::Ordinal)
 $end = $source.IndexOf('        private bool IsBlueprintPieceSelectable(', [StringComparison]::Ordinal)

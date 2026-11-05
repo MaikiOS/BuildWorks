@@ -1,3 +1,5 @@
+> Актуальное рассмотрение26.10.2026: реестр профилей (local development reference; [public status](../../docs/CURRENT_STATUS_RU.md)) и внешний анализ/план (local development reference; [public status](../../docs/CURRENT_STATUS_RU.md)). Исторические0.19.56/2–128 ниже не являются текущим пределом или обещанием поддержки.
+
 <!-- docs-role: design record; reviewed 2026-10-17 -->
 > Проектная спецификация/предложение: требования ниже не являются заявлением о готовности всех функций. [Текущее состояние и очередь](../../docs/CURRENT_STATUS_RU.md).
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.IO;
 using System.Reflection.Emit;
 using BepInEx;
@@ -19,7 +20,7 @@ namespace OstrixMods.BuildWorks
     {
         internal const string PluginGuid = "ostrmod.buildworks";
         internal const string PluginName = "BuildWorks";
-        internal const string PluginVersion = "0.19.280";
+        internal const string PluginVersion = "0.19.329";
 
         internal static ConfigEntry<KeyCode> TogglePrecisionKey { get; private set; }
         internal static ConfigEntry<KeyCode> LockPrecisionKey { get; private set; }
@@ -38,7 +39,11 @@ namespace OstrixMods.BuildWorks
             !HammerCatalogView.BlocksExchangeInput && instance.session?.CanOpenConstructionProject == true;
         internal static bool BeginConstructionProjectPart(BlueprintConstructionPartExecution execution) => instance &&
             instance.session?.BeginProjectPart(execution) == true;
+        internal static bool BeginConstructionSupportSelection(Piece[] pieces, PrecisionPlacementSession.TransformSnapshot[] poses,
+            bool[] resolved, Action<int, string> result) => instance &&
+            instance.session?.BeginProjectSupportSelection(pieces, poses, resolved, result) == true;
         internal static BlueprintServerClient ServerLibraryClient => instance?.serverLibrary?.Client;
+        internal static BlueprintPeerClient PeerBlueprintClient => instance?.serverLibrary?.PeerClient;
 #if BUILDWORKS_TEST_STAND
         private BuildWorksQaControl qaControl;
 #endif
@@ -121,7 +126,9 @@ namespace OstrixMods.BuildWorks
             try
             {
                 hammerCatalog = new UnifiedHammerCatalog(Logger);
-                harmony = Harmony.CreateAndPatchAll(typeof(BuildWorksPlugin).Assembly, PluginGuid);
+                // Retain the owner even when a later patch throws during registration.
+                harmony = new Harmony(PluginGuid);
+                harmony.PatchAll(typeof(BuildWorksPlugin).Assembly);
                 BuildWorksLocalization.RegisterCurrent();
                 if (!HasRegisteredPlacementTranspiler())
                 {
@@ -652,28 +659,46 @@ namespace OstrixMods.BuildWorks
         private static readonly System.Reflection.FieldInfo MaximumPlaceDistanceField =
             AccessTools.Field(typeof(Player), "m_maxPlaceDistance");
 
+        private static void BeginNativePlacementRay(Player player) => instance?.session?.BeginNativePlacementRay();
+
+        private static void CaptureNativePlacementRayDistance(Player player)
+        {
+            if (instance?.session?.RequiresPlacementContact(player) != true) return;
+            // Inside the original ray body, all foreign prefixes have set their scoped range.
+            instance.session.RecordNativePlacementRayDistance(player, (float)MaximumPlaceDistanceField.GetValue(player));
+        }
+
         private static bool ApplyBlueprintValidationContact(bool nativeHit, Player player,
             ref Vector3 point, ref Vector3 normal, ref Piece hitPiece,
             ref Heightmap heightmap, ref Collider waterSurface, bool water)
         {
-            if (instance?.session == null || !instance.session.TryPrepareBlueprintValidation(
-                player, out GameObject ghost, out Piece source)) return nativeHit;
+            if (instance?.session?.RequiresPlacementContact(player) != true) return nativeHit;
             point = normal = Vector3.zero;
             hitPiece = null;
             heightmap = null;
             waterSurface = null;
             try
             {
+                if (!instance.session.TryTakeNativePlacementRayDistance(out float nativeMaximumDistance) ||
+                    !instance.session.TryPrepareBlueprintValidation(player, out GameObject ghost, out Piece source)) return false;
                 if (!BuildWorksPlacementValidation.TryGetBounds(ghost, out Bounds bounds)) return false;
-                PlacementContactSides sides = source.m_inCeilingOnly ? PlacementContactSides.Above :
+                bool surfaceAttachment = BuildWorksPlacementValidation.UsesSurfaceAttachment(source.m_usage);
+                PlacementContactSides sides = surfaceAttachment
+                    ? PlacementContactSides.All : source.m_inCeilingOnly ? PlacementContactSides.Above :
                     source.m_notOnFloor ? PlacementContactSides.NonFloor :
                     source.m_groundPiece || source.m_groundOnly || source.m_cultivatedGroundOnly ||
                     source.m_vegetationGroundOnly
                         ? PlacementContactSides.Below : PlacementContactSides.All;
                 int mask = (int)(water ? PlacementWaterRayMaskField : PlacementRayMaskField).GetValue(player);
-                float maximumDistance = (float)MaximumPlaceDistanceField.GetValue(player) + source.m_extraPlacementDistance;
-                if (!BuildWorksPlacementValidation.TryFindContact(ghost, bounds, mask,
-                    player.GetEyePoint(), maximumDistance, sides, out RaycastHit contact))
+                float maximumDistance = nativeMaximumDistance + source.m_extraPlacementDistance;
+                RaycastHit contact;
+                PlacementContactFailure failure;
+                bool accepted = surfaceAttachment && BlueprintSurfaceContact.NeedsAdapter(ghost)
+                    ? instance.session.TryFindSurfaceContact(ghost, mask, player.GetEyePoint(), maximumDistance, out contact, out failure)
+                    : BuildWorksPlacementValidation.TryFindContact(ghost, bounds, mask,
+                        player.GetEyePoint(), maximumDistance, sides, out contact, out failure, surfaceAttachment: surfaceAttachment);
+                instance.session.RecordPlacementContactFailure(failure);
+                if (!accepted)
                 {
 #if BUILDWORKS_TEST_STAND
                     Debug.LogWarning(BuildWorksTestPlacementDiagnostics.Describe(ghost, bounds, mask,
@@ -690,10 +715,9 @@ namespace OstrixMods.BuildWorks
                 heightmap = contact.collider.GetComponent<Heightmap>();
                 if (contact.collider.gameObject.layer == LayerMask.NameToLayer("Water"))
                     waterSurface = contact.collider;
-                // A dry support collider below the water must not turn an underwater
-                // noInWater piece into a valid placement. Query the native liquid level.
+                // Preserve native water enforcement for structures; functional attachment uses its proven solid contact.
                 Vector3 bottom = new Vector3(bounds.center.x, bounds.min.y, bounds.center.z);
-                if (source.m_noInWater && Floating.GetLiquidLevel(bottom, 1f, LiquidType.Water) >
+                if (!surfaceAttachment && source.m_noInWater && Floating.GetLiquidLevel(bottom, 1f, LiquidType.Water) >
                     bottom.y + BuildWorksPlacementValidation.ContactTolerance(bounds))
                 {
                     WaterVolume volume = null;
@@ -701,6 +725,7 @@ namespace OstrixMods.BuildWorks
                     if (!volume || !volume.GetComponent<Collider>()) return false;
                     waterSurface = volume.GetComponent<Collider>();
                 }
+                instance.session.RecordNativeChestAttachmentContact(player, source, contact);
                 return true;
             }
             catch (Exception exception)
@@ -718,10 +743,30 @@ namespace OstrixMods.BuildWorks
 
         private static bool ShouldRunNativeGhostUpdate(Player player)
         {
+            instance?.session?.BeginNativePlacementRay();
             if (HammerCatalogView.BlocksExchangeInput) return false;
             if (instance?.blueprintEditor?.BlocksWorldInput == true) return false;
             return instance?.session?.AllowsNativeGhostUpdate(player) != false;
         }
+
+        private static bool ApplyChestAttachmentTiltRule(bool requireHorizontal, Player player) =>
+            requireHorizontal && instance?.session?.HasNativeChestAttachmentContact(player) != true;
+
+        private static bool ApplySurfaceAttachmentSupportRule(bool nativeSupports, Player player) =>
+            nativeSupports || instance?.session?.HasNativeChestAttachmentContact(player) == true;
+
+        private static float ApplySurfaceAttachmentClearance(float nativeClearance, Player player) =>
+            instance?.session?.HasNativeChestAttachmentContact(player) == true ? 0f : nativeClearance;
+
+        private static Heightmap.Biome ApplySurfaceAttachmentBiome(Heightmap.Biome nativeBiome, Player player) =>
+            instance?.session?.HasNativeChestAttachmentContact(player) == true ? Heightmap.Biome.None : nativeBiome;
+
+        private static ZNetView ApplySurfaceAttachmentConnection(ZNetView nativeConnection, Player player) =>
+            instance?.session?.HasNativeChestAttachmentContact(player) == true ? null : nativeConnection;
+
+        private static Player.PlacementStatus ApplySurfaceAttachmentStationRule(Player.PlacementStatus nativeStatus, Player player) =>
+            nativeStatus == Player.PlacementStatus.ExtensionMissingStation &&
+            instance?.session?.HasNativeChestAttachmentContact(player) == true ? player.GetPlacementStatus() : nativeStatus;
 
         private static bool ShouldBlockNativePlacement(Player player, Piece piece)
         {
@@ -791,6 +836,18 @@ namespace OstrixMods.BuildWorks
             instance?.session?.ApplyBlueprintCatalogLayout(table);
         }
 
+        [HarmonyPatch(typeof(Player), "PieceRayTest")]
+        private static class NativePlacementRayDistancePatch
+        {
+            private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+            {
+                yield return new CodeInstruction(OpCodes.Ldarg_0);
+                yield return new CodeInstruction(OpCodes.Call,
+                    AccessTools.Method(typeof(BuildWorksPlugin), nameof(CaptureNativePlacementRayDistance)));
+                foreach (CodeInstruction instruction in instructions) yield return instruction;
+            }
+        }
+
         [HarmonyPatch(typeof(Player), "UpdatePlacementGhost")]
         private static class TransformGhostBeforeNativeValidationPatch
         {
@@ -799,6 +856,7 @@ namespace OstrixMods.BuildWorks
                 return ShouldRunNativeGhostUpdate(__instance);
             }
 
+            [HarmonyBefore("augusdogus.Buildheim.hammer")]
             private static IEnumerable<CodeInstruction> Transpiler(
                 IEnumerable<CodeInstruction> instructions)
             {
@@ -939,6 +997,110 @@ namespace OstrixMods.BuildWorks
                 }
                 contactCode.Add(new CodeInstruction(OpCodes.Call, contactMethod));
                 code.InsertRange(contactInjection, contactCode);
+
+                int captureInjection = code.FindIndex(instruction => instruction.Calls(rayTestMethod));
+                var beginCapture = new CodeInstruction(OpCodes.Ldarg_0);
+                beginCapture.labels.AddRange(code[captureInjection].labels);
+                code[captureInjection].labels.Clear();
+                code.InsertRange(captureInjection, new[] { beginCapture, new CodeInstruction(OpCodes.Call,
+                    AccessTools.Method(typeof(BuildWorksPlugin), nameof(BeginNativePlacementRay))) });
+
+                foreach (string fieldName in new[] { nameof(Piece.m_notOnTiltingSurface),
+                    nameof(Piece.m_inCeilingOnly), nameof(Piece.m_notOnFloor), nameof(Piece.m_notOnWood),
+                    nameof(Piece.m_noClipping) })
+                {
+                    var tiltField = AccessTools.Field(typeof(Piece), fieldName);
+                    int[] tiltSites = Enumerable.Range(0, code.Count - 1).Where(index =>
+                        code[index].opcode == OpCodes.Ldfld && Equals(code[index].operand, tiltField)).ToArray();
+                    if (tiltSites.Length == 1 && code[tiltSites[0] + 1].labels.Count == 0 &&
+                        code[tiltSites[0] + 1].blocks.Count == 0 &&
+                        (code[tiltSites[0] + 1].opcode == OpCodes.Brfalse ||
+                            code[tiltSites[0] + 1].opcode == OpCodes.Brfalse_S))
+                        code.InsertRange(tiltSites[0] + 1, new[] { new CodeInstruction(OpCodes.Ldarg_0),
+                            new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(BuildWorksPlugin),
+                                nameof(ApplyChestAttachmentTiltRule))) });
+                    else
+                        Debug.LogWarning("BuildWorks surface attachment unavailable: native guard layout is unsupported: " + fieldName);
+                }
+
+                var supportsField = AccessTools.Field(typeof(WearNTear), nameof(WearNTear.m_supports));
+                int[] supportSites = Enumerable.Range(0, code.Count - 1).Where(index =>
+                    code[index].opcode == OpCodes.Ldfld && Equals(code[index].operand, supportsField)).ToArray();
+                if (supportSites.Length == 1 && code[supportSites[0] + 1].labels.Count == 0 &&
+                    code[supportSites[0] + 1].blocks.Count == 0 &&
+                    (code[supportSites[0] + 1].opcode == OpCodes.Brtrue || code[supportSites[0] + 1].opcode == OpCodes.Brtrue_S))
+                    code.InsertRange(supportSites[0] + 1, new[] { new CodeInstruction(OpCodes.Ldarg_0),
+                        new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(BuildWorksPlugin),
+                            nameof(ApplySurfaceAttachmentSupportRule))) });
+                else Debug.LogWarning("BuildWorks functional contact unavailable: native support guard layout is unsupported.");
+
+                foreach (string fieldName in new[] { nameof(Piece.m_spaceRequirement), nameof(Piece.m_blockRadius) })
+                {
+                    var field = AccessTools.Field(typeof(Piece), fieldName);
+                    int[] sites = Enumerable.Range(0, code.Count - 1).Where(index =>
+                        code[index].opcode == OpCodes.Ldfld && Equals(code[index].operand, field)).ToArray();
+                    int expected = fieldName == nameof(Piece.m_blockRadius) ? 2 : 1;
+                    if (sites.Length != expected || sites.Any(index => code[index + 1].labels.Count != 0 || code[index + 1].blocks.Count != 0))
+                    {
+                        Debug.LogWarning("BuildWorks functional overlap unavailable: native clearance layout is unsupported: " + fieldName);
+                        continue;
+                    }
+                    foreach (int index in sites.Reverse())
+                        code.InsertRange(index + 1, new[] { new CodeInstruction(OpCodes.Ldarg_0),
+                            new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(BuildWorksPlugin),
+                                nameof(ApplySurfaceAttachmentClearance))) });
+                }
+
+                // Per-object environment restrictions change only after a real final-pose contact.
+                foreach (var flag in new Dictionary<string, int> {
+                    [nameof(Piece.m_groundPiece)] = 5, [nameof(Piece.m_groundOnly)] = 2,
+                    [nameof(Piece.m_cultivatedGroundOnly)] = 2, [nameof(Piece.m_vegetationGroundOnly)] = 1,
+                    [nameof(Piece.m_waterPiece)] = 3, [nameof(Piece.m_noInWater)] = 2,
+                    [nameof(Piece.m_onlyInTeleportArea)] = 1, [nameof(Piece.m_requireDeepSnow)] = 1,
+                    [nameof(Piece.m_allowedInDeepSnow)] = 1, [nameof(Piece.m_allowedInDungeons)] = 1 })
+                {
+                    var field = AccessTools.Field(typeof(Piece), flag.Key);
+                    int[] sites = Enumerable.Range(0, code.Count - 1).Where(index =>
+                        code[index].opcode == OpCodes.Ldfld && Equals(code[index].operand, field)).ToArray();
+                    if (sites.Length != flag.Value || sites.Any(index => code[index + 1].labels.Count != 0 || code[index + 1].blocks.Count != 0))
+                    {
+                        Debug.LogWarning("BuildWorks functional environment unavailable: native flag layout is unsupported: " + flag.Key);
+                        continue;
+                    }
+                    string rule = flag.Key == nameof(Piece.m_allowedInDeepSnow) || flag.Key == nameof(Piece.m_allowedInDungeons)
+                        ? nameof(ApplySurfaceAttachmentSupportRule) : nameof(ApplyChestAttachmentTiltRule);
+                    foreach (int index in sites.Reverse())
+                        code.InsertRange(index + 1, new[] { new CodeInstruction(OpCodes.Ldarg_0),
+                            new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(BuildWorksPlugin), rule)) });
+                }
+
+                foreach (var fieldRule in new[] {
+                    new { Field = nameof(Piece.m_onlyInBiome), Rule = nameof(ApplySurfaceAttachmentBiome) },
+                    new { Field = nameof(Piece.m_mustConnectTo), Rule = nameof(ApplySurfaceAttachmentConnection) } })
+                {
+                    var field = AccessTools.Field(typeof(Piece), fieldRule.Field);
+                    int[] sites = Enumerable.Range(0, code.Count - 1).Where(index =>
+                        code[index].opcode == OpCodes.Ldfld && Equals(code[index].operand, field)).ToArray();
+                    if (sites.Length != 2 || sites.Any(index => code[index + 1].labels.Count != 0 || code[index + 1].blocks.Count != 0))
+                    {
+                        Debug.LogWarning("BuildWorks functional environment unavailable: native field layout is unsupported: " + fieldRule.Field);
+                        continue;
+                    }
+                    foreach (int index in sites.Reverse())
+                        code.InsertRange(index + 1, new[] { new CodeInstruction(OpCodes.Ldarg_0),
+                            new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(BuildWorksPlugin), fieldRule.Rule)) });
+                }
+
+                var statusField = AccessTools.Field(typeof(Player), "m_placementStatus");
+                int[] missingStationSites = Enumerable.Range(1, code.Count - 1).Where(index =>
+                    code[index].opcode == OpCodes.Stfld && Equals(code[index].operand, statusField) &&
+                    code[index - 1].opcode == OpCodes.Ldc_I4_7).ToArray();
+                if ((int)Player.PlacementStatus.ExtensionMissingStation == 7 && missingStationSites.Length == 1 &&
+                    code[missingStationSites[0]].labels.Count == 0 && code[missingStationSites[0]].blocks.Count == 0)
+                    code.InsertRange(missingStationSites[0], new[] { new CodeInstruction(OpCodes.Ldarg_0),
+                        new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(BuildWorksPlugin),
+                            nameof(ApplySurfaceAttachmentStationRule))) });
+                else Debug.LogWarning("BuildWorks functional station attachment unavailable: native missing-station layout is unsupported.");
 
                 return code;
             }
@@ -1178,35 +1340,69 @@ namespace OstrixMods.BuildWorks
         [HarmonyPatch(typeof(Player), "PlacePiece")]
         private static class NativePieceScalePlacementPatch
         {
-            private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+            [HarmonyPriority(Priority.First)]
+            private static bool Prefix(Player __instance) =>
+                instance?.session?.BlocksPlacementForSupport(__instance) != true;
+
+            [HarmonyPriority(Priority.First)]
+            private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, ILGenerator generator)
             {
-                var replacement = AccessTools.Method(typeof(NativePieceScalePlacementPatch), nameof(InstantiatePiece));
-                int count = 0;
-                foreach (CodeInstruction instruction in instructions)
-                {
-                    if (instruction.operand is System.Reflection.MethodInfo method &&
-                        method.DeclaringType == typeof(UnityEngine.Object) && method.Name == nameof(UnityEngine.Object.Instantiate) &&
-                        method.IsGenericMethod && method.GetGenericArguments()[0] == typeof(GameObject) &&
-                        method.GetParameters().Length == 3 && method.GetParameters()[1].ParameterType == typeof(Vector3) &&
-                        method.GetParameters()[2].ParameterType == typeof(Quaternion))
-                    {
-                        instruction.opcode = OpCodes.Call;
-                        instruction.operand = replacement;
-                        ++count;
-                    }
-                    yield return instruction;
-                }
+                var code = instructions.ToList();
+                bool IsFactory(CodeInstruction instruction) =>
+                    instruction.opcode == OpCodes.Call &&
+                    instruction.operand is System.Reflection.MethodInfo method &&
+                    method.DeclaringType == typeof(UnityEngine.Object) && method.Name == nameof(UnityEngine.Object.Instantiate) &&
+                    method.IsGenericMethod && method.GetGenericArguments()[0] == typeof(GameObject) &&
+                    method.GetParameters().Length == 3 && method.GetParameters()[1].ParameterType == typeof(Vector3) &&
+                    method.GetParameters()[2].ParameterType == typeof(Quaternion);
+                int count = code.Count(IsFactory);
                 if (count != 1) throw new InvalidOperationException("PlacePiece native Instantiate hook count: " + count);
+                int index = code.FindIndex(IsFactory);
+                CodeInstruction factory = code[index];
+                if (factory.blocks.Count != 0)
+                    throw new InvalidOperationException("PlacePiece Instantiate exception boundary is unsupported.");
+                LocalBuilder source = generator.DeclareLocal(typeof(GameObject));
+                LocalBuilder position = generator.DeclareLocal(typeof(Vector3));
+                LocalBuilder rotation = generator.DeclareLocal(typeof(Quaternion));
+                LocalBuilder piece = generator.DeclareLocal(typeof(Piece));
+                var first = new CodeInstruction(OpCodes.Stloc, rotation);
+                first.labels.AddRange(factory.labels);
+                factory.labels.Clear();
+                code.InsertRange(index, new[] {
+                    first, new CodeInstruction(OpCodes.Stloc, position), new CodeInstruction(OpCodes.Stloc, source),
+                    new CodeInstruction(OpCodes.Ldloc, source),
+                    new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(NativePieceScalePlacementPatch), nameof(PrepareNativeInstantiation))),
+                    new CodeInstruction(OpCodes.Stloc, piece),
+                    new CodeInstruction(OpCodes.Ldloc, source), new CodeInstruction(OpCodes.Ldloc, position),
+                    new CodeInstruction(OpCodes.Ldloc, rotation)
+                });
+                // Leave the original factory call available to other mods' transpilers.
+                code.InsertRange(index + 10, new[] {
+                    new CodeInstruction(OpCodes.Ldloc, source), new CodeInstruction(OpCodes.Ldloc, piece),
+                    new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(NativePieceScalePlacementPatch), nameof(CompleteNativeInstantiation)))
+                });
+                return code;
             }
 
-            private static GameObject InstantiatePiece(GameObject source, Vector3 position, Quaternion rotation)
+            private static Piece PrepareNativeInstantiation(GameObject source)
             {
-                GameObject placed = null;
                 try
                 {
                     Piece piece = source.GetComponent<Piece>();
                     instance?.session?.RequireNativePlacementMaterialCreation(piece);
-                    placed = UnityEngine.Object.Instantiate(source, position, rotation);
+                    return piece;
+                }
+                catch
+                {
+                    TerrainModifier.SetTriggerOnPlaced(false);
+                    throw;
+                }
+            }
+
+            private static GameObject CompleteNativeInstantiation(GameObject placed, GameObject source, Piece piece)
+            {
+                try
+                {
                     instance?.session?.ApplyNativePlacementScale(placed, piece);
                     return placed;
                 }
@@ -1221,6 +1417,12 @@ namespace OstrixMods.BuildWorks
                     }
                     throw;
                 }
+            }
+
+            private static Exception Finalizer(Exception __exception)
+            {
+                TerrainModifier.SetTriggerOnPlaced(false);
+                return __exception;
             }
         }
 
@@ -1357,6 +1559,12 @@ namespace OstrixMods.BuildWorks
                 BlueprintConstructionPayoutCleanup.AllowNetwork(__0, out __state);
             private static Exception Finalizer(BlueprintConstructionPayoutCleanup.Witness __state, Exception __exception)
             { BlueprintConstructionPayoutCleanup.ConfirmNetwork(__state, __exception); return __exception; }
+        }
+
+        [HarmonyPatch(typeof(Menu), "Update")]
+        private static class WorldSelectionMenuEscapePatch
+        {
+            private static bool Prefix() => instance?.session?.ShouldBlockMenuEscape() != true;
         }
 
         [HarmonyPatch(typeof(Player), "TakeInput")]

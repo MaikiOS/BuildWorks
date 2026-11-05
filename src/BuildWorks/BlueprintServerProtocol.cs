@@ -151,15 +151,15 @@ namespace OstrixMods.BuildWorks
                 string.IsNullOrWhiteSpace(item.Publisher) || string.IsNullOrWhiteSpace(item.Editor)) throw Invalid();
             return item;
         }
-        private static void WriteText(BinaryWriter writer, string text)
+        internal static void WriteText(BinaryWriter writer, string text)
         {
             if (text == null || text.Length > 1024) throw Invalid();
             byte[] bytes = new UTF8Encoding(false, true).GetBytes(text);
             if (bytes.Length > 1024) throw Invalid(); writer.Write(bytes.Length); writer.Write(bytes);
         }
-        private static string ReadText(BinaryReader reader) => new UTF8Encoding(false, true).GetString(ReadExact(reader, ReadRange(reader, 0, 1024)));
-        private static Guid ReadGuid(BinaryReader reader) => new Guid(ReadExact(reader, 16));
-        private static void WriteHash(BinaryWriter writer, string hash)
+        internal static string ReadText(BinaryReader reader) => new UTF8Encoding(false, true).GetString(ReadExact(reader, ReadRange(reader, 0, 1024)));
+        internal static Guid ReadGuid(BinaryReader reader) => new Guid(ReadExact(reader, 16));
+        internal static void WriteHash(BinaryWriter writer, string hash)
         {
             if (hash == null || hash.Length != 64) throw Invalid();
             for (int i = 0; i < 64; i += 2)
@@ -170,10 +170,10 @@ namespace OstrixMods.BuildWorks
                 writer.Write(value);
             }
         }
-        private static string ReadHash(BinaryReader reader) => BitConverter.ToString(ReadExact(reader, 32)).Replace("-", "");
-        private static int ReadRange(BinaryReader reader, int minimum, int maximum)
+        internal static string ReadHash(BinaryReader reader) => BitConverter.ToString(ReadExact(reader, 32)).Replace("-", "");
+        internal static int ReadRange(BinaryReader reader, int minimum, int maximum)
         { int value = reader.ReadInt32(); if (value < minimum || value > maximum) throw Invalid(); return value; }
-        private static byte[] ReadExact(BinaryReader reader, int length)
+        internal static byte[] ReadExact(BinaryReader reader, int length)
         {
             if (length > reader.BaseStream.Length - reader.BaseStream.Position) throw Invalid();
             byte[] result = reader.ReadBytes(length); if (result.Length != length) throw Invalid(); return result;

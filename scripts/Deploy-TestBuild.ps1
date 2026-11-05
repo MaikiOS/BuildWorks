@@ -66,7 +66,7 @@ $targetBepInEx = Join-Path $targetProfileRoot 'BepInEx'
 $targetPlugins = Join-Path $targetBepInEx 'plugins'
 $defaultPlugins = Join-Path $profilesRoot 'Default\BepInEx\plugins'
 $defaultInstall = Join-Path $defaultPlugins 'Ostrix-BuildWorks'
-$dllNames = @('BuildWorks.dll', 'BuildWorks.Geometry.dll')
+$artifactNames = @('BuildWorks.dll', 'BuildWorks.Geometry.dll', 'YamlDotNet.dll', 'THIRD_PARTY_NOTICES.md')
 
 Assert-NotReparsePoint $targetBepInEx
 Assert-NotReparsePoint $targetPlugins
@@ -204,7 +204,7 @@ if ($BlueprintLibraryArchive) {
 $sourceHashes = @{}
 $needsDeploy = $false
 
-foreach ($name in $dllNames) {
+foreach ($name in $artifactNames) {
     $source = Join-Path $artifactRoot $name
     $destination = Join-Path $targetInstall $name
     Assert-NotReparsePoint $source
@@ -223,7 +223,7 @@ foreach ($name in $dllNames) {
 }
 
 if ($needsDeploy) {
-    $operation = 'Deploy BuildWorks.dll and BuildWorks.Geometry.dll as one required pair'
+    $operation = 'Deploy BuildWorks, Geometry, YAML dependency and license notice as one required set'
     if (-not $PSCmdlet.ShouldProcess($targetInstall, $operation)) {
         Assert-DefaultClean
         Write-Output "Validated BuildWorks test target; no files copied: $targetInstall"
@@ -242,7 +242,7 @@ if ($needsDeploy) {
     New-Item -ItemType Directory -Path $scratchRoot -Force -Confirm:$false | Out-Null
 
     try {
-        foreach ($name in $dllNames) {
+        foreach ($name in $artifactNames) {
             $staged = Join-Path $scratchRoot $name
             Copy-Item `
                 -LiteralPath (Join-Path $artifactRoot $name) `
@@ -260,7 +260,7 @@ if ($needsDeploy) {
         $originalHashes = @{}
         New-Item -ItemType Directory -Path $targetInstall -Force -Confirm:$false | Out-Null
 
-        foreach ($name in $dllNames) {
+        foreach ($name in $artifactNames) {
             $destination = Join-Path $targetInstall $name
             $hadOriginal[$name] = Test-Path -LiteralPath $destination -PathType Leaf
             if ($hadOriginal[$name]) {
@@ -280,7 +280,7 @@ if ($needsDeploy) {
         }
 
         try {
-            foreach ($name in $dllNames) {
+            foreach ($name in $artifactNames) {
                 Assert-NotReparsePoint (Join-Path $targetInstall $name)
                 Copy-Item `
                     -LiteralPath (Join-Path $scratchRoot $name) `
@@ -289,7 +289,7 @@ if ($needsDeploy) {
                     -Confirm:$false
             }
 
-            foreach ($name in $dllNames) {
+            foreach ($name in $artifactNames) {
                 $installedHash = (Get-FileHash `
                     -LiteralPath (Join-Path $targetInstall $name) `
                     -Algorithm SHA256).Hash
@@ -301,7 +301,7 @@ if ($needsDeploy) {
         catch {
             $deployError = $_
             $rollbackErrors = [Collections.Generic.List[string]]::new()
-            foreach ($name in $dllNames) {
+            foreach ($name in $artifactNames) {
                 try {
                     $destination = Join-Path $targetInstall $name
                     Assert-NotReparsePoint $destination
@@ -340,10 +340,10 @@ if ($needsDeploy) {
     }
 }
 else {
-    Write-Output "$TargetProfile already contains the current artifact pair; no files copied."
+    Write-Output "$TargetProfile already contains the current artifact set; no files copied."
 }
 
-foreach ($name in $dllNames) {
+foreach ($name in $artifactNames) {
     $destination = Join-Path $targetInstall $name
     Assert-NotReparsePoint $destination
     if (-not (Test-Path -LiteralPath $destination -PathType Leaf)) {

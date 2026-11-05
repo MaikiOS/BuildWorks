@@ -29,8 +29,38 @@ internal static class Program
         Reject(batch.Replace("\"action\":", "\"stopRevision\":-1,\"action\":"));
         string ui = Header + "\"action\":\"batch\",\"stopRevision\":0,\"steps\":[{\"milliseconds\":100,\"uiTarget\":\"0123456789abcdef0123456789abcdef\",\"pointer\":true,\"buttons\":1},{\"milliseconds\":300}]}";
         if (Read(ui).steps[0].uiTarget.Length != 32) throw new Exception("UI target lost."); ++checks;
+        string secondId = "1123456789abcdef0123456789abcdef";
+        string pair = ui.Substring(0, ui.Length - 2) + ",{\"milliseconds\":100,\"uiTarget\":\"" + secondId + "\",\"pointer\":true,\"buttons\":1},{\"milliseconds\":400}]}";
+        if (Read(pair).steps.Length != 4 || Read(pair).steps[2].uiTarget != secondId || !Read(pair).InventoryPair || Read(pair).FocusThenText)
+            throw new Exception("Guarded inventory pair lost its second target."); ++checks;
+        Reject(pair.Replace("\"stopRevision\":0,", ""));
+        Reject(pair.Replace(secondId, "bad"));
+        Reject(pair.Replace("\"uiTarget\":\"" + secondId + "\",", ""));
+        Reject(pair.Replace("{\"milliseconds\":300}", "{\"milliseconds\":300,\"buttons\":1}"));
+        Reject(pair.Replace("{\"milliseconds\":400}", "{\"milliseconds\":400,\"pointer\":true}"));
+        Reject(pair.Replace("\"pointer\":true,\"buttons\":1", "\"text\":\"not a click\""));
+        Reject(pair.Replace("{\"milliseconds\":400}", "{\"milliseconds\":400,\"keys\":[\"Return\"]}"));
         string text = ui.Replace("\"pointer\":true,\"buttons\":1", "\"text\":\"QA copy\",\"keys\":[\"Return\"]");
         if (Read(text).steps[0].text != "QA copy") throw new Exception("Guarded text lost."); ++checks;
+        string focusText = pair.Replace(secondId, "0123456789abcdef0123456789abcdef");
+        int secondAction = focusText.LastIndexOf("\"pointer\":true,\"buttons\":1", StringComparison.Ordinal);
+        focusText = focusText.Remove(secondAction, "\"pointer\":true,\"buttons\":1".Length).Insert(secondAction, "\"text\":\"QA copy\",\"keys\":[\"Return\"]");
+        if (Read(focusText).steps[2].text != "QA copy" || !Read(focusText).FocusThenText || Read(focusText).InventoryPair)
+            throw new Exception("Same-field focus/text sequence lost."); ++checks;
+        if (Read(focusText.Replace("QA copy", "")).steps[2].text != "") throw new Exception("Clearing a focused field was rejected."); ++checks;
+        Reject(focusText.Replace("\"stopRevision\":0,", ""));
+        Reject(focusText.Replace("QA copy", new string('a', 257)));
+        Reject(focusText.Replace("\"text\":\"QA copy\"", "\"pointer\":true,\"text\":\"QA copy\""));
+        Reject(focusText.Replace("\"text\":\"QA copy\"", "\"buttons\":1,\"text\":\"QA copy\""));
+        Reject(focusText.Replace("\"text\":\"QA copy\"", "\"lookX\":1,\"text\":\"QA copy\""));
+        Reject(focusText.Replace("\"text\":\"QA copy\"", "\"scroll\":1,\"text\":\"QA copy\""));
+        Reject(focusText.Replace("Return", "E"));
+        Reject(focusText.Replace("{\"milliseconds\":300}", "{\"milliseconds\":300,\"text\":\"extra\"}"));
+        Reject(focusText.Replace("{\"milliseconds\":400}", "{\"milliseconds\":400,\"keys\":[\"Return\"]}"));
+        Reject(focusText.Replace("\"uiTarget\":\"0123456789abcdef0123456789abcdef\",\"text\"", "\"uiTarget\":\"" + secondId + "\",\"text\""));
+        Reject(focusText.Replace("\"pointer\":true,\"buttons\":1", "\"text\":\"not a click\""));
+        if (Read(focusText.Replace(",\"keys\":[\"Return\"]", "")).steps[2].keys != null)
+            throw new Exception("Focus/text without submit changed keys."); ++checks;
         Reject(ui.Replace("\"stopRevision\":0,", ""));
         Reject(ui.Replace("0123456789abcdef0123456789abcdef", "bad"));
         Reject(ui.Replace("0123456789abcdef0123456789abcdef", "g123456789abcdef0123456789abcdef"));

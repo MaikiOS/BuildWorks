@@ -4,9 +4,11 @@
 
 ## Current work and scoped results
 
-Private alpha0.19.329 is issued for manual testing. Section1 and2.1–2.15 keep their scoped acceptance;2.17/2.18 are accepted only for format/capture data.2.19 Unbound file/state encoding is accepted as source/CPU, while its UI and original-consumer validation remain open and are not part of the issued archive.2.16 remains mandatory before release. All14sections and137stableIDs remain:35scoped accepted,102open. Future milestones do not replace the current module. [Version and limits](ALPHA_0.19.329.md).
+**Installable alpha: 0.19.329.** [Download and release notes](https://github.com/MaikiOS/BuildWorks/releases/tag/v0.19.329-alpha). The original 2 November ZIP is unchanged; its internal “private test candidate” wording describes its manual-test origin. This is an alpha prerelease; beta follows completion of the full agreed goal. No Thunderstore upload is included.
 
-**Alpha 0.19.329 limits:** paid placement and cold reload are confirmed for one wall-overlap chest and one rotated wall cookingstation; the chest opens. Cooking with food/fire/fuel and the sufficient-resources negative case remain untested. Placement does not waive operating requirements, resources, permissions or station checks. A chest cannot provide attachment support for another chest. Producer-name corrections are included; review missing parts and test your own mod stack. Unbound export UI is later source work and is not included in this issued archive.
+This tag preserves the archive source: checkpoint `5a095eb81967e074c29c8588161e0495325c4b6d`. It freezes the 2 November alpha; later development is not included in the ZIP. 2.19 Unbound and the full module remain open. See [main](https://github.com/MaikiOS/BuildWorks/blob/main/docs/CURRENT_STATUS.md) for subsequent development.
+
+The .329 archive has bounded acceptance for one wall-overlap chest costing 10 Wood and a wall cooking station rotated 90 degrees costing 2 Wood, followed by a new-process reload; the chest opens. Poses were set with virtual transform fields and confirmed through native placement. Physical mouse/gizmo input was not re-proved. The container-only NoContact negative had 2 Wood; a sufficiently funded negative and cooking/fire/food/fuel remain untested. Old 329h preservation UNKNOWN/HOLD and planner strictPlayerStateSame=false are retained. Full module and host+remote acceptance remain open.
 
 ## Product direction
 
@@ -225,4 +227,3 @@ Statuses mirror LIVE; no new checkmarks. English entries are editorial summaries
 | 14.7 | Scoped accepted | Preserve assemblies, guides, adaptive pieces and EarthWorks future directions |
 | 14.8 | Open | Full completion audit before goal completion; docs do not change goal state |
 | 14.9 | Open | Bilingual docs/wiki and truthful media; Thunderstore upload still withheld |
-

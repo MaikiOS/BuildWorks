@@ -49,7 +49,15 @@ public static class RuntimeEditorAcceptance
             SessionState.SetBool(PendingRun, false);
             bool signsOnly = SessionState.GetBool("BuildWorks.SignAcceptance.Pending", false);
             SessionState.SetBool("BuildWorks.SignAcceptance.Pending", false);
-            run = signsOnly ? SignPreviewAcceptance.Run().GetEnumerator() : CaptureRuntime();
+            bool exchangeOnly = SessionState.GetBool("BuildWorks.ExchangeAcceptance.Pending", false);
+            SessionState.SetBool("BuildWorks.ExchangeAcceptance.Pending", false);
+            bool plannerOnly = SessionState.GetBool("BuildWorks.PlannerAcceptance.Pending", false);
+            SessionState.SetBool("BuildWorks.PlannerAcceptance.Pending", false);
+            bool placementOnly = SessionState.GetBool("BuildWorks.PlacementFrames.Pending", false);
+            SessionState.SetBool("BuildWorks.PlacementFrames.Pending", false);
+            bool inputOnly = SessionState.GetBool("BuildWorks.ControllerInput.Pending", false);
+            SessionState.SetBool("BuildWorks.ControllerInput.Pending", false);
+            run = inputOnly ? CheckControllerInput() : placementOnly ? CheckPlacementFrames() : plannerOnly ? CaptureExchangeExports(true) : exchangeOnly ? CaptureExchangeExports() : signsOnly ? SignPreviewAcceptance.Run().GetEnumerator() : CaptureRuntime();
             EditorApplication.update += Advance;
         };
     }
@@ -138,10 +146,116 @@ public static class RuntimeEditorAcceptance
         BeginPlay();
     }
 
+    public static void VerifyPlacementFrames()
+    {
+        SessionState.SetBool("BuildWorks.PlacementFrames.Pending", true);
+        BeginPlay();
+    }
+
+    public static void VerifyControllerInput()
+    {
+        SessionState.SetBool("BuildWorks.ControllerInput.Pending", true);
+        CaptureAll();
+    }
+
+    private static IEnumerator CheckControllerInput()
+    {
+        Require(Application.isPlaying, "Controller input checks require Play Mode");
+        runtimeErrors.Clear();
+        Application.LogCallback track = (message, stack, type) =>
+        { if (type == LogType.Error || type == LogType.Exception || type == LogType.Assert) runtimeErrors.Add(message); };
+        Application.logMessageReceived += track;
+        var events = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+        var template = new GameObject("HostCamera", typeof(Camera)).GetComponent<Camera>(); template.enabled = false;
+        var font = new GameObject("Font", typeof(RectTransform)).AddComponent<TextMeshProUGUI>();
+        font.font = TMP_FontAsset.CreateFontAsset(Font.CreateDynamicFontFromOSFont("Arial", 20)); font.gameObject.SetActive(false);
+        string output = Path.GetFullPath(Path.Combine(Application.dataPath, "../../../artifacts/ui-controller-input"));
+        Directory.CreateDirectory(output);
+        var restore = UseGameViewSize(1280, 720);
+        try
+        {
+            yield return null;
+            foreach (object step in PlacementContactAcceptance.VerifyIsolatedStructuralQueries()) yield return step;
+            foreach (object step in StructuralSnapshotAcceptance.Run()) yield return step;
+            foreach (object step in StructuralAnalysisAcceptance.Run()) yield return step;
+            foreach (object step in ControllerInputAcceptance.Run(template, font, output)) yield return step;
+            Require(runtimeErrors.Count == 0, "Controller runtime errors: " + string.Join("\n", runtimeErrors));
+            Debug.Log("BUILDWORKS_CONTROLLER_INPUT_OK");
+        }
+        finally
+        {
+            restore(); Application.logMessageReceived -= track;
+            Object.Destroy(template.gameObject); Object.Destroy(font.gameObject); Object.Destroy(events);
+        }
+    }
+
+    private static IEnumerator CheckPlacementFrames()
+    {
+        var template = new GameObject("PlacementFramesCamera", typeof(Camera)).GetComponent<Camera>();
+        template.enabled = false;
+        try
+        {
+            yield return null;
+            TestRotatedPlacementFrames(template);
+            TestRotatedPlacementFrames(template, new Vector3(.2f, .15f, -.1f));
+            Debug.Log("BUILDWORKS_PLACEMENT_FRAMES_OK");
+        }
+        finally { Object.Destroy(template.gameObject); }
+    }
+
     public static void VerifySignPreviews()
     {
         SessionState.SetBool("BuildWorks.SignAcceptance.Pending", true);
         BeginPlay();
+    }
+
+    public static void VerifyExchangeExports()
+    {
+        SessionState.SetBool("BuildWorks.ExchangeAcceptance.Pending", true);
+        BeginPlay();
+    }
+
+    public static void VerifyPlannerExports()
+    {
+        SessionState.SetBool("BuildWorks.PlannerAcceptance.Pending", true);
+        BeginPlay();
+    }
+
+    private static IEnumerator CaptureExchangeExports(bool plannerOnly = false)
+    {
+        Require(Application.isPlaying, "Exchange checks require Play Mode");
+        Application.logMessageReceived += (message, stack, type) =>
+        { if (type == LogType.Error || type == LogType.Exception || type == LogType.Assert) runtimeErrors.Add(message); };
+        new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+        var template = new GameObject("HostCamera", typeof(Camera)).GetComponent<Camera>(); template.enabled = false;
+        var font = new GameObject("Font", typeof(RectTransform)).AddComponent<TextMeshProUGUI>();
+        font.font = TMP_FontAsset.CreateFontAsset(Font.CreateDynamicFontFromOSFont("Arial", 20)); font.gameObject.SetActive(false);
+        string output = Path.GetFullPath(Path.Combine(Application.dataPath, plannerOnly ? "../../../artifacts/point-2.17-20261029/ui-planner324-v1" : "../../../artifacts/point-2.16-20261028/ui-legacy321"));
+        Directory.CreateDirectory(output);
+        var restore = UseGameViewSize(1280, 720);
+        try
+        {
+            yield return null;
+            if (plannerOnly)
+            {
+                foreach (object step in ControllerInputAcceptance.RunPlannerExports(template, font, output)) yield return step;
+                Require(runtimeErrors.Count == 0, "Planner runtime errors: " + string.Join("\n", runtimeErrors));
+                Debug.Log("BUILDWORKS_PLANNER_EXPORTS_OK");
+                yield break;
+            }
+            string regressionOutput = Path.Combine(output,"exchange-lifecycle");
+            Directory.CreateDirectory(regressionOutput);
+            foreach (object step in ControllerInputAcceptance.RunExchangeLifecycle(template, font, regressionOutput)) yield return step;
+            foreach (object step in ControllerInputAcceptance.RunOpenKeepExports(template, font, output)) yield return step;
+            foreach (object step in ControllerInputAcceptance.RunKgExports(template, font, output)) yield return step;
+            foreach (object step in ControllerInputAcceptance.RunBbpExports(template, font, output)) yield return step;
+            foreach (object step in ControllerInputAcceptance.RunBbpExports(template, font, output, true)) yield return step;
+            foreach (object step in ControllerInputAcceptance.RunKgPresentation(template, font, output)) yield return step;
+            Require(runtimeErrors.Count == 0, "Exchange runtime errors: " + string.Join("\n", runtimeErrors));
+            File.WriteAllText(Path.Combine(output, "acceptance.json"), "{\"passed\":true,\"gameHostTested\":false,\"languages\":2,\"targets\":2,\"existingExchangeLifecycle\":true,\"nativeScrollEvent\":true,\"freshDeferredScreenshots\":2}");
+            Debug.Log("BUILDWORKS_EXCHANGE_EXPORTS_OK");
+        }
+        finally { restore(); Object.Destroy(template.gameObject); Object.Destroy(font.gameObject); }
     }
 
     private static void AfterTmpImport(string packageName)
@@ -2378,12 +2492,15 @@ public static class RuntimeEditorAcceptance
         checks.Add("Game snapping accepts native sockets inside their own mesh, not generated midpoints");
     }
 
-    private static void TestRotatedPlacementFrames(Camera template)
+    private static void TestRotatedPlacementFrames(Camera template, Vector3? socketOffset = null)
     {
         GameObject source = GameObject.CreatePrimitive(PrimitiveType.Cube); source.SetActive(false);
         var socket = new GameObject("RotatedSocket"); socket.tag = "snappoint"; socket.transform.SetParent(source.transform, false);
+        Vector3 localSocket = socketOffset ?? Vector3.zero;
+        socket.transform.localPosition = localSocket;
         Quaternion targetFrame = Quaternion.Euler(23, 41, -17), yaw = Quaternion.Euler(0, 37, 0);
-        Vector3 target = new Vector3(0, 1, 0);
+        Vector3 target = new Vector3(0, 1, 0) + targetFrame * localSocket;
+        Vector3 expectedRoot = target - yaw * localSocket;
         var doc = new BlueprintEditorDocument(null, "Rotated target", "Test", new[] {
             new BlueprintEditorPart("target", "fixture", "Target", new Point3(0,1,0),
                 new Rotation3(targetFrame.x, targetFrame.y, targetFrame.z, targetFrame.w)) });
@@ -2396,9 +2513,9 @@ public static class RuntimeEditorAcceptance
                 Require(scene.TrySync(doc, out string error), error);
                 Require(scene.ShowPlacementPreview("fixture", target - Vector3.up * .4f, Vector3.up, yaw, true,
                     out Vector3 final, out error, 0), error);
-                Require(scene.PlacementSnapTarget.HasValue && Vector3.Distance(final, target) < .001f &&
-                    Quaternion.Angle(scene.PlacementFinalRotation, targetFrame * yaw) < .01f,
-                    "Single ghost did not inherit target XYZ and preserve grip");
+                Require(scene.PlacementSnapTarget.HasValue && Vector3.Distance(final, expectedRoot) < .001f &&
+                    Quaternion.Angle(scene.PlacementFinalRotation, yaw) < .01f,
+                    "Single snapped ghost must preserve the chosen orientation and grip");
                 var ghost = Field<object>(scene, "placementPreview");
                 Require(Quaternion.Angle(Field<GameObject>(ghost, "Root").transform.rotation, scene.PlacementFinalRotation) < .01f,
                     "Single ghost final frame differs from commit frame");
@@ -2411,15 +2528,28 @@ public static class RuntimeEditorAcceptance
                     new Rotation3(yaw.x,yaw.y,yaw.z,yaw.w));
                 scene.ShowBlueprintPlacementPreview(new[] { first, second }, target - Vector3.up * .4f,
                     out Vector3 offset, snap:true, inputRotation:yaw);
-                Require(scene.PlacementSnapTarget.HasValue && Quaternion.Angle(scene.PlacementFinalRotation, targetFrame * yaw) < .01f,
+                Require(scene.PlacementSnapTarget.HasValue && Quaternion.Angle(scene.PlacementFinalRotation, yaw) < .01f,
                     "Second part native socket in blueprint ghost was skipped");
                 var previews = Field<IList>(scene, "duplicatePreviews");
                 Transform near = Field<GameObject>(previews[1], "Root").transform;
-                Require(Vector3.Distance(near.position, target) < .001f &&
-                    Quaternion.Angle(near.rotation, targetFrame * yaw) < .01f, "Blueprint ghost grip/frame mismatch");
+                Require(Vector3.Distance(near.position, expectedRoot) < .001f &&
+                    Quaternion.Angle(near.rotation, yaw) < .01f, "Blueprint ghost grip/frame mismatch");
                 Transform far = Field<GameObject>(previews[0], "Root").transform;
-                Require(Vector3.Distance(far.position - near.position, targetFrame * Vector3.right * 10) < .001f,
+                Require(Vector3.Distance(far.position - near.position, Vector3.right * 10) < .001f,
                     "Blueprint alignment changed relative geometry");
+                for (int i = 0; i < 4; ++i)
+                {
+                    var chained = new BlueprintEditorDocument(null, "Next wall", "Test", new[] {
+                        new BlueprintEditorPart("target", "fixture", "Target", new Point3(0,1,0),
+                            new Rotation3(yaw.x, yaw.y, yaw.z, yaw.w)) });
+                    Require(scene.TrySync(chained, out error), error);
+                    Vector3 chainTarget = new Vector3(0, 1, 0) + yaw * localSocket;
+                    Require(scene.ShowPlacementPreview("fixture", chainTarget - Vector3.up * .4f, Vector3.up, yaw, true,
+                        out final, out error, 0) && scene.PlacementSnapTarget.HasValue &&
+                        Quaternion.Angle(scene.PlacementFinalRotation, yaw) < .01f && Vector3.Distance(final, new Vector3(0,1,0)) < .001f,
+                        "Repeated wall snap accumulated the target rotation");
+                }
+                Require(scene.TrySync(doc, out error), error);
                 var targets = new List<Vector3>(); var flags = new List<bool>();
                 Require(scene.TryCursorSnap(Array.Empty<string>(), new[] { target + Vector3.right * .1f }, new[] { 0 },
                     0, 1, targets, flags, out int selected, out Vector3 point, out bool native,
@@ -2429,7 +2559,7 @@ public static class RuntimeEditorAcceptance
             }
         }
         finally { Object.Destroy(source); }
-        checks.Add("XYZ rotated native target: single/second-part blueprint ghosts preserve grip, relative geometry and final commit frame; no stale free frame");
+        checks.Add("XYZ rotated target: positional snap preserves chosen single/group orientation, grip, relative geometry and commit frame; explicit G target frame retained");
     }
 
     private static void TestHoverAppearance(Camera template)

@@ -23,7 +23,7 @@ public struct Vector3 {
     public static float Distance(Vector3 a,Vector3 b) => (float)Math.Sqrt((a-b).sqrMagnitude);
 }
 public class Transform : Obj {
-    public Vector3 position; public int rotation; public Transform parent; public Piece owner;
+    public Vector3 position; public Vector3 localScale=new Vector3(1,1,1); public int rotation; public Transform parent; public Piece owner;
     public bool IsChildOf(Transform target) {for(var p=this;p!=null;p=p.parent)if(p==target)return true;return false;}
     public T GetComponentInParent<T>() where T:class {for(var p=this;p!=null;p=p.parent)if(p.owner is T)return p.owner as T;return null;}
 }
@@ -33,13 +33,13 @@ public class GameObject : Obj {
 }
 public class Piece : Obj {
     public Transform transform=new Transform(); public List<Transform> points=new List<Transform>();
-    public int Reads;
+    public int Reads; public bool Supported=true;
     public Piece(){transform.owner=this;}
     public void GetSnapPoints(List<Transform> result){++Reads;result.AddRange(points);}
 }
 public class Player {public static Player m_localPlayer;public bool AlternativePlacementActive;public GameObject Ghost;public int Manual=-1;public Piece Selected;public Piece GetSelectedPiece()=>Selected;}
 public enum PlacementState {Inactive,Armed}
-public class Registry {public bool IsBlueprint;public bool TryGetBlueprint(Piece piece,out object value){value=null;return IsBlueprint;}}
+public class Registry {public bool IsBlueprint;public Piece RegisteredPiece;public bool TryGetBlueprint(Piece piece,out object value){value=null;return IsBlueprint&&(RegisteredPiece==null||ReferenceEquals(piece,RegisteredPiece));}}
 public static class BlueprintPlacementFrame {
     public static int Calls; public static bool Blueprint;
     public static int AutoJoinRotation(int target,int ghost,bool blueprint){++Calls;Blueprint=blueprint;return blueprint?ghost:target+ghost;}
@@ -49,7 +49,7 @@ public partial class Harness {
     private static FieldInfo PlacementGhostField=typeof(Player).GetField("Ghost"),ManualSnapPointField=typeof(Player).GetField("Manual");
     private List<Transform> sourceNativeSnapPoints=new List<Transform>(),nativeSnapPoints=new List<Transform>();
     public Registry blueprintPieceRegistry=null;
-    private bool SupportsPrecisionPlacement(Piece selected)=>selected;
+    private bool SupportsPrecisionPlacement(Piece selected)=>selected&&selected.Supported;
 }
 public static class Cases {
     private static int assertions;
@@ -70,14 +70,42 @@ public static class Cases {
         internal bool Apply(Piece aimed){return Session.ApplyPassiveAutoJoin(Player,ref Source,ref Target,aimed);}
     }
     public static string Run(){
-        foreach(int manual in new[]{-1,0})foreach(int targetRotation in new[]{0,7,90,180,270}){
+        foreach(int manual in new[]{-1,0})foreach(int targetRotation in new[]{0,7,90,180,270})
+        foreach(var scale in new[]{new Vector3(1,1,1),new Vector3(1.3f,.8f,1.1f),new Vector3(.5f,2,1.25f)}){
             var s=new Setup();s.Session.blueprintPieceRegistry.IsBlueprint=false;s.Player.Manual=manual;
             s.AimedPiece.transform.rotation=targetRotation;s.NativePiece.transform.rotation=targetRotation;
+            s.AimedPiece.transform.localScale=s.NativePiece.transform.localScale=scale;
+            var ghost=s.Player.Ghost.transform;ghost.position=new Vector3(10,20,30);ghost.localScale=new Vector3(.75f,2,1.5f);
+            var position=ghost.position;var ghostScale=ghost.localScale;
             s.Aim(0);var source=s.Source;var target=s.Target;
             Require(s.Apply(s.AimedPiece),"ordinary native pair vetoed");
             Require(s.Source==source&&s.Target==target,"ordinary native pair replaced by aimed-piece search");
             Require(s.Player.Ghost.transform.rotation==5,"ordinary native wheel rotation inherited hidden target frame");
+            Require(ghost.position.Equals(position)&&ghost.localScale.Equals(ghostScale),"ordinary hook changed supplied ghost position/scale");
             Require(s.AimedPiece.Reads==0&&s.GhostPiece.Reads==0,"ordinary snap performed a second point scan");
+        }
+        {
+            // Keep one session/registry across tool and host-ghost replacements; no cached classification may leak.
+            var s=new Setup();var composite=new Piece();var ordinaryB=new Piece();ordinaryB.transform.rotation=90;
+            var unsupported=new Piece{Supported=false};
+            s.Session.blueprintPieceRegistry.RegisteredPiece=composite;
+            var candidate=s.Aim(.2f);
+            foreach(Piece selected in new[]{s.GhostPiece,ordinaryB,null,unsupported,composite,s.GhostPiece}){
+                s.Player.Selected=selected;
+                var host=new Piece();host.transform.position=new Vector3(7,8,9);host.transform.rotation=37;
+                host.transform.localScale=new Vector3(.5f,2,1.25f);
+                s.Player.Ghost=new GameObject{piece=host,transform=host.transform};
+                s.Source=new Transform{parent=host.transform};host.points.Add(s.Source);
+                s.Target=new Transform{parent=s.NativePiece.transform,position=new Vector3(.1f,0,0)};
+                var source=s.Source;var target=s.Target;int reads=s.AimedPiece.Reads;
+                Require(s.Apply(s.AimedPiece),"tool switch vetoed native snap");
+                Require(s.Player.Ghost.transform.rotation==37&&host.transform.position.Equals(new Vector3(7,8,9))&&
+                    host.transform.localScale.Equals(new Vector3(.5f,2,1.25f)),"tool/ghost switch inherited old pose");
+                if(selected==composite)
+                    Require(s.Target==candidate&&s.AimedPiece.Reads==reads+1,"fresh composite selection failed to use current ghost/aim");
+                else Require(s.Source==source&&s.Target==target&&s.AimedPiece.Reads==reads&&host.Reads==0,
+                    "ordinary/null/unsupported selection reused composite rerank after tool switch");
+            }
         }
         foreach(float radius in new[]{.499f,.5f}){
             var s=new Setup();var candidate=s.Aim(radius);
@@ -128,7 +156,7 @@ public static class Cases {
             s.Aim(.25f);
             Require(s.Apply(s.AimedPiece)&&s.Player.Ghost.transform.rotation==5&&BlueprintPlacementFrame.Calls==0,"composite changed wheel rotation");
         }
-        return "PASS "+assertions+" assertions: actual session method, ordinary native pair/rotation preserved across hidden frames and manual/auto, composite inclusive radius/sqrt ties, native fallback, null/invalid/guards. Inert host only; no native translation, quaternion math, physics or game proof.";
+        return "PASS "+assertions+" assertions: actual session method, ordinary pair/position/scale/rotation invariant across supplied target scales/hidden frames/manual-auto and selected/tool/ghost switches, composite inclusive radius/sqrt ties, native fallback, null/invalid/guards. Inert host only; rotation is an integer substitute, supplied scale is not native TRS; no native translation, quaternion math, physics or game proof.";
     }
 }
 }

@@ -23,7 +23,7 @@ namespace ReservationChecks
         }
     }
 
-    internal static class PersistenceChecks
+    internal static partial class PersistenceChecks
     {
         private static int assertions;
         private static void Check(bool value, string reason) { assertions++; if (!value) throw new InvalidOperationException("Persistence: " + reason); }
@@ -34,7 +34,7 @@ namespace ReservationChecks
             internal readonly PlayerProfile Profile;
             internal BlueprintStoragePersistence Verification;
             internal int ProfileSaves, WorldSaves;
-            internal Rig(bool durabilityBoundary = false)
+            internal Rig(bool durabilityBoundary = false, bool linked = false, Func<bool> current = null)
             {
                 Directory.CreateDirectory(Root); SaveSystem.Generation = 7; SaveSystem.Flags = 0; ZNet.Open = false;
                 ZNet.instance.World.Directory = Root;
@@ -44,7 +44,8 @@ namespace ReservationChecks
                     var hammer = Program.Item("Hammer", 1); hammer.m_gridPos = new Vector2i(1, 0); hammer.m_durability = 18.879f;
                     Frame.Player.Inventory.Items.Add(hammer);
                 }
-                Check(Frame.Begin() && Frame.Transfer.MoveNext() == BlueprintStorageTransfer.Result.Transferred, Frame.Error ?? "transfer setup");
+                Check((linked ? ConstructionTransferBindingChecks.Begin(Frame, current ?? (() => true)) : Frame.Begin()) &&
+                    Frame.Transfer.MoveNext() == BlueprintStorageTransfer.Result.Transferred, Frame.Error ?? "transfer setup");
                 File.WriteAllBytes(Profile.Path, ProfileChecks.FileFor(Frame.Player));
                 Check(Frame.Transfer.TryPreparePlayerReadback(out var prior, out _) && prior.TryVerify(out _, out _), "old file is not a valid matching-inventory control");
                 Game.instance.SaveAction = SaveProfile;
@@ -58,7 +59,12 @@ namespace ReservationChecks
                 FileHelpers.ReplaceOldFile(Profile.Path, Profile.Path + ".new", Profile.Path + ".old", null, FileHelpers.FileSource.Local);
                 PlayerProfile.SavingFinished?.Invoke();
             }
-            internal void SaveWorld() { WorldSaves++; SaveSystem.Generation++; WorldGenerationChecks.WriteWorld(Frame, Root, SaveSystem.Generation); }
+            internal void SaveWorld()
+            {
+                WorldSaves++; SaveSystem.Generation++;
+                Frame.Placed.Container.View.Data.ByteArrays.TryGetValue(BlueprintConstructionPartExecution.ReceiptKey, out var receipt);
+                WorldGenerationChecks.WriteWorld(Frame, Root, SaveSystem.Generation, receipt: receipt);
+            }
             internal bool Begin() => Frame.Transfer.TryBeginPersistence(out Verification, out _);
             internal BlueprintStoragePersistence.Result Finish()
             {
@@ -79,11 +85,60 @@ namespace ReservationChecks
 
         internal static void Run()
         {
+            CheckPairedReturnRecovery();
+            CheckReturnResume();
+            CheckProjectReturn();
+            using (var rig = new Rig(linked: true))
+            {
+                var tick = new PartContentsTickProbe(rig.Frame.Transfer);
+                string path = rig.Frame.Transfer.JournalPath;
+                Check(!BlueprintStorageTransferJournal.Read(path).Settled, "fixture was already settled");
+                var deadline = DateTime.UtcNow.AddSeconds(5);
+                while (!tick.Finished && DateTime.UtcNow < deadline) { tick.Tick(); Thread.Sleep(1); }
+                Check(tick.Finished && tick.Status == "committed" && BlueprintStorageTransferJournal.Read(path).Settled,
+                    tick.Reason ?? "actual project contents tick did not settle the linked transfer");
+                Check(rig.ProfileSaves == 1 && rig.WorldSaves == 1 && rig.Frame.Placed.Container.Inventory.MoveCalls == 1,
+                    "contents coordinator repeated a native move or save");
+                byte[] settled = File.ReadAllBytes(path); tick.Tick();
+                Check(settled.SequenceEqual(File.ReadAllBytes(path)) && rig.ProfileSaves == 1 && rig.WorldSaves == 1,
+                    "finished coordinator replayed settlement/save");
+            }
+            bool validParent = true;
+            using (var rig = new Rig(linked: true, current: () => validParent))
+            {
+                var tick = new PartContentsTickProbe(rig.Frame.Transfer);
+                string path = rig.Frame.Transfer.JournalPath; validParent = false;
+                tick.Tick();
+                Check(tick.Finished && tick.Status == "reconciliation" && !BlueprintStorageTransferJournal.Read(path).Settled &&
+                    rig.ProfileSaves == 0 && rig.WorldSaves == 0 && rig.Frame.Placed.Container.Inventory.MoveCalls == 1,
+                    "actual contents tick saved/settled/replayed after losing parent authority");
+            }
+            validParent = true;
+            using (var rig = new Rig(linked: true, current: () => validParent))
+            {
+                var tick = new PartContentsTickProbe(rig.Frame.Transfer);
+                string path = rig.Frame.Transfer.JournalPath;
+                ZNet.instance.SaveAction = () => { rig.SaveWorld(); validParent = false; };
+                tick.Tick();
+                Check(tick.Finished && tick.Status == "reconciliation" && !BlueprintStorageTransferJournal.Read(path).Settled &&
+                    rig.Frame.Placed.Container.Inventory.MoveCalls == 1,
+                    "actual contents tick settled or repeated movement after a save callback invalidated its parent");
+            }
             using (var rig = new Rig(durabilityBoundary: true))
             {
                 rig.Frame.Player.m_customData["BuildWorks.StorageSaveProof"] = "previous-owned-value";
                 Check(rig.Begin(), "exact save refused");
                 Check(rig.Finish() == BlueprintStoragePersistence.Result.Verified, rig.Verification.Reason);
+                Check(rig.Verification.TryVerifyCurrent(out var currentError), currentError);
+                SaveSystem.Generation++;
+                Check(!rig.Verification.TryVerifyCurrent(out _), "stale generation remained settlement authority");
+                SaveSystem.Generation--;
+                Check(!Task.Run(() => rig.Verification.TryVerifyCurrent(out _)).Result, "settlement proof accepted another thread");
+                float providedDurability = rig.Frame.Item.m_durability;
+                rig.Frame.Item.m_durability = 0;
+                Check(!rig.Verification.TryVerifyCurrent(out _), "changed provided properties remained settlement authority");
+                rig.Frame.Item.m_durability = providedDurability;
+                Check(rig.Verification.TryVerifyCurrent(out currentError), currentError);
                 var saved = BlueprintStorageTransferJournal.Read(rig.Frame.Transfer.JournalPath);
                 Check(saved.Schema == 5 && saved.Terminal && saved.SavedPair != null && saved.SavedPair.BeforeGeneration == 7 &&
                     saved.SavedPair.Generation == 8 && saved.SavedPair.Player == 100 && saved.SavedPair.World == 1 &&
@@ -92,6 +147,7 @@ namespace ReservationChecks
                     saved.SavedPair.SourceSession == BlueprintStoragePlayerProfile.ProcessSession &&
                     saved.SavedPair.SourcePlayerInstance == rig.Frame.Player.GetInstanceID(), "paired WAL evidence missing");
                 Check(saved.RequiresReconciliation && !BlueprintStorageCapture.CanRemoveEmpty(rig.Frame.Placed, rig.Frame.Player), "pair authorized settlement or destructive cleanup");
+                StorageSettlementChecks.Run(rig.Frame, rig.Root, saved);
                 Check(rig.Frame.Player.m_customData["BuildWorks.StorageSaveProof"] == "previous-owned-value", "prior player metadata overwritten");
                 Check(File.ReadAllBytes(rig.Profile.Path).SequenceEqual(ProfileChecks.FileFor(rig.Frame.Player)), "saved player metadata changed by verification");
                 Check(!rig.Frame.Transfer.TryBeginPersistence(out _, out _) && rig.ProfileSaves == 1 && rig.WorldSaves == 1, "automatic save replay");
@@ -227,6 +283,118 @@ namespace ReservationChecks
                 reverse.Dispose();
             }
             Console.WriteLine("PASS " + assertions + " paired persistence assertions; actual adapters/journal, inert save API and temporary files; no native game save, settlement or network proof.");
+        }
+        private static BlueprintStorageTransfer PrepareCurrentReturn(TransferChecks.Frame frame, Guid operation, object binding)
+        {
+            var items = frame.Placed.Container.Inventory.Items.Select(item => new BlueprintItemStandPlacement.Reservation(
+                item, item.m_stack, BlueprintItemStandPlacement.SnapshotItem(item))).ToArray();
+            try
+            {
+                return (BlueprintStorageTransfer)typeof(BlueprintStorageTransfer).GetMethod("PrepareReturn",
+                    System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).Invoke(null,
+                    new object[] { operation, frame.Player, frame.Placed.Piece, frame.Placed.Container, frame.Placed.RootView, items, binding });
+            }
+            catch (System.Reflection.TargetInvocationException error) { throw error.InnerException; }
+        }
+        private static void CheckProjectReturn()
+        {
+            foreach (bool unmarked in new[] { false, true })
+            using (var rig = new Rig(linked: true))
+            {
+                Check(rig.Begin() && rig.Finish() == BlueprintStoragePersistence.Result.Verified &&
+                    rig.Frame.Transfer.TrySettleConstruction(out _), "forward fixture not settled");
+                var parent = BlueprintStorageTransferJournal.Read(rig.Frame.Transfer.JournalPath).Prepared;
+                object binding = typeof(BlueprintStorageTransfer).GetField("construction",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(rig.Frame.Transfer);
+                // Current contents differ from the original supplied recipe: one stack spent, another added/damaged.
+                var chest = rig.Frame.Placed.Container;
+                chest.Inventory.Items[0].m_stack = 1;
+                var added = Program.Item("Stone", 4, "current-added"); added.m_durability = 1.25f; added.m_gridPos = new Vector2i(1, 0);
+                chest.Inventory.Items.Add(added); chest.SaveForTest();
+                if (unmarked) chest.View.Data.Set(BlueprintStorageCapture.TransferMarkerKey, "");
+                chest.SyncCacheForTest();
+                int starts = 0;
+                BlueprintStorageTransfer reverse = null;
+                BlueprintStorageTransfer.ReturnProducer = () => { starts++; return reverse = PrepareCurrentReturn(rig.Frame, parent.Operation, binding); };
+                var tick = new ContentsReturnTickProbe(() => { });
+                Check(!tick.Finished && starts == 1 && rig.Frame.Player.Inventory.MoveCalls == 0, "prepared coordinator moved contents before Tick");
+                if (unmarked)
+                {
+                    tick.Tick();
+                    Check(!tick.Finished && rig.Frame.Player.Inventory.MoveCalls == 0, "marker synchronization was not transient");
+                    var loaded = chest.Inventory.Items.Select(item => item.Clone()).ToArray();
+                    chest.Inventory.Items.Clear(); chest.Inventory.Items.AddRange(loaded);
+                    chest.LoadForTest(parent.Operation.ToString("N")); tick.Tick();
+                }
+                var deadline = DateTime.UtcNow.AddSeconds(5);
+                while (!tick.Finished && DateTime.UtcNow < deadline) { tick.Tick(); Thread.Sleep(1); }
+                Check(tick.Finished && tick.Status == "returned" && chest.Inventory.Items.Count == 0, tick.Reason ?? "return not finished");
+                var received = rig.Frame.Player.Inventory.Items.Single(item => item.m_dropPrefab.name == "Stone");
+                Check(BlueprintItemStandPlacement.SnapshotItem(received, true) == BlueprintItemStandPlacement.SnapshotItem(added, true) &&
+                    received.m_stack == 4 && received.m_durability == 1.25f &&
+                    rig.Frame.Player.Inventory.Items.Where(item => item.m_dropPrefab.name == "Wood").Sum(item => item.m_stack) == 2 &&
+                    rig.Frame.Player.Inventory.MoveCalls == 2 && rig.ProfileSaves == 2 && rig.WorldSaves == 2,
+                    "current native stacks/properties or exactly-once pair differ");
+                var history = BlueprintStorageTransferJournal.ReadCancellation(parent.ConstructionProject, parent.ConstructionPart,
+                    parent.Operation, parent.World, parent.Player, parent.ConstructionFingerprint, parent.Paid);
+                Check(history.Forward.Settled && history.Returned.Settled && history.Returned.Prepared.Paid.Length == 0 &&
+                    !BlueprintStorageTransferJournal.HasUnresolved(parent.World), "return did not settle against saved linked parent");
+                bool refused = false;
+                try { BlueprintStorageTransferJournal.ReadConstruction(parent.ConstructionProject, parent.ConstructionPart,
+                    parent.Operation, parent.World, parent.Player, parent.ConstructionFingerprint, parent.Paid); }
+                catch (InvalidOperationException) { refused = true; }
+                Check(refused, "forward completion reused after return");
+                byte[] bytes = File.ReadAllBytes(reverse.JournalPath); tick.Tick();
+                Check(starts == 1 && bytes.SequenceEqual(File.ReadAllBytes(reverse.JournalPath)) && rig.Frame.Player.Inventory.MoveCalls == 2,
+                    "finished return coordinator replayed");
+                chest.Inventory.Items.Add(Program.Item("Stone", 1)); chest.SaveForTest(); chest.SyncCacheForTest();
+                bool repeated = false;
+                try { PrepareCurrentReturn(rig.Frame, parent.Operation, binding); } catch (InvalidOperationException) { repeated = true; }
+                Check(repeated && bytes.SequenceEqual(File.ReadAllBytes(reverse.JournalPath)) && rig.Frame.Player.Inventory.MoveCalls == 2,
+                    "existing child was recreated for later additions");
+                // Read-only restart join does not require an old forward file for a manually filled paid shell.
+                string forwardPath = rig.Frame.Transfer.JournalPath, moved = forwardPath + ".fixture";
+                rig.Frame.Transfer.Dispose();
+                File.Move(forwardPath, moved);
+                try
+                {
+                    var onlyReturn = BlueprintStorageTransferJournal.ReadCancellation(parent.ConstructionProject, parent.ConstructionPart,
+                        parent.Operation, parent.World, parent.Player, parent.ConstructionFingerprint, parent.Paid);
+                    Check(onlyReturn.Forward == null && onlyReturn.Returned.Settled, "return-only linked shell lost durable child");
+                }
+                finally { File.Move(moved, forwardPath); }
+                bool wrongParent = false;
+                try { BlueprintStorageTransferJournal.ReadCancellation(Guid.NewGuid(), parent.ConstructionPart, parent.Operation,
+                    parent.World, parent.Player, parent.ConstructionFingerprint, parent.Paid); }
+                catch (InvalidDataException) { wrongParent = true; }
+                Check(wrongParent, "different construction parent reused return");
+            }
+            foreach (string failure in new[] { "context", "unchanged", "save" })
+            using (var rig = new Rig(linked: true))
+            {
+                Check(rig.Begin() && rig.Finish() == BlueprintStoragePersistence.Result.Verified && rig.Frame.Transfer.TrySettleConstruction(out _),
+                    "refusal fixture not settled");
+                object binding = typeof(BlueprintStorageTransfer).GetField("construction",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(rig.Frame.Transfer);
+                BlueprintStorageTransfer.ReturnProducer = () => PrepareCurrentReturn(rig.Frame, rig.Frame.Operation, binding);
+                bool valid = true;
+                var tick = new ContentsReturnTickProbe(() => { if (!valid) throw new InvalidOperationException("board moved"); });
+                if (failure == "context") valid = false;
+                if (failure == "unchanged") rig.Frame.Player.Inventory.NoChange = true;
+                if (failure == "save") Game.instance.SaveAction = () => throw new IOException("fixture save failed");
+                var deadline = DateTime.UtcNow.AddSeconds(5);
+                while (!tick.Finished && DateTime.UtcNow < deadline) { tick.Tick(); Thread.Sleep(1); }
+                Check(tick.Finished && tick.Status == "reconciliation" && rig.Frame.Player.Inventory.MoveCalls == (failure == "context" ? 0 : 1) &&
+                    BlueprintStorageTransferJournal.HasUnresolved(1), "failed " + failure + " return continued or released hold");
+            }
+            int emptyChecks = 0; BlueprintStorageTransfer.ReturnProducer = () => { emptyChecks++; return null; };
+            Check(new ContentsReturnTickProbe(() => { }, 2).Finished && emptyChecks == 2, "already empty parts were not checked separately");
+            BlueprintStorageTransfer.ReturnProducer = () => throw new InvalidOperationException("unsettled child");
+            bool interrupted = false;
+            try { new ContentsReturnTickProbe(() => { }); } catch (InvalidOperationException) { interrupted = true; }
+            Check(interrupted, "interrupted child was skipped");
+            BlueprintStorageTransfer.ReturnProducer = null;
+            Console.WriteLine("PASS actual return factory and coordinator Advance/Tick: changed native stacks, marked/unmarked wait, paired settlement, parent/forward joins, no replay, empty/context/interrupted refusal. Plan lookup/producer authority substituted; no game/reload/removal proof.");
         }
     }
 }

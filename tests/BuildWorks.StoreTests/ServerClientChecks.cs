@@ -13,6 +13,7 @@ namespace OstrixMods.BuildWorks.StoreTests
     {
         internal static void Run(string folder, byte[] original)
         {
+            ReentrantCleanupChecks();
             var seed = new ServerBlueprintLibrary(folder, _ => true);
             seed.Publish("admin", original, ServerBlueprintLibrary.Access.Players);
             seed.Publish("admin", original, ServerBlueprintLibrary.Access.Administrators);
@@ -133,6 +134,67 @@ namespace OstrixMods.BuildWorks.StoreTests
                 }
             }
         }
+        internal static void ReentrantCleanupChecks()
+        {
+            foreach (string mode in new[] { "tick", "tick-throw", "begin", "invalid", "dispose" })
+            {
+                BlueprintServerClient client = null; Task<BlueprintServerClient.Result> upload = null, replacement = null;
+                var sent = new List<P.Message>(); bool entered = false, refused = false;
+                Guid session = Guid.NewGuid(), nextSession = Guid.NewGuid();
+                void Reply(Guid request, Guid nonce) => client.Receive(P.Encode(new P.Message { Kind = P.Command.ListResult,
+                    World = 1901, Request = request, Session = nonce, Total = 0, Items = Array.Empty<P.Item>() }), 1);
+                using (client = new BlueprintServerClient(1901, bytes =>
+                {
+                    var message = P.Decode(bytes); sent.Add(message);
+                    if ((mode == "tick" || mode == "tick-throw") && message.Kind == P.Command.PublishStart)
+                    {
+                        entered = true; client.Cancel(upload); replacement = client.List();
+                        if (mode == "tick-throw") throw new IOException("Old library send failed after replacement");
+                    }
+                    if (mode == "begin" && message.Kind == P.Command.List && message.Session != Guid.Empty && !entered)
+                    {
+                        entered = true; Reply(message.Request, session); replacement = client.List();
+                        throw new IOException("Completed library Begin send failed");
+                    }
+                    if (message.Kind != P.Command.Cancel || entered) return;
+                    entered = true;
+                    if (mode == "dispose")
+                    { try { client.List(); } catch (InvalidOperationException) { refused = true; } }
+                    else { replacement = client.List(); Reply(sent.Last(m => m.Kind == P.Command.List).Request, nextSession); }
+                }))
+                {
+                    var hello = client.List(); Reply(sent.Last().Request, session); hello.GetAwaiter().GetResult();
+                    if (mode == "tick" || mode == "tick-throw")
+                    {
+                        upload = client.Publish(new byte[] { 1, 2, 3 }, 0); client.Tick(1);
+                        Require(entered && Code(upload) == P.Failure.Cancelled && replacement != null && !replacement.IsCompleted && client.Ready,
+                            "Old library callback cancelled replacement request");
+                        Reply(sent.Last(m => m.Kind == P.Command.List).Request, session); replacement.GetAwaiter().GetResult();
+                    }
+                    else if (mode == "begin")
+                    {
+                        Require(client.List().Result.Reply.Kind == P.Command.ListResult && !replacement.IsCompleted && client.Ready,
+                            "Old library Begin error cancelled replacement");
+                        Reply(sent.Last(m => m.Kind == P.Command.List).Request, session); replacement.GetAwaiter().GetResult();
+                    }
+                    else if (mode == "dispose")
+                    {
+                        var pending = client.List(); client.Dispose();
+                        Require(refused && Code(pending) == P.Failure.Unavailable && !client.Ready && !client.Busy, "Library Dispose allowed reentry");
+                    }
+                    else
+                    {
+                        var pending = client.List();
+                        client.Receive(P.Encode(new P.Message { Kind = P.Command.Deleted, World = 1901, Session = session,
+                            Request = sent.Last().Request, Id = Guid.NewGuid() }), 1);
+                        Require(Code(pending) == P.Failure.Invalid && replacement.IsCompleted && client.Ready, "Old invalid library Receive forgot replacement session");
+                    }
+                }
+            }
+            Console.WriteLine("PASS library client captured-operation cleanup: Tick plain/throw, Begin replacement, invalid Receive bootstrap, Dispose reentry. Inert callbacks only.");
+        }
+        private static P.Failure Code(Task<BlueprintServerClient.Result> task)
+        { try { task.GetAwaiter().GetResult(); throw new Exception("Expected library failure"); } catch (BlueprintServerClient.Failure error) { return error.Code; } }
         private static void Require(bool value, string error) { if (!value) throw new Exception(error); }
     }
 }

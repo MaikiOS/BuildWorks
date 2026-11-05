@@ -4,7 +4,6 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.Serialization.Json;
-using System.Security.Cryptography;
 using System.Text;
 
 namespace OstrixMods.BuildWorks
@@ -14,8 +13,7 @@ namespace OstrixMods.BuildWorks
     {
         private readonly byte[] native;
         private byte[] plan;
-        private readonly object publishGate = new object();
-        private bool cancelled;
+        private BlueprintExportPair files;
         internal readonly SortedDictionary<string, int> OmittedSigns = new SortedDictionary<string, int>(StringComparer.Ordinal);
         internal readonly SortedDictionary<string, int> OmittedState = new SortedDictionary<string, int>(StringComparer.Ordinal);
         internal int Parts, Groups, Supports, Anchors, Metadata, Sources, MaterialSeeds, CustomSnaps, LibraryOrigins, PeerOrigins;
@@ -25,25 +23,14 @@ namespace OstrixMods.BuildWorks
         private PlanBuildExport(byte[] nativeBytes, byte[] planBytes)
         { native = nativeBytes; plan = planBytes; }
 
-        internal void CancelWrite() { lock (publishGate) cancelled = true; }
-        private void CheckCancelled()
-        { lock (publishGate) if (cancelled) throw new OperationCanceledException("$buildworks_exchange.plan_cancelled"); }
+        internal void CancelWrite() => files.CancelWrite();
 
         internal static PlanBuildExport Review(CompositeBlueprintStore.Blueprint source,
             Func<string, CompositeBlueprintStore.VectorData?> resolveScale)
         {
-            if (source == null || source.importError != null)
-                throw new InvalidDataException(source?.importError ?? "$buildworks_import.format");
-            // Encode before any foreign omissions. Decode owns the frozen, fully detached document.
-            var portable = source.ImportCopy();
-            if (source.IsExternal)
-            {
-                // External catalog IDs are cache keys; the portable document requires a stable GUID.
-                using (var hash = SHA256.Create())
-                    portable.id = new Guid(hash.ComputeHash(Encoding.UTF8.GetBytes(source.id)).Take(16).ToArray()).ToString("N");
-            }
-            byte[] backup = BlueprintExchangeFormat.Encode(portable);
-            var document = BlueprintExchangeFormat.Decode(new UTF8Encoding(false, true).GetString(backup));
+            var snapshot = BlueprintExportPair.Snapshot(source);
+            byte[] backup = snapshot.Native;
+            var document = snapshot.Document;
             var output = new StringBuilder();
             output.Append("#Name:").Append(document.name).Append("\n#Creator:").Append(Creators(document)).Append("\n#Description:")
                 .Append(JsonString("Exported with BuildWorks; original source credits, terms and full construction data are in the adjacent .buildworks.json."))
@@ -101,75 +88,18 @@ namespace OstrixMods.BuildWorks
             byte[] bytes = new UTF8Encoding(false, true).GetBytes(output.ToString());
             if (bytes.Length > BlueprintExchangeFormat.MaximumBytes) throw new InvalidDataException("$buildworks_import.file_limit");
             review.plan = bytes;
+            review.files = new BlueprintExportPair(backup, bytes, ".blueprint");
             return review;
         }
 
         internal bool TryWrite(CompositeBlueprintStore.Blueprint source,
             Func<string, CompositeBlueprintStore.VectorData?> resolveScale, string directory, string name,
-            out string result, out string error)
-        {
-            result = null; error = null; string temporary = null;
-            try
+            out string result, out string error) => files.TryWrite(() =>
             {
-                CheckCancelled();
                 var current = Review(source, resolveScale);
-                CheckCancelled();
-                if (!native.SequenceEqual(current.native) || !plan.SequenceEqual(current.plan))
-                    throw new InvalidDataException("$buildworks_exchange.plan_changed");
-                directory = CompositeBlueprintStore.ValidateExchangeDirectory(directory);
-                CompositeBlueprintStore.ValidateExportName(name);
-                string target = Path.Combine(directory, name);
-                if (Directory.Exists(target) || File.Exists(target))
-                    throw new IOException("$buildworks_exchange.exists\t" + target);
-                string staging = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".tmp");
-                // Unity's Windows Mono file streams cannot use legacy paths of 260 characters or more.
-                if (Environment.OSVersion.Platform == PlatformID.Win32NT)
-                    foreach (string folder in new[] { target, staging })
-                        if (Path.Combine(folder, name + ".buildworks.json").Length >= 260)
-                            throw new IOException("$buildworks_exchange.plan_path\t" + target);
-                Directory.CreateDirectory(directory);
-                temporary = staging;
-                Directory.CreateDirectory(temporary);
-                CompositeBlueprintStore.ValidateExchangeDirectory(temporary);
-                CheckCancelled();
-                Write(Path.Combine(temporary, name + ".blueprint"), plan);
-                CheckCancelled();
-                Write(Path.Combine(temporary, name + ".buildworks.json"), native);
-                // Closing the view and final publication have one ordering, even on different threads.
-                lock (publishGate)
-                {
-                    CheckCancelled();
-                    Directory.Move(temporary, target); // Publish both closed files together, never a partial pair.
-                    temporary = null; result = target; return true;
-                }
-            }
-            catch (OperationCanceledException) { throw; }
-            catch (Exception exception) { error = exception.Message; return false; }
-            finally
-            {
-                if (temporary != null)
-                {
-                    try
-                    {
-                        CompositeBlueprintStore.ValidateExchangeDirectory(temporary);
-                        foreach (string suffix in new[] { ".blueprint", ".buildworks.json" })
-                        {
-                            string file = Path.Combine(temporary, name + suffix);
-                            if (File.Exists(file)) File.Delete(file);
-                        }
-                        Directory.Delete(temporary, false);
-                    }
-                    catch (Exception exception) { UnityEngine.Debug.LogWarning("BuildWorks export cleanup: " + exception.Message); }
-                }
-            }
-        }
+                return (current.native, current.plan);
+            }, directory, name, out result, out error);
 
-        private static void Write(string path, byte[] bytes)
-        {
-            using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-            { stream.Write(bytes, 0, bytes.Length); stream.Flush(true); }
-            if (!File.ReadAllBytes(path).SequenceEqual(bytes)) throw new IOException("$buildworks_import.fields");
-        }
         private static void Add(IDictionary<string, int> counts, string value)
         { counts.TryGetValue(value, out int count); counts[value] = count + 1; }
         private static string Number(float value) => value.ToString("R", CultureInfo.InvariantCulture);

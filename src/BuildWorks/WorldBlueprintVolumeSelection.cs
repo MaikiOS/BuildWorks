@@ -17,7 +17,9 @@ namespace OstrixMods.BuildWorks
         private readonly List<Piece> blueprintVolumeRows = new List<Piece>();
         private (string name, bool selected)[] blueprintVolumeHudItems = Array.Empty<(string, bool)>();
         private bool blueprintVolumeMode, blueprintVolumeReady, blueprintVolumeDirty;
-        private bool blueprintVolumeDragValid;
+        private bool blueprintVolumeDragValid, blueprintVolumeResizing;
+        private float blueprintVolumeDragPlane;
+        private Vector3 blueprintVolumeDragOffset;
         private Vector3 blueprintVolumeFirst, blueprintVolumeSecond, blueprintVolumeDragFirst;
         private float blueprintVolumePlane, blueprintVolumeBottom, blueprintVolumeTop;
         private string blueprintVolumeStatus;
@@ -35,7 +37,7 @@ namespace OstrixMods.BuildWorks
         private void ClearBlueprintVolumeSelection()
         {
             blueprintVolumeMode = blueprintVolumeReady = blueprintVolumeDirty = false;
-            blueprintVolumeDragValid = false;
+            blueprintVolumeDragValid = blueprintVolumeResizing = false;
             blueprintVolumeIncluded.Clear();
             blueprintVolumeExcluded.Clear();
             blueprintVolumeRows.Clear();
@@ -89,7 +91,7 @@ namespace OstrixMods.BuildWorks
         private bool TryBlueprintAreaPoint(Camera camera, Vector2 mouse, out Vector3 point)
         {
             Ray ray = camera.ScreenPointToRay(mouse);
-            var plane = new Plane(Vector3.up, new Vector3(0, blueprintVolumePlane, 0));
+            var plane = new Plane(Vector3.up, new Vector3(0, blueprintVolumeDragPlane, 0));
             point = Vector3.zero;
             if (!plane.Raycast(ray, out float distance) || distance < 0 || distance > 512f) return false;
             point = ray.GetPoint(distance);
@@ -99,7 +101,7 @@ namespace OstrixMods.BuildWorks
         private void CancelBlueprintSelectionDrag()
         {
             blueprintSelectionDragging = false;
-            blueprintVolumeDragValid = false;
+            blueprintVolumeDragValid = blueprintVolumeResizing = false;
             hud.HideSelectionBox();
             if (blueprintVolumeMode && blueprintVolumeReady && blueprintVolumeBottom <= blueprintVolumeTop)
                 ShowBlueprintVolume(BlueprintVolume(blueprintVolumeFirst, blueprintVolumeSecond));
@@ -110,7 +112,16 @@ namespace OstrixMods.BuildWorks
         {
             if (Input.GetMouseButtonDown(0) && !MouseOverEditorPanel(mouse))
             {
+                blueprintVolumeDragPlane = blueprintVolumePlane;
+                blueprintVolumeDragOffset = Vector3.zero;
+                blueprintVolumeResizing = TryBeginBlueprintVolumeResize(camera, mouse, out Vector3 corner, out Vector3 opposite);
+                if (blueprintVolumeResizing) blueprintVolumeDragPlane = corner.y;
                 blueprintVolumeDragValid = TryBlueprintAreaPoint(camera, mouse, out blueprintVolumeDragFirst);
+                if (blueprintVolumeResizing && blueprintVolumeDragValid)
+                {
+                    blueprintVolumeDragOffset = corner - blueprintVolumeDragFirst;
+                    blueprintVolumeDragFirst = opposite;
+                }
                 blueprintSelectionDragging = true;
                 blueprintSelectionStart = mouse;
                 suppressPlacementFrame = Time.frameCount;
@@ -118,14 +129,15 @@ namespace OstrixMods.BuildWorks
             if (!blueprintSelectionDragging) return;
             bool draggingArea = (mouse - blueprintSelectionStart).sqrMagnitude >= 64f;
             if (Input.GetMouseButton(0) && draggingArea && blueprintVolumeDragValid && TryBlueprintAreaPoint(camera, mouse, out Vector3 preview))
-                ShowBlueprintVolume(BlueprintVolume(blueprintVolumeDragFirst, preview));
+                ShowBlueprintVolume(BlueprintVolume(blueprintVolumeDragFirst, preview + blueprintVolumeDragOffset));
             if (!Input.GetMouseButtonUp(0)) return;
             blueprintSelectionDragging = false;
             if (MouseOverEditorPanel(mouse)) { CancelBlueprintSelectionDrag(); return; }
             if (!draggingArea)
             {
+                bool resizing = blueprintVolumeResizing;
                 CancelBlueprintSelectionDrag();
-                if (TryGetPlacedPieceAt(camera, mouse, out Piece piece, out _) && IsBlueprintPieceSelectable(piece))
+                if (!resizing && TryGetPlacedPieceAt(camera, mouse, out Piece piece, out _) && IsBlueprintPieceSelectable(piece))
                     ToggleBlueprintVolumePiece(piece, Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl));
                 return;
             }
@@ -136,11 +148,36 @@ namespace OstrixMods.BuildWorks
                 return;
             }
             blueprintVolumeFirst = blueprintVolumeDragFirst;
-            blueprintVolumeSecond = end;
-            blueprintVolumeDragValid = false;
+            blueprintVolumeSecond = end + blueprintVolumeDragOffset;
+            blueprintVolumeDragValid = blueprintVolumeResizing = false;
             blueprintVolumeReady = blueprintVolumeDirty = true;
             blueprintVolumeStatus = null;
             RefreshBlueprintVolumeSelection();
+        }
+
+        private bool TryBeginBlueprintVolumeResize(Camera camera, Vector2 mouse, out Vector3 corner, out Vector3 opposite)
+        {
+            corner = opposite = Vector3.zero;
+            if (!blueprintVolumeReady || blueprintVolumeBottom > blueprintVolumeTop ||
+                Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) return false;
+            float nearest = 12f * 12f;
+            bool found = false;
+            for (int i = 0; i < 4; ++i)
+            {
+                var candidate = new Vector3((i & 1) == 0 ? blueprintVolumeFirst.x : blueprintVolumeSecond.x,
+                    blueprintVolumePlane + blueprintVolumeBottom,
+                    (i & 2) == 0 ? blueprintVolumeFirst.z : blueprintVolumeSecond.z);
+                Vector3 screen = camera.WorldToScreenPoint(candidate);
+                if (!IsFinite(screen) || screen.z < camera.nearClipPlane) continue;
+                float distance = (new Vector2(screen.x, screen.y) - mouse).sqrMagnitude;
+                if (distance > nearest) continue;
+                nearest = distance;
+                found = true;
+                corner = candidate;
+                opposite = new Vector3((i & 1) == 0 ? blueprintVolumeSecond.x : blueprintVolumeFirst.x,
+                    candidate.y, (i & 2) == 0 ? blueprintVolumeSecond.z : blueprintVolumeFirst.z);
+            }
+            return found;
         }
 
         private void ToggleBlueprintVolumeRow(int row)
@@ -206,7 +243,7 @@ namespace OstrixMods.BuildWorks
                         blueprintVolumeExcluded.Contains(piece)) && seen.Add(piece))
                     blueprintVolumeRows.Add(piece);
             blueprintVolumeDirty = false;
-            blueprintVolumeStatus = BuildWorksLocalization.Text("selection.loaded_status", unloaded, selected.Count);
+            blueprintVolumeStatus = BuildWorksLocalization.Text("selection.loaded_resize_status", unloaded, selected.Count);
             ShowBlueprintVolume(volume);
             UpdateBlueprintVolumeHud();
             return true;

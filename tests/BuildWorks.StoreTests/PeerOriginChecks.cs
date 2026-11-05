@@ -23,7 +23,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                 "a", null, out var source, out string error), error);
             byte[] portable = BlueprintExchangeFormat.Encode(source);
             var origin = new B.PeerOrigin { server = "server", worldUid = 71, sender = "Steam_sender", recipient = "Steam_receiver",
-                offerId = Guid.NewGuid().ToString("N"), documentId = source.id, sha256 = Hash(portable), formatVersion = 15 };
+                offerId = Guid.NewGuid().ToString("N"), documentId = source.id, sha256 = Hash(portable), formatVersion = BlueprintExchangeFormat.Version };
             Require(store.TrySaveAcceptedPeerCopy(portable, origin, out var copy, out error), error);
             Require(copy.id != source.id && copy.parts[0].signText == part.signText && copy.peerOrigins.Count == 1 && source.peerOrigins == null,
                 "Acceptance lost supported data, reused ID or changed source.");
@@ -46,20 +46,21 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(!store.TrySaveAcceptedPeerCopy(portable, bad, out _, out _) && store.All().Count == count, "Wrong source hash created a card.");
             bad = copy.peerOrigins[0].Copy(); bad.documentId = Guid.NewGuid().ToString("N");
             Require(!store.TrySaveAcceptedPeerCopy(portable, bad, out _, out _) && store.All().Count == count, "Wrong source ID created a card.");
-            Refuse(accepted.Replace("\"version\":15", "\"version\":14"));
-            Refuse(accepted.Replace("\"formatVersion\":15", "\"formatVersion\":16"));
+            Refuse(accepted.Replace("\"version\":" + BlueprintExchangeFormat.Version, "\"version\":14"));
+            Refuse(accepted.Replace("\"formatVersion\":" + BlueprintExchangeFormat.Version,
+                "\"formatVersion\":" + (BlueprintExchangeFormat.Version + 1)));
             Refuse(accepted.Replace("\"worldUid\":71", "\"worldUid\":0"));
             Refuse(accepted.Replace("\"sender\":\"Steam_sender\"", "\"sender\":\"<admin>\""));
             Refuse(accepted.Replace("\"sender\":\"Steam_sender\"", "\"sender\":\"Steam_sender\",\"admin\":true"));
-            string old = Encoding.UTF8.GetString(portable).Replace("\"version\":15", "\"version\":14");
+            string old = Encoding.UTF8.GetString(portable).Replace("\"version\":" + BlueprintExchangeFormat.Version, "\"version\":14");
             Require(BlueprintExchangeFormat.Decode(old).peerOrigins == null, "Legacy portable without peer field refused.");
             foreach (string value in new[] { "null", "[]" })
                 Refuse(old.Replace("\"blueprint\":{", "\"blueprint\":{\"peerOrigins\":" + value + ","));
             string native = File.ReadAllText(path); string oldPath = Path.Combine(folder, "old.json");
-            File.WriteAllText(oldPath, native.Replace("\"version\":27", "\"version\":25"));
+            File.WriteAllText(oldPath, native.Replace("\"version\":" + CompositeBlueprintStore.FormatVersion, "\"version\":25"));
             var oldStore = new B(oldPath);
             Require(oldStore.All().Count == 0 && !oldStore.TryAddCategory("blocked", out _) &&
-                File.ReadAllText(oldPath) == native.Replace("\"version\":27", "\"version\":25"), "Legacy native accepted peer fields or rewrote refused file.");
+                File.ReadAllText(oldPath) == native.Replace("\"version\":" + CompositeBlueprintStore.FormatVersion, "\"version\":25"), "Legacy native accepted peer fields or rewrote refused file.");
             var editorPart = new BlueprintEditorPart("a", "woodwall", "Wall", new Point3(), new Rotation3(0, 0, 0, 1));
             var editor = new BlueprintEditorDocument(null, "Destination", "QA", new[] { editorPart });
             var incoming = new BlueprintEditorDocument(null, "Incoming", "QA", new[] { editorPart }, sourcePeerOrigins: copy.peerOrigins.Select(value => value.ToGeometry()));

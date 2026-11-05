@@ -85,6 +85,88 @@ namespace OstrixMods.BuildWorks.Geometry
             { return false; }
         }
 
+        // Collect names to resolve on the host thread before a background import decodes the demand.
+        public static bool TryGetNativePrefabHashes(string package, out IReadOnlyList<int> hashes)
+        {
+            hashes = null;
+            try
+            {
+                using (var reader = NativeReader(package))
+                {
+                    int version = NativeHeader(reader, out int count);
+                    var found = new SortedSet<int>();
+                    void Add(int value) { if (value == 0) throw new InvalidDataException("Missing native item prefab."); found.Add(value); }
+                    for (int i = 0; i < count; ++i)
+                        if (version == 106) Add(KgBlueprint.StablePrefabHash(ReadLegacyItem(reader).Prefab));
+                        else ReadItem(reader, null, version, discard: true, seenHash: Add);
+                    if (reader.BaseStream.Position != reader.BaseStream.Length) return false;
+                    hashes = Array.AsReadOnly(found.ToArray()); return true;
+                }
+            }
+            catch (Exception error) when (error is IOException || error is InvalidDataException || error is ArgumentException || error is FormatException)
+            { return false; }
+        }
+
+        public static bool TryConvertNative(string package, int width, int height, Func<int, string> resolvePrefab,
+            out BlueprintForeignPartData data)
+        {
+            data = null;
+            if (width < 1 || width > 256 || height < 1 || height > 256) return false;
+            try
+            {
+                using (var reader = NativeReader(package))
+                {
+                    int version = NativeHeader(reader, out int count);
+                    if (version == 106) return TryConvertLegacy106(package, width, height, KgBlueprint.StablePrefabHash, out data);
+                    if (count > width * height) return false;
+                    var names = new Dictionary<int, string>();
+                    string Resolve(int hash)
+                    {
+                        if (hash == 0) throw new InvalidDataException("Missing native item prefab.");
+                        if (!names.TryGetValue(hash, out string name))
+                        {
+                            name = resolvePrefab?.Invoke(hash);
+                            if (string.IsNullOrWhiteSpace(name) || name.Length > 128 || name != name.Trim() ||
+                                name.Any(c => char.IsControl(c) || "/\\<>:|".Contains(c)) || KgBlueprint.StablePrefabHash(name) != hash)
+                                throw new InvalidDataException("Unresolved native item prefab.");
+                            names.Add(hash, name);
+                        }
+                        return name;
+                    }
+                    int units = 0;
+                    for (int i = 0; i < count; ++i) units = checked(units + ReadItem(reader, null, version, discard: false, resolve: Resolve).Stack);
+                    if (reader.BaseStream.Position != reader.BaseStream.Length) return false;
+                    string info = string.Join(":", new[] { width, height, count, units }.Select(n => n.ToString(CultureInfo.InvariantCulture)));
+                    if (names.Count != 0) info += "|" + string.Join("|", names.Values.OrderBy(n => n, StringComparer.Ordinal));
+                    var candidate = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, info, package, null);
+                    if (!TryRead(candidate, KgBlueprint.StablePrefabHash, out _)) return false;
+                    data = candidate; return true;
+                }
+            }
+            catch (Exception error) when (error is IOException || error is InvalidDataException || error is ArgumentException ||
+                error is FormatException || error is OverflowException)
+            { return false; }
+        }
+
+        private static BinaryReader NativeReader(string package)
+        {
+            if (package == null || package.Length > BlueprintForeignPartData.MaximumContainerBase64) throw new InvalidDataException("Native inventory size.");
+            byte[] bytes = Convert.FromBase64String(package);
+            if (bytes.Length < 6 || bytes.Length > BlueprintForeignPartData.MaximumContainerBytes || Convert.ToBase64String(bytes) != package)
+                throw new InvalidDataException("Native inventory encoding.");
+            return new BinaryReader(new MemoryStream(bytes, false), new UTF8Encoding(false, true));
+        }
+
+        private static int NativeHeader(BinaryReader reader, out int count)
+        {
+            int version = reader.ReadInt32();
+            if (version != 106 && version != 109 && version != 110) throw new InvalidDataException("Unknown native inventory version.");
+            count = version == 106 ? reader.ReadInt32() : reader.ReadUInt16();
+            if (count < 0 || count > 4096 || count * (version == 106 ? 44L : 13L) > reader.BaseStream.Length - reader.BaseStream.Position)
+                throw new InvalidDataException("Native inventory count.");
+            return version;
+        }
+
         public static bool TryConvertLegacy106(string package, int width, int height, Func<string, int> prefabHash,
             out BlueprintForeignPartData data)
         {
@@ -155,7 +237,8 @@ namespace OstrixMods.BuildWorks.Geometry
         // Locate later Player.Save fields without loading, naming or returning unresolved inventory items.
         internal static void SkipItem(BinaryReader reader, int version) => ReadItem(reader, null, version, discard: true);
 
-        private static Item ReadItem(BinaryReader reader, Dictionary<int, string> names, int version, bool discard)
+        private static Item ReadItem(BinaryReader reader, Dictionary<int, string> names, int version, bool discard,
+            Func<int, string> resolve = null, Action<int> seenHash = null)
         {
             int durability = reader.ReadInt32(), x = reader.ReadByte(), y = reader.ReadByte();
             int worldLevel = reader.ReadByte(), flags = reader.ReadByte();
@@ -178,8 +261,17 @@ namespace OstrixMods.BuildWorks.Geometry
                 throw new InvalidDataException("Invalid native item defaults.");
             int prefabHash = (flags & 64) != 0 ? reader.ReadInt32() : 0;
             string prefab = null;
-            if (!discard && ((flags & 64) == 0 || !names.TryGetValue(prefabHash, out prefab)))
-                throw new InvalidDataException("Unknown native item prefab.");
+            if (seenHash != null)
+            {
+                if ((flags & 64) == 0 || prefabHash == 0) throw new InvalidDataException("Missing native item prefab.");
+                seenHash(prefabHash);
+            }
+            if (!discard)
+            {
+                if (resolve != null) prefab = resolve(prefabHash);
+                else names?.TryGetValue(prefabHash, out prefab);
+                if ((flags & 64) == 0 || prefab == null) throw new InvalidDataException("Unknown native item prefab.");
+            }
             var customData = discard ? null : new Dictionary<string, string>(StringComparer.Ordinal);
             int customCount = 0;
             if ((flags & 128) != 0)

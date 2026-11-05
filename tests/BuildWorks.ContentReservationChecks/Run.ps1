@@ -15,6 +15,12 @@ $preview = [IO.File]::ReadAllText((Resolve-Path -LiteralPath $PreviewSourcePath)
 $previewHash = (Get-FileHash -LiteralPath $PreviewSourcePath).Hash
 $transferSource = [IO.File]::ReadAllText((Resolve-Path -LiteralPath $TransferSourcePath))
 $transferHash = (Get-FileHash -LiteralPath $TransferSourcePath).Hash
+$returnRecoveryPath = Join-Path $root 'src/BuildWorks/BlueprintStorageTransfer.ReturnRecovery.cs'
+$pairedRecoveryPath = Join-Path $root 'src/BuildWorks/BlueprintStorageTransfer.PairedRecovery.cs'
+[IO.File]::WriteAllText((Join-Path $output 'PairedRecoverySource.cs'),
+    [IO.File]::ReadAllText($pairedRecoveryPath).Replace('namespace OstrixMods.BuildWorks', 'namespace ReservationChecks'), [Text.UTF8Encoding]::new($false))
+[IO.File]::WriteAllText((Join-Path $output 'ReturnRecoverySource.cs'),
+    [IO.File]::ReadAllText($returnRecoveryPath).Replace('namespace OstrixMods.BuildWorks', 'namespace ReservationChecks'), [Text.UTF8Encoding]::new($false))
 $capturePath = Join-Path $root 'src/BuildWorks/BlueprintStorageCapture.cs'
 $capture = [IO.File]::ReadAllText($capturePath)
 $captureHash = (Get-FileHash -LiteralPath $capturePath).Hash
@@ -80,6 +86,27 @@ $generated = "using System; using System.Collections.Generic; using System.Globa
 [IO.File]::WriteAllText((Join-Path $output 'StorageTransferSource.cs'),
     $transferSource.Replace('using UnityEngine;', '').Replace('namespace OstrixMods.BuildWorks', 'namespace ReservationChecks'),
     [Text.UTF8Encoding]::new($false))
+$constructionTransfer = [IO.File]::ReadAllText((Join-Path $root 'src/BuildWorks/BlueprintStorageTransfer.Construction.cs'))
+$settleStart = $constructionTransfer.IndexOf('        internal bool TrySettleConstruction(', [StringComparison]::Ordinal)
+$settleEnd = $constructionTransfer.LastIndexOf("`n    }", [StringComparison]::Ordinal)
+if ($settleStart -lt 0 -or $settleEnd -le $settleStart) { throw 'Actual settlement source boundary changed.' }
+[IO.File]::WriteAllText((Join-Path $output 'StorageSettlementSource.cs'),
+    "using System; namespace ReservationChecks { internal sealed partial class BlueprintStorageTransfer {`n" +
+    $constructionTransfer.Substring($settleStart, $settleEnd - $settleStart) + "`n} }", [Text.UTF8Encoding]::new($false))
+$partExecution = [IO.File]::ReadAllText((Join-Path $root 'src/BuildWorks/BlueprintConstructionPartExecution.cs'))
+$returnCoordinator = [IO.File]::ReadAllText((Join-Path $root 'src/BuildWorks/BlueprintConstructionContentsReturn.cs'))
+$advanceStart = $returnCoordinator.IndexOf('        private void Advance()', [StringComparison]::Ordinal)
+$advanceEnd = $returnCoordinator.LastIndexOf("`n    }", [StringComparison]::Ordinal)
+if ($advanceStart -lt 0 -or $advanceEnd -le $advanceStart) { throw 'Actual return coordinator boundary changed.' }
+[IO.File]::WriteAllText((Join-Path $output 'ContentsReturnTickSource.cs'),
+    "using System; namespace ReservationChecks { internal sealed partial class ContentsReturnTickProbe {`n" +
+    $returnCoordinator.Substring($advanceStart, $advanceEnd - $advanceStart) + "`n} }", [Text.UTF8Encoding]::new($false))
+$tickStart = $partExecution.IndexOf('        private void TickContents()', [StringComparison]::Ordinal)
+$tickEnd = $partExecution.IndexOf('        private bool Context()', $tickStart, [StringComparison]::Ordinal)
+if ($tickStart -lt 0 -or $tickEnd -le $tickStart) { throw 'Actual contents tick boundary changed.' }
+[IO.File]::WriteAllText((Join-Path $output 'PartContentsTickSource.cs'),
+    "using System; namespace ReservationChecks { internal sealed partial class PartContentsTickProbe {`n" +
+    $partExecution.Substring($tickStart, $tickEnd - $tickStart) + "`n} }", [Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText((Join-Path $output 'StorageJournalSource.cs'),
     $journal.Replace('namespace OstrixMods.BuildWorks', 'namespace ReservationChecks'), [Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText((Join-Path $output 'StorageProfileSource.cs'),
@@ -95,6 +122,13 @@ $persistenceHash = (Get-FileHash -LiteralPath $persistencePath).Hash
 [IO.File]::WriteAllText((Join-Path $output 'StorageWorldSource.cs'),
     $worldSource.Replace('namespace OstrixMods.BuildWorks', 'namespace ReservationChecks'), [Text.UTF8Encoding]::new($false))
 $captureStart = $capture.IndexOf('        private static readonly FieldInfo ContainerView', [StringComparison]::Ordinal)
+$callbackSource = [IO.File]::ReadAllText((Join-Path $root 'src/BuildWorks/BlueprintConstructionContainerGuard.cs'))
+$callbackStart = $callbackSource.IndexOf('        private const BindingFlags InstanceFields', [StringComparison]::Ordinal)
+$callbackEnd = $callbackSource.IndexOf('        internal static bool NativeRoot(', $callbackStart, [StringComparison]::Ordinal)
+if ($callbackStart -lt 0 -or $callbackEnd -le $callbackStart) { throw 'Native callback predicate boundary changed.' }
+[IO.File]::WriteAllText((Join-Path $output 'ContainerCallbacksSource.cs'),
+    "using System; using System.Reflection; namespace ReservationChecks { internal static class BlueprintConstructionContainerGuard {`n" +
+    $callbackSource.Substring($callbackStart, $callbackEnd - $callbackStart) + "`n} }", [Text.UTF8Encoding]::new($false))
 $captureEnd = $capture.IndexOf('        // Only construction compatibility', [StringComparison]::Ordinal)
 if ($captureStart -lt 0 -or $captureEnd -le $captureStart) { throw 'Capture cancellation guard boundary missing.' }
 [IO.File]::WriteAllText((Join-Path $output 'StorageRemovalSource.cs'),

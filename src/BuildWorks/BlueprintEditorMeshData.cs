@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using OstrixMods.BuildWorks.Geometry;
 using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -133,6 +134,53 @@ namespace OstrixMods.BuildWorks
             {
                 vertices = Array.Empty<Vector3>();
                 triangles = Array.Empty<int>();
+                error = (mesh ? mesh.name : "Missing mesh") + ": " + exception.Message;
+                return false;
+            }
+        }
+
+        // Raw geometry only. Share read counters across one validation; never cache these arrays across validations.
+        internal static bool TryReadContact(Mesh mesh, ref int readVertices, ref int readTriangles,
+            out Vector3[] vertices, out int[] triangles, out string error)
+        {
+            vertices = Array.Empty<Vector3>(); triangles = Array.Empty<int>(); error = null;
+            try
+            {
+                if (!mesh || !mesh.isReadable || mesh.vertexCount <= 0 ||
+                    mesh.vertexCount > TriangleContactCandidates.MaximumVerticesPerMesh ||
+                    mesh.subMeshCount <= 0 || mesh.subMeshCount > 256 ||
+                    readVertices < 0 || readVertices > TriangleContactCandidates.MaximumVerticesPerValidation ||
+                    readTriangles < 0 || readTriangles > TriangleContactCandidates.MaximumTrianglesPerValidation)
+                    throw new InvalidOperationException("Contact mesh is unreadable, empty or outside its read budget.");
+                int vertexCount = mesh.vertexCount, triangleCount = 0;
+                for (int submesh = 0; submesh < mesh.subMeshCount; ++submesh)
+                {
+                    SubMeshDescriptor descriptor = mesh.GetSubMesh(submesh);
+                    if (descriptor.topology != MeshTopology.Triangles || descriptor.indexStart < 0 ||
+                        descriptor.indexCount < 0 || descriptor.indexCount % 3 != 0 ||
+                        descriptor.indexCount / 3 > TriangleContactCandidates.MaximumTrianglesPerMesh - triangleCount)
+                        throw new InvalidOperationException("Contact mesh requires bounded complete triangle submeshes.");
+                    triangleCount += descriptor.indexCount / 3;
+                }
+                if (triangleCount == 0 || vertexCount > TriangleContactCandidates.MaximumVerticesPerValidation - readVertices ||
+                    triangleCount > TriangleContactCandidates.MaximumTrianglesPerValidation - readTriangles)
+                    throw new InvalidOperationException("Contact mesh exceeds the remaining validation read budget.");
+                // Failed reads still consume their bounded input work; they must not reset the validation budget.
+                readVertices += vertexCount; readTriangles += triangleCount;
+                ReadCpu(mesh, out vertices, out triangles);
+                if (vertices.Length != vertexCount || triangles.Length != triangleCount * 3)
+                    throw new InvalidOperationException("Contact mesh changed while being read.");
+                foreach (Vector3 point in vertices)
+                    if (!Finite(point.x) || !Finite(point.y) || !Finite(point.z))
+                        throw new InvalidOperationException("Contact mesh position is not finite.");
+                foreach (int index in triangles)
+                    if (index < 0 || index >= vertexCount)
+                        throw new InvalidOperationException("Contact mesh index is outside its vertex buffer.");
+                return true;
+            }
+            catch (Exception exception)
+            {
+                vertices = Array.Empty<Vector3>(); triangles = Array.Empty<int>();
                 error = (mesh ? mesh.name : "Missing mesh") + ": " + exception.Message;
                 return false;
             }

@@ -145,11 +145,22 @@ namespace ReservationChecks
         }
         private static BlueprintForeignPartData Mount(string prefab) => new BlueprintForeignPartData(
             BlueprintForeignPartData.NativeItemStandFormat, prefab + ":0:1:0", null, null);
-        private static Piece Cost(ItemDrop.ItemData item, int amount) => new Piece { m_resources = new[] {
+        internal static Piece Cost(ItemDrop.ItemData item, int amount) => new Piece { m_resources = new[] {
             new Piece.Requirement { m_resItem = new ItemDrop.Drop { m_itemData = item }, Amount = amount } } };
 
         private static int Main(string[] args)
         {
+            if (args.Length == 2 && args[0] == "--open-return-journal")
+            {
+                try
+                {
+                    BepInEx.Paths.ConfigPath = new DirectoryInfo(Path.GetDirectoryName(args[1])).Parent.Parent.FullName;
+                    var saved = BlueprintStorageTransferJournal.Read(args[1]);
+                    using (var journal = BlueprintStorageTransferJournal.ResumeReturn(saved))
+                    { if (!journal.OnlyUnresolvedReturn()) return 2; Console.WriteLine(saved.Prepared.Operation.ToString("N")); return 0; }
+                }
+                catch (Exception error) { Console.Error.WriteLine(error.Message); return 1; }
+            }
             if (args.Length == 2 && args[0] == "--read-journal")
             {
                 try { var journal = BlueprintStorageTransferJournal.Read(args[1]); Console.WriteLine(journal.Prepared.Operation.ToString("N")); return journal.RequiresReconciliation ? 0 : 2; }
@@ -157,6 +168,7 @@ namespace ReservationChecks
             }
             try
             {
+                PaidSupplySelectionChecks.Run();
                 var player = new Player(); var wood = Item("Wood", 10); player.Inventory.Items.Add(wood);
                 var chest = Container(2, Item("Wood", 3, "archived"));
                 var mount = Mount("Wood");

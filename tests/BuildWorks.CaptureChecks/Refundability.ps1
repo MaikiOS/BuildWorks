@@ -55,6 +55,6 @@ if ($BudgetNegativeControl) {
     return
 }
 if ($taskObserved) { throw $taskObserved }
-if ($taskChecks -ne 40) { throw ('Refundability coverage differs: ' + $taskChecks) }
+if ($taskChecks -ne 42) { throw ('Refundability coverage differs: ' + $taskChecks) }
 if ($ReportPath) { @{passed=$true;checks=$taskChecks;actualPreflightAndRestoreCompiled=$true;nativeBoundariesSubstituted=$true;exactPropertyValidatorSubstituted=$true;gameHostTested=$false} | ConvertTo-Json | Set-Content $ReportPath }
 "PASS refundability: $taskChecks actual-preflight/Restore checks and early-call wiring; native and exact-property validation boundaries substituted."

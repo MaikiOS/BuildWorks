@@ -1,8 +1,15 @@
+>309 correction: declared PlanBuild V1 may start directly with piece rows; importer and immutable source index now agree. Unknown sections still stop parsing until #Pieces; actual rows close the pre-piece provenance window.28/16 fields unchanged. Scoped acceptance (local development reference; [public status](../../docs/CURRENT_STATUS.md)).
+
+>26Oct2026 clarification:28/16 retained. Format register (RU) (local development reference; [public status](../../docs/CURRENT_STATUS.md)) records Tomrer9/Homestead gaps and unsupported KG/BBP/OpenKeep candidates. New codecs require full source/normalization/store/exchange contracts; binary originals need a bytes/migration design.
+
 # Current blueprint format and exchange contract
 
 [Русский](blueprint-format_RU.md) · [Current acceptance](../../docs/CURRENT_STATUS.md)
 
-Native library schema **24** (`CompositeBlueprintStore`); portable schema **13** (`BlueprintExchangeFormat`). Schema versions are not package versions.
+Native library schema **35** (`CompositeBlueprintStore`); portable schema **23** (`BlueprintExchangeFormat`). Schema versions are not package versions.
+
+
+> Source candidate0.19.324 uses native35/portable23 for optional Group.sourceDocumentId/sourceLayerId; old34/22 reject field presence and planner sources. InstalledQA323 remains34/22. Planner JSON file import is independently accepted (03FDFFFA);planner paired export/UI accepted in Workbench scope (8D691B88); original consumer/game remain open.
 
 | Input/output | Supported boundary |
 | --- | --- |
@@ -22,3 +29,6 @@ Content categories have independent import/export/build choices. Survival/admin 
 Limits: document50000 parts; normal interactive/editor512, isolated QA/Unity editor50000; owned store32 cards/12 categories/100000 aggregate parts. Byte/depth/archive and memory guards remain. See source constants for exact validation; these maxima are not performance guarantees.
 
 [Corpus provenance/permissions](../../docs/EXTERNAL_CORPUS_REGISTER.md) · [Historical format evolution](blueprint-format-history-206.md). No claim that every external file or unknown dialect is supported.
+
+
+World-capture source record `world-capture-v1` is a bounded, strictly validated, inert TSV: known world UID or explicit unknown, original world position/quaternion, host module MVID and BuildWorks version. The frame never transforms local parts or establishes authority. It is preserved through store/editor/copy/portable paths. Native28/portable16 require this source kind; backdating it to27/15 is rejected. Older27/15 without it remain readable without inventing missing origins.

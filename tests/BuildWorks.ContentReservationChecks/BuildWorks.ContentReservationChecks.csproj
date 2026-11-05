@@ -10,6 +10,12 @@
   <ItemGroup>
     <Compile Include="../../artifacts/content-reservations/ReservationSource.cs" Link="ReservationSource.cs" />
     <Compile Include="../../artifacts/content-reservations/StorageTransferSource.cs" Link="StorageTransferSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/ReturnRecoverySource.cs" Link="ReturnRecoverySource.cs" />
+    <Compile Include="../../artifacts/content-reservations/PairedRecoverySource.cs" Link="PairedRecoverySource.cs" />
+    <Compile Include="../../artifacts/content-reservations/StorageSettlementSource.cs" Link="StorageSettlementSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/PartContentsTickSource.cs" Link="PartContentsTickSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/ContentsReturnTickSource.cs" Link="ContentsReturnTickSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/ContainerCallbacksSource.cs" Link="ContainerCallbacksSource.cs" />
     <Compile Include="../../artifacts/content-reservations/StorageJournalSource.cs" Link="StorageJournalSource.cs" />
     <Compile Include="../../artifacts/content-reservations/StorageRemovalSource.cs" Link="StorageRemovalSource.cs" />
     <Compile Include="../../artifacts/content-reservations/StorageProfileSource.cs" Link="StorageProfileSource.cs" />

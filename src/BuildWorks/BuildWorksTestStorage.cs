@@ -11,7 +11,7 @@ using UnityEngine;
 namespace OstrixMods.BuildWorks
 {
     // Explicit offline QA only. No automatic provisioning, replay, refunds or journal settlement.
-    internal sealed class BuildWorksTestStorage : MonoBehaviour
+    internal sealed partial class BuildWorksTestStorage : MonoBehaviour
     {
         private const string Scenario = BuildWorksTestStorageReceipt.Scenario;
         private IEnumerator steps;

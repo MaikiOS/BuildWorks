@@ -98,6 +98,22 @@ namespace OstrixMods.BuildWorks
                 .Append(" eye=").Append(Vector(eye)).Append(" maxDistance=").Append(Number(maximumDistance))
                 .Append(" tolerance=").Append(Number(BuildWorksPlacementValidation.ContactTolerance(bounds)))
                 .Append(" mask=").Append(mask).Append(" sides=").Append(sides).Append(" nativeHit=").Append(nativeHit);
+            result.Append(" nativeWear=").Append((bool)ghost.GetComponent<WearNTear>())
+                .Append(" active=").Append(ghost.activeInHierarchy);
+            Collider[] shapes = ghost.GetComponentsInChildren<Collider>(true);
+            for (int index = 0; index < shapes.Length && index < 16; ++index)
+            {
+                Collider shape = shapes[index];
+                result.Append("\nshape=").Append(index).Append(" type=").Append(shape.GetType().Name)
+                    .Append(" enabled=").Append(shape.enabled).Append(" active=").Append(shape.gameObject.activeInHierarchy)
+                    .Append(" trigger=").Append(shape.isTrigger).Append(" rigidbody=").Append((bool)shape.attachedRigidbody)
+                    .Append(" layer=").Append(shape.gameObject.layer)
+                    .Append(" position=").Append(Vector(shape.transform.position))
+                    .Append(" rotation=").Append(shape.transform.rotation.ToString("G9"))
+                    .Append(" scale=").Append(Vector(shape.transform.lossyScale));
+                if (shape is BoxCollider box)
+                    result.Append(" centre=").Append(Vector(box.center)).Append(" size=").Append(Vector(box.size));
+            }
             var hits = new RaycastHit[32];
             for (int face = 0; face < 6; ++face)
             {

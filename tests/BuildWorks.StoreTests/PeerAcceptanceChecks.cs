@@ -47,7 +47,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             changedSource.id = Guid.NewGuid().ToString("N"); different = BlueprintExchangeFormat.Encode(changedSource);
             changed = origin.Copy(); changed.documentId = changedSource.id; changed.sha256 = Hash(different); Refuse(store, path, different, changed);
             changed = origin.Copy(); changed.formatVersion--; Refuse(store, path, portable, changed);
-            byte[] legacyPortable = Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(portable).Replace("\"version\":15", "\"version\":14"));
+            byte[] legacyPortable = Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(portable).Replace("\"version\":" + BlueprintExchangeFormat.Version, "\"version\":14"));
             changed = origin.Copy(); changed.formatVersion = 14; changed.sha256 = Hash(legacyPortable); Refuse(store, path, legacyPortable, changed);
             Refuse(store, path, portable.Take(portable.Length - 1).ToArray(), origin);
             Refuse(store, path, Array.Empty<byte>(), origin);
@@ -86,14 +86,15 @@ namespace OstrixMods.BuildWorks.StoreTests
             string json = File.ReadAllText(path);
             string without = json.Substring(0, json.IndexOf(",\"peerReceipts\":", StringComparison.Ordinal)) + "}";
             string legacyPath = Path.Combine(folder, "legacy26.json");
-            File.WriteAllText(legacyPath, without.Replace("\"version\":27", "\"version\":26"));
+            File.WriteAllText(legacyPath, without.Replace("\"version\":" + CompositeBlueprintStore.FormatVersion, "\"version\":26"));
             var legacy = new B(legacyPath);
             Require(legacy.All().Count == 3 && legacy.TryAddCategory("Legacy", out string error) &&
-                File.ReadAllText(legacyPath).Contains("\"version\":27"), "Native26 without local receipts did not migrate.");
+                File.ReadAllText(legacyPath).Contains("\"version\":" + CompositeBlueprintStore.FormatVersion), "Native26 without local receipts did not migrate.");
             foreach (string value in new[] { "null", "[]" })
-                RefuseLibrary(folder, without.Replace("\"version\":27", "\"version\":26").TrimEnd('}') + ",\"peerReceipts\":" + value + "}", portable, origin);
-            RefuseLibrary(folder, json.Replace("\"version\":27", "\"version\":26"), portable, origin);
-            RefuseLibrary(folder, json.Replace("\"version\":27", "\"version\":28"), portable, origin);
+                RefuseLibrary(folder, without.Replace("\"version\":" + CompositeBlueprintStore.FormatVersion, "\"version\":26").TrimEnd('}') + ",\"peerReceipts\":" + value + "}", portable, origin);
+            RefuseLibrary(folder, json.Replace("\"version\":" + CompositeBlueprintStore.FormatVersion, "\"version\":26"), portable, origin);
+            RefuseLibrary(folder, json.Replace("\"version\":" + CompositeBlueprintStore.FormatVersion,
+                "\"version\":" + (CompositeBlueprintStore.FormatVersion + 1)), portable, origin);
             RefuseLibrary(folder, json.Replace("\"peerReceipts\":[", "\"peerReceipts\":[null,"), portable, origin);
             RefuseLibrary(folder, json.Replace("\"origin\":{", "\"origin\":{\"admin\":true,"), portable, origin);
             RefuseLibrary(folder, json.Replace("\"copyId\":", "\"unexpected\":"), portable, origin);

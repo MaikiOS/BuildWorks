@@ -7,6 +7,6 @@ namespace OstrixMods.BuildWorks.Geometry
         public const string CurrentRoof = "wood_wall_roof_a";
 
         public static bool IsRecordedPair(string original, string effective) =>
-            original == null || original == OldRoof && effective == CurrentRoof;
+            original == null || original == OldRoof && effective == CurrentRoof || PlannerPrefabNames.IsPair(original, effective);
     }
 }

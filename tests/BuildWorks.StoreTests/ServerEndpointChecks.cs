@@ -28,6 +28,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             var claimed = new Connection { Principal = "admin" };
             double now = 0; bool loseReply = false, revokeRead = false;
             BlueprintServerEndpoint endpoint = null;
+            var sharedBudget = new BlueprintTransferBudget(1024 * 1024);
             var library = new ServerBlueprintLibrary(folder, principal => endpoint.IsAdministrator(principal));
             using (endpoint = new BlueprintServerEndpoint(library, 1001,
                 connection =>
@@ -42,10 +43,15 @@ namespace OstrixMods.BuildWorks.StoreTests
                     if (loseReply && reply.Kind == P.Command.Published) { loseReply = false; throw new IOException("Reply lost after commit"); }
                     value.Replies.Add(reply);
                     if (revokeRead && reply.Kind == P.Command.DataStart) { value.Admin = false; revokeRead = false; }
-                }, maximumTransferBytes: 1024 * 1024))
+                }, maximumTransferBytes: 1024 * 1024, transferBudget: sharedBudget))
             {
                 Pump(() => !endpoint.HasPendingWork);
                 Bootstrap(admin); Bootstrap(player); Bootstrap(claimed);
+                Require(sharedBudget.TryReserve(1024 * 1024), "Other channel could not reserve shared budget");
+                Guid sharedDenied = Send(admin, Start());
+                Require(Last(admin, sharedDenied).Error == P.Failure.Capacity && endpoint.ReservedBytes == 0 &&
+                    sharedBudget.Reserved == 1024 * 1024, "Endpoint bypassed or released another channel's reservation");
+                sharedBudget.Release(1024 * 1024);
                 var publicList = player.Replies.Last();
                 Require(publicList.Kind == P.Command.ListResult && !publicList.Administrator && publicList.Items.Single().Id.ToString("N") == publicInfo.Id,
                     "Player list exposed restricted metadata");
@@ -112,11 +118,11 @@ namespace OstrixMods.BuildWorks.StoreTests
                 var large1 = Start(); large1.Length = 256 * 1024; var large2 = Start(); large2.Length = 256 * 1024;
                 var slot1 = Send(admin, large1); var slot2 = Send(peer2, large2);
                 var full = Start(); full.Length = 256 * 1024; var fullId = Send(peer3, full);
-                Require(endpoint.ReservedBytes == 1024 * 1024 && Last(peer3, fullId).Error == P.Failure.Capacity,
+                Require(endpoint.ReservedBytes == 1024 * 1024 && sharedBudget.Reserved == endpoint.ReservedBytes && Last(peer3, fullId).Error == P.Failure.Capacity,
                     "Aggregate incoming memory quota was bypassed");
                 Send(admin, new P.Message { Kind = P.Command.Cancel, Request = slot1 });
                 Send(peer2, new P.Message { Kind = P.Command.Cancel, Request = slot2 });
-                Require(endpoint.ReservedBytes == 0, "Released quota was not reusable");
+                Require(endpoint.ReservedBytes == 0 && sharedBudget.Reserved == 0, "Released quota was not reusable");
 
                 var interrupted = Send(admin, Start());
                 Guid oldSession = admin.Session; endpoint.Disconnect(admin);
@@ -145,6 +151,7 @@ namespace OstrixMods.BuildWorks.StoreTests
                     endpoint.Receive(player, P.Encode(new P.Message { Kind = P.Command.List, World = 1001, Request = Guid.NewGuid(), Session = player.Session }), now);
                 Require(player.Replies.Count - count <= 16, "Request flood bypassed rate limit");
             }
+            Require(sharedBudget.Reserved == 0, "Disposed endpoint leaked shared quota");
             Console.WriteLine("PASS server endpoint: authenticated connection-scoped ACL, nonce/reconnect denial, read stream, revoked read/commit, ordered/cancel/timeout/quota/rate limits and lost-reply/idempotent publish/delete. In-process transport only; no native RPC registration/UI/game proof.");
 
             P.Message Start() => new P.Message { Kind = P.Command.PublishStart, Request = Guid.NewGuid(), Length = document.Length, Sha256 = Hash(document) };

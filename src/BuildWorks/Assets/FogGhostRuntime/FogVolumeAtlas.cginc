@@ -52,6 +52,9 @@ float3 AtlasDensities(float3 p, int owner, out float3 pigment)
     [branch] if(inRest || inField) state = FogReadPublished(owner);
     #endif
     active = state.valid && state.active;
+    #if !defined(BUILDWORKS_FOG_BOUNDS_BASELINE)
+    active = active && !state.dynamicEmpty;
+    #endif
     inField = inField && active;
     float clock = state.dormant ? _RegionOriginClock[owner].w : state.clock;
     #else
@@ -61,6 +64,7 @@ float3 AtlasDensities(float3 p, int owner, out float3 pigment)
     #endif
     #endif
     float building=0, wake=0, wakeLight=1;
+    #if !defined(BUILDWORKS_FOG_WAKE_ONLY) || !defined(BUILDWORKS_FOG_PUBLISHED) || defined(BUILDWORKS_FOG_BOUNDS_BASELINE)
     [branch] if (inRest)
     {
         float shape = tex3Dlod(_AtlasShape,float4(AtlasUV(uv,_RegionShapeSize[owner].xyz,owner),0)).r;
@@ -78,7 +82,11 @@ float3 AtlasDensities(float3 p, int owner, out float3 pigment)
             #if defined(BUILDWORKS_FOG_BOUNDS_BASELINE)
             [branch] if(active) damage=(_PublishedSparse != 0 ? FogPackedSample(owner,2,wakeUV) : tex3Dlod(_AtlasSurface,float4(FogDynamicUV(wakeUV,_RegionFieldSize[owner].xyz,_RegionDynamicOffset[owner].xyz),0))).w;
             #else
-            [branch] if(active) damage=(_PublishedSparse != 0 ? FogPackedSample(owner,2,wakeUV,state) : tex3Dlod(_AtlasSurface,float4(FogDynamicUV(wakeUV,_RegionFieldSize[owner].xyz,_RegionDynamicOffset[owner].xyz),0))).w;
+            [branch] if(active)
+            {
+                [branch] if(_PublishedSparse != 0) damage=FogPackedSample(owner,2,wakeUV,state).w;
+                else damage=tex3Dlod(_AtlasSurface,float4(FogDynamicUV(wakeUV,_RegionFieldSize[owner].xyz,_RegionDynamicOffset[owner].xyz),0)).w;
+            }
             #endif
             #else
             [branch] if(active) damage=tex3Dlod(_AtlasSurface,float4(AtlasUV(wakeUV,_RegionFieldSize[owner].xyz,owner),0)).w;
@@ -91,6 +99,7 @@ float3 AtlasDensities(float3 p, int owner, out float3 pigment)
             building=shape*(.45+noise*.55)*(1-damage)*.85;
         }
     }
+    #endif
     [branch] if(inField)
     {
         #if defined(BUILDWORKS_FOG_PUBLISHED)
@@ -98,8 +107,17 @@ float3 AtlasDensities(float3 p, int owner, out float3 pigment)
         float4 smoke=_PublishedSparse != 0 ? FogPackedSample(owner,0,wakeUV) : tex3Dlod(_AtlasSmoke,float4(FogDynamicUV(wakeUV,_RegionFieldSize[owner].xyz,_RegionDynamicOffset[owner].xyz),0));
         float4 shade=_PublishedSparse != 0 ? FogPackedSample(owner,0,wakeUV-_BeamDirection*.04) : tex3Dlod(_AtlasSmoke,float4(FogDynamicUV(wakeUV-_BeamDirection*.04,_RegionFieldSize[owner].xyz,_RegionDynamicOffset[owner].xyz),0));
         #else
-        float4 smoke=_PublishedSparse != 0 ? FogPackedSample(owner,0,wakeUV,state) : tex3Dlod(_AtlasSmoke,float4(FogDynamicUV(wakeUV,_RegionFieldSize[owner].xyz,_RegionDynamicOffset[owner].xyz),0));
-        float4 shade=_PublishedSparse != 0 ? FogPackedSample(owner,0,wakeUV-_BeamDirection*.04,state) : tex3Dlod(_AtlasSmoke,float4(FogDynamicUV(wakeUV-_BeamDirection*.04,_RegionFieldSize[owner].xyz,_RegionDynamicOffset[owner].xyz),0));
+        float4 smoke,shade;
+        [branch] if(_PublishedSparse != 0)
+        {
+            smoke=FogPackedSample(owner,0,wakeUV,state);
+            shade=FogPackedSample(owner,0,wakeUV-_BeamDirection*.04,state);
+        }
+        else
+        {
+            smoke=tex3Dlod(_AtlasSmoke,float4(FogDynamicUV(wakeUV,_RegionFieldSize[owner].xyz,_RegionDynamicOffset[owner].xyz),0));
+            shade=tex3Dlod(_AtlasSmoke,float4(FogDynamicUV(wakeUV-_BeamDirection*.04,_RegionFieldSize[owner].xyz,_RegionDynamicOffset[owner].xyz),0));
+        }
         #endif
         #else
         float4 smoke=tex3Dlod(_AtlasSmoke,float4(AtlasUV(wakeUV,_RegionFieldSize[owner].xyz,owner),0));
@@ -121,10 +139,22 @@ float3 AtlasDensities(float3 p, int owner, out float3 pigment)
     }
     return float3(building,wake,wakeLight);
 }
-void AtlasCandidates(float3 origin, float3 ray, float enter, float leave, out int owners[32], out int count)
+#if defined(BUILDWORKS_FOG_PUBLISHED) && !defined(BUILDWORKS_FOG_BOUNDS_BASELINE)
+#define BUILDWORKS_FOG_CANDIDATE_MASK 1
+#endif
+void AtlasCandidates(float3 origin, float3 ray, float enter, float leave,
+    #if defined(BUILDWORKS_FOG_CANDIDATE_MASK)
+    out uint candidates)
+    #else
+    out int owners[32], out int count)
+    #endif
 {
+    #if defined(BUILDWORKS_FOG_CANDIDATE_MASK)
+    candidates=0;
+    #else
     count=0;
     [unroll] for(int clear=0;clear<32;++clear) owners[clear]=0;
+    #endif
     float3 safeRay=lerp(-1,1,step(0,ray))*max(abs(ray),.00001);
     [loop] for(int owner=0;owner<_RegionCount;++owner)
     {
@@ -134,6 +164,9 @@ void AtlasCandidates(float3 origin, float3 ray, float enter, float leave, out in
         #if defined(BUILDWORKS_FOG_PUBLISHED)
         FogPublishedState state=FogReadPublished(owner);
         bool dormant=!state.valid || !state.active;
+        #if !defined(BUILDWORKS_FOG_BOUNDS_BASELINE)
+        dormant = dormant || state.dynamicEmpty;
+        #endif
         #else
         bool dormant=_RegionShapeSize[owner].w<.5;
         #endif
@@ -146,16 +179,39 @@ void AtlasCandidates(float3 origin, float3 ray, float enter, float leave, out in
         }
         #endif
         float3 t0=(minimum-origin)/safeRay,t1=(maximum-origin)/safeRay,lo=min(t0,t1),hi=max(t0,t1);
-        if(max(enter,max(max(lo.x,lo.y),lo.z))<min(leave,min(min(hi.x,hi.y),hi.z))) owners[count++]=owner;
+        if(max(enter,max(max(lo.x,lo.y),lo.z))<min(leave,min(min(hi.x,hi.y),hi.z)))
+        {
+            #if defined(BUILDWORKS_FOG_CANDIDATE_MASK)
+            candidates |= 1u << owner;
+            #else
+            owners[count++]=owner;
+            #endif
+        }
     }
 }
-void AtlasMatter(float3 p, int owners[32], int count, out float extinction, out float density, out float3 scatter)
+void AtlasMatter(float3 p,
+    #if defined(BUILDWORKS_FOG_CANDIDATE_MASK)
+    uint candidates,
+    #else
+    int owners[32], int count,
+    #endif
+    out float extinction, out float density, out float3 scatter)
 {
     extinction=0; density=0; scatter=0;
+    #if defined(BUILDWORKS_FOG_CANDIDATE_MASK)
+    uint remaining=candidates;
+    [loop] while(remaining!=0)
+    #else
     [loop] for(int i=0;i<count;++i)
+    #endif
     {
+        #if defined(BUILDWORKS_FOG_CANDIDATE_MASK)
+        int owner=(int)FogTakeCandidate(remaining);
+        #else
+        int owner=owners[i];
+        #endif
         float3 pigment=float3(.57,.60,.62);
-        float3 matter=AtlasDensities(p,owners[i],pigment);
+        float3 matter=AtlasDensities(p,owner,pigment);
         density+=matter.x+matter.y; extinction+=matter.x*.22+matter.y*.4;
         scatter+=float3(.23,.12,.055)*matter.x*.11+pigment*matter.y*(matter.z*.45+.55)*.5;
     }
@@ -163,22 +219,92 @@ void AtlasMatter(float3 p, int owners[32], int count, out float extinction, out 
 float AtlasLight(float3 p)
 {
     float3 path=p-_BeamOrigin; float lengthPath=length(path);
+    #if defined(BUILDWORKS_FOG_CANDIDATE_MASK)
+    uint candidates; AtlasCandidates(_BeamOrigin,path/max(.00001,lengthPath),0,lengthPath,candidates);
+    #else
     int owners[32],count; AtlasCandidates(_BeamOrigin,path/max(.00001,lengthPath),0,lengthPath,owners,count);
+    #endif
     float opticalDepth=0,ds=lengthPath/24;
     [loop] for(int s=0;s<24;++s)
     {
         float3 sample=_BeamOrigin+path*((s+.5)/24);
+        #if defined(BUILDWORKS_FOG_CANDIDATE_MASK)
+        uint remaining=candidates;
+        [loop] while(remaining!=0)
+        #else
         [loop] for(int i=0;i<count;++i)
+        #endif
         {
+            #if defined(BUILDWORKS_FOG_CANDIDATE_MASK)
+            int owner=(int)FogTakeCandidate(remaining);
+            #else
+            int owner=owners[i];
+            #endif
             float3 pigment=float3(.57,.60,.62);
-            float3 matter=AtlasDensities(sample,owners[i],pigment);
+            float3 matter=AtlasDensities(sample,owner,pigment);
             opticalDepth+=(matter.x*.9+matter.y*.4)*ds;
         }
     }
     return exp(-opticalDepth);
 }
+#if defined(BUILDWORKS_FOG_WAKE_ONLY) && defined(BUILDWORKS_FOG_CANDIDATE_MASK)
+// Experimental contact volume; the textured surface remains the building's visible form.
+float4 IntegrateWake(float2 uv)
+{
+    float2 ndc=uv*2-1;
+    float3 ray=normalize(_CameraForward+_CameraRight*ndc.x*_Aspect*_TanHalfFov+_CameraUp*ndc.y*_TanHalfFov);
+    float depth=LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture,uv))/max(.001,dot(ray,_CameraForward));
+    float enter=depth,leave=0;
+    uint candidates=0;
+    [loop] for(int owner=0;owner<_RegionCount;++owner)
+    {
+        FogPublishedState state=FogReadPublished(owner);
+        [branch] if(!state.valid || !state.active || state.dynamicEmpty) continue;
+        float3 minimum=_RegionFieldMin[owner].xyz+_RegionOriginClock[owner].xyz;
+        float3 maximum=_RegionFieldMax[owner].xyz+_RegionOriginClock[owner].xyz;
+        float near=0,far=depth;
+        // Parallel axes must neither divide by zero nor invent an intersection outside a field.
+        [unroll] for(int axis=0;axis<3;++axis)
+        {
+            if(abs(ray[axis])<.0000001)
+            {
+                if(_FogCameraOrigin[axis]<minimum[axis] || _FogCameraOrigin[axis]>maximum[axis]) far=-1;
+            }
+            else
+            {
+                float a=(minimum[axis]-_FogCameraOrigin[axis])/ray[axis];
+                float b=(maximum[axis]-_FogCameraOrigin[axis])/ray[axis];
+                near=max(near,min(a,b)); far=min(far,max(a,b));
+            }
+        }
+        if(far<=near) continue;
+        candidates|=1u<<owner; enter=min(enter,near); leave=max(leave,far);
+    }
+    if(candidates==0) return float4(0,0,0,1);
+    float distance=enter+.025*frac(sin(dot(uv,float2(12.9898,78.233)))*43758.5453);
+    float transmission=1; float3 accumulated=0;
+    [loop] for(int k=0;k<4096 && k<_IntegrationSteps && distance<leave;++k)
+    {
+        float ds=min(.025,leave-distance),extinction,density; float3 scatter;
+        AtlasMatter(_FogCameraOrigin+ray*distance,candidates,extinction,density,scatter);
+        accumulated+=transmission*scatter*ds;
+        transmission*=exp(-extinction*ds);
+        if(transmission<.015) break;
+        distance+=ds;
+    }
+    return float4(accumulated,transmission);
+}
+float4 FogWakeOnlyFragment(v2f_img i)
+{
+    float4 background=tex2D(_MainTex,i.uv),wake=IntegrateWake(i.uv);
+    return float4(wake.rgb+wake.a*background.rgb,background.a);
+}
+#endif
 float4 FogAtlasFragment(v2f_img i)
 {
+    #if defined(BUILDWORKS_FOG_WAKE_ONLY) && defined(BUILDWORKS_FOG_CANDIDATE_MASK)
+    return FogWakeOnlyFragment(i);
+    #else
     float4 background=tex2D(_MainTex,i.uv);
     float2 ndc=i.uv*2-1;
     float3 ray=normalize(_CameraForward+_CameraRight*ndc.x*_Aspect*_TanHalfFov+_CameraUp*ndc.y*_TanHalfFov);
@@ -189,7 +315,11 @@ float4 FogAtlasFragment(v2f_img i)
     float eye=LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture,i.uv));
     leave=min(leave,eye/max(.001,dot(ray,_CameraForward)));
     if(leave<=enter) return background;
+    #if defined(BUILDWORKS_FOG_CANDIDATE_MASK)
+    uint candidates; AtlasCandidates(origin,ray,enter,leave,candidates);
+    #else
     int owners[32],count; AtlasCandidates(origin,ray,enter,leave,owners,count);
+    #endif
     float3 fine0=(_FineMin-origin)/safeRay,fine1=(_FineMax-origin)/safeRay,fineLo=min(fine0,fine1),fineHi=max(fine0,fine1);
     float fineEnter=max(max(fineLo.x,fineLo.y),fineLo.z),fineLeave=min(min(fineHi.x,fineHi.y),fineHi.z);
     float stepLength=(leave-enter)/160;
@@ -199,7 +329,11 @@ float4 FogAtlasFragment(v2f_img i)
     {
         float ds=distance>=fineEnter && distance<=fineLeave?min(stepLength,.025):stepLength;
         float3 p=origin+ray*distance,scatter;float extinction,density;
+        #if defined(BUILDWORKS_FOG_CANDIDATE_MASK)
+        AtlasMatter(p,candidates,extinction,density,scatter);
+        #else
         AtlasMatter(p,owners,count,extinction,density,scatter);
+        #endif
         float mask=beam(p)*_BeamStrength,visibleLight=0;
         [branch] if(mask>.005) visibleLight=mask*AtlasLight(p);
         scatter+=float3(1,.73,.39)*visibleLight*(.32+density*.22);
@@ -209,5 +343,6 @@ float4 FogAtlasFragment(v2f_img i)
         distance+=ds;
     }
     return float4(accumulated+transmission*background.rgb,1);
+    #endif
 }
 #endif

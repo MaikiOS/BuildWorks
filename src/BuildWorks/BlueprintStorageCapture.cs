@@ -23,6 +23,18 @@ namespace OstrixMods.BuildWorks
         {
             try
             {
+                var view = ContainerView.GetValue(placed.GetComponent<Container>()) as ZNetView;
+                return string.IsNullOrEmpty(TransferMarker(view.GetZDO())) &&
+                    !BlueprintStorageTransferJournal.HasUnresolved(ZNet.instance.GetWorld().m_uid) && EmptyState(placed, player);
+            }
+            catch (Exception) { return false; }
+        }
+
+        // State only; project removal must separately prove its saved parent and transfer history.
+        internal static bool EmptyState(GameObject placed, Player player)
+        {
+            try
+            {
                 Piece piece = placed ? placed.GetComponent<Piece>() : null;
                 Container container = placed ? placed.GetComponent<Container>() : null;
                 var view = container ? ContainerView?.GetValue(container) as ZNetView : null;
@@ -34,10 +46,7 @@ namespace OstrixMods.BuildWorks
                     !PrivateArea.CheckAccess(piece.transform.position, 0f, false, false) ||
                     container.GetInventory() == null || container.GetInventory().GetAllItems().Count != 0) return false;
                 ZDO zdo = view.GetZDO();
-                // Includes an orphan marker whose journal is unavailable. Never infer permission to destroy it.
-                if (!string.IsNullOrEmpty(TransferMarker(zdo))) return false;
-                if (!ZNet.instance || ZNet.instance.GetWorld() == null || BlueprintStorageTransferJournal.HasUnresolved(
-                    ZNet.instance.GetWorld().m_uid, TransferMarker(zdo))) return false;
+                if (!ZNet.instance || ZNet.instance.GetWorld() == null) return false;
                 return TryCapture(piece, player, out var state) &&
                     BlueprintContainerInventory.TryRead(state, name => name.GetStableHashCode(), out var items) && items.Count == 0 &&
                     ReferenceEquals(ContainerView.GetValue(container), view) && view.IsValid() && view.IsOwner() &&
@@ -46,6 +55,19 @@ namespace OstrixMods.BuildWorks
             }
             catch (Exception) { return false; }
         }
+
+        // Unity-thread classification; absent state never proves a storage or holder is empty.
+        internal static bool? SupportsKgStateProjection(GameObject prefab)
+        {
+            if (!prefab) return null;
+            return prefab.GetComponent<Piece>() && prefab.GetComponentsInChildren<MonoBehaviour>(true)
+                .All(component=>component && KgOrdinaryComponent(component.GetType()));
+        }
+
+        // Exact types only: a new behaviour requires its own state contract before admission.
+        internal static bool KgOrdinaryComponent(Type type)=>type==typeof(Piece) || type==typeof(ZNetView) ||
+            type==typeof(WearNTear) || type==typeof(Sign) || type==typeof(RandomMaterialValues) ||
+            type==typeof(TMPro.TextMeshPro) || type==typeof(TMPro.TextMeshProUGUI) || type==typeof(UnityEngine.UI.CanvasScaler);
 
         // Only construction compatibility; do not load, clear or alter a live inventory.
         internal static bool CanPlaceWithoutContents(Piece piece, BlueprintForeignPartData data)

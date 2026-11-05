@@ -34,6 +34,11 @@ public static class WorldLayoutRunner
                     throw new InvalidOperationException("BuildWorks DLL changed after test compilation.");
             Console.SetOut(captured);
             Application.logMessageReceived += onLog;
+            Assembly geometry = AppDomain.CurrentDomain.GetAssemblies().Single(a => a.GetName().Name == "BuildWorks.Geometry");
+            using (var sha = SHA256.Create())
+                if (!sha.ComputeHash(File.ReadAllBytes(geometry.Location)).SequenceEqual(
+                    sha.ComputeHash(File.ReadAllBytes(Path.Combine(root, "artifacts", "bin", "BuildWorks.Geometry.dll")))))
+                    throw new InvalidOperationException("Workbench loaded a stale BuildWorks.Geometry dependency.");
             Assembly checks = Assembly.LoadFrom(Path.Combine(output, "WorldLayoutChecks.exe"));
             result = (int)checks.EntryPoint.Invoke(null, new object[] { new[] { root } });
             Assembly actual = AppDomain.CurrentDomain.GetAssemblies().Single(a => a.GetName().Name == "BuildWorks");

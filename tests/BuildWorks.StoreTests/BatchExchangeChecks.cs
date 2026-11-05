@@ -21,7 +21,19 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(raw.Documents.Count == 2 && raw.Sources.Count == 2 && raw.FileErrors.Count == 1, "Batch file review/duplicate/error accounting failed");
             var bytes = new[] { File.ReadAllBytes(a), File.ReadAllBytes(b) };
             var store = NewStore(Path.Combine(folder, "library"));
+            var rejected = NewStore(Path.Combine(folder, "all-rejected"));
+            string absent = Path.Combine(folder, "absent.blueprint");
+            var rejectedReview = rejected.PrepareImportReview(
+                CompositeBlueprintStore.ReviewImportFiles(new[] { bad, absent }, ForeignZdoChecks.Hash, 0), ForeignZdoChecks.Hash).GetAwaiter().GetResult();
+            Require(rejectedReview.Documents.Count == 0 && rejectedReview.Sources.Count == 0 &&
+                rejectedReview.FileErrors.Select(entry => entry.Source).SequenceEqual(new[] { bad, absent }) &&
+                rejectedReview.FileErrors.All(entry => !string.IsNullOrWhiteSpace(entry.Error)) &&
+                !rejected.TryImportReviewed(rejectedReview, false, false, ForeignZdoChecks.Hash, out _) &&
+                rejected.CatalogAll().Count == 0 && !Directory.Exists(rejected.ImportDirectory),
+                "All-rejected batch lost per-file errors or created catalog/output data");
             var review = store.PrepareImportReview(raw, ForeignZdoChecks.Hash).GetAwaiter().GetResult();
+            Require(review.Documents.Select(item => item.importSource).SequenceEqual(new[] { "a.blueprint", "b.blueprint" }),
+                "Host preparation lost current input names before publication");
             var categories = new Dictionary<int, string> { [1] = "override" };
             var committedStop = new CancellationTokenSource();
             Require(store.TryImportReviewed(review, false, false, ForeignZdoChecks.Hash, out string error,
@@ -29,6 +41,10 @@ namespace OstrixMods.BuildWorks.StoreTests
             Ready(store);
             committedStop.Cancel();
             var imported = store.CatalogAll().ToArray();
+            Require(imported.Select(item => item.importSource).SequenceEqual(Enumerable.Range(0, 2).Select(index =>
+                Path.GetFileName(store.ImportResultPath) + "/document_" + index + ".buildworks.json")) &&
+                review.Documents.Select(item => item.importSource).SequenceEqual(new[] { "a.blueprint", "b.blueprint" }),
+                "Publication lost entry-index mapping or changed the retained input review");
             Require(imported.Length == 2 && imported.Select(item => item.category).OrderBy(value => value).SequenceEqual(new[] { "COMMON", "OVERRIDE" }) &&
                 File.ReadAllBytes(a).SequenceEqual(bytes[0]) && File.ReadAllBytes(b).SequenceEqual(bytes[1]) &&
                 raw.Documents.Select(item => item.category).SequenceEqual(new[] { "FIRST", "SECOND" }), "Batch categories/source/review changed");
@@ -79,6 +95,10 @@ namespace OstrixMods.BuildWorks.StoreTests
                 "Each ZIP reset the shared uncompressed budget");
             var exact = CompositeBlueprintStore.ReviewImportFiles(new[] { zipA, zipB }, ForeignZdoChecks.Hash, 0, uncompressedBudget: oneText * 2);
             Require(exact.Documents.Count == 2 && exact.FileErrors.Count == 0, "Exact shared read budget refused");
+            var preparedZip = store.PrepareImportReview(exact, ForeignZdoChecks.Hash).GetAwaiter().GetResult();
+            Require(preparedZip.Documents.Select(item => item.importSource).SequenceEqual(new[] {
+                "compressed-a.zip/same.blueprint", "compressed-b.zip/same.blueprint" }),
+                "ZIP host preparation lost archive/entry input labels");
             string brokenZip = Path.Combine(folder, "mixed-broken.zip");
             using (var zip = ZipFile.Open(brokenZip, ZipArchiveMode.Create))
             {
@@ -111,6 +131,7 @@ namespace OstrixMods.BuildWorks.StoreTests
             Require(exportCancelled && !File.Exists(Path.Combine(folder, "cancel-export.zip")) && File.Exists(committedPath),
                 "Cancelled export changed published import or leaked result");
             WritingCancellation(folder, imported[0]);
+            PublicationFailure(folder, imported[0]);
             ContentsPolicies(folder, imported[0]);
             Console.WriteLine("PASS batch exchange: multi-file/malformed/duplicates, common and per-document categories, exact originals+manifest, reload, source-change atomic refusal, pre-cancel, full ZIP roundtrip and no overwrite/card/temp leak.");
         }
@@ -168,6 +189,62 @@ namespace OstrixMods.BuildWorks.StoreTests
                     "Export cancellation after staging leaked temporary/published data or metadata was not snapshotted");
             }
             Console.WriteLine("PASS batch cancellation during import/export staging, no target/temp/card leak; export metadata host-thread snapshot");
+        }
+
+        private static void PublicationFailure(string folder, CompositeBlueprintStore.Blueprint source)
+        {
+            var document = ExternalBlueprintLibrary.DetachedCopy(source);
+            document.parts[0].foreignData = new CompositeBlueprintStore.ForeignPartData {
+                format = OstrixMods.BuildWorks.Geometry.BlueprintForeignPartData.NativeItemStandFormat,
+                info = "SwordIron:0:1:0", zdo = StandPackage() };
+            string input = Path.Combine(folder, "publication-failure.buildworks.json");
+            byte[] original = BlueprintExchangeFormat.Encode(document); File.WriteAllBytes(input, original);
+            var store = NewStore(Path.Combine(folder, "publication-failure"));
+            var review = store.PrepareImportReview(CompositeBlueprintStore.ReviewImportFiles(new[] { input }, ForeignZdoChecks.Hash, 0),
+                ForeignZdoChecks.Hash).GetAwaiter().GetResult();
+            Require(store.TryImportReviewed(review, false, false, ForeignZdoChecks.Hash, out string error), error);
+            Ready(store);
+            string previous = store.ImportResultPath;
+            Require(review.Documents.Single().importSource == Path.GetFileName(input) &&
+                review.Documents.Single().sourceDocuments.Any(item => item.name != Path.GetFileName(input)),
+                "Portable import fixture no longer distinguishes current input from historical provenance");
+            byte[] previousBytes = File.ReadAllBytes(previous);
+            string[] previousIds = store.CatalogAll().Select(item => item.id).ToArray();
+            review = store.PrepareImportReview(CompositeBlueprintStore.ReviewImportFiles(new[] { input }, ForeignZdoChecks.Hash, 0),
+                ForeignZdoChecks.Hash).GetAwaiter().GetResult();
+            bool staged = false;
+            int BlockPublication(string name)
+            {
+                if (!staged && Directory.GetFiles(store.ImportDirectory, "*.tmp.zip").Length > 0)
+                {
+                    staged = true;
+                    Directory.CreateDirectory(store.ImportOperationPath);
+                }
+                return ForeignZdoChecks.Hash(name);
+            }
+            Require(store.TryImportReviewed(review, false, true, BlockPublication, out error), error);
+            Ready(store, expectFailure: true);
+            Require(staged && store.ImportResultPath == null && store.CatalogAll().Select(item => item.id).SequenceEqual(previousIds) &&
+                File.ReadAllBytes(previous).SequenceEqual(previousBytes) && Directory.GetFiles(store.ImportDirectory).Length == 1 &&
+                Directory.Exists(store.ImportOperationPath) && File.ReadAllBytes(input).SequenceEqual(original),
+                "Failed import publication changed previous archive/catalog/source, removed competing path or leaked staging data");
+
+            string target = Path.Combine(folder, "publication-race.zip");
+            byte[] competing = { 1, 2, 3, 4 };
+            bool competingWritten = false;
+            store.ConfigurePrefabMetadata(_ =>
+            {
+                // Metadata is captured after the initial target check, before the worker writes its archive.
+                File.WriteAllBytes(target, competing); competingWritten = true; return null;
+            });
+            bool refused = false;
+            try { store.ExportBatch(new[] { source, document }, folder, "publication-race", false, false, ForeignZdoChecks.Hash).GetAwaiter().GetResult(); }
+            catch (IOException) { refused = true; }
+            Require(competingWritten && refused && File.ReadAllBytes(target).SequenceEqual(competing) &&
+                Directory.GetFiles(folder, "*.tmp.zip").Length == 0 && File.ReadAllBytes(input).SequenceEqual(original) &&
+                File.ReadAllBytes(previous).SequenceEqual(previousBytes) && store.CatalogAll().Select(item => item.id).SequenceEqual(previousIds),
+                "Failed export publication overwrote competing target, changed catalog/source or leaked staging data");
+            Console.WriteLine("PASS batch late import/export publication refusal: prior archive/catalog/source and competing targets intact, no staging/card leak");
         }
 
         private static string StandPackage()

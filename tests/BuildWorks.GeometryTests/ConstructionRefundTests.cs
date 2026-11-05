@@ -130,10 +130,11 @@ internal static class ConstructionRefundTests
             ItemDrop.Drops.Count == delayedBefore + 1 && ItemDrop.Drops[delayedBefore].m_stack == 2 &&
             ItemDrop.Drops[delayedBefore].m_customData["key"] == "changed after debit",
             "Deferred post-placement failure lost or duplicated the actual paid resources");
+        ConstructionSourceDebitTests.Run();
         Console.WriteLine("PASS actual construction debit/refund: no-cost, distinct/equal stacks, duplicate source refusal, item properties, idempotence, uncertain native failure; inert host doubles, no game proof");
     }
 
-    private static ItemDrop.ItemData Item(string name, int count, int quality, float durability, string crafter, string custom) =>
+    internal static ItemDrop.ItemData Item(string name, int count, int quality, float durability, string crafter, string custom) =>
         new ItemDrop.ItemData
         {
             m_shared = new ItemDrop.SharedData { m_name = name },

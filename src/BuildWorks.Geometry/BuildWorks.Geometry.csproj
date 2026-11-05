@@ -8,9 +8,13 @@
     <Version>0.1.0</Version>
     <AssemblyVersion>0.1.0.0</AssemblyVersion>
     <FileVersion>0.1.0.0</FileVersion>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="YamlDotNet" Version="16.3.0" />
+    <EmbeddedResource Include="PlannerCatalogue.tsv" LogicalName="BuildWorks.PlannerCatalogue.tsv" />
+    <None Include="..\..\THIRD_PARTY_NOTICES.md" Link="THIRD_PARTY_NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
     <Compile Remove="AdaptiveGablePanel.cs" />
   </ItemGroup>
 

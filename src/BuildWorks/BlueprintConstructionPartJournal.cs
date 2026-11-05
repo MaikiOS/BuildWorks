@@ -13,7 +13,7 @@ using Plan = OstrixMods.BuildWorks.BlueprintConstructionProjectStore;
 namespace OstrixMods.BuildWorks
 {
     // Detached receipts only: this journal cannot debit, place, authorize, settle a crash or issue a refund.
-    internal sealed class BlueprintConstructionPartJournal
+    internal sealed partial class BlueprintConstructionPartJournal
     {
         internal const int Intent = 1, Observed = 2, Committed = 3, NoEffect = 4;
         private const int MaximumBytes = 8 * 1024 * 1024;
@@ -161,16 +161,31 @@ namespace OstrixMods.BuildWorks
             string path = PathFor(project, part); if (!File.Exists(path)) return null;
             return ReadFile(path, plans.Load(project), part);
         }
+        internal Record RequireSavedPayment(Guid project, Guid part, long player)
+        {
+            using (plans.Lock(project))
+            {
+                ActivePlan(project, part);
+                var record = Read(project, part);
+                if (record?.Phase != Committed || record.Player != player || record.CostFree || record.Paid.Length == 0)
+                    throw new InvalidOperationException("Contents require this player's saved native construction payment in an active project.");
+                return record;
+            }
+        }
         internal static bool HasExecutionEvidence(Plan plans, Plan.Record plan)
         {
             var journal = new BlueprintConstructionPartJournal(plans);
+            bool evidence = false;
             foreach (string path in Directory.EnumerateFiles(plans.DirectoryPath, plan.Id.ToString("N") + ".*.bwpart"))
             {
                 string[] names = Path.GetFileName(path).Split('.');
                 if (names.Length != 3 || !Guid.TryParseExact(names[1], "N", out var part)) throw new InvalidDataException("Malformed part receipt filename.");
-                if (journal.Read(plan.Id, part).Phase != NoEffect) return true;
+                var payment = journal.ReadPayment(plan.Id, part);
+                int? phase = payment.Outcome?.Phase ?? payment.Sources?.Phase ?? payment.Legacy?.Phase;
+                if (!phase.HasValue) throw new InvalidDataException("Enumerated construction payment journal disappeared.");
+                evidence |= phase.Value != NoEffect;
             }
-            return false;
+            return evidence;
         }
 
         private Plan.Record ActivePlan(Guid project, Guid part)

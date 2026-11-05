@@ -1513,7 +1513,8 @@ namespace OstrixMods.BuildWorks
         [HarmonyPatch(typeof(ZNet), "ServerLoadWorld")]
         private static class BlueprintMountWorldLoadPatch
         {
-            private static void Prefix() => BlueprintConstructionMountContext.BeginReturnWorldLoad();
+            private static void Prefix()
+            { ConstructionProjects?.Suspend(); BlueprintConstructionMountContext.BeginReturnWorldLoad(); }
             private static Exception Finalizer(Exception __exception)
             { BlueprintConstructionMountContext.EndReturnWorldLoad(__exception); return __exception; }
         }
@@ -1522,6 +1523,18 @@ namespace OstrixMods.BuildWorks
         {
             private static Exception Finalizer(ItemDrop __instance, Exception __exception)
             { BlueprintConstructionMountContext.ReturnSourceNativeLoaded(__instance, __exception); return __exception; }
+        }
+        [HarmonyPatch(typeof(ZDO), nameof(ZDO.Load))]
+        private static class BlueprintMountTargetLoadPatch
+        {
+            private static Exception Finalizer(ZDO __instance, Exception __exception)
+            { BlueprintConstructionMountExecution.NativeTargetLoaded(__instance, __exception); return __exception; }
+        }
+        [HarmonyPatch(typeof(ZDO), nameof(ZDO.LoadOldFormat))]
+        private static class BlueprintMountTargetOldLoadPatch
+        {
+            private static Exception Finalizer(ZDO __instance, Exception __exception)
+            { BlueprintConstructionMountExecution.NativeTargetLoaded(__instance, __exception); return __exception; }
         }
         [HarmonyPatch(typeof(ItemDrop), "OnDestroy")]
         private static class BlueprintPayoutUnloadPatch
@@ -1536,6 +1549,26 @@ namespace OstrixMods.BuildWorks
                 if (!__1 && ConstructionProjects?.TryBeginCollection(__instance, __0) != true && __0 == Player.m_localPlayer && Player.m_localPlayer)
                     Player.m_localPlayer.Message(MessageHud.MessageType.Center, BuildWorksLocalization.Text("project.review"));
                 return false;
+            }
+        }
+        [HarmonyPatch(typeof(ItemStand), nameof(ItemStand.Interact), new Type[] { typeof(Humanoid), typeof(bool), typeof(bool) })]
+        private static class BlueprintMountReturnInteractPatch
+        {
+            private static bool Prefix(ItemStand __instance, Humanoid __0, bool __1, bool __2, ref bool __result)
+            {
+                if (BlueprintConstructionMountDetachExecution.IsNativeInteraction(__instance) ||
+                    ConstructionProjects?.IsPendingReturnStand(__instance) != true) return true;
+                __result = !__1 && !__2 && ConstructionProjects.TryReturnStand(__instance, __0);
+                return false;
+            }
+        }
+        [HarmonyPatch(typeof(ItemStand), nameof(ItemStand.GetHoverText))]
+        private static class BlueprintMountReturnHoverPatch
+        {
+            private static void Postfix(ItemStand __instance, ref string __result)
+            {
+                string text = ConstructionProjects?.ReturnStandHover(__instance);
+                if (text != null) __result = Localization.instance.Localize(text);
             }
         }
         [HarmonyPatch(typeof(Humanoid), nameof(Humanoid.Pickup), new Type[] { typeof(GameObject), typeof(bool), typeof(bool) })]

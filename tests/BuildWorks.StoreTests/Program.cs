@@ -17,6 +17,8 @@ namespace OstrixMods.BuildWorks.StoreTests
             Directory.CreateDirectory(directory);
             try
             {
+                if (args.Length == 3 && args[0] == "--native-mount-control")
+                { NativeMountControlChecks.Run(args[1],args[2]); return 0; }
                 if (args.Length == 3 && args[0] == "--contact-profiles")
                 { ContactProfileChecks.Run(args[1],args[2]); return 0; }
                 if (args.Length == 1 && args[0] == "--unbound-projection")

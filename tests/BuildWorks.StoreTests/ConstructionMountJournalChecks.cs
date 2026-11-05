@@ -165,17 +165,23 @@ namespace OstrixMods.BuildWorks.StoreTests
             new BlueprintConstructionCancellationJournal(fixture.Plans).Prepare(fixture.Plan.Id, fixture.Plan.Revision, Guid.NewGuid(), 17);
 
         private static (Plans Plans, Journal Journal, Plans.Record Plan, Guid Part, Guid Parent) Fixture(string folder, string mode = "paid",
-            string prefab = "SwordIron", int quality = 1, int variant = 0, long payer = 17)
+            string prefab = "SwordIron", int quality = 1, int variant = 0, long payer = 17, int partCount = 1, bool withContainer = false)
         {
             Directory.CreateDirectory(folder); var library = new B(Path.Combine(folder, "library.json"));
             var source = new B.Part { stableId = "stand", prefabName = "itemstand", displayName = "Stand",
                 position = new B.VectorData(), rotation = new B.QuaternionData { w = 1 },
                 scale = new B.VectorData { x = 1, y = 1, z = 1 }, baseScale = new B.VectorData { x = 1, y = 1, z = 1 }, editorVisible = true,
                 foreignData = B.ForeignPartData.FromGeometry(Mounted("archive-B", 9999, prefab: prefab)) };
-            Check(library.TrySaveDocument("Mount fixture", "QA", new[] { source }, Array.Empty<B.Group>(), Array.Empty<B.VectorData>(),
+            var rawContainer=Inventory(1,0);
+            var containerDemand=new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat,"3:1:1:1|Wood",rawContainer.Zdo,null);
+            var sources = Enumerable.Range(0,partCount).Select(index => index==0?source:new B.Part {
+                stableId="stand"+index,prefabName=withContainer&&index==partCount-1?"piece_chest_wood":"itemstand",displayName="Part "+index,
+                position=new B.VectorData(),rotation=new B.QuaternionData{w=1},scale=new B.VectorData{x=1,y=1,z=1},baseScale=new B.VectorData{x=1,y=1,z=1},editorVisible=true,
+                foreignData=withContainer&&index==partCount-1?B.ForeignPartData.FromGeometry(containerDemand):source.foreignData }).ToArray();
+            Check(library.TrySaveDocument("Mount fixture", "QA", sources, Array.Empty<B.Group>(), Array.Empty<B.VectorData>(),
                 "stand", null, out var blueprint, out string error), error);
             var plans = new Plans(Path.Combine(folder, "projects"), 42); var pose = new Plans.Pose(new float[] { 5, 2, 7, 0, 0, 0, 1, 1, 1, 1 });
-            var plan = plans.Create(Guid.NewGuid(), blueprint, pose, new[] { pose }); var part = plan.Parts[0].Id;
+            var plan = plans.Create(Guid.NewGuid(), blueprint, pose, Enumerable.Repeat(pose,partCount).ToArray()); var part = plan.Parts[0].Id;
             var journal = new Journal(plans); var parent = Guid.NewGuid(); var before = Inventory(3, 1, prefab, quality, variant); var after = Inventory(1, 1, prefab, quality, variant);
             var row = new Journal.PaidRow { Prefab = "Wood", Before = 3, Paid = 2, Quality = 1, Properties = Properties("Wood", 1, 0, false, 10000, null) };
             if (mode == "sources")
@@ -207,6 +213,19 @@ namespace OstrixMods.BuildWorks.StoreTests
             return (plans, journal, plan, part, parent);
         }
         internal static (Plans Plans, Journal Journal, Plans.Record Plan, Guid Part, Guid Parent) RuntimeFixture(string folder) => Fixture(folder, payer:100);
+        internal static (Plans Plans, Journal Journal, Plans.Record Plan, Guid Part, Guid Parent) RuntimeMixedFixture(string folder)
+        {
+            var f=Fixture(folder,payer:100,partCount:3,withContainer:true);
+            foreach(var part in f.Plan.Parts.Skip(1)) {
+                var before=Inventory(3,1);var after=Inventory(1,1);var operation=Guid.NewGuid();
+                f.Journal.Prepare(f.Plan.Id,part.Id,operation,100,before,out _);
+                var row=new Journal.PaidRow{Prefab="Wood",Before=3,Paid=2,Quality=1,Properties=Properties("Wood",1,0,false,10000,null)};
+                var observed=f.Journal.Observe(f.Plan.Id,part.Id,operation,31,(uint)(9+part.SourceIndex),
+                    f.Plan.Blueprint.parts[part.SourceIndex].prefabName.GetStableHashCode(),100,after,false,new[]{row});
+                f.Journal.ConfirmSaved(f.Plan.Id,part.Id,operation,Saved(after,observed.Receipt));
+            }
+            return f;
+        }
         private static Journal.SavePair Saved(BlueprintForeignPartData inventory, byte[] receipt) => new Journal.SavePair {
             BeforeGeneration = 7, Generation = 8, ProfileHash = new string('A', 128),
             InventoryHash = Digest(Convert.FromBase64String(inventory.Zdo)), WorldPayloadHash = Digest(receipt) };

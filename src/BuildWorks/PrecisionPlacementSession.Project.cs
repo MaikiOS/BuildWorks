@@ -19,6 +19,13 @@ namespace OstrixMods.BuildWorks
         internal static bool SupportsStorageProjectPart(Piece piece) => SupportsPrecisionPlacementBase(piece) &&
             piece.GetComponentsInChildren<TerrainModifier>(true).Length == 0 && BlueprintStorageCapture.PrefabGrid(piece.gameObject).HasValue;
 
+        internal static bool SupportsMountProjectPart(Piece piece, CompositeBlueprintStore.Part source) => piece &&
+            SupportsPrecisionPlacementBase(piece) && !piece.GetComponent<ArmorStand>() && !piece.GetComponent<Container>() &&
+            piece.GetComponent<ItemStand>() && piece.GetComponent<ItemStand>().GetType() == typeof(ItemStand) &&
+            piece.GetComponentsInChildren<TerrainModifier>(true).Length == 0 &&
+            (source.foreignData == null || source.foreignData.ToGeometry().Format == OstrixMods.BuildWorks.Geometry.BlueprintForeignPartData.NativeItemStandFormat &&
+                BlueprintItemStandPlacement.CanRestore(piece, source.foreignData.ToGeometry()));
+
         // Consume the confirmation here; only the queued ProjectPart session may reach native placement.
         private bool TryCreateConstructionProject(Player player)
         {
@@ -27,8 +34,7 @@ namespace OstrixMods.BuildWorks
                 !BlueprintConstructionProjectRuntime.IsPrivateLocalPlacement || gizmoMode == GizmoMode.Repeat || gizmoMode == GizmoMode.Guide ||
                 placementPlan.Count != activeBlueprint.parts.Count || placementPlanPieces.Count != placementPlan.Count ||
                 currentBlueprintPlacements.Count != 0 || constructionPayments.Count != 0 || nativeConstructionPayment != null ||
-                placementPlanPieces.Any(piece => !piece || !SupportsProjectPart(piece)) ||
-                activeBlueprint.parts.Any(part => part.foreignData != null) || placementPlan.Any(pose => pose.ItemStandContents != null)) return false;
+                placementPlanPieces.Where((piece, index) => !SupportsProjectSource(piece, activeBlueprint.parts[index], placementPlan[index].ItemStandContents)).Any()) return false;
             try
             {
                 if (runtime?.CanCreateFromPlacement != true) throw new InvalidOperationException(BuildWorksLocalization.Text("project.unavailable"));
@@ -53,6 +59,18 @@ namespace OstrixMods.BuildWorks
         }
         private static Store.Pose ProjectPose(Vector3 p, Quaternion q, Vector3 scale) =>
             new Store.Pose(new[] { p.x, p.y, p.z, q.x, q.y, q.z, q.w, scale.x, scale.y, scale.z });
+
+        private static bool SupportsProjectSource(Piece piece, CompositeBlueprintStore.Part source, OstrixMods.BuildWorks.Geometry.BlueprintForeignPartData preview)
+        {
+            if (!piece) return false;
+            var data = source.foreignData?.ToGeometry();
+            if (preview == null ? data != null && !data.ContentsCleared : data == null || preview.Format != data.Format || preview.Info != data.Info || preview.Zdo != data.Zdo)
+                return false;
+            if (SupportsMountProjectPart(piece, source)) return true;
+            if (SupportsStorageProjectPart(piece)) return data == null ||
+                data.Format == OstrixMods.BuildWorks.Geometry.BlueprintForeignPartData.NativeContainerFormat && BlueprintStorageCapture.CanPlaceWithoutContents(piece, data);
+            return SupportsProjectPart(piece) && data == null;
+        }
 
         internal bool BeginProjectPart(BlueprintConstructionPartExecution execution)
         {

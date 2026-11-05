@@ -296,7 +296,7 @@ namespace OstrixMods.BuildWorks
                 debits.TryGetValue((item.X, item.Y), out var debit);
                 int expected = item.Stack - (debit?.Paid ?? 0);
                 bool exists = remaining.TryGetValue((item.X, item.Y), out var current);
-                if (expected == 0 ? exists : !exists || current.Stack != expected || !SameItem(item, current, debit == null))
+                if (expected == 0 ? exists : !exists || current.Stack != expected || !SameItem(item, current, debit == null, unequippedCopy && debit != null))
                     throw new InvalidDataException("Inventory delta differs from the recorded debit.");
             }
             if (remaining.Keys.Any(slot => !originals.ContainsKey(slot))) throw new InvalidDataException("Construction added an unrecorded inventory stack.");

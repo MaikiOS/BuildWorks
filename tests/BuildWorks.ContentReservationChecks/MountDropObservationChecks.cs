@@ -27,20 +27,25 @@ namespace ReservationChecks
     internal sealed partial class BlueprintConstructionPayoutJournal
     {
         internal const int Prepared=1,Attempted=1;
-        internal const string CustodyKey="bw_test_material_custody";
-        internal static readonly int ItemMarkerKey="bw_test_material_drop".GetStableHashCode();
-        internal sealed class Entry { internal Guid Id; internal int State=Attempted;internal string Blob; }
-        internal sealed class Record { internal Guid Project=Guid.NewGuid(),Operation=Guid.NewGuid();internal long Player=100;internal int Phase=Prepared;internal Entry[] Items; }
+        internal const string CustodyKey=OstrixMods.BuildWorks.BlueprintConstructionPayoutJournal.CustodyKey;
+        internal static readonly int ItemMarkerKey=OstrixMods.BuildWorks.BlueprintConstructionPayoutJournal.ItemMarkerKey;
+        internal sealed class Entry { internal Guid Id; internal int State=Ready;internal string Blob;internal long ObjectUser=0;internal uint ObjectId=0; }
+        internal sealed class Record {
+            internal Guid Project=Guid.NewGuid(),Operation=Guid.NewGuid();internal long Player=100,World=1,Revision=1;
+            internal int Phase=Prepared;internal Entry[] Items;internal uint BeforeGeneration=0;internal string RemovalHash=null,BeforeInfo=null,BeforeBytes=null;internal Proof Saved=null;
+        }
         internal Record Value;
-        internal Record Read(Guid id)=>Value;
+        internal Record Read(Guid id)=>disk==null?Value:JournalDisk.Copy<Record>(disk.Read(id));
     }
     internal sealed partial class ItemDrop
     {
-        internal GameObject gameObject;
+        internal new GameObject gameObject;
         internal Transform transform=>gameObject.transform;
         internal ItemData m_itemData;
+        internal Action m_onDrop=null;
         internal bool m_autoPickup=true,m_autoDestroy=true,enabled=true;
         internal static Action BeforeNativeDrop;
+        private static uint nextMaterialId=5000;
         internal T GetComponent<T>() where T:class=>gameObject.GetComponent<T>();
         internal static ItemDrop Make(ItemData item)
         {
@@ -52,9 +57,12 @@ namespace ReservationChecks
         {
             BeforeNativeDrop?.Invoke();
             BlueprintConstructionPayoutSeal.BeforeDrop(item);
-            var drop=Make(item.Clone());BlueprintConstructionPayoutSeal.BeforeAwake(drop);BlueprintConstructionPayoutSeal.AfterAwake(drop,null);
+            var drop=Make(item.Clone());drop.transform.position=position;
+            if(item.m_customData.ContainsKey(BlueprintConstructionPayoutJournal.CustodyKey))drop.GetComponent<ZNetView>().Data.m_uid=new ZDOID(99,nextMaterialId++);
+            BlueprintConstructionPayoutSeal.BeforeAwake(drop);BlueprintConstructionPayoutSeal.AfterAwake(drop,null);
             var data=drop.GetComponent<ZNetView>().Data;
             if(BlueprintConstructionPayoutSeal.AllowSave(drop.m_itemData,data,-1))data.Set(ZDOVars.s_itemData,BlueprintConstructionPayoutSeal.Package(drop.m_itemData));
+            if(item.m_customData.ContainsKey(BlueprintConstructionPayoutJournal.CustodyKey))UnityEngine.Object.Loaded.Add(drop);
             return drop;
         }
         internal static void LoadFromZDO(ItemData item,ZDO data)
@@ -146,6 +154,8 @@ namespace ReservationChecks
             }
             using(var r=new Rig()){
                 Check(r.Begin(),"cancel control refused");r.Observation.Dispose();
+                Check(!BlueprintConstructionPayoutSeal.HasActiveDropObservation,"cancelled request retained global lease");
+                using(var other=new Rig()) { Check(other.Begin(),"cancelled old stand blocked an unrelated fresh observation"); }
                 Check(!BlueprintConstructionPayoutSeal.BeginMountDropHandler(r.Holder.Stand,out var s),"cancelled queued request entered native handler");
                 BlueprintConstructionPayoutSeal.EndMountDropHandler(s,null);Check(r.BindCalls==0&&!r.Observation.Complete,"cancelled request claims a source");
             }
@@ -170,7 +180,7 @@ namespace ReservationChecks
             }
             using(var r=new Rig()){
                 var item=Program.Item("Wood",2,"material");var id=Guid.NewGuid();item.m_customData[BlueprintConstructionPayoutJournal.CustodyKey]=id.ToString("N");
-                var entry=new BlueprintConstructionPayoutJournal.Entry{Id=id,Blob=Convert.ToBase64String(BlueprintConstructionPayoutSeal.Package(item))};
+                var entry=new BlueprintConstructionPayoutJournal.Entry{Id=id,State=BlueprintConstructionPayoutJournal.Attempted,Blob=Convert.ToBase64String(BlueprintConstructionPayoutSeal.Package(item))};
                 var record=new BlueprintConstructionPayoutJournal.Record{Items=new[]{entry}};var journal=new BlueprintConstructionPayoutJournal{Value=record};
                 var drop=BlueprintConstructionPayoutSeal.Create(journal,record,0,item,new Vector3());r.Created.Add(drop);
                 Check(BlueprintConstructionPayoutSeal.IsHeld(drop)&&drop.GetComponent<ZNetView>().Data.GetString(BlueprintConstructionPayoutSeal.MarkerKey,"")==id.ToString("N")&&
@@ -180,7 +190,7 @@ namespace ReservationChecks
                 Check(r.Begin(),"material-overlap control refused");
                 Check(BlueprintConstructionPayoutSeal.BeginMountDropHandler(r.Holder.Stand,out var handler),"overlap handler refused");
                 var item=Program.Item("SwordIron",1);var id=Guid.NewGuid();item.m_customData[BlueprintConstructionPayoutJournal.CustodyKey]=id.ToString("N");
-                var entry=new BlueprintConstructionPayoutJournal.Entry{Id=id,Blob=Convert.ToBase64String(BlueprintConstructionPayoutSeal.Package(item))};
+                var entry=new BlueprintConstructionPayoutJournal.Entry{Id=id,State=BlueprintConstructionPayoutJournal.Attempted,Blob=Convert.ToBase64String(BlueprintConstructionPayoutSeal.Package(item))};
                 var record=new BlueprintConstructionPayoutJournal.Record{Items=new[]{entry}};var journal=new BlueprintConstructionPayoutJournal{Value=record};
                 int nativeCalls=0;ItemDrop.BeforeNativeDrop=()=>{nativeCalls++;throw new InvalidOperationException("native boundary reached");};
                 try{BlueprintConstructionPayoutSeal.Create(journal,record,0,item,new Vector3());}

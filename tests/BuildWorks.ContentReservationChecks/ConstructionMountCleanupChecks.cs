@@ -29,7 +29,9 @@ namespace ReservationChecks
         {
             DestroyCalls++; BeforeDestroy?.Invoke();
             if (!BlueprintConstructionPayoutCleanup.AllowNetwork(data,out var witness)) throw new InvalidOperationException("native destroy refused");
+            var removal=BlueprintConstructionCancellationRemoval.CaptureNetwork(data);
             m_destroySendList.Add(data.m_uid); BlueprintConstructionPayoutCleanup.ConfirmNetwork(witness,null);
+            BlueprintConstructionCancellationRemoval.ConfirmNetwork(removal,null);
         }
     }
     internal sealed partial class BlueprintConstructionPartJournal

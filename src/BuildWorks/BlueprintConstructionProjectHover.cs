@@ -23,7 +23,8 @@ namespace OstrixMods.BuildWorks
                 !GameCamera.instance) return;
             Find(__instance, out GameObject hit, out _);
             var board = hit ? hit.GetComponentInParent<BlueprintConstructionProjectBoard>() : null;
-            if (!board || runtime.Board(board.Id) != board) return;
+            var stand = hit ? hit.GetComponentInParent<ItemStand>() : null;
+            if ((!board || runtime.Board(board.Id) != board) && !runtime.IsPendingReturnStand(stand)) return;
             ___m_hovering = hit;
         }
     }

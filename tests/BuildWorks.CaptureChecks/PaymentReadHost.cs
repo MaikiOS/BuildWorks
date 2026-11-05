@@ -21,8 +21,8 @@ namespace PaymentReadChecks {
  public static class BuildWorksLocalization { public static string Text(string key)=>key; }
  public static class BlueprintConstructionCancellationJournal { public static void RequireNotStarted(Store store,Guid id){} }
  public static class BlueprintConstructionPartExecution {
-  public static int Calls;
-  public static bool Complete(Store.Record plan,Store.Part part,Journal.Record row,object source){Calls++;return row?.Phase==Journal.Committed;}
+  public static int Calls; public static Store LastStore;
+  public static bool Complete(Store.Record plan,Store.Part part,Journal.Record row,object source,Store store){Calls++;LastStore=store;return row?.Phase==Journal.Committed;}
  }
  public sealed class Runtime {
   private readonly Store store=new Store();
@@ -61,6 +61,7 @@ namespace PaymentReadChecks {
     var runtime=Reset();Journal.Payment=(phase==0?null:new Journal.Record{Phase=phase},null,null);
     var progress=runtime.Progress(id);
     Check(!progress.NeedsReview&&progress.Built==(phase==Journal.Committed?1:0),"Legacy progress changed");
+    Check(ReferenceEquals(BlueprintConstructionPartExecution.LastStore,runtime.store),"Completion did not receive its exact project store");
     Check((runtime.NextPart(id)==null)==(phase==Journal.Committed),"Legacy next-part choice changed");
     runtime.StartGuard(id,runtime.plan.Parts[0].Id);Check(runtime.effects==1,"Legacy start refused");
    }

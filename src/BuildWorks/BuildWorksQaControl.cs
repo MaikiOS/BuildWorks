@@ -101,6 +101,21 @@ namespace OstrixMods.BuildWorks
         }
 
         public string StoragePersistenceStatus() => GetComponent<BuildWorksTestStorage>()?.Status ?? "idle";
+        private void RequireMountCreditPauseControl()
+        {
+            if (ownerThread == 0 || System.Threading.Thread.CurrentThread.ManagedThreadId != ownerThread || running != null || capture != null ||
+                !SafeSession() || !Application.isFocused || UnityEngine.Input.GetKey(KeyCode.F12) || File.Exists(PathFor("stop.flag")))
+                throw new InvalidOperationException("Mount pause control requires idle QA input on the isolated owner thread.");
+            BuildWorksTestIsolation.RequireLoadedSession();
+        }
+        public string ArmMountCreditPause(string project, string part)
+        {
+            RequireMountCreditPauseControl();
+            return BuildWorksPlugin.QaConstructionProjects.QaArmMountCreditPause(Guid.ParseExact(project, "N"), Guid.ParseExact(part, "N"));
+        }
+        public string MountCreditPauseState() { RequireMountCreditPauseControl(); return BlueprintConstructionContentsReturn.QaPauseState; }
+        public string ReleaseMountCreditPause()
+        { RequireMountCreditPauseControl(); BlueprintConstructionContentsReturn.QaReleasePause(); return BlueprintConstructionContentsReturn.QaPauseState; }
         public bool StoragePersistenceBusy() => GetComponent<BuildWorksTestStorage>()?.Busy ?? false;
 
         internal void RequireStorageIdle()
@@ -467,6 +482,11 @@ namespace OstrixMods.BuildWorks
 
         internal void Stop(string reason, bool preserveManualVisual = false)
         {
+            if (BlueprintConstructionContentsReturn.QaPauseArmed)
+            {
+                BuildWorksPlugin.QaConstructionProjects?.Suspend();
+                BlueprintConstructionContentsReturn.QaReleasePause();
+            }
             try { if (!preserveManualVisual || Time.realtimeSinceStartup >= manualFogUntil) CloseFogVisual(); }
             catch (Exception error) { Debug.LogError("Fog QA cleanup failed; continuing input release: " + error.Message); }
             try { GetComponent<BuildWorksTestStorage>()?.Cancel(reason); }

@@ -35,6 +35,7 @@ namespace OstrixMods.BuildWorks.Geometry
             internal readonly byte[] MountedBytes;
             internal readonly int MountedItem, MountedVariant, MountedQuality, MountedOrientation;
             internal readonly bool EmptyStand;
+            internal readonly int AbsentKey;
             internal bool ChecksItemStand => EmptyStand || MountedBytes != null;
             public Expectation(long world, Guid operation, int prefab, long creator, int creatorKey, int markerKey, int itemsKey, byte[] inventory)
                 : this(world, operation, prefab, creator, creatorKey, markerKey, itemsKey, inventory, true) { }
@@ -54,8 +55,19 @@ namespace OstrixMods.BuildWorks.Geometry
                 int creatorKey, int markerKey, int receiptKey, byte[] receipt) =>
                 new Expectation(world, parentOperation, prefab, creator, creatorKey, markerKey, receiptKey, receipt, false, emptyStand: true);
 
+            public static Expectation ForUnreceiptedItemStand(long world, Guid parentOperation, int prefab, long creator,
+                int creatorKey, int markerKey, int parentReceiptKey, byte[] parentReceipt, int childReceiptKey, BlueprintForeignPartData mounted) =>
+                new Expectation(world, parentOperation, prefab, creator, creatorKey, markerKey, parentReceiptKey, parentReceipt, false,
+                    mounted ?? throw new ArgumentException("Missing actual attachment."),
+                    absentKey: childReceiptKey != 0 ? childReceiptKey : throw new ArgumentException("Missing child receipt key."));
+
+            public static Expectation ForUnreceiptedEmptyItemStand(long world, Guid parentOperation, int prefab, long creator,
+                int creatorKey, int markerKey, int parentReceiptKey, byte[] parentReceipt, int childReceiptKey) =>
+                new Expectation(world, parentOperation, prefab, creator, creatorKey, markerKey, parentReceiptKey, parentReceipt, false,
+                    emptyStand: true, absentKey: childReceiptKey != 0 ? childReceiptKey : throw new ArgumentException("Missing child receipt key."));
+
             private Expectation(long world, Guid operation, int prefab, long creator, int creatorKey, int markerKey, int itemsKey, byte[] inventory,
-                bool nativeInventory, BlueprintForeignPartData mounted = null, bool emptyStand = false)
+                bool nativeInventory, BlueprintForeignPartData mounted = null, bool emptyStand = false, int absentKey = 0)
             {
                 if (world == 0 || operation == Guid.Empty || prefab == 0 || creator == 0 || creatorKey == markerKey || markerKey == itemsKey || creatorKey == itemsKey ||
                     inventory == null || (nativeInventory ? inventory.Length < 6 || inventory.Length > 1024 * 1024 ||
@@ -65,11 +77,13 @@ namespace OstrixMods.BuildWorks.Geometry
                 CreatorKey = creatorKey; MarkerKey = markerKey; ItemsKey = itemsKey; Inventory = (byte[])inventory.Clone();
                 Marker = operation.ToString("N");
                 EmptyStand = emptyStand;
+                AbsentKey = absentKey;
                 if (mounted != null || emptyStand)
                 {
                     var keys = new[] { creatorKey, markerKey, itemsKey, ItemKey, VariantKey, QualityKey, OrientationKey, ItemDataKey };
                     if (keys.Any(key => key == 0) || keys.Distinct().Count() != keys.Length)
                         throw new ArgumentException("Item-stand expectation keys must be distinct and nonzero.");
+                    if (absentKey != 0 && keys.Contains(absentKey)) throw new ArgumentException("Absent child receipt key conflicts with attachment evidence.");
                 }
                 if (mounted != null)
                 {
@@ -288,6 +302,7 @@ namespace OstrixMods.BuildWorks.Geometry
             long creator = 0; string marker = null; bool itemsPresent = false, itemsMatch = false, absentMatch = false;
             int mountedItem = 0, mountedVariant = 0, mountedQuality = 1, mountedOrientation = 0;
             bool mountedPresent = false, mountedMatch = false, mountTypeMismatch = false;
+            bool forbiddenKeyPresent = false;
             for (int map = 0; map < 7; ++map)
             {
                 if ((flags & (2 << map)) == 0) continue;
@@ -296,6 +311,7 @@ namespace OstrixMods.BuildWorks.Geometry
                 {
                     if ((i & 127) == 0) cancellation.ThrowIfCancellationRequested();
                     int key = reader.ReadInt32();
+                    forbiddenKeyPresent |= expected?.AbsentKey != 0 && key == expected?.AbsentKey;
                     scratchKeys[i] = key;
                     if (absent != null && absent.IsMarkerKey(key) && map != 5)
                         throw new InvalidDataException("Unexpected operation marker type prevents an absence proof.");
@@ -344,6 +360,7 @@ namespace OstrixMods.BuildWorks.Geometry
             }
             if (absent != null) return absentMatch;
             if (marker != expected.Marker) return false;
+            if (forbiddenKeyPresent) throw new InvalidDataException("Saved target already has a child receipt; missing-receipt recovery refused.");
             if ((flags & 256) == 0 || prefab != expected.Prefab || creator != expected.Creator || !itemsPresent)
                 throw new InvalidDataException("Saved marked object's identity or contents differ.");
             if (!itemsMatch) throw new InvalidDataException("Saved marked inventory differs.");

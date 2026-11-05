@@ -32,13 +32,14 @@ namespace OstrixMods.BuildWorks
         private static World epochWorld;
         private static ZDOMan epochManager;
         private static Guid returnEpoch;
+        internal static Guid NativeWorldEpoch => returnEpoch;
         private static bool worldLoading, loadFailed;
         private static readonly Dictionary<Guid, ReturnSourceBinding> returnBindings = new Dictionary<Guid, ReturnSourceBinding>();
         private static readonly Dictionary<ItemDrop, ReturnSourceBinding> nativeLoads = new Dictionary<ItemDrop, ReturnSourceBinding>();
         private static bool SameReturnWorld() => ReferenceEquals(epochNetwork, ZNet.instance) &&
             ReferenceEquals(epochWorld, ZNet.instance ? ZNet.instance.GetWorld() : null) && ReferenceEquals(epochManager, ZDOMan.instance);
         private static void CaptureReturnWorld() { epochNetwork = ZNet.instance; epochWorld = ZNet.instance ? ZNet.instance.GetWorld() : null; epochManager = ZDOMan.instance; }
-        private static Guid CurrentReturnEpoch()
+        protected static Guid CurrentReturnEpoch()
         {
             if (worldLoading || !ZNet.instance || ZNet.instance.GetWorld() == null || ZDOMan.instance == null)
                 throw new InvalidOperationException("Loaded world epoch is unavailable.");
@@ -47,7 +48,7 @@ namespace OstrixMods.BuildWorks
             if (loadFailed || ZNet.m_loadError) throw new InvalidOperationException("Current native world load failed.");
             return returnEpoch;
         }
-        private static void NewReturnEpoch() { returnEpoch = Guid.NewGuid(); returnBindings.Clear(); nativeLoads.Clear(); }
+        private static void NewReturnEpoch() { returnEpoch = Guid.NewGuid(); returnBindings.Clear(); nativeLoads.Clear(); BlueprintConstructionMountExecution.ResetTargetBindings(); }
         internal static void BeginReturnWorldLoad() { CaptureReturnWorld(); worldLoading = true; loadFailed = false; NewReturnEpoch(); }
         internal static void EndReturnWorldLoad(Exception error)
         {

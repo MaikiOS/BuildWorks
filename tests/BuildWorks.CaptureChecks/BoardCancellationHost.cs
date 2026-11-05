@@ -21,11 +21,17 @@ namespace BoardCancellationChecks {
  }
  __ENUM__
  public class BlueprintConstructionProjectRuntime {
-  private bool IsPrivateLocalPlacement=true,Context=true,Hammer=true,PayoutBusy;
+  private bool IsPrivateLocalPlacement=true,Context=true,Hammer=true;
   private Board OpenBoard=new Board(),Registered;
   private Guid queued;
   private class Operation { public bool Finished=false; }
   private Operation execution,removal;
+  private Operation payout,collection,cleanup,paidCancellation;
+  private class ReturnOperation { public Guid Project; public bool Busy,Finished; public string Status; }
+  private ReturnOperation contentsReturn;
+  private class Button { public bool interactable; }
+  __BUSY__
+  __PENDING__
   private readonly BlueprintConstructionProjectStore store=new BlueprintConstructionProjectStore();
   private readonly HashSet<Guid> cancellationProjects=new HashSet<Guid>();
   private readonly List<string> calls=new List<string>();
@@ -52,6 +58,13 @@ namespace BoardCancellationChecks {
    __SUMMARY__
    return string.Join("|",text.ToString().Split(new[]{'\r','\n'},StringSplitOptions.RemoveEmptyEntries));
   }
+  private static bool ContinueEnabled(ConstructionCancellationAction action,bool pending) {
+   var runtime=Reset();var board=runtime.OpenBoard;var continueButton=new Button();
+   if(pending)runtime.contentsReturn=new ReturnOperation{Project=board.Id,Status="waiting-for-stand"};
+   __BUILDING__
+   __CONTINUE__
+   return continueButton.interactable;
+  }
   private static int checks;
   private static void Check(bool value,string message) { checks++;if(!value)throw new Exception(message); }
   private static BlueprintConstructionProjectRuntime Reset() {
@@ -77,13 +90,26 @@ namespace BoardCancellationChecks {
    var failures=new Action<BlueprintConstructionProjectRuntime>[] {
     r=>r.Context=false,r=>r.IsPrivateLocalPlacement=false,r=>Player.m_localPlayer=null,r=>Player.m_localPlayer.Dead=true,
     r=>r.OpenBoard=null,r=>r.Registered=new Board(),r=>BuildWorksPlugin.CanOpenConstructionProject=false,r=>r.Hammer=false,
-    r=>Player.m_localPlayer.transform.position=5.01f,r=>r.queued=Guid.NewGuid(),r=>r.PayoutBusy=true,
+    r=>Player.m_localPlayer.transform.position=5.01f,r=>r.queued=Guid.NewGuid(),r=>r.payout=new Operation(),
     r=>r.execution=new Operation(),r=>r.removal=new Operation(),r=>r.action=ConstructionCancellationAction.Review
    };
    foreach(var mutate in failures) {
     var r=Reset();var id=r.OpenBoard.Id;mutate(r);bool refused=false;
     try { r.RequestCancellationFromBoard(id,1,Guid.NewGuid()); }catch(InvalidOperationException){refused=true;}
     Check(refused&&r.calls.Count==0&&r.cancellationProjects.Count==0,"Unsafe request caused an effect");
+   }
+   foreach(int slot in new[]{0,1,2}) {
+    var r=Reset();if(slot==0)r.collection=new Operation();else if(slot==1)r.cleanup=new Operation();else r.paidCancellation=new Operation();
+    bool refused=false;try{r.RequestCancellationFromBoard(r.OpenBoard.Id,1,Guid.NewGuid());}catch(InvalidOperationException){refused=true;}
+    Check(refused&&r.calls.Count==0,"Other active payout admitted board cancellation");
+   }
+   {var r=Reset();r.payout=new Operation{Finished=true};r.RequestCancellationFromBoard(r.OpenBoard.Id,1,Guid.NewGuid());Check(r.calls.Count==1,"Completed payout blocked board cancellation");}
+   foreach(string state in new[]{"durable-step","waiting-E","other-project","returned"}) {
+    var r=Reset();r.action=ConstructionCancellationAction.Remove;r.contentsReturn=new ReturnOperation{
+     Project=state=="other-project"?Guid.NewGuid():r.OpenBoard.Id,Busy=state=="durable-step",Finished=state=="returned",Status=state};
+    bool refused=false;try{r.RequestCancellationFromBoard(r.OpenBoard.Id,1,Guid.NewGuid());}catch(InvalidOperationException){refused=true;}
+    bool blocked=state=="durable-step"||state=="other-project";
+    Check(refused==blocked&&r.calls.Count==(blocked?0:1),"Wrong contents return board guard "+state);
    }
    foreach(bool empty in new[]{false,true}) {
     var r=Reset();bool refused=false;
@@ -97,6 +123,8 @@ namespace BoardCancellationChecks {
    Check(ConfirmationKey(ConstructionCancellationAction.Remove)=="project.cancel_confirm","Paid removal confirmation differs");
    Check(ConfirmationKey(ConstructionCancellationAction.ResumeRemoval)=="project.cancel_confirm","Removal recovery confirmation differs");
    Check(ConfirmationKey(ConstructionCancellationAction.IssueRefund)=="project.refund_confirm","Refund confirmation differs");
+   foreach(var kind in new[]{ConstructionCancellationAction.Unpaid,ConstructionCancellationAction.AwaitCollection})foreach(bool pending in new[]{false,true})
+    Check(ContinueEnabled(kind,pending)==(kind==ConstructionCancellationAction.Unpaid&&!pending),"Continue ignored pending return or action");
    foreach(var kind in new[]{ConstructionCancellationAction.IssueRefund,ConstructionCancellationAction.Unpaid,
     ConstructionCancellationAction.Remove,ConstructionCancellationAction.ResumeRemoval,ConstructionCancellationAction.AwaitCollection,
     ConstructionCancellationAction.Review}) foreach(bool needsReview in new[]{true,false}) {

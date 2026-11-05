@@ -8,12 +8,19 @@ namespace ReservationChecks
     internal sealed partial class BlueprintConstructionPartJournal
     {
         internal DiskJournal Disk;
+        internal string DiskDirectory;
+        internal string DiskPath()=>Shared.DiskDirectory;
         internal MountRecord Refresh(DiskJournal.MountRecord record) { Mount=Copy<MountRecord>(record);return Mount; }
         internal static T Copy<T>(object value) => (T)Copy(value,typeof(T));
         private static object Copy(object value,Type target)
         {
             if(value==null)return null;
             if(target.IsInstanceOfType(value))return value;
+            if(target.IsArray) {
+                var source=(Array)value;var result=Array.CreateInstance(target.GetElementType(),source.Length);
+                for(int i=0;i<source.Length;i++)result.SetValue(Copy(source.GetValue(i),target.GetElementType()),i);
+                return result;
+            }
             var copy=Activator.CreateInstance(target,true);
             foreach(var field in target.GetFields(BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic))
             {
@@ -37,7 +44,7 @@ namespace ReservationChecks
             r.Forward.Target.RootView.Data.BeforeSet=null;r.Forward.Target.RootView.Data.PrefabHash=parent.PrefabHash;
             r.Forward.Target.RootView.Data.Set(BlueprintConstructionPartExecution.MarkerKey,parent.Operation.ToString("N"));
             r.Forward.Target.RootView.Data.Set(BlueprintConstructionPartExecution.ReceiptKey,parent.Receipt);ZNet.instance.World.m_uid=42;
-            r.Journal.Disk=journal;r.Journal.Refresh(journal.ReadMount(project,part));
+            r.Journal.Disk=journal;r.Journal.DiskDirectory=directory;r.Journal.Refresh(journal.ReadMount(project,part));
             r.Stand.Contents=null;r.Forward.Target.RootView.Data.Set(BlueprintConstructionMountExecution.ReceiptKey,r.Journal.Mount.Receipt);
         }
         private static void ConnectDisk(Rig r)
@@ -61,7 +68,7 @@ namespace ReservationChecks
             var saved=BlueprintConstructionPartJournal.Copy<DiskJournal.SavePair>(row.Saved);
             using(var sha=System.Security.Cryptography.SHA256.Create())saved.WorldPayloadHash=BitConverter.ToString(sha.ComputeHash(observed.Receipt)).Replace("-","");
             fixture.Journal.ConfirmMountSaved(fixture.Plan.Id,fixture.Part,row.Operation,saved);
-            r.Journal.Disk=fixture.Journal;r.Journal.Refresh(fixture.Journal.ReadMount(fixture.Plan.Id,fixture.Part));
+            r.Journal.Disk=fixture.Journal;r.Journal.DiskDirectory=fixture.Plans.DirectoryPath;r.Journal.Refresh(fixture.Journal.ReadMount(fixture.Plan.Id,fixture.Part));
             r.Forward.Target.RootView.Data.Set(BlueprintConstructionMountExecution.ReceiptKey,r.Journal.Mount.Receipt);
         }
     }

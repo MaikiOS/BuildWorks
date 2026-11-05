@@ -10,6 +10,7 @@ namespace OstrixMods.BuildWorks
     {
         internal static readonly int MountMarkerKey = "ostrix_buildworks_mount_return_v1".GetStableHashCode();
         private static MountDropObservation mountRequest, mountHandler;
+        private static readonly HashSet<ItemStand> cancelledMountStands = new HashSet<ItemStand>();
         internal static bool HasActiveDropObservation => active != null || mountHandler != null || mountRequest != null;
 
         // Observation/seal only. The caller supplies a live durable return intent and persists identity before marking.
@@ -77,8 +78,9 @@ namespace OstrixMods.BuildWorks
             public void Dispose()
             {
                 Cancelled = true;
-                // A queued owner handler must still be refused after cancellation; do not reopen this stand early.
-                if (HandlerFinished && ReferenceEquals(mountRequest, this)) mountRequest = null;
+                // Release the global lease; the exact old stand keeps its late-handler fence.
+                if (!HandlerFinished) cancelledMountStands.Add(Stand);
+                if (ReferenceEquals(mountRequest, this)) mountRequest = null;
             }
         }
 
@@ -91,6 +93,8 @@ namespace OstrixMods.BuildWorks
             {
                 if (HasActiveDropObservation)
                     throw new InvalidOperationException("Another drop observation is still active or awaiting its owner handler.");
+                cancelledMountStands.RemoveWhere(value => !value);
+                if (cancelledMountStands.Contains(stand)) throw new InvalidOperationException("The cancelled native request may only resume from existing saved return evidence.");
                 observation = new MountDropObservation(player, stand, operation, currentDurableIntent, bindIdentity);
                 mountRequest = observation; return true;
             }
@@ -100,6 +104,7 @@ namespace OstrixMods.BuildWorks
         internal static bool BeginMountDropHandler(ItemStand stand, out MountDropObservation state)
         {
             state = null;
+            if (cancelledMountStands.Contains(stand)) return false;
             if (mountRequest == null || !ReferenceEquals(mountRequest.Stand, stand)) return true;
             // Refused invocations never own the active or already completed handler's finalizer state.
             if (mountRequest.HandlerSeen)

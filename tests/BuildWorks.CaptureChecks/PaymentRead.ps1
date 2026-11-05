@@ -31,6 +31,6 @@ foreach($name in @('BlueprintConstructionProjectView.cs','BlueprintConstructionP
 }
 Add-Type -TypeDefinition $code
 $checks=[PaymentReadChecks.Runtime]::Run()
-if($checks -ne 39){throw "Payment runtime coverage differs: $checks"}
+if($checks -ne 42){throw "Payment runtime coverage differs: $checks"}
 if($ReportPath){@{passed=$true;checks=$checks;actualRuntimeMethodsAndStartGuard=$true;fakeJournalAndNative=$true;nativeTested=$false}|ConvertTo-Json|Set-Content -LiteralPath $ReportPath}
 "PASS source-aware runtime read: $checks actual-method/start-guard assertions; phase View/Fog bindings checked; journal/native boundaries substituted, no game/provider proof."

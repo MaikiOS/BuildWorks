@@ -5,6 +5,7 @@
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
+    <DefineConstants>$(DefineConstants);BUILDWORKS_TEST_STAND</DefineConstants>
     <ProfileRoot Condition="'$(ProfileRoot)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..\'))</ProfileRoot>
   </PropertyGroup>
   <ItemGroup>
@@ -13,8 +14,15 @@
     <Compile Include="../../artifacts/content-reservations/ReturnRecoverySource.cs" Link="ReturnRecoverySource.cs" />
     <Compile Include="../../artifacts/content-reservations/PairedRecoverySource.cs" Link="PairedRecoverySource.cs" />
     <Compile Include="../../artifacts/content-reservations/StorageSettlementSource.cs" Link="StorageSettlementSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/StorageProjectFactorySource.cs" Link="StorageProjectFactorySource.cs" />
+    <Compile Include="../../artifacts/content-reservations/StorageProjectReturnSource.cs" Link="StorageProjectReturnSource.cs" />
     <Compile Include="../../artifacts/content-reservations/PartContentsTickSource.cs" Link="PartContentsTickSource.cs" />
     <Compile Include="../../artifacts/content-reservations/ContentsReturnTickSource.cs" Link="ContentsReturnTickSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/RuntimeReturnSource.cs" Link="RuntimeReturnSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/MountRemovalGuardSource.cs" Link="MountRemovalGuardSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/PayoutIssuanceSource.cs" Link="PayoutIssuanceSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/MountInteractionSource.cs" Link="MountInteractionSource.cs" />
+    <Compile Include="../../artifacts/content-reservations/ProjectHoverSource.cs" Link="ProjectHoverSource.cs" />
     <Compile Include="../../artifacts/content-reservations/ContainerCallbacksSource.cs" Link="ContainerCallbacksSource.cs" />
     <Compile Include="../../artifacts/content-reservations/StorageJournalSource.cs" Link="StorageJournalSource.cs" />
     <Compile Include="../../artifacts/content-reservations/StorageRemovalSource.cs" Link="StorageRemovalSource.cs" />

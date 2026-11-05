@@ -10,6 +10,8 @@ namespace OstrixMods.BuildWorks
     // Detach/observation only. Admission stays closed until saved custody, credit and cleanup are connected.
     internal sealed partial class BlueprintConstructionMountDetachExecution : BlueprintConstructionMountContext
     {
+        [ThreadStatic] private static ItemStand nativeInteraction;
+        internal static bool IsNativeInteraction(ItemStand stand) => ReferenceEquals(nativeInteraction, stand);
         private readonly Journal.MountRecord mount;
         private readonly BlueprintForeignPartData before, mounted;
         private readonly Guid operation = Guid.NewGuid();
@@ -148,7 +150,11 @@ namespace OstrixMods.BuildWorks
                     if (!BlueprintConstructionPayoutSeal.TryObserveMountDrop(player, stand, operation, IntentCurrent, BindIdentity, out observation, out string error))
                         throw new InvalidOperationException(error ?? "Durable detach observation could not be reserved; intent retained.");
                     attempted = true; Status = "awaiting-native";
-                    if (!stand.Interact(player, true, false)) throw new InvalidOperationException("Native interaction refused or has an unknown outcome; no replay.");
+                    bool accepted;
+                    nativeInteraction = stand;
+                    try { accepted = stand.Interact(player, true, false); }
+                    finally { nativeInteraction = null; }
+                    if (!accepted) throw new InvalidOperationException("Native interaction refused or has an unknown outcome; no replay.");
                 }
                 if (observation.Error != null) throw new InvalidOperationException(observation.Error);
                 if (!observation.HandlerFinished)

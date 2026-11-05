@@ -4,7 +4,8 @@ param(
     [string]$TransferSourcePath = (Join-Path $PSScriptRoot '../../src/BuildWorks/BlueprintStorageTransfer.cs'),
     [string]$JournalSourcePath = (Join-Path $PSScriptRoot '../../src/BuildWorks/BlueprintStorageTransferJournal.cs'),
     [string]$ProfileSourcePath = (Join-Path $PSScriptRoot '../../src/BuildWorks/BlueprintStoragePlayerProfile.cs'),
-    [switch]$NoRestore
+    [switch]$NoRestore,
+    [switch]$BuildOnly
 )
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -72,6 +73,7 @@ function Segment([string]$from, [string]$until) {
 }
 $methods = (Segment '        internal sealed class Reservation' '        internal static bool CanRestore') +
     (Segment '        internal static bool NeedsSupply' '        internal static bool TryApply')
+$methods = [regex]::Replace($methods, '(List<Supply> result, Piece payingPiece = null\)\s*\{)', '$1 SelectionCalls++;')
 if ($source -notmatch 'return BlueprintStorageCapture.CanPlaceWithoutContents\(piece, data\);') {
     throw 'Populated storage placement guard changed; the reservation test does not verify transfers.'
 }
@@ -124,6 +126,17 @@ $seam=ExactSegment $cleanupBody '        internal static void DestroyExact(' '  
     $transferSource.Replace('using UnityEngine;', '').Replace('namespace OstrixMods.BuildWorks', 'namespace ReservationChecks'),
     [Text.UTF8Encoding]::new($false))
 $constructionTransfer = [IO.File]::ReadAllText((Join-Path $root 'src/BuildWorks/BlueprintStorageTransfer.Construction.cs'))
+$projectReturn = [IO.File]::ReadAllText((Join-Path $root 'src/BuildWorks/BlueprintStorageTransfer.ProjectReturn.cs'))
+$factoryStart = $constructionTransfer.IndexOf('        internal static bool TryBeginFromProject(', [StringComparison]::Ordinal)
+$factoryEnd = $constructionTransfer.IndexOf('        internal bool TrySettleConstruction(', [StringComparison]::Ordinal)
+[IO.File]::WriteAllText((Join-Path $output 'StorageProjectFactorySource.cs'),
+    "using System; using System.Linq; using System.Collections.Generic; using OstrixMods.BuildWorks.Geometry; using Parts=ReservationChecks.BlueprintConstructionPartJournal; using Plans=ReservationChecks.BlueprintConstructionProjectStore; namespace ReservationChecks { internal sealed partial class BlueprintStorageTransfer {`n"+
+    $constructionTransfer.Substring($factoryStart,$factoryEnd-$factoryStart)+"`n} }",[Text.UTF8Encoding]::new($false))
+[IO.File]::WriteAllText((Join-Path $output 'StorageProjectReturnSource.cs'),
+    $projectReturn.Replace('using UnityEngine;', '').Replace('namespace OstrixMods.BuildWorks','namespace ReservationChecks').
+        Replace('using Parts = OstrixMods.BuildWorks.', 'using Parts = ReservationChecks.').Replace('using Plans = OstrixMods.BuildWorks.', 'using Plans = ReservationChecks.').
+        Replace('using Transfers = OstrixMods.BuildWorks.', 'using Transfers = ReservationChecks.').
+        Replace('internal static bool TryBeginProjectReturn(', 'internal static bool TryBeginProjectReturnActual('),[Text.UTF8Encoding]::new($false))
 $settleStart = $constructionTransfer.IndexOf('        internal bool TrySettleConstruction(', [StringComparison]::Ordinal)
 $settleEnd = $constructionTransfer.LastIndexOf("`n    }", [StringComparison]::Ordinal)
 if ($settleStart -lt 0 -or $settleEnd -le $settleStart) { throw 'Actual settlement source boundary changed.' }
@@ -132,18 +145,50 @@ if ($settleStart -lt 0 -or $settleEnd -le $settleStart) { throw 'Actual settleme
     $constructionTransfer.Substring($settleStart, $settleEnd - $settleStart) + "`n} }", [Text.UTF8Encoding]::new($false))
 $partExecution = [IO.File]::ReadAllText((Join-Path $root 'src/BuildWorks/BlueprintConstructionPartExecution.cs'))
 $returnCoordinator = [IO.File]::ReadAllText((Join-Path $root 'src/BuildWorks/BlueprintConstructionContentsReturn.cs'))
-$advanceStart = $returnCoordinator.IndexOf('        private void Advance()', [StringComparison]::Ordinal)
-$advanceEnd = $returnCoordinator.LastIndexOf("`n    }", [StringComparison]::Ordinal)
-if ($advanceStart -lt 0 -or $advanceEnd -le $advanceStart) { throw 'Actual return coordinator boundary changed.' }
+$runtimeSource = [IO.File]::ReadAllText((Join-Path $root 'src/BuildWorks/BlueprintConstructionProjectRuntime.cs'))
+$pluginSource=[IO.File]::ReadAllText((Join-Path $root 'src/BuildWorks/BuildWorksPlugin.cs'))
+$interactPatch=ExactSegment $pluginSource '        private static class BlueprintMountReturnInteractPatch' '        [HarmonyPatch(typeof(ItemStand), nameof(ItemStand.GetHoverText))]'
+$hoverPatch=ExactSegment $pluginSource '        private static class BlueprintMountReturnHoverPatch' '        [HarmonyPatch(typeof(Humanoid), nameof(Humanoid.Pickup)'
+[IO.File]::WriteAllText((Join-Path $output 'MountInteractionSource.cs'),
+    ("namespace ReservationChecks { internal static partial class BuildWorksPlugin {`n"+$interactPatch+$hoverPatch+
+    'internal static bool TestMountInteract(ItemStand stand,Humanoid user,bool hold,bool alt,ref bool result)=>BlueprintMountReturnInteractPatch.Prefix(stand,user,hold,alt,ref result);'+
+    'internal static void TestMountHover(ItemStand stand,ref string result)=>BlueprintMountReturnHoverPatch.Postfix(stand,ref result);'+"`n} }").
+        Replace('private static bool Prefix(', 'internal static bool Prefix(').Replace('private static void Postfix(', 'internal static void Postfix('),[Text.UTF8Encoding]::new($false))
+[IO.File]::WriteAllText((Join-Path $output 'ProjectHoverSource.cs'),
+    [IO.File]::ReadAllText((Join-Path $root 'src/BuildWorks/BlueprintConstructionProjectHover.cs')).Replace('using UnityEngine;', '').
+        Replace('namespace OstrixMods.BuildWorks','namespace ReservationChecks').Replace('private static void Postfix(', 'internal static void Postfix('),[Text.UTF8Encoding]::new($false))
+$removalSource = [IO.File]::ReadAllText((Join-Path $root 'src/BuildWorks/BlueprintConstructionCancellationRemoval.cs'))
+$removalSource=$removalSource.Replace('using UnityEngine;', 'using MonoBehaviour=ReservationChecks.Obj;').Replace('namespace OstrixMods.BuildWorks','namespace ReservationChecks').
+    Replace('using Plans = OstrixMods.BuildWorks.', 'using Plans = ReservationChecks.').Replace('using Parts = OstrixMods.BuildWorks.', 'using Parts = ReservationChecks.').
+    Replace('using Journal = OstrixMods.BuildWorks.', 'using Journal = ReservationChecks.').Replace('Geometry.NativePlayerProfileReadback','NativePlayerProfileReadback').
+    Replace('internal sealed class BlueprintConstructionCancellationRemoval','internal sealed partial class BlueprintConstructionCancellationRemoval')
+[IO.File]::WriteAllText((Join-Path $output 'MountRemovalGuardSource.cs'),$removalSource,[Text.UTF8Encoding]::new($false))
+$issuanceSource=[IO.File]::ReadAllText((Join-Path $root 'src/BuildWorks/BlueprintConstructionPayoutIssuance.cs'))
+[IO.File]::WriteAllText((Join-Path $output 'PayoutIssuanceSource.cs'),
+    $issuanceSource.Replace('using UnityEngine;', '').Replace('namespace OstrixMods.BuildWorks','namespace ReservationChecks').
+        Replace('using Plans = OstrixMods.BuildWorks.', 'using Plans = ReservationChecks.').Replace('using Removal = OstrixMods.BuildWorks.', 'using Removal = ReservationChecks.').
+        Replace('using Journal = OstrixMods.BuildWorks.', 'using Journal = ReservationChecks.'),[Text.UTF8Encoding]::new($false))
+$runtimeMethods = (ExactSegment $runtimeSource '        private bool OtherPayoutBusy' '        internal static bool IsPrivateLocalPlacement') +
+    (ExactSegment $runtimeSource '        internal void BeginPaidRemoval(' '        internal void BeginCollection(') +
+    (ExactSegment $runtimeSource '        internal bool Open(' '        private void AddBoard(') +
+    (ExactSegment $runtimeSource '        internal void Suspend()' "`n    }")
+$runtimeMethods = $runtimeMethods.Replace("#if BUILDWORKS_TEST_STAND`r`n            QaImmediateFogReceipts = null;`r`n#endif", '').Replace("#if BUILDWORKS_TEST_STAND`n            QaImmediateFogReceipts = null;`n#endif", '')
+[IO.File]::WriteAllText((Join-Path $output 'RuntimeReturnSource.cs'),
+    "using System; namespace ReservationChecks { internal sealed partial class BlueprintConstructionProjectRuntime {`n" + $runtimeMethods + "`n} }",[Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText((Join-Path $output 'ContentsReturnTickSource.cs'),
-    "using System; namespace ReservationChecks { internal sealed partial class ContentsReturnTickProbe {`n" +
-    $returnCoordinator.Substring($advanceStart, $advanceEnd - $advanceStart) + "`n} }", [Text.UTF8Encoding]::new($false))
-$tickStart = $partExecution.IndexOf('        private void TickContents()', [StringComparison]::Ordinal)
+    $returnCoordinator.Replace('using UnityEngine;', '').Replace('namespace OstrixMods.BuildWorks', 'namespace ReservationChecks').
+        Replace('using Plans = OstrixMods.BuildWorks.', 'using Plans = ReservationChecks.').Replace('using Parts = OstrixMods.BuildWorks.', 'using Parts = ReservationChecks.').
+        Replace('internal sealed class BlueprintConstructionContentsReturn', 'internal sealed partial class BlueprintConstructionContentsReturn'), [Text.UTF8Encoding]::new($false))
+$tickStart = $partExecution.IndexOf('        internal static bool Complete(', [StringComparison]::Ordinal)
 $tickEnd = $partExecution.IndexOf('        private bool Context()', $tickStart, [StringComparison]::Ordinal)
 if ($tickStart -lt 0 -or $tickEnd -le $tickStart) { throw 'Actual contents tick boundary changed.' }
 [IO.File]::WriteAllText((Join-Path $output 'PartContentsTickSource.cs'),
-    "using System; namespace ReservationChecks { internal sealed partial class PartContentsTickProbe {`n" +
-    $partExecution.Substring($tickStart, $tickEnd - $tickStart) + "`n} }", [Text.UTF8Encoding]::new($false))
+    ("using System; using System.Linq; using System.Collections.Generic; using OstrixMods.BuildWorks.Geometry; using Plans=ReservationChecks.BlueprintConstructionProjectStore; using Journal=ReservationChecks.BlueprintConstructionPartJournal; namespace ReservationChecks { internal sealed partial class PartContentsTickProbe {`n" +
+    (ExactSegment $partExecution '        internal static BlueprintForeignPartData StorageDemand(' '        internal static void RequireStoragePreflight(') +
+    $partExecution.Substring($tickStart, $tickEnd - $tickStart) +
+    (ExactSegment $partExecution '        internal void Tick()' '        internal void StopBeforeNative(') +
+    (ExactSegment $partExecution '        internal void Refuse(' '        private static Journal.PaidRow Row(') +
+    "`n} }").Replace('CompositeBlueprintStore.Part','BlueprintConstructionProjectStore.Source'), [Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText((Join-Path $output 'StorageJournalSource.cs'),
     $journal.Replace('namespace OstrixMods.BuildWorks', 'namespace ReservationChecks'), [Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText((Join-Path $output 'StorageProfileSource.cs'),
@@ -161,20 +206,21 @@ $persistenceHash = (Get-FileHash -LiteralPath $persistencePath).Hash
 $captureStart = $capture.IndexOf('        private static readonly FieldInfo ContainerView', [StringComparison]::Ordinal)
 $callbackSource = [IO.File]::ReadAllText((Join-Path $root 'src/BuildWorks/BlueprintConstructionContainerGuard.cs'))
 $callbackStart = $callbackSource.IndexOf('        private const BindingFlags InstanceFields', [StringComparison]::Ordinal)
-$callbackEnd = $callbackSource.IndexOf('        internal static bool NativeRoot(', $callbackStart, [StringComparison]::Ordinal)
+$callbackEnd = $callbackSource.LastIndexOf("`n    }", [StringComparison]::Ordinal)
 if ($callbackStart -lt 0 -or $callbackEnd -le $callbackStart) { throw 'Native callback predicate boundary changed.' }
 [IO.File]::WriteAllText((Join-Path $output 'ContainerCallbacksSource.cs'),
-    "using System; using System.Reflection; namespace ReservationChecks { internal static class BlueprintConstructionContainerGuard {`n" +
+    "using System; using System.Linq; using System.Reflection; using MonoBehaviour=ReservationChecks.Obj; namespace ReservationChecks { internal static class BlueprintConstructionContainerGuard {`n" +
     $callbackSource.Substring($callbackStart, $callbackEnd - $callbackStart) + "`n} }", [Text.UTF8Encoding]::new($false))
 $captureEnd = $capture.IndexOf('        // Unity-thread classification;', [StringComparison]::Ordinal)
 if ($captureStart -lt 0 -or $captureEnd -le $captureStart) { throw 'Capture cancellation guard boundary missing.' }
 [IO.File]::WriteAllText((Join-Path $output 'StorageRemovalSource.cs'),
     "using System; using System.Reflection; using OstrixMods.BuildWorks.Geometry; namespace ReservationChecks { internal static partial class BlueprintStorageCapture {`n" +
     $capture.Substring($captureStart, $captureEnd - $captureStart) + "`n} }", [Text.UTF8Encoding]::new($false))
-$buildArgs = @('build', (Join-Path $PSScriptRoot 'BuildWorks.ContentReservationChecks.csproj'), '-c', 'Release', '--nologo', '-m:1')
+$buildArgs = @('build', (Join-Path $PSScriptRoot 'BuildWorks.ContentReservationChecks.csproj'), '-c', 'Release', '--nologo', '-m:1', '-nr:false', '-p:BuildInParallel=false', '-p:UseSharedCompilation=false')
 if ($NoRestore) { $buildArgs += '--no-restore' }
 & dotnet @buildArgs
 if ($LASTEXITCODE -ne 0) { throw 'Reservation CPU harness build failed.' }
+if ($BuildOnly) { return }
 & (Join-Path $PSScriptRoot 'bin/Release/net472/BuildWorks.ContentReservationChecks.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Reservation CPU checks failed. Native transfer is not exercised.' }
 @{ status = 'passed_cpu_host_substitutes'; sourceSHA256 = $sourceHash; previewSHA256 = $previewHash; transferSHA256 = $transferHash; captureSHA256 = $captureHash; journalSHA256 = $journalHash; profileAdapterSHA256 = $profileHash; profileParserSHA256 = $profileParserHash; loadedInventorySHA256 = $loadedHash;

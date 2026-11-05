@@ -18,9 +18,10 @@ namespace ReservationChecks
             { using (var writer = new BinaryWriter(memory, Encoding.UTF8, true)) write(writer); return memory.ToArray(); }
         }
         internal static void WriteWorld(TransferChecks.Frame frame, string root, uint generation = 7, int formatVersion = 41, int? chunkVersion = null, int? markerKey = null,
-            byte[] receipt = null, bool separateReceipt = false, BlueprintForeignPartData mounted = null, byte[] mountReceipt = null, long worldId = 1)
+            byte[] receipt = null, bool separateReceipt = false, BlueprintForeignPartData mounted = null, byte[] mountReceipt = null, long worldId = 1,
+            Guid? constructionOperation = null, int prefabHash = 123)
         {
-            Guid marker = frame.Operation;
+            Guid marker = constructionOperation ?? frame.Operation;
             byte[] payload = Bytes(w => { w.Write(formatVersion); w.Write("QA"); w.Write("seed"); w.Write(10); w.Write(worldId); w.Write(1); w.Write(true); w.Write(0); w.Write(0); });
             File.WriteAllBytes(Path.Combine(root, "_main." + generation + ".fwl2"), Bytes(w => { w.Write(payload.Length); w.Write(payload); }));
             int objects = receipt != null && separateReceipt ? 2 : 1;
@@ -33,7 +34,7 @@ namespace ReservationChecks
                 void Object(bool storage, bool construction)
                 {
                     bool mount = construction && mounted != null;
-                    w.Write((ushort)(256 | 32 | 64 | 128 | (mount ? 16 : 0))); w.Write(0f); w.Write(0f); w.Write(0f); w.Write(123);
+                    w.Write((ushort)(256 | 32 | 64 | 128 | (mount ? 16 : 0))); w.Write(0f); w.Write(0f); w.Write(0f); w.Write(prefabHash);
                     if(mount) {
                         var info=mounted.Info.Split(':'); w.Write((byte)4);
                         w.Write("item".GetStableHashCode()); w.Write(info[0].GetStableHashCode());
@@ -45,11 +46,11 @@ namespace ReservationChecks
                     w.Write((byte)((storage ? 1 : 0) + (construction ? 1 : 0)));
                     if (storage) { w.Write(markerKey ?? BlueprintStorageCapture.TransferMarkerKey); w.Write(marker.ToString("N")); }
                     if (construction) { w.Write(BlueprintConstructionPartExecution.MarkerKey); w.Write(marker.ToString("N")); }
-                    w.Write((byte)((storage ? 1 : 0) + (construction ? 1 : 0) + (mount ? 2 : 0)));
+                    w.Write((byte)((storage ? 1 : 0) + (construction ? 1 : 0) + (mount ? 1 + (mountReceipt == null ? 0 : 1) : 0)));
                     if (storage) { w.Write(ZDOVars.s_items); w.Write(inventory.Length); w.Write(inventory); }
                     if (construction) { w.Write(BlueprintConstructionPartExecution.ReceiptKey); w.Write(receipt.Length); w.Write(receipt); }
                     if(mount) {
-                        w.Write(BlueprintConstructionMountExecution.ReceiptKey); w.Write(mountReceipt.Length); w.Write(mountReceipt);
+                        if(mountReceipt!=null) { w.Write(BlueprintConstructionMountExecution.ReceiptKey); w.Write(mountReceipt.Length); w.Write(mountReceipt); }
                         byte[] packet=Convert.FromBase64String(mounted.Zdo); w.Write("itemData".GetStableHashCode()); w.Write(packet.Length); w.Write(packet);
                     }
                 }

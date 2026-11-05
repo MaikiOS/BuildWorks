@@ -1292,3 +1292,10 @@ exchange.unbound_block_terrainframe	A layout with terrain data has changed place
 exchange.unbound_block_precision	Requested transforms or object state cannot be written exactly: {0}. Use the full BuildWorks copy.
 exchange.unbound_block_format	Documents outside the supported Unbound format: {0}. Use the full BuildWorks copy.
 exchange.unbound_blocked	This document cannot be exported safely as .vtbp. See the reasons above; Back allows a full BuildWorks export.
+project.mount_pending	Paid stand saved. Your inventory is missing the requested item: {0}. Bring it and continue at the board. Stand materials will not be charged again.
+project.mount_return_board	Items returned. Return to the board to finish cancellation.
+project.mount_return_pending	Cancellation confirmed. Return contents; stands remaining: {0}. Aim at a project stand and press E.
+project.mount_return_busy	Returning the item and verifying saved custody. Wait.
+project.mount_return_use	Return the actual mounted item
+project.mount_finish_cancel	Finish cancellation
+project.mount_return_untracked	A stand holds an item without a recorded project contribution. Remove it using the normal Valheim interaction; untracked contents are not automatically returned.

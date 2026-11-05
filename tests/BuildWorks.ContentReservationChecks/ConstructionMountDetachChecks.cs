@@ -64,8 +64,11 @@ namespace ReservationChecks
         internal string DetachMode;
         internal Action BeforeInteract,AfterLoad,AfterBody;
         internal readonly List<ItemDrop> Returned=new List<ItemDrop>();
+        internal uint? NextDropId=null;
         internal bool Interact(Player player,bool hold,bool alt)
         {
+            bool intercepted=false;
+            if(!BuildWorksPlugin.TestMountInteract(this,player,hold,alt,ref intercepted))return intercepted;
             DetachCalls++;
             if(!ReferenceEquals(player,Player.m_localPlayer)||!hold||alt)throw new InvalidOperationException("wrong native interaction arguments");
             BeforeInteract?.Invoke();
@@ -101,6 +104,7 @@ namespace ReservationChecks
         private ItemDrop Spawn(string prefab)
         {
             var drop=ItemDrop.Make(Program.Item(prefab,1,"prefab-default"));Returned.Add(drop);
+            if(NextDropId.HasValue)drop.GetComponent<ZNetView>().Data.m_uid.Id=NextDropId.Value;
             BlueprintConstructionPayoutSeal.BeforeAwake(drop);BlueprintConstructionPayoutSeal.AfterAwake(drop,null);return drop;
         }
     }
@@ -221,6 +225,7 @@ namespace ReservationChecks
             CreditChecks();
             CleanupChecks();
             RecoveryPipelineChecks();
+            ProductionReturnCoordinatorChecks();
             Console.WriteLine("PASS mount detach actor: "+assertions+" orchestration/guard assertions including saved empty-holder/drop pair; actual context/actor/seal/readers, substituted journal/native/save APIs. No native detach/save/credit/cleanup/reload or authority proof.");
         }
 

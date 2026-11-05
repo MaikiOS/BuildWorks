@@ -167,7 +167,7 @@ namespace ReservationChecks
             r.Stand.Returned.Clear();r.Stand.Returned.Add(loaded);UnityEngine.Object.Loaded.Clear();UnityEngine.Object.Loaded.Add(loaded);
             BlueprintConstructionPayoutSeal.BeforeAwake(loaded);BlueprintConstructionPayoutSeal.AfterAwake(loaded,null);return loaded;
         }
-        private static void LoadInventoryNative(Inventory inventory,BlueprintForeignPartData raw)
+        internal static void LoadInventoryNative(Inventory inventory,BlueprintForeignPartData raw)
         {
             Check(BlueprintContainerInventory.TryRead(raw,n=>n.GetStableHashCode(),out var rows),"loaded inventory fixture unreadable");inventory.Items.Clear();
             foreach(var row in rows){var item=Program.Item(row.Prefab,row.Stack);item.m_durability=(float)row.DurabilityHundredths.Value*0.01f;

@@ -8,8 +8,15 @@ using OstrixMods.BuildWorks.Geometry;
 namespace ReservationChecks
 {
     // Inert host substitutes. These do not invoke Unity, native Inventory or a world.
-    internal class Obj { public static implicit operator bool(Obj value) => value != null; internal int GetInstanceID() => GetHashCode(); }
-    internal sealed class Prefab : Obj { internal string name; }
+    internal class Obj { internal GameObject gameObject; public static implicit operator bool(Obj value) => value != null; internal int GetInstanceID() => GetHashCode(); }
+    internal sealed class Prefab : Obj {
+        internal string name;
+        private ItemDrop nativeDrop;
+        internal T GetComponent<T>() where T:class {
+            if(nativeDrop==null){nativeDrop=ItemDrop.Make(Program.Item(name,1,"prefab-default"));nativeDrop.m_itemData.m_dropPrefab=this;}
+            return nativeDrop.gameObject.GetComponent<T>();
+        }
+    }
     internal sealed partial class ItemDrop : Obj
     {
         internal sealed class Shared { internal string m_name; internal int m_maxStackSize = 50, m_maxQuality = 5, m_variants = 4; internal bool m_questItem; }
@@ -28,6 +35,11 @@ namespace ReservationChecks
             internal string Custom { get => m_customData["property"]; set => m_customData["property"] = value; }
             internal ItemData Clone() { var copy = (ItemData)MemberwiseClone(); copy.m_customData = new Dictionary<string, string>(m_customData); return copy; }
             internal void Save(ZPackage package) => Program.WriteItem(package.Writer, this);
+            internal sealed class Damage { internal float GetTotalDamage()=>0; }
+            internal Damage GetDamage()=>new Damage();
+            internal static int Load(ZPackage package,ItemData item,Version.Item version) {
+                var data=new ZDO();data.Set(ZDOVars.s_itemData,package.GetArray());ItemDrop.LoadFromZDO(item,data);return item.m_dropPrefab.name.GetStableHashCode();
+            }
         }
         internal sealed class Drop : Obj { internal ItemData m_itemData; }
     }
@@ -36,6 +48,8 @@ namespace ReservationChecks
         private readonly MemoryStream stream = new MemoryStream();
         internal readonly BinaryWriter Writer;
         internal ZPackage() { Writer = new BinaryWriter(stream, Encoding.UTF8, true); }
+        internal ZPackage(byte[] bytes){stream.Write(bytes,0,bytes.Length);stream.Position=0;Writer=new BinaryWriter(stream,Encoding.UTF8,true);}
+        internal byte ReadByte()=>checked((byte)stream.ReadByte());
         internal void Write(byte value) => Writer.Write(value);
         internal byte[] GetArray() { Writer.Flush(); return stream.ToArray(); }
     }
@@ -45,7 +59,8 @@ namespace ReservationChecks
         internal List<ItemDrop.ItemData> GetAllItems() => Items;
         internal bool ContainsItem(ItemDrop.ItemData item) => Items.Contains(item);
     }
-    internal sealed partial class Player : Obj
+    internal class Humanoid : Obj { internal readonly Transform transform = new Transform(); }
+    internal sealed partial class Player : Humanoid
     {
         internal Inventory Inventory = new Inventory();
         internal CraftingStation Station;
@@ -150,6 +165,7 @@ namespace ReservationChecks
 
         private static int Main(string[] args)
         {
+            if(args.Length==1&&args[0]=="--mount-lifecycle"){try{ConstructionMixedLifecycleChecks.Run();return 0;}catch(Exception error){Console.Error.WriteLine(error);return 1;}}
             if(args.Length==2 && args[0]=="--mount-recovery-process"){try{ConstructionMountDetachChecks.RecoveryChild(args[1]);return 0;}catch(Exception error){Console.Error.WriteLine(error);return 1;}}
             if(args.Length==2 && args[0]=="--mount-recovery-defect"){try{ConstructionMountDetachChecks.RecoveryRegression(args[1]);return 0;}catch(Exception error){Console.Error.WriteLine(error);return 1;}}
             if (args.Length == 2 && args[0] == "--open-return-journal")
@@ -255,6 +271,7 @@ namespace ReservationChecks
                 LoadedInventoryChecks.RunMountedItems();
                 ConstructionMountExecutionChecks.Run();
                 ConstructionMountDetachChecks.Run();
+                ConstructionMixedLifecycleChecks.Run();
                 MountDropObservationChecks.Run();
                 Console.WriteLine("PASS " + assertions + " content reservation assertions: actual selectors/payment checks and native-record decoder with inert host/serializer; reservation subset only; no native game execution.");
                 return 0;

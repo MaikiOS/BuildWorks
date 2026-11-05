@@ -36,6 +36,16 @@ namespace OstrixMods.BuildWorks
         private BlueprintConstructionPartExecution fogExecution;
         private string fogExecutionStatus;
 #if BUILDWORKS_TEST_STAND
+        internal string QaArmMountCreditPause(Guid project, Guid part)
+        {
+            BuildWorksTestIsolation.RequireLoadedSession(); RequireContext();
+            var mount = new Journal(store).ReadMount(project, part);
+            if (mount?.Phase != Journal.Committed || mount.Player != Player.m_localPlayer.GetPlayerID() ||
+                mount.Return?.Cleanup != null || mount.Return?.Phase == Journal.MountReturnComplete)
+                throw new InvalidOperationException("Select one saved paid mount before cleanup starts.");
+            BlueprintConstructionContentsReturn.QaArmPause(mount.Operation);
+            return BlueprintConstructionContentsReturn.QaPauseState;
+        }
         internal static bool QaFailNextBoard;
         internal bool QaReadonlyIdle => !disposed && !failed && store != null && Allowed() &&
             queued == Guid.Empty && !OpenBoard && !view.IsOpen && cleanupProjects.Count == 0 && cancellationProjects.Count == 0 &&
@@ -71,9 +81,25 @@ namespace OstrixMods.BuildWorks
         internal long World => world;
         internal string Failure { get; private set; }
         internal BlueprintConstructionProjectBoard OpenBoard { get; private set; }
-        private bool PayoutBusy => payout != null && !payout.Finished || collection != null && !collection.Finished || cleanup != null && !cleanup.Finished ||
-            paidCancellation != null && !paidCancellation.Finished || contentsReturn != null && !contentsReturn.Finished;
-        internal bool BlocksInput => view.IsOpen || execution?.Saving == true || removal != null && !removal.Finished || PayoutBusy;
+        private bool OtherPayoutBusy => payout != null && !payout.Finished || collection != null && !collection.Finished || cleanup != null && !cleanup.Finished ||
+            paidCancellation != null && !paidCancellation.Finished;
+        private bool PayoutBusy => OtherPayoutBusy || contentsReturn != null;
+        internal bool BlocksInput => view.IsOpen || execution?.Saving == true || removal != null && !removal.Finished || OtherPayoutBusy || contentsReturn?.Busy == true;
+        internal bool ReturnPending(Guid project) => contentsReturn?.Project == project;
+        internal bool ReturnReady(Guid project) => ReturnPending(project) && contentsReturn.Status == "returned";
+        internal string ReturnStatus(Guid project) => !ReturnPending(project) ? null : BuildWorksLocalization.Text(
+            contentsReturn.Status == "returned" ? "project.mount_return_board" : "project.mount_return_pending", contentsReturn.Remaining) +
+            (contentsReturn.Reason == null ? "" : "\n" + BuildWorksLocalization.Text("project.error", contentsReturn.Reason));
+        internal bool IsPendingReturnStand(ItemStand stand) => contentsReturn?.IsPendingStand(stand) == true;
+        internal string ReturnStandHover(ItemStand stand) => !IsPendingReturnStand(stand) ? null : ReturnStatus(contentsReturn.Project) + "\n" +
+            (contentsReturn.Busy ? BuildWorksLocalization.Text("project.mount_return_busy") : "[<color=yellow><b>$KEY_Use</b></color>] " + BuildWorksLocalization.Text("project.mount_return_use"));
+        internal bool TryReturnStand(ItemStand stand, Humanoid user)
+        {
+            if (!IsPendingReturnStand(stand)) return false;
+            if (!contentsReturn.TryBeginStand(stand, user, out string reason)) Failure = reason;
+            else Failure = null;
+            return true;
+        }
         internal static bool IsPrivateLocalPlacement => ZNet.instance && Player.m_localPlayer && Game.instance &&
             !Game.instance.IsShuttingDown() && ZNet.instance.IsServer() && !ZNet.instance.IsDedicated() &&
             !ZNet.IsOpenServer() && ZNet.instance.GetPeers().Count == 0 && ZNet.instance.LocalPlayerIsAdminOrHost() &&
@@ -89,7 +115,7 @@ namespace OstrixMods.BuildWorks
             if (disposed) return;
             ZNet current = ZNet.instance; long uid = WorldId(current);
             if (network != current || uid != world) { Suspend(); network = current; world = uid; }
-            if (!Allowed()) { contentsReturn?.Refuse("Construction context closed; contents evidence retained."); execution?.Refuse("Construction context closed; evidence retained."); removal?.Refuse("Construction context closed; removal evidence retained."); payout?.Refuse("Construction context closed; payout evidence retained."); collection?.Refuse("Construction context closed; credit evidence retained."); cleanup?.Refuse("Construction context closed; cleanup evidence retained."); paidCancellation?.Refuse("Construction context closed; cancellation evidence retained."); execution = null; queued = Guid.Empty; cleanupProjects.Clear(); cancellationProjects.Clear(); ClearBoards(); store = null; return; }
+            if (!Allowed()) { Suspend(); return; }
             TickContentsReturn();
             removal?.Tick();
             bool paying = payout != null && !payout.Finished;
@@ -113,7 +139,7 @@ namespace OstrixMods.BuildWorks
             }
             if (OpenBoard && (!Player.m_localPlayer || Player.m_localPlayer.IsDead() ||
                 !HasHammer(Player.m_localPlayer) || Vector3.Distance(Player.m_localPlayer.transform.position, OpenBoard.transform.position) > 5)) Close();
-            try { if (contentsReturn == null || contentsReturn.Finished) view.Tick(this, OpenBoard); }
+            try { view.Tick(this, OpenBoard); }
             catch (Exception error) { Close(); log?.Invoke(error); }
             if (!failed && store == null) try
             {
@@ -134,7 +160,7 @@ namespace OstrixMods.BuildWorks
         {
             RequireContext();
             if (PayoutBusy) throw new InvalidOperationException(BuildWorksLocalization.Text("project.unavailable"));
-            if (blueprint?.parts?.Any(part => BlueprintConstructionPartExecution.StorageDemand(part) != null) == true)
+            if (blueprint?.parts?.Any(part => BlueprintConstructionPartExecution.ContentsDemand(part) != null) == true)
                 BlueprintConstructionPartExecution.RequireStoragePreflight(world);
             Store.Record record = store.Create(id, blueprint, rootPose, poses);
             // A confirmed durable write remains successful even when its presentation cannot be created.
@@ -172,7 +198,7 @@ namespace OstrixMods.BuildWorks
                 if (payment.Sources != null || payment.Outcome != null) { review = true; continue; }
                 var row = payment.Legacy;
                 review |= row?.RequiresReconciliation == true;
-                try { if (BlueprintConstructionPartExecution.Complete(record, part, row, blueprint.parts[part.SourceIndex])) built++; }
+                try { if (BlueprintConstructionPartExecution.Complete(record, part, row, blueprint.parts[part.SourceIndex], store)) built++; }
                 catch (Exception) { review = true; }
             }
             return (built, record.Parts.Count, review);
@@ -183,7 +209,7 @@ namespace OstrixMods.BuildWorks
             var plan = Read(id); if (plan.Cancelled) throw new InvalidOperationException("Construction project was cancelled.");
             if (Progress(id).NeedsReview) throw new InvalidOperationException(BuildWorksLocalization.Text("project.review"));
             var blueprint = plan.Blueprint;
-            return plan.Parts.Where(part => !BlueprintConstructionPartExecution.Complete(plan, part, ReadPart(id, part.Id), blueprint.parts[part.SourceIndex])).ToArray();
+            return plan.Parts.Where(part => !BlueprintConstructionPartExecution.Complete(plan, part, ReadPart(id, part.Id), blueprint.parts[part.SourceIndex], store)).ToArray();
         }
         private Store.Part NextPart(Guid id)
         {
@@ -215,7 +241,7 @@ namespace OstrixMods.BuildWorks
             {
                 int index = part.SourceIndex; var source = blueprint.parts[index];
                 pieces[index] = BlueprintConstructionPartExecution.ResolvePiece(Player.m_localPlayer, source);
-                BlueprintConstructionPartExecution.StorageDemand(source);
+                BlueprintConstructionPartExecution.ContentsDemand(source);
                 poses[index] = BlueprintConstructionPartExecution.ResolvePose(part, source, points[index]);
                 resolved[index] = false;
             }
@@ -271,7 +297,8 @@ namespace OstrixMods.BuildWorks
             if (!IsPrivateLocalPlacement || !player || player.IsDead() || !OpenBoard || OpenBoard.Id != id || Board(id) != OpenBoard ||
                 !BuildWorksPlugin.CanOpenConstructionProject || !HasHammer(player) ||
                 Vector3.Distance(player.transform.position, OpenBoard.transform.position) > 5 || queued != Guid.Empty ||
-                PayoutBusy || execution != null && !execution.Finished || removal != null && !removal.Finished || operation == Guid.Empty)
+                OtherPayoutBusy || contentsReturn?.Busy == true || contentsReturn != null && contentsReturn.Project != id ||
+                execution != null && !execution.Finished || removal != null && !removal.Finished || operation == Guid.Empty)
                 throw new InvalidOperationException(BuildWorksLocalization.Text("project.unavailable"));
             switch (CancellationAction(id, revision))
             {
@@ -295,39 +322,40 @@ namespace OstrixMods.BuildWorks
         internal void BeginPaidRemoval(Guid id, long revision, Guid operation)
         {
             RequireRemovalRequest(id);
+            if (contentsReturn?.Project == id && contentsReturn.Revision == revision && contentsReturn.Status == "returned")
+            { BeginNativePaidRemoval(id, revision, contentsReturn.Operation); return; }
+            contentsReturn?.Refuse("Cancellation reconfirmed at the board; existing child journals retained.");
             var board = OpenBoard;
+            var confirmedNetwork = network; var confirmedWorld = network.GetWorld();
             var next = new BlueprintConstructionContentsReturn(store, id, revision, operation, () =>
-                !disposed && !failed && Allowed() && IsPrivateLocalPlacement && board && OpenBoard == board && Board(id) == board &&
-                HasHammer(Player.m_localPlayer) && Vector3.Distance(Player.m_localPlayer.transform.position, board.transform.position) <= 5);
+                !disposed && !failed && Allowed() && IsPrivateLocalPlacement && ReferenceEquals(network, confirmedNetwork) &&
+                ReferenceEquals(network.GetWorld(), confirmedWorld) && board && Board(id) == board &&
+                HasHammer(Player.m_localPlayer));
             contentsReturn = next; Failure = null;
             if (next.Finished) BeginNativePaidRemoval(id, revision, operation);
-            else view.Close();
+            else Close();
         }
         private void TickContentsReturn()
         {
             if (contentsReturn == null || contentsReturn.Finished) return;
             contentsReturn.Tick();
             if (!contentsReturn.Finished) return;
-            try
-            {
-                if (contentsReturn.Status != "returned") throw new InvalidOperationException(contentsReturn.Reason);
-                BeginNativePaidRemoval(contentsReturn.Project, contentsReturn.Revision, contentsReturn.Operation);
-            }
-            catch (Exception error) { Failure = error.Message; log?.Invoke(error); }
+            if (contentsReturn.Status != "returned") { Failure = contentsReturn.Reason; log?.Invoke(new InvalidOperationException(Failure)); }
         }
         private void RequireRemovalRequest(Guid id)
         {
             RequireContext();
             if (!IsPrivateLocalPlacement || !OpenBoard || OpenBoard.Id != id || Board(id) != OpenBoard || !HasHammer(Player.m_localPlayer) ||
                 Vector3.Distance(Player.m_localPlayer.transform.position, OpenBoard.transform.position) > 5 || queued != Guid.Empty ||
-                PayoutBusy || execution != null && !execution.Finished || removal != null && !removal.Finished)
+                OtherPayoutBusy || contentsReturn?.Busy == true || contentsReturn != null && contentsReturn.Project != id ||
+                execution != null && !execution.Finished || removal != null && !removal.Finished)
                 throw new InvalidOperationException(BuildWorksLocalization.Text("project.unavailable"));
         }
         private void BeginNativePaidRemoval(Guid id, long revision, Guid operation)
         {
             RequireRemovalRequest(id);
             var next = new BlueprintConstructionCancellationRemoval(store, id, revision, operation);
-            Close(); removal = next;
+            contentsReturn = null; Close(); removal = next;
         }
 
         internal void BeginPayout(Guid id)
@@ -487,7 +515,8 @@ namespace OstrixMods.BuildWorks
         {
             try
             {
-                if (disposed || failed || store == null || !Allowed() || PayoutBusy || !board || !BuildWorksPlugin.CanOpenConstructionProject ||
+                if (disposed || failed || store == null || !Allowed() || !board || OtherPayoutBusy || contentsReturn?.Busy == true ||
+                    contentsReturn != null && contentsReturn.Project != board.Id || !BuildWorksPlugin.CanOpenConstructionProject ||
                     user != Player.m_localPlayer || Player.m_localPlayer.IsDead() || !HasHammer(user) || Board(board.Id) != board ||
                     Vector3.Distance(user.transform.position, board.transform.position) > 5 || store.Load(board.Id).Cancelled) return false;
                 OpenBoard = board; view.Tick(this, board); return true;

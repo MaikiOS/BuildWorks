@@ -89,11 +89,13 @@ namespace OstrixMods.BuildWorks
             var data = view ? view.GetZDO() : null; var wear = instance ? instance.GetComponent<WearNTear>() : null;
             float[] pose = part.WorldPose.Values;
             bool storage = piece && piece.GetComponent<Container>();
+            bool mounted = piece && piece.GetComponent<ItemStand>() && !piece.GetComponent<ArmorStand>();
             if (storage) BlueprintConstructionPartExecution.StorageDemand(source);
             bool Current()
             {
                 if (receipt.Player != player.GetPlayerID() || !piece ||
-                    !(storage ? PrecisionPlacementSession.SupportsStorageProjectPart(piece) : PrecisionPlacementSession.SupportsProjectPart(piece)) ||
+                    !(storage ? PrecisionPlacementSession.SupportsStorageProjectPart(piece) : mounted ?
+                        PrecisionPlacementSession.SupportsMountProjectPart(piece, source) : PrecisionPlacementSession.SupportsProjectPart(piece)) ||
                     !instance || !view || !view.IsValid() || !view.IsOwner() || data == null || !data.IsValid() || data.m_uid.IsNone() ||
                     !ReferenceEquals(instance.GetComponent<ZNetView>(), view) || !ReferenceEquals(view.GetZDO(), data) ||
                     !ReferenceEquals(instance.GetComponent<WearNTear>(), wear) ||
@@ -106,10 +108,41 @@ namespace OstrixMods.BuildWorks
                     Vector3.Distance(instance.transform.localScale, Vector3.Scale(prefab.transform.localScale, new Vector3(pose[7], pose[8], pose[9]))) > .001f) return false;
                 return storage ? BlueprintConstructionContainerGuard.NativeRoot(instance, wear) &&
                     BlueprintStorageTransfer.ProjectEmpty(plans, plan.Id, part.Id, player, instance) :
+                    mounted ? EmptyMount(plans, plan.Id, part.Id, instance) && NativeStandRoot(instance, wear, view) :
                     source.foreignData == null && wear.m_onDestroyed == null && BlueprintConstructionContainerGuard.ViewsMatch(null, wear, view);
             }
             if (!Current()) throw new InvalidOperationException("Removal requires an exact owned receipt/pose and supported callbacks; storage must be verified empty and unmarked.");
             return new Witness { Wear = wear, Data = data, Id = data.m_uid, Current = Current };
+        }
+        internal static bool EmptyMount(Plans plans, Guid project, Guid part, GameObject instance)
+        {
+            var stand = instance ? instance.GetComponent<ItemStand>() : null;
+            var view = instance ? instance.GetComponent<ZNetView>() : null;
+            var piece = instance ? instance.GetComponent<Piece>() : null;
+            var journal = new Parts(plans); var parent = journal.Read(project, part); var mount = journal.ReadMount(project, part);
+            if (!stand || !piece || parent?.Phase != Parts.Committed || !Player.m_localPlayer || parent.Player != Player.m_localPlayer.GetPlayerID() ||
+                !BlueprintItemStandPlacement.OwnsView(instance, view) || !BlueprintItemStandPlacement.IsIdleStand(stand) ||
+                !BlueprintItemStandPlacement.CanRollback(instance, forceDestroy: true) ||
+                !BlueprintItemStandCapture.TryCapture(piece, out var contents) || contents != null) return false;
+            var data = view.GetZDO();
+            if (data.GetString(BlueprintConstructionPartExecution.MarkerKey, "") != parent.Operation.ToString("N") ||
+                data.GetByteArray(BlueprintConstructionPartExecution.ReceiptKey)?.SequenceEqual(parent.Receipt) != true) return false;
+            var receipt = data.GetByteArray(BlueprintConstructionMountExecution.ReceiptKey);
+            return mount?.Return?.Phase == Parts.MountReturnComplete ? receipt?.SequenceEqual(mount.Receipt) == true :
+                (mount == null || mount.Phase == Parts.NoEffect) && receipt == null;
+        }
+        private static bool NativeStandRoot(GameObject instance, WearNTear wear, ZNetView view)
+        {
+            var stand = instance.GetComponent<ItemStand>();
+            var method = typeof(ItemStand).GetMethod("OnDestroyed", BindingFlags.Instance | BindingFlags.NonPublic, null, Type.EmptyTypes, null);
+            var callbacks = wear.m_onDestroyed?.GetInvocationList();
+            var components = instance.GetComponentsInChildren<MonoBehaviour>(true);
+            return stand && stand.GetType() == typeof(ItemStand) && wear.GetType() == typeof(WearNTear) &&
+                BlueprintConstructionContainerGuard.ViewsMatch(null, wear, view) && method != null && callbacks?.Length == 1 &&
+                ReferenceEquals(callbacks[0].Target, stand) && callbacks[0].Method == method &&
+                components.Length == 4 && components.All(component => component && component.gameObject == instance &&
+                    (component.GetType() == typeof(ItemStand) || component.GetType() == typeof(Piece) ||
+                        component.GetType() == typeof(WearNTear) || component.GetType() == typeof(ZNetView)));
         }
         private bool Context() => Thread.CurrentThread.ManagedThreadId == thread && network && ReferenceEquals(network, ZNet.instance) &&
             BlueprintConstructionProjectRuntime.IsPrivateLocalPlacement && ReferenceEquals(network.GetWorld(), world) && world != null &&

@@ -13,6 +13,9 @@ namespace ReservationChecks
         internal Vector3(float x,float y,float z) { this.x=x; this.y=y; this.z=z; }
         internal static float Distance(Vector3 a,Vector3 b) => (float)Math.Sqrt((a.x-b.x)*(a.x-b.x)+(a.y-b.y)*(a.y-b.y)+(a.z-b.z)*(a.z-b.z));
         internal static Vector3 Scale(Vector3 a,Vector3 b) => new Vector3(a.x*b.x,a.y*b.y,a.z*b.z);
+        internal static Vector3 up=>new Vector3(0,1,0);
+        public static Vector3 operator +(Vector3 a,Vector3 b)=>new Vector3(a.x+b.x,a.y+b.y,a.z+b.z);
+        public static Vector3 operator *(Vector3 a,float value)=>new Vector3(a.x*value,a.y*value,a.z*value);
     }
     internal struct Quaternion {
         internal float x,y,z,w;
@@ -35,16 +38,31 @@ namespace ReservationChecks
         internal ItemStand Stand;
         internal ItemDrop Drop;
         internal Rigidbody Body;
+        internal WearNTear Wear;
         internal Collider[] Colliders=Array.Empty<Collider>();
-        internal T[] GetComponentsInChildren<T>() where T:class => Colliders.OfType<T>().ToArray();
+        internal T[] GetComponentsInChildren<T>(bool includeInactive=false) where T:class
+        {
+            if(typeof(T)==typeof(Obj)) {
+                var components=new Obj[]{Piece,Container,Stand,Wear,RootView}.Where(value=>value!=null).ToArray();
+                foreach(var component in components)component.gameObject=this;
+                return components.OfType<T>().ToArray();
+            }
+            return Colliders.OfType<T>().ToArray();
+        }
         internal T GetComponentInParent<T>() where T:class => GetComponent<T>();
-        internal T GetComponent<T>() where T : class => typeof(T) == typeof(Piece) ? Piece as T :
+        internal T GetComponent<T>() where T : class {
+            var found=typeof(T) == typeof(Piece) ? Piece as T :
             typeof(T) == typeof(ZNetView) ? RootView as T : typeof(T) == typeof(ItemStand) ? Stand as T :
-            typeof(T) == typeof(ItemDrop) ? Drop as T : typeof(T) == typeof(Rigidbody) ? Body as T : Container as T;
+            typeof(T) == typeof(ItemDrop) ? Drop as T : typeof(T) == typeof(Rigidbody) ? Body as T :
+            typeof(T)==typeof(WearNTear)?Wear as T:Container as T;
+            if(found is Obj component)component.gameObject=this;
+            return found;
+        }
     }
     internal sealed partial class Piece
     {
-        internal GameObject gameObject;
+        internal new GameObject gameObject;
+        internal T GetComponent<T>() where T:class => gameObject.GetComponent<T>();
         internal Transform transform => gameObject.transform;
         internal long Creator = 100;
         internal long GetCreator() => Creator;
@@ -103,6 +121,7 @@ namespace ReservationChecks
         }
     }
     internal struct ZDOID { internal long Id, User; internal long UserID => User == 0 ? 99 : User; internal uint ID => (uint)Id; internal bool IsNone() => Id == 0;
+        internal ZDOID(long user,uint id){User=user;Id=id;}
         internal static ZDOID None => default;
         public static bool operator ==(ZDOID a,ZDOID b) => a.Id==b.Id && a.User==b.User;
         public static bool operator !=(ZDOID a,ZDOID b) => !(a==b);
@@ -115,11 +134,15 @@ namespace ReservationChecks
         internal static readonly int MarkerKey = "ostrix_buildworks_project_operation_v1".GetStableHashCode();
         internal static readonly int ReceiptKey = "ostrix_buildworks_project_receipt_v1".GetStableHashCode();
         internal static GameObject MountTarget;
+        internal static readonly Dictionary<Guid,GameObject> MountTargets=new Dictionary<Guid,GameObject>();
         internal static bool StorageUnresolved;
         internal static void RequireStoragePreflight(long _) { if(StorageUnresolved) throw new InvalidOperationException("unresolved storage"); }
-        internal static GameObject FindMarked(Guid _,string prefab) => MountTarget;
+        internal static BlueprintForeignPartData StorageDemand(BlueprintConstructionProjectStore.Source source)=>PartContentsTickProbe.StorageDemand(source);
+        internal static GameObject FindMarked(Guid operation,string prefab) => MountTargets.TryGetValue(operation,out var target)?target:MountTarget;
     }
     internal sealed class ZDO { internal ZDOID m_uid = new ZDOID { Id = 1 }; internal uint DataRevision; internal byte[] Raw;
+        internal bool Valid=true;
+        internal bool IsValid()=>Valid;
         internal bool Persistent = true;
         internal int PrefabHash = 123;
         internal readonly Dictionary<int,long> Longs = new Dictionary<int,long>();
@@ -135,6 +158,7 @@ namespace ReservationChecks
         internal byte[] GetByteArray(int key, byte[] fallback = null) => key == ZDOVars.s_items ? Raw ?? fallback : ByteArrays.TryGetValue(key, out var value) ? value : fallback; }
     internal sealed class ZNetView : Obj
     {
+        internal bool m_persistent=true;
         internal readonly ZDO Data = new ZDO(); internal bool Valid = true, Owner = true;
         internal bool IsValid() => Valid; internal bool IsOwner() => Owner; internal ZDO GetZDO() => Data;
     }
@@ -145,7 +169,7 @@ namespace ReservationChecks
         internal string Directory;
         internal string GetSaveDirectory(FileHelpers.FileSource _) => Directory;
     }
-    internal sealed class ZNet : Obj
+    internal sealed partial class ZNet : Obj
     {
         internal static ZNet instance = new ZNet(); internal World World = new World();
         internal bool Server = true, Saving;
@@ -183,6 +207,12 @@ namespace ReservationChecks
         internal Action m_onDestroyed;
         private ZNetView m_nview;
         internal WearNTear(ZNetView view = null) { m_nview = view; }
+        internal void Remove(bool blockDrops) {
+            var witness=BlueprintConstructionCancellationRemoval.CaptureWear(this,blockDrops);Exception failure=null;
+            try { m_onDestroyed?.Invoke();ZDOMan.instance.DestroyZDO(m_nview.GetZDO());BlueprintConstructionCancellationRemoval.Started++; }
+            catch(Exception error){failure=error;}
+            BlueprintConstructionCancellationRemoval.ConfirmWear(witness,blockDrops,failure);if(failure!=null)throw failure;
+        }
     }
     internal class Container : Obj
     {

@@ -85,6 +85,48 @@ namespace OstrixMods.BuildWorks.Geometry
             { return false; }
         }
 
+        // Reconstruct the one recorded native debit without Load/Save or changing other item packets.
+        public static BlueprintForeignPartData DebitOne(BlueprintForeignPartData before, int x, int y, Func<string, int> prefabHash)
+        {
+            if (!TryRead(before, prefabHash, out var items) || items.Any(item => item.SourceVersion != 110))
+                throw new InvalidDataException("Exact current inventory is required for the recorded debit.");
+            var selected = items.Single(item => item.X == x && item.Y == y);
+            var names = items.Select(item => item.Prefab).Distinct().ToDictionary(prefabHash, name => name);
+            byte[] bytes = Convert.FromBase64String(before.Zdo);
+            using (var input = new MemoryStream(bytes, false))
+            using (var reader = new BinaryReader(input, new UTF8Encoding(false, true)))
+            using (var output = new MemoryStream())
+            using (var writer = new BinaryWriter(output))
+            {
+                reader.ReadInt32(); reader.ReadUInt16();
+                writer.Write(110); writer.Write((ushort)(items.Count - (selected.Stack == 1 ? 1 : 0)));
+                for (int index = 0; index < items.Count; index++)
+                {
+                    int start = checked((int)input.Position);
+                    var item = ReadItem(reader, names, 110);
+                    int end = checked((int)input.Position);
+                    if (item.X != x || item.Y != y) { writer.Write(bytes, start, end - start); continue; }
+                    if (item.Stack == 1) continue;
+                    writer.Write(bytes, start, 7);
+                    int flags = bytes[start + 7] & ~2;
+                    if (item.Stack == 2) flags &= ~8;
+                    writer.Write((byte)flags);
+                    int stackOffset = start + 8 + ((bytes[start + 7] & 4) != 0 ? 2 : 0);
+                    writer.Write(bytes, start + 8, stackOffset - start - 8);
+                    if (item.Stack > 2) writer.Write((ushort)(item.Stack - 1));
+                    writer.Write(bytes, stackOffset + 2, end - stackOffset - 2);
+                }
+                string[] dimensions = before.Info.Split('|')[0].Split(':');
+                var remaining = items.Where(item => item != selected || selected.Stack != 1).ToArray();
+                string info = string.Join(":", dimensions.Take(2).Concat(new[] { remaining.Length.ToString(CultureInfo.InvariantCulture),
+                    (items.Sum(item => item.Stack) - 1).ToString(CultureInfo.InvariantCulture) }));
+                if (remaining.Length != 0) info += "|" + string.Join("|", remaining.Select(item => item.Prefab).Distinct().OrderBy(name => name, StringComparer.Ordinal));
+                var after = new BlueprintForeignPartData(BlueprintForeignPartData.NativeContainerFormat, info, Convert.ToBase64String(output.ToArray()), null);
+                if (!TryRead(after, prefabHash, out _)) throw new InvalidDataException("Reconstructed debit is invalid.");
+                return after;
+            }
+        }
+
         // Collect names to resolve on the host thread before a background import decodes the demand.
         public static bool TryGetNativePrefabHashes(string package, out IReadOnlyList<int> hashes)
         {

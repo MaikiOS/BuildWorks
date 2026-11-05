@@ -7,7 +7,7 @@ using OstrixMods.BuildWorks.Geometry;
 
 namespace ReservationChecks
 {
-    internal static class BuildWorksLocalization { internal static string Text(string key)=>key; }
+    internal static class BuildWorksLocalization { internal static string Text(string key,params object[] values)=>key; }
     internal sealed partial class ItemDrop
     {
         internal float GetHoverOffset() => 0;

@@ -21,6 +21,8 @@ $taskCode = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'BoardCancellation
 $taskCode = $taskCode.Replace('__ENUM__', (Extract-Block $taskActions 'internal enum ConstructionCancellationAction'))
 $taskCode = $taskCode.Replace('__ROUTER__', (Extract-Block $taskRuntime 'internal void RequestCancellationFromBoard('))
 $taskCode = $taskCode.Replace('__RESUME__', (Extract-Block $taskRuntime 'internal void ResumePreparedRemoval('))
+$taskCode = $taskCode.Replace('__BUSY__', [regex]::Match($taskRuntime, 'private bool OtherPayoutBusy\s*=>[^;]+;').Value)
+$taskCode = $taskCode.Replace('__PENDING__', [regex]::Match($taskRuntime, 'internal bool ReturnPending\([^;]+;').Value)
 $taskView = Get-Content -LiteralPath (Join-Path $taskRoot 'src/BuildWorks/BlueprintConstructionProjectView.cs') -Raw
 $taskConfirmation = [regex]::Match($taskView, 'private static string ConfirmationKey\([^;]+;').Value
 if (!$taskConfirmation) { throw 'Confirmation mapping missing.' }
@@ -30,16 +32,19 @@ $taskSummaryStart = $taskView.IndexOf('var progress = runtime.Progress(board.Id)
 $taskSummaryEnd = $taskView.IndexOf('else if (missing)', [Math]::Max(0, $taskSummaryStart), [StringComparison]::Ordinal)
 if (!$taskBuilding -or $taskSummaryStart -lt 0 -or $taskSummaryEnd -le $taskSummaryStart) { throw 'Phase summary source fragment missing.' }
 $taskCode = $taskCode.Replace('__BUILDING__', $taskBuilding).Replace('__SUMMARY__', $taskView.Substring($taskSummaryStart, $taskSummaryEnd-$taskSummaryStart))
+$taskContinue = [regex]::Match($taskView, 'continueButton.interactable = [^;]+;').Value
+if (!$taskContinue) { throw 'Continue gate missing.' }
+$taskCode = $taskCode.Replace('__CONTINUE__', $taskContinue)
 Add-Type -TypeDefinition $taskCode
 $taskChecks = [BoardCancellationChecks.BlueprintConstructionProjectRuntime]::Run()
-if ($taskChecks -ne 42) { throw ('Board cancellation coverage differs: '+$taskChecks) }
+if ($taskChecks -ne 54) { throw ('Board cancellation coverage differs: '+$taskChecks) }
 if ($taskView -match 'runtime.CancelUnpaid\(' -or $taskView -notmatch 'runtime.RequestCancellationFromBoard\(') { throw 'Board view bypasses cancellation router.' }
 if ($taskView -notmatch 'bool building = action == ConstructionCancellationAction.Unpaid \|\| action == ConstructionCancellationAction.Remove;' -or
-    $taskView -notmatch 'continueButton.interactable = building;' -or
+    $taskView -notmatch 'continueButton.interactable = building && !runtime.ReturnPending\(board.Id\);' -or
     $taskView -notmatch 'cancelButton.interactable = action != ConstructionCancellationAction.Review && action != ConstructionCancellationAction.AwaitCollection;' -or
     $taskView -notmatch 'BuildWorksLocalization.Text\(ConfirmationKey\(action\)\)') { throw 'View mutation availability or confirmation wiring differs.' }
 if ($ReportPath) {
-    @{passed=$true;checks=$taskChecks;routerChecks=30;phaseSummaryChecks=12;actualPhaseSummaryCompiled=$true;actualRouterAndResumeCompiled=$true;fakeHost=$true;gameHostTested=$false;
+    @{passed=$true;checks=$taskChecks;routerChecks=38;phaseSummaryChecks=12;continueChecks=4;actualPhaseSummaryCompiled=$true;actualRouterAndResumeCompiled=$true;fakeHost=$true;gameHostTested=$false;
       runtimeSha256=(Get-FileHash -LiteralPath $taskRuntimePath).Hash} | ConvertTo-Json | Set-Content -LiteralPath $ReportPath
 }
-"PASS board cancellation: 30 actual-router assertions +12 actual phase-summary cases; native operations substituted, no game/payment/refund proof."
+"PASS board cancellation: 38 actual-router assertions +12 actual phase-summary +4 Continue cases; native operations substituted, no game/payment/refund proof."

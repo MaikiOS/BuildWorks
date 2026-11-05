@@ -84,10 +84,10 @@ namespace OstrixMods.BuildWorks
             {
                 var action = runtime.CancellationAction(board.Id, board.Revision);
                 bool building = action == ConstructionCancellationAction.Unpaid || action == ConstructionCancellationAction.Remove;
-                continueButton.interactable = building;
+                continueButton.interactable = building && !runtime.ReturnPending(board.Id);
                 cancelButton.interactable = action != ConstructionCancellationAction.Review && action != ConstructionCancellationAction.AwaitCollection;
                 cancelButton.GetComponentInChildren<TMP_Text>().text = BuildWorksLocalization.Text(
-                    action == ConstructionCancellationAction.IssueRefund ? "project.refund" : "project.cancel");
+                    action == ConstructionCancellationAction.IssueRefund ? "project.refund" : runtime.ReturnReady(board.Id) ? "project.mount_finish_cancel" : "project.cancel");
                 if (confirming && confirmedAction != action) confirming = false;
                 if (confirming) text.AppendLine().AppendLine(BuildWorksLocalization.Text(ConfirmationKey(action)));
                 var progress = runtime.Progress(board.Id);
@@ -105,6 +105,7 @@ namespace OstrixMods.BuildWorks
                     text.AppendLine().Append(cost.Name).Append(": ").Append(have).Append(" / ").Append(amount);
                 }
                 if (building) text.AppendLine().AppendLine(BuildWorksLocalization.Text("project.payment_pending"));
+                if (runtime.ReturnPending(board.Id)) text.AppendLine().AppendLine(runtime.ReturnStatus(board.Id));
                 if (runtime.Failure != null || runtime.Execution?.Reason != null)
                     text.AppendLine().AppendLine(BuildWorksLocalization.Text("project.error", runtime.Failure ?? runtime.Execution.Reason));
                 if (operationError != null) text.AppendLine().AppendLine(operationError);

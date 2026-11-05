@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net472</TargetFramework><LangVersion>latest</LangVersion>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <ProfileRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..\'))</ProfileRoot>
+    <StationPolicySource Condition="'$(StationPolicySource)' == ''">../../artifacts/fb-0006-station-fix-20261105/generated/StationPolicy.cs</StationPolicySource>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="NativeHost/NativeHost.csproj" />
+    <Compile Include="Program.cs" />
+    <Compile Include="$(StationPolicySource)" Link="StationPolicy.cs" />
+    <Compile Include="../../src/BuildWorks/VanillaMidpointSnapPoints.cs" Link="VanillaMidpointSnapPoints.cs" />
+    <Compile Include="../../src/BuildWorks/BlueprintWorldSnapPoints.cs" Link="BlueprintWorldSnapPoints.cs" />
+    <Reference Include="BuildWorks.Geometry"><HintPath>../../artifacts/bin/BuildWorks.Geometry.dll</HintPath></Reference>
+    <Reference Include="0Harmony"><HintPath>$(ProfileRoot)/BepInEx/core/0Harmony.dll</HintPath></Reference>
+    <Reference Include="Mono.Cecil"><HintPath>$(ProfileRoot)/BepInEx/core/Mono.Cecil.dll</HintPath></Reference>
+    <Reference Include="MonoMod.Utils"><HintPath>$(ProfileRoot)/BepInEx/core/MonoMod.Utils.dll</HintPath></Reference>
+    <Reference Include="MonoMod.RuntimeDetour"><HintPath>$(ProfileRoot)/BepInEx/core/MonoMod.RuntimeDetour.dll</HintPath></Reference>
+    <Reference Include="System.Numerics" />
+  </ItemGroup>
+</Project>

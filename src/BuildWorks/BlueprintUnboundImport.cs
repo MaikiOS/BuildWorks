@@ -33,7 +33,8 @@ namespace OstrixMods.BuildWorks
                 views.Length != 1 || views[0].gameObject != prefab || pieces.Length != 1 || pieces[0].gameObject != prefab ||
                 !ObjectDB.instance || ObjectDB.instance.m_items == null ||
                 prefab.GetComponentsInChildren<MonoBehaviour>(true).Any(component => !component ||
-                    component != stands[0] && !BlueprintStorageCapture.KgOrdinaryComponent(component.GetType()))) return null;
+                    component != stands[0] && !BlueprintStorageCapture.KgOrdinaryComponent(component.GetType()) &&
+                    !VanillaMidpointSnapPoints.IsRootCache(component, prefab))) return null;
             var result = new List<UnboundItemStandItem>();
             foreach (var group in ObjectDB.instance.m_items.Where(item => item).Distinct().GroupBy(item => item.name.GetStableHashCode()))
             {

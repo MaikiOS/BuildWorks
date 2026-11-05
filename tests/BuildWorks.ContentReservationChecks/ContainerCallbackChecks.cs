@@ -2,6 +2,11 @@ using System;
 
 namespace ReservationChecks
 {
+    // These Obj fixtures have no runtime cache; actual Append/admission integration runs in MidpointChecks.
+    internal static class VanillaMidpointSnapPoints
+    {
+        internal static bool IsRootCache(Obj component, GameObject root) => false;
+    }
     internal static class ContainerCallbackChecks
     {
         private sealed class OtherContainer : Container { internal OtherContainer() : base(2) { } }

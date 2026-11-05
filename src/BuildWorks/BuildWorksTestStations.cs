@@ -44,7 +44,8 @@ namespace OstrixMods.BuildWorks
                 prefab.GetComponentsInChildren<TerrainComp>(true).Length != 0)
                 throw new InvalidDataException("Terrain-changing QA station refused: " + prefab.name);
             if (prefab.GetComponentsInChildren<MonoBehaviour>(true).Any(component =>
-                !component || component.GetType().Assembly != typeof(Piece).Assembly))
+                !component || (component.GetType().Assembly != typeof(Piece).Assembly &&
+                    !VanillaMidpointSnapPoints.IsRootCache(component, prefab))))
                 throw new InvalidDataException("Unreviewed station behaviour in QA prefab: " + prefab.name);
             GameObject visual = PlacementGhostPreviewView.CreateVisualClone(prefab, "BuildWorks_QA_Bounds", prefab.layer);
             Bounds bounds;

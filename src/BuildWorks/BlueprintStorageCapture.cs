@@ -61,7 +61,8 @@ namespace OstrixMods.BuildWorks
         {
             if (!prefab) return null;
             return prefab.GetComponent<Piece>() && prefab.GetComponentsInChildren<MonoBehaviour>(true)
-                .All(component=>component && KgOrdinaryComponent(component.GetType()));
+                .All(component=>component && (KgOrdinaryComponent(component.GetType()) ||
+                    VanillaMidpointSnapPoints.IsRootCache(component, prefab)));
         }
 
         // Exact types only: a new behaviour requires its own state contract before admission.

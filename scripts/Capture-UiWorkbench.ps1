@@ -99,10 +99,10 @@ $runtimeFiles = @('BlueprintRotationState.cs', 'BlueprintSignPreview.cs', 'Bluep
 $sourceProof = foreach ($name in $runtimeFiles) {
     $source = Join-Path $repositoryRoot ('src\BuildWorks\' + $name)
     $destination = Join-Path $runtimeSources $name
-    if ($name -eq 'BlueprintWorldSnapPoints.cs') {
+    if ($name -in @('BlueprintWorldSnapPoints.cs', 'VanillaMidpointSnapPoints.cs')) {
         # MonoBehaviour belongs to the runtime assembly, not Assembly-CSharp-Editor.
         if (Test-Path -LiteralPath $destination -PathType Leaf) { Remove-Item -LiteralPath $destination }
-        $destination = Join-Path $projectPath 'Assets\RuntimeHost\BlueprintWorldSnapPoints.cs'
+        $destination = Join-Path $projectPath ('Assets\RuntimeHost\' + $name)
     }
     Copy-Item -LiteralPath $source -Destination $destination -Force
     $hash = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash

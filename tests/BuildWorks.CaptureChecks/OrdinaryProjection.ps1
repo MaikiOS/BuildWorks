@@ -37,6 +37,8 @@ public class Piece:MonoBehaviour {} public class ZNetView:MonoBehaviour {} publi
 public class Sign:MonoBehaviour {} public class RandomMaterialValues:MonoBehaviour {} public class SimpleMeshCombine:MonoBehaviour {}
 public class Container:MonoBehaviour {} public class ItemStand:MonoBehaviour {} public class ArmorStand:MonoBehaviour {}
 public class UnknownScript:MonoBehaviour {} public class DerivedMesh:SimpleMeshCombine {}
+// This isolated predicate fixture has no caches; production Append/root-cache integration is in MidpointChecks.
+public static class VanillaMidpointSnapPoints { public static bool IsRootCache(MonoBehaviour component,GameObject root)=>false; }
 namespace TMPro { public class TextMeshPro:MonoBehaviour {} public class TextMeshProUGUI:MonoBehaviour {} }
 namespace UnityEngine.UI { public class CanvasScaler:MonoBehaviour {} }
 public static class OrdinaryProjectionChecks {

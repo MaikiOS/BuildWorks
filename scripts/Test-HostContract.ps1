@@ -3127,8 +3127,17 @@ Assert-Contract ($null -ne $midpointAppend) 'Compiled vanilla midpoint append me
 $midpointOperands = @(
     $midpointAppend.Body.Instructions | ForEach-Object { [string]$_.Operand }
 ) -join "`n"
-Assert-Contract ($midpointOperands -match 'AnchorAdjustment::ConnectableSnapEdges' -and
-    $midpointOperands -match 'GameObject::set_tag') `
+$midpointRebuild = $midpointType.Methods | Where-Object Name -eq 'Rebuild'
+Assert-Contract ($null -ne $midpointRebuild -and
+    $midpointOperands -match 'VanillaMidpointSnapPoints::Matches' -and
+    $midpointOperands -match 'VanillaMidpointSnapPoints::Rebuild' -and
+    $midpointOperands -match 'BlueprintWorldSnapPoints::AppendUnique') `
+    'Compiled midpoint query no longer validates/rebuilds local geometry or composes scoped membership.'
+$midpointRebuildOperands = @(
+    $midpointRebuild.Body.Instructions | ForEach-Object { [string]$_.Operand }
+) -join "`n"
+Assert-Contract ($midpointRebuildOperands -match 'AnchorAdjustment::ConnectableSnapEdges' -and
+    $midpointRebuildOperands -match 'GameObject::set_tag') `
     'Compiled midpoint helper does not create real tagged Valheim snap points.'
 $midpointRemove = $midpointType.Methods | Where-Object Name -eq 'RemoveAll'
 Assert-Contract ($null -ne $midpointRemove) 'Compiled vanilla midpoint cleanup is missing.'

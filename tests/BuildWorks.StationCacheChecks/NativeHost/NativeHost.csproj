@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework><LangVersion>latest</LangVersion>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../BuildWorks.MidpointChecks/Host.cs" Link="Host.cs" />
+    <Reference Include="System.Numerics" />
+  </ItemGroup>
+</Project>

@@ -75,6 +75,18 @@ internal static class WorldSnapCollectionAcceptance
             Require(threw && !Active, "Exception leaked collection context");
             Piece.BeforeCollection = null; Compare(initial, expected, expectedPieces);
 
+            Transform native = first.transform.GetChild(1);
+            Transform retired = expected.First(VanillaMidpointSnapPoints.IsGenerated);
+            var changed = new List<Transform>(initial); iteration = 0;
+            Piece.BeforeCollection = piece => { if (++iteration == 3) native.tag = "Untagged"; };
+            Piece.GetSnapPoints(Vector3.zero, 10, changed, new List<Piece>());
+            Piece.BeforeCollection = null;
+            Require(!changed.Contains(retired) && changed.Count(t => t == first.transform.GetChild(0)) == 2,
+                "Mid-query retirement retained stale midpoint or removed native duplicates");
+            native.tag = "snappoint";
+            VanillaMidpointSnapPoints.Append(first, new List<Transform>());
+            Compare(initial, expected, expectedPieces);
+
             foreach (Type[] signature in new[] { new[] { typeof(List<Transform>) },
                 new[] { typeof(Vector3), typeof(float), typeof(List<Transform>), typeof(List<Piece>) } })
             {
@@ -89,7 +101,7 @@ internal static class WorldSnapCollectionAcceptance
             Piece.GetSnapPoints(Vector3.zero, 10, empty, new List<Piece>());
             Require(empty.SequenceEqual(initial) && !Active, "Empty query altered seed/leaked context");
             File.WriteAllText(Path.Combine(output, "world-snap-collection-check.txt"),
-                "PASS: actual production Harmony static collection + composed production native/midpoint/custom helpers on inert native-signature Piece; exact ordered reference list/piece visits, repeated hits, preseeded duplicates/null, other list, nested same/different lists, fault cleanup, cleared pool reuse and foreign patches on either overload. Plugin postfix call order pinned by HostContract. Not Valheim physics/save/network/FPS.");
+                "PASS: actual production Harmony static collection + composed production native/midpoint/custom helpers on inert native-signature Piece; exact ordered reference list/piece visits, repeated hits, preseeded duplicates/null, mid-query midpoint retirement, other list, nested same/different lists, fault cleanup, cleared pool reuse and foreign patches on either overload. Plugin postfix call order pinned by HostContract. Not Valheim physics/save/network/FPS.");
         }
         finally
         {

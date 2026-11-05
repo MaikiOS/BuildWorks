@@ -40,7 +40,8 @@ namespace OstrixMods.BuildWorks
             if (!instance || !wear || wear.gameObject != instance ||
                 !ViewsMatch(instance.GetComponent<Container>(), wear, instance.GetComponent<ZNetView>()) ||
                 !CallbacksOnly(instance.GetComponent<Container>(), wear)) return false;
-            var components = instance.GetComponentsInChildren<MonoBehaviour>(true);
+            var components = instance.GetComponentsInChildren<MonoBehaviour>(true)
+                .Where(component => !VanillaMidpointSnapPoints.IsRootCache(component, instance)).ToArray();
             // Unknown behaviours may run OnDestroy even when the inventory is empty.
             return components.Length == 4 && components.All(component => component && component.gameObject == instance &&
                 (component.GetType() == typeof(Container) || component.GetType() == typeof(Piece) ||

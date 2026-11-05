@@ -136,7 +136,8 @@ namespace OstrixMods.BuildWorks
             var stand = instance.GetComponent<ItemStand>();
             var method = typeof(ItemStand).GetMethod("OnDestroyed", BindingFlags.Instance | BindingFlags.NonPublic, null, Type.EmptyTypes, null);
             var callbacks = wear.m_onDestroyed?.GetInvocationList();
-            var components = instance.GetComponentsInChildren<MonoBehaviour>(true);
+            var components = instance.GetComponentsInChildren<MonoBehaviour>(true)
+                .Where(component => !VanillaMidpointSnapPoints.IsRootCache(component, instance)).ToArray();
             return stand && stand.GetType() == typeof(ItemStand) && wear.GetType() == typeof(WearNTear) &&
                 BlueprintConstructionContainerGuard.ViewsMatch(null, wear, view) && method != null && callbacks?.Length == 1 &&
                 ReferenceEquals(callbacks[0].Target, stand) && callbacks[0].Method == method &&

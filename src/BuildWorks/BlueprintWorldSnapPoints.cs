@@ -21,6 +21,7 @@ namespace OstrixMods.BuildWorks
             internal List<Transform> Result;
             internal readonly HashSet<Transform> Seen = new HashSet<Transform>();
             internal bool Seeded;
+            internal int Count;
         }
 
         [HarmonyPatch(typeof(Piece), nameof(Piece.GetSnapPoints), new Type[] {
@@ -56,6 +57,7 @@ namespace OstrixMods.BuildWorks
                     current.Result = null;
                     current.Seen.Clear();
                     current.Seeded = false;
+                    current.Count = 0;
                     spare = current;
                 }
                 current = __state;
@@ -122,16 +124,37 @@ namespace OstrixMods.BuildWorks
                     component.nodes.Add(node.transform);
                 }
             }
+            foreach (Transform node in component.nodes)
+                if (node) AppendUnique(result, node);
+        }
+
+        internal static void AppendUnique(List<Transform> result, Transform node)
+        {
             Collection collection = current;
-            bool scoped = collection != null && ReferenceEquals(collection.Result, result);
-            if (scoped && !collection.Seeded)
+            if (collection == null || !ReferenceEquals(collection.Result, result))
             {
-                collection.Seen.UnionWith(result);
+                if (!result.Contains(node)) result.Add(node);
+                return;
+            }
+            if (!collection.Seeded || collection.Count > result.Count)
+            {
+                collection.Seen.Clear();
+                collection.Count = 0;
                 collection.Seeded = true;
             }
-            // Native/midpoint getters only add tagged nodes; our untagged nodes cannot enter the list through them.
-            foreach (Transform node in component.nodes)
-                if (node && (scoped ? collection.Seen.Add(node) : !result.Contains(node))) result.Add(node);
+            // Native getters append tagged midpoints again for each collider hit.
+            for (int index = collection.Count; index < result.Count; ++index)
+                collection.Seen.Add(result[index]);
+            if (collection.Seen.Add(node)) result.Add(node);
+            collection.Count = result.Count;
+        }
+
+        internal static void RemoveRetired(List<Transform> result, Transform node)
+        {
+            bool removed = false;
+            while (result.Remove(node)) removed = true;
+            if (removed && current != null && ReferenceEquals(current.Result, result))
+                current.Seeded = false;
         }
 
         internal static void RemoveAll()

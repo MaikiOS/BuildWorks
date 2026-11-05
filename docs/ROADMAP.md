@@ -36,6 +36,18 @@ Numbers show the direction of development. Some preparation can overlap. No enti
 
 ### 1. Precision construction and editor
 
+<a id="f9-planned-20261105"></a>
+**F9 feedback accepted for planning — 5 November 2026.** These requirements are not confirmed fixes and are not included as new behaviour in alpha 0.19.329. The reported version/profile and causes remain unverified; no implementation or release date is assigned.
+
+- **Selected transformation point:** investigate the reported rotation/scale regression where F9 uses the object centre instead of the selected point. Keep that point fixed during rotation and applicable scaling; use the normal centre when no point is selected.
+- **Ordinary objects as supports:** allow furniture, chests and crafting objects to support other objects through real contact and a valid support chain—for example, a scaled-down chest on a stool. Object type alone must not exclude a support. This planned policy replaces the earlier blanket exclusion of containers; it does not change the released alpha. Walls, beams and roofs retain their strength rules. Floating self-supporting cycles and a global support override are excluded; removal, alternative contacts and reload still need validation.
+- **World grid:** stable world origin/axes and adjustable spacing, with independent display and snapping switches. Snap the selected point; the grid must not follow the camera or object. Keep existing connection-point snapping; no universal vanilla grid has been established.
+- **Consistent controls:** match the editor's G/R/S tools, axes/axis pairs, selected point, mouse/numeric input, confirmation and cancellation. Reuse the editor's transformation behaviour and mathematics.
+- **Explicit F9 scale:** provide S, axis controls and numeric scaling around the selected point within the existing positive 1–1000% range per component, including proportional scaling. Account for the original prefab scale and keep colliders, preview, snapping, payment, interaction and saved/reloaded results consistent. Reject invalid or unrepresentable values.
+
+Pivot regression and support behaviour have priority within this feedback. Reproduction and game validation remain required; no fix or release version is claimed. The existing order of blueprint work, the complete agreed goal and all future milestones remain. Beta still requires completion of the full agreed goal.
+
+
 Translate, rotate, and scale on selected axes; reliably snap rotated pieces; use groups, independent anchors, connection points, Undo/Redo, and an interior camera. **Outcome:** predictable assembly, placement matching the preview, and the same shape after reload. Core tools exist; complex snapping and remaining control issues still need verification.
 
 Ordinary world auto-join, including F9, preserves the chosen player rotation. Adopting additional target tilt is a separate held mode, without hidden turns caused by equivalent axes of symmetric beams. **Acceptance:** unchanged inputs give an unchanged result across camera sides, vertical/horizontal/diagonal prefabs, actual root XYZ changes, manual rotation and mode transitions. Prefab mesh tilt and root rotation are distinct cases.

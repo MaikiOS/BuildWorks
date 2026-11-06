@@ -41,6 +41,8 @@ $editorViewSourcePath = Join-Path $projectRoot `
     'src\BuildWorks\BlueprintEditorView.cs'
 $editorControllerSourcePath = Join-Path $projectRoot `
     'src\BuildWorks\BlueprintEditorController.cs'
+$transformKeyboardSourcePath = Join-Path $projectRoot 'src\BuildWorks\TransformKeyboardInput.cs'
+$sessionTransformSourcePath = Join-Path $projectRoot 'src\BuildWorks\PrecisionPlacementSession.Transform.cs'
 $gizmoSourcePath = Join-Path $projectRoot `
     'src\BuildWorks\TransformGizmoView.cs'
 $editorIconLibrarySourcePath = Join-Path $projectRoot `
@@ -76,6 +78,8 @@ foreach ($path in @(
     $editorSceneSourcePath,
     $editorViewSourcePath,
     $editorControllerSourcePath,
+    $transformKeyboardSourcePath,
+    $sessionTransformSourcePath,
     $gizmoSourcePath,
     $editorIconLibrarySourcePath)) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
@@ -805,6 +809,23 @@ Assert-Contract ($factoryFinalizer.ReturnType.FullName -eq 'System.Exception' -a
 $precisionSessionType = $plugin.MainModule.Types | Where-Object {
     $_.Name -eq 'PrecisionPlacementSession'
 }
+$keyboardHelperType = $plugin.MainModule.Types | Where-Object Name -eq 'TransformKeyboardInput'
+$keyboardControllerType = $plugin.MainModule.Types | Where-Object Name -eq 'BlueprintEditorController'
+Assert-Contract ($null -ne $keyboardHelperType -and $null -ne $keyboardControllerType) `
+    'Editor and F9 must compile the shared keyboard helper.'
+foreach ($entry in @(
+    @{ Type = $keyboardControllerType; Method = 'PreviewKeyboardNumber'; Target = 'TryNumber' },
+    @{ Type = $precisionSessionType; Method = 'PreviewKeyboardTransform'; Target = 'TryNumber' })) {
+    $method = @($entry.Type.Methods | Where-Object Name -eq $entry.Method)
+    Assert-Contract ($method.Count -eq 1 -and @($method[0].Body.Instructions | Where-Object {
+        $_.Operand -is [Mono.Cecil.MethodReference] -and
+        $_.Operand.DeclaringType.Name -eq 'TransformKeyboardInput' -and $_.Operand.Name -eq $entry.Target
+    }).Count -eq 1) 'Compiled editor/F9 numeric routes must call the same evaluator.'
+}
+$keyboardUpdate = @($precisionSessionType.Methods | Where-Object Name -eq 'Update')
+Assert-Contract ($keyboardUpdate.Count -eq 1 -and @($keyboardUpdate[0].Body.Instructions | Where-Object {
+    $_.Operand -is [Mono.Cecil.MethodReference] -and $_.Operand.Name -eq 'HandleKeyboardTransform'
+}).Count -eq 1) 'The real session Update must reach its guarded keyboard route.'
 $applyPlacementScale = $precisionSessionType.Methods | Where-Object {
     $_.Name -eq 'ApplyNativePlacementScale'
 }
@@ -2520,12 +2541,30 @@ $scaleAlternativeSkip = @($resolveScaleInstructions | Where-Object {
 Assert-Contract ($null -ne $editorRootScale -and $null -ne $worldRelativeScale -and
     $editorSelectsRoot -and $scaleAlternativeSkip.Count -eq 1) `
     'Editor resolution must validate exact RootScale while only world resolution applies the native relative range.'
+$effectiveScale = $precisionSessionType.Methods | Where-Object Name -eq 'BlueprintPartTransform'
+$effectiveScaleCalls = @($effectiveScale.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
+function Test-PinnedF9ScaleChain([string] $calls) {
+    return $calls -match 'Part::RootScale' -and $calls -match 'CompositeBlueprintStore::RelativeScale'
+}
+Assert-Contract (Test-PinnedF9ScaleChain $effectiveScaleCalls) `
+    'Effective F9 poses must retain the pinned root basis and validate the actual native-relative scale.'
+Assert-Contract (-not (Test-PinnedF9ScaleChain ($effectiveScaleCalls -replace 'Part::RootScale', 'Part::get_scale')) -and
+    -not (Test-PinnedF9ScaleChain ($effectiveScaleCalls -replace 'CompositeBlueprintStore::RelativeScale', 'VectorData::ToVector3'))) `
+    'Pinned-scale gate must reject replacing the root basis or bypassing relative conversion.'
 foreach ($methodName in 'ShowPassiveBlueprintPreview', 'ApplyEditingGhostTransform', 'TryAddPlacementInstance', 'ApplyBlueprintAnchors') {
     $scaleConsumer = $precisionSessionType.Methods | Where-Object Name -eq $methodName
     $scaleConsumerCalls = @($scaleConsumer.Body.Instructions | ForEach-Object { [string]$_.Operand }) -join "`n"
-    Assert-Contract ($scaleConsumerCalls -match 'Part::PlacementScale') `
+    $pinnedBasisPath = if ($methodName -eq 'ShowPassiveBlueprintPreview') {
+        $scaleConsumerCalls -match 'Part::PlacementScale'
+    } else { $scaleConsumerCalls -match 'PrecisionPlacementSession::BlueprintPartTransform' }
+    Assert-Contract $pinnedBasisPath `
         "World scale path bypasses the pinned scale basis: $methodName"
 }
+$ghostScaleCalls = @(($precisionSessionType.Methods | Where-Object Name -eq 'ApplyEditingGhostTransform').Body.Instructions |
+    ForEach-Object { [string]$_.Operand }) -join "`n"
+Assert-Contract ($ghostScaleCalls -match 'TransformSnapshot::get_Scale' -and
+    $ghostScaleCalls -match 'Transform::get_localScale' -and $ghostScaleCalls -match 'Vector3::Scale') `
+    'F9 ghost must apply the validated relative plan scale to its prefab basis.'
 $addInstance = $precisionSessionType.Methods | Where-Object Name -eq 'TryAddPlacementInstance'
 $scalePreflight = $addInstance.Body.Instructions | Where-Object {
     [string]$_.Operand -match 'ZNetView::m_syncInitialScale'
@@ -2655,7 +2694,7 @@ $applyBlueprintAnchorsOperands = @(
 Assert-Contract ($applyBlueprintAnchorsOperands -match 'AnchorBounds::Anchor' -and
     $applyBlueprintAnchorsOperands -match 'Piece::GetSnapPoints' -and
     $applyBlueprintAnchorsOperands -match 'ExternalCompositeSnapPoints' -and
-    $applyBlueprintAnchorsOperands -match 'Part::PlacementScale' -and
+    $applyBlueprintAnchorsOperands -match 'PrecisionPlacementSession::BlueprintPartTransform' -and
     $applyBlueprintAnchorsOperands -notmatch 'Blueprint::anchors') `
     'Whole-blueprint precision must combine current scaled prefab native/midpoint snaps after bounds anchors.'
 $armPlacement = $pluginMethods | Where-Object Name -eq 'ArmPlacement'
@@ -2770,7 +2809,7 @@ Assert-Contract ($null -ne $worldCapture -and
     $worldCaptureCalls -notmatch '::Destroy|::ClaimOwnership|::SetPositionAndRotation|::set_position|::set_rotation|::SetLocalScale' -and
     $sessionSource -match 'pendingWorldBlueprintSelection && GameplayInputAvailable' -and
     $sessionSource -match
-        'private void Finish\([^)]*\)\s*\{\s*nativePlacementRayDistance = null;\s*HammerCatalogView\.CancelPlacementContents\(\); ClearContentsRecipe\(\);[\s\S]{0,180}?pendingWorldBlueprintSelection = false;' -and
+        'private void Finish\([^)]*\)\s*\{\s*ClearKeyboardTransform\(\);\s*nativePlacementRayDistance = null;\s*HammerCatalogView\.CancelPlacementContents\(\); ClearContentsRecipe\(\);[\s\S]{0,180}?pendingWorldBlueprintSelection = false;' -and
     $hudSource -match 'confirmText\.text = selectingBlueprint \? BuildWorksLocalization\.Text\("hud\.save"\)' -and
     $sessionSource -match 'if \(selectingBlueprint\)\s*\{\s*SaveCurrentBlueprint\(\);\s*return;' -and
     $sessionSource -match 'TrySaveWorldSelection[\s\S]*?Finish\(\);\s*RefreshBlueprintEditorLibrary' -and
@@ -3523,7 +3562,7 @@ Assert-Contract ($pluginSource -match 'SkyCleanupWorld = "TerrainRamp_Lab"' -and
     $pluginSource -notmatch 'GetGroundHeight') `
     'One-shot cleanup is no longer restricted to the three exact legacy sky pieces.'
 Assert-Contract ($sessionSource -match 'PrecisionAdjustment\.ScreenAlignedRotationDelta' -and
-    $sessionSource -match 'camera\.transform\.position - currentPosition') `
+    $sessionSource -match 'camera\.transform\.position - dragTransformPivot') `
     'Rotation drag direction no longer accounts for the camera side.'
 Assert-Contract ($sessionSource -match
     'precisionEnabled = true;\s*if \(!TryBeginWorldPrecision\(player, showErrors: true, useContinuation: false\)\)') `

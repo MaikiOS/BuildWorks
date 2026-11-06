@@ -496,6 +496,8 @@ namespace OstrixMods.BuildWorks
                 HideGameCanvases(view.RootCanvas);
                 ApplyCamera();
                 scene.UpdateOccluders();
+                scene.UpdateStructuralAnalysis(document);
+                view.SetStructuralCheck(scene.StructuralEnabled, scene.StructuralStatus(document.ActiveNodeId));
                 if (view.HasCatalog || view.HasModal) scene.HideGizmo();
                 else UpdateGizmo();
             }
@@ -682,6 +684,8 @@ namespace OstrixMods.BuildWorks
             view.LightingChanged += scene.SetLighting;
             view.ViewportSettingsChanged += (move, rotation, array, points, scale, grid) =>
                 scene.SetViewportSettings(move, rotation, array, points, scale, grid);
+            view.GroundHeightChanged += value => scene.SetGroundHeight(value);
+            view.StructuralCheckChanged += scene.SetStructuralCheck;
             view.InteriorCameraRequested += ToggleInteriorCamera;
             view.InteriorSpeedChanged += SetInteriorSpeed;
             view.ProjectionChanged += value => { if (!interiorCamera) orthographic = value; ApplyCamera(); };
@@ -718,6 +722,19 @@ namespace OstrixMods.BuildWorks
                 if (blueprint == null) { view.SetStatus(BuildWorksLocalization.Text("catalog.choose_blueprint")); return; }
                 view.ShowExchange((parent, font, closed) => new BlueprintExchangeView(parent, font, store, blueprint, closed));
             };
+            view.CatalogShareRequested += blueprint =>
+            {
+                if (blueprint == null) { view.SetStatus(BuildWorksLocalization.Text("catalog.choose_blueprint")); return; }
+                view.ShowExchange((parent, font, closed) => BlueprintExchangeView.ForShareFile(parent, font, store, blueprint, closed));
+            };
+            view.CatalogServerRequested += blueprint => view.ShowExchange((parent, font, closed) =>
+                BlueprintExchangeView.ForServer(parent, font, store, blueprint, () => (BlueprintServerClient)BuildWorksPlugin.ServerLibraryClient, closed,
+                    accepted: imported =>
+                    {
+                        if (!IsEditing || !view.HasCatalog || imported.Length == 0) return;
+                        catalogImportPending = true;
+                        pendingImportedBlueprint = imported[0]; pendingImportedCount = imported.Length; pendingImportedFrame = Time.frameCount;
+                    }, peers: () => BuildWorksPlugin.PeerBlueprintClient));
             view.InspectorSubmitted += ApplyInspector;
             view.RenameSubmitted += (id, name) => ApplyDocumentEdit(() =>
                 document.Rename(id, name));
@@ -1145,9 +1162,9 @@ namespace OstrixMods.BuildWorks
                 {
                     GizmoHandleKind hoverHandle = scene.HitTestGizmo(SelectionGizmoTool, hoverPivot,
                         hoverOrientation, localSpace, input.MousePosition, out _);
-                    bool copyArrow = (input.GetKey(KeyCode.LeftAlt) || input.GetKey(KeyCode.RightAlt)) &&
-                        hoverHandle == GizmoHandleKind.Move;
-                    int point = hoverHandle == GizmoHandleKind.Scale || copyArrow
+                    bool copyMove = (input.GetKey(KeyCode.LeftAlt) || input.GetKey(KeyCode.RightAlt)) &&
+                        (hoverHandle == GizmoHandleKind.Move || hoverHandle == GizmoHandleKind.MovePlane);
+                    int point = hoverHandle == GizmoHandleKind.Scale || copyMove
                         ? -1 : scene.HitTestAnchor(gizmoAnchors, input.MousePosition);
                     if (point >= 0)
                         view.SetNextAction(BuildWorksLocalization.Text("editor.view.point_hover",
@@ -1485,7 +1502,9 @@ namespace OstrixMods.BuildWorks
             }
             if (input.GetKeyDown(KeyCode.Escape)) CancelGizmoDrag();
             else if (keyboardPreview && keyboardValid &&
-                (input.GetKeyDown(KeyCode.Return) || input.GetKeyDown(KeyCode.KeypadEnter)) ||
+                (input.GetKeyDown(KeyCode.Return) || input.GetKeyDown(KeyCode.KeypadEnter) ||
+                    input.GetMouseButtonDown(0) && !input.GetMouseButton(1) && !input.GetMouseButton(2) &&
+                    viewport.Contains(mouse) && !view.IsViewportControlHit(mouse)) ||
                 !keyboardPreview && input.GetMouseButtonUp(0)) CommitGizmoDrag();
             else if (!pointerWrapUnavailable && (pointerWarpWait += Mathf.Max(0f, input.UnscaledDeltaTime)) >= .25f)
             {
@@ -1613,28 +1632,17 @@ namespace OstrixMods.BuildWorks
             dragStartMouse = mouse;
             Vector3 origin = dragPivot + dragTranslation;
             Quaternion orientation = dragRotation * keyboardOrientation;
-            dragAxisWorld = dragAxis == GizmoAxis.None ? scene.Camera.transform.forward :
-                TransformGizmoView.AxisVector(dragAxis, orientation, localSpace);
-            if (dragHandle == GizmoHandleKind.MovePlane && keyboardSecondAxis != GizmoAxis.None)
-                dragAxisWorld = Vector3.Cross(dragAxisWorld,
-                    TransformGizmoView.AxisVector(keyboardSecondAxis, orientation, localSpace)).normalized;
-            dragAnchorPlane = new Plane(dragAxisWorld, origin);
-            Ray ray = scene.Camera.ScreenPointToRay(mouse);
-            keyboardValid = !keyboardSurface && dragAnchorPlane.Raycast(ray, out _);
-            dragPlaneStart = dragAnchorPlane.Raycast(ray, out float distance) ? ray.GetPoint(distance) : origin;
-            keyboardPlaneFirst = Vector3.Cross(dragAxisWorld,
-                Mathf.Abs(Vector3.Dot(dragAxisWorld, Vector3.up)) < .9f ? Vector3.up : Vector3.right).normalized;
-            keyboardPlaneSecond = Vector3.Cross(dragAxisWorld, keyboardPlaneFirst).normalized;
-            if (dragHandle == GizmoHandleKind.MovePlane && keyboardSecondAxis != GizmoAxis.None)
-            {
-                keyboardPlaneFirst = TransformGizmoView.AxisVector(dragAxis, orientation, localSpace);
-                keyboardPlaneSecond = TransformGizmoView.AxisVector(keyboardSecondAxis, orientation, localSpace);
-            }
+            var projection = new TransformKeyboardInput.Projection(scene.Camera, mouse, origin, orientation,
+                dragHandle, dragAxis, keyboardSecondAxis, localSpace);
+            dragAxisWorld = projection.Axis;
+            dragAnchorPlane = projection.Plane;
+            keyboardValid = !keyboardSurface && projection.PlaneValid;
+            dragPlaneStart = projection.PlaneStart;
+            keyboardPlaneFirst = projection.PlaneFirst;
+            keyboardPlaneSecond = projection.PlaneSecond;
+            dragScreenDirection = projection.ScreenDirection;
+            dragWorldUnitsPerPixel = projection.UnitsPerPixel;
             Vector3 start = scene.Camera.WorldToScreenPoint(origin);
-            Vector3 end = scene.Camera.WorldToScreenPoint(origin + dragAxisWorld);
-            Vector2 screenAxis = new Vector2(end.x - start.x, end.y - start.y);
-            dragScreenDirection = screenAxis.normalized;
-            dragWorldUnitsPerPixel = 1f / Mathf.Max(2f, screenAxis.magnitude);
             if (ViewDepthMove)
             {
                 dragScreenDirection = Vector2.up;
@@ -1644,7 +1652,8 @@ namespace OstrixMods.BuildWorks
             dragStartAngle = Mathf.Atan2(mouse.y - start.y, mouse.x - start.x) * Mathf.Rad2Deg;
             if (dragHandle == GizmoHandleKind.Rotate)
             {
-                dragUsesRotationPlane = TryRotationDirection(mouse, origin, dragAxisWorld, out dragStartDirection);
+                dragUsesRotationPlane = projection.RotationValid;
+                dragStartDirection = projection.RotationDirection;
                 keyboardValid = dragUsesRotationPlane;
             }
             if (dragHandle == GizmoHandleKind.Scale) keyboardValid = true;
@@ -1655,25 +1664,16 @@ namespace OstrixMods.BuildWorks
 
         private void SetKeyboardAxis(GizmoAxis axis)
         {
-            if (axis == dragAxis)
+            bool previousLocalSpace = localSpace;
+            TransformKeyboardInput.SelectAxis(ref dragHandle, ref dragAxis, ref keyboardSecondAxis, ref localSpace, axis, ShiftHeld);
+            if (previousLocalSpace != localSpace)
             {
-                localSpace = !localSpace;
                 transformFrame = localSpace ? keyboardSavedFrame == TransformFrame.World ? TransformFrame.Local : keyboardSavedFrame
                     : TransformFrame.World;
                 UpdateTransformContext();
             }
-            if (axis != dragAxis)
-            {
-                if (!ShiftHeld && dragHandle != GizmoHandleKind.Rotate && dragAxis != GizmoAxis.None &&
-                    keyboardSecondAxis == GizmoAxis.None)
-                    keyboardSecondAxis = axis;
-                else { dragAxis = axis; keyboardSecondAxis = GizmoAxis.None; }
-            }
-            if (ShiftHeld) keyboardSecondAxis = GizmoAxis.None;
             keyboardSurface = false;
             view.SetCursorSourcesAvailable(false);
-            if (dragHandle != GizmoHandleKind.Rotate && dragHandle != GizmoHandleKind.Scale)
-                dragHandle = ShiftHeld || keyboardSecondAxis != GizmoAxis.None ? GizmoHandleKind.MovePlane : GizmoHandleKind.Move;
             // Changing constraint starts at the original operation pose. Camera
             // rebasing still retains the preview; it is a different operation.
             dragTranslation = Vector3.zero;
@@ -1741,8 +1741,8 @@ namespace OstrixMods.BuildWorks
             }
             else if (dragHandle == GizmoHandleKind.Move)
             {
-                float delta = Vector2.Dot(mouse - dragStartMouse, dragScreenDirection) * dragWorldUnitsPerPixel;
-                if (!ShiftHeld) delta = Mathf.Round(delta / translationStep) * translationStep;
+                float delta = TransformKeyboardInput.AxisTranslation(mouse, dragStartMouse, dragScreenDirection,
+                    dragWorldUnitsPerPixel, translationStep, ShiftHeld);
                 keyboardValid = dragScreenDirection.sqrMagnitude > .01f;
                 dragTranslation = keyboardBaseTranslation + dragAxisWorld * delta;
             }
@@ -1774,62 +1774,29 @@ namespace OstrixMods.BuildWorks
             }
             else if (dragHandle == GizmoHandleKind.Scale)
             {
-                float percent = mouse.y - dragStartMouse.y;
-                if (!ShiftHeld) percent = Mathf.Round(percent / view.ScaleStepPercent) * view.ScaleStepPercent;
-                dragScale = ClampMouseScale(keyboardBaseScale * Mathf.Max(.001f, 1f + percent * .01f));
+                dragScale = ClampMouseScale(TransformKeyboardInput.MouseScale(mouse, dragStartMouse,
+                    keyboardBaseScale, view.ScaleStepPercent, ShiftHeld));
             }
             if (PreviewKeyboardPose()) UpdateGizmo();
         }
 
-        private Vector3 KeyboardAxisMask => TransformGizmoView.AxisVector(dragAxis, Quaternion.identity, false) +
-            (keyboardSecondAxis == GizmoAxis.None ? Vector3.zero :
-                TransformGizmoView.AxisVector(keyboardSecondAxis, Quaternion.identity, false));
+        private Vector3 KeyboardAxisMask => TransformKeyboardInput.AxisMask(dragAxis, keyboardSecondAxis);
 
-        private Vector3 DragScaleVector => dragHandle == GizmoHandleKind.Scale && dragAxis != GizmoAxis.None
-            ? Vector3.one + KeyboardAxisMask * (dragScale - 1f)
-            : Vector3.one * dragScale;
+        private Vector3 DragScaleVector => TransformKeyboardInput.ScaleVector(dragHandle, dragAxis, keyboardSecondAxis, dragScale);
 
-        private Quaternion DragScaleFrame => keyboardPreview && dragHandle == GizmoHandleKind.Scale &&
-            dragAxis != GizmoAxis.None && localSpace ? keyboardOrientation : Quaternion.identity;
+        private Quaternion DragScaleFrame => keyboardPreview
+            ? TransformKeyboardInput.ScaleFrame(dragHandle, dragAxis, localSpace, keyboardOrientation) : Quaternion.identity;
 
         private float ClampMouseScale(float requested)
         {
-            double minimum = float.Epsilon, maximum = float.MaxValue;
-            Vector3 mask = keyboardPreview && dragAxis != GizmoAxis.None
-                ? KeyboardAxisMask : Vector3.one;
-            Quaternion inverseFrame = Quaternion.Inverse(DragScaleFrame);
             var selected = new HashSet<string>(dragIds, StringComparer.Ordinal);
-            foreach (BlueprintEditorPart part in document.Parts)
-            {
-                if (!selected.Contains(part.StableId)) continue;
-                Quaternion local = inverseFrame * ToQuaternion(part.Rotation);
-                Limit(part.Scale.X, part.BaseScale?.X ?? 1, local * Vector3.right, part.ScaleIsAbsolute);
-                Limit(part.Scale.Y, part.BaseScale?.Y ?? 1, local * Vector3.up, part.ScaleIsAbsolute);
-                Limit(part.Scale.Z, part.BaseScale?.Z ?? 1, local * Vector3.forward, part.ScaleIsAbsolute);
-            }
-            return (float)Math.Max(minimum, Math.Min(maximum, requested));
-
-            void Limit(double current, double basis, Vector3 axis, bool absolute)
-            {
-                double weight = mask == Vector3.one ? 1 :
-                    mask.x * axis.x * axis.x + mask.y * axis.y * axis.y + mask.z * axis.z * axis.z;
-                if (weight == 0) return;
-                // Same projected multiplier as TransformPart; shear is still rejected there.
-                double lower = absolute ? float.Epsilon : BlueprintEditorDocument.MinimumScale;
-                double upper = absolute ? float.MaxValue : BlueprintEditorDocument.MaximumScale;
-                lower = Math.Max(lower, float.Epsilon / basis);
-                upper = Math.Min(upper, float.MaxValue / basis);
-                // Ignore only float-axis noise whose worst relative-scale contribution fits boundary roundoff.
-                double worstFactor = 3 * BlueprintEditorDocument.MaximumScale / BlueprintEditorDocument.MinimumScale + 1;
-                if (!absolute && lower == BlueprintEditorDocument.MinimumScale && upper == BlueprintEditorDocument.MaximumScale &&
-                    weight * worstFactor < BlueprintEditorDocument.ScaleBoundaryRelativeTolerance * .5) return;
-                minimum = Math.Max(minimum, 1 + (lower / current - 1) / weight);
-                maximum = Math.Min(maximum, 1 + (upper / current - 1) / weight);
-            }
+            return TransformKeyboardInput.ClampMouseScale(requested,
+                document.Parts.Where(part => selected.Contains(part.StableId)),
+                keyboardPreview && dragAxis != GizmoAxis.None ? KeyboardAxisMask : Vector3.one, DragScaleFrame);
         }
 
-        private Vector3 TransformDragPoint(Vector3 point) => dragPivot + dragRotation *
-            (DragScaleFrame * Vector3.Scale(Quaternion.Inverse(DragScaleFrame) * (point - dragPivot), DragScaleVector)) + dragTranslation;
+        private Vector3 TransformDragPoint(Vector3 point) => TransformKeyboardInput.TransformPoint(
+            point, dragPivot, dragTranslation, dragRotation, DragScaleVector, DragScaleFrame);
 
         private bool PreviewKeyboardPose()
         {
@@ -1854,48 +1821,16 @@ namespace OstrixMods.BuildWorks
         private void ReadKeyboardNumber()
         {
             string previous = keyboardNumber;
-            foreach (char character in input.InputString ?? "")
-            {
-                if (character == '\b')
-                    keyboardNumber = keyboardNumber.Length == 0 ? "" : keyboardNumber.Substring(0, keyboardNumber.Length - 1);
-                else if (keyboardNumber.Length < 32 &&
-                    (character >= '0' && character <= '9' || character == '-' || character == '.' || character == ','))
-                    keyboardNumber += character;
-            }
-            if (input.GetKeyDown(KeyCode.Delete)) keyboardNumber = "";
+            keyboardNumber = TransformKeyboardInput.ReadNumber(keyboardNumber, input.InputString, input.GetKeyDown(KeyCode.Delete));
             if (previous.Length > 0 && keyboardNumber.Length == 0)
                 RebaseKeyboardPreview(input.MousePosition);
         }
 
         private void PreviewKeyboardNumber()
         {
-            // Numeric values replace the entire mouse delta. The document/pivot stay
-            // unchanged throughout the preview, even when camera navigation rebases input.
-            float value = 0f;
-            keyboardValid = !keyboardNumber.EndsWith(".", StringComparison.Ordinal) &&
-                !keyboardNumber.EndsWith(",", StringComparison.Ordinal) &&
-                float.TryParse(keyboardNumber.Replace(',', '.'), NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
-                    CultureInfo.InvariantCulture, out value) && !float.IsNaN(value) && !float.IsInfinity(value);
-            if (!keyboardValid) return;
-            Vector3 axis = dragAxis == GizmoAxis.None ? keyboardStartViewAxis :
-                TransformGizmoView.AxisVector(dragAxis, keyboardOrientation, localSpace);
-            Vector3 translation = Vector3.zero;
-            Quaternion rotation = Quaternion.identity;
-            float scale = 1f;
-            if (dragHandle == GizmoHandleKind.Rotate)
-                rotation = Quaternion.AngleAxis(value, axis);
-            else if (dragHandle == GizmoHandleKind.Scale)
-            {
-                scale = value;
-                keyboardValid = scale > 0f;
-            }
-            else
-            {
-                bool pair = dragHandle == GizmoHandleKind.MovePlane && keyboardSecondAxis != GizmoAxis.None;
-                keyboardValid = dragAxis != GizmoAxis.None && (dragHandle == GizmoHandleKind.Move || pair);
-                translation = (pair ? axis + TransformGizmoView.AxisVector(keyboardSecondAxis, keyboardOrientation, localSpace) : axis) * value;
-                keyboardValid &= IsFinite(translation.sqrMagnitude);
-            }
+            keyboardValid = TransformKeyboardInput.TryNumber(dragHandle, dragAxis, keyboardSecondAxis,
+                keyboardOrientation, localSpace, keyboardStartViewAxis, keyboardNumber,
+                out Vector3 translation, out Quaternion rotation, out float scale);
             if (!keyboardValid) return;
             dragTranslation = translation;
             dragRotation = rotation;
@@ -1919,10 +1854,10 @@ namespace OstrixMods.BuildWorks
             UpdateGizmo();
             GizmoHandleKind hoveredHandle = scene.HitTestGizmo(
                 SelectionGizmoTool, pivot, orientation, localSpace, mouse, out GizmoAxis hoveredAxis);
-            bool copyArrow = (input.GetKey(KeyCode.LeftAlt) || input.GetKey(KeyCode.RightAlt)) &&
-                hoveredHandle == GizmoHandleKind.Move;
+            bool copyMove = (input.GetKey(KeyCode.LeftAlt) || input.GetKey(KeyCode.RightAlt)) &&
+                (hoveredHandle == GizmoHandleKind.Move || hoveredHandle == GizmoHandleKind.MovePlane);
             int anchor = gizmoFamily != GizmoFamily.Points && gizmoFamily != GizmoFamily.Combined && activeTool != BlueprintEditorTool.Array ||
-                hoveredHandle == GizmoHandleKind.Scale || copyArrow ||
+                hoveredHandle == GizmoHandleKind.Scale || copyMove ||
                 activeTool == BlueprintEditorTool.Array && hoveredHandle == GizmoHandleKind.Layout
                 ? -1 : scene.HitTestAnchor(gizmoAnchors, mouse);
             if (anchor >= 0)
@@ -1979,7 +1914,8 @@ namespace OstrixMods.BuildWorks
             { ResetGizmoDrag(); view.SetStatus(BuildWorksLocalization.Text("editor.support.no_scale")); return true; }
             CaptureSupportDrag();
 
-            dragDuplicate = dragSupportId == null && dragHandle == GizmoHandleKind.Move &&
+            dragDuplicate = dragSupportId == null &&
+                (dragHandle == GizmoHandleKind.Move || dragHandle == GizmoHandleKind.MovePlane) &&
                 (input.GetKey(KeyCode.LeftAlt) || input.GetKey(KeyCode.RightAlt));
             if (dragDuplicate)
             {
@@ -2189,10 +2125,16 @@ namespace OstrixMods.BuildWorks
                 dragTranslation = Vector3.zero;
                 dragRotation = Quaternion.AngleAxis(degrees, dragAxisWorld);
             }
-            if (previousTranslation == dragTranslation && previousRotation == dragRotation &&
+            // Approximate vector equality can cross the copy commit threshold.
+            if ((dragDuplicate ? previousTranslation.Equals(dragTranslation) : previousTranslation == dragTranslation) && previousRotation == dragRotation &&
                 previousScale == dragScale) return;
             if (dragDuplicate)
             {
+                if (dragTranslation.sqrMagnitude < 0.0000001f)
+                {
+                    scene.ClearDuplicatePreview();
+                    return;
+                }
                 var preview = CopyDocument(document);
                 preview.DuplicateSelection(ToPoint(dragTranslation),
                     BuildWorksLocalization.Text("editor.generated.copy"));
@@ -2371,7 +2313,7 @@ namespace OstrixMods.BuildWorks
             var copy = new BlueprintEditorDocument(source.SourceBlueprintId, source.Name,
                 source.Category, source.Parts, source.Groups, source.PrimaryPartId,
                 source.PrimaryGroupId, source.CustomSnapPoints, source.Supports,
-                source.PlacementSupportId, source.Sources);
+                source.PlacementSupportId, source.Sources, source.LibraryOrigins, source.PeerOrigins);
             foreach (string id in source.Selection) copy.ToggleSelection(id);
             copy.SelectSupport(source.ActiveSupportId);
             return copy;
@@ -2388,24 +2330,8 @@ namespace OstrixMods.BuildWorks
             return added;
         }
 
-        private bool TryRotationDirection(
-            Vector2 mouse,
-            Vector3 pivot,
-            Vector3 axis,
-            out Vector3 direction)
-        {
-            Ray ray = scene.Camera.ScreenPointToRay(mouse);
-            Plane plane = new Plane(axis, pivot);
-            if (!plane.Raycast(ray, out float distance))
-            {
-                direction = Vector3.zero;
-                return false;
-            }
-            direction = ray.GetPoint(distance) - pivot;
-            if (direction.sqrMagnitude < 0.000001f) return false;
-            direction.Normalize();
-            return true;
-        }
+        private bool TryRotationDirection(Vector2 mouse, Vector3 pivot, Vector3 axis, out Vector3 direction)
+            => TransformKeyboardInput.TryRotationDirection(scene.Camera, mouse, pivot, axis, out direction);
 
         private void SetActiveTool(BlueprintEditorTool tool)
         {
@@ -2928,7 +2854,7 @@ namespace OstrixMods.BuildWorks
             {
                 logError("BuildWorks blueprint editor command failed: " + exception);
                 view.SetStatus(exception.Message == BlueprintEditorDocument.NonUniformScaleShearError
-                    ? BuildWorksLocalization.Text("editor.scale.shear") : exception.Message, error: true);
+                    ? BuildWorksLocalization.Text("editor.scale.shear") : OriginError(exception.Message), error: true);
             }
             return false;
         }
@@ -3093,15 +3019,15 @@ namespace OstrixMods.BuildWorks
                 view.ShowConfirmation(BuildWorksLocalization.Text(keepTarget ? "editor.position_title" : "editor.replace_title"),
                     BuildWorksLocalization.Text(keepTarget ? "editor.position_steps" : "editor.replace_steps"), () =>
                     {
-                        BlueprintEditorPart missing = SingleMissingTarget();
-                        if (missing == null) { view.SetStatus(BuildWorksLocalization.Text("editor.replace_changed"), error: true); return; }
+                        BlueprintEditorPart selected = SingleReplacementTarget();
+                        if (selected == null) { view.SetStatus(BuildWorksLocalization.Text("editor.replace_changed"), error: true); return; }
                         var expected = document;
                         int expectedRevision = document.RevisionToken;
                         RequestCatalog();
                         if (view.HasCatalog)
                         {
                             view.SetCatalogReplacement(true, keepTarget);
-                            replacementCatalogSelected = source => RequestCatalogAlignment(expected, expectedRevision, missing.StableId, source, keepTarget);
+                            replacementCatalogSelected = source => RequestCatalogAlignment(expected, expectedRevision, selected.StableId, source, keepTarget);
                         }
                     },
                     height: 500f, acceptLabel: BuildWorksLocalization.Text("editor.replace_catalog"));
@@ -3132,7 +3058,7 @@ namespace OstrixMods.BuildWorks
                 }
             }
             catch (Exception exception)
-            { RestoreReplacementPreview(expectedDocument); view.SetStatus(exception.Message, error: true); return; }
+            { RestoreReplacementPreview(expectedDocument); view.SetStatus(OriginError(exception.Message), error: true); return; }
             string firstName = replacements[0].DisplayName;
             if (firstName.Length > 64) firstName = firstName.Substring(0, 64) + "…";
             view.ShowConfirmation(BuildWorksLocalization.Text(keepTarget ? "editor.position_title" : "editor.replace_title"),
@@ -3151,12 +3077,11 @@ namespace OstrixMods.BuildWorks
                 }, height: 450f, closed: () => RestoreReplacementPreview(expectedDocument), scenePreview: true);
         }
 
-        private BlueprintEditorPart SingleMissingTarget()
+        private BlueprintEditorPart SingleReplacementTarget()
         {
             if (document == null || document.ActiveSupportId != null || document.Selection.Count != 1) return null;
             var part = document.Parts.FirstOrDefault(p => p.StableId == document.Selection[0]);
-            return part != null && document.IsEffectivelyVisible(part.StableId) && !document.IsEffectivelyLocked(part.StableId) &&
-                (part.ScaleIsAbsolute || !ResolveVisualSource(part.PrefabName)) ? part : null;
+            return part != null && document.IsEffectivelyVisible(part.StableId) && !document.IsEffectivelyLocked(part.StableId) ? part : null;
         }
 
         private void RestoreReplacementPreview(BlueprintEditorDocument expected)
@@ -3169,11 +3094,11 @@ namespace OstrixMods.BuildWorks
         private void RequestCatalogAlignment(BlueprintEditorDocument expected, int revision, string targetId,
             BlueprintEditorDocument source, bool keepTarget)
         {
-            BlueprintEditorPart target = SingleMissingTarget();
+            BlueprintEditorPart target = SingleReplacementTarget();
             if (source.Parts.Count == 0 || source.Parts.Any(part => part.ScaleIsAbsolute || !ResolveVisualSource(part.PrefabName)))
             { view.SetStatus(BuildWorksLocalization.Text("editor.replace_source_missing"), error: true); return; }
             bool Current() => ReferenceEquals(document, expected) && document.RevisionToken == revision &&
-                SingleMissingTarget()?.StableId == targetId && source.Parts.Count > 0 &&
+                SingleReplacementTarget()?.StableId == targetId && source.Parts.Count > 0 &&
                 source.Parts.All(part => !part.ScaleIsAbsolute && ResolveVisualSource(part.PrefabName));
             if (!Current()) { view.SetStatus(BuildWorksLocalization.Text("editor.replace_changed"), error: true); return; }
             var anchor = source.Parts.FirstOrDefault(part => part.StableId == source.PrimaryPartId) ?? source.Parts[0];
@@ -3196,7 +3121,7 @@ namespace OstrixMods.BuildWorks
             catch (Exception exception)
             {
                 scene.ClearDuplicatePreview();
-                view.SetStatus(exception.Message, error: true);
+                view.SetStatus(OriginError(exception.Message), error: true);
                 return;
             }
             view.HideCatalog();
@@ -3304,7 +3229,10 @@ namespace OstrixMods.BuildWorks
                 return prefab ? new CompositeBlueprintStore.VectorData(prefab.transform.localScale) : (CompositeBlueprintStore.VectorData?)null;
             }, name => name.GetStableHashCode(), Game.m_worldLevel,
                 name => BlueprintMaterialState.Supports(ResolveVisualSource(name)),
-                name => BlueprintStorageCapture.PrefabGrid(ResolveVisualSource(name)));
+                name => BlueprintStorageCapture.PrefabGrid(ResolveVisualSource(name)),
+                value => { GameObject prefab=ZNetScene.instance ? ZNetScene.instance.GetPrefab(value) : null; return prefab ? prefab.name : null; },
+                name => BlueprintStorageCapture.SupportsKgStateProjection(ResolveVisualSource(name)),
+                name => BlueprintUnboundImport.Capture(ResolveVisualSource(name)));
 
         internal static void EditorCatalogStatus(CompositeBlueprintStore.Blueprint source,
             Func<string, bool> prefabAvailable, out string unavailable, out string warning)
@@ -3362,21 +3290,22 @@ namespace OstrixMods.BuildWorks
             var groups = new List<BlueprintEditorGroup>();
             foreach (CompositeBlueprintStore.Group group in source.groups ?? new List<CompositeBlueprintStore.Group>())
                 groups.Add(new BlueprintEditorGroup(group.stableId, group.name, group.editorVisible,
-                    group.editorLocked, group.parentGroupId, group.pivotPartId));
+                    group.editorLocked, group.parentGroupId, group.pivotPartId, group.sourceDocumentId, group.sourceLayerId));
             var parts = new List<BlueprintEditorPart>();
             foreach (CompositeBlueprintStore.Part part in source.parts ?? new List<CompositeBlueprintStore.Part>())
                 parts.Add(new BlueprintEditorPart(part.stableId, part.prefabName, part.displayName,
                     ToPoint(part.position.ToVector3()), ToRotation(part.rotation.ToQuaternion()), part.parentGroupId,
                     part.editorVisible, part.editorLocked, ToPoint(part.scale.ToVector3()), part.signText,
                     part.sourceDocumentId, part.sourceLine, part.foreignData?.ToGeometry(), part.scaleIsAbsolute,
-                    part.baseScale.HasValue ? ToPoint(part.baseScale.Value.ToVector3()) : (Point3?)null, part.metadata?.ToGeometry(), part.materialSeed));
+                    part.baseScale.HasValue ? ToPoint(part.baseScale.Value.ToVector3()) : (Point3?)null, part.metadata?.ToGeometry(), part.materialSeed, part.originalPrefabName, part.sourceFrameApplied, part.sourceRecord));
             return new BlueprintEditorDocument(source.id, source.name,
                 source.category ?? CompositeBlueprintStore.DefaultCategory, parts, groups,
                 source.primaryPartId, source.primaryGroupId,
                 source.customSnapPoints?.Select(point => ToPoint(point.ToVector3())),
                 source.supports?.Select(support => new BlueprintEditorSupport(support.stableId, support.name,
                     ToPoint(support.position.ToVector3()), ToRotation(support.rotation.ToQuaternion()))),
-                source.placementSupportId, source.sourceDocuments?.Select(evidence => evidence.ToGeometry()));
+                source.placementSupportId, source.sourceDocuments?.Select(evidence => evidence.ToGeometry()),
+                source.libraryOrigins?.Select(origin => origin.ToGeometry()), source.peerOrigins?.Select(origin => origin.ToGeometry()));
         }
 
         private void ApplyInspector(
@@ -3451,7 +3380,7 @@ namespace OstrixMods.BuildWorks
                 {
                     scene.ClearBlueprintPlacementPreview();
                     scene.HidePlacementTarget();
-                    view.SetStatus(exception.Message, error: true);
+                    view.SetStatus(OriginError(exception.Message), error: true);
                     return;
                 }
             }
@@ -4059,7 +3988,7 @@ namespace OstrixMods.BuildWorks
                 string error;
                 bool success = blueprint.IsExternal ? store.TrySetHidden(blueprint, !restore, out error) :
                     store.TryDelete(blueprint, out error);
-                if (!success) { view.ShowError(action, error, canRetry: false); return; }
+                if (!success) { view.ShowError(action, BuildWorksLocalization.ResolveUserText(error) + "\n" + BlueprintExchangeView.ShareWarning(store), canRetry: false); return; }
                 if (!blueprint.IsExternal && sourceBlueprint?.id == blueprint.id)
                 {
                     sourceBlueprint = null;
@@ -4134,7 +4063,9 @@ namespace OstrixMods.BuildWorks
                         {
                             previewYaw = template.previewYaw,
                             previewPitch = template.previewPitch,
-                            previewZoom = template.previewZoom
+                            previewZoom = template.previewZoom,
+                            libraryOrigins = CompositeBlueprintStore.CloneLibraryOrigins(template.libraryOrigins),
+                            peerOrigins = CompositeBlueprintStore.ClonePeerOrigins(template.peerOrigins)
                         };
                     success = store.TrySaveDocument(
                         copyName ?? document.Name,
@@ -4147,7 +4078,7 @@ namespace OstrixMods.BuildWorks
                         supports,
                         document.PlacementSupportId,
                         out savedBlueprint,
-                        out error, customPoints, template, BuildStoreSources());
+                        out error, customPoints, template, BuildStoreSources(), BuildStoreLibraryOrigins(), BuildStorePeerOrigins());
                 }
                 else
                     success = store.TryUpdateDocument(
@@ -4161,7 +4092,7 @@ namespace OstrixMods.BuildWorks
                         document.PrimaryGroupId,
                         supports,
                         document.PlacementSupportId,
-                        out error, customPoints, BuildStoreSources());
+                        out error, customPoints, BuildStoreSources(), BuildStoreLibraryOrigins(), BuildStorePeerOrigins());
                 if (!success)
                 {
                     state = EditorState.Editing;
@@ -4169,6 +4100,7 @@ namespace OstrixMods.BuildWorks
                         BuildWorksLocalization.Text("editor.save_error_title"), error);
                     return false;
                 }
+                string shareWarning = BlueprintExchangeView.ShareWarning(store);
                 sourceBlueprint = savedBlueprint;
                 previewTemplate = savedBlueprint;
                 document.AdoptSavedIdentity(
@@ -4187,7 +4119,19 @@ namespace OstrixMods.BuildWorks
                     view.SetStatus(BuildWorksLocalization.Text(
                         "editor.library_refresh_failed"), error: true);
                 }
-                if (closeAfterSave) Cleanup();
+                if (!string.IsNullOrEmpty(shareWarning))
+                {
+                    // The document is already committed. Retry must never create another Save As copy.
+                    retrySave = () =>
+                    {
+                        if (!store.TryRepairShareFiles(out string shareError))
+                        { view.ShowError(BuildWorksLocalization.Text("share.action"), BuildWorksLocalization.ResolveUserText(shareError)); return; }
+                        Bind(BuildWorksLocalization.Text("editor.blueprint_saved"));
+                        if (closeAfterSave) Cleanup();
+                    };
+                    view.ShowError(BuildWorksLocalization.Text("share.action"), shareWarning);
+                }
+                else if (closeAfterSave) Cleanup();
                 return true;
             }
             catch (Exception exception)
@@ -4224,6 +4168,9 @@ namespace OstrixMods.BuildWorks
                     signText = part.SignText,
                     sourceDocumentId = part.SourceDocumentId,
                     sourceLine = part.SourceLine,
+                    sourceRecord = part.SourceRecord,
+                    sourceFrameApplied = part.SourceFrameApplied,
+                    originalPrefabName = part.OriginalPrefabName,
                     foreignData = CompositeBlueprintStore.ForeignPartData.FromGeometry(part.ForeignData),
                     metadata = CompositeBlueprintStore.PrefabMetadata.FromGeometry(part.Metadata),
                     materialSeed = part.MaterialSeed
@@ -4234,6 +4181,18 @@ namespace OstrixMods.BuildWorks
 
         private List<CompositeBlueprintStore.SourceDocument> BuildStoreSources() => document.Sources
             .Select(CompositeBlueprintStore.SourceDocument.FromGeometry).ToList();
+
+        private List<CompositeBlueprintStore.PeerOrigin> BuildStorePeerOrigins() => document.PeerOrigins
+            .Select(CompositeBlueprintStore.PeerOrigin.FromGeometry).ToList();
+
+        private List<CompositeBlueprintStore.LibraryOrigin> BuildStoreLibraryOrigins() => document.LibraryOrigins
+            .Select(CompositeBlueprintStore.LibraryOrigin.FromGeometry).ToList();
+
+        private static string OriginError(string message) => message == BlueprintLibraryOrigin.LimitError
+            ? BuildWorksLocalization.Text("server.origin_limit") : message == BlueprintLibraryOrigin.ConflictError
+            ? BuildWorksLocalization.Text("server.origin_conflict") : message == BlueprintPeerOrigin.LimitError
+            ? BuildWorksLocalization.Text("peer.origin_limit") : message == BlueprintPeerOrigin.ConflictError
+            ? BuildWorksLocalization.Text("peer.origin_conflict") : message;
 
         private List<CompositeBlueprintStore.Support> BuildStoreSupports() => document.Supports
             .Select(support => new CompositeBlueprintStore.Support
@@ -4256,7 +4215,8 @@ namespace OstrixMods.BuildWorks
                     parentGroupId = group.ParentGroupId,
                     pivotPartId = group.PivotPartId,
                     editorVisible = group.Visible,
-                    editorLocked = group.Locked
+                    editorLocked = group.Locked,
+                    sourceDocumentId = group.SourceDocumentId, sourceLayerId = group.SourceLayerId
                 });
             }
             return result;
@@ -4320,7 +4280,8 @@ namespace OstrixMods.BuildWorks
         {
             if (string.IsNullOrEmpty(status) && (document.Parts.Any(part => part.ForeignData != null ||
                 part.MaterialSeed.HasValue && !store.SupportsMaterialSeed(part.PrefabName)) ||
-                document.Sources.Any(source => source.HasOpaqueSections))) status = BuildWorksLocalization.Text("import.foreign_pending");
+                BlueprintSourceDocument.Unresolved(document.Sources, document.Parts.Select(part =>
+                    (SourceId: part.SourceDocumentId, FrameApplied: part.SourceFrameApplied))).Any())) status = BuildWorksLocalization.Text("import.foreign_pending");
             var missing = new HashSet<string>(StringComparer.Ordinal);
             foreach (BlueprintEditorPart part in document.Parts)
                 if (part.ScaleIsAbsolute || !ResolveVisualSource(part.PrefabName)) missing.Add(part.StableId);
@@ -4333,10 +4294,12 @@ namespace OstrixMods.BuildWorks
                 : (Vector3?)null;
             view.SupportCentreId = transformSupportPivotId;
             view.MissingReplacementAvailable = TryMissingReplacement(out _, out _);
+            view.CatalogReplacementAvailable = SingleReplacementTarget() != null;
             BlueprintEditorPart standPart = EditableItemStand(document.ActiveNodeId, out _);
             view.ItemStandEditable = standPart != null && document.Selection.Count == 1;
             view.ItemStandHasContents = standPart?.ForeignData != null && !standPart.ForeignData.ContentsCleared;
             view.Bind(document, true, missing, boundsSize);
+            view.SetGroundHeight(scene.GroundHeight);
             UpdateOperationMetrics();
             if (!string.IsNullOrEmpty(status))
                 view.SetStatus(status, status.StartsWith("Blueprint editor scene sync failed:",

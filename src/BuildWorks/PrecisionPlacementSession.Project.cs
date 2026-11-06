@@ -84,6 +84,7 @@ namespace OstrixMods.BuildWorks
                 placementPlan.Add(execution.Pose); placementPlanPieces.Add(execution.Piece); placementSupplies.Add(null);
                 if (!SelectPlanPiece(player, 0)) throw new InvalidOperationException("Native construction piece could not be selected.");
                 currentPosition = execution.Pose.Position; currentRotation = execution.Pose.Rotation;
+                currentScale = execution.Pose.Scale;
                 state = PlacementState.Armed; requestAutomaticPlacement = true;
                 dragAxis = GizmoAxis.None; dragHandle = GizmoHandleKind.None;
                 RestoreCursor(); return true;

@@ -1299,3 +1299,5 @@ project.mount_return_busy	Returning the item and verifying saved custody. Wait.
 project.mount_return_use	Return the actual mounted item
 project.mount_finish_cancel	Finish cancellation
 project.mount_return_untracked	A stand holds an item without a recorded project contribution. Remove it using the normal Valheim interaction; untracked contents are not automatically returned.
+f9.transform.idle	G move · R rotate · S scale · Click: pivot · Shift-click: fixed point
+f9.transform.active	{0} {1} · Enter/click: apply transform · Esc: cancel\nG: meters · R: degrees · S: factor (2 = 200%); result 0.01–10 per axis · X/Y/Z; repeat: local/world · Shift: precision/plane

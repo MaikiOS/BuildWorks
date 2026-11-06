@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework><OutputType>Exe</OutputType><LangVersion>latest</LangVersion>
+    <ValheimManagedDir>C:\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed</ValheimManagedDir>
+    <SessionRouteSource>../../artifacts/f9-transform-20261105/generated/SessionRoute.cs</SessionRouteSource>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(SessionRouteSource)" Link="SessionRoute.cs" />
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(ValheimManagedDir)/UnityEngine.CoreModule.dll</HintPath></Reference>
+    <Reference Include="BuildWorks.Geometry"><HintPath>../../artifacts/bin/BuildWorks.Geometry.dll</HintPath></Reference>
+    <Reference Include="System.Numerics" />
+  </ItemGroup>
+</Project>

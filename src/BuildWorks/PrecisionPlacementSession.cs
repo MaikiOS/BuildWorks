@@ -161,7 +161,9 @@ namespace OstrixMods.BuildWorks
         internal readonly struct TransformSnapshot
         {
             public TransformSnapshot(Vector3 position, Quaternion rotation, Vector3? scale = null, string signText = null,
-                BlueprintForeignPartData itemStandContents = null, Point3[] customSnapPoints = null, int? materialSeed = null)
+                BlueprintForeignPartData itemStandContents = null, Point3[] customSnapPoints = null, int? materialSeed = null,
+                TransformSnapshot[] partTransforms = null, Vector3[] anchorPoints = null, Vector3? blueprintPivot = null,
+                bool? compositeFrame = null, bool? blueprintDirty = null)
             {
                 Position = position;
                 Rotation = rotation;
@@ -170,6 +172,11 @@ namespace OstrixMods.BuildWorks
                 ItemStandContents = itemStandContents;
                 CustomSnapPoints = customSnapPoints;
                 MaterialSeed = materialSeed;
+                PartTransforms = partTransforms;
+                AnchorPoints = anchorPoints;
+                BlueprintPivot = blueprintPivot;
+                CompositeFrame = compositeFrame;
+                BlueprintDirty = blueprintDirty;
             }
 
             public Vector3 Position { get; }
@@ -179,6 +186,11 @@ namespace OstrixMods.BuildWorks
             public BlueprintForeignPartData ItemStandContents { get; }
             public Point3[] CustomSnapPoints { get; }
             public int? MaterialSeed { get; }
+            public TransformSnapshot[] PartTransforms { get; }
+            public Vector3[] AnchorPoints { get; }
+            public Vector3? BlueprintPivot { get; }
+            public bool? CompositeFrame { get; }
+            public bool? BlueprintDirty { get; }
         }
 
         private readonly struct SnapEdge
@@ -358,6 +370,7 @@ namespace OstrixMods.BuildWorks
         private TransformSnapshot baseSnapshot;
         private Vector3 currentPosition;
         private Quaternion currentRotation;
+        private Vector3 currentScale = Vector3.one;
         private GizmoMode gizmoMode = GizmoMode.Move;
         private GizmoAxis dragAxis;
         private GizmoHandleKind dragHandle;
@@ -383,6 +396,10 @@ namespace OstrixMods.BuildWorks
         private Vector2 dragStartMouse;
         private Vector3 dragStartPosition;
         private Quaternion dragStartRotation;
+        private Vector3 dragStartScale = Vector3.one;
+        private TransformSnapshot dragStartSnapshot;
+        private BlueprintEditorPart dragTransformPart;
+        private Vector3 dragTransformPivot;
         private Vector3 dragStartRepeatStep;
         private GizmoAxis dragStartRepeatAxis;
         private float dragStartRepeatDraggedDistance;
@@ -419,6 +436,7 @@ namespace OstrixMods.BuildWorks
         private readonly HashSet<Renderer> lodZeroRenderers = new HashSet<Renderer>();
         private int dragAnchorPoint = -1;
         private int pinnedAnchorPoint = -1;
+        private int selectedAnchorPoint = -1;
         private GizmoAxis anchorConstraintAxis;
         private bool dragMagneticMove;
         private bool dragSourceIsNative;
@@ -600,6 +618,7 @@ namespace OstrixMods.BuildWorks
         private Piece continuationPiece;
         private TransformSnapshot continuationTransform;
         private CompositeBlueprintStore.Blueprint activeBlueprint;
+        private TransformSnapshot[] blueprintPartTransforms;
         private Piece blueprintPalettePiece;
         private Piece editorReturnPiece;
         private readonly List<Piece> activeBlueprintPieces = new List<Piece>();
@@ -1082,11 +1101,23 @@ namespace OstrixMods.BuildWorks
 
             if (hud.IsEditingAngle)
             {
+                if (keyboardPreview) keyboardPaused = true;
                 return;
             }
 
+            if (!transformInput.HasFocus)
+            {
+                if (keyboardPreview) CancelKeyboardTransform();
+                return;
+            }
+            bool? keyboardInputAllowed = keyboardPreview ? (bool?)GameplayInputAvailable(player) : null;
+            if (keyboardInputAllowed == false) { keyboardPaused = true; return; }
+
             if (Input.GetKeyDown(KeyCode.Escape))
             {
+                if (state == PlacementState.Editing && sessionMode != SessionMode.ProjectPart &&
+                    (keyboardPreview || dragAxis != GizmoAxis.None || dragAnchorPoint >= 0 || selectedAnchorPoint >= 0 || pinnedAnchorPoint >= 0) &&
+                    CancelNewestStage()) return;
                 if (sessionMode == SessionMode.ProjectPart) { Cancel(); return; }
                 if (sessionMode == SessionMode.BlueprintEditor)
                 {
@@ -1166,8 +1197,9 @@ namespace OstrixMods.BuildWorks
                     freeViewCamera,
                     Input.mousePosition)) return;
             }
-            if (!GameplayInputAvailable(player))
+            if (!(keyboardInputAllowed ?? GameplayInputAvailable(player)))
             {
+                if (keyboardPreview) { keyboardPaused = true; return; }
                 if (sessionMode == SessionMode.BlueprintEditor ||
                     sessionMode == SessionMode.BlueprintWorldSelection)
                 {
@@ -1193,22 +1225,23 @@ namespace OstrixMods.BuildWorks
                     Input.GetKey(KeyCode.RightControl);
                 bool shiftHeld = Input.GetKey(KeyCode.LeftShift) ||
                     Input.GetKey(KeyCode.RightShift);
-                if (controlHeld && dragAxis == GizmoAxis.None && dragAnchorPoint < 0 &&
+                if (!keyboardPreview && controlHeld && dragAxis == GizmoAxis.None && dragAnchorPoint < 0 &&
                     (Input.GetKeyDown(KeyCode.Y) ||
                     shiftHeld && Input.GetKeyDown(KeyCode.Z)))
                 {
                     RedoTransform();
                     return;
                 }
-                if (controlHeld && Input.GetKeyDown(KeyCode.Z) &&
+                if (!keyboardPreview && controlHeld && Input.GetKeyDown(KeyCode.Z) &&
                     dragAxis == GizmoAxis.None && dragAnchorPoint < 0)
                 {
                     UndoTransform();
                     return;
                 }
                 HandleFreeViewInput(freeViewCamera);
+                if (HandleKeyboardTransform(freeViewCamera)) return;
                 if (sessionMode == SessionMode.BlueprintWorldPlacement &&
-                    blueprintEditPartIndex < 0 && dragAxis == GizmoAxis.None &&
+                    !keyboardPreview && blueprintEditPartIndex < 0 && dragAxis == GizmoAxis.None &&
                     dragAnchorPoint < 0)
                     UpdateBlueprintFrameOverride();
                 if (selectingBlueprint)
@@ -1394,9 +1427,11 @@ namespace OstrixMods.BuildWorks
             currentRotation = baseRotation = placementGhost
                 ? placementGhost.transform.rotation
                 : Quaternion.identity;
+            currentScale = Vector3.one;
             baseSnapshot = CaptureHistorySnapshot();
             history.Reset(baseSnapshot);
             activeBlueprint = null;
+            blueprintPartTransforms = null;
             activeBlueprintPieces.Clear();
             ClearLayout();
             SaveAndUnlockCursor();
@@ -1516,6 +1551,7 @@ namespace OstrixMods.BuildWorks
             editorReturnPiece = previous;
             sessionMode = SessionMode.BlueprintEditor;
             activeBlueprint = blueprint;
+            blueprintPartTransforms = null;
             if (!blueprintPieceRegistry.SelectPiece(player, entryPiece))
             {
                 Finish();
@@ -1553,6 +1589,7 @@ namespace OstrixMods.BuildWorks
             ghost.SetActive(true);
             currentPosition = basePosition = EditorWorkspaceOrigin;
             currentRotation = baseRotation = Quaternion.identity;
+            currentScale = Vector3.one;
             if (!TrySuspendExternalBuildCamera())
             {
                 Finish();
@@ -1967,6 +2004,15 @@ namespace OstrixMods.BuildWorks
                 return false;
             }
 
+            Vector3 relativeScale;
+            try
+            {
+                relativeScale = CompositeBlueprintStore.RelativeScale(
+                    new CompositeBlueprintStore.VectorData(part.Visual.transform.localScale),
+                    new CompositeBlueprintStore.VectorData(part.Source.transform.localScale)).ToVector3();
+            }
+            catch (ArgumentException)
+            { ShowStatus(player, BuildWorksLocalization.Text("layout.scale_bounds")); return false; }
             GameObject hostGhost = PlacementGhostField.GetValue(player) as GameObject;
             if (hostGhost) hostGhost.SetActive(false);
             blueprintWorkspaceEditPart = part;
@@ -1974,21 +2020,23 @@ namespace OstrixMods.BuildWorks
             selectedPiece = part.Source;
             MovePieceWithoutMovingCameraFocus(part.Visual.transform.position);
             currentRotation = part.Visual.transform.rotation;
+            currentScale = relativeScale;
             basePosition = currentPosition;
             baseRotation = currentRotation;
-            baseSnapshot = CaptureHistorySnapshot();
-            history.Reset(baseSnapshot);
             ClearLayout();
             gizmoMode = GizmoMode.Move;
             dragAxis = GizmoAxis.None;
             dragHandle = GizmoHandleKind.None;
             dragAnchorPoint = -1;
             pinnedAnchorPoint = -1;
+            selectedAnchorPoint = -1;
             anchorConstraintAxis = GizmoAxis.None;
             alignmentTargetVisible = false;
             ClearSnapDrag();
             anchorBoundsAvailable = CaptureAnchorPoints(part.Visual);
             singlePieceAnchorLocalPoints = (Vector3[])anchorLocalPoints.Clone();
+            baseSnapshot = CaptureHistorySnapshot();
+            history.Reset(baseSnapshot);
             suppressPlacementFrame = Time.frameCount;
             ShowStatus(player, BuildWorksLocalization.Text(
                 "placement.temp_precision_hint"));
@@ -1999,12 +2047,19 @@ namespace OstrixMods.BuildWorks
         {
             BlueprintWorkspacePart part = blueprintWorkspaceEditPart;
             if (sessionMode != SessionMode.BlueprintEditor || part?.Visual == null) return;
+            if (keyboardPreview)
+            {
+                if (restoreTransform || !keyboardValid) CancelKeyboardTransform();
+                else ConfirmKeyboardTransform();
+            }
             if (restoreTransform)
             {
                 currentPosition = basePosition;
                 currentRotation = baseRotation;
+                currentScale = baseSnapshot.Scale;
             }
             part.Visual.transform.SetPositionAndRotation(currentPosition, currentRotation);
+            part.Visual.transform.localScale = Vector3.Scale(part.Source.transform.localScale, currentScale);
             blueprintWorkspaceEditPart = null;
             ClearLayout();
             history.Clear();
@@ -2012,6 +2067,7 @@ namespace OstrixMods.BuildWorks
             dragHandle = GizmoHandleKind.None;
             dragAnchorPoint = -1;
             pinnedAnchorPoint = -1;
+            selectedAnchorPoint = -1;
             anchorConstraintAxis = GizmoAxis.None;
             alignmentTargetVisible = false;
             ClearSnapDrag();
@@ -2101,6 +2157,7 @@ namespace OstrixMods.BuildWorks
                 placementRotation = supportRotation;
             }
             activeBlueprint = blueprint;
+            blueprintPartTransforms = null;
             blueprintCompositeFrame = !CompositeBlueprintStore.HasExplicitFrame(blueprint);
             activeBlueprintPieces.Clear();
             activeBlueprintPieces.AddRange(pieces);
@@ -2109,6 +2166,7 @@ namespace OstrixMods.BuildWorks
                 out blueprintRootPosition, out blueprintRootRotation);
             basePosition = currentPosition = ghost.transform.position;
             baseRotation = currentRotation = blueprintRootRotation;
+            currentScale = Vector3.one;
             Debug.Log("BuildWorks blueprint placement root " + blueprintRootPosition +
                 ", ghost " + ghost.transform.position + ", origin " + placementOrigin + ".");
             blueprintEditPartIndex = -1;
@@ -2254,16 +2312,18 @@ namespace OstrixMods.BuildWorks
                         anchorConstraintAxis,
                         currentRotation,
                         localSpace);
+                gizmo.Family = keyboardPreview ? dragHandle == GizmoHandleKind.Scale ? GizmoFamily.Scale :
+                    dragHandle == GizmoHandleKind.Rotate ? GizmoFamily.Rotate : GizmoFamily.Move : GizmoFamily.Combined;
                 gizmo.Show(
                     freeViewCamera,
-                    currentPosition,
+                    ResolveTransformPivot(),
                     currentRotation,
                     localSpace,
                     gizmoMode,
                     dragHandle,
                     dragAxis,
                     anchors,
-                    dragAnchorPoint,
+                    dragAnchorPoint >= 0 ? dragAnchorPoint : selectedAnchorPoint,
                     pinnedAnchorPoint,
                     NativeAnchorStart,
                     showAllAnchors,
@@ -2275,7 +2335,7 @@ namespace OstrixMods.BuildWorks
                     showConstraintPath,
                     constraintCenter,
                     constraintAxisWorld,
-                    dragConstraintActive ? dragConstraintRadius : 0f);
+                    dragConstraintActive ? dragConstraintRadius : 0f, allowExtended: keyboardPreview);
                 gizmo.ShowSnapCandidates(
                     freeViewCamera,
                     dragMagneticMove
@@ -2476,6 +2536,7 @@ namespace OstrixMods.BuildWorks
                 placementGhost.transform.SetPositionAndRotation(
                     currentPosition,
                     currentRotation);
+                placementGhost.transform.localScale = Vector3.Scale(selectedPiece.transform.localScale, currentScale);
                 return;
             }
             int blueprintGhostIndex = blueprintEditPartIndex >= 0
@@ -2485,15 +2546,17 @@ namespace OstrixMods.BuildWorks
                 !selectingPlacementSupport && (state == PlacementState.Editing || state == PlacementState.Frozen) &&
                 blueprintGhostIndex < placementPlan.Count
                 ? placementPlan[blueprintGhostIndex]
-                : new TransformSnapshot(currentPosition, currentRotation);
+                : new TransformSnapshot(currentPosition, currentRotation, currentScale);
             placementGhost.transform.SetPositionAndRotation(
                 transform.Position,
                 transform.Rotation);
             Vector3 scale = (state == PlacementState.Armed || selectingPlacementSupport) &&
                 placementPlanIndex < placementPlan.Count
                 ? placementPlan[placementPlanIndex].Scale
+                : IsBlueprintTransform && blueprintGhostIndex < placementPlan.Count
+                    ? placementPlan[blueprintGhostIndex].Scale
                 : activeBlueprint != null && blueprintGhostIndex < activeBlueprint.parts.Count
-                    ? activeBlueprint.parts[blueprintGhostIndex].PlacementScale(selectedPiece.transform.localScale)
+                    ? BlueprintPartTransform(blueprintGhostIndex).Scale
                 : transform.Scale;
             placementGhost.transform.localScale = Vector3.Scale(selectedPiece.transform.localScale, scale);
             int? materialSeed = (state == PlacementState.Armed || selectingPlacementSupport) && placementPlanIndex < placementPlan.Count
@@ -3095,7 +3158,7 @@ namespace OstrixMods.BuildWorks
 
         private bool IsEditorInteractionAt(Camera camera, Vector2 mouse)
         {
-            if (!camera || MouseOverEditorPanel(mouse) || freeViewFlyLooking ||
+            if (keyboardPreview || !camera || MouseOverEditorPanel(mouse) || freeViewFlyLooking ||
                 selectingBlueprint || dragAxis != GizmoAxis.None || dragAnchorPoint >= 0)
             {
                 return true;
@@ -3448,11 +3511,13 @@ namespace OstrixMods.BuildWorks
             baseRotation = currentRotation = continueLayout
                 ? continuationTransform.Rotation
                 : ghost.transform.rotation;
+            currentScale = continueLayout ? continuationTransform.Scale : Vector3.one;
             if (continueLayout) ClearContinuation();
-            baseSnapshot = CaptureHistorySnapshot();
-            history.Reset(baseSnapshot);
             activeBlueprint = null;
+            blueprintPartTransforms = null;
             activeBlueprintPieces.Clear();
+            ghost.transform.SetPositionAndRotation(currentPosition, currentRotation);
+            ghost.transform.localScale = Vector3.Scale(piece.transform.localScale, currentScale);
             anchorBoundsAvailable = CaptureAnchorPoints(ghost);
             singlePieceAnchorLocalPoints = (Vector3[])anchorLocalPoints.Clone();
             ClearLayout();
@@ -3475,6 +3540,8 @@ namespace OstrixMods.BuildWorks
             passiveCursorActive = false;
             dragAxis = GizmoAxis.None;
             dragHandle = GizmoHandleKind.None;
+            baseSnapshot = CaptureHistorySnapshot();
+            history.Reset(baseSnapshot);
             SaveAndUnlockCursor();
             BeginFreeView(camera, isolateBlueprint);
             Vector3 unalignedPosition = currentPosition;
@@ -3627,6 +3694,7 @@ namespace OstrixMods.BuildWorks
                 int anchor = gizmo.HitTestAnchor(camera, anchorWorldPoints, mouse);
                 if (anchor >= 0)
                 {
+                    selectedAnchorPoint = anchor;
                     if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
                     {
                         pinnedAnchorPoint = pinnedAnchorPoint == anchor ? -1 : anchor;
@@ -3645,21 +3713,21 @@ namespace OstrixMods.BuildWorks
                 if (gizmoMode == GizmoMode.Repeat)
                 {
                     dragAxis = gizmo.HitTestLayout(
-                        camera, currentPosition, currentRotation, localSpace, mouse);
+                        camera, ResolveTransformPivot(), currentRotation, localSpace, mouse);
                     if (dragAxis != GizmoAxis.None)
                         dragHandle = GizmoHandleKind.Layout;
                 }
                 if (dragHandle == GizmoHandleKind.None && gizmoMode != GizmoMode.Guide)
                 {
                     dragAxis = gizmo.HitTestMove(
-                        camera, currentPosition, currentRotation, localSpace, mouse);
+                        camera, ResolveTransformPivot(), currentRotation, localSpace, mouse);
                     if (dragAxis != GizmoAxis.None)
                         dragHandle = GizmoHandleKind.Move;
                 }
                 if (dragHandle == GizmoHandleKind.None)
                 {
                     dragAxis = gizmo.HitTestRotation(
-                        camera, currentPosition, currentRotation, localSpace, mouse);
+                        camera, ResolveTransformPivot(), currentRotation, localSpace, mouse);
                     if (dragAxis != GizmoAxis.None)
                         dragHandle = GizmoHandleKind.Rotate;
                 }
@@ -3714,7 +3782,7 @@ namespace OstrixMods.BuildWorks
                 else if (dragHandle == GizmoHandleKind.Rotate)
                 {
                     alignmentTargetVisible = false;
-                    Vector3 pivotScreen = camera.WorldToScreenPoint(currentPosition);
+                    Vector3 pivotScreen = camera.WorldToScreenPoint(dragTransformPivot);
                     float currentAngle = Mathf.Atan2(
                         mouse.y - pivotScreen.y,
                         mouse.x - pivotScreen.x) * Mathf.Rad2Deg;
@@ -3725,9 +3793,10 @@ namespace OstrixMods.BuildWorks
                         rawDegrees,
                         Geometry.PrecisionStepPresets.Rotation[rotationStepIndex]);
                     Vector3 canonicalAxis = CanonicalAxis(dragAxis);
-                    currentRotation = localSpace
+                    Quaternion rotation = localSpace
                         ? dragStartRotation * Quaternion.AngleAxis(degrees, canonicalAxis)
                         : Quaternion.AngleAxis(degrees, canonicalAxis) * dragStartRotation;
+                    ApplyGizmoRotation(rotation);
                     RotateLocalLayoutFromDragStart();
                     RebuildActiveLayout();
                 }
@@ -3744,7 +3813,7 @@ namespace OstrixMods.BuildWorks
                 {
                     if (dragHandle != GizmoHandleKind.Layout || dragAnchorPoint >= 0)
                     {
-                        CommitTransformIfChanged(dragStartPosition, dragStartRotation);
+                        CommitTransformIfChanged(dragStartPosition, dragStartRotation, dragStartSnapshot);
                     }
                 }
                 if (dragHandle == GizmoHandleKind.Layout && repeatAxis != GizmoAxis.None)
@@ -3912,7 +3981,9 @@ namespace OstrixMods.BuildWorks
             dragStartPosition = currentPosition;
             dragStartRotation = currentRotation;
             CaptureDragLayoutState();
-            dragMovingAnchorLocal = anchorLocalPoints[movingAnchor];
+            dragStartScale = currentScale;
+            dragStartSnapshot = CaptureHistorySnapshot();
+            dragMovingAnchorLocal = ScaledAnchor(movingAnchor);
             dragSourceIsNative = movingAnchor >= NativeAnchorStart;
             dragConstraintActive = false;
             if (magneticMove)
@@ -3938,7 +4009,7 @@ namespace OstrixMods.BuildWorks
                 return;
             }
 
-            dragFixedAnchorLocal = anchorLocalPoints[fixedAnchor];
+            dragFixedAnchorLocal = ScaledAnchor(fixedAnchor);
             dragFixedAnchorWorld = dragStartPosition + dragStartRotation * dragFixedAnchorLocal;
             dragMovingVector = anchorWorldPoints[movingAnchor] - dragFixedAnchorWorld;
             if (anchorConstraintAxis == GizmoAxis.None)
@@ -4423,14 +4494,49 @@ namespace OstrixMods.BuildWorks
             snapEdges.Clear();
         }
 
+        private Vector3 ResolveTransformPivot()
+        {
+            Vector3[] anchors = UpdateAnchorWorldPoints();
+            int anchor = selectedAnchorPoint >= 0 ? selectedAnchorPoint : pinnedAnchorPoint;
+            return anchors != null && anchor >= 0 && anchor < anchors.Length
+                ? anchors[anchor] : currentPosition;
+        }
+
+        private void ApplyGizmoRotation(Quaternion rotation)
+        {
+            var pose = Geometry.BlueprintEditorDocument.TransformPart(
+                dragTransformPart, new Point3(0, 0, 0),
+                ToGeometry(rotation * Quaternion.Inverse(dragStartRotation)),
+                ToGeometry(dragTransformPivot), new Point3(1, 1, 1), new Rotation3(0, 0, 0, 1));
+            MovePieceWithoutMovingCameraFocus(ToUnity(pose.Position));
+            currentRotation = new Quaternion((float)pose.Rotation.X, (float)pose.Rotation.Y,
+                (float)pose.Rotation.Z, (float)pose.Rotation.W);
+            currentScale = ToUnity(pose.Scale);
+        }
+
         private void BeginDrag(Camera camera, Vector2 mouse)
         {
+            if (!selectedPiece)
+            {
+                dragAxis = GizmoAxis.None;
+                dragHandle = GizmoHandleKind.None;
+                return;
+            }
             dragStartMouse = mouse;
             dragStartPosition = currentPosition;
             dragStartRotation = currentRotation;
+            dragStartScale = currentScale;
+            dragStartSnapshot = CaptureHistorySnapshot();
+            dragTransformPivot = ResolveTransformPivot();
+            dragTransformPart = new BlueprintEditorPart(
+                selectedPiece.GetInstanceID().ToString(System.Globalization.CultureInfo.InvariantCulture),
+                selectedPiece.name, selectedPiece.name,
+                ToGeometry(dragStartPosition), ToGeometry(dragStartRotation),
+                scale: ToGeometry(dragStartScale),
+                baseScale: ToGeometry(selectedPiece.transform.localScale));
             CaptureDragLayoutState();
             dragAxisWorld = TransformGizmoView.AxisVector(dragAxis, currentRotation, localSpace);
-            Vector3 pivotScreen = camera.WorldToScreenPoint(currentPosition);
+            Vector3 pivotScreen = camera.WorldToScreenPoint(dragTransformPivot);
             if (dragHandle != GizmoHandleKind.Rotate)
             {
                 if (dragHandle == GizmoHandleKind.Layout)
@@ -4439,7 +4545,7 @@ namespace OstrixMods.BuildWorks
                         dragAxis != repeatAxis;
                 }
                 Vector3 endScreen = camera.WorldToScreenPoint(
-                    currentPosition + dragAxisWorld * gizmo.Scale);
+                    dragTransformPivot + dragAxisWorld * gizmo.Scale);
                 Vector2 screenAxis = new Vector2(
                     endScreen.x - pivotScreen.x,
                     endScreen.y - pivotScreen.y);
@@ -4457,7 +4563,7 @@ namespace OstrixMods.BuildWorks
                         1.0,
                         Vector3.Dot(
                             dragAxisWorld,
-                            camera.transform.position - currentPosition));
+                            camera.transform.position - dragTransformPivot));
             }
         }
 
@@ -4542,7 +4648,7 @@ namespace OstrixMods.BuildWorks
             for (int index = start; index < end; ++index)
             {
                 float projected = Vector3.Dot(
-                    currentRotation * anchorLocalPoints[index],
+                    currentRotation * ScaledAnchor(index),
                     axisWorld);
                 minimum = Mathf.Min(minimum, projected);
                 maximum = Mathf.Max(maximum, projected);
@@ -4562,12 +4668,12 @@ namespace OstrixMods.BuildWorks
             }
 
             Vector3 directionLocal = Quaternion.Inverse(currentRotation) * directionWorld;
-            Vector3 center = anchorLocalPoints[AnchorAdjustment.CenterAnchorIndex];
+            Vector3 center = ScaledAnchor(AnchorAdjustment.CenterAnchorIndex);
             float minimum = float.PositiveInfinity;
             float maximum = float.NegativeInfinity;
             for (int index = 0; index < AnchorAdjustment.AnchorCount; ++index)
             {
-                float projected = Vector3.Dot(anchorLocalPoints[index], directionLocal);
+                float projected = Vector3.Dot(ScaledAnchor(index), directionLocal);
                 minimum = Mathf.Min(minimum, projected);
                 maximum = Mathf.Max(maximum, projected);
             }
@@ -5009,6 +5115,14 @@ namespace OstrixMods.BuildWorks
 
         private void RebuildBlueprintPlan()
         {
+            if (keyboardPreview && keyboardPreviewPlan != null && IsBlueprintTransform)
+            {
+                placementPlan.Clear();
+                placementPlan.AddRange(keyboardPreviewPlan);
+                placementPlanPieces.Clear();
+                placementPlanPieces.AddRange(activeBlueprintPieces);
+                return;
+            }
             CommitBlueprintEditTarget();
             placementPlan.Clear();
             placementPlanPieces.Clear();
@@ -5032,10 +5146,11 @@ namespace OstrixMods.BuildWorks
         private bool TryAddPlacementInstance(Vector3 position, Quaternion rotation, float uniformScale = 1f)
         {
             Vector3[] relativeScales = null;
+            Vector3 ordinaryScale = Vector3.one;
             try
             {
                 if (activeBlueprint == null)
-                    BlueprintEditorPart.NormalizeScale(new Point3(uniformScale, uniformScale, uniformScale), nameof(uniformScale));
+                    ordinaryScale = ToUnity(BlueprintEditorPart.NormalizeScale(ToGeometry(currentScale) * uniformScale, nameof(uniformScale)));
                 else
                 {
                     if (activeBlueprintPieces.Count != activeBlueprint.parts.Count) return false;
@@ -5043,11 +5158,6 @@ namespace OstrixMods.BuildWorks
                     for (int index = 0; index < activeBlueprint.parts.Count; ++index)
                     {
                         CompositeBlueprintStore.Part part = activeBlueprint.parts[index];
-                        if (part.scaleIsAbsolute)
-                        {
-                            repeatPlanError = BuildWorksLocalization.Text("import.scale_missing", part.prefabName);
-                            return false;
-                        }
                         Piece piece = activeBlueprintPieces[index];
                         if (!piece)
                         {
@@ -5055,7 +5165,7 @@ namespace OstrixMods.BuildWorks
                             return false;
                         }
                         relativeScales[index] = ToUnity(BlueprintEditorPart.NormalizeScale(
-                            ToGeometry(part.PlacementScale(piece.transform.localScale)) * uniformScale, nameof(uniformScale)));
+                            ToGeometry(BlueprintPartTransform(index).Scale) * uniformScale, nameof(uniformScale)));
                         ZNetView view = piece.GetComponent<ZNetView>();
                         if (relativeScales[index] != Vector3.one && (!view || !view.m_syncInitialScale))
                         {
@@ -5072,7 +5182,13 @@ namespace OstrixMods.BuildWorks
             }
             if (activeBlueprint == null)
             {
-                placementPlan.Add(new TransformSnapshot(position, rotation, Vector3.one * uniformScale));
+                ZNetView view = selectedPiece ? selectedPiece.GetComponent<ZNetView>() : null;
+                if (!IsFinite(position) || ordinaryScale != Vector3.one && (!view || !view.m_syncInitialScale))
+                {
+                    repeatPlanError = BuildWorksLocalization.Text("blueprint.scale_persistence_suffix", selectedPiece ? selectedPiece.name : "");
+                    return false;
+                }
+                placementPlan.Add(new TransformSnapshot(position, rotation, ordinaryScale));
                 placementPlanPieces.Add(selectedPiece);
                 return true;
             }
@@ -5085,18 +5201,25 @@ namespace OstrixMods.BuildWorks
                 expandedPlanLimited = true;
                 return false;
             }
+            var instances = new TransformSnapshot[activeBlueprint.parts.Count];
             for (int index = 0; index < activeBlueprint.parts.Count; ++index)
             {
                 CompositeBlueprintStore.Part part = activeBlueprint.parts[index];
-                Vector3 localPosition = part.position.ToVector3();
-                Quaternion localRotation = part.rotation.ToQuaternion();
-                placementPlan.Add(new TransformSnapshot(
-                    position + rotation * (localPosition * uniformScale),
-                    rotation * localRotation,
+                TransformSnapshot pose = BlueprintPartTransform(index);
+                Vector3 world = position + rotation * (pose.Position * uniformScale);
+                if (!IsFinite(world))
+                {
+                    repeatPlanError = BuildWorksLocalization.Text("layout.scale_bounds");
+                    return false;
+                }
+                instances[index] = new TransformSnapshot(
+                    world,
+                    rotation * pose.Rotation,
                     relativeScales[index], part.signText,
-                    part.foreignData?.ToGeometry(), blueprintSnapLocalSets[index], part.materialSeed));
-                placementPlanPieces.Add(activeBlueprintPieces[index]);
+                    part.foreignData?.ToGeometry(), blueprintSnapLocalSets[index], part.materialSeed);
             }
+            placementPlan.AddRange(instances);
+            placementPlanPieces.AddRange(activeBlueprintPieces);
             return true;
         }
 
@@ -5152,6 +5275,7 @@ namespace OstrixMods.BuildWorks
 
         private void SaveCurrentBlueprint()
         {
+            if (keyboardPreview) { ConfirmKeyboardTransform(); return; }
             if (sessionMode == SessionMode.BlueprintEditor)
             {
                 SaveAndCloseBlueprintEditor();
@@ -5406,6 +5530,7 @@ namespace OstrixMods.BuildWorks
             }
 
             activeBlueprint = blueprint;
+            blueprintPartTransforms = null;
             blueprintCompositeFrame = !CompositeBlueprintStore.HasExplicitFrame(blueprint);
             activeBlueprintPieces.Clear();
             activeBlueprintPieces.AddRange(pieces);
@@ -5425,6 +5550,7 @@ namespace OstrixMods.BuildWorks
             if (!ApplyBlueprintAnchors())
             {
                 activeBlueprint = null;
+                blueprintPartTransforms = null;
                 activeBlueprintPieces.Clear();
                 RestoreSinglePieceAnchors();
                 ShowStatus(Player.m_localPlayer, BuildWorksLocalization.Text(
@@ -5438,6 +5564,7 @@ namespace OstrixMods.BuildWorks
             {
                 RestoreBlueprintDraft();
                 activeBlueprint = null;
+                blueprintPartTransforms = null;
                 activeBlueprintPieces.Clear();
                 ShowStatus(Player.m_localPlayer, BuildWorksLocalization.Text(
                     "blueprint.frame_edit_select_failed"));
@@ -5466,12 +5593,13 @@ namespace OstrixMods.BuildWorks
 
             if (index >= 0)
             {
-                CompositeBlueprintStore.Part part = activeBlueprint.parts[index];
+                TransformSnapshot pose = BlueprintPartTransform(index);
                 currentPosition = blueprintRootPosition + blueprintRootRotation *
-                    part.position.ToVector3();
-                currentRotation = blueprintRootRotation * part.rotation.ToQuaternion();
+                    pose.Position;
+                currentRotation = blueprintRootRotation * pose.Rotation;
+                currentScale = pose.Scale;
                 placementGhost.transform.SetPositionAndRotation(currentPosition, currentRotation);
-                placementGhost.transform.localScale = part.RootScale(selectedPiece.transform.localScale);
+                placementGhost.transform.localScale = Vector3.Scale(selectedPiece.transform.localScale, currentScale);
                 anchorBoundsAvailable = CaptureAnchorPoints(placementGhost);
                 if (!anchorBoundsAvailable) return false;
                 singlePieceAnchorLocalPoints = (Vector3[])anchorLocalPoints.Clone();
@@ -5480,6 +5608,7 @@ namespace OstrixMods.BuildWorks
             {
                 currentPosition = blueprintRootPosition + blueprintRootRotation * blueprintPivotLocal;
                 currentRotation = blueprintRootRotation;
+                currentScale = Vector3.one;
                 RebuildBlueprintPlan();
                 ApplyEditingGhostTransform();
                 anchorBoundsAvailable = ApplyBlueprintAnchors();
@@ -5491,6 +5620,7 @@ namespace OstrixMods.BuildWorks
             baseSnapshot = CaptureHistorySnapshot();
             history.Reset(baseSnapshot);
             pinnedAnchorPoint = -1;
+            selectedAnchorPoint = -1;
             anchorConstraintAxis = GizmoAxis.None;
             ClearSnapDrag();
             return true;
@@ -5509,6 +5639,7 @@ namespace OstrixMods.BuildWorks
 
         private void CommitBlueprintEditTarget()
         {
+            if (keyboardPreview) return;
             if (activeBlueprint == null) return;
             if (blueprintEditPartIndex < 0)
             {
@@ -5517,17 +5648,15 @@ namespace OstrixMods.BuildWorks
                 return;
             }
 
-            CompositeBlueprintStore.Part part = activeBlueprint.parts[blueprintEditPartIndex];
             Quaternion inverse = Quaternion.Inverse(blueprintRootRotation);
             Vector3 localPosition = inverse * (currentPosition - blueprintRootPosition);
             Quaternion localRotation = inverse * currentRotation;
-            Vector3 previousPosition = part.position.ToVector3();
-            Quaternion previousRotation = part.rotation.ToQuaternion();
-            if (!TransformChanged(previousPosition, previousRotation, localPosition, localRotation))
-                return;
-            part.position = new CompositeBlueprintStore.VectorData(localPosition);
-            part.rotation = new CompositeBlueprintStore.QuaternionData(localRotation);
-            blueprintSnapLocalSets = null;
+            TransformSnapshot pose = new TransformSnapshot(localPosition, localRotation, currentScale);
+            if (!HistorySnapshotChanged(BlueprintPartTransform(blueprintEditPartIndex), pose)) return;
+            var next = new TransformSnapshot[activeBlueprint.parts.Count];
+            for (int index = 0; index < next.Length; ++index) next[index] = BlueprintPartTransform(index);
+            next[blueprintEditPartIndex] = pose;
+            blueprintPartTransforms = next;
             blueprintPartsDirty = true;
         }
 
@@ -5542,9 +5671,29 @@ namespace OstrixMods.BuildWorks
                 error = BuildWorksLocalization.Text("blueprint.anchors_recalc_failed");
                 return false;
             }
-            if (!blueprintStore.TryUpdateParts(activeBlueprint, activeBlueprint.parts, anchors,
-                out error))
-                return false;
+            var parts = CompositeBlueprintStore.CloneParts(activeBlueprint.parts);
+            for (int index = 0; index < parts.Count; ++index)
+            {
+                TransformSnapshot pose = BlueprintPartTransform(index);
+                parts[index].position = new CompositeBlueprintStore.VectorData(pose.Position);
+                parts[index].rotation = new CompositeBlueprintStore.QuaternionData(pose.Rotation);
+                parts[index].scale = new CompositeBlueprintStore.VectorData(pose.Scale);
+                parts[index].baseScale = new CompositeBlueprintStore.VectorData(activeBlueprintPieces[index].transform.localScale);
+                parts[index].scaleIsAbsolute = false;
+            }
+            var previousCustomPoints = activeBlueprint.customSnapPoints;
+            var customPoints = BlueprintCustomPoints().Select(point => new CompositeBlueprintStore.VectorData(point)).ToList();
+            bool saved = false;
+            try
+            {
+                activeBlueprint.customSnapPoints = customPoints;
+                saved = blueprintStore.TryUpdateParts(activeBlueprint, parts, anchors, out error);
+                if (!saved) return false;
+            }
+            finally
+            {
+                if (!saved) activeBlueprint.customSnapPoints = previousCustomPoints;
+            }
             originalBlueprintParts = null;
             originalBlueprintAnchors = null;
             blueprintPartsDirty = false;
@@ -5581,7 +5730,7 @@ namespace OstrixMods.BuildWorks
                     continue;
                 Piece piece = activeBlueprintPieces[index];
                 if (!piece) return false;
-                CompositeBlueprintStore.Part part = activeBlueprint.parts[index];
+                TransformSnapshot pose = BlueprintPartTransform(index);
                 var native = new List<Transform>();
                 piece.GetSnapPoints(native);
                 var local = new List<Point3>(native.Count);
@@ -5590,8 +5739,7 @@ namespace OstrixMods.BuildWorks
                 {
                     if (!point) continue;
                     Vector3 pieceLocal = inversePiece * (point.position - piece.transform.position);
-                    Vector3 rootLocal = part.position.ToVector3() +
-                        part.rotation.ToQuaternion() * pieceLocal;
+                    Vector3 rootLocal = pose.Position + pose.Rotation * Vector3.Scale(pieceLocal, pose.Scale);
                     local.Add(ToGeometry(rootLocal));
                 }
                 snapPoints.Add(local);
@@ -5617,9 +5765,9 @@ namespace OstrixMods.BuildWorks
                 if (!piece || !TryCaptureAnchorBounds(piece.gameObject,
                     piece.transform.position, piece.transform.rotation, out AnchorBounds bounds, prefabLocal: true))
                     continue;
-                CompositeBlueprintStore.Part part = activeBlueprint.parts[index];
-                Vector3 partPosition = part.position.ToVector3();
-                Quaternion partRotation = part.rotation.ToQuaternion();
+                TransformSnapshot pose = BlueprintPartTransform(index);
+                Vector3 partPosition = pose.Position;
+                Quaternion partRotation = pose.Rotation;
                 Vector2 minimum = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
                 Vector2 maximum = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
                 float depth = float.PositiveInfinity;
@@ -5627,7 +5775,7 @@ namespace OstrixMods.BuildWorks
                 for (int corner = 0; corner < 8; ++corner)
                 {
                     Vector3 world = blueprintRootPosition + blueprintRootRotation *
-                        (partPosition + partRotation * ToUnity(bounds.Corner(corner)));
+                        (partPosition + partRotation * Vector3.Scale(ToUnity(bounds.Corner(corner)), pose.Scale));
                     Vector3 screen = camera.WorldToScreenPoint(world);
                     if (screen.z <= 0f) continue;
                     visible = true;
@@ -5739,6 +5887,26 @@ namespace OstrixMods.BuildWorks
             return unavailable.Count == 0 && pieces.Count >= 1;
         }
 
+        private IEnumerable<Vector3> BlueprintCustomPoints()
+        {
+            if (blueprintPartTransforms == null)
+            {
+                foreach (var point in activeBlueprint.customSnapPoints ?? Enumerable.Empty<CompositeBlueprintStore.VectorData>())
+                    yield return point.ToVector3();
+                yield break;
+            }
+            // Extra native points keep their original part-local attachment through the same TRS.
+            if (blueprintSnapLocalSets == null)
+                blueprintSnapLocalSets = BlueprintPlacementFrame.SnapLocalSets(activeBlueprint, activeBlueprintPieces);
+            for (int index = 0; index < activeBlueprint.parts.Count; ++index)
+            {
+                TransformSnapshot pose = BlueprintPartTransform(index);
+                Vector3 rootScale = Vector3.Scale(activeBlueprintPieces[index].transform.localScale, pose.Scale);
+                foreach (Point3 point in blueprintSnapLocalSets[index] ?? Array.Empty<Point3>())
+                    yield return pose.Position + pose.Rotation * Vector3.Scale(rootScale, ToUnity(point));
+            }
+        }
+
         private bool ApplyBlueprintAnchors()
         {
             blueprintSnapLocalSets = null;
@@ -5761,10 +5929,10 @@ namespace OstrixMods.BuildWorks
                     piece.transform.rotation,
                     out AnchorBounds partBounds, prefabLocal: true))
                     return false;
-                CompositeBlueprintStore.Part part = activeBlueprint.parts[index];
-                Vector3 partPosition = part.position.ToVector3();
-                Quaternion partRotation = part.rotation.ToQuaternion();
-                Vector3 relativeScale = part.PlacementScale(piece.transform.localScale);
+                TransformSnapshot pose = BlueprintPartTransform(index);
+                Vector3 partPosition = pose.Position;
+                Quaternion partRotation = pose.Rotation;
+                Vector3 relativeScale = pose.Scale;
                 for (int corner = 0; corner < 8; ++corner)
                 {
                     corners.Add(ToGeometry(partPosition +
@@ -5810,9 +5978,8 @@ namespace OstrixMods.BuildWorks
             for (int index = 0; index < externalSnaps.Count &&
                 index < MaximumBlueprintSourceNativeSnapPoints; ++index)
                 points.Add(ToUnity(externalSnaps[index]) - blueprintPivotLocal);
-            foreach (CompositeBlueprintStore.VectorData point in activeBlueprint.customSnapPoints ??
-                Enumerable.Empty<CompositeBlueprintStore.VectorData>())
-                points.Add(point.ToVector3() - blueprintPivotLocal);
+            foreach (Vector3 point in BlueprintCustomPoints())
+                points.Add(point - blueprintPivotLocal);
             anchorLocalPoints = points.ToArray();
             anchorWorldPoints = new Vector3[anchorLocalPoints.Length];
             anchorBoundsAvailable = true;
@@ -5825,14 +5992,28 @@ namespace OstrixMods.BuildWorks
                 Input.GetKey(BuildWorksPlugin.BlueprintCompositeFrameKey.Value);
             if (blueprintCompositeFrame == composite) return;
             CommitBlueprintEditTarget();
+            // A different frame replaces anchor identities, so no index-based drag or pin can survive it.
+            dragAxis = GizmoAxis.None;
+            dragHandle = GizmoHandleKind.None;
+            dragAnchorPoint = -1;
+            pinnedAnchorPoint = -1;
+            selectedAnchorPoint = -1;
+            anchorConstraintAxis = GizmoAxis.None;
+            alignmentTargetVisible = false;
+            ClearSnapDrag();
             blueprintCompositeFrame = composite;
-            if (!ApplyBlueprintAnchors()) return;
+            if (!ApplyBlueprintAnchors())
+            {
+                blueprintCompositeFrame = !composite;
+                return;
+            }
             RebuildBlueprintPlan();
             ApplyEditingGhostTransform();
         }
 
         private void RestoreSinglePieceAnchors()
         {
+            selectedAnchorPoint = -1;
             anchorLocalPoints = (Vector3[])singlePieceAnchorLocalPoints.Clone();
             anchorWorldPoints = new Vector3[anchorLocalPoints.Length];
             anchorBoundsAvailable = anchorLocalPoints.Length >= NativeAnchorStart;
@@ -6008,16 +6189,22 @@ namespace OstrixMods.BuildWorks
 #endif
         private bool CancelNewestStage()
         {
+            if (keyboardPreview) { CancelKeyboardTransform(); return true; }
             if (dragAxis != GizmoAxis.None || dragAnchorPoint >= 0)
             {
-                currentPosition = dragStartPosition;
-                currentRotation = dragStartRotation;
+                ApplyHistorySnapshot(dragStartSnapshot);
                 RestoreDragLayoutState();
                 dragAxis = GizmoAxis.None;
                 dragHandle = GizmoHandleKind.None;
                 dragAnchorPoint = -1;
                 dragConstraintActive = false;
                 ClearSnapDrag();
+                return true;
+            }
+            if (selectedAnchorPoint >= 0 || pinnedAnchorPoint >= 0)
+            {
+                pinnedAnchorPoint = -1;
+                selectedAnchorPoint = -1;
                 return true;
             }
             if (gizmoMode == GizmoMode.Guide)
@@ -6053,11 +6240,6 @@ namespace OstrixMods.BuildWorks
                 ClearLayout();
                 return true;
             }
-            if (pinnedAnchorPoint >= 0)
-            {
-                pinnedAnchorPoint = -1;
-                return true;
-            }
             if (anchorConstraintAxis != GizmoAxis.None)
             {
                 anchorConstraintAxis = GizmoAxis.None;
@@ -6074,6 +6256,7 @@ namespace OstrixMods.BuildWorks
 
         private void SelectGizmoMode(GizmoMode mode)
         {
+            if (keyboardPreview) CancelKeyboardTransform();
             if (mode == gizmoMode && mode != GizmoMode.Move)
                 mode = GizmoMode.Move;
             if ((mode == GizmoMode.Guide || mode == GizmoMode.Repeat) &&
@@ -6096,6 +6279,18 @@ namespace OstrixMods.BuildWorks
 
         private void SelectAnchorConstraint(GizmoAxis axis)
         {
+            if (keyboardPreview)
+            {
+                if (axis != GizmoAxis.None) SetKeyboardTransformAxis(freeViewCamera, axis);
+                else
+                {
+                    GizmoHandleKind handle = dragHandle == GizmoHandleKind.Scale ? GizmoHandleKind.Scale :
+                        dragHandle == GizmoHandleKind.Rotate ? GizmoHandleKind.Rotate : GizmoHandleKind.MovePlane;
+                    CancelKeyboardTransform();
+                    BeginKeyboardTransform(freeViewCamera, handle);
+                }
+                return;
+            }
             if (!anchorBoundsAvailable)
             {
                 ShowStatus(Player.m_localPlayer, BuildWorksLocalization.Text(
@@ -6127,6 +6322,17 @@ namespace OstrixMods.BuildWorks
 
         private void ToggleSpace()
         {
+            if (keyboardPreview)
+            {
+                localSpace = !localSpace;
+                keyboardAttemptCached = false;
+                keyboardTranslation = Vector3.zero;
+                keyboardRotation = Quaternion.identity;
+                keyboardScale = keyboardValidScale = 1f;
+                TryPreviewKeyboardTransform();
+                RebaseKeyboardTransform(freeViewCamera);
+                return;
+            }
             if (gizmoMode == GizmoMode.Repeat)
             {
                 ClearLayout();
@@ -6256,6 +6462,7 @@ namespace OstrixMods.BuildWorks
 
         private void ToggleAutoAlignment()
         {
+            if (!autoAlignmentEnabled && keyboardPreview) CancelKeyboardTransform();
             autoAlignmentEnabled = !autoAlignmentEnabled;
             alignmentTargetVisible = false;
             if (autoAlignmentEnabled)
@@ -6328,7 +6535,7 @@ namespace OstrixMods.BuildWorks
             bool found = false;
             for (int source = NativeAnchorStart; source < anchorLocalPoints.Length; ++source)
             {
-                Vector3 candidateSource = anchorLocalPoints[source];
+                Vector3 candidateSource = ScaledAnchor(source);
                 Vector3 sourceWorld = currentPosition + sourceRotation * candidateSource;
                 foreach (Transform target in nativeSnapPoints)
                 {
@@ -6402,9 +6609,21 @@ namespace OstrixMods.BuildWorks
                 : string.Empty;
             PruneBlueprintSelection();
             bool canSaveBlueprint = sessionMode != SessionMode.BlueprintEditor;
+            string transformName = dragHandle == GizmoHandleKind.Rotate ? "R" : dragHandle == GizmoHandleKind.Scale ? "S" : "G";
+            if (keyboardPreview && dragAxis != GizmoAxis.None)
+            {
+                transformName += " " + (dragHandle == GizmoHandleKind.MovePlane && keyboardSecondAxis == GizmoAxis.None ? "Shift+" : "") + dragAxis;
+                if (keyboardSecondAxis != GizmoAxis.None) transformName += "+" + keyboardSecondAxis;
+            }
+            if (!selectingBlueprint)
+                modeHint += "\n" + (keyboardPreview ? BuildWorksLocalization.Text("f9.transform.active",
+                    transformName, keyboardNumber)
+                    : BuildWorksLocalization.Text("f9.transform.idle"));
+            if (keyboardPreview && !keyboardValid)
+                modeHint += "\n" + BuildWorksLocalization.Text(keyboardError ?? "editor.hint.numeric_invalid");
             hud.ShowEditing(
                 gizmoMode,
-                anchorConstraintAxis,
+                keyboardPreview ? dragAxis : anchorConstraintAxis,
                 localSpace,
                 showAllAnchors,
                 (HandleScales[handleScaleIndex] * 100f).ToString("0") + "%",
@@ -6517,6 +6736,7 @@ namespace OstrixMods.BuildWorks
 
         private void ConfirmEditor()
         {
+            if (keyboardPreview) { ConfirmKeyboardTransform(); return; }
             if (selectingBlueprint)
             {
                 SaveCurrentBlueprint();
@@ -6612,14 +6832,23 @@ namespace OstrixMods.BuildWorks
             foreach (BlueprintWorkspacePart workspacePart in blueprintWorkspaceParts)
             {
                 Transform visual = workspacePart.Visual.transform;
+                CompositeBlueprintStore.VectorData relativeScale;
+                try
+                {
+                    relativeScale = CompositeBlueprintStore.RelativeScale(
+                        new CompositeBlueprintStore.VectorData(visual.localScale),
+                        new CompositeBlueprintStore.VectorData(workspacePart.Source.transform.localScale));
+                }
+                catch (ArgumentException)
+                { error = BuildWorksLocalization.Text("layout.scale_bounds"); return false; }
                 parts.Add(new CompositeBlueprintStore.Part
                 {
                     prefabName = PrefabName(workspacePart.Source),
                     position = new CompositeBlueprintStore.VectorData(
                         visual.position - rootPosition),
                     rotation = new CompositeBlueprintStore.QuaternionData(visual.rotation),
-                    scale = new CompositeBlueprintStore.VectorData(Vector3.one),
-                    baseScale = new CompositeBlueprintStore.VectorData(visual.localScale),
+                    scale = relativeScale,
+                    baseScale = new CompositeBlueprintStore.VectorData(workspacePart.Source.transform.localScale),
                     signText = workspacePart.SignText,
                     materialSeed = workspacePart.SourceData?.materialSeed,
                     sourceDocumentId = workspacePart.SourceData?.sourceDocumentId,
@@ -6664,6 +6893,7 @@ namespace OstrixMods.BuildWorks
 
         private bool ArmPlacement()
         {
+            if (keyboardPreview) { ConfirmKeyboardTransform(); return false; }
             if (state != PlacementState.Editing ||
                 sessionMode != SessionMode.WorldPrecision &&
                 sessionMode != SessionMode.BlueprintWorldPlacement)
@@ -6697,8 +6927,11 @@ namespace OstrixMods.BuildWorks
                 if (activeBlueprint != null) RebuildBlueprintPlan();
                 else
                 {
-                    placementPlan.Add(new TransformSnapshot(currentPosition, currentRotation));
-                    placementPlanPieces.Add(selectedPiece);
+                    if (!TryAddPlacementInstance(currentPosition, currentRotation))
+                    {
+                        ShowStatus(player, repeatPlanError ?? BuildWorksLocalization.Text("layout.scale_bounds"));
+                        return false;
+                    }
                 }
             }
             if (placementPlanPieces.Count != placementPlan.Count)
@@ -6724,7 +6957,7 @@ namespace OstrixMods.BuildWorks
                     : BuildWorksLocalization.Text("placement.preview_failed", previews.HeavyError));
                 return false;
             }
-            editorRootBeforePlacement = new TransformSnapshot(currentPosition, currentRotation);
+            editorRootBeforePlacement = new TransformSnapshot(currentPosition, currentRotation, currentScale);
             if (TryCreateConstructionProject(player)) return false;
             supportOrder = sessionMode == SessionMode.BlueprintWorldPlacement
                 ? new PendingPlacementOrder(placementPlan.Count) : null;
@@ -6740,6 +6973,7 @@ namespace OstrixMods.BuildWorks
             }
             currentPosition = placementPlan[0].Position;
             currentRotation = placementPlan[0].Rotation;
+            currentScale = placementPlan[0].Scale;
 
             EndFreeView(restoreCamera: true);
             if (!RestoreExternalBuildCamera())
@@ -6817,11 +7051,13 @@ namespace OstrixMods.BuildWorks
             {
                 currentPosition = editorRootBeforePlacement.Position;
                 currentRotation = editorRootBeforePlacement.Rotation;
+                currentScale = editorRootBeforePlacement.Scale;
             }
             if (activeBlueprint != null)
             {
                 currentPosition = editorRootBeforePlacement.Position;
                 currentRotation = editorRootBeforePlacement.Rotation;
+                currentScale = editorRootBeforePlacement.Scale;
                 if (preserveLayout) RebuildActiveLayout();
                 else RebuildBlueprintPlan();
                 if (!SelectPlanPiece(player, 0))
@@ -6856,6 +7092,7 @@ namespace OstrixMods.BuildWorks
 
         private void ResetTransform()
         {
+            if (keyboardPreview) CancelKeyboardTransform();
             if (state != PlacementState.Editing)
             {
                 return;
@@ -6873,6 +7110,7 @@ namespace OstrixMods.BuildWorks
             dragHandle = GizmoHandleKind.None;
             dragAnchorPoint = -1;
             pinnedAnchorPoint = -1;
+            selectedAnchorPoint = -1;
             alignmentTargetVisible = false;
             ClearSnapDrag();
             history.Commit(CaptureHistorySnapshot());
@@ -6880,6 +7118,7 @@ namespace OstrixMods.BuildWorks
 
         private void UndoTransform()
         {
+            if (keyboardPreview) { CancelKeyboardTransform(); return; }
             if (state != PlacementState.Editing || dragAxis != GizmoAxis.None ||
                 dragAnchorPoint >= 0 || !history.TryUndo(out TransformSnapshot snapshot))
             {
@@ -6894,6 +7133,7 @@ namespace OstrixMods.BuildWorks
 
         private void RedoTransform()
         {
+            if (keyboardPreview) { CancelKeyboardTransform(); return; }
             if (state != PlacementState.Editing || dragAxis != GizmoAxis.None ||
                 dragAnchorPoint >= 0 || !history.TryRedo(out TransformSnapshot snapshot))
             {
@@ -6908,14 +7148,51 @@ namespace OstrixMods.BuildWorks
 
         private TransformSnapshot CaptureHistorySnapshot()
         {
-            Vector3 position = activeBlueprint != null && blueprintEditPartIndex < 0
+            if (IsBlueprintTransform && blueprintPartTransforms == null)
+            {
+                var initial = new TransformSnapshot[activeBlueprint.parts.Count];
+                for (int index = 0; index < initial.Length; ++index) initial[index] = BlueprintPartTransform(index);
+                blueprintPartTransforms = initial;
+            }
+            Vector3 position = IsBlueprintTransform && blueprintEditPartIndex < 0
                 ? currentPosition - currentRotation * blueprintPivotLocal
                 : currentPosition;
-            return new TransformSnapshot(position, currentRotation);
+            return new TransformSnapshot(position, currentRotation, currentScale,
+                partTransforms: IsBlueprintTransform ? blueprintPartTransforms : null,
+                anchorPoints: anchorLocalPoints,
+                blueprintPivot: IsBlueprintTransform ? (Vector3?)blueprintPivotLocal : null,
+                compositeFrame: IsBlueprintTransform ? (bool?)blueprintCompositeFrame : null,
+                blueprintDirty: IsBlueprintTransform ? (bool?)blueprintPartsDirty : null);
+        }
+
+        private TransformSnapshot BlueprintPartTransform(int index)
+        {
+            if (blueprintPartTransforms != null) return blueprintPartTransforms[index];
+            CompositeBlueprintStore.Part part = activeBlueprint.parts[index];
+            Piece piece = activeBlueprintPieces[index];
+            return new TransformSnapshot(part.position.ToVector3(), part.rotation.ToQuaternion(),
+                CompositeBlueprintStore.RelativeScale(new CompositeBlueprintStore.VectorData(part.RootScale(piece.transform.localScale)),
+                    new CompositeBlueprintStore.VectorData(piece.transform.localScale)).ToVector3());
         }
 
         private void ApplyHistorySnapshot(TransformSnapshot snapshot)
         {
+            Vector3 scale = ToUnity(BlueprintEditorPart.NormalizeScale(ToGeometry(snapshot.Scale), nameof(snapshot)));
+            if (snapshot.PartTransforms != null &&
+                (!IsBlueprintTransform || activeBlueprint.parts.Count != snapshot.PartTransforms.Length))
+                throw new InvalidOperationException("Blueprint history no longer matches the active parts.");
+            if (IsBlueprintTransform) blueprintPartTransforms = snapshot.PartTransforms;
+            if (snapshot.BlueprintPivot.HasValue) blueprintPivotLocal = snapshot.BlueprintPivot.Value;
+            if (snapshot.CompositeFrame.HasValue) blueprintCompositeFrame = snapshot.CompositeFrame.Value;
+            if (snapshot.BlueprintDirty.HasValue) blueprintPartsDirty = snapshot.BlueprintDirty.Value;
+            if (snapshot.AnchorPoints != null)
+            {
+                anchorLocalPoints = snapshot.AnchorPoints;
+                if (anchorWorldPoints.Length != anchorLocalPoints.Length)
+                    anchorWorldPoints = new Vector3[anchorLocalPoints.Length];
+                if (selectedAnchorPoint >= anchorLocalPoints.Length) selectedAnchorPoint = -1;
+                if (pinnedAnchorPoint >= anchorLocalPoints.Length) pinnedAnchorPoint = -1;
+            }
             if (localSpace && gizmoMode == GizmoMode.Repeat &&
                 repeatAxis != GizmoAxis.None)
             {
@@ -6924,7 +7201,7 @@ namespace OstrixMods.BuildWorks
                 planeSecondStep = layoutDelta * planeSecondStep;
             }
             Vector3 position = snapshot.Position;
-            if (activeBlueprint != null && blueprintEditPartIndex < 0)
+            if (IsBlueprintTransform && blueprintEditPartIndex < 0)
             {
                 blueprintRootPosition = snapshot.Position;
                 blueprintRootRotation = snapshot.Rotation;
@@ -6932,11 +7209,17 @@ namespace OstrixMods.BuildWorks
             }
             MovePieceWithoutMovingCameraFocus(position);
             currentRotation = snapshot.Rotation;
+            currentScale = scale;
         }
 
-        private void CommitTransformIfChanged(Vector3 oldPosition, Quaternion oldRotation)
+        private void CommitTransformIfChanged(Vector3 oldPosition, Quaternion oldRotation, TransformSnapshot? oldSnapshot = null)
         {
-            if (TransformChanged(oldPosition, oldRotation, currentPosition, currentRotation))
+            if (oldSnapshot.HasValue)
+            {
+                TransformSnapshot current = CaptureHistorySnapshot();
+                if (HistorySnapshotChanged(oldSnapshot.Value, current)) history.Commit(current);
+            }
+            else if (TransformChanged(oldPosition, oldRotation, currentPosition, currentRotation))
             {
                 history.Commit(CaptureHistorySnapshot());
             }
@@ -6956,7 +7239,15 @@ namespace OstrixMods.BuildWorks
             TransformSnapshot left,
             TransformSnapshot right)
         {
-            return TransformChanged(left.Position, left.Rotation, right.Position, right.Rotation);
+            if (TransformChanged(left.Position, left.Rotation, right.Position, right.Rotation) ||
+                (left.Scale - right.Scale).sqrMagnitude > 0.00000001f) return true;
+            if (left.PartTransforms == null || right.PartTransforms == null)
+                return left.PartTransforms != right.PartTransforms;
+            if (ReferenceEquals(left.PartTransforms, right.PartTransforms)) return false;
+            if (left.PartTransforms.Length != right.PartTransforms.Length) return true;
+            for (int index = 0; index < left.PartTransforms.Length; ++index)
+                if (HistorySnapshotChanged(left.PartTransforms[index], right.PartTransforms[index])) return true;
+            return false;
         }
 
         private void Cancel(bool restoreCursor = true)
@@ -7190,6 +7481,7 @@ namespace OstrixMods.BuildWorks
 
         private void Finish(bool restoreCursor = true, bool preserveContinuation = false)
         {
+            ClearKeyboardTransform();
             nativePlacementRayDistance = null;
             HammerCatalogView.CancelPlacementContents(); ClearContentsRecipe();
             bool restoreWorldSelectionGhost =
@@ -7210,6 +7502,7 @@ namespace OstrixMods.BuildWorks
             placementGhost = null;
             selectedPiece = null;
             activeBlueprint = null;
+            blueprintPartTransforms = null;
             blueprintSnapLocalSets = null;
             passivePreviewBlueprint = null;
             passivePreviewPlan.Clear();
@@ -7230,11 +7523,13 @@ namespace OstrixMods.BuildWorks
             blueprintPalettePiece = null;
             editorReturnPiece = null;
             sessionMode = SessionMode.None;
+            currentScale = Vector3.one;
             singlePieceAnchorLocalPoints = Array.Empty<Vector3>();
             dragAxis = GizmoAxis.None;
             dragHandle = GizmoHandleKind.None;
             dragAnchorPoint = -1;
             pinnedAnchorPoint = -1;
+            selectedAnchorPoint = -1;
             anchorConstraintAxis = GizmoAxis.None;
             dragConstraintActive = false;
             alignmentTargetVisible = false;
@@ -7339,7 +7634,7 @@ namespace OstrixMods.BuildWorks
             Quaternion delta = last.Rotation * Quaternion.Inverse(previous.Rotation);
             continuationTransform = new TransformSnapshot(
                 last.Position + (last.Position - previous.Position),
-                delta * last.Rotation);
+                delta * last.Rotation, last.Scale);
             continuationPiece = selectedPiece;
             continuationPending = true;
         }
@@ -7904,8 +8199,10 @@ namespace OstrixMods.BuildWorks
                 points.Add(local);
             }
 
-            anchorLocalPoints = points.ToArray();
+            Vector3 inverseScale = new Vector3(1f / currentScale.x, 1f / currentScale.y, 1f / currentScale.z);
+            anchorLocalPoints = points.Select(point => Vector3.Scale(point, inverseScale)).ToArray();
             anchorWorldPoints = new Vector3[anchorLocalPoints.Length];
+            selectedAnchorPoint = -1;
             return true;
         }
 
@@ -7957,6 +8254,11 @@ namespace OstrixMods.BuildWorks
             return true;
         }
 
+        private Vector3 ScaledAnchor(int anchor)
+        {
+            return Vector3.Scale(anchorLocalPoints[anchor], currentScale);
+        }
+
         private Vector3[] UpdateAnchorWorldPoints()
         {
             if (!anchorBoundsAvailable)
@@ -7966,7 +8268,7 @@ namespace OstrixMods.BuildWorks
             for (int anchor = 0; anchor < anchorWorldPoints.Length; ++anchor)
             {
                 anchorWorldPoints[anchor] = currentPosition +
-                    currentRotation * anchorLocalPoints[anchor];
+                    currentRotation * ScaledAnchor(anchor);
             }
             return anchorWorldPoints;
         }

@@ -1632,28 +1632,17 @@ namespace OstrixMods.BuildWorks
             dragStartMouse = mouse;
             Vector3 origin = dragPivot + dragTranslation;
             Quaternion orientation = dragRotation * keyboardOrientation;
-            dragAxisWorld = dragAxis == GizmoAxis.None ? scene.Camera.transform.forward :
-                TransformGizmoView.AxisVector(dragAxis, orientation, localSpace);
-            if (dragHandle == GizmoHandleKind.MovePlane && keyboardSecondAxis != GizmoAxis.None)
-                dragAxisWorld = Vector3.Cross(dragAxisWorld,
-                    TransformGizmoView.AxisVector(keyboardSecondAxis, orientation, localSpace)).normalized;
-            dragAnchorPlane = new Plane(dragAxisWorld, origin);
-            Ray ray = scene.Camera.ScreenPointToRay(mouse);
-            keyboardValid = !keyboardSurface && dragAnchorPlane.Raycast(ray, out _);
-            dragPlaneStart = dragAnchorPlane.Raycast(ray, out float distance) ? ray.GetPoint(distance) : origin;
-            keyboardPlaneFirst = Vector3.Cross(dragAxisWorld,
-                Mathf.Abs(Vector3.Dot(dragAxisWorld, Vector3.up)) < .9f ? Vector3.up : Vector3.right).normalized;
-            keyboardPlaneSecond = Vector3.Cross(dragAxisWorld, keyboardPlaneFirst).normalized;
-            if (dragHandle == GizmoHandleKind.MovePlane && keyboardSecondAxis != GizmoAxis.None)
-            {
-                keyboardPlaneFirst = TransformGizmoView.AxisVector(dragAxis, orientation, localSpace);
-                keyboardPlaneSecond = TransformGizmoView.AxisVector(keyboardSecondAxis, orientation, localSpace);
-            }
+            var projection = new TransformKeyboardInput.Projection(scene.Camera, mouse, origin, orientation,
+                dragHandle, dragAxis, keyboardSecondAxis, localSpace);
+            dragAxisWorld = projection.Axis;
+            dragAnchorPlane = projection.Plane;
+            keyboardValid = !keyboardSurface && projection.PlaneValid;
+            dragPlaneStart = projection.PlaneStart;
+            keyboardPlaneFirst = projection.PlaneFirst;
+            keyboardPlaneSecond = projection.PlaneSecond;
+            dragScreenDirection = projection.ScreenDirection;
+            dragWorldUnitsPerPixel = projection.UnitsPerPixel;
             Vector3 start = scene.Camera.WorldToScreenPoint(origin);
-            Vector3 end = scene.Camera.WorldToScreenPoint(origin + dragAxisWorld);
-            Vector2 screenAxis = new Vector2(end.x - start.x, end.y - start.y);
-            dragScreenDirection = screenAxis.normalized;
-            dragWorldUnitsPerPixel = 1f / Mathf.Max(2f, screenAxis.magnitude);
             if (ViewDepthMove)
             {
                 dragScreenDirection = Vector2.up;
@@ -1663,7 +1652,8 @@ namespace OstrixMods.BuildWorks
             dragStartAngle = Mathf.Atan2(mouse.y - start.y, mouse.x - start.x) * Mathf.Rad2Deg;
             if (dragHandle == GizmoHandleKind.Rotate)
             {
-                dragUsesRotationPlane = TryRotationDirection(mouse, origin, dragAxisWorld, out dragStartDirection);
+                dragUsesRotationPlane = projection.RotationValid;
+                dragStartDirection = projection.RotationDirection;
                 keyboardValid = dragUsesRotationPlane;
             }
             if (dragHandle == GizmoHandleKind.Scale) keyboardValid = true;
@@ -1674,25 +1664,16 @@ namespace OstrixMods.BuildWorks
 
         private void SetKeyboardAxis(GizmoAxis axis)
         {
-            if (axis == dragAxis)
+            bool previousLocalSpace = localSpace;
+            TransformKeyboardInput.SelectAxis(ref dragHandle, ref dragAxis, ref keyboardSecondAxis, ref localSpace, axis, ShiftHeld);
+            if (previousLocalSpace != localSpace)
             {
-                localSpace = !localSpace;
                 transformFrame = localSpace ? keyboardSavedFrame == TransformFrame.World ? TransformFrame.Local : keyboardSavedFrame
                     : TransformFrame.World;
                 UpdateTransformContext();
             }
-            if (axis != dragAxis)
-            {
-                if (!ShiftHeld && dragHandle != GizmoHandleKind.Rotate && dragAxis != GizmoAxis.None &&
-                    keyboardSecondAxis == GizmoAxis.None)
-                    keyboardSecondAxis = axis;
-                else { dragAxis = axis; keyboardSecondAxis = GizmoAxis.None; }
-            }
-            if (ShiftHeld) keyboardSecondAxis = GizmoAxis.None;
             keyboardSurface = false;
             view.SetCursorSourcesAvailable(false);
-            if (dragHandle != GizmoHandleKind.Rotate && dragHandle != GizmoHandleKind.Scale)
-                dragHandle = ShiftHeld || keyboardSecondAxis != GizmoAxis.None ? GizmoHandleKind.MovePlane : GizmoHandleKind.Move;
             // Changing constraint starts at the original operation pose. Camera
             // rebasing still retains the preview; it is a different operation.
             dragTranslation = Vector3.zero;
@@ -1760,8 +1741,8 @@ namespace OstrixMods.BuildWorks
             }
             else if (dragHandle == GizmoHandleKind.Move)
             {
-                float delta = Vector2.Dot(mouse - dragStartMouse, dragScreenDirection) * dragWorldUnitsPerPixel;
-                if (!ShiftHeld) delta = Mathf.Round(delta / translationStep) * translationStep;
+                float delta = TransformKeyboardInput.AxisTranslation(mouse, dragStartMouse, dragScreenDirection,
+                    dragWorldUnitsPerPixel, translationStep, ShiftHeld);
                 keyboardValid = dragScreenDirection.sqrMagnitude > .01f;
                 dragTranslation = keyboardBaseTranslation + dragAxisWorld * delta;
             }
@@ -1793,62 +1774,29 @@ namespace OstrixMods.BuildWorks
             }
             else if (dragHandle == GizmoHandleKind.Scale)
             {
-                float percent = mouse.y - dragStartMouse.y;
-                if (!ShiftHeld) percent = Mathf.Round(percent / view.ScaleStepPercent) * view.ScaleStepPercent;
-                dragScale = ClampMouseScale(keyboardBaseScale * Mathf.Max(.001f, 1f + percent * .01f));
+                dragScale = ClampMouseScale(TransformKeyboardInput.MouseScale(mouse, dragStartMouse,
+                    keyboardBaseScale, view.ScaleStepPercent, ShiftHeld));
             }
             if (PreviewKeyboardPose()) UpdateGizmo();
         }
 
-        private Vector3 KeyboardAxisMask => TransformGizmoView.AxisVector(dragAxis, Quaternion.identity, false) +
-            (keyboardSecondAxis == GizmoAxis.None ? Vector3.zero :
-                TransformGizmoView.AxisVector(keyboardSecondAxis, Quaternion.identity, false));
+        private Vector3 KeyboardAxisMask => TransformKeyboardInput.AxisMask(dragAxis, keyboardSecondAxis);
 
-        private Vector3 DragScaleVector => dragHandle == GizmoHandleKind.Scale && dragAxis != GizmoAxis.None
-            ? Vector3.one + KeyboardAxisMask * (dragScale - 1f)
-            : Vector3.one * dragScale;
+        private Vector3 DragScaleVector => TransformKeyboardInput.ScaleVector(dragHandle, dragAxis, keyboardSecondAxis, dragScale);
 
-        private Quaternion DragScaleFrame => keyboardPreview && dragHandle == GizmoHandleKind.Scale &&
-            dragAxis != GizmoAxis.None && localSpace ? keyboardOrientation : Quaternion.identity;
+        private Quaternion DragScaleFrame => keyboardPreview
+            ? TransformKeyboardInput.ScaleFrame(dragHandle, dragAxis, localSpace, keyboardOrientation) : Quaternion.identity;
 
         private float ClampMouseScale(float requested)
         {
-            double minimum = float.Epsilon, maximum = float.MaxValue;
-            Vector3 mask = keyboardPreview && dragAxis != GizmoAxis.None
-                ? KeyboardAxisMask : Vector3.one;
-            Quaternion inverseFrame = Quaternion.Inverse(DragScaleFrame);
             var selected = new HashSet<string>(dragIds, StringComparer.Ordinal);
-            foreach (BlueprintEditorPart part in document.Parts)
-            {
-                if (!selected.Contains(part.StableId)) continue;
-                Quaternion local = inverseFrame * ToQuaternion(part.Rotation);
-                Limit(part.Scale.X, part.BaseScale?.X ?? 1, local * Vector3.right, part.ScaleIsAbsolute);
-                Limit(part.Scale.Y, part.BaseScale?.Y ?? 1, local * Vector3.up, part.ScaleIsAbsolute);
-                Limit(part.Scale.Z, part.BaseScale?.Z ?? 1, local * Vector3.forward, part.ScaleIsAbsolute);
-            }
-            return (float)Math.Max(minimum, Math.Min(maximum, requested));
-
-            void Limit(double current, double basis, Vector3 axis, bool absolute)
-            {
-                double weight = mask == Vector3.one ? 1 :
-                    mask.x * axis.x * axis.x + mask.y * axis.y * axis.y + mask.z * axis.z * axis.z;
-                if (weight == 0) return;
-                // Same projected multiplier as TransformPart; shear is still rejected there.
-                double lower = absolute ? float.Epsilon : BlueprintEditorDocument.MinimumScale;
-                double upper = absolute ? float.MaxValue : BlueprintEditorDocument.MaximumScale;
-                lower = Math.Max(lower, float.Epsilon / basis);
-                upper = Math.Min(upper, float.MaxValue / basis);
-                // Ignore only float-axis noise whose worst relative-scale contribution fits boundary roundoff.
-                double worstFactor = 3 * BlueprintEditorDocument.MaximumScale / BlueprintEditorDocument.MinimumScale + 1;
-                if (!absolute && lower == BlueprintEditorDocument.MinimumScale && upper == BlueprintEditorDocument.MaximumScale &&
-                    weight * worstFactor < BlueprintEditorDocument.ScaleBoundaryRelativeTolerance * .5) return;
-                minimum = Math.Max(minimum, 1 + (lower / current - 1) / weight);
-                maximum = Math.Min(maximum, 1 + (upper / current - 1) / weight);
-            }
+            return TransformKeyboardInput.ClampMouseScale(requested,
+                document.Parts.Where(part => selected.Contains(part.StableId)),
+                keyboardPreview && dragAxis != GizmoAxis.None ? KeyboardAxisMask : Vector3.one, DragScaleFrame);
         }
 
-        private Vector3 TransformDragPoint(Vector3 point) => dragPivot + dragRotation *
-            (DragScaleFrame * Vector3.Scale(Quaternion.Inverse(DragScaleFrame) * (point - dragPivot), DragScaleVector)) + dragTranslation;
+        private Vector3 TransformDragPoint(Vector3 point) => TransformKeyboardInput.TransformPoint(
+            point, dragPivot, dragTranslation, dragRotation, DragScaleVector, DragScaleFrame);
 
         private bool PreviewKeyboardPose()
         {
@@ -1873,48 +1821,16 @@ namespace OstrixMods.BuildWorks
         private void ReadKeyboardNumber()
         {
             string previous = keyboardNumber;
-            foreach (char character in input.InputString ?? "")
-            {
-                if (character == '\b')
-                    keyboardNumber = keyboardNumber.Length == 0 ? "" : keyboardNumber.Substring(0, keyboardNumber.Length - 1);
-                else if (keyboardNumber.Length < 32 &&
-                    (character >= '0' && character <= '9' || character == '-' || character == '.' || character == ','))
-                    keyboardNumber += character;
-            }
-            if (input.GetKeyDown(KeyCode.Delete)) keyboardNumber = "";
+            keyboardNumber = TransformKeyboardInput.ReadNumber(keyboardNumber, input.InputString, input.GetKeyDown(KeyCode.Delete));
             if (previous.Length > 0 && keyboardNumber.Length == 0)
                 RebaseKeyboardPreview(input.MousePosition);
         }
 
         private void PreviewKeyboardNumber()
         {
-            // Numeric values replace the entire mouse delta. The document/pivot stay
-            // unchanged throughout the preview, even when camera navigation rebases input.
-            float value = 0f;
-            keyboardValid = !keyboardNumber.EndsWith(".", StringComparison.Ordinal) &&
-                !keyboardNumber.EndsWith(",", StringComparison.Ordinal) &&
-                float.TryParse(keyboardNumber.Replace(',', '.'), NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
-                    CultureInfo.InvariantCulture, out value) && !float.IsNaN(value) && !float.IsInfinity(value);
-            if (!keyboardValid) return;
-            Vector3 axis = dragAxis == GizmoAxis.None ? keyboardStartViewAxis :
-                TransformGizmoView.AxisVector(dragAxis, keyboardOrientation, localSpace);
-            Vector3 translation = Vector3.zero;
-            Quaternion rotation = Quaternion.identity;
-            float scale = 1f;
-            if (dragHandle == GizmoHandleKind.Rotate)
-                rotation = Quaternion.AngleAxis(value, axis);
-            else if (dragHandle == GizmoHandleKind.Scale)
-            {
-                scale = value;
-                keyboardValid = scale > 0f;
-            }
-            else
-            {
-                bool pair = dragHandle == GizmoHandleKind.MovePlane && keyboardSecondAxis != GizmoAxis.None;
-                keyboardValid = dragAxis != GizmoAxis.None && (dragHandle == GizmoHandleKind.Move || pair);
-                translation = (pair ? axis + TransformGizmoView.AxisVector(keyboardSecondAxis, keyboardOrientation, localSpace) : axis) * value;
-                keyboardValid &= IsFinite(translation.sqrMagnitude);
-            }
+            keyboardValid = TransformKeyboardInput.TryNumber(dragHandle, dragAxis, keyboardSecondAxis,
+                keyboardOrientation, localSpace, keyboardStartViewAxis, keyboardNumber,
+                out Vector3 translation, out Quaternion rotation, out float scale);
             if (!keyboardValid) return;
             dragTranslation = translation;
             dragRotation = rotation;
@@ -2414,24 +2330,8 @@ namespace OstrixMods.BuildWorks
             return added;
         }
 
-        private bool TryRotationDirection(
-            Vector2 mouse,
-            Vector3 pivot,
-            Vector3 axis,
-            out Vector3 direction)
-        {
-            Ray ray = scene.Camera.ScreenPointToRay(mouse);
-            Plane plane = new Plane(axis, pivot);
-            if (!plane.Raycast(ray, out float distance))
-            {
-                direction = Vector3.zero;
-                return false;
-            }
-            direction = ray.GetPoint(distance) - pivot;
-            if (direction.sqrMagnitude < 0.000001f) return false;
-            direction.Normalize();
-            return true;
-        }
+        private bool TryRotationDirection(Vector2 mouse, Vector3 pivot, Vector3 axis, out Vector3 direction)
+            => TransformKeyboardInput.TryRotationDirection(scene.Camera, mouse, pivot, axis, out direction);
 
         private void SetActiveTool(BlueprintEditorTool tool)
         {
